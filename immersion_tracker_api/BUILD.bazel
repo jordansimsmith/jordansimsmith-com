@@ -1,0 +1,19 @@
+load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
+
+java_binary(
+    name = "api",
+    srcs = glob(["src/main/java/**/*.java"]),
+    main_class = "com.jordansimsmith.immersiontracker.Main"
+)
+
+java_test_suite(
+    name = "unit-tests",
+    size = "small",
+    srcs = glob(["src/test/java/**/*.java"]),
+    runner = "junit5",
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        ":api",
+        "@maven//:org_junit_jupiter_junit_jupiter_api"
+    ]
+)
