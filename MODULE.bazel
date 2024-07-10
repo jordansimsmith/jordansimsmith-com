@@ -10,9 +10,29 @@ maven.install(
         "org.junit.platform:junit-platform-reporting:1.10.3",
         "org.junit.jupiter:junit-jupiter-api:5.10.3",
         "org.junit.jupiter:junit-jupiter-params:5.10.3",
-        "org.junit.jupiter:junit-jupiter-engine:5.10.3"
+        "org.junit.jupiter:junit-jupiter-engine:5.10.3",
+        "org.testcontainers:testcontainers:1.19.8",
+        "org.testcontainers:junit-jupiter:1.19.8",
+        "org.slf4j:slf4j-api:2.0.13",
+        "ch.qos.logback:logback-core:1.5.6",
+        "ch.qos.logback:logback-classic:1.5.6",
+        "org.assertj:assertj-core:3.26.0",
+        "com.github.docker-java:docker-java-api:3.3.6",
     ]
 )
 use_repo(maven, "maven")
 
 bazel_dep(name = "contrib_rules_jvm", version = "0.27.0")
+
+bazel_dep(name = "rules_oci", version = "2.0.0-beta1")
+oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
+oci.pull(
+    name = "dynamodb",
+    tag = "2.5.2",
+    image = "docker.io/amazon/dynamodb-local",
+    platforms = [
+        "linux/amd64",
+        "linux/arm64"
+    ],
+)
+use_repo(oci, "dynamodb")

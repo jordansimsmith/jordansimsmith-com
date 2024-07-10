@@ -1,4 +1,5 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 
 java_binary(
     name = "api",
@@ -6,14 +7,39 @@ java_binary(
     main_class = "com.jordansimsmith.immersiontracker.Main"
 )
 
+oci_image(
+    name = "dynamodb-image",
+    base = "@dynamodb//:dynamodb"
+)
+
+oci_load(
+    name = "dynamodb-load",
+    image = ":dynamodb-image",
+    repo_tags = [
+        "bazel/dynamodb:latest"
+    ]
+)
+
 java_test_suite(
-    name = "unit-tests",
-    size = "small",
+    name = "integration-tests",
+    size = "medium",
     srcs = glob(["src/test/java/**/*.java"]),
+    test_suffixes = ["IntegrationTest.java"],
+    resources = glob(["src/test/resources/**/*"]),
+    data = [
+        ":dynamodb-load"
+    ],
     runner = "junit5",
     runtime_deps = JUNIT5_DEPS,
     deps = [
         ":api",
-        "@maven//:org_junit_jupiter_junit_jupiter_api"
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_testcontainers_testcontainers",
+        "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:com_github_docker_java_docker_java_api",
     ]
 )
