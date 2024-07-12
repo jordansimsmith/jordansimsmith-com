@@ -40,3 +40,11 @@ oci.pull(
     tag = "2.5.2",
 )
 use_repo(oci, "dynamodb", "dynamodb_linux_amd64", "dynamodb_linux_arm64")
+
+bazel_dep(name = "aspect_rules_lint", version = "0.21.0")
+http_jar = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_jar")
+http_jar(
+    name = "google_java_format",
+    url = "https://github.com/google/google-java-format/releases/download/v1.17.0/google-java-format-1.17.0-all-deps.jar",
+    sha256 = "33068bbbdce1099982ec1171f5e202898eb35f2919cf486141e439fc6e3a4203",
+)

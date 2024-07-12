@@ -1,10 +1,8 @@
 name: Build
-
 on:
   push:
     branches:
       - master
-
 jobs:
   build:
     name: Build
@@ -12,18 +10,14 @@ jobs:
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
-
       - name: Setup bazel
         uses: bazelbuild/setup-bazelisk@v3
-
       - name: Mount bazel cache
         uses: actions/cache@v4
         with:
           path: ~/.cache/bazel
           key: bazel
-
       - name: Bazel build
         run: bazel build //...
-
       - name: Bazel test
         run: bazel test //...
