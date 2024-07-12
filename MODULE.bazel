@@ -1,8 +1,9 @@
 module(
-    name = "com_jordansimsmith"
+    name = "com_jordansimsmith",
 )
 
 bazel_dep(name = "rules_jvm_external", version = "6.1")
+
 maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
 maven.install(
     artifacts = [
@@ -18,21 +19,24 @@ maven.install(
         "ch.qos.logback:logback-classic:1.5.6",
         "org.assertj:assertj-core:3.26.0",
         "com.github.docker-java:docker-java-api:3.3.6",
-    ]
+        "software.amazon.awssdk:bom:2.26.19",
+        "software.amazon.awssdk:dynamodb:2.26.19",
+        "software.amazon.awssdk:dynamodb-enhanced:2.26.19",
+    ],
 )
 use_repo(maven, "maven")
 
 bazel_dep(name = "contrib_rules_jvm", version = "0.27.0")
-
 bazel_dep(name = "rules_oci", version = "2.0.0-beta1")
+
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 oci.pull(
     name = "dynamodb",
-    tag = "2.5.2",
     image = "docker.io/amazon/dynamodb-local",
     platforms = [
         "linux/amd64",
-        "linux/arm64"
+        "linux/arm64",
     ],
+    tag = "2.5.2",
 )
-use_repo(oci, "dynamodb")
+use_repo(oci, "dynamodb", "dynamodb_linux_amd64", "dynamodb_linux_arm64")
