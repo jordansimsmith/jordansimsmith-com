@@ -40,7 +40,16 @@ oci.pull(
     ],
     tag = "2.5.2",
 )
-use_repo(oci, "dynamodb", "dynamodb_linux_amd64", "dynamodb_linux_arm64")
+oci.pull(
+    name = "ryuk",
+    image = "docker.io/testcontainers/ryuk",
+    platforms = [
+        "linux/amd64",
+        "linux/arm64",
+    ],
+    tag = "0.6.0",
+)
+use_repo(oci, "dynamodb", "dynamodb_linux_amd64", "dynamodb_linux_arm64", "ryuk", "ryuk_linux_amd64", "ryuk_linux_arm64")
 
 bazel_dep(name = "aspect_rules_lint", version = "0.21.0")
 

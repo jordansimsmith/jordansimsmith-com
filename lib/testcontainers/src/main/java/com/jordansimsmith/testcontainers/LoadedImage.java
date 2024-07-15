@@ -2,19 +2,11 @@ package com.jordansimsmith.testcontainers;
 
 import com.google.common.base.Preconditions;
 import java.io.IOException;
-import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.utility.DockerImageName;
 import org.testcontainers.utility.TestcontainersConfiguration;
 
-class LoadedContainer<SELF extends LoadedContainer<SELF>> extends GenericContainer<SELF> {
-
-  public LoadedContainer(String imageKey, String loaderKey) {
-    super(loadImage(imageKey, loaderKey));
-
-    this.withImagePullPolicy(image -> false);
-  }
-
-  private static DockerImageName loadImage(String imageKey, String loaderKey) {
+public class LoadedImage {
+  public static DockerImageName loadImage(String imageKey, String loaderKey) {
     var image =
         TestcontainersConfiguration.getInstance().getClasspathProperties().getProperty(imageKey);
     var loader =
