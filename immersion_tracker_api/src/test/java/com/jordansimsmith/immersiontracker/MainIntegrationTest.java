@@ -2,13 +2,10 @@ package com.jordansimsmith.immersiontracker;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import java.io.IOException;
-import java.net.URI;
+import com.jordansimsmith.testcontainers.DynamoDbContainer;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.*;
@@ -16,39 +13,14 @@ import software.amazon.awssdk.services.dynamodb.model.*;
 @Testcontainers
 public class MainIntegrationTest {
 
-  private static final int DYNAMODB_PORT = 8000;
-
-  // TODO: move to DynamoDbContainer in separate bazel target
-  static GenericContainer<?> getDynamoDb() {
-    try {
-      // TODO: configure install script location from properties
-      var builder = new ProcessBuilder("immersion_tracker_api/dynamodb-load.sh");
-      builder.redirectErrorStream(true);
-      var process = builder.start();
-      var code = process.waitFor();
-      if (code != 0) {
-        throw new RuntimeException("unsuccessful load");
-      }
-    } catch (IOException | InterruptedException e) {
-      throw new RuntimeException(e);
-    }
-
-    // TODO: configure image name from properties
-    return new GenericContainer(DockerImageName.parse("bazel/dynamodb:latest"))
-        .withExposedPorts(DYNAMODB_PORT)
-        .withImagePullPolicy(image -> false);
-  }
-
-  @Container GenericContainer<?> dynamodb = getDynamoDb();
+  @Container DynamoDbContainer dynamodb = new DynamoDbContainer();
 
   @Test
   void test() throws Exception {
     assertThat(dynamodb.isRunning()).isTrue();
     assertThat(dynamodb.getHost()).isEqualTo("localhost");
 
-    var endpoint =
-        new URI(
-            "http://%s:%d".formatted(dynamodb.getHost(), dynamodb.getMappedPort(DYNAMODB_PORT)));
+    var endpoint = dynamodb.getEndpoint();
 
     var client = DynamoDbClient.builder().endpointOverride(endpoint).build();
     var enhancedClient = DynamoDbEnhancedClient.builder().dynamoDbClient(client).build();
