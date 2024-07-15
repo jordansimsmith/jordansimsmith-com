@@ -2,35 +2,35 @@ load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 
 oci_image(
     name = "dynamodb-image",
-    base = "@dynamodb//:dynamodb"
+    base = "@dynamodb//:dynamodb",
 )
 
 oci_load(
     name = "dynamodb-load",
     image = ":dynamodb-image",
     repo_tags = [
-        "bazel/dynamodb:dynamodb"
-    ]
+        "bazel/dynamodb:dynamodb",
+    ],
 )
 
 java_library(
     name = "lib",
-    visibility = [
-        "//visibility:public"
-    ],
     srcs = glob(["src/main/java/**/*.java"]),
+    data = [
+        ":dynamodb-load",
+    ],
     resources = glob([
         "src/main/resources/**/*.properties",
         "src/main/resources/logback-test.xml",
     ]),
-    data = [
-        ":dynamodb-load"
+    visibility = [
+        "//visibility:public",
     ],
     deps = [
-        "@maven//:org_testcontainers_testcontainers",
-        "@maven//:org_slf4j_slf4j_api",
-        "@maven//:ch_qos_logback_logback_core",
         "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:org_testcontainers_testcontainers",
     ],
 )

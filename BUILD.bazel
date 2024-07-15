@@ -1,4 +1,4 @@
 alias(
     name = "format",
-    actual = "//tools/format:format"
+    actual = "//tools/format:format",
 )
