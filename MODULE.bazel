@@ -23,6 +23,7 @@ maven.install(
         "software.amazon.awssdk:dynamodb:2.26.19",
         "software.amazon.awssdk:dynamodb-enhanced:2.26.19",
         "com.google.guava:guava:33.2.1-jre",
+        "com.amazonaws:aws-lambda-java-core:1.2.3",
     ],
 )
 use_repo(maven, "maven")
@@ -51,7 +52,7 @@ oci.pull(
 )
 use_repo(oci, "dynamodb", "dynamodb_linux_amd64", "dynamodb_linux_arm64", "ryuk", "ryuk_linux_amd64", "ryuk_linux_arm64")
 
-bazel_dep(name = "aspect_rules_lint", version = "0.21.0")
+bazel_dep(name = "aspect_rules_lint", version = "1.0.0-rc8")
 
 http_jar = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_jar")
 

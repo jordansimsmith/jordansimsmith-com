@@ -19,6 +19,7 @@ format_multirun(
     name = "format",
     java = ":java-format",
     starlark = "@buildifier_prebuilt//:buildifier",
+    terraform = "@aspect_rules_lint//format:terraform",
     visibility = [
         "//:__pkg__",
     ],

@@ -1,3 +1,6 @@
 bazel-*
 .ijwb/
 .idea/
+**/.terraform/
+**/*.tfstate
+**/*.tfstate.backup

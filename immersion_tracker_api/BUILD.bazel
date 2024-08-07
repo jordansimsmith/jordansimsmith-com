@@ -1,9 +1,12 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 
 java_binary(
-    name = "api",
-    srcs = glob(["src/main/java/**/*.java"]),
-    main_class = "com.jordansimsmith.immersiontracker.Main",
+    name = "get-progress-handler",
+    srcs = glob(["src/main/java/com/jordansimsmith/immersiontracker/GetProgressHandler.java"]),
+    create_executable = False,
+    deps = [
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+    ],
 )
 
 java_test_suite(
@@ -13,14 +16,13 @@ java_test_suite(
     env = {
         "AWS_ACCESS_KEY_ID": "fake",
         "AWS_SECRET_ACCESS_KEY": "fake",
-        "AWS_REGION": "ap-southeast-1",
+        "AWS_REGION": "ap-southeast-2",
     },
     resources = glob(["src/test/resources/**/*.properties"]),
     runner = "junit5",
     test_suffixes = ["IntegrationTest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
-        ":api",
         "//lib/testcontainers:lib",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
