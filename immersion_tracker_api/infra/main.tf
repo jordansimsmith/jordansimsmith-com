@@ -1,4 +1,10 @@
 terraform {
+  backend "s3" {
+    bucket = "jordansimsmith-terraform"
+    key    = "immersion_tracker_api/infra/terraform.tfstate"
+    region = "ap-southeast-2"
+  }
+
   required_providers {
     aws = {
       source  = "hashicorp/aws"
