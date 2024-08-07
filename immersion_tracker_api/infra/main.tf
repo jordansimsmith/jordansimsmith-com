@@ -55,6 +55,6 @@ resource "aws_lambda_function" "get_progress_handler_lambda" {
   role             = aws_iam_role.lambda_role.arn
   source_code_hash = data.local_file.get_progress_handler_file.content_base64sha256
   handler          = "com.jordansimsmith.immersiontracker.GetProgressHandler"
-  runtime          = "java21"
+  runtime          = "java17"
 }
 
