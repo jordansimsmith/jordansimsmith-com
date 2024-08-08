@@ -1290,7 +1290,7 @@
     "@@rules_jvm_external~//:extensions.bzl%maven": {
       "general": {
         "bzlTransitiveDigest": "Pq3YnJEflPAALx/UMykUnN3aA5bve0fNm/cuLvt/zvI=",
-        "usagesDigest": "s0eL47jL2r0N07wKfYiHIg2drG57rlfxt5BqjckYZEE=",
+        "usagesDigest": "xwPbWH6yakHmlR8DAMxHCjXY30aL2XbAaDztxrDcAJM=",
         "recordedFileInputs": {
           "@@rules_jvm_external~//rules_jvm_external_deps_install.json": "0bfbc915d9155df44d7a3b216e8f3c1fbcd110e358dd07637dc393583a5227e8",
           "@@contrib_rules_jvm~//contrib_rules_jvm_deps_install.json": "c65d8722c471d3b75be39f94e3c4a6ce19c4e377e96cb9b28746ac559f6267de"
@@ -6672,6 +6672,9 @@
                 "{ \"group\": \"software.amazon.awssdk\", \"artifact\": \"dynamodb-enhanced\", \"version\": \"2.26.19\" }",
                 "{ \"group\": \"com.google.guava\", \"artifact\": \"guava\", \"version\": \"33.2.1-jre\" }",
                 "{ \"group\": \"com.amazonaws\", \"artifact\": \"aws-lambda-java-core\", \"version\": \"1.2.3\" }",
+                "{ \"group\": \"com.google.dagger\", \"artifact\": \"dagger\", \"version\": \"2.52\" }",
+                "{ \"group\": \"com.google.dagger\", \"artifact\": \"dagger-compiler\", \"version\": \"2.52\" }",
+                "{ \"group\": \"com.google.dagger\", \"artifact\": \"dagger-producers\", \"version\": \"2.52\" }",
                 "{ \"group\": \"com.google.code.findbugs\", \"artifact\": \"jsr305\", \"version\": \"3.0.2\" }",
                 "{ \"group\": \"com.google.code.gson\", \"artifact\": \"gson\", \"version\": \"2.8.9\" }",
                 "{ \"group\": \"com.google.errorprone\", \"artifact\": \"error_prone_annotations\", \"version\": \"2.3.2\" }",

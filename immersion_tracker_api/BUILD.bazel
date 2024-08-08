@@ -1,10 +1,27 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
+load("@dagger//:workspace_defs.bzl", "dagger_rules")
+
+dagger_rules()
+
+HANDLERS = glob(["src/main/java/**/*Handler.java"])
+
+java_library(
+    name = "lib",
+    srcs = glob(
+        ["src/main/java/**/*.java"],
+        exclude = HANDLERS,
+    ),
+    deps = [
+        ":dagger",
+    ],
+)
 
 java_binary(
     name = "get-progress-handler",
     srcs = glob(["src/main/java/com/jordansimsmith/immersiontracker/GetProgressHandler.java"]),
     create_executable = False,
     deps = [
+        ":lib",
         "@maven//:com_amazonaws_aws_lambda_java_core",
     ],
 )
