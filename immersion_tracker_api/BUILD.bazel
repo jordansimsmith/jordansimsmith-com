@@ -13,6 +13,10 @@ java_library(
     ),
     deps = [
         ":dagger",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
     ],
 )
 
@@ -23,6 +27,9 @@ java_binary(
     deps = [
         ":lib",
         "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_google_guava_guava",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
     ],
 )
 
@@ -40,7 +47,10 @@ java_test_suite(
     test_suffixes = ["IntegrationTest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":get-progress-handler",
+        ":lib",
         "//lib/testcontainers:lib",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
         "@maven//:org_testcontainers_junit_jupiter",
