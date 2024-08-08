@@ -4,6 +4,7 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.google.common.annotations.VisibleForTesting;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
+import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
 public class GetProgressHandler implements RequestHandler<Object, String> {
@@ -22,6 +23,10 @@ public class GetProgressHandler implements RequestHandler<Object, String> {
 
   @Override
   public String handleRequest(Object s, Context context) {
-    return dynamoDbClient.listTables().toString();
+
+    var schema = TableSchema.fromBean(ImmersionTrackerRecord.class);
+    var table = dynamoDbEnhancedClient.table("immersion_tracker", schema);
+
+    return table.scan().items().stream().toList().toString();
   }
 }

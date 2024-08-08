@@ -30,18 +30,20 @@ public class GetProgressHandlerIntegrationTest {
 
     var req =
         CreateTableRequest.builder()
-            .tableName("my_table")
-            .keySchema(KeySchemaElement.builder().keyType(KeyType.HASH).attributeName("pk").build())
+            .tableName("immersion_tracker")
+            .keySchema(
+                KeySchemaElement.builder().keyType(KeyType.HASH).attributeName("pk").build(),
+                KeySchemaElement.builder().keyType(KeyType.RANGE).attributeName("sk").build())
             .attributeDefinitions(
                 AttributeDefinition.builder()
                     .attributeName("pk")
                     .attributeType(ScalarAttributeType.S)
+                    .build(),
+                AttributeDefinition.builder()
+                    .attributeName("sk")
+                    .attributeType(ScalarAttributeType.S)
                     .build())
-            .provisionedThroughput(
-                ProvisionedThroughput.builder()
-                    .readCapacityUnits(1L)
-                    .writeCapacityUnits(1L)
-                    .build())
+            .billingMode(BillingMode.PAY_PER_REQUEST)
             .build();
     dynamodbClient.createTable(req);
 
@@ -52,13 +54,17 @@ public class GetProgressHandlerIntegrationTest {
 
   @Test
   void test1() {
-    getProgressHandler.handleRequest(null, null);
-    assertThat(dynamodbClient.listTables().tableNames()).contains("my_table");
+    assertThat(dynamodbClient.listTables().tableNames()).contains("immersion_tracker");
+
+    var res = getProgressHandler.handleRequest(null, null);
+    assertThat(res).isEqualTo("[]");
   }
 
   @Test
   void test2() {
-    getProgressHandler.handleRequest(null, null);
-    assertThat(dynamodbClient.listTables().tableNames()).doesNotContain("my_table_2");
+    assertThat(dynamodbClient.listTables().tableNames()).doesNotContain("my_nonexisting_table");
+
+    var res = getProgressHandler.handleRequest(null, null);
+    assertThat(res).isEqualTo("[]");
   }
 }

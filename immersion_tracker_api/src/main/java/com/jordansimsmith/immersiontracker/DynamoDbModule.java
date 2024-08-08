@@ -12,7 +12,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 public class DynamoDbModule {
 
   @Provides
-  public DynamoDbClient dynamoDbClient(@Nullable @Named("dynamoDbEndpoint") URI dynamoDbEndpoint) {
+  public DynamoDbClient dynamoDbClient(@Named("dynamoDbEndpoint") @Nullable URI dynamoDbEndpoint) {
     var builder = DynamoDbClient.builder();
     if (dynamoDbEndpoint != null) {
       builder.endpointOverride(dynamoDbEndpoint);

@@ -24,8 +24,13 @@ java_binary(
     name = "get-progress-handler",
     srcs = glob(["src/main/java/com/jordansimsmith/immersiontracker/GetProgressHandler.java"]),
     create_executable = False,
+    resources = glob([
+        "src/main/resources/logback.xml",
+    ]),
     deps = [
         ":lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
         "@maven//:com_google_guava_guava",
         "@maven//:software_amazon_awssdk_dynamodb",

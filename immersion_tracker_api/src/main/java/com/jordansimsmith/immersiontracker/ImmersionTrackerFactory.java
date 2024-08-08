@@ -3,6 +3,7 @@ package com.jordansimsmith.immersiontracker;
 import dagger.BindsInstance;
 import dagger.Component;
 import java.net.URI;
+import javax.annotation.Nullable;
 import javax.inject.Named;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -17,7 +18,7 @@ public interface ImmersionTrackerFactory {
   @Component.Builder
   interface Builder {
     @BindsInstance
-    Builder dynamoDbEndpoint(@Named("dynamoDbEndpoint") URI dynamoDbEndpoint);
+    Builder dynamoDbEndpoint(@Named("dynamoDbEndpoint") @Nullable URI dynamoDbEndpoint);
 
     ImmersionTrackerFactory build();
   }
