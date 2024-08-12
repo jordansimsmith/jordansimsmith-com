@@ -3,13 +3,13 @@ package com.jordansimsmith.immersiontracker;
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.google.common.annotations.VisibleForTesting;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
-import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import java.util.List;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
-public class GetProgressHandler implements RequestHandler<Object, String> {
-  private final DynamoDbClient dynamoDbClient;
-  private final DynamoDbEnhancedClient dynamoDbEnhancedClient;
+public class GetProgressHandler implements RequestHandler<Object, List<ImmersionTrackerItem>> {
+  private final DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable;
 
   public GetProgressHandler() {
     this(ImmersionTrackerFactory.create());
@@ -17,16 +17,23 @@ public class GetProgressHandler implements RequestHandler<Object, String> {
 
   @VisibleForTesting
   GetProgressHandler(ImmersionTrackerFactory factory) {
-    this.dynamoDbEnhancedClient = factory.dynamoDbEnhancedClient();
-    this.dynamoDbClient = factory.dynamoDbClient();
+    this.immersionTrackerTable = factory.immersionTrackerTable();
   }
 
   @Override
-  public String handleRequest(Object s, Context context) {
+  public List<ImmersionTrackerItem> handleRequest(Object s, Context context) {
 
-    var schema = TableSchema.fromBean(ImmersionTrackerRecord.class);
-    var table = dynamoDbEnhancedClient.table("immersion_tracker", schema);
+    // TODO: auth
+    var user = "jordansimsmith";
 
-    return table.scan().items().stream().toList().toString();
+    var query =
+        immersionTrackerTable.query(
+            QueryEnhancedRequest.builder()
+                .queryConditional(
+                    QueryConditional.keyEqualTo(
+                        b -> b.partitionValue(ImmersionTrackerItem.formatPk(user))))
+                .build());
+
+    return query.items().stream().toList();
   }
 }

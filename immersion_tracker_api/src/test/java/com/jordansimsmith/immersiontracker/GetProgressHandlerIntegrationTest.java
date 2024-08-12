@@ -7,15 +7,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.*;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.services.dynamodb.waiters.DynamoDbWaiter;
 
 @Testcontainers
 public class GetProgressHandlerIntegrationTest {
-
-  private DynamoDbClient dynamodbClient;
-  private DynamoDbEnhancedClient dynamoDbEnhancedClient;
+  private DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable;
 
   private GetProgressHandler getProgressHandler;
 
@@ -23,48 +20,41 @@ public class GetProgressHandlerIntegrationTest {
 
   @BeforeEach
   void setUp() {
-    dynamodbClient =
-        DynamoDbClient.builder().endpointOverride(dynamoDbContainer.getEndpoint()).build();
-    dynamoDbEnhancedClient =
-        DynamoDbEnhancedClient.builder().dynamoDbClient(dynamodbClient).build();
-
-    var req =
-        CreateTableRequest.builder()
-            .tableName("immersion_tracker")
-            .keySchema(
-                KeySchemaElement.builder().keyType(KeyType.HASH).attributeName("pk").build(),
-                KeySchemaElement.builder().keyType(KeyType.RANGE).attributeName("sk").build())
-            .attributeDefinitions(
-                AttributeDefinition.builder()
-                    .attributeName("pk")
-                    .attributeType(ScalarAttributeType.S)
-                    .build(),
-                AttributeDefinition.builder()
-                    .attributeName("sk")
-                    .attributeType(ScalarAttributeType.S)
-                    .build())
-            .billingMode(BillingMode.PAY_PER_REQUEST)
-            .build();
-    dynamodbClient.createTable(req);
-
     var factory =
         ImmersionTrackerFactory.builder().dynamoDbEndpoint(dynamoDbContainer.getEndpoint()).build();
+
+    var dynamoDbClient = factory.dynamoDbClient();
+    immersionTrackerTable = factory.immersionTrackerTable();
+    immersionTrackerTable.createTable();
+    try (var waiter = DynamoDbWaiter.builder().client(dynamoDbClient).build()) {
+      var res =
+          waiter
+              .waitUntilTableExists(b -> b.tableName(immersionTrackerTable.tableName()).build())
+              .matched();
+      res.response().orElseThrow();
+    }
+
     getProgressHandler = new GetProgressHandler(factory);
   }
 
   @Test
-  void test1() {
-    assertThat(dynamodbClient.listTables().tableNames()).contains("immersion_tracker");
+  void handleRequestShouldQueryItems() {
+    // arrange
+    var episode1 = ImmersionTrackerItem.createEpisode("jordansimsmith", "show1", "episode1", 123);
+    var episode2 = ImmersionTrackerItem.createEpisode("jordansimsmith", "show1", "episode2", 456);
+    var show = ImmersionTrackerItem.createShow("jordansimsmith", "show1");
 
+    immersionTrackerTable.putItem(episode1);
+    immersionTrackerTable.putItem(episode2);
+    immersionTrackerTable.putItem(show);
+
+    // act
     var res = getProgressHandler.handleRequest(null, null);
-    assertThat(res).isEqualTo("[]");
-  }
 
-  @Test
-  void test2() {
-    assertThat(dynamodbClient.listTables().tableNames()).doesNotContain("my_nonexisting_table");
-
-    var res = getProgressHandler.handleRequest(null, null);
-    assertThat(res).isEqualTo("[]");
+    // assert
+    assertThat(res).contains(episode1);
+    assertThat(res).contains(episode2);
+    assertThat(res).contains(show);
+    assertThat(res).hasSize(3);
   }
 }
