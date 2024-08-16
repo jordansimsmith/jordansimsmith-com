@@ -62,6 +62,12 @@ data "aws_iam_policy_document" "lambda_sts_allow_policy_document" {
   }
 }
 
+resource "aws_iam_role" "lambda_role" {
+  name               = "${local.application_id}_lambda_exec"
+  assume_role_policy = data.aws_iam_policy_document.lambda_sts_allow_policy_document.json
+  tags               = local.tags
+}
+
 data "aws_iam_policy_document" "lambda_dynamodb_allow_policy_document" {
   statement {
     effect = "Allow"
@@ -90,12 +96,6 @@ resource "aws_iam_policy" "lambda_dynamodb_allow_policy_document" {
   tags   = local.tags
 }
 
-resource "aws_iam_role" "lambda_role" {
-  name               = "${local.application_id}_lambda_exec"
-  assume_role_policy = data.aws_iam_policy_document.lambda_sts_allow_policy_document.json
-  tags               = local.tags
-}
-
 resource "aws_iam_role_policy_attachment" "lambda_policy_attachment" {
   role       = aws_iam_role.lambda_role.name
   policy_arn = aws_iam_policy.lambda_dynamodb_allow_policy_document.arn
@@ -113,9 +113,9 @@ data "local_file" "get_progress_handler_file" {
   filename = data.external.get_progress_handler_location.result.location
 }
 
-resource "aws_lambda_function" "get_progress_handler_lambda" {
+resource "aws_lambda_function" "get_progress" {
   filename         = data.local_file.get_progress_handler_file.filename
-  function_name    = "${local.application_id}_get_progress_handler"
+  function_name    = "${local.application_id}_get_progress"
   role             = aws_iam_role.lambda_role.arn
   source_code_hash = data.local_file.get_progress_handler_file.content_base64sha256
   handler          = "com.jordansimsmith.immersiontracker.GetProgressHandler"
@@ -125,3 +125,37 @@ resource "aws_lambda_function" "get_progress_handler_lambda" {
   tags             = local.tags
 }
 
+resource "aws_api_gateway_rest_api" "immersion_tracker" {
+  name = "${local.application_id}_gateway"
+  tags = local.tags
+}
+
+resource "aws_api_gateway_resource" "get_progress" {
+  rest_api_id = aws_api_gateway_rest_api.immersion_tracker.id
+  parent_id   = aws_api_gateway_rest_api.immersion_tracker.root_resource_id
+  path_part   = "progress"
+}
+
+resource "aws_api_gateway_method" "get_progress" {
+  rest_api_id   = aws_api_gateway_rest_api.immersion_tracker.id
+  resource_id   = aws_api_gateway_resource.get_progress.id
+  http_method   = "GET"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "get_progress" {
+  rest_api_id             = aws_api_gateway_rest_api.immersion_tracker.id
+  resource_id             = aws_api_gateway_resource.get_progress.id
+  http_method             = aws_api_gateway_method.get_progress.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.get_progress.invoke_arn
+}
+
+resource "aws_api_gateway_deployment" "immersion_tracker" {
+  depends_on = [
+    aws_api_gateway_integration.get_progress
+  ]
+
+  rest_api_id = aws_api_gateway_rest_api.immersion_tracker.id
+}
