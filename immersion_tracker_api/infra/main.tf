@@ -46,6 +46,8 @@ resource "aws_dynamodb_table" "immersion_tracker_table" {
     enabled = true
   }
 
+  deletion_protection_enabled = true
+
   tags = local.tags
 }
 
@@ -90,15 +92,20 @@ data "aws_iam_policy_document" "lambda_dynamodb_allow_policy_document" {
   }
 }
 
-resource "aws_iam_policy" "lambda_dynamodb_allow_policy_document" {
-  name   = "${local.application_id}_lambda_dynamodb_allow"
+resource "aws_iam_policy" "lambda_dynamodb" {
+  name   = "${local.application_id}_lambda_dynamodb"
   policy = data.aws_iam_policy_document.lambda_dynamodb_allow_policy_document.json
   tags   = local.tags
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_policy_attachment" {
+resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
   role       = aws_iam_role.lambda_role.name
-  policy_arn = aws_iam_policy.lambda_dynamodb_allow_policy_document.arn
+  policy_arn = aws_iam_policy.lambda_dynamodb.arn
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_basic" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
 data "external" "get_progress_handler_location" {
@@ -123,6 +130,16 @@ resource "aws_lambda_function" "get_progress" {
   memory_size      = 512
   timeout          = 10
   tags             = local.tags
+}
+
+resource "aws_lambda_permission" "api_gateway" {
+  for_each = toset([aws_lambda_function.get_progress.function_name])
+
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = each.key
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.immersion_tracker.execution_arn}/*/*"
 }
 
 resource "aws_api_gateway_rest_api" "immersion_tracker" {
@@ -153,9 +170,23 @@ resource "aws_api_gateway_integration" "get_progress" {
 }
 
 resource "aws_api_gateway_deployment" "immersion_tracker" {
-  depends_on = [
-    aws_api_gateway_integration.get_progress
-  ]
-
   rest_api_id = aws_api_gateway_rest_api.immersion_tracker.id
+
+  triggers = {
+    redeployment = sha1(jsonencode([
+      aws_api_gateway_resource.get_progress.id,
+      aws_api_gateway_method.get_progress.id,
+      aws_api_gateway_integration.get_progress.id,
+    ]))
+  }
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_api_gateway_stage" "prod" {
+  deployment_id = aws_api_gateway_deployment.immersion_tracker.id
+  rest_api_id   = aws_api_gateway_rest_api.immersion_tracker.id
+  stage_name    = "prod"
 }

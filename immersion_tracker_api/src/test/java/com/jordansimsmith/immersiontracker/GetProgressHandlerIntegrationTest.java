@@ -2,6 +2,7 @@ package com.jordansimsmith.immersiontracker;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.jordansimsmith.testcontainers.DynamoDbContainer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,12 +50,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(show);
 
     // act
-    var res = getProgressHandler.handleRequest(null, null);
+    var res = getProgressHandler.handleRequest(APIGatewayV2HTTPEvent.builder().build(), null);
 
     // assert
-    assertThat(res).contains(episode1);
-    assertThat(res).contains(episode2);
-    assertThat(res).contains(show);
-    assertThat(res).hasSize(3);
+    assertThat(res.getStatusCode()).isEqualTo(200);
+    assertThat(res.getBody()).contains(episode1.toString());
+    assertThat(res.getBody()).contains(episode2.toString());
+    assertThat(res.getBody()).contains(show.toString());
   }
 }

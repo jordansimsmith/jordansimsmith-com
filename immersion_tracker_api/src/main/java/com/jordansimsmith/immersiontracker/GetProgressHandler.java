@@ -2,13 +2,15 @@ package com.jordansimsmith.immersiontracker;
 
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
+import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
+import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.google.common.annotations.VisibleForTesting;
-import java.util.List;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
-public class GetProgressHandler implements RequestHandler<Object, List<ImmersionTrackerItem>> {
+public class GetProgressHandler
+    implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
   private final DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable;
 
   public GetProgressHandler() {
@@ -21,8 +23,7 @@ public class GetProgressHandler implements RequestHandler<Object, List<Immersion
   }
 
   @Override
-  public List<ImmersionTrackerItem> handleRequest(Object s, Context context) {
-
+  public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     // TODO: auth
     var user = "jordansimsmith";
 
@@ -34,6 +35,11 @@ public class GetProgressHandler implements RequestHandler<Object, List<Immersion
                         b -> b.partitionValue(ImmersionTrackerItem.formatPk(user))))
                 .build());
 
-    return query.items().stream().toList();
+    var items = query.items().stream().toList();
+
+    return APIGatewayV2HTTPResponse.builder()
+        .withStatusCode(200)
+        .withBody(items.toString())
+        .build();
   }
 }
