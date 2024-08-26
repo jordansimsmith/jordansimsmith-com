@@ -1,5 +1,6 @@
 package com.jordansimsmith.immersiontracker;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import dagger.Module;
 import dagger.Provides;
 import java.net.URI;
@@ -12,7 +13,11 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
 @Module
-public class DynamoDbModule {
+public class ImmersionTrackerModule {
+  @Provides
+  public ObjectMapper objectMapper() {
+    return new ObjectMapper();
+  }
 
   @Provides
   @Singleton

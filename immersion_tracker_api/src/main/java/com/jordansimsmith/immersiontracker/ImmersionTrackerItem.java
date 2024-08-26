@@ -8,6 +8,11 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortK
 
 @DynamoDbBean
 public class ImmersionTrackerItem {
+  public static final String DELIMITER = "#";
+  public static final String USER_PREFIX = "USER" + DELIMITER;
+  public static final String EPISODE_PREFIX = "EPISODE" + DELIMITER;
+  public static final String SHOW_PREFIX = "SHOW" + DELIMITER;
+
   private String pk;
   private String sk;
   private String user;
@@ -153,15 +158,15 @@ public class ImmersionTrackerItem {
   }
 
   public static String formatPk(String user) {
-    return "USER#" + user;
+    return USER_PREFIX + user;
   }
 
   public static String formatEpisodeSk(String folderName, String fileName) {
-    return "EPISODE#" + folderName + "#" + fileName;
+    return EPISODE_PREFIX + folderName + DELIMITER + fileName;
   }
 
   public static String formatShowSk(String folderName) {
-    return "SHOW#" + folderName;
+    return SHOW_PREFIX + folderName;
   }
 
   public static ImmersionTrackerItem createEpisode(
@@ -180,6 +185,7 @@ public class ImmersionTrackerItem {
     var show = new ImmersionTrackerItem();
     show.setPk(formatPk(user));
     show.setSk(formatShowSk(folderName));
+    show.setFolderName(folderName);
     show.setUser(user);
     return show;
   }

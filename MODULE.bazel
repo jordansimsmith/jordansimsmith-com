@@ -37,6 +37,9 @@ maven.install(
         "com.google.dagger:dagger:2.52",
         "com.google.dagger:dagger-compiler:2.52",
         "com.google.dagger:dagger-producers:2.52",
+        "com.fasterxml.jackson.core:jackson-annotations:2.17.2",
+        "com.fasterxml.jackson.core:jackson-core:2.17.2",
+        "com.fasterxml.jackson.core:jackson-databind:2.17.2",
     ],
 )
 use_repo(maven, "maven")
