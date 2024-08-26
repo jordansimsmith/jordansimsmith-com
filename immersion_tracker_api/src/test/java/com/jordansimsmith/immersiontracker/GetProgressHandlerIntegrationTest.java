@@ -1,8 +1,11 @@
 package com.jordansimsmith.immersiontracker;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.testcontainers.DynamoDbContainer;
+import com.jordansimsmith.time.FakeClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
@@ -10,29 +13,31 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.services.dynamodb.waiters.DynamoDbWaiter;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 @Testcontainers
 public class GetProgressHandlerIntegrationTest {
+  private FakeClock fakeClock;
   private ObjectMapper objectMapper;
   private DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable;
 
   private GetProgressHandler getProgressHandler;
 
-  @Container
-  DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
+  @Container DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
   @BeforeEach
   void setUp() {
-    var factory = ImmersionTrackerFactory.builder().dynamoDbEndpoint(dynamoDbContainer.getEndpoint()).build();
+    var factory = ImmersionTrackerTestFactory.create(dynamoDbContainer.getEndpoint());
 
+    fakeClock = factory.fakeClock();
     objectMapper = factory.objectMapper();
 
     var dynamoDbClient = factory.dynamoDbClient();
     immersionTrackerTable = factory.immersionTrackerTable();
     immersionTrackerTable.createTable();
     try (var waiter = DynamoDbWaiter.builder().client(dynamoDbClient).build()) {
-      var res = waiter.waitUntilTableExists(b -> b.tableName(immersionTrackerTable.tableName()).build()).matched();
+      var res =
+          waiter
+              .waitUntilTableExists(b -> b.tableName(immersionTrackerTable.tableName()).build())
+              .matched();
       res.response().orElseThrow();
     }
 
@@ -40,11 +45,15 @@ public class GetProgressHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldQueryItems() throws Exception {
+  void handleRequestShouldCalculateProgress() throws Exception {
     // arrange
-    var episode1 = ImmersionTrackerItem.createEpisode("jordansimsmith", "show1", "episode1", 123);
-    var episode2 = ImmersionTrackerItem.createEpisode("jordansimsmith", "show1", "episode2", 456);
-    var episode3 = ImmersionTrackerItem.createEpisode("jordansimsmith", "show2", "episode1", 789);
+    var now = (int) fakeClock.now().atZone(GetProgressHandler.ZONE_ID).toInstant().getEpochSecond();
+    var episode1 =
+        ImmersionTrackerItem.createEpisode("jordansimsmith", "show1", "episode1", now - 100);
+    var episode2 =
+        ImmersionTrackerItem.createEpisode("jordansimsmith", "show1", "episode2", now + 100);
+    var episode3 =
+        ImmersionTrackerItem.createEpisode("jordansimsmith", "show2", "episode1", now - 100);
     var show = ImmersionTrackerItem.createShow("jordansimsmith", "show1");
     show.setTvdbId(1);
     show.setTvdbName("my show");
@@ -65,7 +74,7 @@ public class GetProgressHandlerIntegrationTest {
     assertThat(progress).isNotNull();
     assertThat(progress.totalEpisodesWatched()).isEqualTo(3);
     assertThat(progress.totalHoursWatched()).isEqualTo(1);
-    assertThat(progress.episodesWatchedToday()).isEqualTo(0);
+    assertThat(progress.episodesWatchedToday()).isEqualTo(1);
 
     var shows = progress.shows();
     assertThat(shows).hasSize(2);

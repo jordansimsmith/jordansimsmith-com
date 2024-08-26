@@ -7,6 +7,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.jordansimsmith.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
@@ -23,8 +24,9 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 public class GetProgressHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
   private static final int MINUTES_PER_EPISODE = 20;
-  private static final ZoneId AUCKLAND_ZONE_ID = ZoneId.of("Pacific/Auckland");
+  @VisibleForTesting static final ZoneId ZONE_ID = ZoneId.of("Pacific/Auckland");
 
+  private final Clock clock;
   private final ObjectMapper objectMapper;
   private final DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable;
 
@@ -48,6 +50,7 @@ public class GetProgressHandler
 
   @VisibleForTesting
   GetProgressHandler(ImmersionTrackerFactory factory) {
+    this.clock = factory.clock();
     this.objectMapper = factory.objectMapper();
     this.immersionTrackerTable = factory.immersionTrackerTable();
   }
@@ -85,7 +88,7 @@ public class GetProgressHandler
 
     var totalEpisodesWatched = episodes.size();
     var totalHoursWatched = totalEpisodesWatched * MINUTES_PER_EPISODE / 60;
-    var today = Instant.now().atZone(AUCKLAND_ZONE_ID).truncatedTo(ChronoUnit.DAYS).toInstant();
+    var today = clock.now().atZone(ZONE_ID).truncatedTo(ChronoUnit.DAYS).toInstant();
     var episodesWatchedToday =
         episodes.stream()
             .filter(e -> Instant.ofEpochSecond(e.getTimestamp()).isAfter(today))

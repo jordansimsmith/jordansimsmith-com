@@ -1,19 +1,27 @@
 package com.jordansimsmith.immersiontracker;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import dagger.BindsInstance;
+import com.jordansimsmith.dynamodb.DynamoDbModule;
+import com.jordansimsmith.json.ObjectMapperModule;
+import com.jordansimsmith.time.Clock;
+import com.jordansimsmith.time.ClockModule;
 import dagger.Component;
-import java.net.URI;
-import javax.annotation.Nullable;
-import javax.inject.Named;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
 @Singleton
-@Component(modules = {ImmersionTrackerModule.class})
+@Component(
+    modules = {
+      ClockModule.class,
+      ObjectMapperModule.class,
+      DynamoDbModule.class,
+      ImmersionTrackerModule.class
+    })
 public interface ImmersionTrackerFactory {
+  Clock clock();
+
   ObjectMapper objectMapper();
 
   DynamoDbClient dynamoDbClient();
@@ -22,19 +30,7 @@ public interface ImmersionTrackerFactory {
 
   DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable();
 
-  @Component.Builder
-  interface Builder {
-    @BindsInstance
-    Builder dynamoDbEndpoint(@Named("dynamoDbEndpoint") @Nullable URI dynamoDbEndpoint);
-
-    ImmersionTrackerFactory build();
-  }
-
   static ImmersionTrackerFactory create() {
-    return DaggerImmersionTrackerFactory.builder().build();
-  }
-
-  static ImmersionTrackerFactory.Builder builder() {
-    return DaggerImmersionTrackerFactory.builder();
+    return DaggerImmersionTrackerFactory.create();
   }
 }
