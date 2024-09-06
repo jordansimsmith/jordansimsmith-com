@@ -14,6 +14,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -23,8 +24,8 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 public class GetProgressHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
-  private static final int MINUTES_PER_EPISODE = 20;
   @VisibleForTesting static final ZoneId ZONE_ID = ZoneId.of("Pacific/Auckland");
+  private static final int MINUTES_PER_EPISODE = 20;
 
   private final Clock clock;
   private final ObjectMapper objectMapper;
@@ -102,17 +103,23 @@ public class GetProgressHandler
             .map(e -> new EpisodeShow(e, showsByFolderName.get(e.getFolderName())))
             .toList();
     var unknownShows = showEpisodes.stream().filter(e -> e.show() == null).toList();
-    var unknownShowsProgress = new ShowProgress(null, unknownShows.size());
+    var unknownShowsProgress =
+        !unknownShows.isEmpty()
+            ? Stream.of(new ShowProgress(null, unknownShows.size()))
+            : Stream.<ShowProgress>empty();
     var knownShows =
         showEpisodes.stream()
             .filter(e -> e.show() != null)
-            .collect(Collectors.groupingBy(EpisodeShow::show));
+            .collect(Collectors.groupingBy(e -> Objects.requireNonNull(e.show().getTvdbId())));
     var knownShowsProgress =
-        knownShows.entrySet().stream()
-            .map(e -> new ShowProgress(e.getKey().getTvdbName(), e.getValue().size()));
+        knownShows.values().stream()
+            .map(
+                e ->
+                    new ShowProgress(
+                        Objects.requireNonNull(e.get(0).show()).getTvdbName(), e.size()));
 
     var progresses =
-        Stream.concat(Stream.of(unknownShowsProgress), knownShowsProgress)
+        Stream.concat(unknownShowsProgress, knownShowsProgress)
             .sorted(Comparator.comparing(e -> e.episodesWatched, Comparator.reverseOrder()))
             .toList();
 

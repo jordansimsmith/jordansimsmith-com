@@ -9,6 +9,7 @@ import dagger.Component;
 import java.net.URI;
 import javax.inject.Named;
 import javax.inject.Singleton;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
 @Singleton
 @Component(
@@ -20,6 +21,8 @@ import javax.inject.Singleton;
     })
 public interface ImmersionTrackerTestFactory extends ImmersionTrackerFactory {
   FakeClock fakeClock();
+
+  DynamoDbClient dynamoDbClient();
 
   @Component.Factory
   interface Factory {

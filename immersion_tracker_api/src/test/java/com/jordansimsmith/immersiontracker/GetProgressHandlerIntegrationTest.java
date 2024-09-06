@@ -51,17 +51,25 @@ public class GetProgressHandlerIntegrationTest {
     var episode1 =
         ImmersionTrackerItem.createEpisode("jordansimsmith", "show1", "episode1", now - 100);
     var episode2 =
-        ImmersionTrackerItem.createEpisode("jordansimsmith", "show1", "episode2", now + 100);
+        ImmersionTrackerItem.createEpisode("jordansimsmith", "show2", "episode2", now + 100);
     var episode3 =
-        ImmersionTrackerItem.createEpisode("jordansimsmith", "show2", "episode1", now - 100);
-    var show = ImmersionTrackerItem.createShow("jordansimsmith", "show1");
-    show.setTvdbId(1);
-    show.setTvdbName("my show");
+        ImmersionTrackerItem.createEpisode("jordansimsmith", "show3", "episode1", now - 100);
+    var show1 = ImmersionTrackerItem.createShow("jordansimsmith", "show1");
+    show1.setTvdbId(1);
+    show1.setTvdbName("my show");
+    var show2 = ImmersionTrackerItem.createShow("jordansimsmith", "show2");
+    show2.setTvdbId(1);
+    show2.setTvdbName("my show");
+    var show3 = ImmersionTrackerItem.createShow("jordansimsmith", "show3");
+    show3.setTvdbId(2);
+    show3.setTvdbName("my other show");
 
     immersionTrackerTable.putItem(episode1);
     immersionTrackerTable.putItem(episode2);
     immersionTrackerTable.putItem(episode3);
-    immersionTrackerTable.putItem(show);
+    immersionTrackerTable.putItem(show1);
+    immersionTrackerTable.putItem(show2);
+    immersionTrackerTable.putItem(show3);
 
     // act
     var res = getProgressHandler.handleRequest(APIGatewayV2HTTPEvent.builder().build(), null);
@@ -76,6 +84,42 @@ public class GetProgressHandlerIntegrationTest {
     assertThat(progress.totalHoursWatched()).isEqualTo(1);
     assertThat(progress.episodesWatchedToday()).isEqualTo(1);
 
+    var shows = progress.shows();
+    assertThat(shows).hasSize(2);
+    assertThat(shows.get(0).name()).isEqualTo("my show");
+    assertThat(shows.get(0).episodesWatched()).isEqualTo(2);
+    assertThat(shows.get(1).name()).isEqualTo("my other show");
+    assertThat(shows.get(1).episodesWatched()).isEqualTo(1);
+  }
+
+  @Test
+  void handleRequestShouldReturnUnknownShow() throws Exception {
+    // arrange
+    var now = (int) fakeClock.now().atZone(GetProgressHandler.ZONE_ID).toInstant().getEpochSecond();
+    var episode1 =
+        ImmersionTrackerItem.createEpisode("jordansimsmith", "show1", "episode1", now - 100);
+    var episode2 =
+        ImmersionTrackerItem.createEpisode("jordansimsmith", "show1", "episode2", now + 100);
+    var episode3 =
+        ImmersionTrackerItem.createEpisode("jordansimsmith", "show3", "episode1", now - 100);
+    var show1 = ImmersionTrackerItem.createShow("jordansimsmith", "show1");
+    show1.setTvdbId(1);
+    show1.setTvdbName("my show");
+
+    immersionTrackerTable.putItem(episode1);
+    immersionTrackerTable.putItem(episode2);
+    immersionTrackerTable.putItem(episode3);
+    immersionTrackerTable.putItem(show1);
+
+    // act
+    var res = getProgressHandler.handleRequest(APIGatewayV2HTTPEvent.builder().build(), null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(200);
+    assertThat(res.getHeaders()).containsEntry("Content-Type", "application/json; charset=utf-8");
+
+    var progress = objectMapper.readValue(res.getBody(), GetProgressHandler.ProgressResponse.class);
+    assertThat(progress).isNotNull();
     var shows = progress.shows();
     assertThat(shows).hasSize(2);
     assertThat(shows.get(0).name()).isEqualTo("my show");
