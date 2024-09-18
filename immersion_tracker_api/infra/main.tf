@@ -54,7 +54,7 @@ resource "aws_dynamodb_table" "immersion_tracker_table" {
 resource "aws_secretsmanager_secret" "users" {
   name                    = "${local.application_id}_users"
   recovery_window_in_days = 0
-  tags = local.tags
+  tags                    = local.tags
 }
 
 data "aws_iam_policy_document" "lambda_sts_allow_policy_document" {
@@ -154,6 +154,30 @@ resource "aws_iam_role_policy_attachment" "lambda_secretsmanager" {
   policy_arn = aws_iam_policy.lambda_secretsmanager.arn
 }
 
+data "external" "auth_handler_location" {
+  program = ["bash", "${path.module}/resolve_location.sh"]
+
+  query = {
+    target = "//immersion_tracker_api:auth-handler_deploy.jar"
+  }
+}
+
+data "local_file" "auth_handler_file" {
+  filename = data.external.auth_handler_location.result.location
+}
+
+resource "aws_lambda_function" "auth" {
+  filename         = data.local_file.auth_handler_file.filename
+  function_name    = "${local.application_id}_auth"
+  role             = aws_iam_role.lambda_role.arn
+  source_code_hash = data.local_file.auth_handler_file.content_base64sha256
+  handler          = "com.jordansimsmith.immersiontracker.AuthHandler"
+  runtime          = "java17"
+  memory_size      = 512
+  timeout          = 10
+  tags             = local.tags
+}
+
 data "external" "get_progress_handler_location" {
   program = ["bash", "${path.module}/resolve_location.sh"]
 
@@ -179,7 +203,7 @@ resource "aws_lambda_function" "get_progress" {
 }
 
 resource "aws_lambda_permission" "api_gateway" {
-  for_each = toset([aws_lambda_function.get_progress.function_name])
+  for_each = toset([aws_lambda_function.auth.function_name, aws_lambda_function.get_progress.function_name])
 
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
@@ -193,6 +217,13 @@ resource "aws_api_gateway_rest_api" "immersion_tracker" {
   tags = local.tags
 }
 
+resource "aws_api_gateway_authorizer" "immersion_tracker" {
+  name           = "${local.application_id}_authorizer"
+  rest_api_id    = aws_api_gateway_rest_api.immersion_tracker.id
+  authorizer_uri = aws_lambda_function.auth.invoke_arn
+  type           = "TOKEN"
+}
+
 resource "aws_api_gateway_resource" "get_progress" {
   rest_api_id = aws_api_gateway_rest_api.immersion_tracker.id
   parent_id   = aws_api_gateway_rest_api.immersion_tracker.root_resource_id
@@ -203,7 +234,8 @@ resource "aws_api_gateway_method" "get_progress" {
   rest_api_id   = aws_api_gateway_rest_api.immersion_tracker.id
   resource_id   = aws_api_gateway_resource.get_progress.id
   http_method   = "GET"
-  authorization = "NONE"
+  authorization = "CUSTOM"
+  authorizer_id = aws_api_gateway_authorizer.immersion_tracker.id
 }
 
 resource "aws_api_gateway_integration" "get_progress" {
@@ -220,9 +252,10 @@ resource "aws_api_gateway_deployment" "immersion_tracker" {
 
   triggers = {
     redeployment = sha1(jsonencode([
-      aws_api_gateway_resource.get_progress.id,
-      aws_api_gateway_method.get_progress.id,
-      aws_api_gateway_integration.get_progress.id,
+      aws_api_gateway_authorizer.immersion_tracker,
+      aws_api_gateway_resource.get_progress,
+      aws_api_gateway_method.get_progress,
+      aws_api_gateway_integration.get_progress,
     ]))
   }
 
