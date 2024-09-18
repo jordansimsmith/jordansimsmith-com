@@ -203,7 +203,10 @@ resource "aws_lambda_function" "get_progress" {
 }
 
 resource "aws_lambda_permission" "api_gateway" {
-  for_each = toset([aws_lambda_function.auth.function_name, aws_lambda_function.get_progress.function_name])
+  for_each = toset([
+    aws_lambda_function.auth.function_name,
+    aws_lambda_function.get_progress.function_name
+  ])
 
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
@@ -222,6 +225,20 @@ resource "aws_api_gateway_authorizer" "immersion_tracker" {
   rest_api_id    = aws_api_gateway_rest_api.immersion_tracker.id
   authorizer_uri = aws_lambda_function.auth.invoke_arn
   type           = "TOKEN"
+}
+
+resource "aws_api_gateway_gateway_response" "unauthorized" {
+  rest_api_id   = aws_api_gateway_rest_api.immersion_tracker.id
+  status_code   = "401"
+  response_type = "UNAUTHORIZED"
+
+  response_templates = {
+    "application/json" = "{\"message\":$context.error.messageString}"
+  }
+
+  response_parameters = {
+    "gatewayresponse.header.WWW-Authenticate" = "'Basic'"
+  }
 }
 
 resource "aws_api_gateway_resource" "get_progress" {
@@ -253,6 +270,7 @@ resource "aws_api_gateway_deployment" "immersion_tracker" {
   triggers = {
     redeployment = sha1(jsonencode([
       aws_api_gateway_authorizer.immersion_tracker,
+      aws_api_gateway_gateway_response.unauthorized,
       aws_api_gateway_resource.get_progress,
       aws_api_gateway_method.get_progress,
       aws_api_gateway_integration.get_progress,
