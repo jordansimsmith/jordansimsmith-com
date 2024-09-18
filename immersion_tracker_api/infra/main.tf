@@ -51,6 +51,12 @@ resource "aws_dynamodb_table" "immersion_tracker_table" {
   tags = local.tags
 }
 
+resource "aws_secretsmanager_secret" "users" {
+  name                    = "${local.application_id}_users"
+  recovery_window_in_days = 0
+  tags = local.tags
+}
+
 data "aws_iam_policy_document" "lambda_sts_allow_policy_document" {
   statement {
     effect = "Allow"
@@ -106,6 +112,46 @@ resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
 resource "aws_iam_role_policy_attachment" "lambda_basic" {
   role       = aws_iam_role.lambda_role.name
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+data "aws_iam_policy_document" "lambda_secretsmanager_allow_policy_document" {
+  statement {
+    effect = "Allow"
+
+    resources = [
+      aws_secretsmanager_secret.users.arn
+    ]
+
+    actions = [
+      "secretsmanager:GetResourcePolicy",
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:DescribeSecret",
+      "secretsmanager:ListSecretVersionIds"
+    ]
+  }
+
+  statement {
+    effect = "Allow"
+
+    resources = [
+      "*"
+    ]
+
+    actions = [
+      "secretsmanager:ListSecrets"
+    ]
+  }
+}
+
+resource "aws_iam_policy" "lambda_secretsmanager" {
+  name   = "${local.application_id}_lambda_secretsmanager"
+  policy = data.aws_iam_policy_document.lambda_secretsmanager_allow_policy_document.json
+  tags   = local.tags
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_secretsmanager" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = aws_iam_policy.lambda_secretsmanager.arn
 }
 
 data "external" "get_progress_handler_location" {
