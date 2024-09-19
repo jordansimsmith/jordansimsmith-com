@@ -2,6 +2,8 @@ package com.jordansimsmith.immersiontracker;
 
 import com.jordansimsmith.dynamodb.DynamoDbTestModule;
 import com.jordansimsmith.json.ObjectMapperModule;
+import com.jordansimsmith.secrets.FakeSecrets;
+import com.jordansimsmith.secrets.SecretsTestModule;
 import com.jordansimsmith.time.ClockTestModule;
 import com.jordansimsmith.time.FakeClock;
 import dagger.BindsInstance;
@@ -15,12 +17,15 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 @Component(
     modules = {
       ClockTestModule.class,
+      SecretsTestModule.class,
       ObjectMapperModule.class,
       DynamoDbTestModule.class,
       ImmersionTrackerModule.class
     })
 public interface ImmersionTrackerTestFactory extends ImmersionTrackerFactory {
   FakeClock fakeClock();
+
+  FakeSecrets fakeSecrets();
 
   DynamoDbClient dynamoDbClient();
 

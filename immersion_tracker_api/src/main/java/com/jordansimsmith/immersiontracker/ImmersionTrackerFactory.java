@@ -3,6 +3,8 @@ package com.jordansimsmith.immersiontracker;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbModule;
 import com.jordansimsmith.json.ObjectMapperModule;
+import com.jordansimsmith.secrets.Secrets;
+import com.jordansimsmith.secrets.SecretsModule;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.time.ClockModule;
 import dagger.Component;
@@ -13,12 +15,15 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 @Component(
     modules = {
       ClockModule.class,
+      SecretsModule.class,
       ObjectMapperModule.class,
       DynamoDbModule.class,
       ImmersionTrackerModule.class
     })
 public interface ImmersionTrackerFactory {
   Clock clock();
+
+  Secrets secrets();
 
   ObjectMapper objectMapper();
 

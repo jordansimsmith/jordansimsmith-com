@@ -32,6 +32,7 @@ maven.install(
         "software.amazon.awssdk:dynamodb:2.26.19",
         "software.amazon.awssdk:dynamodb-enhanced:2.26.19",
         "software.amazon.awssdk:iam-policy-builder:2.28.3",
+        "software.amazon.awssdk:secretsmanager:2.28.3",
         "com.amazonaws:aws-lambda-java-core:1.2.3",
         "com.amazonaws:aws-lambda-java-events:3.13.0",
         "com.google.guava:guava:33.2.1-jre",
