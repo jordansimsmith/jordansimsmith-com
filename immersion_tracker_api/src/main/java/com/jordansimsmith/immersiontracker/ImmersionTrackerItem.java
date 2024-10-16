@@ -28,7 +28,7 @@ public class ImmersionTrackerItem {
   private String user;
   private String folderName;
   private String fileName;
-  private Integer timestamp;
+  private Long timestamp;
   private Integer tvdbId;
   private String tvdbName;
   private String tvdbImage;
@@ -81,11 +81,11 @@ public class ImmersionTrackerItem {
   }
 
   @DynamoDbAttribute(TIMESTAMP)
-  public Integer getTimestamp() {
+  public Long getTimestamp() {
     return timestamp;
   }
 
-  public void setTimestamp(Integer timestamp) {
+  public void setTimestamp(Long timestamp) {
     this.timestamp = timestamp;
   }
 
@@ -180,7 +180,7 @@ public class ImmersionTrackerItem {
   }
 
   public static ImmersionTrackerItem createEpisode(
-      String user, String folderName, String fileName, int timestamp) {
+      String user, String folderName, String fileName, long timestamp) {
     var episode = new ImmersionTrackerItem();
     episode.setPk(formatPk(user));
     episode.setSk(formatEpisodeSk(folderName, fileName));
