@@ -15,17 +15,19 @@ import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.LinkedHashMap;
+import java.util.Map;
 import software.amazon.awssdk.policybuilder.iam.IamEffect;
 import software.amazon.awssdk.policybuilder.iam.IamPolicy;
 import software.amazon.awssdk.policybuilder.iam.IamStatement;
 
 public class AuthHandler implements RequestHandler<AuthorizerEvent, AuthorizerResponse> {
-  @VisibleForTesting static final String USERS_SECRET = "immersion_tracker_api_users";
+  @VisibleForTesting static final String SECRET = "immersion_tracker_api";
 
   private final Secrets secrets;
   private final ObjectMapper objectMapper;
 
-  public record AuthorizerEvent(String authorizationToken, String methodArn) {}
+  public record AuthorizerEvent(
+      Map<String, String> headers, Map<String, String> queryStringParameters, String methodArn) {}
 
   public record AuthorizerResponse(String principalId, Object policyDocument) {}
 
@@ -55,24 +57,28 @@ public class AuthHandler implements RequestHandler<AuthorizerEvent, AuthorizerRe
 
   public AuthorizerResponse doHandleRequest(AuthorizerEvent event, Context context)
       throws Exception {
-    var token = event.authorizationToken();
+    var token = event.headers().get("Authorization");
     if (Strings.isNullOrEmpty(token)) {
       throw new RuntimeException("Unauthorized");
     }
 
-    var base64 = token.replace("Basic ", "");
+    var base64 = token.substring("Basic".length()).trim();
     var bytes = Base64.getDecoder().decode(base64);
     var credentials = new String(bytes, StandardCharsets.UTF_8).split(":", 2);
     var user = new User(credentials[0], credentials[1]);
 
-    var secret = secrets.get(USERS_SECRET);
-    var users = objectMapper.readValue(secret, User[].class);
+    var secret = secrets.get(SECRET);
+    var users = objectMapper.treeToValue(objectMapper.readTree(secret).get("users"), User[].class);
 
-    if (Arrays.asList(users).contains(user)) {
-      return response(user.user, IamEffect.ALLOW, event.methodArn());
+    if (!Arrays.asList(users).contains(user)) {
+      return response(user.user, IamEffect.DENY, event.methodArn());
     }
 
-    return response(user.user, IamEffect.DENY, event.methodArn());
+    if (!user.user.equals(event.queryStringParameters().get("user"))) {
+      return response(user.user, IamEffect.DENY, event.methodArn());
+    }
+
+    return response(user.user, IamEffect.ALLOW, event.methodArn());
   }
 
   private AuthorizerResponse response(String principal, IamEffect effect, String resource)

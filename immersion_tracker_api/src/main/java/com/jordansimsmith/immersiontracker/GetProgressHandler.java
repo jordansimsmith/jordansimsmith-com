@@ -7,6 +7,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.jordansimsmith.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -67,8 +68,8 @@ public class GetProgressHandler
 
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event, Context context)
       throws Exception {
-    // TODO: auth
-    var user = "jordansimsmith";
+    var user = event.getQueryStringParameters().get("user");
+    Preconditions.checkNotNull(user);
 
     var query =
         immersionTrackerTable.query(

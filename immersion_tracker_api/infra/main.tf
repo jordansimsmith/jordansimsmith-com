@@ -51,8 +51,8 @@ resource "aws_dynamodb_table" "immersion_tracker_table" {
   tags = local.tags
 }
 
-resource "aws_secretsmanager_secret" "users" {
-  name                    = "${local.application_id}_users"
+resource "aws_secretsmanager_secret" "immersion_tracker" {
+  name                    = local.application_id
   recovery_window_in_days = 0
   tags                    = local.tags
 }
@@ -119,7 +119,7 @@ data "aws_iam_policy_document" "lambda_secretsmanager_allow_policy_document" {
     effect = "Allow"
 
     resources = [
-      aws_secretsmanager_secret.users.arn
+      aws_secretsmanager_secret.immersion_tracker.arn
     ]
 
     actions = [
@@ -221,10 +221,12 @@ resource "aws_api_gateway_rest_api" "immersion_tracker" {
 }
 
 resource "aws_api_gateway_authorizer" "immersion_tracker" {
-  name           = "${local.application_id}_authorizer"
-  rest_api_id    = aws_api_gateway_rest_api.immersion_tracker.id
-  authorizer_uri = aws_lambda_function.auth.invoke_arn
-  type           = "TOKEN"
+  name                             = "${local.application_id}_authorizer"
+  rest_api_id                      = aws_api_gateway_rest_api.immersion_tracker.id
+  authorizer_uri                   = aws_lambda_function.auth.invoke_arn
+  type                             = "REQUEST"
+  identity_source                  = "method.request.header.Authorization,method.request.querystring.user"
+  authorizer_result_ttl_in_seconds = 0
 }
 
 resource "aws_api_gateway_gateway_response" "unauthorized" {
