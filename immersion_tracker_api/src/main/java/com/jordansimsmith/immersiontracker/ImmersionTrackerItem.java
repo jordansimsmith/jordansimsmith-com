@@ -13,6 +13,16 @@ public class ImmersionTrackerItem {
   public static final String EPISODE_PREFIX = "EPISODE" + DELIMITER;
   public static final String SHOW_PREFIX = "SHOW" + DELIMITER;
 
+  public static final String PK = "pk";
+  public static final String SK = "sk";
+  public static final String USER = "user";
+  public static final String FOLDER_NAME = "folder_name";
+  public static final String FILE_NAME = "file_name";
+  public static final String TIMESTAMP = "timestamp";
+  public static final String TVDB_ID = "tvdb_id";
+  public static final String TVDB_NAME = "tvdb_name";
+  public static final String TVDB_IMAGE = "tvdb_image";
+
   private String pk;
   private String sk;
   private String user;
@@ -24,7 +34,7 @@ public class ImmersionTrackerItem {
   private String tvdbImage;
 
   @DynamoDbPartitionKey
-  @DynamoDbAttribute("pk")
+  @DynamoDbAttribute(PK)
   public String getPk() {
     return pk;
   }
@@ -34,7 +44,7 @@ public class ImmersionTrackerItem {
   }
 
   @DynamoDbSortKey
-  @DynamoDbAttribute("sk")
+  @DynamoDbAttribute(SK)
   public String getSk() {
     return sk;
   }
@@ -43,7 +53,7 @@ public class ImmersionTrackerItem {
     this.sk = sk;
   }
 
-  @DynamoDbAttribute("user")
+  @DynamoDbAttribute(USER)
   public String getUser() {
     return user;
   }
@@ -52,7 +62,7 @@ public class ImmersionTrackerItem {
     this.user = user;
   }
 
-  @DynamoDbAttribute("folder_name")
+  @DynamoDbAttribute(FOLDER_NAME)
   public String getFolderName() {
     return folderName;
   }
@@ -61,7 +71,7 @@ public class ImmersionTrackerItem {
     this.folderName = folderName;
   }
 
-  @DynamoDbAttribute("file_name")
+  @DynamoDbAttribute(FILE_NAME)
   public String getFileName() {
     return fileName;
   }
@@ -70,7 +80,7 @@ public class ImmersionTrackerItem {
     this.fileName = fileName;
   }
 
-  @DynamoDbAttribute("timestamp")
+  @DynamoDbAttribute(TIMESTAMP)
   public Integer getTimestamp() {
     return timestamp;
   }
@@ -79,7 +89,7 @@ public class ImmersionTrackerItem {
     this.timestamp = timestamp;
   }
 
-  @DynamoDbAttribute("tvdb_id")
+  @DynamoDbAttribute(TVDB_ID)
   public Integer getTvdbId() {
     return tvdbId;
   }
@@ -88,7 +98,7 @@ public class ImmersionTrackerItem {
     this.tvdbId = tvdbId;
   }
 
-  @DynamoDbAttribute("tvdb_name")
+  @DynamoDbAttribute(TVDB_NAME)
   public String getTvdbName() {
     return tvdbName;
   }
@@ -97,7 +107,7 @@ public class ImmersionTrackerItem {
     this.tvdbName = tvdbName;
   }
 
-  @DynamoDbAttribute("tvdb_image")
+  @DynamoDbAttribute(TVDB_IMAGE)
   public String getTvdbImage() {
     return tvdbImage;
   }

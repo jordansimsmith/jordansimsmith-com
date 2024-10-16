@@ -33,14 +33,14 @@ public class GetProgressHandler
   private final DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable;
 
   @VisibleForTesting
-  record ProgressResponse(
+  record GetProgressResponse(
       @JsonProperty("total_episodes_watched") int totalEpisodesWatched,
       @JsonProperty("total_hours_watched") int totalHoursWatched,
       @JsonProperty("episodes_watched_today") int episodesWatchedToday,
-      @JsonProperty("shows") List<ShowProgress> shows) {}
+      @JsonProperty("shows") List<Show> shows) {}
 
   @VisibleForTesting
-  record ShowProgress(
+  record Show(
       @Nullable @JsonProperty("name") String name,
       @JsonProperty("episodes_watched") int episodesWatched) {}
 
@@ -106,18 +106,15 @@ public class GetProgressHandler
     var unknownShows = showEpisodes.stream().filter(e -> e.show() == null).toList();
     var unknownShowsProgress =
         !unknownShows.isEmpty()
-            ? Stream.of(new ShowProgress(null, unknownShows.size()))
-            : Stream.<ShowProgress>empty();
+            ? Stream.of(new Show(null, unknownShows.size()))
+            : Stream.<Show>empty();
     var knownShows =
         showEpisodes.stream()
             .filter(e -> e.show() != null)
             .collect(Collectors.groupingBy(e -> Objects.requireNonNull(e.show().getTvdbId())));
     var knownShowsProgress =
         knownShows.values().stream()
-            .map(
-                e ->
-                    new ShowProgress(
-                        Objects.requireNonNull(e.get(0).show()).getTvdbName(), e.size()));
+            .map(e -> new Show(Objects.requireNonNull(e.get(0).show()).getTvdbName(), e.size()));
 
     var progresses =
         Stream.concat(unknownShowsProgress, knownShowsProgress)
@@ -125,7 +122,7 @@ public class GetProgressHandler
             .toList();
 
     var res =
-        new ProgressResponse(
+        new GetProgressResponse(
             totalEpisodesWatched, totalHoursWatched, episodesWatchedToday, progresses);
 
     return APIGatewayV2HTTPResponse.builder()

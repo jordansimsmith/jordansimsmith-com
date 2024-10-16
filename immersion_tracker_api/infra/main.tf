@@ -202,10 +202,35 @@ resource "aws_lambda_function" "get_progress" {
   tags             = local.tags
 }
 
+data "external" "get_shows_handler_location" {
+  program = ["bash", "${path.module}/resolve_location.sh"]
+
+  query = {
+    target = "//immersion_tracker_api:get-shows-handler_deploy.jar"
+  }
+}
+
+data "local_file" "get_shows_handler_file" {
+  filename = data.external.get_shows_handler_location.result.location
+}
+
+resource "aws_lambda_function" "get_shows" {
+  filename         = data.local_file.get_shows_handler_file.filename
+  function_name    = "${local.application_id}_get_shows"
+  role             = aws_iam_role.lambda_role.arn
+  source_code_hash = data.local_file.get_shows_handler_file.content_base64sha256
+  handler          = "com.jordansimsmith.immersiontracker.GetShowsHandler"
+  runtime          = "java17"
+  memory_size      = 512
+  timeout          = 10
+  tags             = local.tags
+}
+
 resource "aws_lambda_permission" "api_gateway" {
   for_each = toset([
     aws_lambda_function.auth.function_name,
-    aws_lambda_function.get_progress.function_name
+    aws_lambda_function.get_progress.function_name,
+    aws_lambda_function.get_shows.function_name,
   ])
 
   statement_id  = "AllowAPIGatewayInvoke"
@@ -266,6 +291,29 @@ resource "aws_api_gateway_integration" "get_progress" {
   uri                     = aws_lambda_function.get_progress.invoke_arn
 }
 
+resource "aws_api_gateway_resource" "get_shows" {
+  rest_api_id = aws_api_gateway_rest_api.immersion_tracker.id
+  parent_id   = aws_api_gateway_rest_api.immersion_tracker.root_resource_id
+  path_part   = "shows"
+}
+
+resource "aws_api_gateway_method" "get_shows" {
+  rest_api_id   = aws_api_gateway_rest_api.immersion_tracker.id
+  resource_id   = aws_api_gateway_resource.get_shows.id
+  http_method   = "GET"
+  authorization = "CUSTOM"
+  authorizer_id = aws_api_gateway_authorizer.immersion_tracker.id
+}
+
+resource "aws_api_gateway_integration" "get_shows" {
+  rest_api_id             = aws_api_gateway_rest_api.immersion_tracker.id
+  resource_id             = aws_api_gateway_resource.get_shows.id
+  http_method             = aws_api_gateway_method.get_shows.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.get_shows.invoke_arn
+}
+
 resource "aws_api_gateway_deployment" "immersion_tracker" {
   rest_api_id = aws_api_gateway_rest_api.immersion_tracker.id
 
@@ -276,6 +324,9 @@ resource "aws_api_gateway_deployment" "immersion_tracker" {
       aws_api_gateway_resource.get_progress,
       aws_api_gateway_method.get_progress,
       aws_api_gateway_integration.get_progress,
+      aws_api_gateway_resource.get_shows,
+      aws_api_gateway_method.get_shows,
+      aws_api_gateway_integration.get_shows,
     ]))
   }
 
