@@ -20,12 +20,14 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
       SecretsTestModule.class,
       ObjectMapperModule.class,
       DynamoDbTestModule.class,
-      ImmersionTrackerModule.class
+      ImmersionTrackerTestModule.class
     })
 public interface ImmersionTrackerTestFactory extends ImmersionTrackerFactory {
   FakeClock fakeClock();
 
   FakeSecrets fakeSecrets();
+
+  FakeTvdbClient fakeTvdbClient();
 
   DynamoDbClient dynamoDbClient();
 

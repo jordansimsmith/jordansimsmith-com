@@ -1,6 +1,7 @@
 package com.jordansimsmith.immersiontracker;
 
 import java.util.Objects;
+import software.amazon.awssdk.enhanced.dynamodb.extensions.annotations.DynamoDbVersionAttribute;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
@@ -22,6 +23,7 @@ public class ImmersionTrackerItem {
   public static final String TVDB_ID = "tvdb_id";
   public static final String TVDB_NAME = "tvdb_name";
   public static final String TVDB_IMAGE = "tvdb_image";
+  public static final String VERSION = "version";
 
   private String pk;
   private String sk;
@@ -32,6 +34,7 @@ public class ImmersionTrackerItem {
   private Integer tvdbId;
   private String tvdbName;
   private String tvdbImage;
+  private Long version;
 
   @DynamoDbPartitionKey
   @DynamoDbAttribute(PK)
@@ -114,6 +117,16 @@ public class ImmersionTrackerItem {
 
   public void setTvdbImage(String tvdbImage) {
     this.tvdbImage = tvdbImage;
+  }
+
+  @DynamoDbVersionAttribute()
+  @DynamoDbAttribute(VERSION)
+  public Long getVersion() {
+    return version;
+  }
+
+  public void setVersion(Long version) {
+    this.version = version;
   }
 
   @Override

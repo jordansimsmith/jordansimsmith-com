@@ -23,16 +23,6 @@ public class SyncEpisodesHandler
   private final ObjectMapper objectMapper;
   private final DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable;
 
-  public SyncEpisodesHandler() {
-    this(ImmersionTrackerFactory.create());
-  }
-
-  SyncEpisodesHandler(ImmersionTrackerFactory factory) {
-    this.clock = factory.clock();
-    this.objectMapper = factory.objectMapper();
-    this.immersionTrackerTable = factory.immersionTrackerTable();
-  }
-
   @VisibleForTesting
   record SyncEpisodesRequest(@JsonProperty("episodes") List<Episode> episodes) {}
 
@@ -42,6 +32,17 @@ public class SyncEpisodesHandler
 
   @VisibleForTesting
   record SyncEpisodesResponse(@JsonProperty("episodes_added") int episodesAdded) {}
+
+  public SyncEpisodesHandler() {
+    this(ImmersionTrackerFactory.create());
+  }
+
+  @VisibleForTesting
+  SyncEpisodesHandler(ImmersionTrackerFactory factory) {
+    this.clock = factory.clock();
+    this.objectMapper = factory.objectMapper();
+    this.immersionTrackerTable = factory.immersionTrackerTable();
+  }
 
   @Override
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {

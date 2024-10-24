@@ -17,7 +17,9 @@ java_library(
         "//lib/json:lib",
         "//lib/secrets:lib",
         "//lib/time:lib",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_guava_guava",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
     ],
@@ -92,6 +94,29 @@ java_binary(
 )
 
 java_binary(
+    name = "update-show-handler",
+    srcs = glob(["src/main/java/com/jordansimsmith/immersiontracker/UpdateShowHandler.java"]),
+    create_executable = False,
+    resources = glob([
+        "src/main/resources/logback.xml",
+    ]),
+    deps = [
+        ":lib",
+        "//lib/time:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
     name = "sync-episodes-handler",
     srcs = glob(["src/main/java/com/jordansimsmith/immersiontracker/SyncEpisodesHandler.java"]),
     create_executable = False,
@@ -134,6 +159,7 @@ java_test_suite(
         ":get-shows-handler",
         ":lib",
         ":sync-episodes-handler",
+        ":update-show-handler",
         "//lib/dynamodb:lib",
         "//lib/json:lib",
         "//lib/secrets:lib",

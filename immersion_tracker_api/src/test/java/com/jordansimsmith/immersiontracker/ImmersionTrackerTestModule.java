@@ -1,17 +1,14 @@
 package com.jordansimsmith.immersiontracker;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jordansimsmith.secrets.Secrets;
 import dagger.Module;
 import dagger.Provides;
-import java.net.http.HttpClient;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 
 @Module
-public class ImmersionTrackerModule {
+public class ImmersionTrackerTestModule {
   @Provides
   @Singleton
   public DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable(
@@ -22,8 +19,13 @@ public class ImmersionTrackerModule {
 
   @Provides
   @Singleton
-  public TvdbClient tvdbClient(ObjectMapper objectMapper, Secrets secrets) {
-    var httpClient = HttpClient.newBuilder().build();
-    return new HttpTvdbClient(objectMapper, secrets, httpClient);
+  public FakeTvdbClient fakeTvdbClient() {
+    return new FakeTvdbClient();
+  }
+
+  @Provides
+  @Singleton
+  public TvdbClient tvdbClient(FakeTvdbClient fakeTvdbClient) {
+    return fakeTvdbClient;
   }
 }

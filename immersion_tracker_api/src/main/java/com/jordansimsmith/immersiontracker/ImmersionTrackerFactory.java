@@ -29,6 +29,8 @@ public interface ImmersionTrackerFactory {
 
   DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable();
 
+  TvdbClient tvdbClient();
+
   static ImmersionTrackerFactory create() {
     return DaggerImmersionTrackerFactory.create();
   }
