@@ -226,6 +226,30 @@ resource "aws_lambda_function" "get_shows" {
   tags             = local.tags
 }
 
+data "external" "update_show_handler_location" {
+  program = ["bash", "${path.module}/resolve_location.sh"]
+
+  query = {
+    target = "//immersion_tracker_api:update-show-handler_deploy.jar"
+  }
+}
+
+data "local_file" "update_show_handler_file" {
+  filename = data.external.update_show_handler_location.result.location
+}
+
+resource "aws_lambda_function" "update_show" {
+  filename         = data.local_file.update_show_handler_file.filename
+  function_name    = "${local.application_id}_update_show"
+  role             = aws_iam_role.lambda_role.arn
+  source_code_hash = data.local_file.update_show_handler_file.content_base64sha256
+  handler          = "com.jordansimsmith.immersiontracker.UpdateShowHandler"
+  runtime          = "java17"
+  memory_size      = 512
+  timeout          = 10
+  tags             = local.tags
+}
+
 data "external" "sync_episodes_handler_location" {
   program = ["bash", "${path.module}/resolve_location.sh"]
 
@@ -255,6 +279,7 @@ resource "aws_lambda_permission" "api_gateway" {
     aws_lambda_function.auth.function_name,
     aws_lambda_function.get_progress.function_name,
     aws_lambda_function.get_shows.function_name,
+    aws_lambda_function.update_show.function_name,
     aws_lambda_function.sync_episodes.function_name,
   ])
 
@@ -339,6 +364,29 @@ resource "aws_api_gateway_integration" "get_shows" {
   uri                     = aws_lambda_function.get_shows.invoke_arn
 }
 
+resource "aws_api_gateway_resource" "update_show" {
+  rest_api_id = aws_api_gateway_rest_api.immersion_tracker.id
+  parent_id   = aws_api_gateway_rest_api.immersion_tracker.root_resource_id
+  path_part   = "show"
+}
+
+resource "aws_api_gateway_method" "update_show" {
+  rest_api_id   = aws_api_gateway_rest_api.immersion_tracker.id
+  resource_id   = aws_api_gateway_resource.update_show.id
+  http_method   = "PUT"
+  authorization = "CUSTOM"
+  authorizer_id = aws_api_gateway_authorizer.immersion_tracker.id
+}
+
+resource "aws_api_gateway_integration" "update_show" {
+  rest_api_id             = aws_api_gateway_rest_api.immersion_tracker.id
+  resource_id             = aws_api_gateway_resource.update_show.id
+  http_method             = aws_api_gateway_method.update_show.http_method
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = aws_lambda_function.update_show.invoke_arn
+}
+
 resource "aws_api_gateway_resource" "sync_episodes" {
   rest_api_id = aws_api_gateway_rest_api.immersion_tracker.id
   parent_id   = aws_api_gateway_rest_api.immersion_tracker.root_resource_id
@@ -375,6 +423,9 @@ resource "aws_api_gateway_deployment" "immersion_tracker" {
       aws_api_gateway_resource.get_shows,
       aws_api_gateway_method.get_shows,
       aws_api_gateway_integration.get_shows,
+      aws_api_gateway_resource.update_show,
+      aws_api_gateway_method.update_show,
+      aws_api_gateway_integration.update_show,
       aws_api_gateway_resource.sync_episodes,
       aws_api_gateway_method.sync_episodes,
       aws_api_gateway_integration.sync_episodes,
