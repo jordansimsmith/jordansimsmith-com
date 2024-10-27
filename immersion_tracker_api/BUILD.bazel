@@ -1,5 +1,7 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 load("@dagger//:workspace_defs.bzl", "dagger_rules")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 dagger_rules()
 
@@ -174,5 +176,40 @@ java_test_suite(
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
         "@maven//:software_amazon_awssdk_iam_policy_builder",
+    ],
+)
+
+pkg_tar(
+    name = "local-handlers-tar",
+    srcs = [
+        ":get-progress-handler_deploy.jar",
+        ":get-shows-handler_deploy.jar",
+        ":sync-episodes-handler_deploy.jar",
+        ":update-show-handler_deploy.jar",
+    ],
+    mode = "0755",
+    package_dir = "/opt/code/localstack/",
+)
+
+pkg_tar(
+    name = "local-init-resources-tar",
+    srcs = ["local/init_resources.py"],
+    package_dir = "/etc/localstack/init/ready.d/",
+)
+
+oci_image(
+    name = "local-image",
+    base = "@localstack//:localstack",
+    tars = [
+        ":local-init-resources-tar",
+        ":local-handlers-tar",
+    ],
+)
+
+oci_load(
+    name = "local-load",
+    image = ":local-image",
+    repo_tags = [
+        "bazel/immersion-tracker-local:latest",
     ],
 )

@@ -9,7 +9,7 @@ oci_load(
     name = "ryuk-load",
     image = ":ryuk-image",
     repo_tags = [
-        "bazel/ryuk:ryuk",
+        "bazel/ryuk:latest",
     ],
 )
 
@@ -22,7 +22,7 @@ oci_load(
     name = "dynamodb-load",
     image = ":dynamodb-image",
     repo_tags = [
-        "bazel/dynamodb:dynamodb",
+        "bazel/dynamodb:latest",
     ],
 )
 
