@@ -10,7 +10,13 @@ public class LoadedImageNameSubstitutor extends ImageNameSubstitutor {
   @Override
   public DockerImageName apply(DockerImageName original) {
     if (original.toString().equals("testcontainers/ryuk:0.7.0")) {
-      return LoadedImage.loadImage("ryuk.image.name", "ryuk.image.loader");
+      return LoadedImage.loadImage(
+          TestcontainersConfiguration.getInstance()
+              .getClasspathProperties()
+              .getProperty("ryuk.image.name"),
+          TestcontainersConfiguration.getInstance()
+              .getClasspathProperties()
+              .getProperty("ryuk.image.loader"));
     }
 
     var loadedPrefix =

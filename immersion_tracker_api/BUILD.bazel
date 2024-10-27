@@ -7,6 +7,10 @@ dagger_rules()
 
 HANDLERS = glob(["src/main/java/**/*Handler.java"])
 
+INTEGRATION_TESTS = glob(["src/test/java/**/*IntegrationTest.java"])
+
+E2E_TESTS = glob(["src/test/java/**/*E2ETest.java"])
+
 java_library(
     name = "lib",
     srcs = glob(
@@ -31,9 +35,9 @@ java_binary(
     name = "auth-handler",
     srcs = glob(["src/main/java/com/jordansimsmith/immersiontracker/AuthHandler.java"]),
     create_executable = False,
-    resources = glob([
+    resources = [
         "src/main/resources/logback.xml",
-    ]),
+    ],
     deps = [
         ":lib",
         "//lib/secrets:lib",
@@ -54,9 +58,9 @@ java_binary(
     name = "get-progress-handler",
     srcs = glob(["src/main/java/com/jordansimsmith/immersiontracker/GetProgressHandler.java"]),
     create_executable = False,
-    resources = glob([
+    resources = [
         "src/main/resources/logback.xml",
-    ]),
+    ],
     deps = [
         ":lib",
         "//lib/time:lib",
@@ -76,9 +80,9 @@ java_binary(
     name = "get-shows-handler",
     srcs = glob(["src/main/java/com/jordansimsmith/immersiontracker/GetShowsHandler.java"]),
     create_executable = False,
-    resources = glob([
+    resources = [
         "src/main/resources/logback.xml",
-    ]),
+    ],
     deps = [
         ":lib",
         "//lib/time:lib",
@@ -99,9 +103,9 @@ java_binary(
     name = "update-show-handler",
     srcs = glob(["src/main/java/com/jordansimsmith/immersiontracker/UpdateShowHandler.java"]),
     create_executable = False,
-    resources = glob([
+    resources = [
         "src/main/resources/logback.xml",
-    ]),
+    ],
     deps = [
         ":lib",
         "//lib/time:lib",
@@ -122,9 +126,9 @@ java_binary(
     name = "sync-episodes-handler",
     srcs = glob(["src/main/java/com/jordansimsmith/immersiontracker/SyncEpisodesHandler.java"]),
     create_executable = False,
-    resources = glob([
+    resources = [
         "src/main/resources/logback.xml",
-    ]),
+    ],
     deps = [
         ":lib",
         "//lib/time:lib",
@@ -141,28 +145,52 @@ java_binary(
     ],
 )
 
+java_library(
+    name = "test-lib",
+    srcs = glob(
+        ["src/test/java/**/*.java"],
+        exclude = INTEGRATION_TESTS + E2E_TESTS,
+    ),
+    data = [
+        ":local-load",
+    ],
+    resources = ["src/test/resources/test.properties"],
+    deps = [
+        ":dagger",
+        ":lib",
+        "//lib/dynamodb:lib",
+        "//lib/json:lib",
+        "//lib/secrets:lib",
+        "//lib/testcontainers:lib",
+        "//lib/time:lib",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_testcontainers_testcontainers",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
 java_test_suite(
     name = "integration-tests",
     size = "medium",
-    srcs = glob(["src/test/java/**/*.java"]),
+    srcs = INTEGRATION_TESTS,
     env = {
         "AWS_ACCESS_KEY_ID": "fake",
         "AWS_SECRET_ACCESS_KEY": "fake",
         "AWS_REGION": "ap-southeast-2",
     },
-    resources = glob(["src/test/resources/**/*.properties"]),
     runner = "junit5",
     test_suffixes = ["IntegrationTest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
         ":auth-handler",
-        ":dagger",
         ":get-progress-handler",
         ":get-shows-handler",
         ":lib",
         ":sync-episodes-handler",
+        ":test-lib",
         ":update-show-handler",
-        "//lib/dynamodb:lib",
         "//lib/json:lib",
         "//lib/secrets:lib",
         "//lib/testcontainers:lib",
@@ -180,19 +208,18 @@ java_test_suite(
 )
 
 pkg_tar(
-    name = "local-handlers-tar",
+    name = "local-handlers.tar",
     srcs = [
         ":get-progress-handler_deploy.jar",
         ":get-shows-handler_deploy.jar",
         ":sync-episodes-handler_deploy.jar",
         ":update-show-handler_deploy.jar",
     ],
-    mode = "0755",
     package_dir = "/opt/code/localstack/",
 )
 
 pkg_tar(
-    name = "local-init-resources-tar",
+    name = "local-init-resources.tar",
     srcs = ["local/init_resources.py"],
     package_dir = "/etc/localstack/init/ready.d/",
 )
@@ -200,9 +227,12 @@ pkg_tar(
 oci_image(
     name = "local-image",
     base = "@localstack//:localstack",
+    env = {
+        "LOCALSTACK_LAMBDA_IGNORE_ARCHITECTURE": 1,
+    },
     tars = [
-        ":local-init-resources-tar",
-        ":local-handlers-tar",
+        ":local-init-resources.tar",
+        ":local-handlers.tar",
     ],
 )
 
@@ -211,5 +241,23 @@ oci_load(
     image = ":local-image",
     repo_tags = [
         "bazel/immersion-tracker-local:latest",
+    ],
+)
+
+java_test_suite(
+    name = "e2e-tests",
+    size = "medium",
+    srcs = E2E_TESTS,
+    resources = ["src/test/resources/test.properties"],
+    runner = "junit5",
+    test_suffixes = ["E2ETest.java"],
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        ":lib",
+        ":test-lib",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_testcontainers_junit_jupiter",
     ],
 )

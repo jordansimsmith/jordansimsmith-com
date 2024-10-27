@@ -3,15 +3,9 @@ package com.jordansimsmith.testcontainers;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
 import org.testcontainers.utility.DockerImageName;
-import org.testcontainers.utility.TestcontainersConfiguration;
 
 public class LoadedImage {
-  public static DockerImageName loadImage(String imageKey, String loaderKey) {
-    var image =
-        TestcontainersConfiguration.getInstance().getClasspathProperties().getProperty(imageKey);
-    var loader =
-        TestcontainersConfiguration.getInstance().getClasspathProperties().getProperty(loaderKey);
-
+  public static DockerImageName loadImage(String image, String loader) {
     Preconditions.checkNotNull(image);
     Preconditions.checkNotNull(loader);
 

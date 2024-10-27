@@ -2,7 +2,7 @@ import boto3
 import json
 import os
 
-region_name = "us-east-1"
+region_name = "ap-southeast-2"
 endpoint_url = "http://localhost:4566"
 
 iam_client = boto3.client("iam", endpoint_url=endpoint_url, region_name=region_name)
