@@ -229,6 +229,7 @@ oci_image(
     base = "@localstack//:localstack",
     env = {
         "LOCALSTACK_LAMBDA_IGNORE_ARCHITECTURE": 1,
+        "LOCALSTACK_LAMBDA_KEEPALIVE_MS": 0,
     },
     tars = [
         ":local-init-resources.tar",
@@ -260,16 +261,28 @@ java_test_suite(
     data = [
         ":sync-episodes-script.py",
     ],
-    resources = ["src/test/resources/test.properties"],
+    env = {
+        "IMMERSION_TRACKER_USER": "alice",
+        "IMMERSION_TRACKER_PASSWORD": "password",
+        "TVDB_API_KEY": "",
+    },
+    resources = [
+        "src/test/resources/logback-test.xml",
+        "src/test/resources/test.properties",
+    ],
     runner = "junit5",
+    tags = ["manual"],
     test_suffixes = ["E2ETest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
         ":lib",
         ":test-lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_google_guava_guava",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_slf4j_slf4j_api",
         "@maven//:org_testcontainers_junit_jupiter",
     ],
 )

@@ -1,5 +1,6 @@
 package com.jordansimsmith.immersiontracker;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
@@ -26,14 +27,18 @@ public class HttpTvdbClient implements TvdbClient {
 
   private record LoginRequest(@JsonProperty("apikey") String apiKey) {}
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   private record LoginResponse(
       @JsonProperty("status") String status, @JsonProperty("data") LoginData data) {}
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   private record LoginData(@JsonProperty("token") String token) {}
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   private record SeriesResponse(
       @JsonProperty("status") String status, @JsonProperty("data") SeriesData data) {}
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   private record SeriesData(@JsonProperty("name") String name, @JsonProperty String image) {}
 
   @Override
@@ -79,6 +84,7 @@ public class HttpTvdbClient implements TvdbClient {
             .uri(new URI("https://api4.thetvdb.com/v4/series/" + id))
             .header("Accept", "application/json")
             .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer " + token)
             .GET()
             .build();
     var seriesRes = httpClient.send(seriesReq, HttpResponse.BodyHandlers.ofString());

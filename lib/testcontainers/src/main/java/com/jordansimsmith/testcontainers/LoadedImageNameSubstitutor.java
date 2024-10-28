@@ -19,6 +19,16 @@ public class LoadedImageNameSubstitutor extends ImageNameSubstitutor {
               .getProperty("ryuk.image.loader"));
     }
 
+    if (original.toString().equals("alpine:3.17")) {
+      return LoadedImage.loadImage(
+          TestcontainersConfiguration.getInstance()
+              .getClasspathProperties()
+              .getProperty("alpine.image.name"),
+          TestcontainersConfiguration.getInstance()
+              .getClasspathProperties()
+              .getProperty("alpine.image.loader"));
+    }
+
     var loadedPrefix =
         TestcontainersConfiguration.getInstance()
             .getClasspathProperties()

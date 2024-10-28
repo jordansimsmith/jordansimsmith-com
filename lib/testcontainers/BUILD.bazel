@@ -1,6 +1,19 @@
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 
 oci_image(
+    name = "alpine-image",
+    base = "@alpine//:alpine",
+)
+
+oci_load(
+    name = "alpine-load",
+    image = ":alpine-image",
+    repo_tags = [
+        "bazel/alpine:latest",
+    ],
+)
+
+oci_image(
     name = "ryuk-image",
     base = "@ryuk//:ryuk",
 )
@@ -30,6 +43,7 @@ java_library(
     name = "lib",
     srcs = glob(["src/main/java/**/*.java"]),
     data = [
+        ":alpine-load",
         ":dynamodb-load",
         ":ryuk-load",
     ],

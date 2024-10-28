@@ -7679,7 +7679,7 @@
     "@@rules_oci~//oci:extensions.bzl%oci": {
       "general": {
         "bzlTransitiveDigest": "k6JSSalmOn/TG7IJLQ4T9onXC+H81Y+fq5IyHfsP9c8=",
-        "usagesDigest": "beOXCHE57ZANHKJfXIFDIs7UCQpeJp1BlVn+qzpjsIw=",
+        "usagesDigest": "Yfs0NVgvOiiz/IRAqIUDz1GMGIh6qknkJKQl6Dl6UCE=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -7867,7 +7867,7 @@
               "scheme": "https",
               "registry": "index.docker.io",
               "repository": "testcontainers/ryuk",
-              "identifier": "0.6.0",
+              "identifier": "0.7.0",
               "platforms": {
                 "@@platforms//cpu:x86_64": "@ryuk_linux_amd64",
                 "@@platforms//cpu:arm64": "@ryuk_linux_arm64"
@@ -7898,6 +7898,19 @@
               },
               "bzlmod_repository": "dynamodb",
               "reproducible": true
+            }
+          },
+          "alpine_linux_arm64_v8": {
+            "bzlFile": "@@rules_oci~//oci/private:pull.bzl",
+            "ruleClassName": "oci_pull",
+            "attributes": {
+              "scheme": "https",
+              "registry": "index.docker.io",
+              "repository": "library/alpine",
+              "identifier": "3.17",
+              "platform": "linux/arm64/v8",
+              "target_name": "alpine_linux_arm64_v8",
+              "bazel_tags": []
             }
           },
           "oci_crane_windows_armv6": {
@@ -7960,6 +7973,23 @@
             "attributes": {
               "platform": "windows_amd64",
               "crane_version": "v0.18.0"
+            }
+          },
+          "alpine": {
+            "bzlFile": "@@rules_oci~//oci/private:pull.bzl",
+            "ruleClassName": "oci_alias",
+            "attributes": {
+              "target_name": "alpine",
+              "scheme": "https",
+              "registry": "index.docker.io",
+              "repository": "library/alpine",
+              "identifier": "3.17",
+              "platforms": {
+                "@@platforms//cpu:x86_64": "@alpine_linux_amd64",
+                "@@platforms//cpu:arm64": "@alpine_linux_arm64_v8"
+              },
+              "bzlmod_repository": "alpine",
+              "reproducible": true
             }
           },
           "oci_regctl_linux_arm64": {
@@ -8099,7 +8129,7 @@
               "scheme": "https",
               "registry": "index.docker.io",
               "repository": "testcontainers/ryuk",
-              "identifier": "0.6.0",
+              "identifier": "0.7.0",
               "platform": "linux/arm64",
               "target_name": "ryuk_linux_arm64",
               "bazel_tags": []
@@ -8146,6 +8176,19 @@
             "ruleClassName": "tar_toolchains_repo",
             "attributes": {
               "user_repository_name": "bsd_tar"
+            }
+          },
+          "alpine_linux_amd64": {
+            "bzlFile": "@@rules_oci~//oci/private:pull.bzl",
+            "ruleClassName": "oci_pull",
+            "attributes": {
+              "scheme": "https",
+              "registry": "index.docker.io",
+              "repository": "library/alpine",
+              "identifier": "3.17",
+              "platform": "linux/amd64",
+              "target_name": "alpine_linux_amd64",
+              "bazel_tags": []
             }
           },
           "jq_windows_amd64": {
@@ -8202,7 +8245,7 @@
               "scheme": "https",
               "registry": "index.docker.io",
               "repository": "testcontainers/ryuk",
-              "identifier": "0.6.0",
+              "identifier": "0.7.0",
               "platform": "linux/amd64",
               "target_name": "ryuk_linux_amd64",
               "bazel_tags": []
@@ -8222,6 +8265,9 @@
             "dynamodb",
             "dynamodb_linux_amd64",
             "dynamodb_linux_arm64",
+            "alpine",
+            "alpine_linux_amd64",
+            "alpine_linux_arm64_v8",
             "ryuk",
             "ryuk_linux_amd64",
             "ryuk_linux_arm64",

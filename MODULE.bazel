@@ -61,13 +61,22 @@ oci.pull(
     tag = "2.5.2",
 )
 oci.pull(
+    name = "alpine",
+    image = "docker.io/library/alpine",
+    platforms = [
+        "linux/amd64",
+        "linux/arm64/v8",
+    ],
+    tag = "3.17",
+)
+oci.pull(
     name = "ryuk",
     image = "docker.io/testcontainers/ryuk",
     platforms = [
         "linux/amd64",
         "linux/arm64",
     ],
-    tag = "0.6.0",
+    tag = "0.7.0",
 )
 oci.pull(
     name = "localstack",
@@ -78,7 +87,7 @@ oci.pull(
     ],
     tag = "3.8.0",
 )
-use_repo(oci, "dynamodb", "dynamodb_linux_amd64", "dynamodb_linux_arm64", "localstack", "localstack_linux_amd64", "localstack_linux_arm64", "ryuk", "ryuk_linux_amd64", "ryuk_linux_arm64")
+use_repo(oci, "alpine", "alpine_linux_amd64", "alpine_linux_arm64_v8", "dynamodb", "dynamodb_linux_amd64", "dynamodb_linux_arm64", "localstack", "localstack_linux_amd64", "localstack_linux_arm64", "ryuk", "ryuk_linux_amd64", "ryuk_linux_arm64")
 
 bazel_dep(name = "aspect_rules_lint", version = "1.0.0-rc8")
 

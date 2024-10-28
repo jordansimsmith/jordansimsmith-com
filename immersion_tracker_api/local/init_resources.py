@@ -20,7 +20,7 @@ dynamodb_client = boto3.client(
 )
 
 secretsmanager_client.create_secret(
-    Name="immersion_tracker",
+    Name="immersion_tracker_api",
     SecretString=json.dumps(
         {"users": [], "tvdb_api_key": os.getenv("TVDB_API_KEY", "")}
     ),
@@ -74,28 +74,28 @@ iam_client.put_role_policy(
 
 configs = [
     {
-        "function_name": "immersion_tracker_get_progress_handler",
+        "function_name": "get_progress_handler",
         "resource_path_part": "progress",
         "http_method": "GET",
         "handler_name": "com.jordansimsmith.immersiontracker.GetProgressHandler",
         "zip_file": "get-progress-handler_deploy.jar",
     },
     {
-        "function_name": "immersion_tracker_get_shows_handler",
+        "function_name": "get_shows_handler",
         "resource_path_part": "shows",
         "http_method": "GET",
         "handler_name": "com.jordansimsmith.immersiontracker.GetShowsHandler",
         "zip_file": "get-shows-handler_deploy.jar",
     },
     {
-        "function_name": "immersion_tracker_update_show_handler",
+        "function_name": "update_show_handler",
         "resource_path_part": "show",
         "http_method": "PUT",
         "handler_name": "com.jordansimsmith.immersiontracker.UpdateShowHandler",
         "zip_file": "update-show-handler_deploy.jar",
     },
     {
-        "function_name": "immersion_tracker_sync_episodes_handler",
+        "function_name": "sync_episodes_handler",
         "resource_path_part": "sync",
         "http_method": "POST",
         "handler_name": "com.jordansimsmith.immersiontracker.SyncEpisodesHandler",
