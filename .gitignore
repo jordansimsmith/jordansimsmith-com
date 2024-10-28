@@ -4,3 +4,4 @@ bazel-*
 **/.terraform/
 **/*.tfstate
 **/*.tfstate.backup
+venv/

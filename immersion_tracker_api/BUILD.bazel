@@ -244,10 +244,22 @@ oci_load(
     ],
 )
 
+py_binary(
+    name = "sync-episodes-script.py",
+    srcs = ["script/sync_episodes.py"],
+    main = "script/sync_episodes.py",
+    deps = [
+        "@pypi//requests",
+    ],
+)
+
 java_test_suite(
     name = "e2e-tests",
     size = "medium",
     srcs = E2E_TESTS,
+    data = [
+        ":sync-episodes-script.py",
+    ],
     resources = ["src/test/resources/test.properties"],
     runner = "junit5",
     test_suffixes = ["E2ETest.java"],
