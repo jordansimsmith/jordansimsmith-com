@@ -2,6 +2,7 @@ import os
 import requests
 import json
 import urllib.parse
+import pathlib
 
 
 def main():
@@ -34,7 +35,7 @@ def find_local_episodes_watched():
             if not os.path.isfile(os.path.join(watched, episode)):
                 continue
 
-            episode = {"folder_name": show, "file_name": os.path.basename(episode)}
+            episode = {"folder_name": show, "file_name": pathlib.Path(episode).stem}
             episodes.append(episode)
 
     return episodes
