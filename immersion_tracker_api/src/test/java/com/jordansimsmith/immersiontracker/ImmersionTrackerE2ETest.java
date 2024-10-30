@@ -94,8 +94,8 @@ public class ImmersionTrackerE2ETest {
         Successfully updated show metadata.
         Retrieving progress summary...
 
-        2 episodes of ハイキュー!!.
-        1 episodes of Free!.
+        2 episodes of ハイキュー!!
+        1 episodes of Free!
 
         3 episodes watched today.
         1 total hours watched.

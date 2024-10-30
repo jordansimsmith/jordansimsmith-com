@@ -71,7 +71,7 @@ def get_remote_show_progress():
     for show in res["shows"]:
         name = show["name"] or "Unknown"
         episodes_watched = show["episodes_watched"]
-        print(f"{episodes_watched} episodes of {name}.")
+        print(f"{episodes_watched} episodes of {name}")
 
     episodes_watched_today = res["episodes_watched_today"]
     total_hours_watched = res["total_hours_watched"]
