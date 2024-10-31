@@ -75,6 +75,7 @@ java_test_suite(
         ":lib",
         ":test-lib",
         ":update-prices-handler",
+        "//lib/dynamodb:lib",
         "//lib/testcontainers:lib",
         "//lib/time:lib",
         "@maven//:com_amazonaws_aws_lambda_java_core",

@@ -191,6 +191,7 @@ java_test_suite(
         ":sync-episodes-handler",
         ":test-lib",
         ":update-show-handler",
+        "//lib/dynamodb:lib",
         "//lib/json:lib",
         "//lib/secrets:lib",
         "//lib/testcontainers:lib",

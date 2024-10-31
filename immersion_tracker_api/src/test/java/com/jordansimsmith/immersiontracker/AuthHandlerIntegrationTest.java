@@ -4,31 +4,26 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.secrets.FakeSecrets;
-import com.jordansimsmith.testcontainers.DynamoDbContainer;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.policybuilder.iam.IamAction;
 import software.amazon.awssdk.policybuilder.iam.IamEffect;
 import software.amazon.awssdk.policybuilder.iam.IamPolicy;
 import software.amazon.awssdk.policybuilder.iam.IamResource;
 
-@Testcontainers
 public class AuthHandlerIntegrationTest {
   private FakeSecrets fakeSecrets;
   private ObjectMapper objectMapper;
 
   private AuthHandler authHandler;
 
-  @Container DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
-
   @BeforeEach
   void setUp() {
-    var factory = ImmersionTrackerTestFactory.create(dynamoDbContainer.getEndpoint());
+    var factory = ImmersionTrackerTestFactory.create(URI.create("unused"));
     fakeSecrets = factory.fakeSecrets();
     objectMapper = factory.objectMapper();
 
