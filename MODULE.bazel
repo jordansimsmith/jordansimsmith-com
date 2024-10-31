@@ -43,6 +43,7 @@ maven.install(
         "com.fasterxml.jackson.core:jackson-annotations:2.17.2",
         "com.fasterxml.jackson.core:jackson-core:2.17.2",
         "com.fasterxml.jackson.core:jackson-databind:2.17.2",
+        "org.jsoup:jsoup:1.18.1",
     ],
 )
 use_repo(maven, "maven")
