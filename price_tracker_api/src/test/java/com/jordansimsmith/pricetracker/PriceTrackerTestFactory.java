@@ -1,6 +1,8 @@
 package com.jordansimsmith.pricetracker;
 
 import com.jordansimsmith.dynamodb.DynamoDbTestModule;
+import com.jordansimsmith.lib.notifications.FakeNotificationPublisher;
+import com.jordansimsmith.lib.notifications.NotificationTestModule;
 import com.jordansimsmith.time.ClockTestModule;
 import com.jordansimsmith.time.FakeClock;
 import dagger.BindsInstance;
@@ -15,12 +17,15 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
     modules = {
       ClockTestModule.class,
       DynamoDbTestModule.class,
+      NotificationTestModule.class,
       PriceTrackerTestModule.class,
     })
 public interface PriceTrackerTestFactory extends PriceTrackerFactory {
   FakeClock fakeClock();
 
   DynamoDbClient dynamoDbClient();
+
+  FakeNotificationPublisher fakeNotificationPublisher();
 
   FakeChemistWarehouseClient fakeChemistWarehouseClient();
 

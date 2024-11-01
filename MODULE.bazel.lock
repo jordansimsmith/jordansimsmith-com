@@ -1306,7 +1306,7 @@
     "@@rules_jvm_external~//:extensions.bzl%maven": {
       "general": {
         "bzlTransitiveDigest": "Pq3YnJEflPAALx/UMykUnN3aA5bve0fNm/cuLvt/zvI=",
-        "usagesDigest": "ebAhpGWr9GLEAYz6+P41iASYyv0ey8AjGzk+DISJd6Y=",
+        "usagesDigest": "EcKJ4fSppbGeqHIWzRbTVvJ2EDqxlZRoJvPORLtKFQk=",
         "recordedFileInputs": {
           "@@stardoc~//maven_install.json": "de0bfa778b4ed6aebb77509362dd87ab8d20fc7c7c18d2a7429cdfee03949a21",
           "@@rules_jvm_external~//rules_jvm_external_deps_install.json": "0bfbc915d9155df44d7a3b216e8f3c1fbcd110e358dd07637dc393583a5227e8",
@@ -6815,6 +6815,7 @@
                 "{ \"group\": \"software.amazon.awssdk\", \"artifact\": \"dynamodb-enhanced\", \"version\": \"2.29.0\" }",
                 "{ \"group\": \"software.amazon.awssdk\", \"artifact\": \"iam-policy-builder\", \"version\": \"2.29.0\" }",
                 "{ \"group\": \"software.amazon.awssdk\", \"artifact\": \"secretsmanager\", \"version\": \"2.29.0\" }",
+                "{ \"group\": \"software.amazon.awssdk\", \"artifact\": \"sns\", \"version\": \"2.29.0\" }",
                 "{ \"group\": \"com.amazonaws\", \"artifact\": \"aws-lambda-java-core\", \"version\": \"1.2.3\" }",
                 "{ \"group\": \"com.amazonaws\", \"artifact\": \"aws-lambda-java-events\", \"version\": \"3.13.0\" }",
                 "{ \"group\": \"com.google.guava\", \"artifact\": \"guava\", \"version\": \"33.2.1-jre\" }",

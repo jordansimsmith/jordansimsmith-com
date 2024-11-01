@@ -4,19 +4,26 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
 import com.google.common.annotations.VisibleForTesting;
+import com.jordansimsmith.lib.notifications.NotificationPublisher;
 import com.jordansimsmith.time.Clock;
 import java.util.ArrayList;
 import java.util.Objects;
+import java.util.StringJoiner;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 public class UpdatePricesHandler implements RequestHandler<ScheduledEvent, Void> {
+  @VisibleForTesting static final String TOPIC = "my topic";
+
   private final Clock clock;
+  private final NotificationPublisher notificationPublisher;
   private final ChemistWarehouseClient chemistWarehouseClient;
   private final ProductsFactory productsFactory;
   private final DynamoDbTable<PriceTrackerItem> priceTrackerTable;
+
+  private record PriceChange(String url, String name, double currentPrice, double previousPrice) {}
 
   public UpdatePricesHandler() {
     this(PriceTrackerFactory.create());
@@ -25,6 +32,7 @@ public class UpdatePricesHandler implements RequestHandler<ScheduledEvent, Void>
   @VisibleForTesting
   UpdatePricesHandler(PriceTrackerFactory factory) {
     this.clock = factory.clock();
+    this.notificationPublisher = factory.notificationPublisher();
     this.chemistWarehouseClient = factory.chemistWarehouseClient();
     this.productsFactory = factory.productsFactory();
     this.priceTrackerTable = factory.priceTrackerTable();
@@ -50,6 +58,7 @@ public class UpdatePricesHandler implements RequestHandler<ScheduledEvent, Void>
       prices.add(priceTrackerItem);
     }
 
+    var priceChanges = new ArrayList<PriceChange>();
     for (var price : prices) {
       var previousPrice =
           priceTrackerTable
@@ -73,8 +82,30 @@ public class UpdatePricesHandler implements RequestHandler<ScheduledEvent, Void>
       }
 
       if (!Objects.equals(previousPrice.getPrice(), price.getPrice())) {
-        // TODO: dispatch notification
+        priceChanges.add(
+            new PriceChange(
+                price.getUrl(), price.getName(), price.getPrice(), previousPrice.getPrice()));
       }
+    }
+
+    if (!priceChanges.isEmpty()) {
+      var subject =
+          priceChanges.size() == 1
+              ? "1 price updated"
+              : "%d prices updated".formatted(priceChanges.size());
+      var message = new StringJoiner("\\n");
+      for (var priceChange : priceChanges) {
+        var line =
+            "%s $%.2f -> $%.2f %s"
+                .formatted(
+                    priceChange.name,
+                    priceChange.previousPrice,
+                    priceChange.currentPrice,
+                    priceChange.url);
+        message.add(line);
+      }
+
+      notificationPublisher.publish(TOPIC, subject, message.toString());
     }
 
     for (var price : prices) {
