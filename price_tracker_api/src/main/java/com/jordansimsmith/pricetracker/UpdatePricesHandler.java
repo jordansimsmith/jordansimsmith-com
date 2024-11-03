@@ -15,7 +15,7 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 public class UpdatePricesHandler implements RequestHandler<ScheduledEvent, Void> {
-  @VisibleForTesting static final String TOPIC = "my topic";
+  @VisibleForTesting static final String TOPIC = "price_tracker_api_price_updates";
 
   private final Clock clock;
   private final NotificationPublisher notificationPublisher;
@@ -93,7 +93,7 @@ public class UpdatePricesHandler implements RequestHandler<ScheduledEvent, Void>
           priceChanges.size() == 1
               ? "1 price updated"
               : "%d prices updated".formatted(priceChanges.size());
-      var message = new StringJoiner("\\n");
+      var message = new StringJoiner("\r\n\r\n");
       for (var priceChange : priceChanges) {
         var line =
             "%s $%.2f -> $%.2f %s"

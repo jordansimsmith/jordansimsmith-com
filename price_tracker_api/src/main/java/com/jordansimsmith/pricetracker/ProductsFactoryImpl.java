@@ -41,6 +41,14 @@ public class ProductsFactoryImpl implements ProductsFactory {
         new Product(
             URI.create(
                 "https://www.chemistwarehouse.co.nz/buy/111309/inc-high-protein-bar-peanut-butter-fudge-100g"),
-            "Chemist Warehouse - INC High Protein Bar Peanut Butter Fudge 100g"));
+            "Chemist Warehouse - INC High Protein Bar Peanut Butter Fudge 100g"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/120088/musashi-electrolytes-blue-raspberry-300g"),
+            "Musashi Electrolytes Blue Raspberry 300g"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/101969/musashi-electrolytes-watermelon-300g"),
+            "Musashi Electrolytes Watermelon 300g"));
   }
 }

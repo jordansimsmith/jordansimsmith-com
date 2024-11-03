@@ -129,7 +129,6 @@ data "aws_iam_policy_document" "lambda_dynamodb_allow_policy_document" {
     actions = [
       "dynamodb:PutItem",
       "dynamodb:UpdateItem",
-      "dynamodb:DeleteItem",
       "dynamodb:BatchWriteItem",
       "dynamodb:GetItem",
       "dynamodb:BatchGetItem",
