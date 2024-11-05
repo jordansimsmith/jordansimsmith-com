@@ -1,1 +1,4 @@
-.git
+.git/
+venv/
+node_modules/
+personal_website_web/node_modules/

@@ -4,4 +4,6 @@ bazel-*
 **/.terraform/
 **/*.tfstate
 **/*.tfstate.backup
-venv/
+**/venv/
+**/node_modules/
+pnpm-debug.log*

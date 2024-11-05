@@ -19,7 +19,8 @@
     "https://bcr.bazel.build/modules/aspect_bazel_lib/2.7.7/source.json": "87f12b449cd1d27d3e83840a59a6966d557e7c3c5f19e7b2e0361da5edc6b397",
     "https://bcr.bazel.build/modules/aspect_rules_js/1.33.1/MODULE.bazel": "db3e7f16e471cf6827059d03af7c21859e7a0d2bc65429a3a11f005d46fc501b",
     "https://bcr.bazel.build/modules/aspect_rules_js/1.40.0/MODULE.bazel": "01a1014e95e6816b68ecee2584ae929c7d6a1b72e4333ab1ff2d2c6c30babdf1",
-    "https://bcr.bazel.build/modules/aspect_rules_js/1.40.0/source.json": "b6fd491369e9ef888fdef64b839023a2360caaea8eb370d2cfbfdd2a96721311",
+    "https://bcr.bazel.build/modules/aspect_rules_js/2.1.0/MODULE.bazel": "f747a24e13bc3c35c712580fc4e30186c54d80d21997b9503e29705e4d864533",
+    "https://bcr.bazel.build/modules/aspect_rules_js/2.1.0/source.json": "3a43843c6bd0ac65d118e72f504ff553a1ba1e65fec91938e5546effb4245104",
     "https://bcr.bazel.build/modules/aspect_rules_lint/0.12.0/MODULE.bazel": "e767c5dbfeb254ec03275a7701b5cfde2c4d2873676804bc7cb27ddff3728fed",
     "https://bcr.bazel.build/modules/aspect_rules_lint/1.0.0-rc8/MODULE.bazel": "7c119c96df01e97ed8501ad319a26f29c975e22121d06fae3e88be5d0a0e96ee",
     "https://bcr.bazel.build/modules/aspect_rules_lint/1.0.0-rc8/source.json": "0c87d888e7b38d2cb2cf051003579fb75ab68889ef7d4f2ea22e800b262823c4",
@@ -31,6 +32,7 @@
     "https://bcr.bazel.build/modules/bazel_features/1.11.0/source.json": "c9320aa53cd1c441d24bd6b716da087ad7e4ff0d9742a9884587596edfe53015",
     "https://bcr.bazel.build/modules/bazel_features/1.2.0/MODULE.bazel": "122b2b606622afbaa498913d54f52d9bcd2d19a5edd1bd6d6c5aa17441c4d5f9",
     "https://bcr.bazel.build/modules/bazel_features/1.4.1/MODULE.bazel": "e45b6bb2350aff3e442ae1111c555e27eac1d915e77775f6fdc4b351b758b5d7",
+    "https://bcr.bazel.build/modules/bazel_features/1.9.0/MODULE.bazel": "885151d58d90d8d9c811eb75e3288c11f850e1d6b481a8c9f766adee4712358b",
     "https://bcr.bazel.build/modules/bazel_features/1.9.1/MODULE.bazel": "8f679097876a9b609ad1f60249c49d68bfab783dd9be012faf9d82547b14815a",
     "https://bcr.bazel.build/modules/bazel_skylib/1.0.3/MODULE.bazel": "bcb0fd896384802d1ad283b4e4eb4d718eebd8cb820b0a2c3a347fb971afd9d8",
     "https://bcr.bazel.build/modules/bazel_skylib/1.1.1/MODULE.bazel": "1add3e7d93ff2e6998f9e118022c84d163917d912f5afafb3058e3d2f1545b5e",
@@ -119,7 +121,8 @@
     "https://bcr.bazel.build/modules/rules_multitool/0.4.0/MODULE.bazel": "15517987d5c00c9e7faab41fbe22ee67a350b6eabcc1e08baded5c6d9025897f",
     "https://bcr.bazel.build/modules/rules_multitool/0.4.0/source.json": "d73b450b7c6d9683e400d6cebc463fbc2b870cc5d8e2e75080d6278805aaab08",
     "https://bcr.bazel.build/modules/rules_nodejs/5.8.2/MODULE.bazel": "6bc03c8f37f69401b888023bf511cb6ee4781433b0cb56236b2e55a21e3a026a",
-    "https://bcr.bazel.build/modules/rules_nodejs/5.8.2/source.json": "6e82cf5753d835ea18308200bc79b9c2e782efe2e2a4edc004a9162ca93382ca",
+    "https://bcr.bazel.build/modules/rules_nodejs/6.3.0/MODULE.bazel": "45345e4aba35dd6e4701c1eebf5a4e67af4ed708def9ebcdc6027585b34ee52d",
+    "https://bcr.bazel.build/modules/rules_nodejs/6.3.0/source.json": "1254ffd8d0d908a19c67add7fb5e2a1f604df133bc5d206425264293e2e537fc",
     "https://bcr.bazel.build/modules/rules_oci/2.0.0-beta1/MODULE.bazel": "4ec537c70cec01503ce989aa17e37b735b6b5782580b1b658cd1733064d29c07",
     "https://bcr.bazel.build/modules/rules_oci/2.0.0-beta1/source.json": "23e3081125b982ba84d7f7b4d126996f99d877eb13461bbc60bd762e14c40785",
     "https://bcr.bazel.build/modules/rules_pkg/0.7.0/MODULE.bazel": "df99f03fc7934a4737122518bb87e667e62d780b610910f0447665a7e2be62dc",
@@ -208,7 +211,7 @@
     "@@aspect_bazel_lib~//lib:extensions.bzl%toolchains": {
       "general": {
         "bzlTransitiveDigest": "3KydN9M+cGcn8Huu/umxX7Vk08sXz5lJeUxg/b0Gxjc=",
-        "usagesDigest": "oVv9AxWOOJirSGJlV4XCSI2askX1kezfOpBfwP0ddVE=",
+        "usagesDigest": "J5sMnXOCLpGY15oiwkiPUCImvOYJEMD++I8poIMz430=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -674,8 +677,8 @@
     },
     "@@aspect_rules_js~//npm:extensions.bzl%pnpm": {
       "general": {
-        "bzlTransitiveDigest": "MSpOxC/qU108nzN2yAAFl6TBuvs1pCw2PAIhkE1qkpI=",
-        "usagesDigest": "Jxv1z2hZxjdD1R/J1MfyYBgR+UIX9DZZtnm0V48qJXk=",
+        "bzlTransitiveDigest": "xSi49QoVeOv2LYuZxilxR/lItnFXAS7df9Iy+nyrcX8=",
+        "usagesDigest": "oSX0k7KMMZwG8VPfH6WsJ8KL4F0yf9qnhX6KPmUYhms=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -698,7 +701,6 @@
               ],
               "lifecycle_hooks_use_default_shell_env": false,
               "bins": {},
-              "npm_translate_lock_repo": "",
               "package_visibility": [
                 "//visibility:public"
               ],
@@ -729,7 +731,8 @@
               "lifecycle_hooks": [],
               "extra_build_content": "load(\"@aspect_rules_js//js:defs.bzl\", \"js_binary\")\njs_binary(name = \"pnpm\", data = glob([\"package/**\"]), entry_point = \"package/dist/pnpm.cjs\", visibility = [\"//visibility:public\"])",
               "generate_bzl_library_targets": false,
-              "extract_full_archive": true
+              "extract_full_archive": true,
+              "system_tar": "auto"
             }
           }
         },
@@ -766,8 +769,13 @@
           ],
           [
             "bazel_features~",
-            "bazel_tools",
-            "bazel_tools"
+            "bazel_features_globals",
+            "bazel_features~~version_extension~bazel_features_globals"
+          ],
+          [
+            "bazel_features~",
+            "bazel_features_version",
+            "bazel_features~~version_extension~bazel_features_version"
           ]
         ]
       }
@@ -7580,8 +7588,8 @@
     },
     "@@rules_nodejs~//nodejs:extensions.bzl%node": {
       "general": {
-        "bzlTransitiveDigest": "liNCpme8abwnUcdsL6FZlbuEqQRiO4GmDTZyX6QuOH4=",
-        "usagesDigest": "PK17kgVNa/ZEIu96GAPHuB82/W4Xn4BTFA07oJviqKE=",
+        "bzlTransitiveDigest": "SqbzUarOVzAfK28Ca5+NIU3LUwnW/b3h0xXBUS97oyI=",
+        "usagesDigest": "jhSJxjHvVaptc85qpnk3AKFX/p7UdNysC7R89zrtRRU=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -7595,57 +7603,93 @@
           },
           "nodejs_linux_s390x": {
             "bzlFile": "@@rules_nodejs~//nodejs:repositories.bzl",
-            "ruleClassName": "node_repositories",
+            "ruleClassName": "_nodejs_repositories",
             "attributes": {
-              "platform": "linux_s390x",
-              "node_version": "16.19.0"
+              "node_download_auth": {},
+              "node_repositories": {},
+              "node_urls": [
+                "https://nodejs.org/dist/v{version}/{filename}"
+              ],
+              "node_version": "18.20.4",
+              "include_headers": false,
+              "platform": "linux_s390x"
             }
           },
           "nodejs_windows_amd64": {
             "bzlFile": "@@rules_nodejs~//nodejs:repositories.bzl",
-            "ruleClassName": "node_repositories",
+            "ruleClassName": "_nodejs_repositories",
             "attributes": {
-              "platform": "windows_amd64",
-              "node_version": "16.19.0"
+              "node_download_auth": {},
+              "node_repositories": {},
+              "node_urls": [
+                "https://nodejs.org/dist/v{version}/{filename}"
+              ],
+              "node_version": "18.20.4",
+              "include_headers": false,
+              "platform": "windows_amd64"
             }
           },
           "nodejs_toolchains": {
-            "bzlFile": "@@rules_nodejs~//nodejs/private:toolchains_repo.bzl",
-            "ruleClassName": "toolchains_repo",
+            "bzlFile": "@@rules_nodejs~//nodejs/private:nodejs_toolchains_repo.bzl",
+            "ruleClassName": "nodejs_toolchains_repo",
             "attributes": {
               "user_node_repository_name": "nodejs"
             }
           },
           "nodejs_linux_amd64": {
             "bzlFile": "@@rules_nodejs~//nodejs:repositories.bzl",
-            "ruleClassName": "node_repositories",
+            "ruleClassName": "_nodejs_repositories",
             "attributes": {
-              "platform": "linux_amd64",
-              "node_version": "16.19.0"
+              "node_download_auth": {},
+              "node_repositories": {},
+              "node_urls": [
+                "https://nodejs.org/dist/v{version}/{filename}"
+              ],
+              "node_version": "18.20.4",
+              "include_headers": false,
+              "platform": "linux_amd64"
             }
           },
           "nodejs_linux_ppc64le": {
             "bzlFile": "@@rules_nodejs~//nodejs:repositories.bzl",
-            "ruleClassName": "node_repositories",
+            "ruleClassName": "_nodejs_repositories",
             "attributes": {
-              "platform": "linux_ppc64le",
-              "node_version": "16.19.0"
+              "node_download_auth": {},
+              "node_repositories": {},
+              "node_urls": [
+                "https://nodejs.org/dist/v{version}/{filename}"
+              ],
+              "node_version": "18.20.4",
+              "include_headers": false,
+              "platform": "linux_ppc64le"
             }
           },
           "nodejs_darwin_amd64": {
             "bzlFile": "@@rules_nodejs~//nodejs:repositories.bzl",
-            "ruleClassName": "node_repositories",
+            "ruleClassName": "_nodejs_repositories",
             "attributes": {
-              "platform": "darwin_amd64",
-              "node_version": "16.19.0"
+              "node_download_auth": {},
+              "node_repositories": {},
+              "node_urls": [
+                "https://nodejs.org/dist/v{version}/{filename}"
+              ],
+              "node_version": "18.20.4",
+              "include_headers": false,
+              "platform": "darwin_amd64"
             }
           },
           "nodejs_linux_arm64": {
             "bzlFile": "@@rules_nodejs~//nodejs:repositories.bzl",
-            "ruleClassName": "node_repositories",
+            "ruleClassName": "_nodejs_repositories",
             "attributes": {
-              "platform": "linux_arm64",
-              "node_version": "16.19.0"
+              "node_download_auth": {},
+              "node_repositories": {},
+              "node_urls": [
+                "https://nodejs.org/dist/v{version}/{filename}"
+              ],
+              "node_version": "18.20.4",
+              "include_headers": false,
+              "platform": "linux_arm64"
             }
           },
           "nodejs": {
@@ -7657,25 +7701,20 @@
           },
           "nodejs_darwin_arm64": {
             "bzlFile": "@@rules_nodejs~//nodejs:repositories.bzl",
-            "ruleClassName": "node_repositories",
+            "ruleClassName": "_nodejs_repositories",
             "attributes": {
-              "platform": "darwin_arm64",
-              "node_version": "16.19.0"
+              "node_download_auth": {},
+              "node_repositories": {},
+              "node_urls": [
+                "https://nodejs.org/dist/v{version}/{filename}"
+              ],
+              "node_version": "18.20.4",
+              "include_headers": false,
+              "platform": "darwin_arm64"
             }
           }
         },
-        "recordedRepoMappingEntries": [
-          [
-            "rules_nodejs~",
-            "bazel_skylib",
-            "bazel_skylib~"
-          ],
-          [
-            "rules_nodejs~",
-            "bazel_tools",
-            "bazel_tools"
-          ]
-        ]
+        "recordedRepoMappingEntries": []
       }
     },
     "@@rules_oci~//oci:extensions.bzl%oci": {
