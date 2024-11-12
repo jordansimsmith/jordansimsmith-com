@@ -32,7 +32,7 @@ locals {
     }
   }
 
-  subscriptions = ["jordansimsmith@gmail.com"]
+  subscriptions = ["jordansimsmith@gmail.com", "harrisonl7190@gmail.com"]
 }
 
 data "aws_iam_policy_document" "lambda_sts_allow_policy_document" {
