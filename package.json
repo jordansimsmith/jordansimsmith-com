@@ -5,8 +5,13 @@
     "onlyBuiltDependencies": []
   },
   "dependencies": {
+    "@bazel/ibazel": "^0.25.0",
+    "@mantine/core": "^7.13.5",
+    "@mantine/hooks": "^7.13.5",
     "@vitejs/plugin-react": "^4.3.3",
-    "globals": "^15.11.0",
+    "postcss": "^8.4.49",
+    "postcss-preset-mantine": "^1.17.0",
+    "postcss-simple-vars": "^7.0.1",
     "prettier": "^3.3.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",

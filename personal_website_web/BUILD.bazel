@@ -7,18 +7,27 @@ npm_link_all_packages(
 )
 
 js_library(
-    name = "vite.config",
+    name = "vite-config",
     srcs = ["vite.config.js"],
-    data = [
+    deps = [
         "//:node_modules/@vitejs/plugin-react",
         "//:node_modules/vite",
+    ],
+)
+
+js_library(
+    name = "postcss-config",
+    srcs = ["postcss.config.js"],
+    deps = [
+        "//:node_modules/postcss-preset-mantine",
+        "//:node_modules/postcss-simple-vars",
     ],
 )
 
 bin.vite_binary(
     name = "vite",
     chdir = package_name(),
-    data = [":vite.config"],
+    data = [":vite-config"],
 )
 
 js_library(
@@ -37,6 +46,7 @@ js_library(
     ]),
     data = [":assets"],
     deps = [
+        "//:node_modules/@mantine/core",
         "//:node_modules/react",
         "//:node_modules/react-dom",
     ],
@@ -49,16 +59,14 @@ filegroup(
 
 js_run_binary(
     name = "build",
-    srcs =
-        [
-            "index.html",
-            "package.json",
-            ":assets",
-            ":public",
-            ":src",
-            "//:node_modules/react",
-            "//:node_modules/react-dom",
-        ],
+    srcs = [
+        "index.html",
+        "package.json",
+        ":assets",
+        ":postcss-config",
+        ":public",
+        ":src",
+    ],
     args = ["build"],
     out_dirs = ["dist"],
     tool = ":vite",
