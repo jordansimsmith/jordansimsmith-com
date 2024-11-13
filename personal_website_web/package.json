@@ -1,9 +1,5 @@
 {
   "name": "@jordansimsmith_com/personal_website_web",
   "private": true,
-  "type": "module",
-  "dependencies": {
-    "@bazel/ibazel": "^0.25.0",
-    "uninstall": "^0.0.0"
-  }
+  "type": "module"
 }
