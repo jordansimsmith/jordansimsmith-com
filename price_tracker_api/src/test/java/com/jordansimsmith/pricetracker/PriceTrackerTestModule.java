@@ -11,7 +11,7 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 public class PriceTrackerTestModule {
   @Provides
   @Singleton
-  public DynamoDbTable<PriceTrackerItem> immersionTrackerTable(
+  public DynamoDbTable<PriceTrackerItem> priceTrackerTable(
       DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(PriceTrackerItem.class);
     return dynamoDbEnhancedClient.table("price_tracker", schema);
