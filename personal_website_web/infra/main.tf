@@ -19,6 +19,11 @@ provider "aws" {
   region = "ap-southeast-2"
 }
 
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+}
+
 locals {
   application_id = "personal_website_web"
   origin_id      = "${local.application_id}_s3_origin"
@@ -107,6 +112,18 @@ resource "aws_cloudfront_origin_access_control" "personal_website_web" {
   signing_protocol                  = "sigv4"
 }
 
+resource "aws_acm_certificate" "personal_website_web" {
+  provider          = aws.us_east_1
+  domain_name       = "jordansimsmith.com"
+  validation_method = "DNS"
+
+  tags = local.tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
 resource "aws_cloudfront_distribution" "personal_website_web" {
   origin {
     domain_name              = aws_s3_bucket.personal_website_web.bucket_regional_domain_name
@@ -118,6 +135,8 @@ resource "aws_cloudfront_distribution" "personal_website_web" {
   is_ipv6_enabled     = true
   default_root_object = "index.html"
   price_class         = "PriceClass_All"
+
+  aliases = ["jordansimsmith.com"]
 
   default_cache_behavior {
     allowed_methods  = ["GET", "HEAD"]
@@ -145,7 +164,9 @@ resource "aws_cloudfront_distribution" "personal_website_web" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    acm_certificate_arn      = aws_acm_certificate.personal_website_web.arn
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
   }
 
   tags = local.tags
