@@ -19,6 +19,11 @@ provider "aws" {
   region = "ap-southeast-2"
 }
 
+provider "aws" {
+  alias  = "us_east_1"
+  region = "us-east-1"
+}
+
 locals {
   application_id = "immersion_tracker_api"
   tags = {
@@ -314,4 +319,28 @@ resource "aws_api_gateway_stage" "prod" {
   deployment_id = aws_api_gateway_deployment.immersion_tracker.id
   rest_api_id   = aws_api_gateway_rest_api.immersion_tracker.id
   stage_name    = "prod"
+  tags          = local.tags
+}
+
+resource "aws_acm_certificate" "immersion_tracker" {
+  provider          = aws.us_east_1
+  domain_name       = "api.immersion-tracker.jordansimsmith.com"
+  validation_method = "DNS"
+  tags              = local.tags
+
+  lifecycle {
+    create_before_destroy = true
+  }
+}
+
+resource "aws_api_gateway_domain_name" "immersion_tracker" {
+  domain_name     = aws_acm_certificate.immersion_tracker.domain_name
+  certificate_arn = aws_acm_certificate.immersion_tracker.arn
+  tags            = local.tags
+}
+
+resource "aws_api_gateway_base_path_mapping" "immersion_tracker" {
+  api_id      = aws_api_gateway_rest_api.immersion_tracker.id
+  stage_name  = aws_api_gateway_stage.prod.stage_name
+  domain_name = aws_api_gateway_domain_name.immersion_tracker.domain_name
 }

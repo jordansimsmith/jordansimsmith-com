@@ -92,7 +92,7 @@ def send_request(method, path, body=None):
 
     base_path = (
         os.getenv("IMMERSION_TRACKER_API_URL")
-        or "https://9tpnqbuz76.execute-api.ap-southeast-2.amazonaws.com/prod"
+        or "https://api.immersion-tracker.jordansimsmith.com"
     )
     if base_path[-1] != "/":
         base_path += "/"

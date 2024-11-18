@@ -136,7 +136,7 @@ resource "aws_cloudfront_distribution" "personal_website_web" {
   default_root_object = "index.html"
   price_class         = "PriceClass_All"
 
-  aliases = ["jordansimsmith.com"]
+  aliases = [aws_acm_certificate.personal_website_web.domain_name]
 
   default_cache_behavior {
     allowed_methods  = ["GET", "HEAD"]
