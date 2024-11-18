@@ -17,18 +17,27 @@ terraform {
 
 provider "aws" {
   region = "ap-southeast-2"
+
+  default_tags {
+    tags = {
+      application_id = local.application_id
+    }
+  }
 }
 
 provider "aws" {
   alias  = "us_east_1"
   region = "us-east-1"
+
+  default_tags {
+    tags = {
+      application_id = local.application_id
+    }
+  }
 }
 
 locals {
   application_id = "immersion_tracker_api"
-  tags = {
-    application_id = local.application_id
-  }
 
   lambdas = {
     auth = {
@@ -94,14 +103,11 @@ resource "aws_dynamodb_table" "immersion_tracker_table" {
   }
 
   deletion_protection_enabled = true
-
-  tags = local.tags
 }
 
 resource "aws_secretsmanager_secret" "immersion_tracker" {
   name                    = local.application_id
   recovery_window_in_days = 0
-  tags                    = local.tags
 }
 
 data "aws_iam_policy_document" "lambda_sts_allow_policy_document" {
@@ -120,7 +126,6 @@ data "aws_iam_policy_document" "lambda_sts_allow_policy_document" {
 resource "aws_iam_role" "lambda_role" {
   name               = "${local.application_id}_lambda_exec"
   assume_role_policy = data.aws_iam_policy_document.lambda_sts_allow_policy_document.json
-  tags               = local.tags
 }
 
 data "aws_iam_policy_document" "lambda_dynamodb_allow_policy_document" {
@@ -147,7 +152,6 @@ data "aws_iam_policy_document" "lambda_dynamodb_allow_policy_document" {
 resource "aws_iam_policy" "lambda_dynamodb" {
   name   = "${local.application_id}_lambda_dynamodb"
   policy = data.aws_iam_policy_document.lambda_dynamodb_allow_policy_document.json
-  tags   = local.tags
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
@@ -192,7 +196,6 @@ data "aws_iam_policy_document" "lambda_secretsmanager_allow_policy_document" {
 resource "aws_iam_policy" "lambda_secretsmanager" {
   name   = "${local.application_id}_lambda_secretsmanager"
   policy = data.aws_iam_policy_document.lambda_secretsmanager_allow_policy_document.json
-  tags   = local.tags
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_secretsmanager" {
@@ -227,7 +230,6 @@ resource "aws_lambda_function" "lambda" {
   runtime          = "java17"
   memory_size      = 512
   timeout          = 10
-  tags             = local.tags
 }
 
 resource "aws_lambda_permission" "api_gateway" {
@@ -242,7 +244,6 @@ resource "aws_lambda_permission" "api_gateway" {
 
 resource "aws_api_gateway_rest_api" "immersion_tracker" {
   name = "${local.application_id}_gateway"
-  tags = local.tags
 }
 
 resource "aws_api_gateway_authorizer" "immersion_tracker" {
@@ -319,14 +320,12 @@ resource "aws_api_gateway_stage" "prod" {
   deployment_id = aws_api_gateway_deployment.immersion_tracker.id
   rest_api_id   = aws_api_gateway_rest_api.immersion_tracker.id
   stage_name    = "prod"
-  tags          = local.tags
 }
 
 resource "aws_acm_certificate" "immersion_tracker" {
   provider          = aws.us_east_1
   domain_name       = "api.immersion-tracker.jordansimsmith.com"
   validation_method = "DNS"
-  tags              = local.tags
 
   lifecycle {
     create_before_destroy = true
@@ -336,7 +335,6 @@ resource "aws_acm_certificate" "immersion_tracker" {
 resource "aws_api_gateway_domain_name" "immersion_tracker" {
   domain_name     = aws_acm_certificate.immersion_tracker.domain_name
   certificate_arn = aws_acm_certificate.immersion_tracker.arn
-  tags            = local.tags
 }
 
 resource "aws_api_gateway_base_path_mapping" "immersion_tracker" {

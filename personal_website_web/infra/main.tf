@@ -17,24 +17,32 @@ terraform {
 
 provider "aws" {
   region = "ap-southeast-2"
+
+  default_tags {
+    tags = {
+      application_id = local.application_id
+    }
+  }
 }
 
 provider "aws" {
   alias  = "us_east_1"
   region = "us-east-1"
+
+  default_tags {
+    tags = {
+      application_id = local.application_id
+    }
+  }
 }
 
 locals {
   application_id = "personal_website_web"
   origin_id      = "${local.application_id}_s3_origin"
-  tags = {
-    application_id = local.application_id
-  }
 }
 
 resource "aws_s3_bucket" "personal_website_web" {
   bucket = "personal-website.jordansimsmith.com"
-  tags   = local.tags
 }
 
 resource "aws_s3_bucket_ownership_controls" "personal_website_web" {
@@ -117,8 +125,6 @@ resource "aws_acm_certificate" "personal_website_web" {
   domain_name       = "jordansimsmith.com"
   validation_method = "DNS"
 
-  tags = local.tags
-
   lifecycle {
     create_before_destroy = true
   }
@@ -168,6 +174,4 @@ resource "aws_cloudfront_distribution" "personal_website_web" {
     ssl_support_method       = "sni-only"
     minimum_protocol_version = "TLSv1.2_2021"
   }
-
-  tags = local.tags
 }

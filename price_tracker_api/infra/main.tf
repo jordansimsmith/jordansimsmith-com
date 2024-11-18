@@ -17,13 +17,16 @@ terraform {
 
 provider "aws" {
   region = "ap-southeast-2"
+
+  default_tags {
+    tags = {
+      application_id = local.application_id
+    }
+  }
 }
 
 locals {
   application_id = "price_tracker_api"
-  tags = {
-    application_id = local.application_id
-  }
 
   lambdas = {
     update_prices = {
@@ -51,7 +54,6 @@ data "aws_iam_policy_document" "lambda_sts_allow_policy_document" {
 resource "aws_iam_role" "lambda_role" {
   name               = "${local.application_id}_lambda_exec"
   assume_role_policy = data.aws_iam_policy_document.lambda_sts_allow_policy_document.json
-  tags               = local.tags
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_basic" {
@@ -80,8 +82,6 @@ resource "aws_dynamodb_table" "price_tracker" {
   }
 
   deletion_protection_enabled = true
-
-  tags = local.tags
 }
 
 data "aws_iam_policy_document" "lambda_dynamodb" {
@@ -108,7 +108,6 @@ data "aws_iam_policy_document" "lambda_dynamodb" {
 resource "aws_iam_policy" "lambda_dynamodb" {
   name   = "${local.application_id}_lambda_dynamodb"
   policy = data.aws_iam_policy_document.lambda_dynamodb.json
-  tags   = local.tags
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
@@ -157,7 +156,6 @@ data "aws_iam_policy_document" "lambda_sns" {
 resource "aws_iam_policy" "lambda_sns" {
   name   = "${local.application_id}_lambda_sns"
   policy = data.aws_iam_policy_document.lambda_sns.json
-  tags   = local.tags
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_sns" {
@@ -192,7 +190,6 @@ resource "aws_lambda_function" "lambda" {
   runtime          = "java17"
   memory_size      = 1024
   timeout          = 30
-  tags             = local.tags
 }
 
 resource "aws_cloudwatch_event_rule" "trigger" {
