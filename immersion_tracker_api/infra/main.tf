@@ -213,19 +213,13 @@ data "external" "handler_location" {
   }
 }
 
-data "local_file" "handler_file" {
-  for_each = local.lambdas
-
-  filename = data.external.handler_location[each.key].result.location
-}
-
 resource "aws_lambda_function" "lambda" {
   for_each = local.lambdas
 
-  filename         = data.local_file.handler_file[each.key].filename
+  filename         = data.external.handler_location[each.key].result.location
   function_name    = "${local.application_id}_${each.key}"
   role             = aws_iam_role.lambda_role.arn
-  source_code_hash = data.local_file.handler_file[each.key].content_base64sha256
+  source_code_hash = filebase64sha256(data.external.handler_location[each.key].result.location)
   handler          = each.value.handler
   runtime          = "java17"
   memory_size      = 512
