@@ -1,8 +1,10 @@
-import os
-import requests
+import glob
 import json
-import urllib.parse
+import os
 import pathlib
+import urllib.parse
+
+import requests
 
 
 def main():
@@ -14,6 +16,7 @@ def main():
     sync_local_episodes_watched(local_episodes_watched)
     update_remote_shows()
     get_remote_show_progress()
+    delete_local_episodes_watched(local_episodes_watched)
 
     print()
     input("Press ENTER to close...")
@@ -79,6 +82,34 @@ def get_remote_show_progress():
     print()
     print(f"{episodes_watched_today} episodes watched today.")
     print(f"{total_hours_watched} total hours watched.")
+
+
+def delete_local_episodes_watched(episodes):
+    print()
+    print(f"Deleting {len(episodes)} local episodes watched...")
+
+    size_bytes = 0
+    for episode in episodes:
+        path = os.path.join(
+            episode["folder_name"], "watched", episode["file_name"] + "*"
+        )
+        files = glob.glob(path)
+
+        if len(files) != 1 or not os.path.isfile(files[0]):
+            raise Exception(
+                f"episode at {path} for deletion did not contain a single file"
+            )
+
+        try:
+            episode_size_bytes = os.path.getsize(files[0])
+            os.remove(files[0])
+            size_bytes += episode_size_bytes
+        except OSError:
+            # episode probably in use
+            pass
+
+    size_gigabytes = size_bytes / 1024 / 1024 / 1024
+    print(f"Deleted {size_gigabytes:.2f} GB of watched episodes.")
 
 
 def send_request(method, path, body=None):
