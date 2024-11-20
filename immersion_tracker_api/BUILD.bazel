@@ -221,7 +221,7 @@ pkg_tar(
 
 pkg_tar(
     name = "local-init-resources.tar",
-    srcs = ["local/init_resources.py"],
+    srcs = ["src/test/resources/init_resources.py"],
     package_dir = "/etc/localstack/init/ready.d/",
 )
 

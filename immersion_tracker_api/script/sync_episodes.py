@@ -90,10 +90,9 @@ def delete_local_episodes_watched(episodes):
 
     size_bytes = 0
     for episode in episodes:
-        path = os.path.join(
-            episode["folder_name"], "watched", episode["file_name"] + "*"
-        )
-        files = glob.glob(path)
+        path = os.path.join(episode["folder_name"], "watched", episode["file_name"])
+        pattern = glob.escape(path) + ".*"
+        files = glob.glob(pattern)
 
         if len(files) != 1 or not os.path.isfile(files[0]):
             raise Exception(

@@ -25,47 +25,47 @@ public class ImmersionTrackerE2ETest {
     // arrange
     var tmp = new File(System.getProperty("java.io.tmpdir"));
 
-    var show1 = Path.of(tmp.getPath(), "show 1").toFile();
+    var show1 = Path.of(tmp.getPath(), "1 [123] Free!").toFile();
     show1.mkdir();
     var watched1 = Path.of(show1.getPath(), "watched").toFile();
     watched1.mkdir();
-    var show1Episode1 = Path.of(watched1.getPath(), "episode 1.mp4").toFile();
+    var show1Episode1 = Path.of(watched1.getPath(), "[123] Free! episode 1.mp4").toFile();
     show1Episode1.createNewFile();
     try (var show1Episode1RandomAccessFile = new RandomAccessFile(show1Episode1, "rw")) {
       show1Episode1RandomAccessFile.setLength(560 * 1024 * 1024);
     }
-    var show1Episode2 = Path.of(watched1.getPath(), "episode 2.mp4").toFile();
+    var show1Episode2 = Path.of(watched1.getPath(), "[123] Free! episode 10.mp4").toFile();
     show1Episode2.createNewFile();
     try (var show1Episode2RandomAccessFile = new RandomAccessFile(show1Episode2, "rw")) {
       show1Episode2RandomAccessFile.setLength(220 * 1024 * 1024);
     }
 
-    var show2 = Path.of(tmp.getPath(), "show 2").toFile();
+    var show2 = Path.of(tmp.getPath(), "2 (123) Haikyuu Part 1").toFile();
     show2.mkdir();
     var watched2 = Path.of(show2.getPath(), "watched").toFile();
     watched2.mkdir();
-    var show2Episode1 = Path.of(watched2.getPath(), "episode 1.mkv").toFile();
+    var show2Episode1 = Path.of(watched2.getPath(), "(123) Haikyuu S01E01.mkv").toFile();
     show2Episode1.createNewFile();
     try (var show2Episode1RandomAccessFile = new RandomAccessFile(show2Episode1, "rw")) {
       show2Episode1RandomAccessFile.setLength(130 * 1024 * 1024);
     }
 
-    var show3 = Path.of(tmp.getPath(), "show 3").toFile();
+    var show3 = Path.of(tmp.getPath(), "3 (123) Haikyuu Part 2").toFile();
     show3.mkdir();
     var watched3 = Path.of(show3.getPath(), "watched").toFile();
     watched3.mkdir();
-    var show3Episode1 = Path.of(watched3.getPath(), "episode 1.mkv").toFile();
+    var show3Episode1 = Path.of(watched3.getPath(), "(123) Haikyuu S01E013.mkv").toFile();
     show3Episode1.createNewFile();
     try (var show3Episode1RandomAccessFile = new RandomAccessFile(show3Episode1, "rw")) {
       show3Episode1RandomAccessFile.setLength(770 * 1024 * 1024);
     }
-    var show3Episode2 = Path.of(show3.getPath(), "episode 2.mkv").toFile();
+    var show3Episode2 = Path.of(show3.getPath(), "(123) Haikyuu S01E014.mkv").toFile();
     show3Episode2.createNewFile();
     try (var show3Episode2RandomAccessFile = new RandomAccessFile(show3Episode2, "rw")) {
       show3Episode2RandomAccessFile.setLength(440 * 1024 * 1024);
     }
 
-    var show4 = Path.of(tmp.getPath(), "show 4").toFile();
+    var show4 = Path.of(tmp.getPath(), "4 {123} Attack on Titan?").toFile();
     show4.mkdir();
 
     // act
@@ -107,11 +107,11 @@ public class ImmersionTrackerE2ETest {
         Syncing 4 local episodes watched...
         Successfully added 4 new episodes to the remote server.
         Retrieving remote show metadata...
-        Enter the TVDB id for show show 1:
+        Enter the TVDB id for show 1 [123] Free!:
         Successfully updated show metadata.
-        Enter the TVDB id for show show 2:
+        Enter the TVDB id for show 2 (123) Haikyuu Part 1:
         Successfully updated show metadata.
-        Enter the TVDB id for show show 3:
+        Enter the TVDB id for show 3 (123) Haikyuu Part 2:
         Successfully updated show metadata.
         Retrieving progress summary...
 
