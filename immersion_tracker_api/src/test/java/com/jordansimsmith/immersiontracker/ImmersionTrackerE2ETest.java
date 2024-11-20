@@ -29,12 +29,12 @@ public class ImmersionTrackerE2ETest {
     show1.mkdir();
     var watched1 = Path.of(show1.getPath(), "watched").toFile();
     watched1.mkdir();
-    var show1Episode1 = Path.of(watched1.getPath(), "episode 1.mkv").toFile();
+    var show1Episode1 = Path.of(watched1.getPath(), "episode 1.mp4").toFile();
     show1Episode1.createNewFile();
     try (var show1Episode1RandomAccessFile = new RandomAccessFile(show1Episode1, "rw")) {
       show1Episode1RandomAccessFile.setLength(560 * 1024 * 1024);
     }
-    var show1Episode2 = Path.of(watched1.getPath(), "episode 2.mkv").toFile();
+    var show1Episode2 = Path.of(watched1.getPath(), "episode 2.mp4").toFile();
     show1Episode2.createNewFile();
     try (var show1Episode2RandomAccessFile = new RandomAccessFile(show1Episode2, "rw")) {
       show1Episode2RandomAccessFile.setLength(220 * 1024 * 1024);
@@ -58,6 +58,11 @@ public class ImmersionTrackerE2ETest {
     show3Episode1.createNewFile();
     try (var show3Episode1RandomAccessFile = new RandomAccessFile(show3Episode1, "rw")) {
       show3Episode1RandomAccessFile.setLength(770 * 1024 * 1024);
+    }
+    var show3Episode2 = Path.of(show3.getPath(), "episode 2.mkv").toFile();
+    show3Episode2.createNewFile();
+    try (var show3Episode2RandomAccessFile = new RandomAccessFile(show3Episode2, "rw")) {
+      show3Episode2RandomAccessFile.setLength(440 * 1024 * 1024);
     }
 
     var show4 = Path.of(tmp.getPath(), "show 4").toFile();
@@ -125,5 +130,6 @@ public class ImmersionTrackerE2ETest {
     assertThat(show1Episode2).doesNotExist();
     assertThat(show2Episode1).doesNotExist();
     assertThat(show3Episode1).doesNotExist();
+    assertThat(show3Episode2).exists();
   }
 }
