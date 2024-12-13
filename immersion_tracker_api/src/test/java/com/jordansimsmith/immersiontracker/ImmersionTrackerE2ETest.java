@@ -39,6 +39,8 @@ public class ImmersionTrackerE2ETest {
     try (var show1Episode2RandomAccessFile = new RandomAccessFile(show1Episode2, "rw")) {
       show1Episode2RandomAccessFile.setLength(220 * 1024 * 1024);
     }
+    var dsStore = Path.of(watched1.getPath(), ".DS_Store").toFile();
+    dsStore.createNewFile();
 
     var show2 = Path.of(tmp.getPath(), "2 (123) Haikyuu Part 1").toFile();
     show2.mkdir();

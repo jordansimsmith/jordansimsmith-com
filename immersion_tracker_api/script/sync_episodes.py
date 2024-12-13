@@ -6,6 +6,8 @@ import urllib.parse
 
 import requests
 
+SUPPORTED_EXTENSIONS = [".mkv", ".mp4"]
+
 
 def main():
     local_episodes_watched = find_local_episodes_watched()
@@ -36,6 +38,9 @@ def find_local_episodes_watched():
 
         for episode in os.listdir(watched):
             if not os.path.isfile(os.path.join(watched, episode)):
+                continue
+
+            if os.path.splitext(episode)[1] not in SUPPORTED_EXTENSIONS:
                 continue
 
             episode = {"folder_name": show, "file_name": pathlib.Path(episode).stem}

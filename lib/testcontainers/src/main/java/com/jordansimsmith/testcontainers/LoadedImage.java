@@ -15,7 +15,8 @@ public class LoadedImage {
       var process = builder.start();
       var code = process.waitFor();
       if (code != 0) {
-        throw new RuntimeException("failed to load image:" + image);
+        var error = new String(process.getInputStream().readAllBytes());
+        throw new RuntimeException("failed to load image: " + image + " with error: " + error);
       }
     } catch (IOException | InterruptedException e) {
       throw new RuntimeException(e);
