@@ -49,6 +49,37 @@ public class ProductsFactoryImpl implements ProductsFactory {
         new Product(
             URI.create(
                 "https://www.chemistwarehouse.co.nz/buy/101969/musashi-electrolytes-watermelon-300g"),
-            "Musashi Electrolytes Watermelon 300g"));
+            "Musashi Electrolytes Watermelon 300g"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/80063/quest-protein-bar-white-chocolate-raspberry-60g"),
+            "Quest Protein Bar White Chocolate Raspberry 60g"),
+        new Product(
+            URI.create("https://www.chemistwarehouse.co.nz/buy/82946/quest-protein-bar-smores-60g"),
+            "Quest Protein Bar Smores 60g"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/136022/quest-protein-bar-dipped-cookies-cream-50g"),
+            "Quest Protein Bar Dipped Cookies & Cream 50g"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/88817/quest-protein-bar-birthday-cake-60g"),
+            "Quest Protein Bar Birthday Cake 60g"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/80060/quest-protein-bar-chocolate-chip-cookie-dough-60g"),
+            "Quest Protein Bar Chocolate Chip Cookie Dough 60g"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/82940/quest-protein-bar-chocolate-brownie-60g"),
+            "Quest Protein Bar Chocolate Brownie 60g"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/80061/quest-protein-bar-cookies-cream-60g"),
+            "Quest Protein Bar Cookies & Cream 60g"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/136023/quest-protein-bar-dipped-choc-chip-cookie-dough-50g"),
+            "Quest Protein Bar Dipped Choc Chip Cookie Dough 50g"));
   }
 }
