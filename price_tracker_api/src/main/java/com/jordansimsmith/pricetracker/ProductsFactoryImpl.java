@@ -24,6 +24,30 @@ public class ProductsFactoryImpl implements ProductsFactory {
                 "https://www.chemistwarehouse.co.nz/buy/98677/inc-100-dynamic-whey-choc-mint-flavour-2kg"),
             "Chemist Warehouse - Dynamic Whey 2kg - Choc mint"),
         new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/79763/inc-micellar-casein-vanilla-2kg"),
+            "INC Micellar Casein Vanilla 2kg"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/79762/inc-micellar-casein-chocolate-2kg"),
+            "INC Micellar Casein Chocolate 2kg"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/74332/inc-100-wpi-vanilla-flavour-2kg"),
+            "INC 100% WPI Vanilla Flavour 2kg"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/74331/inc-100-wpi-chocolate-flavour-2kg"),
+            "INC 100% WPI Chocolate Flavour 2kg"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/74350/inc-shred-max-pro-vanilla-flavour-2kg"),
+            "INC Shred Max Pro Vanilla Flavour 2kg"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/74347/inc-shred-max-pro-chocolate-flavour-2kg"),
+            "INC Shred Max Pro Chocolate Flavour 2kg"),
+        new Product(
             URI.create("https://www.chemistwarehouse.co.nz/buy/74336/inc-creatine-500g"),
             "Chemist Warehouse - INC Creatine 500g"),
         new Product(
@@ -42,6 +66,30 @@ public class ProductsFactoryImpl implements ProductsFactory {
             URI.create(
                 "https://www.chemistwarehouse.co.nz/buy/111309/inc-high-protein-bar-peanut-butter-fudge-100g"),
             "Chemist Warehouse - INC High Protein Bar Peanut Butter Fudge 100g"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/111303/inc-shred-max-protein-bar-raspberry-coconut-60g"),
+            "INC Shred Max Protein Bar Raspberry Coconut 60g"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/111301/inc-shred-max-protein-bar-choc-crunch-60g"),
+            "INC Shred Max Protein Bar Choc Crunch 60g"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/111305/inc-low-carb-protein-bar-choc-chip-mint-60g"),
+            "INC Low Carb Protein Bar Choc Chip Mint 60g"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/111302/inc-shred-max-protein-bar-peanut-caramel-60g"),
+            "INC Shred Max Protein Bar Peanut Caramel 60g"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/111304/inc-low-carb-protein-bar-choc-caramel-60g"),
+            "INC Low Carb Protein Bar Choc Caramel 60g"),
+        new Product(
+            URI.create(
+                "https://www.chemistwarehouse.co.nz/buy/111306/inc-low-carb-protein-bar-cookies-cream-60g"),
+            "INC Low Carb Protein Bar Cookies & Cream 60g"),
         new Product(
             URI.create(
                 "https://www.chemistwarehouse.co.nz/buy/120088/musashi-electrolytes-blue-raspberry-300g"),
