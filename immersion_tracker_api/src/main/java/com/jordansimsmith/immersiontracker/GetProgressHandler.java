@@ -37,6 +37,7 @@ public class GetProgressHandler
       @JsonProperty("total_episodes_watched") int totalEpisodesWatched,
       @JsonProperty("total_hours_watched") int totalHoursWatched,
       @JsonProperty("episodes_watched_today") int episodesWatchedToday,
+      @JsonProperty("days_since_first_episode") long daysSinceFirstEpisode,
       @JsonProperty("shows") List<Show> shows) {}
 
   @VisibleForTesting
@@ -70,6 +71,7 @@ public class GetProgressHandler
       throws Exception {
     var user = event.getQueryStringParameters().get("user");
     Preconditions.checkNotNull(user);
+    var now = clock.now();
 
     var query =
         immersionTrackerTable.query(
@@ -90,12 +92,20 @@ public class GetProgressHandler
 
     var totalEpisodesWatched = episodes.size();
     var totalHoursWatched = totalEpisodesWatched * MINUTES_PER_EPISODE / 60;
-    var today = clock.now().atZone(ZONE_ID).truncatedTo(ChronoUnit.DAYS).toInstant();
+    var today = now.atZone(ZONE_ID).truncatedTo(ChronoUnit.DAYS).toInstant();
     var episodesWatchedToday =
         episodes.stream()
             .filter(e -> Instant.ofEpochSecond(e.getTimestamp()).isAfter(today))
             .toList()
             .size();
+
+    var firstEpisodeWatched =
+        Instant.ofEpochSecond(
+            episodes.stream()
+                .mapToLong(ImmersionTrackerItem::getTimestamp)
+                .min()
+                .orElse(now.getEpochSecond()));
+    var daysSinceFirstEpisode = ChronoUnit.DAYS.between(firstEpisodeWatched, now);
 
     var showsByFolderName =
         shows.stream().collect(Collectors.toMap(ImmersionTrackerItem::getFolderName, v -> v));
@@ -123,7 +133,11 @@ public class GetProgressHandler
 
     var res =
         new GetProgressResponse(
-            totalEpisodesWatched, totalHoursWatched, episodesWatchedToday, progresses);
+            totalEpisodesWatched,
+            totalHoursWatched,
+            episodesWatchedToday,
+            daysSinceFirstEpisode,
+            progresses);
 
     return APIGatewayV2HTTPResponse.builder()
         .withStatusCode(200)

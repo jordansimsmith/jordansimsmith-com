@@ -84,9 +84,19 @@ def get_remote_show_progress():
     episodes_watched_today = res["episodes_watched_today"]
     total_hours_watched = res["total_hours_watched"]
 
+    average_days_per_month = 365 / 12
+    years_since_first_episode = int(res["days_since_first_episode"] / 365)
+    months_since_first_episode = int(
+        (res["days_since_first_episode"] % 365) / average_days_per_month
+    )
+
     print()
     print(f"{episodes_watched_today} episodes watched today.")
     print(f"{total_hours_watched} total hours watched.")
+    print()
+    print(
+        f"{years_since_first_episode} year{'' if years_since_first_episode == 1 else 's'} and {months_since_first_episode} month{'' if months_since_first_episode == 1 else 's'} since immersion started."
+    )
 
 
 def delete_local_episodes_watched(episodes):

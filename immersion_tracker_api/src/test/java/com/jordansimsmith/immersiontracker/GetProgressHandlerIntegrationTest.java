@@ -41,10 +41,11 @@ public class GetProgressHandlerIntegrationTest {
   void handleRequestShouldCalculateProgress() throws Exception {
     // arrange
     var user = "alice";
-    var now = (int) fakeClock.now().atZone(GetProgressHandler.ZONE_ID).toInstant().getEpochSecond();
-    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", now - 100);
-    var episode2 = ImmersionTrackerItem.createEpisode(user, "show2", "episode2", now + 100);
-    var episode3 = ImmersionTrackerItem.createEpisode(user, "show3", "episode1", now - 100);
+    fakeClock.setTime(100_000_000);
+    var now = fakeClock.now().atZone(GetProgressHandler.ZONE_ID).toInstant().getEpochSecond();
+    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", 0);
+    var episode2 = ImmersionTrackerItem.createEpisode(user, "show2", "episode2", now);
+    var episode3 = ImmersionTrackerItem.createEpisode(user, "show3", "episode1", now);
     var show1 = ImmersionTrackerItem.createShow(user, "show1");
     show1.setTvdbId(1);
     show1.setTvdbName("my show");
@@ -76,7 +77,8 @@ public class GetProgressHandlerIntegrationTest {
     assertThat(progress).isNotNull();
     assertThat(progress.totalEpisodesWatched()).isEqualTo(3);
     assertThat(progress.totalHoursWatched()).isEqualTo(1);
-    assertThat(progress.episodesWatchedToday()).isEqualTo(1);
+    assertThat(progress.episodesWatchedToday()).isEqualTo(2);
+    assertThat(progress.daysSinceFirstEpisode()).isEqualTo(1);
 
     var shows = progress.shows();
     assertThat(shows).hasSize(2);
@@ -90,10 +92,10 @@ public class GetProgressHandlerIntegrationTest {
   void handleRequestShouldReturnUnknownShow() throws Exception {
     // arrange
     var user = "alice";
-    var now = (int) fakeClock.now().atZone(GetProgressHandler.ZONE_ID).toInstant().getEpochSecond();
-    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", now - 100);
-    var episode2 = ImmersionTrackerItem.createEpisode(user, "show1", "episode2", now + 100);
-    var episode3 = ImmersionTrackerItem.createEpisode(user, "show3", "episode1", now - 100);
+    var now = fakeClock.now().atZone(GetProgressHandler.ZONE_ID).toInstant().getEpochSecond();
+    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", now);
+    var episode2 = ImmersionTrackerItem.createEpisode(user, "show1", "episode2", now);
+    var episode3 = ImmersionTrackerItem.createEpisode(user, "show3", "episode1", now);
     var show1 = ImmersionTrackerItem.createShow(user, "show1");
     show1.setTvdbId(1);
     show1.setTvdbName("my show");

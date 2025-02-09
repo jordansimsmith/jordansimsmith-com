@@ -123,6 +123,8 @@ public class ImmersionTrackerE2ETest {
         4 episodes watched today.
         1 total hours watched.
 
+        0 years and 0 months since immersion started.
+
         Deleting 4 local episodes watched...
         Deleted 1.64 GB of watched episodes.
 
