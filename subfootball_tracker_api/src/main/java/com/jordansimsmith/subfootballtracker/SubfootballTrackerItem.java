@@ -1,5 +1,6 @@
 package com.jordansimsmith.subfootballtracker;
 
+import java.time.Instant;
 import java.util.Objects;
 import software.amazon.awssdk.enhanced.dynamodb.extensions.annotations.DynamoDbVersionAttribute;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
@@ -27,7 +28,7 @@ public class SubfootballTrackerItem {
   private String pk;
   private String sk;
   private Page page;
-  private Long timestamp;
+  private Instant timestamp;
   private String content;
   private Long version;
 
@@ -61,11 +62,11 @@ public class SubfootballTrackerItem {
   }
 
   @DynamoDbAttribute(TIMESTAMP)
-  public Long getTimestamp() {
+  public Instant getTimestamp() {
     return timestamp;
   }
 
-  public void setTimestamp(Long timestamp) {
+  public void setTimestamp(Instant timestamp) {
     this.timestamp = timestamp;
   }
 
@@ -131,11 +132,11 @@ public class SubfootballTrackerItem {
     return PAGE_PREFIX + page;
   }
 
-  public static String formatSk(long timestamp) {
-    return TIMESTAMP_PREFIX + timestamp;
+  public static String formatSk(Instant timestamp) {
+    return TIMESTAMP_PREFIX + timestamp.getEpochSecond();
   }
 
-  public static SubfootballTrackerItem create(Page page, long timestamp, String content) {
+  public static SubfootballTrackerItem create(Page page, Instant timestamp, String content) {
     var subfootballTrackerItem = new SubfootballTrackerItem();
     subfootballTrackerItem.setPk(formatPk(page));
     subfootballTrackerItem.setSk(formatSk(timestamp));

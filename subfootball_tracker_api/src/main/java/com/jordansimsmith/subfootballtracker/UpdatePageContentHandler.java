@@ -77,8 +77,7 @@ public class UpdatePageContentHandler implements RequestHandler<ScheduledEvent, 
     }
 
     var current =
-        SubfootballTrackerItem.create(
-            SubfootballTrackerItem.Page.REGISTRATION, now.getEpochSecond(), content);
+        SubfootballTrackerItem.create(SubfootballTrackerItem.Page.REGISTRATION, now, content);
     subfootballTrackerTable.putItem(current);
 
     return null;

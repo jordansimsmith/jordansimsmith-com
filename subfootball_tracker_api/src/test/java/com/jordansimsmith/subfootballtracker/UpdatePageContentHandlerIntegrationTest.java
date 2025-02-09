@@ -7,6 +7,7 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.notifications.FakeNotificationPublisher;
 import com.jordansimsmith.testcontainers.DynamoDbContainer;
 import com.jordansimsmith.time.FakeClock;
+import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
@@ -44,10 +45,14 @@ public class UpdatePageContentHandlerIntegrationTest {
     // arrange
     var contentHistory1 =
         SubfootballTrackerItem.create(
-            SubfootballTrackerItem.Page.REGISTRATION, 1_000, "content 1\ncontent 1");
+            SubfootballTrackerItem.Page.REGISTRATION,
+            Instant.ofEpochSecond(1_000),
+            "content 1\ncontent 1");
     var contentHistory2 =
         SubfootballTrackerItem.create(
-            SubfootballTrackerItem.Page.REGISTRATION, 2_000, "content 2\ncontent 2");
+            SubfootballTrackerItem.Page.REGISTRATION,
+            Instant.ofEpochSecond(2_000),
+            "content 2\ncontent 2");
     subfootballTrackerTable.putItem(contentHistory1);
     subfootballTrackerTable.putItem(contentHistory2);
 
@@ -64,11 +69,11 @@ public class UpdatePageContentHandlerIntegrationTest {
             Key.builder()
                 .partitionValue(
                     SubfootballTrackerItem.formatPk(SubfootballTrackerItem.Page.REGISTRATION))
-                .sortValue(SubfootballTrackerItem.formatSk(fakeClock.now().getEpochSecond()))
+                .sortValue(SubfootballTrackerItem.formatSk(fakeClock.now()))
                 .build());
     assertThat(contentHistory3).isNotNull();
     assertThat(contentHistory3.getPage()).isEqualTo(SubfootballTrackerItem.Page.REGISTRATION);
-    assertThat(contentHistory3.getTimestamp()).isEqualTo(fakeClock.now().getEpochSecond());
+    assertThat(contentHistory3.getTimestamp()).isEqualTo(fakeClock.now());
     assertThat(contentHistory3.getContent())
         .isEqualTo(fakeSubfootballClient.getRegistrationContent());
 
