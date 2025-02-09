@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.testcontainers.DynamoDbContainer;
 import com.jordansimsmith.time.FakeClock;
+import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -42,8 +43,8 @@ public class GetProgressHandlerIntegrationTest {
     // arrange
     var user = "alice";
     fakeClock.setTime(100_000_000);
-    var now = fakeClock.now().atZone(GetProgressHandler.ZONE_ID).toInstant().getEpochSecond();
-    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", 0);
+    var now = fakeClock.now().atZone(GetProgressHandler.ZONE_ID).toInstant();
+    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", Instant.EPOCH);
     var episode2 = ImmersionTrackerItem.createEpisode(user, "show2", "episode2", now);
     var episode3 = ImmersionTrackerItem.createEpisode(user, "show3", "episode1", now);
     var show1 = ImmersionTrackerItem.createShow(user, "show1");
@@ -92,7 +93,7 @@ public class GetProgressHandlerIntegrationTest {
   void handleRequestShouldReturnUnknownShow() throws Exception {
     // arrange
     var user = "alice";
-    var now = fakeClock.now().atZone(GetProgressHandler.ZONE_ID).toInstant().getEpochSecond();
+    var now = fakeClock.now().atZone(GetProgressHandler.ZONE_ID).toInstant();
     var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", now);
     var episode2 = ImmersionTrackerItem.createEpisode(user, "show1", "episode2", now);
     var episode3 = ImmersionTrackerItem.createEpisode(user, "show3", "episode1", now);

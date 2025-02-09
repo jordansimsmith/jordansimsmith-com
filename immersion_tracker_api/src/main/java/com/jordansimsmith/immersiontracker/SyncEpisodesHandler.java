@@ -82,9 +82,7 @@ public class SyncEpisodesHandler
                   .sortValue(ImmersionTrackerItem.formatEpisodeSk(e.folderName, e.fileName))
                   .build());
       if (episode == null) {
-        episode =
-            ImmersionTrackerItem.createEpisode(
-                user, e.folderName, e.fileName, now.getEpochSecond());
+        episode = ImmersionTrackerItem.createEpisode(user, e.folderName, e.fileName, now);
         immersionTrackerTable.putItem(episode);
         episodesAdded++;
       }

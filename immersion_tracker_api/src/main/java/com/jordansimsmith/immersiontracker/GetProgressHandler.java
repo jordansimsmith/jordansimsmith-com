@@ -94,17 +94,13 @@ public class GetProgressHandler
     var totalHoursWatched = totalEpisodesWatched * MINUTES_PER_EPISODE / 60;
     var today = now.atZone(ZONE_ID).truncatedTo(ChronoUnit.DAYS).toInstant();
     var episodesWatchedToday =
-        episodes.stream()
-            .filter(e -> Instant.ofEpochSecond(e.getTimestamp()).isAfter(today))
-            .toList()
-            .size();
+        episodes.stream().filter(e -> e.getTimestamp().isAfter(today)).toList().size();
 
     var firstEpisodeWatched =
-        Instant.ofEpochSecond(
-            episodes.stream()
-                .mapToLong(ImmersionTrackerItem::getTimestamp)
-                .min()
-                .orElse(now.getEpochSecond()));
+        episodes.stream()
+            .map(ImmersionTrackerItem::getTimestamp)
+            .min(Instant::compareTo)
+            .orElse(now);
     var daysSinceFirstEpisode = ChronoUnit.DAYS.between(firstEpisodeWatched, now);
 
     var showsByFolderName =

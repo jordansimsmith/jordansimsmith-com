@@ -1,11 +1,10 @@
 package com.jordansimsmith.immersiontracker;
 
+import com.jordansimsmith.dynamodb.EpochSecondConverter;
+import java.time.Instant;
 import java.util.Objects;
 import software.amazon.awssdk.enhanced.dynamodb.extensions.annotations.DynamoDbVersionAttribute;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 @DynamoDbBean
 public class ImmersionTrackerItem {
@@ -30,7 +29,7 @@ public class ImmersionTrackerItem {
   private String user;
   private String folderName;
   private String fileName;
-  private Long timestamp;
+  private Instant timestamp;
   private Integer tvdbId;
   private String tvdbName;
   private String tvdbImage;
@@ -84,11 +83,12 @@ public class ImmersionTrackerItem {
   }
 
   @DynamoDbAttribute(TIMESTAMP)
-  public Long getTimestamp() {
+  @DynamoDbConvertedBy(EpochSecondConverter.class)
+  public Instant getTimestamp() {
     return timestamp;
   }
 
-  public void setTimestamp(Long timestamp) {
+  public void setTimestamp(Instant timestamp) {
     this.timestamp = timestamp;
   }
 
@@ -193,7 +193,7 @@ public class ImmersionTrackerItem {
   }
 
   public static ImmersionTrackerItem createEpisode(
-      String user, String folderName, String fileName, long timestamp) {
+      String user, String folderName, String fileName, Instant timestamp) {
     var episode = new ImmersionTrackerItem();
     episode.setPk(formatPk(user));
     episode.setSk(formatEpisodeSk(folderName, fileName));

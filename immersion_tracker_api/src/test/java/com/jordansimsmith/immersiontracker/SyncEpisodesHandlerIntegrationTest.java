@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.testcontainers.DynamoDbContainer;
 import com.jordansimsmith.time.FakeClock;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -44,10 +45,10 @@ public class SyncEpisodesHandlerIntegrationTest {
   @Test
   void handleRequestShouldSyncEpisodes() throws Exception {
     // arrange
-    clock.setTime(123456);
+    clock.setTime(123_000);
     var user = "alice";
-    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", 0);
-    var episode2 = ImmersionTrackerItem.createEpisode(user, "show2", "episode1", 0);
+    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", Instant.EPOCH);
+    var episode2 = ImmersionTrackerItem.createEpisode(user, "show2", "episode1", Instant.EPOCH);
     var show1 = ImmersionTrackerItem.createShow(user, "show1");
     immersionTrackerTable.putItem(episode1);
     immersionTrackerTable.putItem(episode2);
@@ -92,21 +93,17 @@ public class SyncEpisodesHandlerIntegrationTest {
             .toList();
 
     assertThat(items).contains(ImmersionTrackerItem.createShow(user, "show1"));
-    assertThat(items).contains(ImmersionTrackerItem.createEpisode(user, "show1", "episode1", 0));
     assertThat(items)
-        .contains(
-            ImmersionTrackerItem.createEpisode(
-                user, "show1", "episode2", clock.now().getEpochSecond()));
+        .contains(ImmersionTrackerItem.createEpisode(user, "show1", "episode1", Instant.EPOCH));
+    assertThat(items)
+        .contains(ImmersionTrackerItem.createEpisode(user, "show1", "episode2", clock.now()));
 
     assertThat(items).contains(ImmersionTrackerItem.createShow(user, "show2"));
-    assertThat(items).contains(ImmersionTrackerItem.createEpisode(user, "show2", "episode1", 0));
     assertThat(items)
-        .contains(
-            ImmersionTrackerItem.createEpisode(
-                user, "show2", "episode2", clock.now().getEpochSecond()));
+        .contains(ImmersionTrackerItem.createEpisode(user, "show2", "episode1", Instant.EPOCH));
     assertThat(items)
-        .contains(
-            ImmersionTrackerItem.createEpisode(
-                user, "show2", "episode3", clock.now().getEpochSecond()));
+        .contains(ImmersionTrackerItem.createEpisode(user, "show2", "episode2", clock.now()));
+    assertThat(items)
+        .contains(ImmersionTrackerItem.createEpisode(user, "show2", "episode3", clock.now()));
   }
 }

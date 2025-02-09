@@ -6,6 +6,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.testcontainers.DynamoDbContainer;
+import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +39,7 @@ public class GetShowsHandlerIntegrationTest {
   void handleRequestShouldGetShows() throws Exception {
     // arrange
     var user = "alice";
-    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", 0);
+    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", Instant.EPOCH);
     var show1 = ImmersionTrackerItem.createShow(user, "show1");
     show1.setTvdbId(123);
     show1.setTvdbName("my show");
