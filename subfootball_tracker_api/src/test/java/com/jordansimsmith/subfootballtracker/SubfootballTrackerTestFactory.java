@@ -1,8 +1,8 @@
 package com.jordansimsmith.subfootballtracker;
 
 import com.jordansimsmith.dynamodb.DynamoDbTestModule;
-import com.jordansimsmith.lib.notifications.FakeNotificationPublisher;
-import com.jordansimsmith.lib.notifications.NotificationTestModule;
+import com.jordansimsmith.notifications.FakeNotificationPublisher;
+import com.jordansimsmith.notifications.NotificationTestModule;
 import com.jordansimsmith.time.ClockTestModule;
 import com.jordansimsmith.time.FakeClock;
 import dagger.BindsInstance;

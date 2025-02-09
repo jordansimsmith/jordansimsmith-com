@@ -1,8 +1,8 @@
 package com.jordansimsmith.pricetracker;
 
 import com.jordansimsmith.dynamodb.DynamoDbModule;
-import com.jordansimsmith.lib.notifications.NotificationModule;
-import com.jordansimsmith.lib.notifications.NotificationPublisher;
+import com.jordansimsmith.notifications.NotificationModule;
+import com.jordansimsmith.notifications.NotificationPublisher;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.time.ClockModule;
 import dagger.Component;

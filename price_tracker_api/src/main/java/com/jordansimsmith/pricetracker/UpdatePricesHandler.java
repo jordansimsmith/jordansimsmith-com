@@ -4,7 +4,7 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
 import com.google.common.annotations.VisibleForTesting;
-import com.jordansimsmith.lib.notifications.NotificationPublisher;
+import com.jordansimsmith.notifications.NotificationPublisher;
 import com.jordansimsmith.time.Clock;
 import java.util.ArrayList;
 import java.util.Objects;

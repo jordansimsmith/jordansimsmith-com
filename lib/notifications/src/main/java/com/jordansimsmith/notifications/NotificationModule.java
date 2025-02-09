@@ -1,4 +1,4 @@
-package com.jordansimsmith.lib.notifications;
+package com.jordansimsmith.notifications;
 
 import dagger.Module;
 import dagger.Provides;

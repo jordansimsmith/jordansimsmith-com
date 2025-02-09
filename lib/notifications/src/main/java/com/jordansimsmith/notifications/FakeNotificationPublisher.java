@@ -1,4 +1,4 @@
-package com.jordansimsmith.lib.notifications;
+package com.jordansimsmith.notifications;
 
 import com.google.common.collect.ArrayListMultimap;
 import com.google.common.collect.Multimap;

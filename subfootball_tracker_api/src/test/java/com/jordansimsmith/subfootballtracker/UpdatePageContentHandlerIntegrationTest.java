@@ -4,7 +4,7 @@ import static org.assertj.core.api.Assertions.*;
 
 import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
-import com.jordansimsmith.lib.notifications.FakeNotificationPublisher;
+import com.jordansimsmith.notifications.FakeNotificationPublisher;
 import com.jordansimsmith.testcontainers.DynamoDbContainer;
 import com.jordansimsmith.time.FakeClock;
 import org.junit.jupiter.api.BeforeEach;

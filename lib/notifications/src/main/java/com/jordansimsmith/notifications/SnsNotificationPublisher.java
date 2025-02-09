@@ -1,11 +1,12 @@
-package com.jordansimsmith.lib.notifications;
+package com.jordansimsmith.notifications;
 
 import com.google.common.collect.Iterables;
 import software.amazon.awssdk.services.sns.SnsClient;
 import software.amazon.awssdk.services.sns.model.ListTopicsRequest;
 import software.amazon.awssdk.services.sns.model.PublishRequest;
 
-public class SnsNotificationPublisher implements NotificationPublisher {
+public class SnsNotificationPublisher
+    implements com.jordansimsmith.notifications.NotificationPublisher {
   private final SnsClient snsClient;
 
   public SnsNotificationPublisher(SnsClient snsClient) {
