@@ -1,11 +1,10 @@
 package com.jordansimsmith.pricetracker;
 
+import com.jordansimsmith.dynamodb.EpochSecondConverter;
+import java.time.Instant;
 import java.util.Objects;
 import software.amazon.awssdk.enhanced.dynamodb.extensions.annotations.DynamoDbVersionAttribute;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 @DynamoDbBean
 public class PriceTrackerItem {
@@ -24,7 +23,7 @@ public class PriceTrackerItem {
   private String pk;
   private String sk;
   private Double price;
-  private Long timestamp;
+  private Instant timestamp;
   private String name;
   private String url;
   private Long version;
@@ -59,11 +58,12 @@ public class PriceTrackerItem {
   }
 
   @DynamoDbAttribute(TIMESTAMP)
-  public Long getTimestamp() {
+  @DynamoDbConvertedBy(EpochSecondConverter.class)
+  public Instant getTimestamp() {
     return timestamp;
   }
 
-  public void setTimestamp(Long timestamp) {
+  public void setTimestamp(Instant timestamp) {
     this.timestamp = timestamp;
   }
 
@@ -144,11 +144,11 @@ public class PriceTrackerItem {
     return PRODUCT_PREFIX + url;
   }
 
-  public static String formatSk(long timestamp) {
-    return TIMESTAMP_PREFIX + timestamp;
+  public static String formatSk(Instant timestamp) {
+    return TIMESTAMP_PREFIX + timestamp.getEpochSecond();
   }
 
-  public static PriceTrackerItem create(String url, String name, long timestamp, double price) {
+  public static PriceTrackerItem create(String url, String name, Instant timestamp, double price) {
     var priceTrackerItem = new PriceTrackerItem();
     priceTrackerItem.setPk(formatPk(url));
     priceTrackerItem.setSk(formatSk(timestamp));

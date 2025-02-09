@@ -8,6 +8,7 @@ import com.jordansimsmith.notifications.FakeNotificationPublisher;
 import com.jordansimsmith.testcontainers.DynamoDbContainer;
 import com.jordansimsmith.time.FakeClock;
 import java.net.URI;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -59,11 +60,17 @@ public class UpdatePricesHandlerIntegrationTest {
     fakeChemistWarehouseClient.setPrice(product3.url(), product3Price);
 
     var product1History1 =
-        PriceTrackerItem.create(product1.url().toString(), product1.name(), 1_000, 21.30);
+        PriceTrackerItem.create(
+            product1.url().toString(), product1.name(), Instant.ofEpochSecond(1_000), 21.30);
     var product1History2 =
-        PriceTrackerItem.create(product1.url().toString(), product1.name(), 2_000, 25.80);
+        PriceTrackerItem.create(
+            product1.url().toString(), product1.name(), Instant.ofEpochSecond(2_000), 25.80);
     var product2History1 =
-        PriceTrackerItem.create(product2.url().toString(), product2.name(), 2_000, product2Price);
+        PriceTrackerItem.create(
+            product2.url().toString(),
+            product2.name(),
+            Instant.ofEpochSecond(2_000),
+            product2Price);
     priceTrackerTable.putItem(product1History1);
     priceTrackerTable.putItem(product1History2);
     priceTrackerTable.putItem(product2History1);
@@ -78,37 +85,37 @@ public class UpdatePricesHandlerIntegrationTest {
         priceTrackerTable.getItem(
             Key.builder()
                 .partitionValue(PriceTrackerItem.formatPk(product1.url().toString()))
-                .sortValue(PriceTrackerItem.formatSk(fakeClock.now().getEpochSecond()))
+                .sortValue(PriceTrackerItem.formatSk(fakeClock.now()))
                 .build());
     assertThat(product1New).isNotNull();
     assertThat(product1New.getName()).isEqualTo(product1.name());
     assertThat(product1New.getUrl()).isEqualTo(product1.url().toString());
     assertThat(product1New.getPrice()).isEqualTo(product1Price);
-    assertThat(product1New.getTimestamp()).isEqualTo(fakeClock.now().getEpochSecond());
+    assertThat(product1New.getTimestamp()).isEqualTo(fakeClock.now());
 
     var product2New =
         priceTrackerTable.getItem(
             Key.builder()
                 .partitionValue(PriceTrackerItem.formatPk(product2.url().toString()))
-                .sortValue(PriceTrackerItem.formatSk(fakeClock.now().getEpochSecond()))
+                .sortValue(PriceTrackerItem.formatSk(fakeClock.now()))
                 .build());
     assertThat(product2New).isNotNull();
     assertThat(product2New.getName()).isEqualTo(product2.name());
     assertThat(product2New.getUrl()).isEqualTo(product2.url().toString());
     assertThat(product2New.getPrice()).isEqualTo(product2Price);
-    assertThat(product2New.getTimestamp()).isEqualTo(fakeClock.now().getEpochSecond());
+    assertThat(product2New.getTimestamp()).isEqualTo(fakeClock.now());
 
     var product3New =
         priceTrackerTable.getItem(
             Key.builder()
                 .partitionValue(PriceTrackerItem.formatPk(product3.url().toString()))
-                .sortValue(PriceTrackerItem.formatSk(fakeClock.now().getEpochSecond()))
+                .sortValue(PriceTrackerItem.formatSk(fakeClock.now()))
                 .build());
     assertThat(product3New).isNotNull();
     assertThat(product3New.getName()).isEqualTo(product3.name());
     assertThat(product3New.getUrl()).isEqualTo(product3.url().toString());
     assertThat(product3New.getPrice()).isEqualTo(product3Price);
-    assertThat(product3New.getTimestamp()).isEqualTo(fakeClock.now().getEpochSecond());
+    assertThat(product3New.getTimestamp()).isEqualTo(fakeClock.now());
 
     var notifications = fakeNotificationPublisher.findNotifications(UpdatePricesHandler.TOPIC);
     assertThat(notifications.size()).isEqualTo(1);
