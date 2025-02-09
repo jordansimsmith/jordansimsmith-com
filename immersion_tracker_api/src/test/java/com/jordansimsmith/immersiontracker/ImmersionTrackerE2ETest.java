@@ -127,6 +127,8 @@ public class ImmersionTrackerE2ETest {
 
         Deleting 4 local episodes watched...
         Deleted 1.64 GB of watched episodes.
+        Deleted completed show: 2 (123) Haikyuu Part 1
+        Deleted completed show: 1 [123] Free!
 
         Press ENTER to close...""";
     assertThat(output).isEqualTo(expectedOutput);
@@ -135,5 +137,10 @@ public class ImmersionTrackerE2ETest {
     assertThat(show2Episode1).doesNotExist();
     assertThat(show3Episode1).doesNotExist();
     assertThat(show3Episode2).exists();
+
+    assertThat(show1).doesNotExist();
+    assertThat(show2).doesNotExist();
+    assertThat(show3).exists();
+    assertThat(show4).exists();
   }
 }

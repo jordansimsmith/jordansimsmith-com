@@ -3,6 +3,7 @@ import json
 import os
 import pathlib
 import urllib.parse
+import shutil
 
 import requests
 
@@ -19,6 +20,7 @@ def main():
     update_remote_shows()
     get_remote_show_progress()
     delete_local_episodes_watched(local_episodes_watched)
+    delete_completed_shows(local_episodes_watched)
 
     print()
     input("Press ENTER to close...")
@@ -124,6 +126,22 @@ def delete_local_episodes_watched(episodes):
 
     size_gigabytes = size_bytes / 1024 / 1024 / 1024
     print(f"Deleted {size_gigabytes:.2f} GB of watched episodes.")
+
+
+def delete_completed_shows(episodes):
+    for episode in episodes:
+        folder = episode["folder_name"]
+        if not os.path.isdir(folder):
+            continue
+
+        unwatched_episodes = [
+            item
+            for item in os.listdir(folder)
+            if os.path.isfile(os.path.join(folder, item))
+        ]
+        if len(unwatched_episodes) == 0:
+            shutil.rmtree(folder)
+            print(f"Deleted completed show: {folder}")
 
 
 def send_request(method, path, body=None):
