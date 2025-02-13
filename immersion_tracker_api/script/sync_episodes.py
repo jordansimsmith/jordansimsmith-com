@@ -134,14 +134,14 @@ def delete_completed_shows(episodes):
         if not os.path.isdir(folder):
             continue
 
-        unwatched_episodes = [
-            item
-            for item in os.listdir(folder)
-            if os.path.isfile(os.path.join(folder, item))
-        ]
-        if len(unwatched_episodes) == 0:
-            shutil.rmtree(folder)
-            print(f"Deleted completed show: {folder}")
+        # check that the folder is empty
+        if any(
+            any(pathlib.Path(folder).rglob(f"*{ext}")) for ext in SUPPORTED_EXTENSIONS
+        ):
+            continue
+
+        shutil.rmtree(folder)
+        print(f"Deleted completed show: {folder}")
 
 
 def send_request(method, path, body=None):
