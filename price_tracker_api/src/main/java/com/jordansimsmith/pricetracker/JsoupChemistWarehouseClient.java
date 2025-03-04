@@ -52,8 +52,7 @@ public class JsoupChemistWarehouseClient implements ChemistWarehouseClient {
     }
 
     if (lastException != null) {
-      throw new RuntimeException(
-          "Failed to fetch price after " + MAX_RETRIES + " retries", lastException);
+      throw lastException;
     }
 
     return null;
