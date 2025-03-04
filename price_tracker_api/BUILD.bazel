@@ -59,7 +59,10 @@ java_library(
     data = [
         ":local-load",
     ],
-    resources = ["src/test/resources/test.properties"],
+    resources = [
+        "src/test/resources/logback-test.xml",
+        "src/test/resources/test.properties",
+    ],
     deps = [
         ":dagger",
         ":lib",
@@ -67,7 +70,10 @@ java_library(
         "//lib/notifications:lib",
         "//lib/testcontainers:lib",
         "//lib/time:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
         "@maven//:org_testcontainers_junit_jupiter",
         "@maven//:org_testcontainers_testcontainers",
         "@maven//:software_amazon_awssdk_dynamodb",
@@ -84,6 +90,10 @@ java_test_suite(
         "AWS_SECRET_ACCESS_KEY": "fake",
         "AWS_REGION": "ap-southeast-2",
     },
+    resources = [
+        "src/test/resources/logback-test.xml",
+        "src/test/resources/test.properties",
+    ],
     runner = "junit5",
     test_suffixes = ["IntegrationTest.java"],
     runtime_deps = JUNIT5_DEPS,
@@ -95,10 +105,13 @@ java_test_suite(
         "//lib/notifications:lib",
         "//lib/testcontainers:lib",
         "//lib/time:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
         "@maven//:com_amazonaws_aws_lambda_java_events",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_slf4j_slf4j_api",
         "@maven//:org_testcontainers_junit_jupiter",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
@@ -150,6 +163,7 @@ java_test_suite(
         "AWS_REGION": "ap-southeast-2",
     },
     resources = [
+        "src/test/resources/logback-test.xml",
         "src/test/resources/test.properties",
     ],
     runner = "junit5",
@@ -158,8 +172,11 @@ java_test_suite(
     deps = [
         ":lib",
         ":test-lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_slf4j_slf4j_api",
         "@maven//:org_testcontainers_junit_jupiter",
     ],
 )
