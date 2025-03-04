@@ -1,6 +1,5 @@
 import boto3
 import json
-import os
 
 region_name = "ap-southeast-2"
 endpoint_url = "http://localhost:4566"
@@ -9,16 +8,45 @@ iam_client = boto3.client("iam", endpoint_url=endpoint_url, region_name=region_n
 lambda_client = boto3.client(
     "lambda", endpoint_url=endpoint_url, region_name=region_name
 )
-sns_client = boto3.client("sns", endpoint_url=endpoint_url, region_name=region_name)
 dynamodb_client = boto3.client(
     "dynamodb", endpoint_url=endpoint_url, region_name=region_name
 )
 events_client = boto3.client(
     "events", endpoint_url=endpoint_url, region_name=region_name
 )
+sqs_client = boto3.client("sqs", endpoint_url=endpoint_url, region_name=region_name)
+sns_client = boto3.client("sns", endpoint_url=endpoint_url, region_name=region_name)
 
+# Create SNS topic for price updates
 topic_name = "price_tracker_api_price_updates"
-topic_arn = sns_client.create_topic(Name=topic_name)["TopicArn"]
+topic_response = sns_client.create_topic(Name=topic_name)
+topic_arn = topic_response["TopicArn"]
+
+queue_name = "price-tracker-test-queue"
+queue_url = sqs_client.create_queue(QueueName=queue_name)["QueueUrl"]
+queue_attributes = sqs_client.get_queue_attributes(
+    QueueUrl=queue_url, AttributeNames=["QueueArn"]
+)
+queue_arn = queue_attributes["Attributes"]["QueueArn"]
+queue_policy = {
+    "Version": "2012-10-17",
+    "Id": "AllowAll",
+    "Statement": [
+        {
+            "Sid": "AllowAllActions",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "*",
+            "Resource": "*",
+        }
+    ],
+}
+sqs_client.set_queue_attributes(
+    QueueUrl=queue_url, Attributes={"Policy": json.dumps(queue_policy)}
+)
+
+# Subscribe SQS queue to SNS topic
+sns_client.subscribe(TopicArn=topic_arn, Protocol="sqs", Endpoint=queue_arn)
 
 table_name = "price_tracker"
 dynamodb_client.create_table(
@@ -85,20 +113,3 @@ for config in configs:
     lambda_client.get_waiter("function_active_v2").wait(
         FunctionName=config["function_name"]
     )
-
-rule_name = "price_tracker_api_trigger"
-rule_arn = events_client.put_rule(
-    Name=rule_name, ScheduleExpression="rate(1 hour)", State="ENABLED"
-)["RuleArn"]
-
-lambda_client.add_permission(
-    FunctionName=configs[0]["function_name"],
-    StatementId="AllowExecutionFromCloudWatch",
-    Action="lambda:InvokeFunction",
-    Principal="events.amazonaws.com",
-    SourceArn=rule_arn,
-)
-
-events_client.put_targets(
-    Rule=rule_name, Targets=[{"Id": "lambda", "Arn": function_arn}]
-)

@@ -3,6 +3,7 @@ package com.jordansimsmith.pricetracker;
 import com.google.common.base.Preconditions;
 import com.jordansimsmith.testcontainers.LoadedImage;
 import java.io.IOException;
+import java.net.URI;
 import java.util.Properties;
 import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.GenericContainer;
@@ -21,6 +22,11 @@ public class PriceTrackerContainer extends GenericContainer<PriceTrackerContaine
     this.waitingFor(
         Wait.forHttp("/_localstack/init/ready")
             .forResponsePredicate(res -> res.contains("\"completed\": true")));
+  }
+
+  @SuppressWarnings("HttpUrlsUsage")
+  public URI getLocalstackUrl() {
+    return URI.create("http://" + getHost() + ":" + getMappedPort(LOCALSTACK_PORT));
   }
 
   private static String getProperty(String key) {

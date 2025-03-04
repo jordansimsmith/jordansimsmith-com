@@ -1,7 +1,9 @@
 package com.jordansimsmith.pricetracker;
 
 import java.net.URI;
+import javax.annotation.Nullable;
 
 public interface ChemistWarehouseClient {
-  double getPrice(URI url);
+  @Nullable
+  Double getPrice(URI url);
 }

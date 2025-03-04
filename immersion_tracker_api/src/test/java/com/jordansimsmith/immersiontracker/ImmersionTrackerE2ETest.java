@@ -19,6 +19,11 @@ public class ImmersionTrackerE2ETest {
   private final ImmersionTrackerContainer immersionTrackerContainer =
       new ImmersionTrackerContainer();
 
+  @Test
+  void shouldStartContainer() {
+    assertThat(immersionTrackerContainer.isRunning()).isTrue();
+  }
+
   @SuppressWarnings("ResultOfMethodCallIgnored")
   @Test
   void scriptShouldSyncEpisodes() throws Exception {

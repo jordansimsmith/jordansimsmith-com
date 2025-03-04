@@ -52,6 +52,9 @@ public class UpdatePricesHandler implements RequestHandler<ScheduledEvent, Void>
     var prices = new ArrayList<PriceTrackerItem>();
     for (var product : productsFactory.findChemistWarehouseProducts()) {
       var price = chemistWarehouseClient.getPrice(product.url());
+      if (price == null) {
+        continue;
+      }
       var priceTrackerItem =
           PriceTrackerItem.create(product.url().toString(), product.name(), now, price);
       prices.add(priceTrackerItem);
