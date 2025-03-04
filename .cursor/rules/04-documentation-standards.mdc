@@ -1,0 +1,119 @@
+---
+description: Standards for service documentation in README.md files
+globs: **/*.md
+---
+
+# Documentation standards for services
+
+Brief overview: All service documentation should be placed in README.md files with a consistent format.
+
+## Documentation requirements
+
+This rule establishes a standard format for service documentation to ensure consistency across the codebase and make information easily discoverable.
+
+### Location
+- All service documentation must be placed in a `README.md` file at the root of the specific service directory (e.g., `price_tracker_api/README.md`)
+- Service documentation should never be placed in the repository root README.md
+- Do not create separate documentation files or folders
+
+### Heading format
+- All headings must use sentence casing (only capitalize the first word and proper nouns)
+- Do not use title casing (capitalizing most words)
+- Example: Use "System architecture" instead of "System Architecture"
+
+### Content structure
+All README.md documentation must follow this exact structure:
+
+1. **Service name**
+   - Must be the first heading (H1) in the document
+   - Example: `# Price tracker service`
+
+2. **Service overview**
+   - Must follow immediately after the service name
+   - Must be exactly one sentence that clearly describes what the service does
+   - Example: `The price tracker service monitors product prices across various retailers and notifies users of price drops.`
+
+3. **System architecture**
+   - Must include a Mermaid diagram showing the main system components and their interactions
+   - Focus on high-level architecture, not implementation details
+   - Use proper Mermaid syntax for flowcharts or sequence diagrams
+   - Example:
+     ```mermaid
+     graph TD
+       A[Client] --> B[API Gateway]
+       B --> C[Lambda Function]
+       C --> D[DynamoDB]
+       C --> E[SNS Topic]
+       E --> F[Email Notification]
+     ```
+
+4. **Requirements and specifications**
+   - Must provide a comprehensive list of all product requirements and technical specifications
+   - Use bullet points for clarity
+   - Group related requirements when possible
+   - Include both functional and non-functional requirements
+
+5. **Implementation details**
+   - Must provide information about the actual implementation
+   - Include technologies used, design patterns, and notable code structures
+   - Document important algorithms or business logic
+   - Explain key configuration settings and their impact
+   - Do not include command examples or terminal commands
+
+## Example README.md
+
+```markdown
+# Price tracker service
+
+The price tracker service automatically monitors product prices on e-commerce websites and notifies users when prices drop below their specified thresholds.
+
+## System architecture
+
+```mermaid
+graph TD
+  A[Scheduled Event] --> B[Lambda Function]
+  B --> C[Web Scraper]
+  C --> D[Price Comparison]
+  D --> E[DynamoDB]
+  D --> F[SNS Topic]
+  F --> G[Email Notification]
+```
+
+## Requirements and specifications
+
+### Functional requirements
+- Monitor product prices from Chemist Warehouse website
+- Store price history for each tracked product
+- Send notifications when price drops below user-defined threshold
+- Support adding and removing products from tracking
+- Automatically update prices daily
+
+### Technical specifications
+- Maximum latency for price checks: 5 seconds per product
+- Support for tracking up to 1000 products simultaneously
+- Email notifications must be sent within 10 minutes of price drop detection
+- Price history retained for minimum of 90 days
+- 99.9% uptime for notification service
+
+## Implementation details
+
+### Technologies
+- AWS Lambda for serverless execution
+- DynamoDB for storing product and price data
+- Amazon SNS for notification delivery
+- Java 11 runtime environment
+- Jsoup library for HTML parsing
+
+### Key components
+- `UpdatePricesHandler`: Lambda handler that processes scheduled events
+- `ChemistWarehouseClient`: Client for retrieving product data
+- `PriceTrackerItem`: Data model for tracked products
+- `NotificationPublisher`: Interface for sending price drop alerts
+
+### Configuration
+- Lambda execution frequency: Once per day at 00:00 UTC
+- DynamoDB read/write capacity: 5 units
+- SNS topic name: "price_tracker_api_price_updates"
+```
+
+When creating new services or updating existing ones, ensure the README.md adheres to this consistent format to maintain documentation standards. 

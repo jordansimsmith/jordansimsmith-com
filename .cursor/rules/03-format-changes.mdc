@@ -3,11 +3,11 @@ description: Guidelines for formatting code changes after completing a task
 globs: **/*
 ---
 
-# Format Changes After Task Completion
+# Format changes after task completion
 
 When a task or feature has been completed, all code changes should be properly formatted before submission. This ensures consistent code style across the repository.
 
-## Formatting Steps
+## Formatting steps
 
 Follow these steps to format your changes:
 
@@ -29,7 +29,7 @@ Proper formatting:
 - Prevents unnecessary merge conflicts due to formatting issues
 - Follows project conventions automatically
 
-## When to Run
+## When to run
 
 These commands should be run:
 - After completing a feature or bug fix
