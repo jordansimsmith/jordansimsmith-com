@@ -48,6 +48,8 @@ def find_local_episodes_watched():
             episode = {"folder_name": show, "file_name": pathlib.Path(episode).stem}
             episodes.append(episode)
 
+    episodes.sort(key=lambda x: (x["folder_name"], x["file_name"]))
+
     return episodes
 
 

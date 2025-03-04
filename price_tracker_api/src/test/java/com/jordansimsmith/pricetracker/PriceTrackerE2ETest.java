@@ -54,7 +54,9 @@ public class PriceTrackerE2ETest {
             .build();
     var lambdaResponse = lambdaClient.invoke(request);
     assertThat(lambdaResponse.statusCode()).isEqualTo(200);
-    assertThat(lambdaResponse.functionError()).isNull();
+    assertThat(lambdaResponse.functionError())
+        .withFailMessage(new String(lambdaResponse.payload().asByteArray()))
+        .isNull();
 
     // assert
     var queueName = "price-tracker-test-queue";
