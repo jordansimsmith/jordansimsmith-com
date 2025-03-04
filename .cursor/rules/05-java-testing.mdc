@@ -15,6 +15,34 @@ Our codebase follows these naming conventions to clearly indicate test types:
 - **Integration tests**: Files ending with `IntegrationTest.java` (e.g., `UserServiceIntegrationTest.java`)
 - **End-to-End tests**: Files ending with `E2ETest.java` (e.g., `UserServiceE2ETest.java`)
 
+## Test structure
+
+All tests should follow the Arrange-Act-Assert (AAA) pattern:
+
+```java
+@Test
+void testMethod() {
+    // arrange
+    User user = new User("test@example.com");
+    UserService service = new UserService(fakeRepository);
+    
+    // act
+    boolean result = service.createUser(user);
+    
+    // assert
+    assertThat(result).isTrue();
+    assertThat(fakeRepository.findByEmail("test@example.com")).isNotNull();
+}
+```
+
+- Use only these three comments (`// arrange`, `// act`, `// assert`) to organize your test
+- Do not add additional comments unless strictly necessary
+- The comments should always be lowercase
+- Each section should have a clear purpose:
+  - **arrange**: Set up the test data and preconditions
+  - **act**: Perform the action being tested
+  - **assert**: Verify the expected outcomes
+
 ## Testing levels
 
 ### Unit testing
@@ -35,7 +63,14 @@ public class UserServiceTest {
     
     @Test
     public void shouldCreateUser() {
-        // Test implementation
+        // arrange
+        User user = new User("test@example.com");
+        
+        // act
+        boolean created = service.create(user);
+        
+        // assert
+        assertThat(created).isTrue();
     }
 }
 ```
@@ -67,7 +102,14 @@ public class UserServiceIntegrationTest {
     
     @Test
     public void shouldPersistUserToDatabase() {
-        // Test implementation
+        // arrange
+        User user = new User("test@example.com");
+        
+        // act
+        service.create(user);
+        
+        // assert
+        assertThat(repository.findByEmail("test@example.com")).isNotNull();
     }
 }
 ```
@@ -96,7 +138,15 @@ public class UserManagementE2ETest {
     
     @Test
     public void shouldCompleteUserRegistrationFlow() {
-        // Test implementation using the external API client
+        // arrange
+        UserRegistrationRequest request = new UserRegistrationRequest("test@example.com", "password123");
+        
+        // act
+        UserRegistrationResponse response = client.registerUser(request);
+        
+        // assert
+        assertThat(response.isSuccess()).isTrue();
+        assertThat(client.login("test@example.com", "password123").isSuccessful()).isTrue();
     }
 }
 ```
@@ -116,7 +166,7 @@ Always use AssertJ assertions with static imports over JUnit or any other librar
 ### AssertJ best practices
 
 - Import AssertJ assertions statically: `import static org.assertj.core.api.Assertions.assertThat;`
-- Use the fluent API with descriptive failure messages using `.as()`
+- Only use the `.as()` method when the assertion is not self-explanatory and needs clarification
 - Take advantage of AssertJ's rich assertion methods for better readability
 
 Example:
@@ -126,10 +176,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @Test
 void shouldPerformCorrectCalculation() {
+    // arrange
     Calculator calculator = new Calculator();
+    
+    // act
     int result = calculator.add(2, 3);
     
-    assertThat(result).as("2 + 3 should equal 5").isEqualTo(5);
+    // assert
+    assertThat(result).isEqualTo(5);
+}
+
+// When the assertion needs clarification, use .as()
+@Test
+void shouldRejectInvalidInput() {
+    // arrange
+    InputValidator validator = new InputValidator();
+    String complexInput = generateComplexInput();
+    
+    // act
+    ValidationResult result = validator.validate(complexInput);
+    
+    // assert
+    assertThat(result.isValid()).as("Complex input with special characters should be rejected").isFalse();
 }
 
 // ❌ INCORRECT: Using JUnit assertions
