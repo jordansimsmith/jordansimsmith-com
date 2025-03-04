@@ -1,0 +1,110 @@
+---
+description: Guidelines for Java testing strategies and conventions
+globs: **/*Test.java
+---
+
+# Java testing guidelines
+
+This rule outlines the testing strategy for Java code, defining three testing levels (unit, integration, and end-to-end), their naming conventions, and appropriate usage patterns.
+
+## Test naming conventions
+
+Our codebase follows these naming conventions to clearly indicate test types:
+
+- **Unit tests**: Files ending with `Test.java` (e.g., `UserServiceTest.java`)
+- **Integration tests**: Files ending with `IntegrationTest.java` (e.g., `UserServiceIntegrationTest.java`)
+- **End-to-End tests**: Files ending with `E2ETest.java` (e.g., `UserServiceE2ETest.java`)
+
+## Testing levels
+
+### Unit testing
+
+Unit tests verify isolated components without external dependencies.
+
+- Must not interact with any network dependencies (including local databases)
+- Should use fakes over mocks when possible
+- Should be fast and focused on testing a single component
+- Focus on testing business logic and edge cases
+
+Example:
+```java
+public class UserServiceTest {
+    // Use a fake repository instead of mocking
+    private UserRepository fakeRepository = new InMemoryUserRepository();
+    private UserService service = new UserService(fakeRepository);
+    
+    @Test
+    public void shouldCreateUser() {
+        // Test implementation
+    }
+}
+```
+
+### Integration testing
+
+Integration tests verify component interactions with local dependencies.
+
+- Should use local dependencies (e.g., Testcontainers for Docker)
+- Fall back to fakes when local dependencies are not available
+- Test the integration between multiple components
+- Focus on testing component boundaries and interactions
+
+Example:
+```java
+public class UserServiceIntegrationTest {
+    // Use testcontainers for DynamoDB
+    @Container
+    private static final DynamoDBContainer dynamoDb = new DynamoDBContainer();
+    
+    private UserRepository repository;
+    private UserService service;
+    
+    @BeforeEach
+    public void setup() {
+        repository = new DynamoDbUserRepository(dynamoDb.getClient());
+        service = new UserService(repository);
+    }
+    
+    @Test
+    public void shouldPersistUserToDatabase() {
+        // Test implementation
+    }
+}
+```
+
+### End-to-End testing
+
+E2E tests verify the full system behavior from an external perspective.
+
+- Should build a local stack version of the complete system
+- Must interact with the system as an external client would
+- Test real user workflows and scenarios
+- Focus on validating system-wide requirements
+
+Example:
+```java
+public class UserManagementE2ETest {
+    @Container
+    private static final ApplicationContainer app = new ApplicationContainer();
+    
+    private ApiClient client;
+    
+    @BeforeEach
+    public void setup() {
+        client = new ApiClient(app.getBaseUrl());
+    }
+    
+    @Test
+    public void shouldCompleteUserRegistrationFlow() {
+        // Test implementation using the external API client
+    }
+}
+```
+
+## Best practices
+
+1. Prefer unit tests for most scenarios to keep the test suite fast
+2. Use integration tests to verify boundary interactions
+3. Keep E2E tests focused on critical user journeys
+4. Avoid duplicating test coverage across levels
+5. Maintain a testing pyramid: many unit tests, fewer integration tests, fewest E2E tests 
