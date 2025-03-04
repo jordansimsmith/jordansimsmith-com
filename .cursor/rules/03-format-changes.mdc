@@ -1,0 +1,40 @@
+---
+description: Guidelines for formatting code changes after completing a task
+globs: **/*
+---
+
+# Format Changes After Task Completion
+
+When a task or feature has been completed, all code changes should be properly formatted before submission. This ensures consistent code style across the repository.
+
+## Formatting Steps
+
+Follow these steps to format your changes:
+
+1. First, tidy up Bazel module dependencies:
+   ```bash
+   bazel mod tidy
+   ```
+
+2. Then format all code files using the project's formatter:
+   ```bash
+   bazel run format
+   ```
+
+## Importance
+
+Proper formatting:
+- Makes code reviews easier
+- Ensures consistent style across the codebase
+- Prevents unnecessary merge conflicts due to formatting issues
+- Follows project conventions automatically
+
+## When to Run
+
+These commands should be run:
+- After completing a feature or bug fix
+- Before creating a pull request
+- After addressing review comments that involved code changes
+- Any time significant code modifications have been made
+
+Always verify that the formatted code still builds and passes tests.

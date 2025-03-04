@@ -1,0 +1,55 @@
+---
+description: Guidelines for building and testing Java code with Bazel
+globs: **/*.java
+---
+
+# Bazel Java Build and Test Procedures
+
+Brief overview: Always build and test Java code changes using Bazel commands before considering them complete.
+
+## Details
+
+This rule establishes the proper procedures for building and testing Java code changes in this repository. It ensures code quality by verifying both compilation success and passing tests.
+
+### Build Process
+- When making changes to Java code, always build the changes to check for compilation errors using `bazel build`.
+- For changes in specific API folders, use the targeted build command: `bazel build //folder_name`.
+  - Example: For changes in `immersion_tracker_api`, use: `bazel build //immersion_tracker_api`
+  - Example: For changes in `price_tracker_api`, use: `bazel build //price_tracker_api`
+
+### Testing Process
+- After building successfully, always test the changes using `bazel test`.
+- For changes in specific API folders, use the targeted test command: `bazel test //folder_name`.
+  - Example: For changes in `immersion_tracker_api`, use: `bazel test //immersion_tracker_api`
+  - Example: For changes in `price_tracker_api`, use: `bazel test //price_tracker_api`
+
+### Error Resolution
+- If build or test errors occur, fix the underlying code issues rather than modifying tests to accept buggy code.
+- Address build errors first, then test failures:
+  1. Read the error messages carefully to identify the problem
+  2. Fix code issues in the implementation files
+  3. Re-run build and verify it succeeds
+  4. Run tests to confirm changes don't break existing functionality
+  5. Fix test failures by correcting the implementation, not by altering tests to match bugs
+- Ensure both build and test processes complete successfully before considering changes complete.
+
+## Example usage
+
+```bash
+# Build entire project
+bazel build //...
+
+# Build specific API
+bazel build //immersion_tracker_api
+
+# Run all tests
+bazel test //...
+
+# Test specific API
+bazel test //immersion_tracker_api
+```
+
+### Common Build Errors and Resolutions
+- **Compilation errors**: Check syntax, imports, and method signatures in the indicated file
+- **Dependency issues**: Ensure all dependencies are correctly specified in the BUILD.bazel files
+- **Test failures**: Check if the implementation meets the expected behavior in tests

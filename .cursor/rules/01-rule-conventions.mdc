@@ -1,0 +1,81 @@
+---
+description: Documents the conventions for Cursor rules in this repository
+globs: **/*.mdc
+---
+
+# Cursor rule conventions
+
+All Cursor rules should follow these conventions:
+
+1. Rules should be stored in the `.cursor/rules` directory
+2. Each rule should be in a separate file with a `.mdc` extension
+3. Files should be prefixed with a number for ordering (e.g., `01-`, `02-`)
+4. Rules should be written in Model-Driven Code (MDC) format
+5. Each rule should have a name and description in the frontmatter
+6. Rules should include a glob pattern using `globs:` in the frontmatter to ensure they are automatically included
+7. Cursor rules should NEVER be placed outside the `.cursor/rules` directory
+8. Filenames should use kebab-case (words separated by hyphens) after the number prefix
+
+## Rule structure
+
+A proper MDC rule should have the following structure:
+
+```
+---
+description: Brief description of what the rule does
+globs: **/*.{extension}
+---
+
+# Rule name
+
+Brief overview of the rule's purpose and what it accomplishes.
+
+## Details
+
+More detailed explanation of how the rule works, what it enforces, and why it's important.
+
+### Specific guidelines
+
+Any specific guidelines, constraints, or behaviors the rule enforces.
+
+## Example usage
+
+This file itself serves as an example of a properly formatted Cursor rule.
+```
+
+## Correct vs. Incorrect Examples
+
+### ✅ CORRECT Frontmatter:
+```
+---
+description: Guidelines for building and testing Java code with Bazel
+globs: **/*.java
+---
+```
+
+### ❌ INCORRECT Frontmatter:
+```
+---
+description: Guidelines for building and testing Java code with Bazel
+glob: "**/*.java"  # Wrong: using singular "glob" instead of "globs"
+---
+```
+
+```
+---
+description: Guidelines for building and testing Java code with Bazel
+# Wrong: missing globs entirely
+---
+```
+
+## File Naming Examples:
+
+### ✅ CORRECT:
+- `01-rule-conventions.mdc`
+- `02-bazel-java.mdc`
+
+### ❌ INCORRECT:
+- `rule-conventions.mdc` # Missing number prefix
+- `01_rule_conventions.mdc` # Using underscores instead of hyphens
+- `01-rule-conventions.md` # Wrong file extension
+- `rules/01-rule-conventions.mdc` # Wrong directory
