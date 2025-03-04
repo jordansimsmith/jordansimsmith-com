@@ -107,4 +107,47 @@ public class UserManagementE2ETest {
 2. Use integration tests to verify boundary interactions
 3. Keep E2E tests focused on critical user journeys
 4. Avoid duplicating test coverage across levels
-5. Maintain a testing pyramid: many unit tests, fewer integration tests, fewest E2E tests 
+5. Maintain a testing pyramid: many unit tests, fewer integration tests, fewest E2E tests
+
+## Assertion guidelines
+
+Always use AssertJ assertions with static imports over JUnit or any other library's assertions.
+
+### AssertJ best practices
+
+- Import AssertJ assertions statically: `import static org.assertj.core.api.Assertions.assertThat;`
+- Use the fluent API with descriptive failure messages using `.as()`
+- Take advantage of AssertJ's rich assertion methods for better readability
+
+Example:
+```java
+// ✅ CORRECT: Using AssertJ assertions
+import static org.assertj.core.api.Assertions.assertThat;
+
+@Test
+void shouldPerformCorrectCalculation() {
+    Calculator calculator = new Calculator();
+    int result = calculator.add(2, 3);
+    
+    assertThat(result).as("2 + 3 should equal 5").isEqualTo(5);
+}
+
+// ❌ INCORRECT: Using JUnit assertions
+import static org.junit.jupiter.api.Assertions.assertEquals;
+
+@Test
+void shouldPerformCorrectCalculation() {
+    Calculator calculator = new Calculator();
+    int result = calculator.add(2, 3);
+    
+    assertEquals(5, result, "2 + 3 should equal 5");
+}
+```
+
+### Benefits of AssertJ
+
+- More readable and fluent API
+- Better error messages with detailed explanations
+- Rich assertion methods for collections, exceptions, dates, and more
+- Better assertion composition
+- Easier to extend with custom assertions 
