@@ -1,0 +1,126 @@
+---
+description: Java coding style guidelines for consistent code quality
+globs: **/*.java
+---
+
+# Java style guidelines
+
+This rule documents our Java coding style guidelines to ensure consistent and maintainable code.
+
+## Variable declarations
+
+- Use the `var` keyword whenever the type is obvious from the assignment
+- Only use explicit type declarations when the type is not immediately clear from the right side of the assignment
+
+### ✅ CORRECT:
+```java
+var user = new User();
+var count = 0;
+var message = "Hello";
+var userMap = Map.of("admin", user);
+
+// Type not obvious from right side, explicit declaration is appropriate
+List<User> filteredUsers = userService.getFilteredUsers();
+```
+
+### ❌ INCORRECT:
+```java
+User user = new User();
+int count = 0;
+String message = "Hello";
+Map<String, User> userMap = Map.of("admin", user);
+```
+
+## Comments
+
+- Comments should be minimal and focused on explaining "why" not "what"
+- All comments should be lowercase with rare exceptions for proper nouns
+- Comments should not repeat what is already obvious from the code
+
+### ✅ CORRECT:
+```java
+// workaround for known issue with legacy API (JIRA-1234)
+client.forceReconnect();
+
+// formula derived from smith's algorithm (2018)
+double result = calculateWithFactor(x, 0.7854);
+```
+
+### ❌ INCORRECT:
+```java
+// This reconnects the client
+client.forceReconnect();
+
+// Calculate the result
+double result = calculateWithFactor(x, 0.7854);
+```
+
+## Exception handling pattern
+
+Use a specific pattern for exception handling to minimize nesting and try-catch blocks:
+
+1. Public methods should call private implementation methods that can throw exceptions
+2. Public methods should catch and wrap exceptions into runtime exceptions
+3. Use this pattern to avoid deep nesting of try-catch blocks
+
+### ✅ CORRECT:
+```java
+public Price getPrice(String productId) {
+    try {
+        return doGetPrice(productId);
+    } catch (Exception e) {
+        throw new RuntimeException("Failed to get price for product " + productId, e);
+    }
+}
+
+private Price doGetPrice(String productId) throws Exception {
+    // implementation that can throw checked exceptions
+    return priceService.fetchCurrentPrice(productId);
+}
+```
+
+### ❌ INCORRECT:
+```java
+public Price getPrice(String productId) {
+    try {
+        return priceService.fetchCurrentPrice(productId);
+    } catch (NotFoundException e) {
+        throw new RuntimeException("Product not found", e);
+    } catch (ServiceException e) {
+        throw new RuntimeException("Service error", e);
+    } catch (Exception e) {
+        throw new RuntimeException("Unknown error", e);
+    }
+}
+```
+
+## Example usage
+
+```java
+public class ProductService {
+    private final PriceRepository repository;
+    
+    public ProductService(PriceRepository repository) {
+        this.repository = repository;
+    }
+    
+    public PriceResponse getProductPrice(String id) {
+        try {
+            return doGetProductPrice(id);
+        } catch (Exception e) {
+            throw new RuntimeException("Error retrieving price for product " + id, e);
+        }
+    }
+    
+    private PriceResponse doGetProductPrice(String id) throws Exception {
+        // this method can throw checked exceptions
+        var product = repository.findById(id);
+        var price = product.getPrice();
+        var discount = calculateDiscount(product);
+        
+        // note: we use explicit type here as the return type isn't obvious
+        PriceResponse response = new PriceResponse(price, discount);
+        return response;
+    }
+}
+``` 
