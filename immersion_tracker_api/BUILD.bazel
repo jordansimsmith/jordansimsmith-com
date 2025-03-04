@@ -265,14 +265,12 @@ java_test_suite(
     env = {
         "IMMERSION_TRACKER_USER": "alice",
         "IMMERSION_TRACKER_PASSWORD": "password",
-        "TVDB_API_KEY": "",
     },
     resources = [
         "src/test/resources/logback-test.xml",
         "src/test/resources/test.properties",
     ],
     runner = "junit5",
-    tags = ["manual"],
     test_suffixes = ["E2ETest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
