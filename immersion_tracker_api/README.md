@@ -17,6 +17,7 @@ graph TD
 ## Requirements and specifications
 
 ### Functional requirements
+
 - Track watched TV shows and episodes for language learning immersion
 - Store metadata about shows from TVDB API
 - Provide progress statistics (total episodes watched, hours watched, etc.)
@@ -26,6 +27,7 @@ graph TD
 - Support authentication for secure access
 
 ### Technical specifications
+
 - RESTful API for accessing tracker functionality
 - Secure data storage with user-based partitioning
 - Automatic cleanup of local files after syncing
@@ -37,6 +39,7 @@ graph TD
 ## Implementation details
 
 ### Technologies
+
 - AWS Lambda for serverless computing
 - Amazon DynamoDB for data storage
 - AWS API Gateway for REST API endpoints
@@ -47,6 +50,7 @@ graph TD
 - Terraform for infrastructure as code
 
 ### Key components
+
 - `AuthHandler`: Handles user authentication
 - `GetProgressHandler`: Retrieves progress statistics
 - `GetShowsHandler`: Lists tracked shows
@@ -56,8 +60,9 @@ graph TD
 - `sync_episodes.py`: Client script that scans local files, calls the Lambda API to sync episodes, and manages watched files
 
 ### Configuration
+
 - DynamoDB table with partition key for user and sort key for item type
 - Lambda functions with minimal permissions following least privilege
 - API Gateway with custom domain (api.immersion-tracker.jordansimsmith.com)
 - Authentication using API Gateway authorizers
-- TVDB API integration for metadata lookup 
+- TVDB API integration for metadata lookup

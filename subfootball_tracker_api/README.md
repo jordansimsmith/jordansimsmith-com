@@ -19,6 +19,7 @@ graph TD
 ## Requirements and specifications
 
 ### Functional requirements
+
 - Monitor the SUB Football registration page for content changes
 - Store historical content snapshots in a database
 - Send email notifications when content changes are detected
@@ -26,6 +27,7 @@ graph TD
 - Execute monitoring on a scheduled basis (hourly)
 
 ### Technical specifications
+
 - Content snapshot history retained indefinitely
 - Email notifications sent within minutes of change detection
 - Support for multiple email subscribers
@@ -35,6 +37,7 @@ graph TD
 ## Implementation details
 
 ### Technologies
+
 - AWS Lambda for serverless execution
 - DynamoDB for storing content snapshots
 - Amazon SNS for notification delivery
@@ -44,14 +47,16 @@ graph TD
 - Terraform for infrastructure as code
 
 ### Key components
+
 - `UpdatePageContentHandler`: Lambda handler that processes scheduled events
 - `JsoupSubfootballClient`: Client for retrieving website content
 - `SubfootballTrackerItem`: Data model for tracking content snapshots
 - `NotificationPublisher`: Interface for sending content update alerts
 
 ### Configuration
+
 - Lambda execution frequency: Once per hour
 - DynamoDB table: "subfootball_tracker" (partition key: pk, sort key: sk)
 - SNS topic name: "subfootball_tracker_api_page_content_updates"
 - Point-in-time recovery: Enabled
-- Deletion protection: Enabled 
+- Deletion protection: Enabled

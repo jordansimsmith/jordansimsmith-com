@@ -19,6 +19,7 @@ graph TD
 ## Requirements and specifications
 
 ### Functional requirements
+
 - Monitor product prices from Chemist Warehouse website
 - Store price history for each tracked product
 - Send notifications when prices change
@@ -26,6 +27,7 @@ graph TD
 - Automatically update prices hourly
 
 ### Technical specifications
+
 - Serverless architecture using AWS Lambda
 - Data persistence with DynamoDB
 - Notification delivery through Amazon SNS
@@ -36,6 +38,7 @@ graph TD
 ## Implementation details
 
 ### Technologies
+
 - AWS Lambda for serverless execution
 - DynamoDB for storing product and price data
 - Amazon SNS for notification delivery
@@ -45,6 +48,7 @@ graph TD
 - Terraform for infrastructure as code
 
 ### Key components
+
 - `UpdatePricesHandler`: Lambda handler that processes scheduled events and updates prices
 - `ChemistWarehouseClient`: Client interface for retrieving product data from Chemist Warehouse
 - `JsoupChemistWarehouseClient`: Implementation that uses Jsoup to scrape product data
@@ -55,7 +59,8 @@ graph TD
 - `NotificationPublisher`: Interface for sending price change alerts
 
 ### Configuration
+
 - Lambda execution frequency: Once per hour via CloudWatch Events
 - DynamoDB table: "price_tracker" with hash key "pk" and range key "sk"
 - SNS topic name: "price_tracker_api_price_updates"
-- Email subscribers: Configured in Terraform 
+- Email subscribers: Configured in Terraform
