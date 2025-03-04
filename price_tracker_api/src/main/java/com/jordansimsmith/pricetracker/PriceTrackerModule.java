@@ -2,6 +2,7 @@ package com.jordansimsmith.pricetracker;
 
 import dagger.Module;
 import dagger.Provides;
+import java.util.Random;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -20,7 +21,7 @@ public class PriceTrackerModule {
   @Provides
   @Singleton
   public ChemistWarehouseClient chemistWarehouseClient() {
-    return new JsoupChemistWarehouseClient();
+    return new JsoupChemistWarehouseClient(new Random());
   }
 
   @Provides
