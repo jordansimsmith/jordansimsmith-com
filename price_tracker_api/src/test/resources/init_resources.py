@@ -107,7 +107,7 @@ for config in configs:
         Role=role_arn,
         Handler=config["handler_name"],
         Code={"ZipFile": zip_file_bytes},
-        Timeout=30,
+        Timeout=120,
         MemorySize=1024,
     )["FunctionArn"]
     lambda_client.get_waiter("function_active_v2").wait(

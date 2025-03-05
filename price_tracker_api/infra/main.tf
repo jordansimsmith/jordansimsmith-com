@@ -183,7 +183,7 @@ resource "aws_lambda_function" "lambda" {
   handler          = each.value.handler
   runtime          = "java17"
   memory_size      = 1024
-  timeout          = 30
+  timeout          = 120
 }
 
 resource "aws_cloudwatch_event_rule" "trigger" {

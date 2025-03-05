@@ -24,7 +24,7 @@ public class JsoupChemistWarehouseClient implements ChemistWarehouseClient {
     var backoffMs = INITIAL_BACKOFF_MS;
     Exception lastException = null;
 
-    for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    for (var attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
         var price = doGetPrice(url);
         if (price != null) {
@@ -32,10 +32,6 @@ public class JsoupChemistWarehouseClient implements ChemistWarehouseClient {
         }
       } catch (Exception e) {
         lastException = e;
-      }
-
-      if (attempt == MAX_RETRIES) {
-        break;
       }
 
       var jitterMs = (long) (random.nextDouble() * JITTER_FACTOR * backoffMs);
@@ -52,7 +48,7 @@ public class JsoupChemistWarehouseClient implements ChemistWarehouseClient {
     }
 
     if (lastException != null) {
-      throw lastException;
+      throw new RuntimeException(lastException);
     }
 
     return null;
