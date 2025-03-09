@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.time.Instant;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
@@ -26,7 +27,10 @@ public class PriceTrackerE2ETest {
     assertThat(priceTrackerContainer.isRunning()).isTrue();
   }
 
+  // skipped in CI because cloudflare blocks requests to the product websites from github actions
+  // agents
   @Test
+  @DisabledIfEnvironmentVariable(named = "CI", matches = "true")
   void shouldTrackPricesAndSendNotifications() throws Exception {
     // arrange
     var dynamoDbClient =
