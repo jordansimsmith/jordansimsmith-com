@@ -51,11 +51,7 @@ public class UpdatePricesHandler implements RequestHandler<ScheduledEvent, Void>
     var now = clock.now();
     var prices = new ArrayList<PriceTrackerItem>();
 
-    // Process all products from both sources using the unified PriceClient
-    var allProducts = new ArrayList<ProductsFactory.Product>();
-    allProducts.addAll(productsFactory.findChemistWarehouseProducts());
-    allProducts.addAll(productsFactory.findNzProteinProducts());
-
+    var allProducts = productsFactory.findProducts();
     for (var product : allProducts) {
       var price = priceClient.getPrice(product.url());
       if (price == null) {

@@ -8,13 +8,11 @@ public class FakeProductsFactory implements ProductsFactory {
   private final List<Product> nzProteinProducts = new ArrayList<>();
 
   @Override
-  public List<Product> findChemistWarehouseProducts() {
-    return List.copyOf(chemistWarehouseProducts);
-  }
-
-  @Override
-  public List<Product> findNzProteinProducts() {
-    return List.copyOf(nzProteinProducts);
+  public List<Product> findProducts() {
+    var allProducts = new ArrayList<Product>();
+    allProducts.addAll(chemistWarehouseProducts);
+    allProducts.addAll(nzProteinProducts);
+    return allProducts;
   }
 
   public void addChemistWarehouseProducts(List<Product> products) {
