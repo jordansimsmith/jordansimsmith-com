@@ -1,6 +1,6 @@
 ---
-description: 
-globs: 
+description: Instructions for building and running tests for Java code with Bazel
+globs: */**.java
 ---
 # Bazel Java build and test procedures
 

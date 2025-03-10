@@ -19,27 +19,14 @@ public class PriceTrackerTestModule {
 
   @Provides
   @Singleton
-  public FakeChemistWarehouseClient fakeChemistWarehouseClient() {
-    return new FakeChemistWarehouseClient();
+  public FakePriceClient fakePriceClient() {
+    return new FakePriceClient();
   }
 
   @Provides
   @Singleton
-  public ChemistWarehouseClient chemistWarehouseClient(
-      FakeChemistWarehouseClient fakeChemistWarehouseClient) {
-    return fakeChemistWarehouseClient;
-  }
-
-  @Provides
-  @Singleton
-  public FakeNzProteinClient fakeNzProteinClient() {
-    return new FakeNzProteinClient();
-  }
-
-  @Provides
-  @Singleton
-  public NzProteinClient nzProteinClient(FakeNzProteinClient fakeNzProteinClient) {
-    return fakeNzProteinClient;
+  public PriceClient priceClient(FakePriceClient fakePriceClient) {
+    return fakePriceClient;
   }
 
   @Provides

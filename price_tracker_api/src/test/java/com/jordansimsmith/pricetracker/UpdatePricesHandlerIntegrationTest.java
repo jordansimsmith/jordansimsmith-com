@@ -21,8 +21,7 @@ import software.amazon.awssdk.enhanced.dynamodb.Key;
 public class UpdatePricesHandlerIntegrationTest {
   private FakeClock fakeClock;
   private FakeNotificationPublisher fakeNotificationPublisher;
-  private FakeChemistWarehouseClient fakeChemistWarehouseClient;
-  private FakeNzProteinClient fakeNzProteinClient;
+  private FakePriceClient fakePriceClient;
   private FakeProductsFactory fakeProductsFactory;
   private DynamoDbTable<PriceTrackerItem> priceTrackerTable;
 
@@ -36,8 +35,7 @@ public class UpdatePricesHandlerIntegrationTest {
 
     fakeClock = factory.fakeClock();
     fakeNotificationPublisher = factory.fakeNotificationPublisher();
-    fakeChemistWarehouseClient = factory.fakeChemistWarehouseClient();
-    fakeNzProteinClient = factory.fakeNzProteinClient();
+    fakePriceClient = factory.fakePriceClient();
     fakeProductsFactory = factory.fakeProductsFactory();
     priceTrackerTable = factory.priceTrackerTable();
 
@@ -57,9 +55,9 @@ public class UpdatePricesHandlerIntegrationTest {
     var product1Price = 22.50;
     var product2Price = 18.00;
     var product3Price = 23.79;
-    fakeChemistWarehouseClient.setPrice(product1.url(), product1Price);
-    fakeChemistWarehouseClient.setPrice(product2.url(), product2Price);
-    fakeChemistWarehouseClient.setPrice(product3.url(), product3Price);
+    fakePriceClient.setPrice(product1.url(), product1Price);
+    fakePriceClient.setPrice(product2.url(), product2Price);
+    fakePriceClient.setPrice(product3.url(), product3Price);
 
     var product1History1 =
         PriceTrackerItem.create(
@@ -136,7 +134,7 @@ public class UpdatePricesHandlerIntegrationTest {
     fakeProductsFactory.addNzProteinProducts(List.of(product1));
 
     var product1Price = 52.00;
-    fakeNzProteinClient.setPrice(product1Price);
+    fakePriceClient.setPrice(product1.url(), product1Price);
 
     var product1History =
         PriceTrackerItem.create(

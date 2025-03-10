@@ -2,7 +2,9 @@ package com.jordansimsmith.pricetracker;
 
 import dagger.Module;
 import dagger.Provides;
+import java.util.Map;
 import java.util.Random;
+import java.util.random.RandomGenerator;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -20,14 +22,15 @@ public class PriceTrackerModule {
 
   @Provides
   @Singleton
-  public ChemistWarehouseClient chemistWarehouseClient() {
-    return new JsoupChemistWarehouseClient(new Random());
-  }
+  public PriceClient priceClient() {
+    RandomGenerator randomGenerator = new Random();
 
-  @Provides
-  @Singleton
-  public NzProteinClient nzProteinClient() {
-    return new JsoupNzProteinClient();
+    var extractors =
+        Map.of(
+            "www.chemistwarehouse.co.nz", new ChemistWarehousePriceExtractor(),
+            "www.nzprotein.co.nz", new NzProteinPriceExtractor());
+
+    return new JsoupPriceClient(randomGenerator, extractors);
   }
 
   @Provides

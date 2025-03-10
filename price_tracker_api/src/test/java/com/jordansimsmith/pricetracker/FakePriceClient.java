@@ -5,7 +5,7 @@ import java.util.HashMap;
 import java.util.Map;
 import javax.annotation.Nullable;
 
-public class FakeChemistWarehouseClient implements ChemistWarehouseClient {
+public class FakePriceClient implements PriceClient {
   private final Map<URI, Double> prices = new HashMap<>();
 
   @Override
@@ -14,7 +14,7 @@ public class FakeChemistWarehouseClient implements ChemistWarehouseClient {
     return prices.get(url);
   }
 
-  public void setPrice(URI url, double price) {
+  public void setPrice(URI url, Double price) {
     prices.put(url, price);
   }
 

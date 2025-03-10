@@ -24,9 +24,7 @@ public interface PriceTrackerFactory {
 
   NotificationPublisher notificationPublisher();
 
-  ChemistWarehouseClient chemistWarehouseClient();
-
-  NzProteinClient nzProteinClient();
+  PriceClient priceClient();
 
   ProductsFactory productsFactory();
 

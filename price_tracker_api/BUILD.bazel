@@ -11,6 +11,11 @@ INTEGRATION_TESTS = glob(["src/test/java/**/*IntegrationTest.java"])
 
 E2E_TESTS = glob(["src/test/java/**/*E2ETest.java"])
 
+UNIT_TESTS = glob(
+    ["src/test/java/**/*Test.java"],
+    exclude = INTEGRATION_TESTS + E2E_TESTS,
+)
+
 java_library(
     name = "lib",
     srcs = glob(
@@ -56,7 +61,7 @@ java_library(
     name = "test-lib",
     srcs = glob(
         ["src/test/java/**/*.java"],
-        exclude = INTEGRATION_TESTS + E2E_TESTS,
+        exclude = INTEGRATION_TESTS + E2E_TESTS + UNIT_TESTS,
     ),
     data = [
         ":local-load",
@@ -81,6 +86,23 @@ java_library(
         "@maven//:org_testcontainers_testcontainers",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_test_suite(
+    name = "unit-tests",
+    size = "small",
+    srcs = UNIT_TESTS,
+    runner = "junit5",
+    test_suffixes = ["Test.java"],
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        ":lib",
+        ":test-lib",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_jsoup_jsoup",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_mockito_mockito_core",
     ],
 )
 

@@ -27,9 +27,7 @@ public interface PriceTrackerTestFactory extends PriceTrackerFactory {
 
   FakeNotificationPublisher fakeNotificationPublisher();
 
-  FakeChemistWarehouseClient fakeChemistWarehouseClient();
-
-  FakeNzProteinClient fakeNzProteinClient();
+  FakePriceClient fakePriceClient();
 
   FakeProductsFactory fakeProductsFactory();
 

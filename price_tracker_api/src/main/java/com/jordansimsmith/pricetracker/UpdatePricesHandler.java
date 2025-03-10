@@ -19,8 +19,7 @@ public class UpdatePricesHandler implements RequestHandler<ScheduledEvent, Void>
 
   private final Clock clock;
   private final NotificationPublisher notificationPublisher;
-  private final ChemistWarehouseClient chemistWarehouseClient;
-  private final NzProteinClient nzProteinClient;
+  private final PriceClient priceClient;
   private final ProductsFactory productsFactory;
   private final DynamoDbTable<PriceTrackerItem> priceTrackerTable;
 
@@ -34,8 +33,7 @@ public class UpdatePricesHandler implements RequestHandler<ScheduledEvent, Void>
   UpdatePricesHandler(PriceTrackerFactory factory) {
     this.clock = factory.clock();
     this.notificationPublisher = factory.notificationPublisher();
-    this.chemistWarehouseClient = factory.chemistWarehouseClient();
-    this.nzProteinClient = factory.nzProteinClient();
+    this.priceClient = factory.priceClient();
     this.productsFactory = factory.productsFactory();
     this.priceTrackerTable = factory.priceTrackerTable();
   }
@@ -53,20 +51,13 @@ public class UpdatePricesHandler implements RequestHandler<ScheduledEvent, Void>
     var now = clock.now();
     var prices = new ArrayList<PriceTrackerItem>();
 
-    // Process Chemist Warehouse products
-    for (var product : productsFactory.findChemistWarehouseProducts()) {
-      var price = chemistWarehouseClient.getPrice(product.url());
-      if (price == null) {
-        continue;
-      }
-      var priceTrackerItem =
-          PriceTrackerItem.create(product.url().toString(), product.name(), now, price);
-      prices.add(priceTrackerItem);
-    }
+    // Process all products from both sources using the unified PriceClient
+    var allProducts = new ArrayList<ProductsFactory.Product>();
+    allProducts.addAll(productsFactory.findChemistWarehouseProducts());
+    allProducts.addAll(productsFactory.findNzProteinProducts());
 
-    // Process NZ Protein products
-    for (var product : productsFactory.findNzProteinProducts()) {
-      var price = nzProteinClient.getPrice(product.url());
+    for (var product : allProducts) {
+      var price = priceClient.getPrice(product.url());
       if (price == null) {
         continue;
       }
