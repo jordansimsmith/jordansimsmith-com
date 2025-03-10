@@ -22,6 +22,7 @@ public class UpdatePricesHandlerIntegrationTest {
   private FakeClock fakeClock;
   private FakeNotificationPublisher fakeNotificationPublisher;
   private FakeChemistWarehouseClient fakeChemistWarehouseClient;
+  private FakeNzProteinClient fakeNzProteinClient;
   private FakeProductsFactory fakeProductsFactory;
   private DynamoDbTable<PriceTrackerItem> priceTrackerTable;
 
@@ -36,6 +37,7 @@ public class UpdatePricesHandlerIntegrationTest {
     fakeClock = factory.fakeClock();
     fakeNotificationPublisher = factory.fakeNotificationPublisher();
     fakeChemistWarehouseClient = factory.fakeChemistWarehouseClient();
+    fakeNzProteinClient = factory.fakeNzProteinClient();
     fakeProductsFactory = factory.fakeProductsFactory();
     priceTrackerTable = factory.priceTrackerTable();
 
@@ -50,7 +52,7 @@ public class UpdatePricesHandlerIntegrationTest {
     var product1 = new ProductsFactory.Product(URI.create("product1.com"), "product 1");
     var product2 = new ProductsFactory.Product(URI.create("product2.com"), "product 2");
     var product3 = new ProductsFactory.Product(URI.create("product3.com"), "product 3");
-    fakeProductsFactory.addProducts(List.of(product1, product2, product3));
+    fakeProductsFactory.addChemistWarehouseProducts(List.of(product1, product2, product3));
 
     var product1Price = 22.50;
     var product2Price = 18.00;
@@ -122,5 +124,50 @@ public class UpdatePricesHandlerIntegrationTest {
     var notification = notifications.get(0);
     assertThat(notification.subject()).isEqualTo("1 price updated");
     assertThat(notification.message()).isEqualTo("product 1 $25.80 -> $22.50 product1.com");
+  }
+
+  @Test
+  void handleRequestShouldUpdateNzProteinPrices() {
+    // arrange
+    var product1 =
+        new ProductsFactory.Product(
+            URI.create("https://www.nzprotein.co.nz/product/nz-whey-1kg-2-2lbs"),
+            "NZ Protein - NZ Whey 1kg (2.2lbs)");
+    fakeProductsFactory.addNzProteinProducts(List.of(product1));
+
+    var product1Price = 52.00;
+    fakeNzProteinClient.setPrice(product1Price);
+
+    var product1History =
+        PriceTrackerItem.create(
+            product1.url().toString(), product1.name(), Instant.ofEpochSecond(2_000), 55.99);
+    priceTrackerTable.putItem(product1History);
+
+    fakeClock.setTime(3_000_000);
+
+    // act
+    updatePricesHandler.handleRequest(new ScheduledEvent(), null);
+
+    // assert
+    var product1New =
+        priceTrackerTable.getItem(
+            Key.builder()
+                .partitionValue(PriceTrackerItem.formatPk(product1.url().toString()))
+                .sortValue(PriceTrackerItem.formatSk(fakeClock.now()))
+                .build());
+    assertThat(product1New).isNotNull();
+    assertThat(product1New.getName()).isEqualTo(product1.name());
+    assertThat(product1New.getUrl()).isEqualTo(product1.url().toString());
+    assertThat(product1New.getPrice()).isEqualTo(product1Price);
+    assertThat(product1New.getTimestamp()).isEqualTo(fakeClock.now());
+
+    var notifications = fakeNotificationPublisher.findNotifications(UpdatePricesHandler.TOPIC);
+    assertThat(notifications.size()).isEqualTo(1);
+    var notification = notifications.get(0);
+    assertThat(notification.subject()).isEqualTo("1 price updated");
+    assertThat(notification.message())
+        .isEqualTo(
+            "NZ Protein - NZ Whey 1kg (2.2lbs) $55.99 -> $52.00"
+                + " https://www.nzprotein.co.nz/product/nz-whey-1kg-2-2lbs");
   }
 }

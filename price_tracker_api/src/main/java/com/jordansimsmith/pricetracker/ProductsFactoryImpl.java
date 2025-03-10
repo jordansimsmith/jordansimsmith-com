@@ -130,4 +130,12 @@ public class ProductsFactoryImpl implements ProductsFactory {
                 "https://www.chemistwarehouse.co.nz/buy/136023/quest-protein-bar-dipped-choc-chip-cookie-dough-50g"),
             "Quest Protein Bar Dipped Choc Chip Cookie Dough 50g"));
   }
+
+  @Override
+  public List<Product> findNzProteinProducts() {
+    return List.of(
+        new Product(
+            URI.create("https://www.nzprotein.co.nz/product/nz-whey-1kg-2-2lbs"),
+            "NZ Protein - NZ Whey 1kg (2.2lbs)"));
+  }
 }

@@ -26,6 +26,8 @@ public interface PriceTrackerFactory {
 
   ChemistWarehouseClient chemistWarehouseClient();
 
+  NzProteinClient nzProteinClient();
+
   ProductsFactory productsFactory();
 
   static PriceTrackerFactory create() {

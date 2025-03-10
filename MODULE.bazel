@@ -48,6 +48,9 @@ maven.install(
         "com.fasterxml.jackson.core:jackson-databind:2.17.2",
         "org.jsoup:jsoup:1.18.1",
     ],
+    repositories = [
+        "https://repo.maven.apache.org/maven2",
+    ],
 )
 use_repo(maven, "maven")
 

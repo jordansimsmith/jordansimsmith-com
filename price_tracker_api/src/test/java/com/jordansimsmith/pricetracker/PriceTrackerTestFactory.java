@@ -29,6 +29,8 @@ public interface PriceTrackerTestFactory extends PriceTrackerFactory {
 
   FakeChemistWarehouseClient fakeChemistWarehouseClient();
 
+  FakeNzProteinClient fakeNzProteinClient();
+
   FakeProductsFactory fakeProductsFactory();
 
   @Component.Factory

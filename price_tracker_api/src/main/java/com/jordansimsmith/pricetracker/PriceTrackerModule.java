@@ -26,6 +26,12 @@ public class PriceTrackerModule {
 
   @Provides
   @Singleton
+  public NzProteinClient nzProteinClient() {
+    return new JsoupNzProteinClient();
+  }
+
+  @Provides
+  @Singleton
   public ProductsFactory productsFactory() {
     return new ProductsFactoryImpl();
   }

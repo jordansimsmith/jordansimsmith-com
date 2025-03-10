@@ -32,6 +32,18 @@ public class PriceTrackerTestModule {
 
   @Provides
   @Singleton
+  public FakeNzProteinClient fakeNzProteinClient() {
+    return new FakeNzProteinClient();
+  }
+
+  @Provides
+  @Singleton
+  public NzProteinClient nzProteinClient(FakeNzProteinClient fakeNzProteinClient) {
+    return fakeNzProteinClient;
+  }
+
+  @Provides
+  @Singleton
   public FakeProductsFactory fakeProductsFactory() {
     return new FakeProductsFactory();
   }

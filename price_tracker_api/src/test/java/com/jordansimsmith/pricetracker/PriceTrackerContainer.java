@@ -5,11 +5,16 @@ import com.jordansimsmith.testcontainers.LoadedImage;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Properties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
 public class PriceTrackerContainer extends GenericContainer<PriceTrackerContainer> {
+  private static final Logger logger = LoggerFactory.getLogger(PriceTrackerContainer.class);
+
   private static final int LOCALSTACK_PORT = 4566;
 
   public PriceTrackerContainer() {
@@ -22,6 +27,7 @@ public class PriceTrackerContainer extends GenericContainer<PriceTrackerContaine
     this.waitingFor(
         Wait.forHttp("/_localstack/init/ready")
             .forResponsePredicate(res -> res.contains("\"completed\": true")));
+    this.withLogConsumer(new Slf4jLogConsumer(logger).withSeparateOutputStreams());
   }
 
   @SuppressWarnings("HttpUrlsUsage")

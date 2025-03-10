@@ -7,4 +7,6 @@ public interface ProductsFactory {
   record Product(URI url, String name) {}
 
   List<Product> findChemistWarehouseProducts();
+
+  List<Product> findNzProteinProducts();
 }

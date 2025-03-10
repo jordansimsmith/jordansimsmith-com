@@ -1314,7 +1314,7 @@
     "@@rules_jvm_external~//:extensions.bzl%maven": {
       "general": {
         "bzlTransitiveDigest": "Pq3YnJEflPAALx/UMykUnN3aA5bve0fNm/cuLvt/zvI=",
-        "usagesDigest": "+MRzdBVl5sFm9R/dpTkINr/Pqr2DUkbvG4IIHtsX1xI=",
+        "usagesDigest": "KahqmxPsc4gbATMzlWfeY1ivbtyDHnKpVnGKhQprwac=",
         "recordedFileInputs": {
           "@@stardoc~//maven_install.json": "de0bfa778b4ed6aebb77509362dd87ab8d20fc7c7c18d2a7429cdfee03949a21",
           "@@rules_jvm_external~//rules_jvm_external_deps_install.json": "0bfbc915d9155df44d7a3b216e8f3c1fbcd110e358dd07637dc393583a5227e8",
@@ -6804,7 +6804,7 @@
             "attributes": {
               "user_provided_name": "maven",
               "repositories": [
-                "{ \"repo_url\": \"https://repo1.maven.org/maven2\" }"
+                "{ \"repo_url\": \"https://repo.maven.apache.org/maven2\" }"
               ],
               "artifacts": [
                 "{ \"group\": \"org.junit.platform\", \"artifact\": \"junit-platform-launcher\", \"version\": \"1.10.3\" }",
