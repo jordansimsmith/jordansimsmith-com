@@ -19,6 +19,7 @@ graph TD
 ## Requirements and specifications
 
 ### Functional requirements
+
 - Extract event information from Auckland Stadiums website
 - Process both individual event pages and season overview pages
 - Capture comprehensive event details including:
@@ -39,6 +40,7 @@ graph TD
 - Regularly update event data through scheduled polling
 
 ### Technical specifications
+
 - Complete extraction process within 2 minutes
 - Process all event types (sports matches, concerts, special events)
 - Handle season overview pages containing multiple event listings
@@ -54,6 +56,7 @@ graph TD
 ## Implementation details
 
 ### Technologies
+
 - AWS Lambda for serverless execution
 - Java runtime environment for Lambda functions
 - Amazon EventBridge for scheduled task execution
@@ -63,6 +66,7 @@ graph TD
 - Amazon SNS for optional notification delivery
 
 ### Key components
+
 - `UpdateEventsHandler`: Lambda handler that processes scheduled events to scrape the website
 - `GoMediaEventClient`: Client interface for retrieving event data
 - `JsoupGoMediaEventClient`: Implementation that uses Jsoup to scrape event data
@@ -71,6 +75,7 @@ graph TD
 - `GetSubscriptionHandler`: Lambda handler that serves iCal subscription data
 
 ### Configuration
+
 - Lambda execution frequency: Hourly via EventBridge schedule
-- DynamoDB table: "events" with hash key "pk" and range key "sk"
+- DynamoDB table: "event_calendar" with hash key "pk" and range key "sk"
 - API Gateway endpoint for iCal subscription

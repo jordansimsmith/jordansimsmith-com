@@ -16,6 +16,38 @@ Our codebase follows these naming conventions to clearly indicate test types:
 - **Integration tests**: Files ending with `IntegrationTest.java` (e.g., `UserServiceIntegrationTest.java`)
 - **End-to-End tests**: Files ending with `E2ETest.java` (e.g., `UserServiceE2ETest.java`)
 
+## Test method naming
+
+Test method names should:
+- Start with the name of the method being tested
+- Not contain underscores
+- Describe the scenario and expected outcome
+- Use camelCase naming convention
+
+### ✅ CORRECT:
+```java
+@Test
+void createUserSavesToDatabase() { }
+
+@Test
+void createUserThrowsWhenInvalidInput() { }
+
+@Test
+void handleRequestSavesEventsToDb() { }
+```
+
+### ❌ INCORRECT:
+```java
+@Test
+void test_create_user() { }
+
+@Test
+void should_save_user_to_database() { }
+
+@Test
+void testCreateUser() { }
+```
+
 ## Test structure
 
 All tests should follow the Arrange-Act-Assert (AAA) pattern:

@@ -1,0 +1,117 @@
+load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
+load("@dagger//:workspace_defs.bzl", "dagger_rules")
+
+dagger_rules()
+
+HANDLERS = glob(["src/main/java/**/*Handler.java"])
+
+INTEGRATION_TESTS = glob(["src/test/java/**/*IntegrationTest.java"])
+
+UNIT_TESTS = glob(
+    ["src/test/java/**/*Test.java"],
+    exclude = INTEGRATION_TESTS,
+)
+
+java_library(
+    name = "lib",
+    srcs = glob(
+        ["src/main/java/**/*.java"],
+        exclude = HANDLERS,
+    ),
+    visibility = [
+        "//visibility:public",
+    ],
+    deps = [
+        ":dagger",
+        "//lib/dynamodb:lib",
+        "//lib/time:lib",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_jsoup_jsoup",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "update-events-handler",
+    srcs = glob(["src/main/java/com/jordansimsmith/eventcalendar/UpdateEventsHandler.java"]),
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/time:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_library(
+    name = "test-lib",
+    srcs = glob(
+        ["src/test/java/**/*.java"],
+        exclude = UNIT_TESTS + INTEGRATION_TESTS,
+    ),
+    deps = [
+        ":dagger",
+        ":lib",
+        "//lib/dynamodb:lib",
+        "//lib/testcontainers:lib",
+        "//lib/time:lib",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_google_guava_guava",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_test_suite(
+    name = "unit-tests",
+    size = "small",
+    srcs = UNIT_TESTS,
+    runner = "junit5",
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        ":lib",
+        ":test-lib",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_jsoup_jsoup",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+)
+
+java_test_suite(
+    name = "integration-tests",
+    size = "medium",
+    srcs = INTEGRATION_TESTS,
+    env = {
+        "AWS_ACCESS_KEY_ID": "fake",
+        "AWS_SECRET_ACCESS_KEY": "fake",
+        "AWS_REGION": "ap-southeast-2",
+    },
+    runner = "junit5",
+    test_suffixes = ["IntegrationTest.java"],
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        ":lib",
+        ":test-lib",
+        ":update-events-handler",
+        "//lib/dynamodb:lib",
+        "//lib/testcontainers:lib",
+        "//lib/time:lib",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
