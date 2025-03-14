@@ -1,6 +1,7 @@
 ---
-description: Guidelines for implementing new features using Test-Driven Development (TDD)
-globs: **/*.java
+description: 
+globs: 
+alwaysApply: true
 ---
 
 # Test-driven development approach

@@ -1,6 +1,7 @@
 ---
 description: Standards for service documentation in README.md files
 globs: **/*.md
+alwaysApply: false
 ---
 
 # Documentation standards for services

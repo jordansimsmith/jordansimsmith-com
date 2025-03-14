@@ -1,6 +1,7 @@
 ---
 description: Documents the conventions for Cursor rules in this repository
 globs: **/*.mdc
+alwaysApply: false
 ---
 
 # Cursor rule conventions
@@ -51,6 +52,7 @@ This file itself serves as an example of a properly formatted Cursor rule.
 ---
 description: Guidelines for building and testing Java code with Bazel
 globs: **/*.java
+alwaysApply: false
 ---
 ```
 

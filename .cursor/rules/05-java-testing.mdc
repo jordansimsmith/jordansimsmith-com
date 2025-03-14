@@ -1,6 +1,7 @@
 ---
 description: Guidelines for Java testing strategies and conventions
 globs: **/*Test.java
+alwaysApply: false
 ---
 
 # Java testing guidelines

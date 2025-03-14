@@ -1,6 +1,7 @@
 ---
-description: Guidelines for formatting code changes after completing a task
-globs: **/*
+description: 
+globs: 
+alwaysApply: true
 ---
 
 # Format changes after task completion

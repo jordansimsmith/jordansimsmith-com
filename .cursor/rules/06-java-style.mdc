@@ -55,6 +55,40 @@ client.forceReconnect();
 double result = calculateWithFactor(x, 0.7854);
 ```
 
+## Javadoc comments
+
+- Do not include Javadoc comments on classes unless strictly necessary
+- Class purpose and functionality should be evident from its name and implementation
+- Only use Javadoc comments when complex behavior or non-obvious design decisions need explanation
+- Public APIs that are consumed by other teams should still have appropriate Javadoc
+
+### ✅ CORRECT:
+```java
+// Simple class with self-explanatory purpose doesn't need Javadoc
+public class UserRepository {
+    // Class implementation
+}
+
+/**
+ * Factory that creates optimized query plans based on the database schema.
+ * Uses cost-based optimization for join ordering.
+ */
+public class QueryPlanFactory {
+    // Complex implementation where javadoc is valuable
+}
+```
+
+### ❌ INCORRECT:
+```java
+/**
+ * A repository class for users.
+ * This class handles user data.
+ */
+public class UserRepository {
+    // Class implementation with unnecessary Javadoc
+}
+```
+
 ## Exception handling pattern
 
 Use a specific pattern for exception handling to minimize nesting and try-catch blocks:

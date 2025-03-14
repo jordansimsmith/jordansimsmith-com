@@ -1,6 +1,7 @@
 ---
-description: Guidelines for maintaining consistency across services when implementing new features
-globs: **/*.java
+description: 
+globs: 
+alwaysApply: true
 ---
 
 # Service consistency
