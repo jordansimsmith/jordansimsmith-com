@@ -9,8 +9,8 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 @DynamoDbBean
 public class EventCalendarItem {
   public static final String DELIMITER = "#";
+  public static final String STADIUM_PREFIX = "STADIUM" + DELIMITER;
   public static final String EVENT_PREFIX = "EVENT" + DELIMITER;
-  public static final String TIMESTAMP_PREFIX = "TIMESTAMP" + DELIMITER;
 
   private static final String PK = "pk";
   private static final String SK = "sk";
@@ -19,6 +19,7 @@ public class EventCalendarItem {
   private static final String EVENT_INFO = "event_info";
   private static final String TIMESTAMP = "timestamp";
   private static final String VERSION = "version";
+  private static final String STADIUM_URL = "stadium_url";
 
   private String pk;
   private String sk;
@@ -27,6 +28,7 @@ public class EventCalendarItem {
   private String eventInfo;
   private Instant timestamp;
   private Long version;
+  private String stadiumUrl;
 
   @DynamoDbPartitionKey
   @DynamoDbAttribute(PK)
@@ -95,6 +97,15 @@ public class EventCalendarItem {
     this.version = version;
   }
 
+  @DynamoDbAttribute(STADIUM_URL)
+  public String getStadiumUrl() {
+    return stadiumUrl;
+  }
+
+  public void setStadiumUrl(String stadiumUrl) {
+    this.stadiumUrl = stadiumUrl;
+  }
+
   @Override
   public String toString() {
     return "EventCalendarItem{"
@@ -117,6 +128,9 @@ public class EventCalendarItem {
         + timestamp
         + ", version="
         + version
+        + ", stadiumUrl='"
+        + stadiumUrl
+        + '\''
         + '}';
   }
 
@@ -130,31 +144,33 @@ public class EventCalendarItem {
         && Objects.equals(eventUrl, that.eventUrl)
         && Objects.equals(eventInfo, that.eventInfo)
         && Objects.equals(timestamp, that.timestamp)
-        && Objects.equals(version, that.version);
+        && Objects.equals(version, that.version)
+        && Objects.equals(stadiumUrl, that.stadiumUrl);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(pk, sk, title, eventUrl, eventInfo, timestamp, version);
+    return Objects.hash(pk, sk, title, eventUrl, eventInfo, timestamp, version, stadiumUrl);
   }
 
   public static String formatPk(String stadiumUrl) {
-    return EVENT_PREFIX + stadiumUrl;
+    return STADIUM_PREFIX + stadiumUrl;
   }
 
-  public static String formatSk(Instant timestamp) {
-    return TIMESTAMP_PREFIX + timestamp.getEpochSecond();
+  public static String formatSk(String eventUrl) {
+    return EVENT_PREFIX + eventUrl;
   }
 
   public static EventCalendarItem create(
       String stadiumUrl, String title, String eventUrl, String eventInfo, Instant timestamp) {
     var eventCalendarItem = new EventCalendarItem();
     eventCalendarItem.setPk(formatPk(stadiumUrl));
-    eventCalendarItem.setSk(formatSk(timestamp));
+    eventCalendarItem.setSk(formatSk(eventUrl));
     eventCalendarItem.setTitle(title);
     eventCalendarItem.setEventUrl(eventUrl);
     eventCalendarItem.setEventInfo(eventInfo);
     eventCalendarItem.setTimestamp(timestamp);
+    eventCalendarItem.setStadiumUrl(stadiumUrl);
     return eventCalendarItem;
   }
 }

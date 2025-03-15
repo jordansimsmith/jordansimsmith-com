@@ -51,21 +51,21 @@ public class UpdateEventsHandlerIntegrationTest {
     var event = new ScheduledEvent();
 
     var warriors =
-        new GoMediaEvent(
+        new GoMediaEventClient.GoMediaEvent(
             "Warriors vs Storm",
             STADIUM_URL,
             "https://www.aucklandstadiums.co.nz/event/warriors-storm",
             LocalDateTime.of(2024, 3, 25, 19, 30).toInstant(ZoneOffset.UTC),
             "Box office opens at 5:30PM, Gates open at 6:30PM");
     var concert =
-        new GoMediaEvent(
+        new GoMediaEventClient.GoMediaEvent(
             "Taylor Swift Concert",
             STADIUM_URL,
             "https://www.aucklandstadiums.co.nz/event/taylor-swift",
             LocalDateTime.of(2024, 4, 15, 20, 0).toInstant(ZoneOffset.UTC),
             "Box office opens at 6PM, Gates open at 7PM");
     var cricket =
-        new GoMediaEvent(
+        new GoMediaEventClient.GoMediaEvent(
             "Black Caps vs Australia",
             STADIUM_URL,
             "https://www.aucklandstadiums.co.nz/event/black-caps-australia",
@@ -94,7 +94,7 @@ public class UpdateEventsHandlerIntegrationTest {
             .findFirst()
             .orElseThrow();
     assertThat(warriorsItem.getEventUrl()).isEqualTo(warriors.eventUrl());
-    assertThat(warriorsItem.getEventInfo()).contains(warriors.eventInfo());
+    assertThat(warriorsItem.getEventInfo()).isEqualTo(warriors.eventInfo());
     assertThat(warriorsItem.getTimestamp()).isEqualTo(warriors.startTime());
 
     // Concert event
@@ -104,7 +104,7 @@ public class UpdateEventsHandlerIntegrationTest {
             .findFirst()
             .orElseThrow();
     assertThat(concertItem.getEventUrl()).isEqualTo(concert.eventUrl());
-    assertThat(concertItem.getEventInfo()).contains(concert.eventInfo());
+    assertThat(concertItem.getEventInfo()).isEqualTo(concert.eventInfo());
     assertThat(concertItem.getTimestamp()).isEqualTo(concert.startTime());
 
     // Cricket event
@@ -114,7 +114,7 @@ public class UpdateEventsHandlerIntegrationTest {
             .findFirst()
             .orElseThrow();
     assertThat(cricketItem.getEventUrl()).isEqualTo(cricket.eventUrl());
-    assertThat(cricketItem.getEventInfo()).contains(cricket.eventInfo());
+    assertThat(cricketItem.getEventInfo()).isEqualTo(cricket.eventInfo());
     assertThat(cricketItem.getTimestamp()).isEqualTo(cricket.startTime());
   }
 }
