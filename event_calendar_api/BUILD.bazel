@@ -34,7 +34,7 @@ java_library(
 
 java_binary(
     name = "update-events-handler",
-    srcs = glob(["src/main/java/com/jordansimsmith/eventcalendar/UpdateEventsHandler.java"]),
+    srcs = ["src/main/java/com/jordansimsmith/eventcalendar/UpdateEventsHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
@@ -48,6 +48,27 @@ java_binary(
         "@maven//:com_amazonaws_aws_lambda_java_events",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "get-calendar-subscription-handler",
+    srcs = ["src/main/java/com/jordansimsmith/eventcalendar/GetCalendarSubscriptionHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/time:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:net_sf_biweekly_biweekly",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
     ],
 )
@@ -100,6 +121,7 @@ java_test_suite(
     test_suffixes = ["IntegrationTest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":get-calendar-subscription-handler",
         ":lib",
         ":test-lib",
         ":update-events-handler",
@@ -108,6 +130,7 @@ java_test_suite(
         "//lib/time:lib",
         "@maven//:com_amazonaws_aws_lambda_java_core",
         "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:net_sf_biweekly_biweekly",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
         "@maven//:org_testcontainers_junit_jupiter",
