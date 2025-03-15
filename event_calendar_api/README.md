@@ -1,81 +1,73 @@
 # Event calendar API service
 
-The event calendar API service extracts, processes, and provides structured data about stadium events and game times from the Auckland Stadiums website.
+The event calendar API service extracts, processes, and provides structured data about stadium events and game times from the Go Media Stadium (formerly Mt Smart Stadium) in Auckland.
 
 ## System architecture
 
 ```mermaid
 graph TD
-  A[EventBridge Schedule] --> B[Web Scraper Lambda]
+  A[EventBridge Schedule] --> B[UpdateEventsHandler Lambda]
   B --> C[Auckland Stadiums Website]
   C --> B
-  B --> D[Data Normalization]
-  D --> E[DynamoDB]
-  F[iCal API Lambda] --> E
-  F --> G[iCal Subscription]
-  G --> H[iPhone Calendar]
+  B --> D[DynamoDB]
+  E[GetCalendarSubscriptionHandler Lambda] --> D
+  E --> F[iCal Response]
+  F --> G[iPhone Calendar]
 ```
 
 ## Requirements and specifications
 
 ### Functional requirements
 
-- Extract event information from Auckland Stadiums website
+- Extract event information from Go Media Stadium website
 - Process both individual event pages and season overview pages
 - Capture comprehensive event details including:
   - Event title
-  - Event date
-  - Kickoff time
-  - Venue
-  - Detailed timing information (box office opening, gate opening)
-- Normalize dates to ISO format (YYYY-MM-DD)
-- Normalize times to 24-hour format
-- Remove prefix text from venue names
-- Store extracted data in a structured format
-- Expose data through a consistent API
-- Avoid duplicate processing of event pages
-- Implement rate limiting through appropriate delays between requests
-- Provide detailed logging of the extraction process
-- Provide calendar data in iCal format for subscription in iPhone calendar
-- Regularly update event data through scheduled polling
+  - Event date and time
+  - Event URL
+  - Event information (box office opening, gate opening, etc.)
+- Store extracted data in DynamoDB
+- Expose event data through iCal subscription endpoint
+- Update event data hourly through scheduled polling
+- Support calendar subscription in iPhone and other calendar apps
 
 ### Technical specifications
 
-- Complete extraction process within 2 minutes
-- Process all event types (sports matches, concerts, special events)
-- Handle season overview pages containing multiple event listings
-- Extract event information from both main venue page and individual event pages
-- Provide data normalization for consistent formatting
-- Support incremental updates of event information
-- Implement proper error handling for network failures or HTML structure changes
-- Ensure the system is maintainable and extensible for future venue additions
-- Poll the Auckland Stadiums website at regular intervals via EventBridge schedule
-- Persist structured event data in DynamoDB
-- Expose iCal subscription endpoint for seamless calendar integration
+- Lambda execution frequency: Every hour via EventBridge schedule
+- DynamoDB table: "event_calendar" with hash key "pk" and range key "sk"
+- Point-in-time recovery enabled for data protection
+- Deletion protection enabled for the DynamoDB table
+- Lambda memory: 1024MB
+- Lambda timeout: 30 seconds
+- Java 17 runtime for Lambda functions
+- API Gateway endpoint with custom domain: api.event-calendar.jordansimsmith.com
 
 ## Implementation details
 
 ### Technologies
 
 - AWS Lambda for serverless execution
-- Java runtime environment for Lambda functions
 - Amazon EventBridge for scheduled task execution
 - DynamoDB for storing structured event data
 - AWS API Gateway for exposing the iCal endpoint
+- Java 17 runtime environment
 - Jsoup library for HTML parsing
-- Amazon SNS for optional notification delivery
+- Biweekly library for iCal generation
+- AWS Certificate Manager for SSL/TLS
+- Custom domain name with API Gateway
 
 ### Key components
 
 - `UpdateEventsHandler`: Lambda handler that processes scheduled events to scrape the website
-- `GoMediaEventClient`: Client interface for retrieving event data
+- `GetCalendarSubscriptionHandler`: Lambda handler that serves iCal subscription data
 - `JsoupGoMediaEventClient`: Implementation that uses Jsoup to scrape event data
-- `Event`: Data model for storing event data in DynamoDB
+- `EventCalendarItem`: Data model for storing event data in DynamoDB
 - `EventCalendarFactory`: Factory for creating the required dependencies
-- `GetSubscriptionHandler`: Lambda handler that serves iCal subscription data
 
 ### Configuration
 
 - Lambda execution frequency: Hourly via EventBridge schedule
 - DynamoDB table: "event_calendar" with hash key "pk" and range key "sk"
-- API Gateway endpoint for iCal subscription
+- API Gateway endpoint: GET /calendar
+- Custom domain: api.event-calendar.jordansimsmith.com
+- Time zone: Pacific/Auckland
