@@ -3,7 +3,6 @@ package com.jordansimsmith.eventcalendar;
 import com.jordansimsmith.dynamodb.EpochSecondConverter;
 import java.time.Instant;
 import java.util.Objects;
-import software.amazon.awssdk.enhanced.dynamodb.extensions.annotations.DynamoDbVersionAttribute;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 @DynamoDbBean
@@ -18,7 +17,6 @@ public class EventCalendarItem {
   private static final String EVENT_URL = "event_url";
   private static final String EVENT_INFO = "event_info";
   private static final String TIMESTAMP = "timestamp";
-  private static final String VERSION = "version";
   private static final String STADIUM_URL = "stadium_url";
 
   private String pk;
@@ -27,7 +25,6 @@ public class EventCalendarItem {
   private String eventUrl;
   private String eventInfo;
   private Instant timestamp;
-  private Long version;
   private String stadiumUrl;
 
   @DynamoDbPartitionKey
@@ -87,16 +84,6 @@ public class EventCalendarItem {
     this.timestamp = timestamp;
   }
 
-  @DynamoDbVersionAttribute
-  @DynamoDbAttribute(VERSION)
-  public Long getVersion() {
-    return version;
-  }
-
-  public void setVersion(Long version) {
-    this.version = version;
-  }
-
   @DynamoDbAttribute(STADIUM_URL)
   public String getStadiumUrl() {
     return stadiumUrl;
@@ -126,8 +113,6 @@ public class EventCalendarItem {
         + '\''
         + ", timestamp="
         + timestamp
-        + ", version="
-        + version
         + ", stadiumUrl='"
         + stadiumUrl
         + '\''
@@ -144,13 +129,12 @@ public class EventCalendarItem {
         && Objects.equals(eventUrl, that.eventUrl)
         && Objects.equals(eventInfo, that.eventInfo)
         && Objects.equals(timestamp, that.timestamp)
-        && Objects.equals(version, that.version)
         && Objects.equals(stadiumUrl, that.stadiumUrl);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(pk, sk, title, eventUrl, eventInfo, timestamp, version, stadiumUrl);
+    return Objects.hash(pk, sk, title, eventUrl, eventInfo, timestamp, stadiumUrl);
   }
 
   public static String formatPk(String stadiumUrl) {

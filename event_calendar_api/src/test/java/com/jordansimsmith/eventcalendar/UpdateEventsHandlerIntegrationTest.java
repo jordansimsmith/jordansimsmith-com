@@ -50,6 +50,16 @@ public class UpdateEventsHandlerIntegrationTest {
     fakeClock.setTime(testTime.toEpochMilli());
     var event = new ScheduledEvent();
 
+    // create pre-existing Warriors event with old date
+    var existingWarriorsEvent =
+        EventCalendarItem.create(
+            STADIUM_URL,
+            "Warriors vs Storm",
+            "https://www.aucklandstadiums.co.nz/event/warriors-storm",
+            "Box office opens at 5:30PM, Gates open at 6:30PM",
+            LocalDateTime.of(2024, 3, 24, 19, 30).toInstant(ZoneOffset.UTC));
+    eventCalendarTable.putItem(existingWarriorsEvent);
+
     var warriors =
         new GoMediaEventClient.GoMediaEvent(
             "Warriors vs Storm",
@@ -87,7 +97,7 @@ public class UpdateEventsHandlerIntegrationTest {
     var items = eventCalendarTable.query(request).items().stream().toList();
     assertThat(items).hasSize(3);
 
-    // Warriors event
+    // warriors event - verify it was updated with new date
     var warriorsItem =
         items.stream()
             .filter(item -> item.getTitle().equals(warriors.title()))
@@ -95,9 +105,11 @@ public class UpdateEventsHandlerIntegrationTest {
             .orElseThrow();
     assertThat(warriorsItem.getEventUrl()).isEqualTo(warriors.eventUrl());
     assertThat(warriorsItem.getEventInfo()).isEqualTo(warriors.eventInfo());
-    assertThat(warriorsItem.getTimestamp()).isEqualTo(warriors.startTime());
+    assertThat(warriorsItem.getTimestamp())
+        .isEqualTo(warriors.startTime())
+        .isNotEqualTo(existingWarriorsEvent.getTimestamp());
 
-    // Concert event
+    // concert event
     var concertItem =
         items.stream()
             .filter(item -> item.getTitle().equals(concert.title()))
@@ -107,7 +119,7 @@ public class UpdateEventsHandlerIntegrationTest {
     assertThat(concertItem.getEventInfo()).isEqualTo(concert.eventInfo());
     assertThat(concertItem.getTimestamp()).isEqualTo(concert.startTime());
 
-    // Cricket event
+    // cricket event
     var cricketItem =
         items.stream()
             .filter(item -> item.getTitle().equals(cricket.title()))
