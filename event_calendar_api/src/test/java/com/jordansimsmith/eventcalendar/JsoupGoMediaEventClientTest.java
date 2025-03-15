@@ -78,6 +78,13 @@ class JsoupGoMediaEventClientTest {
             </svg>
             14 March 2025
           </span>
+          <span class="event-hero-carousel-detail icon">
+            <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true" focusable="true" name="location" class="icon" type="default">
+              <title>Location</title>
+              <use xlink:href="/static/assets/images/sprite.89806abf415d74b426d4.svg#location"></use>
+            </svg>
+            Go Media Stadium
+          </span>
           <div class="event-summary">
             <ul>
               <li>Box Office opens at 2PM, Gates open at 5PM</li>
@@ -101,6 +108,13 @@ class JsoupGoMediaEventClientTest {
             </svg>
             21 March 2025
           </span>
+          <span class="event-hero-carousel-detail icon">
+            <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true" focusable="true" name="location" class="icon" type="default">
+              <title>Location</title>
+              <use xlink:href="/static/assets/images/sprite.89806abf415d74b426d4.svg#location"></use>
+            </svg>
+            Go Media Stadium
+          </span>
           <div class="event-summary">
             <ul>
               <li>Box Office opens at 2 PM, Gates open at 5PM</li>
@@ -123,6 +137,13 @@ class JsoupGoMediaEventClientTest {
               <use xlink:href="/static/assets/images/sprite.89806abf415d74b426d4.svg#event-calendar"></use>
             </svg>
             19 April 2025
+          </span>
+          <span class="event-hero-carousel-detail icon">
+            <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true" focusable="true" name="location" class="icon" type="default">
+              <title>Location</title>
+              <use xlink:href="/static/assets/images/sprite.89806abf415d74b426d4.svg#location"></use>
+            </svg>
+            Go Media Stadium
           </span>
           <div class="event-summary">
             <ul>

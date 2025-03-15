@@ -1,6 +1,7 @@
 package com.jordansimsmith.eventcalendar;
 
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Verify;
 import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -22,6 +23,7 @@ public class JsoupGoMediaEventClient implements GoMediaEventClient {
   private static final String BASE_URL = "https://www.aucklandstadiums.co.nz";
   private static final String STADIUM_URL = BASE_URL + "/our-venues/go-media-stadium";
   private static final ZoneId AUCKLAND_ZONE = ZoneId.of("Pacific/Auckland");
+  private static final Pattern DATE_PATTERN = Pattern.compile("\\d{1,2}\\s+[A-Za-z]+\\s+\\d{4}");
   private static final Pattern TIME_PATTERN =
       Pattern.compile("\\d{1,2}(?::\\d{2})?\\s*(?:AM|PM)", Pattern.CASE_INSENSITIVE);
   private static final DateTimeFormatter DATE_FORMATTER =
@@ -91,20 +93,18 @@ public class JsoupGoMediaEventClient implements GoMediaEventClient {
             .map(Element::text)
             .collect(Collectors.joining(", "));
 
-    // parse date from the hero carousel detail
-    var date =
-        LocalDate.parse(
-            doc.select("span.event-hero-carousel-detail")
-                .text()
-                .replaceAll("Event Calendar", "")
-                .trim(),
-            DATE_FORMATTER);
+    // parse date from the hero carousel detail that contains the calendar icon
+    var dateText =
+        doc.select("span.event-hero-carousel-detail:has(svg[name=event-calendar])").text();
+    var matcher = DATE_PATTERN.matcher(dateText);
+    Verify.verify(matcher.find(), "Could not find date in text: %s", dateText);
+    var date = LocalDate.parse(matcher.group(), DATE_FORMATTER);
 
     // find the latest time in the event info
-    var matcher = TIME_PATTERN.matcher(info);
+    var timeMatcher = TIME_PATTERN.matcher(info);
     var times = new ArrayList<LocalTime>();
-    while (matcher.find()) {
-      var timeStr = matcher.group().trim();
+    while (timeMatcher.find()) {
+      var timeStr = timeMatcher.group().trim();
       var time = LocalTime.parse(timeStr, TIME_FORMATTER);
       times.add(time);
     }
