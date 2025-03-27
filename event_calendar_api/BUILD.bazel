@@ -1,5 +1,7 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 load("@dagger//:workspace_defs.bzl", "dagger_rules")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 dagger_rules()
 
@@ -7,9 +9,11 @@ HANDLERS = glob(["src/main/java/**/*Handler.java"])
 
 INTEGRATION_TESTS = glob(["src/test/java/**/*IntegrationTest.java"])
 
+E2E_TESTS = glob(["src/test/java/**/*E2ETest.java"])
+
 UNIT_TESTS = glob(
     ["src/test/java/**/*Test.java"],
-    exclude = INTEGRATION_TESTS,
+    exclude = INTEGRATION_TESTS + E2E_TESTS,
 )
 
 java_library(
@@ -77,17 +81,29 @@ java_library(
     name = "test-lib",
     srcs = glob(
         ["src/test/java/**/*.java"],
-        exclude = UNIT_TESTS + INTEGRATION_TESTS,
+        exclude = UNIT_TESTS + INTEGRATION_TESTS + E2E_TESTS,
     ),
+    data = [
+        ":local-load",
+    ],
+    resources = [
+        "src/test/resources/logback-test.xml",
+        "src/test/resources/test.properties",
+    ],
     deps = [
         ":dagger",
         ":lib",
         "//lib/dynamodb:lib",
         "//lib/testcontainers:lib",
         "//lib/time:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
         "@maven//:com_amazonaws_aws_lambda_java_events",
         "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:org_testcontainers_testcontainers",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
     ],
@@ -117,6 +133,9 @@ java_test_suite(
         "AWS_SECRET_ACCESS_KEY": "fake",
         "AWS_REGION": "ap-southeast-2",
     },
+    resources = [
+        "src/test/resources/logback-test.xml",
+    ],
     runner = "junit5",
     test_suffixes = ["IntegrationTest.java"],
     runtime_deps = JUNIT5_DEPS,
@@ -128,13 +147,86 @@ java_test_suite(
         "//lib/dynamodb:lib",
         "//lib/testcontainers:lib",
         "//lib/time:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
         "@maven//:com_amazonaws_aws_lambda_java_events",
         "@maven//:net_sf_biweekly_biweekly",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_slf4j_slf4j_api",
         "@maven//:org_testcontainers_junit_jupiter",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+pkg_tar(
+    name = "local-handlers.tar",
+    srcs = [
+        ":get-calendar-subscription-handler_deploy.jar",
+        ":update-events-handler_deploy.jar",
+    ],
+    package_dir = "/opt/code/localstack/",
+)
+
+pkg_tar(
+    name = "local-init-resources.tar",
+    srcs = ["src/test/resources/init_resources.py"],
+    package_dir = "/etc/localstack/init/ready.d/",
+)
+
+oci_image(
+    name = "local-image",
+    base = "@localstack//:localstack",
+    env = {
+        "LOCALSTACK_LAMBDA_IGNORE_ARCHITECTURE": 1,
+        "LOCALSTACK_LAMBDA_KEEPALIVE_MS": 0,
+    },
+    tars = [
+        ":local-init-resources.tar",
+        ":local-handlers.tar",
+    ],
+)
+
+oci_load(
+    name = "local-load",
+    image = ":local-image",
+    repo_tags = [
+        "bazel/event-calendar-local:latest",
+    ],
+)
+
+java_test_suite(
+    name = "e2e-tests",
+    size = "large",
+    srcs = E2E_TESTS,
+    env = {
+        "AWS_ACCESS_KEY_ID": "fake",
+        "AWS_SECRET_ACCESS_KEY": "fake",
+        "AWS_REGION": "ap-southeast-2",
+    },
+    resources = [
+        "src/test/resources/logback-test.xml",
+        "src/test/resources/test.properties",
+    ],
+    runner = "junit5",
+    test_suffixes = ["E2ETest.java"],
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        ":lib",
+        ":test-lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:net_sf_biweekly_biweekly",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_lambda",
     ],
 )
