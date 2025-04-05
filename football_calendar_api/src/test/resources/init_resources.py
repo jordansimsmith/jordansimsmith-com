@@ -12,7 +12,7 @@ dynamodb_client = boto3.client(
     "dynamodb", endpoint_url=endpoint_url, region_name=region_name
 )
 
-table_name = "event_calendar"
+table_name = "football_calendar"
 dynamodb_client.create_table(
     TableName=table_name,
     AttributeDefinitions=[
@@ -55,13 +55,13 @@ iam_client.put_role_policy(
 
 configs = [
     {
-        "function_name": "update_events_handler",
-        "handler_name": "com.jordansimsmith.eventcalendar.UpdateEventsHandler",
-        "zip_file": "update-events-handler_deploy.jar",
+        "function_name": "update_fixtures_handler",
+        "handler_name": "com.jordansimsmith.footballcalendar.UpdateFixturesHandler",
+        "zip_file": "update-fixtures-handler_deploy.jar",
     },
     {
         "function_name": "get_calendar_subscription_handler",
-        "handler_name": "com.jordansimsmith.eventcalendar.GetCalendarSubscriptionHandler",
+        "handler_name": "com.jordansimsmith.footballcalendar.GetCalendarSubscriptionHandler",
         "zip_file": "get-calendar-subscription-handler_deploy.jar",
     },
 ]
