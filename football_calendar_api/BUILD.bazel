@@ -1,0 +1,139 @@
+load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
+load("@dagger//:workspace_defs.bzl", "dagger_rules")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
+
+dagger_rules()
+
+HANDLERS = glob(["src/main/java/**/*Handler.java"])
+
+INTEGRATION_TESTS = glob(["src/test/java/**/*IntegrationTest.java"])
+
+E2E_TESTS = glob(["src/test/java/**/*E2ETest.java"])
+
+UNIT_TESTS = glob(
+    ["src/test/java/**/*Test.java"],
+    exclude = INTEGRATION_TESTS + E2E_TESTS,
+)
+
+java_library(
+    name = "lib",
+    srcs = glob(
+        ["src/main/java/**/*.java"],
+        exclude = HANDLERS,
+    ),
+    visibility = [
+        "//visibility:public",
+    ],
+    deps = [
+        ":dagger",
+        "//lib/dynamodb:lib",
+        "//lib/json:lib",
+        "//lib/time:lib",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_guava_guava",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_library(
+    name = "test-lib",
+    srcs = glob(
+        ["src/test/java/**/*.java"],
+        exclude = UNIT_TESTS + INTEGRATION_TESTS + E2E_TESTS,
+    ),
+    deps = [
+        ":dagger",
+        ":lib",
+        "//lib/dynamodb:lib",
+        "//lib/json:lib",
+        "//lib/testcontainers:lib",
+        "//lib/time:lib",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_google_guava_guava",
+        "@maven//:javax_inject_javax_inject",
+        "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:org_testcontainers_testcontainers",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_test_suite(
+    name = "unit-tests",
+    size = "small",
+    srcs = UNIT_TESTS,
+    runner = "junit5",
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        ":lib",
+        ":test-lib",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_mockito_mockito_core",
+    ],
+)
+
+java_library(
+    name = "get-calendar-subscription-handler",
+    srcs = ["src/main/java/com/jordansimsmith/footballcalendar/GetCalendarSubscriptionHandler.java"],
+    deps = [
+        ":dagger",
+        ":lib",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_google_guava_guava",
+        "@maven//:net_sf_biweekly_biweekly",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_library(
+    name = "update-fixtures-handler",
+    srcs = ["src/main/java/com/jordansimsmith/footballcalendar/UpdateFixturesHandler.java"],
+    deps = [
+        ":dagger",
+        ":lib",
+        "//lib/time:lib",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_google_guava_guava",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_test_suite(
+    name = "integration-tests",
+    size = "medium",
+    srcs = INTEGRATION_TESTS,
+    env = {
+        "AWS_ACCESS_KEY_ID": "fake",
+        "AWS_SECRET_ACCESS_KEY": "fake",
+        "AWS_REGION": "ap-southeast-2",
+    },
+    runner = "junit5",
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        ":dagger",
+        ":get-calendar-subscription-handler",
+        ":lib",
+        ":test-lib",
+        ":update-fixtures-handler",
+        "//lib/dynamodb:lib",
+        "//lib/testcontainers:lib",
+        "//lib/time:lib",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_google_guava_guava",
+        "@maven//:javax_inject_javax_inject",
+        "@maven//:net_sf_biweekly_biweekly",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
