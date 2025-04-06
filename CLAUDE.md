@@ -34,6 +34,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Exception handling: Public methods should call private implementation methods that can throw
 - Public methods should catch and wrap exceptions into runtime exceptions
 - If a dependency doesn't need to be shared between providers, inline its creation in the provider method
+- Don't add private methods when the logic is simple and used only once - inline it
+- Let exceptions bubble up naturally when appropriate instead of unnecessarily catching them
 
 ## Testing guidelines
 

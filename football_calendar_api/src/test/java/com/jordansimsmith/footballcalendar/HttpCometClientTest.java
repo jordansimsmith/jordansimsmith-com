@@ -14,6 +14,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -30,7 +32,7 @@ public class HttpCometClientTest {
   @BeforeEach
   void setUp() {
     openMocks = openMocks(this);
-    ObjectMapper objectMapper = new ObjectMapper();
+    var objectMapper = new ObjectMapper();
     client = new HttpCometClient(mockHttpClient, objectMapper);
   }
 
@@ -62,7 +64,10 @@ public class HttpCometClientTest {
     assertThat(fixture.id()).isEqualTo("2716942185");
     assertThat(fixture.homeTeamName()).isEqualTo("Bucklands Beach Bucks M5");
     assertThat(fixture.awayTeamName()).isEqualTo("Ellerslie AFC Flamingoes M");
-    assertThat(fixture.timestamp()).isEqualTo(Instant.parse("2025-04-05T15:00:00Z"));
+    // Convert from Auckland time to UTC for comparison
+    var expectedLocalDateTime = LocalDateTime.of(2025, 4, 5, 15, 0, 0);
+    var expectedInstant = expectedLocalDateTime.atZone(ZoneId.of("Pacific/Auckland")).toInstant();
+    assertThat(fixture.timestamp()).isEqualTo(expectedInstant);
     assertThat(fixture.venue()).isEqualTo("Lloyd Elsmore Park 2");
     assertThat(fixture.address()).isEqualTo("2 Bells Avenue");
     assertThat(fixture.latitude()).isEqualTo(-36.9053315);
@@ -124,7 +129,7 @@ public class HttpCometClientTest {
               "CompetitionId": null,
               "Round": "Round",
               "RoundName": "Round",
-              "Date": "2025-04-05T15:00:00Z",
+              "Date": "2025-04-05T15:00:00",
               "VenueId": "47651",
               "VenueName": "Lloyd Elsmore Park 2",
               "GLN": "9429302884032",

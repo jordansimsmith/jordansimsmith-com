@@ -8,6 +8,9 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -15,6 +18,9 @@ public class HttpCometClient implements CometClient {
   private static final String API_URL =
       "https://www.nrf.org.nz/api/1.0/competition/cometwidget/filteredfixtures";
   private static final String SPORT_ID = "1";
+
+  private static final ZoneId AUCKLAND_ZONE = ZoneId.of("Pacific/Auckland");
+  private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ISO_LOCAL_DATE_TIME;
 
   private final HttpClient httpClient;
   private final ObjectMapper objectMapper;
@@ -66,14 +72,19 @@ public class HttpCometClient implements CometClient {
     var httpRequest =
         HttpRequest.newBuilder()
             .uri(new URI(API_URL))
+            .header("Accept", "application/json")
             .header("Content-Type", "application/json")
+            .header(
+                "User-Agent",
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like"
+                    + " Gecko) Chrome/135.0.0.0 Safari/537.36")
             .POST(HttpRequest.BodyPublishers.ofString(requestBody))
             .build();
 
     var response = httpClient.send(httpRequest, HttpResponse.BodyHandlers.ofString());
 
     if (response.statusCode() != 200) {
-      throw new RuntimeException("API request failed with status: " + response.statusCode());
+      throw new RuntimeException("API request failed with response: " + response.body());
     }
 
     var fixtureResponse = objectMapper.readValue(response.body(), FixtureResponse.class);
@@ -103,7 +114,9 @@ public class HttpCometClient implements CometClient {
       }
     }
 
-    var timestamp = Instant.parse(fixture.date());
+    // Parse the date as local date time in Auckland timezone
+    var localDateTime = LocalDateTime.parse(fixture.date(), DATE_FORMATTER);
+    var timestamp = localDateTime.atZone(AUCKLAND_ZONE).toInstant();
 
     return new FootballFixture(
         fixture.id(),

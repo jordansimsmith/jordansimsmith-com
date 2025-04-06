@@ -1,5 +1,7 @@
 package com.jordansimsmith.footballcalendar;
 
+import static com.jordansimsmith.footballcalendar.Teams.ELLERSLIE_FLAMINGOS;
+
 import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
@@ -13,7 +15,6 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Void> {
   private static final String NRF_MENS_DIV_6_CENTRAL_EAST = "2716594877";
   private static final String ELLERSLIE = "44838";
-  private static final String ELLERSLIE_FLAMINGOS = "Flamingos";
 
   private final DynamoDbTable<FootballCalendarItem> footballCalendarTable;
   private final CometClient cometClient;
@@ -60,8 +61,8 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
         fixtures.stream()
             .filter(
                 fixture ->
-                    fixture.homeTeamName().contains(ELLERSLIE_FLAMINGOS)
-                        || fixture.awayTeamName().contains(ELLERSLIE_FLAMINGOS))
+                    fixture.homeTeamName().toLowerCase().contains("flamingo")
+                        || fixture.awayTeamName().toLowerCase().contains("flamingo"))
             .toList();
 
     // Save each fixture to DynamoDB with Flamingos as the team

@@ -1,5 +1,7 @@
 package com.jordansimsmith.footballcalendar;
 
+import static com.jordansimsmith.footballcalendar.Teams.ELLERSLIE_FLAMINGOS;
+
 import biweekly.Biweekly;
 import biweekly.ICalendar;
 import biweekly.component.VEvent;
@@ -18,8 +20,6 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 
 public class GetCalendarSubscriptionHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
-
-  private static final String ELLERSLIE_FLAMINGOS = "Flamingos";
 
   private final DynamoDbTable<FootballCalendarItem> footballCalendarTable;
 
