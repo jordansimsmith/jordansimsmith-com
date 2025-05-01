@@ -2,11 +2,10 @@ package com.jordansimsmith.subfootballtracker;
 
 import java.time.Instant;
 import java.util.Objects;
+
+import com.jordansimsmith.dynamodb.EpochSecondConverter;
 import software.amazon.awssdk.enhanced.dynamodb.extensions.annotations.DynamoDbVersionAttribute;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
 @DynamoDbBean
 public class SubfootballTrackerItem {
@@ -62,6 +61,7 @@ public class SubfootballTrackerItem {
   }
 
   @DynamoDbAttribute(TIMESTAMP)
+  @DynamoDbConvertedBy(EpochSecondConverter.class)
   public Instant getTimestamp() {
     return timestamp;
   }
