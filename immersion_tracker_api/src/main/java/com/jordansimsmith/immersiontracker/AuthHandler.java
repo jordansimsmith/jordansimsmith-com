@@ -16,11 +16,14 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.policybuilder.iam.IamEffect;
 import software.amazon.awssdk.policybuilder.iam.IamPolicy;
 import software.amazon.awssdk.policybuilder.iam.IamStatement;
 
 public class AuthHandler implements RequestHandler<AuthorizerEvent, AuthorizerResponse> {
+  private static final Logger logger = LoggerFactory.getLogger(AuthHandler.class);
   @VisibleForTesting static final String SECRET = "immersion_tracker_api";
 
   private final Secrets secrets;
@@ -49,8 +52,10 @@ public class AuthHandler implements RequestHandler<AuthorizerEvent, AuthorizerRe
     try {
       return doHandleRequest(event, context);
     } catch (RuntimeException e) {
+      logger.error("Runtime error during authorization", e);
       throw e;
     } catch (Exception e) {
+      logger.error("Error during authorization", e);
       throw new RuntimeException(e);
     }
   }

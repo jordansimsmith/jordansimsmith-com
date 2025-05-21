@@ -54,6 +54,7 @@ java_binary(
         "@maven//:com_amazonaws_aws_lambda_java_events",
         "@maven//:com_google_guava_guava",
         "@maven//:net_sf_biweekly_biweekly",
+        "@maven//:org_slf4j_slf4j_api",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
     ],
 )
@@ -74,6 +75,7 @@ java_binary(
         "@maven//:com_amazonaws_aws_lambda_java_core",
         "@maven//:com_amazonaws_aws_lambda_java_events",
         "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
     ],
 )

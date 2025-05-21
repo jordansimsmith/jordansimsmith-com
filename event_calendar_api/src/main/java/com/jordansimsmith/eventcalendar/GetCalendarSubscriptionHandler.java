@@ -10,12 +10,17 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.Date;
 import java.util.HashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 public class GetCalendarSubscriptionHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
+
+  private static final Logger logger =
+      LoggerFactory.getLogger(GetCalendarSubscriptionHandler.class);
 
   private final DynamoDbTable<EventCalendarItem> eventCalendarTable;
 
@@ -33,6 +38,7 @@ public class GetCalendarSubscriptionHandler
     try {
       return doHandleRequest(event, context);
     } catch (Exception e) {
+      logger.error("Error processing calendar subscription request", e);
       throw new RuntimeException(e);
     }
   }

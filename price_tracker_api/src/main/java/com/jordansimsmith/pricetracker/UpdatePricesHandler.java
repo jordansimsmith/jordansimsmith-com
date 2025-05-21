@@ -9,12 +9,15 @@ import com.jordansimsmith.time.Clock;
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.StringJoiner;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 public class UpdatePricesHandler implements RequestHandler<ScheduledEvent, Void> {
+  private static final Logger logger = LoggerFactory.getLogger(UpdatePricesHandler.class);
   @VisibleForTesting static final String TOPIC = "price_tracker_api_price_updates";
 
   private final Clock clock;
@@ -43,6 +46,7 @@ public class UpdatePricesHandler implements RequestHandler<ScheduledEvent, Void>
     try {
       return doHandleRequest(event, context);
     } catch (Exception e) {
+      logger.error("Error processing price updates", e);
       throw new RuntimeException(e);
     }
   }

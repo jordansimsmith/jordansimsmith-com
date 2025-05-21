@@ -14,12 +14,17 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Strings;
 import java.util.Date;
 import java.util.HashMap;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 
 public class GetCalendarSubscriptionHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
+
+  private static final Logger logger =
+      LoggerFactory.getLogger(GetCalendarSubscriptionHandler.class);
 
   private final DynamoDbTable<FootballCalendarItem> footballCalendarTable;
 
@@ -37,6 +42,7 @@ public class GetCalendarSubscriptionHandler
     try {
       return doHandleRequest(event, context);
     } catch (Exception e) {
+      logger.error("Error processing football calendar subscription request", e);
       throw new RuntimeException(e);
     }
   }

@@ -5,11 +5,15 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
 import com.google.common.annotations.VisibleForTesting;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 
 public class UpdateEventsHandler implements RequestHandler<ScheduledEvent, Void> {
+  private static final Logger logger = LoggerFactory.getLogger(UpdateEventsHandler.class);
+
   private final DynamoDbTable<EventCalendarItem> eventCalendarTable;
   private final GoMediaEventClient goMediaEventClient;
 
@@ -28,6 +32,7 @@ public class UpdateEventsHandler implements RequestHandler<ScheduledEvent, Void>
     try {
       return doHandleRequest(event, context);
     } catch (Exception e) {
+      logger.error("Error processing event calendar update", e);
       throw new RuntimeException(e);
     }
   }

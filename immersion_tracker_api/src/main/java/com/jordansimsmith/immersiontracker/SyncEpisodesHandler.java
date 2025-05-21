@@ -12,11 +12,14 @@ import com.jordansimsmith.time.Clock;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 
 public class SyncEpisodesHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
+  private static final Logger logger = LoggerFactory.getLogger(SyncEpisodesHandler.class);
   @VisibleForTesting static final ZoneId ZONE_ID = ZoneId.of("Pacific/Auckland");
 
   private final Clock clock;
@@ -49,6 +52,7 @@ public class SyncEpisodesHandler
     try {
       return doHandleRequest(event, context);
     } catch (Exception e) {
+      logger.error("Error processing episode sync request", e);
       throw new RuntimeException(e);
     }
   }

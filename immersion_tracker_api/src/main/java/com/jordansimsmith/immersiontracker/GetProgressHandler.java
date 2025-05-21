@@ -19,12 +19,15 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 public class GetProgressHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
+  private static final Logger logger = LoggerFactory.getLogger(GetProgressHandler.class);
   @VisibleForTesting static final ZoneId ZONE_ID = ZoneId.of("Pacific/Auckland");
   private static final int MINUTES_PER_EPISODE = 20;
 
@@ -63,6 +66,7 @@ public class GetProgressHandler
     try {
       return doHandleRequest(event, context);
     } catch (Exception e) {
+      logger.error("Error processing progress request", e);
       throw new RuntimeException(e);
     }
   }

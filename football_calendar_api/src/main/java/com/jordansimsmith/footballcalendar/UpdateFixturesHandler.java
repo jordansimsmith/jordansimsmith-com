@@ -12,11 +12,14 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 
 public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Void> {
+  private static final Logger logger = LoggerFactory.getLogger(UpdateFixturesHandler.class);
   @VisibleForTesting static final String NRF_MENS_DIV_6_CENTRAL_EAST = "2716594877";
   @VisibleForTesting static final String NRF_MENS_COMMUNITY_CUP = "2714644497";
   private static final String ELLERSLIE = "44838";
@@ -41,6 +44,7 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
     try {
       return doHandleRequest(event, context);
     } catch (Exception e) {
+      logger.error("Error processing football fixtures update", e);
       throw new RuntimeException(e);
     }
   }

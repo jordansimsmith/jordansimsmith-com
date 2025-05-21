@@ -9,11 +9,15 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 
 public class UpdateShowHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
+  private static final Logger logger = LoggerFactory.getLogger(UpdateShowHandler.class);
+
   private final ObjectMapper objectMapper;
   private final DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable;
   private final TvdbClient tvdbClient;
@@ -41,6 +45,7 @@ public class UpdateShowHandler
     try {
       return doHandleRequest(event, context);
     } catch (Exception e) {
+      logger.error("Error processing update show request", e);
       throw new RuntimeException(e);
     }
   }

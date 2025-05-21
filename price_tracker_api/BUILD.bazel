@@ -53,6 +53,7 @@ java_binary(
         "@maven//:com_amazonaws_aws_lambda_java_events",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
     ],
 )
