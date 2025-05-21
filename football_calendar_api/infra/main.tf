@@ -116,6 +116,7 @@ data "aws_iam_policy_document" "lambda_dynamodb_allow_policy_document" {
       "dynamodb:Scan",
       "dynamodb:Query",
       "dynamodb:ConditionCheckItem",
+      "dynamodb:DeleteItem",
     ]
   }
 }
