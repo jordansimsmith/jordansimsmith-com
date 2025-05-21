@@ -11,7 +11,10 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 
 public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Void> {
   @VisibleForTesting static final String NRF_MENS_DIV_6_CENTRAL_EAST = "2716594877";
@@ -74,7 +77,30 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
                         || fixture.awayTeamName().toLowerCase().contains("flamingo"))
             .toList();
 
-    // Save each fixture to DynamoDB with Flamingos as the team
+    // Fetch all existing fixtures from DynamoDB
+    var existingFixtures =
+        footballCalendarTable
+            .query(
+                QueryConditional.keyEqualTo(
+                    Key.builder()
+                        .partitionValue(FootballCalendarItem.formatPk(ELLERSLIE_FLAMINGOS))
+                        .build()))
+            .items()
+            .stream()
+            .toList();
+
+    // Create a set of match IDs from the API response to use for comparison
+    var currentFixtureIds =
+        flamingoFixtures.stream().map(CometClient.FootballFixture::id).collect(Collectors.toSet());
+
+    // Delete fixtures that no longer exist in the API response
+    for (var existingFixture : existingFixtures) {
+      if (!currentFixtureIds.contains(existingFixture.getMatchId())) {
+        footballCalendarTable.deleteItem(existingFixture);
+      }
+    }
+
+    // Update or add current fixtures
     for (var fixture : flamingoFixtures) {
       var item =
           FootballCalendarItem.create(

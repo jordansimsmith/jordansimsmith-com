@@ -170,4 +170,100 @@ public class UpdateFixturesHandlerIntegrationTest {
     assertThat(cupItem.getStatus()).isEqualTo(cupFixture.status());
     assertThat(cupItem.getSk()).isEqualTo("MATCH#" + cupFixture.id());
   }
+
+  @Test
+  void handleRequestShouldDeleteFixturesThatNoLongerExistInApi() {
+    // arrange
+    var testTime = Instant.parse("2023-05-01T10:00:00Z");
+    fakeClock.setTime(testTime.toEpochMilli());
+    var event = new ScheduledEvent();
+
+    // Create three pre-existing fixtures in DB
+    var existingFixture1 =
+        FootballCalendarItem.create(
+            "Flamingos",
+            "fixture1",
+            "Eastern Suburbs AFC",
+            "Ellerslie AFC Flamingos M",
+            Instant.parse("2023-05-07T14:00:00Z"),
+            "Madills Farm",
+            "20 Melanesia Road, Kohimarama, Auckland",
+            -36.8485,
+            174.8582,
+            "Scheduled");
+
+    var existingFixture2 =
+        FootballCalendarItem.create(
+            "Flamingos",
+            "fixture2",
+            "Ellerslie AFC Flamingos M",
+            "Auckland United",
+            Instant.parse("2023-05-14T14:00:00Z"),
+            "Ellerslie Domain",
+            "10 Main Highway, Ellerslie, Auckland",
+            -36.8995,
+            174.8140,
+            "Scheduled");
+
+    var existingFixture3 =
+        FootballCalendarItem.create(
+            "Flamingos",
+            "fixture3",
+            "Ellerslie AFC Flamingos M",
+            "Western Springs",
+            Instant.parse("2023-05-21T14:00:00Z"),
+            "Seddon Fields",
+            "180 Meola Road, Point Chevalier, Auckland",
+            -36.8605,
+            174.7280,
+            "Scheduled");
+
+    footballCalendarTable.putItem(existingFixture1);
+    footballCalendarTable.putItem(existingFixture2);
+    footballCalendarTable.putItem(existingFixture3);
+
+    // Only add fixtures 1 and 2 to the API response (fixture3 is now canceled/removed)
+    var apiFixture1 =
+        new CometClient.FootballFixture(
+            "fixture1",
+            "Eastern Suburbs AFC",
+            "Ellerslie AFC Flamingos M",
+            Instant.parse("2023-05-07T14:00:00Z"),
+            "Madills Farm",
+            "20 Melanesia Road, Kohimarama, Auckland",
+            -36.8485,
+            174.8582,
+            "Scheduled");
+
+    var apiFixture2 =
+        new CometClient.FootballFixture(
+            "fixture2",
+            "Ellerslie AFC Flamingos M",
+            "Auckland United",
+            Instant.parse("2023-05-14T14:00:00Z"),
+            "Ellerslie Domain",
+            "10 Main Highway, Ellerslie, Auckland",
+            -36.8995,
+            174.8140,
+            "Scheduled");
+
+    fakeCometClient.addFixture(UpdateFixturesHandler.NRF_MENS_DIV_6_CENTRAL_EAST, apiFixture1);
+    fakeCometClient.addFixture(UpdateFixturesHandler.NRF_MENS_DIV_6_CENTRAL_EAST, apiFixture2);
+
+    // act
+    updateFixturesHandler.handleRequest(event, null);
+
+    // assert
+    var items = footballCalendarTable.scan().items().stream().toList();
+
+    // Should only have 2 items - the fixtures returned by the API
+    assertThat(items).hasSize(2);
+
+    // Verify the correct fixtures exist
+    assertThat(items).anyMatch(item -> item.getMatchId().equals("fixture1"));
+    assertThat(items).anyMatch(item -> item.getMatchId().equals("fixture2"));
+
+    // Verify fixture3 was deleted
+    assertThat(items).noneMatch(item -> item.getMatchId().equals("fixture3"));
+  }
 }
