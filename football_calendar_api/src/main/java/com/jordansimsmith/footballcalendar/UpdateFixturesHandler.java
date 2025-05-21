@@ -9,11 +9,13 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.time.Clock;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 
 public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Void> {
-  private static final String NRF_MENS_DIV_6_CENTRAL_EAST = "2716594877";
+  @VisibleForTesting static final String NRF_MENS_DIV_6_CENTRAL_EAST = "2716594877";
+  @VisibleForTesting static final String NRF_MENS_COMMUNITY_CUP = "2714644497";
   private static final String ELLERSLIE = "44838";
 
   private final DynamoDbTable<FootballCalendarItem> footballCalendarTable;
@@ -51,14 +53,21 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
     var to =
         ZonedDateTime.of(currentYear, 12, 31, 23, 59, 59, 0, ZoneId.systemDefault()).toInstant();
 
-    // Get fixtures from the Comet API
-    var fixtures =
+    // Get fixtures from both competitions
+    var leagueFixtures =
         cometClient.getFixtures(
             seasonId, NRF_MENS_DIV_6_CENTRAL_EAST, List.of(ELLERSLIE), from, to);
+    var cupFixtures =
+        cometClient.getFixtures(seasonId, NRF_MENS_COMMUNITY_CUP, List.of(ELLERSLIE), from, to);
+
+    // Combine fixtures from both competitions
+    var allFixtures = new ArrayList<CometClient.FootballFixture>();
+    allFixtures.addAll(leagueFixtures);
+    allFixtures.addAll(cupFixtures);
 
     // Filter for fixtures involving Flamingos team
     var flamingoFixtures =
-        fixtures.stream()
+        allFixtures.stream()
             .filter(
                 fixture ->
                     fixture.homeTeamName().toLowerCase().contains("flamingo")

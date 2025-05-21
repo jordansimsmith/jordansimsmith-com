@@ -38,7 +38,7 @@ public class UpdateFixturesHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldSaveFixturesToDb() {
+  void handleRequestShouldSaveFixturesFromMultipleCompetitionsToDb() {
     // arrange
     var testTime = Instant.parse("2023-05-01T10:00:00Z");
     fakeClock.setTime(testTime.toEpochMilli());
@@ -60,8 +60,8 @@ public class UpdateFixturesHandlerIntegrationTest {
             "Scheduled");
     footballCalendarTable.putItem(existingFixture);
 
-    // Add test fixtures to the fake client
-    var updatedFixture =
+    // Add league fixtures to the fake client
+    var leagueFixture =
         new CometClient.FootballFixture(
             existingFixtureId,
             "Eastern Suburbs AFC",
@@ -73,19 +73,7 @@ public class UpdateFixturesHandlerIntegrationTest {
             174.8582,
             "Scheduled");
 
-    var newFixture =
-        new CometClient.FootballFixture(
-            "789012",
-            "Ellerslie AFC Flamingos M",
-            "Birkenhead United",
-            Instant.parse("2023-05-14T15:30:00Z"),
-            "Western Springs Stadium",
-            "731 Great North Road, Western Springs, Auckland",
-            -36.8653,
-            174.7232,
-            "Scheduled");
-
-    var nonFlamingoFixture =
+    var nonFlamingoLeagueFixture =
         new CometClient.FootballFixture(
             "345678",
             "Team A",
@@ -97,9 +85,37 @@ public class UpdateFixturesHandlerIntegrationTest {
             174.7300,
             "Scheduled");
 
-    fakeCometClient.addFixture(updatedFixture);
-    fakeCometClient.addFixture(newFixture);
-    fakeCometClient.addFixture(nonFlamingoFixture);
+    fakeCometClient.addFixture(UpdateFixturesHandler.NRF_MENS_DIV_6_CENTRAL_EAST, leagueFixture);
+    fakeCometClient.addFixture(
+        UpdateFixturesHandler.NRF_MENS_DIV_6_CENTRAL_EAST, nonFlamingoLeagueFixture);
+
+    // Add cup fixtures to the fake client
+    var cupFixture =
+        new CometClient.FootballFixture(
+            "789012",
+            "Ellerslie AFC Flamingos M",
+            "Birkenhead United",
+            Instant.parse("2023-05-14T15:30:00Z"),
+            "Western Springs Stadium",
+            "731 Great North Road, Western Springs, Auckland",
+            -36.8653,
+            174.7232,
+            "Scheduled");
+
+    var nonFlamingoCupFixture =
+        new CometClient.FootballFixture(
+            "901234",
+            "Team C",
+            "Team D",
+            Instant.parse("2023-05-16T17:00:00Z"),
+            "Another Stadium",
+            "456 Another Street, Auckland",
+            -36.8800,
+            174.7400,
+            "Scheduled");
+
+    fakeCometClient.addFixture(UpdateFixturesHandler.NRF_MENS_COMMUNITY_CUP, cupFixture);
+    fakeCometClient.addFixture(UpdateFixturesHandler.NRF_MENS_COMMUNITY_CUP, nonFlamingoCupFixture);
 
     // act
     updateFixturesHandler.handleRequest(event, null);
@@ -107,7 +123,7 @@ public class UpdateFixturesHandlerIntegrationTest {
     // assert
     var items = footballCalendarTable.scan().items().stream().toList();
 
-    // Should only have 2 items - the non-flamingo fixture should be filtered out
+    // Should only have 2 items - the Flamingo fixtures from both competitions
     assertThat(items).hasSize(2);
 
     // Verify all items have team="Flamingos"
@@ -116,41 +132,42 @@ public class UpdateFixturesHandlerIntegrationTest {
     // Verify PK format
     assertThat(items).allMatch(item -> item.getPk().equals("TEAM#Flamingos"));
 
-    // Verify non-flamingo fixture is not saved
-    assertThat(items).noneMatch(item -> item.getMatchId().equals(nonFlamingoFixture.id()));
+    // Verify non-flamingo fixtures are not saved
+    assertThat(items).noneMatch(item -> item.getMatchId().equals(nonFlamingoLeagueFixture.id()));
+    assertThat(items).noneMatch(item -> item.getMatchId().equals(nonFlamingoCupFixture.id()));
 
-    // Updated fixture - verify it was updated with new date
+    // League fixture - verify it was updated with new date
     var updatedItem =
         items.stream()
             .filter(item -> item.getMatchId().equals(existingFixtureId))
             .findFirst()
             .orElseThrow();
-    assertThat(updatedItem.getHomeTeam()).isEqualTo(updatedFixture.homeTeamName());
-    assertThat(updatedItem.getAwayTeam()).isEqualTo(updatedFixture.awayTeamName());
+    assertThat(updatedItem.getHomeTeam()).isEqualTo(leagueFixture.homeTeamName());
+    assertThat(updatedItem.getAwayTeam()).isEqualTo(leagueFixture.awayTeamName());
     assertThat(updatedItem.getTimestamp())
-        .isEqualTo(updatedFixture.timestamp())
+        .isEqualTo(leagueFixture.timestamp())
         .isNotEqualTo(existingFixture.getTimestamp());
-    assertThat(updatedItem.getVenue()).isEqualTo(updatedFixture.venue());
-    assertThat(updatedItem.getAddress()).isEqualTo(updatedFixture.address());
-    assertThat(updatedItem.getLatitude()).isCloseTo(updatedFixture.latitude(), within(0.00001));
-    assertThat(updatedItem.getLongitude()).isCloseTo(updatedFixture.longitude(), within(0.00001));
-    assertThat(updatedItem.getStatus()).isEqualTo(updatedFixture.status());
+    assertThat(updatedItem.getVenue()).isEqualTo(leagueFixture.venue());
+    assertThat(updatedItem.getAddress()).isEqualTo(leagueFixture.address());
+    assertThat(updatedItem.getLatitude()).isCloseTo(leagueFixture.latitude(), within(0.00001));
+    assertThat(updatedItem.getLongitude()).isCloseTo(leagueFixture.longitude(), within(0.00001));
+    assertThat(updatedItem.getStatus()).isEqualTo(leagueFixture.status());
     assertThat(updatedItem.getSk()).isEqualTo("MATCH#" + existingFixtureId);
 
-    // New fixture
-    var newItem =
+    // Cup fixture
+    var cupItem =
         items.stream()
-            .filter(item -> item.getMatchId().equals(newFixture.id()))
+            .filter(item -> item.getMatchId().equals(cupFixture.id()))
             .findFirst()
             .orElseThrow();
-    assertThat(newItem.getHomeTeam()).isEqualTo(newFixture.homeTeamName());
-    assertThat(newItem.getAwayTeam()).isEqualTo(newFixture.awayTeamName());
-    assertThat(newItem.getTimestamp()).isEqualTo(newFixture.timestamp());
-    assertThat(newItem.getVenue()).isEqualTo(newFixture.venue());
-    assertThat(newItem.getAddress()).isEqualTo(newFixture.address());
-    assertThat(newItem.getLatitude()).isCloseTo(newFixture.latitude(), within(0.00001));
-    assertThat(newItem.getLongitude()).isCloseTo(newFixture.longitude(), within(0.00001));
-    assertThat(newItem.getStatus()).isEqualTo(newFixture.status());
-    assertThat(newItem.getSk()).isEqualTo("MATCH#" + newFixture.id());
+    assertThat(cupItem.getHomeTeam()).isEqualTo(cupFixture.homeTeamName());
+    assertThat(cupItem.getAwayTeam()).isEqualTo(cupFixture.awayTeamName());
+    assertThat(cupItem.getTimestamp()).isEqualTo(cupFixture.timestamp());
+    assertThat(cupItem.getVenue()).isEqualTo(cupFixture.venue());
+    assertThat(cupItem.getAddress()).isEqualTo(cupFixture.address());
+    assertThat(cupItem.getLatitude()).isCloseTo(cupFixture.latitude(), within(0.00001));
+    assertThat(cupItem.getLongitude()).isCloseTo(cupFixture.longitude(), within(0.00001));
+    assertThat(cupItem.getStatus()).isEqualTo(cupFixture.status());
+    assertThat(cupItem.getSk()).isEqualTo("MATCH#" + cupFixture.id());
   }
 }

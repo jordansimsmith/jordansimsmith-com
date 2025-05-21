@@ -2,10 +2,12 @@ package com.jordansimsmith.footballcalendar;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class FakeCometClient implements CometClient {
-  private List<FootballFixture> fixtures = new ArrayList<>();
+  private Map<String, List<FootballFixture>> fixturesByCompetition = new HashMap<>();
 
   @Override
   public List<FootballFixture> getFixtures(
@@ -14,14 +16,14 @@ public class FakeCometClient implements CometClient {
       List<String> organisationIds,
       Instant from,
       Instant to) {
-    return fixtures;
+    return fixturesByCompetition.getOrDefault(competitionId, List.of());
   }
 
-  public void addFixture(FootballFixture fixture) {
-    fixtures.add(fixture);
+  public void addFixture(String competitionId, FootballFixture fixture) {
+    fixturesByCompetition.computeIfAbsent(competitionId, k -> new ArrayList<>()).add(fixture);
   }
 
   public void reset() {
-    fixtures.clear();
+    fixturesByCompetition.clear();
   }
 }
