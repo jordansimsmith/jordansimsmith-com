@@ -129,4 +129,77 @@ public class UpdateEventsHandlerIntegrationTest {
     assertThat(cricketItem.getEventInfo()).isEqualTo(cricket.eventInfo());
     assertThat(cricketItem.getTimestamp()).isEqualTo(cricket.startTime());
   }
+
+  @Test
+  void handleRequestShouldDeleteEventsThatNoLongerExistInApi() {
+    // arrange
+    var testTime = Instant.parse("2024-03-20T10:00:00Z");
+    fakeClock.setTime(testTime.toEpochMilli());
+    var event = new ScheduledEvent();
+
+    // create pre-existing events in DB
+    var existingEvent1 =
+        EventCalendarItem.create(
+            STADIUM_URL,
+            "Warriors vs Storm",
+            "https://www.aucklandstadiums.co.nz/event/warriors-storm",
+            "Box office opens at 5:30PM, Gates open at 6:30PM",
+            LocalDateTime.of(2024, 3, 25, 19, 30).toInstant(ZoneOffset.UTC));
+
+    var existingEvent2 =
+        EventCalendarItem.create(
+            STADIUM_URL,
+            "Taylor Swift Concert",
+            "https://www.aucklandstadiums.co.nz/event/taylor-swift",
+            "Box office opens at 6PM, Gates open at 7PM",
+            LocalDateTime.of(2024, 4, 15, 20, 0).toInstant(ZoneOffset.UTC));
+
+    var existingEvent3 =
+        EventCalendarItem.create(
+            STADIUM_URL,
+            "Black Caps vs Australia",
+            "https://www.aucklandstadiums.co.nz/event/black-caps-australia",
+            "Box office opens at 12PM, Gates open at 1PM",
+            LocalDateTime.of(2024, 5, 1, 14, 0).toInstant(ZoneOffset.UTC));
+
+    eventCalendarTable.putItem(existingEvent1);
+    eventCalendarTable.putItem(existingEvent2);
+    eventCalendarTable.putItem(existingEvent3);
+
+    // Only add events 1 and 2 to the API response (event 3 is now canceled/removed)
+    var apiEvent1 =
+        new GoMediaEventClient.GoMediaEvent(
+            "Warriors vs Storm",
+            STADIUM_URL,
+            "https://www.aucklandstadiums.co.nz/event/warriors-storm",
+            LocalDateTime.of(2024, 3, 25, 19, 30).toInstant(ZoneOffset.UTC),
+            "Box office opens at 5:30PM, Gates open at 6:30PM");
+
+    var apiEvent2 =
+        new GoMediaEventClient.GoMediaEvent(
+            "Taylor Swift Concert",
+            STADIUM_URL,
+            "https://www.aucklandstadiums.co.nz/event/taylor-swift",
+            LocalDateTime.of(2024, 4, 15, 20, 0).toInstant(ZoneOffset.UTC),
+            "Box office opens at 6PM, Gates open at 7PM");
+
+    fakeGoMediaEventClient.addEvent(apiEvent1);
+    fakeGoMediaEventClient.addEvent(apiEvent2);
+
+    // act
+    updateEventsHandler.handleRequest(event, null);
+
+    // assert
+    var items = eventCalendarTable.scan().items().stream().toList();
+
+    // Should only have 2 items - the events returned by the API
+    assertThat(items).hasSize(2);
+
+    // Verify the correct events exist
+    assertThat(items).anyMatch(item -> item.getEventUrl().equals(apiEvent1.eventUrl()));
+    assertThat(items).anyMatch(item -> item.getEventUrl().equals(apiEvent2.eventUrl()));
+
+    // Verify event3 was deleted
+    assertThat(items).noneMatch(item -> item.getEventUrl().equals(existingEvent3.getEventUrl()));
+  }
 }
