@@ -31,6 +31,7 @@ java_library(
         "//lib/time:lib",
         "@maven//:com_google_guava_guava",
         "@maven//:org_jsoup_jsoup",
+        "@maven//:org_slf4j_slf4j_api",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
     ],

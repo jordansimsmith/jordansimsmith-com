@@ -1,9 +1,8 @@
 package com.jordansimsmith.subfootballtracker;
 
+import com.jordansimsmith.dynamodb.EpochSecondConverter;
 import java.time.Instant;
 import java.util.Objects;
-
-import com.jordansimsmith.dynamodb.EpochSecondConverter;
 import software.amazon.awssdk.enhanced.dynamodb.extensions.annotations.DynamoDbVersionAttribute;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 

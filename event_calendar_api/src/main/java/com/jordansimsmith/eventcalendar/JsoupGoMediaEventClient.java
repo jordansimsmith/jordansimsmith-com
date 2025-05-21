@@ -9,6 +9,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -18,8 +19,12 @@ import java.util.stream.Collectors;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class JsoupGoMediaEventClient implements GoMediaEventClient {
+  private static final Logger logger = LoggerFactory.getLogger(JsoupGoMediaEventClient.class);
+
   private static final String BASE_URL = "https://www.aucklandstadiums.co.nz";
   private static final String STADIUM_URL = BASE_URL + "/our-venues/go-media-stadium";
   private static final ZoneId AUCKLAND_ZONE = ZoneId.of("Pacific/Auckland");
@@ -105,8 +110,13 @@ public class JsoupGoMediaEventClient implements GoMediaEventClient {
     var times = new ArrayList<LocalTime>();
     while (timeMatcher.find()) {
       var timeStr = timeMatcher.group().trim();
-      var time = LocalTime.parse(timeStr, TIME_FORMATTER);
-      times.add(time);
+      try {
+        var time = LocalTime.parse(timeStr, TIME_FORMATTER);
+        times.add(time);
+      } catch (DateTimeParseException e) {
+        // Skip invalid time formats and log the issue
+        logger.warn("Invalid time format found: '{}'. Error: {}", timeStr, e.getMessage());
+      }
     }
     var startTime = times.stream().max(LocalTime::compareTo).orElseThrow();
     var startDateTime = LocalDateTime.of(date, startTime);

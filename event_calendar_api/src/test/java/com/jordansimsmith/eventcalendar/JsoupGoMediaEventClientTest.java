@@ -233,4 +233,65 @@ class JsoupGoMediaEventClientTest {
               assertThat(e.eventInfo()).contains("Box Office opens at 2pm", "Gates open at 5pm");
             });
   }
+
+  @Test
+  void shouldSkipInvalidTimesInEventInfo() {
+    // arrange
+    var mainPageWithEventHtml =
+        """
+        <html>
+          <body>
+            <article class="new-tile-event">
+              <h5>Event With Mixed Times</h5>
+              <p class="event-date">1 January 2025</p>
+              <p class="location">Go Media Stadium</p>
+              <a class="new-tile-inner" href="/event/event-with-mixed-times"></a>
+            </article>
+          </body>
+        </html>
+        """;
+
+    var invalidTimeEventHtml =
+        """
+        <html>
+          <body>
+            <h1 class="event-hero-carousel-heading">Event With Mixed Times</h1>
+            <span class="event-hero-carousel-detail">
+              <svg name="event-calendar"></svg>
+              1 January 2025
+            </span>
+            <div class="event-summary">
+              <ul>
+                <li>Box Office opens at 2pm</li>
+                <li>Early entry at 12 30pm</li>
+                <li>Main event at 8pm</li>
+              </ul>
+            </div>
+          </body>
+        </html>
+        """;
+
+    JsoupGoMediaEventClient testClient =
+        new JsoupGoMediaEventClient() {
+          @Override
+          protected Document fetchDocument(String url) {
+            if (url.equals(STADIUM_URL)) {
+              return Jsoup.parse(mainPageWithEventHtml);
+            } else if (url.equals(BASE_URL + "/event/event-with-mixed-times")) {
+              return Jsoup.parse(invalidTimeEventHtml);
+            } else {
+              throw new AssertionError("Unexpected URL in test: " + url);
+            }
+          }
+        };
+
+    // act
+    var events = testClient.getEvents();
+
+    // assert
+    // Should select 8pm as the latest valid time, skipping the invalid "12 30pm"
+    assertThat(events).hasSize(1);
+    var expectedTime = LocalDateTime.of(2025, 1, 1, 20, 0).atZone(AUCKLAND_ZONE).toInstant();
+    assertThat(events.get(0).startTime()).isEqualTo(expectedTime);
+  }
 }

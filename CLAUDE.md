@@ -16,10 +16,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Format changes after task completion
 
 Always run these commands after completing a task:
+
 1. First, tidy up Bazel module dependencies: `bazel mod tidy`
 2. Then format all code files: `bazel run //:format`
 
 These commands should be run:
+
 - After completing a feature or bug fix
 - Before creating a pull request
 - After addressing review comments that involved code changes
