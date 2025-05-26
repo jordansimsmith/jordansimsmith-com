@@ -160,14 +160,14 @@ resource "aws_lambda_function" "lambda" {
   timeout          = 30
 }
 
-resource "aws_cloudwatch_event_rule" "update_events_hourly" {
-  name                = "${local.application_id}_update_events_hourly"
-  description         = "Trigger the UpdateEventsHandler Lambda function every hour"
-  schedule_expression = "rate(1 hour)"
+resource "aws_cloudwatch_event_rule" "update_events" {
+  name                = "${local.application_id}_update_events"
+  description         = "Triggers the UpdateEventsHandler Lambda function"
+  schedule_expression = "rate(15 minutes)"
 }
 
 resource "aws_cloudwatch_event_target" "update_events_lambda" {
-  rule      = aws_cloudwatch_event_rule.update_events_hourly.name
+  rule      = aws_cloudwatch_event_rule.update_events.name
   target_id = "UpdateEventsHandler"
   arn       = aws_lambda_function.lambda["update_events"].arn
 }
@@ -177,7 +177,7 @@ resource "aws_lambda_permission" "allow_eventbridge" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.lambda["update_events"].function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.update_events_hourly.arn
+  source_arn    = aws_cloudwatch_event_rule.update_events.arn
 }
 
 

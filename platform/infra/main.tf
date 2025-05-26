@@ -80,4 +80,5 @@ resource "aws_cloudwatch_metric_alarm" "lambda_failures" {
   }
 
   alarm_actions = [aws_sns_topic.lambda_failure_notifications.arn]
+  ok_actions    = [aws_sns_topic.lambda_failure_notifications.arn]
 }

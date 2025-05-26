@@ -160,14 +160,14 @@ resource "aws_lambda_function" "lambda" {
   timeout          = 30
 }
 
-resource "aws_cloudwatch_event_rule" "update_fixtures_hourly" {
-  name                = "${local.application_id}_update_fixtures_hourly"
-  description         = "Trigger the UpdateFixturesHandler Lambda function every hour"
-  schedule_expression = "rate(1 hour)"
+resource "aws_cloudwatch_event_rule" "update_fixtures" {
+  name                = "${local.application_id}_update_fixtures"
+  description         = "Triggers the UpdateFixturesHandler Lambda function"
+  schedule_expression = "rate(15 minutes)"
 }
 
 resource "aws_cloudwatch_event_target" "update_fixtures_lambda" {
-  rule      = aws_cloudwatch_event_rule.update_fixtures_hourly.name
+  rule      = aws_cloudwatch_event_rule.update_fixtures.name
   target_id = "UpdateFixturesHandler"
   arn       = aws_lambda_function.lambda["update_fixtures"].arn
 }
@@ -177,7 +177,7 @@ resource "aws_lambda_permission" "allow_eventbridge" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.lambda["update_fixtures"].function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.update_fixtures_hourly.arn
+  source_arn    = aws_cloudwatch_event_rule.update_fixtures.arn
 }
 
 

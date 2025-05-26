@@ -186,13 +186,14 @@ resource "aws_lambda_function" "lambda" {
   timeout          = 30
 }
 
-resource "aws_cloudwatch_event_rule" "trigger" {
-  name                = "${local.application_id}_trigger"
-  schedule_expression = "rate(1 hour)"
+resource "aws_cloudwatch_event_rule" "update_page_content" {
+  name                = "${local.application_id}_update_page_content"
+  description         = "Triggers the UpdatePageContentHandler Lambda function"
+  schedule_expression = "rate(15 minutes)"
 }
 
 resource "aws_cloudwatch_event_target" "trigger" {
-  rule      = aws_cloudwatch_event_rule.trigger.name
+  rule      = aws_cloudwatch_event_rule.update_page_content.name
   target_id = "lambda"
   arn       = aws_lambda_function.lambda["update_page_content"].arn
 }
@@ -202,5 +203,5 @@ resource "aws_lambda_permission" "cloudwatch_trigger" {
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.lambda["update_page_content"].function_name
   principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.trigger.arn
+  source_arn    = aws_cloudwatch_event_rule.update_page_content.arn
 }
