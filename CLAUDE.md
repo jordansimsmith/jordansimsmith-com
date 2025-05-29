@@ -6,8 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - Build all: `bazel build //...`
 - Build specific API: `bazel build //service_name_api:all` (e.g., `//immersion_tracker_api:all`)
-- Test all: `bazel test --test_env=TVDB_API_KEY //...`
-- Test specific API: `bazel test --test_env=TVDB_API_KEY //service_name_api:all`
+- Test all: `bazel test //...`
+- Test specific API: `bazel test //service_name_api:all`
 - Test single class: `bazel test --test_filter=ClassName //service_name_api:target`
 - Test single method: `bazel test --test_filter=ClassName.methodName //service_name_api:target`
 - Format code: `bazel run //:format`

@@ -13,7 +13,7 @@ graph TD
   B -->|Store Items| F[DynamoDB]
   B -->|LLM Evaluation| G[AWS Bedrock]
   G -->|Log Results| H[CloudWatch Logs]
-  
+
   I[CloudWatch Event] -->|Daily Trigger| J[Daily Digest Lambda]
   J -->|Query New Items| F
   J -->|Send Email| K[SNS Topic]
@@ -79,12 +79,15 @@ graph TD
 ### Data schema
 
 DynamoDB table structure:
+
 - **Partition Key**: pk (String) - Trade Me search URL
 - **Sort Key**: sk (String) - Timestamp + Trade Me item URL
 - **Attributes**:
   - title (String) - Auction item title
+  - ttl (Number) - Time to live expiry timestamp (30 days from item creation)
 
 Example DynamoDB item:
+
 ```json
 {
   "pk": {
@@ -95,6 +98,9 @@ Example DynamoDB item:
   },
   "title": {
     "S": "Titleist Vokey SM6 Wedge 60* K Grind (Rattle in Head) $1 RESERVE!!!"
+  },
+  "ttl": {
+    "N": "1751081155"
   }
 }
 ```

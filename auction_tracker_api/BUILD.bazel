@@ -1,7 +1,5 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 load("@dagger//:workspace_defs.bzl", "dagger_rules")
-load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 dagger_rules()
 
@@ -29,7 +27,6 @@ java_library(
         "//lib/time:lib",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
-        "@maven//:org_jsoup_jsoup",
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
@@ -37,8 +34,8 @@ java_library(
 )
 
 java_binary(
-    name = "update-prices-handler",
-    srcs = glob(["src/main/java/com/jordansimsmith/pricetracker/UpdatePricesHandler.java"]),
+    name = "update-items-handler",
+    srcs = glob(["src/main/java/com/jordansimsmith/auctiontracker/UpdateItemsHandler.java"]),
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
@@ -64,18 +61,13 @@ java_library(
         ["src/test/java/**/*.java"],
         exclude = INTEGRATION_TESTS + E2E_TESTS + UNIT_TESTS,
     ),
-    data = [
-        ":local-load",
-    ],
     resources = [
         "src/test/resources/logback-test.xml",
-        "src/test/resources/test.properties",
     ],
     deps = [
         ":dagger",
         ":lib",
         "//lib/dynamodb:lib",
-        "//lib/notifications:lib",
         "//lib/testcontainers:lib",
         "//lib/time:lib",
         "@maven//:ch_qos_logback_logback_classic",
@@ -87,23 +79,6 @@ java_library(
         "@maven//:org_testcontainers_testcontainers",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-    ],
-)
-
-java_test_suite(
-    name = "unit-tests",
-    size = "small",
-    srcs = UNIT_TESTS,
-    runner = "junit5",
-    test_suffixes = ["Test.java"],
-    runtime_deps = JUNIT5_DEPS,
-    deps = [
-        ":lib",
-        ":test-lib",
-        "@maven//:org_assertj_assertj_core",
-        "@maven//:org_jsoup_jsoup",
-        "@maven//:org_junit_jupiter_junit_jupiter_api",
-        "@maven//:org_mockito_mockito_core",
     ],
 )
 
@@ -125,9 +100,8 @@ java_test_suite(
     deps = [
         ":lib",
         ":test-lib",
-        ":update-prices-handler",
+        ":update-items-handler",
         "//lib/dynamodb:lib",
-        "//lib/notifications:lib",
         "//lib/testcontainers:lib",
         "//lib/time:lib",
         "@maven//:ch_qos_logback_logback_classic",
@@ -140,74 +114,5 @@ java_test_suite(
         "@maven//:org_testcontainers_junit_jupiter",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-    ],
-)
-
-pkg_tar(
-    name = "local-handlers.tar",
-    srcs = [
-        ":update-prices-handler_deploy.jar",
-    ],
-    package_dir = "/opt/code/localstack/",
-)
-
-pkg_tar(
-    name = "local-init-resources.tar",
-    srcs = ["src/test/resources/init_resources.py"],
-    package_dir = "/etc/localstack/init/ready.d/",
-)
-
-oci_image(
-    name = "local-image",
-    base = "@localstack//:localstack",
-    env = {
-        "LOCALSTACK_LAMBDA_IGNORE_ARCHITECTURE": 1,
-        "LOCALSTACK_LAMBDA_KEEPALIVE_MS": 0,
-    },
-    tars = [
-        ":local-init-resources.tar",
-        ":local-handlers.tar",
-    ],
-)
-
-oci_load(
-    name = "local-load",
-    image = ":local-image",
-    repo_tags = [
-        "bazel/price-tracker-local:latest",
-    ],
-)
-
-java_test_suite(
-    name = "e2e-tests",
-    size = "large",
-    srcs = E2E_TESTS,
-    env = {
-        "AWS_ACCESS_KEY_ID": "fake",
-        "AWS_SECRET_ACCESS_KEY": "fake",
-        "AWS_REGION": "ap-southeast-2",
-    },
-    resources = [
-        "src/test/resources/logback-test.xml",
-    ],
-    runner = "junit5",
-    tags = [
-        "no-cache",
-    ],
-    test_suffixes = ["E2ETest.java"],
-    runtime_deps = JUNIT5_DEPS,
-    deps = [
-        ":lib",
-        ":test-lib",
-        "@maven//:ch_qos_logback_logback_classic",
-        "@maven//:ch_qos_logback_logback_core",
-        "@maven//:org_assertj_assertj_core",
-        "@maven//:org_junit_jupiter_junit_jupiter_api",
-        "@maven//:org_slf4j_slf4j_api",
-        "@maven//:org_testcontainers_junit_jupiter",
-        "@maven//:software_amazon_awssdk_dynamodb",
-        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-        "@maven//:software_amazon_awssdk_lambda",
-        "@maven//:software_amazon_awssdk_sqs",
     ],
 )

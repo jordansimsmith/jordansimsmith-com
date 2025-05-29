@@ -5,3 +5,4 @@ common --tool_java_runtime_version=remotejdk_17
 
 test --test_output=errors
 test --verbose_failures
+test --test_env=TVDB_API_KEY

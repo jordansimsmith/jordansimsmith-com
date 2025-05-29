@@ -273,7 +273,6 @@ java_test_suite(
     },
     resources = [
         "src/test/resources/logback-test.xml",
-        "src/test/resources/test.properties",
     ],
     runner = "junit5",
     tags = [
