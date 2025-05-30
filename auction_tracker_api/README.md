@@ -76,6 +76,36 @@ graph TD
 - SNS topic name: "auction_tracker_api_digest"
 - Email subscribers: Configured in Terraform
 
+### Web scraping process
+
+The SeleniumTradeMeClient implements a comprehensive web scraping pipeline for extracting auction data from Trade Me:
+
+#### Search and pagination
+
+1. **Search URL construction**: Builds Trade Me search URLs with encoded search terms and price filters
+2. **Page navigation**: Iterates through search result pages using ChromeDriver with headless browsing
+3. **Result detection**: Waits for search results to load by detecting either result count headers or listing elements
+4. **Link extraction**: Extracts individual listing URLs from search pages using CSS selectors (`a[href*='/listing/']`)
+5. **Smart pagination**: Continues to next page until no new listings found or page limit reached (5 pages max)
+
+#### Individual item extraction
+
+1. **Page loading**: Navigates to each listing URL and waits for content to load (15 second timeout)
+2. **Title extraction**: Uses CSS selector `h1.tm-marketplace-buyer-options__listing_title, h1.tm-marketplace-koru-listing__title` to extract item titles
+3. **Content extraction**: Gathers all text from `.tm-marketplace-listing-body__container, .tm-marketplace-koru-listing__body` elements for descriptions
+4. **Text processing**:
+   - Joins multiple content sections with spaces
+   - Normalizes whitespace and removes excessive formatting
+   - Truncates descriptions to 1000 characters for storage efficiency
+5. **Error handling**: Logs and continues processing when individual listings timeout or fail
+
+#### Technical details
+
+- **Browser configuration**: Uses Chrome with headless mode, no-sandbox, and optimized window size
+- **Wait strategy**: Implements explicit waits using WebDriverWait for reliable element detection
+- **CSS selectors**: Uses specific Trade Me CSS classes validated through testing
+- **Timeout handling**: 30-second timeout per page with graceful failure for slow-loading listings
+
 ### Data schema
 
 DynamoDB table structure:

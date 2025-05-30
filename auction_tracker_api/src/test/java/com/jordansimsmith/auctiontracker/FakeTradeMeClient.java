@@ -1,3 +1,13 @@
 package com.jordansimsmith.auctiontracker;
 
-public class FakeTradeMeClient implements TradeMeClient {}
+import java.net.URI;
+import java.util.List;
+import javax.annotation.Nullable;
+
+public class FakeTradeMeClient implements TradeMeClient {
+  @Override
+  public List<TradeMeItem> searchItems(
+      URI baseUrl, String searchTerm, @Nullable Double minPrice, @Nullable Double maxPrice) {
+    return List.of();
+  }
+}
