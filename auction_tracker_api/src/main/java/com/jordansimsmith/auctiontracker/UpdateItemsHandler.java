@@ -7,7 +7,10 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.time.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbIndex;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 
 public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> {
   private static final Logger logger = LoggerFactory.getLogger(UpdateItemsHandler.class);
@@ -16,6 +19,7 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
   private final SearchFactory searchFactory;
   private final TradeMeClient tradeMeClient;
   private final DynamoDbTable<AuctionTrackerItem> auctionTrackerTable;
+  private final DynamoDbIndex<AuctionTrackerItem> gsi1;
 
   public UpdateItemsHandler() {
     this(AuctionTrackerFactory.create());
@@ -27,6 +31,7 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
     this.searchFactory = factory.searchFactory();
     this.tradeMeClient = factory.tradeMeClient();
     this.auctionTrackerTable = factory.auctionTrackerTable();
+    this.gsi1 = auctionTrackerTable.index("gsi1");
   }
 
   @Override
@@ -40,9 +45,44 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
   }
 
   private Void doHandleRequest(ScheduledEvent event, Context context) throws Exception {
-    logger.info("Starting update items process");
-    // TODO: Implement item update logic
-    logger.info("Completed update items process");
+    var searches = searchFactory.findSearches();
+
+    for (var search : searches) {
+      processSearch(search);
+    }
+
     return null;
+  }
+
+  private void processSearch(SearchFactory.Search search) {
+    var tradeMeItems =
+        tradeMeClient.searchItems(
+            search.baseUrl(), search.searchTerm(), search.minPrice(), search.maxPrice());
+
+    var searchUrl = search.baseUrl().toString();
+    var currentTime = clock.now();
+
+    for (var tradeMeItem : tradeMeItems) {
+      if (itemExists(searchUrl, tradeMeItem.url())) {
+        continue;
+      }
+
+      var auctionTrackerItem =
+          AuctionTrackerItem.create(searchUrl, tradeMeItem.url(), tradeMeItem.title(), currentTime);
+      auctionTrackerTable.putItem(auctionTrackerItem);
+    }
+  }
+
+  private boolean itemExists(String searchUrl, String itemUrl) {
+    var queryConditional =
+        QueryConditional.keyEqualTo(
+            Key.builder()
+                .partitionValue(AuctionTrackerItem.formatGsi1pk(searchUrl))
+                .sortValue(AuctionTrackerItem.formatGsi1sk(itemUrl))
+                .build());
+    return gsi1.query(queryConditional).stream()
+        .flatMap(page -> page.items().stream())
+        .findFirst()
+        .isPresent();
   }
 }

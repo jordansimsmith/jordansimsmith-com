@@ -21,6 +21,8 @@ public class AuctionTrackerItem {
   public static final String URL = "url";
   public static final String TTL = "ttl";
   public static final String VERSION = "version";
+  public static final String GSI1PK = "gsi1pk";
+  public static final String GSI1SK = "gsi1sk";
 
   private String pk;
   private String sk;
@@ -29,6 +31,8 @@ public class AuctionTrackerItem {
   private String url;
   private Long ttl;
   private Long version;
+  private String gsi1pk;
+  private String gsi1sk;
 
   @DynamoDbPartitionKey
   @DynamoDbAttribute(PK)
@@ -97,6 +101,26 @@ public class AuctionTrackerItem {
     this.version = version;
   }
 
+  @DynamoDbSecondaryPartitionKey(indexNames = "gsi1")
+  @DynamoDbAttribute(GSI1PK)
+  public String getGsi1pk() {
+    return gsi1pk;
+  }
+
+  public void setGsi1pk(String gsi1pk) {
+    this.gsi1pk = gsi1pk;
+  }
+
+  @DynamoDbSecondarySortKey(indexNames = "gsi1")
+  @DynamoDbAttribute(GSI1SK)
+  public String getGsi1sk() {
+    return gsi1sk;
+  }
+
+  public void setGsi1sk(String gsi1sk) {
+    this.gsi1sk = gsi1sk;
+  }
+
   @Override
   public String toString() {
     return "AuctionTrackerItem{"
@@ -121,6 +145,12 @@ public class AuctionTrackerItem {
         + ", version='"
         + version
         + '\''
+        + ", gsi1pk='"
+        + gsi1pk
+        + '\''
+        + ", gsi1sk='"
+        + gsi1sk
+        + '\''
         + '}';
   }
 
@@ -134,12 +164,14 @@ public class AuctionTrackerItem {
         && Objects.equals(timestamp, auctionTrackerItem.timestamp)
         && Objects.equals(url, auctionTrackerItem.url)
         && Objects.equals(ttl, auctionTrackerItem.ttl)
-        && Objects.equals(version, auctionTrackerItem.version);
+        && Objects.equals(version, auctionTrackerItem.version)
+        && Objects.equals(gsi1pk, auctionTrackerItem.gsi1pk)
+        && Objects.equals(gsi1sk, auctionTrackerItem.gsi1sk);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(pk, sk, title, timestamp, url, ttl, version);
+    return Objects.hash(pk, sk, title, timestamp, url, ttl, version, gsi1pk, gsi1sk);
   }
 
   public static String formatPk(String searchUrl) {
@@ -148,6 +180,14 @@ public class AuctionTrackerItem {
 
   public static String formatSk(Instant timestamp, String itemUrl) {
     return TIMESTAMP_PREFIX + timestamp.getEpochSecond() + ITEM_PREFIX + itemUrl;
+  }
+
+  public static String formatGsi1pk(String searchUrl) {
+    return formatPk(searchUrl);
+  }
+
+  public static String formatGsi1sk(String itemUrl) {
+    return ITEM_PREFIX + itemUrl;
   }
 
   public static AuctionTrackerItem create(
@@ -159,6 +199,8 @@ public class AuctionTrackerItem {
     auctionTrackerItem.setTimestamp(timestamp);
     auctionTrackerItem.setUrl(itemUrl);
     auctionTrackerItem.setTtl(timestamp.plus(30, ChronoUnit.DAYS).getEpochSecond());
+    auctionTrackerItem.setGsi1pk(formatGsi1pk(searchUrl));
+    auctionTrackerItem.setGsi1sk(formatGsi1sk(itemUrl));
     return auctionTrackerItem;
   }
 }

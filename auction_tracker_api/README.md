@@ -59,11 +59,11 @@ graph TD
 
 ### Key components
 
-- `UpdateItemsHandler`: Lambda handler that scrapes Trade Me for new items
+- `UpdateItemsHandler`: Lambda handler that scrapes Trade Me for new items with GSI-optimized duplicate detection
 - `TradeMeClient`: Client interface for retrieving auction data from Trade Me
 - `SeleniumTradeMeClient`: Implementation using Selenium WebDriver for scraping
 - `SearchFactory`: Factory providing predefined search URLs and criteria
-- `AuctionTrackerItem`: Data model for storing auction data in DynamoDB
+- `AuctionTrackerItem`: Data model for storing auction data in DynamoDB with GSI support
 - `ItemDigestHandler`: Lambda handler that sends daily email summaries
 - `ItemEvaluator`: Client for AWS Bedrock LLM item evaluation
 - `AuctionTrackerFactory`: Factory for creating required dependencies
@@ -110,11 +110,22 @@ The SeleniumTradeMeClient implements a comprehensive web scraping pipeline for e
 
 DynamoDB table structure:
 
-- **Partition Key**: pk (String) - Trade Me search URL
-- **Sort Key**: sk (String) - Timestamp + Trade Me item URL
+- **Partition Key**: pk (String) - Trade Me search URL with prefix
+- **Sort Key**: sk (String) - Timestamp + Trade Me item URL with prefixes
 - **Attributes**:
   - title (String) - Auction item title
+  - url (String) - Trade Me item URL
+  - timestamp (Number) - Item creation timestamp (epoch seconds)
   - ttl (Number) - Time to live expiry timestamp (30 days from item creation)
+  - version (Number) - Optimistic locking version
+  - gsi1pk (String) - GSI partition key (prefixed search URL)
+  - gsi1sk (String) - GSI sort key (prefixed item URL)
+
+**Global Secondary Index (GSI1)**:
+
+- **GSI Partition Key**: gsi1pk (String) - Prefixed Trade Me search URL (`SEARCH#<url>`)
+- **GSI Sort Key**: gsi1sk (String) - Prefixed Trade Me item URL (`ITEM#<url>`)
+- **Purpose**: Efficient duplicate detection using direct key lookup with consistent prefixing
 
 Example DynamoDB item:
 
@@ -129,8 +140,33 @@ Example DynamoDB item:
   "title": {
     "S": "Titleist Vokey SM6 Wedge 60* K Grind (Rattle in Head) $1 RESERVE!!!"
   },
+  "url": {
+    "S": "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003621"
+  },
+  "timestamp": {
+    "N": "1748489155"
+  },
   "ttl": {
     "N": "1751081155"
+  },
+  "version": {
+    "N": "1"
+  },
+  "gsi1pk": {
+    "S": "SEARCH#https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/search?search_string=titleist%20wedge"
+  },
+  "gsi1sk": {
+    "S": "ITEM#https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003621"
   }
 }
 ```
+
+### Duplicate detection optimization
+
+The service uses a Global Secondary Index (GSI1) for efficient duplicate detection:
+
+- **Performance**: O(1) direct key lookup instead of O(n) table scan
+- **Implementation**: Query GSI1 using `formatGsi1pk()` and `formatGsi1sk()` methods for consistent key formation
+- **Key Format**: GSI keys use same prefixes as main table (`SEARCH#` and `ITEM#`) for consistency
+- **Benefits**: Scales efficiently with large datasets and reduces DynamoDB read costs
+- **Pattern**: Uses stream-based query processing with page flattening for reliable existence checking
