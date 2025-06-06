@@ -31,6 +31,7 @@ public class SeleniumTradeMeClient implements TradeMeClient {
           "h1.tm-marketplace-buyer-options__listing_title, h1.tm-marketplace-koru-listing__title");
   private static final By DESCRIPTION_SELECTOR =
       By.cssSelector(".tm-marketplace-listing-body__container, .tm-marketplace-koru-listing__body");
+  private static final By PAGINATION_SELECTOR = By.cssSelector(".tm-search-results__pagination");
 
   @Override
   public List<TradeMeItem> searchItems(
@@ -63,32 +64,30 @@ public class SeleniumTradeMeClient implements TradeMeClient {
       throws Exception {
     var wait = new WebDriverWait(driver, WAIT_TIMEOUT);
 
-    // extract all the item urls from all search pages
+    // search the first page only
+    var searchUrl = buildSearchUrl(baseUrl, searchTerm, minPrice, maxPrice);
+    LOGGER.info("Searching {}", searchUrl);
+    driver.get(searchUrl);
+
+    // wait for search results to load - look for the result count header
+    wait.until(webDriver -> !webDriver.findElements(RESULT_COUNT_SELECTOR).isEmpty());
+
+    // find all listing links on this page
+    var listings = driver.findElements(By.cssSelector("a[href*='/listing/']"));
+
+    // check for pagination and warn if more results exist
+    var paginationElements = driver.findElements(PAGINATION_SELECTOR);
+    if (!paginationElements.isEmpty()) {
+      LOGGER.warn(
+          "Pagination detected on search results page - only processing first page of results."
+              + " Consider narrowing search criteria to fit results on one page.");
+    }
+
+    // extract URLs from this page
     var itemUrls = new HashSet<String>();
-    var currentPage = 1;
-    while (currentPage < 5) {
-      var searchUrl = buildSearchUrl(baseUrl, searchTerm, minPrice, maxPrice, currentPage);
-      LOGGER.info("Searching {}", searchUrl);
-      driver.get(searchUrl);
-
-      // wait for search results to load - look for the result count header
-      wait.until(webDriver -> !webDriver.findElements(RESULT_COUNT_SELECTOR).isEmpty());
-
-      // find all listing links on this page
-      var listings = driver.findElements(By.cssSelector("a[href*='/listing/']"));
-
-      // if no listings found on this page, we've reached the end
-      if (listings.isEmpty()) {
-        break;
-      }
-
-      // extract URLs from this page
-      for (var listing : listings) {
-        var itemUrl = listing.getAttribute("href");
-        itemUrls.add(itemUrl);
-      }
-
-      currentPage++;
+    for (var listing : listings) {
+      var itemUrl = listing.getAttribute("href");
+      itemUrls.add(itemUrl);
     }
 
     // get item details for each url
@@ -129,11 +128,7 @@ public class SeleniumTradeMeClient implements TradeMeClient {
   }
 
   private String buildSearchUrl(
-      URI baseUrl,
-      String searchTerm,
-      @Nullable Double minPrice,
-      @Nullable Double maxPrice,
-      int page) {
+      URI baseUrl, String searchTerm, @Nullable Double minPrice, @Nullable Double maxPrice) {
     var url =
         baseUrl.toString()
             + "?search_string="
@@ -147,11 +142,7 @@ public class SeleniumTradeMeClient implements TradeMeClient {
       url += "&price_max=" + maxPrice.intValue();
     }
 
-    if (page > 1) {
-      url += "&page=" + page;
-    }
-
-    url += "&sort_order=titleasc";
+    url += "&sort_order=expirydesc";
 
     return url;
   }
