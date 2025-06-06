@@ -23,7 +23,7 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 public class GetCalendarSubscriptionHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
 
-  private static final Logger logger =
+  private static final Logger LOGGER =
       LoggerFactory.getLogger(GetCalendarSubscriptionHandler.class);
 
   private final DynamoDbTable<FootballCalendarItem> footballCalendarTable;
@@ -42,7 +42,7 @@ public class GetCalendarSubscriptionHandler
     try {
       return doHandleRequest(event, context);
     } catch (Exception e) {
-      logger.error("Error processing football calendar subscription request", e);
+      LOGGER.error("Error processing football calendar subscription request", e);
       throw new RuntimeException(e);
     }
   }

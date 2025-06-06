@@ -16,7 +16,7 @@ import software.amazon.awssdk.enhanced.dynamodb.Key;
 
 public class UpdateShowHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
-  private static final Logger logger = LoggerFactory.getLogger(UpdateShowHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(UpdateShowHandler.class);
 
   private final ObjectMapper objectMapper;
   private final DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable;
@@ -45,7 +45,7 @@ public class UpdateShowHandler
     try {
       return doHandleRequest(event, context);
     } catch (Exception e) {
-      logger.error("Error processing update show request", e);
+      LOGGER.error("Error processing update show request", e);
       throw new RuntimeException(e);
     }
   }

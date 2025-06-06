@@ -17,7 +17,7 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 public class UpdatePricesHandler implements RequestHandler<ScheduledEvent, Void> {
-  private static final Logger logger = LoggerFactory.getLogger(UpdatePricesHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(UpdatePricesHandler.class);
   @VisibleForTesting static final String TOPIC = "price_tracker_api_price_updates";
 
   private final Clock clock;
@@ -46,7 +46,7 @@ public class UpdatePricesHandler implements RequestHandler<ScheduledEvent, Void>
     try {
       return doHandleRequest(event, context);
     } catch (Exception e) {
-      logger.error("Error processing price updates", e);
+      LOGGER.error("Error processing price updates", e);
       throw new RuntimeException(e);
     }
   }

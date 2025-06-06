@@ -18,7 +18,7 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 public class SendDigestHandler implements RequestHandler<ScheduledEvent, Void> {
-  private static final Logger logger = LoggerFactory.getLogger(SendDigestHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SendDigestHandler.class);
   private static final String SNS_TOPIC = "auction_tracker_api_digest";
 
   private final Clock clock;
@@ -43,7 +43,7 @@ public class SendDigestHandler implements RequestHandler<ScheduledEvent, Void> {
     try {
       return doHandleRequest(event, context);
     } catch (Exception e) {
-      logger.error("Error sending auction digest", e);
+      LOGGER.error("Error sending auction digest", e);
       throw new RuntimeException(e);
     }
   }
@@ -60,7 +60,7 @@ public class SendDigestHandler implements RequestHandler<ScheduledEvent, Void> {
             .collect(Collectors.toList());
 
     if (allNewItems.isEmpty()) {
-      logger.info("No new auction items found in the last 24 hours");
+      LOGGER.info("No new auction items found in the last 24 hours");
       return null;
     }
 
@@ -68,7 +68,7 @@ public class SendDigestHandler implements RequestHandler<ScheduledEvent, Void> {
     var subject = String.format("Auction Tracker Daily Digest - %d new items", allNewItems.size());
 
     notificationPublisher.publish(SNS_TOPIC, subject, digestMessage);
-    logger.info("Sent digest with {} new auction items", allNewItems.size());
+    LOGGER.info("Sent digest with {} new auction items", allNewItems.size());
 
     return null;
   }

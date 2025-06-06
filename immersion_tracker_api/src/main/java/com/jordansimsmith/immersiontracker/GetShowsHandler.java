@@ -21,7 +21,7 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 public class GetShowsHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
 
-  private static final Logger logger = LoggerFactory.getLogger(GetShowsHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(GetShowsHandler.class);
 
   private final ObjectMapper objectMapper;
   private final DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable;
@@ -51,7 +51,7 @@ public class GetShowsHandler
     try {
       return doHandleRequest(event, context);
     } catch (Exception e) {
-      logger.error("Error processing get shows request", e);
+      LOGGER.error("Error processing get shows request", e);
       throw new RuntimeException(e);
     }
   }

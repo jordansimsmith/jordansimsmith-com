@@ -13,7 +13,7 @@ import org.testcontainers.containers.output.Slf4jLogConsumer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
 public class FootballCalendarContainer extends GenericContainer<FootballCalendarContainer> {
-  private static final Logger logger = LoggerFactory.getLogger(FootballCalendarContainer.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(FootballCalendarContainer.class);
 
   private static final int LOCALSTACK_PORT = 4566;
 
@@ -28,7 +28,7 @@ public class FootballCalendarContainer extends GenericContainer<FootballCalendar
     this.waitingFor(
         Wait.forHttp("/_localstack/init/ready")
             .forResponsePredicate(res -> res.contains("\"completed\": true")));
-    this.withLogConsumer(new Slf4jLogConsumer(logger).withSeparateOutputStreams());
+    this.withLogConsumer(new Slf4jLogConsumer(LOGGER).withSeparateOutputStreams());
   }
 
   @SuppressWarnings("HttpUrlsUsage")

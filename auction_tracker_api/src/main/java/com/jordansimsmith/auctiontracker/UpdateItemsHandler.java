@@ -13,7 +13,7 @@ import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 
 public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> {
-  private static final Logger logger = LoggerFactory.getLogger(UpdateItemsHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(UpdateItemsHandler.class);
 
   private final Clock clock;
   private final SearchFactory searchFactory;
@@ -39,7 +39,7 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
     try {
       return doHandleRequest(event, context);
     } catch (Exception e) {
-      logger.error("Error processing auction updates", e);
+      LOGGER.error("Error processing auction updates", e);
       throw new RuntimeException(e);
     }
   }

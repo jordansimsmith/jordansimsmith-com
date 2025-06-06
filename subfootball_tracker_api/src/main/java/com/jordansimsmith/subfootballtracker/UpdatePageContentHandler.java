@@ -15,7 +15,7 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 public class UpdatePageContentHandler implements RequestHandler<ScheduledEvent, Void> {
-  private static final Logger logger = LoggerFactory.getLogger(UpdatePageContentHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(UpdatePageContentHandler.class);
   @VisibleForTesting static final String TOPIC = "subfootball_tracker_api_page_content_updates";
 
   private final Clock clock;
@@ -40,7 +40,7 @@ public class UpdatePageContentHandler implements RequestHandler<ScheduledEvent, 
     try {
       return doHandleRequest(event, context);
     } catch (Exception e) {
-      logger.error("Error processing subfootball page content updates", e);
+      LOGGER.error("Error processing subfootball page content updates", e);
       throw new RuntimeException(e);
     }
   }

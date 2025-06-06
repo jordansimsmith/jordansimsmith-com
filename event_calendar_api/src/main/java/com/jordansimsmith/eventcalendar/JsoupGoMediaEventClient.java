@@ -23,7 +23,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class JsoupGoMediaEventClient implements GoMediaEventClient {
-  private static final Logger logger = LoggerFactory.getLogger(JsoupGoMediaEventClient.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(JsoupGoMediaEventClient.class);
 
   private static final String BASE_URL = "https://www.aucklandstadiums.co.nz";
   private static final String STADIUM_URL = BASE_URL + "/our-venues/go-media-stadium";
@@ -115,7 +115,7 @@ public class JsoupGoMediaEventClient implements GoMediaEventClient {
         times.add(time);
       } catch (DateTimeParseException e) {
         // Skip invalid time formats and log the issue
-        logger.warn("Invalid time format found: '{}'. Error: {}", timeStr, e.getMessage());
+        LOGGER.warn("Invalid time format found: '{}'. Error: {}", timeStr, e.getMessage());
       }
     }
     var startTime = times.stream().max(LocalTime::compareTo).orElseThrow();

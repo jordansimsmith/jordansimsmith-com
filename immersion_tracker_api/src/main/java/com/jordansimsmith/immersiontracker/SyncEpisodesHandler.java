@@ -19,7 +19,7 @@ import software.amazon.awssdk.enhanced.dynamodb.Key;
 
 public class SyncEpisodesHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
-  private static final Logger logger = LoggerFactory.getLogger(SyncEpisodesHandler.class);
+  private static final Logger LOGGER = LoggerFactory.getLogger(SyncEpisodesHandler.class);
   @VisibleForTesting static final ZoneId ZONE_ID = ZoneId.of("Pacific/Auckland");
 
   private final Clock clock;
@@ -52,7 +52,7 @@ public class SyncEpisodesHandler
     try {
       return doHandleRequest(event, context);
     } catch (Exception e) {
-      logger.error("Error processing episode sync request", e);
+      LOGGER.error("Error processing episode sync request", e);
       throw new RuntimeException(e);
     }
   }
