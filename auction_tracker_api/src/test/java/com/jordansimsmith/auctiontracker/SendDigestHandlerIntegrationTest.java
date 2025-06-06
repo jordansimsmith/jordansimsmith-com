@@ -39,10 +39,6 @@ public class SendDigestHandlerIntegrationTest {
 
     DynamoDbUtils.createTable(factory.dynamoDbClient(), auctionTrackerTable);
 
-    fakeClock.reset();
-    fakeNotificationPublisher.reset();
-    fakeSearchFactory.reset();
-
     sendDigestHandler = new SendDigestHandler(factory);
   }
 
