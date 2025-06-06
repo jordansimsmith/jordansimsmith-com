@@ -41,6 +41,7 @@ public class GetProgressHandler
       @JsonProperty("total_hours_watched") int totalHoursWatched,
       @JsonProperty("episodes_watched_today") int episodesWatchedToday,
       @JsonProperty("days_since_first_episode") long daysSinceFirstEpisode,
+      @Nullable @JsonProperty("weekly_trend_percentage") Double weeklyTrendPercentage,
       @JsonProperty("shows") List<Show> shows) {}
 
   @VisibleForTesting
@@ -131,12 +132,23 @@ public class GetProgressHandler
             .sorted(Comparator.comparing(e -> e.episodesWatched, Comparator.reverseOrder()))
             .toList();
 
+    Double weeklyTrendPercentage = null;
+    if (daysSinceFirstEpisode >= 14) {
+      var sevenDaysAgo = now.minus(7, ChronoUnit.DAYS);
+      var episodesWatchedLastWeek =
+          episodes.stream().filter(e -> e.getTimestamp().isAfter(sevenDaysAgo)).toList().size();
+      var averageEpisodesPerWeek = (double) totalEpisodesWatched / daysSinceFirstEpisode * 7;
+      weeklyTrendPercentage =
+          ((episodesWatchedLastWeek - averageEpisodesPerWeek) / averageEpisodesPerWeek) * 100;
+    }
+
     var res =
         new GetProgressResponse(
             totalEpisodesWatched,
             totalHoursWatched,
             episodesWatchedToday,
             daysSinceFirstEpisode,
+            weeklyTrendPercentage,
             progresses);
 
     return APIGatewayV2HTTPResponse.builder()

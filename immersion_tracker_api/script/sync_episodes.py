@@ -102,6 +102,17 @@ def get_remote_show_progress():
         f"{years_since_first_episode} year{'' if years_since_first_episode == 1 else 's'} and {months_since_first_episode} month{'' if months_since_first_episode == 1 else 's'} since immersion started."
     )
 
+    weekly_trend_percentage = res.get("weekly_trend_percentage")
+    if weekly_trend_percentage is not None:
+        print()
+        trend_percentage = round(weekly_trend_percentage)
+        if trend_percentage > 0:
+            print(f"Weekly trend: +{trend_percentage}% (above average).")
+        elif trend_percentage < 0:
+            print(f"Weekly trend: {trend_percentage}% (below average).")
+        else:
+            print("Weekly trend: 0% (at average).")
+
 
 def delete_local_episodes_watched(episodes):
     print()

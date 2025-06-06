@@ -8,6 +8,7 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.testcontainers.DynamoDbContainer;
 import com.jordansimsmith.time.FakeClock;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -124,5 +125,79 @@ public class GetProgressHandlerIntegrationTest {
     assertThat(shows.get(0).episodesWatched()).isEqualTo(2);
     assertThat(shows.get(1).name()).isNull();
     assertThat(shows.get(1).episodesWatched()).isEqualTo(1);
+  }
+
+  @Test
+  void handleRequestShouldReturnPositiveWeeklyTrendWhenRecentViewingAboveAverage()
+      throws Exception {
+    // arrange
+    var user = "alice";
+    fakeClock.setTime(Instant.EPOCH.plus(28, ChronoUnit.DAYS).toEpochMilli());
+    var now = fakeClock.now();
+    var sevenDaysAgo = now.minus(7, ChronoUnit.DAYS);
+
+    // 4 episodes over 28 days = 1 episode per week average
+    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", Instant.EPOCH);
+    var episode2 =
+        ImmersionTrackerItem.createEpisode(
+            user, "show1", "episode2", Instant.EPOCH.plus(14, ChronoUnit.DAYS));
+    var episode3 =
+        ImmersionTrackerItem.createEpisode(
+            user, "show1", "episode3", sevenDaysAgo.plus(1, ChronoUnit.DAYS));
+    var episode4 =
+        ImmersionTrackerItem.createEpisode(
+            user, "show1", "episode4", now.minus(1, ChronoUnit.DAYS));
+
+    immersionTrackerTable.putItem(episode1);
+    immersionTrackerTable.putItem(episode2);
+    immersionTrackerTable.putItem(episode3);
+    immersionTrackerTable.putItem(episode4);
+
+    // act
+    var req =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+    var res = getProgressHandler.handleRequest(req, null);
+
+    // assert
+    var progress =
+        objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
+    // 2 episodes in last 7 days vs 1 per week average = 100% increase
+    assertThat(progress.weeklyTrendPercentage()).isEqualTo(100.0);
+  }
+
+  @Test
+  void handleRequestShouldReturnNegativeWeeklyTrendWhenRecentViewingBelowAverage()
+      throws Exception {
+    // arrange
+    var user = "alice";
+    fakeClock.setTime(Instant.EPOCH.plus(14, ChronoUnit.DAYS).toEpochMilli());
+
+    // 4 episodes over 14 days = 2 episodes per week average, but 0 in last 7 days
+    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", Instant.EPOCH);
+    var episode2 =
+        ImmersionTrackerItem.createEpisode(
+            user, "show1", "episode2", Instant.EPOCH.plus(1, ChronoUnit.DAYS));
+    var episode3 =
+        ImmersionTrackerItem.createEpisode(
+            user, "show1", "episode3", Instant.EPOCH.plus(2, ChronoUnit.DAYS));
+    var episode4 =
+        ImmersionTrackerItem.createEpisode(
+            user, "show1", "episode4", Instant.EPOCH.plus(3, ChronoUnit.DAYS));
+
+    immersionTrackerTable.putItem(episode1);
+    immersionTrackerTable.putItem(episode2);
+    immersionTrackerTable.putItem(episode3);
+    immersionTrackerTable.putItem(episode4);
+
+    // act
+    var req =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+    var res = getProgressHandler.handleRequest(req, null);
+
+    // assert
+    var progress =
+        objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
+    // 0 episodes in last 7 days vs 2 per week average = -100% decrease
+    assertThat(progress.weeklyTrendPercentage()).isEqualTo(-100.0);
   }
 }
