@@ -2,6 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project context
+
+Before starting any task involving a specific project (e.g., auction_tracker_api, immersion_tracker_api), always read the project's README.md file first. Each project directory contains a README.md with project specifications and high-level technical overview that provides essential context for understanding the codebase and requirements.
+
 ## Build and test commands
 
 - Build all: `bazel build //...`

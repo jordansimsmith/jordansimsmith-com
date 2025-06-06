@@ -64,7 +64,7 @@ graph TD
 - `SeleniumTradeMeClient`: Implementation using Selenium WebDriver for scraping
 - `SearchFactory`: Factory providing predefined search URLs and criteria
 - `AuctionTrackerItem`: Data model for storing auction data in DynamoDB with GSI support
-- `ItemDigestHandler`: Lambda handler that sends daily email summaries
+- `SendDigestHandler`: Lambda handler that sends daily email summaries
 - `ItemEvaluator`: Client for AWS Bedrock LLM item evaluation
 - `AuctionTrackerFactory`: Factory for creating required dependencies
 

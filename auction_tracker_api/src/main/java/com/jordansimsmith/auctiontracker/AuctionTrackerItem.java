@@ -4,6 +4,7 @@ import com.jordansimsmith.dynamodb.EpochSecondConverter;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
+import javax.annotation.Nullable;
 import software.amazon.awssdk.enhanced.dynamodb.extensions.annotations.DynamoDbVersionAttribute;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
 
@@ -178,8 +179,12 @@ public class AuctionTrackerItem {
     return SEARCH_PREFIX + searchUrl;
   }
 
-  public static String formatSk(Instant timestamp, String itemUrl) {
-    return TIMESTAMP_PREFIX + timestamp.getEpochSecond() + ITEM_PREFIX + itemUrl;
+  public static String formatSk(Instant timestamp, @Nullable String itemUrl) {
+    var formattedSk = TIMESTAMP_PREFIX + String.format("%010d", timestamp.getEpochSecond());
+    if (itemUrl != null) {
+      formattedSk += ITEM_PREFIX + itemUrl;
+    }
+    return formattedSk;
   }
 
   public static String formatGsi1pk(String searchUrl) {
