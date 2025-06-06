@@ -41,7 +41,7 @@ public class UpdateFixturesHandlerIntegrationTest {
   void handleRequestShouldSaveFixturesFromMultipleCompetitionsToDb() {
     // arrange
     var testTime = Instant.parse("2023-05-01T10:00:00Z");
-    fakeClock.setTime(testTime.toEpochMilli());
+    fakeClock.setTime(testTime);
     var event = new ScheduledEvent();
 
     // Create a pre-existing fixture with old date
@@ -175,7 +175,7 @@ public class UpdateFixturesHandlerIntegrationTest {
   void handleRequestShouldDeleteFixturesThatNoLongerExistInApi() {
     // arrange
     var testTime = Instant.parse("2023-05-01T10:00:00Z");
-    fakeClock.setTime(testTime.toEpochMilli());
+    fakeClock.setTime(testTime);
     var event = new ScheduledEvent();
 
     // Create three pre-existing fixtures in DB

@@ -12,8 +12,8 @@ public class FakeClock implements Clock {
     return Instant.ofEpochMilli(currentEpochMilli);
   }
 
-  public void setTime(long epochMillis) {
-    this.currentEpochMilli = epochMillis;
+  public void setTime(Instant instant) {
+    this.currentEpochMilli = instant.toEpochMilli();
   }
 
   public void reset() {

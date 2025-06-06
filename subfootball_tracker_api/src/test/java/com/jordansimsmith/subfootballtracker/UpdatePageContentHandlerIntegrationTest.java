@@ -56,7 +56,7 @@ public class UpdatePageContentHandlerIntegrationTest {
     subfootballTrackerTable.putItem(contentHistory1);
     subfootballTrackerTable.putItem(contentHistory2);
 
-    fakeClock.setTime(3_000);
+    fakeClock.setTime(Instant.ofEpochMilli(3_000));
 
     fakeSubfootballClient.setRegistrationContent("content 3\ncontent 3");
 

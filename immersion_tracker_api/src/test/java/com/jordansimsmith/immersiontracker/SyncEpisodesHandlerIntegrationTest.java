@@ -45,7 +45,7 @@ public class SyncEpisodesHandlerIntegrationTest {
   @Test
   void handleRequestShouldSyncEpisodes() throws Exception {
     // arrange
-    clock.setTime(123_000);
+    clock.setTime(Instant.ofEpochMilli(123_000));
     var user = "alice";
     var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", Instant.EPOCH);
     var episode2 = ImmersionTrackerItem.createEpisode(user, "show2", "episode1", Instant.EPOCH);

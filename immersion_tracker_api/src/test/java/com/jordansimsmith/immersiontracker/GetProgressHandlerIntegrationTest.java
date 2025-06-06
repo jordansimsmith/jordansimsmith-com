@@ -43,7 +43,7 @@ public class GetProgressHandlerIntegrationTest {
   void handleRequestShouldCalculateProgress() throws Exception {
     // arrange
     var user = "alice";
-    fakeClock.setTime(100_000_000);
+    fakeClock.setTime(Instant.ofEpochMilli(100_000_000));
     var now = fakeClock.now().atZone(GetProgressHandler.ZONE_ID).toInstant();
     var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", Instant.EPOCH);
     var episode2 = ImmersionTrackerItem.createEpisode(user, "show2", "episode2", now);
@@ -132,7 +132,7 @@ public class GetProgressHandlerIntegrationTest {
       throws Exception {
     // arrange
     var user = "alice";
-    fakeClock.setTime(Instant.EPOCH.plus(28, ChronoUnit.DAYS).toEpochMilli());
+    fakeClock.setTime(Instant.EPOCH.plus(28, ChronoUnit.DAYS));
     var now = fakeClock.now();
     var sevenDaysAgo = now.minus(7, ChronoUnit.DAYS);
 
@@ -170,7 +170,7 @@ public class GetProgressHandlerIntegrationTest {
       throws Exception {
     // arrange
     var user = "alice";
-    fakeClock.setTime(Instant.EPOCH.plus(14, ChronoUnit.DAYS).toEpochMilli());
+    fakeClock.setTime(Instant.EPOCH.plus(14, ChronoUnit.DAYS));
 
     // 4 episodes over 14 days = 2 episodes per week average, but 0 in last 7 days
     var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", Instant.EPOCH);

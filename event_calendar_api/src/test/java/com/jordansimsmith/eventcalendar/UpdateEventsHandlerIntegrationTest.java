@@ -47,7 +47,7 @@ public class UpdateEventsHandlerIntegrationTest {
   void testHandleRequestSavesEventsToDb() {
     // arrange
     var testTime = Instant.parse("2024-03-20T10:00:00Z");
-    fakeClock.setTime(testTime.toEpochMilli());
+    fakeClock.setTime(testTime);
     var event = new ScheduledEvent();
 
     // create pre-existing Warriors event with old date
@@ -134,7 +134,7 @@ public class UpdateEventsHandlerIntegrationTest {
   void handleRequestShouldDeleteEventsThatNoLongerExistInApi() {
     // arrange
     var testTime = Instant.parse("2024-03-20T10:00:00Z");
-    fakeClock.setTime(testTime.toEpochMilli());
+    fakeClock.setTime(testTime);
     var event = new ScheduledEvent();
 
     // create pre-existing events in DB

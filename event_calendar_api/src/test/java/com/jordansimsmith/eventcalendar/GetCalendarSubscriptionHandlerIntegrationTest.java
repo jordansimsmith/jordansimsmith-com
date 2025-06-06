@@ -44,7 +44,7 @@ public class GetCalendarSubscriptionHandlerIntegrationTest {
   void handleRequestShouldReturnValidICalendarResponse() {
     // arrange
     var now = Instant.parse("2024-03-20T10:00:00Z");
-    fakeClock.setTime(now.toEpochMilli());
+    fakeClock.setTime(now);
 
     var warriors =
         EventCalendarItem.create(

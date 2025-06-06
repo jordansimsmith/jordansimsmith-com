@@ -50,7 +50,7 @@ public class SendDigestHandlerIntegrationTest {
   void handleRequestShouldSendDigestWithNewItemsFromLast24Hours() {
     // arrange
     var currentTime = Instant.ofEpochSecond(2_000_000);
-    fakeClock.setTime(currentTime.toEpochMilli());
+    fakeClock.setTime(currentTime);
     var yesterdayTime = currentTime.minus(1, ChronoUnit.DAYS);
     var twoDaysAgo = currentTime.minus(2, ChronoUnit.DAYS);
 
@@ -108,7 +108,7 @@ public class SendDigestHandlerIntegrationTest {
   void handleRequestShouldNotSendDigestWhenNoNewItems() {
     // arrange
     var currentTime = Instant.ofEpochSecond(2_000_000);
-    fakeClock.setTime(currentTime.toEpochMilli());
+    fakeClock.setTime(currentTime);
     var twoDaysAgo = currentTime.minus(2, ChronoUnit.DAYS);
 
     var searchUrl = "https://www.trademe.co.nz/search?q=wedge";

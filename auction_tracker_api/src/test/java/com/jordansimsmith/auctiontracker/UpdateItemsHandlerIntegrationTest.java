@@ -43,7 +43,7 @@ public class UpdateItemsHandlerIntegrationTest {
   @Test
   void handleRequestShouldStoreNewItems() {
     // arrange
-    fakeClock.setTime(3_000_000);
+    fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var searchUrl =
         "https://www.trademe.co.nz/a/marketplace/sports/golf/search?search_string=wedge";
     var search = new SearchFactory.Search(URI.create(searchUrl), "wedge", null, null, null);
@@ -103,7 +103,7 @@ public class UpdateItemsHandlerIntegrationTest {
   @Test
   void handleRequestShouldNotStoreDuplicateItems() {
     // arrange
-    fakeClock.setTime(3_000_000);
+    fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var searchUrl =
         "https://www.trademe.co.nz/a/marketplace/sports/golf/search?search_string=wedge";
     var search = new SearchFactory.Search(URI.create(searchUrl), "wedge", null, null, null);
@@ -137,7 +137,7 @@ public class UpdateItemsHandlerIntegrationTest {
   @Test
   void handleRequestShouldProcessMultipleSearches() {
     // arrange
-    fakeClock.setTime(3_000_000);
+    fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var search1 =
         new SearchFactory.Search(
             URI.create("https://www.trademe.co.nz/search1"), "term1", null, null, null);
@@ -168,7 +168,7 @@ public class UpdateItemsHandlerIntegrationTest {
   @Test
   void handleRequestShouldHandleEmptySearchResults() {
     // arrange
-    fakeClock.setTime(3_000_000);
+    fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var search =
         new SearchFactory.Search(
             URI.create("https://www.trademe.co.nz/search"), "term", null, null, null);

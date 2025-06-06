@@ -75,7 +75,7 @@ public class UpdatePricesHandlerIntegrationTest {
     priceTrackerTable.putItem(product1History2);
     priceTrackerTable.putItem(product2History1);
 
-    fakeClock.setTime(3_000_000);
+    fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
 
     // act
     updatePricesHandler.handleRequest(new ScheduledEvent(), null);
@@ -141,7 +141,7 @@ public class UpdatePricesHandlerIntegrationTest {
             product1.url().toString(), product1.name(), Instant.ofEpochSecond(2_000), 55.99);
     priceTrackerTable.putItem(product1History);
 
-    fakeClock.setTime(3_000_000);
+    fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
 
     // act
     updatePricesHandler.handleRequest(new ScheduledEvent(), null);
