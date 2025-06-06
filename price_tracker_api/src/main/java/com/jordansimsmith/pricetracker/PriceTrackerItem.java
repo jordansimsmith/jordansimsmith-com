@@ -145,7 +145,7 @@ public class PriceTrackerItem {
   }
 
   public static String formatSk(Instant timestamp) {
-    return TIMESTAMP_PREFIX + timestamp.getEpochSecond();
+    return TIMESTAMP_PREFIX + String.format("%010d", timestamp.getEpochSecond());
   }
 
   public static PriceTrackerItem create(String url, String name, Instant timestamp, double price) {

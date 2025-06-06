@@ -132,7 +132,7 @@ public class SubfootballTrackerItem {
   }
 
   public static String formatSk(Instant timestamp) {
-    return TIMESTAMP_PREFIX + timestamp.getEpochSecond();
+    return TIMESTAMP_PREFIX + String.format("%010d", timestamp.getEpochSecond());
   }
 
   public static SubfootballTrackerItem create(Page page, Instant timestamp, String content) {

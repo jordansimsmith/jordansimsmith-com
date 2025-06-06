@@ -79,7 +79,7 @@ public class UpdateItemsHandlerIntegrationTest {
     assertThat(item1).isNotNull();
     assertThat(item1.getTitle()).isEqualTo("Titleist Wedge");
     assertThat(item1.getPk()).isEqualTo("SEARCH#" + searchUrl);
-    assertThat(item1.getSk()).startsWith("TIMESTAMP#3000");
+    assertThat(item1.getSk()).startsWith("TIMESTAMP#0000003000");
     assertThat(item1.getTimestamp().getEpochSecond()).isEqualTo(3000);
     assertThat(item1.getTtl()).isEqualTo(3000 + 30 * 24 * 60 * 60);
     assertThat(item1.getGsi1pk()).isEqualTo(AuctionTrackerItem.formatGsi1pk(searchUrl));
