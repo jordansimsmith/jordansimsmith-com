@@ -106,12 +106,7 @@ def get_remote_show_progress():
     if weekly_trend_percentage is not None:
         print()
         trend_percentage = round(weekly_trend_percentage)
-        if trend_percentage > 0:
-            print(f"Weekly trend: +{trend_percentage}% (above average).")
-        elif trend_percentage < 0:
-            print(f"Weekly trend: {trend_percentage}% (below average).")
-        else:
-            print("Weekly trend: 0% (at average).")
+        print(f"The weekly trend is {"+" if trend_percentage > 0 else ""}{trend_percentage} compared to the average.")
 
 
 def delete_local_episodes_watched(episodes):
