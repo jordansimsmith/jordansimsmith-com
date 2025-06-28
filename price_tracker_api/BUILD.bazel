@@ -75,6 +75,7 @@ java_library(
         ":dagger",
         ":lib",
         "//lib/dynamodb:lib",
+        "//lib/localstack:lib",
         "//lib/notifications:lib",
         "//lib/testcontainers:lib",
         "//lib/time:lib",

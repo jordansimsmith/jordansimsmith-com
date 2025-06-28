@@ -98,6 +98,7 @@ java_library(
         ":lib",
         "//lib/dynamodb:lib",
         "//lib/json:lib",
+        "//lib/localstack:lib",
         "//lib/testcontainers:lib",
         "//lib/time:lib",
         "@maven//:ch_qos_logback_logback_classic",

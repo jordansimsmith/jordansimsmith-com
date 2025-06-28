@@ -97,6 +97,7 @@ java_library(
         ":dagger",
         ":lib",
         "//lib/dynamodb:lib",
+        "//lib/localstack:lib",
         "//lib/testcontainers:lib",
         "//lib/time:lib",
         "@maven//:ch_qos_logback_logback_classic",

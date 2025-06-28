@@ -165,6 +165,7 @@ java_library(
         ":lib",
         "//lib/dynamodb:lib",
         "//lib/json:lib",
+        "//lib/localstack:lib",
         "//lib/secrets:lib",
         "//lib/testcontainers:lib",
         "//lib/time:lib",
