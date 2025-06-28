@@ -5,8 +5,8 @@ import static org.assertj.core.api.Assertions.within;
 
 import biweekly.Biweekly;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
+import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
-import com.jordansimsmith.testcontainers.DynamoDbContainer;
 import java.time.Instant;
 import java.util.Date;
 import org.junit.jupiter.api.BeforeEach;

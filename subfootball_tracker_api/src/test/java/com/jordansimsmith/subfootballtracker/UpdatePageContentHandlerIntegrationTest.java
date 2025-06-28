@@ -3,9 +3,9 @@ package com.jordansimsmith.subfootballtracker;
 import static org.assertj.core.api.Assertions.*;
 
 import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
+import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.notifications.FakeNotificationPublisher;
-import com.jordansimsmith.testcontainers.DynamoDbContainer;
 import com.jordansimsmith.time.FakeClock;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeEach;

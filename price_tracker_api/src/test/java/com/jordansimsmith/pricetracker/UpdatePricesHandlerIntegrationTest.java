@@ -3,9 +3,9 @@ package com.jordansimsmith.pricetracker;
 import static org.assertj.core.api.Assertions.*;
 
 import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
+import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.notifications.FakeNotificationPublisher;
-import com.jordansimsmith.testcontainers.DynamoDbContainer;
 import com.jordansimsmith.time.FakeClock;
 import java.net.URI;
 import java.time.Instant;

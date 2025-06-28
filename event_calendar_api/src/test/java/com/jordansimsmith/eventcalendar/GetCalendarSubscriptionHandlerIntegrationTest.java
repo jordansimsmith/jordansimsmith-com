@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import biweekly.Biweekly;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
+import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
-import com.jordansimsmith.testcontainers.DynamoDbContainer;
 import com.jordansimsmith.time.FakeClock;
 import java.time.Instant;
 import java.time.LocalDateTime;
