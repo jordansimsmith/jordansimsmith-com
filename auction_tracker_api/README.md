@@ -9,7 +9,7 @@ graph TD
   A[CloudWatch Event] -->|15 minute Trigger| B[Update Items Lambda]
   B -->|Get Search URLs| C[SearchFactory]
   B -->|Scrape Listings| D[Trade Me Client]
-  D -->|Selenium Browser| E[Trade Me Website]
+  D -->|HTTP Requests| E[Trade Me Website]
   B -->|Store Items| F[DynamoDB]
   B -->|LLM Evaluation| G[AWS Bedrock]
   G -->|Log Results| H[CloudWatch Logs]
@@ -36,7 +36,7 @@ graph TD
 
 - Serverless architecture using AWS Lambda
 - Data persistence with DynamoDB using composite keys
-- Web scraping with Selenium headless browser for client-side rendered pages
+- Web scraping with Jsoup HTTP client for server-side rendered pages
 - LLM integration with AWS Bedrock for item evaluation
 - Notification delivery through Amazon SNS
 - Daily digest scheduling with CloudWatch Events
@@ -51,7 +51,7 @@ graph TD
 - DynamoDB for storing auction item data
 - Amazon SNS for email notification delivery
 - AWS Bedrock for LLM-based item evaluation
-- Selenium WebDriver for web scraping client-side rendered pages
+- Jsoup for web scraping server-side rendered pages
 - Java runtime environment
 - AWS CloudWatch Events for scheduled triggers
 - Terraform for infrastructure as code
@@ -61,7 +61,7 @@ graph TD
 
 - `UpdateItemsHandler`: Lambda handler that scrapes Trade Me for new items with GSI-optimized duplicate detection
 - `TradeMeClient`: Client interface for retrieving auction data from Trade Me
-- `SeleniumTradeMeClient`: Implementation using Selenium WebDriver for scraping
+- `JsoupTradeMeClient`: Implementation using Jsoup HTTP client for scraping
 - `SearchFactory`: Factory providing predefined search URLs and criteria
 - `AuctionTrackerItem`: Data model for storing auction data in DynamoDB with GSI support
 - `SendDigestHandler`: Lambda handler that sends daily email summaries
@@ -78,33 +78,32 @@ graph TD
 
 ### Web scraping process
 
-The SeleniumTradeMeClient implements a comprehensive web scraping pipeline for extracting auction data from Trade Me:
+The JsoupTradeMeClient implements a lightweight web scraping pipeline for extracting auction data from Trade Me's server-side rendered content:
 
 #### Search and pagination
 
 1. **Search URL construction**: Builds Trade Me search URLs with encoded search terms and price filters
-2. **Page navigation**: Iterates through search result pages using ChromeDriver with headless browsing
-3. **Result detection**: Waits for search results to load by detecting either result count headers or listing elements
+2. **HTTP requests**: Makes HTTP GET requests to search pages using Jsoup with proper user agent headers
+3. **Result parsing**: Parses HTML response to extract search results and pagination information
 4. **Link extraction**: Extracts individual listing URLs from search pages using CSS selectors (`a[href*='/listing/']`)
-5. **Smart pagination**: Continues to next page until no new listings found or page limit reached (5 pages max)
 
 #### Individual item extraction
 
-1. **Page loading**: Navigates to each listing URL and waits for content to load (15 second timeout)
+1. **HTTP requests**: Makes direct HTTP requests to each listing URL using Jsoup connection
 2. **Title extraction**: Uses CSS selector `h1.tm-marketplace-buyer-options__listing_title, h1.tm-marketplace-koru-listing__title` to extract item titles
 3. **Content extraction**: Gathers all text from `.tm-marketplace-listing-body__container, .tm-marketplace-koru-listing__body` elements for descriptions
 4. **Text processing**:
    - Joins multiple content sections with spaces
    - Normalizes whitespace and removes excessive formatting
    - Truncates descriptions to 1000 characters for storage efficiency
-5. **Error handling**: Logs and continues processing when individual listings timeout or fail
+5. **Error handling**: Implements retry logic with exponential backoff for failed requests
 
 #### Technical details
 
-- **Browser configuration**: Uses Chrome with headless mode, no-sandbox, and optimized window size
-- **Wait strategy**: Implements explicit waits using WebDriverWait for reliable element detection
+- **HTTP client**: Uses Jsoup's built-in HTTP client with connection pooling
+- **Retry strategy**: Implements exponential backoff with jitter for failed requests
 - **CSS selectors**: Uses specific Trade Me CSS classes validated through testing
-- **Timeout handling**: 30-second timeout per page with graceful failure for slow-loading listings
+- **Timeout handling**: Configurable request timeouts with graceful failure for slow responses
 
 ### Data schema
 

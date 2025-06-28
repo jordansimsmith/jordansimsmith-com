@@ -26,6 +26,6 @@ public class AuctionTrackerModule {
   @Provides
   @Singleton
   public TradeMeClient tradeMeClient() {
-    return new SeleniumTradeMeClient();
+    return new JsoupTradeMeClient();
   }
 }

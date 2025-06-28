@@ -3,6 +3,8 @@ common --java_runtime_version=remotejdk_17
 common --tool_java_language_version=17
 common --tool_java_runtime_version=remotejdk_17
 
+common --noincompatible_enable_cc_toolchain_resolution
+
 test --test_output=errors
 test --verbose_failures
 test --test_env=TVDB_API_KEY
