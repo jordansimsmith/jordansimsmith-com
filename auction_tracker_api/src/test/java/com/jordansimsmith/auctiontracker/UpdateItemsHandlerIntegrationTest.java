@@ -44,9 +44,10 @@ public class UpdateItemsHandlerIntegrationTest {
   void handleRequestShouldStoreNewItems() {
     // arrange
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
-    var searchUrl =
-        "https://www.trademe.co.nz/a/marketplace/sports/golf/search?search_string=wedge";
-    var search = new SearchFactory.Search(URI.create(searchUrl), "wedge", null, null, null);
+    var baseUrl = "https://www.trademe.co.nz/a/marketplace/sports/golf/search";
+    var expectedSearchUrl =
+        "https://www.trademe.co.nz/a/marketplace/sports/golf/search?search_string=wedge&sort_order=expirydesc";
+    var search = new SearchFactory.Search(URI.create(baseUrl), "wedge", null, null, null);
     fakeSearchFactory.addSearches(List.of(search));
 
     var tradeMeItems =
@@ -59,7 +60,7 @@ public class UpdateItemsHandlerIntegrationTest {
                 "https://www.trademe.co.nz/a/marketplace/sports/golf/listing/456",
                 "Cleveland Wedge",
                 "Another wedge"));
-    fakeTradeMeClient.addSearchResponse(URI.create(searchUrl), "wedge", tradeMeItems);
+    fakeTradeMeClient.addSearchResponse(URI.create(baseUrl), "wedge", null, null, tradeMeItems);
 
     // act
     updateItemsHandler.handleRequest(new ScheduledEvent(), null);
@@ -78,11 +79,11 @@ public class UpdateItemsHandlerIntegrationTest {
             .orElse(null);
     assertThat(item1).isNotNull();
     assertThat(item1.getTitle()).isEqualTo("Titleist Wedge");
-    assertThat(item1.getPk()).isEqualTo("SEARCH#" + searchUrl);
+    assertThat(item1.getPk()).isEqualTo("SEARCH#" + expectedSearchUrl);
     assertThat(item1.getSk()).startsWith("TIMESTAMP#0000003000");
     assertThat(item1.getTimestamp().getEpochSecond()).isEqualTo(3000);
     assertThat(item1.getTtl()).isEqualTo(3000 + 30 * 24 * 60 * 60);
-    assertThat(item1.getGsi1pk()).isEqualTo(AuctionTrackerItem.formatGsi1pk(searchUrl));
+    assertThat(item1.getGsi1pk()).isEqualTo(AuctionTrackerItem.formatGsi1pk(expectedSearchUrl));
     assertThat(item1.getGsi1sk())
         .isEqualTo(
             AuctionTrackerItem.formatGsi1sk(
@@ -104,9 +105,10 @@ public class UpdateItemsHandlerIntegrationTest {
   void handleRequestShouldNotStoreDuplicateItems() {
     // arrange
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
-    var searchUrl =
-        "https://www.trademe.co.nz/a/marketplace/sports/golf/search?search_string=wedge";
-    var search = new SearchFactory.Search(URI.create(searchUrl), "wedge", null, null, null);
+    var baseUrl = "https://www.trademe.co.nz/a/marketplace/sports/golf/search";
+    var expectedSearchUrl =
+        "https://www.trademe.co.nz/a/marketplace/sports/golf/search?search_string=wedge&sort_order=expirydesc";
+    var search = new SearchFactory.Search(URI.create(baseUrl), "wedge", null, null, null);
     fakeSearchFactory.addSearches(List.of(search));
 
     var tradeMeItem =
@@ -114,12 +116,13 @@ public class UpdateItemsHandlerIntegrationTest {
             "https://www.trademe.co.nz/a/marketplace/sports/golf/listing/123",
             "Titleist Wedge",
             "Great condition wedge");
-    fakeTradeMeClient.addSearchResponse(URI.create(searchUrl), "wedge", List.of(tradeMeItem));
+    fakeTradeMeClient.addSearchResponse(
+        URI.create(baseUrl), "wedge", null, null, List.of(tradeMeItem));
 
     // store item first time
     var existingItem =
         AuctionTrackerItem.create(
-            searchUrl,
+            expectedSearchUrl,
             "https://www.trademe.co.nz/a/marketplace/sports/golf/listing/123",
             "Titleist Wedge",
             Instant.ofEpochSecond(2000));
@@ -149,10 +152,14 @@ public class UpdateItemsHandlerIntegrationTest {
     fakeTradeMeClient.addSearchResponse(
         URI.create("https://www.trademe.co.nz/search1"),
         "term1",
+        null,
+        null,
         List.of(new TradeMeClient.TradeMeItem("url1", "title1", "desc1")));
     fakeTradeMeClient.addSearchResponse(
         URI.create("https://www.trademe.co.nz/search2"),
         "term2",
+        100.0,
+        200.0,
         List.of(new TradeMeClient.TradeMeItem("url2", "title2", "desc2")));
 
     // act
@@ -174,7 +181,7 @@ public class UpdateItemsHandlerIntegrationTest {
             URI.create("https://www.trademe.co.nz/search"), "term", null, null, null);
     fakeSearchFactory.addSearches(List.of(search));
     fakeTradeMeClient.addSearchResponse(
-        URI.create("https://www.trademe.co.nz/search"), "term", List.of());
+        URI.create("https://www.trademe.co.nz/search"), "term", null, null, List.of());
 
     // act
     updateItemsHandler.handleRequest(new ScheduledEvent(), null);

@@ -11,6 +11,7 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbIndex;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpdateItemsHandler.class);
@@ -59,7 +60,7 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
         tradeMeClient.searchItems(
             search.baseUrl(), search.searchTerm(), search.minPrice(), search.maxPrice());
 
-    var searchUrl = search.baseUrl().toString();
+    var searchUrl = tradeMeClient.getSearchUrl(search).toString();
     var currentTime = clock.now();
 
     for (var tradeMeItem : tradeMeItems) {
@@ -74,13 +75,17 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
   }
 
   private boolean itemExists(String searchUrl, String itemUrl) {
-    var queryConditional =
-        QueryConditional.keyEqualTo(
-            Key.builder()
-                .partitionValue(AuctionTrackerItem.formatGsi1pk(searchUrl))
-                .sortValue(AuctionTrackerItem.formatGsi1sk(itemUrl))
-                .build());
-    return gsi1.query(queryConditional).stream()
+    return gsi1
+        .query(
+            QueryEnhancedRequest.builder()
+                .queryConditional(
+                    QueryConditional.keyEqualTo(
+                        Key.builder()
+                            .partitionValue(AuctionTrackerItem.formatGsi1pk(searchUrl))
+                            .sortValue(AuctionTrackerItem.formatGsi1sk(itemUrl))
+                            .build()))
+                .build())
+        .stream()
         .flatMap(page -> page.items().stream())
         .findFirst()
         .isPresent();

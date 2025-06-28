@@ -188,7 +188,7 @@ public class AuctionTrackerItem {
   }
 
   public static String formatGsi1pk(String searchUrl) {
-    return formatPk(searchUrl);
+    return SEARCH_PREFIX + searchUrl;
   }
 
   public static String formatGsi1sk(String itemUrl) {

@@ -50,28 +50,30 @@ public class SendDigestHandlerIntegrationTest {
     var yesterdayTime = currentTime.minus(1, ChronoUnit.DAYS);
     var twoDaysAgo = currentTime.minus(2, ChronoUnit.DAYS);
 
-    var searchUrl = "https://www.trademe.co.nz/search?q=wedge";
-    var search = new SearchFactory.Search(URI.create(searchUrl), "wedge", null, null, null);
+    var baseUrl = "https://www.trademe.co.nz/search";
+    var expectedSearchUrl =
+        "https://www.trademe.co.nz/search?search_string=wedge&sort_order=expirydesc";
+    var search = new SearchFactory.Search(URI.create(baseUrl), "wedge", null, null, null);
     fakeSearchFactory.addSearches(List.of(search));
 
     // create items - some within 24h, some older
     var recentItem1 =
         AuctionTrackerItem.create(
-            searchUrl,
+            expectedSearchUrl,
             "https://www.trademe.co.nz/listing/123",
             "Recent Wedge 1",
             yesterdayTime.plus(1, ChronoUnit.HOURS) // 23 hours ago
             );
     var recentItem2 =
         AuctionTrackerItem.create(
-            searchUrl,
+            expectedSearchUrl,
             "https://www.trademe.co.nz/listing/456",
             "Recent Wedge 2",
             yesterdayTime.plus(2, ChronoUnit.HOURS) // 22 hours ago
             );
     var oldItem =
         AuctionTrackerItem.create(
-            searchUrl, "https://www.trademe.co.nz/listing/789", "Old Wedge", twoDaysAgo);
+            expectedSearchUrl, "https://www.trademe.co.nz/listing/789", "Old Wedge", twoDaysAgo);
 
     auctionTrackerTable.putItem(recentItem1);
     auctionTrackerTable.putItem(recentItem2);
@@ -107,14 +109,16 @@ public class SendDigestHandlerIntegrationTest {
     fakeClock.setTime(currentTime);
     var twoDaysAgo = currentTime.minus(2, ChronoUnit.DAYS);
 
-    var searchUrl = "https://www.trademe.co.nz/search?q=wedge";
-    var search = new SearchFactory.Search(URI.create(searchUrl), "wedge", null, null, null);
+    var baseUrl = "https://www.trademe.co.nz/search";
+    var expectedSearchUrl =
+        "https://www.trademe.co.nz/search?search_string=wedge&sort_order=expirydesc";
+    var search = new SearchFactory.Search(URI.create(baseUrl), "wedge", null, null, null);
     fakeSearchFactory.addSearches(List.of(search));
 
     // create only old items
     var oldItem =
         AuctionTrackerItem.create(
-            searchUrl, "https://www.trademe.co.nz/listing/789", "Old Wedge", twoDaysAgo);
+            expectedSearchUrl, "https://www.trademe.co.nz/listing/789", "Old Wedge", twoDaysAgo);
     auctionTrackerTable.putItem(oldItem);
 
     // act

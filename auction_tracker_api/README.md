@@ -109,7 +109,7 @@ The JsoupTradeMeClient implements a lightweight web scraping pipeline for extrac
 
 DynamoDB table structure:
 
-- **Partition Key**: pk (String) - Trade Me search URL with prefix
+- **Partition Key**: pk (String) - Complete Trade Me search URL with query parameters and prefix
 - **Sort Key**: sk (String) - Timestamp + Trade Me item URL with prefixes
 - **Attributes**:
   - title (String) - Auction item title
@@ -117,12 +117,12 @@ DynamoDB table structure:
   - timestamp (Number) - Item creation timestamp (epoch seconds)
   - ttl (Number) - Time to live expiry timestamp (30 days from item creation)
   - version (Number) - Optimistic locking version
-  - gsi1pk (String) - GSI partition key (prefixed search URL)
+  - gsi1pk (String) - GSI partition key (prefixed complete search URL)
   - gsi1sk (String) - GSI sort key (prefixed item URL)
 
-**Global Secondary Index (GSI1)**:
+**Global Secondary Index (gsi1)**:
 
-- **GSI Partition Key**: gsi1pk (String) - Prefixed Trade Me search URL (`SEARCH#<url>`)
+- **GSI Partition Key**: gsi1pk (String) - Prefixed complete Trade Me search URL with parameters (`SEARCH#<full_search_url>`)
 - **GSI Sort Key**: gsi1sk (String) - Prefixed Trade Me item URL (`ITEM#<url>`)
 - **Purpose**: Efficient duplicate detection using direct key lookup with consistent prefixing
 
@@ -131,7 +131,7 @@ Example DynamoDB item:
 ```json
 {
   "pk": {
-    "S": "SEARCH#https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/search?search_string=titleist%20wedge"
+    "S": "SEARCH#https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/search?search_string=titleist%20wedge&price_max=70&sort_order=expirydesc"
   },
   "sk": {
     "S": "TIMESTAMP#1748489155ITEM#https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003621"
@@ -152,7 +152,7 @@ Example DynamoDB item:
     "N": "1"
   },
   "gsi1pk": {
-    "S": "SEARCH#https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/search?search_string=titleist%20wedge"
+    "S": "SEARCH#https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/search?search_string=titleist%20wedge&price_max=70&sort_order=expirydesc"
   },
   "gsi1sk": {
     "S": "ITEM#https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003621"
@@ -162,10 +162,10 @@ Example DynamoDB item:
 
 ### Duplicate detection optimization
 
-The service uses a Global Secondary Index (GSI1) for efficient duplicate detection:
+The service uses a Global Secondary Index (gsi1) for efficient duplicate detection:
 
 - **Performance**: O(1) direct key lookup instead of O(n) table scan
-- **Implementation**: Query GSI1 using `formatGsi1pk()` and `formatGsi1sk()` methods for consistent key formation
+- **Implementation**: Query gsi1 using `formatGsi1pk()` and `formatGsi1sk()` methods for consistent key formation
 - **Key Format**: GSI keys use same prefixes as main table (`SEARCH#` and `ITEM#`) for consistency
 - **Benefits**: Scales efficiently with large datasets and reduces DynamoDB read costs
 - **Pattern**: Uses stream-based query processing with page flattening for reliable existence checking

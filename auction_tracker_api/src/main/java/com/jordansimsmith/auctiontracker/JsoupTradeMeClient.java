@@ -3,6 +3,7 @@ package com.jordansimsmith.auctiontracker;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -75,7 +76,12 @@ public class JsoupTradeMeClient implements TradeMeClient {
     return itemUrls;
   }
 
-  private TradeMeItem parseItemPage(Document itemPage, String url) {
+  private String stripQueryParams(String url) throws URISyntaxException {
+    var uri = new URI(url);
+    return new URI(uri.getScheme(), uri.getAuthority(), uri.getPath(), null, null).toString();
+  }
+
+  private TradeMeItem parseItemPage(Document itemPage, String url) throws URISyntaxException {
     // extract title using specific CSS selectors
     var titleElements =
         itemPage.select(
@@ -106,7 +112,7 @@ public class JsoupTradeMeClient implements TradeMeClient {
       description = description.substring(0, 1000) + "...";
     }
 
-    return new TradeMeItem(url, title, description);
+    return new TradeMeItem(stripQueryParams(url), title, description);
   }
 
   private String buildSearchUrl(
@@ -127,6 +133,13 @@ public class JsoupTradeMeClient implements TradeMeClient {
     url += "&sort_order=expirydesc";
 
     return url;
+  }
+
+  @Override
+  public URI getSearchUrl(SearchFactory.Search search) {
+    var urlString =
+        buildSearchUrl(search.baseUrl(), search.searchTerm(), search.minPrice(), search.maxPrice());
+    return URI.create(urlString);
   }
 
   @VisibleForTesting

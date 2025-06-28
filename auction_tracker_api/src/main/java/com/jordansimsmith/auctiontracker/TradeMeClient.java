@@ -9,4 +9,6 @@ public interface TradeMeClient {
 
   List<TradeMeItem> searchItems(
       URI baseUrl, String searchTerm, @Nullable Double minPrice, @Nullable Double maxPrice);
+
+  URI getSearchUrl(SearchFactory.Search search);
 }

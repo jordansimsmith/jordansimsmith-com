@@ -23,6 +23,7 @@ public class SendDigestHandler implements RequestHandler<ScheduledEvent, Void> {
 
   private final Clock clock;
   private final SearchFactory searchFactory;
+  private final TradeMeClient tradeMeClient;
   private final NotificationPublisher notificationPublisher;
   private final DynamoDbTable<AuctionTrackerItem> auctionTrackerTable;
 
@@ -34,6 +35,7 @@ public class SendDigestHandler implements RequestHandler<ScheduledEvent, Void> {
   SendDigestHandler(AuctionTrackerFactory factory) {
     this.clock = factory.clock();
     this.searchFactory = factory.searchFactory();
+    this.tradeMeClient = factory.tradeMeClient();
     this.notificationPublisher = factory.notificationPublisher();
     this.auctionTrackerTable = factory.auctionTrackerTable();
   }
@@ -56,7 +58,10 @@ public class SendDigestHandler implements RequestHandler<ScheduledEvent, Void> {
     var allNewItems =
         searches.stream()
             .flatMap(
-                search -> getNewItemsForSearch(search.baseUrl().toString(), yesterdayTime).stream())
+                search ->
+                    getNewItemsForSearch(
+                        tradeMeClient.getSearchUrl(search).toString(), yesterdayTime)
+                        .stream())
             .collect(Collectors.toList());
 
     if (allNewItems.isEmpty()) {

@@ -24,7 +24,9 @@ locals {
     "price_tracker_api_update_prices",
     "football_calendar_api_update_fixtures",
     "event_calendar_api_update_events",
-    "subfootball_tracker_api_update_page_content"
+    "subfootball_tracker_api_update_page_content",
+    "auction_tracker_api_update_items_handler",
+    "auction_tracker_api_send_digest_handler"
   ]
 
   subscriptions = ["jordansimsmith@gmail.com"]

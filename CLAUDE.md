@@ -17,12 +17,13 @@ Before starting any task involving a specific project (e.g., auction_tracker_api
 - Format code: `bazel run //:format`
 - Tidy Bazel modules: `bazel mod tidy`
 
-## Format changes after task completion
+## Format changes and test after task completion
 
 Always run these commands after completing a task:
 
 1. First, tidy up Bazel module dependencies: `bazel mod tidy`
 2. Then format all code files: `bazel run //:format`
+3. Finally, run tests to ensure everything works: `bazel test //...` (or scope to directories changed, e.g., `bazel test //auction_tracker_api:all`)
 
 These commands should be run:
 
