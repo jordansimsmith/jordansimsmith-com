@@ -1,5 +1,6 @@
 import boto3
 import json
+import time
 
 region_name = "ap-southeast-2"
 endpoint_url = "http://localhost:4566"
@@ -14,12 +15,11 @@ dynamodb_client = boto3.client(
 sqs_client = boto3.client("sqs", endpoint_url=endpoint_url, region_name=region_name)
 sns_client = boto3.client("sns", endpoint_url=endpoint_url, region_name=region_name)
 
-# Create SNS topic for price updates
-topic_name = "price_tracker_api_price_updates"
+topic_name = "auction_tracker_api_digest"
 topic_response = sns_client.create_topic(Name=topic_name)
 topic_arn = topic_response["TopicArn"]
 
-queue_name = "price-tracker-test-queue"
+queue_name = "auction-tracker-test-queue"
 queue_url = sqs_client.create_queue(QueueName=queue_name)["QueueUrl"]
 queue_attributes = sqs_client.get_queue_attributes(
     QueueUrl=queue_url, AttributeNames=["QueueArn"]
@@ -42,23 +42,41 @@ sqs_client.set_queue_attributes(
     QueueUrl=queue_url, Attributes={"Policy": json.dumps(queue_policy)}
 )
 
-# Subscribe SQS queue to SNS topic
 sns_client.subscribe(TopicArn=topic_arn, Protocol="sqs", Endpoint=queue_arn)
 
-table_name = "price_tracker"
+table_name = "auction_tracker"
 dynamodb_client.create_table(
     TableName=table_name,
     AttributeDefinitions=[
         {"AttributeName": "pk", "AttributeType": "S"},
         {"AttributeName": "sk", "AttributeType": "S"},
+        {"AttributeName": "gsi1pk", "AttributeType": "S"},
+        {"AttributeName": "gsi1sk", "AttributeType": "S"},
     ],
     KeySchema=[
         {"AttributeName": "pk", "KeyType": "HASH"},
         {"AttributeName": "sk", "KeyType": "RANGE"},
     ],
+    GlobalSecondaryIndexes=[
+        {
+            "IndexName": "gsi1",
+            "KeySchema": [
+                {"AttributeName": "gsi1pk", "KeyType": "HASH"},
+                {"AttributeName": "gsi1sk", "KeyType": "RANGE"},
+            ],
+            "Projection": {"ProjectionType": "ALL"},
+        }
+    ],
     BillingMode="PAY_PER_REQUEST",
 )
 dynamodb_client.get_waiter("table_exists").wait(TableName=table_name)
+
+while True:
+    table_desc = dynamodb_client.describe_table(TableName=table_name)
+    gsi_status = table_desc["Table"]["GlobalSecondaryIndexes"][0]["IndexStatus"]
+    if gsi_status == "ACTIVE":
+        break
+    time.sleep(1)
 
 role_name = "lambda-execution-role"
 policy_name = "lambda-execution-policy"
@@ -88,10 +106,15 @@ iam_client.put_role_policy(
 
 configs = [
     {
-        "function_name": "update_prices_handler",
-        "handler_name": "com.jordansimsmith.pricetracker.UpdatePricesHandler",
-        "zip_file": "update-prices-handler_deploy.jar",
-    }
+        "function_name": "update_items_handler",
+        "handler_name": "com.jordansimsmith.auctiontracker.UpdateItemsHandler",
+        "zip_file": "update-items-handler_deploy.jar",
+    },
+    {
+        "function_name": "send_digest_handler",
+        "handler_name": "com.jordansimsmith.auctiontracker.SendDigestHandler",
+        "zip_file": "send-digest-handler_deploy.jar",
+    },
 ]
 
 for config in configs:
@@ -105,7 +128,8 @@ for config in configs:
         Handler=config["handler_name"],
         Code={"ZipFile": zip_file_bytes},
         Timeout=120,
-        MemorySize=1024,
+        MemorySize=4096,
+        Architectures=["x86_64"],
     )["FunctionArn"]
     lambda_client.get_waiter("function_active_v2").wait(
         FunctionName=config["function_name"]
