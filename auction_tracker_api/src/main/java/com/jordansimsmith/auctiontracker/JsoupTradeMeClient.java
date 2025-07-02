@@ -40,8 +40,8 @@ public class JsoupTradeMeClient implements TradeMeClient {
     var itemUrls = extractItemUrls(searchPage);
 
     // check for pagination and warn if more results exist
-    var paginationElements = searchPage.select(".tm-search-results__pagination");
-    if (!paginationElements.isEmpty()) {
+    var nextPageLinks = searchPage.select(".tm-search-results__pagination a:contains(Next)");
+    if (!nextPageLinks.isEmpty()) {
       LOGGER.warn(
           "Pagination detected on search results page - only processing first page of results."
               + " Consider narrowing search criteria to fit results on one page.");
@@ -53,7 +53,9 @@ public class JsoupTradeMeClient implements TradeMeClient {
       try {
         var itemPage = fetchDocument(itemUrl);
         var item = parseItemPage(itemPage, itemUrl);
-        items.add(item);
+        if (item != null) {
+          items.add(item);
+        }
       } catch (Exception e) {
         LOGGER.warn("Failed to fetch item details for {}: {}", itemUrl, e.getMessage());
       }
@@ -81,6 +83,7 @@ public class JsoupTradeMeClient implements TradeMeClient {
     return new URI(uri.getScheme(), uri.getAuthority(), uri.getPath(), null, null).toString();
   }
 
+  @Nullable
   private TradeMeItem parseItemPage(Document itemPage, String url) throws URISyntaxException {
     // extract title using specific CSS selectors
     var titleElements =
@@ -91,6 +94,14 @@ public class JsoupTradeMeClient implements TradeMeClient {
       throw new RuntimeException("Could not find title element on page: " + url);
     }
     var title = titleElements.first().text().trim();
+
+    // check if reserve has been met - skip items with unmet reserves
+    var reserveElements = itemPage.select(".tm-koru-auction__reserve-state");
+    if (!reserveElements.isEmpty()
+        && reserveElements.first().text().trim().contains("Reserve not met")) {
+      LOGGER.info("Skipping item with unmet reserve: {}", url);
+      return null;
+    }
 
     // extract description from listing body
     var descriptionElements =

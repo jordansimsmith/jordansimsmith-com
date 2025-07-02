@@ -90,6 +90,51 @@ public class JsoupTradeMeClientTest {
       </html>
       """;
 
+  private static final String SEARCH_HTML_WITH_RESERVE_NOT_MET =
+      """
+      <html>
+        <body>
+          <div class="tm-search-results">
+            <a href="/a/marketplace/sports/golf/wedges-chippers/listing/5337003625">Golf Wedge with Reserve</a>
+            <a href="/a/marketplace/sports/golf/wedges-chippers/listing/5337003626">Regular Golf Wedge</a>
+          </div>
+        </body>
+      </html>
+      """;
+
+  private static final String ITEM_WITH_RESERVE_NOT_MET_HTML =
+      """
+      <html>
+        <body>
+          <h1 class="tm-marketplace-koru-listing__title">Golf Wedge with Unmet Reserve</h1>
+          <div class="tm-marketplace-koru-listing__body">
+            <p>Nice golf wedge in good condition.</p>
+            <p>Starting bid is lower than reserve price.</p>
+          </div>
+          <div class="tm-marketplace-koru-listing__commerce-box">
+            <div class="tm-koru-commerce-box__container">
+              <div class="tm-koru-auction">
+                <p class="tm-koru-auction__reserve-state"> Reserve not met </p>
+              </div>
+            </div>
+          </div>
+        </body>
+      </html>
+      """;
+
+  private static final String REGULAR_ITEM_HTML =
+      """
+      <html>
+        <body>
+          <h1 class="tm-marketplace-koru-listing__title">Regular Golf Wedge</h1>
+          <div class="tm-marketplace-koru-listing__body">
+            <p>Regular golf wedge without reserve issues.</p>
+            <p>Available for purchase now.</p>
+          </div>
+        </body>
+      </html>
+      """;
+
   private JsoupTradeMeClient client;
 
   @BeforeEach
@@ -104,6 +149,8 @@ public class JsoupTradeMeClientTest {
                   .parse(SEARCH_HTML, BASE_URL);
               case BASE_URL + "?search_string=query+param+test&sort_order=expirydesc" -> Jsoup
                   .parse(SEARCH_HTML_WITH_QUERY_PARAMS, BASE_URL);
+              case BASE_URL + "?search_string=reserve+test&sort_order=expirydesc" -> Jsoup.parse(
+                  SEARCH_HTML_WITH_RESERVE_NOT_MET, BASE_URL);
               case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003621" -> Jsoup
                   .parse(ITEM1_HTML);
               case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003622" -> Jsoup
@@ -112,6 +159,10 @@ public class JsoupTradeMeClientTest {
                   .parse(ITEM3_HTML);
               case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003624?rsqid=xyz789-uvw012&ref=search" -> Jsoup
                   .parse(ITEM4_HTML);
+              case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003625" -> Jsoup
+                  .parse(ITEM_WITH_RESERVE_NOT_MET_HTML);
+              case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003626" -> Jsoup
+                  .parse(REGULAR_ITEM_HTML);
               default -> throw new AssertionError("Unexpected URL in test: " + url);
             };
           }
@@ -217,5 +268,32 @@ public class JsoupTradeMeClientTest {
         .doesNotContain("rsqid")
         .doesNotContain("ref")
         .doesNotContain("?");
+  }
+
+  @Test
+  void searchItemsShouldFilterOutListingsWithUnmetReserves() {
+    // arrange
+    var baseUrl = URI.create(BASE_URL);
+    var searchTerm = "reserve test";
+    Double minPrice = null;
+    Double maxPrice = null;
+
+    // act
+    var items = client.searchItems(baseUrl, searchTerm, minPrice, maxPrice);
+
+    // assert
+    assertThat(items).hasSize(1);
+
+    // verify only the item without reserve issues is returned
+    var item = items.get(0);
+    assertThat(item.title()).isEqualTo("Regular Golf Wedge");
+    assertThat(item.url())
+        .isEqualTo(
+            "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003626");
+    assertThat(item.description()).contains("Regular golf wedge without reserve issues");
+
+    // verify the item with unmet reserve was filtered out
+    var hasUnmetReserveItem = items.stream().anyMatch(i -> i.url().contains("5337003625"));
+    assertThat(hasUnmetReserveItem).as("Item with unmet reserve should be filtered out").isFalse();
   }
 }

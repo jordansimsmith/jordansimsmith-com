@@ -8,3 +8,4 @@ bazel-*
 **/node_modules/
 pnpm-debug.log*
 .ruff_cache/
+**/.DS_Store
