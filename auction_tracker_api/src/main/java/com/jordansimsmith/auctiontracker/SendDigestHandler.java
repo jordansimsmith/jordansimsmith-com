@@ -102,11 +102,10 @@ public class SendDigestHandler implements RequestHandler<ScheduledEvent, Void> {
     messageBuilder.append("New auction items found in the last 24 hours:\n\n");
 
     for (var item : items) {
-      messageBuilder.append("• ").append(item.getTitle()).append("\n");
-      messageBuilder.append("  ").append(item.getUrl()).append("\n\n");
+      messageBuilder.append(item.getTitle()).append("\n");
+      messageBuilder.append(item.getUrl()).append("\n\n");
     }
 
-    messageBuilder.append("Total: ").append(items.size()).append(" new items");
     return messageBuilder.toString();
   }
 }

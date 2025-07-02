@@ -8,31 +8,31 @@ public class SearchFactoryImpl implements SearchFactory {
       List.of(
           new Search(
               URI.create(
-                  "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/search"),
-              "titleist wedge",
+                  "https://www.trademe.co.nz/a/marketplace/sports/golf/irons/steel-shaft/search"),
+              "titleist #9 iron",
               null,
-              70.0,
+              75.0,
               null),
           new Search(
               URI.create(
-                  "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/search"),
-              "ping wedge",
+                  "https://www.trademe.co.nz/a/marketplace/sports/golf/irons/steel-shaft/search"),
+              "ping #9 iron",
               null,
-              70.0,
+              75.0,
               null),
           new Search(
               URI.create(
-                  "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/search"),
-              "taylormade wedge",
+                  "https://www.trademe.co.nz/a/marketplace/sports/golf/irons/steel-shaft/search"),
+              "taylormade #9 iron",
               null,
-              70.0,
+              75.0,
               null),
           new Search(
               URI.create(
-                  "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/search"),
-              "callaway wedge",
+                  "https://www.trademe.co.nz/a/marketplace/sports/golf/irons/steel-shaft/search"),
+              "callaway #9 iron",
               null,
-              70.0,
+              75.0,
               null));
 
   @Override

@@ -93,13 +93,13 @@ public class SendDigestHandlerIntegrationTest {
             """
         New auction items found in the last 24 hours:
 
-        • Recent Wedge 1
-          https://www.trademe.co.nz/listing/123
+        Recent Wedge 1
+        https://www.trademe.co.nz/listing/123
 
-        • Recent Wedge 2
-          https://www.trademe.co.nz/listing/456
+        Recent Wedge 2
+        https://www.trademe.co.nz/listing/456
 
-        Total: 2 new items""");
+        """);
   }
 
   @Test
