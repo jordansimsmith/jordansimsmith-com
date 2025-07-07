@@ -24,6 +24,9 @@ def main():
 
     get_remote_show_progress()
 
+    if local_episodes_watched or youtube_video_ids:
+        print()
+
     if len(local_episodes_watched):
         delete_local_episodes_watched(local_episodes_watched)
         delete_completed_shows(local_episodes_watched)
@@ -112,23 +115,24 @@ def get_remote_show_progress():
     print()
     print(f"{episodes_watched_today} episodes watched today.")
     print(f"{youtube_videos_watched_today} YouTube videos watched today.")
-    print(f"{total_hours_watched} total hours watched.")
     print()
     print(
-        f"{years_since_first_episode} year{'' if years_since_first_episode == 1 else 's'} and {months_since_first_episode} month{'' if months_since_first_episode == 1 else 's'} since immersion started."
+        f"{total_hours_watched} total hour{'' if total_hours_watched == 1 else 's'} watched."
     )
 
     weekly_trend_percentage = res.get("weekly_trend_percentage")
     if weekly_trend_percentage is not None:
-        print()
         trend_percentage = round(weekly_trend_percentage)
         print(
             f"This week's activity is {'+' if trend_percentage > 0 else ''}{trend_percentage}% compared to the average."
         )
 
+    print(
+        f"{years_since_first_episode} year{'' if years_since_first_episode == 1 else 's'} and {months_since_first_episode} month{'' if months_since_first_episode == 1 else 's'} since immersion started."
+    )
+
 
 def delete_local_episodes_watched(episodes):
-    print()
     print(f"Deleting {len(episodes)} local episodes watched...")
 
     size_bytes = 0
@@ -201,11 +205,11 @@ def sync_youtube_videos_watched(video_ids):
 
 
 def clear_youtube_watched_file():
+    print(f"Clearing YouTube videos watched...")
     youtube_file = "youtube_watched.txt"
     if os.path.isfile(youtube_file):
         # Clear the file contents
         open(youtube_file, "w").close()
-        print(f"Cleared {youtube_file}.")
 
 
 def send_request(method, path, body=None):

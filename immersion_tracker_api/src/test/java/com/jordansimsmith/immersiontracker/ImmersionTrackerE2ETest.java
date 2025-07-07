@@ -131,8 +131,8 @@ public class ImmersionTrackerE2ETest {
 
         4 episodes watched today.
         0 YouTube videos watched today.
-        1 total hours watched.
 
+        1 total hour watched.
         0 years and 0 months since immersion started.
 
         Deleting 4 local episodes watched...
@@ -209,10 +209,11 @@ public class ImmersionTrackerE2ETest {
 
         0 episodes watched today.
         2 YouTube videos watched today.
-        0 total hours watched.
 
+        0 total hours watched.
         0 years and 0 months since immersion started.
-        Cleared youtube_watched.txt.
+
+        Clearing YouTube videos watched...
 
         Press ENTER to close...""";
     assertThat(output).isEqualTo(expectedOutput);
