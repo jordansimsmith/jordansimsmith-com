@@ -79,7 +79,6 @@ public class GetProgressHandler
       throws Exception {
     var user = event.getQueryStringParameters().get("user");
     Preconditions.checkNotNull(user);
-    var now = clock.now();
 
     var query =
         immersionTrackerTable.query(
@@ -88,7 +87,6 @@ public class GetProgressHandler
                     QueryConditional.keyEqualTo(
                         b -> b.partitionValue(ImmersionTrackerItem.formatPk(user))))
                 .build());
-
     var items = query.items().stream().toList();
 
     var episodes =
@@ -102,18 +100,62 @@ public class GetProgressHandler
             .filter(i -> i.getSk().startsWith(ImmersionTrackerItem.YOUTUBEVIDEO_PREFIX))
             .toList();
 
-    var totalEpisodesWatched = episodes.size();
-    var youtubeVideosWatched = youtubeVideos.size();
+    var now = clock.now();
+    var today = now.atZone(ZONE_ID).truncatedTo(ChronoUnit.DAYS).toInstant();
+
+    var totalEpisodesWatched = totalEpisodesWatched(episodes);
+    var totalHoursWatched = totalHoursWatched(episodes, youtubeVideos);
+    var episodesWatchedToday = episodesWatchedToday(episodes, today);
+    var youtubeVideosWatched = youtubeVideosWatched(youtubeVideos);
+    var youtubeVideosWatchedToday = youtubeVideosWatchedToday(youtubeVideos, today);
+    var daysSinceFirstEpisode = daysSinceFirstEpisode(episodes, youtubeVideos, now);
+    var weeklyTrendPercentage =
+        weeklyTrendPercentage(episodes, youtubeVideos, now, daysSinceFirstEpisode);
+    var progresses = shows(episodes, shows);
+
+    var res =
+        new GetProgressResponse(
+            totalEpisodesWatched,
+            totalHoursWatched,
+            episodesWatchedToday,
+            youtubeVideosWatched,
+            youtubeVideosWatchedToday,
+            daysSinceFirstEpisode,
+            weeklyTrendPercentage,
+            progresses);
+
+    return APIGatewayV2HTTPResponse.builder()
+        .withStatusCode(200)
+        .withHeaders(Map.of("Content-Type", "application/json; charset=utf-8"))
+        .withBody(objectMapper.writeValueAsString(res))
+        .build();
+  }
+
+  private int totalEpisodesWatched(List<ImmersionTrackerItem> episodes) {
+    return episodes.size();
+  }
+
+  private int totalHoursWatched(
+      List<ImmersionTrackerItem> episodes, List<ImmersionTrackerItem> youtubeVideos) {
     var youtubeTotalMinutes =
         youtubeVideos.stream().mapToLong(v -> v.getYoutubeVideoDuration().toMinutes()).sum();
-    var totalHoursWatched =
-        (int) ((totalEpisodesWatched * MINUTES_PER_EPISODE + youtubeTotalMinutes) / 60);
-    var today = now.atZone(ZONE_ID).truncatedTo(ChronoUnit.DAYS).toInstant();
-    var episodesWatchedToday =
-        episodes.stream().filter(e -> e.getTimestamp().isAfter(today)).toList().size();
-    var youtubeVideosWatchedToday =
-        youtubeVideos.stream().filter(v -> v.getTimestamp().isAfter(today)).toList().size();
+    return (int) ((episodes.size() * MINUTES_PER_EPISODE + youtubeTotalMinutes) / 60);
+  }
 
+  private int episodesWatchedToday(List<ImmersionTrackerItem> episodes, Instant today) {
+    return episodes.stream().filter(e -> e.getTimestamp().isAfter(today)).toList().size();
+  }
+
+  private int youtubeVideosWatched(List<ImmersionTrackerItem> youtubeVideos) {
+    return youtubeVideos.size();
+  }
+
+  private int youtubeVideosWatchedToday(List<ImmersionTrackerItem> youtubeVideos, Instant today) {
+    return youtubeVideos.stream().filter(v -> v.getTimestamp().isAfter(today)).toList().size();
+  }
+
+  private long daysSinceFirstEpisode(
+      List<ImmersionTrackerItem> episodes, List<ImmersionTrackerItem> youtubeVideos, Instant now) {
     var firstEpisodeWatched =
         episodes.stream().map(ImmersionTrackerItem::getTimestamp).min(Instant::compareTo);
     var firstYoutubeWatched =
@@ -124,8 +166,37 @@ public class GetProgressHandler
             .map(Optional::get)
             .min(Instant::compareTo)
             .orElse(now);
-    var daysSinceFirstEpisode = ChronoUnit.DAYS.between(firstContentWatched, now);
+    return ChronoUnit.DAYS.between(firstContentWatched, now);
+  }
 
+  private Double weeklyTrendPercentage(
+      List<ImmersionTrackerItem> episodes,
+      List<ImmersionTrackerItem> youtubeVideos,
+      Instant now,
+      long daysSinceFirstEpisode) {
+    if (daysSinceFirstEpisode < 14) {
+      return null;
+    }
+    var sevenDaysAgo = now.minus(7, ChronoUnit.DAYS);
+    var episodesWatchedLastWeek =
+        episodes.stream()
+            .filter(e -> e.getTimestamp().isAfter(sevenDaysAgo))
+            .mapToLong(e -> MINUTES_PER_EPISODE)
+            .sum();
+    var youtubeWatchedLastWeek =
+        youtubeVideos.stream()
+            .filter(v -> v.getTimestamp().isAfter(sevenDaysAgo))
+            .mapToLong(v -> v.getYoutubeVideoDuration().toMinutes())
+            .sum();
+    var totalMinutesWatchedLastWeek = episodesWatchedLastWeek + youtubeWatchedLastWeek;
+    var youtubeTotalMinutes =
+        youtubeVideos.stream().mapToLong(v -> v.getYoutubeVideoDuration().toMinutes()).sum();
+    var totalMinutesWatched = (long) episodes.size() * MINUTES_PER_EPISODE + youtubeTotalMinutes;
+    var averageMinutesPerWeek = (double) totalMinutesWatched / daysSinceFirstEpisode * 7;
+    return ((totalMinutesWatchedLastWeek - averageMinutesPerWeek) / averageMinutesPerWeek) * 100;
+  }
+
+  private List<Show> shows(List<ImmersionTrackerItem> episodes, List<ImmersionTrackerItem> shows) {
     var showsByFolderName =
         shows.stream().collect(Collectors.toMap(ImmersionTrackerItem::getFolderName, v -> v));
     var showEpisodes =
@@ -144,48 +215,8 @@ public class GetProgressHandler
     var knownShowsProgress =
         knownShows.values().stream()
             .map(e -> new Show(Objects.requireNonNull(e.get(0).show()).getTvdbName(), e.size()));
-
-    var progresses =
-        Stream.concat(unknownShowsProgress, knownShowsProgress)
-            .sorted(Comparator.comparing(e -> e.episodesWatched, Comparator.reverseOrder()))
-            .toList();
-
-    Double weeklyTrendPercentage = null;
-    if (daysSinceFirstEpisode >= 14) {
-      var sevenDaysAgo = now.minus(7, ChronoUnit.DAYS);
-      var episodesWatchedLastWeek =
-          episodes.stream()
-              .filter(e -> e.getTimestamp().isAfter(sevenDaysAgo))
-              .mapToLong(e -> MINUTES_PER_EPISODE)
-              .sum();
-      var youtubeWatchedLastWeek =
-          youtubeVideos.stream()
-              .filter(v -> v.getTimestamp().isAfter(sevenDaysAgo))
-              .mapToLong(v -> v.getYoutubeVideoDuration().toMinutes())
-              .sum();
-      var totalMinutesWatchedLastWeek = episodesWatchedLastWeek + youtubeWatchedLastWeek;
-      var totalMinutesWatched =
-          (long) totalEpisodesWatched * MINUTES_PER_EPISODE + youtubeTotalMinutes;
-      var averageMinutesPerWeek = (double) totalMinutesWatched / daysSinceFirstEpisode * 7;
-      weeklyTrendPercentage =
-          ((totalMinutesWatchedLastWeek - averageMinutesPerWeek) / averageMinutesPerWeek) * 100;
-    }
-
-    var res =
-        new GetProgressResponse(
-            totalEpisodesWatched,
-            totalHoursWatched,
-            episodesWatchedToday,
-            youtubeVideosWatched,
-            youtubeVideosWatchedToday,
-            daysSinceFirstEpisode,
-            weeklyTrendPercentage,
-            progresses);
-
-    return APIGatewayV2HTTPResponse.builder()
-        .withStatusCode(200)
-        .withHeaders(Map.of("Content-Type", "application/json; charset=utf-8"))
-        .withBody(objectMapper.writeValueAsString(res))
-        .build();
+    return Stream.concat(unknownShowsProgress, knownShowsProgress)
+        .sorted(Comparator.comparing(e -> e.episodesWatched, Comparator.reverseOrder()))
+        .toList();
   }
 }
