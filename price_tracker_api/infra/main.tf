@@ -184,6 +184,7 @@ resource "aws_lambda_function" "lambda" {
   runtime          = "java17"
   memory_size      = 1024
   timeout          = 120
+  architectures    = ["x86_64"]
 }
 
 resource "aws_cloudwatch_event_rule" "update_prices" {

@@ -232,6 +232,7 @@ resource "aws_lambda_function" "lambda" {
   runtime          = "java17"
   memory_size      = 512
   timeout          = 10
+  architectures    = ["x86_64"]
 }
 
 resource "aws_lambda_permission" "api_gateway" {
