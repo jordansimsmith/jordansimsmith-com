@@ -15,10 +15,6 @@ def main():
     local_episodes_watched = find_local_episodes_watched()
     youtube_video_ids = find_youtube_videos_watched()
 
-    if not len(local_episodes_watched) and not len(youtube_video_ids):
-        print("No local episodes or YouTube videos watched, exiting...")
-        return
-
     if len(local_episodes_watched):
         sync_local_episodes_watched(local_episodes_watched)
         update_remote_shows()
@@ -127,7 +123,7 @@ def get_remote_show_progress():
         print()
         trend_percentage = round(weekly_trend_percentage)
         print(
-            f"The weekly trend is {'+' if trend_percentage > 0 else ''}{trend_percentage} compared to the average."
+            f"This week's activity is {'+' if trend_percentage > 0 else ''}{trend_percentage}% compared to the average."
         )
 
 
