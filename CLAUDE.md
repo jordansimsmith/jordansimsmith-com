@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Before starting any task involving a specific project (e.g., auction_tracker_api, immersion_tracker_api), always read the project's README.md file first. Each project directory contains a README.md with project specifications and high-level technical overview that provides essential context for understanding the codebase and requirements.
 
+When implementing a new feature or refactoring existing functionality, always check the project's README.md and update any necessary product/technical specifications first, before any implementation begins. This should be the first step when moving from planning to implementation to ensure the documentation stays in sync with the codebase.
+
 ## Build and test commands
 
 - Build all: `bazel build //...`
