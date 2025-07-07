@@ -26,4 +26,11 @@ public class ImmersionTrackerModule {
     var httpClient = HttpClient.newBuilder().build();
     return new HttpTvdbClient(objectMapper, secrets, httpClient);
   }
+
+  @Provides
+  @Singleton
+  public YoutubeClient youtubeClient(ObjectMapper objectMapper, Secrets secrets) {
+    var httpClient = HttpClient.newBuilder().build();
+    return new HttpYoutubeClient(objectMapper, secrets, httpClient);
+  }
 }

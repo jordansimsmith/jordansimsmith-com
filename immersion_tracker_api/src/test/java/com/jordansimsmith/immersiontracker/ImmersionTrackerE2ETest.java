@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.nio.file.Path;
@@ -111,6 +112,7 @@ public class ImmersionTrackerE2ETest {
     var expectedOutput =
         """
         Finding local episodes watched...
+        Finding YouTube videos watched...
         Syncing 4 local episodes watched...
         Successfully added 4 new episodes to the remote server.
         Retrieving remote show metadata...
@@ -125,7 +127,10 @@ public class ImmersionTrackerE2ETest {
         2 episodes of Free!
         2 episodes of ハイキュー!!
 
+        0 YouTube videos
+
         4 episodes watched today.
+        0 YouTube videos watched today.
         1 total hours watched.
 
         0 years and 0 months since immersion started.
@@ -147,5 +152,72 @@ public class ImmersionTrackerE2ETest {
     assertThat(show2).doesNotExist();
     assertThat(show3).exists();
     assertThat(show4).exists();
+  }
+
+  @SuppressWarnings("ResultOfMethodCallIgnored")
+  @Test
+  void scriptShouldSyncYoutubeVideos() throws Exception {
+    // arrange
+    var tmp = new File(System.getProperty("java.io.tmpdir"));
+
+    var youtubeWatchedFile = Path.of(tmp.getPath(), "youtube_watched.txt").toFile();
+    youtubeWatchedFile.createNewFile();
+    try (var writer = new FileWriter(youtubeWatchedFile)) {
+      writer.write("https://www.youtube.com/watch?v=9bZkp7q19f0\n");
+      writer.write("https://www.youtube.com/watch?v=kJQP7kiw5Fk&t=30s\n");
+    }
+
+    // act
+    var script = Path.of("immersion_tracker_api/sync-episodes-script.py");
+    var processBuilder = new ProcessBuilder(script.toAbsolutePath().toString());
+    processBuilder.redirectErrorStream(false);
+    processBuilder.directory(tmp);
+    processBuilder
+        .environment()
+        .put("IMMERSION_TRACKER_API_URL", immersionTrackerContainer.getApiUrl().toString());
+    var process = processBuilder.start();
+
+    var input = process.getOutputStream();
+    input.write("\n".getBytes()); // Press ENTER to close
+    input.flush();
+
+    // assert
+    int exitCode = process.waitFor();
+    assertThat(exitCode)
+        .withFailMessage(
+            () ->
+                new BufferedReader(new InputStreamReader(process.getErrorStream()))
+                        .lines()
+                        .collect(Collectors.joining("\n"))
+                    + "\n"
+                    + immersionTrackerContainer.getLogs())
+        .isEqualTo(0);
+
+    var output =
+        new BufferedReader(new InputStreamReader(process.getInputStream()))
+            .lines()
+            .collect(Collectors.joining("\n"));
+    var expectedOutput =
+        """
+        Finding local episodes watched...
+        Finding YouTube videos watched...
+        Syncing 2 YouTube videos watched...
+        Successfully added 2 new YouTube videos to the remote server.
+        Retrieving progress summary...
+
+        2 YouTube videos
+
+        0 episodes watched today.
+        2 YouTube videos watched today.
+        0 total hours watched.
+
+        0 years and 0 months since immersion started.
+        Cleared youtube_watched.txt.
+
+        Press ENTER to close...""";
+    assertThat(output).isEqualTo(expectedOutput);
+
+    assertThat(youtubeWatchedFile).exists();
+    assertThat(youtubeWatchedFile.length()).isEqualTo(0);
   }
 }

@@ -60,6 +60,10 @@ locals {
       target  = "//immersion_tracker_api:update-show-handler_deploy.jar"
       handler = "com.jordansimsmith.immersiontracker.UpdateShowHandler"
     }
+    sync_youtube = {
+      target  = "//immersion_tracker_api:sync-youtube-handler_deploy.jar"
+      handler = "com.jordansimsmith.immersiontracker.SyncYoutubeHandler"
+    }
   }
 
   endpoints = {
@@ -78,6 +82,10 @@ locals {
     update_shows = {
       path   = "show"
       method = "PUT"
+    }
+    sync_youtube = {
+      path   = "syncyoutube"
+      method = "POST"
     }
   }
 }

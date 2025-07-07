@@ -1,12 +1,14 @@
 package com.jordansimsmith.immersiontracker;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.within;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.time.FakeClock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
@@ -80,6 +82,7 @@ public class GetProgressHandlerIntegrationTest {
     assertThat(progress.totalEpisodesWatched()).isEqualTo(3);
     assertThat(progress.totalHoursWatched()).isEqualTo(1);
     assertThat(progress.episodesWatchedToday()).isEqualTo(2);
+    assertThat(progress.youtubeVideosWatchedToday()).isEqualTo(0);
     assertThat(progress.daysSinceFirstEpisode()).isEqualTo(1);
 
     var shows = progress.shows();
@@ -199,5 +202,159 @@ public class GetProgressHandlerIntegrationTest {
         objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
     // 0 episodes in last 7 days vs 2 per week average = -100% decrease
     assertThat(progress.weeklyTrendPercentage()).isEqualTo(-100.0);
+  }
+
+  @Test
+  void handleRequestShouldIncludeYoutubeVideosInProgress() throws Exception {
+    // arrange
+    var user = "alice";
+    fakeClock.setTime(Instant.ofEpochMilli(123_000));
+    var now = fakeClock.now();
+
+    // Create episodes (20 minutes each)
+    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", now);
+    var episode2 = ImmersionTrackerItem.createEpisode(user, "show1", "episode2", now);
+
+    // Create YouTube videos
+    var youtubeVideo1 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user, "UCChannel1", "video1", "YouTube Video 1", Duration.ofMinutes(10), now);
+    var youtubeVideo2 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user, "UCChannel2", "video2", "YouTube Video 2", Duration.ofMinutes(30), now);
+
+    immersionTrackerTable.putItem(episode1);
+    immersionTrackerTable.putItem(episode2);
+    immersionTrackerTable.putItem(youtubeVideo1);
+    immersionTrackerTable.putItem(youtubeVideo2);
+
+    // act
+    var req =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+    var res = getProgressHandler.handleRequest(req, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(200);
+
+    var progress =
+        objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
+
+    // Episodes: 2 * 20 minutes = 40 minutes
+    // YouTube: 10 + 30 = 40 minutes
+    // Total: 80 minutes = 1 hour (rounded down)
+    assertThat(progress.totalHoursWatched()).isEqualTo(1);
+    assertThat(progress.totalEpisodesWatched()).isEqualTo(2);
+    assertThat(progress.youtubeVideosWatched()).isEqualTo(2);
+    assertThat(progress.youtubeVideosWatchedToday()).isEqualTo(2);
+    assertThat(progress.episodesWatchedToday()).isEqualTo(2);
+  }
+
+  @Test
+  void handleRequestShouldIncludeYoutubeVideosInWeeklyTrend() throws Exception {
+    // arrange
+    var user = "alice";
+    fakeClock.setTime(Instant.EPOCH.plus(28, ChronoUnit.DAYS));
+    var now = fakeClock.now();
+    var sevenDaysAgo = now.minus(7, ChronoUnit.DAYS);
+
+    // Historical content: 2 episodes (40 minutes) over 28 days
+    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", Instant.EPOCH);
+    var episode2 =
+        ImmersionTrackerItem.createEpisode(
+            user, "show1", "episode2", Instant.EPOCH.plus(14, ChronoUnit.DAYS));
+
+    // Recent content in last 7 days: 1 episode (20 minutes) + 1 YouTube video (30 minutes) = 50
+    // minutes
+    var recentEpisode =
+        ImmersionTrackerItem.createEpisode(
+            user, "show1", "episode3", sevenDaysAgo.plus(1, ChronoUnit.DAYS));
+    var recentYoutubeVideo =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user,
+            "UCChannel1",
+            "video1",
+            "Recent Video",
+            Duration.ofMinutes(30),
+            now.minus(1, ChronoUnit.DAYS));
+
+    immersionTrackerTable.putItem(episode1);
+    immersionTrackerTable.putItem(episode2);
+    immersionTrackerTable.putItem(recentEpisode);
+    immersionTrackerTable.putItem(recentYoutubeVideo);
+
+    // act
+    var req =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+    var res = getProgressHandler.handleRequest(req, null);
+
+    // assert
+    var progress =
+        objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
+
+    // Total minutes: 3 episodes * 20 + 1 YouTube * 30 = 90 minutes
+    // Average per week over 28 days: 90 / 28 * 7 = 22.5 minutes/week
+    // Last week: 20 + 30 = 50 minutes
+    // Weekly trend: (50 - 22.5) / 22.5 * 100 = 122.22%
+    assertThat(progress.weeklyTrendPercentage()).isCloseTo(122.22, within(0.1));
+  }
+
+  @Test
+  void handleRequestShouldCalculateWeeklyTrendWithOnlyYoutubeVideos() throws Exception {
+    // arrange
+    var user = "alice";
+    fakeClock.setTime(Instant.EPOCH.plus(21, ChronoUnit.DAYS));
+    var now = fakeClock.now();
+    var sevenDaysAgo = now.minus(7, ChronoUnit.DAYS);
+
+    // Historical YouTube videos: 60 minutes over 21 days
+    var oldVideo1 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user, "UCChannel1", "video1", "Old Video 1", Duration.ofMinutes(30), Instant.EPOCH);
+    var oldVideo2 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user,
+            "UCChannel1",
+            "video2",
+            "Old Video 2",
+            Duration.ofMinutes(30),
+            Instant.EPOCH.plus(7, ChronoUnit.DAYS));
+
+    // Recent YouTube videos in last 7 days: 40 minutes
+    var recentVideo1 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user,
+            "UCChannel1",
+            "video3",
+            "Recent Video 1",
+            Duration.ofMinutes(25),
+            sevenDaysAgo.plus(1, ChronoUnit.DAYS));
+    var recentVideo2 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user,
+            "UCChannel1",
+            "video4",
+            "Recent Video 2",
+            Duration.ofMinutes(15),
+            now.minus(1, ChronoUnit.DAYS));
+
+    immersionTrackerTable.putItem(oldVideo1);
+    immersionTrackerTable.putItem(oldVideo2);
+    immersionTrackerTable.putItem(recentVideo1);
+    immersionTrackerTable.putItem(recentVideo2);
+
+    // act
+    var req =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+    var res = getProgressHandler.handleRequest(req, null);
+
+    // assert
+    var progress =
+        objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
+
+    // Total minutes: 100 minutes YouTube
+    // Average per week over 21 days: 100 / 21 * 7 = 33.33 minutes/week
+    // Last week: 40 minutes
+    // Weekly trend: (40 - 33.33) / 33.33 * 100 = 20%
+    assertThat(progress.weeklyTrendPercentage()).isCloseTo(20.0, within(0.1));
   }
 }

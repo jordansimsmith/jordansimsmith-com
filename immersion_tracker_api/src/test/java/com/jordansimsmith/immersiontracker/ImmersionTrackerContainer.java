@@ -7,6 +7,7 @@ public class ImmersionTrackerContainer extends LocalStackContainer<ImmersionTrac
   public ImmersionTrackerContainer() {
     super("test.properties", "immersiontracker.image.name", "immersiontracker.image.loader");
     this.withEnv("TVDB_API_KEY", System.getenv("TVDB_API_KEY"));
+    this.withEnv("YOUTUBE_API_KEY", System.getenv("YOUTUBE_API_KEY"));
   }
 
   @SuppressWarnings("HttpUrlsUsage")

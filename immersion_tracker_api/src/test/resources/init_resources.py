@@ -22,7 +22,11 @@ dynamodb_client = boto3.client(
 secretsmanager_client.create_secret(
     Name="immersion_tracker_api",
     SecretString=json.dumps(
-        {"users": [], "tvdb_api_key": os.getenv("TVDB_API_KEY", "")}
+        {
+            "users": [],
+            "tvdb_api_key": os.getenv("TVDB_API_KEY", ""),
+            "youtube_api_key": os.getenv("YOUTUBE_API_KEY", ""),
+        }
     ),
 )
 
@@ -100,6 +104,13 @@ configs = [
         "http_method": "POST",
         "handler_name": "com.jordansimsmith.immersiontracker.SyncEpisodesHandler",
         "zip_file": "sync-episodes-handler_deploy.jar",
+    },
+    {
+        "function_name": "sync_youtube_handler",
+        "resource_path_part": "syncyoutube",
+        "http_method": "POST",
+        "handler_name": "com.jordansimsmith.immersiontracker.SyncYoutubeHandler",
+        "zip_file": "sync-youtube-handler_deploy.jar",
     },
 ]
 

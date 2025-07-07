@@ -29,6 +29,8 @@ public interface ImmersionTrackerTestFactory extends ImmersionTrackerFactory {
 
   FakeTvdbClient fakeTvdbClient();
 
+  FakeYoutubeClient fakeYoutubeClient();
+
   DynamoDbClient dynamoDbClient();
 
   @Component.Factory

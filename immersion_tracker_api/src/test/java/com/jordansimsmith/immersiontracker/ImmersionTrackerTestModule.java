@@ -28,4 +28,16 @@ public class ImmersionTrackerTestModule {
   public TvdbClient tvdbClient(FakeTvdbClient fakeTvdbClient) {
     return fakeTvdbClient;
   }
+
+  @Provides
+  @Singleton
+  public FakeYoutubeClient fakeYoutubeClient() {
+    return new FakeYoutubeClient();
+  }
+
+  @Provides
+  @Singleton
+  public YoutubeClient youtubeClient(FakeYoutubeClient fakeYoutubeClient) {
+    return fakeYoutubeClient;
+  }
 }

@@ -31,6 +31,8 @@ public interface ImmersionTrackerFactory {
 
   TvdbClient tvdbClient();
 
+  YoutubeClient youtubeClient();
+
   static ImmersionTrackerFactory create() {
     return DaggerImmersionTrackerFactory.create();
   }

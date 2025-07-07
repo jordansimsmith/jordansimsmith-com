@@ -4,6 +4,7 @@ import os
 import pathlib
 import urllib.parse
 import shutil
+import re
 
 import requests
 
@@ -12,15 +13,27 @@ SUPPORTED_EXTENSIONS = [".mkv", ".mp4"]
 
 def main():
     local_episodes_watched = find_local_episodes_watched()
-    if not len(local_episodes_watched):
-        print("No local episodes watched, exiting...")
+    youtube_video_ids = find_youtube_videos_watched()
+
+    if not len(local_episodes_watched) and not len(youtube_video_ids):
+        print("No local episodes or YouTube videos watched, exiting...")
         return
 
-    sync_local_episodes_watched(local_episodes_watched)
-    update_remote_shows()
+    if len(local_episodes_watched):
+        sync_local_episodes_watched(local_episodes_watched)
+        update_remote_shows()
+
+    if len(youtube_video_ids):
+        sync_youtube_videos_watched(youtube_video_ids)
+
     get_remote_show_progress()
-    delete_local_episodes_watched(local_episodes_watched)
-    delete_completed_shows(local_episodes_watched)
+
+    if len(local_episodes_watched):
+        delete_local_episodes_watched(local_episodes_watched)
+        delete_completed_shows(local_episodes_watched)
+
+    if len(youtube_video_ids):
+        clear_youtube_watched_file()
 
     print()
     input("Press ENTER to close...")
@@ -85,7 +98,13 @@ def get_remote_show_progress():
         episodes_watched = show["episodes_watched"]
         print(f"{episodes_watched} episodes of {name}")
 
+    if res["shows"]:
+        print()
+    youtube_videos_watched = res["youtube_videos_watched"]
+    print(f"{youtube_videos_watched} YouTube videos")
+
     episodes_watched_today = res["episodes_watched_today"]
+    youtube_videos_watched_today = res["youtube_videos_watched_today"]
     total_hours_watched = res["total_hours_watched"]
 
     average_days_per_month = 365 / 12
@@ -96,6 +115,7 @@ def get_remote_show_progress():
 
     print()
     print(f"{episodes_watched_today} episodes watched today.")
+    print(f"{youtube_videos_watched_today} YouTube videos watched today.")
     print(f"{total_hours_watched} total hours watched.")
     print()
     print(
@@ -152,6 +172,44 @@ def delete_completed_shows(episodes):
 
         shutil.rmtree(folder)
         print(f"Deleted completed show: {folder}")
+
+
+def find_youtube_videos_watched():
+    print("Finding YouTube videos watched...")
+    video_ids = []
+
+    youtube_file = "youtube_watched.txt"
+    if not os.path.isfile(youtube_file):
+        return video_ids
+
+    with open(youtube_file, "r") as f:
+        for line in f:
+            line = line.strip()
+            if not line:
+                continue
+
+            # Extract video ID from https://youtube.com?v= format
+            match = re.search(r"youtube\.com.*[?&]v=([a-zA-Z0-9_-]{11})", line)
+            if match:
+                video_ids.append(match.group(1))
+
+    return video_ids
+
+
+def sync_youtube_videos_watched(video_ids):
+    print(f"Syncing {len(video_ids)} YouTube videos watched...")
+
+    res = send_request("POST", "syncyoutube", {"video_ids": video_ids})
+    videos_added = res["videos_added"]
+    print(f"Successfully added {videos_added} new YouTube videos to the remote server.")
+
+
+def clear_youtube_watched_file():
+    youtube_file = "youtube_watched.txt"
+    if os.path.isfile(youtube_file):
+        # Clear the file contents
+        open(youtube_file, "w").close()
+        print(f"Cleared {youtube_file}.")
 
 
 def send_request(method, path, body=None):

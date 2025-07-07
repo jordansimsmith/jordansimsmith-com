@@ -16,6 +16,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -40,6 +41,8 @@ public class GetProgressHandler
       @JsonProperty("total_episodes_watched") int totalEpisodesWatched,
       @JsonProperty("total_hours_watched") int totalHoursWatched,
       @JsonProperty("episodes_watched_today") int episodesWatchedToday,
+      @JsonProperty("youtube_videos_watched") int youtubeVideosWatched,
+      @JsonProperty("youtube_videos_watched_today") int youtubeVideosWatchedToday,
       @JsonProperty("days_since_first_episode") long daysSinceFirstEpisode,
       @Nullable @JsonProperty("weekly_trend_percentage") Double weeklyTrendPercentage,
       @JsonProperty("shows") List<Show> shows) {}
@@ -94,19 +97,34 @@ public class GetProgressHandler
             .toList();
     var shows =
         items.stream().filter(i -> i.getSk().startsWith(ImmersionTrackerItem.SHOW_PREFIX)).toList();
+    var youtubeVideos =
+        items.stream()
+            .filter(i -> i.getSk().startsWith(ImmersionTrackerItem.YOUTUBEVIDEO_PREFIX))
+            .toList();
 
     var totalEpisodesWatched = episodes.size();
-    var totalHoursWatched = totalEpisodesWatched * MINUTES_PER_EPISODE / 60;
+    var youtubeVideosWatched = youtubeVideos.size();
+    var youtubeTotalMinutes =
+        youtubeVideos.stream().mapToLong(v -> v.getYoutubeVideoDuration().toMinutes()).sum();
+    var totalHoursWatched =
+        (int) ((totalEpisodesWatched * MINUTES_PER_EPISODE + youtubeTotalMinutes) / 60);
     var today = now.atZone(ZONE_ID).truncatedTo(ChronoUnit.DAYS).toInstant();
     var episodesWatchedToday =
         episodes.stream().filter(e -> e.getTimestamp().isAfter(today)).toList().size();
+    var youtubeVideosWatchedToday =
+        youtubeVideos.stream().filter(v -> v.getTimestamp().isAfter(today)).toList().size();
 
     var firstEpisodeWatched =
-        episodes.stream()
-            .map(ImmersionTrackerItem::getTimestamp)
+        episodes.stream().map(ImmersionTrackerItem::getTimestamp).min(Instant::compareTo);
+    var firstYoutubeWatched =
+        youtubeVideos.stream().map(ImmersionTrackerItem::getTimestamp).min(Instant::compareTo);
+    var firstContentWatched =
+        Stream.of(firstEpisodeWatched, firstYoutubeWatched)
+            .filter(Optional::isPresent)
+            .map(Optional::get)
             .min(Instant::compareTo)
             .orElse(now);
-    var daysSinceFirstEpisode = ChronoUnit.DAYS.between(firstEpisodeWatched, now);
+    var daysSinceFirstEpisode = ChronoUnit.DAYS.between(firstContentWatched, now);
 
     var showsByFolderName =
         shows.stream().collect(Collectors.toMap(ImmersionTrackerItem::getFolderName, v -> v));
@@ -136,10 +154,21 @@ public class GetProgressHandler
     if (daysSinceFirstEpisode >= 14) {
       var sevenDaysAgo = now.minus(7, ChronoUnit.DAYS);
       var episodesWatchedLastWeek =
-          episodes.stream().filter(e -> e.getTimestamp().isAfter(sevenDaysAgo)).toList().size();
-      var averageEpisodesPerWeek = (double) totalEpisodesWatched / daysSinceFirstEpisode * 7;
+          episodes.stream()
+              .filter(e -> e.getTimestamp().isAfter(sevenDaysAgo))
+              .mapToLong(e -> MINUTES_PER_EPISODE)
+              .sum();
+      var youtubeWatchedLastWeek =
+          youtubeVideos.stream()
+              .filter(v -> v.getTimestamp().isAfter(sevenDaysAgo))
+              .mapToLong(v -> v.getYoutubeVideoDuration().toMinutes())
+              .sum();
+      var totalMinutesWatchedLastWeek = episodesWatchedLastWeek + youtubeWatchedLastWeek;
+      var totalMinutesWatched =
+          (long) totalEpisodesWatched * MINUTES_PER_EPISODE + youtubeTotalMinutes;
+      var averageMinutesPerWeek = (double) totalMinutesWatched / daysSinceFirstEpisode * 7;
       weeklyTrendPercentage =
-          ((episodesWatchedLastWeek - averageEpisodesPerWeek) / averageEpisodesPerWeek) * 100;
+          ((totalMinutesWatchedLastWeek - averageMinutesPerWeek) / averageMinutesPerWeek) * 100;
     }
 
     var res =
@@ -147,6 +176,8 @@ public class GetProgressHandler
             totalEpisodesWatched,
             totalHoursWatched,
             episodesWatchedToday,
+            youtubeVideosWatched,
+            youtubeVideosWatchedToday,
             daysSinceFirstEpisode,
             weeklyTrendPercentage,
             progresses);

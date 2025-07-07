@@ -1,6 +1,8 @@
 package com.jordansimsmith.immersiontracker;
 
+import com.jordansimsmith.dynamodb.DurationSecondsConverter;
 import com.jordansimsmith.dynamodb.EpochSecondConverter;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.Objects;
 import software.amazon.awssdk.enhanced.dynamodb.extensions.annotations.DynamoDbVersionAttribute;
@@ -12,6 +14,7 @@ public class ImmersionTrackerItem {
   public static final String USER_PREFIX = "USER" + DELIMITER;
   public static final String EPISODE_PREFIX = "EPISODE" + DELIMITER;
   public static final String SHOW_PREFIX = "SHOW" + DELIMITER;
+  public static final String YOUTUBEVIDEO_PREFIX = "YOUTUBEVIDEO" + DELIMITER;
 
   public static final String PK = "pk";
   public static final String SK = "sk";
@@ -22,6 +25,10 @@ public class ImmersionTrackerItem {
   public static final String TVDB_ID = "tvdb_id";
   public static final String TVDB_NAME = "tvdb_name";
   public static final String TVDB_IMAGE = "tvdb_image";
+  public static final String YOUTUBE_VIDEO_ID = "youtube_video_id";
+  public static final String YOUTUBE_VIDEO_TITLE = "youtube_video_title";
+  public static final String YOUTUBE_CHANNEL_ID = "youtube_channel_id";
+  public static final String YOUTUBE_VIDEO_DURATION = "youtube_video_duration";
   public static final String VERSION = "version";
 
   private String pk;
@@ -33,6 +40,10 @@ public class ImmersionTrackerItem {
   private Integer tvdbId;
   private String tvdbName;
   private String tvdbImage;
+  private String youtubeVideoId;
+  private String youtubeVideoTitle;
+  private String youtubeChannelId;
+  private Duration youtubeVideoDuration;
   private Long version;
 
   @DynamoDbPartitionKey
@@ -119,6 +130,43 @@ public class ImmersionTrackerItem {
     this.tvdbImage = tvdbImage;
   }
 
+  @DynamoDbAttribute(YOUTUBE_VIDEO_ID)
+  public String getYoutubeVideoId() {
+    return youtubeVideoId;
+  }
+
+  public void setYoutubeVideoId(String youtubeVideoId) {
+    this.youtubeVideoId = youtubeVideoId;
+  }
+
+  @DynamoDbAttribute(YOUTUBE_VIDEO_TITLE)
+  public String getYoutubeVideoTitle() {
+    return youtubeVideoTitle;
+  }
+
+  public void setYoutubeVideoTitle(String youtubeVideoTitle) {
+    this.youtubeVideoTitle = youtubeVideoTitle;
+  }
+
+  @DynamoDbAttribute(YOUTUBE_CHANNEL_ID)
+  public String getYoutubeChannelId() {
+    return youtubeChannelId;
+  }
+
+  public void setYoutubeChannelId(String youtubeChannelId) {
+    this.youtubeChannelId = youtubeChannelId;
+  }
+
+  @DynamoDbAttribute(YOUTUBE_VIDEO_DURATION)
+  @DynamoDbConvertedBy(DurationSecondsConverter.class)
+  public Duration getYoutubeVideoDuration() {
+    return youtubeVideoDuration;
+  }
+
+  public void setYoutubeVideoDuration(Duration youtubeVideoDuration) {
+    this.youtubeVideoDuration = youtubeVideoDuration;
+  }
+
   @DynamoDbVersionAttribute()
   @DynamoDbAttribute(VERSION)
   public Long getVersion() {
@@ -156,6 +204,17 @@ public class ImmersionTrackerItem {
         + ", tvdbImage='"
         + tvdbImage
         + '\''
+        + ", youtubeVideoId='"
+        + youtubeVideoId
+        + '\''
+        + ", youtubeVideoTitle='"
+        + youtubeVideoTitle
+        + '\''
+        + ", youtubeChannelId='"
+        + youtubeChannelId
+        + '\''
+        + ", youtubeVideoDuration="
+        + youtubeVideoDuration
         + '}';
   }
 
@@ -172,12 +231,29 @@ public class ImmersionTrackerItem {
         && Objects.equals(timestamp, that.timestamp)
         && Objects.equals(tvdbId, that.tvdbId)
         && Objects.equals(tvdbName, that.tvdbName)
-        && Objects.equals(tvdbImage, that.tvdbImage);
+        && Objects.equals(tvdbImage, that.tvdbImage)
+        && Objects.equals(youtubeVideoId, that.youtubeVideoId)
+        && Objects.equals(youtubeVideoTitle, that.youtubeVideoTitle)
+        && Objects.equals(youtubeChannelId, that.youtubeChannelId)
+        && Objects.equals(youtubeVideoDuration, that.youtubeVideoDuration);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(pk, sk, user, folderName, fileName, timestamp, tvdbId, tvdbName, tvdbImage);
+    return Objects.hash(
+        pk,
+        sk,
+        user,
+        folderName,
+        fileName,
+        timestamp,
+        tvdbId,
+        tvdbName,
+        tvdbImage,
+        youtubeVideoId,
+        youtubeVideoTitle,
+        youtubeChannelId,
+        youtubeVideoDuration);
   }
 
   public static String formatPk(String user) {
@@ -190,6 +266,10 @@ public class ImmersionTrackerItem {
 
   public static String formatShowSk(String folderName) {
     return SHOW_PREFIX + folderName;
+  }
+
+  public static String formatYoutubeVideoSk(String videoId) {
+    return YOUTUBEVIDEO_PREFIX + videoId;
   }
 
   public static ImmersionTrackerItem createEpisode(
@@ -211,5 +291,24 @@ public class ImmersionTrackerItem {
     show.setFolderName(folderName);
     show.setUser(user);
     return show;
+  }
+
+  public static ImmersionTrackerItem createYoutubeVideo(
+      String user,
+      String channelId,
+      String videoId,
+      String title,
+      Duration duration,
+      Instant timestamp) {
+    var video = new ImmersionTrackerItem();
+    video.setPk(formatPk(user));
+    video.setSk(formatYoutubeVideoSk(videoId));
+    video.setUser(user);
+    video.setYoutubeVideoId(videoId);
+    video.setYoutubeVideoTitle(title);
+    video.setYoutubeChannelId(channelId);
+    video.setYoutubeVideoDuration(duration);
+    video.setTimestamp(timestamp);
+    return video;
   }
 }
