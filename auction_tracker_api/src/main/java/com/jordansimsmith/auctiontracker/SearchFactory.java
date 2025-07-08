@@ -6,11 +6,7 @@ import javax.annotation.Nullable;
 
 public interface SearchFactory {
   record Search(
-      URI baseUrl,
-      String searchTerm,
-      @Nullable Double minPrice,
-      @Nullable Double maxPrice,
-      @Nullable String evaluationPrompt) {}
+      URI baseUrl, String searchTerm, @Nullable Double minPrice, @Nullable Double maxPrice) {}
 
   List<Search> findSearches();
 }

@@ -1,6 +1,6 @@
-# Event calendar API service
+# Event calendar service
 
-The event calendar API service extracts, processes, and provides structured data about stadium events and game times from the Go Media Stadium (formerly Mt Smart Stadium) in Auckland.
+The event calendar service extracts, processes, and provides structured data about stadium events and game times from the Go Media Stadium (formerly Mt Smart Stadium) in Auckland.
 
 ## System architecture
 
@@ -15,7 +15,7 @@ graph TD
   F --> G[iPhone Calendar]
 ```
 
-## Requirements and specifications
+## Requirements
 
 ### Functional requirements
 
@@ -28,19 +28,14 @@ graph TD
   - Event information (box office opening, gate opening, etc.)
 - Store extracted data in DynamoDB
 - Expose event data through iCal subscription endpoint
-- Update event data hourly through scheduled polling
+- Update event data every 15 minutes through scheduled polling
 - Support calendar subscription in iPhone and other calendar apps
 
 ### Technical specifications
 
-- Lambda execution frequency: Every hour via EventBridge schedule
-- DynamoDB table: "event_calendar" with hash key "pk" and range key "sk"
-- Point-in-time recovery enabled for data protection
-- Deletion protection enabled for the DynamoDB table
-- Lambda memory: 1024MB
-- Lambda timeout: 30 seconds
-- Java 17 runtime for Lambda functions
-- API Gateway endpoint with custom domain: api.event-calendar.jordansimsmith.com
+- Performance: System updates event data every 15 minutes automatically
+- Reliability: Event data is persistently stored and consistently available
+- Availability: Calendar subscription endpoint accessible 24/7
 
 ## Implementation details
 
@@ -66,8 +61,10 @@ graph TD
 
 ### Configuration
 
-- Lambda execution frequency: Hourly via EventBridge schedule
+- Lambda execution frequency: Every 15 minutes via EventBridge schedule
 - DynamoDB table: "event_calendar" with hash key "pk" and range key "sk"
 - API Gateway endpoint: GET /calendar
 - Custom domain: api.event-calendar.jordansimsmith.com
 - Time zone: Pacific/Auckland
+- Lambda memory: 1024MB, timeout: 30 seconds
+- Java 17 runtime for Lambda functions

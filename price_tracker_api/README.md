@@ -8,22 +8,26 @@ The price tracker service automatically monitors product prices on e-commerce we
 graph TD
   A[CloudWatch Event] -->|Hourly Trigger| B[Update Prices Lambda]
   B -->|Fetch Products| C[ProductsFactory]
-  B -->|Get Price| D[ChemistWarehouseClient]
-  D -->|Scrape| E[Chemist Warehouse Website]
-  B -->|Store Data| F[DynamoDB]
-  B -->|Compare Prices| G[Price Comparison Logic]
-  G -->|On Price Change| H[SNS Topic]
-  H -->|Notifications| I[Email Subscribers]
+  B -->|Get Price| D[JsoupPriceClient]
+  D -->|Route by Host| E[ChemistWarehousePriceExtractor]
+  D -->|Route by Host| F[NzProteinPriceExtractor]
+  E -->|Scrape| G[Chemist Warehouse Website]
+  F -->|Scrape| H[NZ Protein Website]
+  B -->|Store Data| I[DynamoDB]
+  B -->|Compare Prices| J[Price Comparison Logic]
+  J -->|On Price Change| K[SNS Topic]
+  K -->|Notifications| L[Email Subscribers]
 ```
 
-## Requirements and specifications
+## Requirements
 
 ### Functional requirements
 
-- Monitor product prices from Chemist Warehouse website
+- Monitor product prices from Chemist Warehouse and NZ Protein websites
 - Store price history for each tracked product
 - Send notifications when prices change
 - Support multiple product monitoring
+- Support extensible price extraction for additional e-commerce sites
 - Automatically update prices hourly
 
 ### Technical specifications
@@ -50,8 +54,10 @@ graph TD
 ### Key components
 
 - `UpdatePricesHandler`: Lambda handler that processes scheduled events and updates prices
-- `ChemistWarehouseClient`: Client interface for retrieving product data from Chemist Warehouse
-- `JsoupChemistWarehouseClient`: Implementation that uses Jsoup to scrape product data
+- `JsoupPriceClient`: Client that fetches product pages and delegates price extraction
+- `PriceExtractor`: Interface for extracting prices from website-specific HTML
+- `ChemistWarehousePriceExtractor`: Price extraction implementation for Chemist Warehouse
+- `NzProteinPriceExtractor`: Price extraction implementation for NZ Protein
 - `ProductsFactory`: Interface for finding products to track
 - `ProductsFactoryImpl`: Implementation that provides the list of products to track
 - `PriceTrackerItem`: Data model for storing price data in DynamoDB

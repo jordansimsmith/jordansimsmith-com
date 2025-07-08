@@ -16,7 +16,7 @@ graph TD
   E -->|Email notification| F[Subscribers]
 ```
 
-## Requirements and specifications
+## Requirements
 
 ### Functional requirements
 

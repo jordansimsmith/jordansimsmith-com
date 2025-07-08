@@ -47,7 +47,7 @@ public class UpdateItemsHandlerIntegrationTest {
     var baseUrl = "https://www.trademe.co.nz/a/marketplace/sports/golf/search";
     var expectedSearchUrl =
         "https://www.trademe.co.nz/a/marketplace/sports/golf/search?search_string=wedge&sort_order=expirydesc";
-    var search = new SearchFactory.Search(URI.create(baseUrl), "wedge", null, null, null);
+    var search = new SearchFactory.Search(URI.create(baseUrl), "wedge", null, null);
     fakeSearchFactory.addSearches(List.of(search));
 
     var tradeMeItems =
@@ -108,7 +108,7 @@ public class UpdateItemsHandlerIntegrationTest {
     var baseUrl = "https://www.trademe.co.nz/a/marketplace/sports/golf/search";
     var expectedSearchUrl =
         "https://www.trademe.co.nz/a/marketplace/sports/golf/search?search_string=wedge&sort_order=expirydesc";
-    var search = new SearchFactory.Search(URI.create(baseUrl), "wedge", null, null, null);
+    var search = new SearchFactory.Search(URI.create(baseUrl), "wedge", null, null);
     fakeSearchFactory.addSearches(List.of(search));
 
     var tradeMeItem =
@@ -143,10 +143,10 @@ public class UpdateItemsHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var search1 =
         new SearchFactory.Search(
-            URI.create("https://www.trademe.co.nz/search1"), "term1", null, null, null);
+            URI.create("https://www.trademe.co.nz/search1"), "term1", null, null);
     var search2 =
         new SearchFactory.Search(
-            URI.create("https://www.trademe.co.nz/search2"), "term2", 100.0, 200.0, null);
+            URI.create("https://www.trademe.co.nz/search2"), "term2", 100.0, 200.0);
     fakeSearchFactory.addSearches(List.of(search1, search2));
 
     fakeTradeMeClient.addSearchResponse(
@@ -178,7 +178,7 @@ public class UpdateItemsHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var search =
         new SearchFactory.Search(
-            URI.create("https://www.trademe.co.nz/search"), "term", null, null, null);
+            URI.create("https://www.trademe.co.nz/search"), "term", null, null);
     fakeSearchFactory.addSearches(List.of(search));
     fakeTradeMeClient.addSearchResponse(
         URI.create("https://www.trademe.co.nz/search"), "term", null, null, List.of());

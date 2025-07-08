@@ -208,7 +208,7 @@ public class JsoupTradeMeClientTest {
   @Test
   void getSearchUrlShouldReturnFullSearchUrl() {
     // arrange
-    var search = new SearchFactory.Search(URI.create(BASE_URL), "titleist wedge", null, 70.0, null);
+    var search = new SearchFactory.Search(URI.create(BASE_URL), "titleist wedge", null, 70.0);
 
     // act
     var searchUrl = client.getSearchUrl(search);
@@ -221,8 +221,7 @@ public class JsoupTradeMeClientTest {
   @Test
   void getSearchUrlShouldIncludeMinAndMaxPrice() {
     // arrange
-    var search =
-        new SearchFactory.Search(URI.create(BASE_URL), "callaway wedge", 50.0, 150.0, null);
+    var search = new SearchFactory.Search(URI.create(BASE_URL), "callaway wedge", 50.0, 150.0);
 
     // act
     var searchUrl = client.getSearchUrl(search);

@@ -11,23 +11,20 @@ graph TD
   B -->|Scrape Listings| D[Trade Me Client]
   D -->|HTTP Requests| E[Trade Me Website]
   B -->|Store Items| F[DynamoDB]
-  B -->|LLM Evaluation| G[AWS Bedrock]
-  G -->|Log Results| H[CloudWatch Logs]
 
-  I[CloudWatch Event] -->|Daily Trigger| J[Daily Digest Lambda]
-  J -->|Query New Items| F
-  J -->|Send Email| K[SNS Topic]
-  K -->|Notifications| L[Email Subscribers]
+  G[CloudWatch Event] -->|Daily Trigger| H[Daily Digest Lambda]
+  H -->|Query New Items| F
+  H -->|Send Email| I[SNS Topic]
+  I -->|Notifications| J[Email Subscribers]
 ```
 
-## Requirements and specifications
+## Requirements
 
 ### Functional requirements
 
 - Monitor auction listings on Trade Me using web scraping
 - Support multiple predefined search criteria with configurable filters
 - Store discovered auction items in DynamoDB with metadata
-- Evaluate items using AWS Bedrock LLM integration
 - Send daily digest emails with new listings found in the last 24 hours
 - Check for new items every 15 minutes across all searches
 - Support any category of items through flexible search configuration
@@ -37,7 +34,6 @@ graph TD
 - Serverless architecture using AWS Lambda
 - Data persistence with DynamoDB using composite keys
 - Web scraping with Jsoup HTTP client for server-side rendered pages
-- LLM integration with AWS Bedrock for item evaluation
 - Notification delivery through Amazon SNS
 - Daily digest scheduling with CloudWatch Events
 - 15-minute scraping frequency for all searches
@@ -50,12 +46,10 @@ graph TD
 - AWS Lambda for serverless execution
 - DynamoDB for storing auction item data
 - Amazon SNS for email notification delivery
-- AWS Bedrock for LLM-based item evaluation
 - Jsoup for web scraping server-side rendered pages
 - Java runtime environment
 - AWS CloudWatch Events for scheduled triggers
 - Terraform for infrastructure as code
-- LocalStack Bedrock for E2E testing
 
 ### Key components
 
@@ -65,7 +59,6 @@ graph TD
 - `SearchFactory`: Factory providing predefined search URLs and criteria
 - `AuctionTrackerItem`: Data model for storing auction data in DynamoDB with GSI support
 - `SendDigestHandler`: Lambda handler that sends daily email summaries
-- `ItemEvaluator`: Client for AWS Bedrock LLM item evaluation
 - `AuctionTrackerFactory`: Factory for creating required dependencies
 
 ### Configuration
@@ -96,14 +89,14 @@ The JsoupTradeMeClient implements a lightweight web scraping pipeline for extrac
    - Joins multiple content sections with spaces
    - Normalizes whitespace and removes excessive formatting
    - Truncates descriptions to 1000 characters for storage efficiency
-5. **Error handling**: Implements retry logic with exponential backoff for failed requests
+5. **Error handling**: Graceful handling of failed requests with warning logs
 
 #### Technical details
 
-- **HTTP client**: Uses Jsoup's built-in HTTP client with connection pooling
-- **Retry strategy**: Implements exponential backoff with jitter for failed requests
+- **HTTP client**: Uses Jsoup's built-in HTTP client with comprehensive headers and cookies
+- **Error handling**: Warns on individual item fetch failures and continues processing
 - **CSS selectors**: Uses specific Trade Me CSS classes validated through testing
-- **Timeout handling**: Configurable request timeouts with graceful failure for slow responses
+- **Timeout handling**: 30-second request timeout for HTTP connections
 
 ### Data schema
 

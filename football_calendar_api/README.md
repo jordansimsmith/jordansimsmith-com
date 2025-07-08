@@ -1,6 +1,6 @@
-# Football Calendar API service
+# Football calendar service
 
-The football calendar API service extracts, processes, and provides structured data about football fixtures from the Northern Regional Football (NRF) Comet API in Auckland.
+The football calendar service extracts, processes, and provides structured data about football fixtures from the Northern Regional Football (NRF) Comet API in Auckland.
 
 ## System architecture
 
@@ -15,7 +15,7 @@ graph TD
   F --> G[iPhone Calendar]
 ```
 
-## Requirements and specifications
+## Requirements
 
 ### Functional requirements
 
@@ -31,10 +31,13 @@ graph TD
 
 ### Technical specifications
 
-- Lambda execution frequency: Regular schedule via EventBridge
-- DynamoDB table: "football_calendar" with hash key "pk" and range key "sk"
-- Java 17 runtime for Lambda functions
-- API Gateway endpoint with custom domain for calendar subscription
+- Serverless architecture using AWS Lambda
+- Data persistence with DynamoDB using composite keys
+- RESTful API for calendar subscription access
+- Java 17 runtime environment
+- Scheduled execution via EventBridge triggers
+- Custom domain with HTTPS support
+- Time zone support for Pacific/Auckland
 
 ## Implementation details
 
@@ -55,9 +58,11 @@ graph TD
 
 - `UpdateFixturesHandler`: Lambda handler that processes scheduled events to fetch fixture data
 - `GetCalendarSubscriptionHandler`: Lambda handler that serves iCal subscription data
-- `HttpCometClient`: Implementation for interacting with the NRF Comet API
+- `HttpCometClient`: Implementation for interacting with the NRF Comet API using HTTP requests
+- `CometClient`: Client interface for retrieving fixture data from the Comet API
 - `FootballCalendarItem`: Data model for storing fixture data in DynamoDB
 - `FootballCalendarFactory`: Factory for creating the required dependencies
+- `Teams`: Constants class defining team names for filtering (e.g., "Flamingos")
 
 ### Team filtering
 
@@ -70,7 +75,9 @@ The service is designed to track a specific team ("Flamingos") and filter out ot
 
 ### Configuration
 
-- Lambda execution frequency: Weekly via EventBridge schedule
+- Lambda execution frequency: Every 15 minutes via EventBridge schedule
+- Lambda memory: 1024MB, timeout: 30 seconds
+- Java 17 runtime for Lambda functions
 - DynamoDB table: "football_calendar" with hash key "pk" and range key "sk"
 - API Gateway endpoint: GET /calendar
 - Custom domain: api.football-calendar.jordansimsmith.com
@@ -158,3 +165,46 @@ JSON Body:
   - `latitude`: Venue latitude (numeric)
   - `longitude`: Venue longitude (numeric)
   - `status`: Match status (e.g., "POSTPONED")
+
+#### Example DynamoDB item
+
+```json
+{
+  "pk": {
+    "S": "TEAM#flamingos"
+  },
+  "sk": {
+    "S": "MATCH#2716942185"
+  },
+  "team": {
+    "S": "Flamingos"
+  },
+  "match_id": {
+    "S": "2716942185"
+  },
+  "home_team": {
+    "S": "Bucklands Beach Bucks M5"
+  },
+  "away_team": {
+    "S": "Ellerslie AFC Flamingoes M"
+  },
+  "timestamp": {
+    "N": "1743811200"
+  },
+  "venue": {
+    "S": "Lloyd Elsmore Park 2"
+  },
+  "address": {
+    "S": "2 Bells Avenue"
+  },
+  "latitude": {
+    "N": "-36.9053315"
+  },
+  "longitude": {
+    "N": "174.8997797"
+  },
+  "status": {
+    "S": "POSTPONED"
+  }
+}
+```

@@ -11,12 +11,14 @@ graph TD
   C --> D[DynamoDB]
   C --> E[TVDB API]
   C --> H[YouTube API]
-  F[Python Sync Script] --> G[Local File System]
+  F[Python Sync Script] --> B
+  F --> G[Local File System]
   F --> I[youtube_watched.txt]
-  F --> B
+  G --> F
+  I --> F
 ```
 
-## Requirements and specifications
+## Requirements
 
 ### Functional requirements
 

@@ -9,12 +9,14 @@ graph TD
   A[Browser] --> B[CloudFront Distribution]
   B --> C[S3 Bucket]
   C --> D[Static Website Content]
-  E[CI/CD Pipeline] --> F[Build Process]
-  F --> G[Deploy to S3]
-  G --> C
+  E[CI/CD Pipeline] --> F[Bazel Build Process]
+  F --> G[Vite + React + Mantine]
+  G --> H[PostCSS Processing]
+  H --> I[Deploy to S3]
+  I --> C
 ```
 
-## Requirements and specifications
+## Requirements
 
 ### Functional requirements
 
@@ -37,6 +39,8 @@ graph TD
 ### Technologies
 
 - React for component-based UI development
+- Mantine UI as the primary component library and design system
+- PostCSS with Mantine preset for styling preprocessing
 - Vite as the build tool and development server
 - AWS S3 for static website hosting
 - AWS CloudFront for content delivery
@@ -45,10 +49,27 @@ graph TD
 
 ### Key components
 
-- `App.jsx`: Main application component that handles routing and layout
-- `main.jsx`: Entry point for the React application
+- `App.jsx`: Main application component that handles routing and layout using Mantine components
+- `main.jsx`: Entry point for the React application with Mantine theme configuration
+- `postcss.config.js`: PostCSS configuration for Mantine preprocessing and CSS variables
+- `index.css`: Base application styling for full viewport height
 - `infra/main.tf`: Terraform configuration for AWS infrastructure
 - `BUILD.bazel`: Bazel build configuration for the website
+
+### Development workflow
+
+- Build the website: `bazel build //personal_website_web:build`
+- Start development server: `bazel run //personal_website_web:vite -- dev`
+- Preview production build: `bazel run //personal_website_web:preview`
+- Build outputs are generated in the `dist/` directory
+
+### Styling architecture
+
+- Mantine UI provides the component library with built-in responsive design
+- Custom theme configuration reduces heading font weight to 300 for modern typography
+- PostCSS processes Mantine styles and CSS variables for consistent breakpoints
+- CSS-in-JS approach through Mantine's styling system eliminates external stylesheets
+- Responsive design uses Mantine's breakpoint system (xs: 36em, sm: 48em, md: 62em, lg: 75em, xl: 88em)
 
 ### Configuration
 
