@@ -19,13 +19,14 @@ When implementing a new feature or refactoring existing functionality, always ch
 - Format code: `bazel run //:format`
 - Tidy Bazel modules: `bazel mod tidy`
 
-## Format changes and test after task completion
+## Steps after task completion
 
 Always run these commands after completing a task:
 
-1. First, tidy up Bazel module dependencies: `bazel mod tidy`
-2. Then format all code files: `bazel run //:format`
-3. Finally, run tests to ensure everything works: `bazel test //...` (or scope to directories changed, e.g., `bazel test //auction_tracker_api:all`)
+1. First, perform a code review of generated code
+2. Then, run tests to ensure everything works: `bazel test //...` (or scope to directories changed, e.g., `bazel test //auction_tracker_api:all`)
+3. Then, tidy up Bazel module dependencies: `bazel mod tidy`
+4. Finally, format all code files: `bazel run //:format`
 
 These commands should be run:
 
@@ -33,6 +34,16 @@ These commands should be run:
 - Before creating a pull request
 - After addressing review comments that involved code changes
 - Any time significant code modifications have been made
+
+## Code review checklist
+
+When performing the code review step, check for:
+
+- **Import optimization**: Ensure all imports are used instead of fully qualified names (e.g., `import java.util.ArrayList;` instead of `java.util.ArrayList`)
+- **Comment quality**: Remove comments that don't add value over what is already communicated in the code
+- **Code clarity**: Verify that the code is self-explanatory and follows established patterns
+- **Style consistency**: Check that the code follows all style guidelines and matches surrounding code
+- **Unnecessary complexity**: Simplify code where possible without losing functionality
 
 ## Bazel guidelines
 
