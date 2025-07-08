@@ -190,8 +190,10 @@ def find_youtube_videos_watched():
 
             # Extract video ID from https://youtube.com?v= format
             match = re.search(r"youtube\.com.*[?&]v=([a-zA-Z0-9_-]{11})", line)
-            if match:
-                video_ids.append(match.group(1))
+            if not match:
+                raise Exception(f"Unable to extract YouTube video ID from line: {line}")
+
+            video_ids.append(match.group(1))
 
     return video_ids
 
