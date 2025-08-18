@@ -129,7 +129,10 @@ public class ProductsFactoryImpl implements ProductsFactory {
           new Product(
               URI.create(
                   "https://www.chemistwarehouse.co.nz/buy/136023/quest-protein-bar-dipped-choc-chip-cookie-dough-50g"),
-              "Quest Protein Bar Dipped Choc Chip Cookie Dough 50g"));
+              "Quest Protein Bar Dipped Choc Chip Cookie Dough 50g"),
+          new Product(
+              URI.create("https://www.chemistwarehouse.co.nz/buy/63104/ego-qv-flare-up-cream-100g"),
+              "Ego QV Flare Up Cream 100g"));
 
   private static final List<Product> NZ_PROTEIN_PRODUCTS =
       List.of(
