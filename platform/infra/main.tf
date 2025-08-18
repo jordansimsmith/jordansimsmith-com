@@ -69,16 +69,46 @@ resource "aws_cloudwatch_metric_alarm" "lambda_failures" {
   alarm_name          = "${each.value}_failure_alarm"
   comparison_operator = "GreaterThanThreshold"
   evaluation_periods  = 1
-  metric_name         = "Errors"
-  namespace           = "AWS/Lambda"
-  period              = 3600
-  statistic           = "Sum"
-  threshold           = 1
-  alarm_description   = "This alarm monitors for failures in the ${each.value} lambda function"
+  threshold           = 10
+  alarm_description   = "This alarm monitors for >10% error rate in 24hrs for the ${each.value} lambda function"
   treat_missing_data  = "notBreaching"
 
-  dimensions = {
-    FunctionName = each.value
+  metric_query {
+    id          = "errors"
+    return_data = false
+
+    metric {
+      metric_name = "Errors"
+      namespace   = "AWS/Lambda"
+      period      = 86400
+      stat        = "Sum"
+
+      dimensions = {
+        FunctionName = each.value
+      }
+    }
+  }
+
+  metric_query {
+    id          = "invocations"
+    return_data = false
+
+    metric {
+      metric_name = "Invocations"
+      namespace   = "AWS/Lambda"
+      period      = 86400
+      stat        = "Sum"
+
+      dimensions = {
+        FunctionName = each.value
+      }
+    }
+  }
+
+  metric_query {
+    id          = "error_rate"
+    return_data = true
+    expression  = "(errors / invocations) * 100"
   }
 
   alarm_actions = [aws_sns_topic.lambda_failure_notifications.arn]
