@@ -235,6 +235,80 @@ class JsoupGoMediaEventClientTest {
   }
 
   @Test
+  void shouldDefaultToMidnightWhenNoTimeInfoAvailable() {
+    // arrange - using real HTML from
+    // https://www.aucklandstadiums.co.nz/event/kiwis-and-kiwi-ferns-vs-samoa-2025
+    var mainPageWithKiwisEventHtml =
+        """
+        <html>
+          <body>
+            <article class="new-tile-event">
+              <h5>Kiwis and Kiwi Ferns vs Samoa 2025</h5>
+              <p class="event-date">19 October 2025</p>
+              <p class="location">Go Media Stadium</p>
+              <a class="new-tile-inner" href="/event/kiwis-and-kiwi-ferns-vs-samoa-2025"></a>
+            </article>
+          </body>
+        </html>
+        """;
+
+    var kiwisEventPageHtml =
+        """
+        <html>
+          <body>
+            <h1 class="event-hero-carousel-heading">Kiwis and Kiwi Ferns vs Samoa 2025</h1>
+            <span class="event-hero-carousel-detail">
+              <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true" focusable="true" name="event-calendar" class="icon" type="default">
+                <title>Event Calendar</title>
+                <use xlink:href="/static/assets/images/sprite.89806abf415d74b426d4.svg#event-calendar"></use>
+              </svg>
+              19 October 2025
+            </span>
+            <span class="event-hero-carousel-detail icon">
+              <svg width="40" height="40" viewBox="0 0 40 40" aria-hidden="true" focusable="true" name="location" class="icon" type="default">
+                <title>Location</title>
+                <use xlink:href="/static/assets/images/sprite.89806abf415d74b426d4.svg#location"></use>
+              </svg>
+              Go Media Stadium
+            </span>
+            <div class="event-summary">
+              <ul>
+                <li style='background-image: url(/static/assets/images/accessible-seating.e6474850906ba2f3fb72.svg)'>Accessible seating available</li>
+                <li style='background-image: url(/static/assets/images/bag-restrictions.24f533148fd11e62ac3f.svg)'>Bag size restrictions apply</li>
+              </ul>
+            </div>
+          </body>
+        </html>
+        """;
+
+    JsoupGoMediaEventClient testClient =
+        new JsoupGoMediaEventClient() {
+          @Override
+          protected Document fetchDocument(String url) {
+            if (url.equals(STADIUM_URL)) {
+              return Jsoup.parse(mainPageWithKiwisEventHtml);
+            } else if (url.equals(BASE_URL + "/event/kiwis-and-kiwi-ferns-vs-samoa-2025")) {
+              return Jsoup.parse(kiwisEventPageHtml);
+            } else {
+              throw new AssertionError("Unexpected URL in test: " + url);
+            }
+          }
+        };
+
+    // act
+    var events = testClient.getEvents();
+
+    // assert
+    // Should default to 00:00 (midnight) when no time information is available
+    assertThat(events).hasSize(1);
+    var expectedTime = LocalDateTime.of(2025, 10, 19, 0, 0).atZone(AUCKLAND_ZONE).toInstant();
+    assertThat(events.get(0).startTime()).isEqualTo(expectedTime);
+    assertThat(events.get(0).title()).isEqualTo("Kiwis and Kiwi Ferns vs Samoa 2025");
+    assertThat(events.get(0).eventInfo())
+        .isEqualTo("Accessible seating available, Bag size restrictions apply");
+  }
+
+  @Test
   void shouldSkipInvalidTimesInEventInfo() {
     // arrange
     var mainPageWithEventHtml =

@@ -118,7 +118,13 @@ public class JsoupGoMediaEventClient implements GoMediaEventClient {
         LOGGER.warn("Invalid time format found: '{}'. Error: {}", timeStr, e.getMessage());
       }
     }
-    var startTime = times.stream().max(LocalTime::compareTo).orElseThrow();
+    if (times.isEmpty()) {
+      LOGGER.warn(
+          "No valid times found in event info '{}' for URL: {}, using default time of 00:00",
+          info,
+          url);
+    }
+    var startTime = times.stream().max(LocalTime::compareTo).orElse(LocalTime.of(0, 0));
     var startDateTime = LocalDateTime.of(date, startTime);
 
     return new GoMediaEvent(
