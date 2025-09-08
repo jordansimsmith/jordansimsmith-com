@@ -1020,6 +1020,314 @@
       }
     },
     "@@rules_go~//go:extensions.bzl%go_sdk": {
+      "os:linux,arch:amd64": {
+        "bzlTransitiveDigest": "fK3GqLInigj3o/uF7GxGupDIx1/zwjkhwIwkQytZZ/4=",
+        "usagesDigest": "hDVusLfvhtwQv2rBEYrGxjx747n7ssnCTHRZI/1Sfk4=",
+        "recordedFileInputs": {},
+        "recordedDirentsInputs": {},
+        "envVariables": {},
+        "generatedRepoSpecs": {
+          "contrib_rules_jvm__download_0_linux_arm64": {
+            "bzlFile": "@@rules_go~//go/private:sdk.bzl",
+            "ruleClassName": "go_download_sdk_rule",
+            "attributes": {
+              "goos": "",
+              "goarch": "",
+              "sdks": {},
+              "urls": [
+                "https://dl.google.com/go/{}"
+              ],
+              "version": "1.21.5"
+            }
+          },
+          "rules_go__download_0_darwin_arm64": {
+            "bzlFile": "@@rules_go~//go/private:sdk.bzl",
+            "ruleClassName": "go_download_sdk_rule",
+            "attributes": {
+              "goos": "",
+              "goarch": "",
+              "sdks": {},
+              "urls": [
+                "https://dl.google.com/go/{}"
+              ],
+              "version": "1.21.1"
+            }
+          },
+          "go_host_compatible_sdk_label": {
+            "bzlFile": "@@rules_go~//go/private:extensions.bzl",
+            "ruleClassName": "host_compatible_toolchain",
+            "attributes": {
+              "toolchain": "@contrib_rules_jvm__download_0//:ROOT"
+            }
+          },
+          "rules_go__download_0_darwin_amd64": {
+            "bzlFile": "@@rules_go~//go/private:sdk.bzl",
+            "ruleClassName": "go_download_sdk_rule",
+            "attributes": {
+              "goos": "",
+              "goarch": "",
+              "sdks": {},
+              "urls": [
+                "https://dl.google.com/go/{}"
+              ],
+              "version": "1.21.1"
+            }
+          },
+          "contrib_rules_jvm__download_0_darwin_arm64": {
+            "bzlFile": "@@rules_go~//go/private:sdk.bzl",
+            "ruleClassName": "go_download_sdk_rule",
+            "attributes": {
+              "goos": "",
+              "goarch": "",
+              "sdks": {},
+              "urls": [
+                "https://dl.google.com/go/{}"
+              ],
+              "version": "1.21.5"
+            }
+          },
+          "go_toolchains": {
+            "bzlFile": "@@rules_go~//go/private:sdk.bzl",
+            "ruleClassName": "go_multiple_toolchains",
+            "attributes": {
+              "prefixes": [
+                "_0000_contrib_rules_jvm__download_0_",
+                "_0001_contrib_rules_jvm__download_0_darwin_amd64_",
+                "_0002_contrib_rules_jvm__download_0_darwin_arm64_",
+                "_0003_contrib_rules_jvm__download_0_linux_arm64_",
+                "_0004_contrib_rules_jvm__download_0_windows_amd64_",
+                "_0005_contrib_rules_jvm__download_0_windows_arm64_",
+                "_0006_go_default_sdk_",
+                "_0007_rules_go__download_0_darwin_amd64_",
+                "_0008_rules_go__download_0_darwin_arm64_",
+                "_0009_rules_go__download_0_linux_arm64_",
+                "_0010_rules_go__download_0_windows_amd64_",
+                "_0011_rules_go__download_0_windows_arm64_"
+              ],
+              "geese": [
+                "",
+                "darwin",
+                "darwin",
+                "linux",
+                "windows",
+                "windows",
+                "",
+                "darwin",
+                "darwin",
+                "linux",
+                "windows",
+                "windows"
+              ],
+              "goarchs": [
+                "",
+                "amd64",
+                "arm64",
+                "arm64",
+                "amd64",
+                "arm64",
+                "",
+                "amd64",
+                "arm64",
+                "arm64",
+                "amd64",
+                "arm64"
+              ],
+              "sdk_repos": [
+                "contrib_rules_jvm__download_0",
+                "contrib_rules_jvm__download_0_darwin_amd64",
+                "contrib_rules_jvm__download_0_darwin_arm64",
+                "contrib_rules_jvm__download_0_linux_arm64",
+                "contrib_rules_jvm__download_0_windows_amd64",
+                "contrib_rules_jvm__download_0_windows_arm64",
+                "go_default_sdk",
+                "rules_go__download_0_darwin_amd64",
+                "rules_go__download_0_darwin_arm64",
+                "rules_go__download_0_linux_arm64",
+                "rules_go__download_0_windows_amd64",
+                "rules_go__download_0_windows_arm64"
+              ],
+              "sdk_types": [
+                "remote",
+                "remote",
+                "remote",
+                "remote",
+                "remote",
+                "remote",
+                "remote",
+                "remote",
+                "remote",
+                "remote",
+                "remote",
+                "remote"
+              ],
+              "sdk_versions": [
+                "1.21.5",
+                "1.21.5",
+                "1.21.5",
+                "1.21.5",
+                "1.21.5",
+                "1.21.5",
+                "1.21.1",
+                "1.21.1",
+                "1.21.1",
+                "1.21.1",
+                "1.21.1",
+                "1.21.1"
+              ]
+            }
+          },
+          "contrib_rules_jvm__download_0": {
+            "bzlFile": "@@rules_go~//go/private:sdk.bzl",
+            "ruleClassName": "go_download_sdk_rule",
+            "attributes": {
+              "goos": "",
+              "goarch": "",
+              "sdks": {},
+              "experiments": [],
+              "patches": [],
+              "patch_strip": 0,
+              "urls": [
+                "https://dl.google.com/go/{}"
+              ],
+              "version": "1.21.5",
+              "strip_prefix": "go"
+            }
+          },
+          "contrib_rules_jvm__download_0_darwin_amd64": {
+            "bzlFile": "@@rules_go~//go/private:sdk.bzl",
+            "ruleClassName": "go_download_sdk_rule",
+            "attributes": {
+              "goos": "",
+              "goarch": "",
+              "sdks": {},
+              "urls": [
+                "https://dl.google.com/go/{}"
+              ],
+              "version": "1.21.5"
+            }
+          },
+          "io_bazel_rules_nogo": {
+            "bzlFile": "@@rules_go~//go/private:nogo.bzl",
+            "ruleClassName": "go_register_nogo",
+            "attributes": {
+              "nogo": "@io_bazel_rules_go//:default_nogo",
+              "includes": [
+                "'@@//:__subpackages__'"
+              ],
+              "excludes": []
+            }
+          },
+          "rules_go__download_0_windows_arm64": {
+            "bzlFile": "@@rules_go~//go/private:sdk.bzl",
+            "ruleClassName": "go_download_sdk_rule",
+            "attributes": {
+              "goos": "",
+              "goarch": "",
+              "sdks": {},
+              "urls": [
+                "https://dl.google.com/go/{}"
+              ],
+              "version": "1.21.1"
+            }
+          },
+          "rules_go__download_0_linux_arm64": {
+            "bzlFile": "@@rules_go~//go/private:sdk.bzl",
+            "ruleClassName": "go_download_sdk_rule",
+            "attributes": {
+              "goos": "",
+              "goarch": "",
+              "sdks": {},
+              "urls": [
+                "https://dl.google.com/go/{}"
+              ],
+              "version": "1.21.1"
+            }
+          },
+          "contrib_rules_jvm__download_0_windows_arm64": {
+            "bzlFile": "@@rules_go~//go/private:sdk.bzl",
+            "ruleClassName": "go_download_sdk_rule",
+            "attributes": {
+              "goos": "",
+              "goarch": "",
+              "sdks": {},
+              "urls": [
+                "https://dl.google.com/go/{}"
+              ],
+              "version": "1.21.5"
+            }
+          },
+          "go_default_sdk": {
+            "bzlFile": "@@rules_go~//go/private:sdk.bzl",
+            "ruleClassName": "go_download_sdk_rule",
+            "attributes": {
+              "goos": "",
+              "goarch": "",
+              "sdks": {},
+              "experiments": [],
+              "patches": [],
+              "patch_strip": 0,
+              "urls": [
+                "https://dl.google.com/go/{}"
+              ],
+              "version": "1.21.1",
+              "strip_prefix": "go"
+            }
+          },
+          "contrib_rules_jvm__download_0_windows_amd64": {
+            "bzlFile": "@@rules_go~//go/private:sdk.bzl",
+            "ruleClassName": "go_download_sdk_rule",
+            "attributes": {
+              "goos": "",
+              "goarch": "",
+              "sdks": {},
+              "urls": [
+                "https://dl.google.com/go/{}"
+              ],
+              "version": "1.21.5"
+            }
+          },
+          "rules_go__download_0_windows_amd64": {
+            "bzlFile": "@@rules_go~//go/private:sdk.bzl",
+            "ruleClassName": "go_download_sdk_rule",
+            "attributes": {
+              "goos": "",
+              "goarch": "",
+              "sdks": {},
+              "urls": [
+                "https://dl.google.com/go/{}"
+              ],
+              "version": "1.21.1"
+            }
+          }
+        },
+        "recordedRepoMappingEntries": [
+          [
+            "bazel_features~",
+            "bazel_features_globals",
+            "bazel_features~~version_extension~bazel_features_globals"
+          ],
+          [
+            "bazel_features~",
+            "bazel_features_version",
+            "bazel_features~~version_extension~bazel_features_version"
+          ],
+          [
+            "rules_go~",
+            "bazel_tools",
+            "bazel_tools"
+          ],
+          [
+            "rules_go~",
+            "io_bazel_rules_go",
+            "rules_go~"
+          ],
+          [
+            "rules_go~",
+            "io_bazel_rules_go_bazel_features",
+            "bazel_features~"
+          ]
+        ]
+      },
       "os:osx,arch:aarch64": {
         "bzlTransitiveDigest": "fK3GqLInigj3o/uF7GxGupDIx1/zwjkhwIwkQytZZ/4=",
         "usagesDigest": "hDVusLfvhtwQv2rBEYrGxjx747n7ssnCTHRZI/1Sfk4=",
@@ -1602,7 +1910,7 @@
     "@@rules_oci~//oci:extensions.bzl%oci": {
       "general": {
         "bzlTransitiveDigest": "E8wOpHCUo+mr+UGL0h2GdsIy9PUiFkrq0BYRSaLES0Q=",
-        "usagesDigest": "Yfs0NVgvOiiz/IRAqIUDz1GMGIh6qknkJKQl6Dl6UCE=",
+        "usagesDigest": "vs/yu6AUJC+VNnpLShKcYEWsJF414j2wF1QMfoQPHG8=",
         "recordedFileInputs": {},
         "recordedDirentsInputs": {},
         "envVariables": {},
@@ -1694,7 +2002,7 @@
               "scheme": "https",
               "registry": "index.docker.io",
               "repository": "amazon/dynamodb-local",
-              "identifier": "2.5.2",
+              "identifier": "sha256:d7ebddeb60fa418bcda218a6c6a402a58441b2a20d54c9cb1d85fd5194341753",
               "platform": "linux/amd64",
               "target_name": "dynamodb_linux_amd64",
               "bazel_tags": []
@@ -1761,7 +2069,7 @@
               "scheme": "https",
               "registry": "index.docker.io",
               "repository": "localstack/localstack",
-              "identifier": "3.8.0",
+              "identifier": "sha256:f1db6c829fd3ab8db21007e91f62b6f76396722fcbaf6d223a8110f42482fd7e",
               "platform": "linux/arm64",
               "target_name": "localstack_linux_arm64",
               "bazel_tags": []
@@ -1790,7 +2098,7 @@
               "scheme": "https",
               "registry": "index.docker.io",
               "repository": "testcontainers/ryuk",
-              "identifier": "0.7.0",
+              "identifier": "sha256:bcbee39cd601396958ba1bd06ea14ad64ce0ea709de29a427d741d1f5262080a",
               "platforms": {
                 "@@platforms//cpu:x86_64": "@ryuk_linux_amd64",
                 "@@platforms//cpu:arm64": "@ryuk_linux_arm64"
@@ -1814,7 +2122,7 @@
               "scheme": "https",
               "registry": "index.docker.io",
               "repository": "amazon/dynamodb-local",
-              "identifier": "2.5.2",
+              "identifier": "sha256:d7ebddeb60fa418bcda218a6c6a402a58441b2a20d54c9cb1d85fd5194341753",
               "platforms": {
                 "@@platforms//cpu:x86_64": "@dynamodb_linux_amd64",
                 "@@platforms//cpu:arm64": "@dynamodb_linux_arm64"
@@ -1830,7 +2138,7 @@
               "scheme": "https",
               "registry": "index.docker.io",
               "repository": "library/alpine",
-              "identifier": "3.17",
+              "identifier": "sha256:8fc3dacfb6d69da8d44e42390de777e48577085db99aa4e4af35f483eb08b989",
               "platform": "linux/arm64/v8",
               "target_name": "alpine_linux_arm64_v8",
               "bazel_tags": []
@@ -1874,7 +2182,7 @@
               "scheme": "https",
               "registry": "index.docker.io",
               "repository": "localstack/localstack",
-              "identifier": "3.8.0",
+              "identifier": "sha256:f1db6c829fd3ab8db21007e91f62b6f76396722fcbaf6d223a8110f42482fd7e",
               "platforms": {
                 "@@platforms//cpu:x86_64": "@localstack_linux_amd64",
                 "@@platforms//cpu:arm64": "@localstack_linux_arm64"
@@ -1906,7 +2214,7 @@
               "scheme": "https",
               "registry": "index.docker.io",
               "repository": "library/alpine",
-              "identifier": "3.17",
+              "identifier": "sha256:8fc3dacfb6d69da8d44e42390de777e48577085db99aa4e4af35f483eb08b989",
               "platforms": {
                 "@@platforms//cpu:x86_64": "@alpine_linux_amd64",
                 "@@platforms//cpu:arm64": "@alpine_linux_arm64_v8"
@@ -1944,7 +2252,7 @@
               "scheme": "https",
               "registry": "index.docker.io",
               "repository": "amazon/dynamodb-local",
-              "identifier": "2.5.2",
+              "identifier": "sha256:d7ebddeb60fa418bcda218a6c6a402a58441b2a20d54c9cb1d85fd5194341753",
               "platform": "linux/arm64",
               "target_name": "dynamodb_linux_arm64",
               "bazel_tags": []
@@ -1964,7 +2272,7 @@
               "scheme": "https",
               "registry": "index.docker.io",
               "repository": "localstack/localstack",
-              "identifier": "3.8.0",
+              "identifier": "sha256:f1db6c829fd3ab8db21007e91f62b6f76396722fcbaf6d223a8110f42482fd7e",
               "platform": "linux/amd64",
               "target_name": "localstack_linux_amd64",
               "bazel_tags": []
@@ -2052,7 +2360,7 @@
               "scheme": "https",
               "registry": "index.docker.io",
               "repository": "testcontainers/ryuk",
-              "identifier": "0.7.0",
+              "identifier": "sha256:bcbee39cd601396958ba1bd06ea14ad64ce0ea709de29a427d741d1f5262080a",
               "platform": "linux/arm64",
               "target_name": "ryuk_linux_arm64",
               "bazel_tags": []
@@ -2108,7 +2416,7 @@
               "scheme": "https",
               "registry": "index.docker.io",
               "repository": "library/alpine",
-              "identifier": "3.17",
+              "identifier": "sha256:8fc3dacfb6d69da8d44e42390de777e48577085db99aa4e4af35f483eb08b989",
               "platform": "linux/amd64",
               "target_name": "alpine_linux_amd64",
               "bazel_tags": []
@@ -2179,7 +2487,7 @@
               "scheme": "https",
               "registry": "index.docker.io",
               "repository": "testcontainers/ryuk",
-              "identifier": "0.7.0",
+              "identifier": "sha256:bcbee39cd601396958ba1bd06ea14ad64ce0ea709de29a427d741d1f5262080a",
               "platform": "linux/amd64",
               "target_name": "ryuk_linux_amd64",
               "bazel_tags": []

@@ -64,6 +64,7 @@ bazel_dep(name = "rules_oci", version = "2.0.0-beta1")
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 oci.pull(
     name = "dynamodb",
+    digest = "sha256:d7ebddeb60fa418bcda218a6c6a402a58441b2a20d54c9cb1d85fd5194341753",
     image = "docker.io/amazon/dynamodb-local",
     platforms = [
         "linux/amd64",
@@ -73,6 +74,7 @@ oci.pull(
 )
 oci.pull(
     name = "alpine",
+    digest = "sha256:8fc3dacfb6d69da8d44e42390de777e48577085db99aa4e4af35f483eb08b989",
     image = "docker.io/library/alpine",
     platforms = [
         "linux/amd64",
@@ -82,6 +84,7 @@ oci.pull(
 )
 oci.pull(
     name = "ryuk",
+    digest = "sha256:bcbee39cd601396958ba1bd06ea14ad64ce0ea709de29a427d741d1f5262080a",
     image = "docker.io/testcontainers/ryuk",
     platforms = [
         "linux/amd64",
@@ -91,6 +94,7 @@ oci.pull(
 )
 oci.pull(
     name = "localstack",
+    digest = "sha256:f1db6c829fd3ab8db21007e91f62b6f76396722fcbaf6d223a8110f42482fd7e",
     image = "docker.io/localstack/localstack",
     platforms = [
         "linux/amd64",
