@@ -4,6 +4,7 @@ import com.google.common.base.Preconditions;
 import com.jordansimsmith.testcontainers.LoadedImage;
 import java.io.IOException;
 import java.net.URI;
+import java.time.Duration;
 import java.util.Properties;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,6 +33,7 @@ public abstract class LocalStackContainer<T extends LocalStackContainer<T>>
             .forResponsePredicate(
                 res ->
                     res.contains("\"completed\": true") && !res.contains("\"state\": \"ERROR\"")));
+    this.withStartupTimeout(Duration.ofMinutes(2));
     this.withLogConsumer(new Slf4jLogConsumer(LOGGER).withSeparateOutputStreams());
   }
 
