@@ -145,7 +145,19 @@ public class ProductsFactoryImpl implements ProductsFactory {
           new Product(
               URI.create(
                   "https://nzmuscle.co.nz/products/shotgun-whey-protein?variant=51471561195701"),
-              "Shotgun Whey Protein Chocolate 2kg"));
+              "Shotgun Whey Protein Chocolate 2kg"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/shotgun-whey-protein?variant=51471561162933"),
+              "Shotgun Whey Protein Vanilla 2kg"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/shotgun-whey-protein?variant=51471561228469"),
+              "Shotgun Whey Protein Strawberry 2kg"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/shotgun-whey-protein?variant=51471561261237"),
+              "Shotgun Whey Protein Banana 2kg"));
 
   @Override
   public List<Product> findProducts() {
