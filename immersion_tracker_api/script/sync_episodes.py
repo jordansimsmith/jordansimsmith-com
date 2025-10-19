@@ -123,10 +123,6 @@ def get_remote_show_progress():
     print(f"{youtube_videos_watched_today} YouTube videos watched today.")
     print()
     display_weekly_activity(res["daily_activity"])
-    print()
-    print(
-        f"{total_hours_watched} total hour{'' if total_hours_watched == 1 else 's'} watched."
-    )
 
     weekly_trend_percentage = res.get("weekly_trend_percentage")
     if weekly_trend_percentage is not None:
@@ -135,6 +131,10 @@ def get_remote_show_progress():
             f"This week's activity is {'+' if trend_percentage > 0 else ''}{trend_percentage}% compared to the average."
         )
 
+    print()
+    print(
+        f"{total_hours_watched} total hour{'' if total_hours_watched == 1 else 's'} watched."
+    )
     print(
         f"{years_since_first_episode} year{'' if years_since_first_episode == 1 else 's'} and {months_since_first_episode} month{'' if months_since_first_episode == 1 else 's'} since immersion started."
     )
@@ -249,15 +249,12 @@ def display_weekly_activity(daily_activity):
         bar_padded = bar.ljust(bar_width)
 
         # format time
-        if minutes == 0:
-            time_str = "0m"
+        hours = minutes // 60
+        mins = minutes % 60
+        if hours > 0:
+            time_str = f"{hours}h {mins}m"
         else:
-            hours = minutes // 60
-            mins = minutes % 60
-            if hours > 0:
-                time_str = f"{hours}h {mins}m" if mins > 0 else f"{hours}h"
-            else:
-                time_str = f"{mins}m"
+            time_str = f"{mins}m"
 
         # print line
         print(f"{label:<11}│{bar_padded}  {time_str:>7}")
