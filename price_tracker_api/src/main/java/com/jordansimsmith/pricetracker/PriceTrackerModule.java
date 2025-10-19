@@ -28,7 +28,8 @@ public class PriceTrackerModule {
     var extractors =
         Map.of(
             "www.chemistwarehouse.co.nz", new ChemistWarehousePriceExtractor(),
-            "www.nzprotein.co.nz", new NzProteinPriceExtractor());
+            "www.nzprotein.co.nz", new NzProteinPriceExtractor(),
+            "nzmuscle.co.nz", new NzMusclePriceExtractor());
 
     return new JsoupPriceClient(randomGenerator, extractors);
   }

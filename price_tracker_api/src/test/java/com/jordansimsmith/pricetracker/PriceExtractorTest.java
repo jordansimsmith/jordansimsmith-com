@@ -126,4 +126,60 @@ public class PriceExtractorTest {
     // assert
     assertThat(price).isNull();
   }
+
+  @Test
+  void nzMuscleExtractorShouldExtractPrice() {
+    // arrange
+    var html =
+        """
+        <html>
+          <body>
+            <span class="price-item price-item--regular">$92.50</span>
+          </body>
+        </html>
+        """;
+    var document = Jsoup.parse(html);
+    var extractor = new NzMusclePriceExtractor();
+
+    // act
+    var price = extractor.extractPrice(document);
+
+    // assert
+    assertThat(price).isEqualTo(92.50);
+  }
+
+  @Test
+  void nzMuscleExtractorShouldReturnNullWhenElementNotFound() {
+    // arrange
+    var html = "<html><body></body></html>";
+    var document = Jsoup.parse(html);
+    var extractor = new NzMusclePriceExtractor();
+
+    // act
+    var price = extractor.extractPrice(document);
+
+    // assert
+    assertThat(price).isNull();
+  }
+
+  @Test
+  void nzMuscleExtractorShouldReturnNullWhenPriceIsInvalid() {
+    // arrange
+    var html =
+        """
+        <html>
+          <body>
+            <span class="price-item price-item--regular">Invalid Price</span>
+          </body>
+        </html>
+        """;
+    var document = Jsoup.parse(html);
+    var extractor = new NzMusclePriceExtractor();
+
+    // act
+    var price = extractor.extractPrice(document);
+
+    // assert
+    assertThat(price).isNull();
+  }
 }

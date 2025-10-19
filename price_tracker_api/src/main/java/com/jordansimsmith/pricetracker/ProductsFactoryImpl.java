@@ -140,11 +140,19 @@ public class ProductsFactoryImpl implements ProductsFactory {
               URI.create("https://www.nzprotein.co.nz/product/nz-whey-1kg-2-2lbs"),
               "NZ Protein - NZ Whey 1kg (2.2lbs)"));
 
+  private static final List<Product> NZ_MUSCLE_PRODUCTS =
+      List.of(
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/shotgun-whey-protein?variant=51471561195701"),
+              "Shotgun Whey Protein Chocolate 2kg"));
+
   @Override
   public List<Product> findProducts() {
     var allProducts = new ArrayList<Product>();
     allProducts.addAll(CHEMIST_WAREHOUSE_PRODUCTS);
     allProducts.addAll(NZ_PROTEIN_PRODUCTS);
+    allProducts.addAll(NZ_MUSCLE_PRODUCTS);
     return allProducts;
   }
 }
