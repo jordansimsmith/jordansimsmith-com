@@ -73,13 +73,29 @@ public class SyncYoutubeHandler
                   .sortValue(ImmersionTrackerItem.formatYoutubeVideoSk(videoId))
                   .build());
 
-      if (existingVideo == null) {
-        var video = youtubeClient.getVideo(videoId);
-        var videoItem =
-            ImmersionTrackerItem.createYoutubeVideo(
-                user, video.channelId(), video.id(), video.title(), video.duration(), now);
-        immersionTrackerTable.putItem(videoItem);
-        videosAdded++;
+      if (existingVideo != null) {
+        continue;
+      }
+
+      var video = youtubeClient.getVideo(videoId);
+      var videoItem =
+          ImmersionTrackerItem.createYoutubeVideo(
+              user, video.channelId(), video.id(), video.title(), video.duration(), now);
+      immersionTrackerTable.putItem(videoItem);
+      videosAdded++;
+
+      var existingChannel =
+          immersionTrackerTable.getItem(
+              Key.builder()
+                  .partitionValue(ImmersionTrackerItem.formatPk(user))
+                  .sortValue(ImmersionTrackerItem.formatYoutubeChannelSk(video.channelId()))
+                  .build());
+
+      if (existingChannel == null) {
+        var channelItem =
+            ImmersionTrackerItem.createYoutubeChannel(
+                user, video.channelId(), video.channelTitle());
+        immersionTrackerTable.putItem(channelItem);
       }
     }
 

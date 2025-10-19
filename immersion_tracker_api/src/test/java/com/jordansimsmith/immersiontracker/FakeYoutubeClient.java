@@ -15,7 +15,8 @@ public class FakeYoutubeClient implements YoutubeClient {
     return video;
   }
 
-  public void setVideo(String videoId, String title, String channelId, Duration duration) {
-    videos.put(videoId, new Video(videoId, title, channelId, duration));
+  public void setVideo(
+      String videoId, String title, String channelId, String channelTitle, Duration duration) {
+    videos.put(videoId, new Video(videoId, title, channelId, channelTitle, duration));
   }
 }

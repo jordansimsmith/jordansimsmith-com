@@ -55,9 +55,14 @@ public class SyncYoutubeHandlerIntegrationTest {
         "dQw4w9WgXcQ",
         "Never Gonna Give You Up",
         "UCuAXFkgsw1L7xaCfnd5JJOw",
+        "Rick Astley",
         Duration.ofMinutes(3).plusSeconds(32));
     fakeYoutubeClient.setVideo(
-        "jNhQd1gUEFo", "Test Video", "UCTestChannel", Duration.ofMinutes(5).plusSeconds(15));
+        "jNhQd1gUEFo",
+        "Test Video",
+        "UCTestChannel",
+        "Test Channel",
+        Duration.ofMinutes(5).plusSeconds(15));
 
     var videoIds = List.of("dQw4w9WgXcQ", "jNhQd1gUEFo");
     var body = objectMapper.writeValueAsString(new SyncYoutubeHandler.SyncYoutubeRequest(videoIds));
@@ -92,7 +97,7 @@ public class SyncYoutubeHandlerIntegrationTest {
             .stream()
             .toList();
 
-    assertThat(items).hasSize(2);
+    assertThat(items).hasSize(4);
 
     var video1 =
         ImmersionTrackerItem.createYoutubeVideo(
@@ -113,6 +118,13 @@ public class SyncYoutubeHandlerIntegrationTest {
             Duration.ofMinutes(5).plusSeconds(15),
             clock.now());
     assertThat(items).contains(video2);
+
+    var channel1 =
+        ImmersionTrackerItem.createYoutubeChannel(user, "UCuAXFkgsw1L7xaCfnd5JJOw", "Rick Astley");
+    assertThat(items).contains(channel1);
+
+    var channel2 = ImmersionTrackerItem.createYoutubeChannel(user, "UCTestChannel", "Test Channel");
+    assertThat(items).contains(channel2);
   }
 
   @Test
@@ -125,6 +137,7 @@ public class SyncYoutubeHandlerIntegrationTest {
         "dQw4w9WgXcQ",
         "Never Gonna Give You Up",
         "UCuAXFkgsw1L7xaCfnd5JJOw",
+        "Rick Astley",
         Duration.ofMinutes(3).plusSeconds(32));
 
     // Pre-populate with existing video
@@ -173,5 +186,82 @@ public class SyncYoutubeHandlerIntegrationTest {
     // Should still have only the original video
     assertThat(items).hasSize(1);
     assertThat(items.get(0)).isEqualTo(existingVideo);
+  }
+
+  @Test
+  void handleRequestShouldNotDuplicateChannels() throws Exception {
+    // arrange
+    clock.setTime(Instant.ofEpochMilli(123_000));
+    var user = "alice";
+
+    fakeYoutubeClient.setVideo(
+        "video1",
+        "Video 1",
+        "UCTestChannel",
+        "Test Channel",
+        Duration.ofMinutes(5).plusSeconds(15));
+    fakeYoutubeClient.setVideo(
+        "video2",
+        "Video 2",
+        "UCTestChannel",
+        "Test Channel",
+        Duration.ofMinutes(3).plusSeconds(20));
+
+    var videoIds = List.of("video1", "video2");
+    var body = objectMapper.writeValueAsString(new SyncYoutubeHandler.SyncYoutubeRequest(videoIds));
+
+    // act
+    var req =
+        APIGatewayV2HTTPEvent.builder()
+            .withQueryStringParameters(Map.of("user", user))
+            .withBody(body)
+            .build();
+    var res = syncYoutubeHandler.handleRequest(req, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(200);
+
+    var videosAdded =
+        objectMapper.readValue(res.getBody(), SyncYoutubeHandler.SyncYoutubeResponse.class);
+    assertThat(videosAdded.videosAdded()).isEqualTo(2);
+
+    var items =
+        immersionTrackerTable
+            .query(
+                QueryEnhancedRequest.builder()
+                    .queryConditional(
+                        QueryConditional.keyEqualTo(
+                            Key.builder()
+                                .partitionValue(ImmersionTrackerItem.formatPk(user))
+                                .build()))
+                    .build())
+            .items()
+            .stream()
+            .toList();
+
+    assertThat(items).hasSize(3);
+
+    var video1 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user,
+            "UCTestChannel",
+            "video1",
+            "Video 1",
+            Duration.ofMinutes(5).plusSeconds(15),
+            clock.now());
+    assertThat(items).contains(video1);
+
+    var video2 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user,
+            "UCTestChannel",
+            "video2",
+            "Video 2",
+            Duration.ofMinutes(3).plusSeconds(20),
+            clock.now());
+    assertThat(items).contains(video2);
+
+    var channel = ImmersionTrackerItem.createYoutubeChannel(user, "UCTestChannel", "Test Channel");
+    assertThat(items).contains(channel);
   }
 }

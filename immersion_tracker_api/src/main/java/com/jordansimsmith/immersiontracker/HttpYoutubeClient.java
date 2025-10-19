@@ -41,7 +41,9 @@ public class HttpYoutubeClient implements YoutubeClient {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record VideoSnippet(
-      @JsonProperty("title") String title, @JsonProperty("channelId") String channelId) {}
+      @JsonProperty("title") String title,
+      @JsonProperty("channelId") String channelId,
+      @JsonProperty("channelTitle") String channelTitle) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record VideoContentDetails(@JsonProperty("duration") String duration) {}
@@ -97,11 +99,17 @@ public class HttpYoutubeClient implements YoutubeClient {
 
     Preconditions.checkNotNull(item.snippet().title(), "Video title is null");
     Preconditions.checkNotNull(item.snippet().channelId(), "Channel ID is null");
+    Preconditions.checkNotNull(item.snippet().channelTitle(), "Channel title is null");
     Preconditions.checkNotNull(item.contentDetails().duration(), "Video duration is null");
 
     var duration = parseIso8601Duration(item.contentDetails().duration());
 
-    return new Video(item.id(), item.snippet().title(), item.snippet().channelId(), duration);
+    return new Video(
+        item.id(),
+        item.snippet().title(),
+        item.snippet().channelId(),
+        item.snippet().channelTitle(),
+        duration);
   }
 
   @VisibleForTesting

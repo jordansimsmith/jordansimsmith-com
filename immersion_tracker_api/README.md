@@ -119,3 +119,15 @@ graph TD
   "timestamp": 1672531200
 }
 ```
+
+**YouTube channel item:**
+
+```json
+{
+  "pk": "USER#alice",
+  "sk": "YOUTUBECHANNEL#UCChannelId123",
+  "user": "alice",
+  "youtube_channel_id": "UCChannelId123",
+  "youtube_channel_title": "Example Channel"
+}
+```
