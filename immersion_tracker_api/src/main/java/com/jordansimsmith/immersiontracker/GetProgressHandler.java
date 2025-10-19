@@ -45,12 +45,18 @@ public class GetProgressHandler
       @JsonProperty("youtube_videos_watched_today") int youtubeVideosWatchedToday,
       @JsonProperty("days_since_first_episode") long daysSinceFirstEpisode,
       @Nullable @JsonProperty("weekly_trend_percentage") Double weeklyTrendPercentage,
-      @JsonProperty("shows") List<Show> shows) {}
+      @JsonProperty("shows") List<Show> shows,
+      @JsonProperty("youtube_channels") List<YoutubeChannel> youtubeChannels) {}
 
   @VisibleForTesting
   record Show(
       @Nullable @JsonProperty("name") String name,
       @JsonProperty("episodes_watched") int episodesWatched) {}
+
+  @VisibleForTesting
+  record YoutubeChannel(
+      @Nullable @JsonProperty("channel_name") String channelName,
+      @JsonProperty("videos_watched") int videosWatched) {}
 
   private record EpisodeShow(ImmersionTrackerItem episode, @Nullable ImmersionTrackerItem show) {}
 
@@ -99,6 +105,10 @@ public class GetProgressHandler
         items.stream()
             .filter(i -> i.getSk().startsWith(ImmersionTrackerItem.YOUTUBEVIDEO_PREFIX))
             .toList();
+    var youtubeChannels =
+        items.stream()
+            .filter(i -> i.getSk().startsWith(ImmersionTrackerItem.YOUTUBECHANNEL_PREFIX))
+            .toList();
 
     var now = clock.now();
     var today = now.atZone(ZONE_ID).truncatedTo(ChronoUnit.DAYS).toInstant();
@@ -112,6 +122,7 @@ public class GetProgressHandler
     var weeklyTrendPercentage =
         weeklyTrendPercentage(episodes, youtubeVideos, now, daysSinceFirstEpisode);
     var progresses = shows(episodes, shows);
+    var channelProgresses = youtubeChannels(youtubeVideos, youtubeChannels);
 
     var res =
         new GetProgressResponse(
@@ -122,7 +133,8 @@ public class GetProgressHandler
             youtubeVideosWatchedToday,
             daysSinceFirstEpisode,
             weeklyTrendPercentage,
-            progresses);
+            progresses,
+            channelProgresses);
 
     return APIGatewayV2HTTPResponse.builder()
         .withStatusCode(200)
@@ -217,6 +229,29 @@ public class GetProgressHandler
             .map(e -> new Show(Objects.requireNonNull(e.get(0).show()).getTvdbName(), e.size()));
     return Stream.concat(unknownShowsProgress, knownShowsProgress)
         .sorted(Comparator.comparing(e -> e.episodesWatched, Comparator.reverseOrder()))
+        .toList();
+  }
+
+  private List<YoutubeChannel> youtubeChannels(
+      List<ImmersionTrackerItem> youtubeVideos, List<ImmersionTrackerItem> youtubeChannels) {
+    var channelsByChannelId =
+        youtubeChannels.stream()
+            .collect(Collectors.toMap(ImmersionTrackerItem::getYoutubeChannelId, v -> v));
+    var videosByChannelId =
+        youtubeVideos.stream()
+            .collect(Collectors.groupingBy(ImmersionTrackerItem::getYoutubeChannelId));
+    return videosByChannelId.entrySet().stream()
+        .map(
+            entry -> {
+              var channelId = entry.getKey();
+              var videos = entry.getValue();
+              var channel = channelsByChannelId.get(channelId);
+              var channelName = channel != null ? channel.getYoutubeChannelTitle() : null;
+              return new YoutubeChannel(channelName, videos.size());
+            })
+        .sorted(
+            Comparator.comparing((YoutubeChannel c) -> c.videosWatched, Comparator.reverseOrder())
+                .thenComparing(c -> c.channelName, Comparator.nullsLast(Comparator.naturalOrder())))
         .toList();
   }
 }

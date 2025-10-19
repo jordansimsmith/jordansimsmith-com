@@ -97,10 +97,17 @@ def get_remote_show_progress():
         episodes_watched = show["episodes_watched"]
         print(f"{episodes_watched} episodes of {name}")
 
-    if res["shows"]:
+    if res["shows"] and res["youtube_channels"]:
         print()
-    youtube_videos_watched = res["youtube_videos_watched"]
-    print(f"{youtube_videos_watched} YouTube videos")
+
+    for channel in res["youtube_channels"]:
+        name = channel["channel_name"] or "Unknown"
+        videos_watched = channel["videos_watched"]
+        video_word = "video" if videos_watched == 1 else "videos"
+        print(f"{videos_watched} {video_word} of {name}")
+
+    if res["shows"] or res["youtube_channels"]:
+        print()
 
     episodes_watched_today = res["episodes_watched_today"]
     youtube_videos_watched_today = res["youtube_videos_watched_today"]
@@ -112,7 +119,6 @@ def get_remote_show_progress():
         (res["days_since_first_episode"] % 365) / average_days_per_month
     )
 
-    print()
     print(f"{episodes_watched_today} episodes watched today.")
     print(f"{youtube_videos_watched_today} YouTube videos watched today.")
     print()

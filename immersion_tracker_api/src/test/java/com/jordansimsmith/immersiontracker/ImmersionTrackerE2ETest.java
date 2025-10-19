@@ -127,8 +127,6 @@ public class ImmersionTrackerE2ETest {
         2 episodes of Free!
         2 episodes of ハイキュー!!
 
-        0 YouTube videos
-
         4 episodes watched today.
         0 YouTube videos watched today.
 
@@ -205,7 +203,8 @@ public class ImmersionTrackerE2ETest {
         Successfully added 2 new YouTube videos to the remote server.
         Retrieving progress summary...
 
-        2 YouTube videos
+        1 video of LuisFonsiVEVO
+        1 video of officialpsy
 
         0 episodes watched today.
         2 YouTube videos watched today.

@@ -357,4 +357,104 @@ public class GetProgressHandlerIntegrationTest {
     // Weekly trend: (40 - 33.33) / 33.33 * 100 = 20%
     assertThat(progress.weeklyTrendPercentage()).isCloseTo(20.0, within(0.1));
   }
+
+  @Test
+  void handleRequestShouldGroupYoutubeVideosByChannel() throws Exception {
+    // arrange
+    var user = "alice";
+    fakeClock.setTime(Instant.ofEpochMilli(123_000));
+    var now = fakeClock.now();
+
+    var video1 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user, "UCChannel1", "video1", "Video 1", Duration.ofMinutes(10), now);
+    var video2 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user, "UCChannel1", "video2", "Video 2", Duration.ofMinutes(15), now);
+    var video3 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user, "UCChannel2", "video3", "Video 3", Duration.ofMinutes(20), now);
+    var video4 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user, "UCChannel3", "video4", "Video 4", Duration.ofMinutes(5), now);
+    var video5 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user, "UCChannel1", "video5", "Video 5", Duration.ofMinutes(8), now);
+
+    var channel1 = ImmersionTrackerItem.createYoutubeChannel(user, "UCChannel1", "Channel One");
+    var channel2 = ImmersionTrackerItem.createYoutubeChannel(user, "UCChannel2", "Channel Two");
+    var channel3 = ImmersionTrackerItem.createYoutubeChannel(user, "UCChannel3", "Channel Three");
+
+    immersionTrackerTable.putItem(video1);
+    immersionTrackerTable.putItem(video2);
+    immersionTrackerTable.putItem(video3);
+    immersionTrackerTable.putItem(video4);
+    immersionTrackerTable.putItem(video5);
+    immersionTrackerTable.putItem(channel1);
+    immersionTrackerTable.putItem(channel2);
+    immersionTrackerTable.putItem(channel3);
+
+    // act
+    var req =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+    var res = getProgressHandler.handleRequest(req, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(200);
+
+    var progress =
+        objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
+
+    var channels = progress.youtubeChannels();
+    assertThat(channels).hasSize(3);
+    assertThat(channels.get(0).channelName()).isEqualTo("Channel One");
+    assertThat(channels.get(0).videosWatched()).isEqualTo(3);
+    assertThat(channels.get(1).channelName()).isEqualTo("Channel Three");
+    assertThat(channels.get(1).videosWatched()).isEqualTo(1);
+    assertThat(channels.get(2).channelName()).isEqualTo("Channel Two");
+    assertThat(channels.get(2).videosWatched()).isEqualTo(1);
+  }
+
+  @Test
+  void handleRequestShouldReturnUnknownChannelWhenChannelItemMissing() throws Exception {
+    // arrange
+    var user = "alice";
+    fakeClock.setTime(Instant.ofEpochMilli(123_000));
+    var now = fakeClock.now();
+
+    var video1 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user, "UCChannel1", "video1", "Video 1", Duration.ofMinutes(10), now);
+    var video2 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user, "UCChannel2", "video2", "Video 2", Duration.ofMinutes(15), now);
+    var video3 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user, "UCChannel2", "video3", "Video 3", Duration.ofMinutes(20), now);
+
+    var channel2 = ImmersionTrackerItem.createYoutubeChannel(user, "UCChannel2", "Channel Two");
+
+    immersionTrackerTable.putItem(video1);
+    immersionTrackerTable.putItem(video2);
+    immersionTrackerTable.putItem(video3);
+    immersionTrackerTable.putItem(channel2);
+
+    // act
+    var req =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+    var res = getProgressHandler.handleRequest(req, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(200);
+
+    var progress =
+        objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
+
+    var channels = progress.youtubeChannels();
+    assertThat(channels).hasSize(2);
+    assertThat(channels.get(0).channelName()).isEqualTo("Channel Two");
+    assertThat(channels.get(0).videosWatched()).isEqualTo(2);
+    assertThat(channels.get(1).channelName()).isNull();
+    assertThat(channels.get(1).videosWatched()).isEqualTo(1);
+  }
 }
