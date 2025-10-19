@@ -130,6 +130,15 @@ public class ImmersionTrackerE2ETest {
         4 episodes watched today.
         0 YouTube videos watched today.
 
+        Weekly activity:
+        6 days ago │                                     0m
+        5 days ago │                                     0m
+        4 days ago │                                     0m
+        3 days ago │                                     0m
+        2 days ago │                                     0m
+        Yesterday  │                                     0m
+        Today      │██████████████████████████████   1h 20m
+
         1 total hour watched.
         0 years and 0 months since immersion started.
 
@@ -208,6 +217,15 @@ public class ImmersionTrackerE2ETest {
 
         0 episodes watched today.
         2 YouTube videos watched today.
+
+        Weekly activity:
+        6 days ago │                                     0m
+        5 days ago │                                     0m
+        4 days ago │                                     0m
+        3 days ago │                                     0m
+        2 days ago │                                     0m
+        Yesterday  │                                     0m
+        Today      │██████████████████████████████       8m
 
         0 total hours watched.
         0 years and 0 months since immersion started.

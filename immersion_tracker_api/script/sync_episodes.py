@@ -122,6 +122,8 @@ def get_remote_show_progress():
     print(f"{episodes_watched_today} episodes watched today.")
     print(f"{youtube_videos_watched_today} YouTube videos watched today.")
     print()
+    display_weekly_activity(res["daily_activity"])
+    print()
     print(
         f"{total_hours_watched} total hour{'' if total_hours_watched == 1 else 's'} watched."
     )
@@ -218,6 +220,47 @@ def clear_youtube_watched_file():
     if os.path.isfile(youtube_file):
         # Clear the file contents
         open(youtube_file, "w").close()
+
+
+def display_weekly_activity(daily_activity):
+    print("Weekly activity:")
+
+    max_minutes = max(day["minutes_watched"] for day in daily_activity)
+    if max_minutes == 0:
+        max_minutes = 1
+
+    bar_width = 30
+
+    for day in daily_activity:
+        days_ago = day["days_ago"]
+        minutes = day["minutes_watched"]
+
+        # format day label
+        if days_ago == 0:
+            label = "Today"
+        elif days_ago == 1:
+            label = "Yesterday"
+        else:
+            label = f"{days_ago} days ago"
+
+        # calculate bar
+        bar_length = int((minutes / max_minutes) * bar_width)
+        bar = "█" * bar_length
+        bar_padded = bar.ljust(bar_width)
+
+        # format time
+        if minutes == 0:
+            time_str = "0m"
+        else:
+            hours = minutes // 60
+            mins = minutes % 60
+            if hours > 0:
+                time_str = f"{hours}h {mins}m" if mins > 0 else f"{hours}h"
+            else:
+                time_str = f"{mins}m"
+
+        # print line
+        print(f"{label:<11}│{bar_padded}  {time_str:>7}")
 
 
 def send_request(method, path, body=None):

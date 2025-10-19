@@ -457,4 +457,87 @@ public class GetProgressHandlerIntegrationTest {
     assertThat(channels.get(1).channelName()).isNull();
     assertThat(channels.get(1).videosWatched()).isEqualTo(1);
   }
+
+  @Test
+  void handleRequestShouldCalculateDailyActivity() throws Exception {
+    // arrange
+    var user = "alice";
+    fakeClock.setTime(Instant.parse("2024-01-07T12:00:00Z"));
+    var now = fakeClock.now();
+    var todayStart =
+        now.atZone(GetProgressHandler.ZONE_ID).truncatedTo(ChronoUnit.DAYS).toInstant();
+
+    // 6 days ago: 1 episode (20 minutes)
+    var sixDaysAgo = todayStart.minus(6, ChronoUnit.DAYS).plus(6, ChronoUnit.HOURS);
+    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", sixDaysAgo);
+
+    // 5 days ago: nothing
+
+    // 4 days ago: 2 episodes (40 minutes)
+    var fourDaysAgo = todayStart.minus(4, ChronoUnit.DAYS).plus(12, ChronoUnit.HOURS);
+    var episode2 = ImmersionTrackerItem.createEpisode(user, "show1", "episode2", fourDaysAgo);
+    var episode3 = ImmersionTrackerItem.createEpisode(user, "show1", "episode3", fourDaysAgo);
+
+    // 3 days ago: 1 episode + 1 YouTube video (20 + 30 = 50 minutes)
+    var threeDaysAgo = todayStart.minus(3, ChronoUnit.DAYS).plus(18, ChronoUnit.HOURS);
+    var episode4 = ImmersionTrackerItem.createEpisode(user, "show1", "episode4", threeDaysAgo);
+    var video1 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user, "UCChannel1", "video1", "Video 1", Duration.ofMinutes(30), threeDaysAgo);
+
+    // 2 days ago: 1 YouTube video (45 minutes)
+    var twoDaysAgo = todayStart.minus(2, ChronoUnit.DAYS).plus(8, ChronoUnit.HOURS);
+    var video2 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user, "UCChannel1", "video2", "Video 2", Duration.ofMinutes(45), twoDaysAgo);
+
+    // yesterday: 1 episode (20 minutes)
+    var yesterday = todayStart.minus(1, ChronoUnit.DAYS).plus(14, ChronoUnit.HOURS);
+    var episode5 = ImmersionTrackerItem.createEpisode(user, "show1", "episode5", yesterday);
+
+    // today: 1 episode + 1 YouTube video (20 + 10 = 30 minutes)
+    var today = todayStart.plus(10, ChronoUnit.HOURS);
+    var episode6 = ImmersionTrackerItem.createEpisode(user, "show1", "episode6", today);
+    var video3 =
+        ImmersionTrackerItem.createYoutubeVideo(
+            user, "UCChannel1", "video3", "Video 3", Duration.ofMinutes(10), today);
+
+    immersionTrackerTable.putItem(episode1);
+    immersionTrackerTable.putItem(episode2);
+    immersionTrackerTable.putItem(episode3);
+    immersionTrackerTable.putItem(episode4);
+    immersionTrackerTable.putItem(episode5);
+    immersionTrackerTable.putItem(episode6);
+    immersionTrackerTable.putItem(video1);
+    immersionTrackerTable.putItem(video2);
+    immersionTrackerTable.putItem(video3);
+
+    // act
+    var req =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+    var res = getProgressHandler.handleRequest(req, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(200);
+
+    var progress =
+        objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
+
+    var dailyActivity = progress.dailyActivity();
+    assertThat(dailyActivity).hasSize(7);
+    assertThat(dailyActivity.get(0).daysAgo()).isEqualTo(6);
+    assertThat(dailyActivity.get(0).minutesWatched()).isEqualTo(20);
+    assertThat(dailyActivity.get(1).daysAgo()).isEqualTo(5);
+    assertThat(dailyActivity.get(1).minutesWatched()).isEqualTo(0);
+    assertThat(dailyActivity.get(2).daysAgo()).isEqualTo(4);
+    assertThat(dailyActivity.get(2).minutesWatched()).isEqualTo(40);
+    assertThat(dailyActivity.get(3).daysAgo()).isEqualTo(3);
+    assertThat(dailyActivity.get(3).minutesWatched()).isEqualTo(50);
+    assertThat(dailyActivity.get(4).daysAgo()).isEqualTo(2);
+    assertThat(dailyActivity.get(4).minutesWatched()).isEqualTo(45);
+    assertThat(dailyActivity.get(5).daysAgo()).isEqualTo(1);
+    assertThat(dailyActivity.get(5).minutesWatched()).isEqualTo(20);
+    assertThat(dailyActivity.get(6).daysAgo()).isEqualTo(0);
+    assertThat(dailyActivity.get(6).minutesWatched()).isEqualTo(30);
+  }
 }

@@ -45,6 +45,7 @@ public class GetProgressHandler
       @JsonProperty("youtube_videos_watched_today") int youtubeVideosWatchedToday,
       @JsonProperty("days_since_first_episode") long daysSinceFirstEpisode,
       @Nullable @JsonProperty("weekly_trend_percentage") Double weeklyTrendPercentage,
+      @JsonProperty("daily_activity") List<DailyActivity> dailyActivity,
       @JsonProperty("shows") List<Show> shows,
       @JsonProperty("youtube_channels") List<YoutubeChannel> youtubeChannels) {}
 
@@ -57,6 +58,10 @@ public class GetProgressHandler
   record YoutubeChannel(
       @Nullable @JsonProperty("channel_name") String channelName,
       @JsonProperty("videos_watched") int videosWatched) {}
+
+  @VisibleForTesting
+  record DailyActivity(
+      @JsonProperty("days_ago") int daysAgo, @JsonProperty("minutes_watched") int minutesWatched) {}
 
   private record EpisodeShow(ImmersionTrackerItem episode, @Nullable ImmersionTrackerItem show) {}
 
@@ -121,6 +126,7 @@ public class GetProgressHandler
     var daysSinceFirstEpisode = daysSinceFirstEpisode(episodes, youtubeVideos, now);
     var weeklyTrendPercentage =
         weeklyTrendPercentage(episodes, youtubeVideos, now, daysSinceFirstEpisode);
+    var activity = dailyActivity(episodes, youtubeVideos, now);
     var progresses = shows(episodes, shows);
     var channelProgresses = youtubeChannels(youtubeVideos, youtubeChannels);
 
@@ -133,6 +139,7 @@ public class GetProgressHandler
             youtubeVideosWatchedToday,
             daysSinceFirstEpisode,
             weeklyTrendPercentage,
+            activity,
             progresses,
             channelProgresses);
 
@@ -253,5 +260,34 @@ public class GetProgressHandler
             Comparator.comparing((YoutubeChannel c) -> c.videosWatched, Comparator.reverseOrder())
                 .thenComparing(c -> c.channelName, Comparator.nullsLast(Comparator.naturalOrder())))
         .toList();
+  }
+
+  private List<DailyActivity> dailyActivity(
+      List<ImmersionTrackerItem> episodes, List<ImmersionTrackerItem> youtubeVideos, Instant now) {
+    var result = new java.util.ArrayList<DailyActivity>();
+    for (int daysAgo = 6; daysAgo >= 0; daysAgo--) {
+      var dayStart =
+          now.atZone(ZONE_ID).truncatedTo(ChronoUnit.DAYS).minusDays(daysAgo).toInstant();
+      var dayEnd = dayStart.plus(1, ChronoUnit.DAYS);
+
+      var episodeMinutes =
+          episodes.stream()
+                  .filter(
+                      e ->
+                          !e.getTimestamp().isBefore(dayStart) && e.getTimestamp().isBefore(dayEnd))
+                  .count()
+              * MINUTES_PER_EPISODE;
+
+      var youtubeMinutes =
+          youtubeVideos.stream()
+              .filter(
+                  v -> !v.getTimestamp().isBefore(dayStart) && v.getTimestamp().isBefore(dayEnd))
+              .mapToLong(v -> v.getYoutubeVideoDuration().toMinutes())
+              .sum();
+
+      var totalMinutes = (int) (episodeMinutes + youtubeMinutes);
+      result.add(new DailyActivity(daysAgo, totalMinutes));
+    }
+    return result;
   }
 }
