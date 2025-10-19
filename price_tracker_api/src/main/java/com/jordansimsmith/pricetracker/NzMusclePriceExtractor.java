@@ -7,13 +7,22 @@ public class NzMusclePriceExtractor implements PriceExtractor {
   @Override
   @Nullable
   public Double extractPrice(Document document) {
-    var element = document.select(".price-item--regular");
-    if (element.isEmpty()) {
+    var saleElement = document.select(".price-item--sale");
+    if (!saleElement.isEmpty()) {
+      try {
+        return Double.parseDouble(saleElement.text().replaceAll("\\$", "").trim());
+      } catch (NumberFormatException e) {
+        return null;
+      }
+    }
+
+    var regularElement = document.select(".price-item--regular");
+    if (regularElement.isEmpty()) {
       return null;
     }
 
     try {
-      return Double.parseDouble(element.text().replaceAll("\\$", "").trim());
+      return Double.parseDouble(regularElement.text().replaceAll("\\$", "").trim());
     } catch (NumberFormatException e) {
       return null;
     }
