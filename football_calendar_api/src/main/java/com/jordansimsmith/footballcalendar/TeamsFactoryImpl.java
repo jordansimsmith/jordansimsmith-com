@@ -13,7 +13,14 @@ public class TeamsFactoryImpl implements TeamsFactory {
       new NorthernRegionalFootballTeam("Flamingos", "flamingo", "44838", "2714644497", "2025");
 
   private static final FootballFixTeam FOOTBALL_FIX_FLAMINGOS_SEVENS =
-      new FootballFixTeam("Flamingos Sevens", "flamingoes", "13", "131", "89", "6030");
+      new FootballFixTeam(
+          "Flamingos Sevens",
+          "flamingoes",
+          "13",
+          "131",
+          "89",
+          "6030",
+          "3/25 Normanby Road, Mount Eden, Auckland 1024");
 
   @Override
   public List<NorthernRegionalFootballTeam> findNorthernRegionalFootballTeams() {

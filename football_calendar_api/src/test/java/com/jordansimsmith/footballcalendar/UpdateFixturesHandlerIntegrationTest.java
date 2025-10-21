@@ -293,17 +293,18 @@ public class UpdateFixturesHandlerIntegrationTest {
 
     fakeTeamsFactory.addTeam(
         new TeamsFactory.FootballFixTeam(
-            "Flamingos Sevens", "flamingoes", "13", "131", "89", "6030"));
+            "Flamingos Sevens",
+            "flamingoes",
+            "13",
+            "131",
+            "89",
+            "6030",
+            "3/25 Normanby Road, Mount Eden, Auckland 1024"));
 
     // add Football Fix fixtures
     var flamingoesFixture =
         new FootballFixClient.FootballFixture(
-            "148617",
-            "Lad FC",
-            "Flamingoes",
-            Instant.parse("2025-10-23T08:40:00Z"),
-            "Field 2",
-            "3/25 Normanby Road, Mount Eden, Auckland 1024");
+            "148617", "Lad FC", "Flamingoes", Instant.parse("2025-10-23T08:40:00Z"), "Field 2");
 
     var nonFlamingoesFixture =
         new FootballFixClient.FootballFixture(
@@ -311,8 +312,7 @@ public class UpdateFixturesHandlerIntegrationTest {
             "Jesus and the Shepherds",
             "G-Raves RC",
             Instant.parse("2025-10-23T07:20:00Z"),
-            "Field 1",
-            "3/25 Normanby Road, Mount Eden, Auckland 1024");
+            "Field 1");
 
     fakeFootballFixClient.addFixture("6030", flamingoesFixture);
     fakeFootballFixClient.addFixture("6030", nonFlamingoesFixture);
@@ -340,7 +340,7 @@ public class UpdateFixturesHandlerIntegrationTest {
     assertThat(item.getAwayTeam()).isEqualTo(flamingoesFixture.awayTeamName());
     assertThat(item.getTimestamp()).isEqualTo(flamingoesFixture.timestamp());
     assertThat(item.getVenue()).isEqualTo(flamingoesFixture.venue());
-    assertThat(item.getAddress()).isEqualTo(flamingoesFixture.address());
+    assertThat(item.getAddress()).isEqualTo("3/25 Normanby Road, Mount Eden, Auckland 1024");
     assertThat(item.getLatitude()).isNull();
     assertThat(item.getLongitude()).isNull();
     assertThat(item.getStatus()).isNull();
@@ -362,7 +362,13 @@ public class UpdateFixturesHandlerIntegrationTest {
     // add Football Fix team
     fakeTeamsFactory.addTeam(
         new TeamsFactory.FootballFixTeam(
-            "Flamingos Sevens", "flamingoes", "13", "131", "89", "6030"));
+            "Flamingos Sevens",
+            "flamingoes",
+            "13",
+            "131",
+            "89",
+            "6030",
+            "3/25 Normanby Road, Mount Eden, Auckland 1024"));
 
     // add NRF fixture
     var nrfFixture =
@@ -382,12 +388,7 @@ public class UpdateFixturesHandlerIntegrationTest {
     // add Football Fix fixture
     var footballFixFixture =
         new FootballFixClient.FootballFixture(
-            "148617",
-            "Flamingoes",
-            "Lad FC",
-            Instant.parse("2025-10-30T07:20:00Z"),
-            "Field 2",
-            "3/25 Normanby Road, Mount Eden, Auckland 1024");
+            "148617", "Flamingoes", "Lad FC", Instant.parse("2025-10-30T07:20:00Z"), "Field 2");
 
     fakeFootballFixClient.addFixture("6030", footballFixFixture);
 

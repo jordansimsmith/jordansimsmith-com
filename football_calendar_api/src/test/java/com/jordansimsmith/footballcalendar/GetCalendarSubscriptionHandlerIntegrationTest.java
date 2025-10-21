@@ -105,7 +105,13 @@ public class GetCalendarSubscriptionHandlerIntegrationTest {
     // arrange
     fakeTeamsFactory.addTeam(
         new TeamsFactory.FootballFixTeam(
-            "Flamingos Sevens", "flamingoes", "13", "131", "89", "6030"));
+            "Flamingos Sevens",
+            "flamingoes",
+            "13",
+            "131",
+            "89",
+            "6030",
+            "3/25 Normanby Road, Mount Eden, Auckland 1024"));
 
     var fixture =
         FootballCalendarItem.create(
@@ -150,7 +156,13 @@ public class GetCalendarSubscriptionHandlerIntegrationTest {
             "Flamingos", "flamingo", "44838", "2716594877", "2025"));
     fakeTeamsFactory.addTeam(
         new TeamsFactory.FootballFixTeam(
-            "Flamingos Sevens", "flamingoes", "13", "131", "89", "6030"));
+            "Flamingos Sevens",
+            "flamingoes",
+            "13",
+            "131",
+            "89",
+            "6030",
+            "3/25 Normanby Road, Mount Eden, Auckland 1024"));
 
     // add NRF fixture
     var nrfFixture =

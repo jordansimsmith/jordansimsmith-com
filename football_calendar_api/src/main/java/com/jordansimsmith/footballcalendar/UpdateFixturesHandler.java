@@ -163,7 +163,7 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
                 fixture.awayTeamName(),
                 fixture.timestamp(),
                 fixture.venue(),
-                fixture.address(),
+                team.address(),
                 null,
                 null,
                 null);

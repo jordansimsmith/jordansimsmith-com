@@ -21,12 +21,6 @@ public class JsoupFootballFixClient implements FootballFixClient {
   private static final DateTimeFormatter TIME_FORMATTER =
       DateTimeFormatter.ofPattern("h:mma", Locale.ENGLISH);
 
-  private final String address;
-
-  public JsoupFootballFixClient(String address) {
-    this.address = address;
-  }
-
   @Override
   public List<FootballFixClient.FootballFixture> getFixtures(
       String venueId, String leagueId, String seasonId, String divisionId) {
@@ -94,7 +88,6 @@ public class JsoupFootballFixClient implements FootballFixClient {
     var zonedDateTime = ZonedDateTime.of(date, time, AUCKLAND_ZONE);
     var timestamp = zonedDateTime.toInstant();
 
-    return new FootballFixClient.FootballFixture(
-        fixtureId, homeTeam, awayTeam, timestamp, venue, address);
+    return new FootballFixClient.FootballFixture(fixtureId, homeTeam, awayTeam, timestamp, venue);
   }
 }

@@ -13,7 +13,8 @@ public interface TeamsFactory {
       String venueId,
       String leagueId,
       String seasonId,
-      String divisionId) {}
+      String divisionId,
+      String address) {}
 
   List<NorthernRegionalFootballTeam> findNorthernRegionalFootballTeams();
 
