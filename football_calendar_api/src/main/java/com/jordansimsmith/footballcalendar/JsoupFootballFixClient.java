@@ -1,15 +1,19 @@
 package com.jordansimsmith.footballcalendar;
 
+import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import java.io.IOException;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
 public class JsoupFootballFixClient implements FootballFixClient {
@@ -19,7 +23,10 @@ public class JsoupFootballFixClient implements FootballFixClient {
   private static final DateTimeFormatter DATE_FORMATTER =
       DateTimeFormatter.ofPattern("EEEE dd MMM yyyy", Locale.ENGLISH);
   private static final DateTimeFormatter TIME_FORMATTER =
-      DateTimeFormatter.ofPattern("h:mma", Locale.ENGLISH);
+      new DateTimeFormatterBuilder()
+          .parseCaseInsensitive()
+          .appendPattern("h:mma")
+          .toFormatter(Locale.ENGLISH);
 
   @Override
   public List<FootballFixClient.FootballFixture> getFixtures(
@@ -38,7 +45,7 @@ public class JsoupFootballFixClient implements FootballFixClient {
             "%s?SportId=%d&VenueId=%s&LeagueId=%s&SeasonId=%s&DivisionId=%s",
             BASE_URL, SPORT_ID, venueId, leagueId, seasonId, divisionId);
 
-    var doc = Jsoup.connect(url).get();
+    var doc = fetchDocument(url);
     List<FootballFixClient.FootballFixture> fixtures = new ArrayList<>();
 
     var tables = doc.select("table.FTable");
@@ -89,5 +96,10 @@ public class JsoupFootballFixClient implements FootballFixClient {
     var timestamp = zonedDateTime.toInstant();
 
     return new FootballFixClient.FootballFixture(fixtureId, homeTeam, awayTeam, timestamp, venue);
+  }
+
+  @VisibleForTesting
+  protected Document fetchDocument(String url) throws IOException {
+    return Jsoup.connect(url).get();
   }
 }

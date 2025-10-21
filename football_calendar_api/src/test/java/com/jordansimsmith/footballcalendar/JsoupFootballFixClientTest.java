@@ -2,201 +2,276 @@ package com.jordansimsmith.footballcalendar;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
 import org.junit.jupiter.api.Test;
 
 public class JsoupFootballFixClientTest {
   @Test
-  void parseFixtureShouldExtractAllFieldsCorrectly() {
+  void getFixturesShouldExtractAllFieldsCorrectly() {
     // arrange
     var html =
         """
-        <table class="FTable">
-          <tr class="FHeader">
-            <td colspan="5">Thursday 23 Oct 2025</td>
-          </tr>
-          <tr class="FRow FBand">
-            <td class="FDate">7:20pm</td>
-            <td class="FPlayingArea">Field 1<br /></td>
-            <td class="FHomeTeam"><a href="#">Jesus and the Shepherds</a></td>
-            <td class="FScore"><div><nobr data-fixture-id="148618">vs</nobr></div></td>
-            <td class="FAwayTeam"><a href="#">G-Raves RC</a></td>
-          </tr>
-          <tr class="FRow">
-            <td class="FDate">8:40pm</td>
-            <td class="FPlayingArea">Field 1<br /></td>
-            <td class="FHomeTeam"><a href="#">ABCDE FC</a></td>
-            <td class="FScore"><div><nobr data-fixture-id="148616">vs</nobr></div></td>
-            <td class="FAwayTeam"><a href="#">Gaan Maro FC</a></td>
-          </tr>
-          <tr class="FRow FBand">
-            <td class="FDate">8:40pm</td>
-            <td class="FPlayingArea">Field 2<br /></td>
-            <td class="FHomeTeam"><a href="#">Lad FC</a></td>
-            <td class="FScore"><div><nobr data-fixture-id="148617">vs</nobr></div></td>
-            <td class="FAwayTeam"><a href="#">Flamingoes</a></td>
-          </tr>
-        </table>
+        <html>
+          <body>
+            <table class="FTable">
+              <tr class="FHeader">
+                <td colspan="5">Thursday 23 Oct 2025</td>
+              </tr>
+              <tr class="FRow FBand">
+                <td class="FDate">7:20pm</td>
+                <td class="FPlayingArea">Field 1<br /></td>
+                <td class="FHomeTeam"><a href="#">Jesus and the Shepherds</a></td>
+                <td class="FScore"><div><nobr data-fixture-id="148618">vs</nobr></div></td>
+                <td class="FAwayTeam"><a href="#">G-Raves RC</a></td>
+              </tr>
+              <tr class="FRow">
+                <td class="FDate">8:40pm</td>
+                <td class="FPlayingArea">Field 1<br /></td>
+                <td class="FHomeTeam"><a href="#">ABCDE FC</a></td>
+                <td class="FScore"><div><nobr data-fixture-id="148616">vs</nobr></div></td>
+                <td class="FAwayTeam"><a href="#">Gaan Maro FC</a></td>
+              </tr>
+              <tr class="FRow FBand">
+                <td class="FDate">8:40pm</td>
+                <td class="FPlayingArea">Field 2<br /></td>
+                <td class="FHomeTeam"><a href="#">Lad FC</a></td>
+                <td class="FScore"><div><nobr data-fixture-id="148617">vs</nobr></div></td>
+                <td class="FAwayTeam"><a href="#">Flamingoes</a></td>
+              </tr>
+            </table>
+          </body>
+        </html>
         """;
+    var client =
+        new JsoupFootballFixClient() {
+          @Override
+          protected Document fetchDocument(String url) {
+            return Jsoup.parse(html);
+          }
+        };
+    var venueId = "13";
+    var leagueId = "131";
+    var seasonId = "89";
+    var divisionId = "6030";
 
     // act
-    var doc = Jsoup.parse(html);
-    var tables = doc.select("table.FTable");
-    var firstTable = tables.first();
-    var rows = firstTable.select("tr");
-
-    var dateRow = rows.get(0);
-    assertThat(dateRow.hasClass("FHeader")).isTrue();
-
-    var fixtureRow = rows.get(1);
-    assertThat(fixtureRow.hasClass("FRow")).isTrue();
+    var fixtures = client.getFixtures(venueId, leagueId, seasonId, divisionId);
 
     // assert
-    var timeText = fixtureRow.select("td.FDate").text().trim();
-    assertThat(timeText).isEqualTo("7:20pm");
+    assertThat(fixtures).hasSize(3);
 
-    var venue = fixtureRow.select("td.FPlayingArea").text().trim();
-    assertThat(venue).isEqualTo("Field 1");
+    var fixture1 = fixtures.stream().filter(f -> f.id().equals("148618")).findFirst().orElseThrow();
+    assertThat(fixture1.homeTeamName()).isEqualTo("Jesus and the Shepherds");
+    assertThat(fixture1.awayTeamName()).isEqualTo("G-Raves RC");
+    assertThat(fixture1.venue()).isEqualTo("Field 1");
 
-    var homeTeam = fixtureRow.select("td.FHomeTeam").text().trim();
-    assertThat(homeTeam).isEqualTo("Jesus and the Shepherds");
+    var expectedInstant1 =
+        ZonedDateTime.of(2025, 10, 23, 19, 20, 0, 0, ZoneId.of("Pacific/Auckland")).toInstant();
+    assertThat(fixture1.timestamp()).isEqualTo(expectedInstant1);
 
-    var awayTeam = fixtureRow.select("td.FAwayTeam").text().trim();
-    assertThat(awayTeam).isEqualTo("G-Raves RC");
+    var fixture2 = fixtures.stream().filter(f -> f.id().equals("148616")).findFirst().orElseThrow();
+    assertThat(fixture2.homeTeamName()).isEqualTo("ABCDE FC");
+    assertThat(fixture2.awayTeamName()).isEqualTo("Gaan Maro FC");
+    assertThat(fixture2.venue()).isEqualTo("Field 1");
 
-    var scoreElement = fixtureRow.select("td.FScore nobr").first();
-    assertThat(scoreElement).isNotNull();
+    var expectedInstant2 =
+        ZonedDateTime.of(2025, 10, 23, 20, 40, 0, 0, ZoneId.of("Pacific/Auckland")).toInstant();
+    assertThat(fixture2.timestamp()).isEqualTo(expectedInstant2);
 
-    var fixtureId = scoreElement.attr("data-fixture-id");
-    assertThat(fixtureId).isEqualTo("148618");
+    var fixture3 = fixtures.stream().filter(f -> f.id().equals("148617")).findFirst().orElseThrow();
+    assertThat(fixture3.homeTeamName()).isEqualTo("Lad FC");
+    assertThat(fixture3.awayTeamName()).isEqualTo("Flamingoes");
+    assertThat(fixture3.venue()).isEqualTo("Field 2");
+
+    var expectedInstant3 =
+        ZonedDateTime.of(2025, 10, 23, 20, 40, 0, 0, ZoneId.of("Pacific/Auckland")).toInstant();
+    assertThat(fixture3.timestamp()).isEqualTo(expectedInstant3);
   }
 
   @Test
-  void parseDateShouldHandleVariousFormats() {
+  void getFixturesShouldParseMultipleDates() {
     // arrange
     var html =
         """
-        <table class="FTable">
-          <tr class="FHeader">
-            <td colspan="5">Thursday 23 Oct 2025</td>
-          </tr>
-          <tr class="FRow FBand">
-            <td class="FDate">7:20pm</td>
-            <td class="FPlayingArea">Field 1<br /></td>
-            <td class="FHomeTeam"><a href="#">Jesus and the Shepherds</a></td>
-            <td class="FScore"><div><nobr data-fixture-id="148618">vs</nobr></div></td>
-            <td class="FAwayTeam"><a href="#">G-Raves RC</a></td>
-          </tr>
-        </table>
+        <html>
+          <body>
+            <table class="FTable">
+              <tr class="FHeader">
+                <td colspan="5">Thursday 23 Oct 2025</td>
+              </tr>
+              <tr class="FRow FBand">
+                <td class="FDate">7:20pm</td>
+                <td class="FPlayingArea">Field 1<br /></td>
+                <td class="FHomeTeam"><a href="#">Jesus and the Shepherds</a></td>
+                <td class="FScore"><div><nobr data-fixture-id="148618">vs</nobr></div></td>
+                <td class="FAwayTeam"><a href="#">G-Raves RC</a></td>
+              </tr>
+              <tr class="FRow">
+                <td class="FDate">8:40pm</td>
+                <td class="FPlayingArea">Field 1<br /></td>
+                <td class="FHomeTeam"><a href="#">ABCDE FC</a></td>
+                <td class="FScore"><div><nobr data-fixture-id="148616">vs</nobr></div></td>
+                <td class="FAwayTeam"><a href="#">Gaan Maro FC</a></td>
+              </tr>
+              <tr class="FRow FBand">
+                <td class="FDate">8:40pm</td>
+                <td class="FPlayingArea">Field 2<br /></td>
+                <td class="FHomeTeam"><a href="#">Lad FC</a></td>
+                <td class="FScore"><div><nobr data-fixture-id="148617">vs</nobr></div></td>
+                <td class="FAwayTeam"><a href="#">Flamingoes</a></td>
+              </tr>
+            </table>
+            <table class="FTable">
+              <tr class="FHeader">
+                <td colspan="5">Thursday 30 Oct 2025</td>
+              </tr>
+              <tr class="FRow FBand">
+                <td class="FDate">7:20pm</td>
+                <td class="FPlayingArea">Field 1<br /></td>
+                <td class="FHomeTeam"><a href="#">Lad FC</a></td>
+                <td class="FScore"><div><nobr data-fixture-id="148619">vs</nobr></div></td>
+                <td class="FAwayTeam"><a href="#">Gaan Maro FC</a></td>
+              </tr>
+              <tr class="FRow">
+                <td class="FDate">7:20pm</td>
+                <td class="FPlayingArea">Field 2<br /></td>
+                <td class="FHomeTeam"><a href="#">Flamingoes</a></td>
+                <td class="FScore"><div><nobr data-fixture-id="148620">vs</nobr></div></td>
+                <td class="FAwayTeam"><a href="#">G-Raves RC</a></td>
+              </tr>
+              <tr class="FRow FBand">
+                <td class="FDate">7:20pm</td>
+                <td class="FPlayingArea">Field 3<br /></td>
+                <td class="FHomeTeam"><a href="#">ABCDE FC</a></td>
+                <td class="FScore"><div><nobr data-fixture-id="148621">vs</nobr></div></td>
+                <td class="FAwayTeam"><a href="#">Jesus and the Shepherds</a></td>
+              </tr>
+            </table>
+          </body>
+        </html>
         """;
+    var client =
+        new JsoupFootballFixClient() {
+          @Override
+          protected Document fetchDocument(String url) {
+            return Jsoup.parse(html);
+          }
+        };
+    var venueId = "13";
+    var leagueId = "131";
+    var seasonId = "89";
+    var divisionId = "6030";
 
     // act
-    var doc = Jsoup.parse(html);
-    var dateText = doc.select("tr.FHeader td").first().text();
+    var fixtures = client.getFixtures(venueId, leagueId, seasonId, divisionId);
 
     // assert
-    assertThat(dateText).isEqualTo("Thursday 23 Oct 2025");
+    assertThat(fixtures).hasSize(6);
+
+    var oct23Fixtures =
+        fixtures.stream()
+            .filter(f -> f.timestamp().atZone(ZoneId.of("Pacific/Auckland")).getDayOfMonth() == 23)
+            .toList();
+    assertThat(oct23Fixtures).hasSize(3);
+
+    var oct30Fixtures =
+        fixtures.stream()
+            .filter(f -> f.timestamp().atZone(ZoneId.of("Pacific/Auckland")).getDayOfMonth() == 30)
+            .toList();
+    assertThat(oct30Fixtures).hasSize(3);
+
+    var oct30Fixture1 =
+        fixtures.stream().filter(f -> f.id().equals("148619")).findFirst().orElseThrow();
+    assertThat(oct30Fixture1.homeTeamName()).isEqualTo("Lad FC");
+    assertThat(oct30Fixture1.awayTeamName()).isEqualTo("Gaan Maro FC");
   }
 
   @Test
-  void parseTimeShouldHandleVariousFormats() {
+  void getFixturesShouldParseVariousTimeFormats() {
     // arrange
     var html =
         """
-        <table class="FTable">
-          <tr class="FHeader">
-            <td colspan="5">Thursday 06 Nov 2025</td>
-          </tr>
-          <tr class="FRow FBand">
-            <td class="FDate">6:40pm</td>
-            <td class="FPlayingArea">Field 2<br /></td>
-            <td class="FHomeTeam"><a href="#">Lad FC</a></td>
-            <td class="FScore"><div><nobr data-fixture-id="148623">vs</nobr></div></td>
-            <td class="FAwayTeam"><a href="#">G-Raves RC</a></td>
-          </tr>
-        </table>
+        <html>
+          <body>
+            <table class="FTable">
+              <tr class="FHeader">
+                <td colspan="5">Thursday 06 Nov 2025</td>
+              </tr>
+              <tr class="FRow FBand">
+                <td class="FDate">7:20pm</td>
+                <td class="FPlayingArea">Field 1<br /></td>
+                <td class="FHomeTeam"><a href="#">Home Team</a></td>
+                <td class="FScore"><div><nobr data-fixture-id="1001">vs</nobr></div></td>
+                <td class="FAwayTeam"><a href="#">Away Team</a></td>
+              </tr>
+              <tr class="FRow">
+                <td class="FDate">9:15am</td>
+                <td class="FPlayingArea">Field 2<br /></td>
+                <td class="FHomeTeam"><a href="#">Morning Home</a></td>
+                <td class="FScore"><div><nobr data-fixture-id="1002">vs</nobr></div></td>
+                <td class="FAwayTeam"><a href="#">Morning Away</a></td>
+              </tr>
+              <tr class="FRow FBand">
+                <td class="FDate">11:30AM</td>
+                <td class="FPlayingArea">Field 3<br /></td>
+                <td class="FHomeTeam"><a href="#">Uppercase Home</a></td>
+                <td class="FScore"><div><nobr data-fixture-id="1003">vs</nobr></div></td>
+                <td class="FAwayTeam"><a href="#">Uppercase Away</a></td>
+              </tr>
+              <tr class="FRow">
+                <td class="FDate">6:00PM</td>
+                <td class="FPlayingArea">Field 4<br /></td>
+                <td class="FHomeTeam"><a href="#">Evening Home</a></td>
+                <td class="FScore"><div><nobr data-fixture-id="1004">vs</nobr></div></td>
+                <td class="FAwayTeam"><a href="#">Evening Away</a></td>
+              </tr>
+            </table>
+          </body>
+        </html>
         """;
+    var client =
+        new JsoupFootballFixClient() {
+          @Override
+          protected Document fetchDocument(String url) {
+            return Jsoup.parse(html);
+          }
+        };
+    var venueId = "13";
+    var leagueId = "131";
+    var seasonId = "89";
+    var divisionId = "6030";
 
     // act
-    var doc = Jsoup.parse(html);
-    var timeText = doc.select("td.FDate").first().text();
+    var fixtures = client.getFixtures(venueId, leagueId, seasonId, divisionId);
 
     // assert
-    assertThat(timeText).isEqualTo("6:40pm");
-  }
+    assertThat(fixtures).hasSize(4);
 
-  @Test
-  void parseMultipleFixturesShouldReturnAllFixtures() {
-    // arrange
-    var html =
-        """
-        <table class="FTable">
-          <tr class="FHeader">
-            <td colspan="5">Thursday 23 Oct 2025</td>
-          </tr>
-          <tr class="FRow FBand">
-            <td class="FDate">7:20pm</td>
-            <td class="FPlayingArea">Field 1<br /></td>
-            <td class="FHomeTeam"><a href="#">Jesus and the Shepherds</a></td>
-            <td class="FScore"><div><nobr data-fixture-id="148618">vs</nobr></div></td>
-            <td class="FAwayTeam"><a href="#">G-Raves RC</a></td>
-          </tr>
-          <tr class="FRow">
-            <td class="FDate">8:40pm</td>
-            <td class="FPlayingArea">Field 1<br /></td>
-            <td class="FHomeTeam"><a href="#">ABCDE FC</a></td>
-            <td class="FScore"><div><nobr data-fixture-id="148616">vs</nobr></div></td>
-            <td class="FAwayTeam"><a href="#">Gaan Maro FC</a></td>
-          </tr>
-          <tr class="FRow FBand">
-            <td class="FDate">8:40pm</td>
-            <td class="FPlayingArea">Field 2<br /></td>
-            <td class="FHomeTeam"><a href="#">Lad FC</a></td>
-            <td class="FScore"><div><nobr data-fixture-id="148617">vs</nobr></div></td>
-            <td class="FAwayTeam"><a href="#">Flamingoes</a></td>
-          </tr>
-        </table>
-        <table class="FTable">
-          <tr class="FHeader">
-            <td colspan="5">Thursday 30 Oct 2025</td>
-          </tr>
-          <tr class="FRow FBand">
-            <td class="FDate">7:20pm</td>
-            <td class="FPlayingArea">Field 1<br /></td>
-            <td class="FHomeTeam"><a href="#">Lad FC</a></td>
-            <td class="FScore"><div><nobr data-fixture-id="148619">vs</nobr></div></td>
-            <td class="FAwayTeam"><a href="#">Gaan Maro FC</a></td>
-          </tr>
-          <tr class="FRow">
-            <td class="FDate">7:20pm</td>
-            <td class="FPlayingArea">Field 2<br /></td>
-            <td class="FHomeTeam"><a href="#">Flamingoes</a></td>
-            <td class="FScore"><div><nobr data-fixture-id="148620">vs</nobr></div></td>
-            <td class="FAwayTeam"><a href="#">G-Raves RC</a></td>
-          </tr>
-          <tr class="FRow FBand">
-            <td class="FDate">7:20pm</td>
-            <td class="FPlayingArea">Field 3<br /></td>
-            <td class="FHomeTeam"><a href="#">ABCDE FC</a></td>
-            <td class="FScore"><div><nobr data-fixture-id="148621">vs</nobr></div></td>
-            <td class="FAwayTeam"><a href="#">Jesus and the Shepherds</a></td>
-          </tr>
-        </table>
-        """;
+    var pmLowercase =
+        fixtures.stream().filter(f -> f.id().equals("1001")).findFirst().orElseThrow();
+    var expectedPmLowercase =
+        ZonedDateTime.of(2025, 11, 6, 19, 20, 0, 0, ZoneId.of("Pacific/Auckland")).toInstant();
+    assertThat(pmLowercase.timestamp()).isEqualTo(expectedPmLowercase);
 
-    // act
-    var doc = Jsoup.parse(html);
-    var tables = doc.select("table.FTable");
+    var amLowercase =
+        fixtures.stream().filter(f -> f.id().equals("1002")).findFirst().orElseThrow();
+    var expectedAmLowercase =
+        ZonedDateTime.of(2025, 11, 6, 9, 15, 0, 0, ZoneId.of("Pacific/Auckland")).toInstant();
+    assertThat(amLowercase.timestamp()).isEqualTo(expectedAmLowercase);
 
-    // assert
-    assertThat(tables).hasSize(2);
+    var amUppercase =
+        fixtures.stream().filter(f -> f.id().equals("1003")).findFirst().orElseThrow();
+    var expectedAmUppercase =
+        ZonedDateTime.of(2025, 11, 6, 11, 30, 0, 0, ZoneId.of("Pacific/Auckland")).toInstant();
+    assertThat(amUppercase.timestamp()).isEqualTo(expectedAmUppercase);
 
-    var firstTable = tables.get(0);
-    var firstTableRows = firstTable.select("tr.FRow");
-    assertThat(firstTableRows).hasSize(3);
-
-    var secondTable = tables.get(1);
-    var secondTableRows = secondTable.select("tr.FRow");
-    assertThat(secondTableRows).hasSize(3);
+    var pmUppercase =
+        fixtures.stream().filter(f -> f.id().equals("1004")).findFirst().orElseThrow();
+    var expectedPmUppercase =
+        ZonedDateTime.of(2025, 11, 6, 18, 0, 0, 0, ZoneId.of("Pacific/Auckland")).toInstant();
+    assertThat(pmUppercase.timestamp()).isEqualTo(expectedPmUppercase);
   }
 }
