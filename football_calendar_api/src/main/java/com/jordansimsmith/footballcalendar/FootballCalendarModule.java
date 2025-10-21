@@ -26,4 +26,10 @@ public class FootballCalendarModule {
     var httpClient = HttpClient.newBuilder().build();
     return new HttpCometClient(httpClient, objectMapper);
   }
+
+  @Provides
+  @Singleton
+  TeamsFactory teamsFactory() {
+    return new TeamsFactoryImpl();
+  }
 }

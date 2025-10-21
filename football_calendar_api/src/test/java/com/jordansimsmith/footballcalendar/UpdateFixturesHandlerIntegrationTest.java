@@ -16,8 +16,12 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 
 @Testcontainers
 public class UpdateFixturesHandlerIntegrationTest {
+  private static final String NRF_MENS_DIV_6_CENTRAL_EAST = "2716594877";
+  private static final String NRF_MENS_COMMUNITY_CUP = "2714644497";
+
   private FakeClock fakeClock;
   private FakeCometClient fakeCometClient;
+  private FakeTeamsFactory fakeTeamsFactory;
   private DynamoDbTable<FootballCalendarItem> footballCalendarTable;
 
   private UpdateFixturesHandler updateFixturesHandler;
@@ -30,6 +34,7 @@ public class UpdateFixturesHandlerIntegrationTest {
 
     fakeClock = factory.fakeClock();
     fakeCometClient = factory.fakeCometClient();
+    fakeTeamsFactory = factory.fakeTeamsFactory();
     footballCalendarTable = factory.footballCalendarTable();
 
     DynamoDbUtils.createTable(factory.dynamoDbClient(), footballCalendarTable);
@@ -43,6 +48,13 @@ public class UpdateFixturesHandlerIntegrationTest {
     var testTime = Instant.parse("2023-05-01T10:00:00Z");
     fakeClock.setTime(testTime);
     var event = new ScheduledEvent();
+
+    fakeTeamsFactory.addTeam(
+        new TeamsFactory.NorthernRegionalFootballTeam(
+            "Flamingos", "flamingo", "44838", NRF_MENS_DIV_6_CENTRAL_EAST));
+    fakeTeamsFactory.addTeam(
+        new TeamsFactory.NorthernRegionalFootballTeam(
+            "Flamingos", "flamingo", "44838", NRF_MENS_COMMUNITY_CUP));
 
     // Create a pre-existing fixture with old date
     var existingFixtureId = "123456";
@@ -85,9 +97,8 @@ public class UpdateFixturesHandlerIntegrationTest {
             174.7300,
             "Scheduled");
 
-    fakeCometClient.addFixture(UpdateFixturesHandler.NRF_MENS_DIV_6_CENTRAL_EAST, leagueFixture);
-    fakeCometClient.addFixture(
-        UpdateFixturesHandler.NRF_MENS_DIV_6_CENTRAL_EAST, nonFlamingoLeagueFixture);
+    fakeCometClient.addFixture(NRF_MENS_DIV_6_CENTRAL_EAST, leagueFixture);
+    fakeCometClient.addFixture(NRF_MENS_DIV_6_CENTRAL_EAST, nonFlamingoLeagueFixture);
 
     // Add cup fixtures to the fake client
     var cupFixture =
@@ -114,8 +125,8 @@ public class UpdateFixturesHandlerIntegrationTest {
             174.7400,
             "Scheduled");
 
-    fakeCometClient.addFixture(UpdateFixturesHandler.NRF_MENS_COMMUNITY_CUP, cupFixture);
-    fakeCometClient.addFixture(UpdateFixturesHandler.NRF_MENS_COMMUNITY_CUP, nonFlamingoCupFixture);
+    fakeCometClient.addFixture(NRF_MENS_COMMUNITY_CUP, cupFixture);
+    fakeCometClient.addFixture(NRF_MENS_COMMUNITY_CUP, nonFlamingoCupFixture);
 
     // act
     updateFixturesHandler.handleRequest(event, null);
@@ -177,6 +188,10 @@ public class UpdateFixturesHandlerIntegrationTest {
     var testTime = Instant.parse("2023-05-01T10:00:00Z");
     fakeClock.setTime(testTime);
     var event = new ScheduledEvent();
+
+    fakeTeamsFactory.addTeam(
+        new TeamsFactory.NorthernRegionalFootballTeam(
+            "Flamingos", "flamingo", "44838", NRF_MENS_DIV_6_CENTRAL_EAST));
 
     // Create three pre-existing fixtures in DB
     var existingFixture1 =
@@ -247,8 +262,8 @@ public class UpdateFixturesHandlerIntegrationTest {
             174.8140,
             "Scheduled");
 
-    fakeCometClient.addFixture(UpdateFixturesHandler.NRF_MENS_DIV_6_CENTRAL_EAST, apiFixture1);
-    fakeCometClient.addFixture(UpdateFixturesHandler.NRF_MENS_DIV_6_CENTRAL_EAST, apiFixture2);
+    fakeCometClient.addFixture(NRF_MENS_DIV_6_CENTRAL_EAST, apiFixture1);
+    fakeCometClient.addFixture(NRF_MENS_DIV_6_CENTRAL_EAST, apiFixture2);
 
     // act
     updateFixturesHandler.handleRequest(event, null);

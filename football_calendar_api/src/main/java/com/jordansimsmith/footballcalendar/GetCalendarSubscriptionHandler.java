@@ -1,7 +1,5 @@
 package com.jordansimsmith.footballcalendar;
 
-import static com.jordansimsmith.footballcalendar.Teams.ELLERSLIE_FLAMINGOS;
-
 import biweekly.Biweekly;
 import biweekly.ICalendar;
 import biweekly.component.VEvent;
@@ -27,6 +25,7 @@ public class GetCalendarSubscriptionHandler
       LoggerFactory.getLogger(GetCalendarSubscriptionHandler.class);
 
   private final DynamoDbTable<FootballCalendarItem> footballCalendarTable;
+  private final TeamsFactory teamsFactory;
 
   public GetCalendarSubscriptionHandler() {
     this(FootballCalendarFactory.create());
@@ -35,6 +34,7 @@ public class GetCalendarSubscriptionHandler
   @VisibleForTesting
   GetCalendarSubscriptionHandler(FootballCalendarFactory factory) {
     this.footballCalendarTable = factory.footballCalendarTable();
+    this.teamsFactory = factory.teamsFactory();
   }
 
   @Override
@@ -52,41 +52,43 @@ public class GetCalendarSubscriptionHandler
     var calendar = new ICalendar();
     calendar.setProductId("-//jordansimsmith.com//Football Calendar//EN");
 
-    // Query for all fixtures for the Flamingos team
-    var queryConditional =
-        QueryConditional.keyEqualTo(
-            Key.builder()
-                .partitionValue(FootballCalendarItem.formatPk(ELLERSLIE_FLAMINGOS))
-                .build());
+    var teamIds = teamsFactory.findTeamIds();
 
-    for (var item : footballCalendarTable.query(queryConditional).items()) {
-      var vevent = new VEvent();
+    // query for fixtures for each team
+    for (var teamId : teamIds) {
+      var queryConditional =
+          QueryConditional.keyEqualTo(
+              Key.builder().partitionValue(FootballCalendarItem.formatPk(teamId)).build());
 
-      // set match title as summary (home vs away)
-      vevent.setSummary(String.format("%s vs %s", item.getHomeTeam(), item.getAwayTeam()));
+      for (var item : footballCalendarTable.query(queryConditional).items()) {
+        var vevent = new VEvent();
 
-      // set match date
-      vevent.setDateStart(Date.from(item.getTimestamp()));
+        // set match title as summary (home vs away)
+        vevent.setSummary(String.format("%s vs %s", item.getHomeTeam(), item.getAwayTeam()));
 
-      // set location
-      String location = item.getVenue();
-      if (!Strings.isNullOrEmpty(item.getAddress())) {
-        location += ", " + item.getAddress();
+        // set match date
+        vevent.setDateStart(Date.from(item.getTimestamp()));
+
+        // set location
+        String location = item.getVenue();
+        if (!Strings.isNullOrEmpty(item.getAddress())) {
+          location += ", " + item.getAddress();
+        }
+        vevent.setLocation(location);
+
+        // set geo coordinates
+        if (item.getLatitude() != null && item.getLongitude() != null) {
+          vevent.setGeo(new Geo(item.getLatitude(), item.getLongitude()));
+        }
+
+        // set description with status, only if status is available
+        if (!Strings.isNullOrEmpty(item.getStatus())) {
+          vevent.setDescription("Status: " + item.getStatus());
+        }
+
+        // add event to calendar
+        calendar.addEvent(vevent);
       }
-      vevent.setLocation(location);
-
-      // set geo coordinates
-      if (item.getLatitude() != null && item.getLongitude() != null) {
-        vevent.setGeo(new Geo(item.getLatitude(), item.getLongitude()));
-      }
-
-      // set description with status, only if status is available
-      if (!Strings.isNullOrEmpty(item.getStatus())) {
-        vevent.setDescription("Status: " + item.getStatus());
-      }
-
-      // add event to calendar
-      calendar.addEvent(vevent);
     }
 
     // generate ical string

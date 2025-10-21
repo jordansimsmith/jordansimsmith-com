@@ -5,6 +5,7 @@ bazel-*
 **/*.tfstate
 **/*.tfstate.backup
 **/venv/
+**/.venv/
 **/node_modules/
 pnpm-debug.log*
 .ruff_cache/

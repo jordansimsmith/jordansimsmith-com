@@ -23,6 +23,8 @@ public interface FootballCalendarFactory {
 
   CometClient cometClient();
 
+  TeamsFactory teamsFactory();
+
   static FootballCalendarFactory create() {
     return DaggerFootballCalendarFactory.create();
   }

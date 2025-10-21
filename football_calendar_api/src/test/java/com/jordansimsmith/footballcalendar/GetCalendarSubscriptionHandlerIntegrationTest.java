@@ -18,6 +18,7 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 @Testcontainers
 public class GetCalendarSubscriptionHandlerIntegrationTest {
 
+  private FakeTeamsFactory fakeTeamsFactory;
   private DynamoDbTable<FootballCalendarItem> footballCalendarTable;
   private GetCalendarSubscriptionHandler getCalendarSubscriptionHandler;
 
@@ -27,6 +28,7 @@ public class GetCalendarSubscriptionHandlerIntegrationTest {
   void setUp() {
     var factory = FootballCalendarTestFactory.create(dynamoDbContainer.getEndpoint());
 
+    fakeTeamsFactory = factory.fakeTeamsFactory();
     footballCalendarTable = factory.footballCalendarTable();
 
     DynamoDbUtils.createTable(factory.dynamoDbClient(), footballCalendarTable);
@@ -56,6 +58,10 @@ public class GetCalendarSubscriptionHandlerIntegrationTest {
   @Test
   void shouldReturnFixturesInCalendar() {
     // arrange
+    fakeTeamsFactory.addTeam(
+        new TeamsFactory.NorthernRegionalFootballTeam(
+            "Flamingos", "flamingo", "44838", "2716594877"));
+
     var fixture =
         FootballCalendarItem.create(
             "Flamingos",

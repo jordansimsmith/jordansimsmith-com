@@ -29,4 +29,16 @@ public class FootballCalendarTestModule {
   public CometClient cometClient(FakeCometClient fakeCometClient) {
     return fakeCometClient;
   }
+
+  @Provides
+  @Singleton
+  public FakeTeamsFactory fakeTeamsFactory() {
+    return new FakeTeamsFactory();
+  }
+
+  @Provides
+  @Singleton
+  public TeamsFactory teamsFactory(FakeTeamsFactory fakeTeamsFactory) {
+    return fakeTeamsFactory;
+  }
 }
