@@ -48,13 +48,6 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
   }
 
   private Void doHandleRequest(ScheduledEvent event, Context context) {
-    var now = clock.now();
-    var currentYear = ZonedDateTime.ofInstant(now, ZoneId.systemDefault()).getYear();
-    var seasonId = String.valueOf(currentYear);
-    var from = ZonedDateTime.of(currentYear, 1, 1, 0, 0, 0, 0, ZoneId.systemDefault()).toInstant();
-    var to =
-        ZonedDateTime.of(currentYear, 12, 31, 23, 59, 59, 0, ZoneId.systemDefault()).toInstant();
-
     var nrfTeams = teamsFactory.findNorthernRegionalFootballTeams();
 
     // group team configurations by id
@@ -80,6 +73,13 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
       // fetch fixtures from all competitions for this team
       var allFixtures = new ArrayList<CometClient.FootballFixture>();
       for (var nrfTeam : nrfTeamsForTeamId) {
+        var seasonId = nrfTeam.seasonId();
+        var seasonYear = Integer.parseInt(seasonId);
+        var from =
+            ZonedDateTime.of(seasonYear, 1, 1, 0, 0, 0, 0, ZoneId.systemDefault()).toInstant();
+        var to =
+            ZonedDateTime.of(seasonYear, 12, 31, 23, 59, 59, 0, ZoneId.systemDefault()).toInstant();
+
         var fixtures =
             cometClient.getFixtures(
                 seasonId, nrfTeam.competitionId(), List.of(nrfTeam.clubId()), from, to);

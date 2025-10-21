@@ -60,7 +60,7 @@ public class GetCalendarSubscriptionHandlerIntegrationTest {
     // arrange
     fakeTeamsFactory.addTeam(
         new TeamsFactory.NorthernRegionalFootballTeam(
-            "Flamingos", "flamingo", "44838", "2716594877"));
+            "Flamingos", "flamingo", "44838", "2716594877", "2025"));
 
     var fixture =
         FootballCalendarItem.create(

@@ -51,10 +51,10 @@ public class UpdateFixturesHandlerIntegrationTest {
 
     fakeTeamsFactory.addTeam(
         new TeamsFactory.NorthernRegionalFootballTeam(
-            "Flamingos", "flamingo", "44838", NRF_MENS_DIV_6_CENTRAL_EAST));
+            "Flamingos", "flamingo", "44838", NRF_MENS_DIV_6_CENTRAL_EAST, "2025"));
     fakeTeamsFactory.addTeam(
         new TeamsFactory.NorthernRegionalFootballTeam(
-            "Flamingos", "flamingo", "44838", NRF_MENS_COMMUNITY_CUP));
+            "Flamingos", "flamingo", "44838", NRF_MENS_COMMUNITY_CUP, "2025"));
 
     // Create a pre-existing fixture with old date
     var existingFixtureId = "123456";
@@ -191,7 +191,7 @@ public class UpdateFixturesHandlerIntegrationTest {
 
     fakeTeamsFactory.addTeam(
         new TeamsFactory.NorthernRegionalFootballTeam(
-            "Flamingos", "flamingo", "44838", NRF_MENS_DIV_6_CENTRAL_EAST));
+            "Flamingos", "flamingo", "44838", NRF_MENS_DIV_6_CENTRAL_EAST, "2025"));
 
     // Create three pre-existing fixtures in DB
     var existingFixture1 =

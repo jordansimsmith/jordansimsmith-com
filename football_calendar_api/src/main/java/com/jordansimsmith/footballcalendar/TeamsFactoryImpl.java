@@ -6,10 +6,10 @@ import java.util.stream.Collectors;
 
 public class TeamsFactoryImpl implements TeamsFactory {
   private static final NorthernRegionalFootballTeam NRF_FLAMINGOS_LEAGUE =
-      new NorthernRegionalFootballTeam("Flamingos", "flamingo", "44838", "2716594877");
+      new NorthernRegionalFootballTeam("Flamingos", "flamingo", "44838", "2716594877", "2025");
 
   private static final NorthernRegionalFootballTeam NRF_FLAMINGOS_CUP =
-      new NorthernRegionalFootballTeam("Flamingos", "flamingo", "44838", "2714644497");
+      new NorthernRegionalFootballTeam("Flamingos", "flamingo", "44838", "2714644497", "2025");
 
   @Override
   public List<NorthernRegionalFootballTeam> findNorthernRegionalFootballTeams() {
