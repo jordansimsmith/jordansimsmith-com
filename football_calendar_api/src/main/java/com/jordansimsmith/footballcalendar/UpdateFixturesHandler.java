@@ -4,8 +4,6 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
-import com.jordansimsmith.time.Clock;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -22,7 +20,7 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
 
   private final DynamoDbTable<FootballCalendarItem> footballCalendarTable;
   private final CometClient cometClient;
-  private final Clock clock;
+  private final FootballFixClient footballFixClient;
   private final TeamsFactory teamsFactory;
 
   public UpdateFixturesHandler() {
@@ -33,7 +31,7 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
   UpdateFixturesHandler(FootballCalendarFactory factory) {
     this.footballCalendarTable = factory.footballCalendarTable();
     this.cometClient = factory.cometClient();
-    this.clock = factory.clock();
+    this.footballFixClient = factory.footballFixClient();
     this.teamsFactory = factory.teamsFactory();
   }
 
@@ -48,52 +46,17 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
   }
 
   private Void doHandleRequest(ScheduledEvent event, Context context) {
-    var nrfTeams = teamsFactory.findNorthernRegionalFootballTeams();
-
-    // group team configurations by id
-    var nrfTeamsByTeamId =
-        nrfTeams.stream()
-            .collect(Collectors.groupingBy(TeamsFactory.NorthernRegionalFootballTeam::id));
+    // find and combine all fixtures from various sources
+    var allFixtures = new ArrayList<FootballCalendarItem>();
+    allFixtures.addAll(findNorthernRegionalFootballFixtures());
+    allFixtures.addAll(findFootballFixFixtures());
+    var fixturesByTeam =
+        allFixtures.stream().collect(Collectors.groupingBy(FootballCalendarItem::getTeam));
 
     // process each team separately
-    for (var entry : nrfTeamsByTeamId.entrySet()) {
+    for (var entry : fixturesByTeam.entrySet()) {
       var teamId = entry.getKey();
-      var nrfTeamsForTeamId = entry.getValue();
-
-      var distinctNameMatchers =
-          nrfTeamsForTeamId.stream()
-              .map(TeamsFactory.NorthernRegionalFootballTeam::nameMatcher)
-              .distinct()
-              .toList();
-      Preconditions.checkState(
-          distinctNameMatchers.size() == 1,
-          "All team configs for the same team must have the same nameMatcher");
-      var nameMatcher = nrfTeamsForTeamId.get(0).nameMatcher();
-
-      // fetch fixtures from all competitions for this team
-      var allFixtures = new ArrayList<CometClient.FootballFixture>();
-      for (var nrfTeam : nrfTeamsForTeamId) {
-        var seasonId = nrfTeam.seasonId();
-        var seasonYear = Integer.parseInt(seasonId);
-        var from =
-            ZonedDateTime.of(seasonYear, 1, 1, 0, 0, 0, 0, ZoneId.systemDefault()).toInstant();
-        var to =
-            ZonedDateTime.of(seasonYear, 12, 31, 23, 59, 59, 0, ZoneId.systemDefault()).toInstant();
-
-        var fixtures =
-            cometClient.getFixtures(
-                seasonId, nrfTeam.competitionId(), List.of(nrfTeam.clubId()), from, to);
-        allFixtures.addAll(fixtures);
-      }
-
-      // filter for fixtures involving this team
-      var teamFixtures =
-          allFixtures.stream()
-              .filter(
-                  fixture ->
-                      fixture.homeTeamName().toLowerCase().contains(nameMatcher)
-                          || fixture.awayTeamName().toLowerCase().contains(nameMatcher))
-              .toList();
+      var fixtures = entry.getValue();
 
       // fetch all existing fixtures for this team from DynamoDB
       var existingFixtures =
@@ -106,21 +69,55 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
               .toList();
 
       // create a set of match IDs from the API response to use for comparison
-      var currentFixtureIds =
-          teamFixtures.stream().map(CometClient.FootballFixture::id).collect(Collectors.toSet());
+      var newFixtureIds =
+          fixtures.stream().map(FootballCalendarItem::getMatchId).collect(Collectors.toSet());
 
       // delete fixtures that no longer exist in the API response
       for (var existingFixture : existingFixtures) {
-        if (!currentFixtureIds.contains(existingFixture.getMatchId())) {
+        if (!newFixtureIds.contains(existingFixture.getMatchId())) {
           footballCalendarTable.deleteItem(existingFixture);
         }
       }
 
       // update or add current fixtures
+      for (var fixture : fixtures) {
+        footballCalendarTable.putItem(fixture);
+      }
+    }
+
+    return null;
+  }
+
+  private List<FootballCalendarItem> findNorthernRegionalFootballFixtures() {
+    var allFixtures = new ArrayList<FootballCalendarItem>();
+    var teams = teamsFactory.findNorthernRegionalFootballTeams();
+
+    // process each team separately
+    for (var team : teams) {
+
+      // fetch fixtures from all competitions for this team
+      var seasonYear = Integer.parseInt(team.seasonId());
+      var from = ZonedDateTime.of(seasonYear, 1, 1, 0, 0, 0, 0, ZoneId.systemDefault()).toInstant();
+      var to =
+          ZonedDateTime.of(seasonYear, 12, 31, 23, 59, 59, 0, ZoneId.systemDefault()).toInstant();
+      var fixtures =
+          cometClient.getFixtures(
+              team.seasonId(), team.competitionId(), List.of(team.clubId()), from, to);
+
+      // filter for fixtures involving this team
+      var teamFixtures =
+          fixtures.stream()
+              .filter(
+                  fixture ->
+                      fixture.homeTeamName().toLowerCase().contains(team.nameMatcher())
+                          || fixture.awayTeamName().toLowerCase().contains(team.nameMatcher()))
+              .toList();
+
+      // map to dynamodb item
       for (var fixture : teamFixtures) {
         var item =
             FootballCalendarItem.create(
-                teamId,
+                team.id(),
                 fixture.id(),
                 fixture.homeTeamName(),
                 fixture.awayTeamName(),
@@ -130,11 +127,50 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
                 fixture.latitude(),
                 fixture.longitude(),
                 fixture.status());
-
-        footballCalendarTable.putItem(item);
+        allFixtures.add(item);
       }
     }
 
-    return null;
+    return allFixtures;
+  }
+
+  private List<FootballCalendarItem> findFootballFixFixtures() {
+    var allFixtures = new ArrayList<FootballCalendarItem>();
+    var teams = teamsFactory.findFootballFixTeams();
+
+    for (var team : teams) {
+      // fetch fixtures from Football Fix
+      var fixtures =
+          footballFixClient.getFixtures(
+              team.venueId(), team.leagueId(), team.seasonId(), team.divisionId());
+
+      // filter for fixtures involving this team
+      var teamFixtures =
+          fixtures.stream()
+              .filter(
+                  fixture ->
+                      fixture.homeTeamName().toLowerCase().contains(team.nameMatcher())
+                          || fixture.awayTeamName().toLowerCase().contains(team.nameMatcher()))
+              .toList();
+
+      // map to dynamodb item
+      for (var fixture : teamFixtures) {
+        var item =
+            FootballCalendarItem.create(
+                team.id(),
+                fixture.id(),
+                fixture.homeTeamName(),
+                fixture.awayTeamName(),
+                fixture.timestamp(),
+                fixture.venue(),
+                fixture.address(),
+                null,
+                null,
+                null);
+        allFixtures.add(item);
+      }
+    }
+
+    return allFixtures;
   }
 }

@@ -29,6 +29,13 @@ public class FootballCalendarModule {
 
   @Provides
   @Singleton
+  FootballFixClient footballFixClient() {
+    var mtEdenAddress = "3/25 Normanby Road, Mount Eden, Auckland 1024";
+    return new JsoupFootballFixClient(mtEdenAddress);
+  }
+
+  @Provides
+  @Singleton
   TeamsFactory teamsFactory() {
     return new TeamsFactoryImpl();
   }

@@ -23,6 +23,8 @@ public interface FootballCalendarFactory {
 
   CometClient cometClient();
 
+  FootballFixClient footballFixClient();
+
   TeamsFactory teamsFactory();
 
   static FootballCalendarFactory create() {

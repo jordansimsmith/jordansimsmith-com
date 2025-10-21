@@ -1,5 +1,6 @@
 package com.jordansimsmith.footballcalendar;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -11,15 +12,28 @@ public class TeamsFactoryImpl implements TeamsFactory {
   private static final NorthernRegionalFootballTeam NRF_FLAMINGOS_CUP =
       new NorthernRegionalFootballTeam("Flamingos", "flamingo", "44838", "2714644497", "2025");
 
+  private static final FootballFixTeam FOOTBALL_FIX_FLAMINGOS_SEVENS =
+      new FootballFixTeam("Flamingos Sevens", "flamingoes", "13", "131", "89", "6030");
+
   @Override
   public List<NorthernRegionalFootballTeam> findNorthernRegionalFootballTeams() {
     return List.of(NRF_FLAMINGOS_LEAGUE, NRF_FLAMINGOS_CUP);
   }
 
   @Override
+  public List<FootballFixTeam> findFootballFixTeams() {
+    return List.of(FOOTBALL_FIX_FLAMINGOS_SEVENS);
+  }
+
+  @Override
   public Set<String> findTeamIds() {
-    return findNorthernRegionalFootballTeams().stream()
-        .map(NorthernRegionalFootballTeam::id)
-        .collect(Collectors.toSet());
+    var teamIds = new HashSet<String>();
+    teamIds.addAll(
+        findNorthernRegionalFootballTeams().stream()
+            .map(NorthernRegionalFootballTeam::id)
+            .collect(Collectors.toSet()));
+    teamIds.addAll(
+        findFootballFixTeams().stream().map(FootballFixTeam::id).collect(Collectors.toSet()));
+    return teamIds;
   }
 }

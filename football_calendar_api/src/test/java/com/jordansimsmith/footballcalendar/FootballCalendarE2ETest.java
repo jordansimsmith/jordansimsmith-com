@@ -76,7 +76,6 @@ public class FootballCalendarE2ETest {
     var firstEvent = events.get(0);
     assertThat(firstEvent.getSummary()).isNotNull();
     assertThat(firstEvent.getDateStart()).isNotNull();
-    assertThat(firstEvent.getDescription()).isNotNull();
     assertThat(firstEvent.getLocation()).isNotNull();
   }
 }

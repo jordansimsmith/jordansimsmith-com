@@ -24,6 +24,8 @@ public interface FootballCalendarTestFactory extends FootballCalendarFactory {
 
   FakeCometClient fakeCometClient();
 
+  FakeFootballFixClient fakeFootballFixClient();
+
   FakeTeamsFactory fakeTeamsFactory();
 
   DynamoDbClient dynamoDbClient();

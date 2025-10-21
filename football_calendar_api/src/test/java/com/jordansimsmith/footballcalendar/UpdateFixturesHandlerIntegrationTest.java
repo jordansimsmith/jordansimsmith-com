@@ -21,6 +21,7 @@ public class UpdateFixturesHandlerIntegrationTest {
 
   private FakeClock fakeClock;
   private FakeCometClient fakeCometClient;
+  private FakeFootballFixClient fakeFootballFixClient;
   private FakeTeamsFactory fakeTeamsFactory;
   private DynamoDbTable<FootballCalendarItem> footballCalendarTable;
 
@@ -34,6 +35,7 @@ public class UpdateFixturesHandlerIntegrationTest {
 
     fakeClock = factory.fakeClock();
     fakeCometClient = factory.fakeCometClient();
+    fakeFootballFixClient = factory.fakeFootballFixClient();
     fakeTeamsFactory = factory.fakeTeamsFactory();
     footballCalendarTable = factory.footballCalendarTable();
 
@@ -280,5 +282,152 @@ public class UpdateFixturesHandlerIntegrationTest {
 
     // Verify fixture3 was deleted
     assertThat(items).noneMatch(item -> item.getMatchId().equals("fixture3"));
+  }
+
+  @Test
+  void handleRequestShouldSaveFootballFixFixturesToDb() {
+    // arrange
+    var testTime = Instant.parse("2025-10-23T10:00:00Z");
+    fakeClock.setTime(testTime);
+    var event = new ScheduledEvent();
+
+    fakeTeamsFactory.addTeam(
+        new TeamsFactory.FootballFixTeam(
+            "Flamingos Sevens", "flamingoes", "13", "131", "89", "6030"));
+
+    // add Football Fix fixtures
+    var flamingoesFixture =
+        new FootballFixClient.FootballFixture(
+            "148617",
+            "Lad FC",
+            "Flamingoes",
+            Instant.parse("2025-10-23T08:40:00Z"),
+            "Field 2",
+            "3/25 Normanby Road, Mount Eden, Auckland 1024");
+
+    var nonFlamingoesFixture =
+        new FootballFixClient.FootballFixture(
+            "148618",
+            "Jesus and the Shepherds",
+            "G-Raves RC",
+            Instant.parse("2025-10-23T07:20:00Z"),
+            "Field 1",
+            "3/25 Normanby Road, Mount Eden, Auckland 1024");
+
+    fakeFootballFixClient.addFixture("6030", flamingoesFixture);
+    fakeFootballFixClient.addFixture("6030", nonFlamingoesFixture);
+
+    // act
+    updateFixturesHandler.handleRequest(event, null);
+
+    // assert
+    var items = footballCalendarTable.scan().items().stream().toList();
+
+    // should only have 1 item - the Flamingoes fixture
+    assertThat(items).hasSize(1);
+
+    // verify team
+    assertThat(items).allMatch(item -> "Flamingos Sevens".equals(item.getTeam()));
+    assertThat(items).allMatch(item -> item.getPk().equals("TEAM#Flamingos Sevens"));
+
+    // verify non-flamingoes fixture is not saved
+    assertThat(items).noneMatch(item -> item.getMatchId().equals(nonFlamingoesFixture.id()));
+
+    // verify Flamingoes fixture
+    var item = items.get(0);
+    assertThat(item.getMatchId()).isEqualTo(flamingoesFixture.id());
+    assertThat(item.getHomeTeam()).isEqualTo(flamingoesFixture.homeTeamName());
+    assertThat(item.getAwayTeam()).isEqualTo(flamingoesFixture.awayTeamName());
+    assertThat(item.getTimestamp()).isEqualTo(flamingoesFixture.timestamp());
+    assertThat(item.getVenue()).isEqualTo(flamingoesFixture.venue());
+    assertThat(item.getAddress()).isEqualTo(flamingoesFixture.address());
+    assertThat(item.getLatitude()).isNull();
+    assertThat(item.getLongitude()).isNull();
+    assertThat(item.getStatus()).isNull();
+    assertThat(item.getSk()).isEqualTo("MATCH#148617");
+  }
+
+  @Test
+  void handleRequestShouldSaveFixturesFromBothNrfAndFootballFix() {
+    // arrange
+    var testTime = Instant.parse("2025-10-23T10:00:00Z");
+    fakeClock.setTime(testTime);
+    var event = new ScheduledEvent();
+
+    // add NRF team
+    fakeTeamsFactory.addTeam(
+        new TeamsFactory.NorthernRegionalFootballTeam(
+            "Flamingos", "flamingo", "44838", NRF_MENS_DIV_6_CENTRAL_EAST, "2025"));
+
+    // add Football Fix team
+    fakeTeamsFactory.addTeam(
+        new TeamsFactory.FootballFixTeam(
+            "Flamingos Sevens", "flamingoes", "13", "131", "89", "6030"));
+
+    // add NRF fixture
+    var nrfFixture =
+        new CometClient.FootballFixture(
+            "123456",
+            "Eastern Suburbs AFC",
+            "Ellerslie AFC Flamingos M",
+            Instant.parse("2025-10-25T14:00:00Z"),
+            "Madills Farm",
+            "20 Melanesia Road, Kohimarama, Auckland",
+            -36.8485,
+            174.8582,
+            "Scheduled");
+
+    fakeCometClient.addFixture(NRF_MENS_DIV_6_CENTRAL_EAST, nrfFixture);
+
+    // add Football Fix fixture
+    var footballFixFixture =
+        new FootballFixClient.FootballFixture(
+            "148617",
+            "Flamingoes",
+            "Lad FC",
+            Instant.parse("2025-10-30T07:20:00Z"),
+            "Field 2",
+            "3/25 Normanby Road, Mount Eden, Auckland 1024");
+
+    fakeFootballFixClient.addFixture("6030", footballFixFixture);
+
+    // act
+    updateFixturesHandler.handleRequest(event, null);
+
+    // assert
+    var items = footballCalendarTable.scan().items().stream().toList();
+
+    // should have 2 items - one from each source
+    assertThat(items).hasSize(2);
+
+    // verify NRF fixture
+    var nrfItem =
+        items.stream()
+            .filter(item -> item.getMatchId().equals(nrfFixture.id()))
+            .findFirst()
+            .orElseThrow();
+    assertThat(nrfItem.getTeam()).isEqualTo("Flamingos");
+    assertThat(nrfItem.getHomeTeam()).isEqualTo(nrfFixture.homeTeamName());
+    assertThat(nrfItem.getAwayTeam()).isEqualTo(nrfFixture.awayTeamName());
+    assertThat(nrfItem.getTimestamp()).isEqualTo(nrfFixture.timestamp());
+    assertThat(nrfItem.getVenue()).isEqualTo(nrfFixture.venue());
+    assertThat(nrfItem.getLatitude()).isCloseTo(nrfFixture.latitude(), within(0.00001));
+    assertThat(nrfItem.getLongitude()).isCloseTo(nrfFixture.longitude(), within(0.00001));
+    assertThat(nrfItem.getStatus()).isEqualTo(nrfFixture.status());
+
+    // verify Football Fix fixture
+    var footballFixItem =
+        items.stream()
+            .filter(item -> item.getMatchId().equals(footballFixFixture.id()))
+            .findFirst()
+            .orElseThrow();
+    assertThat(footballFixItem.getTeam()).isEqualTo("Flamingos Sevens");
+    assertThat(footballFixItem.getHomeTeam()).isEqualTo(footballFixFixture.homeTeamName());
+    assertThat(footballFixItem.getAwayTeam()).isEqualTo(footballFixFixture.awayTeamName());
+    assertThat(footballFixItem.getTimestamp()).isEqualTo(footballFixFixture.timestamp());
+    assertThat(footballFixItem.getVenue()).isEqualTo(footballFixFixture.venue());
+    assertThat(footballFixItem.getLatitude()).isNull();
+    assertThat(footballFixItem.getLongitude()).isNull();
+    assertThat(footballFixItem.getStatus()).isNull();
   }
 }
