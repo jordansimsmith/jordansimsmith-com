@@ -29,6 +29,8 @@ java_library(
         ":dagger",
         "//lib/dynamodb:lib",
         "//lib/time:lib",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_guava_guava",
         "@maven//:org_jsoup_jsoup",
         "@maven//:org_slf4j_slf4j_api",
@@ -122,9 +124,12 @@ java_test_suite(
     deps = [
         ":lib",
         ":test-lib",
+        "//lib/time:lib",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_jsoup_jsoup",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_mockito_mockito_core",
     ],
 )
 

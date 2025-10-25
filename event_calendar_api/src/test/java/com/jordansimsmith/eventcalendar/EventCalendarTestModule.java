@@ -28,4 +28,28 @@ public class EventCalendarTestModule {
   public GoMediaEventClient goMediaEventClient(FakeGoMediaEventClient fakeGoMediaEventClient) {
     return fakeGoMediaEventClient;
   }
+
+  @Provides
+  @Singleton
+  public FakeMeetupClient fakeMeetupClient() {
+    return new FakeMeetupClient();
+  }
+
+  @Provides
+  @Singleton
+  public MeetupClient meetupClient(FakeMeetupClient fakeMeetupClient) {
+    return fakeMeetupClient;
+  }
+
+  @Provides
+  @Singleton
+  public FakeMeetupsFactory fakeMeetupsFactory() {
+    return new FakeMeetupsFactory();
+  }
+
+  @Provides
+  @Singleton
+  public MeetupsFactory meetupsFactory(FakeMeetupsFactory fakeMeetupsFactory) {
+    return fakeMeetupsFactory;
+  }
 }

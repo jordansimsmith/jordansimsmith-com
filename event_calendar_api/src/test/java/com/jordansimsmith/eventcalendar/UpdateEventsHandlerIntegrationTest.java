@@ -6,6 +6,7 @@ import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.time.FakeClock;
+import java.net.URI;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -24,6 +25,8 @@ public class UpdateEventsHandlerIntegrationTest {
 
   private FakeClock fakeClock;
   private FakeGoMediaEventClient fakeGoMediaEventClient;
+  private FakeMeetupClient fakeMeetupClient;
+  private FakeMeetupsFactory fakeMeetupsFactory;
   private DynamoDbTable<EventCalendarItem> eventCalendarTable;
 
   private UpdateEventsHandler updateEventsHandler;
@@ -36,6 +39,8 @@ public class UpdateEventsHandlerIntegrationTest {
 
     fakeClock = factory.fakeClock();
     fakeGoMediaEventClient = factory.fakeGoMediaEventClient();
+    fakeMeetupClient = factory.fakeMeetupClient();
+    fakeMeetupsFactory = factory.fakeMeetupsFactory();
     eventCalendarTable = factory.eventCalendarTable();
 
     DynamoDbUtils.createTable(factory.dynamoDbClient(), eventCalendarTable);
@@ -52,7 +57,7 @@ public class UpdateEventsHandlerIntegrationTest {
 
     // create pre-existing Warriors event with old date
     var existingWarriorsEvent =
-        EventCalendarItem.create(
+        EventCalendarItem.createStadiumEvent(
             STADIUM_URL,
             "Warriors vs Storm",
             "https://www.aucklandstadiums.co.nz/event/warriors-storm",
@@ -90,7 +95,7 @@ public class UpdateEventsHandlerIntegrationTest {
     updateEventsHandler.handleRequest(event, null);
 
     // assert
-    var pk = EventCalendarItem.formatPk(STADIUM_URL);
+    var pk = EventCalendarItem.formatStadiumEventPk(STADIUM_URL);
     var query = QueryConditional.keyEqualTo(b -> b.partitionValue(pk));
     var request = QueryEnhancedRequest.builder().queryConditional(query).build();
 
@@ -139,7 +144,7 @@ public class UpdateEventsHandlerIntegrationTest {
 
     // create pre-existing events in DB
     var existingEvent1 =
-        EventCalendarItem.create(
+        EventCalendarItem.createStadiumEvent(
             STADIUM_URL,
             "Warriors vs Storm",
             "https://www.aucklandstadiums.co.nz/event/warriors-storm",
@@ -147,7 +152,7 @@ public class UpdateEventsHandlerIntegrationTest {
             LocalDateTime.of(2024, 3, 25, 19, 30).toInstant(ZoneOffset.UTC));
 
     var existingEvent2 =
-        EventCalendarItem.create(
+        EventCalendarItem.createStadiumEvent(
             STADIUM_URL,
             "Taylor Swift Concert",
             "https://www.aucklandstadiums.co.nz/event/taylor-swift",
@@ -155,7 +160,7 @@ public class UpdateEventsHandlerIntegrationTest {
             LocalDateTime.of(2024, 4, 15, 20, 0).toInstant(ZoneOffset.UTC));
 
     var existingEvent3 =
-        EventCalendarItem.create(
+        EventCalendarItem.createStadiumEvent(
             STADIUM_URL,
             "Black Caps vs Australia",
             "https://www.aucklandstadiums.co.nz/event/black-caps-australia",
@@ -201,5 +206,39 @@ public class UpdateEventsHandlerIntegrationTest {
 
     // Verify event3 was deleted
     assertThat(items).noneMatch(item -> item.getEventUrl().equals(existingEvent3.getEventUrl()));
+  }
+
+  @Test
+  void handleRequestShouldProcessMeetupEvents() {
+    // arrange
+    var testTime = Instant.parse("2024-03-20T10:00:00Z");
+    fakeClock.setTime(testTime);
+    var event = new ScheduledEvent();
+
+    var testGroupUrl = URI.create("https://www.meetup.com/test-group");
+    fakeMeetupsFactory.addMeetupGroup(new MeetupsFactory.MeetupGroup(testGroupUrl));
+
+    fakeMeetupClient.addEvent(
+        testGroupUrl,
+        new MeetupClient.MeetupEvent(
+            "Test Meetup",
+            "https://www.meetup.com/test-group",
+            "https://www.meetup.com/test-group/events/123",
+            Instant.parse("2025-11-22T02:00:00Z"),
+            "Test Venue, Auckland"));
+
+    // act
+    updateEventsHandler.handleRequest(event, null);
+
+    // assert
+    var items = eventCalendarTable.scan().items().stream().toList();
+    var meetupEvents =
+        items.stream().filter(item -> item.getPk().startsWith("MEETUP_GROUP#")).toList();
+    assertThat(meetupEvents).hasSize(1);
+    assertThat(meetupEvents.get(0).getTitle()).isEqualTo("Test Meetup");
+    assertThat(meetupEvents.get(0).getLocation()).isEqualTo("Test Venue, Auckland");
+    assertThat(meetupEvents.get(0).getEventUrl())
+        .isEqualTo("https://www.meetup.com/test-group/events/123");
+    assertThat(meetupEvents.get(0).getTimestamp()).isEqualTo(Instant.parse("2025-11-22T02:00:00Z"));
   }
 }

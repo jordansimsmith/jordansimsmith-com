@@ -16,6 +16,10 @@ public interface EventCalendarFactory {
 
   GoMediaEventClient goMediaEventClient();
 
+  MeetupClient meetupClient();
+
+  MeetupsFactory meetupsFactory();
+
   static EventCalendarFactory create() {
     return DaggerEventCalendarFactory.create();
   }

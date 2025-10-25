@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class FakeGoMediaEventClient implements GoMediaEventClient {
-  private List<GoMediaEvent> events = new ArrayList<>();
+  private final List<GoMediaEvent> events = new ArrayList<>();
 
   @Override
   public List<GoMediaEvent> getEvents() {

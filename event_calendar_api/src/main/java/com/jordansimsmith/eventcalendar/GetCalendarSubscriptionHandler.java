@@ -8,13 +8,15 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 public class GetCalendarSubscriptionHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
@@ -23,6 +25,7 @@ public class GetCalendarSubscriptionHandler
       LoggerFactory.getLogger(GetCalendarSubscriptionHandler.class);
 
   private final DynamoDbTable<EventCalendarItem> eventCalendarTable;
+  private final MeetupsFactory meetupsFactory;
 
   public GetCalendarSubscriptionHandler() {
     this(EventCalendarFactory.create());
@@ -31,6 +34,7 @@ public class GetCalendarSubscriptionHandler
   @VisibleForTesting
   GetCalendarSubscriptionHandler(EventCalendarFactory factory) {
     this.eventCalendarTable = factory.eventCalendarTable();
+    this.meetupsFactory = factory.meetupsFactory();
   }
 
   @Override
@@ -48,18 +52,39 @@ public class GetCalendarSubscriptionHandler
     var calendar = new ICalendar();
     calendar.setProductId("-//jordansimsmith.com//Event Calendar//EN");
 
-    // get all events from dynamodb for the stadium
-    var pk = EventCalendarItem.formatPk(GoMediaEventClient.STADIUM_URL);
-    var query = QueryConditional.keyEqualTo(b -> b.partitionValue(pk));
-    var request = QueryEnhancedRequest.builder().queryConditional(query).build();
+    // get all events from dynamodb by querying each PK
+    var allItems = new ArrayList<EventCalendarItem>();
 
-    // add each event to the calendar
-    for (var item : eventCalendarTable.query(request).items()) {
+    // query stadium events
+    var stadiumPk = EventCalendarItem.formatStadiumEventPk(GoMediaEventClient.STADIUM_URL);
+    allItems.addAll(
+        eventCalendarTable
+            .query(QueryConditional.keyEqualTo(Key.builder().partitionValue(stadiumPk).build()))
+            .items()
+            .stream()
+            .toList());
+
+    // query meetup events for each group
+    for (var group : meetupsFactory.findMeetupGroups()) {
+      var meetupPk = EventCalendarItem.formatMeetupEventPk(group.meetupGroupUrl().toString());
+      allItems.addAll(
+          eventCalendarTable
+              .query(QueryConditional.keyEqualTo(Key.builder().partitionValue(meetupPk).build()))
+              .items()
+              .stream()
+              .toList());
+    }
+
+    // create ical events
+    for (var item : allItems) {
       var vevent = new VEvent();
       vevent.setSummary(item.getTitle());
       vevent.setDateStart(Date.from(item.getTimestamp()));
       vevent.setDescription(item.getEventInfo());
       vevent.setUrl(item.getEventUrl());
+      if (!Strings.isNullOrEmpty(item.getLocation())) {
+        vevent.setLocation(item.getLocation());
+      }
       calendar.addEvent(vevent);
     }
 
