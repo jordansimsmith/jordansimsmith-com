@@ -1,5 +1,6 @@
 package com.jordansimsmith.eventcalendar;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.time.Clock;
@@ -151,16 +152,22 @@ public class HttpMeetupClient implements MeetupClient {
   private record PersistedQuery(
       @JsonProperty("version") int version, @JsonProperty("sha256Hash") String sha256Hash) {}
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   private record GraphQLResponse(@JsonProperty("data") Data data) {}
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   private record Data(@JsonProperty("groupByUrlname") GroupByUrlname groupByUrlname) {}
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   private record GroupByUrlname(@JsonProperty("events") Events events) {}
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   private record Events(@JsonProperty("edges") List<Edge> edges) {}
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   private record Edge(@JsonProperty("node") Node node) {}
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   private record Node(
       @JsonProperty("id") String id,
       @JsonProperty("title") String title,
@@ -168,6 +175,7 @@ public class HttpMeetupClient implements MeetupClient {
       @JsonProperty("dateTime") String dateTime,
       @JsonProperty("venue") Venue venue) {}
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
   private record Venue(
       @JsonProperty("name") String name,
       @JsonProperty("address") String address,
