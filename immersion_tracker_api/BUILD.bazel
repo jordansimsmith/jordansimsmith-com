@@ -11,6 +11,11 @@ INTEGRATION_TESTS = glob(["src/test/java/**/*IntegrationTest.java"])
 
 E2E_TESTS = glob(["src/test/java/**/*E2ETest.java"])
 
+UNIT_TESTS = glob(
+    ["src/test/java/**/*Test.java"],
+    exclude = INTEGRATION_TESTS + E2E_TESTS,
+)
+
 java_library(
     name = "lib",
     srcs = glob(
@@ -174,11 +179,35 @@ java_binary(
     ],
 )
 
+java_binary(
+    name = "sync-spotify-handler",
+    srcs = glob(["src/main/java/com/jordansimsmith/immersiontracker/SyncSpotifyHandler.java"]),
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/time:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
 java_library(
     name = "test-lib",
     srcs = glob(
         ["src/test/java/**/*.java"],
-        exclude = INTEGRATION_TESTS + E2E_TESTS,
+        exclude = INTEGRATION_TESTS + E2E_TESTS + UNIT_TESTS,
     ),
     data = [
         ":local-load",
@@ -202,6 +231,24 @@ java_library(
 )
 
 java_test_suite(
+    name = "unit-tests",
+    size = "small",
+    srcs = UNIT_TESTS,
+    runner = "junit5",
+    test_suffixes = ["Test.java"],
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        ":lib",
+        ":test-lib",
+        "//lib/secrets:lib",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_mockito_mockito_core",
+    ],
+)
+
+java_test_suite(
     name = "integration-tests",
     size = "medium",
     srcs = INTEGRATION_TESTS,
@@ -219,6 +266,7 @@ java_test_suite(
         ":get-shows-handler",
         ":lib",
         ":sync-episodes-handler",
+        ":sync-spotify-handler",
         ":sync-youtube-handler",
         ":test-lib",
         ":update-show-handler",
@@ -245,6 +293,7 @@ pkg_tar(
         ":get-progress-handler_deploy.jar",
         ":get-shows-handler_deploy.jar",
         ":sync-episodes-handler_deploy.jar",
+        ":sync-spotify-handler_deploy.jar",
         ":sync-youtube-handler_deploy.jar",
         ":update-show-handler_deploy.jar",
     ],

@@ -43,11 +43,14 @@ public class GetProgressHandler
       @JsonProperty("episodes_watched_today") int episodesWatchedToday,
       @JsonProperty("youtube_videos_watched") int youtubeVideosWatched,
       @JsonProperty("youtube_videos_watched_today") int youtubeVideosWatchedToday,
+      @JsonProperty("spotify_episodes_watched") int spotifyEpisodesWatched,
+      @JsonProperty("spotify_episodes_watched_today") int spotifyEpisodesWatchedToday,
       @JsonProperty("days_since_first_episode") long daysSinceFirstEpisode,
       @Nullable @JsonProperty("weekly_trend_percentage") Double weeklyTrendPercentage,
       @JsonProperty("daily_activity") List<DailyActivity> dailyActivity,
       @JsonProperty("shows") List<Show> shows,
-      @JsonProperty("youtube_channels") List<YoutubeChannel> youtubeChannels) {}
+      @JsonProperty("youtube_channels") List<YoutubeChannel> youtubeChannels,
+      @JsonProperty("spotify_shows") List<SpotifyShow> spotifyShows) {}
 
   @VisibleForTesting
   record Show(
@@ -58,6 +61,11 @@ public class GetProgressHandler
   record YoutubeChannel(
       @Nullable @JsonProperty("channel_name") String channelName,
       @JsonProperty("videos_watched") int videosWatched) {}
+
+  @VisibleForTesting
+  record SpotifyShow(
+      @Nullable @JsonProperty("show_name") String showName,
+      @JsonProperty("episodes_watched") int episodesWatched) {}
 
   @VisibleForTesting
   record DailyActivity(
@@ -114,21 +122,33 @@ public class GetProgressHandler
         items.stream()
             .filter(i -> i.getSk().startsWith(ImmersionTrackerItem.YOUTUBECHANNEL_PREFIX))
             .toList();
+    var spotifyEpisodes =
+        items.stream()
+            .filter(i -> i.getSk().startsWith(ImmersionTrackerItem.SPOTIFYEPISODE_PREFIX))
+            .toList();
+    var spotifyShows =
+        items.stream()
+            .filter(i -> i.getSk().startsWith(ImmersionTrackerItem.SPOTIFYSHOW_PREFIX))
+            .toList();
 
     var now = clock.now();
     var today = now.atZone(ZONE_ID).truncatedTo(ChronoUnit.DAYS).toInstant();
 
     var totalEpisodesWatched = totalEpisodesWatched(episodes);
-    var totalHoursWatched = totalHoursWatched(episodes, youtubeVideos);
+    var totalHoursWatched = totalHoursWatched(episodes, youtubeVideos, spotifyEpisodes);
     var episodesWatchedToday = episodesWatchedToday(episodes, today);
     var youtubeVideosWatched = youtubeVideosWatched(youtubeVideos);
     var youtubeVideosWatchedToday = youtubeVideosWatchedToday(youtubeVideos, today);
-    var daysSinceFirstEpisode = daysSinceFirstEpisode(episodes, youtubeVideos, now);
+    var spotifyEpisodesWatched = spotifyEpisodesWatched(spotifyEpisodes);
+    var spotifyEpisodesWatchedToday = spotifyEpisodesWatchedToday(spotifyEpisodes, today);
+    var daysSinceFirstEpisode =
+        daysSinceFirstEpisode(episodes, youtubeVideos, spotifyEpisodes, now);
     var weeklyTrendPercentage =
-        weeklyTrendPercentage(episodes, youtubeVideos, now, daysSinceFirstEpisode);
-    var activity = dailyActivity(episodes, youtubeVideos, now);
+        weeklyTrendPercentage(episodes, youtubeVideos, spotifyEpisodes, now, daysSinceFirstEpisode);
+    var activity = dailyActivity(episodes, youtubeVideos, spotifyEpisodes, now);
     var progresses = shows(episodes, shows);
     var channelProgresses = youtubeChannels(youtubeVideos, youtubeChannels);
+    var spotifyShowProgresses = spotifyShows(spotifyEpisodes, spotifyShows);
 
     var res =
         new GetProgressResponse(
@@ -137,11 +157,14 @@ public class GetProgressHandler
             episodesWatchedToday,
             youtubeVideosWatched,
             youtubeVideosWatchedToday,
+            spotifyEpisodesWatched,
+            spotifyEpisodesWatchedToday,
             daysSinceFirstEpisode,
             weeklyTrendPercentage,
             activity,
             progresses,
-            channelProgresses);
+            channelProgresses,
+            spotifyShowProgresses);
 
     return APIGatewayV2HTTPResponse.builder()
         .withStatusCode(200)
@@ -155,10 +178,15 @@ public class GetProgressHandler
   }
 
   private int totalHoursWatched(
-      List<ImmersionTrackerItem> episodes, List<ImmersionTrackerItem> youtubeVideos) {
+      List<ImmersionTrackerItem> episodes,
+      List<ImmersionTrackerItem> youtubeVideos,
+      List<ImmersionTrackerItem> spotifyEpisodes) {
     var youtubeTotalMinutes =
         youtubeVideos.stream().mapToLong(v -> v.getYoutubeVideoDuration().toMinutes()).sum();
-    return (int) ((episodes.size() * MINUTES_PER_EPISODE + youtubeTotalMinutes) / 60);
+    var spotifyTotalMinutes =
+        spotifyEpisodes.stream().mapToLong(e -> e.getSpotifyEpisodeDuration().toMinutes()).sum();
+    return (int)
+        ((episodes.size() * MINUTES_PER_EPISODE + youtubeTotalMinutes + spotifyTotalMinutes) / 60);
   }
 
   private int episodesWatchedToday(List<ImmersionTrackerItem> episodes, Instant today) {
@@ -173,14 +201,28 @@ public class GetProgressHandler
     return youtubeVideos.stream().filter(v -> v.getTimestamp().isAfter(today)).toList().size();
   }
 
+  private int spotifyEpisodesWatched(List<ImmersionTrackerItem> spotifyEpisodes) {
+    return spotifyEpisodes.size();
+  }
+
+  private int spotifyEpisodesWatchedToday(
+      List<ImmersionTrackerItem> spotifyEpisodes, Instant today) {
+    return spotifyEpisodes.stream().filter(e -> e.getTimestamp().isAfter(today)).toList().size();
+  }
+
   private long daysSinceFirstEpisode(
-      List<ImmersionTrackerItem> episodes, List<ImmersionTrackerItem> youtubeVideos, Instant now) {
+      List<ImmersionTrackerItem> episodes,
+      List<ImmersionTrackerItem> youtubeVideos,
+      List<ImmersionTrackerItem> spotifyEpisodes,
+      Instant now) {
     var firstEpisodeWatched =
         episodes.stream().map(ImmersionTrackerItem::getTimestamp).min(Instant::compareTo);
     var firstYoutubeWatched =
         youtubeVideos.stream().map(ImmersionTrackerItem::getTimestamp).min(Instant::compareTo);
+    var firstSpotifyWatched =
+        spotifyEpisodes.stream().map(ImmersionTrackerItem::getTimestamp).min(Instant::compareTo);
     var firstContentWatched =
-        Stream.of(firstEpisodeWatched, firstYoutubeWatched)
+        Stream.of(firstEpisodeWatched, firstYoutubeWatched, firstSpotifyWatched)
             .filter(Optional::isPresent)
             .map(Optional::get)
             .min(Instant::compareTo)
@@ -191,6 +233,7 @@ public class GetProgressHandler
   private Double weeklyTrendPercentage(
       List<ImmersionTrackerItem> episodes,
       List<ImmersionTrackerItem> youtubeVideos,
+      List<ImmersionTrackerItem> spotifyEpisodes,
       Instant now,
       long daysSinceFirstEpisode) {
     if (daysSinceFirstEpisode < 14) {
@@ -207,10 +250,19 @@ public class GetProgressHandler
             .filter(v -> v.getTimestamp().isAfter(sevenDaysAgo))
             .mapToLong(v -> v.getYoutubeVideoDuration().toMinutes())
             .sum();
-    var totalMinutesWatchedLastWeek = episodesWatchedLastWeek + youtubeWatchedLastWeek;
+    var spotifyWatchedLastWeek =
+        spotifyEpisodes.stream()
+            .filter(e -> e.getTimestamp().isAfter(sevenDaysAgo))
+            .mapToLong(e -> e.getSpotifyEpisodeDuration().toMinutes())
+            .sum();
+    var totalMinutesWatchedLastWeek =
+        episodesWatchedLastWeek + youtubeWatchedLastWeek + spotifyWatchedLastWeek;
     var youtubeTotalMinutes =
         youtubeVideos.stream().mapToLong(v -> v.getYoutubeVideoDuration().toMinutes()).sum();
-    var totalMinutesWatched = (long) episodes.size() * MINUTES_PER_EPISODE + youtubeTotalMinutes;
+    var spotifyTotalMinutes =
+        spotifyEpisodes.stream().mapToLong(e -> e.getSpotifyEpisodeDuration().toMinutes()).sum();
+    var totalMinutesWatched =
+        (long) episodes.size() * MINUTES_PER_EPISODE + youtubeTotalMinutes + spotifyTotalMinutes;
     var averageMinutesPerWeek = (double) totalMinutesWatched / daysSinceFirstEpisode * 7;
     return ((totalMinutesWatchedLastWeek - averageMinutesPerWeek) / averageMinutesPerWeek) * 100;
   }
@@ -262,8 +314,34 @@ public class GetProgressHandler
         .toList();
   }
 
+  private List<SpotifyShow> spotifyShows(
+      List<ImmersionTrackerItem> spotifyEpisodes, List<ImmersionTrackerItem> spotifyShows) {
+    var showsByShowId =
+        spotifyShows.stream()
+            .collect(Collectors.toMap(ImmersionTrackerItem::getSpotifyShowId, v -> v));
+    var episodesByShowId =
+        spotifyEpisodes.stream()
+            .collect(Collectors.groupingBy(ImmersionTrackerItem::getSpotifyShowId));
+    return episodesByShowId.entrySet().stream()
+        .map(
+            entry -> {
+              var showId = entry.getKey();
+              var episodes = entry.getValue();
+              var show = showsByShowId.get(showId);
+              var showName = show != null ? show.getSpotifyShowName() : null;
+              return new SpotifyShow(showName, episodes.size());
+            })
+        .sorted(
+            Comparator.comparing((SpotifyShow s) -> s.episodesWatched, Comparator.reverseOrder())
+                .thenComparing(s -> s.showName, Comparator.nullsLast(Comparator.naturalOrder())))
+        .toList();
+  }
+
   private List<DailyActivity> dailyActivity(
-      List<ImmersionTrackerItem> episodes, List<ImmersionTrackerItem> youtubeVideos, Instant now) {
+      List<ImmersionTrackerItem> episodes,
+      List<ImmersionTrackerItem> youtubeVideos,
+      List<ImmersionTrackerItem> spotifyEpisodes,
+      Instant now) {
     var result = new java.util.ArrayList<DailyActivity>();
     for (int daysAgo = 6; daysAgo >= 0; daysAgo--) {
       var dayStart =
@@ -285,7 +363,14 @@ public class GetProgressHandler
               .mapToLong(v -> v.getYoutubeVideoDuration().toMinutes())
               .sum();
 
-      var totalMinutes = (int) (episodeMinutes + youtubeMinutes);
+      var spotifyMinutes =
+          spotifyEpisodes.stream()
+              .filter(
+                  e -> !e.getTimestamp().isBefore(dayStart) && e.getTimestamp().isBefore(dayEnd))
+              .mapToLong(e -> e.getSpotifyEpisodeDuration().toMinutes())
+              .sum();
+
+      var totalMinutes = (int) (episodeMinutes + youtubeMinutes + spotifyMinutes);
       result.add(new DailyActivity(daysAgo, totalMinutes));
     }
     return result;

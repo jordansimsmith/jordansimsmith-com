@@ -540,4 +540,324 @@ public class GetProgressHandlerIntegrationTest {
     assertThat(dailyActivity.get(6).daysAgo()).isEqualTo(0);
     assertThat(dailyActivity.get(6).minutesWatched()).isEqualTo(30);
   }
+
+  @Test
+  void handleRequestShouldIncludeSpotifyEpisodesInProgress() throws Exception {
+    // arrange
+    var user = "alice";
+    fakeClock.setTime(Instant.ofEpochMilli(123_000));
+    var now = fakeClock.now();
+
+    // Create episodes (20 minutes each)
+    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", now);
+    var episode2 = ImmersionTrackerItem.createEpisode(user, "show1", "episode2", now);
+
+    // Create Spotify episodes
+    var spotifyEpisode1 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user, "testShowId1", "episode1", "Spotify Episode 1", Duration.ofMinutes(15), now);
+    var spotifyEpisode2 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user, "testShowId2", "episode2", "Spotify Episode 2", Duration.ofMinutes(45), now);
+
+    immersionTrackerTable.putItem(episode1);
+    immersionTrackerTable.putItem(episode2);
+    immersionTrackerTable.putItem(spotifyEpisode1);
+    immersionTrackerTable.putItem(spotifyEpisode2);
+
+    // act
+    var req =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+    var res = getProgressHandler.handleRequest(req, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(200);
+
+    var progress =
+        objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
+
+    // Episodes: 2 * 20 minutes = 40 minutes
+    // Spotify: 15 + 45 = 60 minutes
+    // Total: 100 minutes = 1 hour (rounded down)
+    assertThat(progress.totalHoursWatched()).isEqualTo(1);
+    assertThat(progress.totalEpisodesWatched()).isEqualTo(2);
+    assertThat(progress.spotifyEpisodesWatched()).isEqualTo(2);
+    assertThat(progress.spotifyEpisodesWatchedToday()).isEqualTo(2);
+    assertThat(progress.episodesWatchedToday()).isEqualTo(2);
+  }
+
+  @Test
+  void handleRequestShouldIncludeSpotifyEpisodesInWeeklyTrend() throws Exception {
+    // arrange
+    var user = "alice";
+    fakeClock.setTime(Instant.EPOCH.plus(28, ChronoUnit.DAYS));
+    var now = fakeClock.now();
+    var sevenDaysAgo = now.minus(7, ChronoUnit.DAYS);
+
+    // Historical content: 2 episodes (40 minutes) over 28 days
+    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", Instant.EPOCH);
+    var episode2 =
+        ImmersionTrackerItem.createEpisode(
+            user, "show1", "episode2", Instant.EPOCH.plus(14, ChronoUnit.DAYS));
+
+    // Recent content in last 7 days: 1 episode (20 minutes) + 1 Spotify episode (30 minutes) = 50
+    // minutes
+    var recentEpisode =
+        ImmersionTrackerItem.createEpisode(
+            user, "show1", "episode3", sevenDaysAgo.plus(1, ChronoUnit.DAYS));
+    var recentSpotifyEpisode =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user,
+            "testShowId",
+            "episode1",
+            "Recent Episode",
+            Duration.ofMinutes(30),
+            now.minus(1, ChronoUnit.DAYS));
+
+    immersionTrackerTable.putItem(episode1);
+    immersionTrackerTable.putItem(episode2);
+    immersionTrackerTable.putItem(recentEpisode);
+    immersionTrackerTable.putItem(recentSpotifyEpisode);
+
+    // act
+    var req =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+    var res = getProgressHandler.handleRequest(req, null);
+
+    // assert
+    var progress =
+        objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
+
+    // Total minutes: 3 episodes * 20 + 1 Spotify * 30 = 90 minutes
+    // Average per week over 28 days: 90 / 28 * 7 = 22.5 minutes/week
+    // Last week: 20 + 30 = 50 minutes
+    // Weekly trend: (50 - 22.5) / 22.5 * 100 = 122.22%
+    assertThat(progress.weeklyTrendPercentage()).isCloseTo(122.22, within(0.1));
+  }
+
+  @Test
+  void handleRequestShouldCalculateWeeklyTrendWithOnlySpotifyEpisodes() throws Exception {
+    // arrange
+    var user = "alice";
+    fakeClock.setTime(Instant.EPOCH.plus(21, ChronoUnit.DAYS));
+    var now = fakeClock.now();
+    var sevenDaysAgo = now.minus(7, ChronoUnit.DAYS);
+
+    // Historical Spotify episodes: 60 minutes over 21 days
+    var oldEpisode1 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user, "testShowId", "episode1", "Old Episode 1", Duration.ofMinutes(30), Instant.EPOCH);
+    var oldEpisode2 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user,
+            "testShowId",
+            "episode2",
+            "Old Episode 2",
+            Duration.ofMinutes(30),
+            Instant.EPOCH.plus(7, ChronoUnit.DAYS));
+
+    // Recent Spotify episodes in last 7 days: 40 minutes
+    var recentEpisode1 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user,
+            "testShowId",
+            "episode3",
+            "Recent Episode 1",
+            Duration.ofMinutes(25),
+            sevenDaysAgo.plus(1, ChronoUnit.DAYS));
+    var recentEpisode2 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user,
+            "testShowId",
+            "episode4",
+            "Recent Episode 2",
+            Duration.ofMinutes(15),
+            now.minus(1, ChronoUnit.DAYS));
+
+    immersionTrackerTable.putItem(oldEpisode1);
+    immersionTrackerTable.putItem(oldEpisode2);
+    immersionTrackerTable.putItem(recentEpisode1);
+    immersionTrackerTable.putItem(recentEpisode2);
+
+    // act
+    var req =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+    var res = getProgressHandler.handleRequest(req, null);
+
+    // assert
+    var progress =
+        objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
+
+    // Total minutes: 100 minutes Spotify
+    // Average per week over 21 days: 100 / 21 * 7 = 33.33 minutes/week
+    // Last week: 40 minutes
+    // Weekly trend: (40 - 33.33) / 33.33 * 100 = 20%
+    assertThat(progress.weeklyTrendPercentage()).isCloseTo(20.0, within(0.1));
+  }
+
+  @Test
+  void handleRequestShouldGroupSpotifyEpisodesByShow() throws Exception {
+    // arrange
+    var user = "alice";
+    fakeClock.setTime(Instant.ofEpochMilli(123_000));
+    var now = fakeClock.now();
+
+    var episode1 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user, "testShowId1", "episode1", "Episode 1", Duration.ofMinutes(10), now);
+    var episode2 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user, "testShowId1", "episode2", "Episode 2", Duration.ofMinutes(15), now);
+    var episode3 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user, "testShowId2", "episode3", "Episode 3", Duration.ofMinutes(20), now);
+    var episode4 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user, "testShowId3", "episode4", "Episode 4", Duration.ofMinutes(5), now);
+    var episode5 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user, "testShowId1", "episode5", "Episode 5", Duration.ofMinutes(8), now);
+
+    var show1 = ImmersionTrackerItem.createSpotifyShow(user, "testShowId1", "Show One");
+    var show2 = ImmersionTrackerItem.createSpotifyShow(user, "testShowId2", "Show Two");
+    var show3 = ImmersionTrackerItem.createSpotifyShow(user, "testShowId3", "Show Three");
+
+    immersionTrackerTable.putItem(episode1);
+    immersionTrackerTable.putItem(episode2);
+    immersionTrackerTable.putItem(episode3);
+    immersionTrackerTable.putItem(episode4);
+    immersionTrackerTable.putItem(episode5);
+    immersionTrackerTable.putItem(show1);
+    immersionTrackerTable.putItem(show2);
+    immersionTrackerTable.putItem(show3);
+
+    // act
+    var req =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+    var res = getProgressHandler.handleRequest(req, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(200);
+
+    var progress =
+        objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
+
+    var shows = progress.spotifyShows();
+    assertThat(shows).hasSize(3);
+    assertThat(shows.get(0).showName()).isEqualTo("Show One");
+    assertThat(shows.get(0).episodesWatched()).isEqualTo(3);
+    assertThat(shows.get(1).showName()).isEqualTo("Show Three");
+    assertThat(shows.get(1).episodesWatched()).isEqualTo(1);
+    assertThat(shows.get(2).showName()).isEqualTo("Show Two");
+    assertThat(shows.get(2).episodesWatched()).isEqualTo(1);
+  }
+
+  @Test
+  void handleRequestShouldHandleSpotifyShowsWithoutShowMetadata() throws Exception {
+    // arrange
+    var user = "alice";
+    fakeClock.setTime(Instant.ofEpochMilli(123_000));
+    var now = fakeClock.now();
+
+    var episode1 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user, "testShowId1", "episode1", "Episode 1", Duration.ofMinutes(10), now);
+    var episode2 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user, "testShowId2", "episode2", "Episode 2", Duration.ofMinutes(15), now);
+    var episode3 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user, "testShowId2", "episode3", "Episode 3", Duration.ofMinutes(20), now);
+
+    var show2 = ImmersionTrackerItem.createSpotifyShow(user, "testShowId2", "Show Two");
+
+    immersionTrackerTable.putItem(episode1);
+    immersionTrackerTable.putItem(episode2);
+    immersionTrackerTable.putItem(episode3);
+    immersionTrackerTable.putItem(show2);
+
+    // act
+    var req =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+    var res = getProgressHandler.handleRequest(req, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(200);
+
+    var progress =
+        objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
+
+    var shows = progress.spotifyShows();
+    assertThat(shows).hasSize(2);
+    assertThat(shows.get(0).showName()).isEqualTo("Show Two");
+    assertThat(shows.get(0).episodesWatched()).isEqualTo(2);
+    assertThat(shows.get(1).showName()).isNull();
+    assertThat(shows.get(1).episodesWatched()).isEqualTo(1);
+  }
+
+  @Test
+  void handleRequestShouldIncludeSpotifyEpisodesInDailyActivity() throws Exception {
+    // arrange
+    var user = "alice";
+    fakeClock.setTime(Instant.parse("2024-01-07T12:00:00Z"));
+    var now = fakeClock.now();
+    var todayStart =
+        now.atZone(GetProgressHandler.ZONE_ID).truncatedTo(ChronoUnit.DAYS).toInstant();
+
+    // 3 days ago: 1 episode + 1 Spotify episode (20 + 30 = 50 minutes)
+    var threeDaysAgo = todayStart.minus(3, ChronoUnit.DAYS).plus(18, ChronoUnit.HOURS);
+    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", threeDaysAgo);
+    var spotifyEpisode1 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user,
+            "testShowId",
+            "episode1",
+            "Spotify Episode 1",
+            Duration.ofMinutes(30),
+            threeDaysAgo);
+
+    // 2 days ago: 1 Spotify episode (45 minutes)
+    var twoDaysAgo = todayStart.minus(2, ChronoUnit.DAYS).plus(8, ChronoUnit.HOURS);
+    var spotifyEpisode2 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user,
+            "testShowId",
+            "episode2",
+            "Spotify Episode 2",
+            Duration.ofMinutes(45),
+            twoDaysAgo);
+
+    // today: 1 episode + 1 Spotify episode (20 + 10 = 30 minutes)
+    var today = todayStart.plus(10, ChronoUnit.HOURS);
+    var episode2 = ImmersionTrackerItem.createEpisode(user, "show1", "episode2", today);
+    var spotifyEpisode3 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user, "testShowId", "episode3", "Spotify Episode 3", Duration.ofMinutes(10), today);
+
+    immersionTrackerTable.putItem(episode1);
+    immersionTrackerTable.putItem(episode2);
+    immersionTrackerTable.putItem(spotifyEpisode1);
+    immersionTrackerTable.putItem(spotifyEpisode2);
+    immersionTrackerTable.putItem(spotifyEpisode3);
+
+    // act
+    var req =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+    var res = getProgressHandler.handleRequest(req, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(200);
+
+    var progress =
+        objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
+
+    var dailyActivity = progress.dailyActivity();
+    assertThat(dailyActivity).hasSize(7);
+    assertThat(dailyActivity.get(3).daysAgo()).isEqualTo(3);
+    assertThat(dailyActivity.get(3).minutesWatched()).isEqualTo(50);
+    assertThat(dailyActivity.get(4).daysAgo()).isEqualTo(2);
+    assertThat(dailyActivity.get(4).minutesWatched()).isEqualTo(45);
+    assertThat(dailyActivity.get(6).daysAgo()).isEqualTo(0);
+    assertThat(dailyActivity.get(6).minutesWatched()).isEqualTo(30);
+  }
 }

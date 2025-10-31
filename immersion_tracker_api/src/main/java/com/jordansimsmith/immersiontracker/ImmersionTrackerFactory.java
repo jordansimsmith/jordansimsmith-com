@@ -33,6 +33,8 @@ public interface ImmersionTrackerFactory {
 
   YoutubeClient youtubeClient();
 
+  SpotifyClient spotifyClient();
+
   static ImmersionTrackerFactory create() {
     return DaggerImmersionTrackerFactory.create();
   }

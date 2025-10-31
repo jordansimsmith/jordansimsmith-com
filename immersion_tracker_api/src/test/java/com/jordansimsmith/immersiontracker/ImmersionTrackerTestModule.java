@@ -40,4 +40,16 @@ public class ImmersionTrackerTestModule {
   public YoutubeClient youtubeClient(FakeYoutubeClient fakeYoutubeClient) {
     return fakeYoutubeClient;
   }
+
+  @Provides
+  @Singleton
+  public FakeSpotifyClient fakeSpotifyClient() {
+    return new FakeSpotifyClient();
+  }
+
+  @Provides
+  @Singleton
+  public SpotifyClient spotifyClient(FakeSpotifyClient fakeSpotifyClient) {
+    return fakeSpotifyClient;
+  }
 }

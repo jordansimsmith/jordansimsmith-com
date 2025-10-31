@@ -33,4 +33,11 @@ public class ImmersionTrackerModule {
     var httpClient = HttpClient.newBuilder().build();
     return new HttpYoutubeClient(objectMapper, secrets, httpClient);
   }
+
+  @Provides
+  @Singleton
+  public SpotifyClient spotifyClient(ObjectMapper objectMapper, Secrets secrets) {
+    var httpClient = HttpClient.newBuilder().build();
+    return new HttpSpotifyClient(objectMapper, secrets, httpClient);
+  }
 }

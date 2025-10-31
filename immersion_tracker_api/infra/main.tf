@@ -64,6 +64,10 @@ locals {
       target  = "//immersion_tracker_api:sync-youtube-handler_deploy.jar"
       handler = "com.jordansimsmith.immersiontracker.SyncYoutubeHandler"
     }
+    sync_spotify = {
+      target  = "//immersion_tracker_api:sync-spotify-handler_deploy.jar"
+      handler = "com.jordansimsmith.immersiontracker.SyncSpotifyHandler"
+    }
   }
 
   endpoints = {
@@ -85,6 +89,10 @@ locals {
     }
     sync_youtube = {
       path   = "syncyoutube"
+      method = "POST"
+    }
+    sync_spotify = {
+      path   = "syncspotify"
       method = "POST"
     }
   }

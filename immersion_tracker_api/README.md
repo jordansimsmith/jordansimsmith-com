@@ -11,9 +11,10 @@ graph TD
   C --> D[DynamoDB]
   C --> E[TVDB API]
   C --> H[YouTube API]
+  C --> J[Spotify API]
   F[Python Sync Script] --> B
   F --> G[Local File System]
-  F --> I[youtube_watched.txt]
+  F --> I[watched.txt]
   G --> F
   I --> F
 ```
@@ -24,13 +25,15 @@ graph TD
 
 - Track watched TV shows and episodes for language learning immersion
 - Track watched YouTube videos for language learning immersion
+- Track watched Spotify podcast episodes for language learning immersion
 - Store metadata about shows from TVDB API
 - Store metadata about YouTube videos from YouTube API
+- Store metadata about Spotify episodes from Spotify API
 - Provide progress statistics (total episodes watched, hours watched, etc.)
 - Support syncing episodes from local files to the cloud database
-- Support syncing YouTube videos from local youtube_watched.txt file
+- Support syncing YouTube videos and Spotify episodes from local watched.txt file
 - Allow updating show metadata with TVDB information
-- Display progress summaries for all tracked shows and YouTube videos
+- Display progress summaries for all tracked shows, YouTube channels, and Spotify shows
 - Support authentication for secure access
 
 ### Technical specifications
@@ -63,9 +66,10 @@ graph TD
 - `GetShowsHandler`: Lists tracked shows
 - `SyncEpisodesHandler`: Syncs local episodes to the database
 - `SyncYoutubeHandler`: Syncs YouTube videos to the database
+- `SyncSpotifyHandler`: Syncs Spotify podcast episodes to the database
 - `UpdateShowHandler`: Updates show metadata with TVDB information
 - `ImmersionTrackerItem`: Data model for DynamoDB items
-- `sync_episodes.py`: Client script that scans local files and youtube_watched.txt, calls the Lambda API to sync episodes and YouTube videos, and manages watched files
+- `sync_episodes.py`: Client script that scans local files and watched.txt, calls the Lambda API to sync episodes, YouTube videos, and Spotify episodes, and manages watched files
 
 ### Configuration
 
@@ -75,6 +79,7 @@ graph TD
 - Authentication using API Gateway authorizers
 - TVDB API integration for show metadata lookup
 - YouTube API integration for video metadata lookup
+- Spotify API integration for podcast episode metadata lookup using client credentials flow
 
 ### DynamoDB data model examples
 
@@ -129,5 +134,32 @@ graph TD
   "user": "alice",
   "youtube_channel_id": "UCChannelId123",
   "youtube_channel_title": "Example Channel"
+}
+```
+
+**Spotify episode item:**
+
+```json
+{
+  "pk": "USER#alice",
+  "sk": "SPOTIFYEPISODE#4qjerzMw8jfD30VOG0tjpK",
+  "user": "alice",
+  "spotify_episode_id": "4qjerzMw8jfD30VOG0tjpK",
+  "spotify_episode_title": "No 1 紹介(しょうかい) Introduction",
+  "spotify_show_id": "6Nl8RDfPxsk4h4bfWe76Kg",
+  "spotify_episode_duration": 388,
+  "timestamp": 1672531200
+}
+```
+
+**Spotify show item:**
+
+```json
+{
+  "pk": "USER#alice",
+  "sk": "SPOTIFYSHOW#6Nl8RDfPxsk4h4bfWe76Kg",
+  "user": "alice",
+  "spotify_show_id": "6Nl8RDfPxsk4h4bfWe76Kg",
+  "spotify_show_name": "The Miku Real Japanese Podcast | Japanese conversation | Japanese culture"
 }
 ```

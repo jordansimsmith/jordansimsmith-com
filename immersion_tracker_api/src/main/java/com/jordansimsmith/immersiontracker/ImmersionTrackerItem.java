@@ -16,6 +16,8 @@ public class ImmersionTrackerItem {
   public static final String SHOW_PREFIX = "SHOW" + DELIMITER;
   public static final String YOUTUBEVIDEO_PREFIX = "YOUTUBEVIDEO" + DELIMITER;
   public static final String YOUTUBECHANNEL_PREFIX = "YOUTUBECHANNEL" + DELIMITER;
+  public static final String SPOTIFYEPISODE_PREFIX = "SPOTIFYEPISODE" + DELIMITER;
+  public static final String SPOTIFYSHOW_PREFIX = "SPOTIFYSHOW" + DELIMITER;
 
   public static final String PK = "pk";
   public static final String SK = "sk";
@@ -31,6 +33,11 @@ public class ImmersionTrackerItem {
   public static final String YOUTUBE_CHANNEL_ID = "youtube_channel_id";
   public static final String YOUTUBE_CHANNEL_TITLE = "youtube_channel_title";
   public static final String YOUTUBE_VIDEO_DURATION = "youtube_video_duration";
+  public static final String SPOTIFY_EPISODE_ID = "spotify_episode_id";
+  public static final String SPOTIFY_EPISODE_TITLE = "spotify_episode_title";
+  public static final String SPOTIFY_SHOW_ID = "spotify_show_id";
+  public static final String SPOTIFY_SHOW_NAME = "spotify_show_name";
+  public static final String SPOTIFY_EPISODE_DURATION = "spotify_episode_duration";
   public static final String VERSION = "version";
 
   private String pk;
@@ -47,6 +54,11 @@ public class ImmersionTrackerItem {
   private String youtubeChannelId;
   private String youtubeChannelTitle;
   private Duration youtubeVideoDuration;
+  private String spotifyEpisodeId;
+  private String spotifyEpisodeTitle;
+  private String spotifyShowId;
+  private String spotifyShowName;
+  private Duration spotifyEpisodeDuration;
   private Long version;
 
   @DynamoDbPartitionKey
@@ -179,6 +191,52 @@ public class ImmersionTrackerItem {
     this.youtubeVideoDuration = youtubeVideoDuration;
   }
 
+  @DynamoDbAttribute(SPOTIFY_EPISODE_ID)
+  public String getSpotifyEpisodeId() {
+    return spotifyEpisodeId;
+  }
+
+  public void setSpotifyEpisodeId(String spotifyEpisodeId) {
+    this.spotifyEpisodeId = spotifyEpisodeId;
+  }
+
+  @DynamoDbAttribute(SPOTIFY_EPISODE_TITLE)
+  public String getSpotifyEpisodeTitle() {
+    return spotifyEpisodeTitle;
+  }
+
+  public void setSpotifyEpisodeTitle(String spotifyEpisodeTitle) {
+    this.spotifyEpisodeTitle = spotifyEpisodeTitle;
+  }
+
+  @DynamoDbAttribute(SPOTIFY_SHOW_ID)
+  public String getSpotifyShowId() {
+    return spotifyShowId;
+  }
+
+  public void setSpotifyShowId(String spotifyShowId) {
+    this.spotifyShowId = spotifyShowId;
+  }
+
+  @DynamoDbAttribute(SPOTIFY_SHOW_NAME)
+  public String getSpotifyShowName() {
+    return spotifyShowName;
+  }
+
+  public void setSpotifyShowName(String spotifyShowName) {
+    this.spotifyShowName = spotifyShowName;
+  }
+
+  @DynamoDbAttribute(SPOTIFY_EPISODE_DURATION)
+  @DynamoDbConvertedBy(DurationSecondsConverter.class)
+  public Duration getSpotifyEpisodeDuration() {
+    return spotifyEpisodeDuration;
+  }
+
+  public void setSpotifyEpisodeDuration(Duration spotifyEpisodeDuration) {
+    this.spotifyEpisodeDuration = spotifyEpisodeDuration;
+  }
+
   @DynamoDbVersionAttribute()
   @DynamoDbAttribute(VERSION)
   public Long getVersion() {
@@ -230,6 +288,20 @@ public class ImmersionTrackerItem {
         + '\''
         + ", youtubeVideoDuration="
         + youtubeVideoDuration
+        + ", spotifyEpisodeId='"
+        + spotifyEpisodeId
+        + '\''
+        + ", spotifyEpisodeTitle='"
+        + spotifyEpisodeTitle
+        + '\''
+        + ", spotifyShowId='"
+        + spotifyShowId
+        + '\''
+        + ", spotifyShowName='"
+        + spotifyShowName
+        + '\''
+        + ", spotifyEpisodeDuration="
+        + spotifyEpisodeDuration
         + '}';
   }
 
@@ -251,7 +323,12 @@ public class ImmersionTrackerItem {
         && Objects.equals(youtubeVideoTitle, that.youtubeVideoTitle)
         && Objects.equals(youtubeChannelId, that.youtubeChannelId)
         && Objects.equals(youtubeChannelTitle, that.youtubeChannelTitle)
-        && Objects.equals(youtubeVideoDuration, that.youtubeVideoDuration);
+        && Objects.equals(youtubeVideoDuration, that.youtubeVideoDuration)
+        && Objects.equals(spotifyEpisodeId, that.spotifyEpisodeId)
+        && Objects.equals(spotifyEpisodeTitle, that.spotifyEpisodeTitle)
+        && Objects.equals(spotifyShowId, that.spotifyShowId)
+        && Objects.equals(spotifyShowName, that.spotifyShowName)
+        && Objects.equals(spotifyEpisodeDuration, that.spotifyEpisodeDuration);
   }
 
   @Override
@@ -270,7 +347,12 @@ public class ImmersionTrackerItem {
         youtubeVideoTitle,
         youtubeChannelId,
         youtubeChannelTitle,
-        youtubeVideoDuration);
+        youtubeVideoDuration,
+        spotifyEpisodeId,
+        spotifyEpisodeTitle,
+        spotifyShowId,
+        spotifyShowName,
+        spotifyEpisodeDuration);
   }
 
   public static String formatPk(String user) {
@@ -291,6 +373,14 @@ public class ImmersionTrackerItem {
 
   public static String formatYoutubeChannelSk(String channelId) {
     return YOUTUBECHANNEL_PREFIX + channelId;
+  }
+
+  public static String formatSpotifyEpisodeSk(String episodeId) {
+    return SPOTIFYEPISODE_PREFIX + episodeId;
+  }
+
+  public static String formatSpotifyShowSk(String showId) {
+    return SPOTIFYSHOW_PREFIX + showId;
   }
 
   public static ImmersionTrackerItem createEpisode(
@@ -342,5 +432,35 @@ public class ImmersionTrackerItem {
     channel.setYoutubeChannelId(channelId);
     channel.setYoutubeChannelTitle(channelTitle);
     return channel;
+  }
+
+  public static ImmersionTrackerItem createSpotifyEpisode(
+      String user,
+      String showId,
+      String episodeId,
+      String title,
+      Duration duration,
+      Instant timestamp) {
+    var episode = new ImmersionTrackerItem();
+    episode.setPk(formatPk(user));
+    episode.setSk(formatSpotifyEpisodeSk(episodeId));
+    episode.setUser(user);
+    episode.setSpotifyEpisodeId(episodeId);
+    episode.setSpotifyEpisodeTitle(title);
+    episode.setSpotifyShowId(showId);
+    episode.setSpotifyEpisodeDuration(duration);
+    episode.setTimestamp(timestamp);
+    return episode;
+  }
+
+  public static ImmersionTrackerItem createSpotifyShow(
+      String user, String showId, String showName) {
+    var show = new ImmersionTrackerItem();
+    show.setPk(formatPk(user));
+    show.setSk(formatSpotifyShowSk(showId));
+    show.setUser(user);
+    show.setSpotifyShowId(showId);
+    show.setSpotifyShowName(showName);
+    return show;
   }
 }

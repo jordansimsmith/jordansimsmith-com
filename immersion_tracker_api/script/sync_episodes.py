@@ -13,7 +13,7 @@ SUPPORTED_EXTENSIONS = [".mkv", ".mp4"]
 
 def main():
     local_episodes_watched = find_local_episodes_watched()
-    youtube_video_ids = find_youtube_videos_watched()
+    youtube_video_ids, spotify_episode_ids = find_watched_urls()
 
     if len(local_episodes_watched):
         sync_local_episodes_watched(local_episodes_watched)
@@ -22,17 +22,20 @@ def main():
     if len(youtube_video_ids):
         sync_youtube_videos_watched(youtube_video_ids)
 
+    if len(spotify_episode_ids):
+        sync_spotify_episodes_watched(spotify_episode_ids)
+
     get_remote_show_progress()
 
-    if local_episodes_watched or youtube_video_ids:
+    if local_episodes_watched or youtube_video_ids or spotify_episode_ids:
         print()
 
     if len(local_episodes_watched):
         delete_local_episodes_watched(local_episodes_watched)
         delete_completed_shows(local_episodes_watched)
 
-    if len(youtube_video_ids):
-        clear_youtube_watched_file()
+    if len(youtube_video_ids) or len(spotify_episode_ids):
+        clear_watched_file()
 
     print()
     input("Press ENTER to close...")
@@ -106,11 +109,21 @@ def get_remote_show_progress():
         video_word = "video" if videos_watched == 1 else "videos"
         print(f"{videos_watched} {video_word} of {name}")
 
-    if res["shows"] or res["youtube_channels"]:
+    if (res["shows"] or res["youtube_channels"]) and res["spotify_shows"]:
+        print()
+
+    for show in res["spotify_shows"]:
+        name = show["show_name"] or "Unknown"
+        episodes_watched = show["episodes_watched"]
+        episode_word = "episode" if episodes_watched == 1 else "episodes"
+        print(f"{episodes_watched} {episode_word} of {name}")
+
+    if res["shows"] or res["youtube_channels"] or res["spotify_shows"]:
         print()
 
     episodes_watched_today = res["episodes_watched_today"]
     youtube_videos_watched_today = res["youtube_videos_watched_today"]
+    spotify_episodes_watched_today = res["spotify_episodes_watched_today"]
     total_hours_watched = res["total_hours_watched"]
 
     average_days_per_month = 365 / 12
@@ -121,6 +134,7 @@ def get_remote_show_progress():
 
     print(f"{episodes_watched_today} episodes watched today.")
     print(f"{youtube_videos_watched_today} YouTube videos watched today.")
+    print(f"{spotify_episodes_watched_today} Spotify episodes watched today.")
     print()
     display_weekly_activity(res["daily_activity"])
 
@@ -182,44 +196,56 @@ def delete_completed_shows(episodes):
         print(f"Deleted completed show: {folder}")
 
 
-def find_youtube_videos_watched():
-    print("Finding YouTube videos watched...")
-    video_ids = []
+def find_watched_urls():
+    print("Finding watched URLs...")
+    youtube_video_ids = []
+    spotify_episode_ids = []
 
-    youtube_file = "youtube_watched.txt"
-    if not os.path.isfile(youtube_file):
-        return video_ids
+    watched_file = "watched.txt"
+    if not os.path.isfile(watched_file):
+        return youtube_video_ids, spotify_episode_ids
 
-    with open(youtube_file, "r") as f:
+    with open(watched_file, "r") as f:
         for line in f:
             line = line.strip()
             if not line:
                 continue
 
-            # Extract video ID from https://youtube.com?v= format
-            match = re.search(r"youtube\.com.*[?&]v=([a-zA-Z0-9_-]{11})", line)
-            if not match:
-                raise Exception(f"Unable to extract YouTube video ID from line: {line}")
+            # Extract YouTube video ID from https://youtube.com?v= format
+            youtube_match = re.search(r"youtube\.com.*[?&]v=([a-zA-Z0-9_-]{11})", line)
+            if youtube_match:
+                youtube_video_ids.append(youtube_match.group(1))
+                continue
 
-            video_ids.append(match.group(1))
+            # Extract Spotify episode ID from https://open.spotify.com/episode/ format
+            spotify_match = re.search(
+                r"open\.spotify\.com/episode/([a-zA-Z0-9]{22})", line
+            )
+            if spotify_match:
+                spotify_episode_ids.append(spotify_match.group(1))
+                continue
 
-    return video_ids
+            raise Exception(f"Unable to extract video/episode ID from line: {line}")
+
+    return youtube_video_ids, spotify_episode_ids
 
 
-def sync_youtube_videos_watched(video_ids):
-    print(f"Syncing {len(video_ids)} YouTube videos watched...")
+def sync_spotify_episodes_watched(episode_ids):
+    print(f"Syncing {len(episode_ids)} Spotify episodes watched...")
 
-    res = send_request("POST", "syncyoutube", {"video_ids": video_ids})
-    videos_added = res["videos_added"]
-    print(f"Successfully added {videos_added} new YouTube videos to the remote server.")
+    res = send_request("POST", "syncspotify", {"episode_ids": episode_ids})
+    episodes_added = res["episodes_added"]
+    print(
+        f"Successfully added {episodes_added} new Spotify episodes to the remote server."
+    )
 
 
-def clear_youtube_watched_file():
-    print(f"Clearing YouTube videos watched...")
-    youtube_file = "youtube_watched.txt"
-    if os.path.isfile(youtube_file):
+def clear_watched_file():
+    print(f"Clearing watched URLs...")
+    watched_file = "watched.txt"
+    if os.path.isfile(watched_file):
         # Clear the file contents
-        open(youtube_file, "w").close()
+        open(watched_file, "w").close()
 
 
 def display_weekly_activity(daily_activity):
