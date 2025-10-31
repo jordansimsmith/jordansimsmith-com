@@ -26,6 +26,8 @@ secretsmanager_client.create_secret(
             "users": [],
             "tvdb_api_key": os.getenv("TVDB_API_KEY", ""),
             "youtube_api_key": os.getenv("YOUTUBE_API_KEY", ""),
+            "spotify_client_id": os.getenv("SPOTIFY_CLIENT_ID", ""),
+            "spotify_client_secret": os.getenv("SPOTIFY_CLIENT_SECRET", ""),
         }
     ),
 )
@@ -111,6 +113,13 @@ configs = [
         "http_method": "POST",
         "handler_name": "com.jordansimsmith.immersiontracker.SyncYoutubeHandler",
         "zip_file": "sync-youtube-handler_deploy.jar",
+    },
+    {
+        "function_name": "sync_spotify_handler",
+        "resource_path_part": "syncspotify",
+        "http_method": "POST",
+        "handler_name": "com.jordansimsmith.immersiontracker.SyncSpotifyHandler",
+        "zip_file": "sync-spotify-handler_deploy.jar",
     },
 ]
 

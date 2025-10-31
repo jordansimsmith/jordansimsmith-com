@@ -230,6 +230,14 @@ def find_watched_urls():
     return youtube_video_ids, spotify_episode_ids
 
 
+def sync_youtube_videos_watched(video_ids):
+    print(f"Syncing {len(video_ids)} YouTube videos watched...")
+
+    res = send_request("POST", "syncyoutube", {"video_ids": video_ids})
+    videos_added = res["videos_added"]
+    print(f"Successfully added {videos_added} new YouTube videos to the remote server.")
+
+
 def sync_spotify_episodes_watched(episode_ids):
     print(f"Syncing {len(episode_ids)} Spotify episodes watched...")
 
