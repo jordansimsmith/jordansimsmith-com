@@ -20,4 +20,9 @@ jobs:
       - name: Bazel build
         run: bazel build //...
       - name: Bazel test
-        run: bazel test //... --test_env=TVDB_API_KEY=${{ secrets.TVDB_API_KEY }} --test_env=YOUTUBE_API_KEY=${{ secrets.YOUTUBE_API_KEY }} --test_env=CI=true --test_output=errors --verbose_failures
+        run: bazel test //...
+        env:
+          TVDB_API_KEY: ${{ secrets.TVDB_API_KEY }}
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+          SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+          SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
