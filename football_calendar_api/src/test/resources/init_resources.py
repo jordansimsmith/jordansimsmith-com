@@ -66,11 +66,12 @@ configs = [
     },
 ]
 
+# create all lambda functions
 for config in configs:
     with open(f"/opt/code/localstack/{config['zip_file']}", "rb") as f:
         zip_file_bytes = f.read()
 
-    function_arn = lambda_client.create_function(
+    lambda_client.create_function(
         FunctionName=config["function_name"],
         Runtime="java17",
         Role=role_arn,
@@ -78,7 +79,10 @@ for config in configs:
         Code={"ZipFile": zip_file_bytes},
         Timeout=120,
         MemorySize=1024,
-    )["FunctionArn"]
+    )
+
+# wait for all lambda functions to be active
+for config in configs:
     lambda_client.get_waiter("function_active_v2").wait(
         FunctionName=config["function_name"]
     )

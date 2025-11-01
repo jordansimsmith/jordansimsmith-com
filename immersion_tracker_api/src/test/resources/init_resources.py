@@ -123,6 +123,7 @@ configs = [
     },
 ]
 
+# create all lambda functions and api gateway resources
 for config in configs:
     with open(config["zip_file"], "rb") as f:
         zip_file_bytes = f.read()
@@ -136,9 +137,6 @@ for config in configs:
         Timeout=60,
         MemorySize=512,
     )["FunctionArn"]
-    lambda_client.get_waiter("function_active_v2").wait(
-        FunctionName=config["function_name"]
-    )
 
     resource_id = apigateway_client.create_resource(
         restApiId=api_id, parentId=root_id, pathPart=config["resource_path_part"]
@@ -156,6 +154,12 @@ for config in configs:
         type="AWS_PROXY",
         integrationHttpMethod="POST",
         uri=f"arn:aws:apigateway:us-east-1:lambda:path/2015-03-31/functions/{function_arn}/invocations",
+    )
+
+# wait for all lambda functions to be active
+for config in configs:
+    lambda_client.get_waiter("function_active_v2").wait(
+        FunctionName=config["function_name"]
     )
 
 apigateway_client.create_deployment(restApiId=api_id, stageName="local")
