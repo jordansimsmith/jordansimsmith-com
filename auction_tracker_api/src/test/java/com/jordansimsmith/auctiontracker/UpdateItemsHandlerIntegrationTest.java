@@ -9,6 +9,7 @@ import com.jordansimsmith.time.FakeClock;
 import java.net.URI;
 import java.time.Instant;
 import java.util.List;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
@@ -24,7 +25,14 @@ public class UpdateItemsHandlerIntegrationTest {
 
   private UpdateItemsHandler updateItemsHandler;
 
-  @Container DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
+  @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
+
+  @BeforeAll
+  static void setUpBeforeClass() {
+    var factory = AuctionTrackerTestFactory.create(dynamoDbContainer.getEndpoint());
+    var table = factory.auctionTrackerTable();
+    DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
+  }
 
   @BeforeEach
   void setUp() {
@@ -35,7 +43,7 @@ public class UpdateItemsHandlerIntegrationTest {
     fakeTradeMeClient = factory.fakeTradeMeClient();
     auctionTrackerTable = factory.auctionTrackerTable();
 
-    DynamoDbUtils.createTable(factory.dynamoDbClient(), auctionTrackerTable);
+    DynamoDbUtils.reset(factory.dynamoDbClient());
 
     updateItemsHandler = new UpdateItemsHandler(factory);
   }

@@ -2,13 +2,16 @@ package com.jordansimsmith.auctiontracker;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import java.util.Base64;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.lambda.LambdaClient;
 import software.amazon.awssdk.services.lambda.model.InvocationType;
 import software.amazon.awssdk.services.lambda.model.InvokeRequest;
@@ -21,7 +24,18 @@ public class AuctionTrackerE2ETest {
   private static final Logger LOGGER = LoggerFactory.getLogger(AuctionTrackerE2ETest.class);
 
   @Container
-  private final AuctionTrackerContainer auctionTrackerContainer = new AuctionTrackerContainer();
+  private static final AuctionTrackerContainer auctionTrackerContainer =
+      new AuctionTrackerContainer();
+
+  @BeforeEach
+  void setup() {
+    var dynamoDbClient =
+        DynamoDbClient.builder()
+            .endpointOverride(auctionTrackerContainer.getLocalstackUrl())
+            .build();
+
+    DynamoDbUtils.reset(dynamoDbClient);
+  }
 
   @Test
   void shouldStartContainer() {

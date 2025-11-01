@@ -2,6 +2,7 @@ package com.jordansimsmith.immersiontracker;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileWriter;
@@ -9,16 +10,28 @@ import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.nio.file.Path;
 import java.util.stream.Collectors;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
 @Testcontainers
 public class ImmersionTrackerE2ETest {
 
   @Container
-  private final ImmersionTrackerContainer immersionTrackerContainer =
+  private static final ImmersionTrackerContainer immersionTrackerContainer =
       new ImmersionTrackerContainer();
+
+  @BeforeEach
+  void setup() {
+    var dynamoDbClient =
+        DynamoDbClient.builder()
+            .endpointOverride(immersionTrackerContainer.getLocalstackUrl())
+            .build();
+
+    DynamoDbUtils.reset(dynamoDbClient);
+  }
 
   @Test
   void shouldStartContainer() {

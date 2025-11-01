@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.Date;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
@@ -28,7 +29,14 @@ public class GetCalendarSubscriptionHandlerIntegrationTest {
   private DynamoDbTable<EventCalendarItem> eventCalendarTable;
   private GetCalendarSubscriptionHandler getCalendarSubscriptionHandler;
 
-  @Container DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
+  @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
+
+  @BeforeAll
+  static void setUpBeforeClass() {
+    var factory = EventCalendarTestFactory.create(dynamoDbContainer.getEndpoint());
+    var table = factory.eventCalendarTable();
+    DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
+  }
 
   @BeforeEach
   void setUp() {
@@ -38,7 +46,7 @@ public class GetCalendarSubscriptionHandlerIntegrationTest {
     fakeMeetupsFactory = factory.fakeMeetupsFactory();
     eventCalendarTable = factory.eventCalendarTable();
 
-    DynamoDbUtils.createTable(factory.dynamoDbClient(), eventCalendarTable);
+    DynamoDbUtils.reset(factory.dynamoDbClient());
 
     getCalendarSubscriptionHandler = new GetCalendarSubscriptionHandler(factory);
   }

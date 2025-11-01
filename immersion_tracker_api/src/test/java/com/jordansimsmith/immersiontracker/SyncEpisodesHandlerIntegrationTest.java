@@ -10,6 +10,7 @@ import com.jordansimsmith.time.FakeClock;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
@@ -27,7 +28,14 @@ public class SyncEpisodesHandlerIntegrationTest {
 
   private SyncEpisodesHandler syncEpisodesHandler;
 
-  @Container DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
+  @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
+
+  @BeforeAll
+  static void setUpBeforeClass() {
+    var factory = ImmersionTrackerTestFactory.create(dynamoDbContainer.getEndpoint());
+    var table = factory.immersionTrackerTable();
+    DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
+  }
 
   @BeforeEach
   void setUp() {
@@ -37,7 +45,7 @@ public class SyncEpisodesHandlerIntegrationTest {
     objectMapper = factory.objectMapper();
     immersionTrackerTable = factory.immersionTrackerTable();
 
-    DynamoDbUtils.createTable(factory.dynamoDbClient(), immersionTrackerTable);
+    DynamoDbUtils.reset(factory.dynamoDbClient());
 
     syncEpisodesHandler = new SyncEpisodesHandler(factory);
   }

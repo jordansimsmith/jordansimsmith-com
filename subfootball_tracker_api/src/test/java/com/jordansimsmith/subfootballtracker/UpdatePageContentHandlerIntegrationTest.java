@@ -8,6 +8,7 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.notifications.FakeNotificationPublisher;
 import com.jordansimsmith.time.FakeClock;
 import java.time.Instant;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
@@ -24,7 +25,14 @@ public class UpdatePageContentHandlerIntegrationTest {
 
   private UpdatePageContentHandler updatePageContentHandler;
 
-  @Container DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
+  @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
+
+  @BeforeAll
+  static void setUpBeforeClass() {
+    var factory = SubfootballTrackerTestFactory.create(dynamoDbContainer.getEndpoint());
+    var table = factory.subfootballTrackerTable();
+    DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
+  }
 
   @BeforeEach
   void setUp() {
@@ -35,7 +43,7 @@ public class UpdatePageContentHandlerIntegrationTest {
     fakeSubfootballClient = factory.fakeSubfootballClient();
     subfootballTrackerTable = factory.subfootballTrackerTable();
 
-    DynamoDbUtils.createTable(factory.dynamoDbClient(), subfootballTrackerTable);
+    DynamoDbUtils.reset(factory.dynamoDbClient());
 
     updatePageContentHandler = new UpdatePageContentHandler(factory);
   }

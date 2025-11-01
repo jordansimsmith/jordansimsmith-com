@@ -4,10 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import biweekly.Biweekly;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.lambda.LambdaClient;
 import software.amazon.awssdk.services.lambda.model.InvocationType;
 import software.amazon.awssdk.services.lambda.model.InvokeRequest;
@@ -17,8 +20,18 @@ public class FootballCalendarE2ETest {
   private final ObjectMapper mapper = new ObjectMapper();
 
   @Container
-  private final FootballCalendarContainer footballCalendarContainer =
+  private static final FootballCalendarContainer footballCalendarContainer =
       new FootballCalendarContainer();
+
+  @BeforeEach
+  void setup() {
+    var dynamoDbClient =
+        DynamoDbClient.builder()
+            .endpointOverride(footballCalendarContainer.getLocalstackUrl())
+            .build();
+
+    DynamoDbUtils.reset(dynamoDbClient);
+  }
 
   @Test
   void shouldStartContainer() {

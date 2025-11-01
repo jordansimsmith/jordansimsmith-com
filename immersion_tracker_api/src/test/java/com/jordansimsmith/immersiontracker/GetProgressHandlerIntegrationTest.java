@@ -12,6 +12,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Map;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
@@ -26,7 +27,14 @@ public class GetProgressHandlerIntegrationTest {
 
   private GetProgressHandler getProgressHandler;
 
-  @Container DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
+  @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
+
+  @BeforeAll
+  static void setUpBeforeClass() {
+    var factory = ImmersionTrackerTestFactory.create(dynamoDbContainer.getEndpoint());
+    var table = factory.immersionTrackerTable();
+    DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
+  }
 
   @BeforeEach
   void setUp() {
@@ -36,7 +44,7 @@ public class GetProgressHandlerIntegrationTest {
     objectMapper = factory.objectMapper();
     immersionTrackerTable = factory.immersionTrackerTable();
 
-    DynamoDbUtils.createTable(factory.dynamoDbClient(), immersionTrackerTable);
+    DynamoDbUtils.reset(factory.dynamoDbClient());
 
     getProgressHandler = new GetProgressHandler(factory);
   }

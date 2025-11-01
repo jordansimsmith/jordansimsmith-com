@@ -9,6 +9,7 @@ import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import java.time.Instant;
 import java.util.Date;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
@@ -22,7 +23,14 @@ public class GetCalendarSubscriptionHandlerIntegrationTest {
   private DynamoDbTable<FootballCalendarItem> footballCalendarTable;
   private GetCalendarSubscriptionHandler getCalendarSubscriptionHandler;
 
-  @Container DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
+  @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
+
+  @BeforeAll
+  static void setUpBeforeClass() {
+    var factory = FootballCalendarTestFactory.create(dynamoDbContainer.getEndpoint());
+    var table = factory.footballCalendarTable();
+    DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
+  }
 
   @BeforeEach
   void setUp() {
@@ -31,7 +39,7 @@ public class GetCalendarSubscriptionHandlerIntegrationTest {
     fakeTeamsFactory = factory.fakeTeamsFactory();
     footballCalendarTable = factory.footballCalendarTable();
 
-    DynamoDbUtils.createTable(factory.dynamoDbClient(), footballCalendarTable);
+    DynamoDbUtils.reset(factory.dynamoDbClient());
 
     getCalendarSubscriptionHandler = new GetCalendarSubscriptionHandler(factory);
   }

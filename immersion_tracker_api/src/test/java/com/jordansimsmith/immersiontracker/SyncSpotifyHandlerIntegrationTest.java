@@ -11,6 +11,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
@@ -29,7 +30,14 @@ public class SyncSpotifyHandlerIntegrationTest {
 
   private SyncSpotifyHandler syncSpotifyHandler;
 
-  @Container DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
+  @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
+
+  @BeforeAll
+  static void setUpBeforeClass() {
+    var factory = ImmersionTrackerTestFactory.create(dynamoDbContainer.getEndpoint());
+    var table = factory.immersionTrackerTable();
+    DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
+  }
 
   @BeforeEach
   void setUp() {
@@ -40,7 +48,7 @@ public class SyncSpotifyHandlerIntegrationTest {
     immersionTrackerTable = factory.immersionTrackerTable();
     fakeSpotifyClient = factory.fakeSpotifyClient();
 
-    DynamoDbUtils.createTable(factory.dynamoDbClient(), immersionTrackerTable);
+    DynamoDbUtils.reset(factory.dynamoDbClient());
 
     syncSpotifyHandler = new SyncSpotifyHandler(factory);
   }

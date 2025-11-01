@@ -2,7 +2,9 @@ package com.jordansimsmith.pricetracker;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import java.time.Instant;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.testcontainers.junit.jupiter.Container;
@@ -20,7 +22,15 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 public class PriceTrackerE2ETest {
 
   @Container
-  private final PriceTrackerContainer priceTrackerContainer = new PriceTrackerContainer();
+  private static final PriceTrackerContainer priceTrackerContainer = new PriceTrackerContainer();
+
+  @BeforeEach
+  void setup() {
+    var dynamoDbClient =
+        DynamoDbClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
+
+    DynamoDbUtils.reset(dynamoDbClient);
+  }
 
   @Test
   void shouldStartContainer() {
