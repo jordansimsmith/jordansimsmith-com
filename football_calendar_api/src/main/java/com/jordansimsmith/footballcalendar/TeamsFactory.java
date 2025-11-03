@@ -16,9 +16,13 @@ public interface TeamsFactory {
       String divisionId,
       String address) {}
 
+  record SubfootballTeam(String id, String teamId) {}
+
   List<NorthernRegionalFootballTeam> findNorthernRegionalFootballTeams();
 
   List<FootballFixTeam> findFootballFixTeams();
+
+  List<SubfootballTeam> findSubfootballTeams();
 
   Set<String> findTeamIds();
 }

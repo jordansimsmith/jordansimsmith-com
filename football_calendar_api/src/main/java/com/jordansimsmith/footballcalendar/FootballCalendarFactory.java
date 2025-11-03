@@ -25,6 +25,8 @@ public interface FootballCalendarFactory {
 
   FootballFixClient footballFixClient();
 
+  SubfootballClient subfootballClient();
+
   TeamsFactory teamsFactory();
 
   static FootballCalendarFactory create() {

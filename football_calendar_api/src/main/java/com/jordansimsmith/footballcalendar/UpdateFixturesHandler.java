@@ -21,6 +21,7 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
   private final DynamoDbTable<FootballCalendarItem> footballCalendarTable;
   private final CometClient cometClient;
   private final FootballFixClient footballFixClient;
+  private final SubfootballClient subfootballClient;
   private final TeamsFactory teamsFactory;
 
   public UpdateFixturesHandler() {
@@ -32,6 +33,7 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
     this.footballCalendarTable = factory.footballCalendarTable();
     this.cometClient = factory.cometClient();
     this.footballFixClient = factory.footballFixClient();
+    this.subfootballClient = factory.subfootballClient();
     this.teamsFactory = factory.teamsFactory();
   }
 
@@ -50,6 +52,7 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
     var allFixtures = new ArrayList<FootballCalendarItem>();
     allFixtures.addAll(findNorthernRegionalFootballFixtures());
     allFixtures.addAll(findFootballFixFixtures());
+    allFixtures.addAll(findSubfootballFixtures());
     var fixturesByTeam =
         allFixtures.stream().collect(Collectors.groupingBy(FootballCalendarItem::getTeam));
 
@@ -164,6 +167,33 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
                 fixture.timestamp(),
                 fixture.venue(),
                 team.address(),
+                null,
+                null,
+                null);
+        allFixtures.add(item);
+      }
+    }
+
+    return allFixtures;
+  }
+
+  private List<FootballCalendarItem> findSubfootballFixtures() {
+    var allFixtures = new ArrayList<FootballCalendarItem>();
+    var teams = teamsFactory.findSubfootballTeams();
+
+    for (var team : teams) {
+      var fixtures = subfootballClient.getFixtures(team.teamId());
+
+      for (var fixture : fixtures) {
+        var item =
+            FootballCalendarItem.create(
+                team.id(),
+                fixture.id(),
+                fixture.homeTeamName(),
+                fixture.awayTeamName(),
+                fixture.timestamp(),
+                fixture.venue(),
+                null,
                 null,
                 null,
                 null);

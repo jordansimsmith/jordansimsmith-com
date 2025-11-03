@@ -1,6 +1,6 @@
 # Football calendar service
 
-The football calendar service extracts, processes, and provides structured data about football fixtures from multiple sources including the Northern Regional Football (NRF) Comet API and the Football Fix website in Auckland.
+The football calendar service extracts, processes, and provides structured data about football fixtures from multiple sources including the Northern Regional Football (NRF) Comet API, the Football Fix website in Auckland, and Subfootball.com.
 
 ## System architecture
 
@@ -11,6 +11,8 @@ graph TD
   C --> B
   B --> H[Football Fix Website]
   H --> B
+  B --> I[Subfootball.com]
+  I --> B
   B --> D[DynamoDB]
   E[GetCalendarSubscriptionHandler Lambda] --> D
   E --> F[iCal Response]
@@ -24,6 +26,7 @@ graph TD
 - Extract fixture information from multiple sources:
   - Northern Regional Football Comet API
   - Football Fix website (via web scraping)
+  - Subfootball.com (via iCal feed)
 - Capture comprehensive fixture details including:
   - Match title (teams playing)
   - Match date and time
@@ -67,6 +70,8 @@ graph TD
 - `CometClient`: Client interface for retrieving fixture data from the Comet API
 - `JsoupFootballFixClient`: Implementation for scraping fixture data from the Football Fix website
 - `FootballFixClient`: Client interface for retrieving fixture data from Football Fix
+- `BiweeklySubfootballClient`: Implementation for retrieving fixture data from Subfootball.com using iCal feeds
+- `SubfootballClient`: Client interface for retrieving fixture data from Subfootball
 - `FootballCalendarItem`: Data model for storing fixture data in DynamoDB
 - `FootballCalendarFactory`: Factory for creating the required dependencies
 - `TeamsFactory`: Factory for defining team configurations and data source parameters
@@ -80,6 +85,7 @@ The service is designed to track specific teams from multiple sources and filter
 3. Supports multiple teams from different sources:
    - "Flamingos" from Northern Regional Football Comet API (both league and cup competitions)
    - "Flamingos Sevens" from Football Fix website
+   - "Man I Love Football" from Subfootball.com
 4. Organizes data in DynamoDB by team, with each match as a separate item
 5. Uses "TEAM#{team_id}" as the partition key and "MATCH#{match_id}" as the sort key
 
@@ -205,6 +211,49 @@ Extracted data:
 - Home team: Text from FHomeTeam cell
 - Away team: Text from FAwayTeam cell
 - Address: Configured per venue (e.g., "3/25 Normanby Road, Mount Eden, Auckland 1024")
+- Timezone: Pacific/Auckland
+
+#### Subfootball iCal feed
+
+The service retrieves fixture data from Subfootball.com using iCal calendar feeds.
+
+URL format:
+
+```
+https://subfootball.com/teams/calendar/{teamId}
+```
+
+Parameters:
+
+- `teamId`: Team identifier (e.g., 4326 for Man I Love Football)
+
+Example iCal format:
+
+```
+BEGIN:VCALENDAR
+PRODID:-//github.com/rianjs/ical.net//NONSGML ical.net 2.2//EN
+VERSION:2.0
+X-WR-CALNAME:Man I Love Football 2025/26 Summer Fixtures
+BEGIN:VEVENT
+DESCRIPTION:Field: Black\nRound: 1\nMan I Love Football and Swede as Bro FC
+DTEND:20251028T053000Z
+DTSTAMP:20251103T083105Z
+DTSTART:20251028T045000Z
+LOCATION:Auckland Domain\\, Auckland
+SEQUENCE:0
+SUMMARY:Round 1 - Man I Love Football vs Swede as Bro FC
+UID:8c19b36f-0b5d-41f9-aa9c-2779b6fff277
+END:VEVENT
+END:VCALENDAR
+```
+
+Extracted data:
+
+- Fixture ID: From UID field
+- Home team: First team in SUMMARY after splitting on " vs "
+- Away team: Second team in SUMMARY after splitting on " vs "
+- Timestamp: Parsed from DTSTART (stored as UTC, interpreted in Pacific/Auckland)
+- Venue: From LOCATION field (handles escaped characters)
 - Timezone: Pacific/Auckland
 
 #### DynamoDB schema

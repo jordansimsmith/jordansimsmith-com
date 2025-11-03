@@ -44,6 +44,18 @@ public class FootballCalendarTestModule {
 
   @Provides
   @Singleton
+  public FakeSubfootballClient fakeSubfootballClient() {
+    return new FakeSubfootballClient();
+  }
+
+  @Provides
+  @Singleton
+  public SubfootballClient subfootballClient(FakeSubfootballClient fakeSubfootballClient) {
+    return fakeSubfootballClient;
+  }
+
+  @Provides
+  @Singleton
   public FakeTeamsFactory fakeTeamsFactory() {
     return new FakeTeamsFactory();
   }

@@ -22,6 +22,9 @@ public class TeamsFactoryImpl implements TeamsFactory {
           "6030",
           "3/25 Normanby Road, Mount Eden, Auckland 1024");
 
+  private static final SubfootballTeam SUBFOOTBALL_MAN_I_LOVE_FOOTBALL =
+      new SubfootballTeam("Man I Love Football", "4326");
+
   @Override
   public List<NorthernRegionalFootballTeam> findNorthernRegionalFootballTeams() {
     return List.of(NRF_FLAMINGOS_LEAGUE, NRF_FLAMINGOS_CUP);
@@ -33,6 +36,11 @@ public class TeamsFactoryImpl implements TeamsFactory {
   }
 
   @Override
+  public List<SubfootballTeam> findSubfootballTeams() {
+    return List.of(SUBFOOTBALL_MAN_I_LOVE_FOOTBALL);
+  }
+
+  @Override
   public Set<String> findTeamIds() {
     var teamIds = new HashSet<String>();
     teamIds.addAll(
@@ -41,6 +49,8 @@ public class TeamsFactoryImpl implements TeamsFactory {
             .collect(Collectors.toSet()));
     teamIds.addAll(
         findFootballFixTeams().stream().map(FootballFixTeam::id).collect(Collectors.toSet()));
+    teamIds.addAll(
+        findSubfootballTeams().stream().map(SubfootballTeam::id).collect(Collectors.toSet()));
     return teamIds;
   }
 }

@@ -9,6 +9,7 @@ import java.util.stream.Collectors;
 public class FakeTeamsFactory implements TeamsFactory {
   private final List<NorthernRegionalFootballTeam> nrfTeams = new ArrayList<>();
   private final List<FootballFixTeam> footballFixTeams = new ArrayList<>();
+  private final List<SubfootballTeam> subfootballTeams = new ArrayList<>();
 
   @Override
   public List<NorthernRegionalFootballTeam> findNorthernRegionalFootballTeams() {
@@ -21,11 +22,17 @@ public class FakeTeamsFactory implements TeamsFactory {
   }
 
   @Override
+  public List<SubfootballTeam> findSubfootballTeams() {
+    return new ArrayList<>(subfootballTeams);
+  }
+
+  @Override
   public Set<String> findTeamIds() {
     var teamIds = new HashSet<String>();
     teamIds.addAll(
         nrfTeams.stream().map(NorthernRegionalFootballTeam::id).collect(Collectors.toSet()));
     teamIds.addAll(footballFixTeams.stream().map(FootballFixTeam::id).collect(Collectors.toSet()));
+    teamIds.addAll(subfootballTeams.stream().map(SubfootballTeam::id).collect(Collectors.toSet()));
     return teamIds;
   }
 
@@ -37,8 +44,13 @@ public class FakeTeamsFactory implements TeamsFactory {
     footballFixTeams.add(team);
   }
 
+  public void addTeam(SubfootballTeam team) {
+    subfootballTeams.add(team);
+  }
+
   public void reset() {
     nrfTeams.clear();
     footballFixTeams.clear();
+    subfootballTeams.clear();
   }
 }

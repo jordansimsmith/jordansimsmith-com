@@ -35,6 +35,13 @@ public class FootballCalendarModule {
 
   @Provides
   @Singleton
+  SubfootballClient subfootballClient() {
+    var httpClient = HttpClient.newBuilder().build();
+    return new BiweeklySubfootballClient(httpClient);
+  }
+
+  @Provides
+  @Singleton
   TeamsFactory teamsFactory() {
     return new TeamsFactoryImpl();
   }
