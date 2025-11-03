@@ -6,13 +6,11 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
 public class BiweeklySubfootballClient implements SubfootballClient {
   private static final String BASE_URL = "https://subfootball.com/teams/calendar/";
-  private static final ZoneId AUCKLAND_ZONE = ZoneId.of("Pacific/Auckland");
 
   private final HttpClient httpClient;
 
@@ -96,13 +94,7 @@ public class BiweeklySubfootballClient implements SubfootballClient {
       return null;
     }
 
-    var timestamp =
-        dtStart
-            .getValue()
-            .toInstant()
-            .atZone(ZoneId.of("UTC"))
-            .withZoneSameLocal(AUCKLAND_ZONE)
-            .toInstant();
+    var timestamp = dtStart.getValue().toInstant();
     var venue = location.getValue();
 
     return new SubfootballClient.SubfootballFixture(

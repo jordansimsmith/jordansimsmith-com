@@ -252,9 +252,8 @@ Extracted data:
 - Fixture ID: From UID field
 - Home team: First team in SUMMARY after splitting on " vs "
 - Away team: Second team in SUMMARY after splitting on " vs "
-- Timestamp: Parsed from DTSTART (stored as UTC, interpreted in Pacific/Auckland)
+- Timestamp: Parsed from DTSTART (already in UTC format with Z suffix)
 - Venue: From LOCATION field (handles escaped characters)
-- Timezone: Pacific/Auckland
 
 #### DynamoDB schema
 
