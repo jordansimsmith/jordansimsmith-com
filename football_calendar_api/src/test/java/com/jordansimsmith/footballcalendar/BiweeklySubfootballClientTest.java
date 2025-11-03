@@ -93,7 +93,8 @@ public class BiweeklySubfootballClientTest {
             .orElseThrow();
     assertThat(fixture1.homeTeamName()).isEqualTo("Man I Love Football");
     assertThat(fixture1.awayTeamName()).isEqualTo("Swede as Bro FC");
-    assertThat(fixture1.venue()).isEqualTo("Auckland Domain, Auckland");
+    assertThat(fixture1.venue()).isEqualTo("Field Black");
+    assertThat(fixture1.address()).isEqualTo("Auckland Domain, Auckland");
     assertThat(fixture1.timestamp()).isEqualTo(Instant.parse("2025-10-28T04:50:00Z"));
 
     var fixture2 =
@@ -103,7 +104,8 @@ public class BiweeklySubfootballClientTest {
             .orElseThrow();
     assertThat(fixture2.homeTeamName()).isEqualTo("Man I Love Football");
     assertThat(fixture2.awayTeamName()).isEqualTo("Ben's Broncos");
-    assertThat(fixture2.venue()).isEqualTo("Auckland Domain, Auckland");
+    assertThat(fixture2.venue()).isEqualTo("Field Black");
+    assertThat(fixture2.address()).isEqualTo("Auckland Domain, Auckland");
     assertThat(fixture2.timestamp()).isEqualTo(Instant.parse("2025-11-04T05:30:00Z"));
 
     var fixture3 =
@@ -113,7 +115,8 @@ public class BiweeklySubfootballClientTest {
             .orElseThrow();
     assertThat(fixture3.homeTeamName()).isEqualTo("Man I Love Football");
     assertThat(fixture3.awayTeamName()).isEqualTo("Multiple Scorgasms");
-    assertThat(fixture3.venue()).isEqualTo("Auckland Domain, Auckland");
+    assertThat(fixture3.venue()).isEqualTo("Field Black");
+    assertThat(fixture3.address()).isEqualTo("Auckland Domain, Auckland");
     assertThat(fixture3.timestamp()).isEqualTo(Instant.parse("2025-11-11T06:20:00Z"));
   }
 
@@ -142,7 +145,8 @@ public class BiweeklySubfootballClientTest {
 
     // assert
     assertThat(fixtures).hasSize(1);
-    assertThat(fixtures.get(0).venue()).isEqualTo("Auckland Domain, Auckland");
+    assertThat(fixtures.get(0).venue()).isNull();
+    assertThat(fixtures.get(0).address()).isEqualTo("Auckland Domain, Auckland");
   }
 
   @Test

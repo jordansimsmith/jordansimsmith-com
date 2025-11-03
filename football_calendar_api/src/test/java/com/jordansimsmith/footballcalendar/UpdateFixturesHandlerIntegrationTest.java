@@ -449,7 +449,9 @@ public class UpdateFixturesHandlerIntegrationTest {
     fakeClock.setTime(testTime);
     var event = new ScheduledEvent();
 
-    fakeTeamsFactory.addTeam(new TeamsFactory.SubfootballTeam("Man I Love Football", "4326"));
+    fakeTeamsFactory.addTeam(
+        new TeamsFactory.SubfootballTeam(
+            "Man I Love Football", "4326", "Park Road, Parnell, Auckland 1010"));
 
     var manILoveFootballFixture =
         new SubfootballClient.SubfootballFixture(
@@ -457,6 +459,7 @@ public class UpdateFixturesHandlerIntegrationTest {
             "Man I Love Football",
             "Swede as Bro FC",
             Instant.parse("2025-10-28T04:50:00Z"),
+            "Field Black",
             "Auckland Domain, Auckland");
 
     var otherTeamFixture =
@@ -465,6 +468,7 @@ public class UpdateFixturesHandlerIntegrationTest {
             "Other Team A",
             "Other Team B",
             Instant.parse("2025-10-28T05:00:00Z"),
+            "Field White",
             "Another Venue");
 
     fakeSubfootballClient.addFixture("4326", manILoveFootballFixture);
@@ -493,7 +497,7 @@ public class UpdateFixturesHandlerIntegrationTest {
     assertThat(item.getAwayTeam()).isEqualTo(manILoveFootballFixture.awayTeamName());
     assertThat(item.getTimestamp()).isEqualTo(manILoveFootballFixture.timestamp());
     assertThat(item.getVenue()).isEqualTo(manILoveFootballFixture.venue());
-    assertThat(item.getAddress()).isNull();
+    assertThat(item.getAddress()).isEqualTo("Park Road, Parnell, Auckland 1010");
     assertThat(item.getLatitude()).isNull();
     assertThat(item.getLongitude()).isNull();
     assertThat(item.getStatus()).isNull();
@@ -524,7 +528,9 @@ public class UpdateFixturesHandlerIntegrationTest {
             "3/25 Normanby Road, Mount Eden, Auckland 1024"));
 
     // add Subfootball team
-    fakeTeamsFactory.addTeam(new TeamsFactory.SubfootballTeam("Man I Love Football", "4326"));
+    fakeTeamsFactory.addTeam(
+        new TeamsFactory.SubfootballTeam(
+            "Man I Love Football", "4326", "Park Road, Parnell, Auckland 1010"));
 
     // add NRF fixture
     var nrfFixture =
@@ -555,6 +561,7 @@ public class UpdateFixturesHandlerIntegrationTest {
             "Man I Love Football",
             "Swede as Bro FC",
             Instant.parse("2025-10-28T04:50:00Z"),
+            "Field Black",
             "Auckland Domain, Auckland");
 
     fakeSubfootballClient.addFixture("4326", subfootballFixture);

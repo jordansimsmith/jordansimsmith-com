@@ -95,10 +95,13 @@ public class BiweeklySubfootballClient implements SubfootballClient {
     }
 
     var timestamp = dtStart.getValue().toInstant();
-    var venue = location.getValue();
+    var address = location.getValue();
+
+    var description = event.getDescription();
+    var venue = parseFieldFromDescription(description);
 
     return new SubfootballClient.SubfootballFixture(
-        uid.getValue(), teams[0], teams[1], timestamp, venue);
+        uid.getValue(), teams[0], teams[1], timestamp, venue, address);
   }
 
   private String[] parseTeamsFromSummary(String summary) {
@@ -116,5 +119,23 @@ public class BiweeklySubfootballClient implements SubfootballClient {
     }
 
     return new String[] {homeTeam, awayTeam};
+  }
+
+  private String parseFieldFromDescription(biweekly.property.Description description) {
+    if (description == null || description.getValue() == null) {
+      return null;
+    }
+
+    var descriptionText = description.getValue();
+    var lines = descriptionText.split("\\n");
+
+    for (var line : lines) {
+      if (line.startsWith("Field: ")) {
+        var fieldName = line.substring("Field: ".length()).trim();
+        return "Field " + fieldName;
+      }
+    }
+
+    return null;
   }
 }

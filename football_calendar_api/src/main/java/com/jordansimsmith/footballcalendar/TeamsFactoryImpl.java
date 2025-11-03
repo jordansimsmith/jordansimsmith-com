@@ -23,7 +23,7 @@ public class TeamsFactoryImpl implements TeamsFactory {
           "3/25 Normanby Road, Mount Eden, Auckland 1024");
 
   private static final SubfootballTeam SUBFOOTBALL_MAN_I_LOVE_FOOTBALL =
-      new SubfootballTeam("Man I Love Football", "4326");
+      new SubfootballTeam("Man I Love Football", "4326", "Park Road, Parnell, Auckland 1010");
 
   @Override
   public List<NorthernRegionalFootballTeam> findNorthernRegionalFootballTeams() {
