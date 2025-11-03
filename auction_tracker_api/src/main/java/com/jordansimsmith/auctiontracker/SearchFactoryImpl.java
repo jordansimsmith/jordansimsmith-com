@@ -29,6 +29,16 @@ public class SearchFactoryImpl implements SearchFactory {
                   "https://www.trademe.co.nz/a/marketplace/sports/golf/irons/steel-shaft/search"),
               "callaway iron",
               null,
+              75.0),
+          new Search(
+              URI.create("https://www.trademe.co.nz/a/marketplace/sports/golf/putters/search"),
+              "taylormade mallet putter",
+              null,
+              75.0),
+          new Search(
+              URI.create("https://www.trademe.co.nz/a/marketplace/sports/golf/putters/search"),
+              "odyssey mallet putter",
+              null,
               75.0));
 
   @Override
