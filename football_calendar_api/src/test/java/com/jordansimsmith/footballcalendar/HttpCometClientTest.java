@@ -42,7 +42,7 @@ public class HttpCometClientTest {
   }
 
   @Test
-  void getFixturesShouldReturnParsedFixturesWhenSuccessful() throws Exception {
+  void findFixturesShouldReturnParsedFixturesWhenSuccessful() throws Exception {
     // arrange
     var mockResponse = createMockResponse(200, readFixturesResponse());
     when(mockHttpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
@@ -55,7 +55,7 @@ public class HttpCometClientTest {
     var to = Instant.parse("2025-04-11T00:00:00Z");
 
     // act
-    var fixtures = client.getFixtures(seasonId, competitionId, organisationIds, from, to);
+    var fixtures = client.findFixtures(seasonId, competitionId, organisationIds, from, to);
 
     // assert
     assertThat(fixtures).isNotNull();
@@ -87,7 +87,7 @@ public class HttpCometClientTest {
   }
 
   @Test
-  void getFixturesShouldThrowExceptionWhenApiReturnsErrorStatus() throws Exception {
+  void findFixturesShouldThrowExceptionWhenApiReturnsErrorStatus() throws Exception {
     // arrange
     var mockResponse = createMockResponse(500, "Server error");
     when(mockHttpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
@@ -102,7 +102,7 @@ public class HttpCometClientTest {
     // act & assert
     assertThrows(
         RuntimeException.class,
-        () -> client.getFixtures(seasonId, competitionId, organisationIds, from, to),
+        () -> client.findFixtures(seasonId, competitionId, organisationIds, from, to),
         "API request failed with status: 500");
   }
 

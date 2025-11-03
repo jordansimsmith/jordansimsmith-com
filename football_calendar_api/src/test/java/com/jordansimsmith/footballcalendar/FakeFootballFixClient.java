@@ -9,7 +9,7 @@ public class FakeFootballFixClient implements FootballFixClient {
   private final Map<String, List<FootballFixture>> fixturesByDivision = new HashMap<>();
 
   @Override
-  public List<FootballFixture> getFixtures(
+  public List<FootballFixture> findFixtures(
       String venueId, String leagueId, String seasonId, String divisionId) {
     return fixturesByDivision.getOrDefault(divisionId, List.of());
   }

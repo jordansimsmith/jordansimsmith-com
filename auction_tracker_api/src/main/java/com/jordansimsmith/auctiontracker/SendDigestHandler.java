@@ -59,7 +59,7 @@ public class SendDigestHandler implements RequestHandler<ScheduledEvent, Void> {
         searches.stream()
             .flatMap(
                 search ->
-                    getNewItemsForSearch(
+                    findNewItemsForSearch(
                         tradeMeClient.getSearchUrl(search).toString(), yesterdayTime)
                         .stream())
             .collect(Collectors.toList());
@@ -78,7 +78,7 @@ public class SendDigestHandler implements RequestHandler<ScheduledEvent, Void> {
     return null;
   }
 
-  private List<AuctionTrackerItem> getNewItemsForSearch(String searchUrl, Instant since) {
+  private List<AuctionTrackerItem> findNewItemsForSearch(String searchUrl, Instant since) {
     var partitionKey = AuctionTrackerItem.formatPk(searchUrl);
     var sortKeyPrefix = AuctionTrackerItem.formatSk(since, null);
 

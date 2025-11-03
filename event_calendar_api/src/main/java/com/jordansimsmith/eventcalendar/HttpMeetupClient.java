@@ -30,7 +30,7 @@ public class HttpMeetupClient implements MeetupClient {
   }
 
   @Override
-  public List<MeetupEvent> getEvents(URI groupUrl) {
+  public List<MeetupEvent> findEvents(URI groupUrl) {
     try {
       return doGetEvents(groupUrl);
     } catch (Exception e) {

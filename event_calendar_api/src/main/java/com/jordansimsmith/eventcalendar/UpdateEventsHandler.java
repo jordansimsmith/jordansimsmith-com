@@ -84,7 +84,7 @@ public class UpdateEventsHandler implements RequestHandler<ScheduledEvent, Void>
   }
 
   private List<EventCalendarItem> findGoMediaEvents() {
-    var events = goMediaEventClient.getEvents();
+    var events = goMediaEventClient.findEvents();
 
     return events.stream()
         .map(
@@ -103,7 +103,7 @@ public class UpdateEventsHandler implements RequestHandler<ScheduledEvent, Void>
     var meetupGroups = meetupsFactory.findMeetupGroups();
 
     for (var group : meetupGroups) {
-      var meetupEvents = meetupClient.getEvents(group.meetupGroupUrl());
+      var meetupEvents = meetupClient.findEvents(group.meetupGroupUrl());
 
       for (var meetupEvent : meetupEvents) {
         var item =

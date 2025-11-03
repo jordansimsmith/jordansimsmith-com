@@ -15,7 +15,7 @@ public interface CometClient {
       Double longitude,
       String status) {}
 
-  List<FootballFixture> getFixtures(
+  List<FootballFixture> findFixtures(
       String seasonId,
       String competitionId,
       List<String> organisationIds,

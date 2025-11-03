@@ -104,7 +104,7 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
       var to =
           ZonedDateTime.of(seasonYear, 12, 31, 23, 59, 59, 0, ZoneId.systemDefault()).toInstant();
       var fixtures =
-          cometClient.getFixtures(
+          cometClient.findFixtures(
               team.seasonId(), team.competitionId(), List.of(team.clubId()), from, to);
 
       // filter for fixtures involving this team
@@ -144,7 +144,7 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
     for (var team : teams) {
       // fetch fixtures from Football Fix
       var fixtures =
-          footballFixClient.getFixtures(
+          footballFixClient.findFixtures(
               team.venueId(), team.leagueId(), team.seasonId(), team.divisionId());
 
       // filter for fixtures involving this team
@@ -182,7 +182,7 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
     var teams = teamsFactory.findSubfootballTeams();
 
     for (var team : teams) {
-      var fixtures = subfootballClient.getFixtures(team.teamId());
+      var fixtures = subfootballClient.findFixtures(team.teamId());
 
       for (var fixture : fixtures) {
         var item =

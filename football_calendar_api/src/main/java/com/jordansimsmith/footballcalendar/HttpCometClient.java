@@ -31,7 +31,7 @@ public class HttpCometClient implements CometClient {
   }
 
   @Override
-  public List<FootballFixture> getFixtures(
+  public List<FootballFixture> findFixtures(
       String seasonId,
       String competitionId,
       List<String> organisationIds,

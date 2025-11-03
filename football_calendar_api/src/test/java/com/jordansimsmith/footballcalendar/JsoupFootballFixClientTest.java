@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test;
 
 public class JsoupFootballFixClientTest {
   @Test
-  void getFixturesShouldExtractAllFieldsCorrectly() {
+  void findFixturesShouldExtractAllFieldsCorrectly() {
     // arrange
     var html =
         """
@@ -58,7 +58,7 @@ public class JsoupFootballFixClientTest {
     var divisionId = "6030";
 
     // act
-    var fixtures = client.getFixtures(venueId, leagueId, seasonId, divisionId);
+    var fixtures = client.findFixtures(venueId, leagueId, seasonId, divisionId);
 
     // assert
     assertThat(fixtures).hasSize(3);
@@ -92,7 +92,7 @@ public class JsoupFootballFixClientTest {
   }
 
   @Test
-  void getFixturesShouldParseMultipleDates() {
+  void findFixturesShouldParseMultipleDates() {
     // arrange
     var html =
         """
@@ -166,7 +166,7 @@ public class JsoupFootballFixClientTest {
     var divisionId = "6030";
 
     // act
-    var fixtures = client.getFixtures(venueId, leagueId, seasonId, divisionId);
+    var fixtures = client.findFixtures(venueId, leagueId, seasonId, divisionId);
 
     // assert
     assertThat(fixtures).hasSize(6);
@@ -190,7 +190,7 @@ public class JsoupFootballFixClientTest {
   }
 
   @Test
-  void getFixturesShouldParseVariousTimeFormats() {
+  void findFixturesShouldParseVariousTimeFormats() {
     // arrange
     var html =
         """
@@ -245,7 +245,7 @@ public class JsoupFootballFixClientTest {
     var divisionId = "6030";
 
     // act
-    var fixtures = client.getFixtures(venueId, leagueId, seasonId, divisionId);
+    var fixtures = client.findFixtures(venueId, leagueId, seasonId, divisionId);
 
     // assert
     assertThat(fixtures).hasSize(4);

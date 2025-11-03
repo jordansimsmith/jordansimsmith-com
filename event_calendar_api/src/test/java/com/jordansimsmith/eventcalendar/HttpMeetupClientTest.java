@@ -129,7 +129,7 @@ public class HttpMeetupClientTest {
         .thenReturn(pastResponse);
 
     // act
-    var events = client.getEvents(URI.create("https://www.meetup.com/test-group"));
+    var events = client.findEvents(URI.create("https://www.meetup.com/test-group"));
 
     // assert
     assertThat(events).hasSize(2);
@@ -165,7 +165,7 @@ public class HttpMeetupClientTest {
         .thenReturn(pastResponse);
 
     // act
-    var events = client.getEvents(URI.create("https://www.meetup.com/test-group"));
+    var events = client.findEvents(URI.create("https://www.meetup.com/test-group"));
 
     // assert
     assertThat(events).hasSize(1);
@@ -185,7 +185,7 @@ public class HttpMeetupClientTest {
         .thenReturn(pastResponse);
 
     // act
-    var events = client.getEvents(URI.create("https://www.meetup.com/test-group"));
+    var events = client.findEvents(URI.create("https://www.meetup.com/test-group"));
 
     // assert
     assertThat(events).hasSize(2);
@@ -207,7 +207,7 @@ public class HttpMeetupClientTest {
         .thenReturn(pastResponse);
 
     // act
-    var events = client.getEvents(URI.create("https://www.meetup.com/test-group"));
+    var events = client.findEvents(URI.create("https://www.meetup.com/test-group"));
 
     // assert
     assertThat(events).hasSize(1);

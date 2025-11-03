@@ -8,5 +8,5 @@ public interface MeetupClient {
   record MeetupEvent(
       String title, String groupUrl, String eventUrl, Instant startTime, String location) {}
 
-  List<MeetupEvent> getEvents(URI groupUrl);
+  List<MeetupEvent> findEvents(URI groupUrl);
 }

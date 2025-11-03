@@ -7,7 +7,7 @@ public class FakeGoMediaEventClient implements GoMediaEventClient {
   private final List<GoMediaEvent> events = new ArrayList<>();
 
   @Override
-  public List<GoMediaEvent> getEvents() {
+  public List<GoMediaEvent> findEvents() {
     return events;
   }
 

@@ -21,7 +21,7 @@ public class BiweeklySubfootballClient implements SubfootballClient {
   }
 
   @Override
-  public List<SubfootballFixture> getFixtures(String teamId) {
+  public List<SubfootballFixture> findFixtures(String teamId) {
     try {
       return doGetFixtures(teamId);
     } catch (Exception e) {

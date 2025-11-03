@@ -10,7 +10,7 @@ public class FakeCometClient implements CometClient {
   private Map<String, List<FootballFixture>> fixturesByCompetition = new HashMap<>();
 
   @Override
-  public List<FootballFixture> getFixtures(
+  public List<FootballFixture> findFixtures(
       String seasonId,
       String competitionId,
       List<String> organisationIds,

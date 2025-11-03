@@ -10,7 +10,7 @@ public class FakeMeetupClient implements MeetupClient {
   private final Map<String, List<MeetupEvent>> eventsByGroup = new HashMap<>();
 
   @Override
-  public List<MeetupEvent> getEvents(URI groupUrl) {
+  public List<MeetupEvent> findEvents(URI groupUrl) {
     return eventsByGroup.getOrDefault(groupUrl.toString(), List.of());
   }
 

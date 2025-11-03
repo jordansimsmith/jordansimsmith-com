@@ -7,5 +7,5 @@ public interface SubfootballClient {
   record SubfootballFixture(
       String id, String homeTeamName, String awayTeamName, Instant timestamp, String venue) {}
 
-  List<SubfootballFixture> getFixtures(String teamId);
+  List<SubfootballFixture> findFixtures(String teamId);
 }

@@ -29,7 +29,7 @@ public class JsoupFootballFixClient implements FootballFixClient {
           .toFormatter(Locale.ENGLISH);
 
   @Override
-  public List<FootballFixClient.FootballFixture> getFixtures(
+  public List<FootballFixClient.FootballFixture> findFixtures(
       String venueId, String leagueId, String seasonId, String divisionId) {
     try {
       return doGetFixtures(venueId, leagueId, seasonId, divisionId);

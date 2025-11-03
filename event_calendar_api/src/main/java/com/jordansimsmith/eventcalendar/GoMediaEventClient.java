@@ -15,5 +15,5 @@ public interface GoMediaEventClient {
    *
    * @return A list of events with their details
    */
-  List<GoMediaEvent> getEvents();
+  List<GoMediaEvent> findEvents();
 }

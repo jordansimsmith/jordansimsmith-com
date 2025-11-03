@@ -7,6 +7,6 @@ public interface FootballFixClient {
   record FootballFixture(
       String id, String homeTeamName, String awayTeamName, Instant timestamp, String venue) {}
 
-  List<FootballFixture> getFixtures(
+  List<FootballFixture> findFixtures(
       String venueId, String leagueId, String seasonId, String divisionId);
 }

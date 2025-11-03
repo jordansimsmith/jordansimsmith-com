@@ -67,6 +67,7 @@ When performing the code review step, check for:
 - Don't add private methods when the logic is simple and used only once - inline it
 - Let exceptions bubble up naturally when appropriate instead of unnecessarily catching them
 - Always use imports instead of fully qualified names (e.g., `import java.util.ArrayList;` instead of `java.util.ArrayList`)
+- Method naming: Use `get` prefix for methods that return a single item, use `find` prefix for methods that return multiple items (collections like List, Set, Collection)
 
 ## Testing guidelines
 

@@ -183,7 +183,7 @@ class JsoupGoMediaEventClientTest {
   @Test
   void getEventsExtractsEventsFromMainPage() {
     // arrange & act
-    var events = client.getEvents();
+    var events = client.findEvents();
 
     // assert
     assertThat(events).hasSize(3);
@@ -296,7 +296,7 @@ class JsoupGoMediaEventClientTest {
         };
 
     // act
-    var events = testClient.getEvents();
+    var events = testClient.findEvents();
 
     // assert
     // Should default to 00:00 (midnight) when no time information is available
@@ -360,7 +360,7 @@ class JsoupGoMediaEventClientTest {
         };
 
     // act
-    var events = testClient.getEvents();
+    var events = testClient.findEvents();
 
     // assert
     // Should select 8pm as the latest valid time, skipping the invalid "12 30pm"

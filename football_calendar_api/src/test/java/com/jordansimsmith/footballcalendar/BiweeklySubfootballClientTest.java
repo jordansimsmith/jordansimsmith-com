@@ -35,7 +35,7 @@ public class BiweeklySubfootballClientTest {
   }
 
   @Test
-  void getFixturesShouldExtractAllFieldsCorrectly() throws Exception {
+  void findFixturesShouldExtractAllFieldsCorrectly() throws Exception {
     // arrange
     var ical =
         """
@@ -81,7 +81,7 @@ public class BiweeklySubfootballClientTest {
         .thenReturn(mockResponse);
 
     // act
-    var fixtures = client.getFixtures("4326");
+    var fixtures = client.findFixtures("4326");
 
     // assert
     assertThat(fixtures).hasSize(3);
@@ -127,7 +127,7 @@ public class BiweeklySubfootballClientTest {
   }
 
   @Test
-  void getFixturesShouldHandleEscapedCharactersInLocation() throws Exception {
+  void findFixturesShouldHandleEscapedCharactersInLocation() throws Exception {
     // arrange
     var ical =
         """
@@ -147,7 +147,7 @@ public class BiweeklySubfootballClientTest {
         .thenReturn(mockResponse);
 
     // act
-    var fixtures = client.getFixtures("4326");
+    var fixtures = client.findFixtures("4326");
 
     // assert
     assertThat(fixtures).hasSize(1);
@@ -155,7 +155,7 @@ public class BiweeklySubfootballClientTest {
   }
 
   @Test
-  void getFixturesShouldParseTeamsFromSummaryWithRoundPrefix() throws Exception {
+  void findFixturesShouldParseTeamsFromSummaryWithRoundPrefix() throws Exception {
     // arrange
     var ical =
         """
@@ -175,7 +175,7 @@ public class BiweeklySubfootballClientTest {
         .thenReturn(mockResponse);
 
     // act
-    var fixtures = client.getFixtures("4326");
+    var fixtures = client.findFixtures("4326");
 
     // assert
     assertThat(fixtures).hasSize(1);
@@ -184,7 +184,7 @@ public class BiweeklySubfootballClientTest {
   }
 
   @Test
-  void getFixturesShouldHandleMultipleEventsOnDifferentDates() throws Exception {
+  void findFixturesShouldHandleMultipleEventsOnDifferentDates() throws Exception {
     // arrange
     var ical =
         """
@@ -216,7 +216,7 @@ public class BiweeklySubfootballClientTest {
         .thenReturn(mockResponse);
 
     // act
-    var fixtures = client.getFixtures("4326");
+    var fixtures = client.findFixtures("4326");
 
     // assert
     assertThat(fixtures).hasSize(3);
@@ -249,7 +249,7 @@ public class BiweeklySubfootballClientTest {
   }
 
   @Test
-  void getFixturesShouldSkipEventsWithMissingFields() throws Exception {
+  void findFixturesShouldSkipEventsWithMissingFields() throws Exception {
     // arrange
     var ical =
         """
@@ -284,7 +284,7 @@ public class BiweeklySubfootballClientTest {
         .thenReturn(mockResponse);
 
     // act
-    var fixtures = client.getFixtures("4326");
+    var fixtures = client.findFixtures("4326");
 
     // assert
     assertThat(fixtures).hasSize(1);

@@ -40,7 +40,7 @@ public class JsoupGoMediaEventClient implements GoMediaEventClient {
           .toFormatter(Locale.ENGLISH);
 
   @Override
-  public List<GoMediaEvent> getEvents() {
+  public List<GoMediaEvent> findEvents() {
     try {
       return doGetEvents();
     } catch (Exception e) {
