@@ -9,8 +9,8 @@ import static org.mockito.MockitoAnnotations.openMocks;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Instant;
 import java.time.ZoneId;
-import java.time.ZonedDateTime;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -94,10 +94,7 @@ public class BiweeklySubfootballClientTest {
     assertThat(fixture1.homeTeamName()).isEqualTo("Man I Love Football");
     assertThat(fixture1.awayTeamName()).isEqualTo("Swede as Bro FC");
     assertThat(fixture1.venue()).isEqualTo("Auckland Domain, Auckland");
-
-    var expectedInstant1 =
-        ZonedDateTime.of(2025, 10, 28, 4, 50, 0, 0, ZoneId.of("Pacific/Auckland")).toInstant();
-    assertThat(fixture1.timestamp()).isEqualTo(expectedInstant1);
+    assertThat(fixture1.timestamp()).isEqualTo(Instant.parse("2025-10-28T04:50:00Z"));
 
     var fixture2 =
         fixtures.stream()
@@ -107,10 +104,7 @@ public class BiweeklySubfootballClientTest {
     assertThat(fixture2.homeTeamName()).isEqualTo("Man I Love Football");
     assertThat(fixture2.awayTeamName()).isEqualTo("Ben's Broncos");
     assertThat(fixture2.venue()).isEqualTo("Auckland Domain, Auckland");
-
-    var expectedInstant2 =
-        ZonedDateTime.of(2025, 11, 4, 5, 30, 0, 0, ZoneId.of("Pacific/Auckland")).toInstant();
-    assertThat(fixture2.timestamp()).isEqualTo(expectedInstant2);
+    assertThat(fixture2.timestamp()).isEqualTo(Instant.parse("2025-11-04T05:30:00Z"));
 
     var fixture3 =
         fixtures.stream()
@@ -120,10 +114,7 @@ public class BiweeklySubfootballClientTest {
     assertThat(fixture3.homeTeamName()).isEqualTo("Man I Love Football");
     assertThat(fixture3.awayTeamName()).isEqualTo("Multiple Scorgasms");
     assertThat(fixture3.venue()).isEqualTo("Auckland Domain, Auckland");
-
-    var expectedInstant3 =
-        ZonedDateTime.of(2025, 11, 11, 6, 20, 0, 0, ZoneId.of("Pacific/Auckland")).toInstant();
-    assertThat(fixture3.timestamp()).isEqualTo(expectedInstant3);
+    assertThat(fixture3.timestamp()).isEqualTo(Instant.parse("2025-11-11T06:20:00Z"));
   }
 
   @Test
