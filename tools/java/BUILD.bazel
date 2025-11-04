@@ -1,0 +1,33 @@
+load("@rules_java//toolchains:default_java_toolchain.bzl", "default_java_toolchain")
+
+package(default_visibility = ["//visibility:public"])
+
+package_group(
+    name = "error_prone_packages",
+    packages = [
+        "//...",
+    ],
+)
+
+java_package_configuration(
+    name = "error_prone_config",
+    javacopts = [
+        "-XepDisableWarningsInGeneratedCode",
+        "-Xep:UnnecessarilyFullyQualified:ERROR",
+    ],
+    packages = [":error_prone_packages"],
+)
+
+default_java_toolchain(
+    name = "custom_java_toolchain_impl",
+    package_configuration = [":error_prone_config"],
+    source_version = "17",
+    target_version = "17",
+    visibility = ["//visibility:public"],
+)
+
+toolchain(
+    name = "custom_java_toolchain",
+    toolchain = ":custom_java_toolchain_impl",
+    toolchain_type = "@bazel_tools//tools/jdk:toolchain_type",
+)

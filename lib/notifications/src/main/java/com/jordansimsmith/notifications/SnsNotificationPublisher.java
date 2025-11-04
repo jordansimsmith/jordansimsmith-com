@@ -5,8 +5,7 @@ import software.amazon.awssdk.services.sns.SnsClient;
 import software.amazon.awssdk.services.sns.model.ListTopicsRequest;
 import software.amazon.awssdk.services.sns.model.PublishRequest;
 
-public class SnsNotificationPublisher
-    implements com.jordansimsmith.notifications.NotificationPublisher {
+public class SnsNotificationPublisher implements NotificationPublisher {
   private final SnsClient snsClient;
 
   public SnsNotificationPublisher(SnsClient snsClient) {

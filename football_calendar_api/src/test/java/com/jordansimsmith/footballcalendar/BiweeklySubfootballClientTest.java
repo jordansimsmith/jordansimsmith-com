@@ -15,6 +15,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mock;
+import org.mockito.Mockito;
 
 public class BiweeklySubfootballClientTest {
   @Mock HttpClient mockHttpClient;
@@ -288,7 +289,7 @@ public class BiweeklySubfootballClientTest {
 
   @SuppressWarnings("unchecked")
   private <T> HttpResponse<T> createMockResponse(int statusCode, T body) {
-    HttpResponse<T> response = (HttpResponse<T>) org.mockito.Mockito.mock(HttpResponse.class);
+    HttpResponse<T> response = (HttpResponse<T>) Mockito.mock(HttpResponse.class);
     when(response.statusCode()).thenReturn(statusCode);
     when(response.body()).thenReturn(body);
     return response;

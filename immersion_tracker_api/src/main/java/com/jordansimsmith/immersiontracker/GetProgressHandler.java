@@ -12,6 +12,7 @@ import com.jordansimsmith.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -342,7 +343,7 @@ public class GetProgressHandler
       List<ImmersionTrackerItem> youtubeVideos,
       List<ImmersionTrackerItem> spotifyEpisodes,
       Instant now) {
-    var result = new java.util.ArrayList<DailyActivity>();
+    var result = new ArrayList<DailyActivity>();
     for (int daysAgo = 6; daysAgo >= 0; daysAgo--) {
       var dayStart =
           now.atZone(ZONE_ID).truncatedTo(ChronoUnit.DAYS).minusDays(daysAgo).toInstant();

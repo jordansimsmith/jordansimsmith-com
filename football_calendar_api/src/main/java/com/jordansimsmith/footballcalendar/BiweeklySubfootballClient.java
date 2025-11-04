@@ -2,6 +2,7 @@ package com.jordansimsmith.footballcalendar;
 
 import biweekly.Biweekly;
 import biweekly.component.VEvent;
+import biweekly.property.Description;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -121,7 +122,7 @@ public class BiweeklySubfootballClient implements SubfootballClient {
     return new String[] {homeTeam, awayTeam};
   }
 
-  private String parseFieldFromDescription(biweekly.property.Description description) {
+  private String parseFieldFromDescription(Description description) {
     if (description == null || description.getValue() == null) {
       return null;
     }

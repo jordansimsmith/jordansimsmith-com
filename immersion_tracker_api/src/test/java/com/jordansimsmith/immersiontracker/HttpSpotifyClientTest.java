@@ -11,6 +11,7 @@ import static org.mockito.MockitoAnnotations.openMocks;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.secrets.FakeSecrets;
 import com.jordansimsmith.secrets.Secrets;
+import java.io.IOException;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -219,7 +220,7 @@ public class HttpSpotifyClientTest {
     // act & assert
     assertThatThrownBy(() -> client.getEpisode("testEpisodeId"))
         .isInstanceOf(RuntimeException.class)
-        .hasCauseInstanceOf(java.io.IOException.class)
+        .hasCauseInstanceOf(IOException.class)
         .hasMessageContaining("Spotify token request failed with status code 401");
   }
 
@@ -245,7 +246,7 @@ public class HttpSpotifyClientTest {
     // act & assert
     assertThatThrownBy(() -> client.getEpisode("nonexistent"))
         .isInstanceOf(RuntimeException.class)
-        .hasCauseInstanceOf(java.io.IOException.class)
+        .hasCauseInstanceOf(IOException.class)
         .hasMessageContaining("Spotify API request failed with status code 404");
   }
 
