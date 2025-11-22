@@ -40,7 +40,10 @@ public class HttpTvdbClient implements TvdbClient {
       @JsonProperty("status") String status, @JsonProperty("data") SeriesData data) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
-  private record SeriesData(@JsonProperty("name") String name, @JsonProperty String image) {}
+  private record SeriesData(
+      @JsonProperty("name") String name,
+      @JsonProperty String image,
+      @JsonProperty("averageRuntime") Integer averageRuntimeMinutes) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record MovieResponse(
@@ -95,7 +98,12 @@ public class HttpTvdbClient implements TvdbClient {
 
     Preconditions.checkNotNull(seriesResBody.data.name);
     Preconditions.checkNotNull(seriesResBody.data.image);
-    return new Show(id, seriesResBody.data.name, seriesResBody.data.image);
+    Preconditions.checkNotNull(seriesResBody.data.averageRuntimeMinutes);
+    return new Show(
+        id,
+        seriesResBody.data.name,
+        seriesResBody.data.image,
+        Duration.ofMinutes(seriesResBody.data.averageRuntimeMinutes));
   }
 
   private Movie doGetMovie(int id) throws Exception {

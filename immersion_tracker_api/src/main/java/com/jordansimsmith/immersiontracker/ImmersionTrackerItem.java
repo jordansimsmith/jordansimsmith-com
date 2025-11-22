@@ -29,6 +29,7 @@ public class ImmersionTrackerItem {
   public static final String TVDB_ID = "tvdb_id";
   public static final String TVDB_NAME = "tvdb_name";
   public static final String TVDB_IMAGE = "tvdb_image";
+  public static final String TVDB_AVERAGE_RUNTIME = "tvdb_average_runtime";
   public static final String YOUTUBE_VIDEO_ID = "youtube_video_id";
   public static final String YOUTUBE_VIDEO_TITLE = "youtube_video_title";
   public static final String YOUTUBE_CHANNEL_ID = "youtube_channel_id";
@@ -51,6 +52,7 @@ public class ImmersionTrackerItem {
   private Integer tvdbId;
   private String tvdbName;
   private String tvdbImage;
+  private Duration tvdbAverageRuntime;
   private String youtubeVideoId;
   private String youtubeVideoTitle;
   private String youtubeChannelId;
@@ -146,6 +148,16 @@ public class ImmersionTrackerItem {
 
   public void setTvdbImage(String tvdbImage) {
     this.tvdbImage = tvdbImage;
+  }
+
+  @DynamoDbAttribute(TVDB_AVERAGE_RUNTIME)
+  @DynamoDbConvertedBy(DurationSecondsConverter.class)
+  public Duration getTvdbAverageRuntime() {
+    return tvdbAverageRuntime;
+  }
+
+  public void setTvdbAverageRuntime(Duration tvdbAverageRuntime) {
+    this.tvdbAverageRuntime = tvdbAverageRuntime;
   }
 
   @DynamoDbAttribute(YOUTUBE_VIDEO_ID)

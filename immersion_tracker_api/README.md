@@ -65,7 +65,7 @@ graph TD
 ### Key components
 
 - `AuthHandler`: Handles user authentication
-- `GetProgressHandler`: Retrieves progress statistics
+- `GetProgressHandler`: Retrieves progress statistics and uses each show's `tvdb_average_runtime` when present (falling back to 20 minutes per episode)
 - `GetShowsHandler`: Lists tracked shows
 - `SyncEpisodesHandler`: Syncs local episodes to the database
 - `SyncMoviesHandler`: Syncs local movies to the database
@@ -110,7 +110,8 @@ graph TD
   "folder_name": "show_name",
   "tvdb_id": 12345,
   "tvdb_name": "Example Show",
-  "tvdb_image": "https://artworks.thetvdb.com/banners/posters/12345-1.jpg"
+  "tvdb_image": "https://artworks.thetvdb.com/banners/posters/12345-1.jpg",
+  "tvdb_average_runtime": 1200
 }
 ```
 

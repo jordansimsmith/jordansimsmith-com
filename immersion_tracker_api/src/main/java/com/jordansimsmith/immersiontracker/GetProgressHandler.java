@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import com.jordansimsmith.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
@@ -31,7 +32,7 @@ public class GetProgressHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
   private static final Logger LOGGER = LoggerFactory.getLogger(GetProgressHandler.class);
   @VisibleForTesting static final ZoneId ZONE_ID = ZoneId.of("Pacific/Auckland");
-  private static final int MINUTES_PER_EPISODE = 20;
+  private static final Duration DEFAULT_EPISODE_DURATION = Duration.ofMinutes(20);
 
   private final Clock clock;
   private final ObjectMapper objectMapper;
@@ -121,6 +122,13 @@ public class GetProgressHandler
             .toList();
     var shows =
         items.stream().filter(i -> i.getSk().startsWith(ImmersionTrackerItem.SHOW_PREFIX)).toList();
+    var showsByFolderName =
+        shows.stream()
+            .collect(
+                Collectors.toMap(
+                    ImmersionTrackerItem::getFolderName,
+                    v -> v,
+                    (existing, replacement) -> existing));
     var youtubeVideos =
         items.stream()
             .filter(i -> i.getSk().startsWith(ImmersionTrackerItem.YOUTUBEVIDEO_PREFIX))
@@ -147,7 +155,8 @@ public class GetProgressHandler
 
     var totalEpisodesWatched = totalEpisodesWatched(episodes);
     var totalMoviesWatched = totalMoviesWatched(movies);
-    var totalHoursWatched = totalHoursWatched(episodes, youtubeVideos, spotifyEpisodes, movies);
+    var totalHoursWatched =
+        totalHoursWatched(episodes, showsByFolderName, youtubeVideos, spotifyEpisodes, movies);
     var episodesWatchedToday = episodesWatchedToday(episodes, today);
     var moviesWatchedToday = moviesWatchedToday(movies, today);
     var youtubeVideosWatched = youtubeVideosWatched(youtubeVideos);
@@ -158,8 +167,15 @@ public class GetProgressHandler
         daysSinceFirstEpisode(episodes, youtubeVideos, spotifyEpisodes, movies, now);
     var weeklyTrendPercentage =
         weeklyTrendPercentage(
-            episodes, youtubeVideos, spotifyEpisodes, movies, now, daysSinceFirstEpisode);
-    var activity = dailyActivity(episodes, youtubeVideos, spotifyEpisodes, movies, now);
+            episodes,
+            showsByFolderName,
+            youtubeVideos,
+            spotifyEpisodes,
+            movies,
+            now,
+            daysSinceFirstEpisode);
+    var activity =
+        dailyActivity(episodes, showsByFolderName, youtubeVideos, spotifyEpisodes, movies, now);
     var progresses = shows(episodes, shows);
     var channelProgresses = youtubeChannels(youtubeVideos, youtubeChannels);
     var spotifyShowProgresses = spotifyShows(spotifyEpisodes, spotifyShows);
@@ -201,20 +217,21 @@ public class GetProgressHandler
 
   private int totalHoursWatched(
       List<ImmersionTrackerItem> episodes,
+      Map<String, ImmersionTrackerItem> showsByFolderName,
       List<ImmersionTrackerItem> youtubeVideos,
       List<ImmersionTrackerItem> spotifyEpisodes,
       List<ImmersionTrackerItem> movies) {
+    var episodeMinutes =
+        episodes.stream()
+            .mapToLong(e -> getEpisodeDuration(e, showsByFolderName).toMinutes())
+            .sum();
     var youtubeTotalMinutes =
         youtubeVideos.stream().mapToLong(v -> v.getYoutubeVideoDuration().toMinutes()).sum();
     var spotifyTotalMinutes =
         spotifyEpisodes.stream().mapToLong(e -> e.getSpotifyEpisodeDuration().toMinutes()).sum();
     var movieTotalMinutes = movies.stream().mapToLong(m -> m.getMovieDuration().toMinutes()).sum();
     return (int)
-        ((episodes.size() * MINUTES_PER_EPISODE
-                + youtubeTotalMinutes
-                + spotifyTotalMinutes
-                + movieTotalMinutes)
-            / 60);
+        ((episodeMinutes + youtubeTotalMinutes + spotifyTotalMinutes + movieTotalMinutes) / 60);
   }
 
   private int episodesWatchedToday(List<ImmersionTrackerItem> episodes, Instant today) {
@@ -267,6 +284,7 @@ public class GetProgressHandler
 
   private Double weeklyTrendPercentage(
       List<ImmersionTrackerItem> episodes,
+      Map<String, ImmersionTrackerItem> showsByFolderName,
       List<ImmersionTrackerItem> youtubeVideos,
       List<ImmersionTrackerItem> spotifyEpisodes,
       List<ImmersionTrackerItem> movies,
@@ -279,7 +297,7 @@ public class GetProgressHandler
     var episodesWatchedLastWeek =
         episodes.stream()
             .filter(e -> e.getTimestamp().isAfter(sevenDaysAgo))
-            .mapToLong(e -> MINUTES_PER_EPISODE)
+            .mapToLong(e -> getEpisodeDuration(e, showsByFolderName).toMinutes())
             .sum();
     var youtubeWatchedLastWeek =
         youtubeVideos.stream()
@@ -306,11 +324,12 @@ public class GetProgressHandler
     var spotifyTotalMinutes =
         spotifyEpisodes.stream().mapToLong(e -> e.getSpotifyEpisodeDuration().toMinutes()).sum();
     var movieTotalMinutes = movies.stream().mapToLong(m -> m.getMovieDuration().toMinutes()).sum();
+    var episodeTotalMinutes =
+        episodes.stream()
+            .mapToLong(e -> getEpisodeDuration(e, showsByFolderName).toMinutes())
+            .sum();
     var totalMinutesWatched =
-        (long) episodes.size() * MINUTES_PER_EPISODE
-            + youtubeTotalMinutes
-            + spotifyTotalMinutes
-            + movieTotalMinutes;
+        episodeTotalMinutes + youtubeTotalMinutes + spotifyTotalMinutes + movieTotalMinutes;
     var averageMinutesPerWeek = (double) totalMinutesWatched / daysSinceFirstEpisode * 7;
     return ((totalMinutesWatchedLastWeek - averageMinutesPerWeek) / averageMinutesPerWeek) * 100;
   }
@@ -387,6 +406,7 @@ public class GetProgressHandler
 
   private List<DailyActivity> dailyActivity(
       List<ImmersionTrackerItem> episodes,
+      Map<String, ImmersionTrackerItem> showsByFolderName,
       List<ImmersionTrackerItem> youtubeVideos,
       List<ImmersionTrackerItem> spotifyEpisodes,
       List<ImmersionTrackerItem> movies,
@@ -399,11 +419,10 @@ public class GetProgressHandler
 
       var episodeMinutes =
           episodes.stream()
-                  .filter(
-                      e ->
-                          !e.getTimestamp().isBefore(dayStart) && e.getTimestamp().isBefore(dayEnd))
-                  .count()
-              * MINUTES_PER_EPISODE;
+              .filter(
+                  e -> !e.getTimestamp().isBefore(dayStart) && e.getTimestamp().isBefore(dayEnd))
+              .mapToLong(e -> getEpisodeDuration(e, showsByFolderName).toMinutes())
+              .sum();
 
       var youtubeMinutes =
           youtubeVideos.stream()
@@ -437,5 +456,12 @@ public class GetProgressHandler
         .map(m -> new Movie(m.getTvdbName()))
         .sorted(Comparator.comparing(m -> m.name, Comparator.nullsLast(Comparator.naturalOrder())))
         .toList();
+  }
+
+  private Duration getEpisodeDuration(
+      ImmersionTrackerItem episode, Map<String, ImmersionTrackerItem> showsByFolderName) {
+    var show = showsByFolderName.get(episode.getFolderName());
+    var showDuration = show != null ? show.getTvdbAverageRuntime() : null;
+    return showDuration != null ? showDuration : DEFAULT_EPISODE_DURATION;
   }
 }

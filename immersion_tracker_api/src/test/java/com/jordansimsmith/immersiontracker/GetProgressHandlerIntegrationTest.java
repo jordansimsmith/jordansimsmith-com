@@ -102,6 +102,43 @@ public class GetProgressHandlerIntegrationTest {
   }
 
   @Test
+  void handleRequestShouldUseShowAverageRuntimeWhenAvailable() throws Exception {
+    // arrange
+    var user = "alice";
+    fakeClock.setTime(Instant.ofEpochMilli(200_000));
+    var now = fakeClock.now();
+    var episode1 = ImmersionTrackerItem.createEpisode(user, "show1", "episode1", now);
+    var episode2 = ImmersionTrackerItem.createEpisode(user, "show1", "episode2", now);
+    var episode3 = ImmersionTrackerItem.createEpisode(user, "show1", "episode3", now);
+    var show = ImmersionTrackerItem.createShow(user, "show1");
+    show.setTvdbId(1);
+    show.setTvdbName("my show");
+    show.setTvdbAverageRuntime(Duration.ofMinutes(45));
+
+    immersionTrackerTable.putItem(episode1);
+    immersionTrackerTable.putItem(episode2);
+    immersionTrackerTable.putItem(episode3);
+    immersionTrackerTable.putItem(show);
+
+    // act
+    var req =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+    var res = getProgressHandler.handleRequest(req, null);
+
+    // assert
+    var progress =
+        objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
+    assertThat(progress.totalEpisodesWatched()).isEqualTo(3);
+    assertThat(progress.totalHoursWatched()).isEqualTo(2); // 3 * 45 minutes = 135 -> 2 hours
+    var today =
+        progress.dailyActivity().stream()
+            .filter(activity -> activity.daysAgo() == 0)
+            .findFirst()
+            .orElseThrow();
+    assertThat(today.minutesWatched()).isEqualTo(135);
+  }
+
+  @Test
   void handleRequestShouldReturnUnknownShow() throws Exception {
     // arrange
     var user = "alice";

@@ -6,6 +6,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import java.time.Duration;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -52,7 +53,7 @@ public class UpdateShowHandlerIntegrationTest {
     var show1 = ImmersionTrackerItem.createShow(user, "show1");
     immersionTrackerTable.putItem(show1);
 
-    var tvdbShow = new TvdbClient.Show(123, "my show", "my image");
+    var tvdbShow = new TvdbClient.Show(123, "my show", "my image", Duration.ofMinutes(45));
     tvdbClient.addShow(tvdbShow);
 
     var body = new UpdateShowHandler.UpdateShowRequest(show1.getFolderName(), tvdbShow.id());
@@ -78,6 +79,7 @@ public class UpdateShowHandlerIntegrationTest {
     assertThat(updatedShow.getTvdbId()).isEqualTo(tvdbShow.id());
     assertThat(updatedShow.getTvdbName()).isEqualTo(tvdbShow.name());
     assertThat(updatedShow.getTvdbImage()).isEqualTo(tvdbShow.image());
+    assertThat(updatedShow.getTvdbAverageRuntime()).isEqualTo(Duration.ofMinutes(45));
     assertThat(updatedShow.getVersion()).isEqualTo(2);
   }
 }

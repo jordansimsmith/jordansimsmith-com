@@ -38,7 +38,8 @@ public class HttpTvdbClientTest {
         "status": "success",
         "data": {
           "name": "Test Show",
-          "image": "https://example.com/show.jpg"
+          "image": "https://example.com/show.jpg",
+          "averageRuntime": 45
         }
       }
       """;
@@ -95,6 +96,37 @@ public class HttpTvdbClientTest {
     assertThat(show.id()).isEqualTo(123);
     assertThat(show.name()).isEqualTo("Test Show");
     assertThat(show.image()).isEqualTo("https://example.com/show.jpg");
+    assertThat(show.averageRuntime()).isEqualTo(Duration.ofMinutes(45));
+  }
+
+  @Test
+  void getShowShouldThrowWhenRuntimeMissing() throws Exception {
+    // arrange
+    var secretJson = objectMapper.createObjectNode().put("tvdb_api_key", "test-api-key");
+    ((FakeSecrets) secrets).set(HttpTvdbClient.SECRET, objectMapper.writeValueAsString(secretJson));
+
+    var loginResponse = createMockResponse(200, LOGIN_RESPONSE);
+    var seriesResponse =
+        createMockResponse(
+            200,
+            """
+            {
+              "status": "success",
+              "data": {
+                "name": "Test Show",
+                "image": "https://example.com/show.jpg"
+              }
+            }
+            """);
+
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(loginResponse)
+        .thenReturn(seriesResponse);
+
+    // act & assert
+    assertThatThrownBy(() -> client.getShow(123))
+        .isInstanceOf(RuntimeException.class)
+        .hasCauseInstanceOf(NullPointerException.class);
   }
 
   @Test

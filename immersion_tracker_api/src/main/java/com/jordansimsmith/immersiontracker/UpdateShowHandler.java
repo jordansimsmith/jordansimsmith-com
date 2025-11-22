@@ -70,6 +70,7 @@ public class UpdateShowHandler
     show.setTvdbId(tvdbShow.id());
     show.setTvdbName(tvdbShow.name());
     show.setTvdbImage(tvdbShow.image());
+    show.setTvdbAverageRuntime(tvdbShow.averageRuntime());
     immersionTrackerTable.updateItem(show);
 
     var res = new UpdateShowResponse();
