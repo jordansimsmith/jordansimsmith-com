@@ -68,6 +68,10 @@ locals {
       target  = "//immersion_tracker_api:sync-spotify-handler_deploy.jar"
       handler = "com.jordansimsmith.immersiontracker.SyncSpotifyHandler"
     }
+    sync_movies = {
+      target  = "//immersion_tracker_api:sync-movies-handler_deploy.jar"
+      handler = "com.jordansimsmith.immersiontracker.SyncMoviesHandler"
+    }
   }
 
   endpoints = {
@@ -93,6 +97,10 @@ locals {
     }
     sync_spotify = {
       path   = "syncspotify"
+      method = "POST"
+    }
+    sync_movies = {
+      path   = "syncmovies"
       method = "POST"
     }
   }

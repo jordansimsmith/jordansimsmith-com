@@ -24,16 +24,19 @@ graph TD
 ### Functional requirements
 
 - Track watched TV shows and episodes for language learning immersion
+- Track watched movies for language learning immersion
 - Track watched YouTube videos for language learning immersion
 - Track watched Spotify podcast episodes for language learning immersion
 - Store metadata about shows from TVDB API
+- Store metadata about movies from TVDB API
 - Store metadata about YouTube videos from YouTube API
 - Store metadata about Spotify episodes from Spotify API
 - Provide progress statistics (total episodes watched, hours watched, etc.)
 - Support syncing episodes from local files to the cloud database
+- Support syncing movies from local files to the cloud database
 - Support syncing YouTube videos and Spotify episodes from local watched.txt file
 - Allow updating show metadata with TVDB information
-- Display progress summaries for all tracked shows, YouTube channels, and Spotify shows
+- Display progress summaries for all tracked shows, movies, YouTube channels, and Spotify shows
 - Support authentication for secure access
 
 ### Technical specifications
@@ -65,11 +68,12 @@ graph TD
 - `GetProgressHandler`: Retrieves progress statistics
 - `GetShowsHandler`: Lists tracked shows
 - `SyncEpisodesHandler`: Syncs local episodes to the database
+- `SyncMoviesHandler`: Syncs local movies to the database
 - `SyncYoutubeHandler`: Syncs YouTube videos to the database
 - `SyncSpotifyHandler`: Syncs Spotify podcast episodes to the database
 - `UpdateShowHandler`: Updates show metadata with TVDB information
 - `ImmersionTrackerItem`: Data model for DynamoDB items
-- `sync_episodes.py`: Client script that scans local files and watched.txt, calls the Lambda API to sync episodes, YouTube videos, and Spotify episodes, and manages watched files
+- `sync_episodes.py`: Client script that scans local files and watched.txt, calls the Lambda API to sync episodes, movies, YouTube videos, and Spotify episodes, and manages watched files
 
 ### Configuration
 
@@ -161,5 +165,21 @@ graph TD
   "user": "alice",
   "spotify_show_id": "6Nl8RDfPxsk4h4bfWe76Kg",
   "spotify_show_name": "The Miku Real Japanese Podcast | Japanese conversation | Japanese culture"
+}
+```
+
+**Movie item:**
+
+```json
+{
+  "pk": "USER#alice",
+  "sk": "MOVIE#spirited_away",
+  "user": "alice",
+  "file_name": "spirited_away",
+  "tvdb_id": 12345,
+  "tvdb_name": "Spirited Away",
+  "tvdb_image": "https://artworks.thetvdb.com/artworks/12345/posters/12345-1.jpg",
+  "movie_duration": 7500,
+  "timestamp": 1672531200
 }
 ```

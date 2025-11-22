@@ -13,11 +13,15 @@ SUPPORTED_EXTENSIONS = [".mkv", ".mp4"]
 
 def main():
     local_episodes_watched = find_local_episodes_watched()
+    local_movies_watched = find_local_movies_watched()
     youtube_video_ids, spotify_episode_ids = find_watched_urls()
 
     if len(local_episodes_watched):
         sync_local_episodes_watched(local_episodes_watched)
         update_remote_shows()
+
+    if len(local_movies_watched):
+        sync_movies_watched(local_movies_watched)
 
     if len(youtube_video_ids):
         sync_youtube_videos_watched(youtube_video_ids)
@@ -27,12 +31,20 @@ def main():
 
     get_remote_show_progress()
 
-    if local_episodes_watched or youtube_video_ids or spotify_episode_ids:
+    if (
+        local_episodes_watched
+        or local_movies_watched
+        or youtube_video_ids
+        or spotify_episode_ids
+    ):
         print()
 
     if len(local_episodes_watched):
         delete_local_episodes_watched(local_episodes_watched)
         delete_completed_shows(local_episodes_watched)
+
+    if len(local_movies_watched):
+        delete_local_movies_watched(local_movies_watched)
 
     if len(youtube_video_ids) or len(spotify_episode_ids):
         clear_watched_file()
@@ -47,6 +59,9 @@ def find_local_episodes_watched():
 
     for show in os.listdir(os.path.curdir):
         if not os.path.isdir(show):
+            continue
+
+        if show in ("movies", "watched"):
             continue
 
         watched = os.path.join(show, "watched")
@@ -68,12 +83,49 @@ def find_local_episodes_watched():
     return episodes
 
 
+def find_local_movies_watched():
+    print("Finding local movies watched...")
+    movies = []
+
+    movies_dir = os.path.join("movies", "watched")
+    if not os.path.isdir(movies_dir):
+        return movies
+
+    for movie in os.listdir(movies_dir):
+        path = os.path.join(movies_dir, movie)
+        if not os.path.isfile(path):
+            continue
+
+        if os.path.splitext(movie)[1] not in SUPPORTED_EXTENSIONS:
+            continue
+
+        movies.append({"file_name": pathlib.Path(movie).stem})
+
+    movies.sort(key=lambda x: x["file_name"])
+
+    return movies
+
+
 def sync_local_episodes_watched(episodes):
     print(f"Syncing {len(episodes)} local episodes watched...")
 
     res = send_request("POST", "sync", {"episodes": episodes})
     episodes_added = res["episodes_added"]
     print(f"Successfully added {episodes_added} new episodes to the remote server.")
+
+
+def sync_movies_watched(movies):
+    print(f"Syncing {len(movies)} movies watched...")
+
+    movies_with_ids = []
+    for movie in movies:
+        file_name = movie["file_name"]
+        tvdb_id = int(input(f"Enter the TVDB id for movie {file_name}:\n"))
+        movies_with_ids.append({"file_name": file_name, "tvdb_id": tvdb_id})
+
+    res = send_request("POST", "syncmovies", {"movies": movies_with_ids})
+    movies_added = res["movies_added"]
+    print(f"Successfully added {movies_added} new movies to the remote server.")
 
 
 def update_remote_shows():
@@ -100,7 +152,14 @@ def get_remote_show_progress():
         episodes_watched = show["episodes_watched"]
         print(f"{episodes_watched} episodes of {name}")
 
-    if res["shows"] and res["youtube_channels"]:
+    if res["shows"] and res.get("movies"):
+        print()
+
+    for movie in res.get("movies", []):
+        name = movie["name"] or "Unknown"
+        print(name)
+
+    if (res["shows"] or res.get("movies")) and res["youtube_channels"]:
         print()
 
     for channel in res["youtube_channels"]:
@@ -109,7 +168,9 @@ def get_remote_show_progress():
         video_word = "video" if videos_watched == 1 else "videos"
         print(f"{videos_watched} {video_word} of {name}")
 
-    if (res["shows"] or res["youtube_channels"]) and res["spotify_shows"]:
+    if (res["shows"] or res.get("movies") or res["youtube_channels"]) and res[
+        "spotify_shows"
+    ]:
         print()
 
     for show in res["spotify_shows"]:
@@ -118,10 +179,16 @@ def get_remote_show_progress():
         episode_word = "episode" if episodes_watched == 1 else "episodes"
         print(f"{episodes_watched} {episode_word} of {name}")
 
-    if res["shows"] or res["youtube_channels"] or res["spotify_shows"]:
+    if (
+        res["shows"]
+        or res.get("movies")
+        or res["youtube_channels"]
+        or res["spotify_shows"]
+    ):
         print()
 
     episodes_watched_today = res["episodes_watched_today"]
+    movies_watched_today = res["movies_watched_today"]
     youtube_videos_watched_today = res["youtube_videos_watched_today"]
     spotify_episodes_watched_today = res["spotify_episodes_watched_today"]
     total_hours_watched = res["total_hours_watched"]
@@ -133,6 +200,7 @@ def get_remote_show_progress():
     )
 
     print(f"{episodes_watched_today} episodes watched today.")
+    print(f"{movies_watched_today} movies watched today.")
     print(f"{youtube_videos_watched_today} YouTube videos watched today.")
     print(f"{spotify_episodes_watched_today} Spotify episodes watched today.")
     print()
@@ -178,6 +246,32 @@ def delete_local_episodes_watched(episodes):
 
     size_gigabytes = size_bytes / 1024 / 1024 / 1024
     print(f"Deleted {size_gigabytes:.2f} GB of watched episodes.")
+
+
+def delete_local_movies_watched(movies):
+    print(f"Deleting {len(movies)} local movies watched...")
+
+    size_bytes = 0
+    for movie in movies:
+        path = os.path.join("movies", "watched", movie["file_name"])
+        pattern = glob.escape(path) + ".*"
+        files = glob.glob(pattern)
+
+        if len(files) != 1 or not os.path.isfile(files[0]):
+            raise Exception(
+                f"movie at {path} for deletion did not contain a single file"
+            )
+
+        try:
+            movie_size_bytes = os.path.getsize(files[0])
+            os.remove(files[0])
+            size_bytes += movie_size_bytes
+        except OSError:
+            # movie probably in use
+            pass
+
+    size_gigabytes = size_bytes / 1024 / 1024 / 1024
+    print(f"Deleted {size_gigabytes:.2f} GB of watched movies.")
 
 
 def delete_completed_shows(episodes):

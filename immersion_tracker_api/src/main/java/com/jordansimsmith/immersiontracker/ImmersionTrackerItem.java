@@ -14,6 +14,7 @@ public class ImmersionTrackerItem {
   public static final String USER_PREFIX = "USER" + DELIMITER;
   public static final String EPISODE_PREFIX = "EPISODE" + DELIMITER;
   public static final String SHOW_PREFIX = "SHOW" + DELIMITER;
+  public static final String MOVIE_PREFIX = "MOVIE" + DELIMITER;
   public static final String YOUTUBEVIDEO_PREFIX = "YOUTUBEVIDEO" + DELIMITER;
   public static final String YOUTUBECHANNEL_PREFIX = "YOUTUBECHANNEL" + DELIMITER;
   public static final String SPOTIFYEPISODE_PREFIX = "SPOTIFYEPISODE" + DELIMITER;
@@ -38,6 +39,7 @@ public class ImmersionTrackerItem {
   public static final String SPOTIFY_SHOW_ID = "spotify_show_id";
   public static final String SPOTIFY_SHOW_NAME = "spotify_show_name";
   public static final String SPOTIFY_EPISODE_DURATION = "spotify_episode_duration";
+  public static final String MOVIE_DURATION = "movie_duration";
   public static final String VERSION = "version";
 
   private String pk;
@@ -59,6 +61,7 @@ public class ImmersionTrackerItem {
   private String spotifyShowId;
   private String spotifyShowName;
   private Duration spotifyEpisodeDuration;
+  private Duration movieDuration;
   private Long version;
 
   @DynamoDbPartitionKey
@@ -237,6 +240,16 @@ public class ImmersionTrackerItem {
     this.spotifyEpisodeDuration = spotifyEpisodeDuration;
   }
 
+  @DynamoDbAttribute(MOVIE_DURATION)
+  @DynamoDbConvertedBy(DurationSecondsConverter.class)
+  public Duration getMovieDuration() {
+    return movieDuration;
+  }
+
+  public void setMovieDuration(Duration movieDuration) {
+    this.movieDuration = movieDuration;
+  }
+
   @DynamoDbVersionAttribute()
   @DynamoDbAttribute(VERSION)
   public Long getVersion() {
@@ -302,6 +315,8 @@ public class ImmersionTrackerItem {
         + '\''
         + ", spotifyEpisodeDuration="
         + spotifyEpisodeDuration
+        + ", movieDuration="
+        + movieDuration
         + '}';
   }
 
@@ -328,7 +343,8 @@ public class ImmersionTrackerItem {
         && Objects.equals(spotifyEpisodeTitle, that.spotifyEpisodeTitle)
         && Objects.equals(spotifyShowId, that.spotifyShowId)
         && Objects.equals(spotifyShowName, that.spotifyShowName)
-        && Objects.equals(spotifyEpisodeDuration, that.spotifyEpisodeDuration);
+        && Objects.equals(spotifyEpisodeDuration, that.spotifyEpisodeDuration)
+        && Objects.equals(movieDuration, that.movieDuration);
   }
 
   @Override
@@ -352,7 +368,8 @@ public class ImmersionTrackerItem {
         spotifyEpisodeTitle,
         spotifyShowId,
         spotifyShowName,
-        spotifyEpisodeDuration);
+        spotifyEpisodeDuration,
+        movieDuration);
   }
 
   public static String formatPk(String user) {
@@ -365,6 +382,10 @@ public class ImmersionTrackerItem {
 
   public static String formatShowSk(String folderName) {
     return SHOW_PREFIX + folderName;
+  }
+
+  public static String formatMovieSk(String fileName) {
+    return MOVIE_PREFIX + fileName;
   }
 
   public static String formatYoutubeVideoSk(String videoId) {
@@ -462,5 +483,26 @@ public class ImmersionTrackerItem {
     show.setSpotifyShowId(showId);
     show.setSpotifyShowName(showName);
     return show;
+  }
+
+  public static ImmersionTrackerItem createMovie(
+      String user,
+      String fileName,
+      int tvdbId,
+      String tvdbName,
+      String tvdbImage,
+      Duration duration,
+      Instant timestamp) {
+    var movie = new ImmersionTrackerItem();
+    movie.setPk(formatPk(user));
+    movie.setSk(formatMovieSk(fileName));
+    movie.setUser(user);
+    movie.setFileName(fileName);
+    movie.setTvdbId(tvdbId);
+    movie.setTvdbName(tvdbName);
+    movie.setTvdbImage(tvdbImage);
+    movie.setMovieDuration(duration);
+    movie.setTimestamp(timestamp);
+    return movie;
   }
 }

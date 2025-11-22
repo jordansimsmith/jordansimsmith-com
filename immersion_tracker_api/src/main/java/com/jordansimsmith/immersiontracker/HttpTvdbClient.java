@@ -11,6 +11,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Duration;
 
 public class HttpTvdbClient implements TvdbClient {
   @VisibleForTesting static final String SECRET = "immersion_tracker_api";
@@ -41,6 +42,16 @@ public class HttpTvdbClient implements TvdbClient {
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record SeriesData(@JsonProperty("name") String name, @JsonProperty String image) {}
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record MovieResponse(
+      @JsonProperty("status") String status, @JsonProperty("data") MovieData data) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record MovieData(
+      @JsonProperty("name") String name,
+      @JsonProperty String image,
+      @JsonProperty("runtime") Integer runtimeMinutes) {}
+
   @Override
   public Show getShow(int id) {
     try {
@@ -50,7 +61,74 @@ public class HttpTvdbClient implements TvdbClient {
     }
   }
 
+  @Override
+  public Movie getMovie(int id) {
+    try {
+      return doGetMovie(id);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   private Show doGetShow(int id) throws Exception {
+    var token = getToken();
+
+    var seriesReq =
+        HttpRequest.newBuilder()
+            .uri(new URI("https://api4.thetvdb.com/v4/series/" + id))
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer " + token)
+            .GET()
+            .build();
+    var seriesRes = httpClient.send(seriesReq, HttpResponse.BodyHandlers.ofString());
+
+    if (seriesRes.statusCode() != 200) {
+      throw new IOException(
+          "tvdb.com series request failed with status code " + seriesRes.statusCode());
+    }
+
+    var seriesResBody = objectMapper.readValue(seriesRes.body(), SeriesResponse.class);
+    if (!seriesResBody.status.equals("success")) {
+      throw new IOException("tvdb.com series request failed with status " + seriesResBody.status);
+    }
+
+    Preconditions.checkNotNull(seriesResBody.data.name);
+    Preconditions.checkNotNull(seriesResBody.data.image);
+    return new Show(id, seriesResBody.data.name, seriesResBody.data.image);
+  }
+
+  private Movie doGetMovie(int id) throws Exception {
+    var token = getToken();
+
+    var movieReq =
+        HttpRequest.newBuilder()
+            .uri(new URI("https://api4.thetvdb.com/v4/movies/" + id))
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer " + token)
+            .GET()
+            .build();
+    var movieRes = httpClient.send(movieReq, HttpResponse.BodyHandlers.ofString());
+
+    if (movieRes.statusCode() != 200) {
+      throw new IOException(
+          "tvdb.com movie request failed with status code " + movieRes.statusCode());
+    }
+
+    var movieResBody = objectMapper.readValue(movieRes.body(), MovieResponse.class);
+    if (!movieResBody.status.equals("success")) {
+      throw new IOException("tvdb.com movie request failed with status " + movieResBody.status);
+    }
+
+    Preconditions.checkNotNull(movieResBody.data.name);
+    Preconditions.checkNotNull(movieResBody.data.image);
+    Preconditions.checkNotNull(movieResBody.data.runtimeMinutes);
+    var duration = Duration.ofMinutes(movieResBody.data.runtimeMinutes);
+    return new Movie(id, movieResBody.data.name, movieResBody.data.image, duration);
+  }
+
+  private String getToken() throws Exception {
     var secret = secrets.get(SECRET);
     var apikey = objectMapper.readTree(secret).get("tvdb_api_key").asText(null);
     Preconditions.checkNotNull(apikey);
@@ -79,28 +157,6 @@ public class HttpTvdbClient implements TvdbClient {
     var token = loginResBody.data.token;
     Preconditions.checkNotNull(token);
 
-    var seriesReq =
-        HttpRequest.newBuilder()
-            .uri(new URI("https://api4.thetvdb.com/v4/series/" + id))
-            .header("Accept", "application/json")
-            .header("Content-Type", "application/json")
-            .header("Authorization", "Bearer " + token)
-            .GET()
-            .build();
-    var seriesRes = httpClient.send(seriesReq, HttpResponse.BodyHandlers.ofString());
-
-    if (seriesRes.statusCode() != 200) {
-      throw new IOException(
-          "tvdb.com series request failed with status code " + seriesRes.statusCode());
-    }
-
-    var seriesResBody = objectMapper.readValue(seriesRes.body(), SeriesResponse.class);
-    if (!seriesResBody.status.equals("success")) {
-      throw new IOException("tvdb.com series request failed with status " + seriesResBody.status);
-    }
-
-    Preconditions.checkNotNull(seriesResBody.data.name);
-    Preconditions.checkNotNull(seriesResBody.data.image);
-    return new Show(id, seriesResBody.data.name, seriesResBody.data.image);
+    return token;
   }
 }

@@ -868,4 +868,44 @@ public class GetProgressHandlerIntegrationTest {
     assertThat(dailyActivity.get(6).daysAgo()).isEqualTo(0);
     assertThat(dailyActivity.get(6).minutesWatched()).isEqualTo(30);
   }
+
+  @Test
+  void handleRequestShouldIncludeMoviesInProgress() throws Exception {
+    // arrange
+    var user = "alice";
+    fakeClock.setTime(Instant.ofEpochMilli(123_000));
+    var now = fakeClock.now();
+
+    var movie1 =
+        ImmersionTrackerItem.createMovie(
+            user, "movie1", 1, "My Movie", "image1", Duration.ofMinutes(120), now);
+    var movie2 =
+        ImmersionTrackerItem.createMovie(
+            user, "movie2", 2, "Another Movie", "image2", Duration.ofMinutes(30), now);
+
+    immersionTrackerTable.putItem(movie1);
+    immersionTrackerTable.putItem(movie2);
+
+    // act
+    var req =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+    var res = getProgressHandler.handleRequest(req, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(200);
+
+    var progress =
+        objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
+
+    // Movies: 120 + 30 minutes = 150 minutes = 2 hours (rounded down)
+    assertThat(progress.totalHoursWatched()).isEqualTo(2);
+    assertThat(progress.totalMoviesWatched()).isEqualTo(2);
+    assertThat(progress.moviesWatchedToday()).isEqualTo(2);
+
+    var movies = progress.movies();
+    assertThat(movies).hasSize(2);
+    assertThat(movies)
+        .extracting(GetProgressHandler.Movie::name)
+        .containsExactly("Another Movie", "My Movie");
+  }
 }
