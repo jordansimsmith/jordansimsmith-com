@@ -108,6 +108,13 @@ configs = [
         "zip_file": "sync-episodes-handler_deploy.jar",
     },
     {
+        "function_name": "sync_movies_handler",
+        "resource_path_part": "syncmovies",
+        "http_method": "POST",
+        "handler_name": "com.jordansimsmith.immersiontracker.SyncMoviesHandler",
+        "zip_file": "sync-movies-handler_deploy.jar",
+    },
+    {
         "function_name": "sync_youtube_handler",
         "resource_path_part": "syncyoutube",
         "http_method": "POST",

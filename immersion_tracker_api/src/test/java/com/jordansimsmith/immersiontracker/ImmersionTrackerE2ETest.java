@@ -125,6 +125,7 @@ public class ImmersionTrackerE2ETest {
     var expectedOutput =
         """
         Finding local episodes watched...
+        Finding local movies watched...
         Finding watched URLs...
         Syncing 4 local episodes watched...
         Successfully added 4 new episodes to the remote server.
@@ -141,6 +142,7 @@ public class ImmersionTrackerE2ETest {
         2 episodes of ハイキュー!!
 
         4 episodes watched today.
+        0 movies watched today.
         0 YouTube videos watched today.
         0 Spotify episodes watched today.
 
@@ -173,6 +175,101 @@ public class ImmersionTrackerE2ETest {
     assertThat(show2).doesNotExist();
     assertThat(show3).exists();
     assertThat(show4).exists();
+  }
+
+  @SuppressWarnings("ResultOfMethodCallIgnored")
+  @Test
+  void scriptShouldSyncMovies() throws Exception {
+    // arrange
+    var tmp = new File(System.getProperty("java.io.tmpdir"));
+
+    var movies = Path.of(tmp.getPath(), "movies").toFile();
+    movies.mkdir();
+    var watched = Path.of(movies.getPath(), "watched").toFile();
+    watched.mkdir();
+    var suzume = Path.of(watched.getPath(), "suzume.mp4").toFile();
+    suzume.createNewFile();
+    try (var suzumeRandomAccessFile = new RandomAccessFile(suzume, "rw")) {
+      suzumeRandomAccessFile.setLength(1024L * 1024 * 1024);
+    }
+    var yourName = Path.of(watched.getPath(), "your_name.mkv").toFile();
+    yourName.createNewFile();
+    try (var yourNameRandomAccessFile = new RandomAccessFile(yourName, "rw")) {
+      yourNameRandomAccessFile.setLength(1024L * 1024 * 1024 * 2);
+    }
+
+    // act
+    var script = Path.of("immersion_tracker_api/sync-episodes-script.py");
+    var processBuilder = new ProcessBuilder(script.toAbsolutePath().toString());
+    processBuilder.redirectErrorStream(false);
+    processBuilder.directory(tmp);
+    processBuilder
+        .environment()
+        .put("IMMERSION_TRACKER_API_URL", immersionTrackerContainer.getApiUrl().toString());
+    var process = processBuilder.start();
+
+    var input = process.getOutputStream();
+    input.write("331904\n".getBytes());
+    input.write("197\n".getBytes());
+    input.write("\n".getBytes());
+    input.flush();
+
+    // assert
+    int exitCode = process.waitFor();
+    assertThat(exitCode)
+        .withFailMessage(
+            () ->
+                new BufferedReader(new InputStreamReader(process.getErrorStream()))
+                        .lines()
+                        .collect(Collectors.joining("\n"))
+                    + "\n"
+                    + immersionTrackerContainer.getLogs())
+        .isEqualTo(0);
+
+    var output =
+        new BufferedReader(new InputStreamReader(process.getInputStream()))
+            .lines()
+            .collect(Collectors.joining("\n"));
+    var expectedOutput =
+        """
+        Finding local episodes watched...
+        Finding local movies watched...
+        Finding watched URLs...
+        Syncing 2 movies watched...
+        Enter the TVDB id for movie suzume:
+        Enter the TVDB id for movie your_name:
+        Successfully added 2 new movies to the remote server.
+        Retrieving progress summary...
+
+        すずめの戸締まり
+        君の名は。
+
+        0 episodes watched today.
+        2 movies watched today.
+        0 YouTube videos watched today.
+        0 Spotify episodes watched today.
+
+        Weekly activity:
+        6 days ago │                                     0m
+        5 days ago │                                     0m
+        4 days ago │                                     0m
+        3 days ago │                                     0m
+        2 days ago │                                     0m
+        Yesterday  │                                     0m
+        Today      │██████████████████████████████   3h 52m
+
+        3 total hours watched.
+        0 years and 0 months since immersion started.
+
+        Deleting 2 local movies watched...
+        Deleted 3.00 GB of watched movies.
+
+        Press ENTER to close...""";
+    assertThat(output).isEqualTo(expectedOutput);
+    assertThat(suzume).doesNotExist();
+    assertThat(yourName).doesNotExist();
+    assertThat(watched).exists();
+    assertThat(movies).exists();
   }
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
@@ -221,6 +318,7 @@ public class ImmersionTrackerE2ETest {
     var expectedOutput =
         """
         Finding local episodes watched...
+        Finding local movies watched...
         Finding watched URLs...
         Syncing 2 YouTube videos watched...
         Successfully added 2 new YouTube videos to the remote server.
@@ -230,6 +328,7 @@ public class ImmersionTrackerE2ETest {
         1 video of officialpsy
 
         0 episodes watched today.
+        0 movies watched today.
         2 YouTube videos watched today.
         0 Spotify episodes watched today.
 
@@ -300,6 +399,7 @@ public class ImmersionTrackerE2ETest {
     var expectedOutput =
         """
         Finding local episodes watched...
+        Finding local movies watched...
         Finding watched URLs...
         Syncing 2 Spotify episodes watched...
         Successfully added 2 new Spotify episodes to the remote server.
@@ -308,6 +408,7 @@ public class ImmersionTrackerE2ETest {
         2 episodes of The Miku Real Japanese Podcast | Japanese conversation | Japanese culture
 
         0 episodes watched today.
+        0 movies watched today.
         0 YouTube videos watched today.
         2 Spotify episodes watched today.
 
