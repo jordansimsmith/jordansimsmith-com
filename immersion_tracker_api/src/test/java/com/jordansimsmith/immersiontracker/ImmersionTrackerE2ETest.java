@@ -153,7 +153,7 @@ public class ImmersionTrackerE2ETest {
         3 days ago │                                     0m
         2 days ago │                                     0m
         Yesterday  │                                     0m
-        Today      │██████████████████████████████   1h 20m
+        Today      │██████████████████████████████   1h 38m
 
         1 total hour watched.
         0 years and 0 months since immersion started.
