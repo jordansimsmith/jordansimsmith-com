@@ -44,7 +44,10 @@ public class ImmersionTrackerE2ETest {
     // arrange
     var tmp = new File(System.getProperty("java.io.tmpdir"));
 
-    var show1 = Path.of(tmp.getPath(), "1 [123] Free!").toFile();
+    var shows = Path.of(tmp.getPath(), "shows").toFile();
+    shows.mkdir();
+
+    var show1 = Path.of(shows.getPath(), "1 [123] Free!").toFile();
     show1.mkdir();
     var watched1 = Path.of(show1.getPath(), "watched").toFile();
     watched1.mkdir();
@@ -61,7 +64,7 @@ public class ImmersionTrackerE2ETest {
     var dsStore = Path.of(watched1.getPath(), ".DS_Store").toFile();
     dsStore.createNewFile();
 
-    var show2 = Path.of(tmp.getPath(), "2 (123) Haikyuu Part 1").toFile();
+    var show2 = Path.of(shows.getPath(), "2 (123) Haikyuu Part 1").toFile();
     show2.mkdir();
     var watched2 = Path.of(show2.getPath(), "watched").toFile();
     watched2.mkdir();
@@ -71,7 +74,7 @@ public class ImmersionTrackerE2ETest {
       show2Episode1RandomAccessFile.setLength(130 * 1024 * 1024);
     }
 
-    var show3 = Path.of(tmp.getPath(), "3 (123) Haikyuu Part 2").toFile();
+    var show3 = Path.of(shows.getPath(), "3 (123) Haikyuu Part 2").toFile();
     show3.mkdir();
     var watched3 = Path.of(show3.getPath(), "watched").toFile();
     watched3.mkdir();
@@ -86,7 +89,7 @@ public class ImmersionTrackerE2ETest {
       show3Episode2RandomAccessFile.setLength(440 * 1024 * 1024);
     }
 
-    var show4 = Path.of(tmp.getPath(), "4 {123} Attack on Titan?").toFile();
+    var show4 = Path.of(shows.getPath(), "4 {123} Attack on Titan?").toFile();
     show4.mkdir();
 
     // act

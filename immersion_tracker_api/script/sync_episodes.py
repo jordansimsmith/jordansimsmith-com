@@ -57,14 +57,16 @@ def find_local_episodes_watched():
     print("Finding local episodes watched...")
     episodes = []
 
-    for show in os.listdir(os.path.curdir):
-        if not os.path.isdir(show):
+    shows_dir = "shows"
+    if not os.path.isdir(shows_dir):
+        return episodes
+
+    for show in os.listdir(shows_dir):
+        show_path = os.path.join(shows_dir, show)
+        if not os.path.isdir(show_path):
             continue
 
-        if show in ("movies", "watched"):
-            continue
-
-        watched = os.path.join(show, "watched")
+        watched = os.path.join(show_path, "watched")
         if not os.path.isdir(watched):
             continue
 
@@ -75,7 +77,10 @@ def find_local_episodes_watched():
             if os.path.splitext(episode)[1] not in SUPPORTED_EXTENSIONS:
                 continue
 
-            episode = {"folder_name": show, "file_name": pathlib.Path(episode).stem}
+            episode = {
+                "folder_name": show,
+                "file_name": pathlib.Path(episode).stem,
+            }
             episodes.append(episode)
 
     episodes.sort(key=lambda x: (x["folder_name"], x["file_name"]))
@@ -227,7 +232,9 @@ def delete_local_episodes_watched(episodes):
 
     size_bytes = 0
     for episode in episodes:
-        path = os.path.join(episode["folder_name"], "watched", episode["file_name"])
+        path = os.path.join(
+            "shows", episode["folder_name"], "watched", episode["file_name"]
+        )
         pattern = glob.escape(path) + ".*"
         files = glob.glob(pattern)
 
@@ -277,16 +284,18 @@ def delete_local_movies_watched(movies):
 def delete_completed_shows(episodes):
     for episode in episodes:
         folder = episode["folder_name"]
-        if not os.path.isdir(folder):
+        folder_path = os.path.join("shows", folder)
+        if not os.path.isdir(folder_path):
             continue
 
         # check that the folder is empty
         if any(
-            any(pathlib.Path(folder).rglob(f"*{ext}")) for ext in SUPPORTED_EXTENSIONS
+            any(pathlib.Path(folder_path).rglob(f"*{ext}"))
+            for ext in SUPPORTED_EXTENSIONS
         ):
             continue
 
-        shutil.rmtree(folder)
+        shutil.rmtree(folder_path)
         print(f"Deleted completed show: {folder}")
 
 
