@@ -134,7 +134,11 @@ public class PriceExtractorTest {
         """
         <html>
           <body>
-            <span class="price-item price-item--regular">$92.50</span>
+            <div class="price price--show-badge">
+              <div class="price__regular">
+                <span class="price-item price-item--regular price-item--last">$92.50</span>
+              </div>
+            </div>
           </body>
         </html>
         """;
@@ -169,7 +173,11 @@ public class PriceExtractorTest {
         """
         <html>
           <body>
-            <span class="price-item price-item--regular">Invalid Price</span>
+            <div class="price price--show-badge">
+              <div class="price__regular">
+                <span class="price-item price-item--regular price-item--last">Invalid Price</span>
+              </div>
+            </div>
           </body>
         </html>
         """;
@@ -190,17 +198,19 @@ public class PriceExtractorTest {
         """
         <html>
           <body>
-            <div class="price__sale">
-              <span class="visually-hidden visually-hidden--inline">Regular price</span>
-              <span>
-                <s class="price-item price-item--regular">
-                  $4.95
-                </s>
-              </span>
-              <span class="visually-hidden visually-hidden--inline">Sale price</span>
-              <span class="price-item price-item--sale price-item--last">
-                $2.95
-              </span>
+            <div class="price price--show-badge">
+              <div class="price__sale">
+                <span class="visually-hidden visually-hidden--inline">Regular price</span>
+                <span>
+                  <s class="price-item price-item--regular">
+                    $4.95
+                  </s>
+                </span>
+                <span class="visually-hidden visually-hidden--inline">Sale price</span>
+                <span class="price-item price-item--sale price-item--last">
+                  $2.95
+                </span>
+              </div>
             </div>
           </body>
         </html>
@@ -213,5 +223,34 @@ public class PriceExtractorTest {
 
     // assert
     assertThat(price).isEqualTo(2.95);
+  }
+
+  @Test
+  void nzMuscleExtractorShouldHandleMultipleVariantPrices() {
+    // arrange
+    var html =
+        """
+        <html>
+          <body>
+            <div class="price price--show-badge">
+              <div class="price__sale">
+                <span class="price-item price-item--sale price-item--last">$92.50</span>
+              </div>
+            </div>
+            <div class="variant-template">
+              <span class="price-item price-item--sale">$94.00</span>
+              <span class="price-item price-item--sale">$99.00</span>
+            </div>
+          </body>
+        </html>
+        """;
+    var document = Jsoup.parse(html);
+    var extractor = new NzMusclePriceExtractor();
+
+    // act
+    var price = extractor.extractPrice(document);
+
+    // assert
+    assertThat(price).isEqualTo(92.50);
   }
 }
