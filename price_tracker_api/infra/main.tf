@@ -190,7 +190,7 @@ resource "aws_lambda_function" "lambda" {
 resource "aws_cloudwatch_event_rule" "update_prices" {
   name                = "${local.application_id}_update_prices"
   description         = "Triggers the UpdatePricesHandler Lambda function"
-  schedule_expression = "rate(15 minutes)"
+  schedule_expression = "rate(1 hour)"
 }
 
 resource "aws_cloudwatch_event_target" "trigger" {
