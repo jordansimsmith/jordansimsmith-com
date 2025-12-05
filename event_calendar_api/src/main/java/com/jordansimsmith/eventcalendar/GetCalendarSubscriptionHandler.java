@@ -75,13 +75,25 @@ public class GetCalendarSubscriptionHandler
               .toList());
     }
 
+    // query sports team events (currently only Leinster Rugby)
+    var sportsPk =
+        EventCalendarItem.formatSportsTeamEventPk(LeinsterRugbyClient.PUBLIC_FIXTURES_URL);
+    allItems.addAll(
+        eventCalendarTable
+            .query(QueryConditional.keyEqualTo(Key.builder().partitionValue(sportsPk).build()))
+            .items()
+            .stream()
+            .toList());
+
     // create ical events
     for (var item : allItems) {
       var vevent = new VEvent();
       vevent.setSummary(item.getTitle());
       vevent.setDateStart(Date.from(item.getTimestamp()));
       vevent.setDescription(item.getEventInfo());
-      vevent.setUrl(item.getEventUrl());
+      if (!Strings.isNullOrEmpty(item.getEventUrl())) {
+        vevent.setUrl(item.getEventUrl());
+      }
       if (!Strings.isNullOrEmpty(item.getLocation())) {
         vevent.setLocation(item.getLocation());
       }

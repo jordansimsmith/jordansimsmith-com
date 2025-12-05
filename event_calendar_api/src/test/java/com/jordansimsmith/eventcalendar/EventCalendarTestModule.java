@@ -52,4 +52,16 @@ public class EventCalendarTestModule {
   public MeetupsFactory meetupsFactory(FakeMeetupsFactory fakeMeetupsFactory) {
     return fakeMeetupsFactory;
   }
+
+  @Provides
+  @Singleton
+  public FakeLeinsterRugbyClient fakeLeinsterRugbyClient() {
+    return new FakeLeinsterRugbyClient();
+  }
+
+  @Provides
+  @Singleton
+  public LeinsterRugbyClient leinsterRugbyClient(FakeLeinsterRugbyClient fakeLeinsterRugbyClient) {
+    return fakeLeinsterRugbyClient;
+  }
 }

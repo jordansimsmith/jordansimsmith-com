@@ -30,6 +30,7 @@ java_library(
         "//lib/dynamodb:lib",
         "//lib/time:lib",
         "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_core",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_guava_guava",
         "@maven//:org_jsoup_jsoup",

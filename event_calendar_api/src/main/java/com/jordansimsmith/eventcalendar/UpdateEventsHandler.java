@@ -20,6 +20,7 @@ public class UpdateEventsHandler implements RequestHandler<ScheduledEvent, Void>
   private final GoMediaEventClient goMediaEventClient;
   private final MeetupClient meetupClient;
   private final MeetupsFactory meetupsFactory;
+  private final LeinsterRugbyClient leinsterRugbyClient;
 
   public UpdateEventsHandler() {
     this(EventCalendarFactory.create());
@@ -31,6 +32,7 @@ public class UpdateEventsHandler implements RequestHandler<ScheduledEvent, Void>
     this.goMediaEventClient = factory.goMediaEventClient();
     this.meetupClient = factory.meetupClient();
     this.meetupsFactory = factory.meetupsFactory();
+    this.leinsterRugbyClient = factory.leinsterRugbyClient();
   }
 
   @Override
@@ -48,6 +50,7 @@ public class UpdateEventsHandler implements RequestHandler<ScheduledEvent, Void>
     var allEvents = new ArrayList<EventCalendarItem>();
     allEvents.addAll(findGoMediaEvents());
     allEvents.addAll(findMeetupEvents());
+    allEvents.addAll(findLeinsterFixtures());
     var eventsByPk = allEvents.stream().collect(Collectors.groupingBy(EventCalendarItem::getPk));
 
     // process each PK separately
@@ -63,13 +66,13 @@ public class UpdateEventsHandler implements RequestHandler<ScheduledEvent, Void>
               .stream()
               .toList();
 
-      // create a set of event URLs from the API response to use for comparison
-      var currentEventUrls =
-          events.stream().map(EventCalendarItem::getEventUrl).collect(Collectors.toSet());
+      // create a set of event sort keys from the API response to use for comparison
+      var currentEventSortKeys =
+          events.stream().map(EventCalendarItem::getSk).collect(Collectors.toSet());
 
       // delete events that no longer exist in the API response
       for (var existingEvent : existingEvents) {
-        if (!currentEventUrls.contains(existingEvent.getEventUrl())) {
+        if (!currentEventSortKeys.contains(existingEvent.getSk())) {
           eventCalendarTable.deleteItem(existingEvent);
         }
       }
@@ -118,5 +121,19 @@ public class UpdateEventsHandler implements RequestHandler<ScheduledEvent, Void>
     }
 
     return allEvents;
+  }
+
+  private List<EventCalendarItem> findLeinsterFixtures() {
+    return leinsterRugbyClient.findFixtures().stream()
+        .map(
+            fixture ->
+                EventCalendarItem.createSportsTeamEvent(
+                    LeinsterRugbyClient.PUBLIC_FIXTURES_URL,
+                    fixture.fixtureId(),
+                    fixture.title(),
+                    fixture.startTime(),
+                    fixture.competition(),
+                    fixture.location()))
+        .toList();
   }
 }

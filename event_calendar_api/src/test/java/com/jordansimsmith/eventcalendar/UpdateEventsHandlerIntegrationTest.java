@@ -28,6 +28,7 @@ public class UpdateEventsHandlerIntegrationTest {
   private FakeGoMediaEventClient fakeGoMediaEventClient;
   private FakeMeetupClient fakeMeetupClient;
   private FakeMeetupsFactory fakeMeetupsFactory;
+  private FakeLeinsterRugbyClient fakeLeinsterRugbyClient;
   private DynamoDbTable<EventCalendarItem> eventCalendarTable;
 
   private UpdateEventsHandler updateEventsHandler;
@@ -49,9 +50,14 @@ public class UpdateEventsHandlerIntegrationTest {
     fakeGoMediaEventClient = factory.fakeGoMediaEventClient();
     fakeMeetupClient = factory.fakeMeetupClient();
     fakeMeetupsFactory = factory.fakeMeetupsFactory();
+    fakeLeinsterRugbyClient = factory.fakeLeinsterRugbyClient();
     eventCalendarTable = factory.eventCalendarTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
+    fakeGoMediaEventClient.reset();
+    fakeMeetupClient.reset();
+    fakeMeetupsFactory.reset();
+    fakeLeinsterRugbyClient.reset();
 
     updateEventsHandler = new UpdateEventsHandler(factory);
   }
@@ -248,5 +254,42 @@ public class UpdateEventsHandlerIntegrationTest {
     assertThat(meetupEvents.get(0).getEventUrl())
         .isEqualTo("https://www.meetup.com/test-group/events/123");
     assertThat(meetupEvents.get(0).getTimestamp()).isEqualTo(Instant.parse("2025-11-22T02:00:00Z"));
+  }
+
+  @Test
+  void handleRequestShouldProcessLeinsterFixtures() {
+    // arrange
+    var testTime = Instant.parse("2024-03-20T10:00:00Z");
+    fakeClock.setTime(testTime);
+    var event = new ScheduledEvent();
+
+    fakeLeinsterRugbyClient.addFixture(
+        new LeinsterRugbyClient.LeinsterFixture(
+            "fixture-123",
+            "Leinster Rugby v Harlequins",
+            Instant.parse("2024-04-20T16:30:00Z"),
+            "Investec Champions Cup",
+            "Aviva Stadium, Dublin"));
+
+    // act
+    updateEventsHandler.handleRequest(event, null);
+
+    // assert
+    var pk = EventCalendarItem.formatSportsTeamEventPk(LeinsterRugbyClient.PUBLIC_FIXTURES_URL);
+    var items =
+        eventCalendarTable
+            .query(QueryConditional.keyEqualTo(b -> b.partitionValue(pk)))
+            .items()
+            .stream()
+            .toList();
+
+    assertThat(items).hasSize(1);
+    var item = items.get(0);
+    assertThat(item.getTitle()).isEqualTo("Leinster Rugby v Harlequins");
+    assertThat(item.getEventInfo()).isEqualTo("Investec Champions Cup");
+    assertThat(item.getLocation()).isEqualTo("Aviva Stadium, Dublin");
+    assertThat(item.getEventId()).isEqualTo("fixture-123");
+    assertThat(item.getEventUrl()).isNull();
+    assertThat(item.getTimestamp()).isEqualTo(Instant.parse("2024-04-20T16:30:00Z"));
   }
 }

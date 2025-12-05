@@ -28,9 +28,14 @@ public class EventCalendarModule {
 
   @Provides
   @Singleton
-  public MeetupClient meetupClient(Clock clock) {
+  public ObjectMapper objectMapper() {
+    return new ObjectMapper();
+  }
+
+  @Provides
+  @Singleton
+  public MeetupClient meetupClient(Clock clock, ObjectMapper objectMapper) {
     var httpClient = HttpClient.newBuilder().build();
-    var objectMapper = new ObjectMapper();
     return new HttpMeetupClient(httpClient, clock, objectMapper);
   }
 
@@ -38,5 +43,12 @@ public class EventCalendarModule {
   @Singleton
   public MeetupsFactory meetupsFactory() {
     return new MeetupsFactoryImpl();
+  }
+
+  @Provides
+  @Singleton
+  public LeinsterRugbyClient leinsterRugbyClient(ObjectMapper objectMapper) {
+    var httpClient = HttpClient.newBuilder().build();
+    return new HttpLeinsterRugbyClient(httpClient, objectMapper);
   }
 }
