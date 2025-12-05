@@ -1,0 +1,9 @@
+py_binary(
+    name = "apply",
+    srcs = ["apply.py"],
+    args = ["$(rootpath //:MODULE.bazel)"],
+    data = ["//:MODULE.bazel"],
+    visibility = [
+        "//:__pkg__",
+    ],
+)

@@ -1,6 +1,8 @@
 load("@npm//:defs.bzl", "npm_link_all_packages")
 load("@aspect_rules_js//js:defs.bzl", "js_library")
 
+exports_files(["MODULE.bazel"])
+
 npm_link_all_packages(
     name = "node_modules",
 )
@@ -14,4 +16,9 @@ js_library(
 alias(
     name = "format",
     actual = "//tools/format:format",
+)
+
+alias(
+    name = "apply",
+    actual = "//tools/terraform:apply",
 )

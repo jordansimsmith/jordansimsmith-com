@@ -64,6 +64,7 @@ When performing the code review step, check for:
 - Exception handling: Public methods should call private implementation methods that can throw
 - Public methods should catch and wrap exceptions into runtime exceptions
 - If a dependency doesn't need to be shared between providers, inline its creation in the provider method
+- Prefer inline method content rather than many small helper private methods - keeps code readable and avoids unnecessary indirection
 - Don't add private methods when the logic is simple and used only once - inline it
 - Let exceptions bubble up naturally when appropriate instead of unnecessarily catching them
 - Always use imports instead of fully qualified names (e.g., `import java.util.ArrayList;` instead of `java.util.ArrayList`)
