@@ -416,7 +416,8 @@ def display_all_time_progress(all_time_progress):
         bar = "█" * bar_length
         bar_padded = bar.ljust(bar_width)
 
-        print(f"{label:<11}│{bar_padded}  {hours:>7}h")
+        hours_str = f"{hours}h"
+        print(f"{label:<11}│{bar_padded}  {hours_str:>7}")
 
 
 def send_request(method, path, body=None):

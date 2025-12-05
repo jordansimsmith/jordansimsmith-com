@@ -9,6 +9,10 @@ import java.io.FileWriter;
 import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.nio.file.Path;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
+import java.util.Locale;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,6 +27,8 @@ public class ImmersionTrackerE2ETest {
   private static final ImmersionTrackerContainer immersionTrackerContainer =
       new ImmersionTrackerContainer();
 
+  private String formattedAllTimeProgressLabel;
+
   @BeforeEach
   void setup() {
     var dynamoDbClient =
@@ -31,6 +37,14 @@ public class ImmersionTrackerE2ETest {
             .build();
 
     DynamoDbUtils.reset(dynamoDbClient);
+
+    var today = LocalDate.now(ZoneId.of("Pacific/Auckland"));
+    var zeroBasedMonth = today.getMonthValue() - 1;
+    var quarterStartMonth = zeroBasedMonth - zeroBasedMonth % 3 + 1;
+    var quarterStart = LocalDate.of(today.getYear(), quarterStartMonth, 1);
+    formattedAllTimeProgressLabel =
+        String.format(
+            "%-11s", quarterStart.format(DateTimeFormatter.ofPattern("MMM uuuu", Locale.ENGLISH)));
   }
 
   @Test
@@ -159,7 +173,7 @@ public class ImmersionTrackerE2ETest {
         Today      │██████████████████████████████   1h 38m
 
         All time progress:
-        Oct 2025   │██████████████████████████████        1h
+        %s│██████████████████████████████       1h
         1 total hour watched.
         0 years and 0 months since immersion started.
 
@@ -168,7 +182,8 @@ public class ImmersionTrackerE2ETest {
         Deleted completed show: 1 [123] Free!
         Deleted completed show: 2 (123) Haikyuu Part 1
 
-        Press ENTER to close...""";
+        Press ENTER to close..."""
+            .formatted(formattedAllTimeProgressLabel);
     assertThat(output).isEqualTo(expectedOutput);
     assertThat(show1Episode1).doesNotExist();
     assertThat(show1Episode2).doesNotExist();
@@ -264,14 +279,15 @@ public class ImmersionTrackerE2ETest {
         Today      │██████████████████████████████   3h 52m
 
         All time progress:
-        Oct 2025   │██████████████████████████████        3h
+        %s│██████████████████████████████       3h
         3 total hours watched.
         0 years and 0 months since immersion started.
 
         Deleting 2 local movies watched...
         Deleted 3.00 GB of watched movies.
 
-        Press ENTER to close...""";
+        Press ENTER to close..."""
+            .formatted(formattedAllTimeProgressLabel);
     assertThat(output).isEqualTo(expectedOutput);
     assertThat(suzume).doesNotExist();
     assertThat(yourName).doesNotExist();
@@ -349,13 +365,14 @@ public class ImmersionTrackerE2ETest {
         Today      │██████████████████████████████       8m
 
         All time progress:
-        Oct 2025   │                                      0h
+        %s│                                     0h
         0 total hours watched.
         0 years and 0 months since immersion started.
 
         Clearing watched URLs...
 
-        Press ENTER to close...""";
+        Press ENTER to close..."""
+            .formatted(formattedAllTimeProgressLabel);
     assertThat(output).isEqualTo(expectedOutput);
 
     assertThat(youtubeWatchedFile).exists();
@@ -431,13 +448,14 @@ public class ImmersionTrackerE2ETest {
         Today      │██████████████████████████████      50m
 
         All time progress:
-        Oct 2025   │                                      0h
+        %s│                                     0h
         0 total hours watched.
         0 years and 0 months since immersion started.
 
         Clearing watched URLs...
 
-        Press ENTER to close...""";
+        Press ENTER to close..."""
+            .formatted(formattedAllTimeProgressLabel);
     assertThat(output).isEqualTo(expectedOutput);
 
     assertThat(spotifyWatchedFile).exists();
