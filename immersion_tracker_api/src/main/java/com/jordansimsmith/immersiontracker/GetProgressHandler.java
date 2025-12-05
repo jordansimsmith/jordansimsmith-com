@@ -233,17 +233,24 @@ public class GetProgressHandler
       List<ImmersionTrackerItem> youtubeVideos,
       List<ImmersionTrackerItem> spotifyEpisodes,
       List<ImmersionTrackerItem> movies) {
-    var episodeMinutes =
+    var episodeDuration =
         episodes.stream()
-            .mapToLong(e -> getEpisodeDuration(e, showsByFolderName).toMinutes())
-            .sum();
-    var youtubeTotalMinutes =
-        youtubeVideos.stream().mapToLong(v -> v.getYoutubeVideoDuration().toMinutes()).sum();
-    var spotifyTotalMinutes =
-        spotifyEpisodes.stream().mapToLong(e -> e.getSpotifyEpisodeDuration().toMinutes()).sum();
-    var movieTotalMinutes = movies.stream().mapToLong(m -> m.getMovieDuration().toMinutes()).sum();
+            .map(e -> getEpisodeDuration(e, showsByFolderName))
+            .reduce(Duration.ZERO, Duration::plus);
+    var youtubeDuration =
+        youtubeVideos.stream()
+            .map(ImmersionTrackerItem::getYoutubeVideoDuration)
+            .reduce(Duration.ZERO, Duration::plus);
+    var spotifyDuration =
+        spotifyEpisodes.stream()
+            .map(ImmersionTrackerItem::getSpotifyEpisodeDuration)
+            .reduce(Duration.ZERO, Duration::plus);
+    var movieDuration =
+        movies.stream()
+            .map(ImmersionTrackerItem::getMovieDuration)
+            .reduce(Duration.ZERO, Duration::plus);
     return (int)
-        ((episodeMinutes + youtubeTotalMinutes + spotifyTotalMinutes + movieTotalMinutes) / 60);
+        episodeDuration.plus(youtubeDuration).plus(spotifyDuration).plus(movieDuration).toHours();
   }
 
   private int episodesWatchedToday(List<ImmersionTrackerItem> episodes, Instant today) {
@@ -306,42 +313,57 @@ public class GetProgressHandler
       return null;
     }
     var sevenDaysAgo = now.minus(7, ChronoUnit.DAYS);
-    var episodesWatchedLastWeek =
+
+    var lastWeekEpisodeDuration =
         episodes.stream()
             .filter(e -> e.getTimestamp().isAfter(sevenDaysAgo))
-            .mapToLong(e -> getEpisodeDuration(e, showsByFolderName).toMinutes())
-            .sum();
-    var youtubeWatchedLastWeek =
+            .map(e -> getEpisodeDuration(e, showsByFolderName))
+            .reduce(Duration.ZERO, Duration::plus);
+    var lastWeekYoutubeDuration =
         youtubeVideos.stream()
             .filter(v -> v.getTimestamp().isAfter(sevenDaysAgo))
-            .mapToLong(v -> v.getYoutubeVideoDuration().toMinutes())
-            .sum();
-    var spotifyWatchedLastWeek =
+            .map(ImmersionTrackerItem::getYoutubeVideoDuration)
+            .reduce(Duration.ZERO, Duration::plus);
+    var lastWeekSpotifyDuration =
         spotifyEpisodes.stream()
             .filter(e -> e.getTimestamp().isAfter(sevenDaysAgo))
-            .mapToLong(e -> e.getSpotifyEpisodeDuration().toMinutes())
-            .sum();
-    var moviesWatchedLastWeek =
+            .map(ImmersionTrackerItem::getSpotifyEpisodeDuration)
+            .reduce(Duration.ZERO, Duration::plus);
+    var lastWeekMovieDuration =
         movies.stream()
             .filter(m -> m.getTimestamp().isAfter(sevenDaysAgo))
-            .mapToLong(m -> m.getMovieDuration().toMinutes())
-            .sum();
-    var totalMinutesWatchedLastWeek =
-        episodesWatchedLastWeek
-            + youtubeWatchedLastWeek
-            + spotifyWatchedLastWeek
-            + moviesWatchedLastWeek;
-    var youtubeTotalMinutes =
-        youtubeVideos.stream().mapToLong(v -> v.getYoutubeVideoDuration().toMinutes()).sum();
-    var spotifyTotalMinutes =
-        spotifyEpisodes.stream().mapToLong(e -> e.getSpotifyEpisodeDuration().toMinutes()).sum();
-    var movieTotalMinutes = movies.stream().mapToLong(m -> m.getMovieDuration().toMinutes()).sum();
-    var episodeTotalMinutes =
+            .map(ImmersionTrackerItem::getMovieDuration)
+            .reduce(Duration.ZERO, Duration::plus);
+    var lastWeekDuration =
+        lastWeekEpisodeDuration
+            .plus(lastWeekYoutubeDuration)
+            .plus(lastWeekSpotifyDuration)
+            .plus(lastWeekMovieDuration);
+
+    var totalEpisodeDuration =
         episodes.stream()
-            .mapToLong(e -> getEpisodeDuration(e, showsByFolderName).toMinutes())
-            .sum();
-    var totalMinutesWatched =
-        episodeTotalMinutes + youtubeTotalMinutes + spotifyTotalMinutes + movieTotalMinutes;
+            .map(e -> getEpisodeDuration(e, showsByFolderName))
+            .reduce(Duration.ZERO, Duration::plus);
+    var totalYoutubeDuration =
+        youtubeVideos.stream()
+            .map(ImmersionTrackerItem::getYoutubeVideoDuration)
+            .reduce(Duration.ZERO, Duration::plus);
+    var totalSpotifyDuration =
+        spotifyEpisodes.stream()
+            .map(ImmersionTrackerItem::getSpotifyEpisodeDuration)
+            .reduce(Duration.ZERO, Duration::plus);
+    var totalMovieDuration =
+        movies.stream()
+            .map(ImmersionTrackerItem::getMovieDuration)
+            .reduce(Duration.ZERO, Duration::plus);
+    var totalDuration =
+        totalEpisodeDuration
+            .plus(totalYoutubeDuration)
+            .plus(totalSpotifyDuration)
+            .plus(totalMovieDuration);
+
+    var totalMinutesWatchedLastWeek = lastWeekDuration.toMinutes();
+    var totalMinutesWatched = totalDuration.toMinutes();
     var averageMinutesPerWeek = (double) totalMinutesWatched / daysSinceFirstEpisode * 7;
     return ((totalMinutesWatchedLastWeek - averageMinutesPerWeek) / averageMinutesPerWeek) * 100;
   }
@@ -429,36 +451,34 @@ public class GetProgressHandler
           now.atZone(ZONE_ID).truncatedTo(ChronoUnit.DAYS).minusDays(daysAgo).toInstant();
       var dayEnd = dayStart.plus(1, ChronoUnit.DAYS);
 
-      var episodeMinutes =
+      var episodeDuration =
           episodes.stream()
               .filter(
                   e -> !e.getTimestamp().isBefore(dayStart) && e.getTimestamp().isBefore(dayEnd))
-              .mapToLong(e -> getEpisodeDuration(e, showsByFolderName).toMinutes())
-              .sum();
-
-      var youtubeMinutes =
+              .map(e -> getEpisodeDuration(e, showsByFolderName))
+              .reduce(Duration.ZERO, Duration::plus);
+      var youtubeDuration =
           youtubeVideos.stream()
               .filter(
                   v -> !v.getTimestamp().isBefore(dayStart) && v.getTimestamp().isBefore(dayEnd))
-              .mapToLong(v -> v.getYoutubeVideoDuration().toMinutes())
-              .sum();
-
-      var spotifyMinutes =
+              .map(ImmersionTrackerItem::getYoutubeVideoDuration)
+              .reduce(Duration.ZERO, Duration::plus);
+      var spotifyDuration =
           spotifyEpisodes.stream()
               .filter(
                   e -> !e.getTimestamp().isBefore(dayStart) && e.getTimestamp().isBefore(dayEnd))
-              .mapToLong(e -> e.getSpotifyEpisodeDuration().toMinutes())
-              .sum();
-
-      var movieMinutes =
+              .map(ImmersionTrackerItem::getSpotifyEpisodeDuration)
+              .reduce(Duration.ZERO, Duration::plus);
+      var movieDuration =
           movies.stream()
               .filter(
                   m -> !m.getTimestamp().isBefore(dayStart) && m.getTimestamp().isBefore(dayEnd))
-              .mapToLong(m -> m.getMovieDuration().toMinutes())
-              .sum();
+              .map(ImmersionTrackerItem::getMovieDuration)
+              .reduce(Duration.ZERO, Duration::plus);
 
-      var totalMinutes = (int) (episodeMinutes + youtubeMinutes + spotifyMinutes + movieMinutes);
-      result.add(new DailyActivity(daysAgo, totalMinutes));
+      var dayDuration =
+          episodeDuration.plus(youtubeDuration).plus(spotifyDuration).plus(movieDuration);
+      result.add(new DailyActivity(daysAgo, (int) dayDuration.toMinutes()));
     }
     return result;
   }
