@@ -158,6 +158,8 @@ public class ImmersionTrackerE2ETest {
         Yesterday  │                                     0m
         Today      │██████████████████████████████   1h 38m
 
+        All time progress:
+        Oct 2025   │██████████████████████████████        1h
         1 total hour watched.
         0 years and 0 months since immersion started.
 
@@ -261,6 +263,8 @@ public class ImmersionTrackerE2ETest {
         Yesterday  │                                     0m
         Today      │██████████████████████████████   3h 52m
 
+        All time progress:
+        Oct 2025   │██████████████████████████████        3h
         3 total hours watched.
         0 years and 0 months since immersion started.
 
@@ -344,6 +348,8 @@ public class ImmersionTrackerE2ETest {
         Yesterday  │                                     0m
         Today      │██████████████████████████████       8m
 
+        All time progress:
+        Oct 2025   │                                      0h
         0 total hours watched.
         0 years and 0 months since immersion started.
 
@@ -424,6 +430,8 @@ public class ImmersionTrackerE2ETest {
         Yesterday  │                                     0m
         Today      │██████████████████████████████      50m
 
+        All time progress:
+        Oct 2025   │                                      0h
         0 total hours watched.
         0 years and 0 months since immersion started.
 

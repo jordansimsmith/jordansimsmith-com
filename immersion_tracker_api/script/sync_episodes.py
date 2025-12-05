@@ -197,6 +197,7 @@ def get_remote_show_progress():
     youtube_videos_watched_today = res["youtube_videos_watched_today"]
     spotify_episodes_watched_today = res["spotify_episodes_watched_today"]
     total_hours_watched = res["total_hours_watched"]
+    all_time_progress = res["all_time_progress"]
 
     average_days_per_month = 365 / 12
     years_since_first_episode = int(res["days_since_first_episode"] / 365)
@@ -219,6 +220,7 @@ def get_remote_show_progress():
         )
 
     print()
+    display_all_time_progress(all_time_progress)
     print(
         f"{total_hours_watched} total hour{'' if total_hours_watched == 1 else 's'} watched."
     )
@@ -395,6 +397,26 @@ def display_weekly_activity(daily_activity):
 
         # print line
         print(f"{label:<11}│{bar_padded}  {time_str:>7}")
+
+
+def display_all_time_progress(all_time_progress):
+    print("All time progress:")
+
+    max_hours = max(point["cumulative_hours"] for point in all_time_progress)
+    if max_hours == 0:
+        max_hours = 1
+
+    bar_width = 30
+
+    for point in all_time_progress:
+        label = point["label"]
+        hours = point["cumulative_hours"]
+
+        bar_length = int((hours / max_hours) * bar_width)
+        bar = "█" * bar_length
+        bar_padded = bar.ljust(bar_width)
+
+        print(f"{label:<11}│{bar_padded}  {hours:>7}h")
 
 
 def send_request(method, path, body=None):

@@ -11,14 +11,18 @@ import com.google.common.base.Preconditions;
 import com.jordansimsmith.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.annotation.Nullable;
@@ -52,6 +56,7 @@ public class GetProgressHandler
       @JsonProperty("days_since_first_episode") long daysSinceFirstEpisode,
       @Nullable @JsonProperty("weekly_trend_percentage") Double weeklyTrendPercentage,
       @JsonProperty("daily_activity") List<DailyActivity> dailyActivity,
+      @JsonProperty("all_time_progress") List<CumulativeProgress> allTimeProgress,
       @JsonProperty("shows") List<Show> shows,
       @JsonProperty("youtube_channels") List<YoutubeChannel> youtubeChannels,
       @JsonProperty("spotify_shows") List<SpotifyShow> spotifyShows,
@@ -78,6 +83,10 @@ public class GetProgressHandler
   @VisibleForTesting
   record DailyActivity(
       @JsonProperty("days_ago") int daysAgo, @JsonProperty("minutes_watched") int minutesWatched) {}
+
+  @VisibleForTesting
+  record CumulativeProgress(
+      @JsonProperty("label") String label, @JsonProperty("cumulative_hours") int cumulativeHours) {}
 
   private record EpisodeShow(ImmersionTrackerItem episode, @Nullable ImmersionTrackerItem show) {}
 
@@ -176,6 +185,8 @@ public class GetProgressHandler
             daysSinceFirstEpisode);
     var activity =
         dailyActivity(episodes, showsByFolderName, youtubeVideos, spotifyEpisodes, movies, now);
+    var allTimeProgress =
+        allTimeProgress(episodes, showsByFolderName, youtubeVideos, spotifyEpisodes, movies);
     var progresses = shows(episodes, shows);
     var channelProgresses = youtubeChannels(youtubeVideos, youtubeChannels);
     var spotifyShowProgresses = spotifyShows(spotifyEpisodes, spotifyShows);
@@ -195,6 +206,7 @@ public class GetProgressHandler
             daysSinceFirstEpisode,
             weeklyTrendPercentage,
             activity,
+            allTimeProgress,
             progresses,
             channelProgresses,
             spotifyShowProgresses,
@@ -449,6 +461,63 @@ public class GetProgressHandler
       result.add(new DailyActivity(daysAgo, totalMinutes));
     }
     return result;
+  }
+
+  @VisibleForTesting
+  List<CumulativeProgress> allTimeProgress(
+      List<ImmersionTrackerItem> episodes,
+      Map<String, ImmersionTrackerItem> showsByFolderName,
+      List<ImmersionTrackerItem> youtubeVideos,
+      List<ImmersionTrackerItem> spotifyEpisodes,
+      List<ImmersionTrackerItem> movies) {
+    var durationsByQuarter = new TreeMap<LocalDate, Duration>();
+
+    for (var episode : episodes) {
+      addProgress(
+          durationsByQuarter,
+          episode.getTimestamp(),
+          getEpisodeDuration(episode, showsByFolderName));
+    }
+
+    for (var video : youtubeVideos) {
+      addProgress(durationsByQuarter, video.getTimestamp(), video.getYoutubeVideoDuration());
+    }
+
+    for (var episode : spotifyEpisodes) {
+      addProgress(durationsByQuarter, episode.getTimestamp(), episode.getSpotifyEpisodeDuration());
+    }
+
+    for (var movie : movies) {
+      addProgress(durationsByQuarter, movie.getTimestamp(), movie.getMovieDuration());
+    }
+
+    if (durationsByQuarter.isEmpty()) {
+      return List.of();
+    }
+
+    var labelFormatter = DateTimeFormatter.ofPattern("MMM uuuu", Locale.ENGLISH);
+    var result = new ArrayList<CumulativeProgress>();
+    var cumulativeDuration = Duration.ZERO;
+    var cursor = durationsByQuarter.firstKey();
+    var lastQuarter = durationsByQuarter.lastKey();
+    while (!cursor.isAfter(lastQuarter)) {
+      var duration = durationsByQuarter.getOrDefault(cursor, Duration.ZERO);
+      cumulativeDuration = cumulativeDuration.plus(duration);
+      var cumulativeHours = (int) cumulativeDuration.toHours();
+      var label = cursor.format(labelFormatter);
+      result.add(new CumulativeProgress(label, cumulativeHours));
+      cursor = cursor.plusMonths(3);
+    }
+    return result;
+  }
+
+  private static void addProgress(
+      Map<LocalDate, Duration> durationsByQuarter, Instant timestamp, Duration duration) {
+    var zoned = timestamp.atZone(ZONE_ID);
+    var zeroBasedMonth = zoned.getMonthValue() - 1;
+    var quarterMonth = zeroBasedMonth - zeroBasedMonth % 3 + 1;
+    var quarterStart = LocalDate.of(zoned.getYear(), quarterMonth, 1);
+    durationsByQuarter.merge(quarterStart, duration, Duration::plus);
   }
 
   private List<Movie> movies(List<ImmersionTrackerItem> movies) {
