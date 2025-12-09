@@ -157,7 +157,31 @@ public class ProductsFactoryImpl implements ProductsFactory {
           new Product(
               URI.create(
                   "https://nzmuscle.co.nz/products/shotgun-whey-protein?variant=51471561261237"),
-              "Shotgun Whey Protein Banana 2kg"));
+              "Shotgun Whey Protein Banana 2kg"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/musashi-high-protein-bars?variant=51471487467701"),
+              "Musashi High Protein Bar Cookies N Cream"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/musashi-high-protein-bars?variant=51471487631541"),
+              "Musashi High Protein Bar Peanut Butter"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/musashi-high-protein-bars?variant=51471487664309"),
+              "Musashi High Protein Bar White Choc Caramel"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/musashi-high-protein-bars?variant=51471487500469"),
+              "Musashi High Protein Bar Milk Chocolate Brownie"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/musashi-high-protein-bars?variant=51471487533237"),
+              "Musashi High Protein Bar Dark Choc Salted Caramel"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/musashi-high-protein-bars?variant=51471487729845"),
+              "Musashi High Protein Bar White Choc Lemon Cheesecake"));
 
   @Override
   public List<Product> findProducts() {
