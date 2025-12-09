@@ -181,7 +181,39 @@ public class ProductsFactoryImpl implements ProductsFactory {
           new Product(
               URI.create(
                   "https://nzmuscle.co.nz/products/musashi-high-protein-bars?variant=51471487729845"),
-              "Musashi High Protein Bar White Choc Lemon Cheesecake"));
+              "Musashi High Protein Bar White Choc Lemon Cheesecake"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/quest-nutrition-protein-bars?variant=51471548514485"),
+              "Quest Nutrition Protein Bar Choc Peanut Butter"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/quest-nutrition-protein-bars?variant=51471548383413"),
+              "Quest Nutrition Protein Bar Caramel Choc Chunk"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/quest-nutrition-protein-bars?variant=51471548481717"),
+              "Quest Nutrition Protein Bar Cookies & Cream"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/quest-nutrition-protein-bars?variant=51471548416181"),
+              "Quest Nutrition Protein Bar Choc Chip Cookie Dough"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/quest-nutrition-protein-bars?variant=51471548580021"),
+              "Quest Nutrition Protein Bar White Chocolate Raspberry"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/quest-nutrition-protein-bars?variant=51471548448949"),
+              "Quest Nutrition Protein Bar Chocolate Brownie"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/quest-nutrition-protein-bars?variant=51471548547253"),
+              "Quest Nutrition Protein Bar Smores"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/quest-nutrition-protein-bars?variant=51471548350645"),
+              "Quest Nutrition Protein Bar Birthday Cake"));
 
   @Override
   public List<Product> findProducts() {
