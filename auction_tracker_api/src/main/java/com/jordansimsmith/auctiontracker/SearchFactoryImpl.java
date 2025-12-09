@@ -39,7 +39,13 @@ public class SearchFactoryImpl implements SearchFactory {
               URI.create("https://www.trademe.co.nz/a/marketplace/sports/golf/putters/search"),
               "odyssey mallet putter",
               null,
-              75.0));
+              75.0),
+          new Search(
+              URI.create(
+                  "https://www.trademe.co.nz/a/marketplace/computers/components/memory-ram/16gb-or-more/search"),
+              "g.skill trident z 32gb ddr4",
+              null,
+              200.0));
 
   @Override
   public List<Search> findSearches() {
