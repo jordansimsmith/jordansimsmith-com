@@ -43,6 +43,24 @@ public class SearchFactoryImpl implements SearchFactory {
           new Search(
               URI.create(
                   "https://www.trademe.co.nz/a/marketplace/computers/components/cpus/amd/search"),
+              "ryzen 7 5700X",
+              null,
+              200.0),
+          new Search(
+              URI.create(
+                  "https://www.trademe.co.nz/a/marketplace/computers/components/cpus/amd/search"),
+              "ryzen 7 5800x",
+              null,
+              300.0),
+          new Search(
+              URI.create(
+                  "https://www.trademe.co.nz/a/marketplace/computers/components/cpus/amd/search"),
+              "ryzen 7 5800xt",
+              null,
+              300.0),
+          new Search(
+              URI.create(
+                  "https://www.trademe.co.nz/a/marketplace/computers/components/cpus/amd/search"),
               "ryzen 7 5700x3d",
               null,
               500.0),
