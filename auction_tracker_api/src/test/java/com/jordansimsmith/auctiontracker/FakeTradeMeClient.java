@@ -14,15 +14,24 @@ public class FakeTradeMeClient implements TradeMeClient {
 
   @Override
   public List<TradeMeItem> searchItems(
-      URI baseUrl, String searchTerm, @Nullable Double minPrice, @Nullable Double maxPrice) {
-    var fullSearchUrl = buildSearchUrl(baseUrl, searchTerm, minPrice, maxPrice);
+      URI baseUrl,
+      String searchTerm,
+      @Nullable Double minPrice,
+      @Nullable Double maxPrice,
+      SearchFactory.Condition condition) {
+    var fullSearchUrl = buildSearchUrl(baseUrl, searchTerm, minPrice, maxPrice, condition);
     return searchResponses.getOrDefault(fullSearchUrl, List.of());
   }
 
   @Override
   public URI getSearchUrl(SearchFactory.Search search) {
     var urlString =
-        buildSearchUrl(search.baseUrl(), search.searchTerm(), search.minPrice(), search.maxPrice());
+        buildSearchUrl(
+            search.baseUrl(),
+            search.searchTerm(),
+            search.minPrice(),
+            search.maxPrice(),
+            search.condition());
     return URI.create(urlString);
   }
 
@@ -31,8 +40,9 @@ public class FakeTradeMeClient implements TradeMeClient {
       String searchTerm,
       @Nullable Double minPrice,
       @Nullable Double maxPrice,
+      SearchFactory.Condition condition,
       List<TradeMeItem> items) {
-    var key = buildSearchUrl(baseUrl, searchTerm, minPrice, maxPrice);
+    var key = buildSearchUrl(baseUrl, searchTerm, minPrice, maxPrice, condition);
     searchResponses.put(key, new ArrayList<>(items));
   }
 
@@ -41,7 +51,11 @@ public class FakeTradeMeClient implements TradeMeClient {
   }
 
   private String buildSearchUrl(
-      URI baseUrl, String searchTerm, @Nullable Double minPrice, @Nullable Double maxPrice) {
+      URI baseUrl,
+      String searchTerm,
+      @Nullable Double minPrice,
+      @Nullable Double maxPrice,
+      SearchFactory.Condition condition) {
     var url =
         baseUrl.toString()
             + "?search_string="
@@ -53,6 +67,12 @@ public class FakeTradeMeClient implements TradeMeClient {
 
     if (maxPrice != null) {
       url += "&price_max=" + maxPrice.intValue();
+    }
+
+    switch (condition) {
+      case NEW -> url += "&condition=new";
+      case USED -> url += "&condition=used";
+      case ALL -> {}
     }
 
     url += "&sort_order=expirydesc";

@@ -178,7 +178,8 @@ public class JsoupTradeMeClientTest {
     Double maxPrice = 70.0;
 
     // act
-    var items = client.searchItems(baseUrl, searchTerm, minPrice, maxPrice);
+    var items =
+        client.searchItems(baseUrl, searchTerm, minPrice, maxPrice, SearchFactory.Condition.ALL);
 
     // assert
     assertThat(items).hasSize(2);
@@ -208,7 +209,9 @@ public class JsoupTradeMeClientTest {
   @Test
   void getSearchUrlShouldReturnFullSearchUrl() {
     // arrange
-    var search = new SearchFactory.Search(URI.create(BASE_URL), "titleist wedge", null, 70.0);
+    var search =
+        new SearchFactory.Search(
+            URI.create(BASE_URL), "titleist wedge", null, 70.0, SearchFactory.Condition.ALL);
 
     // act
     var searchUrl = client.getSearchUrl(search);
@@ -221,7 +224,9 @@ public class JsoupTradeMeClientTest {
   @Test
   void getSearchUrlShouldIncludeMinAndMaxPrice() {
     // arrange
-    var search = new SearchFactory.Search(URI.create(BASE_URL), "callaway wedge", 50.0, 150.0);
+    var search =
+        new SearchFactory.Search(
+            URI.create(BASE_URL), "callaway wedge", 50.0, 150.0, SearchFactory.Condition.ALL);
 
     // act
     var searchUrl = client.getSearchUrl(search);
@@ -242,7 +247,8 @@ public class JsoupTradeMeClientTest {
     Double maxPrice = null;
 
     // act
-    var items = client.searchItems(baseUrl, searchTerm, minPrice, maxPrice);
+    var items =
+        client.searchItems(baseUrl, searchTerm, minPrice, maxPrice, SearchFactory.Condition.ALL);
 
     // assert
     assertThat(items).hasSize(2);
@@ -278,7 +284,8 @@ public class JsoupTradeMeClientTest {
     Double maxPrice = null;
 
     // act
-    var items = client.searchItems(baseUrl, searchTerm, minPrice, maxPrice);
+    var items =
+        client.searchItems(baseUrl, searchTerm, minPrice, maxPrice, SearchFactory.Condition.ALL);
 
     // assert
     assertThat(items).hasSize(1);

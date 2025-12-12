@@ -58,7 +58,11 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
   private void processSearch(SearchFactory.Search search) {
     var tradeMeItems =
         tradeMeClient.searchItems(
-            search.baseUrl(), search.searchTerm(), search.minPrice(), search.maxPrice());
+            search.baseUrl(),
+            search.searchTerm(),
+            search.minPrice(),
+            search.maxPrice(),
+            search.condition());
 
     var searchUrl = tradeMeClient.getSearchUrl(search).toString();
     var currentTime = clock.now();

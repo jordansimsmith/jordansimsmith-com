@@ -60,8 +60,10 @@ public class SendDigestHandlerIntegrationTest {
 
     var baseUrl = "https://www.trademe.co.nz/search";
     var expectedSearchUrl =
-        "https://www.trademe.co.nz/search?search_string=wedge&sort_order=expirydesc";
-    var search = new SearchFactory.Search(URI.create(baseUrl), "wedge", null, null);
+        "https://www.trademe.co.nz/search?search_string=wedge&condition=used&sort_order=expirydesc";
+    var search =
+        new SearchFactory.Search(
+            URI.create(baseUrl), "wedge", null, null, SearchFactory.Condition.USED);
     fakeSearchFactory.addSearches(List.of(search));
 
     // create items - some within 24h, some older
@@ -119,8 +121,10 @@ public class SendDigestHandlerIntegrationTest {
 
     var baseUrl = "https://www.trademe.co.nz/search";
     var expectedSearchUrl =
-        "https://www.trademe.co.nz/search?search_string=wedge&sort_order=expirydesc";
-    var search = new SearchFactory.Search(URI.create(baseUrl), "wedge", null, null);
+        "https://www.trademe.co.nz/search?search_string=wedge&condition=used&sort_order=expirydesc";
+    var search =
+        new SearchFactory.Search(
+            URI.create(baseUrl), "wedge", null, null, SearchFactory.Condition.USED);
     fakeSearchFactory.addSearches(List.of(search));
 
     // create only old items

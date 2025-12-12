@@ -22,18 +22,26 @@ public class JsoupTradeMeClient implements TradeMeClient {
 
   @Override
   public List<TradeMeItem> searchItems(
-      URI baseUrl, String searchTerm, @Nullable Double minPrice, @Nullable Double maxPrice) {
+      URI baseUrl,
+      String searchTerm,
+      @Nullable Double minPrice,
+      @Nullable Double maxPrice,
+      SearchFactory.Condition condition) {
     try {
-      return doSearchItems(baseUrl, searchTerm, minPrice, maxPrice);
+      return doSearchItems(baseUrl, searchTerm, minPrice, maxPrice, condition);
     } catch (Exception e) {
       throw new RuntimeException("Failed to search items", e);
     }
   }
 
   private List<TradeMeItem> doSearchItems(
-      URI baseUrl, String searchTerm, @Nullable Double minPrice, @Nullable Double maxPrice)
+      URI baseUrl,
+      String searchTerm,
+      @Nullable Double minPrice,
+      @Nullable Double maxPrice,
+      SearchFactory.Condition condition)
       throws Exception {
-    var searchUrl = buildSearchUrl(baseUrl, searchTerm, minPrice, maxPrice);
+    var searchUrl = buildSearchUrl(baseUrl, searchTerm, minPrice, maxPrice, condition);
     LOGGER.info("Searching {}", searchUrl);
 
     var searchPage = fetchDocument(searchUrl);
@@ -127,7 +135,11 @@ public class JsoupTradeMeClient implements TradeMeClient {
   }
 
   private String buildSearchUrl(
-      URI baseUrl, String searchTerm, @Nullable Double minPrice, @Nullable Double maxPrice) {
+      URI baseUrl,
+      String searchTerm,
+      @Nullable Double minPrice,
+      @Nullable Double maxPrice,
+      SearchFactory.Condition condition) {
     var url =
         baseUrl.toString()
             + "?search_string="
@@ -141,6 +153,12 @@ public class JsoupTradeMeClient implements TradeMeClient {
       url += "&price_max=" + maxPrice.intValue();
     }
 
+    switch (condition) {
+      case NEW -> url += "&condition=new";
+      case USED -> url += "&condition=used";
+      case ALL -> {}
+    }
+
     url += "&sort_order=expirydesc";
 
     return url;
@@ -149,7 +167,12 @@ public class JsoupTradeMeClient implements TradeMeClient {
   @Override
   public URI getSearchUrl(SearchFactory.Search search) {
     var urlString =
-        buildSearchUrl(search.baseUrl(), search.searchTerm(), search.minPrice(), search.maxPrice());
+        buildSearchUrl(
+            search.baseUrl(),
+            search.searchTerm(),
+            search.minPrice(),
+            search.maxPrice(),
+            search.condition());
     return URI.create(urlString);
   }
 

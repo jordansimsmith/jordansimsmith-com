@@ -8,7 +8,11 @@ public interface TradeMeClient {
   record TradeMeItem(String url, String title, String description) {}
 
   List<TradeMeItem> searchItems(
-      URI baseUrl, String searchTerm, @Nullable Double minPrice, @Nullable Double maxPrice);
+      URI baseUrl,
+      String searchTerm,
+      @Nullable Double minPrice,
+      @Nullable Double maxPrice,
+      SearchFactory.Condition condition);
 
   URI getSearchUrl(SearchFactory.Search search);
 }
