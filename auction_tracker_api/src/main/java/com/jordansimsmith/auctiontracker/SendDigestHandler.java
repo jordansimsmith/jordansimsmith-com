@@ -62,7 +62,11 @@ public class SendDigestHandler implements RequestHandler<ScheduledEvent, Void> {
                     findNewItemsForSearch(
                         tradeMeClient.getSearchUrl(search).toString(), yesterdayTime)
                         .stream())
-            .collect(Collectors.toList());
+            .collect(Collectors.groupingBy(AuctionTrackerItem::getUrl))
+            .values()
+            .stream()
+            .map(items -> items.get(0))
+            .toList();
 
     if (allNewItems.isEmpty()) {
       LOGGER.info("No new auction items found in the last 24 hours");

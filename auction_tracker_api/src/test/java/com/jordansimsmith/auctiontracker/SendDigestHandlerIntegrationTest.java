@@ -99,17 +99,81 @@ public class SendDigestHandlerIntegrationTest {
     var notification = notifications.get(0);
     assertThat(notification.subject()).isEqualTo("Auction Tracker Daily Digest - 2 new items");
     assertThat(notification.message())
-        .isEqualTo(
-            """
-        New auction items found in the last 24 hours:
+        .contains("New auction items found in the last 24 hours:")
+        .contains("Recent Wedge 1")
+        .contains("https://www.trademe.co.nz/listing/123")
+        .contains("Recent Wedge 2")
+        .contains("https://www.trademe.co.nz/listing/456");
+  }
 
-        Recent Wedge 1
-        https://www.trademe.co.nz/listing/123
+  @Test
+  void handleRequestShouldDeduplicateListingsAcrossMultipleSearches() {
+    // arrange
+    var currentTime = Instant.ofEpochSecond(2_000_000);
+    fakeClock.setTime(currentTime);
+    var yesterdayTime = currentTime.minus(1, ChronoUnit.DAYS);
 
-        Recent Wedge 2
-        https://www.trademe.co.nz/listing/456
+    var baseUrl1 = "https://www.trademe.co.nz/category1/search";
+    var baseUrl2 = "https://www.trademe.co.nz/category2/search";
+    var expectedSearchUrl1 =
+        "https://www.trademe.co.nz/category1/search?search_string=item&sort_order=expirydesc";
+    var expectedSearchUrl2 =
+        "https://www.trademe.co.nz/category2/search?search_string=item&sort_order=expirydesc";
 
-        """);
+    var search1 =
+        new SearchFactory.Search(
+            URI.create(baseUrl1), "item", null, null, SearchFactory.Condition.ALL);
+    var search2 =
+        new SearchFactory.Search(
+            URI.create(baseUrl2), "item", null, null, SearchFactory.Condition.ALL);
+    fakeSearchFactory.addSearches(List.of(search1, search2));
+
+    var duplicateListingUrl = "https://www.trademe.co.nz/listing/123";
+    var uniqueListingUrl = "https://www.trademe.co.nz/listing/456";
+
+    // same listing found in search 1
+    var itemFromSearch1 =
+        AuctionTrackerItem.create(
+            expectedSearchUrl1,
+            duplicateListingUrl,
+            "Duplicate Item",
+            yesterdayTime.plus(1, ChronoUnit.HOURS));
+
+    // same listing found in search 2
+    var itemFromSearch2 =
+        AuctionTrackerItem.create(
+            expectedSearchUrl2,
+            duplicateListingUrl,
+            "Duplicate Item",
+            yesterdayTime.plus(2, ChronoUnit.HOURS));
+
+    // unique listing only in search 2
+    var uniqueItem =
+        AuctionTrackerItem.create(
+            expectedSearchUrl2,
+            uniqueListingUrl,
+            "Unique Item",
+            yesterdayTime.plus(3, ChronoUnit.HOURS));
+
+    auctionTrackerTable.putItem(itemFromSearch1);
+    auctionTrackerTable.putItem(itemFromSearch2);
+    auctionTrackerTable.putItem(uniqueItem);
+
+    // act
+    sendDigestHandler.handleRequest(new ScheduledEvent(), null);
+
+    // assert
+    var notifications = fakeNotificationPublisher.findNotifications("auction_tracker_api_digest");
+    assertThat(notifications).hasSize(1);
+
+    var notification = notifications.get(0);
+    assertThat(notification.subject()).isEqualTo("Auction Tracker Daily Digest - 2 new items");
+    assertThat(notification.message())
+        .contains("New auction items found in the last 24 hours:")
+        .contains("Duplicate Item")
+        .contains("https://www.trademe.co.nz/listing/123")
+        .contains("Unique Item")
+        .contains("https://www.trademe.co.nz/listing/456");
   }
 
   @Test
