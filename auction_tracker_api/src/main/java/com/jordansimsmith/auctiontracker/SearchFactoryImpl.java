@@ -53,18 +53,6 @@ public class SearchFactoryImpl implements SearchFactory {
               100.0,
               Condition.USED),
           new Search(
-              URI.create("https://www.trademe.co.nz/a/marketplace/sports/golf/bags/search"),
-              "pencil bag",
-              null,
-              100.0,
-              Condition.USED),
-          new Search(
-              URI.create("https://www.trademe.co.nz/a/marketplace/sports/golf/bags/search"),
-              "stand bag",
-              null,
-              100.0,
-              Condition.USED),
-          new Search(
               URI.create(
                   "https://www.trademe.co.nz/a/marketplace/computers/components/cpus/amd/search"),
               "ryzen 7 5700x3d",
@@ -88,7 +76,14 @@ public class SearchFactoryImpl implements SearchFactory {
           new Search(
               URI.create(
                   "https://www.trademe.co.nz/a/marketplace/computers/components/hard-drives/other/search"),
-              "nvme m.2 2tb ssd",
+              "nvme 1tb ssd",
+              null,
+              125.0,
+              Condition.USED),
+          new Search(
+              URI.create(
+                  "https://www.trademe.co.nz/a/marketplace/computers/components/hard-drives/other/search"),
+              "nvme 2tb ssd",
               null,
               200.0,
               Condition.USED));
