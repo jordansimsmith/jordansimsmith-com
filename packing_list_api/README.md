@@ -7,11 +7,11 @@ Instead of maintaining a manual spreadsheet each holiday, this service supports 
 ## System architecture
 
 ```mermaid
-graph TD
+flowchart TD
   A[Browser] -->|HTTPS| B[API Gateway]
-  B -->|Lambda proxy| C[Lambda handlers (Java 17)]
-  C --> D[DynamoDB: packing_list]
-  C --> E[Secrets Manager: packing_list_api]
+  B -->|Lambda proxy| C["Lambda handlers (Java 17)"]
+  C --> D["DynamoDB: packing_list"]
+  C --> E["Secrets Manager: packing_list_api"]
 ```
 
 ## Requirements

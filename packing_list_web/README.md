@@ -7,11 +7,11 @@ Instead of maintaining a manual spreadsheet each holiday, the web app generates 
 ## System architecture
 
 ```mermaid
-graph TD
+flowchart TD
   A[Browser] --> B[CloudFront Distribution]
   B --> C[S3 Bucket: packing-list.jordansimsmith.com]
-  C --> D[React SPA (Vite + Mantine)]
-  D -->|HTTPS (Basic auth)| E[Packing list API]
+  C --> D["React SPA (Vite + Mantine)"]
+  D -->|HTTPS Basic auth| E[Packing list API]
 ```
 
 ## Requirements
