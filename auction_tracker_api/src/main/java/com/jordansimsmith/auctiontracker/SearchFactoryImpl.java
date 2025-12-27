@@ -72,20 +72,6 @@ public class SearchFactoryImpl implements SearchFactory {
               "g.skill trident z 32gb ddr4",
               null,
               200.0,
-              Condition.USED),
-          new Search(
-              URI.create(
-                  "https://www.trademe.co.nz/a/marketplace/computers/components/hard-drives/other/search"),
-              "nvme 1tb ssd",
-              null,
-              125.0,
-              Condition.USED),
-          new Search(
-              URI.create(
-                  "https://www.trademe.co.nz/a/marketplace/computers/components/hard-drives/other/search"),
-              "nvme 2tb ssd",
-              null,
-              200.0,
               Condition.USED));
 
   @Override
