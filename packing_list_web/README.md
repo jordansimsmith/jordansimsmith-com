@@ -60,10 +60,10 @@ flowchart TD
 - **Notifications**: `@mantine/notifications`
 - **State strategy**:
   - UI state in React component state
-  - server state via typed `fetch` calls (no React Query)
+  - server state via a typed API client (no React Query)
 - **Auth/session**:
   - Basic token stored in `sessionStorage`
-  - request helper adds `Authorization` header and `?user=...` query param
+  - http client injects `Authorization` header and `?user=...` query param
 - **Hosting**: S3 + CloudFront (SPA deep-link support)
 - **Infra**: Terraform (aligned with repo patterns from `personal_website_web`)
 - **Build system**: Bazel (aligned with repo patterns)
@@ -106,9 +106,9 @@ flowchart TD
     - `getTrips()`
     - `getTrip(tripId)`
     - `updateTrip(trip)`
-  - injects:
-    - `Authorization` header
-    - `?user=...` query param
+  - selects an underlying implementation:
+    - `api/http-client.ts` (prod): real HTTP calls with `fetch`
+    - `api/fake-client.ts` (dev): pure in-memory stub for local development (no backend required; resets on refresh)
   - normalizes error handling to `{"message":"..."}`
 
 #### Auth/session
@@ -156,8 +156,8 @@ flowchart TD
 
 - Run the Vite dev server via Bazel:
   - `bazel run //packing_list_web:vite -- dev`
-- Use a Vite dev proxy so local development can call the deployed API without adding `localhost` to API CORS:
-  - proxy `/api/*` -> `https://api.packing-list.jordansimsmith.com/*`
+- By default, the app uses the **fake in-memory API client** in dev mode (no backend required; no network calls)
+- Optionally, switch to the **http API client** to test against the deployed API (e.g. with a Vite env var such as `VITE_API_IMPL=http`)
 
 ### Testing
 
