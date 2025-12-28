@@ -61,6 +61,10 @@ locals {
       target  = "//packing_list_api:get-trip-handler_deploy.jar"
       handler = "com.jordansimsmith.packinglist.GetTripHandler"
     }
+    update_trip = {
+      target  = "//packing_list_api:update-trip-handler_deploy.jar"
+      handler = "com.jordansimsmith.packinglist.UpdateTripHandler"
+    }
   }
 
   root_resources = {
@@ -79,6 +83,7 @@ locals {
     create_trip   = { resource = "trips", method = "POST", lambda = "create_trip" }
     find_trips    = { resource = "trips", method = "GET", lambda = "find_trips" }
     get_trip      = { resource = "trip", method = "GET", lambda = "get_trip" }
+    update_trip   = { resource = "trip", method = "PUT", lambda = "update_trip" }
   }
 
   all_resource_ids = merge(
