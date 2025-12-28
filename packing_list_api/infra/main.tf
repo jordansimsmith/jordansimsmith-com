@@ -57,31 +57,54 @@ locals {
       target  = "//packing_list_api:find-trips-handler_deploy.jar"
       handler = "com.jordansimsmith.packinglist.FindTripsHandler"
     }
+    get_trip = {
+      target  = "//packing_list_api:get-trip-handler_deploy.jar"
+      handler = "com.jordansimsmith.packinglist.GetTripHandler"
+    }
   }
 
-  resources = {
+  root_resources = {
     templates = { path = "templates" }
     trips     = { path = "trips" }
   }
+
+  child_resources = {
+    trip = { path = "{trip_id}", parent = "trips" }
+  }
+
+  all_resources = merge(local.root_resources, local.child_resources)
 
   endpoints = {
     get_templates = { resource = "templates", method = "GET", lambda = "get_templates" }
     create_trip   = { resource = "trips", method = "POST", lambda = "create_trip" }
     find_trips    = { resource = "trips", method = "GET", lambda = "find_trips" }
+    get_trip      = { resource = "trip", method = "GET", lambda = "get_trip" }
   }
+
+  all_resource_ids = merge(
+    { for k, v in aws_api_gateway_resource.root_resource : k => v.id },
+    { for k, v in aws_api_gateway_resource.child_resource : k => v.id }
+  )
 }
 
 check "unique_resource_paths" {
   assert {
-    condition     = length(local.resources) == length(distinct([for r in local.resources : r.path]))
+    condition     = length(local.all_resources) == length(distinct([for r in local.all_resources : r.path]))
     error_message = "Resource paths must be unique"
   }
 }
 
 check "valid_endpoint_resources" {
   assert {
-    condition     = alltrue([for e in local.endpoints : contains(keys(local.resources), e.resource)])
+    condition     = alltrue([for e in local.endpoints : contains(keys(local.all_resources), e.resource)])
     error_message = "All endpoint resources must reference a valid resource key"
+  }
+}
+
+check "valid_child_resource_parents" {
+  assert {
+    condition     = alltrue([for r in local.child_resources : contains(keys(local.root_resources), r.parent)])
+    error_message = "All child resource parents must reference a valid root resource key"
   }
 }
 
@@ -292,11 +315,19 @@ resource "aws_api_gateway_gateway_response" "unauthorized" {
   }
 }
 
-resource "aws_api_gateway_resource" "resource" {
-  for_each = local.resources
+resource "aws_api_gateway_resource" "root_resource" {
+  for_each = local.root_resources
 
   rest_api_id = aws_api_gateway_rest_api.packing_list.id
   parent_id   = aws_api_gateway_rest_api.packing_list.root_resource_id
+  path_part   = each.value.path
+}
+
+resource "aws_api_gateway_resource" "child_resource" {
+  for_each = local.child_resources
+
+  rest_api_id = aws_api_gateway_rest_api.packing_list.id
+  parent_id   = aws_api_gateway_resource.root_resource[each.value.parent].id
   path_part   = each.value.path
 }
 
@@ -304,7 +335,7 @@ resource "aws_api_gateway_method" "method" {
   for_each = local.endpoints
 
   rest_api_id   = aws_api_gateway_rest_api.packing_list.id
-  resource_id   = aws_api_gateway_resource.resource[each.value.resource].id
+  resource_id   = local.all_resource_ids[each.value.resource]
   http_method   = each.value.method
   authorization = "CUSTOM"
   authorizer_id = aws_api_gateway_authorizer.packing_list.id
@@ -314,7 +345,7 @@ resource "aws_api_gateway_integration" "integration" {
   for_each = local.endpoints
 
   rest_api_id             = aws_api_gateway_rest_api.packing_list.id
-  resource_id             = aws_api_gateway_resource.resource[each.value.resource].id
+  resource_id             = local.all_resource_ids[each.value.resource]
   http_method             = aws_api_gateway_method.method[each.key].http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
@@ -322,19 +353,19 @@ resource "aws_api_gateway_integration" "integration" {
 }
 
 resource "aws_api_gateway_method" "options" {
-  for_each = local.resources
+  for_each = local.all_resources
 
   rest_api_id   = aws_api_gateway_rest_api.packing_list.id
-  resource_id   = aws_api_gateway_resource.resource[each.key].id
+  resource_id   = local.all_resource_ids[each.key]
   http_method   = "OPTIONS"
   authorization = "NONE"
 }
 
 resource "aws_api_gateway_integration" "options" {
-  for_each = local.resources
+  for_each = local.all_resources
 
   rest_api_id = aws_api_gateway_rest_api.packing_list.id
-  resource_id = aws_api_gateway_resource.resource[each.key].id
+  resource_id = local.all_resource_ids[each.key]
   http_method = aws_api_gateway_method.options[each.key].http_method
   type        = "MOCK"
 
@@ -344,10 +375,10 @@ resource "aws_api_gateway_integration" "options" {
 }
 
 resource "aws_api_gateway_method_response" "options" {
-  for_each = local.resources
+  for_each = local.all_resources
 
   rest_api_id = aws_api_gateway_rest_api.packing_list.id
-  resource_id = aws_api_gateway_resource.resource[each.key].id
+  resource_id = local.all_resource_ids[each.key]
   http_method = aws_api_gateway_method.options[each.key].http_method
   status_code = "200"
 
@@ -363,10 +394,10 @@ resource "aws_api_gateway_method_response" "options" {
 }
 
 resource "aws_api_gateway_integration_response" "options" {
-  for_each = local.resources
+  for_each = local.all_resources
 
   rest_api_id = aws_api_gateway_rest_api.packing_list.id
-  resource_id = aws_api_gateway_resource.resource[each.key].id
+  resource_id = local.all_resource_ids[each.key]
   http_method = aws_api_gateway_method.options[each.key].http_method
   status_code = aws_api_gateway_method_response.options[each.key].status_code
 
@@ -384,7 +415,8 @@ resource "aws_api_gateway_deployment" "packing_list" {
     redeployment = sha1(jsonencode([
       aws_api_gateway_authorizer.packing_list,
       aws_api_gateway_gateway_response.unauthorized,
-      aws_api_gateway_resource.resource,
+      aws_api_gateway_resource.root_resource,
+      aws_api_gateway_resource.child_resource,
       aws_api_gateway_method.method,
       aws_api_gateway_integration.integration,
       aws_api_gateway_method.options,
