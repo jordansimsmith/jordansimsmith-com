@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URI;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,7 +16,7 @@ public class GetTemplatesHandlerTest {
 
   @BeforeEach
   void setUp() {
-    var factory = PackingListTestFactory.create();
+    var factory = PackingListTestFactory.create(URI.create("unused"));
     objectMapper = factory.objectMapper();
     fakeTemplatesFactory = factory.fakeTemplatesFactory();
     fakeTemplatesFactory.reset();

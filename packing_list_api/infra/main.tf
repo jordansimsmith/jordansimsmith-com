@@ -49,6 +49,10 @@ locals {
       target  = "//packing_list_api:get-templates-handler_deploy.jar"
       handler = "com.jordansimsmith.packinglist.GetTemplatesHandler"
     }
+    create_trip = {
+      target  = "//packing_list_api:create-trip-handler_deploy.jar"
+      handler = "com.jordansimsmith.packinglist.CreateTripHandler"
+    }
   }
 
   endpoints = {
@@ -56,12 +60,56 @@ locals {
       path   = "templates"
       method = "GET"
     }
+    create_trip = {
+      path   = "trips"
+      method = "POST"
+    }
   }
 }
 
 resource "aws_secretsmanager_secret" "packing_list" {
   name                    = local.application_id
   recovery_window_in_days = 0
+}
+
+resource "aws_dynamodb_table" "packing_list" {
+  name         = "packing_list"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "pk"
+  range_key    = "sk"
+
+  attribute {
+    name = "pk"
+    type = "S"
+  }
+
+  attribute {
+    name = "sk"
+    type = "S"
+  }
+
+  attribute {
+    name = "gsi1pk"
+    type = "S"
+  }
+
+  attribute {
+    name = "gsi1sk"
+    type = "S"
+  }
+
+  global_secondary_index {
+    name            = "gsi1"
+    hash_key        = "gsi1pk"
+    range_key       = "gsi1sk"
+    projection_type = "ALL"
+  }
+
+  point_in_time_recovery {
+    enabled = true
+  }
+
+  deletion_protection_enabled = true
 }
 
 data "aws_iam_policy_document" "lambda_sts_allow_policy_document" {
@@ -124,6 +172,38 @@ resource "aws_iam_policy" "lambda_secretsmanager" {
 resource "aws_iam_role_policy_attachment" "lambda_secretsmanager" {
   role       = aws_iam_role.lambda_role.name
   policy_arn = aws_iam_policy.lambda_secretsmanager.arn
+}
+
+data "aws_iam_policy_document" "lambda_dynamodb_allow_policy_document" {
+  statement {
+    effect = "Allow"
+
+    resources = [
+      aws_dynamodb_table.packing_list.arn,
+      "${aws_dynamodb_table.packing_list.arn}/index/*"
+    ]
+
+    actions = [
+      "dynamodb:PutItem",
+      "dynamodb:UpdateItem",
+      "dynamodb:BatchWriteItem",
+      "dynamodb:GetItem",
+      "dynamodb:BatchGetItem",
+      "dynamodb:Scan",
+      "dynamodb:Query",
+      "dynamodb:ConditionCheckItem",
+    ]
+  }
+}
+
+resource "aws_iam_policy" "lambda_dynamodb" {
+  name   = "${local.application_id}_lambda_dynamodb"
+  policy = data.aws_iam_policy_document.lambda_dynamodb_allow_policy_document.json
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = aws_iam_policy.lambda_dynamodb.arn
 }
 
 data "external" "handler_location" {

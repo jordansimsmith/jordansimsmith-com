@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.secrets.FakeSecrets;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
@@ -23,7 +24,7 @@ public class AuthHandlerTest {
 
   @BeforeEach
   void setUp() {
-    var factory = PackingListTestFactory.create();
+    var factory = PackingListTestFactory.create(URI.create("unused"));
     fakeSecrets = factory.fakeSecrets();
     objectMapper = factory.objectMapper();
 
