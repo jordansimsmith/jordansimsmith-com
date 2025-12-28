@@ -24,12 +24,12 @@ flowchart TD
 - Create trips with metadata (`name`, `destination`, `departure_date`, `return_date`) and a fully-materialized snapshot of trip items (`POST /trips`)
 - List trips for the authenticated user ordered by `departure_date` descending (`GET /trips`)
 - Fetch a single trip by id including its items (`GET /trips/{trip_id}`)
-- Update trips after creation (edit trip details and items; add/remove items; update quantity/tags/status) by replacing the full trip object (metadata + items) (`PUT /trips/{trip_id}`)
+- Update trips after creation by replacing the full trip object (metadata + items) (`PUT /trips/{trip_id}`)
+  - typically used by the UI for item status changes while packing
+  - also supports full edits (trip details + add/remove/edit items)
 - Support trip items with categories, quantities, tags, and packing status (`unpacked`, `packed`, `pack-just-in-time`)
-- Snapshot behavior: once a trip is created, it is independent of future template/variation changes
+- Snapshot behavior: once a trip is created, it is independent of subsequent template/variation changes
 - Validate inputs (required fields, item uniqueness, enums, quantity bounds) and return consistent JSON errors
-- Planned: delete trips (hard delete)
-- Planned: trip lifecycle enforcement (editable through the end of the departure day; read-only starting the next local day; inactive trips separated in listing)
 
 ### Technical specifications
 
@@ -58,7 +58,7 @@ flowchart TD
 ### Core concepts
 
 - **Trip**: a holiday with metadata (name, destination, departure date, return date) and a persisted `items` list.
-- **Base template**: the shared default packing list. In M1 the service ships with **one** base template.
+- **Base template**: the shared default packing list. The service ships with **one** base template.
 - **Variation**: a shared additive set of items layered on top of the base template (e.g. skiing, tramping). Variations are additive only: they do not remove or override items.
 - **Trip list snapshot**: the fully-materialized `items` array stored on the trip at creation time; this makes the trip independent of future template/variation changes.
 - **Item**:

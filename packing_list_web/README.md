@@ -31,8 +31,8 @@ flowchart TD
 - **Create trip** (`/trips/create`):
   - enter trip metadata: name, destination, departure date, return date
   - load templates from the backend (`GET /templates`)
-  - select zero or more variations (base template is fixed in M1)
-  - generate a draft list client-side by applying merge rules (see `packing_list_api/README.md`)
+  - select zero or more variations (base template is fixed)
+  - build a live preview list client-side by applying merge rules (see `packing_list_api/README.md`)
   - allow edits before persisting:
     - remove items
     - add one-off items
@@ -45,7 +45,7 @@ flowchart TD
   - categories ordered alphabetically
   - hide categories with zero visible items
   - “hide packed” toggle
-  - fast status controls supporting `unpacked`, `packed`, and `pack-just-in-time`
+  - fast status controls (segmented control) supporting `unpacked`, `pack-just-in-time`, and `packed`
   - display tags at a glance
 - **Responsive UX**: usable on both mobile and desktop
 
@@ -80,20 +80,51 @@ flowchart TD
 ### Client-side generation and snapshot behavior
 
 - The web app generates and edits the packing list client-side, then persists the fully-materialized `items` array via `POST /trips`.
-- This gives “snapshot” behavior naturally: once the trip is created, it is independent from any future changes to templates/variations.
-- There is no server-side draft/finalization workflow in M1; drafts exist only within the create flow before the `POST /trips` call.
+- This gives “snapshot” behavior naturally: once the trip is created, it is independent from any subsequent changes to templates/variations.
+- There is no server-side draft/finalization workflow; drafts exist only within the create flow before the `POST /trips` call.
 
-### UX notes
+### UX guiding principles
 
-- **Generation flow**: the create experience is a 2-step flow — generate a draft list (base + selected variations) → edit/remove/add one-offs → create the trip (persist snapshot).
-- **Make merges obvious**: because item identity is based on normalized name, the UI should make merges visible (e.g. quantity > 1 is clearly shown).
-- **Status ergonomics**: support fast interactions for all 3 statuses:
-  - quick toggle for `packed` vs `unpacked` (checkbox-like)
-  - a distinct “pack later” interaction for `pack-just-in-time`
-- **Categories and tags**:
-  - categories are grouped and sorted alphabetically
+- **vibe**: calm, simple, and fast; avoid visual noise.
+- **mantine-first**: prefer Mantine components + theme tokens; avoid one-off bespoke styling.
+- **responsive**: mobile and desktop are first-class.
+  - mobile uses comfortable spacing and large tap targets
+  - desktop can be slightly denser to fit more on screen
+- **layout**:
+  - use Mantine `AppShell` with a simple header (app name left, user + logout right)
+  - use a centered `Container` for page content (no sidebar navigation)
+- **trips list** (`/trips`):
+  - use list rows with subtle dividers (not heavy cards)
+  - show only the essentials per row: name, destination, departure + return dates
+  - avoid extra trip status badges
+- **create flow** (`/trips/create`):
+  - the create experience is a **live preview**:
+    - start from the base template list
+    - show variations with their item lists so it’s clear what will be included
+    - add variations and the preview updates immediately as each variation is added
+    - variations are **add-only** in a create session; use a single **Reset** action (with confirm) to start over
+    - add/remove/edit items during preview and changes apply immediately
+    - when happy, create the trip (persist snapshot) and navigate to the packing view
+  - **make merges obvious**: show quantity \(> 1\) prominently.
+- **packing view** (`/trips/:trip_id`):
+  - group by category; categories sorted alphabetically; hide empty categories after filters apply
+  - “hide packed” is a top-level toggle
+  - per-item status uses a segmented control:
+    - `unpacked`
+    - `pack-just-in-time` (label shown as **Pack later**)
+    - `packed`
+  - show tags at a glance as small badges
+- **errors and loading**:
+  - inline validation for forms
+  - toasts for API failures (show a short message)
+  - skeletons for list loading; button loading state for create/save actions
+- **accessibility**:
+  - keep visible focus styles
+  - don’t rely on color alone for status
+  - ensure keyboard usability on desktop and generous tap targets on mobile
+
   - encourage reuse of existing categories, but allow creating new ones at any time
-  - tags are free text and created on the fly; show tags at a glance in packing view
+  - tags are free text and created on the fly
 
 ### Module layout
 
@@ -141,7 +172,7 @@ flowchart TD
 #### Feature components
 
 - `TripForm` (name/destination/departure/return)
-- `TemplatesPicker` (base template read-only + variation multi-select)
+- `TemplatesPicker` (base template read-only + variation picker that shows each variation’s items)
 - `PackingListEditor` (add/remove/edit items during create flow)
 - `PackingListView` (packing view with grouping + status toggles)
 
@@ -150,7 +181,7 @@ flowchart TD
 - `CategorySection` (category header + list of items)
 - `ItemRow` (name, quantity, tags, status controls)
 - `TagsInput` (free-text tags)
-- `StatusControl` (supports `unpacked` / `packed` / `pack-just-in-time`)
+- `StatusControl` (segmented control: `unpacked` / `pack-just-in-time` (“pack later”) / `packed`)
 
 ### Local development
 
