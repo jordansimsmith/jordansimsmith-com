@@ -53,17 +53,42 @@ locals {
       target  = "//packing_list_api:create-trip-handler_deploy.jar"
       handler = "com.jordansimsmith.packinglist.CreateTripHandler"
     }
+    find_trips = {
+      target  = "//packing_list_api:find-trips-handler_deploy.jar"
+      handler = "com.jordansimsmith.packinglist.FindTripsHandler"
+    }
+  }
+
+  resources = {
+    templates = { path = "templates" }
+    trips     = { path = "trips" }
   }
 
   endpoints = {
-    get_templates = {
-      path   = "templates"
-      method = "GET"
-    }
-    create_trip = {
-      path   = "trips"
-      method = "POST"
-    }
+    get_templates = { resource = "templates", method = "GET", lambda = "get_templates" }
+    create_trip   = { resource = "trips", method = "POST", lambda = "create_trip" }
+    find_trips    = { resource = "trips", method = "GET", lambda = "find_trips" }
+  }
+}
+
+check "unique_resource_paths" {
+  assert {
+    condition     = length(local.resources) == length(distinct([for r in local.resources : r.path]))
+    error_message = "Resource paths must be unique"
+  }
+}
+
+check "valid_endpoint_resources" {
+  assert {
+    condition     = alltrue([for e in local.endpoints : contains(keys(local.resources), e.resource)])
+    error_message = "All endpoint resources must reference a valid resource key"
+  }
+}
+
+check "valid_endpoint_lambdas" {
+  assert {
+    condition     = alltrue([for e in local.endpoints : contains(keys(local.lambdas), e.lambda)])
+    error_message = "All endpoint lambdas must reference a valid lambda key"
   }
 }
 
@@ -268,7 +293,7 @@ resource "aws_api_gateway_gateway_response" "unauthorized" {
 }
 
 resource "aws_api_gateway_resource" "resource" {
-  for_each = local.endpoints
+  for_each = local.resources
 
   rest_api_id = aws_api_gateway_rest_api.packing_list.id
   parent_id   = aws_api_gateway_rest_api.packing_list.root_resource_id
@@ -279,7 +304,7 @@ resource "aws_api_gateway_method" "method" {
   for_each = local.endpoints
 
   rest_api_id   = aws_api_gateway_rest_api.packing_list.id
-  resource_id   = aws_api_gateway_resource.resource[each.key].id
+  resource_id   = aws_api_gateway_resource.resource[each.value.resource].id
   http_method   = each.value.method
   authorization = "CUSTOM"
   authorizer_id = aws_api_gateway_authorizer.packing_list.id
@@ -289,16 +314,15 @@ resource "aws_api_gateway_integration" "integration" {
   for_each = local.endpoints
 
   rest_api_id             = aws_api_gateway_rest_api.packing_list.id
-  resource_id             = aws_api_gateway_resource.resource[each.key].id
+  resource_id             = aws_api_gateway_resource.resource[each.value.resource].id
   http_method             = aws_api_gateway_method.method[each.key].http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.lambda[each.key].invoke_arn
+  uri                     = aws_lambda_function.lambda[each.value.lambda].invoke_arn
 }
 
-# CORS: OPTIONS method for /templates
 resource "aws_api_gateway_method" "options" {
-  for_each = local.endpoints
+  for_each = local.resources
 
   rest_api_id   = aws_api_gateway_rest_api.packing_list.id
   resource_id   = aws_api_gateway_resource.resource[each.key].id
@@ -307,7 +331,7 @@ resource "aws_api_gateway_method" "options" {
 }
 
 resource "aws_api_gateway_integration" "options" {
-  for_each = local.endpoints
+  for_each = local.resources
 
   rest_api_id = aws_api_gateway_rest_api.packing_list.id
   resource_id = aws_api_gateway_resource.resource[each.key].id
@@ -320,7 +344,7 @@ resource "aws_api_gateway_integration" "options" {
 }
 
 resource "aws_api_gateway_method_response" "options" {
-  for_each = local.endpoints
+  for_each = local.resources
 
   rest_api_id = aws_api_gateway_rest_api.packing_list.id
   resource_id = aws_api_gateway_resource.resource[each.key].id
@@ -339,7 +363,7 @@ resource "aws_api_gateway_method_response" "options" {
 }
 
 resource "aws_api_gateway_integration_response" "options" {
-  for_each = local.endpoints
+  for_each = local.resources
 
   rest_api_id = aws_api_gateway_rest_api.packing_list.id
   resource_id = aws_api_gateway_resource.resource[each.key].id
@@ -401,4 +425,3 @@ resource "aws_api_gateway_base_path_mapping" "packing_list" {
   stage_name  = aws_api_gateway_stage.prod.stage_name
   domain_name = aws_api_gateway_domain_name.packing_list.domain_name
 }
-
