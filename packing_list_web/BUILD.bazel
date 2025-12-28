@@ -1,6 +1,7 @@
 load("@aspect_rules_js//js:defs.bzl", "js_library", "js_run_binary")
 load("@npm//:defs.bzl", "npm_link_all_packages")
-load("@npm//:vite/package_json.bzl", "bin")
+load("@npm//:vite/package_json.bzl", vite_bin = "bin")
+load("@npm//:vitest/package_json.bzl", vitest_bin = "bin")
 
 npm_link_all_packages(
     name = "node_modules",
@@ -8,10 +9,19 @@ npm_link_all_packages(
 
 js_library(
     name = "vite-config",
-    srcs = ["vite.config.js"],
+    srcs = ["vite.config.ts"],
     deps = [
         "//:node_modules/@vitejs/plugin-react",
         "//:node_modules/vite",
+    ],
+)
+
+js_library(
+    name = "vitest-config",
+    srcs = ["vitest.config.ts"],
+    deps = [
+        "//:node_modules/@vitejs/plugin-react",
+        "//:node_modules/vitest",
     ],
 )
 
@@ -24,7 +34,12 @@ js_library(
     ],
 )
 
-bin.vite_binary(
+js_library(
+    name = "tsconfig",
+    srcs = ["tsconfig.json"],
+)
+
+vite_bin.vite_binary(
     name = "vite",
     chdir = package_name(),
     data = [
@@ -34,6 +49,7 @@ bin.vite_binary(
         ":postcss-config",
         ":public",
         ":src",
+        ":tsconfig",
         ":vite-config",
     ],
 )
@@ -48,15 +64,34 @@ js_library(
 
 js_library(
     name = "src",
-    srcs = glob([
-        "src/**/*.js",
-        "src/**/*.jsx",
-    ]),
+    srcs = glob(
+        [
+            "src/**/*.ts",
+            "src/**/*.tsx",
+        ],
+        exclude = ["src/**/*.test.tsx"],
+    ),
     data = [":assets"],
     deps = [
         "//:node_modules/@mantine/core",
+        "//:node_modules/@types/react",
+        "//:node_modules/@types/react-dom",
         "//:node_modules/react",
         "//:node_modules/react-dom",
+    ],
+)
+
+js_library(
+    name = "test-src",
+    srcs = glob([
+        "src/**/*.test.tsx",
+        "src/test-setup.ts",
+    ]),
+    deps = [
+        ":src",
+        "//:node_modules/@mantine/core",
+        "//:node_modules/@testing-library/react",
+        "//:node_modules/vitest",
     ],
 )
 
@@ -74,15 +109,33 @@ js_run_binary(
         ":postcss-config",
         ":public",
         ":src",
+        ":tsconfig",
     ],
     args = ["build"],
     out_dirs = ["dist"],
     tool = ":vite",
 )
 
-bin.vite_binary(
+vite_bin.vite_binary(
     name = "preview",
     args = ["preview"],
     chdir = package_name(),
     data = [":build"],
+)
+
+vitest_bin.vitest_test(
+    name = "unit-tests",
+    args = ["run"],
+    chdir = package_name(),
+    data = [
+        "package.json",
+        ":assets",
+        ":postcss-config",
+        ":src",
+        ":test-src",
+        ":tsconfig",
+        ":vitest-config",
+        "//:node_modules/@testing-library/dom",
+        "//:node_modules/jsdom",
+    ],
 )
