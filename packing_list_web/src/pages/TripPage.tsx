@@ -14,12 +14,38 @@ import {
   Divider,
   ActionIcon,
   Loader,
+  Button,
+  Modal,
+  TextInput,
+  Autocomplete,
+  NumberInput,
+  TagsInput,
+  CloseButton,
 } from '@mantine/core';
-import { IconArrowLeft } from '@tabler/icons-react';
+import { useForm } from '@mantine/form';
+import { useDisclosure } from '@mantine/hooks';
+import { IconArrowLeft, IconPencil, IconPlus } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { apiClient } from '../api/client';
 import type { Trip, TripItem, TripItemStatus } from '../api/client';
+
+function normalizedName(name: string): string {
+  return name.toLowerCase().trim().replace(/\s+/g, ' ');
+}
+
+interface AddItemFormValues {
+  name: string;
+  category: string;
+  quantity: number;
+  tags: string[];
+}
+
+interface EditItemFormValues {
+  category: string;
+  quantity: number;
+  tags: string[];
+}
 
 function formatDate(dateString: string): string {
   const date = new Date(dateString + 'T00:00:00');
@@ -46,9 +72,11 @@ function getStatusColor(status: TripItemStatus): string {
 interface ItemRowProps {
   item: TripItem;
   onStatusChange: (itemName: string, newStatus: TripItemStatus) => void;
+  onEdit: (item: TripItem) => void;
+  onRemove: (itemName: string) => void;
 }
 
-function ItemRow({ item, onStatusChange }: ItemRowProps) {
+function ItemRow({ item, onStatusChange, onEdit, onRemove }: ItemRowProps) {
   return (
     <Box py="sm" px="xs">
       <Group justify="space-between" wrap="nowrap" align="flex-start">
@@ -77,19 +105,34 @@ function ItemRow({ item, onStatusChange }: ItemRowProps) {
             </Group>
           )}
         </Stack>
-        <SegmentedControl
-          size="xs"
-          value={item.status}
-          onChange={(value) =>
-            onStatusChange(item.name, value as TripItemStatus)
-          }
-          data={[
-            { label: 'Unpacked', value: 'unpacked' },
-            { label: 'Pack later', value: 'pack-just-in-time' },
-            { label: 'Packed', value: 'packed' },
-          ]}
-          color={getStatusColor(item.status)}
-        />
+        <Group gap="xs" wrap="nowrap">
+          <ActionIcon
+            size="xs"
+            variant="subtle"
+            aria-label={`Edit ${item.name}`}
+            onClick={() => onEdit(item)}
+          >
+            <IconPencil size={14} />
+          </ActionIcon>
+          <CloseButton
+            size="xs"
+            aria-label={`Remove ${item.name}`}
+            onClick={() => onRemove(normalizedName(item.name))}
+          />
+          <SegmentedControl
+            size="xs"
+            value={item.status}
+            onChange={(value) =>
+              onStatusChange(item.name, value as TripItemStatus)
+            }
+            data={[
+              { label: 'Unpacked', value: 'unpacked' },
+              { label: 'Pack later', value: 'pack-just-in-time' },
+              { label: 'Packed', value: 'packed' },
+            ]}
+            color={getStatusColor(item.status)}
+          />
+        </Group>
       </Group>
     </Box>
   );
@@ -113,12 +156,16 @@ interface CategorySectionProps {
   category: string;
   items: TripItem[];
   onStatusChange: (itemName: string, newStatus: TripItemStatus) => void;
+  onEdit: (item: TripItem) => void;
+  onRemove: (itemName: string) => void;
 }
 
 function CategorySection({
   category,
   items,
   onStatusChange,
+  onEdit,
+  onRemove,
 }: CategorySectionProps) {
   return (
     <Box>
@@ -128,7 +175,12 @@ function CategorySection({
       <Stack gap={0}>
         {items.map((item, index) => (
           <div key={item.name}>
-            <ItemRow item={item} onStatusChange={onStatusChange} />
+            <ItemRow
+              item={item}
+              onStatusChange={onStatusChange}
+              onEdit={onEdit}
+              onRemove={onRemove}
+            />
             {index < items.length - 1 && <Divider />}
           </div>
         ))}
@@ -159,9 +211,52 @@ export function TripPage() {
   const [error, setError] = useState<string | null>(null);
   const [hidePacked, setHidePacked] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [editingItemKey, setEditingItemKey] = useState<string | null>(null);
+  const [
+    addItemModalOpened,
+    { open: openAddItemModal, close: closeAddItemModal },
+  ] = useDisclosure(false);
+  const [
+    editItemModalOpened,
+    { open: openEditItemModal, close: closeEditItemModal },
+  ] = useDisclosure(false);
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingTripRef = useRef<Trip | null>(null);
+
+  const addItemForm = useForm<AddItemFormValues>({
+    initialValues: {
+      name: '',
+      category: '',
+      quantity: 1,
+      tags: [],
+    },
+    validate: {
+      name: (value) => (value.trim() ? null : 'Name is required'),
+      quantity: (value) => (value >= 1 ? null : 'Quantity must be at least 1'),
+    },
+  });
+
+  const editItemForm = useForm<EditItemFormValues>({
+    initialValues: {
+      category: '',
+      quantity: 1,
+      tags: [],
+    },
+    validate: {
+      quantity: (value) => (value >= 1 ? null : 'Quantity must be at least 1'),
+    },
+  });
+
+  const existingCategories = trip
+    ? Array.from(
+        new Set(trip.items.map((item) => item.category).filter(Boolean)),
+      ).sort()
+    : [];
+
+  const existingTags = trip
+    ? Array.from(new Set(trip.items.flatMap((item) => item.tags))).sort()
+    : [];
 
   const saveTrip = useCallback(async (tripToSave: Trip) => {
     setSaving(true);
@@ -257,6 +352,102 @@ export function TripPage() {
     [trip, debouncedSave],
   );
 
+  const handleRemoveItem = useCallback(
+    (itemKey: string) => {
+      if (!trip) return;
+
+      const updatedItems = trip.items.filter(
+        (item) => normalizedName(item.name) !== itemKey,
+      );
+
+      const updatedTrip = { ...trip, items: updatedItems };
+      setTrip(updatedTrip);
+      debouncedSave(updatedTrip);
+    },
+    [trip, debouncedSave],
+  );
+
+  const handleOpenEditItem = useCallback(
+    (item: TripItem) => {
+      setEditingItemKey(normalizedName(item.name));
+      editItemForm.setValues({
+        category: item.category,
+        quantity: item.quantity,
+        tags: item.tags,
+      });
+      openEditItemModal();
+    },
+    [editItemForm, openEditItemModal],
+  );
+
+  const handleEditItem = useCallback(
+    (values: EditItemFormValues) => {
+      if (!trip || !editingItemKey) return;
+
+      const updatedItems = trip.items.map((item) =>
+        normalizedName(item.name) === editingItemKey
+          ? {
+              ...item,
+              category: values.category?.trim() || 'misc/uncategorised',
+              quantity: values.quantity,
+              tags: values.tags,
+            }
+          : item,
+      );
+
+      const updatedTrip = { ...trip, items: updatedItems };
+      setTrip(updatedTrip);
+      debouncedSave(updatedTrip);
+
+      setEditingItemKey(null);
+      editItemForm.reset();
+      closeEditItemModal();
+    },
+    [trip, editingItemKey, debouncedSave, editItemForm, closeEditItemModal],
+  );
+
+  const handleAddItem = useCallback(
+    (values: AddItemFormValues) => {
+      if (!trip) return;
+
+      const newItem: TripItem = {
+        name: values.name.trim(),
+        category: values.category?.trim() || 'misc/uncategorised',
+        quantity: values.quantity,
+        tags: values.tags,
+        status: 'unpacked',
+      };
+
+      const key = normalizedName(newItem.name);
+      const existingItem = trip.items.find(
+        (item) => normalizedName(item.name) === key,
+      );
+
+      let updatedItems: TripItem[];
+      if (existingItem) {
+        updatedItems = trip.items.map((item) =>
+          normalizedName(item.name) === key
+            ? {
+                ...item,
+                quantity: item.quantity + newItem.quantity,
+                tags: [...new Set([...item.tags, ...newItem.tags])],
+              }
+            : item,
+        );
+      } else {
+        updatedItems = [...trip.items, newItem];
+      }
+
+      const updatedTrip = { ...trip, items: updatedItems };
+      setTrip(updatedTrip);
+      debouncedSave(updatedTrip);
+
+      addItemForm.reset();
+      closeAddItemModal();
+    },
+    [trip, debouncedSave, addItemForm, closeAddItemModal],
+  );
+
   const filteredItems = trip
     ? hidePacked
       ? trip.items.filter((item) => item.status !== 'packed')
@@ -343,11 +534,100 @@ export function TripPage() {
                   category={category}
                   items={groupedItems.get(category) || []}
                   onStatusChange={handleStatusChange}
+                  onEdit={handleOpenEditItem}
+                  onRemove={handleRemoveItem}
                 />
               ))}
             </Stack>
+
+            <Divider my="xs" />
+
+            <Button
+              variant="light"
+              leftSection={<IconPlus size={16} />}
+              onClick={openAddItemModal}
+              fullWidth
+            >
+              Add item
+            </Button>
           </Stack>
         )}
+
+        <Modal
+          opened={addItemModalOpened}
+          onClose={closeAddItemModal}
+          title="Add item"
+          centered
+        >
+          <form onSubmit={addItemForm.onSubmit(handleAddItem)}>
+            <Stack>
+              <TextInput
+                label="Name"
+                placeholder="Item name"
+                data-autofocus
+                {...addItemForm.getInputProps('name')}
+              />
+              <Autocomplete
+                label="Category"
+                placeholder="Select or type to create"
+                data={existingCategories}
+                {...addItemForm.getInputProps('category')}
+              />
+              <NumberInput
+                label="Quantity"
+                min={1}
+                {...addItemForm.getInputProps('quantity')}
+              />
+              <TagsInput
+                label="Tags"
+                placeholder="Select or type to add"
+                data={existingTags}
+                {...addItemForm.getInputProps('tags')}
+              />
+              <Group justify="flex-end">
+                <Button variant="default" onClick={closeAddItemModal}>
+                  Cancel
+                </Button>
+                <Button type="submit">Add</Button>
+              </Group>
+            </Stack>
+          </form>
+        </Modal>
+
+        <Modal
+          opened={editItemModalOpened}
+          onClose={closeEditItemModal}
+          title="Edit item"
+          centered
+        >
+          <form onSubmit={editItemForm.onSubmit(handleEditItem)}>
+            <Stack>
+              <Autocomplete
+                label="Category"
+                placeholder="Select or type to create"
+                data={existingCategories}
+                {...editItemForm.getInputProps('category')}
+              />
+              <NumberInput
+                label="Quantity"
+                min={1}
+                {...editItemForm.getInputProps('quantity')}
+              />
+              <TagsInput
+                label="Tags"
+                placeholder="Select or type to add"
+                data={existingTags}
+                {...editItemForm.getInputProps('tags')}
+              />
+              <Group justify="flex-end">
+                <Button variant="default" onClick={closeEditItemModal}>
+                  Cancel
+                </Button>
+                <Button type="submit">Save</Button>
+              </Group>
+            </Stack>
+          </form>
+        </Modal>
       </Container>
     </AppShellLayout>
   );

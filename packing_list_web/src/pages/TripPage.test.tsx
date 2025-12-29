@@ -358,4 +358,262 @@ describe('TripPage', () => {
 
     vi.useRealTimers();
   });
+
+  it('can remove an item from the trip', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    sessionStorage.setItem(
+      'packing_list_auth',
+      JSON.stringify({
+        username: 'testuser',
+        token: 'dGVzdHVzZXI6dGVzdHBhc3M=',
+      }),
+    );
+
+    const mockTrip = {
+      trip_id: 'trip-001',
+      name: 'Test Trip',
+      destination: 'Destination',
+      departure_date: '2025-03-15',
+      return_date: '2025-03-29',
+      items: [
+        {
+          name: 'Passport',
+          category: 'travel',
+          quantity: 1,
+          tags: [],
+          status: 'unpacked' as const,
+        },
+        {
+          name: 'Toothbrush',
+          category: 'toiletries',
+          quantity: 1,
+          tags: [],
+          status: 'unpacked' as const,
+        },
+      ],
+      created_at: 1735000000,
+      updated_at: 1735000000,
+    };
+
+    vi.spyOn(clientModule.apiClient, 'getTrip').mockResolvedValue({
+      trip: mockTrip,
+    });
+
+    const updateTripSpy = vi
+      .spyOn(clientModule.apiClient, 'updateTrip')
+      .mockResolvedValue({
+        trip: {
+          ...mockTrip,
+          items: mockTrip.items.filter((item) => item.name !== 'Passport'),
+        },
+      });
+
+    renderTripPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Passport')).toBeDefined();
+    });
+    expect(screen.getByText('Toothbrush')).toBeDefined();
+
+    const removeButton = screen.getByLabelText('Remove Passport');
+    await user.click(removeButton);
+
+    await waitFor(() => {
+      expect(screen.queryByText('Passport')).toBeNull();
+    });
+    expect(screen.getByText('Toothbrush')).toBeDefined();
+
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(updateTripSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        trip_id: 'trip-001',
+        items: expect.not.arrayContaining([
+          expect.objectContaining({ name: 'Passport' }),
+        ]),
+      }),
+    );
+
+    vi.useRealTimers();
+  });
+
+  it('shows add item button and can add a new item', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    sessionStorage.setItem(
+      'packing_list_auth',
+      JSON.stringify({
+        username: 'testuser',
+        token: 'dGVzdHVzZXI6dGVzdHBhc3M=',
+      }),
+    );
+
+    const mockTrip = {
+      trip_id: 'trip-001',
+      name: 'Test Trip',
+      destination: 'Destination',
+      departure_date: '2025-03-15',
+      return_date: '2025-03-29',
+      items: [
+        {
+          name: 'Passport',
+          category: 'travel',
+          quantity: 1,
+          tags: [],
+          status: 'unpacked' as const,
+        },
+      ],
+      created_at: 1735000000,
+      updated_at: 1735000000,
+    };
+
+    vi.spyOn(clientModule.apiClient, 'getTrip').mockResolvedValue({
+      trip: mockTrip,
+    });
+
+    const updateTripSpy = vi
+      .spyOn(clientModule.apiClient, 'updateTrip')
+      .mockResolvedValue({
+        trip: {
+          ...mockTrip,
+          items: [
+            ...mockTrip.items,
+            {
+              name: 'Sunglasses',
+              category: 'accessories',
+              quantity: 1,
+              tags: [],
+              status: 'unpacked' as const,
+            },
+          ],
+        },
+      });
+
+    renderTripPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Passport')).toBeDefined();
+    });
+
+    const addButton = screen.getByRole('button', { name: 'Add item' });
+    await user.click(addButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeDefined();
+    });
+
+    const nameInput = screen.getByRole('textbox', { name: 'Name' });
+    await user.type(nameInput, 'Sunglasses');
+
+    const categoryInput = screen.getByRole('textbox', { name: 'Category' });
+    await user.type(categoryInput, 'accessories');
+
+    const submitButton = screen.getByRole('button', { name: 'Add' });
+    await user.click(submitButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Sunglasses')).toBeDefined();
+    });
+
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(updateTripSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        trip_id: 'trip-001',
+        items: expect.arrayContaining([
+          expect.objectContaining({ name: 'Sunglasses' }),
+        ]),
+      }),
+    );
+
+    vi.useRealTimers();
+  });
+
+  it('can edit an existing item', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    sessionStorage.setItem(
+      'packing_list_auth',
+      JSON.stringify({
+        username: 'testuser',
+        token: 'dGVzdHVzZXI6dGVzdHBhc3M=',
+      }),
+    );
+
+    const mockTrip = {
+      trip_id: 'trip-001',
+      name: 'Test Trip',
+      destination: 'Destination',
+      departure_date: '2025-03-15',
+      return_date: '2025-03-29',
+      items: [
+        {
+          name: 'Passport',
+          category: 'travel',
+          quantity: 1,
+          tags: [],
+          status: 'unpacked' as const,
+        },
+      ],
+      created_at: 1735000000,
+      updated_at: 1735000000,
+    };
+
+    vi.spyOn(clientModule.apiClient, 'getTrip').mockResolvedValue({
+      trip: mockTrip,
+    });
+
+    const updateTripSpy = vi
+      .spyOn(clientModule.apiClient, 'updateTrip')
+      .mockResolvedValue({
+        trip: {
+          ...mockTrip,
+          items: [{ ...mockTrip.items[0], quantity: 2 }],
+        },
+      });
+
+    renderTripPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Passport')).toBeDefined();
+    });
+
+    const editButton = screen.getByLabelText('Edit Passport');
+    await user.click(editButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeDefined();
+    });
+
+    const quantityInput = screen.getByLabelText('Quantity');
+    await user.clear(quantityInput);
+    await user.type(quantityInput, '2');
+
+    const saveButton = screen.getByRole('button', { name: 'Save' });
+    await user.click(saveButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('×2')).toBeDefined();
+    });
+
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(updateTripSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        trip_id: 'trip-001',
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            name: 'Passport',
+            quantity: 2,
+          }),
+        ]),
+      }),
+    );
+
+    vi.useRealTimers();
+  });
 });
