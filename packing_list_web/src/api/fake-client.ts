@@ -3,6 +3,7 @@ import type {
   ApiClient,
   CreateTripRequest,
   CreateTripResponse,
+  GetTripResponse,
   TemplatesResponse,
   Trip,
   TripsResponse,
@@ -15,7 +16,78 @@ const trips: Trip[] = [
     destination: 'Tokyo',
     departure_date: '2025-03-15',
     return_date: '2025-03-29',
-    items: [],
+    items: [
+      {
+        name: 'Passport',
+        category: 'travel',
+        quantity: 1,
+        tags: ['hand luggage', 'essential'],
+        status: 'packed',
+      },
+      {
+        name: 'Phone charger',
+        category: 'electronics',
+        quantity: 1,
+        tags: ['hand luggage'],
+        status: 'unpacked',
+      },
+      {
+        name: 'Power adapter',
+        category: 'electronics',
+        quantity: 2,
+        tags: [],
+        status: 'unpacked',
+      },
+      {
+        name: 'T-shirts',
+        category: 'clothes',
+        quantity: 5,
+        tags: [],
+        status: 'unpacked',
+      },
+      {
+        name: 'Jeans',
+        category: 'clothes',
+        quantity: 2,
+        tags: [],
+        status: 'packed',
+      },
+      {
+        name: 'Toothbrush',
+        category: 'toiletries',
+        quantity: 1,
+        tags: [],
+        status: 'unpacked',
+      },
+      {
+        name: 'Toothpaste',
+        category: 'toiletries',
+        quantity: 1,
+        tags: [],
+        status: 'pack-just-in-time',
+      },
+      {
+        name: 'Sunglasses',
+        category: 'accessories',
+        quantity: 1,
+        tags: ['hand luggage'],
+        status: 'unpacked',
+      },
+      {
+        name: 'Wallet',
+        category: 'travel',
+        quantity: 1,
+        tags: ['hand luggage', 'essential'],
+        status: 'pack-just-in-time',
+      },
+      {
+        name: 'Camera',
+        category: 'electronics',
+        quantity: 1,
+        tags: ['hand luggage'],
+        status: 'unpacked',
+      },
+    ],
     created_at: 1735000000,
     updated_at: 1735000000,
   },
@@ -25,7 +97,50 @@ const trips: Trip[] = [
     destination: 'Queenstown',
     departure_date: '2025-07-10',
     return_date: '2025-07-17',
-    items: [],
+    items: [
+      {
+        name: 'Ski jacket',
+        category: 'clothes',
+        quantity: 1,
+        tags: [],
+        status: 'unpacked',
+      },
+      {
+        name: 'Ski pants',
+        category: 'clothes',
+        quantity: 1,
+        tags: [],
+        status: 'unpacked',
+      },
+      {
+        name: 'Thermal underwear',
+        category: 'clothes',
+        quantity: 3,
+        tags: [],
+        status: 'unpacked',
+      },
+      {
+        name: 'Goggles',
+        category: 'gear',
+        quantity: 1,
+        tags: [],
+        status: 'packed',
+      },
+      {
+        name: 'Gloves',
+        category: 'gear',
+        quantity: 1,
+        tags: [],
+        status: 'packed',
+      },
+      {
+        name: 'Sunscreen',
+        category: 'toiletries',
+        quantity: 1,
+        tags: [],
+        status: 'unpacked',
+      },
+    ],
     created_at: 1735100000,
     updated_at: 1735100000,
   },
@@ -35,7 +150,36 @@ const trips: Trip[] = [
     destination: 'Berlin',
     departure_date: '2025-12-20',
     return_date: '2026-01-05',
-    items: [],
+    items: [
+      {
+        name: 'Passport',
+        category: 'travel',
+        quantity: 1,
+        tags: ['hand luggage'],
+        status: 'unpacked',
+      },
+      {
+        name: 'Winter coat',
+        category: 'clothes',
+        quantity: 1,
+        tags: [],
+        status: 'unpacked',
+      },
+      {
+        name: 'Scarf',
+        category: 'clothes',
+        quantity: 1,
+        tags: [],
+        status: 'unpacked',
+      },
+      {
+        name: 'Beanie',
+        category: 'clothes',
+        quantity: 1,
+        tags: [],
+        status: 'unpacked',
+      },
+    ],
     created_at: 1735200000,
     updated_at: 1735200000,
   },
@@ -123,6 +267,20 @@ export function createFakeClient(): ApiClient {
       };
 
       trips.push(trip);
+
+      return { trip };
+    },
+
+    async getTrip(tripId: string): Promise<GetTripResponse> {
+      const session = getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const trip = trips.find((t) => t.trip_id === tripId);
+      if (!trip) {
+        throw new Error('Not Found');
+      }
 
       return { trip };
     },

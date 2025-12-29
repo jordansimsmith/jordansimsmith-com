@@ -68,10 +68,15 @@ export interface CreateTripResponse {
   trip: Trip;
 }
 
+export interface GetTripResponse {
+  trip: Trip;
+}
+
 export interface ApiClient {
   getTemplates(): Promise<TemplatesResponse>;
   getTrips(): Promise<TripsResponse>;
   createTrip(request: CreateTripRequest): Promise<CreateTripResponse>;
+  getTrip(tripId: string): Promise<GetTripResponse>;
 }
 
 export const apiClient: ApiClient = import.meta.env.PROD

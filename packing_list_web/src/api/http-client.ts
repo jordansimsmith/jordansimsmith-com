@@ -3,6 +3,7 @@ import type {
   ApiClient,
   CreateTripRequest,
   CreateTripResponse,
+  GetTripResponse,
   TemplatesResponse,
   TripsResponse,
 } from './client';
@@ -87,6 +88,35 @@ export function createHttpClient(): ApiClient {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(request),
+      });
+
+      if (!response.ok) {
+        let message = `Request failed: ${response.statusText}`;
+        try {
+          const error = await response.json();
+          message = error.message || message;
+        } catch {
+          // use default message
+        }
+        throw new Error(message);
+      }
+
+      return response.json();
+    },
+
+    async getTrip(tripId: string): Promise<GetTripResponse> {
+      const session = getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const url = new URL(`${BASE_URL}/trips/${tripId}`);
+      url.searchParams.set('user', session.username);
+
+      const response = await fetch(url.toString(), {
+        headers: {
+          Authorization: `Basic ${session.token}`,
+        },
       });
 
       if (!response.ok) {
