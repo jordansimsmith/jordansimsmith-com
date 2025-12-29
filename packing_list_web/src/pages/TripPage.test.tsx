@@ -672,4 +672,60 @@ describe('TripPage', () => {
 
     vi.useRealTimers();
   });
+
+  it('sorts items alphabetically within each category', async () => {
+    sessionStorage.setItem(
+      'packing_list_auth',
+      JSON.stringify({
+        username: 'testuser',
+        token: 'dGVzdHVzZXI6dGVzdHBhc3M=',
+      }),
+    );
+
+    vi.spyOn(clientModule.apiClient, 'getTrip').mockResolvedValue({
+      trip: {
+        trip_id: 'trip-001',
+        name: 'Test Trip',
+        destination: 'Destination',
+        departure_date: '2025-03-15',
+        return_date: '2025-03-29',
+        items: [
+          {
+            name: 'Zebra hat',
+            category: 'clothes',
+            quantity: 1,
+            tags: [],
+            status: 'unpacked',
+          },
+          {
+            name: 'Apple watch',
+            category: 'clothes',
+            quantity: 1,
+            tags: [],
+            status: 'unpacked',
+          },
+          {
+            name: 'Mittens',
+            category: 'clothes',
+            quantity: 1,
+            tags: [],
+            status: 'unpacked',
+          },
+        ],
+        created_at: 1735000000,
+        updated_at: 1735000000,
+      },
+    });
+
+    renderTripPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Zebra hat')).toBeDefined();
+    });
+
+    const itemTexts = screen
+      .getAllByText(/Zebra hat|Apple watch|Mittens/)
+      .map((el) => el.textContent);
+    expect(itemTexts).toEqual(['Apple watch', 'Mittens', 'Zebra hat']);
+  });
 });

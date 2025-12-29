@@ -198,6 +198,13 @@ function groupItemsByCategory(items: TripItem[]): Map<string, TripItem[]> {
     grouped.set(item.category, existing);
   }
 
+  for (const [category, categoryItems] of grouped) {
+    grouped.set(
+      category,
+      categoryItems.sort((a, b) => a.name.localeCompare(b.name)),
+    );
+  }
+
   return grouped;
 }
 

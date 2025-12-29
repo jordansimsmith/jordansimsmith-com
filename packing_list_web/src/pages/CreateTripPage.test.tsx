@@ -306,4 +306,42 @@ describe('CreateTripPage', () => {
     expect(categoryHeadings[1].textContent?.toLowerCase()).toBe('travel');
     expect(categoryHeadings[2].textContent?.toLowerCase()).toBe('misc');
   });
+
+  it('sorts items alphabetically within each category', async () => {
+    sessionStorage.setItem(
+      'packing_list_auth',
+      JSON.stringify({
+        username: 'testuser',
+        token: 'dGVzdHVzZXI6dGVzdHBhc3M=',
+      }),
+    );
+
+    const templatesWithMultipleItems: clientModule.TemplatesResponse = {
+      base_template: {
+        base_template_id: 'generic',
+        name: 'generic',
+        items: [
+          { name: 'zebra hat', category: 'clothes', quantity: 1, tags: [] },
+          { name: 'apple watch', category: 'clothes', quantity: 1, tags: [] },
+          { name: 'mittens', category: 'clothes', quantity: 1, tags: [] },
+        ],
+      },
+      variations: [],
+    };
+
+    vi.spyOn(clientModule.apiClient, 'getTemplates').mockResolvedValue(
+      templatesWithMultipleItems,
+    );
+
+    renderCreateTripPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('zebra hat')).toBeDefined();
+    });
+
+    const itemTexts = screen
+      .getAllByText(/zebra hat|apple watch|mittens/)
+      .map((el) => el.textContent);
+    expect(itemTexts).toEqual(['apple watch', 'mittens', 'zebra hat']);
+  });
 });

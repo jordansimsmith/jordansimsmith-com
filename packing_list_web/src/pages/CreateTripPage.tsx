@@ -93,6 +93,14 @@ function groupItemsByCategory(items: TripItem[]): Map<string, TripItem[]> {
     }
     groups.get(category)!.push(item);
   }
+
+  for (const [category, categoryItems] of groups) {
+    groups.set(
+      category,
+      categoryItems.sort((a, b) => a.name.localeCompare(b.name)),
+    );
+  }
+
   return new Map(
     [...groups.entries()].sort((a, b) => {
       if (a[0] === 'misc') return 1;
