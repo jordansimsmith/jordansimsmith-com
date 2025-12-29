@@ -20,6 +20,7 @@ flowchart TD
 
 - **Login**:
   - collect username/password
+  - validate credentials via a lightweight authenticated API call (`GET /templates`) before accepting login
   - store a Basic auth token in `sessionStorage` (clears when tab is closed)
   - logout clears the stored token
 - **Route protection**:
@@ -119,6 +120,7 @@ flowchart TD
   - toasts for API failures (show a short message)
   - skeletons for list loading; button loading state for create/save actions
 - **accessibility**:
+
   - keep visible focus styles
   - don’t rely on color alone for status
   - ensure keyboard usability on desktop and generous tap targets on mobile

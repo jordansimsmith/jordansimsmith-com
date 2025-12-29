@@ -74,6 +74,7 @@ flowchart TD
 - **Auth**:
   - all endpoints require `Authorization: Basic …`
   - all endpoints require a `user` query parameter (e.g. `?user=alice`)
+  - there is no dedicated “login” endpoint; clients can validate credentials by calling an authenticated endpoint (e.g. `GET /templates`)
   - unauthorized requests are rejected at API Gateway with `WWW-Authenticate: Basic`
 - **Content types**:
   - requests with a body: `Content-Type: application/json`
