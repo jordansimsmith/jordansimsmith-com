@@ -6,9 +6,11 @@
   },
   "dependencies": {
     "@mantine/core": "7.13.5",
+    "@mantine/dates": "7.13.5",
     "@mantine/form": "7.13.5",
     "@mantine/hooks": "7.13.5",
     "@mantine/notifications": "7.13.5",
+    "dayjs": "^1.11.13",
     "@tabler/icons-react": "^3.26.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.1.0",

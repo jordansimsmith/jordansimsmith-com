@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage';
 import { TripsPage } from './pages/TripsPage';
+import { CreateTripPage } from './pages/CreateTripPage';
 import { getSession } from './auth/session';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -21,6 +22,14 @@ export function App() {
           element={
             <RequireAuth>
               <TripsPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/trips/create"
+          element={
+            <RequireAuth>
+              <CreateTripPage />
             </RequireAuth>
           }
         />

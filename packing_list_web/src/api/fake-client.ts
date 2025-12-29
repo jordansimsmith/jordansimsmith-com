@@ -1,13 +1,21 @@
 import { getSession } from '../auth/session';
-import type { ApiClient, TemplatesResponse, TripsResponse } from './client';
+import type {
+  ApiClient,
+  CreateTripRequest,
+  CreateTripResponse,
+  TemplatesResponse,
+  Trip,
+  TripsResponse,
+} from './client';
 
-const trips = [
+const trips: Trip[] = [
   {
     trip_id: 'trip-001',
     name: 'Japan 2025',
     destination: 'Tokyo',
     departure_date: '2025-03-15',
     return_date: '2025-03-29',
+    items: [],
     created_at: 1735000000,
     updated_at: 1735000000,
   },
@@ -17,6 +25,7 @@ const trips = [
     destination: 'Queenstown',
     departure_date: '2025-07-10',
     return_date: '2025-07-17',
+    items: [],
     created_at: 1735100000,
     updated_at: 1735100000,
   },
@@ -26,6 +35,7 @@ const trips = [
     destination: 'Berlin',
     departure_date: '2025-12-20',
     return_date: '2026-01-05',
+    items: [],
     created_at: 1735200000,
     updated_at: 1735200000,
   },
@@ -92,6 +102,29 @@ export function createFakeClient(): ApiClient {
       );
 
       return { trips: sorted };
+    },
+
+    async createTrip(request: CreateTripRequest): Promise<CreateTripResponse> {
+      const session = getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const now = Math.floor(Date.now() / 1000);
+      const trip: Trip = {
+        trip_id: crypto.randomUUID(),
+        name: request.name,
+        destination: request.destination,
+        departure_date: request.departure_date,
+        return_date: request.return_date,
+        items: request.items,
+        created_at: now,
+        updated_at: now,
+      };
+
+      trips.push(trip);
+
+      return { trip };
     },
   };
 }
