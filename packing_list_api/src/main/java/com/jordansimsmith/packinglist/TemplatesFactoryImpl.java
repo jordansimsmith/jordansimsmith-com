@@ -71,6 +71,7 @@ public class TemplatesFactoryImpl implements TemplatesFactory {
             new TemplateItem("towel", "toiletries", 1, List.of()),
             new TemplateItem("face wash", "toiletries", 1, List.of("optional")),
             new TemplateItem("deoderant", "toiletries", 1, List.of()),
+            new TemplateItem("moisturiser", "toiletries", 1, List.of()),
             new TemplateItem("packet tissues", "toiletries", 3, List.of()),
             new TemplateItem("n95 mask", "toiletries", 2, List.of()),
             new TemplateItem("laundry detergent", "toiletries", 1, List.of("optional")),
@@ -125,6 +126,7 @@ public class TemplatesFactoryImpl implements TemplatesFactory {
                 // toiletries
                 new TemplateItem("insect repellant", "toiletries", 1, List.of()),
                 new TemplateItem("first aid kit", "toiletries", 1, List.of()),
+                new TemplateItem("blister plasters", "toiletries", 1, List.of()),
                 // clothes
                 new TemplateItem("thermal top", "clothes", 1, List.of()),
                 new TemplateItem("thermal bottom", "clothes", 1, List.of()),
@@ -134,6 +136,7 @@ public class TemplatesFactoryImpl implements TemplatesFactory {
                 new TemplateItem("tramping shirt", "clothes", 1, List.of()),
                 new TemplateItem("mosquito hat", "clothes", 1, List.of("optional")),
                 new TemplateItem("tramping boots", "clothes", 1, List.of()),
+                new TemplateItem("tramping neck tube", "clothes", 1, List.of()),
                 new TemplateItem("overtrousers", "clothes", 1, List.of("optional")),
                 new TemplateItem("foot fleece", "clothes", 1, List.of("optional")),
                 // gear
@@ -143,6 +146,7 @@ public class TemplatesFactoryImpl implements TemplatesFactory {
                 new TemplateItem("sleeping bag", "gear", 1, List.of()),
                 new TemplateItem("bedroll", "gear", 1, List.of("optional")),
                 new TemplateItem("silk liner", "gear", 1, List.of()),
+                new TemplateItem("tramping hut fitted sheet", "gear", 1, List.of()),
                 new TemplateItem("tramping tent", "gear", 1, List.of("optional")),
                 new TemplateItem("stove", "gear", 1, List.of("optional")),
                 new TemplateItem("gas cannisters", "gear", 2, List.of("optional")),
@@ -167,7 +171,8 @@ public class TemplatesFactoryImpl implements TemplatesFactory {
                 new TemplateItem("dehydrated meals", "food", 1, List.of("optional")),
                 new TemplateItem("tramping breakfast", "food", 1, List.of()),
                 new TemplateItem("tramping snacks", "food", 1, List.of()),
-                new TemplateItem("emergency rations", "food", 1, List.of())));
+                new TemplateItem("emergency rations", "food", 1, List.of()),
+                new TemplateItem("electrolytes", "food", 1, List.of())));
 
     var camping =
         new Variation(
@@ -217,6 +222,7 @@ public class TemplatesFactoryImpl implements TemplatesFactory {
                 new TemplateItem("ski socks", "clothes", 2, List.of()),
                 new TemplateItem("balaclava", "clothes", 1, List.of("optional")),
                 new TemplateItem("neck tube", "clothes", 1, List.of()),
+                new TemplateItem("scarf", "clothes", 1, List.of()),
                 new TemplateItem("thermal top", "clothes", 1, List.of()),
                 new TemplateItem("thermal bottom", "clothes", 1, List.of()),
                 new TemplateItem("tramping boots", "clothes", 1, List.of())));
