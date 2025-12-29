@@ -35,24 +35,6 @@ public class SearchFactoryImpl implements SearchFactory {
               75.0,
               Condition.USED),
           new Search(
-              URI.create("https://www.trademe.co.nz/a/marketplace/sports/golf/putters/search"),
-              "taylormade mallet putter",
-              null,
-              100.0,
-              Condition.USED),
-          new Search(
-              URI.create("https://www.trademe.co.nz/a/marketplace/sports/golf/putters/search"),
-              "odyssey mallet putter",
-              null,
-              100.0,
-              Condition.USED),
-          new Search(
-              URI.create("https://www.trademe.co.nz/a/marketplace/sports/golf/putters/search"),
-              "wilson mallet putter",
-              null,
-              100.0,
-              Condition.USED),
-          new Search(
               URI.create(
                   "https://www.trademe.co.nz/a/marketplace/computers/components/cpus/amd/search"),
               "ryzen 7 5700x3d",
