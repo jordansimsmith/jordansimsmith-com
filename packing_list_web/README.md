@@ -187,8 +187,11 @@ flowchart TD
 
 ### Local development
 
-- Run the Vite dev server via Bazel:
-  - `bazel run //packing_list_web:vite -- dev`
+- **For hot reloading** (recommended for development): run Vite directly outside Bazel:
+  - `cd packing_list_web && pnpm vite dev`
+  - This enables fast hot module replacement (HMR) when source files change
+- **Via Bazel** (sandboxed, no hot reload): `bazel run //packing_list_web:vite -- dev`
+  - Use this if you need the Bazel-managed environment, but note that source file changes won't auto-reload
 - By default, the app uses the **fake in-memory API client** in dev mode (no backend required; no network calls)
 - Optionally, switch to the **http API client** to test against the deployed API (e.g. with a Vite env var such as `VITE_API_IMPL=http`)
 

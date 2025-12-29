@@ -9,6 +9,7 @@
     "@mantine/form": "7.13.5",
     "@mantine/hooks": "7.13.5",
     "@mantine/notifications": "7.13.5",
+    "@tabler/icons-react": "^3.26.0",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/react": "^16.1.0",
     "@types/react": "^18.3.18",

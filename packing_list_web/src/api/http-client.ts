@@ -1,5 +1,5 @@
 import { getSession } from '../auth/session';
-import type { ApiClient, TemplatesResponse } from './client';
+import type { ApiClient, TemplatesResponse, TripsResponse } from './client';
 
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
@@ -14,6 +14,35 @@ export function createHttpClient(): ApiClient {
       }
 
       const url = new URL(`${BASE_URL}/templates`);
+      url.searchParams.set('user', session.username);
+
+      const response = await fetch(url.toString(), {
+        headers: {
+          Authorization: `Basic ${session.token}`,
+        },
+      });
+
+      if (!response.ok) {
+        let message = `Request failed: ${response.statusText}`;
+        try {
+          const error = await response.json();
+          message = error.message || message;
+        } catch {
+          // use default message
+        }
+        throw new Error(message);
+      }
+
+      return response.json();
+    },
+
+    async getTrips(): Promise<TripsResponse> {
+      const session = getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const url = new URL(`${BASE_URL}/trips`);
       url.searchParams.set('user', session.username);
 
       const response = await fetch(url.toString(), {

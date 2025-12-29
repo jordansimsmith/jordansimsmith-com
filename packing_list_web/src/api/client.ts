@@ -21,8 +21,23 @@ export interface TemplatesResponse {
   }>;
 }
 
+export interface TripSummary {
+  trip_id: string;
+  name: string;
+  destination: string;
+  departure_date: string;
+  return_date: string;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface TripsResponse {
+  trips: TripSummary[];
+}
+
 export interface ApiClient {
   getTemplates(): Promise<TemplatesResponse>;
+  getTrips(): Promise<TripsResponse>;
 }
 
 export const apiClient: ApiClient = import.meta.env.PROD
