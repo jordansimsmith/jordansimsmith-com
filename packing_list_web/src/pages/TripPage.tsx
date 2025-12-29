@@ -388,7 +388,7 @@ export function TripPage() {
         normalizedName(item.name) === editingItemKey
           ? {
               ...item,
-              category: values.category?.trim() || 'misc/uncategorised',
+              category: values.category?.trim() || 'misc',
               quantity: values.quantity,
               tags: values.tags,
             }
@@ -455,9 +455,11 @@ export function TripPage() {
     : [];
 
   const groupedItems = groupItemsByCategory(filteredItems);
-  const sortedCategories = Array.from(groupedItems.keys()).sort((a, b) =>
-    a.localeCompare(b),
-  );
+  const sortedCategories = Array.from(groupedItems.keys()).sort((a, b) => {
+    if (a === 'misc') return 1;
+    if (b === 'misc') return -1;
+    return a.localeCompare(b);
+  });
 
   return (
     <AppShellLayout>

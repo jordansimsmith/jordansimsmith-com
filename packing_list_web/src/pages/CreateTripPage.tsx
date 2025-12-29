@@ -87,14 +87,18 @@ function formatDateForApi(date: Date): string {
 function groupItemsByCategory(items: TripItem[]): Map<string, TripItem[]> {
   const groups = new Map<string, TripItem[]>();
   for (const item of items) {
-    const category = item.category || 'misc/uncategorised';
+    const category = item.category || 'misc';
     if (!groups.has(category)) {
       groups.set(category, []);
     }
     groups.get(category)!.push(item);
   }
   return new Map(
-    [...groups.entries()].sort((a, b) => a[0].localeCompare(b[0])),
+    [...groups.entries()].sort((a, b) => {
+      if (a[0] === 'misc') return 1;
+      if (b[0] === 'misc') return -1;
+      return a[0].localeCompare(b[0]);
+    }),
   );
 }
 
@@ -287,7 +291,7 @@ export function CreateTripPage() {
         normalizedName(item.name) === editingItemKey
           ? {
               ...item,
-              category: values.category?.trim() || 'misc/uncategorised',
+              category: values.category?.trim() || 'misc',
               quantity: values.quantity,
               tags: values.tags,
             }

@@ -253,4 +253,57 @@ describe('CreateTripPage', () => {
 
     expect(screen.getByRole('button', { name: 'Add item' })).toBeDefined();
   });
+
+  it('sorts misc category last in preview', async () => {
+    sessionStorage.setItem(
+      'packing_list_auth',
+      JSON.stringify({
+        username: 'testuser',
+        token: 'dGVzdHVzZXI6dGVzdHBhc3M=',
+      }),
+    );
+
+    const templatesWithMisc: clientModule.TemplatesResponse = {
+      base_template: {
+        base_template_id: 'generic',
+        name: 'generic',
+        items: [
+          {
+            name: 'drink bottle',
+            category: 'misc',
+            quantity: 1,
+            tags: [],
+          },
+          {
+            name: 'passport',
+            category: 'travel',
+            quantity: 1,
+            tags: [],
+          },
+          {
+            name: 'phone charger',
+            category: 'electronics',
+            quantity: 1,
+            tags: [],
+          },
+        ],
+      },
+      variations: [],
+    };
+
+    vi.spyOn(clientModule.apiClient, 'getTemplates').mockResolvedValue(
+      templatesWithMisc,
+    );
+
+    renderCreateTripPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('passport')).toBeDefined();
+    });
+
+    const categoryHeadings = screen.getAllByText(/electronics|travel|misc/i);
+    expect(categoryHeadings[0].textContent?.toLowerCase()).toBe('electronics');
+    expect(categoryHeadings[1].textContent?.toLowerCase()).toBe('travel');
+    expect(categoryHeadings[2].textContent?.toLowerCase()).toBe('misc');
+  });
 });

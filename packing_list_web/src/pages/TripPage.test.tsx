@@ -176,6 +176,62 @@ describe('TripPage', () => {
     expect(categoryHeadings[2].textContent?.toLowerCase()).toBe('travel');
   });
 
+  it('sorts misc category last', async () => {
+    sessionStorage.setItem(
+      'packing_list_auth',
+      JSON.stringify({
+        username: 'testuser',
+        token: 'dGVzdHVzZXI6dGVzdHBhc3M=',
+      }),
+    );
+
+    vi.spyOn(clientModule.apiClient, 'getTrip').mockResolvedValue({
+      trip: {
+        trip_id: 'trip-001',
+        name: 'Test Trip',
+        destination: 'Destination',
+        departure_date: '2025-03-15',
+        return_date: '2025-03-29',
+        items: [
+          {
+            name: 'Drink bottle',
+            category: 'misc',
+            quantity: 1,
+            tags: [],
+            status: 'unpacked',
+          },
+          {
+            name: 'Laptop',
+            category: 'electronics',
+            quantity: 1,
+            tags: [],
+            status: 'unpacked',
+          },
+          {
+            name: 'Passport',
+            category: 'travel',
+            quantity: 1,
+            tags: [],
+            status: 'unpacked',
+          },
+        ],
+        created_at: 1735000000,
+        updated_at: 1735000000,
+      },
+    });
+
+    renderTripPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Test Trip')).toBeDefined();
+    });
+
+    const categoryHeadings = screen.getAllByText(/electronics|travel|misc/i);
+    expect(categoryHeadings[0].textContent?.toLowerCase()).toBe('electronics');
+    expect(categoryHeadings[1].textContent?.toLowerCase()).toBe('travel');
+    expect(categoryHeadings[2].textContent?.toLowerCase()).toBe('misc');
+  });
+
   it('hides packed items when hide packed toggle is enabled', async () => {
     const user = userEvent.setup();
 
