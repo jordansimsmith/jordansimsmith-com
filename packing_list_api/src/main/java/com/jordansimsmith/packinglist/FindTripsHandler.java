@@ -80,7 +80,12 @@ public class FindTripsHandler
 
     return APIGatewayV2HTTPResponse.builder()
         .withStatusCode(200)
-        .withHeaders(Map.of("Content-Type", "application/json; charset=utf-8"))
+        .withHeaders(
+            Map.of(
+                "Content-Type",
+                "application/json; charset=utf-8",
+                "Access-Control-Allow-Origin",
+                "https://packing-list.jordansimsmith.com"))
         .withBody(objectMapper.writeValueAsString(response))
         .build();
   }

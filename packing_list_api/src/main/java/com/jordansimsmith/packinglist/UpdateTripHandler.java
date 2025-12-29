@@ -72,7 +72,12 @@ public class UpdateTripHandler
     if (!pathTripId.equals(request.tripId())) {
       return APIGatewayV2HTTPResponse.builder()
           .withStatusCode(400)
-          .withHeaders(Map.of("Content-Type", "application/json; charset=utf-8"))
+          .withHeaders(
+              Map.of(
+                  "Content-Type",
+                  "application/json; charset=utf-8",
+                  "Access-Control-Allow-Origin",
+                  "https://packing-list.jordansimsmith.com"))
           .withBody(objectMapper.writeValueAsString(new ErrorResponse("trip_id mismatch")))
           .build();
     }
@@ -88,7 +93,12 @@ public class UpdateTripHandler
     if (existingItem == null) {
       return APIGatewayV2HTTPResponse.builder()
           .withStatusCode(404)
-          .withHeaders(Map.of("Content-Type", "application/json; charset=utf-8"))
+          .withHeaders(
+              Map.of(
+                  "Content-Type",
+                  "application/json; charset=utf-8",
+                  "Access-Control-Allow-Origin",
+                  "https://packing-list.jordansimsmith.com"))
           .withBody(objectMapper.writeValueAsString(new ErrorResponse("Not Found")))
           .build();
     }
@@ -112,7 +122,12 @@ public class UpdateTripHandler
     } catch (TripValidator.ValidationException e) {
       return APIGatewayV2HTTPResponse.builder()
           .withStatusCode(400)
-          .withHeaders(Map.of("Content-Type", "application/json; charset=utf-8"))
+          .withHeaders(
+              Map.of(
+                  "Content-Type",
+                  "application/json; charset=utf-8",
+                  "Access-Control-Allow-Origin",
+                  "https://packing-list.jordansimsmith.com"))
           .withBody(objectMapper.writeValueAsString(new ErrorResponse(e.getMessage())))
           .build();
     }
@@ -150,7 +165,12 @@ public class UpdateTripHandler
 
     return APIGatewayV2HTTPResponse.builder()
         .withStatusCode(200)
-        .withHeaders(Map.of("Content-Type", "application/json; charset=utf-8"))
+        .withHeaders(
+            Map.of(
+                "Content-Type",
+                "application/json; charset=utf-8",
+                "Access-Control-Allow-Origin",
+                "https://packing-list.jordansimsmith.com"))
         .withBody(objectMapper.writeValueAsString(response))
         .build();
   }

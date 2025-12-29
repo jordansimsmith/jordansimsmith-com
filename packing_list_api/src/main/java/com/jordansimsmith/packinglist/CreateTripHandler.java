@@ -87,7 +87,12 @@ public class CreateTripHandler
     } catch (TripValidator.ValidationException e) {
       return APIGatewayV2HTTPResponse.builder()
           .withStatusCode(400)
-          .withHeaders(Map.of("Content-Type", "application/json; charset=utf-8"))
+          .withHeaders(
+              Map.of(
+                  "Content-Type",
+                  "application/json; charset=utf-8",
+                  "Access-Control-Allow-Origin",
+                  "https://packing-list.jordansimsmith.com"))
           .withBody(objectMapper.writeValueAsString(new ErrorResponse(e.getMessage())))
           .build();
     }
@@ -125,7 +130,12 @@ public class CreateTripHandler
 
     return APIGatewayV2HTTPResponse.builder()
         .withStatusCode(201)
-        .withHeaders(Map.of("Content-Type", "application/json; charset=utf-8"))
+        .withHeaders(
+            Map.of(
+                "Content-Type",
+                "application/json; charset=utf-8",
+                "Access-Control-Allow-Origin",
+                "https://packing-list.jordansimsmith.com"))
         .withBody(objectMapper.writeValueAsString(response))
         .build();
   }
