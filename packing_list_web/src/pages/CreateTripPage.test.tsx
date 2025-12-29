@@ -170,6 +170,63 @@ describe('CreateTripPage', () => {
     expect(screen.getByText('1 items')).toBeDefined();
   });
 
+  it('sorts items alphabetically within variation accordion', async () => {
+    sessionStorage.setItem(
+      'packing_list_auth',
+      JSON.stringify({
+        username: 'testuser',
+        token: 'dGVzdHVzZXI6dGVzdHBhc3M=',
+      }),
+    );
+
+    const templatesWithMultipleVariationItems: clientModule.TemplatesResponse =
+      {
+        base_template: {
+          base_template_id: 'generic',
+          name: 'generic',
+          items: [],
+        },
+        variations: [
+          {
+            variation_id: 'winter',
+            name: 'winter',
+            items: [
+              {
+                name: 'thermal underwear',
+                category: 'clothes',
+                quantity: 1,
+                tags: [],
+              },
+              { name: 'beanie', category: 'clothes', quantity: 1, tags: [] },
+              { name: 'scarf', category: 'clothes', quantity: 1, tags: [] },
+            ],
+          },
+        ],
+      };
+
+    vi.spyOn(clientModule.apiClient, 'getTemplates').mockResolvedValue(
+      templatesWithMultipleVariationItems,
+    );
+
+    const user = userEvent.setup();
+    renderCreateTripPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('winter')).toBeDefined();
+    });
+
+    await user.click(screen.getByText('winter'));
+
+    await waitFor(() => {
+      expect(screen.getByText('beanie')).toBeDefined();
+    });
+
+    const itemTexts = screen
+      .getAllByText(/thermal underwear|beanie|scarf/)
+      .map((el) => el.textContent?.trim());
+    expect(itemTexts).toEqual(['beanie', 'scarf', 'thermal underwear']);
+  });
+
   it('adds variation items when variation is added', async () => {
     sessionStorage.setItem(
       'packing_list_auth',

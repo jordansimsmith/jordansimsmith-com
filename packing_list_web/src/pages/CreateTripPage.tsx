@@ -429,12 +429,15 @@ export function CreateTripPage() {
                             </Accordion.Control>
                             <Accordion.Panel>
                               <Stack gap="xs">
-                                {variation.items.map((item) => (
-                                  <Text key={item.name} size="sm">
-                                    {item.name}{' '}
-                                    {item.quantity > 1 && `(×${item.quantity})`}
-                                  </Text>
-                                ))}
+                                {[...variation.items]
+                                  .sort((a, b) => a.name.localeCompare(b.name))
+                                  .map((item) => (
+                                    <Text key={item.name} size="sm">
+                                      {item.name}{' '}
+                                      {item.quantity > 1 &&
+                                        `(×${item.quantity})`}
+                                    </Text>
+                                  ))}
                                 {!addedVariations.has(
                                   variation.variation_id,
                                 ) && (
