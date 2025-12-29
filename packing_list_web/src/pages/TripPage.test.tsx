@@ -286,4 +286,76 @@ describe('TripPage', () => {
     });
     expect(screen.getByText('×5')).toBeDefined();
   });
+
+  it('updates item status and calls updateTrip API with debounce', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    sessionStorage.setItem(
+      'packing_list_auth',
+      JSON.stringify({
+        username: 'testuser',
+        token: 'dGVzdHVzZXI6dGVzdHBhc3M=',
+      }),
+    );
+
+    const mockTrip = {
+      trip_id: 'trip-001',
+      name: 'Test Trip',
+      destination: 'Destination',
+      departure_date: '2025-03-15',
+      return_date: '2025-03-29',
+      items: [
+        {
+          name: 'Passport',
+          category: 'travel',
+          quantity: 1,
+          tags: [],
+          status: 'unpacked' as const,
+        },
+      ],
+      created_at: 1735000000,
+      updated_at: 1735000000,
+    };
+
+    vi.spyOn(clientModule.apiClient, 'getTrip').mockResolvedValue({
+      trip: mockTrip,
+    });
+
+    const updateTripSpy = vi
+      .spyOn(clientModule.apiClient, 'updateTrip')
+      .mockResolvedValue({
+        trip: {
+          ...mockTrip,
+          items: [{ ...mockTrip.items[0], status: 'packed' }],
+        },
+      });
+
+    renderTripPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Passport')).toBeDefined();
+    });
+
+    const packedOption = screen.getByRole('radio', { name: 'Packed' });
+    await user.click(packedOption);
+
+    expect(updateTripSpy).not.toHaveBeenCalled();
+
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(updateTripSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        trip_id: 'trip-001',
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            name: 'Passport',
+            status: 'packed',
+          }),
+        ]),
+      }),
+    );
+
+    vi.useRealTimers();
+  });
 });

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -13,6 +13,7 @@ import {
   Box,
   Divider,
   ActionIcon,
+  Loader,
 } from '@mantine/core';
 import { IconArrowLeft } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
@@ -44,9 +45,10 @@ function getStatusColor(status: TripItemStatus): string {
 
 interface ItemRowProps {
   item: TripItem;
+  onStatusChange: (itemName: string, newStatus: TripItemStatus) => void;
 }
 
-function ItemRow({ item }: ItemRowProps) {
+function ItemRow({ item, onStatusChange }: ItemRowProps) {
   return (
     <Box py="sm" px="xs">
       <Group justify="space-between" wrap="nowrap" align="flex-start">
@@ -78,13 +80,15 @@ function ItemRow({ item }: ItemRowProps) {
         <SegmentedControl
           size="xs"
           value={item.status}
+          onChange={(value) =>
+            onStatusChange(item.name, value as TripItemStatus)
+          }
           data={[
             { label: 'Unpacked', value: 'unpacked' },
             { label: 'Pack later', value: 'pack-just-in-time' },
             { label: 'Packed', value: 'packed' },
           ]}
           color={getStatusColor(item.status)}
-          disabled
         />
       </Group>
     </Box>
@@ -108,9 +112,14 @@ function ItemRowSkeleton() {
 interface CategorySectionProps {
   category: string;
   items: TripItem[];
+  onStatusChange: (itemName: string, newStatus: TripItemStatus) => void;
 }
 
-function CategorySection({ category, items }: CategorySectionProps) {
+function CategorySection({
+  category,
+  items,
+  onStatusChange,
+}: CategorySectionProps) {
   return (
     <Box>
       <Text fw={600} size="sm" c="dimmed" tt="uppercase" mb="xs">
@@ -119,7 +128,7 @@ function CategorySection({ category, items }: CategorySectionProps) {
       <Stack gap={0}>
         {items.map((item, index) => (
           <div key={item.name}>
-            <ItemRow item={item} />
+            <ItemRow item={item} onStatusChange={onStatusChange} />
             {index < items.length - 1 && <Divider />}
           </div>
         ))}
@@ -140,6 +149,8 @@ function groupItemsByCategory(items: TripItem[]): Map<string, TripItem[]> {
   return grouped;
 }
 
+const AUTOSAVE_DEBOUNCE_MS = 500;
+
 export function TripPage() {
   const { tripId } = useParams<{ tripId: string }>();
   const navigate = useNavigate();
@@ -147,6 +158,62 @@ export function TripPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hidePacked, setHidePacked] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingTripRef = useRef<Trip | null>(null);
+
+  const saveTrip = useCallback(async (tripToSave: Trip) => {
+    setSaving(true);
+    try {
+      await apiClient.updateTrip({
+        trip_id: tripToSave.trip_id,
+        name: tripToSave.name,
+        destination: tripToSave.destination,
+        departure_date: tripToSave.departure_date,
+        return_date: tripToSave.return_date,
+        items: tripToSave.items,
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to save changes';
+      notifications.show({
+        title: 'Error saving',
+        message,
+        color: 'red',
+      });
+    } finally {
+      setSaving(false);
+    }
+  }, []);
+
+  const debouncedSave = useCallback(
+    (tripToSave: Trip) => {
+      pendingTripRef.current = tripToSave;
+
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
+      saveTimeoutRef.current = setTimeout(() => {
+        if (pendingTripRef.current) {
+          saveTrip(pendingTripRef.current);
+          pendingTripRef.current = null;
+        }
+      }, AUTOSAVE_DEBOUNCE_MS);
+    },
+    [saveTrip],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        if (pendingTripRef.current) {
+          saveTrip(pendingTripRef.current);
+        }
+      }
+    };
+  }, [saveTrip]);
 
   useEffect(() => {
     const fetchTrip = async () => {
@@ -174,6 +241,21 @@ export function TripPage() {
 
     fetchTrip();
   }, [tripId]);
+
+  const handleStatusChange = useCallback(
+    (itemName: string, newStatus: TripItemStatus) => {
+      if (!trip) return;
+
+      const updatedItems = trip.items.map((item) =>
+        item.name === itemName ? { ...item, status: newStatus } : item,
+      );
+
+      const updatedTrip = { ...trip, items: updatedItems };
+      setTrip(updatedTrip);
+      debouncedSave(updatedTrip);
+    },
+    [trip, debouncedSave],
+  );
 
   const filteredItems = trip
     ? hidePacked
@@ -235,7 +317,10 @@ export function TripPage() {
             </Stack>
 
             <Group justify="space-between" align="center">
-              <Text fw={500}>Packing list</Text>
+              <Group gap="xs">
+                <Text fw={500}>Packing list</Text>
+                {saving && <Loader size="xs" />}
+              </Group>
               <Switch
                 label="Hide packed"
                 checked={hidePacked}
@@ -257,6 +342,7 @@ export function TripPage() {
                   key={category}
                   category={category}
                   items={groupedItems.get(category) || []}
+                  onStatusChange={handleStatusChange}
                 />
               ))}
             </Stack>

@@ -6,6 +6,8 @@ import type {
   GetTripResponse,
   TemplatesResponse,
   TripsResponse,
+  UpdateTripRequest,
+  UpdateTripResponse,
 } from './client';
 
 const BASE_URL =
@@ -117,6 +119,38 @@ export function createHttpClient(): ApiClient {
         headers: {
           Authorization: `Basic ${session.token}`,
         },
+      });
+
+      if (!response.ok) {
+        let message = `Request failed: ${response.statusText}`;
+        try {
+          const error = await response.json();
+          message = error.message || message;
+        } catch {
+          // use default message
+        }
+        throw new Error(message);
+      }
+
+      return response.json();
+    },
+
+    async updateTrip(request: UpdateTripRequest): Promise<UpdateTripResponse> {
+      const session = getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const url = new URL(`${BASE_URL}/trips/${request.trip_id}`);
+      url.searchParams.set('user', session.username);
+
+      const response = await fetch(url.toString(), {
+        method: 'PUT',
+        headers: {
+          Authorization: `Basic ${session.token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(request),
       });
 
       if (!response.ok) {

@@ -7,6 +7,8 @@ import type {
   TemplatesResponse,
   Trip,
   TripsResponse,
+  UpdateTripRequest,
+  UpdateTripResponse,
 } from './client';
 
 const trips: Trip[] = [
@@ -283,6 +285,35 @@ export function createFakeClient(): ApiClient {
       }
 
       return { trip };
+    },
+
+    async updateTrip(request: UpdateTripRequest): Promise<UpdateTripResponse> {
+      const session = getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const tripIndex = trips.findIndex((t) => t.trip_id === request.trip_id);
+      if (tripIndex === -1) {
+        throw new Error('Not Found');
+      }
+
+      const existingTrip = trips[tripIndex];
+      const now = Math.floor(Date.now() / 1000);
+      const updatedTrip: Trip = {
+        trip_id: request.trip_id,
+        name: request.name,
+        destination: request.destination,
+        departure_date: request.departure_date,
+        return_date: request.return_date,
+        items: request.items,
+        created_at: existingTrip.created_at,
+        updated_at: now,
+      };
+
+      trips[tripIndex] = updatedTrip;
+
+      return { trip: updatedTrip };
     },
   };
 }
