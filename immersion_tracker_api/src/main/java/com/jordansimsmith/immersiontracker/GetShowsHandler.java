@@ -5,11 +5,10 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,8 +22,8 @@ public class GetShowsHandler
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GetShowsHandler.class);
 
-  private final ObjectMapper objectMapper;
   private final RequestContextFactory requestContextFactory;
+  private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable;
 
   @VisibleForTesting
@@ -43,8 +42,8 @@ public class GetShowsHandler
 
   @VisibleForTesting
   GetShowsHandler(ImmersionTrackerFactory factory) {
-    this.objectMapper = factory.objectMapper();
     this.requestContextFactory = factory.requestContextFactory();
+    this.httpResponseFactory = factory.httpResponseFactory();
     this.immersionTrackerTable = factory.immersionTrackerTable();
   }
 
@@ -80,10 +79,6 @@ public class GetShowsHandler
 
     var res = new GetShowsResponse(shows);
 
-    return APIGatewayV2HTTPResponse.builder()
-        .withStatusCode(200)
-        .withHeaders(Map.of("Content-Type", "application/json; charset=utf-8"))
-        .withBody(objectMapper.writeValueAsString(res))
-        .build();
+    return httpResponseFactory.ok(res);
   }
 }

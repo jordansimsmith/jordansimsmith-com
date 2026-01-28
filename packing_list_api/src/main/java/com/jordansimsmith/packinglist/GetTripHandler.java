@@ -5,10 +5,9 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -25,8 +24,8 @@ public class GetTripHandler
   @VisibleForTesting
   record ErrorResponse(@JsonProperty("message") String message) {}
 
-  private final ObjectMapper objectMapper;
   private final RequestContextFactory requestContextFactory;
+  private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<PackingListItem> packingListTable;
 
   public GetTripHandler() {
@@ -35,8 +34,8 @@ public class GetTripHandler
 
   @VisibleForTesting
   GetTripHandler(PackingListFactory factory) {
-    this.objectMapper = factory.objectMapper();
     this.requestContextFactory = factory.requestContextFactory();
+    this.httpResponseFactory = factory.httpResponseFactory();
     this.packingListTable = factory.packingListTable();
   }
 
@@ -64,16 +63,7 @@ public class GetTripHandler
     var packingListItem = packingListTable.getItem(key);
 
     if (packingListItem == null) {
-      return APIGatewayV2HTTPResponse.builder()
-          .withStatusCode(404)
-          .withHeaders(
-              Map.of(
-                  "Content-Type",
-                  "application/json; charset=utf-8",
-                  "Access-Control-Allow-Origin",
-                  "https://packing-list.jordansimsmith.com"))
-          .withBody(objectMapper.writeValueAsString(new ErrorResponse("Not Found")))
-          .build();
+      return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
 
     var tripItems =
@@ -101,15 +91,6 @@ public class GetTripHandler
 
     var response = new GetTripResponse(trip);
 
-    return APIGatewayV2HTTPResponse.builder()
-        .withStatusCode(200)
-        .withHeaders(
-            Map.of(
-                "Content-Type",
-                "application/json; charset=utf-8",
-                "Access-Control-Allow-Origin",
-                "https://packing-list.jordansimsmith.com"))
-        .withBody(objectMapper.writeValueAsString(response))
-        .build();
+    return httpResponseFactory.ok(response);
   }
 }

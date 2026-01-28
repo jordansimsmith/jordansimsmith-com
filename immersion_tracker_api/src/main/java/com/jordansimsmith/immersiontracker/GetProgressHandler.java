@@ -5,8 +5,8 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.time.Clock;
 import java.time.Duration;
@@ -39,8 +39,8 @@ public class GetProgressHandler
   private static final Duration DEFAULT_EPISODE_DURATION = Duration.ofMinutes(20);
 
   private final Clock clock;
-  private final ObjectMapper objectMapper;
   private final RequestContextFactory requestContextFactory;
+  private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable;
 
   @VisibleForTesting
@@ -98,8 +98,8 @@ public class GetProgressHandler
   @VisibleForTesting
   GetProgressHandler(ImmersionTrackerFactory factory) {
     this.clock = factory.clock();
-    this.objectMapper = factory.objectMapper();
     this.requestContextFactory = factory.requestContextFactory();
+    this.httpResponseFactory = factory.httpResponseFactory();
     this.immersionTrackerTable = factory.immersionTrackerTable();
   }
 
@@ -213,11 +213,7 @@ public class GetProgressHandler
             spotifyShowProgresses,
             movieProgresses);
 
-    return APIGatewayV2HTTPResponse.builder()
-        .withStatusCode(200)
-        .withHeaders(Map.of("Content-Type", "application/json; charset=utf-8"))
-        .withBody(objectMapper.writeValueAsString(res))
-        .build();
+    return httpResponseFactory.ok(res);
   }
 
   private int totalEpisodesWatched(List<ImmersionTrackerItem> episodes) {

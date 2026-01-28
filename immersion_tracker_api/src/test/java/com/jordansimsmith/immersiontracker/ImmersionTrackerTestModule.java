@@ -1,5 +1,7 @@
 package com.jordansimsmith.immersiontracker;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jordansimsmith.http.HttpResponseFactory;
 import dagger.Module;
 import dagger.Provides;
 import javax.inject.Singleton;
@@ -9,6 +11,12 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 
 @Module
 public class ImmersionTrackerTestModule {
+  @Provides
+  @Singleton
+  public HttpResponseFactory httpResponseFactory(ObjectMapper objectMapper) {
+    return new HttpResponseFactory.Builder(objectMapper).build();
+  }
+
   @Provides
   @Singleton
   public DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable(

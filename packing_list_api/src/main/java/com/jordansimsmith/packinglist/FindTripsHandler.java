@@ -5,11 +5,10 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbIndex;
@@ -25,8 +24,8 @@ public class FindTripsHandler
   @VisibleForTesting
   record FindTripsResponse(@JsonProperty("trips") List<TripSummary> trips) {}
 
-  private final ObjectMapper objectMapper;
   private final RequestContextFactory requestContextFactory;
+  private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<PackingListItem> packingListTable;
 
   public FindTripsHandler() {
@@ -35,8 +34,8 @@ public class FindTripsHandler
 
   @VisibleForTesting
   FindTripsHandler(PackingListFactory factory) {
-    this.objectMapper = factory.objectMapper();
     this.requestContextFactory = factory.requestContextFactory();
+    this.httpResponseFactory = factory.httpResponseFactory();
     this.packingListTable = factory.packingListTable();
   }
 
@@ -81,15 +80,6 @@ public class FindTripsHandler
 
     var response = new FindTripsResponse(trips);
 
-    return APIGatewayV2HTTPResponse.builder()
-        .withStatusCode(200)
-        .withHeaders(
-            Map.of(
-                "Content-Type",
-                "application/json; charset=utf-8",
-                "Access-Control-Allow-Origin",
-                "https://packing-list.jordansimsmith.com"))
-        .withBody(objectMapper.writeValueAsString(response))
-        .build();
+    return httpResponseFactory.ok(response);
   }
 }

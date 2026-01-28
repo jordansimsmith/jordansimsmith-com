@@ -7,11 +7,11 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -39,6 +39,7 @@ public class CreateTripHandler
   private final ObjectMapper objectMapper;
   private final Clock clock;
   private final RequestContextFactory requestContextFactory;
+  private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<PackingListItem> packingListTable;
   private final TripValidator tripValidator;
 
@@ -51,6 +52,7 @@ public class CreateTripHandler
     this.objectMapper = factory.objectMapper();
     this.clock = factory.clock();
     this.requestContextFactory = factory.requestContextFactory();
+    this.httpResponseFactory = factory.httpResponseFactory();
     this.packingListTable = factory.packingListTable();
     this.tripValidator = factory.tripValidator();
   }
@@ -88,16 +90,7 @@ public class CreateTripHandler
     try {
       tripValidator.validate(trip);
     } catch (TripValidator.ValidationException e) {
-      return APIGatewayV2HTTPResponse.builder()
-          .withStatusCode(400)
-          .withHeaders(
-              Map.of(
-                  "Content-Type",
-                  "application/json; charset=utf-8",
-                  "Access-Control-Allow-Origin",
-                  "https://packing-list.jordansimsmith.com"))
-          .withBody(objectMapper.writeValueAsString(new ErrorResponse(e.getMessage())))
-          .build();
+      return httpResponseFactory.badRequest(new ErrorResponse(e.getMessage()));
     }
 
     var departureDate = LocalDate.parse(trip.departureDate());
@@ -131,15 +124,6 @@ public class CreateTripHandler
 
     var response = new CreateTripResponse(trip);
 
-    return APIGatewayV2HTTPResponse.builder()
-        .withStatusCode(201)
-        .withHeaders(
-            Map.of(
-                "Content-Type",
-                "application/json; charset=utf-8",
-                "Access-Control-Allow-Origin",
-                "https://packing-list.jordansimsmith.com"))
-        .withBody(objectMapper.writeValueAsString(response))
-        .build();
+    return httpResponseFactory.created(response);
   }
 }

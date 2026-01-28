@@ -5,10 +5,9 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.jordansimsmith.http.HttpResponseFactory;
 import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -41,7 +40,7 @@ public class GetTemplatesHandler
       @JsonProperty("base_template") BaseTemplateResponse baseTemplate,
       @JsonProperty("variations") List<VariationResponse> variations) {}
 
-  private final ObjectMapper objectMapper;
+  private final HttpResponseFactory httpResponseFactory;
   private final TemplatesFactory templatesFactory;
 
   public GetTemplatesHandler() {
@@ -50,7 +49,7 @@ public class GetTemplatesHandler
 
   @VisibleForTesting
   GetTemplatesHandler(PackingListFactory factory) {
-    this.objectMapper = factory.objectMapper();
+    this.httpResponseFactory = factory.httpResponseFactory();
     this.templatesFactory = factory.templatesFactory();
   }
 
@@ -74,16 +73,7 @@ public class GetTemplatesHandler
 
     var response = new GetTemplatesResponse(baseTemplateResponse, variationsResponse);
 
-    return APIGatewayV2HTTPResponse.builder()
-        .withStatusCode(200)
-        .withHeaders(
-            Map.of(
-                "Content-Type",
-                "application/json; charset=utf-8",
-                "Access-Control-Allow-Origin",
-                "https://packing-list.jordansimsmith.com"))
-        .withBody(objectMapper.writeValueAsString(response))
-        .build();
+    return httpResponseFactory.ok(response);
   }
 
   private BaseTemplateResponse toBaseTemplateResponse(TemplatesFactory.BaseTemplate baseTemplate) {

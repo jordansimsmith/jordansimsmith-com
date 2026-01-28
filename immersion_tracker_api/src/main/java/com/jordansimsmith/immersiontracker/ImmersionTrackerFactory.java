@@ -2,6 +2,7 @@ package com.jordansimsmith.immersiontracker;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbModule;
+import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.http.RequestContextModule;
 import com.jordansimsmith.json.ObjectMapperModule;
@@ -31,6 +32,8 @@ public interface ImmersionTrackerFactory {
   ObjectMapper objectMapper();
 
   RequestContextFactory requestContextFactory();
+
+  HttpResponseFactory httpResponseFactory();
 
   DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable();
 

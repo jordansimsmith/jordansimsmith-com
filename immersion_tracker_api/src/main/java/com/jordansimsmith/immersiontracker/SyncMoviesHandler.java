@@ -7,11 +7,11 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.time.Clock;
 import java.time.ZoneId;
 import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -25,6 +25,7 @@ public class SyncMoviesHandler
   private final Clock clock;
   private final ObjectMapper objectMapper;
   private final RequestContextFactory requestContextFactory;
+  private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable;
   private final TvdbClient tvdbClient;
 
@@ -46,6 +47,7 @@ public class SyncMoviesHandler
     this.clock = factory.clock();
     this.objectMapper = factory.objectMapper();
     this.requestContextFactory = factory.requestContextFactory();
+    this.httpResponseFactory = factory.httpResponseFactory();
     this.immersionTrackerTable = factory.immersionTrackerTable();
     this.tvdbClient = factory.tvdbClient();
   }
@@ -97,10 +99,6 @@ public class SyncMoviesHandler
 
     var res = new SyncMoviesResponse(moviesAdded);
 
-    return APIGatewayV2HTTPResponse.builder()
-        .withStatusCode(200)
-        .withHeaders(Map.of("Content-Type", "application/json; charset=utf-8"))
-        .withBody(objectMapper.writeValueAsString(res))
-        .build();
+    return httpResponseFactory.ok(res);
   }
 }
