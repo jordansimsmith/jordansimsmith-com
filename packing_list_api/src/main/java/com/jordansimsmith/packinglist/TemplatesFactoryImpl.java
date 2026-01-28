@@ -32,6 +32,7 @@ public class TemplatesFactoryImpl implements TemplatesFactory {
             new TemplateItem("travel insurance details", "travel", 1, List.of()),
             new TemplateItem("wallet", "travel", 1, List.of("hand luggage")),
             new TemplateItem("house/car keys", "travel", 1, List.of()),
+            new TemplateItem("air tag", "travel", 1, List.of()),
             // electronics
             new TemplateItem("foreign plugs", "electronics", 1, List.of()),
             new TemplateItem("power strip", "electronics", 1, List.of()),
@@ -114,6 +115,9 @@ public class TemplatesFactoryImpl implements TemplatesFactory {
             new TemplateItem("packing cells", "gear", 1, List.of()),
             new TemplateItem("rubber gloves", "gear", 1, List.of()),
             new TemplateItem("shopping bag", "gear", 1, List.of()),
+            new TemplateItem("umbrella", "gear", 1, List.of("optional")),
+            new TemplateItem("laundry line", "gear", 1, List.of("optional")),
+            new TemplateItem("resistance band", "gear", 1, List.of("optional")),
             // misc
             new TemplateItem("playing cards", "misc", 1, List.of("optional")));
 
