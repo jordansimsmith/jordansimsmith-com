@@ -39,7 +39,7 @@ function renderTripsPage() {
 describe('TripsPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sessionStorage.clear();
+    localStorage.clear();
     notifications.clean();
   });
 
@@ -60,7 +60,7 @@ describe('TripsPage', () => {
   });
 
   it('displays trips when loaded', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -102,7 +102,7 @@ describe('TripsPage', () => {
   });
 
   it('shows empty state when no trips exist', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -122,7 +122,7 @@ describe('TripsPage', () => {
   });
 
   it('shows error message when loading fails', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',

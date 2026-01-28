@@ -13,11 +13,19 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function HomeRoute() {
+  const session = getSession();
+  if (session) {
+    return <Navigate to="/trips" replace />;
+  }
+  return <LoginPage />;
+}
+
 export function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<LoginPage />} />
+        <Route path="/" element={<HomeRoute />} />
         <Route
           path="/trips"
           element={

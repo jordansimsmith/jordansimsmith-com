@@ -44,7 +44,7 @@ function renderTripPage(tripId: string = 'trip-001') {
 describe('TripPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sessionStorage.clear();
+    localStorage.clear();
     notifications.clean();
   });
 
@@ -74,7 +74,7 @@ describe('TripPage', () => {
   });
 
   it('displays trip details when loaded', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -122,7 +122,7 @@ describe('TripPage', () => {
   });
 
   it('groups items by category and sorts categories alphabetically', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -180,7 +180,7 @@ describe('TripPage', () => {
   });
 
   it('sorts misc category last', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -238,7 +238,7 @@ describe('TripPage', () => {
   it('hides packed items when hide packed toggle is enabled', async () => {
     const user = userEvent.setup();
 
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -289,7 +289,7 @@ describe('TripPage', () => {
   });
 
   it('shows error message when loading fails', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -309,7 +309,7 @@ describe('TripPage', () => {
   });
 
   it('displays quantity badge for items with quantity greater than 1', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -350,7 +350,7 @@ describe('TripPage', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -422,7 +422,7 @@ describe('TripPage', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -502,7 +502,7 @@ describe('TripPage', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -595,7 +595,7 @@ describe('TripPage', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -677,7 +677,7 @@ describe('TripPage', () => {
   });
 
   it('sorts items alphabetically within each category', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -736,7 +736,7 @@ describe('TripPage', () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
 
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',

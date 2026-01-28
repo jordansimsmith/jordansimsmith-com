@@ -83,7 +83,7 @@ const mockTemplatesResponse: clientModule.TemplatesResponse = {
 describe('CreateTripPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sessionStorage.clear();
+    localStorage.clear();
     notifications.clean();
   });
 
@@ -104,7 +104,7 @@ describe('CreateTripPage', () => {
   });
 
   it('displays create trip form when authenticated', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -128,7 +128,7 @@ describe('CreateTripPage', () => {
   });
 
   it('displays base template items in preview', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -150,7 +150,7 @@ describe('CreateTripPage', () => {
   });
 
   it('displays available variations', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -171,7 +171,7 @@ describe('CreateTripPage', () => {
   });
 
   it('sorts items alphabetically within variation accordion', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -228,7 +228,7 @@ describe('CreateTripPage', () => {
   });
 
   it('adds variation items when variation is added', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -262,7 +262,7 @@ describe('CreateTripPage', () => {
   });
 
   it('can remove items from preview', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -290,7 +290,7 @@ describe('CreateTripPage', () => {
   });
 
   it('shows add item button', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -312,7 +312,7 @@ describe('CreateTripPage', () => {
   });
 
   it('sorts misc category last in preview', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',
@@ -365,7 +365,7 @@ describe('CreateTripPage', () => {
   });
 
   it('sorts items alphabetically within each category', async () => {
-    sessionStorage.setItem(
+    localStorage.setItem(
       'packing_list_auth',
       JSON.stringify({
         username: 'testuser',

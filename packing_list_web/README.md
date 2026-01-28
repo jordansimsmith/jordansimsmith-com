@@ -21,7 +21,7 @@ flowchart TD
 - **Login**:
   - collect username/password
   - validate credentials via a lightweight authenticated API call (`GET /templates`) before accepting login
-  - store a Basic auth token in `sessionStorage` (clears when tab is closed)
+  - store a Basic auth token in `localStorage` (persists across browser sessions)
   - logout clears the stored token
 - **Route protection**:
   - unauthenticated access to `/trips/*` redirects to `/`
@@ -63,7 +63,7 @@ flowchart TD
   - UI state in React component state
   - server state via a typed API client (no React Query)
 - **Auth/session**:
-  - Basic token stored in `sessionStorage`
+  - Basic token stored in `localStorage` (persists across browser sessions)
   - http client injects `Authorization` header and `?user=...` query param
 - **Hosting**: S3 + CloudFront (SPA deep-link support)
 - **Infra**: Terraform (aligned with repo patterns from `personal_website_web`)
@@ -147,7 +147,7 @@ flowchart TD
 #### Auth/session
 
 - `auth/session.ts`
-  - read/write/clear Basic token in `sessionStorage`
+  - read/write/clear Basic token in `localStorage`
 
 #### Domain helpers
 
