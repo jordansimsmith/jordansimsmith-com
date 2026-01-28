@@ -25,7 +25,7 @@ def parse_args():
     parser.add_argument(
         "--episode-id",
         required=True,
-        help="Spotify episode ID of the most recent watched episode",
+        help="Spotify episode ID of the most recent watched episode (inclusive)",
     )
     parser.add_argument("--user", required=True, help="User to backfill episodes for")
     parser.add_argument(
@@ -228,9 +228,6 @@ def main():
             continue
 
         if release_date > target_release_date:
-            continue
-
-        if episode.get("id") == args.episode_id:
             continue
 
         stats["considered"] += 1
