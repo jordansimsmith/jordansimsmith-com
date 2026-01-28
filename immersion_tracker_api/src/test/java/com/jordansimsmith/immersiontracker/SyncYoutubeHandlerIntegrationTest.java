@@ -7,8 +7,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.time.FakeClock;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
@@ -76,9 +78,13 @@ public class SyncYoutubeHandlerIntegrationTest {
     var body = objectMapper.writeValueAsString(new SyncYoutubeHandler.SyncYoutubeRequest(videoIds));
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
         APIGatewayV2HTTPEvent.builder()
-            .withQueryStringParameters(Map.of("user", user))
+            .withHeaders(Map.of("Authorization", authHeader))
             .withBody(body)
             .build();
     var res = syncYoutubeHandler.handleRequest(req, null);
@@ -163,9 +169,13 @@ public class SyncYoutubeHandlerIntegrationTest {
     var body = objectMapper.writeValueAsString(new SyncYoutubeHandler.SyncYoutubeRequest(videoIds));
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
         APIGatewayV2HTTPEvent.builder()
-            .withQueryStringParameters(Map.of("user", user))
+            .withHeaders(Map.of("Authorization", authHeader))
             .withBody(body)
             .build();
     var res = syncYoutubeHandler.handleRequest(req, null);
@@ -219,9 +229,13 @@ public class SyncYoutubeHandlerIntegrationTest {
     var body = objectMapper.writeValueAsString(new SyncYoutubeHandler.SyncYoutubeRequest(videoIds));
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
         APIGatewayV2HTTPEvent.builder()
-            .withQueryStringParameters(Map.of("user", user))
+            .withHeaders(Map.of("Authorization", authHeader))
             .withBody(body)
             .build();
     var res = syncYoutubeHandler.handleRequest(req, null);

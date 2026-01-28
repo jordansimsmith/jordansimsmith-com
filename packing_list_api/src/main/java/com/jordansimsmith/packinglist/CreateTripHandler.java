@@ -7,6 +7,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
@@ -37,6 +38,7 @@ public class CreateTripHandler
 
   private final ObjectMapper objectMapper;
   private final Clock clock;
+  private final RequestContextFactory requestContextFactory;
   private final DynamoDbTable<PackingListItem> packingListTable;
   private final TripValidator tripValidator;
 
@@ -48,6 +50,7 @@ public class CreateTripHandler
   CreateTripHandler(PackingListFactory factory) {
     this.objectMapper = factory.objectMapper();
     this.clock = factory.clock();
+    this.requestContextFactory = factory.requestContextFactory();
     this.packingListTable = factory.packingListTable();
     this.tripValidator = factory.tripValidator();
   }
@@ -64,7 +67,7 @@ public class CreateTripHandler
 
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event, Context context)
       throws Exception {
-    var user = event.getQueryStringParameters().get("user");
+    var user = requestContextFactory.createCtx(event).user();
     var request = objectMapper.readValue(event.getBody(), CreateTripRequest.class);
 
     var tripId = UUID.randomUUID().toString();

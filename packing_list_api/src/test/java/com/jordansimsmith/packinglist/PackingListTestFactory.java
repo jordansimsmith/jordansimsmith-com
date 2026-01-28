@@ -1,6 +1,7 @@
 package com.jordansimsmith.packinglist;
 
 import com.jordansimsmith.dynamodb.DynamoDbTestModule;
+import com.jordansimsmith.http.RequestContextModule;
 import com.jordansimsmith.json.ObjectMapperModule;
 import com.jordansimsmith.secrets.FakeSecrets;
 import com.jordansimsmith.secrets.SecretsTestModule;
@@ -20,6 +21,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
       SecretsTestModule.class,
       ClockTestModule.class,
       DynamoDbTestModule.class,
+      RequestContextModule.class,
       PackingListTestModule.class
     })
 public interface PackingListTestFactory extends PackingListFactory {

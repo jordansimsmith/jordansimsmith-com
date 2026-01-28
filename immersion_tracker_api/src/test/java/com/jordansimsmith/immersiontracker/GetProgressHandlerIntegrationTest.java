@@ -8,9 +8,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.time.FakeClock;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Base64;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -76,8 +78,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(show3);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getProgressHandler.handleRequest(req, null);
 
     // assert
@@ -121,8 +127,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(show);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getProgressHandler.handleRequest(req, null);
 
     // assert
@@ -156,8 +166,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(show1);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getProgressHandler.handleRequest(req, null);
 
     // assert
@@ -202,8 +216,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(episode4);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getProgressHandler.handleRequest(req, null);
 
     // assert
@@ -238,8 +256,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(episode4);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getProgressHandler.handleRequest(req, null);
 
     // assert
@@ -274,8 +296,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(youtubeVideo2);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getProgressHandler.handleRequest(req, null);
 
     // assert
@@ -328,8 +354,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(recentYoutubeVideo);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getProgressHandler.handleRequest(req, null);
 
     // assert
@@ -388,8 +418,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(recentVideo2);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getProgressHandler.handleRequest(req, null);
 
     // assert
@@ -440,8 +474,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(channel3);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getProgressHandler.handleRequest(req, null);
 
     // assert
@@ -485,8 +523,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(channel2);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getProgressHandler.handleRequest(req, null);
 
     // assert
@@ -558,8 +600,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(video3);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getProgressHandler.handleRequest(req, null);
 
     // assert
@@ -611,8 +657,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(spotifyEpisode2);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getProgressHandler.handleRequest(req, null);
 
     // assert
@@ -665,8 +715,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(recentSpotifyEpisode);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getProgressHandler.handleRequest(req, null);
 
     // assert
@@ -725,8 +779,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(recentEpisode2);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getProgressHandler.handleRequest(req, null);
 
     // assert
@@ -777,8 +835,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(show3);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getProgressHandler.handleRequest(req, null);
 
     // assert
@@ -822,8 +884,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(show2);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getProgressHandler.handleRequest(req, null);
 
     // assert
@@ -886,8 +952,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(spotifyEpisode3);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getProgressHandler.handleRequest(req, null);
 
     // assert
@@ -924,8 +994,12 @@ public class GetProgressHandlerIntegrationTest {
     immersionTrackerTable.putItem(movie2);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getProgressHandler.handleRequest(req, null);
 
     // assert

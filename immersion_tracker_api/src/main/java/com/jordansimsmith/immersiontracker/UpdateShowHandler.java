@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
+import com.jordansimsmith.http.RequestContextFactory;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +20,7 @@ public class UpdateShowHandler
   private static final Logger LOGGER = LoggerFactory.getLogger(UpdateShowHandler.class);
 
   private final ObjectMapper objectMapper;
+  private final RequestContextFactory requestContextFactory;
   private final DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable;
   private final TvdbClient tvdbClient;
 
@@ -36,6 +38,7 @@ public class UpdateShowHandler
   @VisibleForTesting
   UpdateShowHandler(ImmersionTrackerFactory factory) {
     this.objectMapper = factory.objectMapper();
+    this.requestContextFactory = factory.requestContextFactory();
     this.immersionTrackerTable = factory.immersionTrackerTable();
     this.tvdbClient = factory.tvdbClient();
   }
@@ -52,8 +55,7 @@ public class UpdateShowHandler
 
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event, Context context)
       throws Exception {
-    var user = event.getQueryStringParameters().get("user");
-    Preconditions.checkNotNull(user);
+    var user = requestContextFactory.createCtx(event).user();
 
     var body = objectMapper.readValue(event.getBody(), UpdateShowRequest.class);
 

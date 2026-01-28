@@ -443,11 +443,10 @@ def send_request(method, path, body=None):
         "Content-Type": "application/json;charset=UTF-8",
         "Accept": "application/json;charset=UTF-8",
     }
-    params = {"user": user}
     data = json.dumps(body).encode("utf-8") if body else None
 
     res = requests.request(
-        method, url, data=data, params=params, headers=headers, auth=(user, password)
+        method, url, data=data, headers=headers, auth=(user, password)
     )
     if res.status_code != 200:
         raise Exception(

@@ -8,6 +8,8 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -45,6 +47,10 @@ public class PackingListE2ETest {
   @Test
   void shouldCreateListGetUpdateAndGetTrip() throws Exception {
     var user = "testuser";
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
 
     // create trip
     var createRequest =
@@ -62,8 +68,9 @@ public class PackingListE2ETest {
 
     var createHttpRequest =
         HttpRequest.newBuilder()
-            .uri(URI.create(apiUrl + "/trips?user=" + user))
+            .uri(URI.create(apiUrl + "/trips"))
             .header("Content-Type", "application/json")
+            .header("Authorization", authHeader)
             .POST(
                 HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(createRequest)))
             .build();
@@ -87,7 +94,11 @@ public class PackingListE2ETest {
 
     // list trips
     var listHttpRequest =
-        HttpRequest.newBuilder().uri(URI.create(apiUrl + "/trips?user=" + user)).GET().build();
+        HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl + "/trips"))
+            .header("Authorization", authHeader)
+            .GET()
+            .build();
 
     var listHttpResponse = httpClient.send(listHttpRequest, HttpResponse.BodyHandlers.ofString());
     assertThat(listHttpResponse.statusCode()).isEqualTo(200);
@@ -102,7 +113,8 @@ public class PackingListE2ETest {
     // get trip details
     var getHttpRequest =
         HttpRequest.newBuilder()
-            .uri(URI.create(apiUrl + "/trips/" + tripId + "?user=" + user))
+            .uri(URI.create(apiUrl + "/trips/" + tripId))
+            .header("Authorization", authHeader)
             .GET()
             .build();
 
@@ -133,8 +145,9 @@ public class PackingListE2ETest {
 
     var updateHttpRequest =
         HttpRequest.newBuilder()
-            .uri(URI.create(apiUrl + "/trips/" + tripId + "?user=" + user))
+            .uri(URI.create(apiUrl + "/trips/" + tripId))
             .header("Content-Type", "application/json")
+            .header("Authorization", authHeader)
             .PUT(
                 HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(updateRequest)))
             .build();
@@ -158,7 +171,8 @@ public class PackingListE2ETest {
     // get trip details again to verify update persisted
     var getAfterUpdateHttpRequest =
         HttpRequest.newBuilder()
-            .uri(URI.create(apiUrl + "/trips/" + tripId + "?user=" + user))
+            .uri(URI.create(apiUrl + "/trips/" + tripId))
+            .header("Authorization", authHeader)
             .GET()
             .build();
 

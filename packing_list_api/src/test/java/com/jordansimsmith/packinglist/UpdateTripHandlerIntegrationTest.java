@@ -7,8 +7,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.time.FakeClock;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
@@ -99,9 +101,12 @@ public class UpdateTripHandlerIntegrationTest {
         }
         """;
 
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder().encodeToString("alice:password".getBytes(StandardCharsets.UTF_8));
     var event =
         APIGatewayV2HTTPEvent.builder()
-            .withQueryStringParameters(Map.of("user", "alice"))
+            .withHeaders(Map.of("Authorization", authHeader))
             .withPathParameters(Map.of("trip_id", tripId))
             .withBody(requestBody)
             .build();
@@ -166,9 +171,12 @@ public class UpdateTripHandlerIntegrationTest {
         }
         """;
 
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder().encodeToString("alice:password".getBytes(StandardCharsets.UTF_8));
     var event =
         APIGatewayV2HTTPEvent.builder()
-            .withQueryStringParameters(Map.of("user", "alice"))
+            .withHeaders(Map.of("Authorization", authHeader))
             .withPathParameters(Map.of("trip_id", "non-existent-trip"))
             .withBody(requestBody)
             .build();
@@ -220,9 +228,12 @@ public class UpdateTripHandlerIntegrationTest {
         }
         """;
 
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder().encodeToString("alice:password".getBytes(StandardCharsets.UTF_8));
     var event =
         APIGatewayV2HTTPEvent.builder()
-            .withQueryStringParameters(Map.of("user", "alice"))
+            .withHeaders(Map.of("Authorization", authHeader))
             .withPathParameters(Map.of("trip_id", tripId))
             .withBody(requestBody)
             .build();
@@ -274,9 +285,12 @@ public class UpdateTripHandlerIntegrationTest {
         }
         """;
 
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder().encodeToString("alice:password".getBytes(StandardCharsets.UTF_8));
     var event =
         APIGatewayV2HTTPEvent.builder()
-            .withQueryStringParameters(Map.of("user", "alice"))
+            .withHeaders(Map.of("Authorization", authHeader))
             .withPathParameters(Map.of("trip_id", tripId))
             .withBody(requestBody)
             .build();
@@ -333,9 +347,12 @@ public class UpdateTripHandlerIntegrationTest {
         }
         """;
 
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder().encodeToString("bob:password".getBytes(StandardCharsets.UTF_8));
     var event =
         APIGatewayV2HTTPEvent.builder()
-            .withQueryStringParameters(Map.of("user", "bob"))
+            .withHeaders(Map.of("Authorization", authHeader))
             .withPathParameters(Map.of("trip_id", tripId))
             .withBody(requestBody)
             .build();
@@ -398,9 +415,12 @@ public class UpdateTripHandlerIntegrationTest {
         }
         """;
 
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder().encodeToString("alice:password".getBytes(StandardCharsets.UTF_8));
     var event =
         APIGatewayV2HTTPEvent.builder()
-            .withQueryStringParameters(Map.of("user", "alice"))
+            .withHeaders(Map.of("Authorization", authHeader))
             .withPathParameters(Map.of("trip_id", tripId))
             .withBody(requestBody)
             .build();

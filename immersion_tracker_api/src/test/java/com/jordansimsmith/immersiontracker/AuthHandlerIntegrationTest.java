@@ -127,35 +127,4 @@ public class AuthHandlerIntegrationTest {
     var policy = IamPolicy.fromJson(json);
     assertThat(policy.statements().get(0).effect()).isEqualTo(IamEffect.DENY);
   }
-
-  @Test
-  void handleRequestShouldDenyNonMatchingUser() throws Exception {
-    // arrange
-    var secret =
-        """
-        {
-          "users": [
-            {
-              "user": "alice",
-              "password": "123"
-            }
-          ]
-        }
-        """;
-    fakeSecrets.set(AuthHandler.SECRET, secret);
-    var token =
-        "Basic " + Base64.getEncoder().encodeToString("alice:456".getBytes(StandardCharsets.UTF_8));
-    var headers = Map.of("Authorization", token);
-    var queryStringParameters = Map.of("user", "bob");
-    var event = new AuthHandler.AuthorizerEvent(headers, queryStringParameters, "method");
-
-    // act
-    var res = authHandler.handleRequest(event, null);
-
-    // assert
-    assertThat(res.principalId()).isEqualTo("alice");
-    var json = objectMapper.writeValueAsString(res.policyDocument());
-    var policy = IamPolicy.fromJson(json);
-    assertThat(policy.statements().get(0).effect()).isEqualTo(IamEffect.DENY);
-  }
 }

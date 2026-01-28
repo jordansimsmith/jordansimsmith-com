@@ -22,10 +22,7 @@ export function createHttpClient(): ApiClient {
         throw new Error('Not authenticated');
       }
 
-      const url = new URL(`${BASE_URL}/templates`);
-      url.searchParams.set('user', session.username);
-
-      const response = await fetch(url.toString(), {
+      const response = await fetch(`${BASE_URL}/templates`, {
         headers: {
           Authorization: `Basic ${session.token}`,
         },
@@ -51,10 +48,7 @@ export function createHttpClient(): ApiClient {
         throw new Error('Not authenticated');
       }
 
-      const url = new URL(`${BASE_URL}/trips`);
-      url.searchParams.set('user', session.username);
-
-      const response = await fetch(url.toString(), {
+      const response = await fetch(`${BASE_URL}/trips`, {
         headers: {
           Authorization: `Basic ${session.token}`,
         },
@@ -80,10 +74,7 @@ export function createHttpClient(): ApiClient {
         throw new Error('Not authenticated');
       }
 
-      const url = new URL(`${BASE_URL}/trips`);
-      url.searchParams.set('user', session.username);
-
-      const response = await fetch(url.toString(), {
+      const response = await fetch(`${BASE_URL}/trips`, {
         method: 'POST',
         headers: {
           Authorization: `Basic ${session.token}`,
@@ -112,10 +103,7 @@ export function createHttpClient(): ApiClient {
         throw new Error('Not authenticated');
       }
 
-      const url = new URL(`${BASE_URL}/trips/${tripId}`);
-      url.searchParams.set('user', session.username);
-
-      const response = await fetch(url.toString(), {
+      const response = await fetch(`${BASE_URL}/trips/${tripId}`, {
         headers: {
           Authorization: `Basic ${session.token}`,
         },
@@ -141,10 +129,7 @@ export function createHttpClient(): ApiClient {
         throw new Error('Not authenticated');
       }
 
-      const url = new URL(`${BASE_URL}/trips/${request.trip_id}`);
-      url.searchParams.set('user', session.username);
-
-      const response = await fetch(url.toString(), {
+      const response = await fetch(`${BASE_URL}/trips/${request.trip_id}`, {
         method: 'PUT',
         headers: {
           Authorization: `Basic ${session.token}`,

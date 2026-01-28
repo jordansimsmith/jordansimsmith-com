@@ -6,7 +6,9 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -59,8 +61,12 @@ public class GetShowsHandlerIntegrationTest {
     immersionTrackerTable.putItem(show2);
 
     // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", user)).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
     var res = getShowsHandler.handleRequest(req, null);
 
     // assert

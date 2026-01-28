@@ -6,7 +6,9 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Base64;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -57,9 +59,13 @@ public class UpdateShowHandlerIntegrationTest {
     tvdbClient.addShow(tvdbShow);
 
     var body = new UpdateShowHandler.UpdateShowRequest(show1.getFolderName(), tvdbShow.id());
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     var req =
         APIGatewayV2HTTPEvent.builder()
-            .withQueryStringParameters(Map.of("user", user))
+            .withHeaders(Map.of("Authorization", authHeader))
             .withBody(objectMapper.writeValueAsString(body))
             .build();
 

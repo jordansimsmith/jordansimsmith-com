@@ -7,6 +7,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.jordansimsmith.http.RequestContextFactory;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -25,6 +26,7 @@ public class FindTripsHandler
   record FindTripsResponse(@JsonProperty("trips") List<TripSummary> trips) {}
 
   private final ObjectMapper objectMapper;
+  private final RequestContextFactory requestContextFactory;
   private final DynamoDbTable<PackingListItem> packingListTable;
 
   public FindTripsHandler() {
@@ -34,6 +36,7 @@ public class FindTripsHandler
   @VisibleForTesting
   FindTripsHandler(PackingListFactory factory) {
     this.objectMapper = factory.objectMapper();
+    this.requestContextFactory = factory.requestContextFactory();
     this.packingListTable = factory.packingListTable();
   }
 
@@ -49,7 +52,7 @@ public class FindTripsHandler
 
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event, Context context)
       throws Exception {
-    var user = event.getQueryStringParameters().get("user");
+    var user = requestContextFactory.createCtx(event).user();
 
     DynamoDbIndex<PackingListItem> gsi1Index = packingListTable.index(PackingListItem.GSI1_NAME);
 

@@ -7,8 +7,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.time.FakeClock;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
@@ -51,8 +53,11 @@ public class FindTripsHandlerIntegrationTest {
   @Test
   void handleRequestShouldReturnEmptyListWhenNoTrips() throws Exception {
     // arrange
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder().encodeToString("alice:password".getBytes(StandardCharsets.UTF_8));
     var event =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", "alice")).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
 
     // act
     var response = findTripsHandler.handleRequest(event, null);
@@ -111,8 +116,11 @@ public class FindTripsHandlerIntegrationTest {
     packingListTable.putItem(trip2);
     packingListTable.putItem(trip3);
 
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder().encodeToString("alice:password".getBytes(StandardCharsets.UTF_8));
     var event =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", "alice")).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
 
     // act
     var response = findTripsHandler.handleRequest(event, null);
@@ -170,8 +178,11 @@ public class FindTripsHandlerIntegrationTest {
     packingListTable.putItem(aliceTrip);
     packingListTable.putItem(bobTrip);
 
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder().encodeToString("alice:password".getBytes(StandardCharsets.UTF_8));
     var event =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", "alice")).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
 
     // act
     var response = findTripsHandler.handleRequest(event, null);
@@ -212,8 +223,11 @@ public class FindTripsHandlerIntegrationTest {
 
     packingListTable.putItem(trip);
 
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder().encodeToString("alice:password".getBytes(StandardCharsets.UTF_8));
     var event =
-        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("user", "alice")).build();
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
 
     // act
     var response = findTripsHandler.handleRequest(event, null);

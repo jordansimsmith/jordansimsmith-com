@@ -64,7 +64,7 @@ flowchart TD
   - server state via a typed API client (no React Query)
 - **Auth/session**:
   - Basic token stored in `localStorage` (persists across browser sessions)
-  - http client injects `Authorization` header and `?user=...` query param
+  - http client injects `Authorization` header
 - **Hosting**: S3 + CloudFront (SPA deep-link support)
 - **Infra**: Terraform (aligned with repo patterns from `personal_website_web`)
 - **Build system**: Bazel (aligned with repo patterns)

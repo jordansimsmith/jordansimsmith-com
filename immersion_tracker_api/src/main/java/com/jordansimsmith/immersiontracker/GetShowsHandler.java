@@ -7,7 +7,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import com.jordansimsmith.http.RequestContextFactory;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -24,6 +24,7 @@ public class GetShowsHandler
   private static final Logger LOGGER = LoggerFactory.getLogger(GetShowsHandler.class);
 
   private final ObjectMapper objectMapper;
+  private final RequestContextFactory requestContextFactory;
   private final DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable;
 
   @VisibleForTesting
@@ -43,6 +44,7 @@ public class GetShowsHandler
   @VisibleForTesting
   GetShowsHandler(ImmersionTrackerFactory factory) {
     this.objectMapper = factory.objectMapper();
+    this.requestContextFactory = factory.requestContextFactory();
     this.immersionTrackerTable = factory.immersionTrackerTable();
   }
 
@@ -58,8 +60,7 @@ public class GetShowsHandler
 
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event, Context context)
       throws Exception {
-    var user = event.getQueryStringParameters().get("user");
-    Preconditions.checkNotNull(user);
+    var user = requestContextFactory.createCtx(event).user();
 
     var query =
         immersionTrackerTable.query(

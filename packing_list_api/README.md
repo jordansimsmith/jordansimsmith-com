@@ -19,7 +19,7 @@ flowchart TD
 ### Functional requirements
 
 - Require authentication for all endpoints via HTTP Basic
-- Enforce user scoping on every request using the `?user=<id>` query parameter
+- Derive user identity from the `Authorization` header (Basic username)
 - Return the base packing template and available variations for client-side list generation (`GET /templates`)
 - Create trips with metadata (`name`, `destination`, `departure_date`, `return_date`) and a fully-materialized snapshot of trip items (`POST /trips`)
 - List trips for the authenticated user ordered by `departure_date` descending (`GET /trips`)
@@ -73,7 +73,7 @@ flowchart TD
 - **Base url**: `https://api.packing-list.jordansimsmith.com`
 - **Auth**:
   - all endpoints require `Authorization: Basic …`
-  - all endpoints require a `user` query parameter (e.g. `?user=alice`)
+  - user identity is derived from the Basic username in the `Authorization` header
   - there is no dedicated “login” endpoint; clients can validate credentials by calling an authenticated endpoint (e.g. `GET /templates`)
   - unauthorized requests are rejected at API Gateway with `WWW-Authenticate: Basic`
 - **Content types**:
@@ -303,8 +303,8 @@ Validation notes:
 ```
 
 - **User scoping**:
-  - all requests include `?user=<id>`
-  - the authorizer denies requests where the authenticated Basic username does not match the query param
+  - user identity is derived from the Basic username in the `Authorization` header
+  - each handler extracts the user from the `Authorization` header and scopes data access accordingly
 
 ### Data persistence model (DynamoDB)
 

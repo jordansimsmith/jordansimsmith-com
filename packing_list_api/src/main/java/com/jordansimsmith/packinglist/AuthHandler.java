@@ -79,10 +79,6 @@ public class AuthHandler implements RequestHandler<AuthorizerEvent, AuthorizerRe
       return response(user.user, IamEffect.DENY, event.methodArn());
     }
 
-    if (!user.user.equals(event.queryStringParameters().get("user"))) {
-      return response(user.user, IamEffect.DENY, event.methodArn());
-    }
-
     return response(user.user, IamEffect.ALLOW, event.methodArn());
   }
 

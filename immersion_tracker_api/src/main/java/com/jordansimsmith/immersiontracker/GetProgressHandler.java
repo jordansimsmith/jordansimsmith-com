@@ -7,7 +7,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
-import com.google.common.base.Preconditions;
+import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -40,6 +40,7 @@ public class GetProgressHandler
 
   private final Clock clock;
   private final ObjectMapper objectMapper;
+  private final RequestContextFactory requestContextFactory;
   private final DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable;
 
   @VisibleForTesting
@@ -98,6 +99,7 @@ public class GetProgressHandler
   GetProgressHandler(ImmersionTrackerFactory factory) {
     this.clock = factory.clock();
     this.objectMapper = factory.objectMapper();
+    this.requestContextFactory = factory.requestContextFactory();
     this.immersionTrackerTable = factory.immersionTrackerTable();
   }
 
@@ -113,8 +115,7 @@ public class GetProgressHandler
 
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event, Context context)
       throws Exception {
-    var user = event.getQueryStringParameters().get("user");
-    Preconditions.checkNotNull(user);
+    var user = requestContextFactory.createCtx(event).user();
 
     var query =
         immersionTrackerTable.query(

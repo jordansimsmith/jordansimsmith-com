@@ -25,6 +25,7 @@ java_library(
     deps = [
         ":dagger",
         "//lib/dynamodb:lib",
+        "//lib/http:lib",
         "//lib/json:lib",
         "//lib/secrets:lib",
         "//lib/time:lib",
@@ -70,6 +71,7 @@ java_binary(
     ],
     deps = [
         ":lib",
+        "//lib/http:lib",
         "//lib/time:lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
@@ -93,6 +95,7 @@ java_binary(
     ],
     deps = [
         ":lib",
+        "//lib/http:lib",
         "//lib/time:lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
@@ -117,6 +120,7 @@ java_binary(
     ],
     deps = [
         ":lib",
+        "//lib/http:lib",
         "//lib/time:lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
@@ -141,6 +145,7 @@ java_binary(
     ],
     deps = [
         ":lib",
+        "//lib/http:lib",
         "//lib/time:lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
@@ -165,6 +170,7 @@ java_binary(
     ],
     deps = [
         ":lib",
+        "//lib/http:lib",
         "//lib/time:lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
@@ -189,6 +195,7 @@ java_binary(
     ],
     deps = [
         ":lib",
+        "//lib/http:lib",
         "//lib/time:lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
@@ -213,6 +220,7 @@ java_binary(
     ],
     deps = [
         ":lib",
+        "//lib/http:lib",
         "//lib/time:lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
@@ -242,6 +250,7 @@ java_library(
         ":dagger",
         ":lib",
         "//lib/dynamodb:lib",
+        "//lib/http:lib",
         "//lib/json:lib",
         "//lib/localstack:lib",
         "//lib/secrets:lib",
@@ -297,6 +306,7 @@ java_test_suite(
         ":test-lib",
         ":update-show-handler",
         "//lib/dynamodb:lib",
+        "//lib/http:lib",
         "//lib/json:lib",
         "//lib/secrets:lib",
         "//lib/testcontainers:lib",
