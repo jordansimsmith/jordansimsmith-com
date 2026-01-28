@@ -22,6 +22,7 @@ import {
   TagsInput,
   CloseButton,
 } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
 import { useDisclosure } from '@mantine/hooks';
 import { IconArrowLeft, IconPencil, IconPlus } from '@tabler/icons-react';
@@ -47,6 +48,13 @@ interface EditItemFormValues {
   tags: string[];
 }
 
+interface EditTripFormValues {
+  name: string;
+  destination: string;
+  departure_date: Date | null;
+  return_date: Date | null;
+}
+
 function formatDate(dateString: string): string {
   const date = new Date(dateString + 'T00:00:00');
   return date.toLocaleDateString(undefined, {
@@ -55,6 +63,17 @@ function formatDate(dateString: string): string {
     day: 'numeric',
     year: 'numeric',
   });
+}
+
+function parseDateFromApi(dateString: string): Date {
+  return new Date(dateString + 'T00:00:00');
+}
+
+function formatDateForApi(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function getStatusColor(status: TripItemStatus): string {
@@ -227,6 +246,10 @@ export function TripPage() {
     editItemModalOpened,
     { open: openEditItemModal, close: closeEditItemModal },
   ] = useDisclosure(false);
+  const [
+    editTripModalOpened,
+    { open: openEditTripModal, close: closeEditTripModal },
+  ] = useDisclosure(false);
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingTripRef = useRef<Trip | null>(null);
@@ -252,6 +275,27 @@ export function TripPage() {
     },
     validate: {
       quantity: (value) => (value >= 1 ? null : 'Quantity must be at least 1'),
+    },
+  });
+
+  const editTripForm = useForm<EditTripFormValues>({
+    initialValues: {
+      name: '',
+      destination: '',
+      departure_date: null,
+      return_date: null,
+    },
+    validate: {
+      name: (value) => (value.trim() ? null : 'Name is required'),
+      destination: (value) => (value.trim() ? null : 'Destination is required'),
+      departure_date: (value) => (value ? null : 'Departure date is required'),
+      return_date: (value, values) => {
+        if (!value) return 'Return date is required';
+        if (values.departure_date && value < values.departure_date) {
+          return 'Return date must be on or after departure date';
+        }
+        return null;
+      },
     },
   });
 
@@ -455,6 +499,38 @@ export function TripPage() {
     [trip, debouncedSave, addItemForm, closeAddItemModal],
   );
 
+  const handleOpenEditTrip = useCallback(() => {
+    if (!trip) return;
+    editTripForm.setValues({
+      name: trip.name,
+      destination: trip.destination,
+      departure_date: parseDateFromApi(trip.departure_date),
+      return_date: parseDateFromApi(trip.return_date),
+    });
+    openEditTripModal();
+  }, [trip, editTripForm, openEditTripModal]);
+
+  const handleEditTrip = useCallback(
+    (values: EditTripFormValues) => {
+      if (!trip || !values.departure_date || !values.return_date) return;
+
+      const updatedTrip: Trip = {
+        ...trip,
+        name: values.name.trim(),
+        destination: values.destination.trim(),
+        departure_date: formatDateForApi(values.departure_date),
+        return_date: formatDateForApi(values.return_date),
+      };
+
+      setTrip(updatedTrip);
+      debouncedSave(updatedTrip);
+
+      editTripForm.reset();
+      closeEditTripModal();
+    },
+    [trip, debouncedSave, editTripForm, closeEditTripModal],
+  );
+
   const filteredItems = trip
     ? hidePacked
       ? trip.items.filter((item) => item.status !== 'packed')
@@ -482,7 +558,16 @@ export function TripPage() {
           {loading ? (
             <Skeleton height={32} width={200} />
           ) : (
-            <Title order={1}>{trip?.name}</Title>
+            <>
+              <Title order={1}>{trip?.name}</Title>
+              <ActionIcon
+                variant="subtle"
+                onClick={handleOpenEditTrip}
+                aria-label="Edit trip details"
+              >
+                <IconPencil size={20} />
+              </ActionIcon>
+            </>
           )}
         </Group>
 
@@ -630,6 +715,47 @@ export function TripPage() {
               />
               <Group justify="flex-end">
                 <Button variant="default" onClick={closeEditItemModal}>
+                  Cancel
+                </Button>
+                <Button type="submit">Save</Button>
+              </Group>
+            </Stack>
+          </form>
+        </Modal>
+
+        <Modal
+          opened={editTripModalOpened}
+          onClose={closeEditTripModal}
+          title="Edit trip details"
+          centered
+        >
+          <form onSubmit={editTripForm.onSubmit(handleEditTrip)}>
+            <Stack>
+              <TextInput
+                label="Name"
+                placeholder="Trip name"
+                data-autofocus
+                {...editTripForm.getInputProps('name')}
+              />
+              <TextInput
+                label="Destination"
+                placeholder="Destination"
+                {...editTripForm.getInputProps('destination')}
+              />
+              <DatePickerInput
+                label="Departure date"
+                placeholder="Select date"
+                valueFormat="DD MMM YYYY"
+                {...editTripForm.getInputProps('departure_date')}
+              />
+              <DatePickerInput
+                label="Return date"
+                placeholder="Select date"
+                valueFormat="DD MMM YYYY"
+                {...editTripForm.getInputProps('return_date')}
+              />
+              <Group justify="flex-end">
+                <Button variant="default" onClick={closeEditTripModal}>
                   Cancel
                 </Button>
                 <Button type="submit">Save</Button>

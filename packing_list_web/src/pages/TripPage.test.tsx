@@ -1,6 +1,7 @@
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
+import { DatesProvider } from '@mantine/dates';
 import { Notifications, notifications } from '@mantine/notifications';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -19,21 +20,23 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 function renderTripPage(tripId: string = 'trip-001') {
   return render(
     <MantineProvider>
-      <Notifications />
-      <MemoryRouter initialEntries={[`/trips/${tripId}`]}>
-        <Routes>
-          <Route path="/" element={<div>Login page</div>} />
-          <Route path="/trips" element={<div>Trips page</div>} />
-          <Route
-            path="/trips/:tripId"
-            element={
-              <RequireAuth>
-                <TripPage />
-              </RequireAuth>
-            }
-          />
-        </Routes>
-      </MemoryRouter>
+      <DatesProvider settings={{}}>
+        <Notifications />
+        <MemoryRouter initialEntries={[`/trips/${tripId}`]}>
+          <Routes>
+            <Route path="/" element={<div>Login page</div>} />
+            <Route path="/trips" element={<div>Trips page</div>} />
+            <Route
+              path="/trips/:tripId"
+              element={
+                <RequireAuth>
+                  <TripPage />
+                </RequireAuth>
+              }
+            />
+          </Routes>
+        </MemoryRouter>
+      </DatesProvider>
     </MantineProvider>,
   );
 }
@@ -727,5 +730,100 @@ describe('TripPage', () => {
       .getAllByText(/Zebra hat|Apple watch|Mittens/)
       .map((el) => el.textContent);
     expect(itemTexts).toEqual(['Apple watch', 'Mittens', 'Zebra hat']);
+  });
+
+  it('can edit trip details via the edit trip modal', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    sessionStorage.setItem(
+      'packing_list_auth',
+      JSON.stringify({
+        username: 'testuser',
+        token: 'dGVzdHVzZXI6dGVzdHBhc3M=',
+      }),
+    );
+
+    const mockTrip = {
+      trip_id: 'trip-001',
+      name: 'Test Trip',
+      destination: 'Tokyo',
+      departure_date: '2025-03-15',
+      return_date: '2025-03-29',
+      items: [
+        {
+          name: 'Passport',
+          category: 'travel',
+          quantity: 1,
+          tags: [],
+          status: 'unpacked' as const,
+        },
+      ],
+      created_at: 1735000000,
+      updated_at: 1735000000,
+    };
+
+    vi.spyOn(clientModule.apiClient, 'getTrip').mockResolvedValue({
+      trip: mockTrip,
+    });
+
+    const updateTripSpy = vi
+      .spyOn(clientModule.apiClient, 'updateTrip')
+      .mockResolvedValue({
+        trip: {
+          ...mockTrip,
+          name: 'Updated Trip Name',
+          destination: 'Osaka',
+        },
+      });
+
+    renderTripPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Test Trip')).toBeDefined();
+    });
+
+    const editTripButton = screen.getByLabelText('Edit trip details');
+    await user.click(editTripButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeDefined();
+    });
+    expect(screen.getByText('Edit trip details')).toBeDefined();
+
+    const nameInput = screen.getByRole('textbox', { name: 'Name' });
+    await user.clear(nameInput);
+    await user.type(nameInput, 'Updated Trip Name');
+
+    const destinationInput = screen.getByRole('textbox', {
+      name: 'Destination',
+    });
+    await user.clear(destinationInput);
+    await user.type(destinationInput, 'Osaka');
+
+    const saveButton = screen.getByRole('button', { name: 'Save' });
+    await user.click(saveButton);
+
+    await waitFor(() => {
+      expect(screen.getByText('Updated Trip Name')).toBeDefined();
+    });
+    expect(screen.getByText('Osaka')).toBeDefined();
+
+    await vi.advanceTimersByTimeAsync(600);
+
+    expect(updateTripSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        trip_id: 'trip-001',
+        name: 'Updated Trip Name',
+        destination: 'Osaka',
+        departure_date: '2025-03-15',
+        return_date: '2025-03-29',
+        items: expect.arrayContaining([
+          expect.objectContaining({ name: 'Passport' }),
+        ]),
+      }),
+    );
+
+    vi.useRealTimers();
   });
 });
