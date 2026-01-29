@@ -14,7 +14,9 @@ public class ImmersionTrackerTestModule {
   @Provides
   @Singleton
   public HttpResponseFactory httpResponseFactory(ObjectMapper objectMapper) {
-    return new HttpResponseFactory.Builder(objectMapper).build();
+    return new HttpResponseFactory.Builder(objectMapper)
+        .withAllowedOrigin("https://immersion-tracker.jordansimsmith.com")
+        .build();
   }
 
   @Provides

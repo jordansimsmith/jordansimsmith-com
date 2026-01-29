@@ -195,4 +195,3 @@ The response includes the fields required to render the dashboard:
 - Terraform implementation should follow the existing pattern used by `packing_list_web/infra/main.tf`:
   - locate Bazel output via `data.external` and `tools/terraform/resolve_location.sh`
   - upload built assets using `hashicorp/dir/template` + `aws_s3_object`
-

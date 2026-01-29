@@ -148,6 +148,7 @@ npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
 npm.npm_translate_lock(
     name = "npm",
     data = [
+        "//immersion_tracker_web:package.json",
         "//packing_list_web:package.json",
         "//personal_website_web:package.json",
     ],

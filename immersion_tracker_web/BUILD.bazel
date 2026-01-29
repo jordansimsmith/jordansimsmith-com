@@ -1,0 +1,183 @@
+load("@aspect_rules_js//js:defs.bzl", "js_library", "js_run_binary")
+load("@aspect_rules_ts//ts:defs.bzl", "ts_project")
+load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@npm//:vite/package_json.bzl", vite_bin = "bin")
+load("@npm//:vitest/package_json.bzl", vitest_bin = "bin")
+
+npm_link_all_packages(
+    name = "node_modules",
+)
+
+js_library(
+    name = "vite-config",
+    srcs = ["vite.config.ts"],
+    deps = [
+        "//:node_modules/@vitejs/plugin-react",
+        "//:node_modules/vite",
+    ],
+)
+
+js_library(
+    name = "vitest-config",
+    srcs = ["vitest.config.ts"],
+    deps = [
+        "//:node_modules/@vitejs/plugin-react",
+        "//:node_modules/vitest",
+    ],
+)
+
+js_library(
+    name = "postcss-config",
+    srcs = ["postcss.config.js"],
+    deps = [
+        "//:node_modules/postcss-preset-mantine",
+        "//:node_modules/postcss-simple-vars",
+    ],
+)
+
+js_library(
+    name = "tsconfig",
+    srcs = ["tsconfig.json"],
+)
+
+ts_project(
+    name = "typecheck",
+    srcs = glob([
+        "src/**/*.d.ts",
+        "src/**/*.ts",
+        "src/**/*.tsx",
+    ]),
+    declaration = True,
+    emit_declaration_only = True,
+    transpiler = "tsc",
+    tsconfig = "tsconfig.json",
+    deps = [
+        "//:node_modules/@mantine/core",
+        "//:node_modules/@mantine/form",
+        "//:node_modules/@mantine/hooks",
+        "//:node_modules/@mantine/notifications",
+        "//:node_modules/@tabler/icons-react",
+        "//:node_modules/@testing-library/react",
+        "//:node_modules/@testing-library/user-event",
+        "//:node_modules/@types/react",
+        "//:node_modules/@types/react-dom",
+        "//:node_modules/react",
+        "//:node_modules/react-dom",
+        "//:node_modules/react-router-dom",
+        "//:node_modules/vite",
+        "//:node_modules/vitest",
+    ],
+)
+
+vite_bin.vite_binary(
+    name = "vite",
+    chdir = package_name(),
+    data = [
+        "index.html",
+        "package.json",
+        ":assets",
+        ":postcss-config",
+        ":public",
+        ":src",
+        ":tsconfig",
+        ":vite-config",
+    ],
+)
+
+js_library(
+    name = "assets",
+    srcs = glob([
+        "src/**/*.css",
+        "src/**/*.svg",
+    ]),
+)
+
+js_library(
+    name = "src",
+    srcs = glob(
+        [
+            "src/**/*.ts",
+            "src/**/*.tsx",
+        ],
+        exclude = [
+            "src/**/*.test.tsx",
+            "src/test-setup.ts",
+        ],
+    ),
+    data = [":assets"],
+    deps = [
+        "//:node_modules/@mantine/core",
+        "//:node_modules/@mantine/form",
+        "//:node_modules/@mantine/hooks",
+        "//:node_modules/@mantine/notifications",
+        "//:node_modules/@tabler/icons-react",
+        "//:node_modules/@types/react",
+        "//:node_modules/@types/react-dom",
+        "//:node_modules/react",
+        "//:node_modules/react-dom",
+        "//:node_modules/react-router-dom",
+    ],
+)
+
+js_library(
+    name = "test-src",
+    srcs = glob([
+        "src/**/*.test.tsx",
+        "src/test-setup.ts",
+    ]),
+    deps = [
+        ":src",
+        "//:node_modules/@mantine/core",
+        "//:node_modules/@mantine/notifications",
+        "//:node_modules/@testing-library/react",
+        "//:node_modules/@testing-library/user-event",
+        "//:node_modules/react-router-dom",
+        "//:node_modules/vitest",
+    ],
+)
+
+filegroup(
+    name = "public",
+    srcs = glob(["public/**/*"]),
+)
+
+js_run_binary(
+    name = "build",
+    srcs = [
+        "index.html",
+        "package.json",
+        ":assets",
+        ":postcss-config",
+        ":public",
+        ":src",
+        ":tsconfig",
+    ],
+    args = ["build"],
+    out_dirs = ["dist"],
+    tool = ":vite",
+)
+
+vite_bin.vite_binary(
+    name = "preview",
+    args = ["preview"],
+    chdir = package_name(),
+    data = [":build"],
+)
+
+vitest_bin.vitest_test(
+    name = "unit-tests",
+    args = ["run"],
+    chdir = package_name(),
+    data = [
+        "package.json",
+        ":assets",
+        ":postcss-config",
+        ":src",
+        ":test-src",
+        ":tsconfig",
+        ":vitest-config",
+        "//:node_modules/@testing-library/dom",
+        "//:node_modules/@testing-library/user-event",
+        "//:node_modules/jsdom",
+    ],
+)
