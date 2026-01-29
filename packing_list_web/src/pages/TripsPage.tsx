@@ -16,16 +16,7 @@ import { useNavigate } from 'react-router-dom';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { apiClient } from '../api/client';
 import type { TripSummary } from '../api/client';
-
-function formatDate(dateString: string): string {
-  const date = new Date(dateString + 'T00:00:00');
-  return date.toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
+import { formatDateDisplay } from '../domain/dates';
 
 function TripRow({ trip }: { trip: TripSummary }) {
   const navigate = useNavigate();
@@ -47,7 +38,8 @@ function TripRow({ trip }: { trip: TripSummary }) {
           </Text>
         </Stack>
         <Text size="sm" c="dimmed" ta="right" style={{ whiteSpace: 'nowrap' }}>
-          {formatDate(trip.departure_date)} – {formatDate(trip.return_date)}
+          {formatDateDisplay(trip.departure_date)} –{' '}
+          {formatDateDisplay(trip.return_date)}
         </Text>
       </Group>
     </Box>

@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef, useCallback } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
   Container,
@@ -8,154 +8,39 @@ import {
   Group,
   Skeleton,
   Switch,
-  Badge,
-  SegmentedControl,
   Box,
   Divider,
   ActionIcon,
   Loader,
   Button,
-  Modal,
-  TextInput,
-  Autocomplete,
-  NumberInput,
-  TagsInput,
-  CloseButton,
 } from '@mantine/core';
-import { DatePickerInput } from '@mantine/dates';
 import { useForm } from '@mantine/form';
-import { useDisclosure } from '@mantine/hooks';
-import { IconArrowLeft, IconPencil, IconPlus } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
+import { IconArrowLeft, IconPencil, IconPlus } from '@tabler/icons-react';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { apiClient } from '../api/client';
 import type { Trip, TripItem, TripItemStatus } from '../api/client';
-
-function normalizedName(name: string): string {
-  return name.toLowerCase().trim().replace(/\s+/g, ' ');
-}
-
-interface AddItemFormValues {
-  name: string;
-  category: string;
-  quantity: number;
-  tags: string[];
-}
-
-interface EditItemFormValues {
-  category: string;
-  quantity: number;
-  tags: string[];
-}
-
-interface EditTripFormValues {
-  name: string;
-  destination: string;
-  departure_date: Date | null;
-  return_date: Date | null;
-}
-
-function formatDate(dateString: string): string {
-  const date = new Date(dateString + 'T00:00:00');
-  return date.toLocaleDateString(undefined, {
-    weekday: 'short',
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
-function parseDateFromApi(dateString: string): Date {
-  return new Date(dateString + 'T00:00:00');
-}
-
-function formatDateForApi(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-function getStatusColor(status: TripItemStatus): string {
-  switch (status) {
-    case 'packed':
-      return 'teal';
-    case 'pack-just-in-time':
-      return 'yellow';
-    case 'unpacked':
-    default:
-      return 'gray';
-  }
-}
-
-interface ItemRowProps {
-  item: TripItem;
-  onStatusChange: (itemName: string, newStatus: TripItemStatus) => void;
-  onEdit: (item: TripItem) => void;
-  onRemove: (itemName: string) => void;
-}
-
-function ItemRow({ item, onStatusChange, onEdit, onRemove }: ItemRowProps) {
-  return (
-    <Box py="sm" px="xs">
-      <Group justify="space-between" wrap="nowrap" align="flex-start">
-        <Stack gap={4} style={{ flex: 1 }}>
-          <Group gap="xs">
-            <Text
-              fw={500}
-              td={item.status === 'packed' ? 'line-through' : undefined}
-              c={item.status === 'packed' ? 'dimmed' : undefined}
-            >
-              {item.name}
-            </Text>
-            {item.quantity > 1 && (
-              <Badge size="sm" variant="light">
-                ×{item.quantity}
-              </Badge>
-            )}
-          </Group>
-          {item.tags.length > 0 && (
-            <Group gap={4}>
-              {item.tags.map((tag) => (
-                <Badge key={tag} size="xs" variant="outline" color="gray">
-                  {tag}
-                </Badge>
-              ))}
-            </Group>
-          )}
-        </Stack>
-        <Group gap="xs" wrap="nowrap">
-          <ActionIcon
-            size="xs"
-            variant="subtle"
-            aria-label={`Edit ${item.name}`}
-            onClick={() => onEdit(item)}
-          >
-            <IconPencil size={14} />
-          </ActionIcon>
-          <CloseButton
-            size="xs"
-            aria-label={`Remove ${item.name}`}
-            onClick={() => onRemove(normalizedName(item.name))}
-          />
-          <SegmentedControl
-            size="xs"
-            value={item.status}
-            onChange={(value) =>
-              onStatusChange(item.name, value as TripItemStatus)
-            }
-            data={[
-              { label: 'Unpacked', value: 'unpacked' },
-              { label: 'Pack later', value: 'pack-just-in-time' },
-              { label: 'Packed', value: 'packed' },
-            ]}
-            color={getStatusColor(item.status)}
-          />
-        </Group>
-      </Group>
-    </Box>
-  );
-}
+import { formatDateDisplay, parseDateFromApi } from '../domain/dates';
+import { CategorySection } from '../components/CategorySection';
+import {
+  AddItemModal,
+  type AddItemFormValues,
+} from '../components/AddItemModal';
+import {
+  EditItemModal,
+  type EditItemFormValues,
+} from '../components/EditItemModal';
+import {
+  TripDetailsModal,
+  type TripFormValues,
+} from '../components/TripDetailsModal';
+import { TripPresenter } from '../presenters/trip-presenter';
+import {
+  groupAndSortItemsByCategory,
+  getExistingCategories,
+  getExistingTags,
+} from '../domain/items';
+import { normalizedName } from '../domain/normalize';
 
 function ItemRowSkeleton() {
   return (
@@ -171,63 +56,11 @@ function ItemRowSkeleton() {
   );
 }
 
-interface CategorySectionProps {
-  category: string;
-  items: TripItem[];
-  onStatusChange: (itemName: string, newStatus: TripItemStatus) => void;
-  onEdit: (item: TripItem) => void;
-  onRemove: (itemName: string) => void;
-}
-
-function CategorySection({
-  category,
-  items,
-  onStatusChange,
-  onEdit,
-  onRemove,
-}: CategorySectionProps) {
-  return (
-    <Box>
-      <Text fw={600} size="sm" c="dimmed" tt="uppercase" mb="xs">
-        {category}
-      </Text>
-      <Stack gap={0}>
-        {items.map((item, index) => (
-          <div key={item.name}>
-            <ItemRow
-              item={item}
-              onStatusChange={onStatusChange}
-              onEdit={onEdit}
-              onRemove={onRemove}
-            />
-            {index < items.length - 1 && <Divider />}
-          </div>
-        ))}
-      </Stack>
-    </Box>
-  );
-}
-
-function groupItemsByCategory(items: TripItem[]): Map<string, TripItem[]> {
-  const grouped = new Map<string, TripItem[]>();
-
-  for (const item of items) {
-    const existing = grouped.get(item.category) || [];
-    existing.push(item);
-    grouped.set(item.category, existing);
-  }
-
-  for (const [category, categoryItems] of grouped) {
-    grouped.set(
-      category,
-      categoryItems.sort((a, b) => a.name.localeCompare(b.name)),
-    );
-  }
-
-  return grouped;
-}
+type ModalType = 'addItem' | 'editItem' | 'editTrip' | null;
 
 const AUTOSAVE_DEBOUNCE_MS = 500;
+
+const presenter = new TripPresenter({ apiClient });
 
 export function TripPage() {
   const { tripId } = useParams<{ tripId: string }>();
@@ -237,19 +70,8 @@ export function TripPage() {
   const [error, setError] = useState<string | null>(null);
   const [hidePacked, setHidePacked] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [editingItemKey, setEditingItemKey] = useState<string | null>(null);
-  const [
-    addItemModalOpened,
-    { open: openAddItemModal, close: closeAddItemModal },
-  ] = useDisclosure(false);
-  const [
-    editItemModalOpened,
-    { open: openEditItemModal, close: closeEditItemModal },
-  ] = useDisclosure(false);
-  const [
-    editTripModalOpened,
-    { open: openEditTripModal, close: closeEditTripModal },
-  ] = useDisclosure(false);
 
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingTripRef = useRef<Trip | null>(null);
@@ -278,7 +100,7 @@ export function TripPage() {
     },
   });
 
-  const editTripForm = useForm<EditTripFormValues>({
+  const editTripForm = useForm<TripFormValues>({
     initialValues: {
       name: '',
       destination: '',
@@ -299,56 +121,32 @@ export function TripPage() {
     },
   });
 
-  const existingCategories = trip
-    ? Array.from(
-        new Set(trip.items.map((item) => item.category).filter(Boolean)),
-      ).sort()
-    : [];
-
-  const existingTags = trip
-    ? Array.from(new Set(trip.items.flatMap((item) => item.tags))).sort()
-    : [];
-
-  const saveTrip = useCallback(async (tripToSave: Trip) => {
+  const saveTrip = async (tripToSave: Trip) => {
     setSaving(true);
     try {
-      await apiClient.updateTrip({
-        trip_id: tripToSave.trip_id,
-        name: tripToSave.name,
-        destination: tripToSave.destination,
-        departure_date: tripToSave.departure_date,
-        return_date: tripToSave.return_date,
-        items: tripToSave.items,
-      });
+      await presenter.saveTrip(tripToSave);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Failed to save changes';
-      notifications.show({
-        title: 'Error saving',
-        message,
-        color: 'red',
-      });
+      notifications.show({ title: 'Error saving', message, color: 'red' });
     } finally {
       setSaving(false);
     }
-  }, []);
+  };
 
-  const debouncedSave = useCallback(
-    (tripToSave: Trip) => {
-      pendingTripRef.current = tripToSave;
+  const scheduleSave = (tripToSave: Trip) => {
+    pendingTripRef.current = tripToSave;
 
-      if (saveTimeoutRef.current) {
-        clearTimeout(saveTimeoutRef.current);
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(() => {
+      if (pendingTripRef.current) {
+        saveTrip(pendingTripRef.current);
+        pendingTripRef.current = null;
       }
-
-      saveTimeoutRef.current = setTimeout(() => {
-        if (pendingTripRef.current) {
-          saveTrip(pendingTripRef.current);
-          pendingTripRef.current = null;
-        }
-      }, AUTOSAVE_DEBOUNCE_MS);
-    },
-    [saveTrip],
-  );
+    }, AUTOSAVE_DEBOUNCE_MS);
+  };
 
   useEffect(() => {
     return () => {
@@ -359,7 +157,7 @@ export function TripPage() {
         }
       }
     };
-  }, [saveTrip]);
+  }, []);
 
   useEffect(() => {
     const fetchTrip = async () => {
@@ -370,16 +168,12 @@ export function TripPage() {
       }
 
       try {
-        const response = await apiClient.getTrip(tripId);
-        setTrip(response.trip);
+        const loadedTrip = await presenter.loadTrip(tripId);
+        setTrip(loadedTrip);
       } catch (e) {
         const message = e instanceof Error ? e.message : 'Failed to load trip';
         setError(message);
-        notifications.show({
-          title: 'Error',
-          message,
-          color: 'red',
-        });
+        notifications.show({ title: 'Error', message, color: 'red' });
       } finally {
         setLoading(false);
       }
@@ -388,118 +182,54 @@ export function TripPage() {
     fetchTrip();
   }, [tripId]);
 
-  const handleStatusChange = useCallback(
-    (itemName: string, newStatus: TripItemStatus) => {
-      if (!trip) return;
+  const handleStatusChange = (itemName: string, newStatus: TripItemStatus) => {
+    if (!trip) return;
+    const updatedTrip = presenter.updateStatus(trip, itemName, newStatus);
+    setTrip(updatedTrip);
+    scheduleSave(updatedTrip);
+  };
 
-      const updatedItems = trip.items.map((item) =>
-        item.name === itemName ? { ...item, status: newStatus } : item,
-      );
+  const handleRemoveItem = (itemKey: string) => {
+    if (!trip) return;
+    const updatedTrip = presenter.removeItem(trip, itemKey);
+    setTrip(updatedTrip);
+    scheduleSave(updatedTrip);
+  };
 
-      const updatedTrip = { ...trip, items: updatedItems };
-      setTrip(updatedTrip);
-      debouncedSave(updatedTrip);
-    },
-    [trip, debouncedSave],
-  );
+  const handleOpenAddItemModal = () => {
+    setActiveModal('addItem');
+  };
 
-  const handleRemoveItem = useCallback(
-    (itemKey: string) => {
-      if (!trip) return;
+  const handleAddItem = (values: AddItemFormValues) => {
+    if (!trip) return;
+    const updatedTrip = presenter.addItem(trip, values);
+    setTrip(updatedTrip);
+    scheduleSave(updatedTrip);
+    addItemForm.reset();
+    setActiveModal(null);
+  };
 
-      const updatedItems = trip.items.filter(
-        (item) => normalizedName(item.name) !== itemKey,
-      );
+  const handleOpenEditItem = (item: TripItem) => {
+    setEditingItemKey(normalizedName(item.name));
+    editItemForm.setValues({
+      category: item.category,
+      quantity: item.quantity,
+      tags: item.tags,
+    });
+    setActiveModal('editItem');
+  };
 
-      const updatedTrip = { ...trip, items: updatedItems };
-      setTrip(updatedTrip);
-      debouncedSave(updatedTrip);
-    },
-    [trip, debouncedSave],
-  );
+  const handleEditItem = (values: EditItemFormValues) => {
+    if (!trip || !editingItemKey) return;
+    const updatedTrip = presenter.editItem(trip, editingItemKey, values);
+    setTrip(updatedTrip);
+    scheduleSave(updatedTrip);
+    setEditingItemKey(null);
+    editItemForm.reset();
+    setActiveModal(null);
+  };
 
-  const handleOpenEditItem = useCallback(
-    (item: TripItem) => {
-      setEditingItemKey(normalizedName(item.name));
-      editItemForm.setValues({
-        category: item.category,
-        quantity: item.quantity,
-        tags: item.tags,
-      });
-      openEditItemModal();
-    },
-    [editItemForm, openEditItemModal],
-  );
-
-  const handleEditItem = useCallback(
-    (values: EditItemFormValues) => {
-      if (!trip || !editingItemKey) return;
-
-      const updatedItems = trip.items.map((item) =>
-        normalizedName(item.name) === editingItemKey
-          ? {
-              ...item,
-              category: values.category?.trim() || 'misc',
-              quantity: values.quantity,
-              tags: values.tags,
-            }
-          : item,
-      );
-
-      const updatedTrip = { ...trip, items: updatedItems };
-      setTrip(updatedTrip);
-      debouncedSave(updatedTrip);
-
-      setEditingItemKey(null);
-      editItemForm.reset();
-      closeEditItemModal();
-    },
-    [trip, editingItemKey, debouncedSave, editItemForm, closeEditItemModal],
-  );
-
-  const handleAddItem = useCallback(
-    (values: AddItemFormValues) => {
-      if (!trip) return;
-
-      const newItem: TripItem = {
-        name: values.name.trim(),
-        category: values.category?.trim() || 'misc/uncategorised',
-        quantity: values.quantity,
-        tags: values.tags,
-        status: 'unpacked',
-      };
-
-      const key = normalizedName(newItem.name);
-      const existingItem = trip.items.find(
-        (item) => normalizedName(item.name) === key,
-      );
-
-      let updatedItems: TripItem[];
-      if (existingItem) {
-        updatedItems = trip.items.map((item) =>
-          normalizedName(item.name) === key
-            ? {
-                ...item,
-                quantity: item.quantity + newItem.quantity,
-                tags: [...new Set([...item.tags, ...newItem.tags])],
-              }
-            : item,
-        );
-      } else {
-        updatedItems = [...trip.items, newItem];
-      }
-
-      const updatedTrip = { ...trip, items: updatedItems };
-      setTrip(updatedTrip);
-      debouncedSave(updatedTrip);
-
-      addItemForm.reset();
-      closeAddItemModal();
-    },
-    [trip, debouncedSave, addItemForm, closeAddItemModal],
-  );
-
-  const handleOpenEditTrip = useCallback(() => {
+  const handleOpenEditTrip = () => {
     if (!trip) return;
     editTripForm.setValues({
       name: trip.name,
@@ -507,42 +237,37 @@ export function TripPage() {
       departure_date: parseDateFromApi(trip.departure_date),
       return_date: parseDateFromApi(trip.return_date),
     });
-    openEditTripModal();
-  }, [trip, editTripForm, openEditTripModal]);
+    setActiveModal('editTrip');
+  };
 
-  const handleEditTrip = useCallback(
-    (values: EditTripFormValues) => {
-      if (!trip || !values.departure_date || !values.return_date) return;
+  const handleEditTrip = (values: TripFormValues) => {
+    if (!trip || !values.departure_date || !values.return_date) return;
+    const updatedTrip = presenter.editTripDetails(trip, {
+      name: values.name,
+      destination: values.destination,
+      departure_date: values.departure_date,
+      return_date: values.return_date,
+    });
+    setTrip(updatedTrip);
+    scheduleSave(updatedTrip);
+    editTripForm.reset();
+    setActiveModal(null);
+  };
 
-      const updatedTrip: Trip = {
-        ...trip,
-        name: values.name.trim(),
-        destination: values.destination.trim(),
-        departure_date: formatDateForApi(values.departure_date),
-        return_date: formatDateForApi(values.return_date),
-      };
-
-      setTrip(updatedTrip);
-      debouncedSave(updatedTrip);
-
-      editTripForm.reset();
-      closeEditTripModal();
-    },
-    [trip, debouncedSave, editTripForm, closeEditTripModal],
-  );
+  const handleCloseModal = () => {
+    setActiveModal(null);
+    setEditingItemKey(null);
+  };
 
   const filteredItems = trip
     ? hidePacked
       ? trip.items.filter((item) => item.status !== 'packed')
       : trip.items
     : [];
-
-  const groupedItems = groupItemsByCategory(filteredItems);
-  const sortedCategories = Array.from(groupedItems.keys()).sort((a, b) => {
-    if (a === 'misc') return 1;
-    if (b === 'misc') return -1;
-    return a.localeCompare(b);
-  });
+  const { grouped, sortedCategories } =
+    groupAndSortItemsByCategory(filteredItems);
+  const existingCategories = trip ? getExistingCategories(trip.items) : [];
+  const existingTags = trip ? getExistingTags(trip.items) : [];
 
   return (
     <AppShellLayout>
@@ -596,8 +321,8 @@ export function TripPage() {
                 {trip.destination}
               </Text>
               <Text size="sm" c="dimmed">
-                {formatDate(trip.departure_date)} –{' '}
-                {formatDate(trip.return_date)}
+                {formatDateDisplay(trip.departure_date)} –{' '}
+                {formatDateDisplay(trip.return_date)}
               </Text>
             </Stack>
 
@@ -626,10 +351,11 @@ export function TripPage() {
                 <CategorySection
                   key={category}
                   category={category}
-                  items={groupedItems.get(category) || []}
-                  onStatusChange={handleStatusChange}
+                  items={grouped.get(category) || []}
                   onEdit={handleOpenEditItem}
                   onRemove={handleRemoveItem}
+                  showStatusControl
+                  onStatusChange={handleStatusChange}
                 />
               ))}
             </Stack>
@@ -639,7 +365,7 @@ export function TripPage() {
             <Button
               variant="light"
               leftSection={<IconPlus size={16} />}
-              onClick={openAddItemModal}
+              onClick={handleOpenAddItemModal}
               fullWidth
             >
               Add item
@@ -647,122 +373,30 @@ export function TripPage() {
           </Stack>
         )}
 
-        <Modal
-          opened={addItemModalOpened}
-          onClose={closeAddItemModal}
-          title="Add item"
-          centered
-        >
-          <form onSubmit={addItemForm.onSubmit(handleAddItem)}>
-            <Stack>
-              <TextInput
-                label="Name"
-                placeholder="Item name"
-                data-autofocus
-                {...addItemForm.getInputProps('name')}
-              />
-              <Autocomplete
-                label="Category"
-                placeholder="Select or type to create"
-                data={existingCategories}
-                {...addItemForm.getInputProps('category')}
-              />
-              <NumberInput
-                label="Quantity"
-                min={1}
-                {...addItemForm.getInputProps('quantity')}
-              />
-              <TagsInput
-                label="Tags"
-                placeholder="Select or type to add"
-                data={existingTags}
-                {...addItemForm.getInputProps('tags')}
-              />
-              <Group justify="flex-end">
-                <Button variant="default" onClick={closeAddItemModal}>
-                  Cancel
-                </Button>
-                <Button type="submit">Add</Button>
-              </Group>
-            </Stack>
-          </form>
-        </Modal>
+        <AddItemModal
+          opened={activeModal === 'addItem'}
+          onClose={handleCloseModal}
+          form={addItemForm}
+          onSubmit={handleAddItem}
+          existingCategories={existingCategories}
+          existingTags={existingTags}
+        />
 
-        <Modal
-          opened={editItemModalOpened}
-          onClose={closeEditItemModal}
-          title="Edit item"
-          centered
-        >
-          <form onSubmit={editItemForm.onSubmit(handleEditItem)}>
-            <Stack>
-              <Autocomplete
-                label="Category"
-                placeholder="Select or type to create"
-                data={existingCategories}
-                {...editItemForm.getInputProps('category')}
-              />
-              <NumberInput
-                label="Quantity"
-                min={1}
-                {...editItemForm.getInputProps('quantity')}
-              />
-              <TagsInput
-                label="Tags"
-                placeholder="Select or type to add"
-                data={existingTags}
-                {...editItemForm.getInputProps('tags')}
-              />
-              <Group justify="flex-end">
-                <Button variant="default" onClick={closeEditItemModal}>
-                  Cancel
-                </Button>
-                <Button type="submit">Save</Button>
-              </Group>
-            </Stack>
-          </form>
-        </Modal>
+        <EditItemModal
+          opened={activeModal === 'editItem'}
+          onClose={handleCloseModal}
+          form={editItemForm}
+          onSubmit={handleEditItem}
+          existingCategories={existingCategories}
+          existingTags={existingTags}
+        />
 
-        <Modal
-          opened={editTripModalOpened}
-          onClose={closeEditTripModal}
-          title="Edit trip details"
-          centered
-        >
-          <form onSubmit={editTripForm.onSubmit(handleEditTrip)}>
-            <Stack>
-              <TextInput
-                label="Name"
-                placeholder="Trip name"
-                data-autofocus
-                {...editTripForm.getInputProps('name')}
-              />
-              <TextInput
-                label="Destination"
-                placeholder="Destination"
-                {...editTripForm.getInputProps('destination')}
-              />
-              <DatePickerInput
-                label="Departure date"
-                placeholder="Select date"
-                valueFormat="DD MMM YYYY"
-                {...editTripForm.getInputProps('departure_date')}
-              />
-              <DatePickerInput
-                label="Return date"
-                placeholder="Select date"
-                valueFormat="DD MMM YYYY"
-                {...editTripForm.getInputProps('return_date')}
-              />
-              <Group justify="flex-end">
-                <Button variant="default" onClick={closeEditTripModal}>
-                  Cancel
-                </Button>
-                <Button type="submit">Save</Button>
-              </Group>
-            </Stack>
-          </form>
-        </Modal>
+        <TripDetailsModal
+          opened={activeModal === 'editTrip'}
+          onClose={handleCloseModal}
+          form={editTripForm}
+          onSubmit={handleEditTrip}
+        />
       </Container>
     </AppShellLayout>
   );
