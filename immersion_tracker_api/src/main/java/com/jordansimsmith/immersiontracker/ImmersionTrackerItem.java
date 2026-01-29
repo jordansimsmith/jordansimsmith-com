@@ -34,11 +34,13 @@ public class ImmersionTrackerItem {
   public static final String YOUTUBE_VIDEO_TITLE = "youtube_video_title";
   public static final String YOUTUBE_CHANNEL_ID = "youtube_channel_id";
   public static final String YOUTUBE_CHANNEL_TITLE = "youtube_channel_title";
+  public static final String YOUTUBE_CHANNEL_ARTWORK_URL = "youtube_channel_artwork_url";
   public static final String YOUTUBE_VIDEO_DURATION = "youtube_video_duration";
   public static final String SPOTIFY_EPISODE_ID = "spotify_episode_id";
   public static final String SPOTIFY_EPISODE_TITLE = "spotify_episode_title";
   public static final String SPOTIFY_SHOW_ID = "spotify_show_id";
   public static final String SPOTIFY_SHOW_NAME = "spotify_show_name";
+  public static final String SPOTIFY_SHOW_ARTWORK_URL = "spotify_show_artwork_url";
   public static final String SPOTIFY_EPISODE_DURATION = "spotify_episode_duration";
   public static final String MOVIE_DURATION = "movie_duration";
   public static final String VERSION = "version";
@@ -57,11 +59,13 @@ public class ImmersionTrackerItem {
   private String youtubeVideoTitle;
   private String youtubeChannelId;
   private String youtubeChannelTitle;
+  private String youtubeChannelArtworkUrl;
   private Duration youtubeVideoDuration;
   private String spotifyEpisodeId;
   private String spotifyEpisodeTitle;
   private String spotifyShowId;
   private String spotifyShowName;
+  private String spotifyShowArtworkUrl;
   private Duration spotifyEpisodeDuration;
   private Duration movieDuration;
   private Long version;
@@ -196,6 +200,15 @@ public class ImmersionTrackerItem {
     this.youtubeChannelTitle = youtubeChannelTitle;
   }
 
+  @DynamoDbAttribute(YOUTUBE_CHANNEL_ARTWORK_URL)
+  public String getYoutubeChannelArtworkUrl() {
+    return youtubeChannelArtworkUrl;
+  }
+
+  public void setYoutubeChannelArtworkUrl(String youtubeChannelArtworkUrl) {
+    this.youtubeChannelArtworkUrl = youtubeChannelArtworkUrl;
+  }
+
   @DynamoDbAttribute(YOUTUBE_VIDEO_DURATION)
   @DynamoDbConvertedBy(DurationSecondsConverter.class)
   public Duration getYoutubeVideoDuration() {
@@ -240,6 +253,15 @@ public class ImmersionTrackerItem {
 
   public void setSpotifyShowName(String spotifyShowName) {
     this.spotifyShowName = spotifyShowName;
+  }
+
+  @DynamoDbAttribute(SPOTIFY_SHOW_ARTWORK_URL)
+  public String getSpotifyShowArtworkUrl() {
+    return spotifyShowArtworkUrl;
+  }
+
+  public void setSpotifyShowArtworkUrl(String spotifyShowArtworkUrl) {
+    this.spotifyShowArtworkUrl = spotifyShowArtworkUrl;
   }
 
   @DynamoDbAttribute(SPOTIFY_EPISODE_DURATION)
@@ -311,6 +333,9 @@ public class ImmersionTrackerItem {
         + ", youtubeChannelTitle='"
         + youtubeChannelTitle
         + '\''
+        + ", youtubeChannelArtworkUrl='"
+        + youtubeChannelArtworkUrl
+        + '\''
         + ", youtubeVideoDuration="
         + youtubeVideoDuration
         + ", spotifyEpisodeId='"
@@ -324,6 +349,9 @@ public class ImmersionTrackerItem {
         + '\''
         + ", spotifyShowName='"
         + spotifyShowName
+        + '\''
+        + ", spotifyShowArtworkUrl='"
+        + spotifyShowArtworkUrl
         + '\''
         + ", spotifyEpisodeDuration="
         + spotifyEpisodeDuration
@@ -350,11 +378,13 @@ public class ImmersionTrackerItem {
         && Objects.equals(youtubeVideoTitle, that.youtubeVideoTitle)
         && Objects.equals(youtubeChannelId, that.youtubeChannelId)
         && Objects.equals(youtubeChannelTitle, that.youtubeChannelTitle)
+        && Objects.equals(youtubeChannelArtworkUrl, that.youtubeChannelArtworkUrl)
         && Objects.equals(youtubeVideoDuration, that.youtubeVideoDuration)
         && Objects.equals(spotifyEpisodeId, that.spotifyEpisodeId)
         && Objects.equals(spotifyEpisodeTitle, that.spotifyEpisodeTitle)
         && Objects.equals(spotifyShowId, that.spotifyShowId)
         && Objects.equals(spotifyShowName, that.spotifyShowName)
+        && Objects.equals(spotifyShowArtworkUrl, that.spotifyShowArtworkUrl)
         && Objects.equals(spotifyEpisodeDuration, that.spotifyEpisodeDuration)
         && Objects.equals(movieDuration, that.movieDuration);
   }
@@ -375,11 +405,13 @@ public class ImmersionTrackerItem {
         youtubeVideoTitle,
         youtubeChannelId,
         youtubeChannelTitle,
+        youtubeChannelArtworkUrl,
         youtubeVideoDuration,
         spotifyEpisodeId,
         spotifyEpisodeTitle,
         spotifyShowId,
         spotifyShowName,
+        spotifyShowArtworkUrl,
         spotifyEpisodeDuration,
         movieDuration);
   }
@@ -457,13 +489,14 @@ public class ImmersionTrackerItem {
   }
 
   public static ImmersionTrackerItem createYoutubeChannel(
-      String user, String channelId, String channelTitle) {
+      String user, String channelId, String channelTitle, String artworkUrl) {
     var channel = new ImmersionTrackerItem();
     channel.setPk(formatPk(user));
     channel.setSk(formatYoutubeChannelSk(channelId));
     channel.setUser(user);
     channel.setYoutubeChannelId(channelId);
     channel.setYoutubeChannelTitle(channelTitle);
+    channel.setYoutubeChannelArtworkUrl(artworkUrl);
     return channel;
   }
 
@@ -487,13 +520,14 @@ public class ImmersionTrackerItem {
   }
 
   public static ImmersionTrackerItem createSpotifyShow(
-      String user, String showId, String showName) {
+      String user, String showId, String showName, String artworkUrl) {
     var show = new ImmersionTrackerItem();
     show.setPk(formatPk(user));
     show.setSk(formatSpotifyShowSk(showId));
     show.setUser(user);
     show.setSpotifyShowId(showId);
     show.setSpotifyShowName(showName);
+    show.setSpotifyShowArtworkUrl(artworkUrl);
     return show;
   }
 

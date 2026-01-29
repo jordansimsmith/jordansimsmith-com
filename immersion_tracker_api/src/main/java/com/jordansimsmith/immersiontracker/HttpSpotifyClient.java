@@ -13,6 +13,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.List;
 
 public class HttpSpotifyClient implements SpotifyClient {
   @VisibleForTesting static final String SECRET = "immersion_tracker_api";
@@ -38,7 +39,13 @@ public class HttpSpotifyClient implements SpotifyClient {
       @JsonProperty("show") EpisodeShow show) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
-  private record EpisodeShow(@JsonProperty("id") String id, @JsonProperty("name") String name) {}
+  private record EpisodeShow(
+      @JsonProperty("id") String id,
+      @JsonProperty("name") String name,
+      @JsonProperty("images") List<SpotifyImage> images) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record SpotifyImage(@JsonProperty("url") String url) {}
 
   @Override
   public Episode getEpisode(String episodeId) {
@@ -85,13 +92,23 @@ public class HttpSpotifyClient implements SpotifyClient {
     Preconditions.checkNotNull(episodeResponse.durationMs(), "Episode duration is null");
 
     var duration = Duration.ofMillis(episodeResponse.durationMs());
+    var showArtworkUrl = selectFirstImageUrl(episodeResponse.show().images());
 
     return new Episode(
         episodeResponse.id(),
         episodeResponse.name(),
         episodeResponse.show().id(),
         episodeResponse.show().name(),
+        showArtworkUrl,
         duration);
+  }
+
+  private String selectFirstImageUrl(List<SpotifyImage> images) {
+    if (images == null || images.isEmpty()) {
+      return null;
+    }
+    var first = images.get(0);
+    return first != null ? first.url() : null;
   }
 
   private String getAccessToken() throws Exception {

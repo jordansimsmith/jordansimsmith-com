@@ -61,7 +61,10 @@ public class HttpSpotifyClientTest {
           },
           "href": "https://api.spotify.com/v1/shows/6Nl8RDfPxsk4h4bfWe76Kg",
           "id": "6Nl8RDfPxsk4h4bfWe76Kg",
-          "images": [],
+          "images": [
+            {"url": "https://i.scdn.co/image/ab6765630000ba8a1234", "height": 640, "width": 640},
+            {"url": "https://i.scdn.co/image/ab6765630000ba8a5678", "height": 300, "width": 300}
+          ],
           "is_externally_hosted": false,
           "languages": ["en-US"],
           "media_type": "audio",
@@ -148,6 +151,7 @@ public class HttpSpotifyClientTest {
     assertThat(episode.title()).isEqualTo("No 1 紹介(しょうかい) Introduction");
     assertThat(episode.showId()).isEqualTo("6Nl8RDfPxsk4h4bfWe76Kg");
     assertThat(episode.showName()).isEqualTo("The Miku Real Japanese Podcast");
+    assertThat(episode.showArtworkUrl()).isEqualTo("https://i.scdn.co/image/ab6765630000ba8a1234");
     assertThat(episode.duration()).isEqualTo(Duration.ofMillis(388284));
   }
 

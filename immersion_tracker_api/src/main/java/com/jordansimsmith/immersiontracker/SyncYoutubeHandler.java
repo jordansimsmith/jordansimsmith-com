@@ -95,9 +95,10 @@ public class SyncYoutubeHandler
                   .build());
 
       if (existingChannel == null) {
+        var channel = youtubeClient.getChannel(video.channelId());
         var channelItem =
             ImmersionTrackerItem.createYoutubeChannel(
-                user, video.channelId(), video.channelTitle());
+                user, channel.id(), channel.title(), channel.artworkUrl());
         immersionTrackerTable.putItem(channelItem);
       }
     }

@@ -66,12 +66,14 @@ public class SyncSpotifyHandlerIntegrationTest {
         "No 1 紹介(しょうかい) Introduction",
         "6Nl8RDfPxsk4h4bfWe76Kg",
         "The Miku Real Japanese Podcast",
+        "https://i.scdn.co/image/miku-podcast-cover",
         Duration.ofMinutes(6).plusSeconds(28));
     fakeSpotifyClient.setEpisode(
         "anotherEpisodeId",
         "Test Episode",
         "testShowId",
         "Test Show",
+        "https://i.scdn.co/image/test-show-cover",
         Duration.ofMinutes(30).plusSeconds(15));
 
     var episodeIds = List.of("4qjerzMw8jfD30VOG0tjpK", "anotherEpisodeId");
@@ -136,10 +138,15 @@ public class SyncSpotifyHandlerIntegrationTest {
 
     var show1 =
         ImmersionTrackerItem.createSpotifyShow(
-            user, "6Nl8RDfPxsk4h4bfWe76Kg", "The Miku Real Japanese Podcast");
+            user,
+            "6Nl8RDfPxsk4h4bfWe76Kg",
+            "The Miku Real Japanese Podcast",
+            "https://i.scdn.co/image/miku-podcast-cover");
     assertThat(items).contains(show1);
 
-    var show2 = ImmersionTrackerItem.createSpotifyShow(user, "testShowId", "Test Show");
+    var show2 =
+        ImmersionTrackerItem.createSpotifyShow(
+            user, "testShowId", "Test Show", "https://i.scdn.co/image/test-show-cover");
     assertThat(items).contains(show2);
   }
 
@@ -154,6 +161,7 @@ public class SyncSpotifyHandlerIntegrationTest {
         "No 1 紹介(しょうかい) Introduction",
         "6Nl8RDfPxsk4h4bfWe76Kg",
         "The Miku Real Japanese Podcast",
+        "https://i.scdn.co/image/miku-podcast-cover",
         Duration.ofMinutes(6).plusSeconds(28));
 
     // Pre-populate with existing episode
@@ -216,9 +224,19 @@ public class SyncSpotifyHandlerIntegrationTest {
     var user = "alice";
 
     fakeSpotifyClient.setEpisode(
-        "episode1", "Episode 1", "testShowId", "Test Show", Duration.ofMinutes(30).plusSeconds(15));
+        "episode1",
+        "Episode 1",
+        "testShowId",
+        "Test Show",
+        "https://i.scdn.co/image/test-show-cover",
+        Duration.ofMinutes(30).plusSeconds(15));
     fakeSpotifyClient.setEpisode(
-        "episode2", "Episode 2", "testShowId", "Test Show", Duration.ofMinutes(25).plusSeconds(20));
+        "episode2",
+        "Episode 2",
+        "testShowId",
+        "Test Show",
+        "https://i.scdn.co/image/test-show-cover",
+        Duration.ofMinutes(25).plusSeconds(20));
 
     var episodeIds = List.of("episode1", "episode2");
     var body =
@@ -279,7 +297,9 @@ public class SyncSpotifyHandlerIntegrationTest {
             clock.now());
     assertThat(items).contains(episode2);
 
-    var show = ImmersionTrackerItem.createSpotifyShow(user, "testShowId", "Test Show");
+    var show =
+        ImmersionTrackerItem.createSpotifyShow(
+            user, "testShowId", "Test Show", "https://i.scdn.co/image/test-show-cover");
     assertThat(items).contains(show);
   }
 }

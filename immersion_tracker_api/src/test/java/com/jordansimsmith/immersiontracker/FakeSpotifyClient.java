@@ -16,7 +16,13 @@ public class FakeSpotifyClient implements SpotifyClient {
   }
 
   public void setEpisode(
-      String episodeId, String title, String showId, String showName, Duration duration) {
-    episodes.put(episodeId, new Episode(episodeId, title, showId, showName, duration));
+      String episodeId,
+      String title,
+      String showId,
+      String showName,
+      String showArtworkUrl,
+      Duration duration) {
+    episodes.put(
+        episodeId, new Episode(episodeId, title, showId, showName, showArtworkUrl, duration));
   }
 }

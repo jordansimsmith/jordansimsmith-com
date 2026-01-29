@@ -460,9 +460,15 @@ public class GetProgressHandlerIntegrationTest {
         ImmersionTrackerItem.createYoutubeVideo(
             user, "UCChannel1", "video5", "Video 5", Duration.ofMinutes(8), now);
 
-    var channel1 = ImmersionTrackerItem.createYoutubeChannel(user, "UCChannel1", "Channel One");
-    var channel2 = ImmersionTrackerItem.createYoutubeChannel(user, "UCChannel2", "Channel Two");
-    var channel3 = ImmersionTrackerItem.createYoutubeChannel(user, "UCChannel3", "Channel Three");
+    var channel1 =
+        ImmersionTrackerItem.createYoutubeChannel(
+            user, "UCChannel1", "Channel One", "https://yt3.ggpht.com/channel1");
+    var channel2 =
+        ImmersionTrackerItem.createYoutubeChannel(
+            user, "UCChannel2", "Channel Two", "https://yt3.ggpht.com/channel2");
+    var channel3 =
+        ImmersionTrackerItem.createYoutubeChannel(
+            user, "UCChannel3", "Channel Three", "https://yt3.ggpht.com/channel3");
 
     immersionTrackerTable.putItem(video1);
     immersionTrackerTable.putItem(video2);
@@ -515,7 +521,9 @@ public class GetProgressHandlerIntegrationTest {
         ImmersionTrackerItem.createYoutubeVideo(
             user, "UCChannel2", "video3", "Video 3", Duration.ofMinutes(20), now);
 
-    var channel2 = ImmersionTrackerItem.createYoutubeChannel(user, "UCChannel2", "Channel Two");
+    var channel2 =
+        ImmersionTrackerItem.createYoutubeChannel(
+            user, "UCChannel2", "Channel Two", "https://yt3.ggpht.com/channel2");
 
     immersionTrackerTable.putItem(video1);
     immersionTrackerTable.putItem(video2);
@@ -821,9 +829,15 @@ public class GetProgressHandlerIntegrationTest {
         ImmersionTrackerItem.createSpotifyEpisode(
             user, "testShowId1", "episode5", "Episode 5", Duration.ofMinutes(8), now);
 
-    var show1 = ImmersionTrackerItem.createSpotifyShow(user, "testShowId1", "Show One");
-    var show2 = ImmersionTrackerItem.createSpotifyShow(user, "testShowId2", "Show Two");
-    var show3 = ImmersionTrackerItem.createSpotifyShow(user, "testShowId3", "Show Three");
+    var show1 =
+        ImmersionTrackerItem.createSpotifyShow(
+            user, "testShowId1", "Show One", "https://i.scdn.co/image/show1");
+    var show2 =
+        ImmersionTrackerItem.createSpotifyShow(
+            user, "testShowId2", "Show Two", "https://i.scdn.co/image/show2");
+    var show3 =
+        ImmersionTrackerItem.createSpotifyShow(
+            user, "testShowId3", "Show Three", "https://i.scdn.co/image/show3");
 
     immersionTrackerTable.putItem(episode1);
     immersionTrackerTable.putItem(episode2);
@@ -876,7 +890,9 @@ public class GetProgressHandlerIntegrationTest {
         ImmersionTrackerItem.createSpotifyEpisode(
             user, "testShowId2", "episode3", "Episode 3", Duration.ofMinutes(20), now);
 
-    var show2 = ImmersionTrackerItem.createSpotifyShow(user, "testShowId2", "Show Two");
+    var show2 =
+        ImmersionTrackerItem.createSpotifyShow(
+            user, "testShowId2", "Show Two", "https://i.scdn.co/image/show2");
 
     immersionTrackerTable.putItem(episode1);
     immersionTrackerTable.putItem(episode2);

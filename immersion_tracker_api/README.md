@@ -138,7 +138,8 @@ graph TD
   "sk": "YOUTUBECHANNEL#UCChannelId123",
   "user": "alice",
   "youtube_channel_id": "UCChannelId123",
-  "youtube_channel_title": "Example Channel"
+  "youtube_channel_title": "Example Channel",
+  "youtube_channel_artwork_url": "https://yt3.ggpht.com/ytc/example-channel-thumbnail"
 }
 ```
 
@@ -165,7 +166,8 @@ graph TD
   "sk": "SPOTIFYSHOW#6Nl8RDfPxsk4h4bfWe76Kg",
   "user": "alice",
   "spotify_show_id": "6Nl8RDfPxsk4h4bfWe76Kg",
-  "spotify_show_name": "The Miku Real Japanese Podcast | Japanese conversation | Japanese culture"
+  "spotify_show_name": "The Miku Real Japanese Podcast | Japanese conversation | Japanese culture",
+  "spotify_show_artwork_url": "https://i.scdn.co/image/ab6765630000ba8a1234567890"
 }
 ```
 

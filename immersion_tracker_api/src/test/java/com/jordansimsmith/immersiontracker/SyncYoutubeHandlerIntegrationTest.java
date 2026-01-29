@@ -67,12 +67,16 @@ public class SyncYoutubeHandlerIntegrationTest {
         "UCuAXFkgsw1L7xaCfnd5JJOw",
         "Rick Astley",
         Duration.ofMinutes(3).plusSeconds(32));
+    fakeYoutubeClient.setChannel(
+        "UCuAXFkgsw1L7xaCfnd5JJOw", "Rick Astley", "https://yt3.ggpht.com/rick-astley-thumbnail");
     fakeYoutubeClient.setVideo(
         "jNhQd1gUEFo",
         "Test Video",
         "UCTestChannel",
         "Test Channel",
         Duration.ofMinutes(5).plusSeconds(15));
+    fakeYoutubeClient.setChannel(
+        "UCTestChannel", "Test Channel", "https://yt3.ggpht.com/test-channel-thumbnail");
 
     var videoIds = List.of("dQw4w9WgXcQ", "jNhQd1gUEFo");
     var body = objectMapper.writeValueAsString(new SyncYoutubeHandler.SyncYoutubeRequest(videoIds));
@@ -134,10 +138,16 @@ public class SyncYoutubeHandlerIntegrationTest {
     assertThat(items).contains(video2);
 
     var channel1 =
-        ImmersionTrackerItem.createYoutubeChannel(user, "UCuAXFkgsw1L7xaCfnd5JJOw", "Rick Astley");
+        ImmersionTrackerItem.createYoutubeChannel(
+            user,
+            "UCuAXFkgsw1L7xaCfnd5JJOw",
+            "Rick Astley",
+            "https://yt3.ggpht.com/rick-astley-thumbnail");
     assertThat(items).contains(channel1);
 
-    var channel2 = ImmersionTrackerItem.createYoutubeChannel(user, "UCTestChannel", "Test Channel");
+    var channel2 =
+        ImmersionTrackerItem.createYoutubeChannel(
+            user, "UCTestChannel", "Test Channel", "https://yt3.ggpht.com/test-channel-thumbnail");
     assertThat(items).contains(channel2);
   }
 
@@ -224,6 +234,8 @@ public class SyncYoutubeHandlerIntegrationTest {
         "UCTestChannel",
         "Test Channel",
         Duration.ofMinutes(3).plusSeconds(20));
+    fakeYoutubeClient.setChannel(
+        "UCTestChannel", "Test Channel", "https://yt3.ggpht.com/test-channel-thumbnail");
 
     var videoIds = List.of("video1", "video2");
     var body = objectMapper.writeValueAsString(new SyncYoutubeHandler.SyncYoutubeRequest(videoIds));
@@ -283,7 +295,9 @@ public class SyncYoutubeHandlerIntegrationTest {
             clock.now());
     assertThat(items).contains(video2);
 
-    var channel = ImmersionTrackerItem.createYoutubeChannel(user, "UCTestChannel", "Test Channel");
+    var channel =
+        ImmersionTrackerItem.createYoutubeChannel(
+            user, "UCTestChannel", "Test Channel", "https://yt3.ggpht.com/test-channel-thumbnail");
     assertThat(items).contains(channel);
   }
 }

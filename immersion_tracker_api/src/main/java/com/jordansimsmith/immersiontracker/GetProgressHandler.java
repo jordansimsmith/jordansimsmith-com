@@ -65,21 +65,30 @@ public class GetProgressHandler
 
   @VisibleForTesting
   record Show(
+      @Nullable @JsonProperty("show_id") String showId,
       @Nullable @JsonProperty("name") String name,
+      @Nullable @JsonProperty("artwork_url") String artworkUrl,
       @JsonProperty("episodes_watched") int episodesWatched) {}
 
   @VisibleForTesting
   record YoutubeChannel(
+      @Nullable @JsonProperty("channel_id") String channelId,
       @Nullable @JsonProperty("channel_name") String channelName,
+      @Nullable @JsonProperty("artwork_url") String artworkUrl,
       @JsonProperty("videos_watched") int videosWatched) {}
 
   @VisibleForTesting
   record SpotifyShow(
+      @Nullable @JsonProperty("show_id") String showId,
       @Nullable @JsonProperty("show_name") String showName,
+      @Nullable @JsonProperty("artwork_url") String artworkUrl,
       @JsonProperty("episodes_watched") int episodesWatched) {}
 
   @VisibleForTesting
-  record Movie(@Nullable @JsonProperty("name") String name) {}
+  record Movie(
+      @Nullable @JsonProperty("movie_id") String movieId,
+      @Nullable @JsonProperty("name") String name,
+      @Nullable @JsonProperty("artwork_url") String artworkUrl) {}
 
   @VisibleForTesting
   record DailyActivity(
@@ -375,7 +384,7 @@ public class GetProgressHandler
     var unknownShows = showEpisodes.stream().filter(e -> e.show() == null).toList();
     var unknownShowsProgress =
         !unknownShows.isEmpty()
-            ? Stream.of(new Show(null, unknownShows.size()))
+            ? Stream.of(new Show(null, null, null, unknownShows.size()))
             : Stream.<Show>empty();
     var knownShows =
         showEpisodes.stream()
@@ -383,9 +392,14 @@ public class GetProgressHandler
             .collect(Collectors.groupingBy(e -> Objects.requireNonNull(e.show().getTvdbId())));
     var knownShowsProgress =
         knownShows.values().stream()
-            .map(e -> new Show(Objects.requireNonNull(e.get(0).show()).getTvdbName(), e.size()));
+            .map(
+                e -> {
+                  var show = Objects.requireNonNull(e.get(0).show());
+                  var showId = show.getTvdbId() != null ? String.valueOf(show.getTvdbId()) : null;
+                  return new Show(showId, show.getTvdbName(), show.getTvdbImage(), e.size());
+                });
     return Stream.concat(unknownShowsProgress, knownShowsProgress)
-        .sorted(Comparator.comparing(e -> e.episodesWatched, Comparator.reverseOrder()))
+        .sorted(Comparator.comparing(s -> s.episodesWatched, Comparator.reverseOrder()))
         .toList();
   }
 
@@ -404,7 +418,8 @@ public class GetProgressHandler
               var videos = entry.getValue();
               var channel = channelsByChannelId.get(channelId);
               var channelName = channel != null ? channel.getYoutubeChannelTitle() : null;
-              return new YoutubeChannel(channelName, videos.size());
+              var artworkUrl = channel != null ? channel.getYoutubeChannelArtworkUrl() : null;
+              return new YoutubeChannel(channelId, channelName, artworkUrl, videos.size());
             })
         .sorted(
             Comparator.comparing((YoutubeChannel c) -> c.videosWatched, Comparator.reverseOrder())
@@ -427,7 +442,8 @@ public class GetProgressHandler
               var episodes = entry.getValue();
               var show = showsByShowId.get(showId);
               var showName = show != null ? show.getSpotifyShowName() : null;
-              return new SpotifyShow(showName, episodes.size());
+              var artworkUrl = show != null ? show.getSpotifyShowArtworkUrl() : null;
+              return new SpotifyShow(showId, showName, artworkUrl, episodes.size());
             })
         .sorted(
             Comparator.comparing((SpotifyShow s) -> s.episodesWatched, Comparator.reverseOrder())
@@ -539,7 +555,7 @@ public class GetProgressHandler
 
   private List<Movie> movies(List<ImmersionTrackerItem> movies) {
     return movies.stream()
-        .map(m -> new Movie(m.getTvdbName()))
+        .map(m -> new Movie(m.getFileName(), m.getTvdbName(), m.getTvdbImage()))
         .sorted(Comparator.comparing(m -> m.name, Comparator.nullsLast(Comparator.naturalOrder())))
         .toList();
   }

@@ -96,7 +96,8 @@ public class SyncSpotifyHandler
 
       if (existingShow == null) {
         var showItem =
-            ImmersionTrackerItem.createSpotifyShow(user, episode.showId(), episode.showName());
+            ImmersionTrackerItem.createSpotifyShow(
+                user, episode.showId(), episode.showName(), episode.showArtworkUrl());
         immersionTrackerTable.putItem(showItem);
       }
     }
