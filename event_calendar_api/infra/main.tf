@@ -43,10 +43,12 @@ locals {
     get_calendar_subscription = {
       target  = "//event_calendar_api:get-calendar-subscription-handler_deploy.jar"
       handler = "com.jordansimsmith.eventcalendar.GetCalendarSubscriptionHandler"
+      timeout = 30
     }
     update_events = {
       target  = "//event_calendar_api:update-events-handler_deploy.jar"
       handler = "com.jordansimsmith.eventcalendar.UpdateEventsHandler"
+      timeout = 120
     }
   }
 
@@ -157,7 +159,7 @@ resource "aws_lambda_function" "lambda" {
   handler          = each.value.handler
   runtime          = "java17"
   memory_size      = 1024
-  timeout          = 30
+  timeout          = each.value.timeout
   architectures    = ["x86_64"]
 }
 
