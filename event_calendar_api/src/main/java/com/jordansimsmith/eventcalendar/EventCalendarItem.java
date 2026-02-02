@@ -10,7 +10,6 @@ public class EventCalendarItem {
   public static final String DELIMITER = "#";
   public static final String STADIUM_PREFIX = "STADIUM" + DELIMITER;
   public static final String MEETUP_GROUP_PREFIX = "MEETUP_GROUP" + DELIMITER;
-  public static final String SPORTS_TEAM_PREFIX = "SPORTS_TEAM" + DELIMITER;
   public static final String EVENT_PREFIX = "EVENT" + DELIMITER;
 
   private static final String PK = "pk";
@@ -18,11 +17,9 @@ public class EventCalendarItem {
   private static final String TITLE = "title";
   private static final String EVENT_URL = "event_url";
   private static final String EVENT_INFO = "event_info";
-  private static final String EVENT_ID = "event_id";
   private static final String TIMESTAMP = "timestamp";
   private static final String STADIUM_URL = "stadium_url";
   private static final String MEETUP_GROUP_URL = "meetup_group_url";
-  private static final String SPORTS_TEAM_URL = "sports_team_url";
   private static final String LOCATION = "location";
 
   private String pk;
@@ -33,8 +30,6 @@ public class EventCalendarItem {
   private Instant timestamp;
   private String stadiumUrl;
   private String meetupGroupUrl;
-  private String sportsTeamUrl;
-  private String eventId;
   private String location;
 
   @DynamoDbPartitionKey
@@ -112,24 +107,6 @@ public class EventCalendarItem {
     this.meetupGroupUrl = meetupGroupUrl;
   }
 
-  @DynamoDbAttribute(SPORTS_TEAM_URL)
-  public String getSportsTeamUrl() {
-    return sportsTeamUrl;
-  }
-
-  public void setSportsTeamUrl(String sportsTeamUrl) {
-    this.sportsTeamUrl = sportsTeamUrl;
-  }
-
-  @DynamoDbAttribute(EVENT_ID)
-  public String getEventId() {
-    return eventId;
-  }
-
-  public void setEventId(String eventId) {
-    this.eventId = eventId;
-  }
-
   @DynamoDbAttribute(LOCATION)
   public String getLocation() {
     return location;
@@ -165,12 +142,6 @@ public class EventCalendarItem {
         + ", meetupGroupUrl='"
         + meetupGroupUrl
         + '\''
-        + ", sportsTeamUrl='"
-        + sportsTeamUrl
-        + '\''
-        + ", eventId='"
-        + eventId
-        + '\''
         + ", location='"
         + location
         + '\''
@@ -189,25 +160,13 @@ public class EventCalendarItem {
         && Objects.equals(timestamp, that.timestamp)
         && Objects.equals(stadiumUrl, that.stadiumUrl)
         && Objects.equals(meetupGroupUrl, that.meetupGroupUrl)
-        && Objects.equals(sportsTeamUrl, that.sportsTeamUrl)
-        && Objects.equals(eventId, that.eventId)
         && Objects.equals(location, that.location);
   }
 
   @Override
   public int hashCode() {
     return Objects.hash(
-        pk,
-        sk,
-        title,
-        eventUrl,
-        eventInfo,
-        timestamp,
-        stadiumUrl,
-        meetupGroupUrl,
-        sportsTeamUrl,
-        eventId,
-        location);
+        pk, sk, title, eventUrl, eventInfo, timestamp, stadiumUrl, meetupGroupUrl, location);
   }
 
   public static String formatStadiumEventPk(String stadiumUrl) {
@@ -216,10 +175,6 @@ public class EventCalendarItem {
 
   public static String formatMeetupEventPk(String meetupGroupUrl) {
     return MEETUP_GROUP_PREFIX + meetupGroupUrl;
-  }
-
-  public static String formatSportsTeamEventPk(String sportsTeamUrl) {
-    return SPORTS_TEAM_PREFIX + sportsTeamUrl;
   }
 
   public static String formatSk(String eventUrl) {
@@ -237,8 +192,6 @@ public class EventCalendarItem {
     eventCalendarItem.setTimestamp(timestamp);
     eventCalendarItem.setStadiumUrl(stadiumUrl);
     eventCalendarItem.setMeetupGroupUrl(null);
-    eventCalendarItem.setSportsTeamUrl(null);
-    eventCalendarItem.setEventId(null);
     eventCalendarItem.setLocation(null);
     return eventCalendarItem;
   }
@@ -253,30 +206,6 @@ public class EventCalendarItem {
     eventCalendarItem.setEventInfo(null);
     eventCalendarItem.setTimestamp(timestamp);
     eventCalendarItem.setMeetupGroupUrl(meetupGroupUrl);
-    eventCalendarItem.setSportsTeamUrl(null);
-    eventCalendarItem.setEventId(null);
-    eventCalendarItem.setLocation(location);
-    return eventCalendarItem;
-  }
-
-  public static EventCalendarItem createSportsTeamEvent(
-      String publicFixturesUrl,
-      String fixtureId,
-      String title,
-      Instant timestamp,
-      String competitionName,
-      String location) {
-    var eventCalendarItem = new EventCalendarItem();
-    eventCalendarItem.setPk(formatSportsTeamEventPk(publicFixturesUrl));
-    eventCalendarItem.setSk(formatSk(fixtureId));
-    eventCalendarItem.setTitle(title);
-    eventCalendarItem.setEventUrl(null);
-    eventCalendarItem.setEventInfo(competitionName);
-    eventCalendarItem.setTimestamp(timestamp);
-    eventCalendarItem.setSportsTeamUrl(publicFixturesUrl);
-    eventCalendarItem.setEventId(fixtureId);
-    eventCalendarItem.setStadiumUrl(null);
-    eventCalendarItem.setMeetupGroupUrl(null);
     eventCalendarItem.setLocation(location);
     return eventCalendarItem;
   }

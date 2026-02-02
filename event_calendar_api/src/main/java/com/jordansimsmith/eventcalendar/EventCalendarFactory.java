@@ -20,8 +20,6 @@ public interface EventCalendarFactory {
 
   MeetupsFactory meetupsFactory();
 
-  LeinsterRugbyClient leinsterRugbyClient();
-
   static EventCalendarFactory create() {
     return DaggerEventCalendarFactory.create();
   }

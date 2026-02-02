@@ -75,16 +75,6 @@ public class GetCalendarSubscriptionHandler
               .toList());
     }
 
-    // query sports team events (currently only Leinster Rugby)
-    var sportsPk =
-        EventCalendarItem.formatSportsTeamEventPk(LeinsterRugbyClient.PUBLIC_FIXTURES_URL);
-    allItems.addAll(
-        eventCalendarTable
-            .query(QueryConditional.keyEqualTo(Key.builder().partitionValue(sportsPk).build()))
-            .items()
-            .stream()
-            .toList());
-
     // create ical events
     for (var item : allItems) {
       var vevent = new VEvent();

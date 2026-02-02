@@ -44,11 +44,4 @@ public class EventCalendarModule {
   public MeetupsFactory meetupsFactory() {
     return new MeetupsFactoryImpl();
   }
-
-  @Provides
-  @Singleton
-  public LeinsterRugbyClient leinsterRugbyClient(ObjectMapper objectMapper) {
-    var httpClient = HttpClient.newBuilder().build();
-    return new HttpLeinsterRugbyClient(httpClient, objectMapper);
-  }
 }

@@ -202,45 +202,4 @@ public class GetCalendarSubscriptionHandlerIntegrationTest {
                   .isEqualTo("https://www.meetup.com/test-group/events/456");
             });
   }
-
-  @Test
-  void handleRequestShouldReturnLeinsterFixturesInResponse() {
-    // arrange
-    var now = Instant.parse("2024-03-20T10:00:00Z");
-    fakeClock.setTime(now);
-
-    var leinsterFixture =
-        EventCalendarItem.createSportsTeamEvent(
-            LeinsterRugbyClient.PUBLIC_FIXTURES_URL,
-            "fixture-123",
-            "Leinster Rugby v Harlequins",
-            Instant.parse("2024-05-01T18:30:00Z"),
-            "Investec Champions Cup",
-            "Aviva Stadium, Dublin");
-
-    eventCalendarTable.putItem(leinsterFixture);
-
-    var event = new APIGatewayV2HTTPEvent();
-
-    // act
-    var response = getCalendarSubscriptionHandler.handleRequest(event, null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var calendar = Biweekly.parse(response.getBody()).first();
-    assertThat(calendar).isNotNull();
-
-    var events = calendar.getEvents();
-    assertThat(events).hasSize(1);
-    assertThat(events)
-        .anySatisfy(
-            event1 -> {
-              assertThat(event1.getSummary().getValue()).isEqualTo("Leinster Rugby v Harlequins");
-              assertThat(event1.getDateStart().getValue())
-                  .isEqualTo(Date.from(leinsterFixture.getTimestamp()));
-              assertThat(event1.getDescription().getValue()).isEqualTo("Investec Champions Cup");
-              assertThat(event1.getLocation().getValue()).isEqualTo("Aviva Stadium, Dublin");
-              assertThat(event1.getUrl()).isNull();
-            });
-  }
 }

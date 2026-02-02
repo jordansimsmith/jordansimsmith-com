@@ -24,10 +24,6 @@ public interface EventCalendarTestFactory extends EventCalendarFactory {
 
   FakeMeetupsFactory fakeMeetupsFactory();
 
-  FakeLeinsterRugbyClient fakeLeinsterRugbyClient();
-
-  LeinsterRugbyClient leinsterRugbyClient();
-
   @Component.Factory
   interface Factory {
     EventCalendarTestFactory create(@BindsInstance @Named("dynamoDbEndpoint") URI dynamoDbEndpoint);
