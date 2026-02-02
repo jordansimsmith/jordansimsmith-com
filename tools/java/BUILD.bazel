@@ -21,8 +21,8 @@ java_package_configuration(
 default_java_toolchain(
     name = "custom_java_toolchain_impl",
     package_configuration = [":error_prone_config"],
-    source_version = "17",
-    target_version = "17",
+    source_version = "21",
+    target_version = "21",
     visibility = ["//visibility:public"],
 )
 

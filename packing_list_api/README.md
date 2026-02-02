@@ -9,7 +9,7 @@ Instead of maintaining a manual spreadsheet each holiday, this service supports 
 ```mermaid
 flowchart TD
   A[Browser] -->|HTTPS| B[API Gateway]
-  B -->|Lambda proxy| C["Lambda handlers (Java 17)"]
+  B -->|Lambda proxy| C["Lambda handlers (Java 21)"]
   C --> D["DynamoDB: packing_list"]
   C --> E["Secrets Manager: packing_list_api"]
 ```
@@ -33,7 +33,7 @@ flowchart TD
 
 ### Technical specifications
 
-- **Runtime**: AWS Lambda (Java 17), built with Bazel
+- **Runtime**: AWS Lambda (Java 21), built with Bazel
 - **API layer**: API Gateway REST API with Lambda proxy integration
 - **Auth**: API Gateway custom REQUEST authorizer backed by an `AuthHandler` Lambda using HTTP Basic
 - **Storage**: DynamoDB single-table style with `pk`/`sk` prefixes and snake_case attributes

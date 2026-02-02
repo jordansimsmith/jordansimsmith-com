@@ -42,7 +42,7 @@ graph TD
 - DynamoDB for storing content snapshots
 - Amazon SNS for notification delivery
 - Amazon CloudWatch Events for scheduling
-- Java 17 runtime environment
+- Java 21 runtime environment
 - Jsoup library for HTML parsing
 - Terraform for infrastructure as code
 

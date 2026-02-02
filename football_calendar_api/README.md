@@ -41,7 +41,7 @@ graph TD
 - Serverless architecture using AWS Lambda
 - Data persistence with DynamoDB using composite keys
 - RESTful API for calendar subscription access
-- Java 17 runtime environment
+- Java 21 runtime environment
 - Scheduled execution via EventBridge triggers
 - Custom domain with HTTPS support
 - Time zone support for Pacific/Auckland
@@ -54,7 +54,7 @@ graph TD
 - Amazon EventBridge for scheduled task execution
 - DynamoDB for storing structured fixture data
 - AWS API Gateway for exposing the iCal endpoint
-- Java 17 runtime environment
+- Java 21 runtime environment
 - HTTP client library for API requests
 - JSON processing for parsing API responses
 - JSoup library for HTML parsing and web scraping
@@ -93,7 +93,7 @@ The service is designed to track specific teams from multiple sources and filter
 
 - Lambda execution frequency: Every 15 minutes via EventBridge schedule
 - Lambda memory: 1024MB, timeout: 30 seconds
-- Java 17 runtime for Lambda functions
+- Java 21 runtime for Lambda functions
 - DynamoDB table: "football_calendar" with hash key "pk" and range key "sk"
 - API Gateway endpoint: GET /calendar
 - Custom domain: api.football-calendar.jordansimsmith.com

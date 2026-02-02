@@ -101,7 +101,7 @@ for config in configs:
 
     lambda_client.create_function(
         FunctionName=config["function_name"],
-        Runtime="java17",
+        Runtime="java21",
         Role=role_arn,
         Handler=config["handler_name"],
         Code={"ZipFile": zip_file_bytes},

@@ -155,7 +155,7 @@ resource "aws_lambda_function" "lambda" {
   role             = aws_iam_role.lambda_role.arn
   source_code_hash = filebase64sha256(data.external.handler_location[each.key].result.location)
   handler          = each.value.handler
-  runtime          = "java17"
+  runtime          = "java21"
   memory_size      = 1024
   timeout          = 30
   architectures    = ["x86_64"]

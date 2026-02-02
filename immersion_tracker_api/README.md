@@ -57,7 +57,7 @@ graph TD
 - Amazon DynamoDB for data storage
 - AWS API Gateway for REST API endpoints
 - AWS Secrets Manager for credential management
-- Java 17 for Lambda implementation
+- Java 21 for Lambda implementation
 - Python for client-side scripts
 - Bazel for building and deployment
 - Terraform for infrastructure as code

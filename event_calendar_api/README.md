@@ -50,7 +50,7 @@ graph TD
 - Amazon EventBridge for scheduled task execution
 - DynamoDB for storing structured event data
 - AWS API Gateway for exposing the iCal endpoint
-- Java 17 runtime environment
+- Java 21 runtime environment
 - Jsoup library for HTML parsing
 - Java HTTP Client for REST API calls
 - Jackson library for JSON processing
@@ -76,7 +76,7 @@ graph TD
 - Custom domain: api.event-calendar.jordansimsmith.com
 - Time zone: Pacific/Auckland
 - Lambda memory: 1024MB, timeout: 30 seconds
-- Java 17 runtime for Lambda functions
+- Java 21 runtime for Lambda functions
 
 ### Meetup.com integration
 
