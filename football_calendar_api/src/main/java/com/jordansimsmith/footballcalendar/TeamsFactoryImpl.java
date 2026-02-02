@@ -18,8 +18,8 @@ public class TeamsFactoryImpl implements TeamsFactory {
           "flamingoes",
           "13",
           "131",
-          "89",
-          "6030",
+          "93",
+          "6227",
           "3/25 Normanby Road, Mount Eden, Auckland 1024");
 
   private static final SubfootballTeam SUBFOOTBALL_MAN_I_LOVE_FOOTBALL =
