@@ -40,18 +40,24 @@ bin.vite_binary(
 
 js_library(
     name = "assets",
-    srcs = glob([
-        "src/**/*.css",
-        "src/**/*.svg",
-    ]),
+    srcs = glob(
+        [
+            "src/**/*.css",
+            "src/**/*.svg",
+        ],
+        allow_empty = True,
+    ),
 )
 
 js_library(
     name = "src",
-    srcs = glob([
-        "src/**/*.js",
-        "src/**/*.jsx",
-    ]),
+    srcs = glob(
+        [
+            "src/**/*.js",
+            "src/**/*.jsx",
+        ],
+        allow_empty = True,
+    ),
     data = [":assets"],
     deps = [
         "//:node_modules/@mantine/core",

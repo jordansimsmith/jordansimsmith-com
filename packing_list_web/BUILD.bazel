@@ -88,10 +88,13 @@ vite_bin.vite_binary(
 
 js_library(
     name = "assets",
-    srcs = glob([
-        "src/**/*.css",
-        "src/**/*.svg",
-    ]),
+    srcs = glob(
+        [
+            "src/**/*.css",
+            "src/**/*.svg",
+        ],
+        allow_empty = True,
+    ),
 )
 
 js_library(

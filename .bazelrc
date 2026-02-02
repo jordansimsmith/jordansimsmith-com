@@ -3,8 +3,6 @@ common --java_runtime_version=remotejdk_21
 common --tool_java_language_version=21
 common --tool_java_runtime_version=remotejdk_21
 
-common --noincompatible_enable_cc_toolchain_resolution
-
 test --test_output=errors
 test --test_summary=short
 test --verbose_failures
