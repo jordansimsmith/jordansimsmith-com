@@ -43,10 +43,12 @@ locals {
     update_items_handler = {
       target  = "//auction_tracker_api:update-items-handler_deploy.jar"
       handler = "com.jordansimsmith.auctiontracker.UpdateItemsHandler"
+      timeout = 120
     }
     send_digest_handler = {
       target  = "//auction_tracker_api:send-digest-handler_deploy.jar"
       handler = "com.jordansimsmith.auctiontracker.SendDigestHandler"
+      timeout = 30
     }
   }
 
@@ -215,7 +217,7 @@ resource "aws_lambda_function" "lambda" {
   handler          = each.value.handler
   runtime          = "java17"
   memory_size      = 1024
-  timeout          = 120
+  timeout          = each.value.timeout
   architectures    = ["x86_64"]
 }
 
