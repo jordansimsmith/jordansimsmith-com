@@ -106,6 +106,7 @@ public class TemplatesFactoryImpl implements TemplatesFactory {
             new TemplateItem("bed sheets", "gear", 1, List.of("optional")),
             new TemplateItem("pillow case", "gear", 1, List.of("optional")),
             new TemplateItem("bag for dirty gear", "gear", 1, List.of()),
+            new TemplateItem("eye mask", "gear", 1, List.of()),
             new TemplateItem("airplane head restrainer", "gear", 1, List.of()),
             new TemplateItem("drink bottle", "gear", 1, List.of("hand luggage")),
             new TemplateItem("clear toiletries bag", "gear", 1, List.of("hand luggage")),
@@ -179,7 +180,8 @@ public class TemplatesFactoryImpl implements TemplatesFactory {
                 new TemplateItem("tramping breakfast", "food", 1, List.of()),
                 new TemplateItem("tramping snacks", "food", 1, List.of()),
                 new TemplateItem("emergency rations", "food", 1, List.of()),
-                new TemplateItem("electrolytes", "food", 1, List.of())));
+                new TemplateItem("electrolytes", "food", 1, List.of()),
+                new TemplateItem("hot drinks", "food", 1, List.of())));
 
     var camping =
         new Variation(
