@@ -9,15 +9,6 @@ bazel_dep(name = "rules_pkg", version = "1.0.1")
 
 register_toolchains("//tools/java:custom_java_toolchain")
 
-http_archive = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
-
-http_archive(
-    name = "dagger",
-    sha256 = "4062fa2cda8dab32d1961fb10ed50f40aca759149efb64dd5a08077a6fcb2fbc",
-    strip_prefix = "dagger-dagger-2.52",
-    url = "https://github.com/google/dagger/archive/dagger-2.52.zip",
-)
-
 maven = use_extension("@rules_jvm_external//:extensions.bzl", "maven")
 maven.install(
     artifacts = [
@@ -47,7 +38,6 @@ maven.install(
         "com.google.guava:guava:33.2.1-jre",
         "com.google.dagger:dagger:2.52",
         "com.google.dagger:dagger-compiler:2.52",
-        "com.google.dagger:dagger-producers:2.52",
         "com.fasterxml.jackson.core:jackson-annotations:2.17.2",
         "com.fasterxml.jackson.core:jackson-core:2.17.2",
         "com.fasterxml.jackson.core:jackson-databind:2.17.2",

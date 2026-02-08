@@ -1,9 +1,6 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
-load("@dagger//:workspace_defs.bzl", "dagger_rules")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
-
-dagger_rules()
 
 HANDLERS = glob(["src/main/java/**/*Handler.java"])
 
@@ -23,10 +20,10 @@ java_library(
         exclude = HANDLERS,
     ),
     deps = [
-        ":dagger",
         "//lib/dynamodb:lib",
         "//lib/notifications:lib",
         "//lib/time:lib",
+        "//third_party/dagger",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:org_jsoup_jsoup",
@@ -72,13 +69,13 @@ java_library(
         "src/test/resources/test.properties",
     ],
     deps = [
-        ":dagger",
         ":lib",
         "//lib/dynamodb:lib",
         "//lib/localstack:lib",
         "//lib/notifications:lib",
         "//lib/testcontainers:lib",
         "//lib/time:lib",
+        "//third_party/dagger",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_google_code_findbugs_jsr305",

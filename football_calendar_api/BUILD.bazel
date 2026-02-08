@@ -1,9 +1,6 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
-load("@dagger//:workspace_defs.bzl", "dagger_rules")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
-
-dagger_rules()
 
 HANDLERS = glob(["src/main/java/**/*Handler.java"])
 
@@ -26,10 +23,10 @@ java_library(
         "//visibility:public",
     ],
     deps = [
-        ":dagger",
         "//lib/dynamodb:lib",
         "//lib/json:lib",
         "//lib/time:lib",
+        "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_annotations",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_guava_guava",
@@ -48,8 +45,8 @@ java_binary(
         "src/main/resources/logback.xml",
     ],
     deps = [
-        ":dagger",
         ":lib",
+        "//third_party/dagger",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -69,9 +66,9 @@ java_binary(
         "src/main/resources/logback.xml",
     ],
     deps = [
-        ":dagger",
         ":lib",
         "//lib/time:lib",
+        "//third_party/dagger",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -96,13 +93,13 @@ java_library(
         "src/test/resources/test.properties",
     ],
     deps = [
-        ":dagger",
         ":lib",
         "//lib/dynamodb:lib",
         "//lib/json:lib",
         "//lib/localstack:lib",
         "//lib/testcontainers:lib",
         "//lib/time:lib",
+        "//third_party/dagger",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -151,7 +148,6 @@ java_test_suite(
     test_suffixes = ["IntegrationTest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
-        ":dagger",
         ":get-calendar-subscription-handler",
         ":lib",
         ":test-lib",
@@ -159,6 +155,7 @@ java_test_suite(
         "//lib/dynamodb:lib",
         "//lib/testcontainers:lib",
         "//lib/time:lib",
+        "//third_party/dagger",
         "@maven//:com_amazonaws_aws_lambda_java_events",
         "@maven//:com_google_guava_guava",
         "@maven//:javax_inject_javax_inject",
