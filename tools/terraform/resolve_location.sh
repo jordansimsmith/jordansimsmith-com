@@ -4,10 +4,12 @@ set -e
 
 eval "$(jq -r '@sh "TARGET=\(.target)"')"
 
-bazel build "$TARGET" --platforms=//tools/platforms:linux_x86
+BAZEL_ARGS=(--platforms=//tools/platforms:linux_x86)
 
-WORKSPACE=$(bazel info workspace)
-QUERY=$(bazel cquery "$TARGET" --output=files 2>/dev/null)
+bazel build "${BAZEL_ARGS[@]}" "$TARGET"
+
+WORKSPACE=$(bazel info "${BAZEL_ARGS[@]}" workspace)
+QUERY=$(bazel cquery "${BAZEL_ARGS[@]}" --output=files "$TARGET" 2>/dev/null)
 LOCATION="$WORKSPACE/$QUERY"
 
 jq -n --arg location "$LOCATION" '{"location":$location}'
