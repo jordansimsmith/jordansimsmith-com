@@ -213,7 +213,31 @@ public class ProductsFactoryImpl implements ProductsFactory {
           new Product(
               URI.create(
                   "https://nzmuscle.co.nz/products/quest-nutrition-protein-bars?variant=51471548350645"),
-              "Quest Nutrition Protein Bar Birthday Cake"));
+              "Quest Nutrition Protein Bar Birthday Cake"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/nz-muscle-protein-water?variant=51471524823221"),
+              "NZ Muscle Protein Water Tropical 375g"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/nz-muscle-protein-water?variant=51471524855989"),
+              "NZ Muscle Protein Water Pineapple Popsicle 375g"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/nz-muscle-protein-water?variant=51471524888757"),
+              "NZ Muscle Protein Water Raspberry Lemonade 375g"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/nz-muscle-protein-water?variant=51471524921525"),
+              "NZ Muscle Protein Water Passionfruit 375g"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/nz-muscle-protein-water?variant=51471524954293"),
+              "NZ Muscle Protein Water Watermelon Burst 375g"),
+          new Product(
+              URI.create(
+                  "https://nzmuscle.co.nz/products/nz-muscle-protein-water?variant=51471524987061"),
+              "NZ Muscle Protein Water Peach Iced Tea 375g"));
 
   @Override
   public List<Product> findProducts() {
