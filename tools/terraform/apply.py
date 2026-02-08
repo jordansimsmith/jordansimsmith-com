@@ -50,7 +50,7 @@ def main():
     parser.add_argument("root", type=Path, help="Path to a file in the workspace root")
     args = parser.parse_args()
 
-    required_vars = ["AWS_ACCESS_KEY", "AWS_SECRET_ACCESS_KEY"]
+    required_vars = ["AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"]
     missing = [v for v in required_vars if not os.environ.get(v)]
     if missing:
         print(f"ERROR: Missing environment variables: {', '.join(missing)}")
