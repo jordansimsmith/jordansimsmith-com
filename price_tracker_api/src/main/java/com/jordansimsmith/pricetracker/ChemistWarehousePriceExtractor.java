@@ -14,20 +14,29 @@ public class ChemistWarehousePriceExtractor implements PriceExtractor {
   public Double extractPrice(Document document) {
     var element = document.selectFirst(".product_details .Price .product__price");
     if (element == null) {
-      LOGGER.warn("chemist warehouse price not found with product__price selector");
+      LOGGER.warn(
+          "chemist warehouse price not found with product__price selector for url '{}'",
+          document.location());
       return null;
     }
 
     var normalized = element.text().replaceAll("[^0-9.]", "");
     if (normalized.isEmpty()) {
-      LOGGER.warn("chemist warehouse price text '{}' contained no digits", element.text());
+      LOGGER.warn(
+          "chemist warehouse price text '{}' contained no digits for url '{}'",
+          element.text(),
+          document.location());
       return null;
     }
 
     try {
       return Double.parseDouble(normalized);
     } catch (NumberFormatException e) {
-      LOGGER.warn("chemist warehouse price text '{}' could not be parsed", element.text(), e);
+      LOGGER.warn(
+          "chemist warehouse price text '{}' could not be parsed for url '{}'",
+          element.text(),
+          document.location(),
+          e);
       return null;
     }
   }

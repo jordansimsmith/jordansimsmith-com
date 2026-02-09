@@ -13,20 +13,29 @@ public class NzProteinPriceExtractor implements PriceExtractor {
   public Double extractPrice(Document document) {
     var element = document.selectFirst("[itemprop=\"price\"]");
     if (element == null) {
-      LOGGER.warn("nz protein price not found with itemprop=price selector");
+      LOGGER.warn(
+          "nz protein price not found with itemprop=price selector for url '{}'",
+          document.location());
       return null;
     }
 
     var normalized = element.text().replaceAll("[^0-9.]", "");
     if (normalized.isEmpty()) {
-      LOGGER.warn("nz protein price text '{}' contained no digits", element.text());
+      LOGGER.warn(
+          "nz protein price text '{}' contained no digits for url '{}'",
+          element.text(),
+          document.location());
       return null;
     }
 
     try {
       return Double.parseDouble(normalized);
     } catch (NumberFormatException e) {
-      LOGGER.warn("nz protein price text '{}' could not be parsed", element.text(), e);
+      LOGGER.warn(
+          "nz protein price text '{}' could not be parsed for url '{}'",
+          element.text(),
+          document.location(),
+          e);
       return null;
     }
   }
