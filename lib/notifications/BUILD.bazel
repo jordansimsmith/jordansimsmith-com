@@ -12,3 +12,17 @@ java_library(
         "@maven//:software_amazon_awssdk_sns",
     ],
 )
+
+java_library(
+    name = "test-lib",
+    testonly = True,
+    srcs = glob(["src/test/java/**/*.java"]),
+    visibility = [
+        "//visibility:public",
+    ],
+    deps = [
+        ":lib",
+        "//third_party/dagger",
+        "@maven//:com_google_guava_guava",
+    ],
+)

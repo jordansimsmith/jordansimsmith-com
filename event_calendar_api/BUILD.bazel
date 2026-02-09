@@ -83,6 +83,7 @@ java_binary(
 
 java_library(
     name = "test-lib",
+    testonly = True,
     srcs = glob(
         ["src/test/java/**/*.java"],
         exclude = UNIT_TESTS + INTEGRATION_TESTS + E2E_TESTS,
@@ -96,10 +97,10 @@ java_library(
     ],
     deps = [
         ":lib",
-        "//lib/dynamodb:lib",
+        "//lib/dynamodb:test-lib",
         "//lib/localstack:lib",
         "//lib/testcontainers:lib",
-        "//lib/time:lib",
+        "//lib/time:test-lib",
         "//third_party/dagger",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
@@ -152,9 +153,9 @@ java_test_suite(
         ":lib",
         ":test-lib",
         ":update-events-handler",
-        "//lib/dynamodb:lib",
+        "//lib/dynamodb:test-lib",
         "//lib/testcontainers:lib",
-        "//lib/time:lib",
+        "//lib/time:test-lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -226,7 +227,7 @@ java_test_suite(
     deps = [
         ":lib",
         ":test-lib",
-        "//lib/dynamodb:lib",
+        "//lib/dynamodb:test-lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_fasterxml_jackson_core_jackson_core",

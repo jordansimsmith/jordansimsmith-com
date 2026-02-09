@@ -3,11 +3,26 @@ load("@rules_java//java:defs.bzl", "java_library")
 java_library(
     name = "lib",
     srcs = glob(["src/main/java/**/*.java"]),
-    resources = glob(["src/main/resources/**/*.properties"]),
     visibility = [
         "//visibility:public",
     ],
     deps = [
+        "//third_party/dagger",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_library(
+    name = "test-lib",
+    testonly = True,
+    srcs = glob(["src/test/java/**/*.java"]),
+    resources = glob(["src/test/resources/**/*.properties"]),
+    visibility = [
+        "//visibility:public",
+    ],
+    deps = [
+        ":lib",
         "//lib/testcontainers:lib",
         "//third_party/dagger",
         "@maven//:com_google_guava_guava",

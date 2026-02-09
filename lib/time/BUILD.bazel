@@ -10,3 +10,16 @@ java_library(
         "//third_party/dagger",
     ],
 )
+
+java_library(
+    name = "test-lib",
+    testonly = True,
+    srcs = glob(["src/test/java/**/*.java"]),
+    visibility = [
+        "//visibility:public",
+    ],
+    deps = [
+        ":lib",
+        "//third_party/dagger",
+    ],
+)

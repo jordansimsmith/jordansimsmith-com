@@ -47,15 +47,16 @@ java_binary(
 
 java_library(
     name = "test-lib",
+    testonly = True,
     srcs = glob(
         ["src/test/java/**/*.java"],
         exclude = INTEGRATION_TESTS,
     ),
     deps = [
         ":lib",
-        "//lib/dynamodb:lib",
-        "//lib/notifications:lib",
-        "//lib/time:lib",
+        "//lib/dynamodb:test-lib",
+        "//lib/notifications:test-lib",
+        "//lib/time:test-lib",
         "//third_party/dagger",
         "@maven//:com_google_guava_guava",
         "@maven//:software_amazon_awssdk_dynamodb",
@@ -79,10 +80,10 @@ java_test_suite(
         ":lib",
         ":test-lib",
         ":update-page-content-handler",
-        "//lib/dynamodb:lib",
-        "//lib/notifications:lib",
+        "//lib/dynamodb:test-lib",
+        "//lib/notifications:test-lib",
         "//lib/testcontainers:lib",
-        "//lib/time:lib",
+        "//lib/time:test-lib",
         "@maven//:com_amazonaws_aws_lambda_java_core",
         "@maven//:com_amazonaws_aws_lambda_java_events",
         "@maven//:org_assertj_assertj_core",

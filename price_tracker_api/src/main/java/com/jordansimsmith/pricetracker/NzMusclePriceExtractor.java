@@ -23,8 +23,7 @@ public class NzMusclePriceExtractor implements PriceExtractor {
       return parsePrice(regularElement.text(), "regular", url);
     }
 
-    LOGGER.warn(
-        "nzmuscle price not found using .price--show-badge selectors for url '{}'", url);
+    LOGGER.warn("nzmuscle price not found using .price--show-badge selectors for url '{}'", url);
     return null;
   }
 
@@ -33,10 +32,7 @@ public class NzMusclePriceExtractor implements PriceExtractor {
     var normalized = rawText.replaceAll("[^0-9.]", "");
     if (normalized.isEmpty()) {
       LOGGER.warn(
-          "nzmuscle {} price text '{}' contained no digits for url '{}'",
-          priceType,
-          rawText,
-          url);
+          "nzmuscle {} price text '{}' contained no digits for url '{}'", priceType, rawText, url);
       return null;
     }
 

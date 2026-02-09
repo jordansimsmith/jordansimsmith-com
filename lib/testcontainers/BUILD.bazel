@@ -42,6 +42,7 @@ oci_load(
 
 java_library(
     name = "lib",
+    testonly = True,
     srcs = glob(["src/main/java/**/*.java"]),
     data = [
         ":alpine-load",
