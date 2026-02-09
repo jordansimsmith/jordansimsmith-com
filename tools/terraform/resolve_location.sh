@@ -4,7 +4,7 @@ set -e
 
 eval "$(jq -r '@sh "TARGET=\(.target)"')"
 
-BAZEL_ARGS=(--platforms=//tools/platforms:linux_x86)
+BAZEL_ARGS=()
 
 bazel build "${BAZEL_ARGS[@]}" "$TARGET"
 
