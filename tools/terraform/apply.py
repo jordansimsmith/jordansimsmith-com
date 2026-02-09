@@ -82,7 +82,7 @@ def main():
         return
 
     # Phase 2: Show plans and confirm
-    print(f"\n{'='*60}\nPlanned changes:\n{'='*60}")
+    print(f"\n{'=' * 60}\nPlanned changes:\n{'=' * 60}")
     for infra_dir in sorted(with_changes):
         result = subprocess.run(
             ["terraform", "show", plan_path(infra_dir)],

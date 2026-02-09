@@ -2,10 +2,11 @@ module(
     name = "com_jordansimsmith",
 )
 
-bazel_dep(name = "platforms", version = "0.0.11")
-bazel_dep(name = "rules_java", version = "8.14.0")
-bazel_dep(name = "rules_jvm_external", version = "6.7")
-bazel_dep(name = "rules_pkg", version = "1.0.1")
+bazel_dep(name = "platforms", version = "1.0.0")
+bazel_dep(name = "rules_java", version = "9.3.0")
+bazel_dep(name = "rules_jvm_external", version = "6.10")
+bazel_dep(name = "rules_android", version = "0.7.1")
+bazel_dep(name = "rules_pkg", version = "1.2.0")
 
 register_toolchains("//tools/java:custom_java_toolchain")
 
@@ -51,8 +52,9 @@ maven.install(
 )
 use_repo(maven, "maven")
 
-bazel_dep(name = "contrib_rules_jvm", version = "0.27.0")
-bazel_dep(name = "rules_oci", version = "2.0.0-beta1")
+bazel_dep(name = "contrib_rules_jvm", version = "0.32.0")
+
+bazel_dep(name = "rules_oci", version = "2.2.7")
 
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 oci.pull(
@@ -97,7 +99,7 @@ oci.pull(
 )
 use_repo(oci, "alpine", "alpine_linux_amd64", "alpine_linux_arm64_v8", "dynamodb", "dynamodb_linux_amd64", "dynamodb_linux_arm64", "localstack", "localstack_linux_amd64", "localstack_linux_arm64", "ryuk", "ryuk_linux_amd64", "ryuk_linux_arm64")
 
-bazel_dep(name = "aspect_rules_lint", version = "1.0.0-rc8")
+bazel_dep(name = "aspect_rules_lint", version = "2.1.0")
 
 http_jar = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_jar")
 
@@ -109,11 +111,16 @@ http_jar(
 
 bazel_dep(
     name = "buildifier_prebuilt",
-    version = "6.4.0",
+    version = "8.2.1.2",
     dev_dependency = True,
 )
 
-bazel_dep(name = "rules_python", version = "0.40.0")
+bazel_dep(name = "rules_python", version = "1.8.3")
+
+python = use_extension("@rules_python//python/extensions:python.bzl", "python")
+python.toolchain(
+    python_version = "3.11",
+)
 
 pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
 pip.parse(
@@ -123,16 +130,24 @@ pip.parse(
 )
 use_repo(pip, "pypi")
 
-bazel_dep(name = "aspect_rules_js", version = "2.1.0")
-bazel_dep(name = "aspect_rules_ts", version = "3.7.1")
+bazel_dep(name = "aspect_rules_js", version = "3.0.0-rc4")
+bazel_dep(name = "aspect_rules_ts", version = "3.8.4")
 
-rules_ts_ext = use_extension("@aspect_rules_ts//ts:extensions.bzl", "ext")
+rules_ts_ext = use_extension(
+    "@aspect_rules_ts//ts:extensions.bzl",
+    "ext",
+    dev_dependency = True,
+)
 rules_ts_ext.deps(
     ts_version_from = "//:package.json",
 )
 use_repo(rules_ts_ext, "npm_typescript")
 
-pnpm = use_extension("@aspect_rules_js//npm:extensions.bzl", "pnpm")
+pnpm = use_extension(
+    "@aspect_rules_js//npm:extensions.bzl",
+    "pnpm",
+    dev_dependency = True,
+)
 use_repo(pnpm, "pnpm")
 
 npm = use_extension("@aspect_rules_js//npm:extensions.bzl", "npm")
@@ -145,5 +160,6 @@ npm.npm_translate_lock(
     ],
     npmrc = "//:.npmrc",
     pnpm_lock = "//:pnpm-lock.yaml",
+    verify_node_modules_ignored = "//:.bazelignore",
 )
 use_repo(npm, "npm")

@@ -1,3 +1,4 @@
+load("@rules_java//java:defs.bzl", "java_library")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 
 oci_image(
