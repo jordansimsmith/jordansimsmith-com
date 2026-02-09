@@ -26,7 +26,6 @@ maven.install(
         "ch.qos.logback:logback-core:1.5.6",
         "ch.qos.logback:logback-classic:1.5.6",
         "org.assertj:assertj-core:3.26.3",
-        "software.amazon.awssdk:bom:2.29.0",
         "software.amazon.awssdk:dynamodb:2.29.0",
         "software.amazon.awssdk:dynamodb-enhanced:2.29.0",
         "software.amazon.awssdk:iam-policy-builder:2.29.0",
@@ -45,6 +44,7 @@ maven.install(
         "org.jsoup:jsoup:1.18.1",
         "org.mockito:mockito-core:5.16.0",
         "net.sf.biweekly:biweekly:0.6.8",
+        "com.google.googlejavaformat:google-java-format:1.17.0",
     ],
     repositories = [
         "https://repo.maven.apache.org/maven2",
@@ -53,7 +53,6 @@ maven.install(
 use_repo(maven, "maven")
 
 bazel_dep(name = "contrib_rules_jvm", version = "0.32.0")
-
 bazel_dep(name = "rules_oci", version = "2.2.7")
 
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
@@ -100,14 +99,6 @@ oci.pull(
 use_repo(oci, "alpine", "alpine_linux_amd64", "alpine_linux_arm64_v8", "dynamodb", "dynamodb_linux_amd64", "dynamodb_linux_arm64", "localstack", "localstack_linux_amd64", "localstack_linux_arm64", "ryuk", "ryuk_linux_amd64", "ryuk_linux_arm64")
 
 bazel_dep(name = "aspect_rules_lint", version = "2.1.0")
-
-http_jar = use_repo_rule("@bazel_tools//tools/build_defs/repo:http.bzl", "http_jar")
-
-http_jar(
-    name = "google_java_format",
-    sha256 = "33068bbbdce1099982ec1171f5e202898eb35f2919cf486141e439fc6e3a4203",
-    url = "https://github.com/google/google-java-format/releases/download/v1.17.0/google-java-format-1.17.0-all-deps.jar",
-)
 
 bazel_dep(
     name = "buildifier_prebuilt",
