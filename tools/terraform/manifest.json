@@ -1,0 +1,83 @@
+{
+  "terraform_roots": [
+    {
+      "path": "auction_tracker_api/infra",
+      "artifacts": {
+        "update_items_handler": "//auction_tracker_api:update-items-handler_deploy.jar",
+        "send_digest_handler": "//auction_tracker_api:send-digest-handler_deploy.jar"
+      }
+    },
+    {
+      "path": "event_calendar_api/infra",
+      "artifacts": {
+        "get_calendar_subscription": "//event_calendar_api:get-calendar-subscription-handler_deploy.jar",
+        "update_events": "//event_calendar_api:update-events-handler_deploy.jar"
+      }
+    },
+    {
+      "path": "football_calendar_api/infra",
+      "artifacts": {
+        "get_calendar_subscription": "//football_calendar_api:get-calendar-subscription-handler_deploy.jar",
+        "update_fixtures": "//football_calendar_api:update-fixtures-handler_deploy.jar"
+      }
+    },
+    {
+      "path": "immersion_tracker_api/infra",
+      "artifacts": {
+        "auth": "//immersion_tracker_api:auth-handler_deploy.jar",
+        "get_progress": "//immersion_tracker_api:get-progress-handler_deploy.jar",
+        "get_shows": "//immersion_tracker_api:get-shows-handler_deploy.jar",
+        "sync_episodes": "//immersion_tracker_api:sync-episodes-handler_deploy.jar",
+        "update_shows": "//immersion_tracker_api:update-show-handler_deploy.jar",
+        "sync_youtube": "//immersion_tracker_api:sync-youtube-handler_deploy.jar",
+        "sync_spotify": "//immersion_tracker_api:sync-spotify-handler_deploy.jar",
+        "sync_movies": "//immersion_tracker_api:sync-movies-handler_deploy.jar"
+      }
+    },
+    {
+      "path": "immersion_tracker_web/infra",
+      "artifacts": {
+        "build": "//immersion_tracker_web:build"
+      }
+    },
+    {
+      "path": "packing_list_api/infra",
+      "artifacts": {
+        "auth": "//packing_list_api:auth-handler_deploy.jar",
+        "get_templates": "//packing_list_api:get-templates-handler_deploy.jar",
+        "create_trip": "//packing_list_api:create-trip-handler_deploy.jar",
+        "find_trips": "//packing_list_api:find-trips-handler_deploy.jar",
+        "get_trip": "//packing_list_api:get-trip-handler_deploy.jar",
+        "update_trip": "//packing_list_api:update-trip-handler_deploy.jar"
+      }
+    },
+    {
+      "path": "packing_list_web/infra",
+      "artifacts": {
+        "build": "//packing_list_web:build"
+      }
+    },
+    {
+      "path": "personal_website_web/infra",
+      "artifacts": {
+        "build": "//personal_website_web:build"
+      }
+    },
+    {
+      "path": "price_tracker_api/infra",
+      "artifacts": {
+        "update_prices": "//price_tracker_api:update-prices-handler_deploy.jar"
+      }
+    },
+    {
+      "path": "subfootball_tracker_api/infra",
+      "artifacts": {
+        "update_page_content": "//subfootball_tracker_api:update-page-content-handler_deploy.jar"
+      }
+    },
+    {
+      "path": "platform/infra",
+      "artifacts": {}
+    }
+  ]
+}

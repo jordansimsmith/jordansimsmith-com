@@ -36,6 +36,10 @@ provider "aws" {
   }
 }
 
+variable "artifacts" {
+  type = map(string)
+}
+
 locals {
   application_id = "packing_list_web"
   origin_id      = "${local.application_id}_s3_origin"
@@ -52,18 +56,17 @@ resource "aws_s3_bucket_ownership_controls" "packing_list_web" {
   }
 }
 
-data "external" "packing_list_web" {
-  program = ["bash", "../../tools/terraform/resolve_location.sh"]
-
-  query = {
-    target = "//packing_list_web:build"
-  }
-}
-
 module "packing_list_web_dir" {
   source   = "hashicorp/dir/template"
   version  = "1.0.2"
-  base_dir = data.external.packing_list_web.result.location
+  base_dir = var.artifacts["build"]
+}
+
+check "packing_list_web_artifact_not_empty" {
+  assert {
+    condition     = length(module.packing_list_web_dir.files) > 0
+    error_message = "The resolved web artifact directory is empty for packing_list_web. Check artifacts[\"build\"]."
+  }
 }
 
 resource "aws_s3_object" "objects" {

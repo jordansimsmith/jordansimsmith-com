@@ -193,5 +193,5 @@ The response includes the fields required to render the dashboard:
   - SPA routing support:
     - map `403` and `404` to `/index.html` with `200` so deep links work on refresh
 - Terraform implementation should follow the existing pattern used by `packing_list_web/infra/main.tf`:
-  - locate Bazel output via `data.external` and `tools/terraform/resolve_location.sh`
+  - consume build artifact paths from the `artifacts` Terraform input map (passed by `tools/terraform/apply.py` from `tools/terraform/manifest.json`)
   - upload built assets using `hashicorp/dir/template` + `aws_s3_object`

@@ -3,8 +3,14 @@ load("@rules_python//python:defs.bzl", "py_binary")
 py_binary(
     name = "apply",
     srcs = ["apply.py"],
-    args = ["$(rootpath //:MODULE.bazel)"],
-    data = ["//:MODULE.bazel"],
+    args = [
+        "$(rootpath //:MODULE.bazel)",
+        "$(rootpath //tools/terraform:manifest.json)",
+    ],
+    data = [
+        "//:MODULE.bazel",
+        "//tools/terraform:manifest.json",
+    ],
     visibility = [
         "//:__pkg__",
     ],

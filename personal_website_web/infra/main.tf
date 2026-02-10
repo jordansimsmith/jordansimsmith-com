@@ -36,6 +36,10 @@ provider "aws" {
   }
 }
 
+variable "artifacts" {
+  type = map(string)
+}
+
 locals {
   application_id = "personal_website_web"
   origin_id      = "${local.application_id}_s3_origin"
@@ -59,18 +63,17 @@ resource "aws_s3_bucket_acl" "personal_website_web" {
   acl    = "private"
 }
 
-data "external" "personal_website_web" {
-  program = ["bash", "../../tools/terraform/resolve_location.sh"]
-
-  query = {
-    target = "//personal_website_web:build"
-  }
-}
-
 module "personal_website_web_dir" {
   source   = "hashicorp/dir/template"
   version  = "1.0.2"
-  base_dir = data.external.personal_website_web.result.location
+  base_dir = var.artifacts["build"]
+}
+
+check "personal_website_web_artifact_not_empty" {
+  assert {
+    condition     = length(module.personal_website_web_dir.files) > 0
+    error_message = "The resolved web artifact directory is empty for personal_website_web. Check artifacts[\"build\"]."
+  }
 }
 
 resource "aws_s3_object" "objects" {

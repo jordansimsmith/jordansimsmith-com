@@ -36,6 +36,10 @@ provider "aws" {
   }
 }
 
+variable "artifacts" {
+  type = map(string)
+}
+
 locals {
   application_id = "auction_tracker_api"
 
@@ -197,23 +201,13 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-data "external" "handler_location" {
-  for_each = local.lambdas
-
-  program = ["bash", "../../tools/terraform/resolve_location.sh"]
-
-  query = {
-    target = each.value.target
-  }
-}
-
 resource "aws_lambda_function" "lambda" {
   for_each = local.lambdas
 
-  filename         = data.external.handler_location[each.key].result.location
+  filename         = var.artifacts[each.key]
   function_name    = "${local.application_id}_${each.key}"
   role             = aws_iam_role.lambda_role.arn
-  source_code_hash = filebase64sha256(data.external.handler_location[each.key].result.location)
+  source_code_hash = filebase64sha256(var.artifacts[each.key])
   handler          = each.value.handler
   runtime          = "java21"
   memory_size      = 1024

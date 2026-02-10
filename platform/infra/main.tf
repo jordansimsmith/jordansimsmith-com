@@ -19,6 +19,11 @@ provider "aws" {
   region = "ap-southeast-2"
 }
 
+variable "artifacts" {
+  type    = map(string)
+  default = {}
+}
+
 locals {
   functions = [
     "price_tracker_api_update_prices",

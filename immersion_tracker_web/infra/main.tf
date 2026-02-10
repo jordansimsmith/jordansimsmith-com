@@ -36,6 +36,10 @@ provider "aws" {
   }
 }
 
+variable "artifacts" {
+  type = map(string)
+}
+
 locals {
   application_id = "immersion_tracker_web"
   origin_id      = "${local.application_id}_s3_origin"
@@ -52,18 +56,17 @@ resource "aws_s3_bucket_ownership_controls" "immersion_tracker_web" {
   }
 }
 
-data "external" "immersion_tracker_web" {
-  program = ["bash", "../../tools/terraform/resolve_location.sh"]
-
-  query = {
-    target = "//immersion_tracker_web:build"
-  }
-}
-
 module "immersion_tracker_web_dir" {
   source   = "hashicorp/dir/template"
   version  = "1.0.2"
-  base_dir = data.external.immersion_tracker_web.result.location
+  base_dir = var.artifacts["build"]
+}
+
+check "immersion_tracker_web_artifact_not_empty" {
+  assert {
+    condition     = length(module.immersion_tracker_web_dir.files) > 0
+    error_message = "The resolved web artifact directory is empty for immersion_tracker_web. Check artifacts[\"build\"]."
+  }
 }
 
 resource "aws_s3_object" "objects" {
