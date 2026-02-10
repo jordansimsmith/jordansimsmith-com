@@ -4,9 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project context
 
-Before starting any task involving a specific project (e.g., auction_tracker_api, immersion_tracker_api), always read the project's README.md file first. Each project directory contains a README.md with project specifications and high-level technical overview that provides essential context for understanding the codebase and requirements.
+Before implementing changes in any service project (e.g., auction_tracker_api, immersion_tracker_api), always read that service's README.md first.
 
-When implementing a new feature or refactoring existing functionality, always check the project's README.md and update any necessary product/technical specifications first, before any implementation begins. This should be the first step when moving from planning to implementation to ensure the documentation stays in sync with the codebase.
+For service README authoring and update standards, use the project skill at `.cursor/skills/service-readme-authoring/SKILL.md`.
 
 ## Build and test commands
 
@@ -108,11 +108,6 @@ When performing the code review step, check for:
 
 ## Documentation standards
 
-- Service documentation in README.md at root of service directory
-- Use sentence casing for headings (only capitalize first word and proper nouns)
-- Follow structure: service name, overview, system architecture, requirements, implementation details
-- Include Mermaid diagrams for system architecture
-- Service overview should be exactly one sentence that clearly describes what the service does
-- System architecture section must include a Mermaid diagram showing the main components and interactions
-- Requirements section should use bullet points and include both functional and non-functional requirements
-- Implementation details should include technologies used, design patterns, and notable code structures
+- Service documentation belongs in `README.md` at the root of each service directory.
+- Use sentence casing for README headings (only capitalize first word and proper nouns).
+- Use `.cursor/skills/service-readme-authoring/SKILL.md` as the canonical README structure/workflow standard.
