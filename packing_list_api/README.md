@@ -1,194 +1,203 @@
 # Packing list API
 
-The packing list API service provides an authenticated HTTP API for reading packing templates and creating, listing, fetching, and updating per-user trip packing lists.
+The packing list API service provides an authenticated HTTP API for reading shared packing templates and creating, listing, fetching, and updating per-user trip packing lists.
 
-Instead of maintaining a manual spreadsheet each holiday, this service supports a separate packing list per trip that can be generated from shared templates (base + variations), edited for that specific holiday, then tracked via simple per-item packing statuses.
+## Overview
 
-## System architecture
+- **Service type**: backend API (`packing_list_api`)
+- **Interface**: REST over HTTPS
+- **Runtime**: AWS Lambda (Java 21) behind API Gateway REST
+- **Primary storage**: DynamoDB table `packing_list` with `gsi1` index
+- **Auth model**: API Gateway custom REQUEST authorizer backed by `AuthHandler`
+- **Primary consumer**: `packing_list_web`
+
+## Features and scope boundaries
+
+### In scope
+
+- Require HTTP Basic authentication on all API endpoints.
+- Derive request user identity from the Basic username in `Authorization`.
+- Return one base template plus predefined variations from `GET /templates`.
+- Create trips with fully materialized item snapshots via `POST /trips`.
+- List per-user trips in departure-date-descending order via `GET /trips`.
+- Fetch one per-user trip with full item details via `GET /trips/{trip_id}`.
+- Replace full trip content (metadata + items) via `PUT /trips/{trip_id}`.
+- Validate request payloads with deterministic error messages.
+
+### Out of scope
+
+- Collaborative or shared trips across multiple users.
+- Partial patch updates for trips; updates are full replacement only.
+- Server-side template composition or merge logic.
+- Runtime template authoring endpoints.
+- Operational runbooks or release process documentation.
+
+## Architecture
 
 ```mermaid
 flowchart TD
-  A[Browser] -->|HTTPS| B[API Gateway]
-  B -->|Lambda proxy| C["Lambda handlers (Java 21)"]
-  C --> D["DynamoDB: packing_list"]
-  C --> E["Secrets Manager: packing_list_api"]
+  webClient["packing_list_web"] -->|"HTTPS Basic auth"| apiGateway["API Gateway REST"]
+  apiGateway -->|"Custom authorizer"| authLambda["AuthHandler Lambda"]
+  authLambda -->|"Read users"| secretsManager["Secrets Manager: packing_list_api"]
+  apiGateway -->|"Lambda proxy integration"| tripHandlers["Trip handlers"]
+  tripHandlers -->|"Read/write trips"| dynamoTable["DynamoDB: packing_list"]
 ```
 
-## Requirements
+### Primary workflow
 
-### Functional requirements
+```mermaid
+sequenceDiagram
+  participant User as User
+  participant Web as packing_list_web
+  participant Gateway as API Gateway
+  participant Auth as AuthHandler
+  participant Secrets as Secrets Manager
+  participant Create as CreateTripHandler
+  participant Dynamo as DynamoDB
 
-- Require authentication for all endpoints via HTTP Basic
-- Derive user identity from the `Authorization` header (Basic username)
-- Return the base packing template and available variations for client-side list generation (`GET /templates`)
-- Create trips with metadata (`name`, `destination`, `departure_date`, `return_date`) and a fully-materialized snapshot of trip items (`POST /trips`)
-- List trips for the authenticated user ordered by `departure_date` descending (`GET /trips`)
-- Fetch a single trip by id including its items (`GET /trips/{trip_id}`)
-- Update trips after creation by replacing the full trip object (metadata + items) (`PUT /trips/{trip_id}`)
-  - typically used by the UI for item status changes while packing
-  - also supports full edits (trip details + add/remove/edit items)
-- Support trip items with categories, quantities, tags, and packing status (`unpacked`, `packed`, `pack-just-in-time`)
-- Snapshot behavior: once a trip is created, it is independent of subsequent template/variation changes
-- Validate inputs (required fields, item uniqueness, enums, quantity bounds) and return consistent JSON errors
+  User->>Web: confirm generated packing items
+  Web->>Gateway: POST /trips with Basic auth
+  Gateway->>Auth: validate authorization header
+  Auth->>Secrets: get packing_list_api secret
+  Secrets-->>Auth: users and passwords
+  Auth-->>Gateway: allow request
+  Gateway->>Create: invoke create handler
+  Create->>Dynamo: put TRIP item
+  Create-->>Gateway: 201 with created trip
+  Gateway-->>Web: trip payload
+```
 
-### Technical specifications
+## Main technical decisions
 
-- **Runtime**: AWS Lambda (Java 21), built with Bazel
-- **API layer**: API Gateway REST API with Lambda proxy integration
-- **Auth**: API Gateway custom REQUEST authorizer backed by an `AuthHandler` Lambda using HTTP Basic
-- **Storage**: DynamoDB single-table style with `pk`/`sk` prefixes and snake_case attributes
-- **JSON**:
-  - request/response bodies are JSON
-  - all fields use snake_case (`@JsonProperty(...)`)
-- **IDs**: `trip_id` is a UUID (string)
-- **Dates**:
-  - `departure_date` and `return_date` are local date strings (`YYYY-MM-DD`)
-  - timestamps are epoch seconds (number)
-- **API versioning**: none (no `/v1`)
-- **CORS**:
-  - allow origin: `https://packing-list.jordansimsmith.com`
-  - allow headers: `Authorization`, `Content-Type`
-  - allow methods: `GET`, `POST`, `PUT`, `OPTIONS`
-- **Hostnames**:
-  - frontend: `packing-list.jordansimsmith.com`
-  - api: `api.packing-list.jordansimsmith.com`
+- Use API Gateway + Lambda to stay consistent with other repository API services and keep infrastructure lightweight.
+- Keep templates in code (`TemplatesFactoryImpl`) instead of DynamoDB to make template reads deterministic and simple.
+- Persist each trip as a single DynamoDB item containing all trip metadata and items for straightforward retrieval.
+- Use `gsi1` with `DEPARTURE#<YYYY-MM-DD>#TRIP#<trip_id>` sort keys to support descending trip list queries.
+- Make `PUT /trips/{trip_id}` a full replacement operation so the stored trip remains a complete, canonical snapshot.
 
-## Implementation details
+## Domain glossary
 
-### Core concepts
+- **Trip**: one holiday plan with metadata and a full list of trip items.
+- **Base template**: the shared default item set returned by `GET /templates`.
+- **Variation**: an additive item set (for example `tramping`, `camping`, `skiing`, `cycling`) returned by `GET /templates`.
+- **Trip item status**: `unpacked`, `packed`, or `pack-just-in-time`.
+- **Normalized item name**: lowercase, trimmed, and whitespace-collapsed item name used for duplicate detection.
+- **Trip snapshot**: the persisted `items` list on a trip, independent from future template changes.
 
-- **Trip**: a holiday with metadata (name, destination, departure date, return date) and a persisted `items` list.
-- **Base template**: the shared default packing list. The service ships with **one** base template.
-- **Variation**: a shared additive set of items layered on top of the base template (e.g. skiing, tramping). Variations are additive only: they do not remove or override items.
-- **Trip list snapshot**: the fully-materialized `items` array stored on the trip at creation time; this makes the trip independent of future template/variation changes.
-- **Item**:
-  - `name`: free text
-  - `category`: free-text label used for grouping (recommended fallback: `misc/uncategorised`)
-  - `quantity`: integer; defaults to 1; must be `>= 1`
-  - `tags`: list of free-text labels (e.g. `hand luggage`, `leave in car`, `wear on plane`, `optional`)
-  - `status`: `unpacked` | `packed` | `pack-just-in-time` (defaults to `unpacked` when generated)
+## Integration contracts
 
-### API conventions
+### External systems
 
-- **Base url**: `https://api.packing-list.jordansimsmith.com`
-- **Auth**:
-  - all endpoints require `Authorization: Basic …`
-  - user identity is derived from the Basic username in the `Authorization` header
-  - there is no dedicated “login” endpoint; clients can validate credentials by calling an authenticated endpoint (e.g. `GET /templates`)
-  - unauthorized requests are rejected at API Gateway with `WWW-Authenticate: Basic`
-- **Content types**:
-  - requests with a body: `Content-Type: application/json`
-  - responses: `Content-Type: application/json; charset=utf-8`
-- **Error shape** (non-2xx):
+- None in current scope outside AWS platform dependencies (API Gateway, Lambda, DynamoDB, Secrets Manager).
+
+## API contracts
+
+### Conventions
+
+- Base URL: `https://api.packing-list.jordansimsmith.com`
+- Auth: `Authorization: Basic <base64(user:password)>`
+- Request and response fields use `snake_case`.
+- No path version segment (no `/v1`).
+- Non-2xx response shape:
 
 ```json
 {
-  "message": "quantity must be >= 1"
+  "message": "validation error details"
 }
 ```
 
-### Domain model
+### Endpoint summary
 
-#### Item statuses
+| Method | Path               | Purpose                                    |
+| ------ | ------------------ | ------------------------------------------ |
+| `GET`  | `/templates`       | return base template and variations        |
+| `POST` | `/trips`           | create a trip with full item snapshot      |
+| `GET`  | `/trips`           | list trip summaries for authenticated user |
+| `GET`  | `/trips/{trip_id}` | fetch one trip with item details           |
+| `PUT`  | `/trips/{trip_id}` | replace one trip (metadata + items)        |
 
-Trip items support three packing statuses:
+### Example request and response
 
-- `unpacked`
-- `packed`
-- `pack-just-in-time`
+`POST /trips`
 
-#### Item identity and uniqueness
-
-- Items are uniquely identified **within a trip** by their **normalized name**.
-- Normalization algorithm:
-  - case-insensitive (lowercase)
-  - trimmed
-  - collapsed internal whitespace
-- The backend rejects any trip payload containing two items whose normalized names collide (both on `POST /trips` and `PUT /trips/{trip_id}`).
-
-#### Template/variation merge rules (client-side)
-
-Template generation and merging are intentionally performed client-side (the API only serves templates and persists trips), but the merge rules are part of the domain contract:
-
-- **Identity**: same normalized item name
-- **Merge behavior**:
-  - quantities are **summed**
-  - tags are **unioned** (deduplicated)
-  - **first category wins** when merged
-- **Status default**: generated trip items default to `unpacked`
-
-#### Template authoring guidance (to avoid accidental merges)
-
-- If two things are meaningfully different, make item names more specific (e.g. `ski goggles` vs `swim goggles`).
-- Avoid including the same normalized item name in both base + variation unless the intention is to sum quantities.
-
-#### Tag registry
-
-Tags are embedded on items within templates and trips; there is no global tag registry.
-
-### API types (JSON)
-
-**Template item**
+Request:
 
 ```json
 {
-  "name": "passport",
-  "category": "travel",
-  "quantity": 1,
-  "tags": ["hand luggage"]
-}
-```
-
-**Base template**
-
-```json
-{
-  "base_template_id": "generic",
-  "name": "generic",
+  "name": "Japan 2026",
+  "destination": "Tokyo",
+  "departure_date": "2026-01-12",
+  "return_date": "2026-01-26",
   "items": [
     {
       "name": "passport",
       "category": "travel",
       "quantity": 1,
-      "tags": ["hand luggage"]
+      "tags": ["hand luggage"],
+      "status": "unpacked"
     }
   ]
 }
 ```
 
-**Variation**
+Response `201`:
 
 ```json
 {
-  "variation_id": "skiing",
-  "name": "skiing",
-  "items": [
-    {
-      "name": "ski jacket",
-      "category": "clothes",
-      "quantity": 1,
-      "tags": []
-    }
-  ]
+  "trip": {
+    "trip_id": "6f7a0dbe-3c7a-4f5c-9c9f-74e7d9c0a5f5",
+    "name": "Japan 2026",
+    "destination": "Tokyo",
+    "departure_date": "2026-01-12",
+    "return_date": "2026-01-26",
+    "items": [
+      {
+        "name": "passport",
+        "category": "travel",
+        "quantity": 1,
+        "tags": ["hand luggage"],
+        "status": "unpacked"
+      }
+    ],
+    "created_at": 1766884800,
+    "updated_at": 1766884800
+  }
 }
 ```
 
-**Trip item**
+Representative key failures:
+
+- `400`: validation error (for example `{"message":"quantity must be >= 1"}`)
+- `400`: path/body mismatch on update (`{"message":"trip_id mismatch"}`)
+- `404`: trip not found in user scope (`{"message":"Not Found"}`)
+- `401`: unauthorized at API Gateway with `WWW-Authenticate: Basic`
+
+`GET /templates` returns one `base_template` and a `variations` array. The full current catalog is defined in `packing_list_api/src/main/java/com/jordansimsmith/packinglist/TemplatesFactoryImpl.java`.
+
+## Data and storage contracts
+
+### DynamoDB model
+
+- **Table name**: `packing_list`
+- **Primary key**:
+  - `pk`: `USER#<user>`
+  - `sk`: `TRIP#<trip_id>`
+- **Item type**:
+  - `TRIP#<trip_id>` (stores entire trip and all items in one record)
+- **Global secondary index (`gsi1`)**:
+  - `gsi1pk`: `USER#<user>`
+  - `gsi1sk`: `DEPARTURE#<YYYY-MM-DD>#TRIP#<trip_id>`
+  - Query uses `scanIndexForward = false` for departure-date-descending trip lists
+
+### Representative record
 
 ```json
 {
-  "name": "passport",
-  "category": "travel",
-  "quantity": 1,
-  "tags": ["hand luggage"],
-  "status": "unpacked"
-}
-```
-
-**Trip**
-
-```json
-{
+  "pk": "USER#alice",
+  "sk": "TRIP#6f7a0dbe-3c7a-4f5c-9c9f-74e7d9c0a5f5",
+  "gsi1pk": "USER#alice",
+  "gsi1sk": "DEPARTURE#2026-01-12#TRIP#6f7a0dbe-3c7a-4f5c-9c9f-74e7d9c0a5f5",
+  "user": "alice",
   "trip_id": "6f7a0dbe-3c7a-4f5c-9c9f-74e7d9c0a5f5",
   "name": "Japan 2026",
   "destination": "Tokyo",
@@ -208,266 +217,104 @@ Tags are embedded on items within templates and trips; there is no global tag re
 }
 ```
 
-### Endpoints
+## Behavioral invariants and time semantics
 
-#### `GET /templates`
+- `name`, `destination`, `departure_date`, `return_date`, and non-empty `items` are required for create and update.
+- `departure_date` and `return_date` must be valid `YYYY-MM-DD` dates.
+- Each item requires `name`, `category`, `quantity >= 1`, and valid `status`.
+- Valid statuses are `unpacked`, `packed`, and `pack-just-in-time`.
+- Duplicate item names are rejected using normalized-name matching (lowercase + trim + collapsed whitespace).
+- `trip_id` is generated as a UUID on create.
+- `created_at` and `updated_at` are epoch seconds; `created_at` is preserved on update and `updated_at` is replaced.
+- `GET /trips` returns summaries in descending `departure_date` order.
+- Updates are last-write-wins full replacements (no optimistic locking in current scope).
 
-Returns the single base template and all available variations.
+## Source of truth
 
-Response 200:
+| Entity                  | Authoritative source                        | Notes                                                   |
+| ----------------------- | ------------------------------------------- | ------------------------------------------------------- |
+| Template catalog        | `TemplatesFactoryImpl` in service code      | returned by `GET /templates`; not persisted in DynamoDB |
+| User credentials        | Secrets Manager secret `packing_list_api`   | read by `AuthHandler` authorizer                        |
+| Request user identity   | Basic username from `Authorization` header  | used to scope all DynamoDB keys                         |
+| Trip metadata and items | DynamoDB `TRIP#...` items in `packing_list` | canonical state for create/list/get/update              |
+| Trip list ordering      | DynamoDB `gsi1sk` key format                | derived from persisted `departure_date` and `trip_id`   |
 
-```json
-{
-  "base_template": {
-    "base_template_id": "generic",
-    "name": "generic",
-    "items": []
-  },
-  "variations": [
-    {
-      "variation_id": "skiing",
-      "name": "skiing",
-      "items": []
-    }
-  ]
-}
-```
+## Security and privacy
 
-#### `POST /trips`
+- API Gateway custom REQUEST authorizer enforces Basic authentication before handler execution.
+- Credentials are stored in AWS Secrets Manager and read at runtime by `AuthHandler`.
+- Per-user data partitioning (`pk = USER#<user>`) prevents cross-user reads and writes.
+- Transport is HTTPS via API Gateway custom domain `api.packing-list.jordansimsmith.com`.
+- Handler logs should not include raw credentials, authorization headers, or secret payloads.
 
-Creates a trip with the fully-materialized list items.
+## Configuration and secrets reference
 
-Notes:
+### Environment variables
 
-- The client is responsible for applying the merge rules described above.
-- The backend validates input (`quantity >= 1`, status enum, unique items by normalized-name).
-- The backend generates `trip_id` and timestamps.
+No service-specific environment variables are consumed by handlers in current scope.
 
-#### `GET /trips`
+| Name     | Required | Purpose                                                                   | Default behavior                                                       |
+| -------- | -------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `(none)` | n/a      | behavior is configured via code constants and Terraform-managed resources | table name, secret name, and CORS origin come from code/infra defaults |
 
-Lists trip summaries for the authenticated `user`, ordered by `departure_date` descending.
+### Secret shape
 
-Response 200:
-
-```json
-{
-  "trips": [
-    {
-      "trip_id": "6f7a0dbe-3c7a-4f5c-9c9f-74e7d9c0a5f5",
-      "name": "Japan 2026",
-      "destination": "Tokyo",
-      "departure_date": "2026-01-12",
-      "return_date": "2026-01-26",
-      "created_at": 1766884800,
-      "updated_at": 1766884800
-    }
-  ]
-}
-```
-
-#### `GET /trips/{trip_id}`
-
-Fetches a single trip by id, including `items`.
-
-- Returns `404` when not found:
-
-```json
-{
-  "message": "Not Found"
-}
-```
-
-#### `PUT /trips/{trip_id}`
-
-Replaces the entire trip (metadata + items). The request body should include the full trip object.
-
-Validation notes:
-
-- `trip_id` in the path must match `trip_id` in the body; mismatch => `400 {"message":"trip_id mismatch"}`
-- the handler preserves `created_at` from the existing item and updates `updated_at`
-
-### Authentication / authorization
-
-- **Secret name**: `packing_list_api`
-- **Secret format** (JSON):
+Expected secret JSON for `packing_list_api`:
 
 ```json
 {
   "users": [
     {
       "user": "alice",
-      "password": "123"
+      "password": "strong-password"
     }
   ]
 }
 ```
 
-- **User scoping**:
-  - user identity is derived from the Basic username in the `Authorization` header
-  - each handler extracts the user from the `Authorization` header and scopes data access accordingly
+## Performance envelope
 
-### Data persistence model (DynamoDB)
+- Lambda handlers run with `512 MB` memory, `10` second timeout, and `x86_64` architecture.
+- DynamoDB uses `PAY_PER_REQUEST` billing with a single GSI for list queries.
+- Service design targets personal workload scale rather than high-throughput multi-tenant usage.
+- No formal latency SLO is defined in current scope.
 
-- **Table name**: `packing_list`
-- **Primary key**:
-  - `pk` (String): `USER#<user>`
-  - `sk` (String): `TRIP#<trip_id>`
-- **Item type**:
-  - `TRIP#...` items store the full trip (including `items` array) in a single DynamoDB item
-- **Attributes** (snake_case):
-  - `user` (String)
-  - `trip_id` (String)
-  - `name` (String)
-  - `destination` (String)
-  - `departure_date` (String; `YYYY-MM-DD`)
-  - `return_date` (String; `YYYY-MM-DD`)
-  - `items` (List<Map>; each element is a `TripItem`)
-  - `created_at` (Number; epoch seconds)
-  - `updated_at` (Number; epoch seconds)
+## Testing and quality gates
 
-#### Global secondary index (trip listing)
+- Unit tests cover authentication, template response mapping, and trip validation rules.
+- Integration tests cover create/list/get/update handlers against DynamoDB Testcontainers.
+- E2E tests cover create -> list -> get -> update -> get flows with LocalStack.
+- Required service checks:
+  - `bazel build //packing_list_api:all`
+  - `bazel test //packing_list_api:all`
+- Repository-level post-change checks:
+  - `bazel mod tidy`
+  - `bazel run //:format`
 
-- **GSI name**: `gsi1`
-- **Purpose**: list trips for a user ordered by `departure_date` descending
-- **Keys**:
-  - `gsi1pk` (String): `USER#<user>`
-  - `gsi1sk` (String): `DEPARTURE#<YYYY-MM-DD>#TRIP#<trip_id>`
-- **Query**:
-  - `gsi1pk = USER#<user>`
-  - `scanIndexForward = false` (departure date desc)
-- **Projection**: `ALL`
+## Local development and smoke checks
 
-### Infrastructure notes (Terraform)
+- Run focused suites:
+  - `bazel test //packing_list_api:unit-tests`
+  - `bazel test //packing_list_api:integration-tests`
+  - `bazel test //packing_list_api:e2e-tests`
+- Minimal smoke flow:
+  1. `POST /trips` with valid authenticated payload returns `201` and a generated `trip_id`.
+  2. `GET /trips` returns the created trip summary for the same user.
+  3. `GET /trips/{trip_id}` returns full item details.
+  4. `PUT /trips/{trip_id}` updates fields and preserves `created_at`.
 
-Terraform patterns should support:
+## End-to-end scenarios
 
-- `GET` on `/templates`
-- `GET` + `POST` on `/trips`
-- `GET` + `PUT` on `/trips/{trip_id}` (path parameter resource)
-- `OPTIONS` on `/templates`, `/trips`, and `/trips/{trip_id}` returning `200` with CORS headers
+### Scenario 1: create and list a trip
 
-API Gateway/custom domain setup:
+1. User generates a list in `packing_list_web` from `GET /templates`.
+2. Client sends authenticated `POST /trips` with the full item snapshot.
+3. API validates payload, writes one `TRIP#...` DynamoDB record, and returns `201`.
+4. Client calls `GET /trips` and sees the trip in departure-date-descending order.
 
-- Custom domain: `api.packing-list.jordansimsmith.com`
-- Edge-optimized custom domain with ACM certificate in `us-east-1`
-- Stage `prod` with base path mapping at root (no `/v1`)
+### Scenario 2: update a trip while packing
 
-DynamoDB safety settings:
-
-- Point-in-time recovery enabled
-- Deletion protection enabled
-
-### Observability
-
-- Logs emitted to CloudWatch using slf4j/logback (consistent with other services in this repo)
-- Prefer structured log fields (or consistent prefixes) including `user` and `trip_id` where applicable
-- Avoid logging secrets or auth tokens
-
-### Testing
-
-Recommended test coverage (consistent with repo patterns):
-
-- **Unit tests**:
-  - request/response parsing and validation
-  - item name normalization + uniqueness enforcement
-- **Integration tests**:
-  - handler tests using a DynamoDB test container
-  - auth handler tests using fake secrets
-- **E2E tests** (optional):
-  - localstack-based tests for API Gateway/Lambda wiring patterns
-
-## Example templates and variations
-
-These examples are intended to seed initial hardcoded templates/variations and to clarify merge/name-normalization behavior; they are expected to evolve.
-
-### Base template: generic
-
-- **travel**:
-  - passport (qty 1, tags: `hand luggage`)
-  - driver's licence (qty 1, tags: `hand luggage`)
-  - tickets / booking confirmation (qty 1, tags: `hand luggage`)
-  - wallet (qty 1, tags: `hand luggage`)
-  - house/car keys (qty 1)
-- **electronics**:
-  - mobile phone (qty 1, tags: `hand luggage`)
-  - phone charger (qty 1, tags: `hand luggage`)
-  - power bank (qty 1, tags: `hand luggage`)
-  - earbuds (qty 1, tags: `hand luggage`)
-- **toiletries**:
-  - toothbrush (qty 1)
-  - toothpaste (qty 1)
-  - deodorant (qty 1)
-  - sunscreen (qty 1)
-  - moisturiser (qty 1)
-  - insect repellent (qty 1)
-  - personal meds / basic first aid (qty 1)
-- **clothes** (illustrative quantities; expected to be edited during generation):
-  - underwear (qty 7)
-  - socks (qty 7)
-  - t-shirts (qty 5)
-  - shorts (qty 1)
-  - pants (qty 1)
-  - jumper (qty 1)
-  - raincoat (qty 1)
-  - sleepwear (qty 1)
-- **misc/uncategorised**:
-  - drink bottle (qty 1)
-  - snacks (qty 1)
-
-### Variation: tramping
-
-- **gear**:
-  - sleeping bag (qty 1)
-  - sleeping mat (qty 1)
-  - lightweight tramping tent (qty 1)
-  - tramping stove + fuel (qty 1)
-  - headlamp (qty 1)
-  - water purifier (qty 1)
-  - dry bags (qty 1)
-  - toilet paper (qty 1)
-  - map (qty 1)
-  - lighter / matches (qty 1, tags: `hand luggage`)
-- **clothes**:
-  - tramping boots (qty 1)
-  - wool tramping socks (qty 2)
-  - sandfly tights (qty 1, tags: `optional`)
-
-### Variation: camping
-
-- **gear**:
-  - car camping tent (qty 1)
-  - camping stove + fuel (qty 1)
-  - cooking utensils (qty 1)
-  - eating utensils (qty 1)
-  - dishwashing liquid (qty 1)
-  - tea towel / dishcloth (qty 1)
-  - pegs + rope (qty 1)
-  - torch / lantern (qty 1)
-  - solar shower (qty 1, tags: `optional`)
-  - fishing gear (qty 1, tags: `optional`)
-
-### Variation: skiing
-
-- **clothes**:
-  - ski pants (qty 1)
-  - ski jacket (qty 1)
-  - ski helmet (qty 1)
-  - ski goggles (qty 1)
-  - ski gloves (qty 1)
-  - ski glove liners (qty 1, tags: `optional`)
-  - ski socks (qty 1)
-  - balaclava (qty 1)
-  - neck tube (qty 1)
-- **gear**:
-  - knee brace (qty 1, tags: `optional`)
-
-### Variation: cycling
-
-- **clothes**:
-  - cycling gloves (qty 1)
-  - padded bike shorts (qty 1)
-- **gear**:
-  - cycling helmet (qty 1)
-  - gel seat (qty 1, tags: `optional`)
-  - panniers (qty 1)
-  - dry bags (qty 1, tags: `optional`)
+1. User edits trip details and item statuses in `packing_list_web`.
+2. Client sends authenticated `PUT /trips/{trip_id}` with full replacement payload.
+3. API validates `trip_id` match, preserves `created_at`, updates `updated_at`, and rewrites the trip record.
+4. Client calls `GET /trips/{trip_id}` and sees the persisted changes.

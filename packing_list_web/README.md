@@ -1,217 +1,205 @@
 # Packing list web
 
-The packing list web service is a responsive single-page app that lets an authenticated user generate, edit, and pack per-trip packing lists using a base template plus optional variations.
+The packing list web service is a responsive single-page app that lets an authenticated user create, edit, and pack per-trip packing lists from a base template plus optional variations.
 
-Instead of maintaining a manual spreadsheet each holiday, the web app generates a custom packing list for that specific trip, lets you tweak it, and then makes it easy to check items off while packing.
+## Overview
 
-## System architecture
+- **Service type**: web client (`packing_list_web`)
+- **Interface**: browser SPA served via CloudFront and S3
+- **Frontend stack**: React, TypeScript, Vite, Mantine, React Router
+- **Primary backend**: `packing_list_api`
+- **Primary user**: single-user personal trip packing workflow
+
+## Features and scope boundaries
+
+### In scope
+
+- Authenticate with username/password, validate credentials against the backend, and persist a Basic auth token in browser storage.
+- Protect trip routes (`/trips`, `/trips/create`, `/trips/:tripId`) and redirect unauthenticated users to `/`.
+- List trips, create a trip from templates and optional variations, and open an existing trip for packing.
+- Build the create-flow packing list client-side, including add/remove/edit actions before persisting.
+- Persist trip creation via `POST /trips` and trip updates via full replacement `PUT /trips/{trip_id}`.
+- Provide responsive UI behavior for both mobile and desktop layouts.
+
+### Out of scope
+
+- Multi-user collaboration, shared trips, or role-based access controls in the web client.
+- Offline sync, background conflict resolution, or local-first persistence of trip records.
+- Reminder scheduling, push notifications, or calendar integration.
+- Server-managed draft workflows in create flow before trip creation.
+
+## Architecture
 
 ```mermaid
 flowchart TD
-  A[Browser] --> B[CloudFront Distribution]
-  B --> C[S3 Bucket: packing-list.jordansimsmith.com]
-  C --> D["React SPA (Vite + Mantine)"]
-  D -->|HTTPS Basic auth| E[Packing list API]
+  browser[UserBrowser] --> cloudfront[CloudFront]
+  cloudfront --> s3[S3Bucket]
+  s3 --> spa[ReactSPA]
+  spa -->|"HTTPS Basic auth"| api[PackingListAPI]
 ```
 
-## Requirements
+### Primary workflow
 
-### Functional requirements
+```mermaid
+sequenceDiagram
+  participant user as User
+  participant web as packing_list_web
+  participant api as packing_list_api
 
-- **Login**:
-  - collect username/password
-  - validate credentials via a lightweight authenticated API call (`GET /templates`) before accepting login
-  - store a Basic auth token in `localStorage` (persists across browser sessions)
-  - logout clears the stored token
-- **Route protection**:
-  - unauthenticated access to `/trips/*` redirects to `/`
-  - after login, navigate to `/trips`
-- **Trips home** (`/trips`):
-  - list trips ordered by `departure_date` descending
-  - link to create flow and to individual trips
-- **Create trip** (`/trips/create`):
-  - enter trip metadata: name, destination, departure date, return date
-  - load templates from the backend (`GET /templates`)
-  - select zero or more variations (base template is fixed)
-  - build a live preview list client-side by applying merge rules (see `packing_list_api/README.md`)
-  - allow edits before persisting:
-    - remove items
-    - add one-off items
-    - edit quantity/tags/status
-  - persist by creating the trip in one shot (`POST /trips`)
-- **Trip view / packing** (`/trips/:trip_id`):
-  - load full trip (`GET /trips/{trip_id}`)
-  - update by replacing the full trip (`PUT /trips/{trip_id}`)
-  - group items by category
-  - categories ordered alphabetically
-  - hide categories with zero visible items
-  - “hide packed” toggle
-  - fast status controls (segmented control) supporting `unpacked`, `pack-just-in-time`, and `packed`
-  - display tags at a glance
-- **Responsive UX**: usable on both mobile and desktop
+  user->>web: Submit login form
+  web->>api: GET /templates (Authorization Basic)
+  api-->>web: Templates payload
+  user->>web: Build preview and click Create trip
+  web->>api: POST /trips (full items snapshot)
+  api-->>web: Created trip with trip_id
+  web-->>user: Navigate to /trips/{trip_id}
+```
 
-### Technical specifications
+## Main technical decisions
 
-- **Framework**: React
-- **Language**: TypeScript
-- **Build tool**: Vite
-- **UI library**: Mantine
-- **Routing**: React Router (`react-router-dom`)
-- **Forms**: `@mantine/form`
-- **Notifications**: `@mantine/notifications`
-- **State strategy**:
-  - UI state in React component state
-  - server state via a typed API client (no React Query)
-- **Auth/session**:
-  - Basic token stored in `localStorage` (persists across browser sessions)
-  - http client injects `Authorization` header
-- **Hosting**: S3 + CloudFront (SPA deep-link support)
-- **Infra**: Terraform (aligned with repo patterns from `personal_website_web`)
-- **Build system**: Bazel (aligned with repo patterns)
+- Use a typed `ApiClient` interface with swappable implementations to keep page logic transport-agnostic.
+- Select API implementation by build mode: production uses HTTP client, development uses an in-memory fake client for fast local iteration.
+- Store session data in `localStorage` so authentication persists across browser reloads.
+- Generate create-flow packing lists in the client and persist a full snapshot at creation time to avoid backend draft complexity.
+- Use debounced autosave on trip edits to keep interaction responsive while limiting request churn.
+- Keep UI state in React component state and presenters rather than introducing a separate global server-state cache library.
 
-## Implementation details
+## Domain glossary
 
-### Route map
+- **Base template**: default item set always used to initialize a new trip.
+- **Variation**: optional additional item bundle that can be added during create flow.
+- **Trip**: persisted packing plan with metadata (`name`, `destination`, dates) and item list.
+- **Trip item**: one packable entry with `name`, `category`, `quantity`, `tags`, and `status`.
+- **Item status**: packing lifecycle value (`unpacked`, `pack-just-in-time`, `packed`).
 
-- `/` login/home
-- `/trips` trips list (requires auth)
-- `/trips/create` create trip (requires auth)
-- `/trips/:trip_id` trip view + packing (requires auth)
+## Integration contracts
 
-### Client-side generation and snapshot behavior
+### External systems
 
-- The web app generates and edits the packing list client-side, then persists the fully-materialized `items` array via `POST /trips`.
-- This gives “snapshot” behavior naturally: once the trip is created, it is independent from any subsequent changes to templates/variations.
-- There is no server-side draft/finalization workflow; drafts exist only within the create flow before the `POST /trips` call.
+- **None in current scope**: `packing_list_web` does not directly integrate with third-party vendors or webhooks.
 
-### UX guiding principles
+## API contracts
 
-- **vibe**: calm, simple, and fast; avoid visual noise.
-- **mantine-first**: prefer Mantine components + theme tokens; avoid one-off bespoke styling.
-- **responsive**: mobile and desktop are first-class.
-  - mobile uses comfortable spacing and large tap targets
-  - desktop can be slightly denser to fit more on screen
-- **layout**:
-  - use Mantine `AppShell` with a simple header (app name left, user + logout right)
-  - use a centered `Container` for page content (no sidebar navigation)
-- **trips list** (`/trips`):
-  - use list rows with subtle dividers (not heavy cards)
-  - show only the essentials per row: name, destination, departure + return dates
-  - avoid extra trip status badges
-- **create flow** (`/trips/create`):
-  - the create experience is a **live preview**:
-    - start from the base template list
-    - show variations with their item lists so it’s clear what will be included
-    - add variations and the preview updates immediately as each variation is added
-    - variations are **add-only** in a create session; use a single **Reset** action (with confirm) to start over
-    - add/remove/edit items during preview and changes apply immediately
-    - when happy, create the trip (persist snapshot) and navigate to the packing view
-  - **make merges obvious**: show quantity \(> 1\) prominently.
-- **packing view** (`/trips/:trip_id`):
-  - group by category; categories sorted alphabetically; hide empty categories after filters apply
-  - “hide packed” is a top-level toggle
-  - per-item status uses a segmented control:
-    - `unpacked`
-    - `pack-just-in-time` (label shown as **Pack later**)
-    - `packed`
-  - show tags at a glance as small badges
-- **errors and loading**:
-  - inline validation for forms
-  - toasts for API failures (show a short message)
-  - skeletons for list loading; button loading state for create/save actions
-- **accessibility**:
+### Consumed backend endpoints
 
-  - keep visible focus styles
-  - don’t rely on color alone for status
-  - ensure keyboard usability on desktop and generous tap targets on mobile
+| Method | Path               | Purpose                                                 |
+| ------ | ------------------ | ------------------------------------------------------- |
+| `GET`  | `/templates`       | validate session and load base template plus variations |
+| `GET`  | `/trips`           | fetch trip summaries for trips list                     |
+| `POST` | `/trips`           | create a trip with fully materialized items             |
+| `GET`  | `/trips/{trip_id}` | fetch one trip for packing/editing                      |
+| `PUT`  | `/trips/{trip_id}` | replace full trip payload after edits                   |
 
-  - encourage reuse of existing categories, but allow creating new ones at any time
-  - tags are free text and created on the fly
+### UI contract expectations
 
-### Module layout
+- Requests and responses use snake_case fields (for example `trip_id`, `departure_date`, `base_template`).
+- Authenticated requests send `Authorization: Basic <token>` from persisted session state.
+- Trip dates are sent and consumed as `YYYY-MM-DD` strings.
+- API error responses are expected to include `{"message":"..."}`; UI falls back to status text when message parsing fails.
+- Trip updates are full replacements (`PUT` sends complete trip fields and item array, not partial patches).
 
-#### API integration
+## Data and storage contracts
 
-- `api/client.ts`
-  - typed endpoint functions (no generic transport exported):
-    - `getTemplates()`
-    - `createTrip(...)`
-    - `getTrips()`
-    - `getTrip(tripId)`
-    - `updateTrip(trip)`
-  - selects an underlying implementation:
-    - `api/http-client.ts` (prod): real HTTP calls with `fetch`
-    - `api/fake-client.ts` (dev): pure in-memory stub for local development (no backend required; resets on refresh)
-  - normalizes error handling to `{"message":"..."}`
+### Browser storage
 
-#### Auth/session
+| Location              | Key                 | Purpose                                                                                               | Retention                  |
+| --------------------- | ------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------- |
+| `localStorage`        | `packing_list_auth` | persisted session `{ "username": string, "token": string }` where token is base64 `username:password` | until explicit logout      |
+| in-memory React state | n/a                 | create-flow preview, modal state, loading/errors, debounced pending save payload                      | reset on full page refresh |
 
-- `auth/session.ts`
-  - read/write/clear Basic token in `localStorage`
+### Data ownership expectations
 
-#### Domain helpers
+- `packing_list_api` is authoritative for templates, persisted trips, and persisted packing status.
+- Create-flow preview state in the browser is authoritative only until `POST /trips` succeeds.
+- The web client does not persist trip records or templates in browser storage.
+- In development mode, fake-client data is in-memory only and resets on browser refresh.
 
-- `domain/normalize.ts`
-  - `normalizedName(...)` used for item identity rules
-- `domain/generate.ts`
-  - merge logic (sum quantities, union tags, first category wins, status defaults to `unpacked`)
+## Behavioral invariants and time semantics
 
-### Page/component architecture
+- Item identity is normalized with `normalizedName(name)` (lowercased and whitespace-normalized) for merge, edit, and remove behavior.
+- When merging template or variation items, matching item names merge by normalized identity: quantities sum and tags union.
+- New items default to `unpacked` status.
+- Category grouping sorts items alphabetically by name; category groups are alphabetical with `misc` rendered last.
+- `hide packed` filtering is applied before category grouping, and empty categories are not rendered.
+- Dates are formatted for API as `YYYY-MM-DD` and displayed with browser locale formatting from local `Date` objects.
+- Trip edits in `TripPage` are autosaved with a 500ms debounce and pending changes are flushed on unmount.
 
-#### Pages
+## Source of truth
 
-- `LoginPage` (`/`)
-- `TripsPage` (`/trips`)
-- `CreateTripPage` (`/trips/create`)
-- `TripPage` (`/trips/:trip_id`)
+| Entity                        | Authoritative source                       | Notes                                                               |
+| ----------------------------- | ------------------------------------------ | ------------------------------------------------------------------- |
+| Credential validity           | `packing_list_api` auth-protected response | login is treated as successful after authenticated `GET /templates` |
+| Template catalog              | `packing_list_api`                         | base template and variations are loaded from API client response    |
+| Trip records                  | `packing_list_api`                         | list and detail pages render API-backed trip payloads               |
+| In-progress create-flow edits | browser memory                             | temporary until create request succeeds                             |
+| Session persistence           | browser `localStorage`                     | cleared on logout via `clearSession()`                              |
 
-#### Layout and routing helpers
+## Security and privacy
 
-- `AppShellLayout` (Mantine `AppShell` header + main container)
-- `RequireAuth` (redirect unauthenticated users)
-- `ErrorBoundary` (route-level fallback)
+- Production API calls are expected to use HTTPS with Basic auth headers.
+- Username/password are user-provided at runtime and converted to a Base64 token for transport header usage.
+- Session data is stored in `localStorage`, not URL query params or fragments.
+- Logout clears stored session data immediately and returns user to `/`.
+- The web app does not embed backend secrets or infrastructure credentials.
+- Error handling surfaces short user-facing messages and does not intentionally expose credential values.
 
-#### Feature components
+## Configuration and secrets reference
 
-- `TripForm` (name/destination/departure/return)
-- `TemplatesPicker` (base template read-only + variation picker that shows each variation’s items)
-- `PackingListEditor` (add/remove/edit items during create flow)
-- `PackingListView` (packing view with grouping + status toggles)
+### Environment variables
 
-#### Reusable components
+| Name                | Required | Purpose                      | Default behavior                                          |
+| ------------------- | -------- | ---------------------------- | --------------------------------------------------------- |
+| `VITE_API_BASE_URL` | no       | base URL for HTTP API client | defaults to `https://api.packing-list.jordansimsmith.com` |
 
-- `CategorySection` (category header + list of items)
-- `ItemRow` (name, quantity, tags, status controls)
-- `TagsInput` (free-text tags)
-- `StatusControl` (segmented control: `unpacked` / `pack-just-in-time` (“pack later”) / `packed`)
+Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client, while development uses the in-memory fake client.
 
-### Local development
+### Secrets handling
 
-- **For hot reloading** (recommended for development): run Vite directly outside Bazel:
-  - `cd packing_list_web && pnpm vite dev`
-  - This enables fast hot module replacement (HMR) when source files change
-- **Via Bazel** (sandboxed, no hot reload): `bazel run //packing_list_web:vite -- dev`
-  - Use this if you need the Bazel-managed environment, but note that source file changes won't auto-reload
-- By default, the app uses the **fake in-memory API client** in dev mode (no backend required; no network calls)
-- Optionally, switch to the **http API client** to test against the deployed API (e.g. with a Vite env var such as `VITE_API_IMPL=http`)
+- No server-managed secret values are bundled in this frontend runtime.
+- Credentials are entered by the user at login time and used only to generate the `Authorization` header token.
+- The persisted session token is removed on logout.
 
-### Testing
+## Performance envelope
 
-- **Unit tests**: Vitest + React Testing Library (jsdom)
-- **Bazel**: `bazel test //packing_list_web:unit-tests`
-- Focus areas:
-  - packing list editor interactions (add/remove/edit; dedupe-by-normalized-name)
-  - route protection and login redirect behavior
-  - create trip happy path with `api/client.ts` mocked
+- Optimized for a single-user workflow with low-to-moderate trip and item volumes.
+- Core interactions (loading trips, editing item status, and create-flow preview updates) are designed to feel immediate in normal browser conditions.
+- Debounced autosave balances fast UI response with reduced backend write frequency.
+- Dependency choices prioritize straightforward rendering and maintainable performance over heavy client-side data frameworks.
 
-### Deployment (Terraform) notes
+## Testing and quality gates
 
-- **Bucket**: `packing-list.jordansimsmith.com`
-- **CloudFront**:
-  - origin access control (OAC) for private S3 access
-  - viewer protocol policy redirect-to-https
-  - SPA routing support:
-    - map `403` and `404` to `/index.html` with `200` so deep links work on refresh
-- Terraform implementation should follow the existing pattern used by `personal_website_web/infra/main.tf`:
-  - consume build artifact paths from the `artifacts` Terraform input map (passed by `tools/terraform/apply.py` from `tools/terraform/manifest.json`)
-  - upload built assets using `hashicorp/dir/template` + `aws_s3_object`
+- Unit and component tests run with Vitest and React Testing Library in `jsdom`.
+- Key coverage areas include login and route protection, create flow interactions, and trip editing/packing behavior.
+- Required checks before merge:
+  - `bazel test //packing_list_web:unit-tests`
+  - `bazel build //packing_list_web:typecheck`
+  - `bazel build //packing_list_web:build`
+
+## Local development and smoke checks
+
+- Recommended local development: `cd packing_list_web && pnpm vite dev`
+- Bazel development option: `bazel run //packing_list_web:vite -- dev`
+- Development mode uses fake in-memory API data by default (no backend dependency).
+- Basic smoke flow:
+  - log in with any credentials in dev mode
+  - open `/trips` and verify trip list renders
+  - create a trip from `/trips/create` and confirm redirect to `/trips/{trip_id}`
+  - change statuses or item details in trip view and confirm autosave behavior
+
+## End-to-end scenarios
+
+### Scenario 1: login and create a trip
+
+1. User opens `/`, enters credentials, and submits login.
+2. App writes session to `localStorage`, validates with `GET /templates`, then navigates to `/trips`.
+3. User opens `/trips/create`, fills trip details, and adds one or more variations.
+4. User optionally edits preview items, then clicks Create trip.
+5. App sends `POST /trips` with full item snapshot and navigates to `/trips/{trip_id}`.
+
+### Scenario 2: update packing progress on an existing trip
+
+1. User opens `/trips/{trip_id}` from trips list.
+2. App loads full trip via `GET /trips/{trip_id}` and displays grouped categories.
+3. User updates item status, edits quantities/tags, or adds/removes items.
+4. App applies updates locally and autosaves via debounced `PUT /trips/{trip_id}` with full trip payload.
+5. User can toggle `hide packed` and continue packing with current persisted state.
