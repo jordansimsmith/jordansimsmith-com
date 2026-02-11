@@ -68,9 +68,7 @@ sequenceDiagram
 - Keep route-level and UI state in React component state, and avoid a global server-state library. This keeps complexity low, but does not provide automatic caching/polling behavior.
 - Use a presenter (`ProgressPresenter`) to transform API payloads into view models. This keeps React components focused on rendering and interaction.
 - Render the chart with lightweight custom SVG instead of introducing a charting dependency. This keeps bundle complexity lower at the cost of fewer built-in chart features.
-- Use a dual API implementation strategy:
-  - fake in-memory client in development by default
-  - HTTP client in production (and in development when `VITE_API_IMPL=http`)
+- Select API implementation by build mode: production uses the HTTP client, while development uses the in-memory fake client.
 - Persist Basic auth token in `localStorage` so sessions survive browser restarts.
 
 ## Domain glossary
@@ -172,14 +170,13 @@ Only the fields below are required by the current UI. The API may return additio
 
 ### Environment variables
 
-| Name                | Required | Purpose                                       | Default behavior                                               |
-| ------------------- | -------- | --------------------------------------------- | -------------------------------------------------------------- |
-| `VITE_API_IMPL`     | no       | select `http` or `fake` client in development | defaults to `fake` when unset in dev                           |
-| `VITE_API_BASE_URL` | no       | base URL for HTTP client                      | defaults to `https://api.immersion-tracker.jordansimsmith.com` |
+| Name                | Required | Purpose                  | Default behavior                                               |
+| ------------------- | -------- | ------------------------ | -------------------------------------------------------------- |
+| `VITE_API_BASE_URL` | no       | base URL for HTTP client | defaults to `https://api.immersion-tracker.jordansimsmith.com` |
 
 Notes:
 
-- In production builds (`import.meta.env.PROD`), the app always selects the HTTP client.
+- Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client, while development uses the in-memory fake client.
 - The fake client still requires a stored session object and returns in-memory static data.
 
 ### Secrets handling
@@ -214,10 +211,7 @@ Notes:
   - `bazel run //immersion_tracker_web:vite -- dev`
 - Preview built output:
   - `bazel run //immersion_tracker_web:preview`
-- Default local API mode is fake client (no backend required).
-- To call the real API in development:
-  - `VITE_API_IMPL=http`
-  - optional `VITE_API_BASE_URL=<your-api-base-url>`
+- Development mode uses the fake client by default (no backend required).
 
 Smoke check flow:
 

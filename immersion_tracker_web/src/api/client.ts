@@ -62,13 +62,6 @@ export interface ApiClient {
   getProgress(): Promise<ProgressResponse>;
 }
 
-function shouldUseHttpClient(): boolean {
-  if (import.meta.env.PROD) {
-    return true;
-  }
-  return import.meta.env.VITE_API_IMPL === 'http';
-}
-
-export const apiClient: ApiClient = shouldUseHttpClient()
+export const apiClient: ApiClient = import.meta.env.PROD
   ? createHttpClient()
   : createFakeClient();
