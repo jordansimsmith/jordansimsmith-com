@@ -2,6 +2,7 @@ package com.jordansimsmith.subfootballtracker;
 
 import dagger.Module;
 import dagger.Provides;
+import java.net.URI;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -20,6 +21,10 @@ public class SubfootballTrackerModule {
   @Provides
   @Singleton
   public SubfootballClient subfootballClient() {
-    return new JsoupSubfootballClient();
+    var baseUrl = System.getenv("SUBFOOTBALL_TRACKER_SUBFOOTBALL_BASE_URL");
+    if (baseUrl == null || baseUrl.isBlank()) {
+      baseUrl = "https://subfootball.com";
+    }
+    return new JsoupSubfootballClient(URI.create(baseUrl));
   }
 }

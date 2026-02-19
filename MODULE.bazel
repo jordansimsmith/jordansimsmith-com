@@ -96,7 +96,21 @@ oci.pull(
     ],
     tag = "4.13.1",
 )
-use_repo(oci, "alpine", "alpine_linux_amd64", "alpine_linux_arm64_v8", "dynamodb", "dynamodb_linux_amd64", "dynamodb_linux_arm64", "localstack", "localstack_linux_amd64", "localstack_linux_arm64", "ryuk", "ryuk_linux_amd64", "ryuk_linux_arm64")
+oci.pull(
+    name = "temurin21jre",
+    digest = "sha256:34a58218d838035428163eb35abb629944c5906d1bedcfef8bc8864cce11dfe5",
+    image = "docker.io/library/eclipse-temurin",
+    platforms = [
+        "linux/amd64",
+        "linux/arm64/v8",
+    ],
+    tag = "21-jre",
+)
+use_repo(oci, "dynamodb", "dynamodb_linux_amd64", "dynamodb_linux_arm64")
+use_repo(oci, "alpine", "alpine_linux_amd64", "alpine_linux_arm64_v8")
+use_repo(oci, "ryuk", "ryuk_linux_amd64", "ryuk_linux_arm64")
+use_repo(oci, "localstack", "localstack_linux_amd64", "localstack_linux_arm64")
+use_repo(oci, "temurin21jre", "temurin21jre_linux_amd64", "temurin21jre_linux_arm64_v8")
 
 bazel_dep(name = "aspect_rules_lint", version = "2.1.0")
 

@@ -15,7 +15,7 @@ The subfootball tracker API service runs a scheduled backend workflow that monit
 ### In scope
 
 - Run `UpdatePageContentHandler` on a fixed EventBridge schedule (`rate(15 minutes)`).
-- Fetch `https://subfootball.com/register` and extract the `.page.content-item` text content.
+- Fetch `/register` from a configurable SUB Football base URL (defaults to `https://subfootball.com`) and extract the `.page.content-item` text content.
 - Compare the latest stored snapshot against the current scrape result.
 - Publish an SNS email notification when current content differs from the previous snapshot.
 - Persist a new snapshot item on every run, including runs with no detected change.
@@ -69,6 +69,7 @@ sequenceDiagram
 - Persist a new snapshot on every run (not only on changes) so history reflects each poll result over time.
 - Use Jsoup and a single CSS selector (`.page.content-item`) for simple extraction without browser automation.
 - Resolve SNS topic ARN dynamically by listing topics and matching by topic-name suffix; this keeps publish calls simple but assumes exactly one matching topic exists.
+- Make the SUB Football base URL configurable through one optional environment variable so E2E can run against a local stub while production keeps the existing upstream default.
 - Keep table and topic names fixed in service code to reduce per-environment configuration complexity.
 
 ## Domain glossary
@@ -82,7 +83,7 @@ sequenceDiagram
 
 ### External systems
 
-- **SUB Football website**: outbound unauthenticated HTTPS `GET` to `https://subfootball.com/register` every scheduled run. The service requires `.page.content-item` to exist and normalizes extracted lines by translating `<br>` and `<p>` boundaries into newline separators before text comparison.
+- **SUB Football website**: outbound unauthenticated `GET` to `<subfootball_base_url>/register` every scheduled run. `subfootball_base_url` defaults to `https://subfootball.com` and can be overridden with `SUBFOOTBALL_TRACKER_SUBFOOTBALL_BASE_URL` for test environments. The service requires `.page.content-item` to exist and normalizes extracted lines by translating `<br>` and `<p>` boundaries into newline separators before text comparison.
 - **Amazon DynamoDB**: outbound query and put operations against table `subfootball_tracker`. The service queries the latest snapshot for `pk = PAGE#REGISTRATION` and always writes a new snapshot item.
 - **Amazon SNS**: outbound publish to topic `subfootball_tracker_api_page_content_updates` when a content change is detected. The publisher resolves topic ARN using `ListTopics` and suffix matching; missing or duplicate matches fail the invocation.
 
@@ -162,12 +163,12 @@ Representative record:
 
 ## Source of truth
 
-| Entity                    | Authoritative source                             | Notes                                            |
-| ------------------------- | ------------------------------------------------ | ------------------------------------------------ |
-| Live registration content | `https://subfootball.com/register` response body | website is the upstream source for current state |
-| Snapshot history          | DynamoDB `subfootball_tracker` items             | service writes one item per successful run       |
-| Notification distribution | SNS topic subscriptions defined in Terraform     | topic publishes only when change is detected     |
-| Polling cadence           | EventBridge rule `rate(15 minutes)`              | schedule is infrastructure-defined               |
+| Entity                    | Authoritative source                            | Notes                                                                                                      |
+| ------------------------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Live registration content | `<subfootball_base_url>/register` response body | defaults to `https://subfootball.com/register`; E2E can override base URL for deterministic local fixtures |
+| Snapshot history          | DynamoDB `subfootball_tracker` items            | service writes one item per successful run                                                                 |
+| Notification distribution | SNS topic subscriptions defined in Terraform    | topic publishes only when change is detected                                                               |
+| Polling cadence           | EventBridge rule `rate(15 minutes)`             | schedule is infrastructure-defined                                                                         |
 
 ## Security and privacy
 
@@ -182,11 +183,9 @@ Representative record:
 
 ### Environment variables
 
-This service defines no service-specific environment variables in application code.
-
-| Name   | Required | Purpose                                        | Default behavior                                                                                   |
-| ------ | -------- | ---------------------------------------------- | -------------------------------------------------------------------------------------------------- |
-| `none` | n/a      | no service-specific environment variable reads | table and topic names are code-defined; AWS SDK uses default region and credential provider chains |
+| Name                                       | Required | Purpose                                            | Default behavior                                         |
+| ------------------------------------------ | -------- | -------------------------------------------------- | -------------------------------------------------------- |
+| `SUBFOOTBALL_TRACKER_SUBFOOTBALL_BASE_URL` | no       | override base URL used by `JsoupSubfootballClient` | falls back to `https://subfootball.com` when unset/blank |
 
 ### Secret shape
 
@@ -206,13 +205,20 @@ None in current scope. The service does not read Secrets Manager secrets or cust
   - notification publish on content change
   - expected notification subject and message format
 - Integration tests use DynamoDB test containers plus fake SUB Football client and fake notification publisher.
+- E2E coverage exists in `SubfootballTrackerE2ETest`:
+  - boots LocalStack with table, topic, queue, and lambda wiring from `init_resources.py`
+  - runs lambda invocation path end-to-end through AWS SDK clients
+  - uses a local Java `HttpServer` SUB Football stub container on a dedicated Docker network
+  - validates SNS-to-SQS notification delivery and latest snapshot persistence
 - Required checks before merge:
   - `bazel test //subfootball_tracker_api:integration-tests`
+  - `bazel test //subfootball_tracker_api:e2e-tests`
   - `bazel build //subfootball_tracker_api:update-page-content-handler`
 
 ## Local development and smoke checks
 
 - Run integration tests locally: `bazel test //subfootball_tracker_api:integration-tests`
+- Run deterministic offline E2E locally: `bazel test //subfootball_tracker_api:e2e-tests`
 - Build deployable handler artifact: `bazel build //subfootball_tracker_api:update-page-content-handler`
 - Minimal smoke verification:
   - test setup seeds prior content and sets new scrape content

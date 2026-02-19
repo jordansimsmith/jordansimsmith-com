@@ -810,7 +810,7 @@
     "@@rules_oci+//oci:extensions.bzl%oci": {
       "general": {
         "bzlTransitiveDigest": "pRktkjxuGdTLfnxWwCom7kAxIn6acZ+NigEHdGsV9YE=",
-        "usagesDigest": "DXZOS12fiYSMLkVKCboGf3xJiTk7O6qckx0AR+NWXc8=",
+        "usagesDigest": "l60Hq9Lqy/WZQ403RzlkqLB6jOquy5u4ptOlNLit1SM=",
         "recordedInputs": [
           "REPO_MAPPING:aspect_bazel_lib+,bazel_tools bazel_tools",
           "REPO_MAPPING:bazel_features+,bazel_tools bazel_tools",
@@ -991,6 +991,49 @@
               "reproducible": true
             }
           },
+          "temurin21jre_linux_amd64": {
+            "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_pull",
+            "attributes": {
+              "www_authenticate_challenges": {},
+              "scheme": "https",
+              "registry": "index.docker.io",
+              "repository": "library/eclipse-temurin",
+              "identifier": "sha256:34a58218d838035428163eb35abb629944c5906d1bedcfef8bc8864cce11dfe5",
+              "platform": "linux/amd64",
+              "target_name": "temurin21jre_linux_amd64",
+              "bazel_tags": []
+            }
+          },
+          "temurin21jre_linux_arm64_v8": {
+            "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_pull",
+            "attributes": {
+              "www_authenticate_challenges": {},
+              "scheme": "https",
+              "registry": "index.docker.io",
+              "repository": "library/eclipse-temurin",
+              "identifier": "sha256:34a58218d838035428163eb35abb629944c5906d1bedcfef8bc8864cce11dfe5",
+              "platform": "linux/arm64/v8",
+              "target_name": "temurin21jre_linux_arm64_v8",
+              "bazel_tags": []
+            }
+          },
+          "temurin21jre": {
+            "repoRuleId": "@@rules_oci+//oci/private:pull.bzl%oci_alias",
+            "attributes": {
+              "target_name": "temurin21jre",
+              "www_authenticate_challenges": {},
+              "scheme": "https",
+              "registry": "index.docker.io",
+              "repository": "library/eclipse-temurin",
+              "identifier": "sha256:34a58218d838035428163eb35abb629944c5906d1bedcfef8bc8864cce11dfe5",
+              "platforms": {
+                "@@platforms//cpu:x86_64": "@temurin21jre_linux_amd64",
+                "@@platforms//cpu:arm64": "@temurin21jre_linux_arm64_v8"
+              },
+              "bzlmod_repository": "temurin21jre",
+              "reproducible": true
+            }
+          },
           "oci_crane_darwin_amd64": {
             "repoRuleId": "@@rules_oci+//oci:repositories.bzl%crane_repositories",
             "attributes": {
@@ -1118,7 +1161,10 @@
             "ryuk_linux_arm64",
             "localstack",
             "localstack_linux_amd64",
-            "localstack_linux_arm64"
+            "localstack_linux_arm64",
+            "temurin21jre",
+            "temurin21jre_linux_amd64",
+            "temurin21jre_linux_arm64_v8"
           ],
           "explicitRootModuleDirectDevDeps": [],
           "useAllRepos": "NO",
