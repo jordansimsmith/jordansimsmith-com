@@ -17,6 +17,7 @@ public abstract class LocalStackContainer<T extends LocalStackContainer<T>>
     extends GenericContainer<T> {
   private static final Logger LOGGER = LoggerFactory.getLogger(LocalStackContainer.class);
 
+  private static final String CONTAINER_DOCKER_SOCKET = "/var/run/docker.sock";
   private static final int LOCALSTACK_PORT = 4566;
 
   protected LocalStackContainer(
@@ -27,7 +28,14 @@ public abstract class LocalStackContainer<T extends LocalStackContainer<T>>
             getProperty(propertyFileName, imageLoaderProperty)));
 
     this.withExposedPorts(LOCALSTACK_PORT);
-    this.withFileSystemBind("/var/run/docker.sock", "/var/run/docker.sock", BindMode.READ_WRITE);
+    this.withFileSystemBind(CONTAINER_DOCKER_SOCKET, CONTAINER_DOCKER_SOCKET, BindMode.READ_WRITE);
+    this.withPrivilegedMode(true);
+    this.withEnv("DOCKER_HOST", "unix://" + CONTAINER_DOCKER_SOCKET);
+    this.withEnv("DOCKER_SOCK", CONTAINER_DOCKER_SOCKET);
+    this.withEnv("AWS_ACCESS_KEY_ID", "fake");
+    this.withEnv("AWS_SECRET_ACCESS_KEY", "fake");
+    this.withEnv("AWS_DEFAULT_REGION", "ap-southeast-2");
+    this.withEnv("AWS_REGION", "ap-southeast-2");
     this.waitingFor(
         Wait.forHttp("/_localstack/init/ready")
             .forResponsePredicate(
