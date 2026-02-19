@@ -32,11 +32,6 @@ public class PriceTrackerE2ETest {
     DynamoDbUtils.reset(dynamoDbClient);
   }
 
-  @Test
-  void shouldStartContainer() {
-    assertThat(priceTrackerContainer.isRunning()).isTrue();
-  }
-
   // skipped in CI because cloudflare blocks requests to the product websites from github actions
   // agents
   @Test

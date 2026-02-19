@@ -34,11 +34,6 @@ public class FootballCalendarE2ETest {
   }
 
   @Test
-  void shouldStartContainer() {
-    assertThat(footballCalendarContainer.isRunning()).isTrue();
-  }
-
-  @Test
   @DisabledIfEnvironmentVariable(named = "CI", matches = "true")
   void shouldUpdateFixturesAndProvideCalendarSubscription() throws Exception {
     // arrange

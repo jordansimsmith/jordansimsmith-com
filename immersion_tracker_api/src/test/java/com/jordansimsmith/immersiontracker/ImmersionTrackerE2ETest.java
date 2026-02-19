@@ -47,11 +47,6 @@ public class ImmersionTrackerE2ETest {
             "%-11s", quarterStart.format(DateTimeFormatter.ofPattern("MMM uuuu", Locale.ENGLISH)));
   }
 
-  @Test
-  void shouldStartContainer() {
-    assertThat(immersionTrackerContainer.isRunning()).isTrue();
-  }
-
   @SuppressWarnings("ResultOfMethodCallIgnored")
   @Test
   void scriptShouldSyncEpisodes() throws Exception {

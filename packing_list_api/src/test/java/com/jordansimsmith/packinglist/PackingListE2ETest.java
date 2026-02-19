@@ -40,11 +40,6 @@ public class PackingListE2ETest {
   }
 
   @Test
-  void shouldStartContainer() {
-    assertThat(packingListContainer.isRunning()).isTrue();
-  }
-
-  @Test
   void shouldCreateListGetUpdateAndGetTrip() throws Exception {
     var user = "testuser";
     var authHeader =

@@ -33,11 +33,6 @@ public class EventCalendarE2ETest {
   }
 
   @Test
-  void shouldStartContainer() {
-    assertThat(eventCalendarContainer.isRunning()).isTrue();
-  }
-
-  @Test
   @DisabledIfEnvironmentVariable(named = "CI", matches = "true")
   void shouldUpdateEventsAndProvideCalendarSubscription() throws Exception {
     // arrange

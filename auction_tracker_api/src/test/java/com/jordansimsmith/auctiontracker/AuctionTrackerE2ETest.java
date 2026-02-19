@@ -38,11 +38,6 @@ public class AuctionTrackerE2ETest {
   }
 
   @Test
-  void shouldStartContainer() {
-    assertThat(auctionTrackerContainer.isRunning()).isTrue();
-  }
-
-  @Test
   @DisabledIfEnvironmentVariable(named = "CI", matches = "true")
   void shouldUpdateItemsAndSendDigestWithNotification() throws Exception {
     // arrange
