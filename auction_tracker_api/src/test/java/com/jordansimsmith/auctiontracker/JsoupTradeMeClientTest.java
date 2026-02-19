@@ -144,25 +144,24 @@ public class JsoupTradeMeClientTest {
           @Override
           protected Document fetchDocument(String url) {
             return switch (url) {
-              case BASE_URL
-                  + "?search_string=titleist+wedge&price_max=70&sort_order=expirydesc" -> Jsoup
-                  .parse(SEARCH_HTML, BASE_URL);
-              case BASE_URL + "?search_string=query+param+test&sort_order=expirydesc" -> Jsoup
-                  .parse(SEARCH_HTML_WITH_QUERY_PARAMS, BASE_URL);
-              case BASE_URL + "?search_string=reserve+test&sort_order=expirydesc" -> Jsoup.parse(
-                  SEARCH_HTML_WITH_RESERVE_NOT_MET, BASE_URL);
-              case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003621" -> Jsoup
-                  .parse(ITEM1_HTML);
-              case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003622" -> Jsoup
-                  .parse(ITEM2_HTML);
-              case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003623?rsqid=abc123-def456" -> Jsoup
-                  .parse(ITEM3_HTML);
-              case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003624?rsqid=xyz789-uvw012&ref=search" -> Jsoup
-                  .parse(ITEM4_HTML);
-              case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003625" -> Jsoup
-                  .parse(ITEM_WITH_RESERVE_NOT_MET_HTML);
-              case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003626" -> Jsoup
-                  .parse(REGULAR_ITEM_HTML);
+              case BASE_URL + "?search_string=titleist+wedge&price_max=70&sort_order=expirydesc" ->
+                  Jsoup.parse(SEARCH_HTML, BASE_URL);
+              case BASE_URL + "?search_string=query+param+test&sort_order=expirydesc" ->
+                  Jsoup.parse(SEARCH_HTML_WITH_QUERY_PARAMS, BASE_URL);
+              case BASE_URL + "?search_string=reserve+test&sort_order=expirydesc" ->
+                  Jsoup.parse(SEARCH_HTML_WITH_RESERVE_NOT_MET, BASE_URL);
+              case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003621" ->
+                  Jsoup.parse(ITEM1_HTML);
+              case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003622" ->
+                  Jsoup.parse(ITEM2_HTML);
+              case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003623?rsqid=abc123-def456" ->
+                  Jsoup.parse(ITEM3_HTML);
+              case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003624?rsqid=xyz789-uvw012&ref=search" ->
+                  Jsoup.parse(ITEM4_HTML);
+              case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003625" ->
+                  Jsoup.parse(ITEM_WITH_RESERVE_NOT_MET_HTML);
+              case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003626" ->
+                  Jsoup.parse(REGULAR_ITEM_HTML);
               default -> throw new AssertionError("Unexpected URL in test: " + url);
             };
           }

@@ -166,14 +166,14 @@ class JsoupGoMediaEventClientTest {
           protected Document fetchDocument(String url) {
             return switch (url) {
               case STADIUM_URL -> Jsoup.parse(MAIN_PAGE_HTML);
-              case BASE_URL + "/event/one-nz-warriors-2025-nrl-home-season" -> Jsoup.parse(
-                  SEASON_PAGE_HTML);
-              case BASE_URL + "/event/one-nz-warriors-v-sea-eagles-2025-season" -> Jsoup.parse(
-                  SEA_EAGLES_EVENT_PAGE_HTML);
-              case BASE_URL + "/event/one-nz-warriors-v-roosters-2025-season" -> Jsoup.parse(
-                  ROOSTERS_EVENT_PAGE_HTML);
-              case BASE_URL + "/event/one-nz-warriors-v-broncos-2025-season" -> Jsoup.parse(
-                  BRONCOS_EVENT_PAGE_HTML);
+              case BASE_URL + "/event/one-nz-warriors-2025-nrl-home-season" ->
+                  Jsoup.parse(SEASON_PAGE_HTML);
+              case BASE_URL + "/event/one-nz-warriors-v-sea-eagles-2025-season" ->
+                  Jsoup.parse(SEA_EAGLES_EVENT_PAGE_HTML);
+              case BASE_URL + "/event/one-nz-warriors-v-roosters-2025-season" ->
+                  Jsoup.parse(ROOSTERS_EVENT_PAGE_HTML);
+              case BASE_URL + "/event/one-nz-warriors-v-broncos-2025-season" ->
+                  Jsoup.parse(BRONCOS_EVENT_PAGE_HTML);
               default -> throw new AssertionError("Unexpected URL in test: " + url);
             };
           }

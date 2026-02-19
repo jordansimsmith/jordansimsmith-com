@@ -9,7 +9,7 @@ public class LoadedImageNameSubstitutor extends ImageNameSubstitutor {
 
   @Override
   public DockerImageName apply(DockerImageName original) {
-    if (original.toString().equals("testcontainers/ryuk:0.7.0")) {
+    if (original.toString().equals("testcontainers/ryuk:0.13.0")) {
       return LoadedImage.loadImage(
           TestcontainersConfiguration.getInstance()
               .getClasspathProperties()

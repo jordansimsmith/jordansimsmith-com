@@ -182,7 +182,8 @@ public class ImmersionTrackerE2ETest {
         Deleted completed show: 1 [123] Free!
         Deleted completed show: 2 (123) Haikyuu Part 1
 
-        Press ENTER to close..."""
+        Press ENTER to close...\
+        """
             .formatted(formattedAllTimeProgressLabel);
     assertThat(output).isEqualTo(expectedOutput);
     assertThat(show1Episode1).doesNotExist();
@@ -286,7 +287,8 @@ public class ImmersionTrackerE2ETest {
         Deleting 2 local movies watched...
         Deleted 3.00 GB of watched movies.
 
-        Press ENTER to close..."""
+        Press ENTER to close...\
+        """
             .formatted(formattedAllTimeProgressLabel);
     assertThat(output).isEqualTo(expectedOutput);
     assertThat(suzume).doesNotExist();
@@ -371,7 +373,8 @@ public class ImmersionTrackerE2ETest {
 
         Clearing watched URLs...
 
-        Press ENTER to close..."""
+        Press ENTER to close...\
+        """
             .formatted(formattedAllTimeProgressLabel);
     assertThat(output).isEqualTo(expectedOutput);
 
@@ -454,7 +457,8 @@ public class ImmersionTrackerE2ETest {
 
         Clearing watched URLs...
 
-        Press ENTER to close..."""
+        Press ENTER to close...\
+        """
             .formatted(formattedAllTimeProgressLabel);
     assertThat(output).isEqualTo(expectedOutput);
 

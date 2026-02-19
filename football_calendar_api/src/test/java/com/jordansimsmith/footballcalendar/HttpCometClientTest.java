@@ -117,41 +117,41 @@ public class HttpCometClientTest {
 
   private String readFixturesResponse() {
     return """
+    {
+      "fixtures": [
         {
-          "fixtures": [
-            {
-              "Id": "2716942185",
-              "HomeOrgLogo": "//prodcdn.sporty.co.nz/cometcache/comet/logo/285712",
-              "AwayOrgLogo": "//prodcdn.sporty.co.nz/cometcache/comet/logo/289232",
-              "GradeId": "Grade",
-              "GradeName": "Grade",
-              "HomeTeamNameAbbr": "Bucklands Beach Bucks M5",
-              "AwayTeamNameAbbr": "Ellerslie AFC Flamingoes M",
-              "CompetitionId": null,
-              "Round": "Round",
-              "RoundName": "Round",
-              "Date": "2025-04-05T15:00:00",
-              "VenueId": "47651",
-              "VenueName": "Lloyd Elsmore Park 2",
-              "GLN": "9429302884032",
-              "HomeScore": "",
-              "AwayScore": "",
-              "SectionId": 0,
-              "SectionName": null,
-              "PublicNotes": null,
-              "CssName": null,
-              "MatchSummary": null,
-              "MatchDayDescription": null,
-              "SportId": null,
-              "matchDay": 1,
-              "Longitude": "174.8997797",
-              "Latitude": "-36.9053315",
-              "Address": "2 Bells Avenue",
-              "Status": "POSTPONED",
-              "CometScore": ""
-            }
-          ]
+          "Id": "2716942185",
+          "HomeOrgLogo": "//prodcdn.sporty.co.nz/cometcache/comet/logo/285712",
+          "AwayOrgLogo": "//prodcdn.sporty.co.nz/cometcache/comet/logo/289232",
+          "GradeId": "Grade",
+          "GradeName": "Grade",
+          "HomeTeamNameAbbr": "Bucklands Beach Bucks M5",
+          "AwayTeamNameAbbr": "Ellerslie AFC Flamingoes M",
+          "CompetitionId": null,
+          "Round": "Round",
+          "RoundName": "Round",
+          "Date": "2025-04-05T15:00:00",
+          "VenueId": "47651",
+          "VenueName": "Lloyd Elsmore Park 2",
+          "GLN": "9429302884032",
+          "HomeScore": "",
+          "AwayScore": "",
+          "SectionId": 0,
+          "SectionName": null,
+          "PublicNotes": null,
+          "CssName": null,
+          "MatchSummary": null,
+          "MatchDayDescription": null,
+          "SportId": null,
+          "matchDay": 1,
+          "Longitude": "174.8997797",
+          "Latitude": "-36.9053315",
+          "Address": "2 Bells Avenue",
+          "Status": "POSTPONED",
+          "CometScore": ""
         }
-        """;
+      ]
+    }
+    """;
   }
 }

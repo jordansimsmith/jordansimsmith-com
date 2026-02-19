@@ -137,7 +137,7 @@ describe('TripsPage', () => {
     renderTripsPage();
 
     await waitFor(() => {
-      expect(screen.getByText('Network error')).toBeDefined();
+      expect(screen.getAllByText('Network error').length).toBeGreaterThan(0);
     });
   });
 });
