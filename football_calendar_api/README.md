@@ -215,7 +215,11 @@ Representative item:
 
 ### Environment variables
 
-No application environment variables are read in current scope.
+| Name                                      | Required | Purpose                                                                          | Default behavior                             |
+| ----------------------------------------- | -------- | -------------------------------------------------------------------------------- | -------------------------------------------- |
+| `FOOTBALL_CALENDAR_COMET_API_URL`         | no       | Comet base URL resolved with `/api/1.0/competition/cometwidget/filteredfixtures` | defaults to `https://www.nrf.org.nz`         |
+| `FOOTBALL_CALENDAR_FOOTBALL_FIX_BASE_URL` | no       | Football Fix base URL resolved with `/Leagues/Fixtures`                          | defaults to `https://footballfix.spawtz.com` |
+| `FOOTBALL_CALENDAR_SUBFOOTBALL_BASE_URL`  | no       | Subfootball base URL resolved with `/teams/calendar/{id}`                        | defaults to `https://subfootball.com`        |
 
 Current runtime configuration is code and infra defined:
 
@@ -238,7 +242,7 @@ None in current scope. This service does not read runtime secrets.
 
 - Unit tests validate client parsing and mapping behavior (Comet JSON, Football Fix HTML, Subfootball iCal).
 - Integration tests cover update reconciliation and iCal response generation against DynamoDB test containers.
-- E2E tests run against LocalStack and invoke both lambdas to verify end-to-end fixture-to-calendar flow.
+- E2E tests run against LocalStack and internal Comet/Football Fix/Subfootball mock hosts on a shared Testcontainers network, so the suite is deterministic and CI-safe with no outbound internet dependency.
 - Required checks before merge:
   - `bazel test //football_calendar_api:all`
   - `bazel build //football_calendar_api:all`
@@ -249,8 +253,8 @@ None in current scope. This service does not read runtime secrets.
 - Build deployable artifacts: `bazel build //football_calendar_api:all`
 - Quick smoke flow:
   1. Run `bazel test //football_calendar_api:e2e-tests`.
-  2. Verify the test invokes `update_fixtures_handler` and `get_calendar_subscription_handler`.
-  3. Verify parsed iCal output contains `VCALENDAR` and at least one `VEVENT`.
+  2. Verify the test invokes `update_fixtures_handler` and `get_calendar_subscription_handler` inside LocalStack.
+  3. Verify parsed iCal output contains expected `PRODID`, at least one `VEVENT`, and core event fields (`SUMMARY`, `DTSTART`, `LOCATION`).
 
 ## End-to-end scenarios
 

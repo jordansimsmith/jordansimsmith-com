@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -34,7 +35,8 @@ public class HttpCometClientTest {
   void setUp() {
     openMocks = openMocks(this);
     var objectMapper = new ObjectMapper();
-    client = new HttpCometClient(mockHttpClient, objectMapper);
+    client =
+        new HttpCometClient(mockHttpClient, objectMapper, URI.create("https://www.nrf.org.nz"));
   }
 
   @AfterEach

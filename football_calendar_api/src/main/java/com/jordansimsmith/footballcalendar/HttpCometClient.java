@@ -15,8 +15,8 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class HttpCometClient implements CometClient {
-  private static final String API_URL =
-      "https://www.nrf.org.nz/api/1.0/competition/cometwidget/filteredfixtures";
+  private static final String FILTERED_FIXTURES_PATH =
+      "/api/1.0/competition/cometwidget/filteredfixtures";
   private static final String SPORT_ID = "1";
 
   private static final ZoneId AUCKLAND_ZONE = ZoneId.of("Pacific/Auckland");
@@ -24,10 +24,12 @@ public class HttpCometClient implements CometClient {
 
   private final HttpClient httpClient;
   private final ObjectMapper objectMapper;
+  private final URI baseUri;
 
-  public HttpCometClient(HttpClient httpClient, ObjectMapper objectMapper) {
+  public HttpCometClient(HttpClient httpClient, ObjectMapper objectMapper, URI baseUri) {
     this.httpClient = httpClient;
     this.objectMapper = objectMapper;
+    this.baseUri = baseUri;
   }
 
   @Override
@@ -71,7 +73,7 @@ public class HttpCometClient implements CometClient {
 
     var httpRequest =
         HttpRequest.newBuilder()
-            .uri(new URI(API_URL))
+            .uri(baseUri.resolve(FILTERED_FIXTURES_PATH))
             .header("Accept", "application/json")
             .header("Content-Type", "application/json")
             .header(

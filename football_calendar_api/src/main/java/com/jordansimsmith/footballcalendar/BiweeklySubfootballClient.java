@@ -11,12 +11,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class BiweeklySubfootballClient implements SubfootballClient {
-  private static final String BASE_URL = "https://subfootball.com/teams/calendar/";
+  private static final String CALENDAR_PATH = "/teams/calendar/";
 
   private final HttpClient httpClient;
+  private final URI baseUri;
 
-  public BiweeklySubfootballClient(HttpClient httpClient) {
+  public BiweeklySubfootballClient(HttpClient httpClient, URI baseUri) {
     this.httpClient = httpClient;
+    this.baseUri = baseUri;
   }
 
   @Override
@@ -47,10 +49,10 @@ public class BiweeklySubfootballClient implements SubfootballClient {
   }
 
   private String fetchIcal(String teamId) throws Exception {
-    var url = BASE_URL + teamId;
+    var url = baseUri.resolve(CALENDAR_PATH + teamId);
     var request =
         HttpRequest.newBuilder()
-            .uri(new URI(url))
+            .uri(url)
             .header("Accept", "text/calendar")
             .header(
                 "User-Agent",

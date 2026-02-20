@@ -1,5 +1,6 @@
 import boto3
 import json
+import os
 
 region_name = "ap-southeast-2"
 endpoint_url = "http://localhost:4566"
@@ -66,12 +67,22 @@ configs = [
     },
 ]
 
+lambda_env = {
+    "FOOTBALL_CALENDAR_COMET_API_URL": os.getenv("FOOTBALL_CALENDAR_COMET_API_URL", ""),
+    "FOOTBALL_CALENDAR_FOOTBALL_FIX_BASE_URL": os.getenv(
+        "FOOTBALL_CALENDAR_FOOTBALL_FIX_BASE_URL", ""
+    ),
+    "FOOTBALL_CALENDAR_SUBFOOTBALL_BASE_URL": os.getenv(
+        "FOOTBALL_CALENDAR_SUBFOOTBALL_BASE_URL", ""
+    ),
+}
+
 # create all lambda functions
 for config in configs:
     with open(f"/opt/code/localstack/{config['zip_file']}", "rb") as f:
         zip_file_bytes = f.read()
 
-    lambda_client.create_function(
+    request = dict(
         FunctionName=config["function_name"],
         Runtime="java21",
         Role=role_arn,
@@ -80,6 +91,9 @@ for config in configs:
         Timeout=120,
         MemorySize=1024,
     )
+    if config["function_name"] == "update_fixtures_handler":
+        request["Environment"] = {"Variables": lambda_env}
+    lambda_client.create_function(**request)
 
 # wait for all lambda functions to be active
 for config in configs:

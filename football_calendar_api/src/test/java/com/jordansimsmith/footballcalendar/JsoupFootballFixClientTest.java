@@ -2,6 +2,7 @@ package com.jordansimsmith.footballcalendar;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.net.URI;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import org.jsoup.Jsoup;
@@ -46,7 +47,7 @@ public class JsoupFootballFixClientTest {
         </html>
         """;
     var client =
-        new JsoupFootballFixClient() {
+        new JsoupFootballFixClient(URI.create("https://footballfix.spawtz.com")) {
           @Override
           protected Document fetchDocument(String url) {
             return Jsoup.parse(html);
@@ -154,7 +155,7 @@ public class JsoupFootballFixClientTest {
         </html>
         """;
     var client =
-        new JsoupFootballFixClient() {
+        new JsoupFootballFixClient(URI.create("https://footballfix.spawtz.com")) {
           @Override
           protected Document fetchDocument(String url) {
             return Jsoup.parse(html);
@@ -233,7 +234,7 @@ public class JsoupFootballFixClientTest {
         </html>
         """;
     var client =
-        new JsoupFootballFixClient() {
+        new JsoupFootballFixClient(URI.create("https://footballfix.spawtz.com")) {
           @Override
           protected Document fetchDocument(String url) {
             return Jsoup.parse(html);

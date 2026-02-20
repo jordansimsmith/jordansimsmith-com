@@ -80,6 +80,24 @@ java_binary(
     ],
 )
 
+java_binary(
+    name = "comet-mock-server",
+    srcs = ["src/test/java/com/jordansimsmith/footballcalendar/CometMockServer.java"],
+    create_executable = False,
+)
+
+java_binary(
+    name = "football-fix-mock-server",
+    srcs = ["src/test/java/com/jordansimsmith/footballcalendar/FootballFixMockServer.java"],
+    create_executable = False,
+)
+
+java_binary(
+    name = "subfootball-mock-server",
+    srcs = ["src/test/java/com/jordansimsmith/footballcalendar/SubfootballMockServer.java"],
+    create_executable = False,
+)
+
 java_library(
     name = "test-lib",
     testonly = True,
@@ -88,7 +106,10 @@ java_library(
         exclude = UNIT_TESTS + INTEGRATION_TESTS + E2E_TESTS,
     ),
     data = [
+        ":comet-mock-load",
+        ":football-fix-mock-load",
         ":local-load",
+        ":subfootball-mock-load",
     ],
     resources = [
         "src/test/resources/logback-test.xml",
@@ -97,6 +118,7 @@ java_library(
     deps = [
         ":lib",
         "//lib/dynamodb:test-lib",
+        "//lib/http:test-lib",
         "//lib/json:lib",
         "//lib/localstack:lib",
         "//lib/testcontainers:test-lib",
@@ -206,6 +228,78 @@ oci_load(
     ],
 )
 
+pkg_tar(
+    name = "comet-mock-server.tar",
+    srcs = [
+        ":comet-mock-server_deploy.jar",
+    ],
+    package_dir = "/opt/code/comet-mock/",
+)
+
+oci_image(
+    name = "comet-mock-image",
+    base = "@temurin21jre//:temurin21jre",
+    tars = [
+        ":comet-mock-server.tar",
+    ],
+)
+
+oci_load(
+    name = "comet-mock-load",
+    image = ":comet-mock-image",
+    repo_tags = [
+        "bazel/football-calendar-comet-mock:latest",
+    ],
+)
+
+pkg_tar(
+    name = "football-fix-mock-server.tar",
+    srcs = [
+        ":football-fix-mock-server_deploy.jar",
+    ],
+    package_dir = "/opt/code/football-fix-mock/",
+)
+
+oci_image(
+    name = "football-fix-mock-image",
+    base = "@temurin21jre//:temurin21jre",
+    tars = [
+        ":football-fix-mock-server.tar",
+    ],
+)
+
+oci_load(
+    name = "football-fix-mock-load",
+    image = ":football-fix-mock-image",
+    repo_tags = [
+        "bazel/football-calendar-football-fix-mock:latest",
+    ],
+)
+
+pkg_tar(
+    name = "subfootball-mock-server.tar",
+    srcs = [
+        ":subfootball-mock-server_deploy.jar",
+    ],
+    package_dir = "/opt/code/subfootball-mock/",
+)
+
+oci_image(
+    name = "subfootball-mock-image",
+    base = "@temurin21jre//:temurin21jre",
+    tars = [
+        ":subfootball-mock-server.tar",
+    ],
+)
+
+oci_load(
+    name = "subfootball-mock-load",
+    image = ":subfootball-mock-image",
+    repo_tags = [
+        "bazel/football-calendar-subfootball-mock:latest",
+    ],
+)
+
 java_test_suite(
     name = "e2e-tests",
     size = "large",
@@ -219,9 +313,6 @@ java_test_suite(
         "src/test/resources/logback-test.xml",
     ],
     runner = "junit5",
-    tags = [
-        "no-cache",
-    ],
     test_suffixes = ["E2ETest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
@@ -237,6 +328,7 @@ java_test_suite(
         "@maven//:org_junit_jupiter_junit_jupiter_api",
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:org_testcontainers_testcontainers",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
         "@maven//:software_amazon_awssdk_lambda",

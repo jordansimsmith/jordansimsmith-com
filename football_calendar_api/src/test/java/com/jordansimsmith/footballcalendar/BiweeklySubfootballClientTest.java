@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 
+import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -27,7 +28,7 @@ public class BiweeklySubfootballClientTest {
   @BeforeEach
   void setUp() {
     openMocks = openMocks(this);
-    client = new BiweeklySubfootballClient(mockHttpClient);
+    client = new BiweeklySubfootballClient(mockHttpClient, URI.create("https://subfootball.com"));
   }
 
   @AfterEach

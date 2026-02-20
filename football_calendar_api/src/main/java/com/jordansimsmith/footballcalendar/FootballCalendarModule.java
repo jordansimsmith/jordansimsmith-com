@@ -3,6 +3,7 @@ package com.jordansimsmith.footballcalendar;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import dagger.Module;
 import dagger.Provides;
+import java.net.URI;
 import java.net.http.HttpClient;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
@@ -23,21 +24,33 @@ public class FootballCalendarModule {
   @Provides
   @Singleton
   CometClient cometClient(ObjectMapper objectMapper) {
+    var apiUrl = System.getenv("FOOTBALL_CALENDAR_COMET_API_URL");
+    if (apiUrl == null || apiUrl.isBlank()) {
+      apiUrl = "https://www.nrf.org.nz";
+    }
     var httpClient = HttpClient.newBuilder().build();
-    return new HttpCometClient(httpClient, objectMapper);
+    return new HttpCometClient(httpClient, objectMapper, URI.create(apiUrl));
   }
 
   @Provides
   @Singleton
   FootballFixClient footballFixClient() {
-    return new JsoupFootballFixClient();
+    var baseUrl = System.getenv("FOOTBALL_CALENDAR_FOOTBALL_FIX_BASE_URL");
+    if (baseUrl == null || baseUrl.isBlank()) {
+      baseUrl = "https://footballfix.spawtz.com";
+    }
+    return new JsoupFootballFixClient(URI.create(baseUrl));
   }
 
   @Provides
   @Singleton
   SubfootballClient subfootballClient() {
+    var baseUrl = System.getenv("FOOTBALL_CALENDAR_SUBFOOTBALL_BASE_URL");
+    if (baseUrl == null || baseUrl.isBlank()) {
+      baseUrl = "https://subfootball.com";
+    }
     var httpClient = HttpClient.newBuilder().build();
-    return new BiweeklySubfootballClient(httpClient);
+    return new BiweeklySubfootballClient(httpClient, URI.create(baseUrl));
   }
 
   @Provides

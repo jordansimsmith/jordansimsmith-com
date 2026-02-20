@@ -3,6 +3,7 @@ package com.jordansimsmith.footballcalendar;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Preconditions;
 import java.io.IOException;
+import java.net.URI;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
@@ -17,7 +18,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 
 public class JsoupFootballFixClient implements FootballFixClient {
-  private static final String BASE_URL = "https://footballfix.spawtz.com/Leagues/Fixtures";
+  private static final String FIXTURES_PATH = "/Leagues/Fixtures";
   private static final int SPORT_ID = 0;
   private static final ZoneId AUCKLAND_ZONE = ZoneId.of("Pacific/Auckland");
   private static final DateTimeFormatter DATE_FORMATTER =
@@ -27,6 +28,11 @@ public class JsoupFootballFixClient implements FootballFixClient {
           .parseCaseInsensitive()
           .appendPattern("h:mma")
           .toFormatter(Locale.ENGLISH);
+  private final URI baseUri;
+
+  public JsoupFootballFixClient(URI baseUri) {
+    this.baseUri = baseUri;
+  }
 
   @Override
   public List<FootballFixClient.FootballFixture> findFixtures(
@@ -40,10 +46,11 @@ public class JsoupFootballFixClient implements FootballFixClient {
 
   private List<FootballFixClient.FootballFixture> doGetFixtures(
       String venueId, String leagueId, String seasonId, String divisionId) throws Exception {
+    var fixturesUri = baseUri.resolve(FIXTURES_PATH);
     var url =
         String.format(
             "%s?SportId=%d&VenueId=%s&LeagueId=%s&SeasonId=%s&DivisionId=%s",
-            BASE_URL, SPORT_ID, venueId, leagueId, seasonId, divisionId);
+            fixturesUri, SPORT_ID, venueId, leagueId, seasonId, divisionId);
 
     var doc = fetchDocument(url);
     List<FootballFixClient.FootballFixture> fixtures = new ArrayList<>();
