@@ -3,6 +3,7 @@ package com.jordansimsmith.subfootballtracker;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.queue.QueueUtils;
 import java.time.Instant;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -60,8 +61,13 @@ public class SubfootballTrackerE2ETest {
         DynamoDbClient.builder()
             .endpointOverride(subfootballTrackerContainer.getLocalstackUrl())
             .build();
+    var sqsClient =
+        SqsClient.builder()
+            .endpointOverride(subfootballTrackerContainer.getLocalstackUrl())
+            .build();
 
     DynamoDbUtils.reset(dynamoDbClient);
+    QueueUtils.reset(sqsClient);
   }
 
   @Test
@@ -109,17 +115,22 @@ public class SubfootballTrackerE2ETest {
     var receiveRequest =
         ReceiveMessageRequest.builder()
             .queueUrl(queueUrl)
-            .maxNumberOfMessages(1)
+            .maxNumberOfMessages(10)
             .waitTimeSeconds(10)
             .build();
     var messages = sqsClient.receiveMessage(receiveRequest).messages();
     assertThat(messages).isNotEmpty();
 
-    var messageBody = messages.get(0).body();
-    assertThat(messageBody).contains("SUB Football registration page updated");
-    assertThat(messageBody).contains("The latest content reads:");
-    assertThat(messageBody).contains("Turf League registrations are now open.");
-    assertThat(messageBody).contains("Auckland Grammar Turf, Normanby Rd, Mt Eden");
+    var hasExpectedMessage =
+        messages.stream()
+            .map(message -> message.body())
+            .anyMatch(
+                messageBody ->
+                    messageBody.contains("SUB Football registration page updated")
+                        && messageBody.contains("The latest content reads:")
+                        && messageBody.contains("Turf League registrations are now open.")
+                        && messageBody.contains("Auckland Grammar Turf, Normanby Rd, Mt Eden"));
+    assertThat(hasExpectedMessage).isTrue();
 
     var latestSnapshot =
         subfootballTrackerTable

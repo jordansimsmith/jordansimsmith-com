@@ -3,6 +3,7 @@ package com.jordansimsmith.pricetracker;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.queue.QueueUtils;
 import java.time.Instant;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -60,8 +61,11 @@ public class PriceTrackerE2ETest {
   void setup() {
     var dynamoDbClient =
         DynamoDbClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
+    var sqsClient =
+        SqsClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
 
     DynamoDbUtils.reset(dynamoDbClient);
+    QueueUtils.reset(sqsClient);
   }
 
   @Test
@@ -102,17 +106,22 @@ public class PriceTrackerE2ETest {
     var receiveRequest =
         ReceiveMessageRequest.builder()
             .queueUrl(queueUrl)
-            .maxNumberOfMessages(1)
+            .maxNumberOfMessages(10)
             .waitTimeSeconds(10)
             .build();
     var messages = sqsClient.receiveMessage(receiveRequest).messages();
     assertThat(messages).isNotEmpty();
 
-    var messageBody = messages.get(0).body();
-    assertThat(messageBody).contains("price updated");
-    assertThat(messageBody).contains(productName);
-    assertThat(messageBody).contains(productUrl);
-    assertThat(messageBody).contains("$1234.56 -> $52.00");
+    var hasExpectedMessage =
+        messages.stream()
+            .map(message -> message.body())
+            .anyMatch(
+                messageBody ->
+                    messageBody.contains("price updated")
+                        && messageBody.contains(productName)
+                        && messageBody.contains(productUrl)
+                        && messageBody.contains("$1234.56 -> $52.00"));
+    assertThat(hasExpectedMessage).isTrue();
   }
 
   @Test
@@ -152,17 +161,22 @@ public class PriceTrackerE2ETest {
     var receiveRequest =
         ReceiveMessageRequest.builder()
             .queueUrl(queueUrl)
-            .maxNumberOfMessages(1)
+            .maxNumberOfMessages(10)
             .waitTimeSeconds(10)
             .build();
     var messages = sqsClient.receiveMessage(receiveRequest).messages();
     assertThat(messages).isNotEmpty();
 
-    var messageBody = messages.get(0).body();
-    assertThat(messageBody).contains("price updated");
-    assertThat(messageBody).contains(productName);
-    assertThat(messageBody).contains(productUrl);
-    assertThat(messageBody).contains("$4567.89 -> $84.95");
+    var hasExpectedMessage =
+        messages.stream()
+            .map(message -> message.body())
+            .anyMatch(
+                messageBody ->
+                    messageBody.contains("price updated")
+                        && messageBody.contains(productName)
+                        && messageBody.contains(productUrl)
+                        && messageBody.contains("$4567.89 -> $84.95"));
+    assertThat(hasExpectedMessage).isTrue();
   }
 
   @Test
@@ -203,16 +217,21 @@ public class PriceTrackerE2ETest {
     var receiveRequest =
         ReceiveMessageRequest.builder()
             .queueUrl(queueUrl)
-            .maxNumberOfMessages(1)
+            .maxNumberOfMessages(10)
             .waitTimeSeconds(10)
             .build();
     var messages = sqsClient.receiveMessage(receiveRequest).messages();
     assertThat(messages).isNotEmpty();
 
-    var messageBody = messages.get(0).body();
-    assertThat(messageBody).contains("price updated");
-    assertThat(messageBody).contains(productName);
-    assertThat(messageBody).contains(productUrl);
-    assertThat(messageBody).contains("$8901.23 -> $92.50");
+    var hasExpectedMessage =
+        messages.stream()
+            .map(message -> message.body())
+            .anyMatch(
+                messageBody ->
+                    messageBody.contains("price updated")
+                        && messageBody.contains(productName)
+                        && messageBody.contains(productUrl)
+                        && messageBody.contains("$8901.23 -> $92.50"));
+    assertThat(hasExpectedMessage).isTrue();
   }
 }
