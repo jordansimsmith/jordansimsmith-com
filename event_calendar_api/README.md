@@ -189,7 +189,7 @@ Meetup event item:
 | Meetup event metadata      | Meetup GraphQL responses at ingestion time                    | Upcoming and past queries merged each run |
 | Normalized event snapshot  | DynamoDB `event_calendar` items                               | Used as canonical store for API output    |
 | Calendar feed payload      | On-demand iCal generation in `GetCalendarSubscriptionHandler` | Derived from current DynamoDB state       |
-| Meetup group configuration | `MeetupsFactoryImpl` in service code                          | Currently hardcoded to one Meetup group   |
+| Meetup group configuration | `MeetupsFactoryImpl` in service code                          | Currently hardcoded to two Meetup groups  |
 
 ## Security and privacy
 
