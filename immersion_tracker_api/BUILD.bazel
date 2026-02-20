@@ -237,6 +237,7 @@ java_binary(
 
 java_binary(
     name = "immersion-tracker-tvdb-stub-server",
+    testonly = True,
     srcs = [
         "src/test/java/com/jordansimsmith/immersiontracker/ImmersionTrackerTvdbStubServer.java",
     ],
@@ -245,6 +246,7 @@ java_binary(
 
 java_binary(
     name = "immersion-tracker-youtube-stub-server",
+    testonly = True,
     srcs = [
         "src/test/java/com/jordansimsmith/immersiontracker/ImmersionTrackerYoutubeStubServer.java",
     ],
@@ -253,6 +255,7 @@ java_binary(
 
 java_binary(
     name = "immersion-tracker-spotify-accounts-stub-server",
+    testonly = True,
     srcs = [
         "src/test/java/com/jordansimsmith/immersiontracker/ImmersionTrackerSpotifyAccountsStubServer.java",
     ],
@@ -261,6 +264,7 @@ java_binary(
 
 java_binary(
     name = "immersion-tracker-spotify-api-stub-server",
+    testonly = True,
     srcs = [
         "src/test/java/com/jordansimsmith/immersiontracker/ImmersionTrackerSpotifyApiStubServer.java",
     ],
@@ -363,6 +367,7 @@ java_test_suite(
 
 pkg_tar(
     name = "local-handlers.tar",
+    testonly = True,
     srcs = [
         ":get-progress-handler_deploy.jar",
         ":get-shows-handler_deploy.jar",
@@ -377,12 +382,14 @@ pkg_tar(
 
 pkg_tar(
     name = "local-init-resources.tar",
+    testonly = True,
     srcs = ["src/test/resources/init_resources.py"],
     package_dir = "/etc/localstack/init/ready.d/",
 )
 
 oci_image(
     name = "local-image",
+    testonly = True,
     base = "@localstack//:localstack",
     env = {
         "LOCALSTACK_LAMBDA_IGNORE_ARCHITECTURE": 1,
@@ -396,6 +403,7 @@ oci_image(
 
 oci_load(
     name = "local-load",
+    testonly = True,
     image = ":local-image",
     repo_tags = [
         "bazel/immersion-tracker-local:latest",
@@ -404,6 +412,7 @@ oci_load(
 
 pkg_tar(
     name = "immersion-tracker-tvdb-stub-server.tar",
+    testonly = True,
     srcs = [
         ":immersion-tracker-tvdb-stub-server_deploy.jar",
     ],
@@ -412,6 +421,7 @@ pkg_tar(
 
 oci_image(
     name = "immersion-tracker-tvdb-stub-image",
+    testonly = True,
     base = "@temurin21jre//:temurin21jre",
     tars = [
         ":immersion-tracker-tvdb-stub-server.tar",
@@ -420,6 +430,7 @@ oci_image(
 
 oci_load(
     name = "immersion-tracker-tvdb-stub-load",
+    testonly = True,
     image = ":immersion-tracker-tvdb-stub-image",
     repo_tags = [
         "bazel/immersion-tracker-tvdb-stub:latest",
@@ -428,6 +439,7 @@ oci_load(
 
 pkg_tar(
     name = "immersion-tracker-youtube-stub-server.tar",
+    testonly = True,
     srcs = [
         ":immersion-tracker-youtube-stub-server_deploy.jar",
     ],
@@ -436,6 +448,7 @@ pkg_tar(
 
 oci_image(
     name = "immersion-tracker-youtube-stub-image",
+    testonly = True,
     base = "@temurin21jre//:temurin21jre",
     tars = [
         ":immersion-tracker-youtube-stub-server.tar",
@@ -444,6 +457,7 @@ oci_image(
 
 oci_load(
     name = "immersion-tracker-youtube-stub-load",
+    testonly = True,
     image = ":immersion-tracker-youtube-stub-image",
     repo_tags = [
         "bazel/immersion-tracker-youtube-stub:latest",
@@ -452,6 +466,7 @@ oci_load(
 
 pkg_tar(
     name = "immersion-tracker-spotify-accounts-stub-server.tar",
+    testonly = True,
     srcs = [
         ":immersion-tracker-spotify-accounts-stub-server_deploy.jar",
     ],
@@ -460,6 +475,7 @@ pkg_tar(
 
 oci_image(
     name = "immersion-tracker-spotify-accounts-stub-image",
+    testonly = True,
     base = "@temurin21jre//:temurin21jre",
     tars = [
         ":immersion-tracker-spotify-accounts-stub-server.tar",
@@ -468,6 +484,7 @@ oci_image(
 
 oci_load(
     name = "immersion-tracker-spotify-accounts-stub-load",
+    testonly = True,
     image = ":immersion-tracker-spotify-accounts-stub-image",
     repo_tags = [
         "bazel/immersion-tracker-spotify-accounts-stub:latest",
@@ -476,6 +493,7 @@ oci_load(
 
 pkg_tar(
     name = "immersion-tracker-spotify-api-stub-server.tar",
+    testonly = True,
     srcs = [
         ":immersion-tracker-spotify-api-stub-server_deploy.jar",
     ],
@@ -484,6 +502,7 @@ pkg_tar(
 
 oci_image(
     name = "immersion-tracker-spotify-api-stub-image",
+    testonly = True,
     base = "@temurin21jre//:temurin21jre",
     tars = [
         ":immersion-tracker-spotify-api-stub-server.tar",
@@ -492,6 +511,7 @@ oci_image(
 
 oci_load(
     name = "immersion-tracker-spotify-api-stub-load",
+    testonly = True,
     image = ":immersion-tracker-spotify-api-stub-image",
     repo_tags = [
         "bazel/immersion-tracker-spotify-api-stub:latest",
@@ -500,6 +520,7 @@ oci_load(
 
 py_binary(
     name = "sync-episodes-script.py",
+    testonly = True,
     srcs = ["script/sync_episodes.py"],
     main = "script/sync_episodes.py",
     deps = [

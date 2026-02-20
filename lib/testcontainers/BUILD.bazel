@@ -3,11 +3,13 @@ load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 
 oci_image(
     name = "alpine-image",
+    testonly = True,
     base = "@alpine//:alpine",
 )
 
 oci_load(
     name = "alpine-load",
+    testonly = True,
     image = ":alpine-image",
     repo_tags = [
         "bazel/alpine:latest",
@@ -16,11 +18,13 @@ oci_load(
 
 oci_image(
     name = "ryuk-image",
+    testonly = True,
     base = "@ryuk//:ryuk",
 )
 
 oci_load(
     name = "ryuk-load",
+    testonly = True,
     image = ":ryuk-image",
     repo_tags = [
         "bazel/ryuk:latest",
@@ -29,11 +33,13 @@ oci_load(
 
 oci_image(
     name = "dynamodb-image",
+    testonly = True,
     base = "@dynamodb//:dynamodb",
 )
 
 oci_load(
     name = "dynamodb-load",
+    testonly = True,
     image = ":dynamodb-image",
     repo_tags = [
         "bazel/dynamodb:latest",

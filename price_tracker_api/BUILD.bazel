@@ -58,6 +58,7 @@ java_binary(
 
 java_binary(
     name = "price-tracker-website-stub-server",
+    testonly = True,
     srcs = ["src/test/java/com/jordansimsmith/pricetracker/PriceTrackerWebsiteStubServer.java"],
     create_executable = False,
 )
@@ -153,6 +154,7 @@ java_test_suite(
 
 pkg_tar(
     name = "local-handlers.tar",
+    testonly = True,
     srcs = [
         ":update-prices-handler_deploy.jar",
     ],
@@ -161,12 +163,14 @@ pkg_tar(
 
 pkg_tar(
     name = "local-init-resources.tar",
+    testonly = True,
     srcs = ["src/test/resources/init_resources.py"],
     package_dir = "/etc/localstack/init/ready.d/",
 )
 
 oci_image(
     name = "local-image",
+    testonly = True,
     base = "@localstack//:localstack",
     env = {
         "LOCALSTACK_LAMBDA_IGNORE_ARCHITECTURE": 1,
@@ -180,6 +184,7 @@ oci_image(
 
 oci_load(
     name = "local-load",
+    testonly = True,
     image = ":local-image",
     repo_tags = [
         "bazel/price-tracker-local:latest",
@@ -188,6 +193,7 @@ oci_load(
 
 pkg_tar(
     name = "price-tracker-website-stub-server.tar",
+    testonly = True,
     srcs = [
         ":price-tracker-website-stub-server_deploy.jar",
     ],
@@ -196,6 +202,7 @@ pkg_tar(
 
 oci_image(
     name = "price-tracker-website-stub-image",
+    testonly = True,
     base = "@temurin21jre//:temurin21jre",
     tars = [
         ":price-tracker-website-stub-server.tar",
@@ -204,6 +211,7 @@ oci_image(
 
 oci_load(
     name = "price-tracker-website-stub-load",
+    testonly = True,
     image = ":price-tracker-website-stub-image",
     repo_tags = [
         "bazel/price-tracker-website-stub:latest",

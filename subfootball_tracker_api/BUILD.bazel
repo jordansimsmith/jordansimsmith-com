@@ -51,6 +51,7 @@ java_binary(
 
 java_binary(
     name = "subfootball-website-stub-server",
+    testonly = True,
     srcs = ["src/test/java/com/jordansimsmith/subfootballtracker/SubfootballWebsiteStubServer.java"],
     create_executable = False,
 )
@@ -126,6 +127,7 @@ java_test_suite(
 
 pkg_tar(
     name = "local-handlers.tar",
+    testonly = True,
     srcs = [
         ":update-page-content-handler_deploy.jar",
     ],
@@ -134,12 +136,14 @@ pkg_tar(
 
 pkg_tar(
     name = "local-init-resources.tar",
+    testonly = True,
     srcs = ["src/test/resources/init_resources.py"],
     package_dir = "/etc/localstack/init/ready.d/",
 )
 
 oci_image(
     name = "local-image",
+    testonly = True,
     base = "@localstack//:localstack",
     env = {
         "LOCALSTACK_LAMBDA_IGNORE_ARCHITECTURE": 1,
@@ -153,6 +157,7 @@ oci_image(
 
 oci_load(
     name = "local-load",
+    testonly = True,
     image = ":local-image",
     repo_tags = [
         "bazel/subfootball-tracker-local:latest",
@@ -161,6 +166,7 @@ oci_load(
 
 pkg_tar(
     name = "subfootball-website-stub-server.tar",
+    testonly = True,
     srcs = [
         ":subfootball-website-stub-server_deploy.jar",
     ],
@@ -169,6 +175,7 @@ pkg_tar(
 
 oci_image(
     name = "subfootball-website-stub-image",
+    testonly = True,
     base = "@temurin21jre//:temurin21jre",
     tars = [
         ":subfootball-website-stub-server.tar",
@@ -177,6 +184,7 @@ oci_image(
 
 oci_load(
     name = "subfootball-website-stub-load",
+    testonly = True,
     image = ":subfootball-website-stub-image",
     repo_tags = [
         "bazel/subfootball-website-stub:latest",

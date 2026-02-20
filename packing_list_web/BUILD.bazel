@@ -19,6 +19,7 @@ js_library(
 
 js_library(
     name = "vitest-config",
+    testonly = True,
     srcs = ["vitest.config.ts"],
     deps = [
         "//:node_modules/@vitejs/plugin-react",
@@ -128,6 +129,7 @@ js_library(
 
 js_library(
     name = "test-src",
+    testonly = True,
     srcs = glob([
         "src/**/*.test.tsx",
         "src/test-setup.ts",

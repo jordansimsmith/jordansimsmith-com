@@ -83,12 +83,14 @@ java_binary(
 
 java_binary(
     name = "go-media-stub-server",
+    testonly = True,
     srcs = ["src/test/java/com/jordansimsmith/eventcalendar/GoMediaStubServer.java"],
     create_executable = False,
 )
 
 java_binary(
     name = "meetup-stub-server",
+    testonly = True,
     srcs = ["src/test/java/com/jordansimsmith/eventcalendar/MeetupStubServer.java"],
     create_executable = False,
 )
@@ -187,6 +189,7 @@ java_test_suite(
 
 pkg_tar(
     name = "local-handlers.tar",
+    testonly = True,
     srcs = [
         ":get-calendar-subscription-handler_deploy.jar",
         ":update-events-handler_deploy.jar",
@@ -196,12 +199,14 @@ pkg_tar(
 
 pkg_tar(
     name = "local-init-resources.tar",
+    testonly = True,
     srcs = ["src/test/resources/init_resources.py"],
     package_dir = "/etc/localstack/init/ready.d/",
 )
 
 oci_image(
     name = "local-image",
+    testonly = True,
     base = "@localstack//:localstack",
     env = {
         "LOCALSTACK_LAMBDA_IGNORE_ARCHITECTURE": 1,
@@ -215,6 +220,7 @@ oci_image(
 
 oci_load(
     name = "local-load",
+    testonly = True,
     image = ":local-image",
     repo_tags = [
         "bazel/event-calendar-local:latest",
@@ -223,6 +229,7 @@ oci_load(
 
 pkg_tar(
     name = "go-media-stub-server.tar",
+    testonly = True,
     srcs = [
         ":go-media-stub-server_deploy.jar",
     ],
@@ -231,6 +238,7 @@ pkg_tar(
 
 oci_image(
     name = "go-media-stub-image",
+    testonly = True,
     base = "@temurin21jre//:temurin21jre",
     tars = [
         ":go-media-stub-server.tar",
@@ -239,6 +247,7 @@ oci_image(
 
 oci_load(
     name = "go-media-stub-load",
+    testonly = True,
     image = ":go-media-stub-image",
     repo_tags = [
         "bazel/go-media-stub:latest",
@@ -247,6 +256,7 @@ oci_load(
 
 pkg_tar(
     name = "meetup-stub-server.tar",
+    testonly = True,
     srcs = [
         ":meetup-stub-server_deploy.jar",
     ],
@@ -255,6 +265,7 @@ pkg_tar(
 
 oci_image(
     name = "meetup-stub-image",
+    testonly = True,
     base = "@temurin21jre//:temurin21jre",
     tars = [
         ":meetup-stub-server.tar",
@@ -263,6 +274,7 @@ oci_image(
 
 oci_load(
     name = "meetup-stub-load",
+    testonly = True,
     image = ":meetup-stub-image",
     repo_tags = [
         "bazel/meetup-stub:latest",

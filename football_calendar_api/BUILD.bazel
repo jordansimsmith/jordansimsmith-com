@@ -82,18 +82,21 @@ java_binary(
 
 java_binary(
     name = "comet-mock-server",
+    testonly = True,
     srcs = ["src/test/java/com/jordansimsmith/footballcalendar/CometMockServer.java"],
     create_executable = False,
 )
 
 java_binary(
     name = "football-fix-mock-server",
+    testonly = True,
     srcs = ["src/test/java/com/jordansimsmith/footballcalendar/FootballFixMockServer.java"],
     create_executable = False,
 )
 
 java_binary(
     name = "subfootball-mock-server",
+    testonly = True,
     srcs = ["src/test/java/com/jordansimsmith/footballcalendar/SubfootballMockServer.java"],
     create_executable = False,
 )
@@ -194,6 +197,7 @@ java_test_suite(
 
 pkg_tar(
     name = "local-handlers.tar",
+    testonly = True,
     srcs = [
         ":get-calendar-subscription-handler_deploy.jar",
         ":update-fixtures-handler_deploy.jar",
@@ -203,12 +207,14 @@ pkg_tar(
 
 pkg_tar(
     name = "local-init-resources.tar",
+    testonly = True,
     srcs = ["src/test/resources/init_resources.py"],
     package_dir = "/etc/localstack/init/ready.d/",
 )
 
 oci_image(
     name = "local-image",
+    testonly = True,
     base = "@localstack//:localstack",
     env = {
         "LOCALSTACK_LAMBDA_IGNORE_ARCHITECTURE": 1,
@@ -222,6 +228,7 @@ oci_image(
 
 oci_load(
     name = "local-load",
+    testonly = True,
     image = ":local-image",
     repo_tags = [
         "bazel/football-calendar-local:latest",
@@ -230,6 +237,7 @@ oci_load(
 
 pkg_tar(
     name = "comet-mock-server.tar",
+    testonly = True,
     srcs = [
         ":comet-mock-server_deploy.jar",
     ],
@@ -238,6 +246,7 @@ pkg_tar(
 
 oci_image(
     name = "comet-mock-image",
+    testonly = True,
     base = "@temurin21jre//:temurin21jre",
     tars = [
         ":comet-mock-server.tar",
@@ -246,6 +255,7 @@ oci_image(
 
 oci_load(
     name = "comet-mock-load",
+    testonly = True,
     image = ":comet-mock-image",
     repo_tags = [
         "bazel/football-calendar-comet-mock:latest",
@@ -254,6 +264,7 @@ oci_load(
 
 pkg_tar(
     name = "football-fix-mock-server.tar",
+    testonly = True,
     srcs = [
         ":football-fix-mock-server_deploy.jar",
     ],
@@ -262,6 +273,7 @@ pkg_tar(
 
 oci_image(
     name = "football-fix-mock-image",
+    testonly = True,
     base = "@temurin21jre//:temurin21jre",
     tars = [
         ":football-fix-mock-server.tar",
@@ -270,6 +282,7 @@ oci_image(
 
 oci_load(
     name = "football-fix-mock-load",
+    testonly = True,
     image = ":football-fix-mock-image",
     repo_tags = [
         "bazel/football-calendar-football-fix-mock:latest",
@@ -278,6 +291,7 @@ oci_load(
 
 pkg_tar(
     name = "subfootball-mock-server.tar",
+    testonly = True,
     srcs = [
         ":subfootball-mock-server_deploy.jar",
     ],
@@ -286,6 +300,7 @@ pkg_tar(
 
 oci_image(
     name = "subfootball-mock-image",
+    testonly = True,
     base = "@temurin21jre//:temurin21jre",
     tars = [
         ":subfootball-mock-server.tar",
@@ -294,6 +309,7 @@ oci_image(
 
 oci_load(
     name = "subfootball-mock-load",
+    testonly = True,
     image = ":subfootball-mock-image",
     repo_tags = [
         "bazel/football-calendar-subfootball-mock:latest",

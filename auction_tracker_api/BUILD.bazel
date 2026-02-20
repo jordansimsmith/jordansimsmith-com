@@ -80,6 +80,7 @@ java_binary(
 
 java_binary(
     name = "trademe-website-stub-server",
+    testonly = True,
     srcs = ["src/test/java/com/jordansimsmith/auctiontracker/TradeMeWebsiteStubServer.java"],
     create_executable = False,
 )
@@ -181,6 +182,7 @@ java_test_suite(
 
 pkg_tar(
     name = "local-handlers.tar",
+    testonly = True,
     srcs = [
         ":send-digest-handler_deploy.jar",
         ":update-items-handler_deploy.jar",
@@ -190,12 +192,14 @@ pkg_tar(
 
 pkg_tar(
     name = "local-init-resources.tar",
+    testonly = True,
     srcs = ["src/test/resources/init_resources.py"],
     package_dir = "/etc/localstack/init/ready.d/",
 )
 
 oci_image(
     name = "local-image",
+    testonly = True,
     base = "@localstack//:localstack",
     env = {
         "LOCALSTACK_LAMBDA_IGNORE_ARCHITECTURE": 0,
@@ -211,6 +215,7 @@ oci_image(
 
 oci_load(
     name = "local-load",
+    testonly = True,
     image = ":local-image",
     repo_tags = [
         "bazel/auction-tracker-local:latest",
@@ -219,6 +224,7 @@ oci_load(
 
 pkg_tar(
     name = "trademe-website-stub-server.tar",
+    testonly = True,
     srcs = [
         ":trademe-website-stub-server_deploy.jar",
     ],
@@ -227,6 +233,7 @@ pkg_tar(
 
 oci_image(
     name = "trademe-website-stub-image",
+    testonly = True,
     base = "@temurin21jre//:temurin21jre",
     tars = [
         ":trademe-website-stub-server.tar",
@@ -235,6 +242,7 @@ oci_image(
 
 oci_load(
     name = "trademe-website-stub-load",
+    testonly = True,
     image = ":trademe-website-stub-image",
     repo_tags = [
         "bazel/trademe-website-stub:latest",
