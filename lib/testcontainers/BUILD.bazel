@@ -41,17 +41,17 @@ oci_load(
 )
 
 java_library(
-    name = "lib",
+    name = "test-lib",
     testonly = True,
-    srcs = glob(["src/main/java/**/*.java"]),
+    srcs = glob(["src/test/java/**/*.java"]),
     data = [
         ":alpine-load",
         ":dynamodb-load",
         ":ryuk-load",
     ],
     resources = glob([
-        "src/main/resources/**/*.properties",
-        "src/main/resources/logback-test.xml",
+        "src/test/resources/**/*.properties",
+        "src/test/resources/logback-test.xml",
     ]),
     visibility = [
         "//visibility:public",

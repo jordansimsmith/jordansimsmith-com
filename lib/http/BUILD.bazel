@@ -12,3 +12,17 @@ java_library(
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
     ],
 )
+
+java_library(
+    name = "test-lib",
+    testonly = True,
+    srcs = glob(["src/test/java/**/*.java"]),
+    visibility = [
+        "//visibility:public",
+    ],
+    deps = [
+        "//lib/testcontainers:test-lib",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_testcontainers_testcontainers",
+    ],
+)

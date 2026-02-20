@@ -23,7 +23,7 @@ java_library(
     ],
     deps = [
         ":lib",
-        "//lib/testcontainers:lib",
+        "//lib/testcontainers:test-lib",
         "//third_party/dagger",
         "@maven//:com_google_guava_guava",
         "@maven//:org_testcontainers_testcontainers",
