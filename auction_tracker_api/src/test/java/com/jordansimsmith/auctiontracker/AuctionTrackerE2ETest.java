@@ -4,13 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import java.util.Base64;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.containers.Network;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.lambda.LambdaClient;
 import software.amazon.awssdk.services.lambda.model.InvocationType;
@@ -19,13 +19,35 @@ import software.amazon.awssdk.services.lambda.model.LogType;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 
-@Testcontainers
 public class AuctionTrackerE2ETest {
+  private static final String NETWORK_NAME = "auction-tracker-e2e";
+  private static final String TRADEME_STUB_ALIAS = "trademe-stub";
   private static final Logger LOGGER = LoggerFactory.getLogger(AuctionTrackerE2ETest.class);
 
-  @Container
+  private static final Network NETWORK =
+      Network.builder().createNetworkCmdModifier(cmd -> cmd.withName(NETWORK_NAME)).build();
+
+  private static final TradeMeWebsiteStubContainer tradeMeWebsiteStubContainer =
+      new TradeMeWebsiteStubContainer().withNetwork(NETWORK).withNetworkAliases(TRADEME_STUB_ALIAS);
+
   private static final AuctionTrackerContainer auctionTrackerContainer =
-      new AuctionTrackerContainer();
+      new AuctionTrackerContainer()
+          .withNetwork(NETWORK)
+          .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK_NAME)
+          .withEnv("AUCTION_TRACKER_TRADEME_BASE_URL", "http://" + TRADEME_STUB_ALIAS + ":8080");
+
+  @BeforeAll
+  static void setUpBeforeClass() {
+    tradeMeWebsiteStubContainer.start();
+    auctionTrackerContainer.start();
+  }
+
+  @AfterAll
+  static void tearDownAfterClass() {
+    auctionTrackerContainer.stop();
+    tradeMeWebsiteStubContainer.stop();
+    NETWORK.close();
+  }
 
   @BeforeEach
   void setup() {
@@ -38,7 +60,6 @@ public class AuctionTrackerE2ETest {
   }
 
   @Test
-  @DisabledIfEnvironmentVariable(named = "CI", matches = "true")
   void shouldUpdateItemsAndSendDigestWithNotification() throws Exception {
     // arrange
     var lambdaClient =
@@ -88,5 +109,6 @@ public class AuctionTrackerE2ETest {
 
     var messageBody = messages.get(0).body();
     assertThat(messageBody).contains("Auction Tracker Daily Digest");
+    assertThat(messageBody).contains("Titleist iron set");
   }
 }

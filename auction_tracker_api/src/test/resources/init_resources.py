@@ -1,5 +1,6 @@
 import boto3
 import json
+import os
 import time
 
 region_name = "ap-southeast-2"
@@ -117,6 +118,12 @@ configs = [
     },
 ]
 
+lambda_env = {
+    "AUCTION_TRACKER_TRADEME_BASE_URL": os.getenv(
+        "AUCTION_TRACKER_TRADEME_BASE_URL", ""
+    )
+}
+
 # create all lambda functions
 for config in configs:
     with open(f"/opt/code/localstack/{config['zip_file']}", "rb") as f:
@@ -131,6 +138,7 @@ for config in configs:
         Timeout=30,
         MemorySize=1024,
         Architectures=["x86_64"],
+        Environment={"Variables": lambda_env},
     )
 
 # wait for all lambda functions to be active

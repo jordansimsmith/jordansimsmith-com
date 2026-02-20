@@ -89,7 +89,7 @@ sequenceDiagram
 
 ### External systems
 
-- **Trade Me website**: outbound HTTPS `GET` requests to search and listing pages derived from configured searches. Requests include browser-like headers/cookies and a 30-second timeout. Item-page fetch failures are logged and skipped; unrecoverable search errors fail the invocation.
+- **Trade Me website**: outbound `GET` requests to search and listing pages derived from configured searches. The base origin defaults to `https://www.trademe.co.nz` and can be overridden with `AUCTION_TRACKER_TRADEME_BASE_URL` (used in E2E tests). Requests include browser-like headers/cookies and a 30-second timeout. Item-page fetch failures are logged and skipped; unrecoverable search errors fail the invocation.
 - **Amazon DynamoDB**: outbound reads/writes against table `auction_tracker`. Update flow performs duplicate checks and inserts; digest flow queries per-search partitions for recent items.
 - **Amazon SNS**: outbound publish to topic `auction_tracker_api_digest` when at least one new item exists in the digest window. Topic ARN is resolved by listing topics and matching by topic-name suffix.
 - **Amazon EventBridge**: scheduled invocation source for both handlers (`rate(15 minutes)` and `cron(0 21 * * ? *)`).
@@ -204,11 +204,9 @@ Representative record:
 
 ### Environment variables
 
-This service defines no service-specific environment variable reads in application code.
-
-| Name   | Required | Purpose                                        | Default behavior                                                                                  |
-| ------ | -------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `none` | n/a      | no service-specific environment variable reads | table/topic names are code-defined; AWS SDK resolves credentials and region from runtime defaults |
+| Name                               | Required | Purpose                                           | Default behavior                                            |
+| ---------------------------------- | -------- | ------------------------------------------------- | ----------------------------------------------------------- |
+| `AUCTION_TRACKER_TRADEME_BASE_URL` | no       | override Trade Me base origin for search/listings | defaults to `https://www.trademe.co.nz` when unset or blank |
 
 ### Secret shape
 
@@ -226,7 +224,7 @@ None in current scope. The service does not read Secrets Manager secrets or cust
 
 - Unit tests (`JsoupTradeMeClientTest`) cover URL generation, listing parsing, query-parameter stripping, and reserve filtering.
 - Integration tests cover update persistence, duplicate prevention, multi-search processing, 24-hour digest filtering, and digest deduplication.
-- E2E tests validate the LocalStack pipeline (Lambda invoke plus SNS/SQS notification path); the full flow test is disabled in CI.
+- E2E tests validate the LocalStack pipeline (Lambda invoke plus SNS/SQS notification path) against a local Trade Me website stub container and are CI-safe.
 - Required checks before merge:
   - `bazel test //auction_tracker_api:unit-tests`
   - `bazel test //auction_tracker_api:integration-tests`

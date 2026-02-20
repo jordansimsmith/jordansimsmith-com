@@ -2,6 +2,7 @@ package com.jordansimsmith.auctiontracker;
 
 import dagger.Module;
 import dagger.Provides;
+import java.net.URI;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -20,7 +21,11 @@ public class AuctionTrackerModule {
   @Provides
   @Singleton
   public SearchFactory searchFactory() {
-    return new SearchFactoryImpl();
+    var baseUrl = System.getenv("AUCTION_TRACKER_TRADEME_BASE_URL");
+    if (baseUrl == null || baseUrl.isBlank()) {
+      baseUrl = "https://www.trademe.co.nz";
+    }
+    return new SearchFactoryImpl(URI.create(baseUrl));
   }
 
   @Provides

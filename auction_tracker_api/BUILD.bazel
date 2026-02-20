@@ -78,6 +78,12 @@ java_binary(
     ],
 )
 
+java_binary(
+    name = "trademe-website-stub-server",
+    srcs = ["src/test/java/com/jordansimsmith/auctiontracker/TradeMeWebsiteStubServer.java"],
+    create_executable = False,
+)
+
 java_library(
     name = "test-lib",
     testonly = True,
@@ -87,6 +93,7 @@ java_library(
     ),
     data = [
         ":local-load",
+        ":trademe-website-stub-load",
     ],
     resources = [
         "src/test/resources/logback-test.xml",
@@ -95,6 +102,7 @@ java_library(
     deps = [
         ":lib",
         "//lib/dynamodb:test-lib",
+        "//lib/http:test-lib",
         "//lib/localstack:lib",
         "//lib/notifications:test-lib",
         "//lib/testcontainers:test-lib",
@@ -209,6 +217,30 @@ oci_load(
     ],
 )
 
+pkg_tar(
+    name = "trademe-website-stub-server.tar",
+    srcs = [
+        ":trademe-website-stub-server_deploy.jar",
+    ],
+    package_dir = "/opt/code/trademe-website-stub/",
+)
+
+oci_image(
+    name = "trademe-website-stub-image",
+    base = "@temurin21jre//:temurin21jre",
+    tars = [
+        ":trademe-website-stub-server.tar",
+    ],
+)
+
+oci_load(
+    name = "trademe-website-stub-load",
+    image = ":trademe-website-stub-image",
+    repo_tags = [
+        "bazel/trademe-website-stub:latest",
+    ],
+)
+
 java_test_suite(
     name = "e2e-tests",
     size = "large",
@@ -222,9 +254,6 @@ java_test_suite(
         "src/test/resources/logback-test.xml",
     ],
     runner = "junit5",
-    tags = [
-        "no-cache",
-    ],
     test_suffixes = ["E2ETest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
@@ -237,6 +266,7 @@ java_test_suite(
         "@maven//:org_junit_jupiter_junit_jupiter_api",
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:org_testcontainers_testcontainers",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
         "@maven//:software_amazon_awssdk_lambda",
