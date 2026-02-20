@@ -16,6 +16,7 @@ import java.util.Locale;
 import java.util.stream.Collectors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.Network;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -23,9 +24,54 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 @Testcontainers
 public class ImmersionTrackerE2ETest {
 
+  private static final String NETWORK_NAME = "immersion-tracker-e2e";
+  private static final String TVDB_STUB_ALIAS = "tvdb-stub";
+  private static final String YOUTUBE_STUB_ALIAS = "youtube-stub";
+  private static final String SPOTIFY_ACCOUNTS_STUB_ALIAS = "spotify-accounts-stub";
+  private static final String SPOTIFY_API_STUB_ALIAS = "spotify-api-stub";
+
+  private static final Network NETWORK =
+      Network.builder().createNetworkCmdModifier(cmd -> cmd.withName(NETWORK_NAME)).build();
+
+  @Container
+  private static final ImmersionTrackerTvdbStubContainer immersionTrackerTvdbStubContainer =
+      new ImmersionTrackerTvdbStubContainer()
+          .withNetwork(NETWORK)
+          .withNetworkAliases(TVDB_STUB_ALIAS);
+
+  @Container
+  private static final ImmersionTrackerYoutubeStubContainer immersionTrackerYoutubeStubContainer =
+      new ImmersionTrackerYoutubeStubContainer()
+          .withNetwork(NETWORK)
+          .withNetworkAliases(YOUTUBE_STUB_ALIAS);
+
+  @Container
+  private static final ImmersionTrackerSpotifyAccountsStubContainer
+      immersionTrackerSpotifyAccountsStubContainer =
+          new ImmersionTrackerSpotifyAccountsStubContainer()
+              .withNetwork(NETWORK)
+              .withNetworkAliases(SPOTIFY_ACCOUNTS_STUB_ALIAS);
+
+  @Container
+  private static final ImmersionTrackerSpotifyApiStubContainer
+      immersionTrackerSpotifyApiStubContainer =
+          new ImmersionTrackerSpotifyApiStubContainer()
+              .withNetwork(NETWORK)
+              .withNetworkAliases(SPOTIFY_API_STUB_ALIAS);
+
   @Container
   private static final ImmersionTrackerContainer immersionTrackerContainer =
-      new ImmersionTrackerContainer();
+      new ImmersionTrackerContainer()
+          .withNetwork(NETWORK)
+          .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK_NAME)
+          .withEnv("IMMERSION_TRACKER_TVDB_BASE_URL", "http://" + TVDB_STUB_ALIAS + ":8080")
+          .withEnv("IMMERSION_TRACKER_YOUTUBE_BASE_URL", "http://" + YOUTUBE_STUB_ALIAS + ":8080")
+          .withEnv(
+              "IMMERSION_TRACKER_SPOTIFY_ACCOUNTS_BASE_URL",
+              "http://" + SPOTIFY_ACCOUNTS_STUB_ALIAS + ":8080")
+          .withEnv(
+              "IMMERSION_TRACKER_SPOTIFY_API_BASE_URL",
+              "http://" + SPOTIFY_API_STUB_ALIAS + ":8080");
 
   private String formattedAllTimeProgressLabel;
 
@@ -150,8 +196,8 @@ public class ImmersionTrackerE2ETest {
         Successfully updated show metadata.
         Retrieving progress summary...
 
-        2 episodes of Free!
         2 episodes of ハイキュー!!
+        2 episodes of Free!
 
         4 episodes watched today.
         0 movies watched today.
@@ -165,7 +211,7 @@ public class ImmersionTrackerE2ETest {
         3 days ago │                                     0m
         2 days ago │                                     0m
         Yesterday  │                                     0m
-        Today      │██████████████████████████████   1h 38m
+        Today      │██████████████████████████████   1h 36m
 
         All time progress:
         %s│██████████████████████████████       1h
@@ -272,7 +318,7 @@ public class ImmersionTrackerE2ETest {
         3 days ago │                                     0m
         2 days ago │                                     0m
         Yesterday  │                                     0m
-        Today      │██████████████████████████████   3h 52m
+        Today      │██████████████████████████████   3h 48m
 
         All time progress:
         %s│██████████████████████████████       3h
@@ -359,7 +405,7 @@ public class ImmersionTrackerE2ETest {
         3 days ago │                                     0m
         2 days ago │                                     0m
         Yesterday  │                                     0m
-        Today      │██████████████████████████████       8m
+        Today      │██████████████████████████████       7m
 
         All time progress:
         %s│                                     0h
@@ -443,7 +489,7 @@ public class ImmersionTrackerE2ETest {
         3 days ago │                                     0m
         2 days ago │                                     0m
         Yesterday  │                                     0m
-        Today      │██████████████████████████████      50m
+        Today      │██████████████████████████████      56m
 
         All time progress:
         %s│                                     0h

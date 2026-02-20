@@ -235,6 +235,38 @@ java_binary(
     ],
 )
 
+java_binary(
+    name = "immersion-tracker-tvdb-stub-server",
+    srcs = [
+        "src/test/java/com/jordansimsmith/immersiontracker/ImmersionTrackerTvdbStubServer.java",
+    ],
+    create_executable = False,
+)
+
+java_binary(
+    name = "immersion-tracker-youtube-stub-server",
+    srcs = [
+        "src/test/java/com/jordansimsmith/immersiontracker/ImmersionTrackerYoutubeStubServer.java",
+    ],
+    create_executable = False,
+)
+
+java_binary(
+    name = "immersion-tracker-spotify-accounts-stub-server",
+    srcs = [
+        "src/test/java/com/jordansimsmith/immersiontracker/ImmersionTrackerSpotifyAccountsStubServer.java",
+    ],
+    create_executable = False,
+)
+
+java_binary(
+    name = "immersion-tracker-spotify-api-stub-server",
+    srcs = [
+        "src/test/java/com/jordansimsmith/immersiontracker/ImmersionTrackerSpotifyApiStubServer.java",
+    ],
+    create_executable = False,
+)
+
 java_library(
     name = "test-lib",
     testonly = True,
@@ -243,6 +275,10 @@ java_library(
         exclude = INTEGRATION_TESTS + E2E_TESTS + UNIT_TESTS,
     ),
     data = [
+        ":immersion-tracker-spotify-accounts-stub-load",
+        ":immersion-tracker-spotify-api-stub-load",
+        ":immersion-tracker-tvdb-stub-load",
+        ":immersion-tracker-youtube-stub-load",
         ":local-load",
     ],
     resources = ["src/test/resources/test.properties"],
@@ -250,6 +286,7 @@ java_library(
         ":lib",
         "//lib/dynamodb:test-lib",
         "//lib/http:lib",
+        "//lib/http:test-lib",
         "//lib/json:lib",
         "//lib/localstack:lib",
         "//lib/secrets:test-lib",
@@ -365,6 +402,102 @@ oci_load(
     ],
 )
 
+pkg_tar(
+    name = "immersion-tracker-tvdb-stub-server.tar",
+    srcs = [
+        ":immersion-tracker-tvdb-stub-server_deploy.jar",
+    ],
+    package_dir = "/opt/code/immersion-tracker-tvdb-stub/",
+)
+
+oci_image(
+    name = "immersion-tracker-tvdb-stub-image",
+    base = "@temurin21jre//:temurin21jre",
+    tars = [
+        ":immersion-tracker-tvdb-stub-server.tar",
+    ],
+)
+
+oci_load(
+    name = "immersion-tracker-tvdb-stub-load",
+    image = ":immersion-tracker-tvdb-stub-image",
+    repo_tags = [
+        "bazel/immersion-tracker-tvdb-stub:latest",
+    ],
+)
+
+pkg_tar(
+    name = "immersion-tracker-youtube-stub-server.tar",
+    srcs = [
+        ":immersion-tracker-youtube-stub-server_deploy.jar",
+    ],
+    package_dir = "/opt/code/immersion-tracker-youtube-stub/",
+)
+
+oci_image(
+    name = "immersion-tracker-youtube-stub-image",
+    base = "@temurin21jre//:temurin21jre",
+    tars = [
+        ":immersion-tracker-youtube-stub-server.tar",
+    ],
+)
+
+oci_load(
+    name = "immersion-tracker-youtube-stub-load",
+    image = ":immersion-tracker-youtube-stub-image",
+    repo_tags = [
+        "bazel/immersion-tracker-youtube-stub:latest",
+    ],
+)
+
+pkg_tar(
+    name = "immersion-tracker-spotify-accounts-stub-server.tar",
+    srcs = [
+        ":immersion-tracker-spotify-accounts-stub-server_deploy.jar",
+    ],
+    package_dir = "/opt/code/immersion-tracker-spotify-accounts-stub/",
+)
+
+oci_image(
+    name = "immersion-tracker-spotify-accounts-stub-image",
+    base = "@temurin21jre//:temurin21jre",
+    tars = [
+        ":immersion-tracker-spotify-accounts-stub-server.tar",
+    ],
+)
+
+oci_load(
+    name = "immersion-tracker-spotify-accounts-stub-load",
+    image = ":immersion-tracker-spotify-accounts-stub-image",
+    repo_tags = [
+        "bazel/immersion-tracker-spotify-accounts-stub:latest",
+    ],
+)
+
+pkg_tar(
+    name = "immersion-tracker-spotify-api-stub-server.tar",
+    srcs = [
+        ":immersion-tracker-spotify-api-stub-server_deploy.jar",
+    ],
+    package_dir = "/opt/code/immersion-tracker-spotify-api-stub/",
+)
+
+oci_image(
+    name = "immersion-tracker-spotify-api-stub-image",
+    base = "@temurin21jre//:temurin21jre",
+    tars = [
+        ":immersion-tracker-spotify-api-stub-server.tar",
+    ],
+)
+
+oci_load(
+    name = "immersion-tracker-spotify-api-stub-load",
+    image = ":immersion-tracker-spotify-api-stub-image",
+    repo_tags = [
+        "bazel/immersion-tracker-spotify-api-stub:latest",
+    ],
+)
+
 py_binary(
     name = "sync-episodes-script.py",
     srcs = ["script/sync_episodes.py"],
@@ -392,9 +525,6 @@ java_test_suite(
         "src/test/resources/logback-test.xml",
     ],
     runner = "junit5",
-    tags = [
-        "no-cache",
-    ],
     test_suffixes = ["E2ETest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
@@ -408,6 +538,7 @@ java_test_suite(
         "@maven//:org_junit_jupiter_junit_jupiter_api",
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:org_testcontainers_testcontainers",
         "@maven//:software_amazon_awssdk_dynamodb",
     ],
 )

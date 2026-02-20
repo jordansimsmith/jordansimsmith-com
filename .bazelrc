@@ -7,7 +7,3 @@ test --test_output=errors
 test --test_summary=short
 test --verbose_failures
 test --test_env=CI
-test --test_env=TVDB_API_KEY
-test --test_env=YOUTUBE_API_KEY
-test --test_env=SPOTIFY_CLIENT_ID
-test --test_env=SPOTIFY_CLIENT_SECRET

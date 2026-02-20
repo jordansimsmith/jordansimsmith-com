@@ -90,9 +90,9 @@ sequenceDiagram
 
 ### External systems
 
-- **TVDB API (`https://api4.thetvdb.com/v4`)**: `HttpTvdbClient` logs in with secret key `tvdb_api_key` (`POST /login`) then calls `GET /series/{id}` and `GET /movies/{id}` during `PUT /show` and `POST /syncmovies`. Required response data for writes is `name`, `image`, and runtime (`averageRuntime` for series, `runtime` for movies). Non-200 or non-`success` responses fail the request.
-- **YouTube Data API v3 (`https://www.googleapis.com/youtube/v3`)**: `HttpYoutubeClient` uses `youtube_api_key` as query parameter and calls `GET /videos` and `GET /channels` for each new video ID in `POST /syncyoutube`. Required video data is `id`, `snippet.title`, `snippet.channelId`, and `contentDetails.duration`; channel metadata includes title and thumbnail URL preference (high, then medium, then default). Non-200 or invalid payload shape fails the request.
-- **Spotify Web API (`https://accounts.spotify.com` and `https://api.spotify.com/v1`)**: `HttpSpotifyClient` exchanges `spotify_client_id` and `spotify_client_secret` for an access token using client credentials, then calls `GET /episodes/{episode_id}` for each new episode ID in `POST /syncspotify`. Required data includes episode `id`, `name`, `duration_ms`, `show.id`, and `show.name`; first show image URL is used when present. Non-200 or invalid payload shape fails the request.
+- **TVDB API (default origin `https://api4.thetvdb.com`)**: `HttpTvdbClient` logs in with secret key `tvdb_api_key` (`POST /v4/login`) then calls `GET /v4/series/{id}` and `GET /v4/movies/{id}` during `PUT /show` and `POST /syncmovies`. Base origin is configurable with `IMMERSION_TRACKER_TVDB_BASE_URL`; when unset it uses the default production origin. Required response data for writes is `name`, `image`, and runtime (`averageRuntime` for series, `runtime` for movies). Non-200 or non-`success` responses fail the request.
+- **YouTube Data API v3 (default origin `https://www.googleapis.com`)**: `HttpYoutubeClient` uses `youtube_api_key` as query parameter and calls `GET /youtube/v3/videos` and `GET /youtube/v3/channels` for each new video ID in `POST /syncyoutube`. Base origin is configurable with `IMMERSION_TRACKER_YOUTUBE_BASE_URL`; when unset it uses the default production origin. Required video data is `id`, `snippet.title`, `snippet.channelId`, and `contentDetails.duration`; channel metadata includes title and thumbnail URL preference (high, then medium, then default). Non-200 or invalid payload shape fails the request.
+- **Spotify Web API (default origins `https://accounts.spotify.com` and `https://api.spotify.com`)**: `HttpSpotifyClient` exchanges `spotify_client_id` and `spotify_client_secret` for an access token using client credentials (`POST /api/token` on accounts origin), then calls `GET /v1/episodes/{episode_id}` on API origin for each new episode ID in `POST /syncspotify`. Origins are configurable with `IMMERSION_TRACKER_SPOTIFY_ACCOUNTS_BASE_URL` and `IMMERSION_TRACKER_SPOTIFY_API_BASE_URL`; when unset they use production defaults. Required data includes episode `id`, `name`, `duration_ms`, `show.id`, and `show.name`; first show image URL is used when present. Non-200 or invalid payload shape fails the request.
 
 ## API contracts
 
@@ -332,19 +332,22 @@ Movie item:
 
 ### Environment variables
 
-Deployed Lambda handlers do not currently define service-specific environment variables in Terraform for table name, secret name, or provider configuration. The operational constants are fixed in code and infra (`immersion_tracker` table, `immersion_tracker_api` secret).
+Provider base URL overrides (optional, production defaults are preserved when unset or blank):
+
+| Name                                          | Scope                            | Required | Purpose                                    | Default behavior                           |
+| --------------------------------------------- | -------------------------------- | -------- | ------------------------------------------ | ------------------------------------------ |
+| `IMMERSION_TRACKER_TVDB_BASE_URL`             | provider-calling Lambda handlers | no       | TVDB origin for `HttpTvdbClient`           | defaults to `https://api4.thetvdb.com`     |
+| `IMMERSION_TRACKER_YOUTUBE_BASE_URL`          | provider-calling Lambda handlers | no       | YouTube origin for `HttpYoutubeClient`     | defaults to `https://www.googleapis.com`   |
+| `IMMERSION_TRACKER_SPOTIFY_API_BASE_URL`      | `sync_spotify_handler` Lambda    | no       | Spotify API origin for episode fetch calls | defaults to `https://api.spotify.com`      |
+| `IMMERSION_TRACKER_SPOTIFY_ACCOUNTS_BASE_URL` | `sync_spotify_handler` Lambda    | no       | Spotify accounts origin for token exchange | defaults to `https://accounts.spotify.com` |
 
 Local script and test variables:
 
-| Name                         | Scope                     | Required | Purpose                                  | Default behavior              |
-| ---------------------------- | ------------------------- | -------- | ---------------------------------------- | ----------------------------- |
-| `IMMERSION_TRACKER_USER`     | sync script               | yes      | HTTP Basic username for API calls        | script raises if missing      |
-| `IMMERSION_TRACKER_PASSWORD` | sync script               | yes      | HTTP Basic password for API calls        | script raises if missing      |
-| `IMMERSION_TRACKER_API_URL`  | sync script               | no       | API base URL override for local/E2E runs | defaults to production domain |
-| `TVDB_API_KEY`               | LocalStack init for tests | optional | test secret value for TVDB               | empty string when unset       |
-| `YOUTUBE_API_KEY`            | LocalStack init for tests | optional | test secret value for YouTube            | empty string when unset       |
-| `SPOTIFY_CLIENT_ID`          | LocalStack init for tests | optional | test secret value for Spotify auth       | empty string when unset       |
-| `SPOTIFY_CLIENT_SECRET`      | LocalStack init for tests | optional | test secret value for Spotify auth       | empty string when unset       |
+| Name                         | Scope       | Required | Purpose                                  | Default behavior              |
+| ---------------------------- | ----------- | -------- | ---------------------------------------- | ----------------------------- |
+| `IMMERSION_TRACKER_USER`     | sync script | yes      | HTTP Basic username for API calls        | script raises if missing      |
+| `IMMERSION_TRACKER_PASSWORD` | sync script | yes      | HTTP Basic password for API calls        | script raises if missing      |
+| `IMMERSION_TRACKER_API_URL`  | sync script | no       | API base URL override for local/E2E runs | defaults to production domain |
 
 ### Secret shape
 
@@ -374,7 +377,8 @@ Local script and test variables:
 
 - Unit tests cover provider HTTP clients and response/validation behavior.
 - Integration tests cover each handler against DynamoDB test containers with fake provider clients.
-- E2E tests execute the sync script against a LocalStack-backed API and verify user-facing flows.
+- E2E tests execute the sync script against a LocalStack-backed API with internal TVDB/YouTube/Spotify stub containers and verify user-facing flows.
+- E2E tests are deterministic and do not require outbound internet or real provider credentials.
 - Required service checks:
   - `bazel build //immersion_tracker_api:all`
   - `bazel test //immersion_tracker_api:all`
@@ -383,6 +387,7 @@ Local script and test variables:
 
 - Run the full service test suite: `bazel test //immersion_tracker_api:all`
 - Run E2E script coverage only: `bazel test //immersion_tracker_api:e2e-tests`
+- E2E uses internal mock provider hosts by default; no external API keys are required unless you intentionally override the test secret values.
 - Run script directly from workspace root:
   - `bazel run //immersion_tracker_api:sync-episodes-script.py`
   - Set `IMMERSION_TRACKER_USER` and `IMMERSION_TRACKER_PASSWORD`

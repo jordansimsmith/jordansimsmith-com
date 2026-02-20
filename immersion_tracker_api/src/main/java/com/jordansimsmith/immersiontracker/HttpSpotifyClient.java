@@ -18,11 +18,20 @@ import java.util.List;
 public class HttpSpotifyClient implements SpotifyClient {
   @VisibleForTesting static final String SECRET = "immersion_tracker_api";
 
+  private final URI apiBaseUri;
+  private final URI accountsBaseUri;
   private final ObjectMapper objectMapper;
   private final Secrets secrets;
   private final HttpClient httpClient;
 
-  public HttpSpotifyClient(ObjectMapper objectMapper, Secrets secrets, HttpClient httpClient) {
+  public HttpSpotifyClient(
+      URI apiBaseUri,
+      URI accountsBaseUri,
+      ObjectMapper objectMapper,
+      Secrets secrets,
+      HttpClient httpClient) {
+    this.apiBaseUri = apiBaseUri;
+    this.accountsBaseUri = accountsBaseUri;
     this.objectMapper = objectMapper;
     this.secrets = secrets;
     this.httpClient = httpClient;
@@ -61,7 +70,7 @@ public class HttpSpotifyClient implements SpotifyClient {
 
     var request =
         HttpRequest.newBuilder()
-            .uri(new URI("https://api.spotify.com/v1/episodes/" + episodeId))
+            .uri(apiBaseUri.resolve("/v1/episodes/" + episodeId))
             .header("Accept", "application/json")
             .header("Authorization", "Bearer " + accessToken)
             .GET()
@@ -124,7 +133,7 @@ public class HttpSpotifyClient implements SpotifyClient {
 
     var request =
         HttpRequest.newBuilder()
-            .uri(new URI("https://accounts.spotify.com/api/token"))
+            .uri(accountsBaseUri.resolve("/api/token"))
             .header("Content-Type", "application/x-www-form-urlencoded")
             .header("Authorization", "Basic " + encodedCredentials)
             .POST(HttpRequest.BodyPublishers.ofString("grant_type=client_credentials"))

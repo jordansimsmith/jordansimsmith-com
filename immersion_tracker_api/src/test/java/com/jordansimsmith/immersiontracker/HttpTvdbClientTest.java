@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.secrets.FakeSecrets;
 import com.jordansimsmith.secrets.Secrets;
 import java.io.IOException;
+import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -68,7 +69,9 @@ public class HttpTvdbClientTest {
     openMocks = openMocks(this);
     objectMapper = new ObjectMapper();
     secrets = new FakeSecrets();
-    client = new HttpTvdbClient(objectMapper, secrets, httpClient);
+    client =
+        new HttpTvdbClient(
+            URI.create("https://api4.thetvdb.com"), objectMapper, secrets, httpClient);
   }
 
   @AfterEach

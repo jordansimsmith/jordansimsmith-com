@@ -16,11 +16,14 @@ import java.time.Duration;
 public class HttpTvdbClient implements TvdbClient {
   @VisibleForTesting static final String SECRET = "immersion_tracker_api";
 
+  private final URI baseUri;
   private final ObjectMapper objectMapper;
   private final Secrets secrets;
   private final HttpClient httpClient;
 
-  public HttpTvdbClient(ObjectMapper objectMapper, Secrets secrets, HttpClient httpClient) {
+  public HttpTvdbClient(
+      URI baseUri, ObjectMapper objectMapper, Secrets secrets, HttpClient httpClient) {
+    this.baseUri = baseUri;
     this.objectMapper = objectMapper;
     this.secrets = secrets;
     this.httpClient = httpClient;
@@ -78,7 +81,7 @@ public class HttpTvdbClient implements TvdbClient {
 
     var seriesReq =
         HttpRequest.newBuilder()
-            .uri(new URI("https://api4.thetvdb.com/v4/series/" + id))
+            .uri(baseUri.resolve("/v4/series/" + id))
             .header("Accept", "application/json")
             .header("Content-Type", "application/json")
             .header("Authorization", "Bearer " + token)
@@ -111,7 +114,7 @@ public class HttpTvdbClient implements TvdbClient {
 
     var movieReq =
         HttpRequest.newBuilder()
-            .uri(new URI("https://api4.thetvdb.com/v4/movies/" + id))
+            .uri(baseUri.resolve("/v4/movies/" + id))
             .header("Accept", "application/json")
             .header("Content-Type", "application/json")
             .header("Authorization", "Bearer " + token)
@@ -143,7 +146,7 @@ public class HttpTvdbClient implements TvdbClient {
 
     var loginReq =
         HttpRequest.newBuilder()
-            .uri(new URI("https://api4.thetvdb.com/v4/login"))
+            .uri(baseUri.resolve("/v4/login"))
             .header("Accept", "application/json")
             .header("Content-Type", "application/json")
             .POST(

@@ -24,10 +24,10 @@ secretsmanager_client.create_secret(
     SecretString=json.dumps(
         {
             "users": [],
-            "tvdb_api_key": os.getenv("TVDB_API_KEY", ""),
-            "youtube_api_key": os.getenv("YOUTUBE_API_KEY", ""),
-            "spotify_client_id": os.getenv("SPOTIFY_CLIENT_ID", ""),
-            "spotify_client_secret": os.getenv("SPOTIFY_CLIENT_SECRET", ""),
+            "tvdb_api_key": "fake-tvdb-key",
+            "youtube_api_key": "fake-youtube-key",
+            "spotify_client_id": "fake-spotify-client-id",
+            "spotify_client_secret": "fake-spotify-client-secret",
         }
     ),
 )
@@ -85,6 +85,7 @@ configs = [
         "http_method": "GET",
         "handler_name": "com.jordansimsmith.immersiontracker.GetProgressHandler",
         "zip_file": "get-progress-handler_deploy.jar",
+        "provider_env_names": [],
     },
     {
         "function_name": "get_shows_handler",
@@ -92,6 +93,7 @@ configs = [
         "http_method": "GET",
         "handler_name": "com.jordansimsmith.immersiontracker.GetShowsHandler",
         "zip_file": "get-shows-handler_deploy.jar",
+        "provider_env_names": [],
     },
     {
         "function_name": "update_show_handler",
@@ -99,6 +101,7 @@ configs = [
         "http_method": "PUT",
         "handler_name": "com.jordansimsmith.immersiontracker.UpdateShowHandler",
         "zip_file": "update-show-handler_deploy.jar",
+        "provider_env_names": ["IMMERSION_TRACKER_TVDB_BASE_URL"],
     },
     {
         "function_name": "sync_episodes_handler",
@@ -106,6 +109,7 @@ configs = [
         "http_method": "POST",
         "handler_name": "com.jordansimsmith.immersiontracker.SyncEpisodesHandler",
         "zip_file": "sync-episodes-handler_deploy.jar",
+        "provider_env_names": [],
     },
     {
         "function_name": "sync_movies_handler",
@@ -113,6 +117,7 @@ configs = [
         "http_method": "POST",
         "handler_name": "com.jordansimsmith.immersiontracker.SyncMoviesHandler",
         "zip_file": "sync-movies-handler_deploy.jar",
+        "provider_env_names": ["IMMERSION_TRACKER_TVDB_BASE_URL"],
     },
     {
         "function_name": "sync_youtube_handler",
@@ -120,6 +125,7 @@ configs = [
         "http_method": "POST",
         "handler_name": "com.jordansimsmith.immersiontracker.SyncYoutubeHandler",
         "zip_file": "sync-youtube-handler_deploy.jar",
+        "provider_env_names": ["IMMERSION_TRACKER_YOUTUBE_BASE_URL"],
     },
     {
         "function_name": "sync_spotify_handler",
@@ -127,15 +133,38 @@ configs = [
         "http_method": "POST",
         "handler_name": "com.jordansimsmith.immersiontracker.SyncSpotifyHandler",
         "zip_file": "sync-spotify-handler_deploy.jar",
+        "provider_env_names": [
+            "IMMERSION_TRACKER_SPOTIFY_ACCOUNTS_BASE_URL",
+            "IMMERSION_TRACKER_SPOTIFY_API_BASE_URL",
+        ],
     },
 ]
+
+provider_env_values = {
+    "IMMERSION_TRACKER_TVDB_BASE_URL": os.getenv("IMMERSION_TRACKER_TVDB_BASE_URL"),
+    "IMMERSION_TRACKER_YOUTUBE_BASE_URL": os.getenv(
+        "IMMERSION_TRACKER_YOUTUBE_BASE_URL"
+    ),
+    "IMMERSION_TRACKER_SPOTIFY_ACCOUNTS_BASE_URL": os.getenv(
+        "IMMERSION_TRACKER_SPOTIFY_ACCOUNTS_BASE_URL"
+    ),
+    "IMMERSION_TRACKER_SPOTIFY_API_BASE_URL": os.getenv(
+        "IMMERSION_TRACKER_SPOTIFY_API_BASE_URL"
+    ),
+}
 
 # create all lambda functions and api gateway resources
 for config in configs:
     with open(config["zip_file"], "rb") as f:
         zip_file_bytes = f.read()
 
-    function_arn = lambda_client.create_function(
+    lambda_env = {
+        env_name: provider_env_values[env_name]
+        for env_name in config["provider_env_names"]
+        if provider_env_values[env_name]
+    }
+
+    create_function_request = dict(
         FunctionName=config["function_name"],
         Runtime="java21",
         Role=role_arn,
@@ -143,7 +172,13 @@ for config in configs:
         Code={"ZipFile": zip_file_bytes},
         Timeout=60,
         MemorySize=512,
-    )["FunctionArn"]
+    )
+    if lambda_env:
+        create_function_request["Environment"] = {"Variables": lambda_env}
+
+    function_arn = lambda_client.create_function(**create_function_request)[
+        "FunctionArn"
+    ]
 
     resource_id = apigateway_client.create_resource(
         restApiId=api_id, parentId=root_id, pathPart=config["resource_path_part"]

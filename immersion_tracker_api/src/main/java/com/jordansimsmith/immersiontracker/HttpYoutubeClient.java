@@ -20,11 +20,14 @@ public class HttpYoutubeClient implements YoutubeClient {
   private static final Pattern ISO_8601_DURATION_PATTERN =
       Pattern.compile("PT(?:(\\d+)H)?(?:(\\d+)M)?(?:(\\d+)S)?");
 
+  private final URI baseUri;
   private final ObjectMapper objectMapper;
   private final Secrets secrets;
   private final HttpClient httpClient;
 
-  public HttpYoutubeClient(ObjectMapper objectMapper, Secrets secrets, HttpClient httpClient) {
+  public HttpYoutubeClient(
+      URI baseUri, ObjectMapper objectMapper, Secrets secrets, HttpClient httpClient) {
+    this.baseUri = baseUri;
     this.objectMapper = objectMapper;
     this.secrets = secrets;
     this.httpClient = httpClient;
@@ -86,8 +89,8 @@ public class HttpYoutubeClient implements YoutubeClient {
     var request =
         HttpRequest.newBuilder()
             .uri(
-                new URI(
-                    "https://www.googleapis.com/youtube/v3/videos"
+                baseUri.resolve(
+                    "/youtube/v3/videos"
                         + "?part=id,snippet,contentDetails"
                         + "&id="
                         + videoId
@@ -150,8 +153,8 @@ public class HttpYoutubeClient implements YoutubeClient {
     var request =
         HttpRequest.newBuilder()
             .uri(
-                new URI(
-                    "https://www.googleapis.com/youtube/v3/channels"
+                baseUri.resolve(
+                    "/youtube/v3/channels"
                         + "?part=snippet"
                         + "&id="
                         + channelId

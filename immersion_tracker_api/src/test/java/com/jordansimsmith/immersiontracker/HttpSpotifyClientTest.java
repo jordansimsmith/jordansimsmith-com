@@ -12,6 +12,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.secrets.FakeSecrets;
 import com.jordansimsmith.secrets.Secrets;
 import java.io.IOException;
+import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -117,7 +118,13 @@ public class HttpSpotifyClientTest {
     openMocks = openMocks(this);
     objectMapper = new ObjectMapper();
     secrets = new FakeSecrets();
-    client = new HttpSpotifyClient(objectMapper, secrets, httpClient);
+    client =
+        new HttpSpotifyClient(
+            URI.create("https://api.spotify.com"),
+            URI.create("https://accounts.spotify.com"),
+            objectMapper,
+            secrets,
+            httpClient);
   }
 
   @AfterEach
