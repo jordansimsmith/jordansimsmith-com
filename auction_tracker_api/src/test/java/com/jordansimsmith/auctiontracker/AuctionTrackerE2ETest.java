@@ -3,6 +3,7 @@ package com.jordansimsmith.auctiontracker;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.queue.QueueUtils;
 import java.util.Base64;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -55,8 +56,11 @@ public class AuctionTrackerE2ETest {
         DynamoDbClient.builder()
             .endpointOverride(auctionTrackerContainer.getLocalstackUrl())
             .build();
+    var sqsClient =
+        SqsClient.builder().endpointOverride(auctionTrackerContainer.getLocalstackUrl()).build();
 
     DynamoDbUtils.reset(dynamoDbClient);
+    QueueUtils.reset(sqsClient);
   }
 
   @Test
@@ -101,14 +105,19 @@ public class AuctionTrackerE2ETest {
     var receiveRequest =
         ReceiveMessageRequest.builder()
             .queueUrl(queueUrl)
-            .maxNumberOfMessages(1)
+            .maxNumberOfMessages(10)
             .waitTimeSeconds(10)
             .build();
     var messages = sqsClient.receiveMessage(receiveRequest).messages();
     assertThat(messages).isNotEmpty();
 
-    var messageBody = messages.get(0).body();
-    assertThat(messageBody).contains("Auction Tracker Daily Digest");
-    assertThat(messageBody).contains("Titleist iron set");
+    var hasExpectedMessage =
+        messages.stream()
+            .map(message -> message.body())
+            .anyMatch(
+                messageBody ->
+                    messageBody.contains("Auction Tracker Daily Digest")
+                        && messageBody.contains("Titleist iron set"));
+    assertThat(hasExpectedMessage).isTrue();
   }
 }

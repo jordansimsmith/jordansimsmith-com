@@ -210,6 +210,7 @@ java_test_suite(
         ":lib",
         ":test-lib",
         "//lib/dynamodb:test-lib",
+        "//lib/queue:test-lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:org_assertj_assertj_core",
