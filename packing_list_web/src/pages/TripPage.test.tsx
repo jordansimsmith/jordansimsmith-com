@@ -499,8 +499,7 @@ describe('TripPage', () => {
   });
 
   it('shows add item button and can add a new item', async () => {
-    vi.useFakeTimers({ shouldAdvanceTime: true });
-    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const user = userEvent.setup();
 
     localStorage.setItem(
       'packing_list_auth',
@@ -577,18 +576,19 @@ describe('TripPage', () => {
       expect(screen.getByText('Sunglasses')).toBeDefined();
     });
 
-    await vi.advanceTimersByTimeAsync(600);
-
-    expect(updateTripSpy).toHaveBeenCalledWith(
-      expect.objectContaining({
-        trip_id: 'trip-001',
-        items: expect.arrayContaining([
-          expect.objectContaining({ name: 'Sunglasses' }),
-        ]),
-      }),
+    await waitFor(
+      () => {
+        expect(updateTripSpy).toHaveBeenCalledWith(
+          expect.objectContaining({
+            trip_id: 'trip-001',
+            items: expect.arrayContaining([
+              expect.objectContaining({ name: 'Sunglasses' }),
+            ]),
+          }),
+        );
+      },
+      { timeout: 3000 },
     );
-
-    vi.useRealTimers();
   });
 
   it('can edit an existing item', async () => {
