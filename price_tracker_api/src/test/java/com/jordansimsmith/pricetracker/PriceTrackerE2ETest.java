@@ -4,11 +4,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import java.time.Instant;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.containers.Network;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -18,11 +18,43 @@ import software.amazon.awssdk.services.lambda.model.InvokeRequest;
 import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 
-@Testcontainers
 public class PriceTrackerE2ETest {
+  private static final String NETWORK_NAME = "price-tracker-e2e";
+  private static final String CHEMIST_WAREHOUSE_STUB_ALIAS = "chemist-warehouse-stub";
+  private static final String NZ_PROTEIN_STUB_ALIAS = "nz-protein-stub";
+  private static final String NZ_MUSCLE_STUB_ALIAS = "nz-muscle-stub";
 
-  @Container
-  private static final PriceTrackerContainer priceTrackerContainer = new PriceTrackerContainer();
+  private static final Network NETWORK =
+      Network.builder().createNetworkCmdModifier(cmd -> cmd.withName(NETWORK_NAME)).build();
+
+  private static final PriceTrackerWebsiteStubContainer priceTrackerWebsiteStubContainer =
+      new PriceTrackerWebsiteStubContainer()
+          .withNetwork(NETWORK)
+          .withNetworkAliases(
+              CHEMIST_WAREHOUSE_STUB_ALIAS, NZ_PROTEIN_STUB_ALIAS, NZ_MUSCLE_STUB_ALIAS);
+
+  private static final PriceTrackerContainer priceTrackerContainer =
+      new PriceTrackerContainer()
+          .withNetwork(NETWORK)
+          .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK_NAME)
+          .withEnv(
+              "PRICE_TRACKER_CHEMIST_WAREHOUSE_BASE_URL",
+              "http://" + CHEMIST_WAREHOUSE_STUB_ALIAS + ":8080")
+          .withEnv("PRICE_TRACKER_NZ_PROTEIN_BASE_URL", "http://" + NZ_PROTEIN_STUB_ALIAS + ":8080")
+          .withEnv("PRICE_TRACKER_NZ_MUSCLE_BASE_URL", "http://" + NZ_MUSCLE_STUB_ALIAS + ":8080");
+
+  @BeforeAll
+  static void setUpBeforeClass() {
+    priceTrackerWebsiteStubContainer.start();
+    priceTrackerContainer.start();
+  }
+
+  @AfterAll
+  static void tearDownAfterClass() {
+    priceTrackerContainer.stop();
+    priceTrackerWebsiteStubContainer.stop();
+    NETWORK.close();
+  }
 
   @BeforeEach
   void setup() {
@@ -32,10 +64,7 @@ public class PriceTrackerE2ETest {
     DynamoDbUtils.reset(dynamoDbClient);
   }
 
-  // skipped in CI because cloudflare blocks requests to the product websites from github actions
-  // agents
   @Test
-  @DisabledIfEnvironmentVariable(named = "CI", matches = "true")
   void shouldTrackChemistWarehousePricesAndSendNotifications() throws Exception {
     // arrange
     var dynamoDbClient =
@@ -49,7 +78,7 @@ public class PriceTrackerE2ETest {
         SqsClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
 
     var productUrl =
-        "https://www.chemistwarehouse.co.nz/buy/74329/inc-100-dynamic-whey-chocolate-flavour-2kg";
+        "http://chemist-warehouse-stub:8080/buy/74329/inc-100-dynamic-whey-chocolate-flavour-2kg";
     var productName = "Chemist Warehouse - Dynamic Whey 2kg - Chocolate";
     var productHistory =
         PriceTrackerItem.create(productUrl, productName, Instant.ofEpochSecond(1_000_000), 1234.56);
@@ -83,13 +112,10 @@ public class PriceTrackerE2ETest {
     assertThat(messageBody).contains("price updated");
     assertThat(messageBody).contains(productName);
     assertThat(messageBody).contains(productUrl);
-    assertThat(messageBody).contains("$1234.56 ->");
+    assertThat(messageBody).contains("$1234.56 -> $52.00");
   }
 
-  // skipped in CI because cloudflare blocks requests to the product websites from github actions
-  // agents
   @Test
-  @DisabledIfEnvironmentVariable(named = "CI", matches = "true")
   void shouldTrackNzProteinPricesAndSendNotifications() throws Exception {
     // arrange
     var dynamoDbClient =
@@ -102,7 +128,7 @@ public class PriceTrackerE2ETest {
     var sqsClient =
         SqsClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
 
-    var productUrl = "https://www.nzprotein.co.nz/product/nz-whey-1kg-2-2lbs";
+    var productUrl = "http://nz-protein-stub:8080/product/nz-whey-1kg-2-2lbs";
     var productName = "NZ Protein - NZ Whey 1kg (2.2lbs)";
     var productHistory =
         PriceTrackerItem.create(productUrl, productName, Instant.ofEpochSecond(1_000_000), 4567.89);
@@ -136,13 +162,10 @@ public class PriceTrackerE2ETest {
     assertThat(messageBody).contains("price updated");
     assertThat(messageBody).contains(productName);
     assertThat(messageBody).contains(productUrl);
-    assertThat(messageBody).contains("$4567.89 ->");
+    assertThat(messageBody).contains("$4567.89 -> $84.95");
   }
 
-  // skipped in CI because cloudflare blocks requests to the product websites from github actions
-  // agents
   @Test
-  @DisabledIfEnvironmentVariable(named = "CI", matches = "true")
   void shouldTrackNzMusclePricesAndSendNotifications() throws Exception {
     // arrange
     var dynamoDbClient =
@@ -155,7 +178,8 @@ public class PriceTrackerE2ETest {
     var sqsClient =
         SqsClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
 
-    var productUrl = "https://nzmuscle.co.nz/products/shotgun-whey-protein?variant=51471561195701";
+    var productUrl =
+        "http://nz-muscle-stub:8080/products/shotgun-whey-protein?variant=51471561195701";
     var productName = "Shotgun Whey Protein Chocolate 2kg";
     var productHistory =
         PriceTrackerItem.create(productUrl, productName, Instant.ofEpochSecond(1_000_000), 8901.23);
@@ -189,6 +213,6 @@ public class PriceTrackerE2ETest {
     assertThat(messageBody).contains("price updated");
     assertThat(messageBody).contains(productName);
     assertThat(messageBody).contains(productUrl);
-    assertThat(messageBody).contains("$8901.23 ->");
+    assertThat(messageBody).contains("$8901.23 -> $92.50");
   }
 }

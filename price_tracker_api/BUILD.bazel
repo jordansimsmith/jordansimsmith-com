@@ -56,6 +56,12 @@ java_binary(
     ],
 )
 
+java_binary(
+    name = "price-tracker-website-stub-server",
+    srcs = ["src/test/java/com/jordansimsmith/pricetracker/PriceTrackerWebsiteStubServer.java"],
+    create_executable = False,
+)
+
 java_library(
     name = "test-lib",
     testonly = True,
@@ -65,6 +71,7 @@ java_library(
     ),
     data = [
         ":local-load",
+        ":price-tracker-website-stub-load",
     ],
     resources = [
         "src/test/resources/logback-test.xml",
@@ -178,6 +185,30 @@ oci_load(
     ],
 )
 
+pkg_tar(
+    name = "price-tracker-website-stub-server.tar",
+    srcs = [
+        ":price-tracker-website-stub-server_deploy.jar",
+    ],
+    package_dir = "/opt/code/price-tracker-website-stub/",
+)
+
+oci_image(
+    name = "price-tracker-website-stub-image",
+    base = "@temurin21jre//:temurin21jre",
+    tars = [
+        ":price-tracker-website-stub-server.tar",
+    ],
+)
+
+oci_load(
+    name = "price-tracker-website-stub-load",
+    image = ":price-tracker-website-stub-image",
+    repo_tags = [
+        "bazel/price-tracker-website-stub:latest",
+    ],
+)
+
 java_test_suite(
     name = "e2e-tests",
     size = "large",
@@ -191,9 +222,6 @@ java_test_suite(
         "src/test/resources/logback-test.xml",
     ],
     runner = "junit5",
-    tags = [
-        "no-cache",
-    ],
     test_suffixes = ["E2ETest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
@@ -206,6 +234,7 @@ java_test_suite(
         "@maven//:org_junit_jupiter_junit_jupiter_api",
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:org_testcontainers_testcontainers",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
         "@maven//:software_amazon_awssdk_lambda",

@@ -1,5 +1,6 @@
 import boto3
 import json
+import os
 
 region_name = "ap-southeast-2"
 endpoint_url = "http://localhost:4566"
@@ -94,6 +95,18 @@ configs = [
     }
 ]
 
+lambda_env = {
+    "PRICE_TRACKER_CHEMIST_WAREHOUSE_BASE_URL": os.getenv(
+        "PRICE_TRACKER_CHEMIST_WAREHOUSE_BASE_URL", ""
+    ),
+    "PRICE_TRACKER_NZ_PROTEIN_BASE_URL": os.getenv(
+        "PRICE_TRACKER_NZ_PROTEIN_BASE_URL", ""
+    ),
+    "PRICE_TRACKER_NZ_MUSCLE_BASE_URL": os.getenv(
+        "PRICE_TRACKER_NZ_MUSCLE_BASE_URL", ""
+    ),
+}
+
 # create all lambda functions
 for config in configs:
     with open(f"/opt/code/localstack/{config['zip_file']}", "rb") as f:
@@ -107,6 +120,7 @@ for config in configs:
         Code={"ZipFile": zip_file_bytes},
         Timeout=120,
         MemorySize=1024,
+        Environment={"Variables": lambda_env},
     )
 
 # wait for all lambda functions to be active

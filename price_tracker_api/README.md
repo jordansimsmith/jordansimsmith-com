@@ -200,11 +200,13 @@ Representative item:
 
 ### Environment variables
 
-| Name                                          | Required                                       | Purpose                                                           | Default behavior                                                |
-| --------------------------------------------- | ---------------------------------------------- | ----------------------------------------------------------------- | --------------------------------------------------------------- |
-| `none`                                        | n/a                                            | Service code does not read service-specific environment variables | AWS SDK clients resolve region/credentials from runtime context |
-| `AWS_REGION`                                  | runtime-provided in AWS; test-provided locally | Region for AWS SDK clients                                        | Terraform and tests use `ap-southeast-2`                        |
-| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | local tests only                               | AWS SDK credentials for local test containers                     | Not required in production Lambda (execution role is used)      |
+| Name                                          | Required                                       | Purpose                                       | Default behavior                                           |
+| --------------------------------------------- | ---------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------- |
+| `PRICE_TRACKER_CHEMIST_WAREHOUSE_BASE_URL`    | optional                                       | Override Chemist Warehouse product URL base   | `https://www.chemistwarehouse.co.nz`                       |
+| `PRICE_TRACKER_NZ_PROTEIN_BASE_URL`           | optional                                       | Override NZ Protein product URL base          | `https://www.nzprotein.co.nz`                              |
+| `PRICE_TRACKER_NZ_MUSCLE_BASE_URL`            | optional                                       | Override NZ Muscle product URL base           | `https://nzmuscle.co.nz`                                   |
+| `AWS_REGION`                                  | runtime-provided in AWS; test-provided locally | Region for AWS SDK clients                    | Terraform and tests use `ap-southeast-2`                   |
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | local tests only                               | AWS SDK credentials for local test containers | Not required in production Lambda (execution role is used) |
 
 ### Secret shape
 
@@ -222,17 +224,25 @@ Representative item:
 
 - **Unit tests** (`//price_tracker_api:unit-tests`) validate extractor parsing behavior and unsupported host handling.
 - **Integration tests** (`//price_tracker_api:integration-tests`) validate handler behavior with DynamoDB test container plus fake clock/price/products/notifications.
-- **E2E tests** (`//price_tracker_api:e2e-tests`) validate LocalStack wiring (Lambda, DynamoDB, SNS, SQS) with live retailer scraping.
-- Live scraping E2E tests are disabled in CI because retailer traffic may be blocked (for example by Cloudflare), but are expected to run locally.
+- **E2E tests** (`//price_tracker_api:e2e-tests`) validate LocalStack wiring (Lambda, DynamoDB, SNS, SQS) with mock retailer websites on an internal Testcontainers network.
+- E2E runs are CI-safe and do not require outbound internet access to retailer hosts.
 - Recommended pre-merge checks for this service: `bazel build //price_tracker_api:all` and `bazel test //price_tracker_api:all`.
 
 ## Local development and smoke checks
 
 - Build service targets: `bazel build //price_tracker_api:all`
 - Run all service tests: `bazel test //price_tracker_api:all`
-- Fast smoke check (container wiring only): `bazel test --test_filter=PriceTrackerE2ETest.shouldStartContainer //price_tracker_api:e2e-tests`
-- Core behavior smoke check (no live scraping): `bazel test --test_filter=UpdatePricesHandlerIntegrationTest.handleRequestShouldUpdatePrices //price_tracker_api:integration-tests`
-- Full live scrape validation (network dependent, non-CI): `bazel test //price_tracker_api:e2e-tests`
+- Fast E2E smoke check: `bazel test --test_filter=PriceTrackerE2ETest.shouldTrackChemistWarehousePricesAndSendNotifications //price_tracker_api:e2e-tests`
+- Core behavior smoke check: `bazel test --test_filter=UpdatePricesHandlerIntegrationTest.handleRequestShouldUpdatePrices //price_tracker_api:integration-tests`
+- Full E2E validation (mock retailer websites): `bazel test //price_tracker_api:e2e-tests`
+
+### E2E runtime benchmark (2026-02-20)
+
+| Scenario                               | Command                                                                                                      | Result                                                                                                    |
+| -------------------------------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| Pre-migration baseline (origin/master) | `bazel test //price_tracker_api:e2e-tests`                                                                   | Did not complete reliably; run exceeded `400s` and was terminated while waiting on live retailer scraping |
+| Post-migration cold-ish                | `hyperfine --runs 3 --warmup 0 --prepare "bazel clean --expunge" "bazel test //price_tracker_api:e2e-tests"` | Mean `106.204s` (min `100.262s`, max `109.842s`)                                                          |
+| Post-migration warm                    | `hyperfine --runs 3 --warmup 2 "bazel test //price_tracker_api:e2e-tests"`                                   | Mean `261.9ms` (min `229.5ms`, max `324.1ms`)                                                             |
 
 ## End-to-end scenarios
 
