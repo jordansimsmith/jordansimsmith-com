@@ -81,6 +81,18 @@ java_binary(
     ],
 )
 
+java_binary(
+    name = "go-media-stub-server",
+    srcs = ["src/test/java/com/jordansimsmith/eventcalendar/GoMediaStubServer.java"],
+    create_executable = False,
+)
+
+java_binary(
+    name = "meetup-stub-server",
+    srcs = ["src/test/java/com/jordansimsmith/eventcalendar/MeetupStubServer.java"],
+    create_executable = False,
+)
+
 java_library(
     name = "test-lib",
     testonly = True,
@@ -89,7 +101,9 @@ java_library(
         exclude = UNIT_TESTS + INTEGRATION_TESTS + E2E_TESTS,
     ),
     data = [
+        ":go-media-stub-load",
         ":local-load",
+        ":meetup-stub-load",
     ],
     resources = [
         "src/test/resources/logback-test.xml",
@@ -98,6 +112,7 @@ java_library(
     deps = [
         ":lib",
         "//lib/dynamodb:test-lib",
+        "//lib/http:test-lib",
         "//lib/localstack:lib",
         "//lib/testcontainers:test-lib",
         "//lib/time:test-lib",
@@ -206,6 +221,54 @@ oci_load(
     ],
 )
 
+pkg_tar(
+    name = "go-media-stub-server.tar",
+    srcs = [
+        ":go-media-stub-server_deploy.jar",
+    ],
+    package_dir = "/opt/code/go-media-stub/",
+)
+
+oci_image(
+    name = "go-media-stub-image",
+    base = "@temurin21jre//:temurin21jre",
+    tars = [
+        ":go-media-stub-server.tar",
+    ],
+)
+
+oci_load(
+    name = "go-media-stub-load",
+    image = ":go-media-stub-image",
+    repo_tags = [
+        "bazel/go-media-stub:latest",
+    ],
+)
+
+pkg_tar(
+    name = "meetup-stub-server.tar",
+    srcs = [
+        ":meetup-stub-server_deploy.jar",
+    ],
+    package_dir = "/opt/code/meetup-stub/",
+)
+
+oci_image(
+    name = "meetup-stub-image",
+    base = "@temurin21jre//:temurin21jre",
+    tars = [
+        ":meetup-stub-server.tar",
+    ],
+)
+
+oci_load(
+    name = "meetup-stub-load",
+    image = ":meetup-stub-image",
+    repo_tags = [
+        "bazel/meetup-stub:latest",
+    ],
+)
+
 java_test_suite(
     name = "e2e-tests",
     size = "large",
@@ -219,9 +282,6 @@ java_test_suite(
         "src/test/resources/logback-test.xml",
     ],
     runner = "junit5",
-    tags = [
-        "no-cache",
-    ],
     test_suffixes = ["E2ETest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
@@ -237,6 +297,7 @@ java_test_suite(
         "@maven//:org_junit_jupiter_junit_jupiter_api",
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:org_testcontainers_testcontainers",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
         "@maven//:software_amazon_awssdk_lambda",

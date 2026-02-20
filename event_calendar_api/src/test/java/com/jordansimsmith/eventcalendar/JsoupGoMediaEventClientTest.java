@@ -2,6 +2,7 @@ package com.jordansimsmith.eventcalendar;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.net.URI;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import org.jsoup.Jsoup;
@@ -161,7 +162,7 @@ class JsoupGoMediaEventClientTest {
   @BeforeEach
   void setUp() {
     client =
-        new JsoupGoMediaEventClient() {
+        new JsoupGoMediaEventClient(URI.create(BASE_URL)) {
           @Override
           protected Document fetchDocument(String url) {
             return switch (url) {
@@ -282,7 +283,7 @@ class JsoupGoMediaEventClientTest {
         """;
 
     JsoupGoMediaEventClient testClient =
-        new JsoupGoMediaEventClient() {
+        new JsoupGoMediaEventClient(URI.create(BASE_URL)) {
           @Override
           protected Document fetchDocument(String url) {
             if (url.equals(STADIUM_URL)) {
@@ -346,7 +347,7 @@ class JsoupGoMediaEventClientTest {
         """;
 
     JsoupGoMediaEventClient testClient =
-        new JsoupGoMediaEventClient() {
+        new JsoupGoMediaEventClient(URI.create(BASE_URL)) {
           @Override
           protected Document fetchDocument(String url) {
             if (url.equals(STADIUM_URL)) {

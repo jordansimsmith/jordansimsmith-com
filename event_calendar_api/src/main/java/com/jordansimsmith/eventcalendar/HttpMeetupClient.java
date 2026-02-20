@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class HttpMeetupClient implements MeetupClient {
-  private static final String API_ENDPOINT = "https://www.meetup.com/gql2";
+  private static final String GRAPHQL_PATH = "/gql2";
   private static final String UPCOMING_EVENTS_HASH =
       "55bced4dca11114ce83c003609158f19b3ca289939c2e6c0b39ce728722756f4";
   private static final String PAST_EVENTS_HASH =
@@ -22,11 +22,14 @@ public class HttpMeetupClient implements MeetupClient {
   private final HttpClient httpClient;
   private final Clock clock;
   private final ObjectMapper objectMapper;
+  private final URI apiBaseUri;
 
-  public HttpMeetupClient(HttpClient httpClient, Clock clock, ObjectMapper objectMapper) {
+  public HttpMeetupClient(
+      HttpClient httpClient, Clock clock, ObjectMapper objectMapper, URI apiBaseUri) {
     this.httpClient = httpClient;
     this.clock = clock;
     this.objectMapper = objectMapper;
+    this.apiBaseUri = apiBaseUri;
   }
 
   @Override
@@ -57,9 +60,10 @@ public class HttpMeetupClient implements MeetupClient {
   }
 
   private GraphQLResponse fetchEvents(String jsonBody) throws Exception {
+    var endpoint = apiBaseUri.resolve(GRAPHQL_PATH);
     var request =
         HttpRequest.newBuilder()
-            .uri(URI.create(API_ENDPOINT))
+            .uri(endpoint)
             .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
             .build();
 

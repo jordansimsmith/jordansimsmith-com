@@ -3,6 +3,7 @@ package com.jordansimsmith.eventcalendar;
 import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Verify;
 import java.io.IOException;
+import java.net.URI;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -23,10 +24,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class JsoupGoMediaEventClient implements GoMediaEventClient {
+  private static final String GO_MEDIA_STADIUM_PATH = "/our-venues/go-media-stadium";
   private static final Logger LOGGER = LoggerFactory.getLogger(JsoupGoMediaEventClient.class);
 
-  private static final String BASE_URL = "https://www.aucklandstadiums.co.nz";
-  private static final String STADIUM_URL = BASE_URL + "/our-venues/go-media-stadium";
   private static final ZoneId AUCKLAND_ZONE = ZoneId.of("Pacific/Auckland");
   private static final Pattern DATE_PATTERN = Pattern.compile("\\d{1,2}\\s+[A-Za-z]+\\s+\\d{4}");
   private static final Pattern TIME_PATTERN =
@@ -38,6 +38,13 @@ public class JsoupGoMediaEventClient implements GoMediaEventClient {
           .parseCaseInsensitive()
           .appendPattern("h[:mm][ ]a") // Handles both h:mm a and ha formats
           .toFormatter(Locale.ENGLISH);
+  private final URI baseUri;
+  private final URI goMediaStadiumPageUri;
+
+  public JsoupGoMediaEventClient(URI baseUri) {
+    this.baseUri = baseUri;
+    this.goMediaStadiumPageUri = this.baseUri.resolve(GO_MEDIA_STADIUM_PATH);
+  }
 
   @Override
   public List<GoMediaEvent> findEvents() {
@@ -50,7 +57,7 @@ public class JsoupGoMediaEventClient implements GoMediaEventClient {
 
   private List<GoMediaEvent> doGetEvents() throws Exception {
     // get all event and season URLs from main page
-    var mainPage = fetchDocument(STADIUM_URL);
+    var mainPage = fetchDocument(goMediaStadiumPageUri.toString());
     var eventUrls = new HashSet<String>();
     var seasonUrls = new HashSet<String>();
 
@@ -59,7 +66,7 @@ public class JsoupGoMediaEventClient implements GoMediaEventClient {
       if (url.isEmpty()) {
         continue;
       }
-      var absoluteUrl = BASE_URL + url;
+      var absoluteUrl = baseUri.resolve(url).toString();
 
       if (absoluteUrl.contains("home-season")) {
         seasonUrls.add(absoluteUrl);
@@ -76,7 +83,7 @@ public class JsoupGoMediaEventClient implements GoMediaEventClient {
         if (seasonEventUrl.isEmpty()) {
           continue;
         }
-        eventUrls.add(BASE_URL + seasonEventUrl);
+        eventUrls.add(baseUri.resolve(seasonEventUrl).toString());
       }
     }
 
@@ -128,7 +135,11 @@ public class JsoupGoMediaEventClient implements GoMediaEventClient {
     var startDateTime = LocalDateTime.of(date, startTime);
 
     return new GoMediaEvent(
-        title, STADIUM_URL, url, startDateTime.atZone(AUCKLAND_ZONE).toInstant(), info);
+        title,
+        GoMediaEventClient.STADIUM_URL,
+        url,
+        startDateTime.atZone(AUCKLAND_ZONE).toInstant(),
+        info);
   }
 
   @VisibleForTesting

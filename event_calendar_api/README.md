@@ -80,8 +80,8 @@ sequenceDiagram
 
 ### External systems
 
-- **Go Media Stadium website**: outbound HTML fetches against `https://www.aucklandstadiums.co.nz/our-venues/go-media-stadium`, then event and season pages. Required extracted fields are title, event URL, parsed date/time, and event summary details. Authentication is none. Cadence is every scheduled update run (`rate(15 minutes)`). Failures throw and fail the Lambda invocation.
-- **Meetup GraphQL API**: outbound `POST https://www.meetup.com/gql2`. Required request fields are `operationName`, `variables.urlname`, one of `variables.afterDateTime` or `variables.beforeDateTime`, and `extensions.persistedQuery.sha256Hash`. The handler performs two calls per group (upcoming and past events) each run. Authentication is none for public group events. Failures throw and fail the Lambda invocation.
+- **Go Media Stadium website**: outbound HTML fetches against `EVENT_CALENDAR_GOMEDIA_BASE_URL` (default `https://www.aucklandstadiums.co.nz`), then `/our-venues/go-media-stadium`, event pages, and season pages. Required extracted fields are title, event URL, parsed date/time, and event summary details. Authentication is none. Cadence is every scheduled update run (`rate(15 minutes)`). Failures throw and fail the Lambda invocation.
+- **Meetup GraphQL API**: outbound `POST` to `EVENT_CALENDAR_MEETUP_BASE_URL` + `/gql2` (default base URL `https://www.meetup.com`). Required request fields are `operationName`, `variables.urlname`, one of `variables.afterDateTime` or `variables.beforeDateTime`, and `extensions.persistedQuery.sha256Hash`. The handler performs two calls per group (upcoming and past events) each run. Authentication is none for public group events. Failures throw and fail the Lambda invocation.
 
 ## API contracts
 
@@ -203,9 +203,10 @@ Meetup event item:
 
 ### Environment variables
 
-| Name     | Required | Purpose                                      | Default behavior                                                 |
-| -------- | -------- | -------------------------------------------- | ---------------------------------------------------------------- |
-| `(none)` | n/a      | Service runtime logic does not read env vars | Table name and meetup groups are fixed in code/infra definitions |
+| Name                              | Required | Purpose                                            | Default behavior                                   |
+| --------------------------------- | -------- | -------------------------------------------------- | -------------------------------------------------- |
+| `EVENT_CALENDAR_GOMEDIA_BASE_URL` | no       | override Go Media website base URL for event crawl | falls back to `https://www.aucklandstadiums.co.nz` |
+| `EVENT_CALENDAR_MEETUP_BASE_URL`  | no       | override Meetup GraphQL API base URL               | falls back to `https://www.meetup.com`             |
 
 ### Secret shape
 
@@ -223,7 +224,7 @@ None in current scope.
 
 - Unit tests cover parsing and client behavior (`JsoupGoMediaEventClient`, `HttpMeetupClient`).
 - Integration tests cover Lambda handler behavior with DynamoDB test infrastructure.
-- E2E tests validate the local containerized flow from update ingestion to calendar response generation.
+- E2E tests validate the local containerized flow from update ingestion to calendar response generation using mock Go Media and Meetup hosts on an internal test network, so the suite is CI-safe and does not require outbound internet.
 - Pre-merge checks:
   - `bazel build //event_calendar_api:all`
   - `bazel test //event_calendar_api:all`

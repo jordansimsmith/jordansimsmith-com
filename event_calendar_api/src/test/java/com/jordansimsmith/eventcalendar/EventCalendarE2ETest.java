@@ -5,22 +5,53 @@ import static org.assertj.core.api.Assertions.assertThat;
 import biweekly.Biweekly;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.condition.DisabledIfEnvironmentVariable;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.containers.Network;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.lambda.LambdaClient;
 import software.amazon.awssdk.services.lambda.model.InvocationType;
 import software.amazon.awssdk.services.lambda.model.InvokeRequest;
 
-@Testcontainers
 public class EventCalendarE2ETest {
+  private static final String NETWORK_NAME = "event-calendar-e2e";
+  private static final String GO_MEDIA_STUB_ALIAS = "gomedia-stub";
+  private static final String MEETUP_STUB_ALIAS = "meetup-stub";
+
+  private static final Network NETWORK =
+      Network.builder().createNetworkCmdModifier(cmd -> cmd.withName(NETWORK_NAME)).build();
+
+  private static final GoMediaStubContainer goMediaStubContainer =
+      new GoMediaStubContainer().withNetwork(NETWORK).withNetworkAliases(GO_MEDIA_STUB_ALIAS);
+
+  private static final MeetupStubContainer meetupStubContainer =
+      new MeetupStubContainer().withNetwork(NETWORK).withNetworkAliases(MEETUP_STUB_ALIAS);
+
+  private static final EventCalendarContainer eventCalendarContainer =
+      new EventCalendarContainer()
+          .withNetwork(NETWORK)
+          .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK_NAME)
+          .withEnv("EVENT_CALENDAR_GOMEDIA_BASE_URL", "http://" + GO_MEDIA_STUB_ALIAS + ":8080")
+          .withEnv("EVENT_CALENDAR_MEETUP_BASE_URL", "http://" + MEETUP_STUB_ALIAS + ":8080");
+
   private final ObjectMapper mapper = new ObjectMapper();
 
-  @Container
-  private static final EventCalendarContainer eventCalendarContainer = new EventCalendarContainer();
+  @BeforeAll
+  static void setUpBeforeClass() {
+    goMediaStubContainer.start();
+    meetupStubContainer.start();
+    eventCalendarContainer.start();
+  }
+
+  @AfterAll
+  static void tearDownAfterClass() {
+    eventCalendarContainer.stop();
+    meetupStubContainer.stop();
+    goMediaStubContainer.stop();
+    NETWORK.close();
+  }
 
   @BeforeEach
   void setup() {
@@ -33,7 +64,6 @@ public class EventCalendarE2ETest {
   }
 
   @Test
-  @DisabledIfEnvironmentVariable(named = "CI", matches = "true")
   void shouldUpdateEventsAndProvideCalendarSubscription() throws Exception {
     // arrange
     var lambdaClient =

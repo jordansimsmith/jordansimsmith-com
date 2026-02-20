@@ -108,7 +108,7 @@ public class HttpMeetupClientTest {
   void setUp() {
     openMocks = openMocks(this);
     objectMapper = new ObjectMapper();
-    client = new HttpMeetupClient(httpClient, clock, objectMapper);
+    client = new HttpMeetupClient(httpClient, clock, objectMapper, URI.create("http://stub"));
   }
 
   @AfterEach
