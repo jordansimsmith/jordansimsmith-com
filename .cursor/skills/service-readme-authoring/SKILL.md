@@ -53,6 +53,7 @@ For every service README, maintain these sections as the default structure (or e
 
 - service title + one-sentence purpose
 - overview
+- user stories
 - features and scope boundaries (`in scope`, `out of scope`)
 - architecture + primary workflow diagram
 - main technical decisions
@@ -73,6 +74,7 @@ Use conditional subsections where appropriate (for example API-only, web-only, D
 ## Content standards
 
 - Use sentence casing for headings (capitalize only the first word and proper nouns).
+- Write user stories as bullet points in the form `As a <role>, I want <capability>, so that <outcome>.`
 - Write deterministic, implementation-aligned requirements.
 - Define exact contract expectations, not vague intentions.
 - Keep terminology canonical across UI/API/storage/integration boundaries.

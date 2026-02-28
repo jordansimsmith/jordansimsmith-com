@@ -11,6 +11,12 @@ The packing list API service provides an authenticated HTTP API for reading shar
 - **Auth model**: API Gateway custom REQUEST authorizer backed by `AuthHandler`
 - **Primary consumer**: `packing_list_web`
 
+## User stories
+
+- As a traveler, I want template and variation data, so that I can assemble a trip packing list quickly.
+- As an authenticated user, I want to create, list, fetch, and update only my own trips, so that my packing data stays scoped to me.
+- As a client app developer, I want deterministic validation and full-replacement trip updates, so that edit flows are predictable.
+
 ## Features and scope boundaries
 
 ### In scope

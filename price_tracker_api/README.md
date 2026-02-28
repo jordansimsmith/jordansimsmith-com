@@ -11,6 +11,12 @@ The price tracker service runs an hourly scheduled workflow that scrapes curated
 - **Primary outbound integrations**: retailer websites and Amazon SNS
 - **Primary consumers**: Terraform-managed SNS email subscribers
 
+## User stories
+
+- As a shopper, I want hourly checks across tracked product pages, so that I can notice price changes quickly.
+- As an email subscriber, I want one aggregated notification when prices move, so that alerts stay useful without excessive noise.
+- As a maintainer, I want append-only price snapshots for each run, so that historical trends remain auditable.
+
 ## Features and scope boundaries
 
 ### In scope

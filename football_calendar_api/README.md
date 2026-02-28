@@ -10,6 +10,12 @@ The football calendar API aggregates fixtures from multiple football sources, st
 - **Primary storage**: DynamoDB table `football_calendar`
 - **Primary consumers**: iPhone Calendar and other iCal-compatible clients
 
+## User stories
+
+- As a player or supporter, I want fixtures from multiple football sources merged into one feed, so that I only need one calendar subscription.
+- As a maintainer, I want per-team fixture reconciliation with stale-match deletion, so that removed fixtures disappear automatically.
+- As a calendar app user, I want a public `GET /calendar` endpoint, so that native iCal clients can subscribe without extra setup.
+
 ## Features and scope boundaries
 
 ### In scope

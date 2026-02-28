@@ -10,6 +10,12 @@ The bar web service is a responsive single-page app that lets an authenticated u
 - **Primary backend**: `foo_api`
 - **Primary users**: single-user personal productivity workflow
 
+## User stories
+
+- As a user, I want to log in and manage my focus blocks in one place, so that planning and tracking stay simple.
+- As a user checking progress, I want totals and streak feedback after each change, so that I can adjust behavior quickly.
+- As a returning user, I want my session to persist between visits, so that I can resume without signing in every time.
+
 ## Features and scope boundaries
 
 ### In scope

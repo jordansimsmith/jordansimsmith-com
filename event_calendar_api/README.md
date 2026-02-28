@@ -10,6 +10,12 @@ The event calendar API ingests public event data from Go Media Stadium and Meetu
 - **Primary storage**: DynamoDB table `event_calendar`
 - **Primary consumers**: public calendar clients (for example Apple Calendar and Google Calendar)
 
+## User stories
+
+- As a calendar subscriber, I want one iCal feed for stadium and meetup events, so that I can follow both sources in one calendar app.
+- As a maintainer, I want source events normalized and stale records removed each run, so that subscribers receive current event data.
+- As a calendar client, I want unauthenticated access to `/calendar`, so that standard subscription clients can poll reliably.
+
 ## Features and scope boundaries
 
 ### In scope

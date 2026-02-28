@@ -10,6 +10,12 @@ The immersion tracker web service is a responsive single-page app that lets an a
 - **Primary backend**: `immersion_tracker_api`
 - **Primary users**: a single authenticated personal user workflow
 
+## User stories
+
+- As a language learner, I want to sign in and view a progress dashboard, so that I can quickly understand my immersion momentum.
+- As a returning user, I want my authenticated session to persist between visits, so that I do not need to log in every time.
+- As a learner exploring details, I want top-item previews with `See all` expansion, so that I can scan highlights and drill into full lists.
+
 ## Features and scope boundaries
 
 ### In scope

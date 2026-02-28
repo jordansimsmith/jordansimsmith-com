@@ -10,6 +10,12 @@ The foo API service provides an authenticated HTTP API for planning and tracking
 - **Primary storage**: DynamoDB single-table design
 - **Primary consumer**: `bar_web`
 
+## User stories
+
+- As a focused user, I want to record completed focus blocks quickly, so that my daily output is captured accurately.
+- As a user reviewing progress, I want daily totals and streak metrics, so that I can see whether I am staying consistent.
+- As an API client, I want idempotent create behavior, so that retrying requests does not create duplicate blocks.
+
 ## Features and scope boundaries
 
 ### In scope

@@ -10,6 +10,12 @@ The packing list web service is a responsive single-page app that lets an authen
 - **Primary backend**: `packing_list_api`
 - **Primary user**: single-user personal trip packing workflow
 
+## User stories
+
+- As a traveler, I want to generate a trip list from templates and optional variations, so that packing preparation starts quickly.
+- As a traveler actively packing, I want to edit items and statuses with autosave, so that progress is persisted without manual save actions.
+- As a returning user, I want protected trip routes with persisted session state, so that I can resume my packing workflow smoothly.
+
 ## Features and scope boundaries
 
 ### In scope

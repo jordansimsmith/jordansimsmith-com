@@ -10,6 +10,12 @@ The subfootball tracker API service runs a scheduled backend workflow that monit
 - **Primary storage**: DynamoDB table `subfootball_tracker`
 - **Primary consumers**: email subscribers on SNS topic `subfootball_tracker_api_page_content_updates`
 
+## User stories
+
+- As a subscriber, I want registration page changes detected automatically, so that I can respond when SUB Football updates important content.
+- As a maintainer, I want every poll result persisted as a snapshot, so that content history is complete for comparisons.
+- As a subscriber, I want notifications only when content actually changes, so that alert noise stays low.
+
 ## Features and scope boundaries
 
 ### In scope

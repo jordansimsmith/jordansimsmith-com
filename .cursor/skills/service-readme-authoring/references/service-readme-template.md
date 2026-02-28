@@ -8,6 +8,15 @@ Use this heading and opening sentence in every service README.
 Document at-a-glance context such as service type, interface, runtime/stack, primary dependencies, and primary consumers.
 Use this section in every service README.
 
+## User stories
+
+Capture 2-5 concise user stories as bullet points that describe the highest-value outcomes this service provides.
+Use this section in every service README.
+
+- As a <role>, I want <capability>, so that <outcome>.
+- As a <role>, I want <capability>, so that <outcome>.
+- As a <role>, I want <capability>, so that <outcome>.
+
 ## Features and scope boundaries
 
 Describe implemented capabilities and explicit boundaries for what the service does not do.

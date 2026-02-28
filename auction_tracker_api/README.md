@@ -10,6 +10,12 @@ The auction tracker API service runs scheduled backend workflows that scrape Tra
 - **Primary storage**: DynamoDB table `auction_tracker` with `gsi1` for duplicate checks
 - **Primary consumers**: email subscribers on SNS topic `auction_tracker_api_digest`
 
+## User stories
+
+- As a bargain hunter, I want Trade Me listings scraped automatically, so that I do not miss relevant new items.
+- As a digest subscriber, I want one daily deduplicated summary, so that I can review new listings quickly.
+- As a maintainer, I want duplicate detection per search and listing URL, so that persisted records and digests stay clean.
+
 ## Features and scope boundaries
 
 ### In scope

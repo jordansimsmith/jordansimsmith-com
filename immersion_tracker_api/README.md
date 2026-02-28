@@ -11,6 +11,12 @@ The immersion tracker API provides an authenticated backend for recording watche
 - **Primary client**: local sync script (`immersion_tracker_api/script/sync_episodes.py`)
 - **External metadata providers**: TVDB, YouTube Data API v3, Spotify Web API
 
+## User stories
+
+- As a language learner, I want to sync watched episodes, videos, podcasts, and movies, so that my immersion history is centralized.
+- As a sync-script user, I want idempotent ingestion behavior, so that reruns do not create duplicate records.
+- As a learner reviewing progress, I want consolidated totals and trends, so that I can track consistency over time.
+
 ## Features and scope boundaries
 
 ### In scope

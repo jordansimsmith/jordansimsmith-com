@@ -10,6 +10,12 @@ The personal website web service is a static single-page site that presents Jord
 - **Primary backend**: none (static content only)
 - **Primary users**: people viewing Jordan's profile and external links
 
+## User stories
+
+- As a visitor, I want a fast single-page profile overview, so that I can quickly understand who Jordan is.
+- As a visitor, I want direct links to key external profiles, so that I can explore work and background details.
+- As the site owner, I want simple static hosting on CloudFront and S3, so that the site stays easy to deploy and maintain.
+
 ## Features and scope boundaries
 
 ### In scope
