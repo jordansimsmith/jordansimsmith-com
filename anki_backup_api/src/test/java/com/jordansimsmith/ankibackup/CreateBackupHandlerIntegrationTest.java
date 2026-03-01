@@ -181,6 +181,89 @@ public class CreateBackupHandlerIntegrationTest {
   }
 
   @Test
+  void handleRequestShouldReturnSkippedWhenCompletedAtExactlyAtIntervalBoundary() throws Exception {
+    // arrange
+    var user = "alice";
+    var now = Instant.parse("2026-03-02T10:00:00Z");
+    fakeClock.setTime(now);
+
+    var boundaryItem = new AnkiBackupItem();
+    boundaryItem.setPk(AnkiBackupItem.formatPk(user));
+    boundaryItem.setSk(AnkiBackupItem.formatSk("boundary-backup"));
+    boundaryItem.setBackupId("boundary-backup");
+    boundaryItem.setStatus(AnkiBackupItem.STATUS_COMPLETED);
+    boundaryItem.setProfileId("japanese-main");
+    boundaryItem.setS3Bucket(CreateBackupHandler.BUCKET);
+    boundaryItem.setS3Key("users/alice/profiles/japanese-main/backups/2026/03/01/boundary.colpkg");
+    boundaryItem.setUploadId("upload-boundary");
+    boundaryItem.setPartSizeBytes(CreateBackupHandler.PART_SIZE_BYTES);
+    boundaryItem.setSizeBytes(1024L);
+    boundaryItem.setSha256("sha256boundary");
+    boundaryItem.setCreatedAt(now.minus(Duration.ofHours(25)));
+    boundaryItem.setCompletedAt(now.minus(Duration.ofHours(24)));
+    boundaryItem.setExpiresAt(now.plus(Duration.ofDays(90)).toString());
+    boundaryItem.setTtl(now.plus(Duration.ofDays(90)).getEpochSecond());
+    ankiBackupTable.putItem(boundaryItem);
+
+    var body =
+        objectMapper.writeValueAsString(
+            new CreateBackupHandler.CreateBackupRequest(
+                "japanese-main",
+                new CreateBackupHandler.Artifact("collection.colpkg", 1024L, "sha256new")));
+    var event = buildEvent(user, body);
+
+    // act
+    var res = createBackupHandler.handleRequest(event, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(200);
+    var tree = objectMapper.readTree(res.getBody());
+    assertThat(tree.get("status").asText()).isEqualTo("skipped");
+  }
+
+  @Test
+  void handleRequestShouldNotCreateNewItemsWhenSkipped() throws Exception {
+    // arrange
+    var user = "alice";
+    var now = Instant.parse("2026-03-01T10:00:00Z");
+    fakeClock.setTime(now);
+
+    var existingItem = new AnkiBackupItem();
+    existingItem.setPk(AnkiBackupItem.formatPk(user));
+    existingItem.setSk(AnkiBackupItem.formatSk("existing-backup"));
+    existingItem.setBackupId("existing-backup");
+    existingItem.setStatus(AnkiBackupItem.STATUS_COMPLETED);
+    existingItem.setProfileId("japanese-main");
+    existingItem.setS3Bucket(CreateBackupHandler.BUCKET);
+    existingItem.setS3Key("users/alice/profiles/japanese-main/backups/2026/03/01/existing.colpkg");
+    existingItem.setUploadId("upload-existing");
+    existingItem.setPartSizeBytes(CreateBackupHandler.PART_SIZE_BYTES);
+    existingItem.setSizeBytes(1024L);
+    existingItem.setSha256("sha256existing");
+    existingItem.setCreatedAt(now.minus(Duration.ofHours(2)));
+    existingItem.setCompletedAt(now.minus(Duration.ofHours(1)));
+    existingItem.setExpiresAt(now.plus(Duration.ofDays(90)).toString());
+    existingItem.setTtl(now.plus(Duration.ofDays(90)).getEpochSecond());
+    ankiBackupTable.putItem(existingItem);
+
+    var body =
+        objectMapper.writeValueAsString(
+            new CreateBackupHandler.CreateBackupRequest(
+                "japanese-main",
+                new CreateBackupHandler.Artifact("collection.colpkg", 1024L, "sha256new")));
+    var event = buildEvent(user, body);
+
+    // act
+    var res = createBackupHandler.handleRequest(event, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(200);
+    var items = ankiBackupTable.scan().items().stream().toList();
+    assertThat(items).hasSize(1);
+    assertThat(items.get(0).getBackupId()).isEqualTo("existing-backup");
+  }
+
+  @Test
   void handleRequestShouldProceedWhenDifferentUserHasRecentBackup() throws Exception {
     // arrange
     var now = Instant.parse("2026-03-01T10:00:00Z");

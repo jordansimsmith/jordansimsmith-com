@@ -180,4 +180,26 @@ public class GetBackupHandlerIntegrationTest {
     assertThat(backup.get("download_url").asText()).isNotEmpty();
     assertThat(backup.get("download_url_expires_at").asText()).isNotEmpty();
   }
+
+  @Test
+  void handleRequestShouldReturnCorrectDownloadUrlExpiryTimestamp() throws Exception {
+    // arrange
+    var now = Instant.parse("2026-03-01T12:00:00Z");
+    fakeClock.setTime(now);
+
+    createCompletedBackup(
+        "alice", "backup-expiry", now.minus(Duration.ofHours(2)), now.minus(Duration.ofHours(1)));
+
+    var event = buildEvent("alice", "backup-expiry");
+
+    // act
+    var res = getBackupHandler.handleRequest(event, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(200);
+    var tree = objectMapper.readTree(res.getBody());
+    var backup = tree.get("backup");
+    var expectedExpiry = now.plus(Duration.ofSeconds(GetBackupHandler.DOWNLOAD_URL_TTL_SECONDS));
+    assertThat(backup.get("download_url_expires_at").asText()).isEqualTo(expectedExpiry.toString());
+  }
 }

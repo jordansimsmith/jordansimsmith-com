@@ -20,6 +20,7 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
 
 @Testcontainers
 public class UpdateBackupHandlerIntegrationTest {
@@ -166,6 +167,34 @@ public class UpdateBackupHandlerIntegrationTest {
     assertThat(res.getStatusCode()).isEqualTo(400);
     var tree = objectMapper.readTree(res.getBody());
     assertThat(tree.get("message").asText()).isEqualTo("status must be COMPLETED");
+  }
+
+  @Test
+  void handleRequestShouldNotModifyBackupOfDifferentUserWhenRejected() throws Exception {
+    // arrange
+    var now = Instant.parse("2026-03-01T10:00:00Z");
+    fakeClock.setTime(now);
+
+    var createdAt = now.minus(Duration.ofMinutes(5));
+    createPendingBackup("bob", "backup-xyz", createdAt);
+
+    var body =
+        objectMapper.writeValueAsString(new UpdateBackupHandler.UpdateBackupRequest("COMPLETED"));
+    var event = buildEvent("alice", "backup-xyz", body);
+
+    // act
+    var res = updateBackupHandler.handleRequest(event, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(404);
+    var dbItem =
+        ankiBackupTable.getItem(
+            Key.builder()
+                .partitionValue(AnkiBackupItem.formatPk("bob"))
+                .sortValue(AnkiBackupItem.formatSk("backup-xyz"))
+                .build());
+    assertThat(dbItem.getStatus()).isEqualTo(AnkiBackupItem.STATUS_PENDING);
+    assertThat(dbItem.getCompletedAt()).isNull();
   }
 
   @Test
