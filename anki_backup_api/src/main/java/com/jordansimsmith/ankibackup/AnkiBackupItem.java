@@ -46,7 +46,7 @@ public class AnkiBackupItem {
   private String sha256;
   private Instant createdAt;
   private Instant completedAt;
-  private String expiresAt;
+  private Instant expiresAt;
   private Long ttl;
 
   @DynamoDbPartitionKey
@@ -171,11 +171,12 @@ public class AnkiBackupItem {
   }
 
   @DynamoDbAttribute(EXPIRES_AT)
-  public String getExpiresAt() {
+  @DynamoDbConvertedBy(EpochSecondConverter.class)
+  public Instant getExpiresAt() {
     return expiresAt;
   }
 
-  public void setExpiresAt(String expiresAt) {
+  public void setExpiresAt(Instant expiresAt) {
     this.expiresAt = expiresAt;
   }
 

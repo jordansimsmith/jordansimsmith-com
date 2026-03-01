@@ -84,7 +84,7 @@ public class CreateBackupHandlerIntegrationTest {
     existingItem.setSha256("abc123");
     existingItem.setCreatedAt(now.minus(Duration.ofHours(2)));
     existingItem.setCompletedAt(now.minus(Duration.ofHours(1)));
-    existingItem.setExpiresAt(now.plus(Duration.ofDays(90)).toString());
+    existingItem.setExpiresAt(now.plus(Duration.ofDays(90)));
     existingItem.setTtl(now.plus(Duration.ofDays(90)).getEpochSecond());
     ankiBackupTable.putItem(existingItem);
 
@@ -126,7 +126,7 @@ public class CreateBackupHandlerIntegrationTest {
     oldItem.setSha256("sha256old");
     oldItem.setCreatedAt(now.minus(Duration.ofHours(30)));
     oldItem.setCompletedAt(now.minus(Duration.ofHours(25)));
-    oldItem.setExpiresAt(now.plus(Duration.ofDays(90)).toString());
+    oldItem.setExpiresAt(now.plus(Duration.ofDays(90)));
     oldItem.setTtl(now.plus(Duration.ofDays(90)).getEpochSecond());
     ankiBackupTable.putItem(oldItem);
 
@@ -163,7 +163,7 @@ public class CreateBackupHandlerIntegrationTest {
     pendingItem.setSizeBytes(1024L);
     pendingItem.setSha256("sha256pending");
     pendingItem.setCreatedAt(now.minus(Duration.ofMinutes(30)));
-    pendingItem.setExpiresAt(now.plus(Duration.ofDays(90)).toString());
+    pendingItem.setExpiresAt(now.plus(Duration.ofDays(90)));
     pendingItem.setTtl(now.plus(Duration.ofDays(90)).getEpochSecond());
     ankiBackupTable.putItem(pendingItem);
 
@@ -201,7 +201,7 @@ public class CreateBackupHandlerIntegrationTest {
     boundaryItem.setSha256("sha256boundary");
     boundaryItem.setCreatedAt(now.minus(Duration.ofHours(25)));
     boundaryItem.setCompletedAt(now.minus(Duration.ofHours(24)));
-    boundaryItem.setExpiresAt(now.plus(Duration.ofDays(90)).toString());
+    boundaryItem.setExpiresAt(now.plus(Duration.ofDays(90)));
     boundaryItem.setTtl(now.plus(Duration.ofDays(90)).getEpochSecond());
     ankiBackupTable.putItem(boundaryItem);
 
@@ -242,7 +242,7 @@ public class CreateBackupHandlerIntegrationTest {
     existingItem.setSha256("sha256existing");
     existingItem.setCreatedAt(now.minus(Duration.ofHours(2)));
     existingItem.setCompletedAt(now.minus(Duration.ofHours(1)));
-    existingItem.setExpiresAt(now.plus(Duration.ofDays(90)).toString());
+    existingItem.setExpiresAt(now.plus(Duration.ofDays(90)));
     existingItem.setTtl(now.plus(Duration.ofDays(90)).getEpochSecond());
     ankiBackupTable.putItem(existingItem);
 
@@ -283,7 +283,7 @@ public class CreateBackupHandlerIntegrationTest {
     otherUserItem.setSha256("sha256bob");
     otherUserItem.setCreatedAt(now.minus(Duration.ofMinutes(30)));
     otherUserItem.setCompletedAt(now.minus(Duration.ofMinutes(20)));
-    otherUserItem.setExpiresAt(now.plus(Duration.ofDays(90)).toString());
+    otherUserItem.setExpiresAt(now.plus(Duration.ofDays(90)));
     otherUserItem.setTtl(now.plus(Duration.ofDays(90)).getEpochSecond());
     ankiBackupTable.putItem(otherUserItem);
 

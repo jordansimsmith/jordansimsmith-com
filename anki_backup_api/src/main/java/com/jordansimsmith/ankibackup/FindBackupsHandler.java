@@ -106,7 +106,7 @@ public class FindBackupsHandler
                         item.getCompletedAt() != null ? item.getCompletedAt().toString() : null,
                         item.getSizeBytes(),
                         item.getSha256(),
-                        item.getExpiresAt(),
+                        item.getExpiresAt().toString(),
                         null,
                         null))
             .toList();

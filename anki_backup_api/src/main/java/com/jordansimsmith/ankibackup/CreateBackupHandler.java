@@ -193,7 +193,7 @@ public class CreateBackupHandler
     item.setSizeBytes(body.artifact().sizeBytes());
     item.setSha256(body.artifact().sha256());
     item.setCreatedAt(createdAt);
-    item.setExpiresAt(expiresAt.toString());
+    item.setExpiresAt(expiresAt);
     item.setTtl(ttl);
     ankiBackupTable.putItem(item);
 

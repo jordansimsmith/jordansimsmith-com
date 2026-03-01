@@ -80,7 +80,7 @@ public class UpdateBackupHandlerIntegrationTest {
     item.setSizeBytes(1024L);
     item.setSha256("sha256hash");
     item.setCreatedAt(createdAt);
-    item.setExpiresAt(createdAt.plus(Duration.ofDays(90)).toString());
+    item.setExpiresAt(createdAt.plus(Duration.ofDays(90)));
     item.setTtl(createdAt.plus(Duration.ofDays(90)).getEpochSecond());
     ankiBackupTable.putItem(item);
     return item;

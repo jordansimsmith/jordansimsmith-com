@@ -118,7 +118,7 @@ public class GetBackupHandler
             item.getCompletedAt() != null ? item.getCompletedAt().toString() : null,
             item.getSizeBytes(),
             item.getSha256(),
-            item.getExpiresAt(),
+            item.getExpiresAt().toString(),
             presigned.url().toString(),
             downloadUrlExpiresAt.toString());
 

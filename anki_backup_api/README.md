@@ -253,7 +253,7 @@ Representative completed item:
   "sha256": "0f7a6f8f64028f5f2f1f5a9a2b745f9028ce8f5df5c9a2c7d61f73b05c5ce12b",
   "created_at": 1772360660,
   "completed_at": 1772360701,
-  "expires_at": "2026-05-30T10:25:01Z",
+  "expires_at": 1780136701,
   "ttl": 1780136701
 }
 ```
@@ -265,7 +265,7 @@ Representative completed item:
 - The service intentionally accepts a race window where concurrent eligible requests can create more than one backup in the same interval.
 - `POST /backups` creates a `PENDING` backup; only `PUT /backups/{backup_id}` with `status=COMPLETED` can finalize it.
 - Completed backups are immutable and can only disappear through retention expiry.
-- API timestamps are ISO-8601 UTC; DynamoDB operational timestamps use epoch seconds where defined by implementation fields.
+- API timestamps are ISO-8601 UTC; DynamoDB timestamps (`created_at`, `completed_at`, `expires_at`, `ttl`) use epoch seconds.
 - Retention is 90 days in both S3 lifecycle policy and DynamoDB TTL derivation.
 
 ## Source of truth

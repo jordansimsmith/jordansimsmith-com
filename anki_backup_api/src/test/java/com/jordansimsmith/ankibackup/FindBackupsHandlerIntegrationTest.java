@@ -76,7 +76,7 @@ public class FindBackupsHandlerIntegrationTest {
     item.setSha256("sha256-" + backupId);
     item.setCreatedAt(createdAt);
     item.setCompletedAt(completedAt);
-    item.setExpiresAt(createdAt.plus(Duration.ofDays(90)).toString());
+    item.setExpiresAt(createdAt.plus(Duration.ofDays(90)));
     item.setTtl(createdAt.plus(Duration.ofDays(90)).getEpochSecond());
     return item;
   }
@@ -124,6 +124,7 @@ public class FindBackupsHandlerIntegrationTest {
     assertThat(backup.get("size_bytes").asLong()).isEqualTo(534773760L);
     assertThat(backup.get("sha256").asText()).isEqualTo("sha256-backup-1");
     assertThat(backup.get("completed_at").isNull()).isFalse();
+    assertThat(backup.get("expires_at").asText()).isEqualTo(item.getExpiresAt().toString());
     assertThat(backup.get("download_url").isNull()).isTrue();
     assertThat(backup.get("download_url_expires_at").isNull()).isTrue();
   }
@@ -196,7 +197,7 @@ public class FindBackupsHandlerIntegrationTest {
     pending.setSizeBytes(1024L);
     pending.setSha256("sha256-pending");
     pending.setCreatedAt(now.minus(Duration.ofMinutes(10)));
-    pending.setExpiresAt(now.plus(Duration.ofDays(90)).toString());
+    pending.setExpiresAt(now.plus(Duration.ofDays(90)));
     pending.setTtl(now.plus(Duration.ofDays(90)).getEpochSecond());
     ankiBackupTable.putItem(pending);
 

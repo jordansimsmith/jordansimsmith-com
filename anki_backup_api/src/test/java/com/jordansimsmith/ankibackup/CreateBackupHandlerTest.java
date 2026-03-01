@@ -100,6 +100,18 @@ public class CreateBackupHandlerTest {
   }
 
   @Test
+  void expiresAtAndTtlShouldRepresentSameEpochSecondValue() {
+    // arrange
+    var createdAt = Instant.parse("2026-03-01T10:23:01Z");
+    var expiresAt = createdAt.plus(Duration.ofDays(CreateBackupHandler.RETENTION_DAYS));
+    var ttl = expiresAt.getEpochSecond();
+
+    // act + assert
+    assertThat(expiresAt.getEpochSecond()).isEqualTo(ttl);
+    assertThat(Instant.ofEpochSecond(ttl)).isEqualTo(expiresAt);
+  }
+
+  @Test
   void s3KeyShouldFollowExpectedFormat() {
     // arrange
     var user = "alice";

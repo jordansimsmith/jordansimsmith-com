@@ -79,7 +79,7 @@ public class GetBackupHandlerIntegrationTest {
     item.setSha256("sha256-" + backupId);
     item.setCreatedAt(createdAt);
     item.setCompletedAt(completedAt);
-    item.setExpiresAt(createdAt.plus(Duration.ofDays(90)).toString());
+    item.setExpiresAt(createdAt.plus(Duration.ofDays(90)));
     item.setTtl(createdAt.plus(Duration.ofDays(90)).getEpochSecond());
     ankiBackupTable.putItem(item);
     return item;
@@ -138,7 +138,7 @@ public class GetBackupHandlerIntegrationTest {
     pending.setSizeBytes(1024L);
     pending.setSha256("sha256-pending");
     pending.setCreatedAt(now.minus(Duration.ofMinutes(10)));
-    pending.setExpiresAt(now.plus(Duration.ofDays(90)).toString());
+    pending.setExpiresAt(now.plus(Duration.ofDays(90)));
     pending.setTtl(now.plus(Duration.ofDays(90)).getEpochSecond());
     ankiBackupTable.putItem(pending);
 
