@@ -1,0 +1,340 @@
+load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
+load("@rules_java//java:defs.bzl", "java_binary", "java_library")
+load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
+load("@rules_pkg//:pkg.bzl", "pkg_tar")
+
+HANDLERS = glob(["src/main/java/**/*Handler.java"])
+
+INTEGRATION_TESTS = glob(
+    ["src/test/java/**/*IntegrationTest.java"],
+    allow_empty = True,
+)
+
+E2E_TESTS = glob(
+    ["src/test/java/**/*E2ETest.java"],
+    allow_empty = True,
+)
+
+UNIT_TESTS = glob(
+    ["src/test/java/**/*Test.java"],
+    allow_empty = True,
+    exclude = INTEGRATION_TESTS + E2E_TESTS,
+)
+
+java_library(
+    name = "lib",
+    srcs = glob(
+        ["src/main/java/**/*.java"],
+        exclude = HANDLERS,
+    ),
+    deps = [
+        "//lib/dynamodb:lib",
+        "//lib/http:lib",
+        "//lib/json:lib",
+        "//lib/secrets:lib",
+        "//lib/time:lib",
+        "//third_party/dagger",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_s3",
+    ],
+)
+
+java_binary(
+    name = "auth-handler",
+    srcs = ["src/main/java/com/jordansimsmith/ankibackup/AuthHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/secrets:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_iam_policy_builder",
+    ],
+)
+
+java_binary(
+    name = "create-backup-handler",
+    srcs = ["src/main/java/com/jordansimsmith/ankibackup/CreateBackupHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "//lib/time:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_s3",
+    ],
+)
+
+java_binary(
+    name = "update-backup-handler",
+    srcs = ["src/main/java/com/jordansimsmith/ankibackup/UpdateBackupHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "//lib/time:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_s3",
+    ],
+)
+
+java_binary(
+    name = "find-backups-handler",
+    srcs = ["src/main/java/com/jordansimsmith/ankibackup/FindBackupsHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "get-backup-handler",
+    srcs = ["src/main/java/com/jordansimsmith/ankibackup/GetBackupHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_s3",
+    ],
+)
+
+java_library(
+    name = "test-lib",
+    testonly = True,
+    srcs = glob(
+        ["src/test/java/**/*.java"],
+        exclude = INTEGRATION_TESTS + E2E_TESTS + UNIT_TESTS,
+    ),
+    data = [
+        ":local-load",
+    ],
+    resources = [
+        "src/test/resources/logback-test.xml",
+        "src/test/resources/test.properties",
+    ],
+    deps = [
+        ":lib",
+        "//lib/dynamodb:test-lib",
+        "//lib/http:lib",
+        "//lib/http:test-lib",
+        "//lib/json:lib",
+        "//lib/localstack:lib",
+        "//lib/secrets:test-lib",
+        "//lib/testcontainers:test-lib",
+        "//lib/time:test-lib",
+        "//third_party/dagger",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_testcontainers_testcontainers",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_s3",
+    ],
+)
+
+java_test_suite(
+    name = "unit-tests",
+    size = "small",
+    srcs = UNIT_TESTS,
+    resources = [
+        "src/test/resources/logback-test.xml",
+    ],
+    runner = "junit5",
+    test_suffixes = ["Test.java"],
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        ":lib",
+        ":test-lib",
+        "//lib/secrets:lib",
+        "//lib/secrets:test-lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_mockito_mockito_core",
+        "@maven//:org_slf4j_slf4j_api",
+    ],
+)
+
+java_test_suite(
+    name = "integration-tests",
+    size = "medium",
+    srcs = INTEGRATION_TESTS,
+    env = {
+        "AWS_ACCESS_KEY_ID": "fake",
+        "AWS_SECRET_ACCESS_KEY": "fake",
+        "AWS_REGION": "ap-southeast-2",
+    },
+    resources = [
+        "src/test/resources/logback-test.xml",
+    ],
+    runner = "junit5",
+    test_suffixes = ["IntegrationTest.java"],
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        ":auth-handler",
+        ":create-backup-handler",
+        ":find-backups-handler",
+        ":get-backup-handler",
+        ":lib",
+        ":test-lib",
+        ":update-backup-handler",
+        "//lib/dynamodb:test-lib",
+        "//lib/http:lib",
+        "//lib/json:lib",
+        "//lib/secrets:test-lib",
+        "//lib/testcontainers:test-lib",
+        "//lib/time:test-lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_iam_policy_builder",
+        "@maven//:software_amazon_awssdk_s3",
+    ],
+)
+
+pkg_tar(
+    name = "local-handlers.tar",
+    testonly = True,
+    srcs = [
+        ":create-backup-handler_deploy.jar",
+        ":find-backups-handler_deploy.jar",
+        ":get-backup-handler_deploy.jar",
+        ":update-backup-handler_deploy.jar",
+    ],
+    package_dir = "/opt/code/localstack/",
+)
+
+pkg_tar(
+    name = "local-init-resources.tar",
+    testonly = True,
+    srcs = ["src/test/resources/init_resources.py"],
+    package_dir = "/etc/localstack/init/ready.d/",
+)
+
+oci_image(
+    name = "local-image",
+    testonly = True,
+    base = "@localstack//:localstack",
+    env = {
+        "LOCALSTACK_LAMBDA_IGNORE_ARCHITECTURE": 1,
+        "LOCALSTACK_LAMBDA_KEEPALIVE_MS": 0,
+    },
+    tars = [
+        ":local-init-resources.tar",
+        ":local-handlers.tar",
+    ],
+)
+
+oci_load(
+    name = "local-load",
+    testonly = True,
+    image = ":local-image",
+    repo_tags = [
+        "bazel/anki-backup-local:latest",
+    ],
+)
+
+java_test_suite(
+    name = "e2e-tests",
+    size = "medium",
+    srcs = E2E_TESTS,
+    env = {
+        "AWS_ACCESS_KEY_ID": "fake",
+        "AWS_SECRET_ACCESS_KEY": "fake",
+        "AWS_REGION": "ap-southeast-2",
+        "ANKI_BACKUP_USER": "alice",
+        "ANKI_BACKUP_PASSWORD": "password",
+    },
+    resources = [
+        "src/test/resources/logback-test.xml",
+    ],
+    runner = "junit5",
+    test_suffixes = ["E2ETest.java"],
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        ":lib",
+        ":test-lib",
+        "//lib/dynamodb:test-lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:org_testcontainers_testcontainers",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_s3",
+    ],
+)
