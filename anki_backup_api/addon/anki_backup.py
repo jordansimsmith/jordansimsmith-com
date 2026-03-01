@@ -205,10 +205,116 @@ def _upload_and_complete(client, colpkg_path, backup_id, upload):
     toast_success("backup completed successfully")
 
 
+# -- restore discovery --
+
+
+def _format_backup_line(backup):
+    created = backup.get("created_at", "unknown")
+    profile = backup.get("profile_id", "unknown")
+    size_mb = backup.get("size_bytes", 0) / (1024 * 1024)
+    return f"{created}  |  {profile}  |  {size_mb:.1f} MB"
+
+
+def _get_download_url(client, backup_id):
+    result = client.get_backup(backup_id)
+    backup = result["backup"]
+    return backup["download_url"], backup["download_url_expires_at"]
+
+
+def show_backup_history():
+    if not ANKI_BACKUP_USER or not ANKI_BACKUP_PASSWORD:
+        toast_error("credentials not configured")
+        return
+
+    try:
+        client = AnkiBackupClient(
+            ANKI_BACKUP_API_URL, ANKI_BACKUP_USER, ANKI_BACKUP_PASSWORD
+        )
+        result = client.find_backups()
+        backups = result.get("backups", [])
+
+        if not backups:
+            toast_info("no backups available")
+            return
+
+        _show_backup_list_dialog(client, backups)
+    except Exception as e:
+        toast_error(str(e))
+
+
+def _show_backup_list_dialog(client, backups):
+    import webbrowser
+
+    from aqt import mw
+    from aqt.qt import (
+        QDialog,
+        QHBoxLayout,
+        QLabel,
+        QListWidget,
+        QPushButton,
+        QVBoxLayout,
+    )
+
+    dialog = QDialog(mw)
+    dialog.setWindowTitle("Anki Backup - Restore History")
+    dialog.setMinimumWidth(500)
+    dialog.setMinimumHeight(400)
+
+    layout = QVBoxLayout()
+    layout.addWidget(QLabel("Select a backup to download for manual restore:"))
+
+    list_widget = QListWidget()
+    for backup in backups:
+        list_widget.addItem(_format_backup_line(backup))
+    layout.addWidget(list_widget)
+    list_widget.setCurrentRow(0)
+
+    instructions = QLabel(
+        "To restore: download the .colpkg file, then use "
+        "File > Import in Anki to restore the collection."
+    )
+    instructions.setWordWrap(True)
+    layout.addWidget(instructions)
+
+    button_layout = QHBoxLayout()
+    download_btn = QPushButton("Download Backup")
+    close_btn = QPushButton("Close")
+    button_layout.addWidget(download_btn)
+    button_layout.addWidget(close_btn)
+    layout.addLayout(button_layout)
+
+    def on_download():
+        row = list_widget.currentRow()
+        if row < 0:
+            toast_info("select a backup first")
+            return
+        backup_id = backups[row]["backup_id"]
+        try:
+            url, expires_at = _get_download_url(client, backup_id)
+            webbrowser.open(url)
+            toast_success(f"download opened in browser (link expires {expires_at})")
+        except Exception as e:
+            toast_error(str(e))
+
+    download_btn.clicked.connect(on_download)
+    close_btn.clicked.connect(dialog.close)
+
+    dialog.setLayout(layout)
+    dialog.exec()
+
+
 try:
-    from aqt import gui_hooks
+    from aqt import gui_hooks, mw
+    from aqt.qt import QAction
 
     gui_hooks.sync_did_finish.append(on_sync_did_finish)
+
+    def _setup_menu():
+        action = QAction("Anki Backup History...", mw)
+        action.triggered.connect(show_backup_history)
+        mw.form.menuTools.addAction(action)
+
+    gui_hooks.profile_did_open.append(_setup_menu)
 except ImportError:
     pass
 
@@ -349,12 +455,69 @@ if __name__ == "__main__":
                 self.send_response(200)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
-                self.wfile.write(json.dumps({"backups": []}).encode())
+                self.wfile.write(
+                    json.dumps(
+                        {
+                            "backups": [
+                                {
+                                    "backup_id": "backup-001",
+                                    "profile_id": "main",
+                                    "status": "COMPLETED",
+                                    "created_at": "2026-03-01T10:00:00Z",
+                                    "completed_at": "2026-03-01T10:01:00Z",
+                                    "size_bytes": 534773760,
+                                    "sha256": "abc123",
+                                    "expires_at": "2026-05-30T10:00:00Z",
+                                    "download_url": None,
+                                    "download_url_expires_at": None,
+                                },
+                                {
+                                    "backup_id": "backup-002",
+                                    "profile_id": "japanese",
+                                    "status": "COMPLETED",
+                                    "created_at": "2026-02-28T10:00:00Z",
+                                    "completed_at": "2026-02-28T10:01:00Z",
+                                    "size_bytes": 104857600,
+                                    "sha256": "def456",
+                                    "expires_at": "2026-05-29T10:00:00Z",
+                                    "download_url": None,
+                                    "download_url_expires_at": None,
+                                },
+                            ]
+                        }
+                    ).encode()
+                )
             elif self.path.startswith("/backups/"):
-                self.send_response(404)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"message": "backup not found"}).encode())
+                backup_id = self.path.split("/")[-1]
+                if backup_id == "nonexistent-id":
+                    self.send_response(404)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(
+                        json.dumps({"message": "backup not found"}).encode()
+                    )
+                else:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(
+                        json.dumps(
+                            {
+                                "backup": {
+                                    "backup_id": backup_id,
+                                    "profile_id": "main",
+                                    "status": "COMPLETED",
+                                    "created_at": "2026-03-01T10:00:00Z",
+                                    "completed_at": "2026-03-01T10:01:00Z",
+                                    "size_bytes": 534773760,
+                                    "sha256": "abc123",
+                                    "expires_at": "2026-05-30T10:00:00Z",
+                                    "download_url": f"http://127.0.0.1:{port}/s3/download/{backup_id}",
+                                    "download_url_expires_at": "2026-03-01T11:00:00Z",
+                                }
+                            }
+                        ).encode()
+                    )
 
         def log_message(self, format, *args):
             pass
@@ -381,8 +544,12 @@ if __name__ == "__main__":
 
     # test successful find_backups
     result = test_client.find_backups()
-    assert result["backups"] == [], f"expected empty list, got {result}"
-    print("[pass] find_backups API call (empty list)")
+    assert len(result["backups"]) == 2, (
+        f"expected 2 backups, got {len(result['backups'])}"
+    )
+    assert result["backups"][0]["backup_id"] == "backup-001"
+    assert result["backups"][1]["backup_id"] == "backup-002"
+    print("[pass] find_backups API call (2 backups returned)")
 
     # test error handling (404 on get_backup)
     try:
@@ -526,6 +693,67 @@ if __name__ == "__main__":
     assert len(caught_error) == 1, f"expected 1 error toast, got {len(caught_error)}"
     assert not os.path.exists(fail_colpkg), "temp colpkg not cleaned up after failure"
     print("[pass] on_sync_did_finish (upload failure shows error toast + cleanup)")
+
+    # test _format_backup_line
+    line = anki_backup._format_backup_line(
+        {
+            "created_at": "2026-03-01T10:00:00Z",
+            "profile_id": "main",
+            "size_bytes": 534773760,
+        }
+    )
+    assert "2026-03-01T10:00:00Z" in line, f"missing created_at in: {line}"
+    assert "main" in line, f"missing profile_id in: {line}"
+    assert "509.9 MB" in line or "510.0 MB" in line, f"missing size in: {line}"
+    print("[pass] _format_backup_line (formats backup display line)")
+
+    # test _get_download_url
+    anki_backup.ANKI_BACKUP_USER = "alice"
+    anki_backup.ANKI_BACKUP_PASSWORD = "password"
+    anki_backup.ANKI_BACKUP_API_URL = f"http://127.0.0.1:{port}"
+
+    dl_client = AnkiBackupClient(f"http://127.0.0.1:{port}", "alice", "password")
+    url, expires = anki_backup._get_download_url(dl_client, "backup-001")
+    assert "backup-001" in url, f"download URL missing backup id: {url}"
+    assert expires == "2026-03-01T11:00:00Z", f"unexpected expires_at: {expires}"
+    print("[pass] _get_download_url (fetches download URL and expiry)")
+
+    # test show_backup_history with no credentials
+    anki_backup.ANKI_BACKUP_USER = ""
+    anki_backup.ANKI_BACKUP_PASSWORD = ""
+    error_toasts = []
+    with unittest.mock.patch(
+        "anki_backup.toast_error", side_effect=lambda m: error_toasts.append(m)
+    ):
+        anki_backup.show_backup_history()
+    assert len(error_toasts) == 1
+    assert "credentials not configured" in error_toasts[0]
+    print("[pass] show_backup_history (no-op when credentials empty)")
+
+    # test show_backup_history with backups (mocks Qt dialog)
+    anki_backup.ANKI_BACKUP_USER = "alice"
+    anki_backup.ANKI_BACKUP_PASSWORD = "password"
+
+    dialog_backups = []
+
+    def mock_show_dialog(client, backups):
+        dialog_backups.extend(backups)
+
+    with unittest.mock.patch(
+        "anki_backup._show_backup_list_dialog", side_effect=mock_show_dialog
+    ):
+        anki_backup.show_backup_history()
+
+    assert len(dialog_backups) == 2
+    assert dialog_backups[0]["backup_id"] == "backup-001"
+    assert dialog_backups[1]["backup_id"] == "backup-002"
+    print("[pass] show_backup_history (fetches backups and opens dialog)")
+
+    # test get_backup success via client
+    result = test_client.get_backup("backup-001")
+    assert result["backup"]["download_url"] is not None
+    assert result["backup"]["download_url_expires_at"] == "2026-03-01T11:00:00Z"
+    print("[pass] get_backup API call (returns download URL)")
 
     anki_backup.ANKI_BACKUP_USER = original_user
     anki_backup.ANKI_BACKUP_PASSWORD = original_password
