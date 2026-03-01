@@ -9,7 +9,7 @@ The Anki backup API provides an authenticated backend for creating immutable, ve
 - **Runtime**: AWS Lambda (Java 21)
 - **Primary storage**: DynamoDB table `anki_backup` + S3 bucket `anki-backup.jordansimsmith.com`
 - **Auth model**: HTTP Basic via API Gateway custom authorizer backed by Secrets Manager
-- **Primary client**: desktop Anki add-on that runs after successful sync events
+- **Primary client**: desktop Anki add-on that runs after sync events
 - **v1 user profile**: single personal user, with multi-user partitioning path built into key design
 
 ## User stories
@@ -23,7 +23,7 @@ The Anki backup API provides an authenticated backend for creating immutable, ve
 ### In scope
 
 - Authenticate every API route with HTTP Basic credentials validated by a custom API Gateway authorizer.
-- Let the add-on attempt backup after every successful desktop sync while the server enforces frequency gating.
+- Let the add-on attempt backup after every desktop sync while the server enforces frequency gating.
 - Create backup artifacts as full `.colpkg` packages (collection database plus media files).
 - Use S3 multipart upload only, with `64 MB` part size and server-driven completion.
 - Persist backup metadata in DynamoDB with per-user partitioning and immutable completed records.
@@ -43,7 +43,7 @@ The Anki backup API provides an authenticated backend for creating immutable, ve
 
 ```mermaid
 flowchart TD
-  anki[Anki desktop sync success] --> addon[Backup add-on]
+  anki[Anki desktop sync] --> addon[Backup add-on]
   addon -->|POST /backups| gateway[API Gateway]
   gateway --> auth[AuthHandler Lambda]
   gateway --> create[CreateBackup Lambda]
@@ -69,7 +69,7 @@ sequenceDiagram
   participant D as DynamoDB
   participant S as S3
 
-  A->>C: sync succeeds
+  A->>C: sync completes
   C->>G: POST /backups (profile + artifact metadata)
   G->>D: query completed backups in interval window
   alt completed backup exists in interval
@@ -91,7 +91,7 @@ sequenceDiagram
 
 ## Main technical decisions
 
-- Server-side frequency gating is authoritative; the add-on always attempts after successful sync and the API decides `ready` vs `skipped`.
+- Server-side frequency gating is authoritative; the add-on always attempts after sync and the API decides `ready` vs `skipped`.
 - Multipart upload is required in v1 to support large backups and part-level retry behavior without redesigning later.
 - Eligibility is query-based over completed backups within a configured interval (default 24 hours), with accepted race conditions that can allow occasional extra backups.
 - Completed backups are immutable and retention-driven; deletion occurs only through retention expiry policies.
@@ -109,7 +109,7 @@ sequenceDiagram
 
 ### External systems
 
-- **Anki desktop add-on**: client calls API after sync success with required `profile_id` and `artifact` fields (`filename`, `size_bytes`, `sha256`). On `status=ready`, it uploads all parts to S3 using presigned URLs and then completes via `PUT /backups/{backup_id}`; on `status=skipped`, it stops without upload. Failures are surfaced as local toasts and retried only on the next eligible sync event.
+- **Anki desktop add-on**: client calls API after sync completion with required `profile_id` and `artifact` fields (`filename`, `size_bytes`, `sha256`). On `status=ready`, it uploads all parts to S3 using presigned URLs and then completes via `PUT /backups/{backup_id}`; on `status=skipped`, it stops without upload. Failures are surfaced as local toasts and retried only on the next sync event.
 - **Amazon S3 (`anki-backup.jordansimsmith.com`)**: stores immutable `.colpkg` objects at per-user/per-profile keys. Required upload metadata includes object key, upload ID, part numbers, and ETags resolved during completion. Lifecycle policy expires objects after 90 days and aborts incomplete multipart uploads after 1 day.
 
 ## API contracts
@@ -260,7 +260,7 @@ Representative completed item:
 
 ## Behavioral invariants and time semantics
 
-- The add-on attempts backup after each successful sync; the server alone determines whether a new backup is allowed.
+- The add-on attempts backup after each sync; the server alone determines whether a new backup is allowed.
 - The backup interval default is 24 hours and is evaluated against completed backups only.
 - The service intentionally accepts a race window where concurrent eligible requests can create more than one backup in the same interval.
 - `POST /backups` creates a `PENDING` backup; only `PUT /backups/{backup_id}` with `status=COMPLETED` can finalize it.
@@ -337,6 +337,7 @@ None in current scope. The service uses fixed v1 constants that match repository
 
 - Build service targets: `bazel build //anki_backup_api:all`
 - Run tests: `bazel test //anki_backup_api:all`
+- Run add-on smoke tests: `python3 anki_backup_api/addon/anki_backup.py`
 - Fast API smoke flow against a local stack:
   - call `POST /backups` with valid Basic auth and artifact metadata
   - if response is `ready`, upload at least one part using returned URL
@@ -348,16 +349,16 @@ None in current scope. The service uses fixed v1 constants that match repository
 
 ### Scenario 1: automatic backup after desktop sync
 
-1. User completes Anki sync on desktop.
-2. Add-on derives active `profile_id`, exports `.colpkg` with media, computes artifact metadata, and calls `POST /backups`.
+1. User completes Anki sync on desktop, triggering the `sync_did_finish` hook.
+2. Add-on derives active `profile_id`, exports `.colpkg` with media, computes artifact metadata (`filename`, `size_bytes`, `sha256`), and calls `POST /backups`.
 3. API either returns `status=skipped` (already backed up in interval) or `status=ready` with presigned part URLs.
 4. On `ready`, add-on uploads all parts to S3 and calls `PUT /backups/{backup_id}` with `status=COMPLETED`.
 5. API finalizes multipart upload, marks backup completed in DynamoDB, and add-on shows success toast.
 
 ### Scenario 2: restore from a historical backup
 
-1. User requests backup history from the add-on.
-2. Add-on calls `GET /backups` and displays completed backups within retention window.
-3. User selects a backup; add-on calls `GET /backups/{backup_id}` and receives a short-lived `download_url`.
-4. User downloads the `.colpkg` and performs the standard manual Anki restore/import flow.
+1. User opens Tools > Anki Backup History in the desktop application.
+2. Add-on calls `GET /backups` and displays completed backups within retention window in a dialog.
+3. User selects a backup and clicks Download; add-on calls `GET /backups/{backup_id}` and opens the short-lived `download_url` in the system browser.
+4. User downloads the `.colpkg` and performs the standard manual Anki restore flow via File > Import.
 5. User resumes normal sync behavior, and future backups continue under the same interval and retention rules.
