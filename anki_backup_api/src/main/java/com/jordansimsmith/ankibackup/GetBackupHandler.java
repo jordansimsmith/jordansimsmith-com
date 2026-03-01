@@ -8,11 +8,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
+import com.jordansimsmith.time.Clock;
+import java.time.Duration;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 public class GetBackupHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
@@ -22,6 +27,7 @@ public class GetBackupHandler
   @VisibleForTesting static final String BUCKET = "anki-backup.jordansimsmith.com";
   @VisibleForTesting static final int DOWNLOAD_URL_TTL_SECONDS = 3600;
 
+  private final Clock clock;
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<AnkiBackupItem> ankiBackupTable;
@@ -43,12 +49,16 @@ public class GetBackupHandler
       @Nullable @JsonProperty("download_url") String downloadUrl,
       @Nullable @JsonProperty("download_url_expires_at") String downloadUrlExpiresAt) {}
 
+  @VisibleForTesting
+  record ErrorResponse(@JsonProperty("message") String message) {}
+
   public GetBackupHandler() {
     this(AnkiBackupFactory.create());
   }
 
   @VisibleForTesting
   GetBackupHandler(AnkiBackupFactory factory) {
+    this.clock = factory.clock();
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.ankiBackupTable = factory.ankiBackupTable();
@@ -67,6 +77,51 @@ public class GetBackupHandler
 
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event, Context context)
       throws Exception {
-    throw new UnsupportedOperationException("Not yet implemented");
+    var user = requestContextFactory.createCtx(event).user();
+    var backupId = event.getPathParameters().get("backup_id");
+
+    var key =
+        Key.builder()
+            .partitionValue(AnkiBackupItem.formatPk(user))
+            .sortValue(AnkiBackupItem.formatSk(backupId))
+            .build();
+    var item = ankiBackupTable.getItem(key);
+
+    if (item == null) {
+      return httpResponseFactory.notFound(new ErrorResponse("backup not found"));
+    }
+
+    if (!AnkiBackupItem.STATUS_COMPLETED.equals(item.getStatus())) {
+      return httpResponseFactory.badRequest(new ErrorResponse("backup not completed"));
+    }
+
+    var downloadUrlDuration = Duration.ofSeconds(DOWNLOAD_URL_TTL_SECONDS);
+    var presigned =
+        s3Presigner.presignGetObject(
+            GetObjectPresignRequest.builder()
+                .signatureDuration(downloadUrlDuration)
+                .getObjectRequest(
+                    GetObjectRequest.builder()
+                        .bucket(item.getS3Bucket())
+                        .key(item.getS3Key())
+                        .build())
+                .build());
+
+    var downloadUrlExpiresAt = clock.now().plus(downloadUrlDuration);
+
+    var backupResponse =
+        new BackupResponse(
+            item.getBackupId(),
+            item.getProfileId(),
+            item.getStatus(),
+            item.getCreatedAt().toString(),
+            item.getCompletedAt() != null ? item.getCompletedAt().toString() : null,
+            item.getSizeBytes(),
+            item.getSha256(),
+            item.getExpiresAt(),
+            presigned.url().toString(),
+            downloadUrlExpiresAt.toString());
+
+    return httpResponseFactory.ok(new GetBackupResponse(backupResponse));
   }
 }
