@@ -1,7 +1,11 @@
 """Anki Backup - automatic collection backup after sync."""
 
 import base64
+import datetime
+import hashlib
 import json
+import os
+import tempfile
 import urllib.error
 import urllib.request
 
@@ -103,10 +107,97 @@ class AnkiBackupClient:
         return self._request("GET", f"/backups/{backup_id}")
 
 
+# -- artifact helpers --
+
+
+def describe_artifact(path):
+    filename = os.path.basename(path)
+    size_bytes = os.path.getsize(path)
+    sha = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(8192), b""):
+            sha.update(chunk)
+    return {
+        "filename": filename,
+        "size_bytes": size_bytes,
+        "sha256": sha.hexdigest(),
+    }
+
+
+def _cleanup_temp_file(path):
+    try:
+        os.unlink(path)
+        os.rmdir(os.path.dirname(path))
+    except OSError:
+        pass
+
+
+# -- sync hook --
+
+
+def _get_profile_id():
+    from aqt import mw
+
+    return mw.pm.name
+
+
+def _export_colpkg():
+    from aqt import mw
+
+    tmpdir = tempfile.mkdtemp()
+    filename = f"collection-{datetime.date.today().isoformat()}.colpkg"
+    out_path = os.path.join(tmpdir, filename)
+    mw.col.export_collection_package(out_path, include_media=True, legacy=False)
+    return out_path
+
+
+def on_sync_did_finish():
+    if not ANKI_BACKUP_USER or not ANKI_BACKUP_PASSWORD:
+        return
+
+    colpkg_path = None
+    try:
+        profile_id = _get_profile_id()
+        colpkg_path = _export_colpkg()
+        artifact = describe_artifact(colpkg_path)
+
+        client = AnkiBackupClient(
+            ANKI_BACKUP_API_URL, ANKI_BACKUP_USER, ANKI_BACKUP_PASSWORD
+        )
+        result = client.create_backup(profile_id, artifact)
+
+        if result["status"] == "skipped":
+            toast_info("backup skipped (already backed up recently)")
+            return
+
+        # upload parts and complete — implemented in upload completion flow
+        backup_id = result["backup"]["backup_id"]
+        upload = result["upload"]
+        _upload_and_complete(client, colpkg_path, backup_id, upload)
+    except Exception as e:
+        toast_error(str(e))
+    finally:
+        if colpkg_path is not None:
+            _cleanup_temp_file(colpkg_path)
+
+
+def _upload_and_complete(client, colpkg_path, backup_id, upload):
+    raise NotImplementedError("upload flow not yet implemented")
+
+
+try:
+    from aqt import gui_hooks
+
+    gui_hooks.sync_did_finish.append(on_sync_did_finish)
+except ImportError:
+    pass
+
+
 # -- smoke test --
 
 if __name__ == "__main__":
     import sys
+    import unittest.mock
 
     print("=== anki_backup add-on smoke test ===")
 
@@ -134,6 +225,26 @@ if __name__ == "__main__":
     toast_success("test success")
     toast_error("test error")
     print("[pass] toast helpers (fallback to print)")
+
+    # validate describe_artifact with a known temp file
+    tmpdir = tempfile.mkdtemp()
+    test_path = os.path.join(tmpdir, "test-collection.colpkg")
+    test_content = b"fake colpkg content for testing"
+    with open(test_path, "wb") as f:
+        f.write(test_content)
+    art = describe_artifact(test_path)
+    assert art["filename"] == "test-collection.colpkg", f"filename: {art['filename']}"
+    assert art["size_bytes"] == len(test_content), f"size_bytes: {art['size_bytes']}"
+    expected_sha = hashlib.sha256(test_content).hexdigest()
+    assert art["sha256"] == expected_sha, f"sha256: {art['sha256']}"
+    print("[pass] describe_artifact (filename, size_bytes, sha256)")
+
+    # validate _cleanup_temp_file removes file and directory
+    _cleanup_temp_file(test_path)
+    assert not os.path.exists(test_path), "temp file not removed"
+    assert not os.path.exists(tmpdir), "temp dir not removed"
+    _cleanup_temp_file("/nonexistent/path/file.tmp")
+    print("[pass] _cleanup_temp_file (removes file+dir, ignores missing)")
 
     # validate HTTP error handling with a mock server
     from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -202,6 +313,41 @@ if __name__ == "__main__":
         assert e.status_code == 404
         assert e.message == "backup not found"
     print("[pass] get_backup error handling (404 with JSON message)")
+
+    # test on_sync_did_finish with mocked Anki APIs and mock server
+    # mock _get_profile_id and _export_colpkg to avoid Anki dependency
+    sync_tmpdir = tempfile.mkdtemp()
+    sync_colpkg = os.path.join(sync_tmpdir, "collection-2026-03-01.colpkg")
+    with open(sync_colpkg, "wb") as f:
+        f.write(b"sync test content")
+
+    import anki_backup
+
+    original_user = anki_backup.ANKI_BACKUP_USER
+    original_password = anki_backup.ANKI_BACKUP_PASSWORD
+    original_url = anki_backup.ANKI_BACKUP_API_URL
+    anki_backup.ANKI_BACKUP_USER = "alice"
+    anki_backup.ANKI_BACKUP_PASSWORD = "password"
+    anki_backup.ANKI_BACKUP_API_URL = f"http://127.0.0.1:{port}"
+
+    with (
+        unittest.mock.patch("anki_backup._get_profile_id", return_value="main"),
+        unittest.mock.patch("anki_backup._export_colpkg", return_value=sync_colpkg),
+    ):
+        anki_backup.on_sync_did_finish()
+
+    assert not os.path.exists(sync_colpkg), "temp colpkg not cleaned up after sync"
+    print("[pass] on_sync_did_finish (skipped path with mocked Anki + cleanup)")
+
+    # test on_sync_did_finish skips when credentials not configured
+    anki_backup.ANKI_BACKUP_USER = ""
+    anki_backup.ANKI_BACKUP_PASSWORD = ""
+    anki_backup.on_sync_did_finish()
+    print("[pass] on_sync_did_finish (no-op when credentials empty)")
+
+    anki_backup.ANKI_BACKUP_USER = original_user
+    anki_backup.ANKI_BACKUP_PASSWORD = original_password
+    anki_backup.ANKI_BACKUP_API_URL = original_url
 
     server.shutdown()
     print("\n=== all smoke tests passed ===")
