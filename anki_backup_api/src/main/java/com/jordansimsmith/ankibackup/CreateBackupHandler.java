@@ -167,7 +167,6 @@ public class CreateBackupHandler
     var backupId = UUID.randomUUID().toString();
     var createdAt = now;
     var expiresAt = createdAt.plus(Duration.ofDays(RETENTION_DAYS));
-    var ttl = expiresAt.getEpochSecond();
 
     var datePrefix =
         DateTimeFormatter.ofPattern("yyyy/MM/dd").withZone(ZoneOffset.UTC).format(createdAt);
@@ -180,21 +179,19 @@ public class CreateBackupHandler
             CreateMultipartUploadRequest.builder().bucket(BUCKET).key(s3Key).build());
     var uploadId = multipartUpload.uploadId();
 
-    var item = new AnkiBackupItem();
-    item.setPk(AnkiBackupItem.formatPk(user));
-    item.setSk(AnkiBackupItem.formatSk(backupId));
-    item.setBackupId(backupId);
-    item.setStatus(AnkiBackupItem.STATUS_PENDING);
-    item.setProfileId(body.profileId());
-    item.setS3Bucket(BUCKET);
-    item.setS3Key(s3Key);
-    item.setUploadId(uploadId);
-    item.setPartSizeBytes(PART_SIZE_BYTES);
-    item.setSizeBytes(body.artifact().sizeBytes());
-    item.setSha256(body.artifact().sha256());
-    item.setCreatedAt(createdAt);
-    item.setExpiresAt(expiresAt);
-    item.setTtl(ttl);
+    var item =
+        AnkiBackupItem.create(
+            user,
+            backupId,
+            body.profileId(),
+            BUCKET,
+            s3Key,
+            uploadId,
+            PART_SIZE_BYTES,
+            body.artifact().sizeBytes(),
+            body.artifact().sha256(),
+            createdAt,
+            expiresAt);
     ankiBackupTable.putItem(item);
 
     var totalParts = (int) Math.ceil((double) body.artifact().sizeBytes() / PART_SIZE_BYTES);

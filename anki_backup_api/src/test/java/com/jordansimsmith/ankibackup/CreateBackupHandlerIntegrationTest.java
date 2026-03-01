@@ -71,22 +71,21 @@ public class CreateBackupHandlerIntegrationTest {
     var now = Instant.parse("2026-03-01T10:00:00Z");
     fakeClock.setTime(now);
 
-    var existingItem = new AnkiBackupItem();
-    existingItem.setPk(AnkiBackupItem.formatPk(user));
-    existingItem.setSk(AnkiBackupItem.formatSk("existing-backup-id"));
-    existingItem.setBackupId("existing-backup-id");
+    var existingItem =
+        AnkiBackupItem.create(
+            user,
+            "existing-backup-id",
+            "japanese-main",
+            CreateBackupHandler.BUCKET,
+            "users/alice/profiles/japanese-main/backups/2026/03/01/existing.colpkg",
+            "upload-123",
+            CreateBackupHandler.PART_SIZE_BYTES,
+            534773760L,
+            "abc123",
+            now.minus(Duration.ofHours(2)),
+            now.plus(Duration.ofDays(90)));
     existingItem.setStatus(AnkiBackupItem.STATUS_COMPLETED);
-    existingItem.setProfileId("japanese-main");
-    existingItem.setS3Bucket(CreateBackupHandler.BUCKET);
-    existingItem.setS3Key("users/alice/profiles/japanese-main/backups/2026/03/01/existing.colpkg");
-    existingItem.setUploadId("upload-123");
-    existingItem.setPartSizeBytes(CreateBackupHandler.PART_SIZE_BYTES);
-    existingItem.setSizeBytes(534773760L);
-    existingItem.setSha256("abc123");
-    existingItem.setCreatedAt(now.minus(Duration.ofHours(2)));
     existingItem.setCompletedAt(now.minus(Duration.ofHours(1)));
-    existingItem.setExpiresAt(now.plus(Duration.ofDays(90)));
-    existingItem.setTtl(now.plus(Duration.ofDays(90)).getEpochSecond());
     ankiBackupTable.putItem(existingItem);
 
     var body =
@@ -113,22 +112,21 @@ public class CreateBackupHandlerIntegrationTest {
     var now = Instant.parse("2026-03-02T12:00:00Z");
     fakeClock.setTime(now);
 
-    var oldItem = new AnkiBackupItem();
-    oldItem.setPk(AnkiBackupItem.formatPk(user));
-    oldItem.setSk(AnkiBackupItem.formatSk("old-backup-id"));
-    oldItem.setBackupId("old-backup-id");
+    var oldItem =
+        AnkiBackupItem.create(
+            user,
+            "old-backup-id",
+            "japanese-main",
+            CreateBackupHandler.BUCKET,
+            "users/alice/profiles/japanese-main/backups/2026/03/01/old.colpkg",
+            "upload-old",
+            CreateBackupHandler.PART_SIZE_BYTES,
+            1024L,
+            "sha256old",
+            now.minus(Duration.ofHours(30)),
+            now.plus(Duration.ofDays(90)));
     oldItem.setStatus(AnkiBackupItem.STATUS_COMPLETED);
-    oldItem.setProfileId("japanese-main");
-    oldItem.setS3Bucket(CreateBackupHandler.BUCKET);
-    oldItem.setS3Key("users/alice/profiles/japanese-main/backups/2026/03/01/old.colpkg");
-    oldItem.setUploadId("upload-old");
-    oldItem.setPartSizeBytes(CreateBackupHandler.PART_SIZE_BYTES);
-    oldItem.setSizeBytes(1024L);
-    oldItem.setSha256("sha256old");
-    oldItem.setCreatedAt(now.minus(Duration.ofHours(30)));
     oldItem.setCompletedAt(now.minus(Duration.ofHours(25)));
-    oldItem.setExpiresAt(now.plus(Duration.ofDays(90)));
-    oldItem.setTtl(now.plus(Duration.ofDays(90)).getEpochSecond());
     ankiBackupTable.putItem(oldItem);
 
     var body =
@@ -157,21 +155,19 @@ public class CreateBackupHandlerIntegrationTest {
     var now = Instant.parse("2026-03-01T10:00:00Z");
     fakeClock.setTime(now);
 
-    var pendingItem = new AnkiBackupItem();
-    pendingItem.setPk(AnkiBackupItem.formatPk(user));
-    pendingItem.setSk(AnkiBackupItem.formatSk("pending-backup-id"));
-    pendingItem.setBackupId("pending-backup-id");
-    pendingItem.setStatus(AnkiBackupItem.STATUS_PENDING);
-    pendingItem.setProfileId("japanese-main");
-    pendingItem.setS3Bucket(CreateBackupHandler.BUCKET);
-    pendingItem.setS3Key("users/alice/profiles/japanese-main/backups/2026/03/01/pending.colpkg");
-    pendingItem.setUploadId("upload-pending");
-    pendingItem.setPartSizeBytes(CreateBackupHandler.PART_SIZE_BYTES);
-    pendingItem.setSizeBytes(1024L);
-    pendingItem.setSha256("sha256pending");
-    pendingItem.setCreatedAt(now.minus(Duration.ofMinutes(30)));
-    pendingItem.setExpiresAt(now.plus(Duration.ofDays(90)));
-    pendingItem.setTtl(now.plus(Duration.ofDays(90)).getEpochSecond());
+    var pendingItem =
+        AnkiBackupItem.create(
+            user,
+            "pending-backup-id",
+            "japanese-main",
+            CreateBackupHandler.BUCKET,
+            "users/alice/profiles/japanese-main/backups/2026/03/01/pending.colpkg",
+            "upload-pending",
+            CreateBackupHandler.PART_SIZE_BYTES,
+            1024L,
+            "sha256pending",
+            now.minus(Duration.ofMinutes(30)),
+            now.plus(Duration.ofDays(90)));
     ankiBackupTable.putItem(pendingItem);
 
     var body =
@@ -199,22 +195,21 @@ public class CreateBackupHandlerIntegrationTest {
     var now = Instant.parse("2026-03-02T10:00:00Z");
     fakeClock.setTime(now);
 
-    var boundaryItem = new AnkiBackupItem();
-    boundaryItem.setPk(AnkiBackupItem.formatPk(user));
-    boundaryItem.setSk(AnkiBackupItem.formatSk("boundary-backup"));
-    boundaryItem.setBackupId("boundary-backup");
+    var boundaryItem =
+        AnkiBackupItem.create(
+            user,
+            "boundary-backup",
+            "japanese-main",
+            CreateBackupHandler.BUCKET,
+            "users/alice/profiles/japanese-main/backups/2026/03/01/boundary.colpkg",
+            "upload-boundary",
+            CreateBackupHandler.PART_SIZE_BYTES,
+            1024L,
+            "sha256boundary",
+            now.minus(Duration.ofHours(25)),
+            now.plus(Duration.ofDays(90)));
     boundaryItem.setStatus(AnkiBackupItem.STATUS_COMPLETED);
-    boundaryItem.setProfileId("japanese-main");
-    boundaryItem.setS3Bucket(CreateBackupHandler.BUCKET);
-    boundaryItem.setS3Key("users/alice/profiles/japanese-main/backups/2026/03/01/boundary.colpkg");
-    boundaryItem.setUploadId("upload-boundary");
-    boundaryItem.setPartSizeBytes(CreateBackupHandler.PART_SIZE_BYTES);
-    boundaryItem.setSizeBytes(1024L);
-    boundaryItem.setSha256("sha256boundary");
-    boundaryItem.setCreatedAt(now.minus(Duration.ofHours(25)));
     boundaryItem.setCompletedAt(now.minus(Duration.ofHours(24)));
-    boundaryItem.setExpiresAt(now.plus(Duration.ofDays(90)));
-    boundaryItem.setTtl(now.plus(Duration.ofDays(90)).getEpochSecond());
     ankiBackupTable.putItem(boundaryItem);
 
     var body =
@@ -240,22 +235,21 @@ public class CreateBackupHandlerIntegrationTest {
     var now = Instant.parse("2026-03-01T10:00:00Z");
     fakeClock.setTime(now);
 
-    var existingItem = new AnkiBackupItem();
-    existingItem.setPk(AnkiBackupItem.formatPk(user));
-    existingItem.setSk(AnkiBackupItem.formatSk("existing-backup"));
-    existingItem.setBackupId("existing-backup");
+    var existingItem =
+        AnkiBackupItem.create(
+            user,
+            "existing-backup",
+            "japanese-main",
+            CreateBackupHandler.BUCKET,
+            "users/alice/profiles/japanese-main/backups/2026/03/01/existing.colpkg",
+            "upload-existing",
+            CreateBackupHandler.PART_SIZE_BYTES,
+            1024L,
+            "sha256existing",
+            now.minus(Duration.ofHours(2)),
+            now.plus(Duration.ofDays(90)));
     existingItem.setStatus(AnkiBackupItem.STATUS_COMPLETED);
-    existingItem.setProfileId("japanese-main");
-    existingItem.setS3Bucket(CreateBackupHandler.BUCKET);
-    existingItem.setS3Key("users/alice/profiles/japanese-main/backups/2026/03/01/existing.colpkg");
-    existingItem.setUploadId("upload-existing");
-    existingItem.setPartSizeBytes(CreateBackupHandler.PART_SIZE_BYTES);
-    existingItem.setSizeBytes(1024L);
-    existingItem.setSha256("sha256existing");
-    existingItem.setCreatedAt(now.minus(Duration.ofHours(2)));
     existingItem.setCompletedAt(now.minus(Duration.ofHours(1)));
-    existingItem.setExpiresAt(now.plus(Duration.ofDays(90)));
-    existingItem.setTtl(now.plus(Duration.ofDays(90)).getEpochSecond());
     ankiBackupTable.putItem(existingItem);
 
     var body =
@@ -281,22 +275,21 @@ public class CreateBackupHandlerIntegrationTest {
     var now = Instant.parse("2026-03-01T10:00:00Z");
     fakeClock.setTime(now);
 
-    var otherUserItem = new AnkiBackupItem();
-    otherUserItem.setPk(AnkiBackupItem.formatPk("bob"));
-    otherUserItem.setSk(AnkiBackupItem.formatSk("bob-backup-id"));
-    otherUserItem.setBackupId("bob-backup-id");
+    var otherUserItem =
+        AnkiBackupItem.create(
+            "bob",
+            "bob-backup-id",
+            "main",
+            CreateBackupHandler.BUCKET,
+            "users/bob/profiles/main/backups/2026/03/01/bob.colpkg",
+            "upload-bob",
+            CreateBackupHandler.PART_SIZE_BYTES,
+            1024L,
+            "sha256bob",
+            now.minus(Duration.ofMinutes(30)),
+            now.plus(Duration.ofDays(90)));
     otherUserItem.setStatus(AnkiBackupItem.STATUS_COMPLETED);
-    otherUserItem.setProfileId("main");
-    otherUserItem.setS3Bucket(CreateBackupHandler.BUCKET);
-    otherUserItem.setS3Key("users/bob/profiles/main/backups/2026/03/01/bob.colpkg");
-    otherUserItem.setUploadId("upload-bob");
-    otherUserItem.setPartSizeBytes(CreateBackupHandler.PART_SIZE_BYTES);
-    otherUserItem.setSizeBytes(1024L);
-    otherUserItem.setSha256("sha256bob");
-    otherUserItem.setCreatedAt(now.minus(Duration.ofMinutes(30)));
     otherUserItem.setCompletedAt(now.minus(Duration.ofMinutes(20)));
-    otherUserItem.setExpiresAt(now.plus(Duration.ofDays(90)));
-    otherUserItem.setTtl(now.plus(Duration.ofDays(90)).getEpochSecond());
     ankiBackupTable.putItem(otherUserItem);
 
     var body =

@@ -64,23 +64,21 @@ public class GetBackupHandlerIntegrationTest {
 
   private AnkiBackupItem createCompletedBackup(
       String user, String backupId, Instant createdAt, Instant completedAt) {
-    var item = new AnkiBackupItem();
-    item.setPk(AnkiBackupItem.formatPk(user));
-    item.setSk(AnkiBackupItem.formatSk(backupId));
-    item.setBackupId(backupId);
+    var item =
+        AnkiBackupItem.create(
+            user,
+            backupId,
+            "japanese-main",
+            GetBackupHandler.BUCKET,
+            "users/" + user + "/profiles/japanese-main/backups/2026/03/01/" + backupId + ".colpkg",
+            "upload-" + backupId,
+            67_108_864L,
+            534773760L,
+            "sha256-" + backupId,
+            createdAt,
+            createdAt.plus(Duration.ofDays(90)));
     item.setStatus(AnkiBackupItem.STATUS_COMPLETED);
-    item.setProfileId("japanese-main");
-    item.setS3Bucket(GetBackupHandler.BUCKET);
-    item.setS3Key(
-        "users/" + user + "/profiles/japanese-main/backups/2026/03/01/" + backupId + ".colpkg");
-    item.setUploadId("upload-" + backupId);
-    item.setPartSizeBytes(67_108_864L);
-    item.setSizeBytes(534773760L);
-    item.setSha256("sha256-" + backupId);
-    item.setCreatedAt(createdAt);
     item.setCompletedAt(completedAt);
-    item.setExpiresAt(createdAt.plus(Duration.ofDays(90)));
-    item.setTtl(createdAt.plus(Duration.ofDays(90)).getEpochSecond());
     ankiBackupTable.putItem(item);
     return item;
   }
@@ -125,21 +123,19 @@ public class GetBackupHandlerIntegrationTest {
     var now = Instant.parse("2026-03-01T10:00:00Z");
     fakeClock.setTime(now);
 
-    var pending = new AnkiBackupItem();
-    pending.setPk(AnkiBackupItem.formatPk("alice"));
-    pending.setSk(AnkiBackupItem.formatSk("pending-1"));
-    pending.setBackupId("pending-1");
-    pending.setStatus(AnkiBackupItem.STATUS_PENDING);
-    pending.setProfileId("japanese-main");
-    pending.setS3Bucket(GetBackupHandler.BUCKET);
-    pending.setS3Key("users/alice/profiles/japanese-main/backups/2026/03/01/pending-1.colpkg");
-    pending.setUploadId("upload-pending");
-    pending.setPartSizeBytes(67_108_864L);
-    pending.setSizeBytes(1024L);
-    pending.setSha256("sha256-pending");
-    pending.setCreatedAt(now.minus(Duration.ofMinutes(10)));
-    pending.setExpiresAt(now.plus(Duration.ofDays(90)));
-    pending.setTtl(now.plus(Duration.ofDays(90)).getEpochSecond());
+    var pending =
+        AnkiBackupItem.create(
+            "alice",
+            "pending-1",
+            "japanese-main",
+            GetBackupHandler.BUCKET,
+            "users/alice/profiles/japanese-main/backups/2026/03/01/pending-1.colpkg",
+            "upload-pending",
+            67_108_864L,
+            1024L,
+            "sha256-pending",
+            now.minus(Duration.ofMinutes(10)),
+            now.plus(Duration.ofDays(90)));
     ankiBackupTable.putItem(pending);
 
     var event = buildEvent("alice", "pending-1");

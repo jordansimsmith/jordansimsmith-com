@@ -76,21 +76,19 @@ public class UpdateBackupHandlerIntegrationTest {
       String user, String backupId, Instant createdAt, String uploadId) {
     var s3Key =
         "users/" + user + "/profiles/japanese-main/backups/2026/03/01/" + backupId + ".colpkg";
-    var item = new AnkiBackupItem();
-    item.setPk(AnkiBackupItem.formatPk(user));
-    item.setSk(AnkiBackupItem.formatSk(backupId));
-    item.setBackupId(backupId);
-    item.setStatus(AnkiBackupItem.STATUS_PENDING);
-    item.setProfileId("japanese-main");
-    item.setS3Bucket(UpdateBackupHandler.BUCKET);
-    item.setS3Key(s3Key);
-    item.setUploadId(uploadId);
-    item.setPartSizeBytes(CreateBackupHandler.PART_SIZE_BYTES);
-    item.setSizeBytes(1024L);
-    item.setSha256("sha256hash");
-    item.setCreatedAt(createdAt);
-    item.setExpiresAt(createdAt.plus(Duration.ofDays(90)));
-    item.setTtl(createdAt.plus(Duration.ofDays(90)).getEpochSecond());
+    var item =
+        AnkiBackupItem.create(
+            user,
+            backupId,
+            "japanese-main",
+            UpdateBackupHandler.BUCKET,
+            s3Key,
+            uploadId,
+            CreateBackupHandler.PART_SIZE_BYTES,
+            1024L,
+            "sha256hash",
+            createdAt,
+            createdAt.plus(Duration.ofDays(90)));
     ankiBackupTable.putItem(item);
     return item;
   }

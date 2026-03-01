@@ -196,4 +196,34 @@ public class AnkiBackupItem {
   public static String formatSk(String backupId) {
     return BACKUP_PREFIX + backupId;
   }
+
+  public static AnkiBackupItem create(
+      String user,
+      String backupId,
+      String profileId,
+      String s3Bucket,
+      String s3Key,
+      String uploadId,
+      long partSizeBytes,
+      long sizeBytes,
+      String sha256,
+      Instant createdAt,
+      Instant expiresAt) {
+    var item = new AnkiBackupItem();
+    item.setPk(formatPk(user));
+    item.setSk(formatSk(backupId));
+    item.setBackupId(backupId);
+    item.setStatus(STATUS_PENDING);
+    item.setProfileId(profileId);
+    item.setS3Bucket(s3Bucket);
+    item.setS3Key(s3Key);
+    item.setUploadId(uploadId);
+    item.setPartSizeBytes(partSizeBytes);
+    item.setSizeBytes(sizeBytes);
+    item.setSha256(sha256);
+    item.setCreatedAt(createdAt);
+    item.setExpiresAt(expiresAt);
+    item.setTtl(expiresAt.getEpochSecond());
+    return item;
+  }
 }
