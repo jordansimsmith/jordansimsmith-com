@@ -40,6 +40,7 @@ java_library(
         "@maven//:com_google_guava_guava",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_regions",
         "@maven//:software_amazon_awssdk_s3",
     ],
 )
@@ -321,7 +322,7 @@ oci_load(
 
 java_test_suite(
     name = "e2e-tests",
-    size = "medium",
+    size = "large",
     srcs = E2E_TESTS,
     env = {
         "AWS_ACCESS_KEY_ID": "fake",
@@ -334,14 +335,22 @@ java_test_suite(
         "src/test/resources/logback-test.xml",
     ],
     runner = "junit5",
+    tags = [
+        "no-cache",
+    ],
     test_suffixes = ["E2ETest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":create-backup-handler",
+        ":find-backups-handler",
+        ":get-backup-handler",
         ":lib",
         ":test-lib",
+        ":update-backup-handler",
         "//lib/dynamodb:test-lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_guava_guava",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
@@ -350,5 +359,6 @@ java_test_suite(
         "@maven//:org_testcontainers_testcontainers",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_s3",
+        "@maven//:software_amazon_awssdk_sdk_core",
     ],
 )
