@@ -182,7 +182,27 @@ def on_sync_did_finish():
 
 
 def _upload_and_complete(client, colpkg_path, backup_id, upload):
-    raise NotImplementedError("upload flow not yet implemented")
+    part_size = upload["part_size_bytes"]
+    parts = upload["parts"]
+
+    with open(colpkg_path, "rb") as f:
+        for part in parts:
+            data = f.read(part_size)
+            req = urllib.request.Request(
+                part["upload_url"],
+                data=data,
+                method="PUT",
+            )
+            try:
+                with urllib.request.urlopen(req) as resp:
+                    resp.read()
+            except urllib.error.HTTPError as e:
+                raise AnkiBackupApiError(
+                    e.code, f"failed to upload part {part['part_number']}"
+                ) from e
+
+    client.update_backup(backup_id, "COMPLETED")
+    toast_success("backup completed successfully")
 
 
 try:
@@ -250,20 +270,79 @@ if __name__ == "__main__":
     from http.server import BaseHTTPRequestHandler, HTTPServer
     import threading
 
+    uploaded_parts = {}
+
     class MockHandler(BaseHTTPRequestHandler):
         def do_POST(self):
             length = int(self.headers.get("Content-Length", 0))
-            self.rfile.read(length)
+            body = self.rfile.read(length)
             if self.path == "/backups":
-                self.send_response(200)
-                self.send_header("Content-Type", "application/json")
-                self.end_headers()
-                self.wfile.write(json.dumps({"status": "skipped"}).encode())
+                req_json = json.loads(body.decode())
+                if req_json.get("_test_mode") == "ready":
+                    self.send_response(201)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(
+                        json.dumps(
+                            {
+                                "status": "ready",
+                                "backup": {
+                                    "backup_id": "test-backup-id",
+                                    "profile_id": req_json["profile_id"],
+                                    "status": "PENDING",
+                                    "created_at": "2026-03-01T10:00:00Z",
+                                    "completed_at": None,
+                                    "size_bytes": req_json["artifact"]["size_bytes"],
+                                    "sha256": req_json["artifact"]["sha256"],
+                                    "expires_at": "2026-05-30T10:00:00Z",
+                                    "download_url": None,
+                                    "download_url_expires_at": None,
+                                },
+                                "upload": {
+                                    "part_size_bytes": 16,
+                                    "expires_at": "2026-03-01T11:00:00Z",
+                                    "parts": [
+                                        {
+                                            "part_number": 1,
+                                            "upload_url": f"http://127.0.0.1:{port}/s3/part/1",
+                                        },
+                                        {
+                                            "part_number": 2,
+                                            "upload_url": f"http://127.0.0.1:{port}/s3/part/2",
+                                        },
+                                    ],
+                                },
+                            }
+                        ).encode()
+                    )
+                else:
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json")
+                    self.end_headers()
+                    self.wfile.write(json.dumps({"status": "skipped"}).encode())
             else:
                 self.send_response(404)
                 self.send_header("Content-Type", "application/json")
                 self.end_headers()
                 self.wfile.write(json.dumps({"message": "not found"}).encode())
+
+        def do_PUT(self):
+            length = int(self.headers.get("Content-Length", 0))
+            body = self.rfile.read(length)
+            if self.path.startswith("/s3/part/"):
+                part_num = self.path.split("/")[-1]
+                uploaded_parts[part_num] = body
+                self.send_response(200)
+                self.send_header("ETag", f'"etag-{part_num}"')
+                self.end_headers()
+            elif self.path.startswith("/backups/"):
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"status": "completed"}).encode())
+            else:
+                self.send_response(404)
+                self.end_headers()
 
         def do_GET(self):
             if self.path == "/backups":
@@ -314,12 +393,34 @@ if __name__ == "__main__":
         assert e.message == "backup not found"
     print("[pass] get_backup error handling (404 with JSON message)")
 
-    # test on_sync_did_finish with mocked Anki APIs and mock server
-    # mock _get_profile_id and _export_colpkg to avoid Anki dependency
+    # test _upload_and_complete with mock S3 upload and API completion
+    upload_tmpdir = tempfile.mkdtemp()
+    upload_colpkg = os.path.join(upload_tmpdir, "upload-test.colpkg")
+    test_data = b"0123456789abcdef" + b"GHIJKLMNOPQRSTUV"
+    with open(upload_colpkg, "wb") as f:
+        f.write(test_data)
+
+    uploaded_parts.clear()
+    upload_client = AnkiBackupClient(f"http://127.0.0.1:{port}", "alice", "password")
+    upload_info = {
+        "part_size_bytes": 16,
+        "parts": [
+            {"part_number": 1, "upload_url": f"http://127.0.0.1:{port}/s3/part/1"},
+            {"part_number": 2, "upload_url": f"http://127.0.0.1:{port}/s3/part/2"},
+        ],
+    }
+    _upload_and_complete(upload_client, upload_colpkg, "test-backup-id", upload_info)
+    assert uploaded_parts["1"] == b"0123456789abcdef", "part 1 data mismatch"
+    assert uploaded_parts["2"] == b"GHIJKLMNOPQRSTUV", "part 2 data mismatch"
+    _cleanup_temp_file(upload_colpkg)
+    print("[pass] _upload_and_complete (multipart upload + completion)")
+
+    # test on_sync_did_finish with ready path (full flow)
     sync_tmpdir = tempfile.mkdtemp()
     sync_colpkg = os.path.join(sync_tmpdir, "collection-2026-03-01.colpkg")
+    ready_data = b"ready-flow-content!!"
     with open(sync_colpkg, "wb") as f:
-        f.write(b"sync test content")
+        f.write(ready_data)
 
     import anki_backup
 
@@ -330,13 +431,49 @@ if __name__ == "__main__":
     anki_backup.ANKI_BACKUP_PASSWORD = "password"
     anki_backup.ANKI_BACKUP_API_URL = f"http://127.0.0.1:{port}"
 
+    uploaded_parts.clear()
+
+    def mock_export():
+        tmpd = tempfile.mkdtemp()
+        p = os.path.join(tmpd, "collection-2026-03-01.colpkg")
+        with open(p, "wb") as f:
+            f.write(ready_data)
+        return p
+
+    def mock_create_backup(self, profile_id, artifact):
+        body = {"profile_id": profile_id, "artifact": artifact, "_test_mode": "ready"}
+        return upload_client._request("POST", "/backups", body)
+
     with (
         unittest.mock.patch("anki_backup._get_profile_id", return_value="main"),
-        unittest.mock.patch("anki_backup._export_colpkg", return_value=sync_colpkg),
+        unittest.mock.patch("anki_backup._export_colpkg", side_effect=mock_export),
+        unittest.mock.patch.object(
+            anki_backup.AnkiBackupClient,
+            "create_backup",
+            side_effect=mock_create_backup,
+            autospec=True,
+        ),
     ):
         anki_backup.on_sync_did_finish()
 
-    assert not os.path.exists(sync_colpkg), "temp colpkg not cleaned up after sync"
+    assert len(uploaded_parts) == 2, (
+        f"expected 2 uploaded parts, got {len(uploaded_parts)}"
+    )
+    print("[pass] on_sync_did_finish (ready path: upload + complete + cleanup)")
+
+    # test on_sync_did_finish with skipped path
+    sync_tmpdir2 = tempfile.mkdtemp()
+    sync_colpkg2 = os.path.join(sync_tmpdir2, "collection-2026-03-01.colpkg")
+    with open(sync_colpkg2, "wb") as f:
+        f.write(b"skipped test content")
+
+    with (
+        unittest.mock.patch("anki_backup._get_profile_id", return_value="main"),
+        unittest.mock.patch("anki_backup._export_colpkg", return_value=sync_colpkg2),
+    ):
+        anki_backup.on_sync_did_finish()
+
+    assert not os.path.exists(sync_colpkg2), "temp colpkg not cleaned up after sync"
     print("[pass] on_sync_did_finish (skipped path with mocked Anki + cleanup)")
 
     # test on_sync_did_finish skips when credentials not configured
@@ -344,6 +481,51 @@ if __name__ == "__main__":
     anki_backup.ANKI_BACKUP_PASSWORD = ""
     anki_backup.on_sync_did_finish()
     print("[pass] on_sync_did_finish (no-op when credentials empty)")
+
+    # test on_sync_did_finish handles upload failure gracefully
+    anki_backup.ANKI_BACKUP_USER = "alice"
+    anki_backup.ANKI_BACKUP_PASSWORD = "password"
+
+    fail_tmpdir = tempfile.mkdtemp()
+    fail_colpkg = os.path.join(fail_tmpdir, "collection-2026-03-01.colpkg")
+    with open(fail_colpkg, "wb") as f:
+        f.write(b"fail test content")
+
+    def mock_create_ready(self, profile_id, artifact):
+        return {
+            "status": "ready",
+            "backup": {"backup_id": "fail-id"},
+            "upload": {
+                "part_size_bytes": 1024,
+                "parts": [
+                    {"part_number": 1, "upload_url": "http://127.0.0.1:1/bad-url"},
+                ],
+            },
+        }
+
+    caught_error = []
+    original_toast_error = anki_backup.toast_error
+
+    def capture_toast_error(msg):
+        caught_error.append(msg)
+        original_toast_error(msg)
+
+    with (
+        unittest.mock.patch("anki_backup._get_profile_id", return_value="main"),
+        unittest.mock.patch("anki_backup._export_colpkg", return_value=fail_colpkg),
+        unittest.mock.patch.object(
+            anki_backup.AnkiBackupClient,
+            "create_backup",
+            side_effect=mock_create_ready,
+            autospec=True,
+        ),
+        unittest.mock.patch("anki_backup.toast_error", side_effect=capture_toast_error),
+    ):
+        anki_backup.on_sync_did_finish()
+
+    assert len(caught_error) == 1, f"expected 1 error toast, got {len(caught_error)}"
+    assert not os.path.exists(fail_colpkg), "temp colpkg not cleaned up after failure"
+    print("[pass] on_sync_did_finish (upload failure shows error toast + cleanup)")
 
     anki_backup.ANKI_BACKUP_USER = original_user
     anki_backup.ANKI_BACKUP_PASSWORD = original_password
