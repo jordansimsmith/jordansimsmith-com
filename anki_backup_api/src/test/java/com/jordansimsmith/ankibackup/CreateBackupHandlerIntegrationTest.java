@@ -317,6 +317,32 @@ public class CreateBackupHandlerIntegrationTest {
   }
 
   @Test
+  void handleRequestShouldReturnEightPartsWhenFiveHundredMegabyteArtifact() throws Exception {
+    // arrange
+    var user = "alice";
+    var now = Instant.parse("2026-03-01T10:00:00Z");
+    fakeClock.setTime(now);
+
+    var body =
+        objectMapper.writeValueAsString(
+            new CreateBackupHandler.CreateBackupRequest(
+                "japanese-main",
+                new CreateBackupHandler.Artifact("collection.colpkg", 534_773_760L, "sha256hash")));
+    var event = buildEvent(user, body);
+
+    // act
+    var res = createBackupHandler.handleRequest(event, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(201);
+    var tree = objectMapper.readTree(res.getBody());
+    assertThat(tree.get("status").asText()).isEqualTo("ready");
+    assertThat(tree.get("upload").get("parts")).hasSize(8);
+    assertThat(tree.get("upload").get("parts").get(0).get("part_number").asInt()).isEqualTo(1);
+    assertThat(tree.get("upload").get("parts").get(7).get("part_number").asInt()).isEqualTo(8);
+  }
+
+  @Test
   void handleRequestShouldPersistPendingItemAndReturnPresignedUrls() throws Exception {
     // arrange
     var user = "alice";
