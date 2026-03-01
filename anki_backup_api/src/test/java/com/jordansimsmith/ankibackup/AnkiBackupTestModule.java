@@ -4,14 +4,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.http.HttpResponseFactory;
 import dagger.Module;
 import dagger.Provides;
-import java.net.URI;
-import javax.inject.Named;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 @Module
 public class AnkiBackupTestModule {
@@ -27,17 +23,5 @@ public class AnkiBackupTestModule {
       DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(AnkiBackupItem.class);
     return dynamoDbEnhancedClient.table("anki_backup", schema);
-  }
-
-  @Provides
-  @Singleton
-  public S3Client s3Client(@Named("s3Endpoint") URI s3Endpoint) {
-    return S3Client.builder().endpointOverride(s3Endpoint).forcePathStyle(true).build();
-  }
-
-  @Provides
-  @Singleton
-  public S3Presigner s3Presigner(@Named("s3Endpoint") URI s3Endpoint) {
-    return S3Presigner.builder().endpointOverride(s3Endpoint).build();
   }
 }

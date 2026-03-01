@@ -46,6 +46,21 @@ oci_load(
     ],
 )
 
+oci_image(
+    name = "minio-image",
+    testonly = True,
+    base = "@minio//:minio",
+)
+
+oci_load(
+    name = "minio-load",
+    testonly = True,
+    image = ":minio-image",
+    repo_tags = [
+        "bazel/minio:latest",
+    ],
+)
+
 java_library(
     name = "test-lib",
     testonly = True,
@@ -53,6 +68,7 @@ java_library(
     data = [
         ":alpine-load",
         ":dynamodb-load",
+        ":minio-load",
         ":ryuk-load",
     ],
     resources = glob([

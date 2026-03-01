@@ -188,6 +188,7 @@ java_library(
         "//lib/http:test-lib",
         "//lib/json:lib",
         "//lib/localstack:lib",
+        "//lib/s3:test-lib",
         "//lib/secrets:test-lib",
         "//lib/testcontainers:test-lib",
         "//lib/time:test-lib",
@@ -259,6 +260,7 @@ java_test_suite(
         "//lib/dynamodb:test-lib",
         "//lib/http:lib",
         "//lib/json:lib",
+        "//lib/s3:test-lib",
         "//lib/secrets:test-lib",
         "//lib/testcontainers:test-lib",
         "//lib/time:test-lib",
@@ -275,6 +277,7 @@ java_test_suite(
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
         "@maven//:software_amazon_awssdk_iam_policy_builder",
         "@maven//:software_amazon_awssdk_s3",
+        "@maven//:software_amazon_awssdk_sdk_core",
     ],
 )
 

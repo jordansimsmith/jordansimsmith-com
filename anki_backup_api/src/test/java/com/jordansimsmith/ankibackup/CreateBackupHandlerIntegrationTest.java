@@ -1,14 +1,13 @@
 package com.jordansimsmith.ankibackup;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.s3.S3Container;
 import com.jordansimsmith.time.FakeClock;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
@@ -30,18 +29,20 @@ public class CreateBackupHandlerIntegrationTest {
   private CreateBackupHandler createBackupHandler;
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
-
-  private static final URI UNUSED_S3_ENDPOINT = URI.create("http://localhost:1");
+  @Container private static final S3Container s3Container = new S3Container();
 
   @BeforeAll
   static void setUpBeforeClass() {
-    var factory = AnkiBackupTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
+    var factory =
+        AnkiBackupTestFactory.create(dynamoDbContainer.getEndpoint(), s3Container.getEndpoint());
     DynamoDbUtils.createTable(factory.dynamoDbClient(), factory.ankiBackupTable());
+    factory.s3Client().createBucket(b -> b.bucket(CreateBackupHandler.BUCKET));
   }
 
   @BeforeEach
   void setUp() {
-    var factory = AnkiBackupTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
+    var factory =
+        AnkiBackupTestFactory.create(dynamoDbContainer.getEndpoint(), s3Container.getEndpoint());
 
     fakeClock = factory.fakeClock();
     objectMapper = factory.objectMapper();
@@ -106,7 +107,7 @@ public class CreateBackupHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldProceedWhenCompletedBackupIsOutsideInterval() throws Exception {
+  void handleRequestShouldReturnReadyWhenCompletedBackupIsOutsideInterval() throws Exception {
     // arrange
     var user = "alice";
     var now = Instant.parse("2026-03-02T12:00:00Z");
@@ -137,14 +138,20 @@ public class CreateBackupHandlerIntegrationTest {
                 new CreateBackupHandler.Artifact("collection.colpkg", 1024L, "sha256new")));
     var event = buildEvent(user, body);
 
-    // act + assert
-    // eligibility check passes, handler proceeds to S3 which fails (no real S3 endpoint)
-    assertThatThrownBy(() -> createBackupHandler.handleRequest(event, null))
-        .isInstanceOf(RuntimeException.class);
+    // act
+    var res = createBackupHandler.handleRequest(event, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(201);
+    var tree = objectMapper.readTree(res.getBody());
+    assertThat(tree.get("status").asText()).isEqualTo("ready");
+    assertThat(tree.get("backup").get("status").asText()).isEqualTo("PENDING");
+    assertThat(tree.get("backup").get("profile_id").asText()).isEqualTo("japanese-main");
+    assertThat(tree.get("upload").get("parts").size()).isGreaterThan(0);
   }
 
   @Test
-  void handleRequestShouldProceedWhenOnlyPendingBackupsExist() throws Exception {
+  void handleRequestShouldReturnReadyWhenOnlyPendingBackupsExist() throws Exception {
     // arrange
     var user = "alice";
     var now = Instant.parse("2026-03-01T10:00:00Z");
@@ -174,10 +181,15 @@ public class CreateBackupHandlerIntegrationTest {
                 new CreateBackupHandler.Artifact("collection.colpkg", 1024L, "sha256new")));
     var event = buildEvent(user, body);
 
-    // act + assert
-    // pending backups don't count for the interval check, handler proceeds to S3
-    assertThatThrownBy(() -> createBackupHandler.handleRequest(event, null))
-        .isInstanceOf(RuntimeException.class);
+    // act
+    var res = createBackupHandler.handleRequest(event, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(201);
+    var tree = objectMapper.readTree(res.getBody());
+    assertThat(tree.get("status").asText()).isEqualTo("ready");
+    assertThat(tree.get("backup").get("status").asText()).isEqualTo("PENDING");
+    assertThat(tree.get("upload").get("parts").size()).isGreaterThan(0);
   }
 
   @Test
@@ -264,7 +276,7 @@ public class CreateBackupHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldProceedWhenDifferentUserHasRecentBackup() throws Exception {
+  void handleRequestShouldReturnReadyWhenDifferentUserHasRecentBackup() throws Exception {
     // arrange
     var now = Instant.parse("2026-03-01T10:00:00Z");
     fakeClock.setTime(now);
@@ -294,9 +306,64 @@ public class CreateBackupHandlerIntegrationTest {
                 new CreateBackupHandler.Artifact("collection.colpkg", 1024L, "sha256alice")));
     var event = buildEvent("alice", body);
 
-    // act + assert
-    // alice has no recent backup, handler proceeds past eligibility to S3
-    assertThatThrownBy(() -> createBackupHandler.handleRequest(event, null))
-        .isInstanceOf(RuntimeException.class);
+    // act
+    var res = createBackupHandler.handleRequest(event, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(201);
+    var tree = objectMapper.readTree(res.getBody());
+    assertThat(tree.get("status").asText()).isEqualTo("ready");
+    assertThat(tree.get("backup").get("profile_id").asText()).isEqualTo("main");
+  }
+
+  @Test
+  void handleRequestShouldPersistPendingItemAndReturnPresignedUrls() throws Exception {
+    // arrange
+    var user = "alice";
+    var now = Instant.parse("2026-03-01T10:00:00Z");
+    fakeClock.setTime(now);
+
+    var body =
+        objectMapper.writeValueAsString(
+            new CreateBackupHandler.CreateBackupRequest(
+                "japanese-main",
+                new CreateBackupHandler.Artifact("collection.colpkg", 1024L, "sha256hash")));
+    var event = buildEvent(user, body);
+
+    // act
+    var res = createBackupHandler.handleRequest(event, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(201);
+    var tree = objectMapper.readTree(res.getBody());
+    assertThat(tree.get("status").asText()).isEqualTo("ready");
+
+    var backup = tree.get("backup");
+    assertThat(backup.get("backup_id").asText()).isNotEmpty();
+    assertThat(backup.get("status").asText()).isEqualTo("PENDING");
+    assertThat(backup.get("profile_id").asText()).isEqualTo("japanese-main");
+    assertThat(backup.get("size_bytes").asLong()).isEqualTo(1024L);
+    assertThat(backup.get("sha256").asText()).isEqualTo("sha256hash");
+    assertThat(backup.get("created_at").asText()).isEqualTo(now.toString());
+    assertThat(backup.get("completed_at").isNull()).isTrue();
+    assertThat(backup.get("expires_at").asText())
+        .isEqualTo(now.plus(Duration.ofDays(90)).toString());
+
+    var upload = tree.get("upload");
+    assertThat(upload.get("part_size_bytes").asLong())
+        .isEqualTo(CreateBackupHandler.PART_SIZE_BYTES);
+    assertThat(upload.get("parts")).hasSize(1);
+    assertThat(upload.get("parts").get(0).get("part_number").asInt()).isEqualTo(1);
+    assertThat(upload.get("parts").get(0).get("upload_url").asText()).isNotEmpty();
+
+    // verify DynamoDB item
+    var items = ankiBackupTable.scan().items().stream().toList();
+    assertThat(items).hasSize(1);
+    var item = items.get(0);
+    assertThat(item.getBackupId()).isEqualTo(backup.get("backup_id").asText());
+    assertThat(item.getStatus()).isEqualTo(AnkiBackupItem.STATUS_PENDING);
+    assertThat(item.getUploadId()).isNotNull();
+    assertThat(item.getS3Bucket()).isEqualTo(CreateBackupHandler.BUCKET);
+    assertThat(item.getS3Key()).contains("users/alice/profiles/japanese-main/backups/");
   }
 }
