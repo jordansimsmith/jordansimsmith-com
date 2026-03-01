@@ -170,7 +170,6 @@ def on_sync_did_finish():
             toast_info("backup skipped (already backed up recently)")
             return
 
-        # upload parts and complete — implemented in upload completion flow
         backup_id = result["backup"]["backup_id"]
         upload = result["upload"]
         _upload_and_complete(client, colpkg_path, backup_id, upload)

@@ -10,7 +10,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.time.Clock;
-import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -107,7 +106,7 @@ public class UpdateBackupHandler
             .map(
                 part ->
                     CompletedPart.builder().partNumber(part.partNumber()).eTag(part.eTag()).build())
-            .collect(Collectors.toList());
+            .toList();
 
     s3Client.completeMultipartUpload(
         CompleteMultipartUploadRequest.builder()
