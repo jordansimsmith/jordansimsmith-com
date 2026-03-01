@@ -1,7 +1,8 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 load("@rules_java//java:defs.bzl", "java_binary", "java_library")
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("@rules_pkg//:pkg.bzl", "pkg_tar", "pkg_zip")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
 
 HANDLERS = glob(["src/main/java/**/*Handler.java"])
 
@@ -165,6 +166,23 @@ java_binary(
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
         "@maven//:software_amazon_awssdk_s3",
     ],
+)
+
+pkg_files(
+    name = "anki-addon-source-files",
+    srcs = [
+        "addon/__init__.py",
+        "addon/anki_backup.py",
+        "addon/manifest.json",
+    ],
+    strip_prefix = strip_prefix.from_pkg("addon"),
+)
+
+pkg_zip(
+    name = "anki-addon-package",
+    srcs = [":anki-addon-source-files"],
+    out = "anki-backup.ankiaddon",
+    package_dir = "",
 )
 
 java_library(
