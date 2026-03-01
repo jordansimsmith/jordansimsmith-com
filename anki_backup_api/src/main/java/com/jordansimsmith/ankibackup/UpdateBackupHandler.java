@@ -4,6 +4,7 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
@@ -19,12 +20,20 @@ public class UpdateBackupHandler
 
   private static final Logger LOGGER = LoggerFactory.getLogger(UpdateBackupHandler.class);
 
+  @VisibleForTesting static final String BUCKET = "anki-backup.jordansimsmith.com";
+
   private final Clock clock;
   private final ObjectMapper objectMapper;
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<AnkiBackupItem> ankiBackupTable;
   private final S3Client s3Client;
+
+  @VisibleForTesting
+  record UpdateBackupRequest(@JsonProperty("status") String status) {}
+
+  @VisibleForTesting
+  record UpdateBackupResponse(@JsonProperty("status") String status) {}
 
   public UpdateBackupHandler() {
     this(AnkiBackupFactory.create());
