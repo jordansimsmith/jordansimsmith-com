@@ -242,4 +242,32 @@ public class AnkiBackupDtoTest {
     assertThat(deserialized.artifact().sizeBytes()).isEqualTo(1024L);
     assertThat(deserialized.artifact().sha256()).isEqualTo("abc123");
   }
+
+  @Test
+  void updateBackupErrorResponseShouldSerializeToJson() throws Exception {
+    // arrange
+    var response = new UpdateBackupHandler.ErrorResponse("backup not found");
+
+    // act
+    var json = objectMapper.writeValueAsString(response);
+    var tree = objectMapper.readTree(json);
+
+    // assert
+    assertThat(tree.get("message").asText()).isEqualTo("backup not found");
+    assertThat(tree.size()).isEqualTo(1);
+  }
+
+  @Test
+  void getBackupErrorResponseShouldSerializeToJson() throws Exception {
+    // arrange
+    var response = new GetBackupHandler.ErrorResponse("backup not completed");
+
+    // act
+    var json = objectMapper.writeValueAsString(response);
+    var tree = objectMapper.readTree(json);
+
+    // assert
+    assertThat(tree.get("message").asText()).isEqualTo("backup not completed");
+    assertThat(tree.size()).isEqualTo(1);
+  }
 }
