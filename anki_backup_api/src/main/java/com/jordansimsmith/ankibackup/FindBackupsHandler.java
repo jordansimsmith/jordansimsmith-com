@@ -8,11 +8,18 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
+import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.Expression;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 public class FindBackupsHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
@@ -62,6 +69,48 @@ public class FindBackupsHandler
 
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event, Context context)
       throws Exception {
-    throw new UnsupportedOperationException("Not yet implemented");
+    var user = requestContextFactory.createCtx(event).user();
+
+    var items =
+        ankiBackupTable
+            .query(
+                QueryEnhancedRequest.builder()
+                    .queryConditional(
+                        QueryConditional.sortBeginsWith(
+                            Key.builder()
+                                .partitionValue(AnkiBackupItem.formatPk(user))
+                                .sortValue(AnkiBackupItem.BACKUP_PREFIX)
+                                .build()))
+                    .filterExpression(
+                        Expression.builder()
+                            .expression("#s = :completed")
+                            .expressionNames(Map.of("#s", AnkiBackupItem.STATUS))
+                            .expressionValues(
+                                Map.of(
+                                    ":completed",
+                                    AttributeValue.builder()
+                                        .s(AnkiBackupItem.STATUS_COMPLETED)
+                                        .build()))
+                            .build())
+                    .build())
+            .items()
+            .stream()
+            .sorted(Comparator.comparing(AnkiBackupItem::getCreatedAt).reversed())
+            .map(
+                item ->
+                    new BackupResponse(
+                        item.getBackupId(),
+                        item.getProfileId(),
+                        item.getStatus(),
+                        item.getCreatedAt().toString(),
+                        item.getCompletedAt() != null ? item.getCompletedAt().toString() : null,
+                        item.getSizeBytes(),
+                        item.getSha256(),
+                        item.getExpiresAt(),
+                        null,
+                        null))
+            .toList();
+
+    return httpResponseFactory.ok(new FindBackupsResponse(items));
   }
 }
