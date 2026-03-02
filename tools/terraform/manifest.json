@@ -1,6 +1,16 @@
 {
   "terraform_roots": [
     {
+      "path": "anki_backup_api/infra",
+      "artifacts": {
+        "auth": "//anki_backup_api:auth-handler_deploy.jar",
+        "create_backup": "//anki_backup_api:create-backup-handler_deploy.jar",
+        "update_backup": "//anki_backup_api:update-backup-handler_deploy.jar",
+        "find_backups": "//anki_backup_api:find-backups-handler_deploy.jar",
+        "get_backup": "//anki_backup_api:get-backup-handler_deploy.jar"
+      }
+    },
+    {
       "path": "auction_tracker_api/infra",
       "artifacts": {
         "update_items_handler": "//auction_tracker_api:update-items-handler_deploy.jar",
