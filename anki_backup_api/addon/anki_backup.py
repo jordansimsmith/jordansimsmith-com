@@ -120,11 +120,14 @@ def upload_and_complete(colpkg_path, backup_id, upload):
 
 
 def on_sync_did_finish():
-    if not os.getenv("ANKI_BACKUP_USER") or not os.getenv("ANKI_BACKUP_PASSWORD"):
-        return
-
     colpkg_path = None
     try:
+        if not os.getenv("ANKI_BACKUP_USER"):
+            raise Exception("ANKI_BACKUP_USER is not set.")
+
+        if not os.getenv("ANKI_BACKUP_PASSWORD"):
+            raise Exception("ANKI_BACKUP_PASSWORD is not set.")
+
         profile_id = get_profile_id()
         colpkg_path = export_colpkg()
         artifact = describe_artifact(colpkg_path)
