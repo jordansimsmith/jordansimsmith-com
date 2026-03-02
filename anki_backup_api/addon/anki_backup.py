@@ -1,16 +1,22 @@
-import datetime
 import hashlib
 import json
 import os
 import tempfile
 import urllib.parse
+import uuid
 
 import requests
 from aqt import gui_hooks, mw
+from aqt.operations import QueryOp
+from aqt.qt import QAction
 from aqt.utils import tooltip
 
 DEFAULT_ANKI_BACKUP_API_URL = "https://api.anki-backup.jordansimsmith.com"
 REQUEST_TIMEOUT_SECONDS = 60
+
+
+def log(message):
+    print(f"[anki-backup] {message}", flush=True)
 
 
 def send_request(method, path, body=None):
@@ -76,26 +82,14 @@ def describe_artifact(path):
     }
 
 
-def cleanup_temp_file(path):
-    if path is None:
-        return
-
-    try:
-        os.unlink(path)
-        os.rmdir(os.path.dirname(path))
-    except OSError:
-        pass
-
-
-def get_profile_id():
-    return mw.pm.name
-
-
-def export_colpkg():
+def export_colpkg(col):
+    log("Creating collection export package...")
     temp_dir = tempfile.mkdtemp()
-    filename = f"collection-{datetime.date.today().isoformat()}.colpkg"
+    filename = f"collection-{uuid.uuid4()}.colpkg"
     out_path = os.path.join(temp_dir, filename)
-    mw.col.export_collection_package(out_path, include_media=True, legacy=False)
+    col.export_collection_package(out_path, include_media=True, legacy=False)
+    log("Collection export package created.")
+
     return out_path
 
 
@@ -116,10 +110,11 @@ def upload_and_complete(colpkg_path, backup_id, upload):
                     f"failed to upload part {part['part_number']} with code {response.status_code} and body {response.text}"
                 )
 
+    log("Finalizing backup...")
     update_backup(backup_id, "COMPLETED")
 
 
-def on_sync_did_finish():
+def run_backup(col, profile_id):
     colpkg_path = None
     try:
         if not os.getenv("ANKI_BACKUP_USER"):
@@ -128,23 +123,79 @@ def on_sync_did_finish():
         if not os.getenv("ANKI_BACKUP_PASSWORD"):
             raise Exception("ANKI_BACKUP_PASSWORD is not set.")
 
-        profile_id = get_profile_id()
-        colpkg_path = export_colpkg()
+        colpkg_path = export_colpkg(col)
         artifact = describe_artifact(colpkg_path)
+
+        log("Creating backup record...")
         result = create_backup(profile_id, artifact)
 
         if result["status"] == "skipped":
-            tooltip("Backup: backup skipped (already backed up recently)", parent=mw)
-            return
+            log("Backup skipped by server (already backed up recently).")
+            return "skipped"
 
         backup_id = result["backup"]["backup_id"]
         upload = result["upload"]
+        log(f"Uploading {len(upload['parts'])} part(s) to S3...")
         upload_and_complete(colpkg_path, backup_id, upload)
-        tooltip("Backup: backup completed successfully", parent=mw)
-    except Exception as error:
-        tooltip(f"Backup error: {error}", parent=mw)
+        log("Backup completed successfully.")
+
+        return "completed"
     finally:
-        cleanup_temp_file(colpkg_path)
+        if colpkg_path is not None:
+            try:
+                os.unlink(colpkg_path)
+                os.rmdir(os.path.dirname(colpkg_path))
+            except OSError:
+                pass
 
 
-gui_hooks.sync_did_finish.append(on_sync_did_finish)
+def on_manual_backup_action_triggered():
+    profile_id = mw.pm.name
+    log(f"Manual backup triggered for profile '{profile_id}'.")
+
+    gui_hooks.collection_will_temporarily_close(mw.col)
+
+    def reopen_collection_if_needed():
+        if mw.col.db is not None:
+            return True
+
+        log("Reopening collection...")
+        try:
+            mw.reopen()
+            return True
+        except Exception as error:
+            log(f"Backup failed while reopening collection: {error}")
+            mw.close()
+            return False
+
+    def on_success(status):
+        if not reopen_collection_if_needed():
+            return
+
+        if status == "skipped":
+            tooltip("Backup: backup skipped (already backed up recently)", parent=mw)
+            return
+
+        tooltip("Backup: backup completed successfully", parent=mw)
+
+    def on_failure(error):
+        if not reopen_collection_if_needed():
+            return
+
+        log(f"Backup failed: {error}")
+        tooltip(f"Backup error: {error}", parent=mw)
+
+    QueryOp(
+        parent=mw,
+        op=lambda col: run_backup(col, profile_id),
+        success=on_success,
+    ).with_progress("Backing up collection...").failure(on_failure).run_in_background()
+
+
+def register_menu_action():
+    backup_action = QAction("Run backup now", mw)
+    backup_action.triggered.connect(on_manual_backup_action_triggered)
+    mw.form.menuTools.addAction(backup_action)
+
+
+gui_hooks.main_window_did_init.append(register_menu_action)
