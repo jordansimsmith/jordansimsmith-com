@@ -19,6 +19,13 @@ For service README authoring and update standards, use the project skill at `.cu
 - Format code: `bazel run //:format`
 - Tidy Bazel modules: `bazel mod tidy`
 
+## Commit message guidelines
+
+- Write commit subjects in imperative mood (e.g., `Implement backup upload flow`)
+- Use Sentence case for commit subjects
+- Do not prefix commit subjects with a service name and colon (e.g., avoid `anki_backup_api: Implement backup`)
+- Follow existing repository commit history patterns for concise, action-oriented subjects
+
 ## Steps after task completion
 
 Always run these commands after completing a task:
