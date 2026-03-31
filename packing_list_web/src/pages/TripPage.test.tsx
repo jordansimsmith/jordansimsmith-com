@@ -576,19 +576,16 @@ describe('TripPage', () => {
       expect(screen.getByText('Sunglasses')).toBeDefined();
     });
 
-    await waitFor(
-      () => {
-        expect(updateTripSpy).toHaveBeenCalledWith(
-          expect.objectContaining({
-            trip_id: 'trip-001',
-            items: expect.arrayContaining([
-              expect.objectContaining({ name: 'Sunglasses' }),
-            ]),
-          }),
-        );
-      },
-      { timeout: 3000 },
-    );
+    await waitFor(() => {
+      expect(updateTripSpy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          trip_id: 'trip-001',
+          items: expect.arrayContaining([
+            expect.objectContaining({ name: 'Sunglasses' }),
+          ]),
+        }),
+      );
+    });
   });
 
   it('can edit an existing item', async () => {
