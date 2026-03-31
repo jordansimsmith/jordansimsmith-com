@@ -58,7 +58,8 @@
         "create_trip": "//packing_list_api:create-trip-handler_deploy.jar",
         "find_trips": "//packing_list_api:find-trips-handler_deploy.jar",
         "get_trip": "//packing_list_api:get-trip-handler_deploy.jar",
-        "update_trip": "//packing_list_api:update-trip-handler_deploy.jar"
+        "update_trip": "//packing_list_api:update-trip-handler_deploy.jar",
+        "delete_trip": "//packing_list_api:delete-trip-handler_deploy.jar"
       }
     },
     {
