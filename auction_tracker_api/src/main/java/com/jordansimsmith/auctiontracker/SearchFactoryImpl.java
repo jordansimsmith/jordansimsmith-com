@@ -10,30 +10,6 @@ public class SearchFactoryImpl implements SearchFactory {
   private static final List<SearchDefinition> SEARCH_DEFINITIONS =
       List.of(
           new SearchDefinition(
-              "/a/marketplace/sports/golf/irons/steel-shaft/search",
-              "titleist iron",
-              null,
-              75.0,
-              Condition.USED),
-          new SearchDefinition(
-              "/a/marketplace/sports/golf/irons/steel-shaft/search",
-              "ping iron",
-              null,
-              75.0,
-              Condition.USED),
-          new SearchDefinition(
-              "/a/marketplace/sports/golf/irons/steel-shaft/search",
-              "taylormade iron",
-              null,
-              75.0,
-              Condition.USED),
-          new SearchDefinition(
-              "/a/marketplace/sports/golf/irons/steel-shaft/search",
-              "callaway iron",
-              null,
-              75.0,
-              Condition.USED),
-          new SearchDefinition(
               "/a/marketplace/computers/components/cpus/amd/search",
               "ryzen 7 5700x3d",
               null,

@@ -17,7 +17,7 @@ public class SearchFactoryImplTest {
     // assert
     assertThat(searches).isNotEmpty();
     assertThat(searches.getFirst().baseUrl().toString())
-        .isEqualTo("http://trademe-stub:8080/a/marketplace/sports/golf/irons/steel-shaft/search");
+        .isEqualTo("http://trademe-stub:8080/a/marketplace/computers/components/cpus/amd/search");
     assertThat(searches)
         .allSatisfy(search -> assertThat(search.baseUrl().getHost()).isEqualTo("trademe-stub"));
   }
