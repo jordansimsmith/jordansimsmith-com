@@ -1,6 +1,6 @@
 # Packing list web
 
-The packing list web service is a responsive single-page app that lets an authenticated user create, edit, and pack per-trip packing lists from a base template plus optional variations.
+The packing list web service is a responsive single-page app that lets an authenticated user create, edit, delete, and pack per-trip packing lists from a base template plus optional variations.
 
 ## Overview
 
@@ -15,6 +15,7 @@ The packing list web service is a responsive single-page app that lets an authen
 - As a traveler, I want to generate a trip list from templates and optional variations, so that packing preparation starts quickly.
 - As a traveler actively packing, I want to edit items and statuses with autosave, so that progress is persisted without manual save actions.
 - As a returning user, I want protected trip routes with persisted session state, so that I can resume my packing workflow smoothly.
+- As a traveler, I want to delete a trip I no longer need, so that my trip list stays clean.
 
 ## Features and scope boundaries
 
@@ -22,7 +23,7 @@ The packing list web service is a responsive single-page app that lets an authen
 
 - Authenticate with username/password, validate credentials against the backend, and persist a Basic auth token in browser storage.
 - Protect trip routes (`/trips`, `/trips/create`, `/trips/:tripId`) and redirect unauthenticated users to `/`.
-- List trips, create a trip from templates and optional variations, and open an existing trip for packing.
+- List trips, create a trip from templates and optional variations, open an existing trip for packing, and delete a trip with a confirmation dialog.
 - Build the create-flow packing list client-side, including add/remove/edit actions before persisting.
 - Persist trip creation via `POST /trips` and trip updates via full replacement `PUT /trips/{trip_id}`.
 - Provide responsive UI behavior for both mobile and desktop layouts.
@@ -88,13 +89,14 @@ sequenceDiagram
 
 ### Consumed backend endpoints
 
-| Method | Path               | Purpose                                                 |
-| ------ | ------------------ | ------------------------------------------------------- |
-| `GET`  | `/templates`       | validate session and load base template plus variations |
-| `GET`  | `/trips`           | fetch trip summaries for trips list                     |
-| `POST` | `/trips`           | create a trip with fully materialized items             |
-| `GET`  | `/trips/{trip_id}` | fetch one trip for packing/editing                      |
-| `PUT`  | `/trips/{trip_id}` | replace full trip payload after edits                   |
+| Method   | Path               | Purpose                                                 |
+| -------- | ------------------ | ------------------------------------------------------- |
+| `GET`    | `/templates`       | validate session and load base template plus variations |
+| `GET`    | `/trips`           | fetch trip summaries for trips list                     |
+| `POST`   | `/trips`           | create a trip with fully materialized items             |
+| `GET`    | `/trips/{trip_id}` | fetch one trip for packing/editing                      |
+| `PUT`    | `/trips/{trip_id}` | replace full trip payload after edits                   |
+| `DELETE` | `/trips/{trip_id}` | delete a trip                                           |
 
 ### UI contract expectations
 
@@ -129,6 +131,8 @@ sequenceDiagram
 - `hide packed` filtering is applied before category grouping, and empty categories are not rendered.
 - Dates are formatted for API as `YYYY-MM-DD` and displayed with browser locale formatting from local `Date` objects.
 - Trip edits in `TripPage` are autosaved with a 500ms debounce and pending changes are flushed on unmount.
+- Trip deletion requires user confirmation via a modal dialog before calling the API.
+- After successful deletion, the UI navigates to `/trips` and the deleted trip no longer appears in the list.
 
 ## Source of truth
 
@@ -175,7 +179,7 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client, w
 ## Testing and quality gates
 
 - Unit and component tests run with Vitest and React Testing Library in `jsdom`.
-- Key coverage areas include login and route protection, create flow interactions, and trip editing/packing behavior.
+- Key coverage areas include login and route protection, create flow interactions, trip editing/packing behavior, and trip deletion.
 - Required checks before merge:
   - `bazel test //packing_list_web:unit-tests`
   - `bazel build //packing_list_web:typecheck`
@@ -191,6 +195,7 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client, w
   - open `/trips` and verify trip list renders
   - create a trip from `/trips/create` and confirm redirect to `/trips/{trip_id}`
   - change statuses or item details in trip view and confirm autosave behavior
+  - delete a trip and confirm it disappears from the list
 
 ## End-to-end scenarios
 
@@ -209,3 +214,10 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client, w
 3. User updates item status, edits quantities/tags, or adds/removes items.
 4. App applies updates locally and autosaves via debounced `PUT /trips/{trip_id}` with full trip payload.
 5. User can toggle `hide packed` and continue packing with current persisted state.
+
+### Scenario 3: delete a trip
+
+1. User clicks the delete button on a trip row in the trips list or on the trip detail page.
+2. App shows a confirmation dialog asking the user to confirm deletion.
+3. User confirms, and app sends `DELETE /trips/{trip_id}`.
+4. On success, app navigates to `/trips` and the deleted trip no longer appears in the list.

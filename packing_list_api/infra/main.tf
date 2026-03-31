@@ -69,6 +69,10 @@ locals {
       target  = "//packing_list_api:update-trip-handler_deploy.jar"
       handler = "com.jordansimsmith.packinglist.UpdateTripHandler"
     }
+    delete_trip = {
+      target  = "//packing_list_api:delete-trip-handler_deploy.jar"
+      handler = "com.jordansimsmith.packinglist.DeleteTripHandler"
+    }
   }
 
   root_resources = {
@@ -88,6 +92,7 @@ locals {
     find_trips    = { resource = "trips", method = "GET", lambda = "find_trips" }
     get_trip      = { resource = "trip", method = "GET", lambda = "get_trip" }
     update_trip   = { resource = "trip", method = "PUT", lambda = "update_trip" }
+    delete_trip   = { resource = "trip", method = "DELETE", lambda = "delete_trip" }
   }
 
   all_resource_ids = merge(
@@ -248,6 +253,7 @@ data "aws_iam_policy_document" "lambda_dynamodb_allow_policy_document" {
       "dynamodb:BatchGetItem",
       "dynamodb:Scan",
       "dynamodb:Query",
+      "dynamodb:DeleteItem",
       "dynamodb:ConditionCheckItem",
     ]
   }
@@ -402,7 +408,7 @@ resource "aws_api_gateway_integration_response" "options" {
 
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Authorization,Content-Type'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'https://packing-list.jordansimsmith.com'"
   }
 }

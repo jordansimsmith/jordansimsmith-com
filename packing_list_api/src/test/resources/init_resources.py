@@ -110,6 +110,11 @@ configs = [
         "handler_name": "com.jordansimsmith.packinglist.UpdateTripHandler",
         "zip_file": "update-trip-handler_deploy.jar",
     },
+    {
+        "function_name": "delete_trip_handler",
+        "handler_name": "com.jordansimsmith.packinglist.DeleteTripHandler",
+        "zip_file": "delete-trip-handler_deploy.jar",
+    },
 ]
 
 # create /trips resource
@@ -207,6 +212,22 @@ apigateway_client.put_integration(
     type="AWS_PROXY",
     integrationHttpMethod="POST",
     uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:update_trip_handler/invocations",
+)
+
+# DELETE /trips/{trip_id} -> delete_trip_handler
+apigateway_client.put_method(
+    restApiId=api_id,
+    resourceId=trip_resource_id,
+    httpMethod="DELETE",
+    authorizationType="NONE",
+)
+apigateway_client.put_integration(
+    restApiId=api_id,
+    resourceId=trip_resource_id,
+    httpMethod="DELETE",
+    type="AWS_PROXY",
+    integrationHttpMethod="POST",
+    uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:delete_trip_handler/invocations",
 )
 
 apigateway_client.create_deployment(restApiId=api_id, stageName="local")

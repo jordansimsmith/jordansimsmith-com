@@ -199,5 +199,46 @@ public class PackingListE2ETest {
     assertThat(beachTowelItem.category()).isEqualTo("Beach Gear");
     assertThat(beachTowelItem.quantity()).isEqualTo(2);
     assertThat(beachTowelItem.status()).isEqualTo("unpacked");
+
+    // delete trip
+    var deleteHttpRequest =
+        HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl + "/trips/" + tripId))
+            .header("Authorization", authHeader)
+            .DELETE()
+            .build();
+
+    var deleteHttpResponse =
+        httpClient.send(deleteHttpRequest, HttpResponse.BodyHandlers.ofString());
+    assertThat(deleteHttpResponse.statusCode()).isEqualTo(204);
+
+    // verify trip is gone from list
+    var listAfterDeleteHttpRequest =
+        HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl + "/trips"))
+            .header("Authorization", authHeader)
+            .GET()
+            .build();
+
+    var listAfterDeleteHttpResponse =
+        httpClient.send(listAfterDeleteHttpRequest, HttpResponse.BodyHandlers.ofString());
+    assertThat(listAfterDeleteHttpResponse.statusCode()).isEqualTo(200);
+
+    var listAfterDeleteResponse =
+        objectMapper.readValue(
+            listAfterDeleteHttpResponse.body(), FindTripsHandler.FindTripsResponse.class);
+    assertThat(listAfterDeleteResponse.trips()).isEmpty();
+
+    // verify get returns 404
+    var getAfterDeleteHttpRequest =
+        HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl + "/trips/" + tripId))
+            .header("Authorization", authHeader)
+            .GET()
+            .build();
+
+    var getAfterDeleteHttpResponse =
+        httpClient.send(getAfterDeleteHttpRequest, HttpResponse.BodyHandlers.ofString());
+    assertThat(getAfterDeleteHttpResponse.statusCode()).isEqualTo(404);
   }
 }

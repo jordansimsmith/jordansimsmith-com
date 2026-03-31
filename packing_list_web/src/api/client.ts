@@ -91,6 +91,7 @@ export interface ApiClient {
   createTrip(request: CreateTripRequest): Promise<CreateTripResponse>;
   getTrip(tripId: string): Promise<GetTripResponse>;
   updateTrip(request: UpdateTripRequest): Promise<UpdateTripResponse>;
+  deleteTrip(tripId: string): Promise<void>;
 }
 
 export const apiClient: ApiClient = import.meta.env.PROD

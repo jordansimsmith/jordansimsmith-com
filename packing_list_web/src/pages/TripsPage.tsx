@@ -9,8 +9,10 @@ import {
   Skeleton,
   Divider,
   Box,
+  ActionIcon,
+  Modal,
 } from '@mantine/core';
-import { IconPlane, IconPlus } from '@tabler/icons-react';
+import { IconPlane, IconPlus, IconTrash } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
 import { AppShellLayout } from '../layouts/AppShellLayout';
@@ -18,29 +20,53 @@ import { apiClient } from '../api/client';
 import type { TripSummary } from '../api/client';
 import { formatDateDisplay } from '../domain/dates';
 
-function TripRow({ trip }: { trip: TripSummary }) {
+function TripRow({
+  trip,
+  onDelete,
+}: {
+  trip: TripSummary;
+  onDelete: (trip: TripSummary) => void;
+}) {
   const navigate = useNavigate();
 
   return (
-    <Box
-      py="md"
-      px="sm"
-      style={{ cursor: 'pointer' }}
-      onClick={() => navigate(`/trips/${trip.trip_id}`)}
-    >
+    <Box py="md" px="sm">
       <Group justify="space-between" wrap="nowrap">
-        <Stack gap={4}>
-          <Text fw={500} size="lg">
-            {trip.name}
-          </Text>
-          <Text size="sm" c="dimmed">
-            {trip.destination}
-          </Text>
-        </Stack>
-        <Text size="sm" c="dimmed" ta="right" style={{ whiteSpace: 'nowrap' }}>
-          {formatDateDisplay(trip.departure_date)} –{' '}
-          {formatDateDisplay(trip.return_date)}
-        </Text>
+        <Box
+          style={{ cursor: 'pointer', flex: 1, minWidth: 0 }}
+          onClick={() => navigate(`/trips/${trip.trip_id}`)}
+        >
+          <Group justify="space-between" wrap="nowrap">
+            <Stack gap={4}>
+              <Text fw={500} size="lg">
+                {trip.name}
+              </Text>
+              <Text size="sm" c="dimmed">
+                {trip.destination}
+              </Text>
+            </Stack>
+            <Text
+              size="sm"
+              c="dimmed"
+              ta="right"
+              style={{ whiteSpace: 'nowrap' }}
+            >
+              {formatDateDisplay(trip.departure_date)} –{' '}
+              {formatDateDisplay(trip.return_date)}
+            </Text>
+          </Group>
+        </Box>
+        <ActionIcon
+          variant="subtle"
+          color="red"
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(trip);
+          }}
+          aria-label={`Delete ${trip.name}`}
+        >
+          <IconTrash size={18} />
+        </ActionIcon>
       </Group>
     </Box>
   );
@@ -84,6 +110,8 @@ export function TripsPage() {
   const [trips, setTrips] = useState<TripSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deletingTrip, setDeletingTrip] = useState<TripSummary | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     const fetchTrips = async () => {
@@ -105,6 +133,24 @@ export function TripsPage() {
 
     fetchTrips();
   }, []);
+
+  const handleConfirmDelete = async () => {
+    if (!deletingTrip) return;
+
+    setDeleteLoading(true);
+    try {
+      await apiClient.deleteTrip(deletingTrip.trip_id);
+      setTrips((prev) =>
+        prev.filter((t) => t.trip_id !== deletingTrip.trip_id),
+      );
+      setDeletingTrip(null);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to delete trip';
+      notifications.show({ title: 'Error', message, color: 'red' });
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
 
   return (
     <AppShellLayout>
@@ -144,12 +190,43 @@ export function TripsPage() {
           <Stack gap={0}>
             {trips.map((trip, index) => (
               <div key={trip.trip_id}>
-                <TripRow trip={trip} />
+                <TripRow trip={trip} onDelete={setDeletingTrip} />
                 {index < trips.length - 1 && <Divider />}
               </div>
             ))}
           </Stack>
         )}
+
+        <Modal
+          opened={deletingTrip !== null}
+          onClose={() => setDeletingTrip(null)}
+          title="Delete trip"
+          centered
+        >
+          <Text mb="lg">
+            Are you sure you want to delete{' '}
+            <Text span fw={600}>
+              {deletingTrip?.name}
+            </Text>
+            ? This action cannot be undone.
+          </Text>
+          <Group justify="flex-end">
+            <Button
+              variant="default"
+              onClick={() => setDeletingTrip(null)}
+              disabled={deleteLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="red"
+              onClick={handleConfirmDelete}
+              loading={deleteLoading}
+            >
+              Delete
+            </Button>
+          </Group>
+        </Modal>
       </Container>
     </AppShellLayout>
   );

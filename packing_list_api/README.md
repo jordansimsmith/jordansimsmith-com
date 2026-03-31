@@ -1,6 +1,6 @@
 # Packing list API
 
-The packing list API service provides an authenticated HTTP API for reading shared packing templates and creating, listing, fetching, and updating per-user trip packing lists.
+The packing list API service provides an authenticated HTTP API for reading shared packing templates and creating, listing, fetching, updating, and deleting per-user trip packing lists.
 
 ## Overview
 
@@ -14,7 +14,7 @@ The packing list API service provides an authenticated HTTP API for reading shar
 ## User stories
 
 - As a traveler, I want template and variation data, so that I can assemble a trip packing list quickly.
-- As an authenticated user, I want to create, list, fetch, and update only my own trips, so that my packing data stays scoped to me.
+- As an authenticated user, I want to create, list, fetch, update, and delete only my own trips, so that my packing data stays scoped to me.
 - As a client app developer, I want deterministic validation and full-replacement trip updates, so that edit flows are predictable.
 
 ## Features and scope boundaries
@@ -28,6 +28,7 @@ The packing list API service provides an authenticated HTTP API for reading shar
 - List per-user trips in departure-date-descending order via `GET /trips`.
 - Fetch one per-user trip with full item details via `GET /trips/{trip_id}`.
 - Replace full trip content (metadata + items) via `PUT /trips/{trip_id}`.
+- Delete a per-user trip via `DELETE /trips/{trip_id}`.
 - Validate request payloads with deterministic error messages.
 
 ### Out of scope
@@ -114,13 +115,14 @@ sequenceDiagram
 
 ### Endpoint summary
 
-| Method | Path               | Purpose                                    |
-| ------ | ------------------ | ------------------------------------------ |
-| `GET`  | `/templates`       | return base template and variations        |
-| `POST` | `/trips`           | create a trip with full item snapshot      |
-| `GET`  | `/trips`           | list trip summaries for authenticated user |
-| `GET`  | `/trips/{trip_id}` | fetch one trip with item details           |
-| `PUT`  | `/trips/{trip_id}` | replace one trip (metadata + items)        |
+| Method   | Path               | Purpose                                    |
+| -------- | ------------------ | ------------------------------------------ |
+| `GET`    | `/templates`       | return base template and variations        |
+| `POST`   | `/trips`           | create a trip with full item snapshot      |
+| `GET`    | `/trips`           | list trip summaries for authenticated user |
+| `GET`    | `/trips/{trip_id}` | fetch one trip with item details           |
+| `PUT`    | `/trips/{trip_id}` | replace one trip (metadata + items)        |
+| `DELETE` | `/trips/{trip_id}` | delete one trip for authenticated user     |
 
 ### Example request and response
 
@@ -178,6 +180,14 @@ Representative key failures:
 - `404`: trip not found in user scope (`{"message":"Not Found"}`)
 - `401`: unauthorized at API Gateway with `WWW-Authenticate: Basic`
 
+`DELETE /trips/{trip_id}`
+
+Response `204` (no body).
+
+Representative key failures for delete:
+
+- `404`: trip not found in user scope (`{"message":"Not Found"}`)
+
 `GET /templates` returns one `base_template` and a `variations` array. The full current catalog is defined in `packing_list_api/src/main/java/com/jordansimsmith/packinglist/TemplatesFactoryImpl.java`.
 
 ## Data and storage contracts
@@ -234,6 +244,7 @@ Representative key failures:
 - `created_at` and `updated_at` are epoch seconds; `created_at` is preserved on update and `updated_at` is replaced.
 - `GET /trips` returns summaries in descending `departure_date` order.
 - Updates are last-write-wins full replacements (no optimistic locking in current scope).
+- Delete removes the `TRIP#...` DynamoDB item; deleted trips do not appear in subsequent list or get calls.
 
 ## Source of truth
 
@@ -242,7 +253,7 @@ Representative key failures:
 | Template catalog        | `TemplatesFactoryImpl` in service code      | returned by `GET /templates`; not persisted in DynamoDB |
 | User credentials        | Secrets Manager secret `packing_list_api`   | read by `AuthHandler` authorizer                        |
 | Request user identity   | Basic username from `Authorization` header  | used to scope all DynamoDB keys                         |
-| Trip metadata and items | DynamoDB `TRIP#...` items in `packing_list` | canonical state for create/list/get/update              |
+| Trip metadata and items | DynamoDB `TRIP#...` items in `packing_list` | canonical state for create/list/get/update/delete       |
 | Trip list ordering      | DynamoDB `gsi1sk` key format                | derived from persisted `departure_date` and `trip_id`   |
 
 ## Security and privacy
@@ -288,8 +299,8 @@ Expected secret JSON for `packing_list_api`:
 ## Testing and quality gates
 
 - Unit tests cover authentication, template response mapping, and trip validation rules.
-- Integration tests cover create/list/get/update handlers against DynamoDB Testcontainers.
-- E2E tests cover create -> list -> get -> update -> get flows with LocalStack.
+- Integration tests cover create/list/get/update/delete handlers against DynamoDB Testcontainers.
+- E2E tests cover create -> list -> get -> update -> get -> delete -> verify gone flows with LocalStack.
 - Required service checks:
   - `bazel build //packing_list_api:all`
   - `bazel test //packing_list_api:all`
@@ -308,6 +319,7 @@ Expected secret JSON for `packing_list_api`:
   2. `GET /trips` returns the created trip summary for the same user.
   3. `GET /trips/{trip_id}` returns full item details.
   4. `PUT /trips/{trip_id}` updates fields and preserves `created_at`.
+  5. `DELETE /trips/{trip_id}` returns `204` and trip no longer appears in `GET /trips`.
 
 ## End-to-end scenarios
 
@@ -324,3 +336,11 @@ Expected secret JSON for `packing_list_api`:
 2. Client sends authenticated `PUT /trips/{trip_id}` with full replacement payload.
 3. API validates `trip_id` match, preserves `created_at`, updates `updated_at`, and rewrites the trip record.
 4. Client calls `GET /trips/{trip_id}` and sees the persisted changes.
+
+### Scenario 3: delete a trip
+
+1. Client sends authenticated `DELETE /trips/{trip_id}`.
+2. API verifies the trip exists and belongs to the authenticated user.
+3. API deletes the `TRIP#...` DynamoDB item and returns `204`.
+4. Client calls `GET /trips` and the deleted trip no longer appears.
+5. Client calls `GET /trips/{trip_id}` and receives `404`.

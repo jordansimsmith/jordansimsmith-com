@@ -1,4 +1,5 @@
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { Notifications, notifications } from '@mantine/notifications';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
@@ -139,5 +140,67 @@ describe('TripsPage', () => {
     await waitFor(() => {
       expect(screen.getAllByText('Network error').length).toBeGreaterThan(0);
     });
+  });
+
+  it('deletes a trip after confirmation', async () => {
+    const user = userEvent.setup();
+
+    localStorage.setItem(
+      'packing_list_auth',
+      JSON.stringify({
+        username: 'testuser',
+        token: 'dGVzdHVzZXI6dGVzdHBhc3M=',
+      }),
+    );
+
+    vi.spyOn(clientModule.apiClient, 'getTrips').mockResolvedValue({
+      trips: [
+        {
+          trip_id: 'trip-001',
+          name: 'Japan 2025',
+          destination: 'Tokyo',
+          departure_date: '2025-03-15',
+          return_date: '2025-03-29',
+          created_at: 1735000000,
+          updated_at: 1735000000,
+        },
+        {
+          trip_id: 'trip-002',
+          name: 'Ski trip',
+          destination: 'Queenstown',
+          departure_date: '2025-07-10',
+          return_date: '2025-07-17',
+          created_at: 1735100000,
+          updated_at: 1735100000,
+        },
+      ],
+    });
+
+    const deleteTripSpy = vi
+      .spyOn(clientModule.apiClient, 'deleteTrip')
+      .mockResolvedValue(undefined);
+
+    renderTripsPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Japan 2025')).toBeDefined();
+    });
+
+    const deleteButton = screen.getByLabelText('Delete Japan 2025');
+    await user.click(deleteButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeDefined();
+    });
+
+    const confirmButton = screen.getByRole('button', { name: 'Delete' });
+    await user.click(confirmButton);
+
+    await waitFor(() => {
+      expect(deleteTripSpy).toHaveBeenCalledWith('trip-001');
+    });
+
+    expect(screen.queryByText('Japan 2025')).toBeNull();
+    expect(screen.getByText('Ski trip')).toBeDefined();
   });
 });

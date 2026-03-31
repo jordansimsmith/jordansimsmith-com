@@ -315,5 +315,19 @@ export function createFakeClient(): ApiClient {
 
       return { trip: updatedTrip };
     },
+
+    async deleteTrip(tripId: string): Promise<void> {
+      const session = getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const tripIndex = trips.findIndex((t) => t.trip_id === tripId);
+      if (tripIndex === -1) {
+        throw new Error('Not Found');
+      }
+
+      trips.splice(tripIndex, 1);
+    },
   };
 }

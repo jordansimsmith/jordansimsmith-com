@@ -13,10 +13,16 @@ import {
   ActionIcon,
   Loader,
   Button,
+  Modal,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
 import { notifications } from '@mantine/notifications';
-import { IconArrowLeft, IconPencil, IconPlus } from '@tabler/icons-react';
+import {
+  IconArrowLeft,
+  IconPencil,
+  IconPlus,
+  IconTrash,
+} from '@tabler/icons-react';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { apiClient } from '../api/client';
 import type { Trip, TripItem, TripItemStatus } from '../api/client';
@@ -56,7 +62,7 @@ function ItemRowSkeleton() {
   );
 }
 
-type ModalType = 'addItem' | 'editItem' | 'editTrip' | null;
+type ModalType = 'addItem' | 'editItem' | 'editTrip' | 'deleteTrip' | null;
 
 const AUTOSAVE_DEBOUNCE_MS = 500;
 
@@ -259,6 +265,24 @@ export function TripPage() {
     setEditingItemKey(null);
   };
 
+  const handleConfirmDelete = async () => {
+    if (!tripId) return;
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+      pendingTripRef.current = null;
+    }
+
+    try {
+      await apiClient.deleteTrip(tripId);
+      navigate('/trips');
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to delete trip';
+      notifications.show({ title: 'Error', message, color: 'red' });
+      setActiveModal(null);
+    }
+  };
+
   const filteredItems = trip
     ? hidePacked
       ? trip.items.filter((item) => item.status !== 'packed')
@@ -291,6 +315,14 @@ export function TripPage() {
                 aria-label="Edit trip details"
               >
                 <IconPencil size={20} />
+              </ActionIcon>
+              <ActionIcon
+                variant="subtle"
+                color="red"
+                onClick={() => setActiveModal('deleteTrip')}
+                aria-label="Delete trip"
+              >
+                <IconTrash size={20} />
               </ActionIcon>
             </>
           )}
@@ -397,6 +429,29 @@ export function TripPage() {
           form={editTripForm}
           onSubmit={handleEditTrip}
         />
+
+        <Modal
+          opened={activeModal === 'deleteTrip'}
+          onClose={handleCloseModal}
+          title="Delete trip"
+          centered
+        >
+          <Text mb="lg">
+            Are you sure you want to delete{' '}
+            <Text span fw={600}>
+              {trip?.name}
+            </Text>
+            ? This action cannot be undone.
+          </Text>
+          <Group justify="flex-end">
+            <Button variant="default" onClick={handleCloseModal}>
+              Cancel
+            </Button>
+            <Button color="red" onClick={handleConfirmDelete}>
+              Delete
+            </Button>
+          </Group>
+        </Modal>
       </Container>
     </AppShellLayout>
   );

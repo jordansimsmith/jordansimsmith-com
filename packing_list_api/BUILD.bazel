@@ -151,6 +151,28 @@ java_binary(
 )
 
 java_binary(
+    name = "delete-trip-handler",
+    srcs = glob(["src/main/java/com/jordansimsmith/packinglist/DeleteTripHandler.java"]),
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
     name = "update-trip-handler",
     srcs = glob(["src/main/java/com/jordansimsmith/packinglist/UpdateTripHandler.java"]),
     create_executable = False,
@@ -248,6 +270,7 @@ java_test_suite(
     runtime_deps = JUNIT5_DEPS,
     deps = [
         ":create-trip-handler",
+        ":delete-trip-handler",
         ":find-trips-handler",
         ":get-trip-handler",
         ":lib",
@@ -276,6 +299,7 @@ pkg_tar(
     testonly = True,
     srcs = [
         ":create-trip-handler_deploy.jar",
+        ":delete-trip-handler_deploy.jar",
         ":find-trips-handler_deploy.jar",
         ":get-trip-handler_deploy.jar",
         ":update-trip-handler_deploy.jar",
@@ -335,6 +359,7 @@ java_test_suite(
     runtime_deps = JUNIT5_DEPS,
     deps = [
         ":create-trip-handler",
+        ":delete-trip-handler",
         ":find-trips-handler",
         ":get-trip-handler",
         ":lib",

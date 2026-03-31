@@ -151,5 +151,30 @@ export function createHttpClient(): ApiClient {
 
       return response.json();
     },
+
+    async deleteTrip(tripId: string): Promise<void> {
+      const session = getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      const response = await fetch(`${BASE_URL}/trips/${tripId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Basic ${session.token}`,
+        },
+      });
+
+      if (!response.ok) {
+        let message = `Request failed: ${response.statusText}`;
+        try {
+          const error = await response.json();
+          message = error.message || message;
+        } catch {
+          // use default message
+        }
+        throw new Error(message);
+      }
+    },
   };
 }

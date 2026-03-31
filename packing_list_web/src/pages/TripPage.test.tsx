@@ -729,6 +729,69 @@ describe('TripPage', () => {
     expect(itemTexts).toEqual(['Apple watch', 'Mittens', 'Zebra hat']);
   });
 
+  it('deletes trip after confirmation and navigates to trips list', async () => {
+    const user = userEvent.setup();
+
+    localStorage.setItem(
+      'packing_list_auth',
+      JSON.stringify({
+        username: 'testuser',
+        token: 'dGVzdHVzZXI6dGVzdHBhc3M=',
+      }),
+    );
+
+    const mockTrip = {
+      trip_id: 'trip-001',
+      name: 'Test Trip',
+      destination: 'Destination',
+      departure_date: '2025-03-15',
+      return_date: '2025-03-29',
+      items: [
+        {
+          name: 'Passport',
+          category: 'travel',
+          quantity: 1,
+          tags: [],
+          status: 'unpacked' as const,
+        },
+      ],
+      created_at: 1735000000,
+      updated_at: 1735000000,
+    };
+
+    vi.spyOn(clientModule.apiClient, 'getTrip').mockResolvedValue({
+      trip: mockTrip,
+    });
+
+    const deleteTripSpy = vi
+      .spyOn(clientModule.apiClient, 'deleteTrip')
+      .mockResolvedValue(undefined);
+
+    renderTripPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('Test Trip')).toBeDefined();
+    });
+
+    const deleteButton = screen.getByLabelText('Delete trip');
+    await user.click(deleteButton);
+
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeDefined();
+    });
+
+    const confirmButton = screen.getByRole('button', { name: 'Delete' });
+    await user.click(confirmButton);
+
+    await waitFor(() => {
+      expect(deleteTripSpy).toHaveBeenCalledWith('trip-001');
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Trips page')).toBeDefined();
+    });
+  });
+
   it('can edit trip details via the edit trip modal', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
