@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI coding agents when working with code in this repository.
 
 ## Project context
 
@@ -23,7 +23,7 @@ For service README authoring and update standards, use the project skill at `.cu
 
 - Write commit subjects in imperative mood (e.g., `Implement backup upload flow`)
 - Use Sentence case for commit subjects
-- Do not prefix commit subjects with a service name and colon (e.g., avoid `anki_backup_api: Implement backup`)
+- Do not prefix commit subjects with conventional commit types (e.g., avoid `feat:`, `fix:`, `chore():`) or service names (e.g., avoid `anki_backup_api: Implement backup`)
 - Follow existing repository commit history patterns for concise, action-oriented subjects
 
 ## Steps after task completion
