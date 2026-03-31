@@ -1,6 +1,5 @@
 import type { Trip, TripItem, TripItemStatus, ApiClient } from '../api/client';
 import { normalizedName } from '../domain/normalize';
-import { formatDateForApi } from '../domain/dates';
 import {
   upsertTripItem,
   removeTripItem,
@@ -23,8 +22,8 @@ export interface EditItemValues {
 export interface EditTripValues {
   name: string;
   destination: string;
-  departure_date: Date;
-  return_date: Date;
+  departure_date: string;
+  return_date: string;
 }
 
 interface TripPresenterDeps {
@@ -92,8 +91,8 @@ export class TripPresenter {
       ...trip,
       name: values.name.trim(),
       destination: values.destination.trim(),
-      departure_date: formatDateForApi(values.departure_date),
-      return_date: formatDateForApi(values.return_date),
+      departure_date: values.departure_date,
+      return_date: values.return_date,
     };
   }
 }

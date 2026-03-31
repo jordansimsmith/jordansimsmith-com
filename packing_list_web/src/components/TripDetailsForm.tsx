@@ -5,8 +5,8 @@ import type { UseFormReturnType } from '@mantine/form';
 export interface TripFormValues {
   name: string;
   destination: string;
-  departure_date: Date | null;
-  return_date: Date | null;
+  departure_date: string | null;
+  return_date: string | null;
 }
 
 interface TripDetailsFormProps {

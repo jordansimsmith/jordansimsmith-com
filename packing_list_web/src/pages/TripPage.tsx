@@ -26,7 +26,7 @@ import {
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { apiClient } from '../api/client';
 import type { Trip, TripItem, TripItemStatus } from '../api/client';
-import { formatDateDisplay, parseDateFromApi } from '../domain/dates';
+import { formatDateDisplay } from '../domain/dates';
 import { CategorySection } from '../components/CategorySection';
 import {
   AddItemModal,
@@ -240,8 +240,8 @@ export function TripPage() {
     editTripForm.setValues({
       name: trip.name,
       destination: trip.destination,
-      departure_date: parseDateFromApi(trip.departure_date),
-      return_date: parseDateFromApi(trip.return_date),
+      departure_date: trip.departure_date,
+      return_date: trip.return_date,
     });
     setActiveModal('editTrip');
   };

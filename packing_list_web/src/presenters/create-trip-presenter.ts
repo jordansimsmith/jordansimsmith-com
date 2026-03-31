@@ -5,7 +5,6 @@ import type {
   ApiClient,
 } from '../api/client';
 import { normalizedName } from '../domain/normalize';
-import { formatDateForApi } from '../domain/dates';
 import {
   mergeTemplateItemsIntoTripItems,
   upsertTripItem,
@@ -29,8 +28,8 @@ export interface EditItemValues {
 export interface CreateTripValues {
   name: string;
   destination: string;
-  departure_date: Date;
-  return_date: Date;
+  departure_date: string;
+  return_date: string;
 }
 
 export interface ApplyVariationResult {
@@ -125,8 +124,8 @@ export class CreateTripPresenter {
     const request: CreateTripRequest = {
       name: values.name.trim(),
       destination: values.destination.trim(),
-      departure_date: formatDateForApi(values.departure_date),
-      return_date: formatDateForApi(values.return_date),
+      departure_date: values.departure_date,
+      return_date: values.return_date,
       items,
     };
     const response = await this.apiClient.createTrip(request);

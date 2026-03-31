@@ -364,6 +364,79 @@ describe('CreateTripPage', () => {
     expect(categoryHeadings[2].textContent?.toLowerCase()).toBe('misc');
   });
 
+  it('creates trip and navigates to trip page on successful submission', async () => {
+    localStorage.setItem(
+      'packing_list_auth',
+      JSON.stringify({
+        username: 'testuser',
+        token: 'dGVzdHVzZXI6dGVzdHBhc3M=',
+      }),
+    );
+
+    vi.spyOn(clientModule.apiClient, 'getTemplates').mockResolvedValue(
+      mockTemplatesResponse,
+    );
+
+    const mockCreateTrip = vi
+      .spyOn(clientModule.apiClient, 'createTrip')
+      .mockResolvedValue({
+        trip: {
+          trip_id: 'new-trip-123',
+          name: 'Beach Holiday',
+          destination: 'Bali',
+          departure_date: '2025-06-15',
+          return_date: '2025-06-25',
+          items: mockTemplatesResponse.base_template.items.map((item) => ({
+            ...item,
+            status: 'unpacked' as const,
+          })),
+          created_at: 1735000000,
+          updated_at: 1735000000,
+        },
+      });
+
+    const user = userEvent.setup();
+    renderCreateTripPage();
+
+    await waitFor(() => {
+      expect(screen.getByLabelText('Name')).toBeDefined();
+    });
+
+    await user.type(screen.getByLabelText('Name'), 'Beach Holiday');
+    await user.type(screen.getByLabelText('Destination'), 'Bali');
+
+    // select departure date (day 10 of the displayed month)
+    await user.click(screen.getByLabelText('Departure date'));
+    const [departureDay] = await screen.findAllByRole('button', {
+      name: /^10\s/,
+    });
+    await user.click(departureDay);
+
+    // wait for departure calendar to close
+    await waitFor(() => {
+      expect(
+        screen.queryAllByRole('button', { name: /^\d+\s\w+\s\d+$/ }),
+      ).toHaveLength(0);
+    });
+
+    // select return date (day 20 of the displayed month)
+    await user.click(screen.getByLabelText('Return date'));
+    const [returnDay] = await screen.findAllByRole('button', {
+      name: /^20\s/,
+    });
+    await user.click(returnDay);
+
+    await user.click(screen.getByRole('button', { name: 'Create trip' }));
+
+    await waitFor(() => {
+      expect(mockCreateTrip).toHaveBeenCalledOnce();
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('Trip detail page')).toBeDefined();
+    });
+  });
+
   it('sorts items alphabetically within each category', async () => {
     localStorage.setItem(
       'packing_list_auth',
