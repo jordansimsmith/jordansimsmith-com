@@ -28,7 +28,7 @@ public final class SubfootballMockServer {
     server.createContext(
         "/health", exchange -> respond(exchange, "text/plain; charset=utf-8", "ok"));
     server.createContext(
-        "/teams/calendar/4326",
+        "/teams/calendar/4475",
         exchange -> respond(exchange, "text/calendar; charset=utf-8", FIXTURES_ICAL));
     server.start();
     Thread.currentThread().join();
