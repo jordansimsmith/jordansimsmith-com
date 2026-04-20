@@ -5,9 +5,10 @@ import {
   ActionIcon,
   CloseButton,
   SegmentedControl,
-  Stack,
   Box,
+  em,
 } from '@mantine/core';
+import { useMediaQuery } from '@mantine/hooks';
 import { IconPencil } from '@tabler/icons-react';
 import type { TripItem, TripItemStatus } from '../api/client';
 
@@ -38,35 +39,46 @@ export function ItemRow({
   showStatusControl = false,
   onStatusChange,
 }: ItemRowProps) {
+  const isMobile = useMediaQuery(`(max-width: ${em(767)})`);
+
+  const statusControl = showStatusControl && (
+    <SegmentedControl
+      size="xs"
+      fullWidth={isMobile}
+      value={item.status}
+      onChange={(value) => onStatusChange?.(item.name, value as TripItemStatus)}
+      data={[
+        { label: 'Unpacked', value: 'unpacked' },
+        { label: 'Pack later', value: 'pack-just-in-time' },
+        { label: 'Packed', value: 'packed' },
+      ]}
+      color={getStatusColor(item.status)}
+    />
+  );
+
   if (showStatusControl) {
     return (
       <Box py="sm" px="xs">
         <Group justify="space-between" wrap="nowrap" align="flex-start">
-          <Stack gap={4} style={{ flex: 1 }}>
-            <Group gap="xs">
-              <Text
-                fw={500}
-                td={item.status === 'packed' ? 'line-through' : undefined}
-                c={item.status === 'packed' ? 'dimmed' : undefined}
-              >
-                {item.name}
-              </Text>
-              {item.quantity > 1 && (
-                <Badge size="sm" variant="light">
-                  ×{item.quantity}
-                </Badge>
-              )}
-            </Group>
-            {item.tags.length > 0 && (
-              <Group gap={4}>
-                {item.tags.map((tag) => (
-                  <Badge key={tag} size="xs" variant="outline" color="gray">
-                    {tag}
-                  </Badge>
-                ))}
-              </Group>
+          <Group gap="xs" wrap="wrap" style={{ flex: 1, minWidth: 0 }}>
+            <Text
+              fw={500}
+              td={item.status === 'packed' ? 'line-through' : undefined}
+              c={item.status === 'packed' ? 'dimmed' : undefined}
+            >
+              {item.name}
+            </Text>
+            {item.quantity > 1 && (
+              <Badge size="sm" variant="light">
+                ×{item.quantity}
+              </Badge>
             )}
-          </Stack>
+            {item.tags.map((tag) => (
+              <Badge key={tag} size="xs" variant="outline" color="gray">
+                {tag}
+              </Badge>
+            ))}
+          </Group>
           <Group gap="xs" wrap="nowrap">
             <ActionIcon
               size="xs"
@@ -81,21 +93,10 @@ export function ItemRow({
               aria-label={`Remove ${item.name}`}
               onClick={() => onRemove(item.name)}
             />
-            <SegmentedControl
-              size="xs"
-              value={item.status}
-              onChange={(value) =>
-                onStatusChange?.(item.name, value as TripItemStatus)
-              }
-              data={[
-                { label: 'Unpacked', value: 'unpacked' },
-                { label: 'Pack later', value: 'pack-just-in-time' },
-                { label: 'Packed', value: 'packed' },
-              ]}
-              color={getStatusColor(item.status)}
-            />
+            {!isMobile && statusControl}
           </Group>
         </Group>
+        {isMobile && <Box mt="xs">{statusControl}</Box>}
       </Box>
     );
   }
