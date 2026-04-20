@@ -20,21 +20,14 @@ public class TemplatesFactoryImpl implements TemplatesFactory {
     var items =
         List.of(
             // travel
-            new TemplateItem("esim", "travel", 1, List.of()),
-            new TemplateItem("wise card", "travel", 1, List.of()),
             new TemplateItem("bag lock", "travel", 1, List.of("hand luggage")),
             new TemplateItem("air tickets", "travel", 1, List.of("hand luggage")),
             new TemplateItem("accommodation reference", "travel", 1, List.of("hand luggage")),
-            new TemplateItem("foreign cash", "travel", 1, List.of("optional", "hand luggage")),
-            new TemplateItem("passport", "travel", 1, List.of("hand luggage")),
             new TemplateItem("drivers license", "travel", 1, List.of("hand luggage")),
-            new TemplateItem("visa documents", "travel", 1, List.of()),
-            new TemplateItem("travel insurance details", "travel", 1, List.of()),
             new TemplateItem("wallet", "travel", 1, List.of("hand luggage")),
             new TemplateItem("house/car keys", "travel", 1, List.of()),
             new TemplateItem("air tag", "travel", 1, List.of()),
             // electronics
-            new TemplateItem("foreign plugs", "electronics", 1, List.of()),
             new TemplateItem("power strip", "electronics", 1, List.of()),
             new TemplateItem("e-reader", "electronics", 1, List.of("hand luggage")),
             new TemplateItem("e-reader charger", "electronics", 1, List.of("hand luggage")),
@@ -250,6 +243,21 @@ public class TemplatesFactoryImpl implements TemplatesFactory {
                 new TemplateItem("gel seat", "gear", 1, List.of()),
                 new TemplateItem("panniers", "gear", 1, List.of())));
 
-    return List.of(tramping, camping, skiing, cycling);
+    var international =
+        new Variation(
+            "international",
+            "international",
+            List.of(
+                // travel
+                new TemplateItem("esim", "travel", 1, List.of()),
+                new TemplateItem("wise card", "travel", 1, List.of()),
+                new TemplateItem("foreign cash", "travel", 1, List.of("optional", "hand luggage")),
+                new TemplateItem("passport", "travel", 1, List.of("hand luggage")),
+                new TemplateItem("visa documents", "travel", 1, List.of()),
+                new TemplateItem("travel insurance details", "travel", 1, List.of()),
+                // electronics
+                new TemplateItem("foreign plugs", "electronics", 1, List.of())));
+
+    return List.of(tramping, camping, skiing, cycling, international);
   }
 }
