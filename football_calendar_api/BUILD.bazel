@@ -81,9 +81,9 @@ java_binary(
 )
 
 java_binary(
-    name = "comet-mock-server",
+    name = "nrf-mock-server",
     testonly = True,
-    srcs = ["src/test/java/com/jordansimsmith/footballcalendar/CometMockServer.java"],
+    srcs = ["src/test/java/com/jordansimsmith/footballcalendar/NrfMockServer.java"],
     create_executable = False,
 )
 
@@ -109,9 +109,9 @@ java_library(
         exclude = UNIT_TESTS + INTEGRATION_TESTS + E2E_TESTS,
     ),
     data = [
-        ":comet-mock-load",
         ":football-fix-mock-load",
         ":local-load",
+        ":nrf-mock-load",
         ":subfootball-mock-load",
     ],
     resources = [
@@ -236,29 +236,29 @@ oci_load(
 )
 
 pkg_tar(
-    name = "comet-mock-server.tar",
+    name = "nrf-mock-server.tar",
     testonly = True,
     srcs = [
-        ":comet-mock-server_deploy.jar",
+        ":nrf-mock-server_deploy.jar",
     ],
-    package_dir = "/opt/code/comet-mock/",
+    package_dir = "/opt/code/nrf-mock/",
 )
 
 oci_image(
-    name = "comet-mock-image",
+    name = "nrf-mock-image",
     testonly = True,
     base = "@temurin21jre//:temurin21jre",
     tars = [
-        ":comet-mock-server.tar",
+        ":nrf-mock-server.tar",
     ],
 )
 
 oci_load(
-    name = "comet-mock-load",
+    name = "nrf-mock-load",
     testonly = True,
-    image = ":comet-mock-image",
+    image = ":nrf-mock-image",
     repo_tags = [
-        "bazel/football-calendar-comet-mock:latest",
+        "bazel/football-calendar-nrf-mock:latest",
     ],
 )
 

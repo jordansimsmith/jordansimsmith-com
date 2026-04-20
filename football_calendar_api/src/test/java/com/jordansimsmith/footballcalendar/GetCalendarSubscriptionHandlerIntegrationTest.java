@@ -68,20 +68,20 @@ public class GetCalendarSubscriptionHandlerIntegrationTest {
     // arrange
     fakeTeamsFactory.addTeam(
         new TeamsFactory.NorthernRegionalFootballTeam(
-            "Flamingos", "flamingo", "44838", "2716594877", "2025"));
+            "Flamingos", "flamingo", 12869, 9701, 721150, 2026));
 
     var fixture =
         FootballCalendarItem.create(
             "Flamingos",
-            "2716942185",
-            "Bucklands Beach Bucks M5",
-            "Ellerslie AFC Flamingoes M",
-            Instant.parse("2025-04-05T15:00:00Z"),
-            "Lloyd Elsmore Park 2",
-            "2 Bells Avenue",
-            -36.9053315,
-            174.8997797,
-            "CONFIRMED");
+            "6334635",
+            "Bucklands Beach AFC Dusties",
+            "Ellerslie AFC Flamingos",
+            Instant.parse("2026-04-18T01:00:00Z"),
+            "Lloyd Elsmore Pk: Field 2",
+            "Lloyd Elsmore Park",
+            -36.910553,
+            174.90271,
+            "Confirmed");
     footballCalendarTable.putItem(fixture);
 
     var event = APIGatewayV2HTTPEvent.builder().build();
@@ -98,14 +98,14 @@ public class GetCalendarSubscriptionHandlerIntegrationTest {
 
     var calendarEvent = calendar.getEvents().get(0);
     assertThat(calendarEvent.getSummary().getValue())
-        .isEqualTo("Bucklands Beach Bucks M5 vs Ellerslie AFC Flamingoes M");
+        .isEqualTo("Bucklands Beach AFC Dusties vs Ellerslie AFC Flamingos");
     assertThat(calendarEvent.getDateStart().getValue())
-        .isEqualTo(Date.from(Instant.parse("2025-04-05T15:00:00Z")));
+        .isEqualTo(Date.from(Instant.parse("2026-04-18T01:00:00Z")));
     assertThat(calendarEvent.getLocation().getValue())
-        .isEqualTo("Lloyd Elsmore Park 2, 2 Bells Avenue");
-    assertThat(calendarEvent.getDescription().getValue()).contains("CONFIRMED");
-    assertThat(calendarEvent.getGeo().getLatitude()).isCloseTo(-36.9053315, within(0.00001));
-    assertThat(calendarEvent.getGeo().getLongitude()).isCloseTo(174.8997797, within(0.00001));
+        .isEqualTo("Lloyd Elsmore Pk: Field 2, Lloyd Elsmore Park");
+    assertThat(calendarEvent.getDescription().getValue()).contains("Confirmed");
+    assertThat(calendarEvent.getGeo().getLatitude()).isCloseTo(-36.910553, within(0.00001));
+    assertThat(calendarEvent.getGeo().getLongitude()).isCloseTo(174.90271, within(0.00001));
   }
 
   @Test
@@ -161,7 +161,7 @@ public class GetCalendarSubscriptionHandlerIntegrationTest {
     // arrange
     fakeTeamsFactory.addTeam(
         new TeamsFactory.NorthernRegionalFootballTeam(
-            "Flamingos", "flamingo", "44838", "2716594877", "2025"));
+            "Flamingos", "flamingo", 12869, 9701, 721150, 2026));
     fakeTeamsFactory.addTeam(
         new TeamsFactory.FootballFixTeam(
             "Flamingos Sevens",
@@ -176,15 +176,15 @@ public class GetCalendarSubscriptionHandlerIntegrationTest {
     var nrfFixture =
         FootballCalendarItem.create(
             "Flamingos",
-            "2716942185",
-            "Bucklands Beach Bucks M5",
-            "Ellerslie AFC Flamingoes M",
-            Instant.parse("2025-04-05T15:00:00Z"),
-            "Lloyd Elsmore Park 2",
-            "2 Bells Avenue",
-            -36.9053315,
-            174.8997797,
-            "CONFIRMED");
+            "6334635",
+            "Bucklands Beach AFC Dusties",
+            "Ellerslie AFC Flamingos",
+            Instant.parse("2026-04-18T01:00:00Z"),
+            "Lloyd Elsmore Pk: Field 2",
+            "Lloyd Elsmore Park",
+            -36.910553,
+            174.90271,
+            "Confirmed");
     footballCalendarTable.putItem(nrfFixture);
 
     // add Football Fix fixture
@@ -218,6 +218,6 @@ public class GetCalendarSubscriptionHandlerIntegrationTest {
     var summaries = calendar.getEvents().stream().map(e -> e.getSummary().getValue()).toList();
     assertThat(summaries)
         .containsExactlyInAnyOrder(
-            "Bucklands Beach Bucks M5 vs Ellerslie AFC Flamingoes M", "Flamingoes vs Lad FC");
+            "Bucklands Beach AFC Dusties vs Ellerslie AFC Flamingos", "Flamingoes vs Lad FC");
   }
 }

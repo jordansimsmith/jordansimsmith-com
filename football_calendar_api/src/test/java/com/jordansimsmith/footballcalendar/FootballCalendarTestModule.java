@@ -20,14 +20,14 @@ public class FootballCalendarTestModule {
 
   @Provides
   @Singleton
-  public FakeCometClient fakeCometClient() {
-    return new FakeCometClient();
+  public FakeNrfClient fakeNrfClient() {
+    return new FakeNrfClient();
   }
 
   @Provides
   @Singleton
-  public CometClient cometClient(FakeCometClient fakeCometClient) {
-    return fakeCometClient;
+  public NrfClient nrfClient(FakeNrfClient fakeNrfClient) {
+    return fakeNrfClient;
   }
 
   @Provides

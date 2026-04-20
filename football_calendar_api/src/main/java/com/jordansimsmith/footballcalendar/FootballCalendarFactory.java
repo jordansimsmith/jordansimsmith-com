@@ -21,7 +21,7 @@ public interface FootballCalendarFactory {
 
   DynamoDbTable<FootballCalendarItem> footballCalendarTable();
 
-  CometClient cometClient();
+  NrfClient nrfClient();
 
   FootballFixClient footballFixClient();
 

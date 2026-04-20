@@ -7,10 +7,10 @@ import java.util.stream.Collectors;
 
 public class TeamsFactoryImpl implements TeamsFactory {
   private static final NorthernRegionalFootballTeam NRF_FLAMINGOS_LEAGUE =
-      new NorthernRegionalFootballTeam("Flamingos", "flamingo", "44838", "2716594877", "2025");
+      new NorthernRegionalFootballTeam("Flamingos", "flamingo", 12869, 9701, 721150, 2026);
 
   private static final NorthernRegionalFootballTeam NRF_FLAMINGOS_CUP =
-      new NorthernRegionalFootballTeam("Flamingos", "flamingo", "44838", "2714644497", "2025");
+      new NorthernRegionalFootballTeam("Flamingos", "flamingo", 13141, 9701, 721173, 2026);
 
   private static final FootballFixTeam FOOTBALL_FIX_FLAMINGOS_SEVENS =
       new FootballFixTeam(

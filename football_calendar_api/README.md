@@ -20,7 +20,7 @@ The football calendar API aggregates fixtures from multiple football sources, st
 
 ### In scope
 
-- Poll configured teams from Northern Regional Football Comet API, Football Fix, and Subfootball every 15 minutes.
+- Poll configured teams from Northern Regional Football v2 API, Football Fix, and Subfootball every 15 minutes.
 - Transform source records into a unified fixture model and persist records in DynamoDB.
 - Reconcile fixtures per team partition by upserting current fixtures and deleting stale `match_id` values for teams present in a run.
 - Expose `GET /calendar` that returns an aggregated iCal calendar across all configured teams.
@@ -38,10 +38,10 @@ The football calendar API aggregates fixtures from multiple football sources, st
 ```mermaid
 flowchart TD
   scheduler[EventBridge schedule rate 15 minutes] --> updateLambda[Update fixtures Lambda]
-  updateLambda --> comet[Northern Regional Football Comet API]
+  updateLambda --> nrf[Northern Regional Football v2 API]
   updateLambda --> footballFix[Football Fix fixtures page]
   updateLambda --> subfootball[Subfootball iCal feed]
-  comet --> updateLambda
+  nrf --> updateLambda
   footballFix --> updateLambda
   subfootball --> updateLambda
   updateLambda --> ddb[DynamoDB football_calendar]
@@ -58,7 +58,7 @@ flowchart TD
 sequenceDiagram
   participant Scheduler as EventBridge
   participant Update as UpdateFixturesHandler
-  participant Comet as NRFComet
+  participant NRF as NRFv2API
   participant Fix as FootballFix
   participant Sub as Subfootball
   participant Ddb as DynamoDB
@@ -67,8 +67,8 @@ sequenceDiagram
   participant Get as GetCalendarSubscriptionHandler
 
   Scheduler->>Update: trigger every 15 minutes
-  Update->>Comet: POST filteredfixtures
-  Comet-->>Update: fixture list
+  Update->>NRF: POST fixture/Dates
+  NRF-->>Update: fixture list
   Update->>Fix: GET fixtures page
   Fix-->>Update: HTML fixture rows
   Update->>Sub: GET team iCal feed
@@ -103,7 +103,7 @@ sequenceDiagram
 
 ### External systems
 
-- **Northern Regional Football Comet API**: outbound HTTPS `POST` to `https://www.nrf.org.nz/api/1.0/competition/cometwidget/filteredfixtures` with no auth. Required request fields are `competitionId`, `orgIds`, `from`, `to`, `sportId`, and `seasonId`; response fields consumed are `Id`, `HomeTeamNameAbbr`, `AwayTeamNameAbbr`, `Date`, `VenueName`, `Address`, `Latitude`, `Longitude`, and `Status`. Called every scheduled run. Non-200 or parse errors fail the update run.
+- **Northern Regional Football v2 API**: outbound HTTPS `POST` to `https://www.nrf.org.nz/api/v2/competition/widget/fixture/Dates` with no auth. Required request fields are `CompIds`, `OrgIds`, `GradeIds` (integer arrays), `From`, and `To` (ISO local date-time strings); response fields consumed are `Id`, `HomeTeamName`, `HomeOrgName`, `AwayTeamName`, `AwayOrgName`, `From`, `VenueName`, `VenueAddress`, `LocationLat`, `LocationLng`, and `StatusName`. Team display names are constructed as `"{OrgName} {TeamName}"`. Called every scheduled run. Non-200 or parse errors fail the update run.
 - **Football Fix**: outbound HTTPS `GET` to `https://footballfix.spawtz.com/Leagues/Fixtures` with query params `SportId`, `VenueId`, `LeagueId`, `SeasonId`, and `DivisionId`, no auth. Required parsed HTML fields are date headers (`tr.FHeader`), fixture rows (`tr.FRow`), time (`td.FDate`), venue (`td.FPlayingArea`), teams (`td.FHomeTeam`, `td.FAwayTeam`), and `data-fixture-id` from `td.FScore nobr`. Called every scheduled run. Network or parse failures fail the update run; rows missing a fixture id are skipped.
 - **Subfootball**: outbound HTTPS `GET` to `https://subfootball.com/teams/calendar/{teamId}` with `Accept: text/calendar`, no auth. Required VEVENT fields are `UID`, `SUMMARY`, `DTSTART`, and `LOCATION`; `DESCRIPTION` is optional and used to derive field/venue text. Called every scheduled run. Non-200 or parse errors fail the update run; malformed events are skipped.
 
@@ -141,10 +141,10 @@ BEGIN:VCALENDAR
 PRODID:-//jordansimsmith.com//Football Calendar//EN
 VERSION:2.0
 BEGIN:VEVENT
-SUMMARY:Bucklands Beach Bucks M5 vs Ellerslie AFC Flamingoes M
-DTSTART:20250405T150000Z
-LOCATION:Lloyd Elsmore Park 2, 2 Bells Avenue
-DESCRIPTION:Status: CONFIRMED
+SUMMARY:Bucklands Beach AFC Dusties vs Ellerslie AFC Flamingos
+DTSTART:20260418T010000Z
+LOCATION:Lloyd Elsmore Pk: Field 2, Lloyd Elsmore Park
+DESCRIPTION:Status: Confirmed
 END:VEVENT
 END:VCALENDAR
 ```
@@ -168,46 +168,46 @@ Representative item:
 ```json
 {
   "pk": "TEAM#Flamingos",
-  "sk": "MATCH#2716942185",
+  "sk": "MATCH#6334635",
   "team": "Flamingos",
-  "match_id": "2716942185",
-  "home_team": "Bucklands Beach Bucks M5",
-  "away_team": "Ellerslie AFC Flamingoes M",
-  "timestamp": 1743865200,
-  "venue": "Lloyd Elsmore Park 2",
-  "address": "2 Bells Avenue",
-  "latitude": -36.9053315,
-  "longitude": 174.8997797,
-  "status": "CONFIRMED"
+  "match_id": "6334635",
+  "home_team": "Bucklands Beach AFC Dusties",
+  "away_team": "Ellerslie AFC Flamingos",
+  "timestamp": 1744938000,
+  "venue": "Lloyd Elsmore Pk: Field 2",
+  "address": "Lloyd Elsmore Park",
+  "latitude": -36.910553,
+  "longitude": 174.90271,
+  "status": "Confirmed"
 }
 ```
 
 ### Data ownership expectations
 
-- Upstream source systems own raw fixture facts (`Comet`, `Football Fix`, `Subfootball`).
+- Upstream source systems own raw fixture facts (`NRF`, `Football Fix`, `Subfootball`).
 - `football_calendar` is the service's canonical projected store for calendar serving.
 - iCal output is derived from DynamoDB records and is not persisted separately.
 
 ## Behavioral invariants and time semantics
 
-- Comet fixture `Date` values are parsed as `ISO_LOCAL_DATE_TIME` in `Pacific/Auckland`.
+- NRF fixture `From` values are parsed as `ISO_LOCAL_DATE_TIME` in `Pacific/Auckland`.
 - Football Fix date and time strings are parsed in `Pacific/Auckland`.
 - Subfootball event start times are read from iCal `DTSTART` and converted to `Instant`.
 - Persisted `timestamp` values use epoch seconds (UTC instant via `EpochSecondConverter`).
-- Comet and Football Fix fixtures are team-filtered using case-insensitive substring matching on home/away names.
+- NRF and Football Fix fixtures are team-filtered using case-insensitive substring matching on home/away names.
 - Subfootball fixtures are not name-filtered after fetch; all events from configured team feed ids are stored.
 - Event order in `GET /calendar` is not contractually guaranteed.
 - Only team partitions represented in the current fetched fixture set are reconciled for stale deletions.
 
 ## Source of truth
 
-| Entity             | Authoritative source                 | Notes                                                                |
-| ------------------ | ------------------------------------ | -------------------------------------------------------------------- |
-| Team configuration | `TeamsFactoryImpl`                   | Hardcoded team ids, matchers, and source parameters in code.         |
-| NRF fixtures       | Northern Regional Football Comet API | Pulled every schedule run and projected into DynamoDB.               |
-| Football Fix rows  | Football Fix fixtures page           | Parsed from HTML table rows and projected into DynamoDB.             |
-| Subfootball events | Subfootball iCal feed                | Parsed from VEVENT entries and projected into DynamoDB.              |
-| Calendar feed      | DynamoDB `football_calendar` table   | `GET /calendar` reads persisted fixtures and renders iCal on demand. |
+| Entity             | Authoritative source               | Notes                                                                |
+| ------------------ | ---------------------------------- | -------------------------------------------------------------------- |
+| Team configuration | `TeamsFactoryImpl`                 | Hardcoded team ids, matchers, and source parameters in code.         |
+| NRF fixtures       | Northern Regional Football v2 API  | Pulled every schedule run and projected into DynamoDB.               |
+| Football Fix rows  | Football Fix fixtures page         | Parsed from HTML table rows and projected into DynamoDB.             |
+| Subfootball events | Subfootball iCal feed              | Parsed from VEVENT entries and projected into DynamoDB.              |
+| Calendar feed      | DynamoDB `football_calendar` table | `GET /calendar` reads persisted fixtures and renders iCal on demand. |
 
 ## Security and privacy
 
@@ -221,11 +221,11 @@ Representative item:
 
 ### Environment variables
 
-| Name                                      | Required | Purpose                                                                          | Default behavior                             |
-| ----------------------------------------- | -------- | -------------------------------------------------------------------------------- | -------------------------------------------- |
-| `FOOTBALL_CALENDAR_COMET_API_URL`         | no       | Comet base URL resolved with `/api/1.0/competition/cometwidget/filteredfixtures` | defaults to `https://www.nrf.org.nz`         |
-| `FOOTBALL_CALENDAR_FOOTBALL_FIX_BASE_URL` | no       | Football Fix base URL resolved with `/Leagues/Fixtures`                          | defaults to `https://footballfix.spawtz.com` |
-| `FOOTBALL_CALENDAR_SUBFOOTBALL_BASE_URL`  | no       | Subfootball base URL resolved with `/teams/calendar/{id}`                        | defaults to `https://subfootball.com`        |
+| Name                                      | Required | Purpose                                                               | Default behavior                             |
+| ----------------------------------------- | -------- | --------------------------------------------------------------------- | -------------------------------------------- |
+| `FOOTBALL_CALENDAR_NRF_API_URL`           | no       | NRF base URL resolved with `/api/v2/competition/widget/fixture/Dates` | defaults to `https://www.nrf.org.nz`         |
+| `FOOTBALL_CALENDAR_FOOTBALL_FIX_BASE_URL` | no       | Football Fix base URL resolved with `/Leagues/Fixtures`               | defaults to `https://footballfix.spawtz.com` |
+| `FOOTBALL_CALENDAR_SUBFOOTBALL_BASE_URL`  | no       | Subfootball base URL resolved with `/teams/calendar/{id}`             | defaults to `https://subfootball.com`        |
 
 Current runtime configuration is code and infra defined:
 
@@ -246,9 +246,9 @@ None in current scope. This service does not read runtime secrets.
 
 ## Testing and quality gates
 
-- Unit tests validate client parsing and mapping behavior (Comet JSON, Football Fix HTML, Subfootball iCal).
+- Unit tests validate client parsing and mapping behavior (NRF JSON, Football Fix HTML, Subfootball iCal).
 - Integration tests cover update reconciliation and iCal response generation against DynamoDB test containers.
-- E2E tests run against LocalStack and internal Comet/Football Fix/Subfootball mock hosts on a shared Testcontainers network, so the suite is deterministic and CI-safe with no outbound internet dependency.
+- E2E tests run against LocalStack and internal NRF/Football Fix/Subfootball mock hosts on a shared Testcontainers network, so the suite is deterministic and CI-safe with no outbound internet dependency.
 - Required checks before merge:
   - `bazel test //football_calendar_api:all`
   - `bazel build //football_calendar_api:all`
@@ -267,7 +267,7 @@ None in current scope. This service does not read runtime secrets.
 ### Scenario 1: scheduled refresh and calendar subscription
 
 1. EventBridge triggers `update_fixtures` on the 15-minute schedule.
-2. Service fetches fixtures from Comet, Football Fix, and Subfootball for configured teams.
+2. Service fetches fixtures from NRF, Football Fix, and Subfootball for configured teams.
 3. Service writes current fixtures to DynamoDB and removes stale `match_id` values in processed team partitions.
 4. Calendar client calls `GET /calendar`.
 5. Service reads team partitions from DynamoDB and returns aggregated iCal events.

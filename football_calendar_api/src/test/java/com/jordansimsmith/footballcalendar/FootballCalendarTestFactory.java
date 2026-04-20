@@ -22,7 +22,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 public interface FootballCalendarTestFactory extends FootballCalendarFactory {
   FakeClock fakeClock();
 
-  FakeCometClient fakeCometClient();
+  FakeNrfClient fakeNrfClient();
 
   FakeFootballFixClient fakeFootballFixClient();
 

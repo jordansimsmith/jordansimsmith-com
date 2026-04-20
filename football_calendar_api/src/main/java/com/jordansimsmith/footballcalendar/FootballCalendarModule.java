@@ -23,13 +23,13 @@ public class FootballCalendarModule {
 
   @Provides
   @Singleton
-  CometClient cometClient(ObjectMapper objectMapper) {
-    var apiUrl = System.getenv("FOOTBALL_CALENDAR_COMET_API_URL");
+  NrfClient nrfClient(ObjectMapper objectMapper) {
+    var apiUrl = System.getenv("FOOTBALL_CALENDAR_NRF_API_URL");
     if (apiUrl == null || apiUrl.isBlank()) {
       apiUrl = "https://www.nrf.org.nz";
     }
     var httpClient = HttpClient.newBuilder().build();
-    return new HttpCometClient(httpClient, objectMapper, URI.create(apiUrl));
+    return new HttpNrfClient(httpClient, objectMapper, URI.create(apiUrl));
   }
 
   @Provides

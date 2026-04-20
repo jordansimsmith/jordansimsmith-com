@@ -19,7 +19,7 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
   private static final Logger LOGGER = LoggerFactory.getLogger(UpdateFixturesHandler.class);
 
   private final DynamoDbTable<FootballCalendarItem> footballCalendarTable;
-  private final CometClient cometClient;
+  private final NrfClient nrfClient;
   private final FootballFixClient footballFixClient;
   private final SubfootballClient subfootballClient;
   private final TeamsFactory teamsFactory;
@@ -31,7 +31,7 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
   @VisibleForTesting
   UpdateFixturesHandler(FootballCalendarFactory factory) {
     this.footballCalendarTable = factory.footballCalendarTable();
-    this.cometClient = factory.cometClient();
+    this.nrfClient = factory.nrfClient();
     this.footballFixClient = factory.footballFixClient();
     this.subfootballClient = factory.subfootballClient();
     this.teamsFactory = factory.teamsFactory();
@@ -95,19 +95,16 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
     var allFixtures = new ArrayList<FootballCalendarItem>();
     var teams = teamsFactory.findNorthernRegionalFootballTeams();
 
-    // process each team separately
     for (var team : teams) {
-
-      // fetch fixtures from all competitions for this team
-      var seasonYear = Integer.parseInt(team.seasonId());
-      var from = ZonedDateTime.of(seasonYear, 1, 1, 0, 0, 0, 0, ZoneId.systemDefault()).toInstant();
+      var from =
+          ZonedDateTime.of(team.seasonYear(), 1, 1, 0, 0, 0, 0, ZoneId.systemDefault()).toInstant();
       var to =
-          ZonedDateTime.of(seasonYear, 12, 31, 23, 59, 59, 0, ZoneId.systemDefault()).toInstant();
+          ZonedDateTime.of(team.seasonYear(), 12, 31, 23, 59, 59, 0, ZoneId.systemDefault())
+              .toInstant();
       var fixtures =
-          cometClient.findFixtures(
-              team.seasonId(), team.competitionId(), List.of(team.clubId()), from, to);
+          nrfClient.findFixtures(
+              List.of(team.compId()), List.of(team.orgId()), List.of(team.gradeId()), from, to);
 
-      // filter for fixtures involving this team
       var teamFixtures =
           fixtures.stream()
               .filter(
@@ -116,7 +113,6 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
                           || fixture.awayTeamName().toLowerCase().contains(team.nameMatcher()))
               .toList();
 
-      // map to dynamodb item
       for (var fixture : teamFixtures) {
         var item =
             FootballCalendarItem.create(

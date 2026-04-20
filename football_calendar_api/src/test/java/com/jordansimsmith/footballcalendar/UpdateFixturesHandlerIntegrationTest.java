@@ -17,11 +17,10 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 
 @Testcontainers
 public class UpdateFixturesHandlerIntegrationTest {
-  private static final String NRF_MENS_DIV_6_CENTRAL_EAST = "2716594877";
-  private static final String NRF_MENS_COMMUNITY_CUP = "2714644497";
+  private static final int NRF_COMP_ID = 12869;
 
   private FakeClock fakeClock;
-  private FakeCometClient fakeCometClient;
+  private FakeNrfClient fakeNrfClient;
   private FakeFootballFixClient fakeFootballFixClient;
   private FakeSubfootballClient fakeSubfootballClient;
   private FakeTeamsFactory fakeTeamsFactory;
@@ -43,7 +42,7 @@ public class UpdateFixturesHandlerIntegrationTest {
     var factory = FootballCalendarTestFactory.create(dynamoDbContainer.getEndpoint());
 
     fakeClock = factory.fakeClock();
-    fakeCometClient = factory.fakeCometClient();
+    fakeNrfClient = factory.fakeNrfClient();
     fakeFootballFixClient = factory.fakeFootballFixClient();
     fakeSubfootballClient = factory.fakeSubfootballClient();
     fakeTeamsFactory = factory.fakeTeamsFactory();
@@ -55,90 +54,57 @@ public class UpdateFixturesHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldSaveFixturesFromMultipleCompetitionsToDb() {
+  void handleRequestShouldSaveNrfFixturesAndFilterByTeamName() {
     // arrange
-    var testTime = Instant.parse("2023-05-01T10:00:00Z");
+    var testTime = Instant.parse("2026-05-01T10:00:00Z");
     fakeClock.setTime(testTime);
     var event = new ScheduledEvent();
 
     fakeTeamsFactory.addTeam(
         new TeamsFactory.NorthernRegionalFootballTeam(
-            "Flamingos", "flamingo", "44838", NRF_MENS_DIV_6_CENTRAL_EAST, "2025"));
-    fakeTeamsFactory.addTeam(
-        new TeamsFactory.NorthernRegionalFootballTeam(
-            "Flamingos", "flamingo", "44838", NRF_MENS_COMMUNITY_CUP, "2025"));
+            "Flamingos", "flamingo", NRF_COMP_ID, 9701, 721150, 2026));
 
-    // Create a pre-existing fixture with old date
     var existingFixtureId = "123456";
     var existingFixture =
         FootballCalendarItem.create(
             "Flamingos",
             existingFixtureId,
-            "Eastern Suburbs AFC",
-            "Ellerslie AFC Flamingos M",
-            Instant.parse("2023-05-07T14:00:00Z"),
-            "Madills Farm",
-            "20 Melanesia Road, Kohimarama, Auckland",
+            "Eastern Suburbs AFC Tekkerslavakia",
+            "Ellerslie AFC Flamingos",
+            Instant.parse("2026-05-07T14:00:00Z"),
+            "Madills Farm: Field 3",
+            "Madills Farm Recreation Reserve",
             -36.8485,
             174.8582,
-            "Scheduled");
+            "Confirmed");
     footballCalendarTable.putItem(existingFixture);
 
-    // Add league fixtures to the fake client
     var leagueFixture =
-        new CometClient.FootballFixture(
+        new NrfClient.NrfFixture(
             existingFixtureId,
-            "Eastern Suburbs AFC",
-            "Ellerslie AFC Flamingos M",
-            Instant.parse("2023-05-08T14:00:00Z"), // Changed date
-            "Madills Farm",
-            "20 Melanesia Road, Kohimarama, Auckland",
+            "Eastern Suburbs AFC Tekkerslavakia",
+            "Ellerslie AFC Flamingos",
+            Instant.parse("2026-05-08T14:00:00Z"),
+            "Madills Farm: Field 3",
+            "Madills Farm Recreation Reserve",
             -36.8485,
             174.8582,
-            "Scheduled");
+            "Confirmed");
 
-    var nonFlamingoLeagueFixture =
-        new CometClient.FootballFixture(
+    var nonFlamingoFixture =
+        new NrfClient.NrfFixture(
             "345678",
-            "Team A",
-            "Team B",
-            Instant.parse("2023-05-15T16:00:00Z"),
-            "Some Stadium",
-            "123 Some Street, Auckland",
+            "Ellerslie AFC Crimson",
+            "Ellerslie AFC Wild Potros",
+            Instant.parse("2026-05-15T16:00:00Z"),
+            "Michaels Ave Reserve: Field 3",
+            "Michaels Avenue Reserve",
             -36.8700,
             174.7300,
-            "Scheduled");
+            "Confirmed");
 
-    fakeCometClient.addFixture(NRF_MENS_DIV_6_CENTRAL_EAST, leagueFixture);
-    fakeCometClient.addFixture(NRF_MENS_DIV_6_CENTRAL_EAST, nonFlamingoLeagueFixture);
-
-    // Add cup fixtures to the fake client
-    var cupFixture =
-        new CometClient.FootballFixture(
-            "789012",
-            "Ellerslie AFC Flamingos M",
-            "Birkenhead United",
-            Instant.parse("2023-05-14T15:30:00Z"),
-            "Western Springs Stadium",
-            "731 Great North Road, Western Springs, Auckland",
-            -36.8653,
-            174.7232,
-            "Scheduled");
-
-    var nonFlamingoCupFixture =
-        new CometClient.FootballFixture(
-            "901234",
-            "Team C",
-            "Team D",
-            Instant.parse("2023-05-16T17:00:00Z"),
-            "Another Stadium",
-            "456 Another Street, Auckland",
-            -36.8800,
-            174.7400,
-            "Scheduled");
-
-    fakeCometClient.addFixture(NRF_MENS_COMMUNITY_CUP, cupFixture);
-    fakeCometClient.addFixture(NRF_MENS_COMMUNITY_CUP, nonFlamingoCupFixture);
+    fakeNrfClient.addFixture(NRF_COMP_ID, leagueFixture);
+    fakeNrfClient.addFixture(NRF_COMP_ID, nonFlamingoFixture);
 
     // act
     updateFixturesHandler.handleRequest(event, null);
@@ -146,20 +112,11 @@ public class UpdateFixturesHandlerIntegrationTest {
     // assert
     var items = footballCalendarTable.scan().items().stream().toList();
 
-    // Should only have 2 items - the Flamingo fixtures from both competitions
-    assertThat(items).hasSize(2);
-
-    // Verify all items have team="Flamingos"
+    assertThat(items).hasSize(1);
     assertThat(items).allMatch(item -> "Flamingos".equals(item.getTeam()));
-
-    // Verify PK format
     assertThat(items).allMatch(item -> item.getPk().equals("TEAM#Flamingos"));
+    assertThat(items).noneMatch(item -> item.getMatchId().equals(nonFlamingoFixture.id()));
 
-    // Verify non-flamingo fixtures are not saved
-    assertThat(items).noneMatch(item -> item.getMatchId().equals(nonFlamingoLeagueFixture.id()));
-    assertThat(items).noneMatch(item -> item.getMatchId().equals(nonFlamingoCupFixture.id()));
-
-    // League fixture - verify it was updated with new date
     var updatedItem =
         items.stream()
             .filter(item -> item.getMatchId().equals(existingFixtureId))
@@ -176,22 +133,6 @@ public class UpdateFixturesHandlerIntegrationTest {
     assertThat(updatedItem.getLongitude()).isCloseTo(leagueFixture.longitude(), within(0.00001));
     assertThat(updatedItem.getStatus()).isEqualTo(leagueFixture.status());
     assertThat(updatedItem.getSk()).isEqualTo("MATCH#" + existingFixtureId);
-
-    // Cup fixture
-    var cupItem =
-        items.stream()
-            .filter(item -> item.getMatchId().equals(cupFixture.id()))
-            .findFirst()
-            .orElseThrow();
-    assertThat(cupItem.getHomeTeam()).isEqualTo(cupFixture.homeTeamName());
-    assertThat(cupItem.getAwayTeam()).isEqualTo(cupFixture.awayTeamName());
-    assertThat(cupItem.getTimestamp()).isEqualTo(cupFixture.timestamp());
-    assertThat(cupItem.getVenue()).isEqualTo(cupFixture.venue());
-    assertThat(cupItem.getAddress()).isEqualTo(cupFixture.address());
-    assertThat(cupItem.getLatitude()).isCloseTo(cupFixture.latitude(), within(0.00001));
-    assertThat(cupItem.getLongitude()).isCloseTo(cupFixture.longitude(), within(0.00001));
-    assertThat(cupItem.getStatus()).isEqualTo(cupFixture.status());
-    assertThat(cupItem.getSk()).isEqualTo("MATCH#" + cupFixture.id());
   }
 
   @Test
@@ -203,7 +144,7 @@ public class UpdateFixturesHandlerIntegrationTest {
 
     fakeTeamsFactory.addTeam(
         new TeamsFactory.NorthernRegionalFootballTeam(
-            "Flamingos", "flamingo", "44838", NRF_MENS_DIV_6_CENTRAL_EAST, "2025"));
+            "Flamingos", "flamingo", NRF_COMP_ID, 9701, 721150, 2026));
 
     // Create three pre-existing fixtures in DB
     var existingFixture1 =
@@ -251,31 +192,31 @@ public class UpdateFixturesHandlerIntegrationTest {
 
     // Only add fixtures 1 and 2 to the API response (fixture3 is now canceled/removed)
     var apiFixture1 =
-        new CometClient.FootballFixture(
+        new NrfClient.NrfFixture(
             "fixture1",
-            "Eastern Suburbs AFC",
-            "Ellerslie AFC Flamingos M",
+            "Eastern Suburbs AFC Tekkerslavakia",
+            "Ellerslie AFC Flamingos",
             Instant.parse("2023-05-07T14:00:00Z"),
-            "Madills Farm",
-            "20 Melanesia Road, Kohimarama, Auckland",
+            "Madills Farm: Field 3",
+            "Madills Farm Recreation Reserve",
             -36.8485,
             174.8582,
-            "Scheduled");
+            "Confirmed");
 
     var apiFixture2 =
-        new CometClient.FootballFixture(
+        new NrfClient.NrfFixture(
             "fixture2",
-            "Ellerslie AFC Flamingos M",
-            "Auckland United",
+            "Ellerslie AFC Flamingos",
+            "Manukau City AFC Mayhem",
             Instant.parse("2023-05-14T14:00:00Z"),
+            "Ellerslie Domain: Field 1",
             "Ellerslie Domain",
-            "10 Main Highway, Ellerslie, Auckland",
             -36.8995,
             174.8140,
-            "Scheduled");
+            "Confirmed");
 
-    fakeCometClient.addFixture(NRF_MENS_DIV_6_CENTRAL_EAST, apiFixture1);
-    fakeCometClient.addFixture(NRF_MENS_DIV_6_CENTRAL_EAST, apiFixture2);
+    fakeNrfClient.addFixture(NRF_COMP_ID, apiFixture1);
+    fakeNrfClient.addFixture(NRF_COMP_ID, apiFixture2);
 
     // act
     updateFixturesHandler.handleRequest(event, null);
@@ -367,7 +308,7 @@ public class UpdateFixturesHandlerIntegrationTest {
     // add NRF team
     fakeTeamsFactory.addTeam(
         new TeamsFactory.NorthernRegionalFootballTeam(
-            "Flamingos", "flamingo", "44838", NRF_MENS_DIV_6_CENTRAL_EAST, "2025"));
+            "Flamingos", "flamingo", NRF_COMP_ID, 9701, 721150, 2026));
 
     // add Football Fix team
     fakeTeamsFactory.addTeam(
@@ -382,18 +323,18 @@ public class UpdateFixturesHandlerIntegrationTest {
 
     // add NRF fixture
     var nrfFixture =
-        new CometClient.FootballFixture(
+        new NrfClient.NrfFixture(
             "123456",
-            "Eastern Suburbs AFC",
-            "Ellerslie AFC Flamingos M",
+            "Eastern Suburbs AFC Tekkerslavakia",
+            "Ellerslie AFC Flamingos",
             Instant.parse("2025-10-25T14:00:00Z"),
-            "Madills Farm",
-            "20 Melanesia Road, Kohimarama, Auckland",
+            "Madills Farm: Field 3",
+            "Madills Farm Recreation Reserve",
             -36.8485,
             174.8582,
-            "Scheduled");
+            "Confirmed");
 
-    fakeCometClient.addFixture(NRF_MENS_DIV_6_CENTRAL_EAST, nrfFixture);
+    fakeNrfClient.addFixture(NRF_COMP_ID, nrfFixture);
 
     // add Football Fix fixture
     var footballFixFixture =
@@ -514,7 +455,7 @@ public class UpdateFixturesHandlerIntegrationTest {
     // add NRF team
     fakeTeamsFactory.addTeam(
         new TeamsFactory.NorthernRegionalFootballTeam(
-            "Flamingos", "flamingo", "44838", NRF_MENS_DIV_6_CENTRAL_EAST, "2025"));
+            "Flamingos", "flamingo", NRF_COMP_ID, 9701, 721150, 2026));
 
     // add Football Fix team
     fakeTeamsFactory.addTeam(
@@ -534,18 +475,18 @@ public class UpdateFixturesHandlerIntegrationTest {
 
     // add NRF fixture
     var nrfFixture =
-        new CometClient.FootballFixture(
+        new NrfClient.NrfFixture(
             "nrf-123",
-            "Eastern Suburbs AFC",
-            "Ellerslie AFC Flamingos M",
+            "Eastern Suburbs AFC Tekkerslavakia",
+            "Ellerslie AFC Flamingos",
             Instant.parse("2025-10-25T14:00:00Z"),
-            "Madills Farm",
-            "20 Melanesia Road, Kohimarama, Auckland",
+            "Madills Farm: Field 3",
+            "Madills Farm Recreation Reserve",
             -36.8485,
             174.8582,
-            "Scheduled");
+            "Confirmed");
 
-    fakeCometClient.addFixture(NRF_MENS_DIV_6_CENTRAL_EAST, nrfFixture);
+    fakeNrfClient.addFixture(NRF_COMP_ID, nrfFixture);
 
     // add Football Fix fixture
     var footballFixFixture =

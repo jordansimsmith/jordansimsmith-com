@@ -18,7 +18,7 @@ import software.amazon.awssdk.services.lambda.model.InvokeRequest;
 @Testcontainers
 public class FootballCalendarE2ETest {
   private static final String NETWORK_NAME = "football-calendar-e2e";
-  private static final String COMET_MOCK_ALIAS = "comet-mock";
+  private static final String NRF_MOCK_ALIAS = "nrf-mock";
   private static final String FOOTBALL_FIX_MOCK_ALIAS = "football-fix-mock";
   private static final String SUBFOOTBALL_MOCK_ALIAS = "subfootball-mock";
 
@@ -26,8 +26,8 @@ public class FootballCalendarE2ETest {
       Network.builder().createNetworkCmdModifier(cmd -> cmd.withName(NETWORK_NAME)).build();
 
   @Container
-  private static final CometMockContainer cometMockContainer =
-      new CometMockContainer().withNetwork(NETWORK).withNetworkAliases(COMET_MOCK_ALIAS);
+  private static final NrfMockContainer nrfMockContainer =
+      new NrfMockContainer().withNetwork(NETWORK).withNetworkAliases(NRF_MOCK_ALIAS);
 
   @Container
   private static final FootballFixMockContainer footballFixMockContainer =
@@ -48,7 +48,7 @@ public class FootballCalendarE2ETest {
       new FootballCalendarContainer()
           .withNetwork(NETWORK)
           .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK_NAME)
-          .withEnv("FOOTBALL_CALENDAR_COMET_API_URL", "http://" + COMET_MOCK_ALIAS + ":8080")
+          .withEnv("FOOTBALL_CALENDAR_NRF_API_URL", "http://" + NRF_MOCK_ALIAS + ":8080")
           .withEnv(
               "FOOTBALL_CALENDAR_FOOTBALL_FIX_BASE_URL",
               "http://" + FOOTBALL_FIX_MOCK_ALIAS + ":8080")
@@ -123,7 +123,7 @@ public class FootballCalendarE2ETest {
 
     var summaries = events.stream().map(event -> event.getSummary().getValue()).toList();
     assertThat(summaries)
-        .contains("Bucklands Beach Bucks M5 vs Ellerslie AFC Flamingoes M")
+        .contains("Bucklands Beach AFC Dusties vs Ellerslie AFC Flamingos")
         .contains("Lad FC vs Flamingoes")
         .contains("Man I Love Football vs Swede as Bro FC");
   }

@@ -6,34 +6,37 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 
-public final class CometMockServer {
+public final class NrfMockServer {
   private static final String FIXTURES_RESPONSE =
       """
       {
-        "fixtures": [
+        "Fixtures": [
           {
-            "Id": "2716942185",
-            "HomeTeamNameAbbr": "Bucklands Beach Bucks M5",
-            "AwayTeamNameAbbr": "Ellerslie AFC Flamingoes M",
-            "Date": "2025-04-05T15:00:00",
-            "VenueName": "Lloyd Elsmore Park 2",
-            "Address": "2 Bells Avenue",
-            "Latitude": "-36.9053315",
-            "Longitude": "174.8997797",
-            "Status": "CONFIRMED"
+            "Id": 6334635,
+            "HomeTeamName": "Dusties",
+            "HomeOrgName": "Bucklands Beach AFC",
+            "AwayTeamName": "Flamingos",
+            "AwayOrgName": "Ellerslie AFC",
+            "From": "2026-04-18T13:00:00",
+            "To": "2026-04-18T15:00:00",
+            "VenueName": "Lloyd Elsmore Pk: Field 2",
+            "VenueAddress": "Lloyd Elsmore Park",
+            "LocationLat": -36.910553,
+            "LocationLng": 174.90271,
+            "StatusName": "Confirmed"
           }
         ]
       }
       """;
 
-  private CometMockServer() {}
+  private NrfMockServer() {}
 
   public static void main(String[] args) throws Exception {
     var server = HttpServer.create(new InetSocketAddress(8080), 0);
     server.createContext(
         "/health", exchange -> respond(exchange, "text/plain; charset=utf-8", "ok"));
     server.createContext(
-        "/api/1.0/competition/cometwidget/filteredfixtures",
+        "/api/v2/competition/widget/fixture/Dates",
         exchange -> respond(exchange, "application/json; charset=utf-8", FIXTURES_RESPONSE));
     server.start();
     Thread.currentThread().join();

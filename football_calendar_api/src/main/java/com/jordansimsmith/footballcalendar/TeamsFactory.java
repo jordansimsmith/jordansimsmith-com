@@ -5,7 +5,7 @@ import java.util.Set;
 
 public interface TeamsFactory {
   record NorthernRegionalFootballTeam(
-      String id, String nameMatcher, String clubId, String competitionId, String seasonId) {}
+      String id, String nameMatcher, int compId, int orgId, int gradeId, int seasonYear) {}
 
   record FootballFixTeam(
       String id,

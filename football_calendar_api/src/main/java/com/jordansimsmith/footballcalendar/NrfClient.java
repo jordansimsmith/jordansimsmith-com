@@ -3,8 +3,8 @@ package com.jordansimsmith.footballcalendar;
 import java.time.Instant;
 import java.util.List;
 
-public interface CometClient {
-  record FootballFixture(
+public interface NrfClient {
+  record NrfFixture(
       String id,
       String homeTeamName,
       String awayTeamName,
@@ -15,10 +15,10 @@ public interface CometClient {
       Double longitude,
       String status) {}
 
-  List<FootballFixture> findFixtures(
-      String seasonId,
-      String competitionId,
-      List<String> organisationIds,
+  List<NrfFixture> findFixtures(
+      List<Integer> compIds,
+      List<Integer> orgIds,
+      List<Integer> gradeIds,
       Instant from,
       Instant to);
 }
