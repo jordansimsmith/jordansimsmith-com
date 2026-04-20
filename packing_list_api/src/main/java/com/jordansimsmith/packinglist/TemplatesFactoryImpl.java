@@ -174,12 +174,13 @@ public class TemplatesFactoryImpl implements TemplatesFactory {
                 new TemplateItem("tramping pack", "gear", 1, List.of()),
                 new TemplateItem("tramping pack rain cover", "gear", 1, List.of()),
                 new TemplateItem("survival blanket", "gear", 1, List.of()),
+                new TemplateItem("rope", "gear", 1, List.of()),
                 new TemplateItem("diswashing liquid", "gear", 1, List.of("optional")),
                 // food
                 new TemplateItem("dehydrated meals", "food", 1, List.of("optional")),
                 new TemplateItem("tramping breakfast", "food", 1, List.of()),
                 new TemplateItem("tramping snacks", "food", 1, List.of()),
-                new TemplateItem("emergency rations", "food", 1, List.of()),
+                new TemplateItem("MRE", "food", 1, List.of()),
                 new TemplateItem("electrolytes", "food", 1, List.of()),
                 new TemplateItem("hot drinks", "food", 1, List.of())));
 
