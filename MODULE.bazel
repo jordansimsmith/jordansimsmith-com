@@ -3,9 +3,9 @@ module(
 )
 
 bazel_dep(name = "platforms", version = "1.0.0")
-bazel_dep(name = "rules_java", version = "9.5.0")
+bazel_dep(name = "rules_java", version = "9.6.1")
 bazel_dep(name = "rules_jvm_external", version = "6.10")
-bazel_dep(name = "rules_android", version = "0.7.1")
+bazel_dep(name = "rules_android", version = "0.7.2")
 bazel_dep(name = "rules_pkg", version = "1.2.0")
 
 register_toolchains("//tools/java:custom_java_toolchain")
@@ -54,7 +54,7 @@ maven.install(
 use_repo(maven, "maven")
 
 bazel_dep(name = "contrib_rules_jvm", version = "0.32.0")
-bazel_dep(name = "rules_oci", version = "2.2.7")
+bazel_dep(name = "rules_oci", version = "2.3.0")
 
 oci = use_extension("@rules_oci//oci:extensions.bzl", "oci")
 oci.pull(
@@ -124,11 +124,11 @@ use_repo(oci, "localstack", "localstack_linux_amd64", "localstack_linux_arm64")
 use_repo(oci, "minio", "minio_linux_amd64", "minio_linux_arm64")
 use_repo(oci, "temurin21jre", "temurin21jre_linux_amd64", "temurin21jre_linux_arm64_v8")
 
-bazel_dep(name = "aspect_rules_lint", version = "2.1.0")
+bazel_dep(name = "aspect_rules_lint", version = "2.5.0")
 
 bazel_dep(
     name = "buildifier_prebuilt",
-    version = "8.2.1.2",
+    version = "8.5.1.2",
     dev_dependency = True,
 )
 
@@ -147,8 +147,8 @@ pip.parse(
 )
 use_repo(pip, "pypi")
 
-bazel_dep(name = "aspect_rules_js", version = "3.0.0-rc4")
-bazel_dep(name = "aspect_rules_ts", version = "3.8.4")
+bazel_dep(name = "aspect_rules_js", version = "3.0.3")
+bazel_dep(name = "aspect_rules_ts", version = "3.8.8")
 
 rules_ts_ext = use_extension(
     "@aspect_rules_ts//ts:extensions.bzl",
