@@ -117,7 +117,7 @@ public class PriceTrackerE2ETest {
             .map(message -> message.body())
             .anyMatch(
                 messageBody ->
-                    messageBody.contains("price updated")
+                    messageBody.contains("price decreased")
                         && messageBody.contains(productName)
                         && messageBody.contains(productUrl)
                         && messageBody.contains("$1234.56 -> $52.00"));
@@ -172,7 +172,7 @@ public class PriceTrackerE2ETest {
             .map(message -> message.body())
             .anyMatch(
                 messageBody ->
-                    messageBody.contains("price updated")
+                    messageBody.contains("price decreased")
                         && messageBody.contains(productName)
                         && messageBody.contains(productUrl)
                         && messageBody.contains("$4567.89 -> $84.95"));
@@ -228,7 +228,7 @@ public class PriceTrackerE2ETest {
             .map(message -> message.body())
             .anyMatch(
                 messageBody ->
-                    messageBody.contains("price updated")
+                    messageBody.contains("price decreased")
                         && messageBody.contains(productName)
                         && messageBody.contains(productUrl)
                         && messageBody.contains("$8901.23 -> $92.50"));

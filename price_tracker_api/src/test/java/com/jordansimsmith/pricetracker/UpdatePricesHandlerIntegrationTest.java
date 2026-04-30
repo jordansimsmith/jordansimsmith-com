@@ -128,8 +128,41 @@ public class UpdatePricesHandlerIntegrationTest {
     var notifications = fakeNotificationPublisher.findNotifications(UpdatePricesHandler.TOPIC);
     assertThat(notifications.size()).isEqualTo(1);
     var notification = notifications.get(0);
-    assertThat(notification.subject()).isEqualTo("1 price updated");
+    assertThat(notification.subject()).isEqualTo("1 price decreased");
     assertThat(notification.message()).isEqualTo("product 1 $25.80 -> $22.50 product1.com");
+  }
+
+  @Test
+  void handleRequestShouldNotNotifyWhenPriceIncreases() {
+    // arrange
+    var product1 = new ProductsFactory.Product(URI.create("product1.com"), "product 1");
+    fakeProductsFactory.addChemistWarehouseProducts(List.of(product1));
+
+    var product1Price = 30.00;
+    fakePriceClient.setPrice(product1.url(), product1Price);
+
+    var product1History =
+        PriceTrackerItem.create(
+            product1.url().toString(), product1.name(), Instant.ofEpochSecond(1_000), 25.00);
+    priceTrackerTable.putItem(product1History);
+
+    fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
+
+    // act
+    updatePricesHandler.handleRequest(new ScheduledEvent(), null);
+
+    // assert
+    var product1New =
+        priceTrackerTable.getItem(
+            Key.builder()
+                .partitionValue(PriceTrackerItem.formatPk(product1.url().toString()))
+                .sortValue(PriceTrackerItem.formatSk(fakeClock.now()))
+                .build());
+    assertThat(product1New).isNotNull();
+    assertThat(product1New.getPrice()).isEqualTo(product1Price);
+
+    var notifications = fakeNotificationPublisher.findNotifications(UpdatePricesHandler.TOPIC);
+    assertThat(notifications).isEmpty();
   }
 
   @Test
@@ -170,7 +203,7 @@ public class UpdatePricesHandlerIntegrationTest {
     var notifications = fakeNotificationPublisher.findNotifications(UpdatePricesHandler.TOPIC);
     assertThat(notifications.size()).isEqualTo(1);
     var notification = notifications.get(0);
-    assertThat(notification.subject()).isEqualTo("1 price updated");
+    assertThat(notification.subject()).isEqualTo("1 price decreased");
     assertThat(notification.message())
         .isEqualTo(
             "NZ Protein - NZ Whey 1kg (2.2lbs) $55.99 -> $52.00"

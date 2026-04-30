@@ -1,6 +1,6 @@
 # Price tracker service
 
-The price tracker service runs an hourly scheduled workflow that scrapes curated product pages, records price history, and sends notifications when tracked prices change.
+The price tracker service runs an hourly scheduled workflow that scrapes curated product pages, records price history, and sends notifications when tracked prices decrease.
 
 ## Overview
 
@@ -13,8 +13,8 @@ The price tracker service runs an hourly scheduled workflow that scrapes curated
 
 ## User stories
 
-- As a shopper, I want hourly checks across tracked product pages, so that I can notice price changes quickly.
-- As an email subscriber, I want one aggregated notification when prices move, so that alerts stay useful without excessive noise.
+- As a shopper, I want hourly checks across tracked product pages, so that I can notice price decreases quickly.
+- As an email subscriber, I want one aggregated notification when prices decrease, so that alerts stay useful without excessive noise.
 - As a maintainer, I want append-only price snapshots for each run, so that historical trends remain auditable.
 
 ## Features and scope boundaries
@@ -24,8 +24,8 @@ The price tracker service runs an hourly scheduled workflow that scrapes curated
 - Run hourly price checks from a curated in-code product catalog.
 - Scrape product pages using host-specific extractor implementations.
 - Persist append-only price snapshots for every successfully scraped product.
-- Detect changes by comparing the latest stored snapshot to the current scrape.
-- Publish a summary notification when one or more prices changed in the run.
+- Detect price decreases by comparing the latest stored snapshot to the current scrape.
+- Publish a summary notification when one or more prices decreased in the run.
 
 ### Out of scope
 
@@ -77,7 +77,7 @@ sequenceDiagram
     handler->>table: query latest snapshot for PRODUCT#url
     handler->>handler: compare previous vs current
   end
-  handler->>sns: publish summary when any price changed
+  handler->>sns: publish summary when any price decreased
   handler->>table: putItem for collected snapshots
 ```
 
@@ -87,13 +87,13 @@ sequenceDiagram
 - Store the tracked catalog directly in `ProductsFactoryImpl` so monitored products are explicit and versioned with code changes.
 - Route parsing by URL host to dedicated extractors (`Chemist Warehouse`, `NZ Protein`, `NZ Muscle`) for deterministic selector behavior per site.
 - Persist snapshots as append-only DynamoDB items keyed by product URL + timestamp to preserve full historical price series.
-- Publish one aggregated SNS message per run to reduce notification noise when multiple products change together.
+- Publish one aggregated SNS message per run to reduce notification noise when multiple products decrease together.
 
 ## Domain glossary
 
 - **Tracked product**: one curated product URL + display name entry from `ProductsFactory`.
 - **Price snapshot**: one persisted DynamoDB row for a product at a specific scrape timestamp.
-- **Price change**: a difference between latest stored snapshot price and current scraped price for the same URL.
+- **Price decrease**: a current scraped price that is lower than the latest stored snapshot price for the same URL.
 - **Scrape run**: one EventBridge-triggered Lambda execution covering the full product catalog.
 
 ## Integration contracts
@@ -103,7 +103,7 @@ sequenceDiagram
 - **Chemist Warehouse website** (`www.chemistwarehouse.co.nz`): outbound HTTPS `GET` using Jsoup with browser-like headers and `30s` timeout. Required request field is the full product URL in the curated catalog. Auth method is none. Cadence is hourly per product. Failures return `null` when selector/price parsing fails and the product is skipped for that run.
 - **NZ Protein website** (`www.nzprotein.co.nz`): outbound HTTPS `GET` with the same client behavior. Required request field is the full product URL in the curated catalog. Auth method is none. Cadence is hourly. Failures follow the same skip-on-null behavior.
 - **NZ Muscle website** (`nzmuscle.co.nz`): outbound HTTPS `GET` with the same client behavior. Required request field is the full product URL in the curated catalog. Auth method is none. Cadence is hourly. Failures follow the same skip-on-null behavior.
-- **Amazon SNS** (`price_tracker_api_price_updates`): outbound publish integration for change notifications. Required publish fields are topic name, subject, and message body lines containing product name, previous price, current price, and URL. Auth uses Lambda IAM role. When no matching topic ARN exists, publish fails and the invocation fails.
+- **Amazon SNS** (`price_tracker_api_price_updates`): outbound publish integration for price decrease notifications. Required publish fields are topic name, subject, and message body lines containing product name, previous price, current price, and URL. Auth uses Lambda IAM role. When no matching topic ARN exists, publish fails and the invocation fails.
 
 ## API contracts
 
@@ -138,7 +138,7 @@ Invocation outcome:
 
 - Lambda returns `null`.
 - One snapshot is written per successfully scraped product.
-- SNS notification is published only when at least one price changed.
+- SNS notification is published only when at least one price decreased.
 
 ## Data and storage contracts
 
@@ -177,7 +177,7 @@ Representative item:
 
 - Each invocation captures `now` once and uses that same timestamp for all snapshots written in the run.
 - Snapshot timestamps are stored as epoch seconds (UTC) via `EpochSecondConverter`.
-- Price comparison is exact `Double` equality (`Objects.equals(previousPrice, currentPrice)`).
+- Price comparison detects decreases only (`currentPrice < previousPrice`); price increases are not notified.
 - No notification is sent for a product with no previous snapshot.
 - Products with `null` extracted prices are skipped and not written for that run.
 - Notification publish happens before DynamoDB writes for the new snapshots.
@@ -191,7 +191,7 @@ Representative item:
 | Tracked product catalog    | `ProductsFactoryImpl` in service code | Curated list shipped with deployments                  |
 | Product page current price | Retailer HTML page at scrape time     | Parsed through host-specific extractor                 |
 | Historical tracked prices  | DynamoDB `price_tracker` snapshots    | Canonical persisted history for comparisons            |
-| Change notifications       | SNS topic messages                    | Derived from comparison against latest stored snapshot |
+| Decrease notifications     | SNS topic messages                    | Derived from comparison against latest stored snapshot |
 | Subscriber endpoints       | Terraform `local.subscriptions`       | Managed in infrastructure, not in application code     |
 
 ## Security and privacy
@@ -252,12 +252,12 @@ Representative item:
 
 ## End-to-end scenarios
 
-### Scenario 1: hourly run detects a price change
+### Scenario 1: hourly run detects a price decrease
 
 1. EventBridge invokes `UpdatePricesHandler`.
 2. Handler loads curated products and scrapes current prices.
 3. For a product with existing history, handler compares previous and current values.
-4. If changed, handler includes the change in a single SNS summary message.
+4. If decreased, handler includes the decrease in a single SNS summary message.
 5. Handler writes new snapshots for all successfully scraped products.
 
 ### Scenario 2: first-seen product or scrape miss
@@ -265,4 +265,4 @@ Representative item:
 1. EventBridge invokes `UpdatePricesHandler`.
 2. Handler scrapes a product with no prior snapshot, or scraping returns `null`.
 3. First-seen product is written without notification; `null` scrape result is skipped with no write.
-4. Invocation continues processing remaining products and only publishes when at least one valid price change is detected.
+4. Invocation continues processing remaining products and only publishes when at least one valid price decrease is detected.

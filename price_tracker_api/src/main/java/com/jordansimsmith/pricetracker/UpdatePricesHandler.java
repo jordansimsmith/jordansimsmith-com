@@ -7,7 +7,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.notifications.NotificationPublisher;
 import com.jordansimsmith.time.Clock;
 import java.util.ArrayList;
-import java.util.Objects;
 import java.util.StringJoiner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -89,7 +88,7 @@ public class UpdatePricesHandler implements RequestHandler<ScheduledEvent, Void>
         continue;
       }
 
-      if (!Objects.equals(previousPrice.getPrice(), price.getPrice())) {
+      if (price.getPrice() < previousPrice.getPrice()) {
         priceChanges.add(
             new PriceChange(
                 price.getUrl(), price.getName(), price.getPrice(), previousPrice.getPrice()));
@@ -99,8 +98,8 @@ public class UpdatePricesHandler implements RequestHandler<ScheduledEvent, Void>
     if (!priceChanges.isEmpty()) {
       var subject =
           priceChanges.size() == 1
-              ? "1 price updated"
-              : "%d prices updated".formatted(priceChanges.size());
+              ? "1 price decreased"
+              : "%d prices decreased".formatted(priceChanges.size());
       var message = new StringJoiner("\r\n\r\n");
       for (var priceChange : priceChanges) {
         var line =
