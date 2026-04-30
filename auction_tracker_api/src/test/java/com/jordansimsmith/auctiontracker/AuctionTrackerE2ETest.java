@@ -22,20 +22,21 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 
 public class AuctionTrackerE2ETest {
   private static final String NETWORK_NAME = "auction-tracker-e2e";
-  private static final String TRADEME_STUB_ALIAS = "trademe-stub";
   private static final Logger LOGGER = LoggerFactory.getLogger(AuctionTrackerE2ETest.class);
 
   private static final Network NETWORK =
       Network.builder().createNetworkCmdModifier(cmd -> cmd.withName(NETWORK_NAME)).build();
 
   private static final TradeMeWebsiteStubContainer tradeMeWebsiteStubContainer =
-      new TradeMeWebsiteStubContainer().withNetwork(NETWORK).withNetworkAliases(TRADEME_STUB_ALIAS);
+      new TradeMeWebsiteStubContainer().withNetwork(NETWORK);
 
   private static final AuctionTrackerContainer auctionTrackerContainer =
       new AuctionTrackerContainer()
           .withNetwork(NETWORK)
           .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK_NAME)
-          .withEnv("AUCTION_TRACKER_TRADEME_BASE_URL", "http://" + TRADEME_STUB_ALIAS + ":8080");
+          .withEnv(
+              "AUCTION_TRACKER_TRADEME_BASE_URL",
+              tradeMeWebsiteStubContainer.getEndpoint().toString());
 
   @BeforeAll
   static void setUpBeforeClass() {

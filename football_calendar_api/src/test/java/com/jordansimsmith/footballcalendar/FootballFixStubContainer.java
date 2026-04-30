@@ -10,6 +10,7 @@ public class FootballFixStubContainer extends HttpStubContainer<FootballFixStubC
         "footballcalendarfootballfixstub.image.loader",
         "/opt/code/football-fix-stub/football-fix-stub-server_deploy.jar",
         "com.jordansimsmith.footballcalendar.FootballFixStubServer",
-        "/health");
+        "/health",
+        "football-fix-stub");
   }
 }

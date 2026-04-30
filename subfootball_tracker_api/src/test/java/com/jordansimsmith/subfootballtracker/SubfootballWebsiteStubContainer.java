@@ -12,6 +12,7 @@ public class SubfootballWebsiteStubContainer
         "subfootballwebsitestub.image.loader",
         "/opt/code/subfootball-website-stub/subfootball-website-stub-server_deploy.jar",
         "com.jordansimsmith.subfootballtracker.SubfootballWebsiteStubServer",
-        "/register");
+        "/register",
+        "subfootball-stub");
   }
 }

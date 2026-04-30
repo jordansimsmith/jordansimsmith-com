@@ -24,15 +24,12 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 
 public class SubfootballTrackerE2ETest {
   private static final String NETWORK_NAME = "subfootball-tracker-e2e";
-  private static final String SUBFOOTBALL_STUB_ALIAS = "subfootball-stub";
 
   private static final Network NETWORK =
       Network.builder().createNetworkCmdModifier(cmd -> cmd.withName(NETWORK_NAME)).build();
 
   private static final SubfootballWebsiteStubContainer subfootballWebsiteStubContainer =
-      new SubfootballWebsiteStubContainer()
-          .withNetwork(NETWORK)
-          .withNetworkAliases(SUBFOOTBALL_STUB_ALIAS);
+      new SubfootballWebsiteStubContainer().withNetwork(NETWORK);
 
   private static final SubfootballTrackerContainer subfootballTrackerContainer =
       new SubfootballTrackerContainer()
@@ -40,7 +37,7 @@ public class SubfootballTrackerE2ETest {
           .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK_NAME)
           .withEnv(
               "SUBFOOTBALL_TRACKER_SUBFOOTBALL_BASE_URL",
-              "http://" + SUBFOOTBALL_STUB_ALIAS + ":8080");
+              subfootballWebsiteStubContainer.getEndpoint().toString());
 
   @BeforeAll
   static void setUpBeforeClass() {

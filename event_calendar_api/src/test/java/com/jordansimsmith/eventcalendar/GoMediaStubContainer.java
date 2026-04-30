@@ -10,6 +10,7 @@ public class GoMediaStubContainer extends HttpStubContainer<GoMediaStubContainer
         "eventcalendargomediastub.image.loader",
         "/opt/code/go-media-stub/go-media-stub-server_deploy.jar",
         "com.jordansimsmith.eventcalendar.GoMediaStubServer",
-        "/health");
+        "/health",
+        "gomedia-stub");
   }
 }

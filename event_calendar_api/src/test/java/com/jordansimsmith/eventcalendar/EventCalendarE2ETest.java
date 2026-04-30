@@ -17,24 +17,22 @@ import software.amazon.awssdk.services.lambda.model.InvokeRequest;
 
 public class EventCalendarE2ETest {
   private static final String NETWORK_NAME = "event-calendar-e2e";
-  private static final String GO_MEDIA_STUB_ALIAS = "gomedia-stub";
-  private static final String MEETUP_STUB_ALIAS = "meetup-stub";
 
   private static final Network NETWORK =
       Network.builder().createNetworkCmdModifier(cmd -> cmd.withName(NETWORK_NAME)).build();
 
   private static final GoMediaStubContainer goMediaStubContainer =
-      new GoMediaStubContainer().withNetwork(NETWORK).withNetworkAliases(GO_MEDIA_STUB_ALIAS);
+      new GoMediaStubContainer().withNetwork(NETWORK);
 
   private static final MeetupStubContainer meetupStubContainer =
-      new MeetupStubContainer().withNetwork(NETWORK).withNetworkAliases(MEETUP_STUB_ALIAS);
+      new MeetupStubContainer().withNetwork(NETWORK);
 
   private static final EventCalendarContainer eventCalendarContainer =
       new EventCalendarContainer()
           .withNetwork(NETWORK)
           .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK_NAME)
-          .withEnv("EVENT_CALENDAR_GOMEDIA_BASE_URL", "http://" + GO_MEDIA_STUB_ALIAS + ":8080")
-          .withEnv("EVENT_CALENDAR_MEETUP_BASE_URL", "http://" + MEETUP_STUB_ALIAS + ":8080");
+          .withEnv("EVENT_CALENDAR_GOMEDIA_BASE_URL", goMediaStubContainer.getEndpoint().toString())
+          .withEnv("EVENT_CALENDAR_MEETUP_BASE_URL", meetupStubContainer.getEndpoint().toString());
 
   private final ObjectMapper mapper = new ObjectMapper();
 

@@ -25,53 +25,45 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 public class ImmersionTrackerE2ETest {
 
   private static final String NETWORK_NAME = "immersion-tracker-e2e";
-  private static final String TVDB_STUB_ALIAS = "tvdb-stub";
-  private static final String YOUTUBE_STUB_ALIAS = "youtube-stub";
-  private static final String SPOTIFY_ACCOUNTS_STUB_ALIAS = "spotify-accounts-stub";
-  private static final String SPOTIFY_API_STUB_ALIAS = "spotify-api-stub";
 
   private static final Network NETWORK =
       Network.builder().createNetworkCmdModifier(cmd -> cmd.withName(NETWORK_NAME)).build();
 
   @Container
   private static final ImmersionTrackerTvdbStubContainer immersionTrackerTvdbStubContainer =
-      new ImmersionTrackerTvdbStubContainer()
-          .withNetwork(NETWORK)
-          .withNetworkAliases(TVDB_STUB_ALIAS);
+      new ImmersionTrackerTvdbStubContainer().withNetwork(NETWORK);
 
   @Container
   private static final ImmersionTrackerYoutubeStubContainer immersionTrackerYoutubeStubContainer =
-      new ImmersionTrackerYoutubeStubContainer()
-          .withNetwork(NETWORK)
-          .withNetworkAliases(YOUTUBE_STUB_ALIAS);
+      new ImmersionTrackerYoutubeStubContainer().withNetwork(NETWORK);
 
   @Container
   private static final ImmersionTrackerSpotifyAccountsStubContainer
       immersionTrackerSpotifyAccountsStubContainer =
-          new ImmersionTrackerSpotifyAccountsStubContainer()
-              .withNetwork(NETWORK)
-              .withNetworkAliases(SPOTIFY_ACCOUNTS_STUB_ALIAS);
+          new ImmersionTrackerSpotifyAccountsStubContainer().withNetwork(NETWORK);
 
   @Container
   private static final ImmersionTrackerSpotifyApiStubContainer
       immersionTrackerSpotifyApiStubContainer =
-          new ImmersionTrackerSpotifyApiStubContainer()
-              .withNetwork(NETWORK)
-              .withNetworkAliases(SPOTIFY_API_STUB_ALIAS);
+          new ImmersionTrackerSpotifyApiStubContainer().withNetwork(NETWORK);
 
   @Container
   private static final ImmersionTrackerContainer immersionTrackerContainer =
       new ImmersionTrackerContainer()
           .withNetwork(NETWORK)
           .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK_NAME)
-          .withEnv("IMMERSION_TRACKER_TVDB_BASE_URL", "http://" + TVDB_STUB_ALIAS + ":8080")
-          .withEnv("IMMERSION_TRACKER_YOUTUBE_BASE_URL", "http://" + YOUTUBE_STUB_ALIAS + ":8080")
+          .withEnv(
+              "IMMERSION_TRACKER_TVDB_BASE_URL",
+              immersionTrackerTvdbStubContainer.getEndpoint().toString())
+          .withEnv(
+              "IMMERSION_TRACKER_YOUTUBE_BASE_URL",
+              immersionTrackerYoutubeStubContainer.getEndpoint().toString())
           .withEnv(
               "IMMERSION_TRACKER_SPOTIFY_ACCOUNTS_BASE_URL",
-              "http://" + SPOTIFY_ACCOUNTS_STUB_ALIAS + ":8080")
+              immersionTrackerSpotifyAccountsStubContainer.getEndpoint().toString())
           .withEnv(
               "IMMERSION_TRACKER_SPOTIFY_API_BASE_URL",
-              "http://" + SPOTIFY_API_STUB_ALIAS + ":8080");
+              immersionTrackerSpotifyApiStubContainer.getEndpoint().toString());
 
   private String formattedAllTimeProgressLabel;
 

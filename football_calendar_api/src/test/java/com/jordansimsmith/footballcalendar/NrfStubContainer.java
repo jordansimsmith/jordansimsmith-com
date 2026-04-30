@@ -10,6 +10,7 @@ public class NrfStubContainer extends HttpStubContainer<NrfStubContainer> {
         "footballcalendarnrfstub.image.loader",
         "/opt/code/nrf-stub/nrf-stub-server_deploy.jar",
         "com.jordansimsmith.footballcalendar.NrfStubServer",
-        "/health");
+        "/health",
+        "nrf-stub");
   }
 }

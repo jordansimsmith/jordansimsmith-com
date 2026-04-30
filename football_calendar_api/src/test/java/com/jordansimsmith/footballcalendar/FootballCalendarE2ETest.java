@@ -25,28 +25,21 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 @Testcontainers
 public class FootballCalendarE2ETest {
   private static final String NETWORK_NAME = "football-calendar-e2e";
-  private static final String NRF_STUB_ALIAS = "nrf-stub";
-  private static final String FOOTBALL_FIX_STUB_ALIAS = "football-fix-stub";
-  private static final String SUBFOOTBALL_STUB_ALIAS = "subfootball-stub";
 
   private static final Network NETWORK =
       Network.builder().createNetworkCmdModifier(cmd -> cmd.withName(NETWORK_NAME)).build();
 
   @Container
   private static final NrfStubContainer nrfStubContainer =
-      new NrfStubContainer().withNetwork(NETWORK).withNetworkAliases(NRF_STUB_ALIAS);
+      new NrfStubContainer().withNetwork(NETWORK);
 
   @Container
   private static final FootballFixStubContainer footballFixStubContainer =
-      new FootballFixStubContainer()
-          .withNetwork(NETWORK)
-          .withNetworkAliases(FOOTBALL_FIX_STUB_ALIAS);
+      new FootballFixStubContainer().withNetwork(NETWORK);
 
   @Container
   private static final SubfootballStubContainer subfootballStubContainer =
-      new SubfootballStubContainer()
-          .withNetwork(NETWORK)
-          .withNetworkAliases(SUBFOOTBALL_STUB_ALIAS);
+      new SubfootballStubContainer().withNetwork(NETWORK);
 
   private final ObjectMapper mapper = new ObjectMapper();
 
@@ -55,13 +48,13 @@ public class FootballCalendarE2ETest {
       new FootballCalendarContainer()
           .withNetwork(NETWORK)
           .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK_NAME)
-          .withEnv("FOOTBALL_CALENDAR_NRF_API_URL", "http://" + NRF_STUB_ALIAS + ":8080")
+          .withEnv("FOOTBALL_CALENDAR_NRF_API_URL", nrfStubContainer.getEndpoint().toString())
           .withEnv(
               "FOOTBALL_CALENDAR_FOOTBALL_FIX_BASE_URL",
-              "http://" + FOOTBALL_FIX_STUB_ALIAS + ":8080")
+              footballFixStubContainer.getEndpoint().toString())
           .withEnv(
               "FOOTBALL_CALENDAR_SUBFOOTBALL_BASE_URL",
-              "http://" + SUBFOOTBALL_STUB_ALIAS + ":8080");
+              subfootballStubContainer.getEndpoint().toString());
 
   @BeforeEach
   void setup() {

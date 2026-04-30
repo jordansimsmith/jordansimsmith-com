@@ -10,6 +10,7 @@ public class SubfootballStubContainer extends HttpStubContainer<SubfootballStubC
         "footballcalendarsubfootballstub.image.loader",
         "/opt/code/subfootball-stub/subfootball-stub-server_deploy.jar",
         "com.jordansimsmith.footballcalendar.SubfootballStubServer",
-        "/health");
+        "/health",
+        "subfootball-stub");
   }
 }

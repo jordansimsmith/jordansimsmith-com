@@ -11,6 +11,7 @@ public class ImmersionTrackerYoutubeStubContainer
         "immersiontrackeryoutubestub.image.loader",
         "/opt/code/immersion-tracker-youtube-stub/immersion-tracker-youtube-stub-server_deploy.jar",
         "com.jordansimsmith.immersiontracker.ImmersionTrackerYoutubeStubServer",
-        "/health");
+        "/health",
+        "youtube-stub");
   }
 }

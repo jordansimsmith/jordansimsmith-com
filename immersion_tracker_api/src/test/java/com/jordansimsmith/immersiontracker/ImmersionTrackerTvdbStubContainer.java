@@ -11,6 +11,7 @@ public class ImmersionTrackerTvdbStubContainer
         "immersiontrackertvdbstub.image.loader",
         "/opt/code/immersion-tracker-tvdb-stub/immersion-tracker-tvdb-stub-server_deploy.jar",
         "com.jordansimsmith.immersiontracker.ImmersionTrackerTvdbStubServer",
-        "/health");
+        "/health",
+        "tvdb-stub");
   }
 }

@@ -12,6 +12,7 @@ public class PriceTrackerWebsiteStubContainer
         "pricetrackerwebsitestub.image.loader",
         "/opt/code/price-tracker-website-stub/price-tracker-website-stub-server_deploy.jar",
         "com.jordansimsmith.pricetracker.PriceTrackerWebsiteStubServer",
-        "/health");
+        "/health",
+        "price-tracker-website-stub");
   }
 }

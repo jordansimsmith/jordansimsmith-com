@@ -10,6 +10,7 @@ public class TradeMeWebsiteStubContainer extends HttpStubContainer<TradeMeWebsit
         "trademewebsitestub.image.loader",
         "/opt/code/trademe-website-stub/trademe-website-stub-server_deploy.jar",
         "com.jordansimsmith.auctiontracker.TradeMeWebsiteStubServer",
-        "/health");
+        "/health",
+        "trademe-stub");
   }
 }

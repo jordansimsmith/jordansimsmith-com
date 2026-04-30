@@ -11,6 +11,7 @@ public class ImmersionTrackerSpotifyAccountsStubContainer
         "immersiontrackerspotifyaccountsstub.image.loader",
         "/opt/code/immersion-tracker-spotify-accounts-stub/immersion-tracker-spotify-accounts-stub-server_deploy.jar",
         "com.jordansimsmith.immersiontracker.ImmersionTrackerSpotifyAccountsStubServer",
-        "/health");
+        "/health",
+        "spotify-accounts-stub");
   }
 }

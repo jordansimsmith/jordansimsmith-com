@@ -11,6 +11,7 @@ public class ImmersionTrackerSpotifyApiStubContainer
         "immersiontrackerspotifyapistub.image.loader",
         "/opt/code/immersion-tracker-spotify-api-stub/immersion-tracker-spotify-api-stub-server_deploy.jar",
         "com.jordansimsmith.immersiontracker.ImmersionTrackerSpotifyApiStubServer",
-        "/health");
+        "/health",
+        "spotify-api-stub");
   }
 }

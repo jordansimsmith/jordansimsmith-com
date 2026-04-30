@@ -10,6 +10,7 @@ public class MeetupStubContainer extends HttpStubContainer<MeetupStubContainer> 
         "eventcalendarmeetupstub.image.loader",
         "/opt/code/meetup-stub/meetup-stub-server_deploy.jar",
         "com.jordansimsmith.eventcalendar.MeetupStubServer",
-        "/health");
+        "/health",
+        "meetup-stub");
   }
 }
