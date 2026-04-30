@@ -6,6 +6,7 @@ import static org.assertj.core.api.Assertions.within;
 import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.notifications.FakeNotificationPublisher;
 import com.jordansimsmith.time.FakeClock;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeAll;
@@ -20,6 +21,7 @@ public class UpdateFixturesHandlerIntegrationTest {
   private static final int NRF_COMP_ID = 12869;
 
   private FakeClock fakeClock;
+  private FakeNotificationPublisher fakeNotificationPublisher;
   private FakeNrfClient fakeNrfClient;
   private FakeFootballFixClient fakeFootballFixClient;
   private FakeSubfootballClient fakeSubfootballClient;
@@ -42,6 +44,7 @@ public class UpdateFixturesHandlerIntegrationTest {
     var factory = FootballCalendarTestFactory.create(dynamoDbContainer.getEndpoint());
 
     fakeClock = factory.fakeClock();
+    fakeNotificationPublisher = factory.fakeNotificationPublisher();
     fakeNrfClient = factory.fakeNrfClient();
     fakeFootballFixClient = factory.fakeFootballFixClient();
     fakeSubfootballClient = factory.fakeSubfootballClient();
@@ -540,5 +543,248 @@ public class UpdateFixturesHandlerIntegrationTest {
     assertThat(subfootballItem).isPresent();
     assertThat(subfootballItem.get().getTeam()).isEqualTo("Man I Love Football");
     assertThat(subfootballItem.get().getHomeTeam()).isEqualTo(subfootballFixture.homeTeamName());
+  }
+
+  @Test
+  void handleRequestShouldSendNotificationWhenUpcomingFixtureModified() {
+    // arrange
+    var testTime = Instant.parse("2026-05-01T10:00:00Z");
+    fakeClock.setTime(testTime);
+    var event = new ScheduledEvent();
+
+    fakeTeamsFactory.addTeam(
+        new TeamsFactory.NorthernRegionalFootballTeam(
+            "Flamingos", "flamingo", NRF_COMP_ID, 9701, 721150, 2026));
+
+    var existingFixture =
+        FootballCalendarItem.create(
+            "Flamingos",
+            "123456",
+            "Eastern Suburbs AFC Tekkerslavakia",
+            "Ellerslie AFC Flamingos",
+            Instant.parse("2026-05-04T14:00:00Z"),
+            "Madills Farm: Field 3",
+            "Madills Farm Recreation Reserve",
+            -36.8485,
+            174.8582,
+            "Confirmed");
+    footballCalendarTable.putItem(existingFixture);
+
+    var updatedFixture =
+        new NrfClient.NrfFixture(
+            "123456",
+            "Eastern Suburbs AFC Tekkerslavakia",
+            "Ellerslie AFC Flamingos",
+            Instant.parse("2026-05-05T14:00:00Z"),
+            "Ellerslie Domain: Field 1",
+            "Ellerslie Domain",
+            -36.8995,
+            174.8140,
+            "Confirmed");
+    fakeNrfClient.addFixture(NRF_COMP_ID, updatedFixture);
+
+    // act
+    updateFixturesHandler.handleRequest(event, null);
+
+    // assert
+    var notifications = fakeNotificationPublisher.findNotifications(UpdateFixturesHandler.TOPIC);
+    assertThat(notifications).hasSize(1);
+
+    var notification = notifications.get(0);
+    assertThat(notification.subject()).isEqualTo("Football calendar fixture updated");
+    assertThat(notification.message()).contains("MODIFIED");
+    assertThat(notification.message()).contains("Flamingos");
+    assertThat(notification.message()).contains("2026-05-04T14:00:00Z");
+    assertThat(notification.message()).contains("2026-05-05T14:00:00Z");
+    assertThat(notification.message()).contains("Madills Farm: Field 3");
+    assertThat(notification.message()).contains("Ellerslie Domain: Field 1");
+  }
+
+  @Test
+  void handleRequestShouldSendNotificationWhenUpcomingFixtureAdded() {
+    // arrange
+    var testTime = Instant.parse("2026-05-01T10:00:00Z");
+    fakeClock.setTime(testTime);
+    var event = new ScheduledEvent();
+
+    fakeTeamsFactory.addTeam(
+        new TeamsFactory.NorthernRegionalFootballTeam(
+            "Flamingos", "flamingo", NRF_COMP_ID, 9701, 721150, 2026));
+
+    var newFixture =
+        new NrfClient.NrfFixture(
+            "new-123",
+            "Eastern Suburbs AFC Tekkerslavakia",
+            "Ellerslie AFC Flamingos",
+            Instant.parse("2026-05-05T14:00:00Z"),
+            "Madills Farm: Field 3",
+            "Madills Farm Recreation Reserve",
+            -36.8485,
+            174.8582,
+            "Confirmed");
+    fakeNrfClient.addFixture(NRF_COMP_ID, newFixture);
+
+    // act
+    updateFixturesHandler.handleRequest(event, null);
+
+    // assert
+    var notifications = fakeNotificationPublisher.findNotifications(UpdateFixturesHandler.TOPIC);
+    assertThat(notifications).hasSize(1);
+
+    var notification = notifications.get(0);
+    assertThat(notification.subject()).isEqualTo("Football calendar fixture updated");
+    assertThat(notification.message()).contains("ADDED");
+    assertThat(notification.message()).contains("Flamingos");
+    assertThat(notification.message()).contains("2026-05-05T14:00:00Z");
+  }
+
+  @Test
+  void handleRequestShouldSendNotificationWhenUpcomingFixtureRemoved() {
+    // arrange
+    var testTime = Instant.parse("2026-05-01T10:00:00Z");
+    fakeClock.setTime(testTime);
+    var event = new ScheduledEvent();
+
+    fakeTeamsFactory.addTeam(
+        new TeamsFactory.NorthernRegionalFootballTeam(
+            "Flamingos", "flamingo", NRF_COMP_ID, 9701, 721150, 2026));
+
+    var existingFixture =
+        FootballCalendarItem.create(
+            "Flamingos",
+            "to-remove",
+            "Ellerslie AFC Flamingos",
+            "Western Springs",
+            Instant.parse("2026-05-04T14:00:00Z"),
+            "Seddon Fields",
+            "180 Meola Road, Point Chevalier, Auckland",
+            -36.8605,
+            174.7280,
+            "Scheduled");
+    footballCalendarTable.putItem(existingFixture);
+
+    // return a different fixture so the existing one gets removed
+    var keptFixture =
+        new NrfClient.NrfFixture(
+            "kept-123",
+            "Eastern Suburbs AFC Tekkerslavakia",
+            "Ellerslie AFC Flamingos",
+            Instant.parse("2026-05-06T14:00:00Z"),
+            "Madills Farm: Field 3",
+            "Madills Farm Recreation Reserve",
+            -36.8485,
+            174.8582,
+            "Confirmed");
+    fakeNrfClient.addFixture(NRF_COMP_ID, keptFixture);
+
+    // act
+    updateFixturesHandler.handleRequest(event, null);
+
+    // assert
+    var notifications = fakeNotificationPublisher.findNotifications(UpdateFixturesHandler.TOPIC);
+    assertThat(notifications).hasSize(1);
+
+    var notification = notifications.get(0);
+    assertThat(notification.subject()).isEqualTo("Football calendar fixture updated");
+    assertThat(notification.message()).contains("REMOVED");
+    assertThat(notification.message()).contains("Flamingos");
+    assertThat(notification.message()).contains("Seddon Fields");
+    assertThat(notification.message()).contains("ADDED");
+  }
+
+  @Test
+  void handleRequestShouldNotSendNotificationWhenFixtureBeyondSevenDaysChanges() {
+    // arrange
+    var testTime = Instant.parse("2026-05-01T10:00:00Z");
+    fakeClock.setTime(testTime);
+    var event = new ScheduledEvent();
+
+    fakeTeamsFactory.addTeam(
+        new TeamsFactory.NorthernRegionalFootballTeam(
+            "Flamingos", "flamingo", NRF_COMP_ID, 9701, 721150, 2026));
+
+    // existing fixture is more than 7 days away
+    var existingFixture =
+        FootballCalendarItem.create(
+            "Flamingos",
+            "far-away",
+            "Eastern Suburbs AFC Tekkerslavakia",
+            "Ellerslie AFC Flamingos",
+            Instant.parse("2026-05-20T14:00:00Z"),
+            "Madills Farm: Field 3",
+            "Madills Farm Recreation Reserve",
+            -36.8485,
+            174.8582,
+            "Confirmed");
+    footballCalendarTable.putItem(existingFixture);
+
+    // updated fixture has different venue but still beyond 7 days
+    var updatedFixture =
+        new NrfClient.NrfFixture(
+            "far-away",
+            "Eastern Suburbs AFC Tekkerslavakia",
+            "Ellerslie AFC Flamingos",
+            Instant.parse("2026-05-20T14:00:00Z"),
+            "Ellerslie Domain: Field 1",
+            "Ellerslie Domain",
+            -36.8995,
+            174.8140,
+            "Confirmed");
+    fakeNrfClient.addFixture(NRF_COMP_ID, updatedFixture);
+
+    // act
+    updateFixturesHandler.handleRequest(event, null);
+
+    // assert
+    var notifications = fakeNotificationPublisher.findNotifications(UpdateFixturesHandler.TOPIC);
+    assertThat(notifications).isEmpty();
+  }
+
+  @Test
+  void handleRequestShouldNotSendNotificationWhenNoUpcomingFixturesChange() {
+    // arrange
+    var testTime = Instant.parse("2026-05-01T10:00:00Z");
+    fakeClock.setTime(testTime);
+    var event = new ScheduledEvent();
+
+    fakeTeamsFactory.addTeam(
+        new TeamsFactory.NorthernRegionalFootballTeam(
+            "Flamingos", "flamingo", NRF_COMP_ID, 9701, 721150, 2026));
+
+    // existing fixture within 7 days with identical data
+    var existingFixture =
+        FootballCalendarItem.create(
+            "Flamingos",
+            "unchanged",
+            "Eastern Suburbs AFC Tekkerslavakia",
+            "Ellerslie AFC Flamingos",
+            Instant.parse("2026-05-04T14:00:00Z"),
+            "Madills Farm: Field 3",
+            "Madills Farm Recreation Reserve",
+            -36.8485,
+            174.8582,
+            "Confirmed");
+    footballCalendarTable.putItem(existingFixture);
+
+    // API returns identical data
+    var sameFixture =
+        new NrfClient.NrfFixture(
+            "unchanged",
+            "Eastern Suburbs AFC Tekkerslavakia",
+            "Ellerslie AFC Flamingos",
+            Instant.parse("2026-05-04T14:00:00Z"),
+            "Madills Farm: Field 3",
+            "Madills Farm Recreation Reserve",
+            -36.8485,
+            174.8582,
+            "Confirmed");
+    fakeNrfClient.addFixture(NRF_COMP_ID, sameFixture);
+
+    // act
+    updateFixturesHandler.handleRequest(event, null);
+
+    // assert
+    var notifications = fakeNotificationPublisher.findNotifications(UpdateFixturesHandler.TOPIC);
+    assertThat(notifications).isEmpty();
   }
 }

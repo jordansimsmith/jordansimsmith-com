@@ -2,6 +2,8 @@ package com.jordansimsmith.footballcalendar;
 
 import com.jordansimsmith.dynamodb.DynamoDbTestModule;
 import com.jordansimsmith.json.ObjectMapperModule;
+import com.jordansimsmith.notifications.FakeNotificationPublisher;
+import com.jordansimsmith.notifications.NotificationTestModule;
 import com.jordansimsmith.time.ClockTestModule;
 import com.jordansimsmith.time.FakeClock;
 import dagger.BindsInstance;
@@ -16,11 +18,14 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
     modules = {
       ClockTestModule.class,
       DynamoDbTestModule.class,
+      NotificationTestModule.class,
       FootballCalendarTestModule.class,
       ObjectMapperModule.class
     })
 public interface FootballCalendarTestFactory extends FootballCalendarFactory {
   FakeClock fakeClock();
+
+  FakeNotificationPublisher fakeNotificationPublisher();
 
   FakeNrfClient fakeNrfClient();
 

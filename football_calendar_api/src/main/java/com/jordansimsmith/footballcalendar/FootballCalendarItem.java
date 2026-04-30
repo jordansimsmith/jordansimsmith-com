@@ -2,6 +2,7 @@ package com.jordansimsmith.footballcalendar;
 
 import com.jordansimsmith.dynamodb.EpochSecondConverter;
 import java.time.Instant;
+import java.util.Objects;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbConvertedBy;
@@ -149,6 +150,32 @@ public class FootballCalendarItem {
 
   public void setTeam(String team) {
     this.team = team;
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    FootballCalendarItem that = (FootballCalendarItem) o;
+    return Objects.equals(pk, that.pk)
+        && Objects.equals(sk, that.sk)
+        && Objects.equals(homeTeam, that.homeTeam)
+        && Objects.equals(awayTeam, that.awayTeam)
+        && Objects.equals(timestamp, that.timestamp)
+        && Objects.equals(venue, that.venue)
+        && Objects.equals(address, that.address)
+        && Objects.equals(latitude, that.latitude)
+        && Objects.equals(longitude, that.longitude)
+        && Objects.equals(status, that.status)
+        && Objects.equals(matchId, that.matchId)
+        && Objects.equals(team, that.team);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(
+        pk, sk, homeTeam, awayTeam, timestamp, venue, address, latitude, longitude, status, matchId,
+        team);
   }
 
   public static String formatPk(String team) {

@@ -12,6 +12,37 @@ lambda_client = boto3.client(
 dynamodb_client = boto3.client(
     "dynamodb", endpoint_url=endpoint_url, region_name=region_name
 )
+sqs_client = boto3.client("sqs", endpoint_url=endpoint_url, region_name=region_name)
+sns_client = boto3.client("sns", endpoint_url=endpoint_url, region_name=region_name)
+
+topic_name = "football_calendar_api_fixture_updates"
+topic_response = sns_client.create_topic(Name=topic_name)
+topic_arn = topic_response["TopicArn"]
+
+queue_name = "football-calendar-test-queue"
+queue_url = sqs_client.create_queue(QueueName=queue_name)["QueueUrl"]
+queue_attributes = sqs_client.get_queue_attributes(
+    QueueUrl=queue_url, AttributeNames=["QueueArn"]
+)
+queue_arn = queue_attributes["Attributes"]["QueueArn"]
+queue_policy = {
+    "Version": "2012-10-17",
+    "Id": "AllowAll",
+    "Statement": [
+        {
+            "Sid": "AllowAllActions",
+            "Effect": "Allow",
+            "Principal": "*",
+            "Action": "*",
+            "Resource": "*",
+        }
+    ],
+}
+sqs_client.set_queue_attributes(
+    QueueUrl=queue_url, Attributes={"Policy": json.dumps(queue_policy)}
+)
+
+sns_client.subscribe(TopicArn=topic_arn, Protocol="sqs", Endpoint=queue_arn)
 
 table_name = "football_calendar"
 dynamodb_client.create_table(

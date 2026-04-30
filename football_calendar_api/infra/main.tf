@@ -60,6 +60,8 @@ locals {
       method = "GET"
     }
   }
+
+  subscriptions = ["jordansimsmith@gmail.com"]
 }
 
 resource "aws_dynamodb_table" "football_calendar_table" {
@@ -140,6 +142,53 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+resource "aws_sns_topic" "fixture_updates" {
+  name = "${local.application_id}_fixture_updates"
+}
+
+resource "aws_sns_topic_subscription" "fixture_updates" {
+  for_each  = toset(local.subscriptions)
+  topic_arn = aws_sns_topic.fixture_updates.arn
+  protocol  = "email"
+  endpoint  = each.value
+}
+
+data "aws_iam_policy_document" "lambda_sns" {
+  statement {
+    effect = "Allow"
+
+    resources = [
+      aws_sns_topic.fixture_updates.arn,
+    ]
+
+    actions = [
+      "SNS:Publish",
+      "SNS:GetTopicAttributes",
+    ]
+  }
+
+  statement {
+    effect = "Allow"
+
+    resources = [
+      "*"
+    ]
+
+    actions = [
+      "SNS:ListTopics"
+    ]
+  }
+}
+
+resource "aws_iam_policy" "lambda_sns" {
+  name   = "${local.application_id}_lambda_sns"
+  policy = data.aws_iam_policy_document.lambda_sns.json
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_sns" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = aws_iam_policy.lambda_sns.arn
+}
 
 resource "aws_lambda_function" "lambda" {
   for_each = local.lambdas

@@ -4,10 +4,18 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
 import com.google.common.annotations.VisibleForTesting;
+import com.jordansimsmith.notifications.NotificationPublisher;
+import com.jordansimsmith.time.Clock;
+import java.time.Duration;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.StringJoiner;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -17,7 +25,11 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 
 public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Void> {
   private static final Logger LOGGER = LoggerFactory.getLogger(UpdateFixturesHandler.class);
+  @VisibleForTesting static final String TOPIC = "football_calendar_api_fixture_updates";
+  private static final Duration UPCOMING_WINDOW = Duration.ofDays(7);
 
+  private final Clock clock;
+  private final NotificationPublisher notificationPublisher;
   private final DynamoDbTable<FootballCalendarItem> footballCalendarTable;
   private final NrfClient nrfClient;
   private final FootballFixClient footballFixClient;
@@ -30,6 +42,8 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
 
   @VisibleForTesting
   UpdateFixturesHandler(FootballCalendarFactory factory) {
+    this.clock = factory.clock();
+    this.notificationPublisher = factory.notificationPublisher();
     this.footballCalendarTable = factory.footballCalendarTable();
     this.nrfClient = factory.nrfClient();
     this.footballFixClient = factory.footballFixClient();
@@ -48,6 +62,10 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
   }
 
   private Void doHandleRequest(ScheduledEvent event, Context context) {
+    var now = clock.now();
+    var upcomingEnd = now.plus(UPCOMING_WINDOW);
+    var changes = new ArrayList<String>();
+
     // find and combine all fixtures from various sources
     var allFixtures = new ArrayList<FootballCalendarItem>();
     allFixtures.addAll(findNorthernRegionalFootballFixtures());
@@ -71,13 +89,23 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
               .stream()
               .toList();
 
-      // create a set of match IDs from the API response to use for comparison
-      var newFixtureIds =
-          fixtures.stream().map(FootballCalendarItem::getMatchId).collect(Collectors.toSet());
+      var existingByMatchId =
+          existingFixtures.stream()
+              .collect(
+                  Collectors.toMap(
+                      FootballCalendarItem::getMatchId, Function.identity(), (a, b) -> b));
+      var newByMatchId =
+          fixtures.stream()
+              .collect(
+                  Collectors.toMap(
+                      FootballCalendarItem::getMatchId, Function.identity(), (a, b) -> b));
+
+      // detect upcoming fixture changes
+      changes.addAll(detectChanges(existingByMatchId, newByMatchId, teamId, now, upcomingEnd));
 
       // delete fixtures that no longer exist in the API response
       for (var existingFixture : existingFixtures) {
-        if (!newFixtureIds.contains(existingFixture.getMatchId())) {
+        if (!newByMatchId.containsKey(existingFixture.getMatchId())) {
           footballCalendarTable.deleteItem(existingFixture);
         }
       }
@@ -88,7 +116,115 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
       }
     }
 
+    if (!changes.isEmpty()) {
+      var subject = "Football calendar fixture updated";
+      var message = new StringJoiner("\r\n\r\n");
+      message.add("The following upcoming fixtures have changed:");
+      for (var change : changes) {
+        message.add(change);
+      }
+      notificationPublisher.publish(TOPIC, subject, message.toString());
+    }
+
     return null;
+  }
+
+  private List<String> detectChanges(
+      Map<String, FootballCalendarItem> existingByMatchId,
+      Map<String, FootballCalendarItem> newByMatchId,
+      String teamId,
+      Instant now,
+      Instant upcomingEnd) {
+    var changes = new ArrayList<String>();
+
+    // detect added and modified fixtures
+    for (var entry : newByMatchId.entrySet()) {
+      var matchId = entry.getKey();
+      var newFixture = entry.getValue();
+
+      if (!isUpcoming(newFixture.getTimestamp(), now, upcomingEnd)) {
+        continue;
+      }
+
+      var existing = existingByMatchId.get(matchId);
+      if (existing == null) {
+        changes.add(
+            String.format(
+                "ADDED: %s vs %s (%s)\r\n  Time: %s\r\n  Venue: %s",
+                newFixture.getHomeTeam(),
+                newFixture.getAwayTeam(),
+                teamId,
+                newFixture.getTimestamp(),
+                newFixture.getVenue()));
+        continue;
+      }
+
+      if (existing.equals(newFixture)) {
+        continue;
+      }
+
+      var detail = new StringBuilder();
+      detail.append(
+          String.format(
+              "MODIFIED: %s vs %s (%s)",
+              newFixture.getHomeTeam(), newFixture.getAwayTeam(), teamId));
+      if (!Objects.equals(existing.getTimestamp(), newFixture.getTimestamp())) {
+        detail.append(
+            String.format(
+                "\r\n  Time: %s -> %s", existing.getTimestamp(), newFixture.getTimestamp()));
+      }
+      if (!Objects.equals(existing.getVenue(), newFixture.getVenue())) {
+        detail.append(
+            String.format("\r\n  Venue: %s -> %s", existing.getVenue(), newFixture.getVenue()));
+      }
+      if (!Objects.equals(existing.getAddress(), newFixture.getAddress())) {
+        detail.append(
+            String.format(
+                "\r\n  Address: %s -> %s", existing.getAddress(), newFixture.getAddress()));
+      }
+      if (!Objects.equals(existing.getStatus(), newFixture.getStatus())) {
+        detail.append(
+            String.format("\r\n  Status: %s -> %s", existing.getStatus(), newFixture.getStatus()));
+      }
+      if (!Objects.equals(existing.getHomeTeam(), newFixture.getHomeTeam())) {
+        detail.append(
+            String.format(
+                "\r\n  Home: %s -> %s", existing.getHomeTeam(), newFixture.getHomeTeam()));
+      }
+      if (!Objects.equals(existing.getAwayTeam(), newFixture.getAwayTeam())) {
+        detail.append(
+            String.format(
+                "\r\n  Away: %s -> %s", existing.getAwayTeam(), newFixture.getAwayTeam()));
+      }
+      changes.add(detail.toString());
+    }
+
+    // detect removed fixtures
+    for (var entry : existingByMatchId.entrySet()) {
+      var matchId = entry.getKey();
+      var existing = entry.getValue();
+
+      if (!isUpcoming(existing.getTimestamp(), now, upcomingEnd)) {
+        continue;
+      }
+
+      if (!newByMatchId.containsKey(matchId)) {
+        changes.add(
+            String.format(
+                "REMOVED: %s vs %s (%s)\r\n  Was: %s at %s",
+                existing.getHomeTeam(),
+                existing.getAwayTeam(),
+                teamId,
+                existing.getTimestamp(),
+                existing.getVenue()));
+      }
+    }
+
+    return changes;
+  }
+
+  private boolean isUpcoming(Instant timestamp, Instant now, Instant upcomingEnd) {
+    return timestamp != null && !timestamp.isBefore(now) && timestamp.isBefore(upcomingEnd);
   }
 
   private List<FootballCalendarItem> findNorthernRegionalFootballFixtures() {

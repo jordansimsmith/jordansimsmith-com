@@ -15,6 +15,7 @@ The football calendar API aggregates fixtures from multiple football sources, st
 - As a player or supporter, I want fixtures from multiple football sources merged into one feed, so that I only need one calendar subscription.
 - As a maintainer, I want per-team fixture reconciliation with stale-match deletion, so that removed fixtures disappear automatically.
 - As a calendar app user, I want a public `GET /calendar` endpoint, so that native iCal clients can subscribe without extra setup.
+- As a player, I want email notifications when upcoming fixtures change, so that I notice schedule or venue changes promptly.
 
 ## Features and scope boundaries
 
@@ -25,6 +26,7 @@ The football calendar API aggregates fixtures from multiple football sources, st
 - Reconcile fixtures per team partition by upserting current fixtures and deleting stale `match_id` values for teams present in a run.
 - Expose `GET /calendar` that returns an aggregated iCal calendar across all configured teams.
 - Include optional fixture metadata when available from a source (`status`, `latitude`, `longitude`).
+- Send an SNS notification when a fixture within the next 7 days is added, removed, or modified (timestamp, venue, address, status, or team names change).
 
 ### Out of scope
 
@@ -45,6 +47,8 @@ flowchart TD
   footballFix --> updateLambda
   subfootball --> updateLambda
   updateLambda --> ddb[DynamoDB football_calendar]
+  updateLambda --> sns[SNS fixture_updates]
+  sns --> email[Email subscribers]
   client[iCal client] --> apiGateway[API Gateway GET /calendar]
   apiGateway --> getLambda[Get calendar subscription Lambda]
   getLambda --> ddb
@@ -75,6 +79,11 @@ sequenceDiagram
   Sub-->>Update: VEVENT entries
   Update->>Ddb: upsert current fixtures by team
   Update->>Ddb: delete stale match_ids in team partition
+  alt upcoming fixture changed
+    participant SNS as SNS
+    Update->>SNS: publish fixture change notification
+    SNS-->>Update: confirmation
+  end
   Client->>Api: GET /calendar
   Api->>Get: invoke lambda
   Get->>Ddb: query TEAM partitions
@@ -90,6 +99,7 @@ sequenceDiagram
 - Use DynamoDB keys `pk = TEAM#<team_id>` and `sk = MATCH#<match_id>` for direct per-team reads and deterministic overwrite behavior.
 - Fetch all sources before writing so a failed source call fails the run before reconciliation writes start.
 - Build iCal on demand from DynamoDB instead of caching generated calendars to keep output aligned with latest persisted fixtures.
+- Compare fetched fixtures against existing DynamoDB state before writing to detect changes, and only notify for fixtures within the next 7 days to keep notifications relevant.
 
 ## Domain glossary
 
@@ -198,23 +208,27 @@ Representative item:
 - Subfootball fixtures are not name-filtered after fetch; all events from configured team feed ids are stored.
 - Event order in `GET /calendar` is not contractually guaranteed.
 - Only team partitions represented in the current fetched fixture set are reconciled for stale deletions.
+- Fixture change notifications are only sent for fixtures with a timestamp between `now` and `now + 7 days`.
+- A fixture is considered changed if any of `timestamp`, `venue`, `address`, `status`, `home_team`, or `away_team` differ from the persisted value, or if the fixture is added or removed.
+- A single notification is published per update run, aggregating all upcoming changes across all teams.
 
 ## Source of truth
 
-| Entity             | Authoritative source               | Notes                                                                |
-| ------------------ | ---------------------------------- | -------------------------------------------------------------------- |
-| Team configuration | `TeamsFactoryImpl`                 | Hardcoded team ids, matchers, and source parameters in code.         |
-| NRF fixtures       | Northern Regional Football v2 API  | Pulled every schedule run and projected into DynamoDB.               |
-| Football Fix rows  | Football Fix fixtures page         | Parsed from HTML table rows and projected into DynamoDB.             |
-| Subfootball events | Subfootball iCal feed              | Parsed from VEVENT entries and projected into DynamoDB.              |
-| Calendar feed      | DynamoDB `football_calendar` table | `GET /calendar` reads persisted fixtures and renders iCal on demand. |
+| Entity               | Authoritative source                              | Notes                                                                |
+| -------------------- | ------------------------------------------------- | -------------------------------------------------------------------- |
+| Team configuration   | `TeamsFactoryImpl`                                | Hardcoded team ids, matchers, and source parameters in code.         |
+| NRF fixtures         | Northern Regional Football v2 API                 | Pulled every schedule run and projected into DynamoDB.               |
+| Football Fix rows    | Football Fix fixtures page                        | Parsed from HTML table rows and projected into DynamoDB.             |
+| Subfootball events   | Subfootball iCal feed                             | Parsed from VEVENT entries and projected into DynamoDB.              |
+| Calendar feed        | DynamoDB `football_calendar` table                | `GET /calendar` reads persisted fixtures and renders iCal on demand. |
+| Change notifications | SNS topic `football_calendar_api_fixture_updates` | Published by `UpdateFixturesHandler` when upcoming fixtures change.  |
 
 ## Security and privacy
 
 - `GET /calendar` is intentionally public (`authorization = NONE` in API Gateway).
 - Transport is HTTPS through API Gateway custom domain and ACM certificate.
 - Service runtime does not read credential secrets in current scope.
-- IAM permissions for lambdas are scoped to DynamoDB operations for `football_calendar` plus basic execution logging.
+- IAM permissions for lambdas are scoped to DynamoDB operations for `football_calendar`, SNS publish and list for `fixture_updates`, plus basic execution logging.
 - Stored data is fixture metadata only; no user account data is modeled by this service.
 
 ## Configuration and secrets reference
@@ -247,7 +261,7 @@ None in current scope. This service does not read runtime secrets.
 ## Testing and quality gates
 
 - Unit tests validate client parsing and mapping behavior (NRF JSON, Football Fix HTML, Subfootball iCal).
-- Integration tests cover update reconciliation and iCal response generation against DynamoDB test containers.
+- Integration tests cover update reconciliation, change detection notifications, and iCal response generation against DynamoDB test containers.
 - E2E tests run against LocalStack and internal NRF/Football Fix/Subfootball mock hosts on a shared Testcontainers network, so the suite is deterministic and CI-safe with no outbound internet dependency.
 - Required checks before merge:
   - `bazel test //football_calendar_api:all`
@@ -278,3 +292,10 @@ None in current scope. This service does not read runtime secrets.
 2. Next scheduled update fetches current fixtures and computes the new `match_id` set.
 3. Reconciliation deletes the stale DynamoDB item for that team partition.
 4. Subsequent `GET /calendar` responses no longer contain that removed fixture.
+
+### Scenario 3: upcoming fixture changed
+
+1. An existing fixture within the next 7 days has its venue or kickoff time changed upstream.
+2. Scheduled update fetches current fixtures and compares against persisted DynamoDB state.
+3. Handler detects the change, updates DynamoDB, and publishes an SNS notification summarizing the change.
+4. Email subscribers receive the notification with details of what changed.
