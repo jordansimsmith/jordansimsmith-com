@@ -4,6 +4,7 @@ import os
 import tempfile
 import urllib.parse
 import uuid
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import requests
 from aqt import gui_hooks, mw
@@ -93,22 +94,31 @@ def export_colpkg(col):
     return out_path
 
 
+def upload_part(part, data):
+    response = requests.put(
+        part["upload_url"],
+        data=data,
+        timeout=REQUEST_TIMEOUT_SECONDS,
+    )
+    if response.status_code != 200:
+        raise Exception(
+            f"failed to upload part {part['part_number']} with code {response.status_code} and body {response.text}"
+        )
+
+
 def upload_and_complete(colpkg_path, backup_id, upload):
     part_size = upload["part_size_bytes"]
     parts = upload["parts"]
 
+    part_data = []
     with open(colpkg_path, "rb") as file:
         for part in parts:
-            data = file.read(part_size)
-            response = requests.put(
-                part["upload_url"],
-                data=data,
-                timeout=REQUEST_TIMEOUT_SECONDS,
-            )
-            if response.status_code != 200:
-                raise Exception(
-                    f"failed to upload part {part['part_number']} with code {response.status_code} and body {response.text}"
-                )
+            part_data.append((part, file.read(part_size)))
+
+    with ThreadPoolExecutor() as executor:
+        futures = [executor.submit(upload_part, part, data) for part, data in part_data]
+        for future in as_completed(futures):
+            future.result()
 
     log("Finalizing backup...")
     update_backup(backup_id, "COMPLETED")
