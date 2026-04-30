@@ -6,36 +6,30 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 
-public final class FootballFixMockServer {
-  private static final String FIXTURES_HTML =
+public final class SubfootballStubServer {
+  private static final String FIXTURES_ICAL =
       """
-      <html>
-        <body>
-          <table class="FTable">
-            <tr class="FHeader">
-              <td colspan="5">Thursday 23 Oct 2025</td>
-            </tr>
-            <tr class="FRow FBand">
-              <td class="FDate">8:40pm</td>
-              <td class="FPlayingArea">Field 2<br /></td>
-              <td class="FHomeTeam"><a href="#">Lad FC</a></td>
-              <td class="FScore"><div><nobr data-fixture-id="148617">vs</nobr></div></td>
-              <td class="FAwayTeam"><a href="#">Flamingoes</a></td>
-            </tr>
-          </table>
-        </body>
-      </html>
+      BEGIN:VCALENDAR
+      VERSION:2.0
+      BEGIN:VEVENT
+      DESCRIPTION:Field: Black\\nRound: 1\\nMan I Love Football and Swede as Bro FC
+      DTSTART:20251028T045000Z
+      LOCATION:Auckland Domain\\, Auckland
+      SUMMARY:Round 1 - Man I Love Football vs Swede as Bro FC
+      UID:8c19b36f-0b5d-41f9-aa9c-2779b6fff277
+      END:VEVENT
+      END:VCALENDAR
       """;
 
-  private FootballFixMockServer() {}
+  private SubfootballStubServer() {}
 
   public static void main(String[] args) throws Exception {
     var server = HttpServer.create(new InetSocketAddress(8080), 0);
     server.createContext(
         "/health", exchange -> respond(exchange, "text/plain; charset=utf-8", "ok"));
     server.createContext(
-        "/Leagues/Fixtures",
-        exchange -> respond(exchange, "text/html; charset=utf-8", FIXTURES_HTML));
+        "/teams/calendar/4475",
+        exchange -> respond(exchange, "text/calendar; charset=utf-8", FIXTURES_ICAL));
     server.start();
     Thread.currentThread().join();
   }

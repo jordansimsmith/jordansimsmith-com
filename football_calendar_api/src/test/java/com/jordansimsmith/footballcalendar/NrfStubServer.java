@@ -6,7 +6,7 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 
-public final class NrfMockServer {
+public final class NrfStubServer {
   private static final String FIXTURES_RESPONSE =
       """
       {
@@ -29,7 +29,7 @@ public final class NrfMockServer {
       }
       """;
 
-  private NrfMockServer() {}
+  private NrfStubServer() {}
 
   public static void main(String[] args) throws Exception {
     var server = HttpServer.create(new InetSocketAddress(8080), 0);

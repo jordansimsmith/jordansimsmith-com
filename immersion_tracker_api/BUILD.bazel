@@ -1,8 +1,8 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 load("@rules_java//java:defs.bzl", "java_binary", "java_library")
 load("@rules_python//python:defs.bzl", "py_binary")
+load("//lib/http:defs.bzl", "stub_server_image")
 load("//lib/localstack:defs.bzl", "localstack_image")
-load("//lib/testcontainers:defs.bzl", "stub_server_image")
 
 HANDLERS = glob(["src/main/java/**/*Handler.java"])
 

@@ -262,7 +262,7 @@ None in current scope. This service does not read runtime secrets.
 
 - Unit tests validate client parsing and mapping behavior (NRF JSON, Football Fix HTML, Subfootball iCal).
 - Integration tests cover update reconciliation, change detection notifications, and iCal response generation against DynamoDB test containers.
-- E2E tests run against LocalStack and internal NRF/Football Fix/Subfootball mock hosts on a shared Testcontainers network, so the suite is deterministic and CI-safe with no outbound internet dependency.
+- E2E tests run against LocalStack and internal NRF/Football Fix/Subfootball stub hosts on a shared Testcontainers network, so the suite is deterministic and CI-safe with no outbound internet dependency.
 - Required checks before merge:
   - `bazel test //football_calendar_api:all`
   - `bazel build //football_calendar_api:all`

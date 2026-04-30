@@ -1,10 +1,10 @@
-"""Macros for building stub/mock server test container images."""
+"""Macros for building stub server test container images."""
 
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
 def stub_server_image(name, deploy_jar, repo_tag = None):
-    """Creates a JRE-based OCI image for a stub/mock HTTP server.
+    """Creates a JRE-based OCI image for a stub HTTP server.
 
     Generates the following targets:
       - {name}-tar: pkg_tar containing the deploy JAR

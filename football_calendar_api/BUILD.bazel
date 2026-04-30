@@ -1,7 +1,7 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 load("@rules_java//java:defs.bzl", "java_binary", "java_library")
+load("//lib/http:defs.bzl", "stub_server_image")
 load("//lib/localstack:defs.bzl", "localstack_image")
-load("//lib/testcontainers:defs.bzl", "stub_server_image")
 
 HANDLERS = glob(["src/main/java/**/*Handler.java"])
 
@@ -83,23 +83,23 @@ java_binary(
 )
 
 java_binary(
-    name = "nrf-mock-server",
+    name = "nrf-stub-server",
     testonly = True,
-    srcs = ["src/test/java/com/jordansimsmith/footballcalendar/NrfMockServer.java"],
+    srcs = ["src/test/java/com/jordansimsmith/footballcalendar/NrfStubServer.java"],
     create_executable = False,
 )
 
 java_binary(
-    name = "football-fix-mock-server",
+    name = "football-fix-stub-server",
     testonly = True,
-    srcs = ["src/test/java/com/jordansimsmith/footballcalendar/FootballFixMockServer.java"],
+    srcs = ["src/test/java/com/jordansimsmith/footballcalendar/FootballFixStubServer.java"],
     create_executable = False,
 )
 
 java_binary(
-    name = "subfootball-mock-server",
+    name = "subfootball-stub-server",
     testonly = True,
-    srcs = ["src/test/java/com/jordansimsmith/footballcalendar/SubfootballMockServer.java"],
+    srcs = ["src/test/java/com/jordansimsmith/footballcalendar/SubfootballStubServer.java"],
     create_executable = False,
 )
 
@@ -111,10 +111,10 @@ java_library(
         exclude = UNIT_TESTS + INTEGRATION_TESTS + E2E_TESTS,
     ),
     data = [
-        ":football-fix-mock-load",
+        ":football-fix-stub-load",
         ":local-load",
-        ":nrf-mock-load",
-        ":subfootball-mock-load",
+        ":nrf-stub-load",
+        ":subfootball-stub-load",
     ],
     resources = [
         "src/test/resources/logback-test.xml",
@@ -210,21 +210,21 @@ localstack_image(
 )
 
 stub_server_image(
-    name = "nrf-mock",
-    deploy_jar = ":nrf-mock-server_deploy.jar",
-    repo_tag = "bazel/football-calendar-nrf-mock:latest",
+    name = "nrf-stub",
+    deploy_jar = ":nrf-stub-server_deploy.jar",
+    repo_tag = "bazel/football-calendar-nrf-stub:latest",
 )
 
 stub_server_image(
-    name = "football-fix-mock",
-    deploy_jar = ":football-fix-mock-server_deploy.jar",
-    repo_tag = "bazel/football-calendar-football-fix-mock:latest",
+    name = "football-fix-stub",
+    deploy_jar = ":football-fix-stub-server_deploy.jar",
+    repo_tag = "bazel/football-calendar-football-fix-stub:latest",
 )
 
 stub_server_image(
-    name = "subfootball-mock",
-    deploy_jar = ":subfootball-mock-server_deploy.jar",
-    repo_tag = "bazel/football-calendar-subfootball-mock:latest",
+    name = "subfootball-stub",
+    deploy_jar = ":subfootball-stub-server_deploy.jar",
+    repo_tag = "bazel/football-calendar-subfootball-stub:latest",
 )
 
 java_test_suite(
