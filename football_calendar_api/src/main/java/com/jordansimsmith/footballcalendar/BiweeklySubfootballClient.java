@@ -106,6 +106,8 @@ public class BiweeklySubfootballClient implements SubfootballClient {
     var description = event.getDescription();
     var venue = parseFieldFromDescription(description);
 
+    // subfootball regenerates iCal UIDs on each fetch, so we derive a stable id from
+    // content fields to avoid false change notifications from id rotation
     var date = timestamp.atZone(ZoneId.of("Pacific/Auckland")).toLocalDate();
     var idInput = (teams[0] + "\0" + teams[1] + "\0" + date).getBytes(StandardCharsets.UTF_8);
     var id = UUID.nameUUIDFromBytes(idInput).toString();
