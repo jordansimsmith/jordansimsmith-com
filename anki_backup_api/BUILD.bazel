@@ -1,8 +1,8 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 load("@rules_java//java:defs.bzl", "java_binary", "java_library")
-load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
-load("@rules_pkg//:pkg.bzl", "pkg_tar", "pkg_zip")
+load("@rules_pkg//:pkg.bzl", "pkg_zip")
 load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
+load("//lib/localstack:defs.bzl", "localstack_image")
 
 HANDLERS = glob(["src/main/java/**/*Handler.java"])
 
@@ -299,46 +299,16 @@ java_test_suite(
     ],
 )
 
-pkg_tar(
-    name = "local-handlers.tar",
-    testonly = True,
-    srcs = [
+localstack_image(
+    name = "local",
+    handler_jars = [
         ":create-backup-handler_deploy.jar",
         ":find-backups-handler_deploy.jar",
         ":get-backup-handler_deploy.jar",
         ":update-backup-handler_deploy.jar",
     ],
-    package_dir = "/opt/code/localstack/",
-)
-
-pkg_tar(
-    name = "local-init-resources.tar",
-    testonly = True,
-    srcs = ["src/test/resources/init_resources.py"],
-    package_dir = "/etc/localstack/init/ready.d/",
-)
-
-oci_image(
-    name = "local-image",
-    testonly = True,
-    base = "@localstack//:localstack",
-    env = {
-        "LOCALSTACK_LAMBDA_IGNORE_ARCHITECTURE": 1,
-        "LOCALSTACK_LAMBDA_KEEPALIVE_MS": 0,
-    },
-    tars = [
-        ":local-init-resources.tar",
-        ":local-handlers.tar",
-    ],
-)
-
-oci_load(
-    name = "local-load",
-    testonly = True,
-    image = ":local-image",
-    repo_tags = [
-        "bazel/anki-backup-local:latest",
-    ],
+    init_resources = "src/test/resources/init_resources.py",
+    repo_tag = "bazel/anki-backup-local:latest",
 )
 
 java_test_suite(

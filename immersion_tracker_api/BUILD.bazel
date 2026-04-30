@@ -1,8 +1,8 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 load("@rules_java//java:defs.bzl", "java_binary", "java_library")
-load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
 load("@rules_python//python:defs.bzl", "py_binary")
+load("//lib/localstack:defs.bzl", "localstack_image")
+load("//lib/testcontainers:defs.bzl", "stub_server_image")
 
 HANDLERS = glob(["src/main/java/**/*Handler.java"])
 
@@ -365,10 +365,9 @@ java_test_suite(
     ],
 )
 
-pkg_tar(
-    name = "local-handlers.tar",
-    testonly = True,
-    srcs = [
+localstack_image(
+    name = "local",
+    handler_jars = [
         ":get-progress-handler_deploy.jar",
         ":get-shows-handler_deploy.jar",
         ":sync-episodes-handler_deploy.jar",
@@ -377,145 +376,28 @@ pkg_tar(
         ":sync-youtube-handler_deploy.jar",
         ":update-show-handler_deploy.jar",
     ],
-    package_dir = "/opt/code/localstack/",
+    init_resources = "src/test/resources/init_resources.py",
+    repo_tag = "bazel/immersion-tracker-local:latest",
 )
 
-pkg_tar(
-    name = "local-init-resources.tar",
-    testonly = True,
-    srcs = ["src/test/resources/init_resources.py"],
-    package_dir = "/etc/localstack/init/ready.d/",
+stub_server_image(
+    name = "immersion-tracker-tvdb-stub",
+    deploy_jar = ":immersion-tracker-tvdb-stub-server_deploy.jar",
 )
 
-oci_image(
-    name = "local-image",
-    testonly = True,
-    base = "@localstack//:localstack",
-    env = {
-        "LOCALSTACK_LAMBDA_IGNORE_ARCHITECTURE": 1,
-        "LOCALSTACK_LAMBDA_KEEPALIVE_MS": 0,
-    },
-    tars = [
-        ":local-init-resources.tar",
-        ":local-handlers.tar",
-    ],
+stub_server_image(
+    name = "immersion-tracker-youtube-stub",
+    deploy_jar = ":immersion-tracker-youtube-stub-server_deploy.jar",
 )
 
-oci_load(
-    name = "local-load",
-    testonly = True,
-    image = ":local-image",
-    repo_tags = [
-        "bazel/immersion-tracker-local:latest",
-    ],
+stub_server_image(
+    name = "immersion-tracker-spotify-accounts-stub",
+    deploy_jar = ":immersion-tracker-spotify-accounts-stub-server_deploy.jar",
 )
 
-pkg_tar(
-    name = "immersion-tracker-tvdb-stub-server.tar",
-    testonly = True,
-    srcs = [
-        ":immersion-tracker-tvdb-stub-server_deploy.jar",
-    ],
-    package_dir = "/opt/code/immersion-tracker-tvdb-stub/",
-)
-
-oci_image(
-    name = "immersion-tracker-tvdb-stub-image",
-    testonly = True,
-    base = "@temurin21jre//:temurin21jre",
-    tars = [
-        ":immersion-tracker-tvdb-stub-server.tar",
-    ],
-)
-
-oci_load(
-    name = "immersion-tracker-tvdb-stub-load",
-    testonly = True,
-    image = ":immersion-tracker-tvdb-stub-image",
-    repo_tags = [
-        "bazel/immersion-tracker-tvdb-stub:latest",
-    ],
-)
-
-pkg_tar(
-    name = "immersion-tracker-youtube-stub-server.tar",
-    testonly = True,
-    srcs = [
-        ":immersion-tracker-youtube-stub-server_deploy.jar",
-    ],
-    package_dir = "/opt/code/immersion-tracker-youtube-stub/",
-)
-
-oci_image(
-    name = "immersion-tracker-youtube-stub-image",
-    testonly = True,
-    base = "@temurin21jre//:temurin21jre",
-    tars = [
-        ":immersion-tracker-youtube-stub-server.tar",
-    ],
-)
-
-oci_load(
-    name = "immersion-tracker-youtube-stub-load",
-    testonly = True,
-    image = ":immersion-tracker-youtube-stub-image",
-    repo_tags = [
-        "bazel/immersion-tracker-youtube-stub:latest",
-    ],
-)
-
-pkg_tar(
-    name = "immersion-tracker-spotify-accounts-stub-server.tar",
-    testonly = True,
-    srcs = [
-        ":immersion-tracker-spotify-accounts-stub-server_deploy.jar",
-    ],
-    package_dir = "/opt/code/immersion-tracker-spotify-accounts-stub/",
-)
-
-oci_image(
-    name = "immersion-tracker-spotify-accounts-stub-image",
-    testonly = True,
-    base = "@temurin21jre//:temurin21jre",
-    tars = [
-        ":immersion-tracker-spotify-accounts-stub-server.tar",
-    ],
-)
-
-oci_load(
-    name = "immersion-tracker-spotify-accounts-stub-load",
-    testonly = True,
-    image = ":immersion-tracker-spotify-accounts-stub-image",
-    repo_tags = [
-        "bazel/immersion-tracker-spotify-accounts-stub:latest",
-    ],
-)
-
-pkg_tar(
-    name = "immersion-tracker-spotify-api-stub-server.tar",
-    testonly = True,
-    srcs = [
-        ":immersion-tracker-spotify-api-stub-server_deploy.jar",
-    ],
-    package_dir = "/opt/code/immersion-tracker-spotify-api-stub/",
-)
-
-oci_image(
-    name = "immersion-tracker-spotify-api-stub-image",
-    testonly = True,
-    base = "@temurin21jre//:temurin21jre",
-    tars = [
-        ":immersion-tracker-spotify-api-stub-server.tar",
-    ],
-)
-
-oci_load(
-    name = "immersion-tracker-spotify-api-stub-load",
-    testonly = True,
-    image = ":immersion-tracker-spotify-api-stub-image",
-    repo_tags = [
-        "bazel/immersion-tracker-spotify-api-stub:latest",
-    ],
+stub_server_image(
+    name = "immersion-tracker-spotify-api-stub",
+    deploy_jar = ":immersion-tracker-spotify-api-stub-server_deploy.jar",
 )
 
 py_binary(

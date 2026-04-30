@@ -1,7 +1,7 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 load("@rules_java//java:defs.bzl", "java_binary", "java_library")
-load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
-load("@rules_pkg//:pkg.bzl", "pkg_tar")
+load("//lib/localstack:defs.bzl", "localstack_image")
+load("//lib/testcontainers:defs.bzl", "stub_server_image")
 
 HANDLERS = glob(["src/main/java/**/*Handler.java"])
 
@@ -152,70 +152,18 @@ java_test_suite(
     ],
 )
 
-pkg_tar(
-    name = "local-handlers.tar",
-    testonly = True,
-    srcs = [
+localstack_image(
+    name = "local",
+    handler_jars = [
         ":update-prices-handler_deploy.jar",
     ],
-    package_dir = "/opt/code/localstack/",
+    init_resources = "src/test/resources/init_resources.py",
+    repo_tag = "bazel/price-tracker-local:latest",
 )
 
-pkg_tar(
-    name = "local-init-resources.tar",
-    testonly = True,
-    srcs = ["src/test/resources/init_resources.py"],
-    package_dir = "/etc/localstack/init/ready.d/",
-)
-
-oci_image(
-    name = "local-image",
-    testonly = True,
-    base = "@localstack//:localstack",
-    env = {
-        "LOCALSTACK_LAMBDA_IGNORE_ARCHITECTURE": 1,
-        "LOCALSTACK_LAMBDA_KEEPALIVE_MS": 0,
-    },
-    tars = [
-        ":local-init-resources.tar",
-        ":local-handlers.tar",
-    ],
-)
-
-oci_load(
-    name = "local-load",
-    testonly = True,
-    image = ":local-image",
-    repo_tags = [
-        "bazel/price-tracker-local:latest",
-    ],
-)
-
-pkg_tar(
-    name = "price-tracker-website-stub-server.tar",
-    testonly = True,
-    srcs = [
-        ":price-tracker-website-stub-server_deploy.jar",
-    ],
-    package_dir = "/opt/code/price-tracker-website-stub/",
-)
-
-oci_image(
-    name = "price-tracker-website-stub-image",
-    testonly = True,
-    base = "@temurin21jre//:temurin21jre",
-    tars = [
-        ":price-tracker-website-stub-server.tar",
-    ],
-)
-
-oci_load(
-    name = "price-tracker-website-stub-load",
-    testonly = True,
-    image = ":price-tracker-website-stub-image",
-    repo_tags = [
-        "bazel/price-tracker-website-stub:latest",
-    ],
+stub_server_image(
+    name = "price-tracker-website-stub",
+    deploy_jar = ":price-tracker-website-stub-server_deploy.jar",
 )
 
 java_test_suite(
