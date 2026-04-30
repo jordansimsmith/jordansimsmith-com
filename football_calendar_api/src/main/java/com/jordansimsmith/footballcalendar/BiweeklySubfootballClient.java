@@ -7,8 +7,11 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class BiweeklySubfootballClient implements SubfootballClient {
   private static final String CALENDAR_PATH = "/teams/calendar/";
@@ -103,8 +106,12 @@ public class BiweeklySubfootballClient implements SubfootballClient {
     var description = event.getDescription();
     var venue = parseFieldFromDescription(description);
 
+    var date = timestamp.atZone(ZoneId.of("Pacific/Auckland")).toLocalDate();
+    var idInput = (teams[0] + "\0" + teams[1] + "\0" + date).getBytes(StandardCharsets.UTF_8);
+    var id = UUID.nameUUIDFromBytes(idInput).toString();
+
     return new SubfootballClient.SubfootballFixture(
-        uid.getValue(), teams[0], teams[1], timestamp, venue, address);
+        id, teams[0], teams[1], timestamp, venue, address);
   }
 
   private String[] parseTeamsFromSummary(String summary) {

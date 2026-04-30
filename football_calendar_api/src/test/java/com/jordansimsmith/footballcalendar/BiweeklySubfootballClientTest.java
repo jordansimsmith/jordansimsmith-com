@@ -90,7 +90,7 @@ public class BiweeklySubfootballClientTest {
 
     var fixture1 =
         fixtures.stream()
-            .filter(f -> f.id().equals("8c19b36f-0b5d-41f9-aa9c-2779b6fff277"))
+            .filter(f -> f.id().equals("1908111f-add7-366f-b037-9ff028cae1cc"))
             .findFirst()
             .orElseThrow();
     assertThat(fixture1.homeTeamName()).isEqualTo("Man I Love Football");
@@ -101,7 +101,7 @@ public class BiweeklySubfootballClientTest {
 
     var fixture2 =
         fixtures.stream()
-            .filter(f -> f.id().equals("23fd8573-eefc-404b-bc36-692a29d11f1f"))
+            .filter(f -> f.id().equals("17a70974-c5f7-3791-a3d9-e7985fd00ef4"))
             .findFirst()
             .orElseThrow();
     assertThat(fixture2.homeTeamName()).isEqualTo("Man I Love Football");
@@ -112,7 +112,7 @@ public class BiweeklySubfootballClientTest {
 
     var fixture3 =
         fixtures.stream()
-            .filter(f -> f.id().equals("0e21a723-0840-4a78-ae6f-5cf9d0a14f92"))
+            .filter(f -> f.id().equals("4bbae5fa-3c7c-3a95-9aac-3272bacc5cf0"))
             .findFirst()
             .orElseThrow();
     assertThat(fixture3.homeTeamName()).isEqualTo("Man I Love Football");
@@ -285,7 +285,7 @@ public class BiweeklySubfootballClientTest {
 
     // assert
     assertThat(fixtures).hasSize(1);
-    assertThat(fixtures.get(0).id()).isEqualTo("valid-uid");
+    assertThat(fixtures.get(0).id()).isEqualTo("5c75148b-8e7e-36a7-8e9c-416182473d2b");
   }
 
   @SuppressWarnings("unchecked")
