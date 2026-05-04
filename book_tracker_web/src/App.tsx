@@ -1,9 +1,39 @@
-import { Container, Title } from '@mantine/core';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { LoginPage } from './pages/LoginPage';
+import { BooksPage } from './pages/BooksPage';
+import { getSession } from './auth/session';
+
+function RequireAuth({ children }: { children: React.ReactNode }) {
+  const session = getSession();
+  if (!session) {
+    return <Navigate to="/" replace />;
+  }
+  return <>{children}</>;
+}
+
+function HomeRoute() {
+  const session = getSession();
+  if (session) {
+    return <Navigate to="/books" replace />;
+  }
+  return <LoginPage />;
+}
 
 export function App() {
   return (
-    <Container py="xl">
-      <Title order={1}>Book tracker</Title>
-    </Container>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<HomeRoute />} />
+        <Route
+          path="/books"
+          element={
+            <RequireAuth>
+              <BooksPage />
+            </RequireAuth>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
