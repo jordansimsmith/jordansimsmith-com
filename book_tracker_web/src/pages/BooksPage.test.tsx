@@ -8,6 +8,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BooksPage } from './BooksPage';
 import * as clientModule from '../api/client';
 import type { Book } from '../api/client';
+import { LibraryStatsProvider } from '../layouts/library-stats';
 
 const sampleBooks: Book[] = [
   {
@@ -55,13 +56,15 @@ function renderBooksPage() {
     <MantineProvider>
       <DatesProvider settings={{}}>
         <Notifications />
-        <MemoryRouter initialEntries={['/books']}>
-          <Routes>
-            <Route path="/" element={<div>Login page</div>} />
-            <Route path="/books" element={<BooksPage />} />
-            <Route path="/books/add" element={<div>Add book page</div>} />
-          </Routes>
-        </MemoryRouter>
+        <LibraryStatsProvider>
+          <MemoryRouter initialEntries={['/books']}>
+            <Routes>
+              <Route path="/" element={<div>Login page</div>} />
+              <Route path="/books" element={<BooksPage />} />
+              <Route path="/books/add" element={<div>Add book page</div>} />
+            </Routes>
+          </MemoryRouter>
+        </LibraryStatsProvider>
       </DatesProvider>
     </MantineProvider>,
   );
@@ -93,7 +96,8 @@ describe('BooksPage', () => {
 
     const monthHeadings = screen
       .getAllByRole('heading', { level: 3 })
-      .map((heading) => heading.textContent);
+      .map((heading) => heading.textContent ?? '')
+      .filter((text) => /^[A-Z][a-z]+ \d{4}$/.test(text));
     expect(monthHeadings).toEqual(['Apr 2026', 'Mar 2026']);
 
     expect(screen.getByText('The Lord of the Rings')).toBeDefined();

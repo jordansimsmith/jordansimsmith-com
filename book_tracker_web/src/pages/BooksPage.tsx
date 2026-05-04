@@ -7,16 +7,16 @@ import {
   Group,
   Stack,
   Skeleton,
-  Badge,
 } from '@mantine/core';
 import { IconBook2, IconPlus } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
 import { ApiError, apiClient } from '../api/client';
 import type { Book } from '../api/client';
-import { clearSession, getSession } from '../auth/session';
 import { MonthSection } from '../components/MonthSection';
 import { EditBookModal } from '../components/EditBookModal';
+import { AppShellLayout } from '../layouts/AppShellLayout';
+import { useLibraryStats } from '../layouts/library-stats';
 import { monthKey } from '../domain/dates';
 
 interface MonthGroup {
@@ -55,20 +55,10 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   );
 }
 
-async function refreshBooks(
-  setBooks: (books: Book[]) => void,
-  setRollingCount: (count: number) => void,
-) {
-  const response = await apiClient.getBooks();
-  setBooks(response.books);
-  setRollingCount(response.rolling_12_month_count);
-}
-
 export function BooksPage() {
   const navigate = useNavigate();
-  const session = getSession();
+  const { setRollingCount } = useLibraryStats();
   const [books, setBooks] = useState<Book[]>([]);
-  const [rollingCount, setRollingCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Book | null>(null);
@@ -103,11 +93,12 @@ export function BooksPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [setRollingCount]);
 
-  const handleLogout = () => {
-    clearSession();
-    navigate('/');
+  const refreshBooks = async () => {
+    const response = await apiClient.getBooks();
+    setBooks(response.books);
+    setRollingCount(response.rolling_12_month_count);
   };
 
   const handleEditSave = async (book: Book, finishedDate: string) => {
@@ -116,7 +107,7 @@ export function BooksPage() {
       await apiClient.updateBook(book.open_library_work_id, {
         finished_date: finishedDate,
       });
-      await refreshBooks(setBooks, (count) => setRollingCount(count));
+      await refreshBooks();
       notifications.show({
         title: 'Book updated',
         message: `${book.title} moved to ${finishedDate}`,
@@ -140,7 +131,7 @@ export function BooksPage() {
     setDeletingEdit(true);
     try {
       await apiClient.deleteBook(book.open_library_work_id);
-      await refreshBooks(setBooks, (count) => setRollingCount(count));
+      await refreshBooks();
       notifications.show({
         title: 'Book removed',
         message: `${book.title} removed from your library`,
@@ -163,75 +154,60 @@ export function BooksPage() {
   const groups = groupByMonth(books);
 
   return (
-    <Container size="lg" py="xl">
-      <Stack gap="lg">
-        <Group justify="space-between">
-          <Group gap="md">
+    <AppShellLayout>
+      <Container size="lg" py="xl">
+        <Stack gap="lg">
+          <Group justify="space-between">
             <Title order={1}>Books</Title>
-            {rollingCount !== null && (
-              <Badge size="lg" variant="light">
-                {rollingCount} in last 12 months
-              </Badge>
-            )}
-          </Group>
-          <Group gap="sm">
             <Button
               leftSection={<IconPlus size={16} />}
               onClick={() => navigate('/books/add')}
             >
               Add book
             </Button>
-            {session && (
-              <Text size="sm" c="dimmed">
-                {session.username}
-              </Text>
-            )}
-            <Button variant="subtle" onClick={handleLogout}>
-              Log out
-            </Button>
           </Group>
-        </Group>
 
-        {loading && (
-          <Stack gap="md">
-            <Skeleton height={28} width={120} />
-            <Skeleton height={220} />
-          </Stack>
-        )}
+          {loading && (
+            <Stack gap="md">
+              <Skeleton height={28} width={120} />
+              <Skeleton height={220} />
+            </Stack>
+          )}
 
-        {!loading && error && (
-          <Text c="red" ta="center">
-            {error}
-          </Text>
-        )}
+          {!loading && error && (
+            <Text c="red" ta="center">
+              {error}
+            </Text>
+          )}
 
-        {!loading && !error && books.length === 0 && (
-          <EmptyState onAdd={() => navigate('/books/add')} />
-        )}
+          {!loading && !error && books.length === 0 && (
+            <EmptyState onAdd={() => navigate('/books/add')} />
+          )}
 
-        {!loading && !error && books.length > 0 && (
-          <Stack gap="xl">
-            {groups.map((group) => (
-              <MonthSection
-                key={group.yearMonth}
-                yearMonth={group.yearMonth}
-                books={group.books}
-                onBookClick={setEditing}
-              />
-            ))}
-          </Stack>
-        )}
-      </Stack>
+          {!loading && !error && books.length > 0 && (
+            <Stack gap="xl">
+              {groups.map((group) => (
+                <MonthSection
+                  key={group.yearMonth}
+                  yearMonth={group.yearMonth}
+                  books={group.books}
+                  onBookClick={setEditing}
+                />
+              ))}
+            </Stack>
+          )}
+        </Stack>
 
-      <EditBookModal
-        book={editing}
-        opened={editing !== null}
-        onClose={() => setEditing(null)}
-        onSave={handleEditSave}
-        onDelete={handleEditDelete}
-        saving={savingEdit}
-        deleting={deletingEdit}
-      />
-    </Container>
+        <EditBookModal
+          book={editing}
+          opened={editing !== null}
+          onClose={() => setEditing(null)}
+          onSave={handleEditSave}
+          onDelete={handleEditDelete}
+          saving={savingEdit}
+          deleting={deletingEdit}
+        />
+      </Container>
+    </AppShellLayout>
   );
 }

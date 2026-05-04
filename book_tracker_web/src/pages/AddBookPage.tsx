@@ -22,6 +22,7 @@ import { useNavigate } from 'react-router-dom';
 import { ApiError, apiClient } from '../api/client';
 import { openLibraryClient } from '../api/open-library-client';
 import type { OpenLibrarySearchResult } from '../api/open-library-client';
+import { AppShellLayout } from '../layouts/AppShellLayout';
 
 const SEARCH_DEBOUNCE_MS = 300;
 const FINISHED_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -215,89 +216,92 @@ export function AddBookPage() {
   };
 
   return (
-    <Container size="md" py="xl">
-      <Stack gap="lg">
-        <Group>
-          <ActionIcon
-            variant="subtle"
-            onClick={() => navigate('/books')}
-            aria-label="Back to books"
-          >
-            <IconArrowLeft size={20} />
-          </ActionIcon>
-          <Title order={1}>Add a book</Title>
-        </Group>
+    <AppShellLayout>
+      <Container size="md" py="xl">
+        <Stack gap="lg">
+          <Group>
+            <ActionIcon
+              variant="subtle"
+              onClick={() => navigate('/books')}
+              aria-label="Back to books"
+            >
+              <IconArrowLeft size={20} />
+            </ActionIcon>
+            <Title order={1}>Add a book</Title>
+          </Group>
 
-        <TextInput
-          label="Search Open Library"
-          placeholder="Title or author"
-          leftSection={<IconSearch size={16} />}
-          rightSection={searching ? <Loader size="xs" /> : null}
-          value={query}
-          onChange={(event) => setQuery(event.currentTarget.value)}
-          autoFocus
-        />
+          <TextInput
+            label="Search Open Library"
+            placeholder="Title or author"
+            leftSection={<IconSearch size={16} />}
+            rightSection={searching ? <Loader size="xs" /> : null}
+            value={query}
+            onChange={(event) => setQuery(event.currentTarget.value)}
+            autoFocus
+          />
 
-        {!trimmedQuery && (
-          <Text c="dimmed" size="sm">
-            Type a book title or author to search Open Library.
-          </Text>
-        )}
-
-        {trimmedQuery && !searching && results.length === 0 && (
-          <Text c="dimmed" size="sm">
-            No results for &ldquo;{trimmedQuery}&rdquo;.
-          </Text>
-        )}
-
-        {results.length > 0 && (
-          <Stack gap="sm">
-            {results.map((result) => (
-              <ResultRow
-                key={result.open_library_work_id}
-                result={result}
-                selected={
-                  selected?.open_library_work_id === result.open_library_work_id
-                }
-                onSelect={handleSelect}
-              />
-            ))}
-          </Stack>
-        )}
-
-        <Divider />
-
-        <Stack gap="sm">
-          <Title order={3}>Confirm</Title>
-          {selected ? (
-            <Text size="sm">
-              Adding{' '}
-              <Text span fw={600}>
-                {selected.title}
-              </Text>
-              .
-            </Text>
-          ) : (
-            <Text size="sm" c="dimmed">
-              Pick a result above to enable saving.
+          {!trimmedQuery && (
+            <Text c="dimmed" size="sm">
+              Type a book title or author to search Open Library.
             </Text>
           )}
-          <DatePickerInput
-            label="Finished date"
-            placeholder="Select date"
-            valueFormat="DD MMM YYYY"
-            value={finishedDate}
-            onChange={(value) => setFinishedDate(value)}
-          />
-          <Button
-            onClick={handleSubmit}
-            loading={submitting}
-            disabled={submitDisabled}
-          >
-            Add to library
-          </Button>
+
+          {trimmedQuery && !searching && results.length === 0 && (
+            <Text c="dimmed" size="sm">
+              No results for &ldquo;{trimmedQuery}&rdquo;.
+            </Text>
+          )}
+
+          {results.length > 0 && (
+            <Stack gap="sm">
+              {results.map((result) => (
+                <ResultRow
+                  key={result.open_library_work_id}
+                  result={result}
+                  selected={
+                    selected?.open_library_work_id ===
+                    result.open_library_work_id
+                  }
+                  onSelect={handleSelect}
+                />
+              ))}
+            </Stack>
+          )}
+
+          <Divider />
+
+          <Stack gap="sm">
+            <Title order={3}>Confirm</Title>
+            {selected ? (
+              <Text size="sm">
+                Adding{' '}
+                <Text span fw={600}>
+                  {selected.title}
+                </Text>
+                .
+              </Text>
+            ) : (
+              <Text size="sm" c="dimmed">
+                Pick a result above to enable saving.
+              </Text>
+            )}
+            <DatePickerInput
+              label="Finished date"
+              placeholder="Select date"
+              valueFormat="DD MMM YYYY"
+              value={finishedDate}
+              onChange={(value) => setFinishedDate(value)}
+            />
+            <Button
+              onClick={handleSubmit}
+              loading={submitting}
+              disabled={submitDisabled}
+            >
+              Add to library
+            </Button>
+          </Stack>
         </Stack>
-      </Stack>
-    </Container>
+      </Container>
+    </AppShellLayout>
   );
 }
