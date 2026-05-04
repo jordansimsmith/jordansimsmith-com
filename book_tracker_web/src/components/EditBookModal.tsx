@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button, Group, Modal, Stack, Text } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
+import { IconTrash } from '@tabler/icons-react';
 import type { Book } from '../api/client';
 
 interface EditBookModalProps {
@@ -8,7 +9,9 @@ interface EditBookModalProps {
   opened: boolean;
   onClose: () => void;
   onSave: (book: Book, finishedDate: string) => Promise<void> | void;
+  onDelete: (book: Book) => Promise<void> | void;
   saving?: boolean;
+  deleting?: boolean;
 }
 
 const FINISHED_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -18,15 +21,21 @@ export function EditBookModal({
   opened,
   onClose,
   onSave,
+  onDelete,
   saving = false,
+  deleting = false,
 }: EditBookModalProps) {
   const [finishedDate, setFinishedDate] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (book) {
       setFinishedDate(book.finished_date);
     }
-  }, [book]);
+    if (!opened) {
+      setConfirmDelete(false);
+    }
+  }, [book, opened]);
 
   const handleSave = async () => {
     if (!book || !finishedDate) {
@@ -35,7 +44,15 @@ export function EditBookModal({
     await onSave(book, finishedDate);
   };
 
+  const handleConfirmDelete = async () => {
+    if (!book) {
+      return;
+    }
+    await onDelete(book);
+  };
+
   const dateValid = !!finishedDate && FINISHED_DATE_PATTERN.test(finishedDate);
+  const busy = saving || deleting;
 
   return (
     <Modal
@@ -59,18 +76,58 @@ export function EditBookModal({
           value={finishedDate}
           onChange={(value) => setFinishedDate(value)}
         />
-        <Group justify="flex-end">
-          <Button variant="default" onClick={onClose} disabled={saving}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSave}
-            loading={saving}
-            disabled={!dateValid || saving}
-          >
-            Save
-          </Button>
-        </Group>
+        {confirmDelete ? (
+          <Stack gap="sm">
+            <Text size="sm">
+              Remove{' '}
+              <Text span fw={600}>
+                {book?.title}
+              </Text>{' '}
+              from your library?
+            </Text>
+            <Group justify="flex-end">
+              <Button
+                variant="default"
+                onClick={() => setConfirmDelete(false)}
+                disabled={busy}
+              >
+                Cancel
+              </Button>
+              <Button
+                color="red"
+                onClick={handleConfirmDelete}
+                loading={deleting}
+                disabled={busy}
+              >
+                Delete
+              </Button>
+            </Group>
+          </Stack>
+        ) : (
+          <Group justify="space-between">
+            <Button
+              variant="subtle"
+              color="red"
+              leftSection={<IconTrash size={16} />}
+              onClick={() => setConfirmDelete(true)}
+              disabled={busy}
+            >
+              Delete
+            </Button>
+            <Group>
+              <Button variant="default" onClick={onClose} disabled={busy}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSave}
+                loading={saving}
+                disabled={!dateValid || busy}
+              >
+                Save
+              </Button>
+            </Group>
+          </Group>
+        )}
       </Stack>
     </Modal>
   );

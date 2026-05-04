@@ -23,7 +23,9 @@ function renderModal({
   opened = true,
   onClose = vi.fn(),
   onSave = vi.fn(),
+  onDelete = vi.fn(),
   saving = false,
+  deleting = false,
 }: Partial<React.ComponentProps<typeof EditBookModal>> = {}) {
   return {
     ...render(
@@ -34,13 +36,16 @@ function renderModal({
             opened={opened}
             onClose={onClose}
             onSave={onSave}
+            onDelete={onDelete}
             saving={saving}
+            deleting={deleting}
           />
         </DatesProvider>
       </MantineProvider>,
     ),
     onClose,
     onSave,
+    onDelete,
   };
 }
 
@@ -89,5 +94,43 @@ describe('EditBookModal', () => {
 
     const saveButton = screen.getByRole('button', { name: /^save$/i });
     expect(saveButton.hasAttribute('disabled')).toBe(true);
+  });
+
+  it('shows the confirmation message when Delete is clicked', async () => {
+    const user = userEvent.setup();
+    renderModal();
+
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+
+    expect(screen.getByText(/remove/i)).toBeDefined();
+    expect(screen.getByText(/from your library\?/i)).toBeDefined();
+  });
+
+  it('calls onDelete after the confirmation Delete button is clicked', async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn().mockResolvedValue(undefined);
+    renderModal({ onDelete });
+
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+    const confirmDelete = screen.getByRole('button', { name: /^delete$/i });
+    await user.click(confirmDelete);
+
+    await waitFor(() => expect(onDelete).toHaveBeenCalledWith(sampleBook));
+  });
+
+  it('returns to the save view when the confirmation is cancelled', async () => {
+    const user = userEvent.setup();
+    const onDelete = vi.fn();
+    renderModal({ onDelete });
+
+    await user.click(screen.getByRole('button', { name: /^delete$/i }));
+    expect(screen.getByText(/from your library\?/i)).toBeDefined();
+
+    const cancelButtons = screen.getAllByRole('button', { name: /cancel/i });
+    await user.click(cancelButtons[cancelButtons.length - 1]);
+
+    expect(screen.queryByText(/from your library\?/i)).toBeNull();
+    expect(screen.getByRole('button', { name: /^save$/i })).toBeDefined();
+    expect(onDelete).not.toHaveBeenCalled();
   });
 });

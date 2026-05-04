@@ -73,6 +73,7 @@ export function BooksPage() {
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Book | null>(null);
   const [savingEdit, setSavingEdit] = useState(false);
+  const [deletingEdit, setDeletingEdit] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -132,6 +133,30 @@ export function BooksPage() {
       notifications.show({ title: 'Error', message, color: 'red' });
     } finally {
       setSavingEdit(false);
+    }
+  };
+
+  const handleEditDelete = async (book: Book) => {
+    setDeletingEdit(true);
+    try {
+      await apiClient.deleteBook(book.open_library_work_id);
+      await refreshBooks(setBooks, (count) => setRollingCount(count));
+      notifications.show({
+        title: 'Book removed',
+        message: `${book.title} removed from your library`,
+        color: 'green',
+      });
+      setEditing(null);
+    } catch (e) {
+      const message =
+        e instanceof ApiError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : 'Failed to remove book';
+      notifications.show({ title: 'Error', message, color: 'red' });
+    } finally {
+      setDeletingEdit(false);
     }
   };
 
@@ -203,7 +228,9 @@ export function BooksPage() {
         opened={editing !== null}
         onClose={() => setEditing(null)}
         onSave={handleEditSave}
+        onDelete={handleEditDelete}
         saving={savingEdit}
+        deleting={deletingEdit}
       />
     </Container>
   );
