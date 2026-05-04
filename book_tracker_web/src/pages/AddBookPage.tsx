@@ -3,6 +3,7 @@ import {
   ActionIcon,
   Button,
   Container,
+  Divider,
   Group,
   Image,
   Loader,
@@ -13,20 +14,31 @@ import {
   Title,
   Box,
 } from '@mantine/core';
+import { DatePickerInput } from '@mantine/dates';
 import { useDebouncedValue } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
 import { IconArrowLeft, IconSearch } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
+import { ApiError, apiClient } from '../api/client';
 import { openLibraryClient } from '../api/open-library-client';
 import type { OpenLibrarySearchResult } from '../api/open-library-client';
 
 const SEARCH_DEBOUNCE_MS = 300;
+const FINISHED_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export function buildCoverUrl(coverId: number | null): string | null {
   if (coverId == null) {
     return null;
   }
   return `https://covers.openlibrary.org/b/id/${coverId}-L.jpg`;
+}
+
+function todayIsoDate(): string {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 interface ResultRowProps {
@@ -111,6 +123,10 @@ export function AddBookPage() {
   const [selected, setSelected] = useState<OpenLibrarySearchResult | null>(
     null,
   );
+  const [finishedDate, setFinishedDate] = useState<string | null>(
+    todayIsoDate(),
+  );
+  const [submitting, setSubmitting] = useState(false);
 
   const trimmedQuery = useMemo(() => debouncedQuery.trim(), [debouncedQuery]);
 
@@ -152,6 +168,50 @@ export function AddBookPage() {
 
   const handleSelect = (result: OpenLibrarySearchResult) => {
     setSelected(result);
+  };
+
+  const submitDisabled =
+    !selected ||
+    !finishedDate ||
+    !FINISHED_DATE_PATTERN.test(finishedDate) ||
+    submitting;
+
+  const handleSubmit = async () => {
+    if (!selected || !finishedDate) {
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      await apiClient.createBook({
+        open_library_work_id: selected.open_library_work_id,
+        title: selected.title,
+        authors: selected.author_names,
+        cover_url: buildCoverUrl(selected.cover_id),
+        page_count: selected.number_of_pages_median,
+        publication_year: selected.first_publish_year,
+        finished_date: finishedDate,
+      });
+      notifications.show({
+        title: 'Book added',
+        message: `${selected.title} added to your timeline`,
+        color: 'green',
+      });
+      navigate('/books');
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 409) {
+        notifications.show({
+          title: 'Already in your library',
+          message: e.message,
+          color: 'yellow',
+        });
+        return;
+      }
+      const message = e instanceof Error ? e.message : 'Failed to add book';
+      notifications.show({ title: 'Error', message, color: 'red' });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -204,6 +264,39 @@ export function AddBookPage() {
             ))}
           </Stack>
         )}
+
+        <Divider />
+
+        <Stack gap="sm">
+          <Title order={3}>Confirm</Title>
+          {selected ? (
+            <Text size="sm">
+              Adding{' '}
+              <Text span fw={600}>
+                {selected.title}
+              </Text>
+              .
+            </Text>
+          ) : (
+            <Text size="sm" c="dimmed">
+              Pick a result above to enable saving.
+            </Text>
+          )}
+          <DatePickerInput
+            label="Finished date"
+            placeholder="Select date"
+            valueFormat="DD MMM YYYY"
+            value={finishedDate}
+            onChange={(value) => setFinishedDate(value)}
+          />
+          <Button
+            onClick={handleSubmit}
+            loading={submitting}
+            disabled={submitDisabled}
+          >
+            Add to library
+          </Button>
+        </Stack>
       </Stack>
     </Container>
   );
