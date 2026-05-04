@@ -48,6 +48,15 @@ function renderAddBookPage() {
   );
 }
 
+async function findResultOption(title: string | RegExp): Promise<HTMLElement> {
+  const text = await screen.findByText(title);
+  const option = text.closest('[data-combobox-option], [role="option"]');
+  if (option instanceof HTMLElement) {
+    return option;
+  }
+  return text;
+}
+
 describe('AddBookPage', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -77,7 +86,7 @@ describe('AddBookPage', () => {
     expect(searchSpy).not.toHaveBeenCalled();
   });
 
-  it('renders search results returned by the open library client', async () => {
+  it('shows search results in the dropdown attached to the input', async () => {
     const searchSpy = vi
       .spyOn(openLibraryModule.openLibraryClient, 'search')
       .mockResolvedValue({ results: mockResults });
@@ -94,7 +103,7 @@ describe('AddBookPage', () => {
     expect(screen.getAllByText(/patrick rothfuss/i).length).toBeGreaterThan(0);
   });
 
-  it('marks a result as selected after clicking Select', async () => {
+  it('moves a chosen result into the Selected panel and closes the dropdown', async () => {
     vi.spyOn(openLibraryModule.openLibraryClient, 'search').mockResolvedValue({
       results: mockResults,
     });
@@ -104,15 +113,17 @@ describe('AddBookPage', () => {
 
     await user.type(screen.getByLabelText(/search open library/i), 'rothfuss');
 
-    expect(await screen.findByText('The Name of the Wind')).toBeDefined();
+    const option = await findResultOption('The Name of the Wind');
+    await user.click(option);
 
-    const selectButtons = screen.getAllByRole('button', { name: /^select$/i });
-    await user.click(selectButtons[0]);
-
-    expect(screen.getByRole('button', { name: /selected/i })).toBeDefined();
+    const panel = await screen.findByText(/^selected$/i);
+    expect(panel).toBeDefined();
+    expect(
+      screen.getByRole('button', { name: /clear selected book/i }),
+    ).toBeDefined();
   });
 
-  it('shows the no-results message when the search returns nothing', async () => {
+  it('shows the no-results state in the dropdown when the search returns nothing', async () => {
     vi.spyOn(openLibraryModule.openLibraryClient, 'search').mockResolvedValue({
       results: [],
     });
@@ -140,12 +151,35 @@ describe('AddBookPage', () => {
     expect(submit.hasAttribute('disabled')).toBe(true);
 
     await user.type(screen.getByLabelText(/search open library/i), 'rothfuss');
-    expect(await screen.findByText('The Name of the Wind')).toBeDefined();
+    const option = await findResultOption('The Name of the Wind');
+    await user.click(option);
 
-    const selectButtons = screen.getAllByRole('button', { name: /^select$/i });
-    await user.click(selectButtons[0]);
+    await waitFor(() => expect(submit.hasAttribute('disabled')).toBe(false));
+  });
 
-    expect(submit.hasAttribute('disabled')).toBe(false);
+  it('clears the selection when the X button is clicked', async () => {
+    vi.spyOn(openLibraryModule.openLibraryClient, 'search').mockResolvedValue({
+      results: mockResults,
+    });
+
+    const user = userEvent.setup();
+    renderAddBookPage();
+
+    await user.type(screen.getByLabelText(/search open library/i), 'rothfuss');
+    const option = await findResultOption('The Name of the Wind');
+    await user.click(option);
+
+    const clearButton = await screen.findByRole('button', {
+      name: /clear selected book/i,
+    });
+    await user.click(clearButton);
+
+    expect(screen.queryByText(/^selected$/i)).toBeNull();
+    expect(
+      screen
+        .getByRole('button', { name: /add to library/i })
+        .hasAttribute('disabled'),
+    ).toBe(true);
   });
 
   it('creates the book, shows a success notification, and navigates to /books', async () => {
@@ -172,10 +206,8 @@ describe('AddBookPage', () => {
     renderAddBookPage();
 
     await user.type(screen.getByLabelText(/search open library/i), 'rothfuss');
-    expect(await screen.findByText('The Name of the Wind')).toBeDefined();
-
-    const selectButtons = screen.getAllByRole('button', { name: /^select$/i });
-    await user.click(selectButtons[0]);
+    const option = await findResultOption('The Name of the Wind');
+    await user.click(option);
     await user.click(screen.getByRole('button', { name: /add to library/i }));
 
     await waitFor(() => expect(createSpy).toHaveBeenCalledTimes(1));
@@ -208,10 +240,8 @@ describe('AddBookPage', () => {
     renderAddBookPage();
 
     await user.type(screen.getByLabelText(/search open library/i), 'rothfuss');
-    expect(await screen.findByText('The Name of the Wind')).toBeDefined();
-
-    const selectButtons = screen.getAllByRole('button', { name: /^select$/i });
-    await user.click(selectButtons[0]);
+    const option = await findResultOption('The Name of the Wind');
+    await user.click(option);
     await user.click(screen.getByRole('button', { name: /add to library/i }));
 
     await waitFor(() => {

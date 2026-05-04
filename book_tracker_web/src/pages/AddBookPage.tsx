@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActionIcon,
+  Box,
   Button,
+  Combobox,
   Container,
   Divider,
   Group,
@@ -12,12 +14,12 @@ import {
   Text,
   TextInput,
   Title,
-  Box,
+  useCombobox,
 } from '@mantine/core';
 import { DatePickerInput } from '@mantine/dates';
 import { useDebouncedValue } from '@mantine/hooks';
 import { notifications } from '@mantine/notifications';
-import { IconArrowLeft, IconSearch } from '@tabler/icons-react';
+import { IconArrowLeft, IconSearch, IconX } from '@tabler/icons-react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError, apiClient } from '../api/client';
 import { openLibraryClient } from '../api/open-library-client';
@@ -42,79 +44,55 @@ function todayIsoDate(): string {
   return `${year}-${month}-${day}`;
 }
 
-interface ResultRowProps {
-  result: OpenLibrarySearchResult;
-  selected: boolean;
-  onSelect: (result: OpenLibrarySearchResult) => void;
-}
-
-function ResultRow({ result, selected, onSelect }: ResultRowProps) {
-  const coverUrl = buildCoverUrl(result.cover_id);
-  const authorsLabel =
+function formatAuthorsAndYear(result: OpenLibrarySearchResult): string {
+  const authors =
     result.author_names.length > 0
       ? result.author_names.join(', ')
       : 'Unknown author';
-  const yearLabel = result.first_publish_year
+  const year = result.first_publish_year
     ? ` · ${result.first_publish_year}`
     : '';
+  return `${authors}${year}`;
+}
 
+interface CoverThumbProps {
+  coverId: number | null;
+  title: string;
+  width: number;
+  height: number;
+}
+
+function CoverThumb({ coverId, title, width, height }: CoverThumbProps) {
+  const url = buildCoverUrl(coverId);
+  if (url) {
+    return (
+      <Image
+        src={url}
+        alt={`Cover of ${title}`}
+        w={width}
+        h={height}
+        fit="cover"
+        radius="sm"
+      />
+    );
+  }
   return (
-    <Paper
-      p="sm"
-      withBorder
-      radius="md"
+    <Box
+      w={width}
+      h={height}
       style={{
-        borderColor: selected
-          ? 'var(--mantine-color-violet-filled)'
-          : undefined,
-        background: selected ? 'var(--mantine-color-violet-light)' : undefined,
+        background: 'var(--mantine-color-violet-light)',
+        borderRadius: 'var(--mantine-radius-sm)',
       }}
-    >
-      <Group wrap="nowrap" align="flex-start">
-        <Box style={{ width: 60, flexShrink: 0 }}>
-          {coverUrl ? (
-            <Image
-              src={coverUrl}
-              alt={`Cover of ${result.title}`}
-              w={60}
-              h={90}
-              fit="cover"
-              radius="sm"
-            />
-          ) : (
-            <Box
-              w={60}
-              h={90}
-              style={{
-                background: 'var(--mantine-color-violet-light)',
-                borderRadius: 'var(--mantine-radius-sm)',
-              }}
-            />
-          )}
-        </Box>
-        <Stack gap={4} style={{ flex: 1, minWidth: 0 }}>
-          <Text fw={600} lineClamp={2}>
-            {result.title}
-          </Text>
-          <Text size="sm" c="dimmed" lineClamp={1}>
-            {authorsLabel}
-            {yearLabel}
-          </Text>
-        </Stack>
-        <Button
-          size="xs"
-          variant={selected ? 'filled' : 'light'}
-          onClick={() => onSelect(result)}
-        >
-          {selected ? 'Selected' : 'Select'}
-        </Button>
-      </Group>
-    </Paper>
+    />
   );
 }
 
 export function AddBookPage() {
   const navigate = useNavigate();
+  const combobox = useCombobox({
+    onDropdownClose: () => combobox.resetSelectedOption(),
+  });
   const [query, setQuery] = useState('');
   const [debouncedQuery] = useDebouncedValue(query, SEARCH_DEBOUNCE_MS);
   const [results, setResults] = useState<OpenLibrarySearchResult[]>([]);
@@ -165,8 +143,12 @@ export function AddBookPage() {
     };
   }, [trimmedQuery]);
 
-  const handleSelect = (result: OpenLibrarySearchResult) => {
-    setSelected(result);
+  const handleOptionSubmit = (value: string) => {
+    const picked = results.find((r) => r.open_library_work_id === value);
+    if (picked) {
+      setSelected(picked);
+    }
+    combobox.closeDropdown();
   };
 
   const submitDisabled =
@@ -213,6 +195,33 @@ export function AddBookPage() {
     }
   };
 
+  const dropdownHasContent =
+    !!trimmedQuery && (searching || results.length > 0 || results.length === 0);
+
+  const options = results.map((result) => (
+    <Combobox.Option
+      value={result.open_library_work_id}
+      key={result.open_library_work_id}
+    >
+      <Group wrap="nowrap" gap="sm" align="flex-start">
+        <CoverThumb
+          coverId={result.cover_id}
+          title={result.title}
+          width={40}
+          height={60}
+        />
+        <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
+          <Text fw={600} size="sm" lineClamp={2}>
+            {result.title}
+          </Text>
+          <Text size="xs" c="dimmed" lineClamp={1}>
+            {formatAuthorsAndYear(result)}
+          </Text>
+        </Stack>
+      </Group>
+    </Combobox.Option>
+  ));
+
   return (
     <AppShellLayout>
       <Container size="md" py="xl">
@@ -228,61 +237,94 @@ export function AddBookPage() {
             <Title order={1}>Add a book</Title>
           </Group>
 
-          <TextInput
-            label="Search Open Library"
-            placeholder="Title or author"
-            leftSection={<IconSearch size={16} />}
-            rightSection={searching ? <Loader size="xs" /> : null}
-            value={query}
-            onChange={(event) => setQuery(event.currentTarget.value)}
-            autoFocus
-          />
+          <Combobox store={combobox} onOptionSubmit={handleOptionSubmit}>
+            <Combobox.Target>
+              <TextInput
+                label="Search Open Library"
+                placeholder="Title or author"
+                leftSection={<IconSearch size={16} />}
+                rightSection={searching ? <Loader size="xs" /> : null}
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.currentTarget.value);
+                  combobox.openDropdown();
+                  combobox.updateSelectedOptionIndex();
+                }}
+                onFocus={() => {
+                  if (trimmedQuery) {
+                    combobox.openDropdown();
+                  }
+                }}
+                onClick={() => {
+                  if (trimmedQuery) {
+                    combobox.openDropdown();
+                  }
+                }}
+                onBlur={() => combobox.closeDropdown()}
+                autoFocus
+              />
+            </Combobox.Target>
 
-          {!trimmedQuery && (
+            <Combobox.Dropdown hidden={!dropdownHasContent}>
+              <Combobox.Options
+                mah={360}
+                style={{ overflowY: 'auto' }}
+                aria-label="Open Library search results"
+              >
+                {searching && results.length === 0 && (
+                  <Combobox.Empty>Searching…</Combobox.Empty>
+                )}
+                {!searching && results.length === 0 && trimmedQuery && (
+                  <Combobox.Empty>
+                    No results for “{trimmedQuery}”
+                  </Combobox.Empty>
+                )}
+                {options}
+              </Combobox.Options>
+            </Combobox.Dropdown>
+          </Combobox>
+
+          {!trimmedQuery && !selected && (
             <Text c="dimmed" size="sm">
               Type a book title or author to search Open Library.
             </Text>
           )}
 
-          {trimmedQuery && !searching && results.length === 0 && (
-            <Text c="dimmed" size="sm">
-              No results for &ldquo;{trimmedQuery}&rdquo;.
-            </Text>
-          )}
-
-          {results.length > 0 && (
-            <Stack gap="sm">
-              {results.map((result) => (
-                <ResultRow
-                  key={result.open_library_work_id}
-                  result={result}
-                  selected={
-                    selected?.open_library_work_id ===
-                    result.open_library_work_id
-                  }
-                  onSelect={handleSelect}
+          {selected && (
+            <Paper withBorder radius="md" p="sm">
+              <Group wrap="nowrap" align="flex-start" gap="sm">
+                <CoverThumb
+                  coverId={selected.cover_id}
+                  title={selected.title}
+                  width={60}
+                  height={90}
                 />
-              ))}
-            </Stack>
+                <Stack gap={2} style={{ flex: 1, minWidth: 0 }}>
+                  <Text size="xs" c="dimmed" tt="uppercase">
+                    Selected
+                  </Text>
+                  <Text fw={600} lineClamp={2}>
+                    {selected.title}
+                  </Text>
+                  <Text size="sm" c="dimmed" lineClamp={1}>
+                    {formatAuthorsAndYear(selected)}
+                  </Text>
+                </Stack>
+                <ActionIcon
+                  variant="subtle"
+                  color="gray"
+                  onClick={() => setSelected(null)}
+                  aria-label="Clear selected book"
+                >
+                  <IconX size={16} />
+                </ActionIcon>
+              </Group>
+            </Paper>
           )}
 
           <Divider />
 
           <Stack gap="sm">
-            <Title order={3}>Confirm</Title>
-            {selected ? (
-              <Text size="sm">
-                Adding{' '}
-                <Text span fw={600}>
-                  {selected.title}
-                </Text>
-                .
-              </Text>
-            ) : (
-              <Text size="sm" c="dimmed">
-                Pick a result above to enable saving.
-              </Text>
-            )}
             <DatePickerInput
               label="Finished date"
               placeholder="Select date"
@@ -297,6 +339,11 @@ export function AddBookPage() {
             >
               Add to library
             </Button>
+            {!selected && (
+              <Text size="xs" c="dimmed">
+                Pick a result from the search to enable saving.
+              </Text>
+            )}
           </Stack>
         </Stack>
       </Container>
