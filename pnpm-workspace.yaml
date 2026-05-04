@@ -2,3 +2,4 @@ packages:
   - immersion_tracker_web
   - personal_website_web
   - packing_list_web
+  - book_tracker_web
