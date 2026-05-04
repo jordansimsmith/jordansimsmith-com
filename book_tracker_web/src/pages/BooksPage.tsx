@@ -12,10 +12,11 @@ import {
 import { IconBook2, IconPlus } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
-import { apiClient } from '../api/client';
+import { ApiError, apiClient } from '../api/client';
 import type { Book } from '../api/client';
 import { clearSession, getSession } from '../auth/session';
 import { MonthSection } from '../components/MonthSection';
+import { EditBookModal } from '../components/EditBookModal';
 import { monthKey } from '../domain/dates';
 
 interface MonthGroup {
@@ -54,6 +55,15 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   );
 }
 
+async function refreshBooks(
+  setBooks: (books: Book[]) => void,
+  setRollingCount: (count: number) => void,
+) {
+  const response = await apiClient.getBooks();
+  setBooks(response.books);
+  setRollingCount(response.rolling_12_month_count);
+}
+
 export function BooksPage() {
   const navigate = useNavigate();
   const session = getSession();
@@ -61,6 +71,8 @@ export function BooksPage() {
   const [rollingCount, setRollingCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState<Book | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -95,6 +107,32 @@ export function BooksPage() {
   const handleLogout = () => {
     clearSession();
     navigate('/');
+  };
+
+  const handleEditSave = async (book: Book, finishedDate: string) => {
+    setSavingEdit(true);
+    try {
+      await apiClient.updateBook(book.open_library_work_id, {
+        finished_date: finishedDate,
+      });
+      await refreshBooks(setBooks, (count) => setRollingCount(count));
+      notifications.show({
+        title: 'Book updated',
+        message: `${book.title} moved to ${finishedDate}`,
+        color: 'green',
+      });
+      setEditing(null);
+    } catch (e) {
+      const message =
+        e instanceof ApiError
+          ? e.message
+          : e instanceof Error
+            ? e.message
+            : 'Failed to update book';
+      notifications.show({ title: 'Error', message, color: 'red' });
+    } finally {
+      setSavingEdit(false);
+    }
   };
 
   const groups = groupByMonth(books);
@@ -153,11 +191,20 @@ export function BooksPage() {
                 key={group.yearMonth}
                 yearMonth={group.yearMonth}
                 books={group.books}
+                onBookClick={setEditing}
               />
             ))}
           </Stack>
         )}
       </Stack>
+
+      <EditBookModal
+        book={editing}
+        opened={editing !== null}
+        onClose={() => setEditing(null)}
+        onSave={handleEditSave}
+        saving={savingEdit}
+      />
     </Container>
   );
 }
