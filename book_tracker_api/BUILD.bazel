@@ -1,0 +1,331 @@
+load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
+load("@rules_java//java:defs.bzl", "java_binary", "java_library")
+load("//lib/localstack:defs.bzl", "localstack_image")
+
+HANDLERS = glob(["src/main/java/**/*Handler.java"])
+
+INTEGRATION_TESTS = glob(
+    ["src/test/java/**/*IntegrationTest.java"],
+    allow_empty = True,
+)
+
+E2E_TESTS = glob(
+    ["src/test/java/**/*E2ETest.java"],
+    allow_empty = True,
+)
+
+UNIT_TESTS = glob(
+    ["src/test/java/**/*Test.java"],
+    allow_empty = True,
+    exclude = INTEGRATION_TESTS + E2E_TESTS,
+)
+
+java_library(
+    name = "lib",
+    srcs = glob(
+        ["src/main/java/**/*.java"],
+        exclude = HANDLERS,
+    ),
+    deps = [
+        "//lib/dynamodb:lib",
+        "//lib/http:lib",
+        "//lib/json:lib",
+        "//lib/secrets:lib",
+        "//lib/time:lib",
+        "//third_party/dagger",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "auth-handler",
+    srcs = ["src/main/java/com/jordansimsmith/booktracker/AuthHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/secrets:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_iam_policy_builder",
+    ],
+)
+
+java_binary(
+    name = "create-book-handler",
+    srcs = ["src/main/java/com/jordansimsmith/booktracker/CreateBookHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "//lib/time:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "find-books-handler",
+    srcs = ["src/main/java/com/jordansimsmith/booktracker/FindBooksHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "//lib/time:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "get-book-handler",
+    srcs = ["src/main/java/com/jordansimsmith/booktracker/GetBookHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "update-book-handler",
+    srcs = ["src/main/java/com/jordansimsmith/booktracker/UpdateBookHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "//lib/time:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "delete-book-handler",
+    srcs = ["src/main/java/com/jordansimsmith/booktracker/DeleteBookHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_library(
+    name = "test-lib",
+    testonly = True,
+    srcs = glob(
+        ["src/test/java/**/*.java"],
+        exclude = INTEGRATION_TESTS + E2E_TESTS + UNIT_TESTS,
+    ),
+    data = [
+        ":local-load",
+    ],
+    resources = [
+        "src/test/resources/logback-test.xml",
+        "src/test/resources/test.properties",
+    ],
+    deps = [
+        ":lib",
+        "//lib/dynamodb:test-lib",
+        "//lib/http:lib",
+        "//lib/json:lib",
+        "//lib/localstack:lib",
+        "//lib/secrets:test-lib",
+        "//lib/testcontainers:test-lib",
+        "//lib/time:test-lib",
+        "//third_party/dagger",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_testcontainers_testcontainers",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_test_suite(
+    name = "unit-tests",
+    size = "small",
+    srcs = UNIT_TESTS,
+    runner = "junit5",
+    test_suffixes = ["Test.java"],
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        ":auth-handler",
+        ":lib",
+        ":test-lib",
+        "//lib/secrets:test-lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_iam_policy_builder",
+    ],
+)
+
+java_test_suite(
+    name = "integration-tests",
+    size = "medium",
+    srcs = INTEGRATION_TESTS,
+    env = {
+        "AWS_ACCESS_KEY_ID": "fake",
+        "AWS_SECRET_ACCESS_KEY": "fake",
+        "AWS_REGION": "ap-southeast-2",
+    },
+    resources = [
+        "src/test/resources/logback-test.xml",
+    ],
+    runner = "junit5",
+    test_suffixes = ["IntegrationTest.java"],
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        ":create-book-handler",
+        ":delete-book-handler",
+        ":find-books-handler",
+        ":get-book-handler",
+        ":lib",
+        ":test-lib",
+        ":update-book-handler",
+        "//lib/dynamodb:test-lib",
+        "//lib/http:lib",
+        "//lib/testcontainers:test-lib",
+        "//lib/time:test-lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+localstack_image(
+    name = "local",
+    handler_jars = [
+        ":create-book-handler_deploy.jar",
+        ":delete-book-handler_deploy.jar",
+        ":find-books-handler_deploy.jar",
+        ":get-book-handler_deploy.jar",
+        ":update-book-handler_deploy.jar",
+    ],
+    init_resources = "src/test/resources/init_resources.py",
+    repo_tag = "bazel/book-tracker-local:latest",
+)
+
+java_test_suite(
+    name = "e2e-tests",
+    size = "large",
+    srcs = E2E_TESTS,
+    env = {
+        "AWS_ACCESS_KEY_ID": "fake",
+        "AWS_SECRET_ACCESS_KEY": "fake",
+        "AWS_REGION": "ap-southeast-2",
+    },
+    resources = [
+        "src/test/resources/logback-test.xml",
+    ],
+    runner = "junit5",
+    tags = [
+        "no-cache",
+    ],
+    test_suffixes = ["E2ETest.java"],
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        ":create-book-handler",
+        ":delete-book-handler",
+        ":find-books-handler",
+        ":get-book-handler",
+        ":lib",
+        ":test-lib",
+        ":update-book-handler",
+        "//lib/dynamodb:test-lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:software_amazon_awssdk_dynamodb",
+    ],
+)
