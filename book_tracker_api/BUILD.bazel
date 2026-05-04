@@ -85,6 +85,7 @@ java_binary(
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
     ],
 )
@@ -226,6 +227,7 @@ java_test_suite(
         ":lib",
         ":test-lib",
         "//lib/secrets:test-lib",
+        "//lib/time:test-lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",

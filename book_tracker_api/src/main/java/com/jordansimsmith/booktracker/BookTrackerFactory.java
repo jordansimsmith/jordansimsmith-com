@@ -37,6 +37,8 @@ public interface BookTrackerFactory {
 
   DynamoDbTable<BookTrackerItem> bookTrackerTable();
 
+  BookValidator bookValidator();
+
   static BookTrackerFactory create() {
     return DaggerBookTrackerFactory.create();
   }

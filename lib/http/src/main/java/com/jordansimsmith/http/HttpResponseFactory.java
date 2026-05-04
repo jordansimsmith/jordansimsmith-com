@@ -34,6 +34,10 @@ public class HttpResponseFactory {
     return buildResponse(404, body);
   }
 
+  public APIGatewayV2HTTPResponse conflict(Object body) {
+    return buildResponse(409, body);
+  }
+
   private APIGatewayV2HTTPResponse buildResponse(int statusCode, Object body) {
     try {
       return APIGatewayV2HTTPResponse.builder()
