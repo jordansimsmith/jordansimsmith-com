@@ -29,6 +29,12 @@
       }
     },
     {
+      "path": "book_tracker_web/infra",
+      "artifacts": {
+        "build": "//book_tracker_web:build"
+      }
+    },
+    {
       "path": "event_calendar_api/infra",
       "artifacts": {
         "get_calendar_subscription": "//event_calendar_api:get-calendar-subscription-handler_deploy.jar",
