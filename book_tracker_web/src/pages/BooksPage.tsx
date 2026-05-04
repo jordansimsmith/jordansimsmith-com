@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react';
 import {
-  Container,
-  Title,
-  Text,
   Button,
+  Container,
   Group,
-  Stack,
+  Paper,
   Skeleton,
+  Stack,
+  Text,
+  ThemeIcon,
+  Title,
 } from '@mantine/core';
 import { IconBook2, IconPlus } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
@@ -16,7 +18,6 @@ import type { Book } from '../api/client';
 import { MonthSection } from '../components/MonthSection';
 import { EditBookModal } from '../components/EditBookModal';
 import { AppShellLayout } from '../layouts/AppShellLayout';
-import { useLibraryStats } from '../layouts/library-stats';
 import { monthKey } from '../domain/dates';
 
 interface MonthGroup {
@@ -55,10 +56,39 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
   );
 }
 
+function RollingCountBanner({ count }: { count: number }) {
+  return (
+    <Paper
+      p="md"
+      radius="md"
+      withBorder
+      style={{
+        borderColor: 'var(--mantine-color-violet-3)',
+        background: 'var(--mantine-color-violet-0)',
+      }}
+    >
+      <Group gap="md" wrap="nowrap">
+        <ThemeIcon variant="light" color="violet" size="lg" radius="md">
+          <IconBook2 size={20} />
+        </ThemeIcon>
+        <Stack gap={2} style={{ minWidth: 0 }}>
+          <Text size="xs" c="violet.7" fw={700} tt="uppercase">
+            Last 12 months
+          </Text>
+          <Text fw={600}>
+            You&rsquo;ve read {count} {count === 1 ? 'book' : 'books'} in the
+            last 12 months.
+          </Text>
+        </Stack>
+      </Group>
+    </Paper>
+  );
+}
+
 export function BooksPage() {
   const navigate = useNavigate();
-  const { setRollingCount } = useLibraryStats();
   const [books, setBooks] = useState<Book[]>([]);
+  const [rollingCount, setRollingCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<Book | null>(null);
@@ -93,7 +123,7 @@ export function BooksPage() {
     return () => {
       cancelled = true;
     };
-  }, [setRollingCount]);
+  }, []);
 
   const refreshBooks = async () => {
     const response = await apiClient.getBooks();
@@ -169,6 +199,7 @@ export function BooksPage() {
 
           {loading && (
             <Stack gap="md">
+              <Skeleton height={64} radius="md" />
               <Skeleton height={28} width={120} />
               <Skeleton height={220} />
             </Stack>
@@ -186,6 +217,9 @@ export function BooksPage() {
 
           {!loading && !error && books.length > 0 && (
             <Stack gap="xl">
+              {rollingCount !== null && (
+                <RollingCountBanner count={rollingCount} />
+              )}
               {groups.map((group) => (
                 <MonthSection
                   key={group.yearMonth}

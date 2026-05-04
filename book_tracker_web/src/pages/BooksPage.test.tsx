@@ -8,7 +8,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { BooksPage } from './BooksPage';
 import * as clientModule from '../api/client';
 import type { Book } from '../api/client';
-import { LibraryStatsProvider } from '../layouts/library-stats';
 
 const sampleBooks: Book[] = [
   {
@@ -56,15 +55,13 @@ function renderBooksPage() {
     <MantineProvider>
       <DatesProvider settings={{}}>
         <Notifications />
-        <LibraryStatsProvider>
-          <MemoryRouter initialEntries={['/books']}>
-            <Routes>
-              <Route path="/" element={<div>Login page</div>} />
-              <Route path="/books" element={<BooksPage />} />
-              <Route path="/books/add" element={<div>Add book page</div>} />
-            </Routes>
-          </MemoryRouter>
-        </LibraryStatsProvider>
+        <MemoryRouter initialEntries={['/books']}>
+          <Routes>
+            <Route path="/" element={<div>Login page</div>} />
+            <Route path="/books" element={<BooksPage />} />
+            <Route path="/books/add" element={<div>Add book page</div>} />
+          </Routes>
+        </MemoryRouter>
       </DatesProvider>
     </MantineProvider>,
   );
@@ -108,7 +105,7 @@ describe('BooksPage', () => {
     expect(screen.getByText('Jane Austen')).toBeDefined();
   });
 
-  it('renders the rolling 12-month count from the response', async () => {
+  it('renders the rolling 12-month count banner above the timeline', async () => {
     vi.spyOn(clientModule.apiClient, 'getBooks').mockResolvedValue({
       books: sampleBooks,
       rolling_12_month_count: 17,
@@ -117,11 +114,28 @@ describe('BooksPage', () => {
     renderBooksPage();
 
     await waitFor(() => {
-      expect(screen.getByText(/17 in last 12 months/i)).toBeDefined();
+      expect(
+        screen.getByText(/you[’']ve read 17 books in the last 12 months/i),
+      ).toBeDefined();
     });
   });
 
-  it('shows the empty state when no books are returned', async () => {
+  it('uses singular wording when the rolling count is 1', async () => {
+    vi.spyOn(clientModule.apiClient, 'getBooks').mockResolvedValue({
+      books: [sampleBooks[0]],
+      rolling_12_month_count: 1,
+    });
+
+    renderBooksPage();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/you[’']ve read 1 book in the last 12 months/i),
+      ).toBeDefined();
+    });
+  });
+
+  it('shows the empty state without the rolling count banner when no books are returned', async () => {
     vi.spyOn(clientModule.apiClient, 'getBooks').mockResolvedValue({
       books: [],
       rolling_12_month_count: 0,
@@ -132,7 +146,7 @@ describe('BooksPage', () => {
     await waitFor(() => {
       expect(screen.getByText(/no finished books yet/i)).toBeDefined();
     });
-    expect(screen.getByText(/0 in last 12 months/i)).toBeDefined();
+    expect(screen.queryByText(/last 12 months/i)).toBeNull();
   });
 
   it('surfaces an error when loading fails', async () => {
@@ -214,6 +228,8 @@ describe('BooksPage', () => {
       expect(screen.getByText('Feb 2026')).toBeDefined();
     });
 
-    expect(screen.getByText(/6 in last 12 months/i)).toBeDefined();
+    expect(
+      screen.getByText(/you[’']ve read 6 books in the last 12 months/i),
+    ).toBeDefined();
   });
 });
