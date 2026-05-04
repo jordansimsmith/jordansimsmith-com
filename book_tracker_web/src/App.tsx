@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage';
 import { BooksPage } from './pages/BooksPage';
+import { AddBookPage } from './pages/AddBookPage';
 import { getSession } from './auth/session';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -29,6 +30,14 @@ export function App() {
           element={
             <RequireAuth>
               <BooksPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/books/add"
+          element={
+            <RequireAuth>
+              <AddBookPage />
             </RequireAuth>
           }
         />

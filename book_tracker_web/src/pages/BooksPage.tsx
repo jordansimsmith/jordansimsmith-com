@@ -9,7 +9,7 @@ import {
   Skeleton,
   Badge,
 } from '@mantine/core';
-import { IconBook2 } from '@tabler/icons-react';
+import { IconBook2, IconPlus } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
@@ -40,13 +40,16 @@ function groupByMonth(books: Book[]): MonthGroup[] {
     .map(([yearMonth, booksInMonth]) => ({ yearMonth, books: booksInMonth }));
 }
 
-function EmptyState() {
+function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <Stack align="center" gap="md" py="xl">
       <IconBook2 size={64} stroke={1.5} color="var(--mantine-color-dimmed)" />
       <Text c="dimmed" ta="center">
         No finished books yet. Add your first book to start your timeline.
       </Text>
+      <Button leftSection={<IconPlus size={16} />} onClick={onAdd}>
+        Add book
+      </Button>
     </Stack>
   );
 }
@@ -109,6 +112,12 @@ export function BooksPage() {
             )}
           </Group>
           <Group gap="sm">
+            <Button
+              leftSection={<IconPlus size={16} />}
+              onClick={() => navigate('/books/add')}
+            >
+              Add book
+            </Button>
             {session && (
               <Text size="sm" c="dimmed">
                 {session.username}
@@ -133,7 +142,9 @@ export function BooksPage() {
           </Text>
         )}
 
-        {!loading && !error && books.length === 0 && <EmptyState />}
+        {!loading && !error && books.length === 0 && (
+          <EmptyState onAdd={() => navigate('/books/add')} />
+        )}
 
         {!loading && !error && books.length > 0 && (
           <Stack gap="xl">
