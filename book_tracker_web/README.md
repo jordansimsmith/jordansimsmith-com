@@ -28,7 +28,7 @@ The book tracker web service is a responsive single-page app that lets an authen
 - Search Open Library by title with a debounced typeahead, render title/author/cover, and stage a result for confirmation.
 - Confirm an add with a date picker (defaults to today, supports backfilling any past date) and send `POST /books` with the captured metadata.
 - Render finished books grouped by " " sections in descending order.
-- Render the server-computed rolling 12-month count prominently in the application header.
+- Render the server-computed rolling 12-month count prominently as an accented banner above the month-by-month timeline on the books page.
 - Edit an entry's `finished_date` via a modal.
 - Delete an entry with an explicit confirmation dialog.
 - Provide a responsive layout that works on both mobile and desktop widths.
@@ -98,7 +98,7 @@ sequenceDiagram
 - **Book entry**: one persisted record for a finished book belonging to the authenticated user.
 - **Open Library work ID**: Open Library's stable identifier for an abstract book across editions (e.g. `OL27448W`); used in URL path params and as the canonical identity across the API.
 - **Finished date**: the `YYYY-MM-DD` date the user marks the book as finished; user-chosen, editable, backfillable.
-- **Rolling 12-month count**: the server-computed number of finished books within the last 365 days, displayed in the application header.
+- **Rolling 12-month count**: the server-computed number of finished books within the last 365 days, surfaced in an accented banner above the month-by-month timeline on the books page.
 - **Cover URL**: the full image URL captured and constructed in the browser at add time, persisted verbatim by the backend, and returned unchanged in API responses; a text-only card is rendered when the URL is `null`.
 
 ## Integration contracts
