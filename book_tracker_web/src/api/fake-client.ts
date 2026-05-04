@@ -173,9 +173,7 @@ export function createFakeClient(): ApiClient {
       return { book };
     },
 
-    async createBook(
-      request: CreateBookRequest,
-    ): Promise<CreateBookResponse> {
+    async createBook(request: CreateBookRequest): Promise<CreateBookResponse> {
       const session = getSession();
       if (!session) {
         throw new ApiError(401, 'Not authenticated');
@@ -185,10 +183,7 @@ export function createFakeClient(): ApiClient {
         (b) => b.open_library_work_id === request.open_library_work_id,
       );
       if (existing) {
-        throw new ApiError(
-          409,
-          `already added on ${existing.finished_date}`,
-        );
+        throw new ApiError(409, `already added on ${existing.finished_date}`);
       }
 
       const now = Math.floor(Date.now() / 1000);

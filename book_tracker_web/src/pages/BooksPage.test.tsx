@@ -176,11 +176,7 @@ describe('BooksPage', () => {
       updated_at: 1714900000,
     };
 
-    const refreshedBooks = [
-      sampleBooks[1],
-      sampleBooks[2],
-      { ...updatedBook },
-    ];
+    const refreshedBooks = [sampleBooks[1], sampleBooks[2], { ...updatedBook }];
 
     vi.spyOn(clientModule.apiClient, 'getBooks')
       .mockResolvedValueOnce({

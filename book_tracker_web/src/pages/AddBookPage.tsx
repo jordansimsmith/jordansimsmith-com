@@ -67,9 +67,7 @@ function ResultRow({ result, selected, onSelect }: ResultRowProps) {
         borderColor: selected
           ? 'var(--mantine-color-violet-filled)'
           : undefined,
-        background: selected
-          ? 'var(--mantine-color-violet-light)'
-          : undefined,
+        background: selected ? 'var(--mantine-color-violet-light)' : undefined,
       }}
     >
       <Group wrap="nowrap" align="flex-start">
