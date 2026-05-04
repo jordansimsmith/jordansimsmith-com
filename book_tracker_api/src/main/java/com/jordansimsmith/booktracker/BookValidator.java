@@ -48,11 +48,15 @@ public class BookValidator {
         throw new ValidationException("publication_year must be between 0 and " + maxYear);
       }
     }
-    if (book.finishedDate() == null || book.finishedDate().isBlank()) {
+    validateFinishedDate(book.finishedDate());
+  }
+
+  public void validateFinishedDate(String finishedDate) {
+    if (finishedDate == null || finishedDate.isBlank()) {
       throw new ValidationException("finished_date is required");
     }
     try {
-      LocalDate.parse(book.finishedDate());
+      LocalDate.parse(finishedDate);
     } catch (DateTimeParseException e) {
       throw new ValidationException("finished_date must be in YYYY-MM-DD format");
     }
