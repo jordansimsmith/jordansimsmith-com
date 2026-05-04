@@ -89,145 +89,88 @@ iam_client.put_role_policy(
     PolicyDocument=json.dumps(policy_document),
 )
 
-configs = [
-    {
-        "function_name": "create_trip_handler",
-        "handler_name": "com.jordansimsmith.packinglist.CreateTripHandler",
+lambdas = {
+    "create_trip": {
+        "handler": "com.jordansimsmith.packinglist.CreateTripHandler",
         "zip_file": "create-trip-handler_deploy.jar",
     },
-    {
-        "function_name": "find_trips_handler",
-        "handler_name": "com.jordansimsmith.packinglist.FindTripsHandler",
+    "find_trips": {
+        "handler": "com.jordansimsmith.packinglist.FindTripsHandler",
         "zip_file": "find-trips-handler_deploy.jar",
     },
-    {
-        "function_name": "get_trip_handler",
-        "handler_name": "com.jordansimsmith.packinglist.GetTripHandler",
+    "get_trip": {
+        "handler": "com.jordansimsmith.packinglist.GetTripHandler",
         "zip_file": "get-trip-handler_deploy.jar",
     },
-    {
-        "function_name": "update_trip_handler",
-        "handler_name": "com.jordansimsmith.packinglist.UpdateTripHandler",
+    "update_trip": {
+        "handler": "com.jordansimsmith.packinglist.UpdateTripHandler",
         "zip_file": "update-trip-handler_deploy.jar",
     },
-    {
-        "function_name": "delete_trip_handler",
-        "handler_name": "com.jordansimsmith.packinglist.DeleteTripHandler",
+    "delete_trip": {
+        "handler": "com.jordansimsmith.packinglist.DeleteTripHandler",
         "zip_file": "delete-trip-handler_deploy.jar",
     },
-]
+}
 
-# create /trips resource
-trips_resource_id = apigateway_client.create_resource(
-    restApiId=api_id, parentId=root_id, pathPart="trips"
-)["id"]
+root_resources = {
+    "trips": {"path": "trips"},
+}
 
-# create /trips/{trip_id} resource
-trip_resource_id = apigateway_client.create_resource(
-    restApiId=api_id, parentId=trips_resource_id, pathPart="{trip_id}"
-)["id"]
+child_resources = {
+    "trip": {"path": "{trip_id}", "parent": "trips"},
+}
 
-# create all lambda functions
-for config in configs:
+endpoints = {
+    "create_trip": {"resource": "trips", "method": "POST", "lambda": "create_trip"},
+    "find_trips": {"resource": "trips", "method": "GET", "lambda": "find_trips"},
+    "get_trip": {"resource": "trip", "method": "GET", "lambda": "get_trip"},
+    "update_trip": {"resource": "trip", "method": "PUT", "lambda": "update_trip"},
+    "delete_trip": {"resource": "trip", "method": "DELETE", "lambda": "delete_trip"},
+}
+
+for function_name, config in lambdas.items():
     with open(f"/opt/code/localstack/{config['zip_file']}", "rb") as f:
         zip_file_bytes = f.read()
-
     lambda_client.create_function(
-        FunctionName=config["function_name"],
+        FunctionName=function_name,
         Runtime="java21",
         Role=role_arn,
-        Handler=config["handler_name"],
+        Handler=config["handler"],
         Code={"ZipFile": zip_file_bytes},
         Timeout=30,
         MemorySize=1024,
         Architectures=["x86_64"],
     )
 
-# wait for all lambda functions to be active
-for config in configs:
-    lambda_client.get_waiter("function_active_v2").wait(
-        FunctionName=config["function_name"]
+resource_ids = {}
+for name, config in root_resources.items():
+    resource_ids[name] = apigateway_client.create_resource(
+        restApiId=api_id, parentId=root_id, pathPart=config["path"]
+    )["id"]
+for name, config in child_resources.items():
+    resource_ids[name] = apigateway_client.create_resource(
+        restApiId=api_id,
+        parentId=resource_ids[config["parent"]],
+        pathPart=config["path"],
+    )["id"]
+
+for endpoint in endpoints.values():
+    apigateway_client.put_method(
+        restApiId=api_id,
+        resourceId=resource_ids[endpoint["resource"]],
+        httpMethod=endpoint["method"],
+        authorizationType="NONE",
+    )
+    apigateway_client.put_integration(
+        restApiId=api_id,
+        resourceId=resource_ids[endpoint["resource"]],
+        httpMethod=endpoint["method"],
+        type="AWS_PROXY",
+        integrationHttpMethod="POST",
+        uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:{endpoint['lambda']}/invocations",
     )
 
-# set up API Gateway routes
-# POST /trips -> create_trip_handler
-apigateway_client.put_method(
-    restApiId=api_id,
-    resourceId=trips_resource_id,
-    httpMethod="POST",
-    authorizationType="NONE",
-)
-apigateway_client.put_integration(
-    restApiId=api_id,
-    resourceId=trips_resource_id,
-    httpMethod="POST",
-    type="AWS_PROXY",
-    integrationHttpMethod="POST",
-    uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:create_trip_handler/invocations",
-)
-
-# GET /trips -> find_trips_handler
-apigateway_client.put_method(
-    restApiId=api_id,
-    resourceId=trips_resource_id,
-    httpMethod="GET",
-    authorizationType="NONE",
-)
-apigateway_client.put_integration(
-    restApiId=api_id,
-    resourceId=trips_resource_id,
-    httpMethod="GET",
-    type="AWS_PROXY",
-    integrationHttpMethod="POST",
-    uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:find_trips_handler/invocations",
-)
-
-# GET /trips/{trip_id} -> get_trip_handler
-apigateway_client.put_method(
-    restApiId=api_id,
-    resourceId=trip_resource_id,
-    httpMethod="GET",
-    authorizationType="NONE",
-)
-apigateway_client.put_integration(
-    restApiId=api_id,
-    resourceId=trip_resource_id,
-    httpMethod="GET",
-    type="AWS_PROXY",
-    integrationHttpMethod="POST",
-    uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:get_trip_handler/invocations",
-)
-
-# PUT /trips/{trip_id} -> update_trip_handler
-apigateway_client.put_method(
-    restApiId=api_id,
-    resourceId=trip_resource_id,
-    httpMethod="PUT",
-    authorizationType="NONE",
-)
-apigateway_client.put_integration(
-    restApiId=api_id,
-    resourceId=trip_resource_id,
-    httpMethod="PUT",
-    type="AWS_PROXY",
-    integrationHttpMethod="POST",
-    uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:update_trip_handler/invocations",
-)
-
-# DELETE /trips/{trip_id} -> delete_trip_handler
-apigateway_client.put_method(
-    restApiId=api_id,
-    resourceId=trip_resource_id,
-    httpMethod="DELETE",
-    authorizationType="NONE",
-)
-apigateway_client.put_integration(
-    restApiId=api_id,
-    resourceId=trip_resource_id,
-    httpMethod="DELETE",
-    type="AWS_PROXY",
-    integrationHttpMethod="POST",
-    uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:delete_trip_handler/invocations",
-)
+for function_name in lambdas:
+    lambda_client.get_waiter("function_active_v2").wait(FunctionName=function_name)
 
 apigateway_client.create_deployment(restApiId=api_id, stageName="local")

@@ -75,121 +75,95 @@ iam_client.put_role_policy(
     PolicyDocument=json.dumps(policy_document),
 )
 
-configs = [
-    {
-        "function_name": "create_backup_handler",
-        "handler_name": "com.jordansimsmith.ankibackup.CreateBackupHandler",
+lambdas = {
+    "create_backup": {
+        "handler": "com.jordansimsmith.ankibackup.CreateBackupHandler",
         "zip_file": "create-backup-handler_deploy.jar",
     },
-    {
-        "function_name": "update_backup_handler",
-        "handler_name": "com.jordansimsmith.ankibackup.UpdateBackupHandler",
+    "update_backup": {
+        "handler": "com.jordansimsmith.ankibackup.UpdateBackupHandler",
         "zip_file": "update-backup-handler_deploy.jar",
     },
-    {
-        "function_name": "find_backups_handler",
-        "handler_name": "com.jordansimsmith.ankibackup.FindBackupsHandler",
+    "find_backups": {
+        "handler": "com.jordansimsmith.ankibackup.FindBackupsHandler",
         "zip_file": "find-backups-handler_deploy.jar",
     },
-    {
-        "function_name": "get_backup_handler",
-        "handler_name": "com.jordansimsmith.ankibackup.GetBackupHandler",
+    "get_backup": {
+        "handler": "com.jordansimsmith.ankibackup.GetBackupHandler",
         "zip_file": "get-backup-handler_deploy.jar",
     },
-]
+}
 
-for config in configs:
+root_resources = {
+    "backups": {"path": "backups"},
+}
+
+child_resources = {
+    "backup": {"path": "{backup_id}", "parent": "backups"},
+}
+
+endpoints = {
+    "create_backup": {
+        "resource": "backups",
+        "method": "POST",
+        "lambda": "create_backup",
+    },
+    "find_backups": {
+        "resource": "backups",
+        "method": "GET",
+        "lambda": "find_backups",
+    },
+    "update_backup": {
+        "resource": "backup",
+        "method": "PUT",
+        "lambda": "update_backup",
+    },
+    "get_backup": {"resource": "backup", "method": "GET", "lambda": "get_backup"},
+}
+
+for function_name, config in lambdas.items():
     with open(f"/opt/code/localstack/{config['zip_file']}", "rb") as f:
         zip_file_bytes = f.read()
-
     lambda_client.create_function(
-        FunctionName=config["function_name"],
+        FunctionName=function_name,
         Runtime="java21",
         Role=role_arn,
-        Handler=config["handler_name"],
+        Handler=config["handler"],
         Code={"ZipFile": zip_file_bytes},
         Timeout=30,
         MemorySize=512,
         Architectures=["x86_64"],
     )
 
-for config in configs:
-    lambda_client.get_waiter("function_active_v2").wait(
-        FunctionName=config["function_name"]
+resource_ids = {}
+for name, config in root_resources.items():
+    resource_ids[name] = apigateway_client.create_resource(
+        restApiId=api_id, parentId=root_id, pathPart=config["path"]
+    )["id"]
+for name, config in child_resources.items():
+    resource_ids[name] = apigateway_client.create_resource(
+        restApiId=api_id,
+        parentId=resource_ids[config["parent"]],
+        pathPart=config["path"],
+    )["id"]
+
+for endpoint in endpoints.values():
+    apigateway_client.put_method(
+        restApiId=api_id,
+        resourceId=resource_ids[endpoint["resource"]],
+        httpMethod=endpoint["method"],
+        authorizationType="NONE",
+    )
+    apigateway_client.put_integration(
+        restApiId=api_id,
+        resourceId=resource_ids[endpoint["resource"]],
+        httpMethod=endpoint["method"],
+        type="AWS_PROXY",
+        integrationHttpMethod="POST",
+        uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:{endpoint['lambda']}/invocations",
     )
 
-# create /backups resource
-backups_resource_id = apigateway_client.create_resource(
-    restApiId=api_id, parentId=root_id, pathPart="backups"
-)["id"]
-
-# create /backups/{backup_id} resource
-backup_resource_id = apigateway_client.create_resource(
-    restApiId=api_id, parentId=backups_resource_id, pathPart="{backup_id}"
-)["id"]
-
-# POST /backups -> create_backup_handler
-apigateway_client.put_method(
-    restApiId=api_id,
-    resourceId=backups_resource_id,
-    httpMethod="POST",
-    authorizationType="NONE",
-)
-apigateway_client.put_integration(
-    restApiId=api_id,
-    resourceId=backups_resource_id,
-    httpMethod="POST",
-    type="AWS_PROXY",
-    integrationHttpMethod="POST",
-    uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:create_backup_handler/invocations",
-)
-
-# GET /backups -> find_backups_handler
-apigateway_client.put_method(
-    restApiId=api_id,
-    resourceId=backups_resource_id,
-    httpMethod="GET",
-    authorizationType="NONE",
-)
-apigateway_client.put_integration(
-    restApiId=api_id,
-    resourceId=backups_resource_id,
-    httpMethod="GET",
-    type="AWS_PROXY",
-    integrationHttpMethod="POST",
-    uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:find_backups_handler/invocations",
-)
-
-# PUT /backups/{backup_id} -> update_backup_handler
-apigateway_client.put_method(
-    restApiId=api_id,
-    resourceId=backup_resource_id,
-    httpMethod="PUT",
-    authorizationType="NONE",
-)
-apigateway_client.put_integration(
-    restApiId=api_id,
-    resourceId=backup_resource_id,
-    httpMethod="PUT",
-    type="AWS_PROXY",
-    integrationHttpMethod="POST",
-    uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:update_backup_handler/invocations",
-)
-
-# GET /backups/{backup_id} -> get_backup_handler
-apigateway_client.put_method(
-    restApiId=api_id,
-    resourceId=backup_resource_id,
-    httpMethod="GET",
-    authorizationType="NONE",
-)
-apigateway_client.put_integration(
-    restApiId=api_id,
-    resourceId=backup_resource_id,
-    httpMethod="GET",
-    type="AWS_PROXY",
-    integrationHttpMethod="POST",
-    uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:get_backup_handler/invocations",
-)
+for function_name in lambdas:
+    lambda_client.get_waiter("function_active_v2").wait(FunctionName=function_name)
 
 apigateway_client.create_deployment(restApiId=api_id, stageName="local")

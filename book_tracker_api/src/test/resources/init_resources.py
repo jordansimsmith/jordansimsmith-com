@@ -89,144 +89,88 @@ iam_client.put_role_policy(
     PolicyDocument=json.dumps(policy_document),
 )
 
-configs = [
-    {
-        "function_name": "create_book_handler",
-        "handler_name": "com.jordansimsmith.booktracker.CreateBookHandler",
+lambdas = {
+    "create_book": {
+        "handler": "com.jordansimsmith.booktracker.CreateBookHandler",
         "zip_file": "create-book-handler_deploy.jar",
     },
-    {
-        "function_name": "find_books_handler",
-        "handler_name": "com.jordansimsmith.booktracker.FindBooksHandler",
+    "find_books": {
+        "handler": "com.jordansimsmith.booktracker.FindBooksHandler",
         "zip_file": "find-books-handler_deploy.jar",
     },
-    {
-        "function_name": "get_book_handler",
-        "handler_name": "com.jordansimsmith.booktracker.GetBookHandler",
+    "get_book": {
+        "handler": "com.jordansimsmith.booktracker.GetBookHandler",
         "zip_file": "get-book-handler_deploy.jar",
     },
-    {
-        "function_name": "update_book_handler",
-        "handler_name": "com.jordansimsmith.booktracker.UpdateBookHandler",
+    "update_book": {
+        "handler": "com.jordansimsmith.booktracker.UpdateBookHandler",
         "zip_file": "update-book-handler_deploy.jar",
     },
-    {
-        "function_name": "delete_book_handler",
-        "handler_name": "com.jordansimsmith.booktracker.DeleteBookHandler",
+    "delete_book": {
+        "handler": "com.jordansimsmith.booktracker.DeleteBookHandler",
         "zip_file": "delete-book-handler_deploy.jar",
     },
-]
+}
 
-# create /books resource
-books_resource_id = apigateway_client.create_resource(
-    restApiId=api_id, parentId=root_id, pathPart="books"
-)["id"]
+root_resources = {
+    "books": {"path": "books"},
+}
 
-# create /books/{open_library_work_id} resource
-book_resource_id = apigateway_client.create_resource(
-    restApiId=api_id, parentId=books_resource_id, pathPart="{open_library_work_id}"
-)["id"]
+child_resources = {
+    "book": {"path": "{open_library_work_id}", "parent": "books"},
+}
 
-# create all lambda functions
-for config in configs:
+endpoints = {
+    "create_book": {"resource": "books", "method": "POST", "lambda": "create_book"},
+    "find_books": {"resource": "books", "method": "GET", "lambda": "find_books"},
+    "get_book": {"resource": "book", "method": "GET", "lambda": "get_book"},
+    "update_book": {"resource": "book", "method": "PUT", "lambda": "update_book"},
+    "delete_book": {"resource": "book", "method": "DELETE", "lambda": "delete_book"},
+}
+
+for function_name, config in lambdas.items():
     with open(f"/opt/code/localstack/{config['zip_file']}", "rb") as f:
         zip_file_bytes = f.read()
-
     lambda_client.create_function(
-        FunctionName=config["function_name"],
+        FunctionName=function_name,
         Runtime="java21",
         Role=role_arn,
-        Handler=config["handler_name"],
+        Handler=config["handler"],
         Code={"ZipFile": zip_file_bytes},
         Timeout=30,
         MemorySize=1024,
         Architectures=["x86_64"],
     )
 
-# wait for all lambda functions to be active
-for config in configs:
-    lambda_client.get_waiter("function_active_v2").wait(
-        FunctionName=config["function_name"]
+resource_ids = {}
+for name, config in root_resources.items():
+    resource_ids[name] = apigateway_client.create_resource(
+        restApiId=api_id, parentId=root_id, pathPart=config["path"]
+    )["id"]
+for name, config in child_resources.items():
+    resource_ids[name] = apigateway_client.create_resource(
+        restApiId=api_id,
+        parentId=resource_ids[config["parent"]],
+        pathPart=config["path"],
+    )["id"]
+
+for endpoint in endpoints.values():
+    apigateway_client.put_method(
+        restApiId=api_id,
+        resourceId=resource_ids[endpoint["resource"]],
+        httpMethod=endpoint["method"],
+        authorizationType="NONE",
+    )
+    apigateway_client.put_integration(
+        restApiId=api_id,
+        resourceId=resource_ids[endpoint["resource"]],
+        httpMethod=endpoint["method"],
+        type="AWS_PROXY",
+        integrationHttpMethod="POST",
+        uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:{endpoint['lambda']}/invocations",
     )
 
-# POST /books -> create_book_handler
-apigateway_client.put_method(
-    restApiId=api_id,
-    resourceId=books_resource_id,
-    httpMethod="POST",
-    authorizationType="NONE",
-)
-apigateway_client.put_integration(
-    restApiId=api_id,
-    resourceId=books_resource_id,
-    httpMethod="POST",
-    type="AWS_PROXY",
-    integrationHttpMethod="POST",
-    uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:create_book_handler/invocations",
-)
-
-# GET /books -> find_books_handler
-apigateway_client.put_method(
-    restApiId=api_id,
-    resourceId=books_resource_id,
-    httpMethod="GET",
-    authorizationType="NONE",
-)
-apigateway_client.put_integration(
-    restApiId=api_id,
-    resourceId=books_resource_id,
-    httpMethod="GET",
-    type="AWS_PROXY",
-    integrationHttpMethod="POST",
-    uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:find_books_handler/invocations",
-)
-
-# GET /books/{open_library_work_id} -> get_book_handler
-apigateway_client.put_method(
-    restApiId=api_id,
-    resourceId=book_resource_id,
-    httpMethod="GET",
-    authorizationType="NONE",
-)
-apigateway_client.put_integration(
-    restApiId=api_id,
-    resourceId=book_resource_id,
-    httpMethod="GET",
-    type="AWS_PROXY",
-    integrationHttpMethod="POST",
-    uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:get_book_handler/invocations",
-)
-
-# PUT /books/{open_library_work_id} -> update_book_handler
-apigateway_client.put_method(
-    restApiId=api_id,
-    resourceId=book_resource_id,
-    httpMethod="PUT",
-    authorizationType="NONE",
-)
-apigateway_client.put_integration(
-    restApiId=api_id,
-    resourceId=book_resource_id,
-    httpMethod="PUT",
-    type="AWS_PROXY",
-    integrationHttpMethod="POST",
-    uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:update_book_handler/invocations",
-)
-
-# DELETE /books/{open_library_work_id} -> delete_book_handler
-apigateway_client.put_method(
-    restApiId=api_id,
-    resourceId=book_resource_id,
-    httpMethod="DELETE",
-    authorizationType="NONE",
-)
-apigateway_client.put_integration(
-    restApiId=api_id,
-    resourceId=book_resource_id,
-    httpMethod="DELETE",
-    type="AWS_PROXY",
-    integrationHttpMethod="POST",
-    uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:delete_book_handler/invocations",
-)
+for function_name in lambdas:
+    lambda_client.get_waiter("function_active_v2").wait(FunctionName=function_name)
 
 apigateway_client.create_deployment(restApiId=api_id, stageName="local")

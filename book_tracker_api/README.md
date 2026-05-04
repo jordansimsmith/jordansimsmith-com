@@ -54,8 +54,6 @@ flowchart TD
   bookHandlers -->|"Read/write book items"| dynamoTable["DynamoDB: book_tracker"]
 ```
 
-
-
 ### Primary workflow
 
 ```mermaid
@@ -86,8 +84,6 @@ sequenceDiagram
   Dynamo-->>Find: items ordered by finished_date desc
   Find-->>Gateway: books + rolling_12_month_count
 ```
-
-
 
 ## Main technical decisions
 
@@ -134,7 +130,6 @@ sequenceDiagram
 
 ### Endpoint summary
 
-
 | Method   | Path                            | Purpose                                                                 |
 | -------- | ------------------------------- | ----------------------------------------------------------------------- |
 | `POST`   | `/books`                        | create one book entry                                                   |
@@ -142,7 +137,6 @@ sequenceDiagram
 | `GET`    | `/books/{open_library_work_id}` | fetch one book entry                                                    |
 | `PUT`    | `/books/{open_library_work_id}` | update the `finished_date` on one book entry                            |
 | `DELETE` | `/books/{open_library_work_id}` | delete one book entry                                                   |
-
 
 ### Shared book object
 
@@ -272,7 +266,6 @@ Response `204` (no body). `404` with `{"message":"Not Found"}` when the work doe
 
 Item attributes:
 
-
 | Attribute              | Type   | Notes                                                          |
 | ---------------------- | ------ | -------------------------------------------------------------- |
 | `pk`                   | string | `USER#<user>`                                                  |
@@ -289,7 +282,6 @@ Item attributes:
 | `finished_date`        | string | `YYYY-MM-DD`                                                   |
 | `created_at`           | number | epoch seconds                                                  |
 | `updated_at`           | number | epoch seconds                                                  |
-
 
 ### Representative record
 
@@ -314,7 +306,6 @@ Item attributes:
 
 ### Access patterns
 
-
 | Access pattern                    | Operation                                                                       |
 | --------------------------------- | ------------------------------------------------------------------------------- |
 | add book (reject duplicate)       | `PutItem` with `attribute_not_exists(pk) AND attribute_not_exists(sk)`          |
@@ -322,7 +313,6 @@ Item attributes:
 | get single book                   | `GetItem pk=USER#<user>, sk=BOOK#<open_library_work_id>`                        |
 | update `finished_date`            | `PutItem` or `UpdateItem` rewriting `finished_date`, `gsi1sk`, and `updated_at` |
 | delete                            | `DeleteItem pk=USER#<user>, sk=BOOK#<open_library_work_id>`                     |
-
 
 ## Behavioral invariants and time semantics
 
@@ -337,7 +327,6 @@ Item attributes:
 
 ## Source of truth
 
-
 | Entity                 | Authoritative source                                | Notes                                                                        |
 | ---------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------- |
 | User identity          | Basic auth username                                 | parsed from `Authorization` header in authorizer and handler request context |
@@ -346,7 +335,6 @@ Item attributes:
 | Rolling 12-month count | derived at read time from persisted entries         | never materialized; uses server clock                                        |
 | Cover URL              | browser-constructed at add time, persisted verbatim | backend does not re-derive or re-format; `null` when no cover was available  |
 | Credential set         | Secrets Manager `book_tracker_api` secret           | no credential material in code or Terraform state                            |
-
 
 ## Security and privacy
 
@@ -363,11 +351,9 @@ Item attributes:
 
 No service-specific environment variables are consumed by handlers in current scope.
 
-
 | Name     | Required | Purpose                                                                   | Default behavior                                              |
 | -------- | -------- | ------------------------------------------------------------------------- | ------------------------------------------------------------- |
 | `(none)` | n/a      | behavior is configured via code constants and Terraform-managed resources | table name, secret name, and CORS origin come from code/infra |
-
 
 ### Secret shape
 
@@ -440,4 +426,3 @@ Expected JSON for secret `book_tracker_api`:
 2. Client sends `POST /books` with the same `open_library_work_id`.
 3. API's conditional `PutItem` fails; handler loads the existing record and returns `409` with `{"message":"already added on <finished_date>"}`.
 4. Client surfaces the message without disturbing existing state.
-
