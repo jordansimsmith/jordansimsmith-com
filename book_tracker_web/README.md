@@ -54,8 +54,6 @@ flowchart TD
   browser -->|"HTTPS Basic auth"| api["book_tracker_api"]
 ```
 
-
-
 ### Primary workflow
 
 ```mermaid
@@ -80,8 +78,6 @@ sequenceDiagram
     Web-->>User: updated timeline and header count
   end
 ```
-
-
 
 ## Main technical decisions
 
@@ -131,12 +127,10 @@ sequenceDiagram
 
 ### Browser storage
 
-
 | Location              | Key                 | Purpose                                                                                                 | Retention                  |
 | --------------------- | ------------------- | ------------------------------------------------------------------------------------------------------- | -------------------------- |
 | `localStorage`        | `book_tracker_auth` | persisted session `{ "username": string, "token": string }` where `token` is base64 `username:password` | until explicit logout      |
 | in-memory React state | n/a                 | search typeahead state, modal state, loading/error flags, debounced input values                        | reset on full page refresh |
-
 
 ### Data ownership expectations
 
@@ -157,7 +151,6 @@ sequenceDiagram
 
 ## Source of truth
 
-
 | Entity                      | Authoritative source                     | Notes                                                              |
 | --------------------------- | ---------------------------------------- | ------------------------------------------------------------------ |
 | Credential validity         | `book_tracker_api` response              | login is treated as successful after an authenticated `GET /books` |
@@ -165,7 +158,6 @@ sequenceDiagram
 | Rolling 12-month count      | `book_tracker_api` `GET /books` response | never recomputed in the client                                     |
 | Open Library search results | `openlibrary.org/search.json`            | used only to stage the add flow; not persisted locally             |
 | Session persistence         | browser `localStorage`                   | cleared on logout via `clearSession()`                             |
-
 
 ## Security and privacy
 
@@ -181,12 +173,10 @@ sequenceDiagram
 
 ### Environment variables
 
-
 | Name                         | Required | Purpose                                             | Default behavior                                          |
 | ---------------------------- | -------- | --------------------------------------------------- | --------------------------------------------------------- |
 | `VITE_API_BASE_URL`          | no       | base URL for `book_tracker_api` HTTP client         | defaults to `https://api.book-tracker.jordansimsmith.com` |
 | `VITE_OPEN_LIBRARY_BASE_URL` | no       | origin for browser-direct Open Library search calls | defaults to `https://openlibrary.org`                     |
-
 
 Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP API client and the HTTP Open Library client. Development uses in-memory fakes for both so the dev server has no backend or network dependency.
 
@@ -259,4 +249,3 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP API clien
 2. App shows a confirmation dialog; user confirms.
 3. App sends `DELETE /books/{open_library_work_id}`.
 4. Modal closes; the entry disappears from the timeline and the rolling count updates from the follow-up `GET /books`.
-
