@@ -18,6 +18,17 @@
       }
     },
     {
+      "path": "book_tracker_api/infra",
+      "artifacts": {
+        "auth": "//book_tracker_api:auth-handler_deploy.jar",
+        "create_book": "//book_tracker_api:create-book-handler_deploy.jar",
+        "find_books": "//book_tracker_api:find-books-handler_deploy.jar",
+        "get_book": "//book_tracker_api:get-book-handler_deploy.jar",
+        "update_book": "//book_tracker_api:update-book-handler_deploy.jar",
+        "delete_book": "//book_tracker_api:delete-book-handler_deploy.jar"
+      }
+    },
+    {
       "path": "event_calendar_api/infra",
       "artifacts": {
         "get_calendar_subscription": "//event_calendar_api:get-calendar-subscription-handler_deploy.jar",
