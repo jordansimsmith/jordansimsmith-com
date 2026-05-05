@@ -1,5 +1,6 @@
 load("@aspect_rules_js//js:defs.bzl", "js_library")
 load("@npm//:defs.bzl", "npm_link_all_packages")
+load("@rules_python//python:pip.bzl", "compile_pip_requirements")
 
 exports_files(["MODULE.bazel"])
 
@@ -11,6 +12,12 @@ js_library(
     name = "prettierrc",
     srcs = [".prettier.config.js"],
     visibility = ["//tools/format:__pkg__"],
+)
+
+compile_pip_requirements(
+    name = "requirements",
+    src = "requirements.in",
+    requirements_txt = "requirements.txt",
 )
 
 alias(
