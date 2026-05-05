@@ -12,3 +12,4 @@ pnpm-debug.log*
 **/.DS_Store
 **/__pycache__/
 tmp/
+rules_jvm_external++maven+maven_install.json
