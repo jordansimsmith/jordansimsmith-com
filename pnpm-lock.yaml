@@ -85,6 +85,8 @@ importers:
 
   immersion_tracker_web: {}
 
+  japanese_dictionary_web: {}
+
   packing_list_web: {}
 
   personal_website_web: {}

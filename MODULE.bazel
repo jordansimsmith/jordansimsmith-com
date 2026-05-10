@@ -175,6 +175,7 @@ npm.npm_translate_lock(
     data = [
         "//book_tracker_web:package.json",
         "//immersion_tracker_web:package.json",
+        "//japanese_dictionary_web:package.json",
         "//packing_list_web:package.json",
         "//personal_website_web:package.json",
     ],
