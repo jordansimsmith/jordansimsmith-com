@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import {
   Container,
   Paper,
@@ -8,8 +9,10 @@ import {
   Stack,
 } from '@mantine/core';
 import { useForm } from '@mantine/form';
+import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
-import { setSession } from '../auth/session';
+import { setSession, clearSession } from '../auth/session';
+import { apiClient } from '../api/client';
 
 interface LoginFormValues {
   username: string;
@@ -18,6 +21,7 @@ interface LoginFormValues {
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const [loading, setLoading] = useState(false);
 
   const form = useForm<LoginFormValues>({
     initialValues: {
@@ -30,9 +34,23 @@ export function LoginPage() {
     },
   });
 
-  const handleSubmit = (values: LoginFormValues) => {
+  const handleSubmit = async (values: LoginFormValues) => {
+    setLoading(true);
     setSession(values.username.trim(), values.password);
-    navigate('/search');
+
+    try {
+      await apiClient.search('');
+      navigate('/search');
+    } catch {
+      clearSession();
+      notifications.show({
+        title: 'Login failed',
+        message: 'Invalid username or password',
+        color: 'red',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -58,7 +76,7 @@ export function LoginPage() {
               {...form.getInputProps('password')}
             />
 
-            <Button type="submit" fullWidth>
+            <Button type="submit" fullWidth loading={loading}>
               Log in
             </Button>
           </Stack>
