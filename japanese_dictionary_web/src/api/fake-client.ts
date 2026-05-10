@@ -407,6 +407,8 @@ function compareResults(a: SearchResult, b: SearchResult): number {
   return a.sequence - b.sequence;
 }
 
+const FAKE_LATENCY_MS = 250;
+
 export function createFakeClient(): ApiClient {
   return {
     async search(q: string): Promise<SearchResponse> {
@@ -414,6 +416,7 @@ export function createFakeClient(): ApiClient {
       if (trimmed.length === 0) {
         return { results: [] };
       }
+      await new Promise((resolve) => setTimeout(resolve, FAKE_LATENCY_MS));
       const matched = fixtures.filter((r) => matches(r, trimmed));
       const sorted = [...matched].sort(compareResults).slice(0, 10);
       return { results: sorted };

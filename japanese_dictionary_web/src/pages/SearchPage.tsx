@@ -3,7 +3,6 @@ import {
   Alert,
   Container,
   Divider,
-  Loader,
   Stack,
   Text,
   TextInput,
@@ -11,7 +10,7 @@ import {
 import { apiClient } from '../api/client';
 import type { SearchResult } from '../api/client';
 import { AppShellLayout } from '../layouts/AppShellLayout';
-import { ResultEntry } from '../components/ResultEntry';
+import { ResultEntry, ResultEntrySkeleton } from '../components/ResultEntry';
 
 const DEBOUNCE_MS = 250;
 
@@ -132,8 +131,13 @@ export function SearchPage() {
             </Alert>
           )}
           {loading && (
-            <Stack align="center" py="md">
-              <Loader size="sm" />
+            <Stack gap="lg" aria-label="Loading results" aria-busy="true">
+              {[0, 1, 2].map((i) => (
+                <div key={i}>
+                  <ResultEntrySkeleton />
+                  {i < 2 && <Divider mt="lg" />}
+                </div>
+              ))}
             </Stack>
           )}
           {!loading && !error && showEmptyHint && (

@@ -149,7 +149,7 @@ describe('SearchPage', () => {
     expect(screen.getByText('新')).toBeDefined();
   });
 
-  it('shows a loading indicator while the search is in flight', async () => {
+  it('shows skeleton placeholders while the search is in flight', async () => {
     let resolveSearch: (value: { results: SearchResult[] }) => void = () => {};
     searchSpy.mockReturnValue(
       new Promise<{ results: SearchResult[] }>((resolve) => {
@@ -160,8 +160,11 @@ describe('SearchPage', () => {
     renderSearchPage();
 
     await waitFor(() => {
-      expect(document.querySelector('.mantine-Loader-root')).not.toBeNull();
+      expect(screen.getByLabelText(/loading results/i)).toBeDefined();
     });
+    expect(
+      document.querySelectorAll('.mantine-Skeleton-root').length,
+    ).toBeGreaterThan(0);
 
     resolveSearch({ results: [] });
   });
