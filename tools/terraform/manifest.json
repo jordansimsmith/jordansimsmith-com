@@ -75,6 +75,12 @@
       }
     },
     {
+      "path": "japanese_dictionary_web/infra",
+      "artifacts": {
+        "build": "//japanese_dictionary_web:build"
+      }
+    },
+    {
       "path": "packing_list_api/infra",
       "artifacts": {
         "auth": "//packing_list_api:auth-handler_deploy.jar",
