@@ -1,6 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
-import { Container, Title } from '@mantine/core';
 import { LoginPage } from './pages/LoginPage';
+import { SearchPage } from './pages/SearchPage';
 import { getSession } from './auth/session';
 
 function HomeRoute() {
@@ -8,11 +8,7 @@ function HomeRoute() {
   if (!session) {
     return <LoginPage />;
   }
-  return (
-    <Container size="md" py="xl">
-      <Title order={1}>Japanese dictionary</Title>
-    </Container>
-  );
+  return <SearchPage />;
 }
 
 export function App() {
