@@ -11,6 +11,7 @@ import com.jordansimsmith.secrets.SecretsModule;
 import dagger.Component;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
 @Singleton
@@ -34,6 +35,8 @@ public interface DictionaryFactory {
   DynamoDbClient dynamoDbClient();
 
   DynamoDbEnhancedClient dynamoDbEnhancedClient();
+
+  DynamoDbTable<JapaneseDictionaryItem> japaneseDictionaryTable();
 
   static DictionaryFactory create() {
     return DaggerDictionaryFactory.create();

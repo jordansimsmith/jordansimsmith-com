@@ -35,6 +35,7 @@ java_library(
         "//lib/secrets:lib",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
     ],
