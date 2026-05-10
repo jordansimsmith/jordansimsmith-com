@@ -68,6 +68,13 @@
       }
     },
     {
+      "path": "japanese_dictionary_api/infra",
+      "artifacts": {
+        "auth": "//japanese_dictionary_api:auth-handler_deploy.jar",
+        "search": "//japanese_dictionary_api:search-handler_deploy.jar"
+      }
+    },
+    {
       "path": "packing_list_api/infra",
       "artifacts": {
         "auth": "//packing_list_api:auth-handler_deploy.jar",
