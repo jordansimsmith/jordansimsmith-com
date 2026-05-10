@@ -1,7 +1,7 @@
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import {
   describe,
   it,
@@ -19,7 +19,10 @@ function renderSearchPage() {
   return render(
     <MantineProvider>
       <MemoryRouter initialEntries={['/search']}>
-        <SearchPage />
+        <Routes>
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/" element={<div>Login page</div>} />
+        </Routes>
       </MemoryRouter>
     </MantineProvider>,
   );
@@ -51,6 +54,7 @@ describe('SearchPage', () => {
 
   beforeEach(() => {
     setUrlQuery('');
+    localStorage.clear();
     searchSpy = vi
       .spyOn(clientModule.apiClient, 'search')
       .mockResolvedValue({ results: [] });
@@ -195,6 +199,22 @@ describe('SearchPage', () => {
       expect(screen.getByText('新聞')).toBeDefined();
     });
     expect(screen.getByText('新年')).toBeDefined();
+  });
+
+  it('clears the session and navigates home when logout is clicked', async () => {
+    localStorage.setItem(
+      'japanese_dictionary_auth',
+      JSON.stringify({ username: 'alice', token: 'abc' }),
+    );
+    renderSearchPage();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByLabelText(/log out/i));
+
+    await waitFor(() => {
+      expect(screen.getByText('Login page')).toBeDefined();
+    });
+    expect(localStorage.getItem('japanese_dictionary_auth')).toBeNull();
   });
 
   it('runs an immediate search when an internal link triggers navigation', async () => {

@@ -1,16 +1,22 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  ActionIcon,
   Alert,
   Container,
   Divider,
+  Group,
   Loader,
   Stack,
   Text,
   TextInput,
   Title,
+  Tooltip,
 } from '@mantine/core';
+import { IconLogout } from '@tabler/icons-react';
+import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import type { SearchResult } from '../api/client';
+import { clearSession } from '../auth/session';
 import { ResultEntry } from '../components/ResultEntry';
 
 const DEBOUNCE_MS = 250;
@@ -26,6 +32,7 @@ function syncUrl(query: string) {
 }
 
 export function SearchPage() {
+  const navigate = useNavigate();
   const initialQuery =
     typeof window !== 'undefined'
       ? (new URLSearchParams(window.location.search).get('q') ?? '')
@@ -105,6 +112,11 @@ export function SearchPage() {
     runSearch(newQuery);
   };
 
+  const handleLogout = () => {
+    clearSession();
+    navigate('/');
+  };
+
   const trimmedQuery = query.trim();
   const showEmptyHint = trimmedQuery.length === 0 && !loading;
   const showNoResults =
@@ -117,7 +129,20 @@ export function SearchPage() {
   return (
     <Container size="md" px="md" py={{ base: 'md', sm: 'xl' }}>
       <Stack>
-        <Title order={1}>Japanese dictionary</Title>
+        <Group justify="space-between" align="center" wrap="nowrap">
+          <Title order={1}>Japanese dictionary</Title>
+          <Tooltip label="Log out" position="left">
+            <ActionIcon
+              variant="subtle"
+              color="gray"
+              size="lg"
+              onClick={handleLogout}
+              aria-label="Log out"
+            >
+              <IconLogout size={20} />
+            </ActionIcon>
+          </Tooltip>
+        </Group>
         <TextInput
           aria-label="Search"
           placeholder="Type a word in romaji, kana or kanji"
