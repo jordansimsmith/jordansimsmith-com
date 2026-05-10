@@ -8,7 +8,7 @@ import '@mantine/notifications/styles.css';
 import './index.css';
 
 const theme = createTheme({
-  primaryColor: 'indigo',
+  primaryColor: 'pink',
 });
 
 createRoot(document.getElementById('root')!).render(

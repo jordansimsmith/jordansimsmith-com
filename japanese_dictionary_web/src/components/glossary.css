@@ -1,5 +1,5 @@
 .gloss-link {
-  color: var(--mantine-color-indigo-7);
+  color: var(--mantine-primary-color-7);
   text-decoration: none;
 }
 .gloss-link:hover {
@@ -58,9 +58,9 @@
 }
 
 [data-sc-content='part-of-speech-info'] {
-  color: var(--mantine-color-indigo-8);
-  background-color: var(--mantine-color-indigo-0);
-  border-color: var(--mantine-color-indigo-2);
+  color: var(--mantine-primary-color-8);
+  background-color: var(--mantine-primary-color-0);
+  border-color: var(--mantine-primary-color-2);
 }
 
 [data-sc-content='field-info'] {
