@@ -32,10 +32,10 @@ interface PitchGraphProps {
 }
 
 const STEP = 50;
-const RADIUS = 10;
+const RADIUS = 12;
 const HIGH_Y = 25;
 const LOW_Y = 75;
-const PIXEL_HEIGHT = 24;
+const PIXEL_HEIGHT = 36;
 
 export function PitchGraph({ reading, pitch }: PitchGraphProps) {
   const morae = splitMorae(reading);
