@@ -130,6 +130,10 @@ export function SearchPage() {
             onChange={(e) => handleChange(e.currentTarget.value)}
             size="md"
             autoFocus
+            autoComplete="off"
+            autoCorrect="off"
+            autoCapitalize="off"
+            spellCheck={false}
           />
           {error && (
             <Alert color="red" role="alert">
