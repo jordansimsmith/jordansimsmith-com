@@ -16,13 +16,15 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
   };
 
   return (
-    <AppShell header={{ height: { sm: 60, base: 90 } }} padding="md">
+    <AppShell header={{ height: { base: 60 } }} padding="md">
       <AppShell.Header>
-        <Group h="100%" px="md" justify="space-between">
-          <Title order={3}>Immersion tracker</Title>
+        <Group h="100%" px="md" justify="space-between" wrap="nowrap">
+          <Title order={3} style={{ whiteSpace: 'nowrap' }}>
+            Immersion tracker
+          </Title>
           {session && (
-            <Group gap="sm">
-              <Text size="sm" c="dimmed">
+            <Group gap="sm" wrap="nowrap">
+              <Text size="sm" c="dimmed" visibleFrom="sm">
                 {session.username}
               </Text>
               <Button variant="subtle" size="sm" onClick={handleLogout}>
