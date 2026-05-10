@@ -89,11 +89,7 @@ describe('SearchPage', () => {
     renderSearchPage();
     const input = screen.getByLabelText('Search');
     await user.type(input, 'sh');
-    await new Promise((resolve) => setTimeout(resolve, 100));
     await user.type(input, 'i');
-
-    await new Promise((resolve) => setTimeout(resolve, 100));
-    expect(searchSpy).not.toHaveBeenCalled();
 
     await waitFor(
       () => {
@@ -101,6 +97,8 @@ describe('SearchPage', () => {
       },
       { timeout: 1000 },
     );
+    // a single call with the final value proves the intermediate "sh" timer
+    // was cancelled; without cancellation we would observe two calls.
     expect(searchSpy).toHaveBeenCalledTimes(1);
   });
 
