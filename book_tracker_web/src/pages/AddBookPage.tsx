@@ -237,7 +237,11 @@ export function AddBookPage() {
             <Title order={1}>Add a book</Title>
           </Group>
 
-          <Combobox store={combobox} onOptionSubmit={handleOptionSubmit}>
+          <Combobox
+            store={combobox}
+            onOptionSubmit={handleOptionSubmit}
+            middlewares={{ flip: false, shift: true, size: true }}
+          >
             <Combobox.Target>
               <TextInput
                 label="Search Open Library"

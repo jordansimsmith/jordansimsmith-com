@@ -3,10 +3,11 @@ import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { Notifications, notifications } from '@mantine/notifications';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { LoginPage } from './LoginPage';
 import { BooksPage } from './BooksPage';
 import { getSession } from '../auth/session';
+import * as clientModule from '../api/client';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const session = getSession();
@@ -46,6 +47,7 @@ describe('LoginPage', () => {
   afterEach(() => {
     cleanup();
     notifications.clean();
+    vi.restoreAllMocks();
   });
 
   it('renders the login form', () => {
@@ -86,6 +88,24 @@ describe('LoginPage', () => {
     const session = getSession();
     expect(session?.username).toBe('alice');
     expect(session?.token).toBe(btoa('alice:secret'));
+  });
+
+  it('clears the session and shows an error notification on failed validation', async () => {
+    vi.spyOn(clientModule.apiClient, 'getBooks').mockRejectedValue(
+      new Error('Unauthorized'),
+    );
+
+    const user = userEvent.setup();
+    renderApp('/');
+
+    await user.type(screen.getByLabelText(/username/i), 'alice');
+    await user.type(screen.getByLabelText(/password/i), 'wrongpass');
+    await user.click(screen.getByRole('button', { name: /log in/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText(/login failed/i)).toBeDefined();
+    });
+    expect(getSession()).toBeNull();
   });
 
   it('redirects unauthenticated visits to /books back to /', async () => {
