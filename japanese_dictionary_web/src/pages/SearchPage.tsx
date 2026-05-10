@@ -89,6 +89,11 @@ export function SearchPage() {
     syncUrl(value);
     if (debounceTimer.current !== null) {
       clearTimeout(debounceTimer.current);
+      debounceTimer.current = null;
+    }
+    if (value.trim().length === 0) {
+      runSearch('');
+      return;
     }
     debounceTimer.current = setTimeout(() => {
       runSearch(value);
@@ -105,7 +110,8 @@ export function SearchPage() {
   };
 
   const trimmedQuery = query.trim();
-  const showEmptyHint = trimmedQuery.length === 0 && !loading;
+  const showEmptyHint =
+    trimmedQuery.length === 0 && !loading && results.length === 0;
   const showNoResults =
     !loading &&
     !error &&
