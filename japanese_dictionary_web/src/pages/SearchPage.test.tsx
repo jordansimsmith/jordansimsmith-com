@@ -18,7 +18,7 @@ import type { SearchResult } from '../api/client';
 function renderSearchPage() {
   return render(
     <MantineProvider>
-      <MemoryRouter>
+      <MemoryRouter initialEntries={['/search']}>
         <SearchPage />
       </MemoryRouter>
     </MantineProvider>,
@@ -26,7 +26,7 @@ function renderSearchPage() {
 }
 
 function setUrlQuery(q: string) {
-  const url = new URL('http://localhost/');
+  const url = new URL('http://localhost/search');
   if (q) {
     url.searchParams.set('q', q);
   }

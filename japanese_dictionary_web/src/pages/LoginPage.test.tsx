@@ -9,10 +9,10 @@ import { getSession } from '../auth/session';
 function renderLoginPage() {
   return render(
     <MantineProvider>
-      <MemoryRouter initialEntries={['/login']}>
+      <MemoryRouter initialEntries={['/']}>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/" element={<div>Home page</div>} />
+          <Route path="/" element={<LoginPage />} />
+          <Route path="/search" element={<div>Search page</div>} />
         </Routes>
       </MemoryRouter>
     </MantineProvider>,
@@ -51,7 +51,7 @@ describe('LoginPage', () => {
     expect(screen.getByText(/password is required/i)).toBeDefined();
   });
 
-  it('writes session and navigates to home on submit', async () => {
+  it('writes session and navigates to search on submit', async () => {
     const user = userEvent.setup();
     renderLoginPage();
 
@@ -60,7 +60,7 @@ describe('LoginPage', () => {
     await user.click(screen.getByRole('button', { name: /log in/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('Home page')).toBeDefined();
+      expect(screen.getByText('Search page')).toBeDefined();
     });
     const session = getSession();
     expect(session).toEqual({

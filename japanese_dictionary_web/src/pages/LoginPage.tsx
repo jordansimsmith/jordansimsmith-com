@@ -32,7 +32,7 @@ export function LoginPage() {
 
   const handleSubmit = (values: LoginFormValues) => {
     setSession(values.username.trim(), values.password);
-    navigate('/');
+    navigate('/search');
   };
 
   return (

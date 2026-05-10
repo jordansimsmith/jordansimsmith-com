@@ -38,7 +38,7 @@ The Japanese dictionary web service is a single-page app that lets an authentica
 
 - Multi-user accounts, shared sessions, or per-user history.
 - Saved words, favourites, or search history features.
-- A separate detail page or per-entry route (`/term/<id>`); the only sharable URL form is `?q=<query>`.
+- A separate detail page or per-entry route (`/term/<id>`); the only sharable URL form is `/search?q=<query>`.
 - Pagination or "load more"; the top 10 results are the entire response.
 - Image binaries from Jitendex (~595 entries reference image files); image nodes render as inline placeholder text in v1.
 - Anki / flashcard rendering, audio playback, IME-style conversion, or in-app deinflection.
@@ -251,7 +251,7 @@ Build mode behaviour: production (`import.meta.env.PROD`) uses the HTTP client; 
 
 ### Scenario 2: bookmark and revisit a search
 
-1. User has a results page open at `/?q=しんぶん`.
+1. User has a results page open at `/search?q=しんぶん`.
 2. User copies the URL and opens it in another tab.
 3. After login (session is shared via `localStorage`), the search page mounts; reads `?q=しんぶん`; pre-populates the input; fires an immediate (non-debounced) search.
 4. The same top-10 results render.
@@ -260,7 +260,7 @@ Build mode behaviour: production (`import.meta.env.PROD`) uses the HTTP client; 
 
 1. Results show an entry whose glossary contains an internal link (e.g., `<a href="?query=新聞紙">新聞紙</a>` in the source structured content).
 2. User taps the link.
-3. `GlossaryRenderer` intercepts the click, calls React Router `navigate('/?q=新聞紙')`, and the URL updates via `replaceState`.
+3. `GlossaryRenderer` intercepts the click, calls React Router `navigate('/search?q=新聞紙')`, and the URL updates via `replaceState`.
 4. `SearchPage` re-runs the search for `新聞紙` and renders the new top-10 list.
 
 ### Scenario 4: log out

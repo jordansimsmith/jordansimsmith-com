@@ -1,14 +1,22 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { LoginPage } from './pages/LoginPage';
 import { SearchPage } from './pages/SearchPage';
 import { getSession } from './auth/session';
 
-function HomeRoute() {
+function RequireAuth({ children }: { children: React.ReactNode }) {
   const session = getSession();
   if (!session) {
-    return <LoginPage />;
+    return <Navigate to="/" replace />;
   }
-  return <SearchPage />;
+  return <>{children}</>;
+}
+
+function HomeRoute() {
+  const session = getSession();
+  if (session) {
+    return <Navigate to="/search" replace />;
+  }
+  return <LoginPage />;
 }
 
 export function App() {
@@ -16,6 +24,15 @@ export function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<HomeRoute />} />
+        <Route
+          path="/search"
+          element={
+            <RequireAuth>
+              <SearchPage />
+            </RequireAuth>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
   );
