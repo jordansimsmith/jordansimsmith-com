@@ -1,7 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { Container, Stack, TextInput, Title } from '@mantine/core';
+import {
+  Alert,
+  Container,
+  Divider,
+  Loader,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
 import { apiClient } from '../api/client';
 import type { SearchResult } from '../api/client';
+import { ResultEntry } from '../components/ResultEntry';
 
 const DEBOUNCE_MS = 250;
 
@@ -25,6 +35,7 @@ export function SearchPage() {
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hasSearched, setHasSearched] = useState(false);
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestId = useRef(0);
 
@@ -35,6 +46,7 @@ export function SearchPage() {
       setResults([]);
       setLoading(false);
       setError(null);
+      setHasSearched(false);
       return;
     }
     setLoading(true);
@@ -45,6 +57,7 @@ export function SearchPage() {
         return;
       }
       setResults(response.results);
+      setHasSearched(true);
     } catch (e) {
       if (myRequest !== requestId.current) {
         return;
@@ -52,6 +65,7 @@ export function SearchPage() {
       const message = e instanceof Error ? e.message : 'Search failed';
       setError(message);
       setResults([]);
+      setHasSearched(true);
     } finally {
       if (myRequest === requestId.current) {
         setLoading(false);
@@ -82,6 +96,24 @@ export function SearchPage() {
     }, DEBOUNCE_MS);
   };
 
+  const handleInternalNavigate = (newQuery: string) => {
+    if (debounceTimer.current !== null) {
+      clearTimeout(debounceTimer.current);
+    }
+    setQuery(newQuery);
+    syncUrl(newQuery);
+    runSearch(newQuery);
+  };
+
+  const trimmedQuery = query.trim();
+  const showEmptyHint = trimmedQuery.length === 0 && !loading;
+  const showNoResults =
+    !loading &&
+    !error &&
+    hasSearched &&
+    results.length === 0 &&
+    trimmedQuery.length > 0;
+
   return (
     <Container size="md" py="xl">
       <Stack>
@@ -93,11 +125,39 @@ export function SearchPage() {
           onChange={(e) => handleChange(e.currentTarget.value)}
           autoFocus
         />
-        {error && <div role="alert">{error}</div>}
-        {loading && <div>Loading…</div>}
-        {results.map((result) => (
-          <pre key={result.sequence}>{JSON.stringify(result, null, 2)}</pre>
-        ))}
+        {error && (
+          <Alert color="red" role="alert">
+            {error}
+          </Alert>
+        )}
+        {loading && (
+          <Stack align="center" py="md">
+            <Loader size="sm" />
+          </Stack>
+        )}
+        {!loading && !error && showEmptyHint && (
+          <Text c="dimmed" ta="center" py="md">
+            Type a word in romaji, kana or kanji
+          </Text>
+        )}
+        {showNoResults && (
+          <Text c="dimmed" ta="center" py="md">
+            No matches
+          </Text>
+        )}
+        {!loading && !error && results.length > 0 && (
+          <Stack gap="lg">
+            {results.map((result, index) => (
+              <div key={result.sequence}>
+                <ResultEntry
+                  result={result}
+                  onInternalNavigate={handleInternalNavigate}
+                />
+                {index < results.length - 1 && <Divider mt="lg" />}
+              </div>
+            ))}
+          </Stack>
+        )}
       </Stack>
     </Container>
   );

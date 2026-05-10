@@ -13,6 +13,7 @@ import {
 } from 'vitest';
 import { SearchPage } from './SearchPage';
 import * as clientModule from '../api/client';
+import type { SearchResult } from '../api/client';
 
 function renderSearchPage() {
   return render(
@@ -30,6 +31,19 @@ function setUrlQuery(q: string) {
     url.searchParams.set('q', q);
   }
   window.history.replaceState({}, '', url.toString());
+}
+
+function makeResult(overrides: Partial<SearchResult>): SearchResult {
+  return {
+    sequence: 1,
+    expression: '新',
+    reading: 'しん',
+    reading_romaji: 'shin',
+    frequency_rank: 1,
+    pitch: 0,
+    glossary_raw: { tag: 'div', content: 'placeholder' },
+    ...overrides,
+  };
 }
 
 describe('SearchPage', () => {
@@ -123,26 +137,99 @@ describe('SearchPage', () => {
     });
   });
 
-  it('renders results returned from the api', async () => {
-    searchSpy.mockResolvedValue({
-      results: [
-        {
-          sequence: 12345,
-          expression: '新',
-          reading: 'しん',
-          reading_romaji: 'shin',
-          frequency_rank: 1,
-          pitch: 0,
-          glossary_raw: { tag: 'div', content: 'new' },
-        },
-      ],
-    });
-    setUrlQuery('shin');
+  it('shows the empty-state hint when no query is entered', () => {
+    renderSearchPage();
+    expect(
+      screen.getByText(/type a word in romaji, kana or kanji/i),
+    ).toBeDefined();
+  });
 
+  it('shows a loading indicator while the search is in flight', async () => {
+    let resolveSearch: (value: { results: SearchResult[] }) => void = () => {};
+    searchSpy.mockReturnValue(
+      new Promise<{ results: SearchResult[] }>((resolve) => {
+        resolveSearch = resolve;
+      }),
+    );
+    setUrlQuery('shi');
     renderSearchPage();
 
     await waitFor(() => {
-      expect(screen.getByText(/12345/)).toBeDefined();
+      expect(document.querySelector('.mantine-Loader-root')).not.toBeNull();
     });
+
+    resolveSearch({ results: [] });
+  });
+
+  it('shows the no-matches hint when the search returns nothing', async () => {
+    setUrlQuery('zzz');
+    renderSearchPage();
+
+    await waitFor(() => {
+      expect(screen.getByText(/no matches/i)).toBeDefined();
+    });
+  });
+
+  it('shows an error message when the search throws', async () => {
+    searchSpy.mockRejectedValue(new Error('boom'));
+    setUrlQuery('shi');
+    renderSearchPage();
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert')).toBeDefined();
+    });
+    expect(screen.getByRole('alert').textContent).toContain('boom');
+  });
+
+  it('renders ResultEntry components for each search result', async () => {
+    searchSpy.mockResolvedValue({
+      results: [
+        makeResult({ sequence: 100, expression: '新聞', reading: 'しんぶん' }),
+        makeResult({ sequence: 101, expression: '新年', reading: 'しんねん' }),
+      ],
+    });
+    setUrlQuery('しん');
+    renderSearchPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('新聞')).toBeDefined();
+    });
+    expect(screen.getByText('新年')).toBeDefined();
+  });
+
+  it('runs an immediate search when an internal link triggers navigation', async () => {
+    const internalNode = {
+      tag: 'a',
+      href: '?query=寺',
+      content: '寺',
+    };
+    searchSpy.mockResolvedValueOnce({
+      results: [
+        makeResult({
+          sequence: 200,
+          expression: '神社',
+          reading: 'じんじゃ',
+          glossary_raw: internalNode,
+        }),
+      ],
+    });
+    setUrlQuery('じん');
+    renderSearchPage();
+
+    const link = await screen.findByRole('link', { name: '寺' });
+    searchSpy.mockResolvedValue({
+      results: [
+        makeResult({ sequence: 300, expression: '寺', reading: 'てら' }),
+      ],
+    });
+
+    const user = userEvent.setup();
+    await user.click(link);
+
+    await waitFor(() => {
+      expect(searchSpy).toHaveBeenCalledWith('寺');
+    });
+    expect(new URL(window.location.href).searchParams.get('q')).toBe('寺');
+    expect(await screen.findByText('寺')).toBeDefined();
   });
 });
