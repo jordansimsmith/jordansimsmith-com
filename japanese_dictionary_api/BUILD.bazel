@@ -1,5 +1,5 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
-load("@rules_java//java:defs.bzl", "java_library")
+load("@rules_java//java:defs.bzl", "java_binary", "java_library")
 
 HANDLERS = glob(
     ["src/main/java/**/*Handler.java"],
@@ -40,6 +40,29 @@ java_library(
     ],
 )
 
+java_binary(
+    name = "auth-handler",
+    srcs = glob(["src/main/java/com/jordansimsmith/japanesedictionary/AuthHandler.java"]),
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/secrets:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_iam_policy_builder",
+    ],
+)
+
 java_library(
     name = "test-lib",
     testonly = True,
@@ -73,10 +96,15 @@ java_test_suite(
     test_suffixes = ["Test.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":auth-handler",
         ":lib",
         ":test-lib",
+        "//lib/secrets:test-lib",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:software_amazon_awssdk_iam_policy_builder",
     ],
 )
 
