@@ -5,6 +5,7 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
@@ -17,6 +18,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
@@ -33,8 +35,18 @@ public class SearchHandler
 
   private static final Logger LOGGER = LoggerFactory.getLogger(SearchHandler.class);
 
-  @VisibleForTesting static final int MAX_QUERY_LENGTH = 64;
-  @VisibleForTesting static final int RESULT_LIMIT = 10;
+  private static final int MAX_QUERY_LENGTH = 64;
+  private static final int RESULT_LIMIT = 10;
+
+  @VisibleForTesting
+  record SearchResult(
+      @JsonProperty("sequence") long sequence,
+      @JsonProperty("expression") String expression,
+      @JsonProperty("reading") String reading,
+      @JsonProperty("reading_romaji") String readingRomaji,
+      @Nullable @JsonProperty("frequency_rank") Integer frequencyRank,
+      @Nullable @JsonProperty("pitch") Integer pitch,
+      @JsonProperty("glossary_raw") JsonNode glossaryRaw) {}
 
   @VisibleForTesting
   record SearchResponse(@JsonProperty("results") List<SearchResult> results) {}
@@ -49,16 +61,16 @@ public class SearchHandler
   private final RomajiNormaliser romajiNormaliser;
 
   public SearchHandler() {
-    this(DictionaryFactory.create());
+    this(JapaneseDictionaryFactory.create());
   }
 
   @VisibleForTesting
-  SearchHandler(DictionaryFactory factory) {
+  SearchHandler(JapaneseDictionaryFactory factory) {
     this.objectMapper = factory.objectMapper();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.japaneseDictionaryTable = factory.japaneseDictionaryTable();
     this.dynamoDbEnhancedClient = factory.dynamoDbEnhancedClient();
-    this.romajiNormaliser = new RomajiNormaliser();
+    this.romajiNormaliser = factory.romajiNormaliser();
   }
 
   @Override
@@ -149,8 +161,7 @@ public class SearchHandler
     return items;
   }
 
-  @VisibleForTesting
-  static List<Long> rankTopN(List<JapaneseDictionaryItem> candidates, int limit) {
+  private static List<Long> rankTopN(List<JapaneseDictionaryItem> candidates, int limit) {
     var dedup = new LinkedHashMap<Long, JapaneseDictionaryItem>();
     for (var item : candidates) {
       dedup.putIfAbsent(item.getSequence(), item);

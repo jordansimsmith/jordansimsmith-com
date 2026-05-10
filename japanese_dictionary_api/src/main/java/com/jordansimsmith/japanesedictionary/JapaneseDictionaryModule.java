@@ -10,7 +10,7 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 
 @Module
-public class DictionaryModule {
+public class JapaneseDictionaryModule {
   @Provides
   @Singleton
   public HttpResponseFactory httpResponseFactory(ObjectMapper objectMapper) {
@@ -25,5 +25,11 @@ public class DictionaryModule {
       DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(JapaneseDictionaryItem.class);
     return dynamoDbEnhancedClient.table(JapaneseDictionaryItem.TABLE_NAME, schema);
+  }
+
+  @Provides
+  @Singleton
+  public RomajiNormaliser romajiNormaliser() {
+    return new RomajiNormaliser();
   }
 }

@@ -24,7 +24,7 @@ public class AuthHandlerTest {
 
   @BeforeEach
   void setUp() {
-    var factory = DictionaryTestFactory.create(URI.create("unused"));
+    var factory = JapaneseDictionaryTestFactory.create(URI.create("unused"));
     fakeSecrets = factory.fakeSecrets();
     objectMapper = factory.objectMapper();
 

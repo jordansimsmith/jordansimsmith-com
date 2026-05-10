@@ -21,9 +21,9 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
       SecretsModule.class,
       DynamoDbModule.class,
       RequestContextModule.class,
-      DictionaryModule.class
+      JapaneseDictionaryModule.class
     })
-public interface DictionaryFactory {
+public interface JapaneseDictionaryFactory {
   ObjectMapper objectMapper();
 
   Secrets secrets();
@@ -38,7 +38,9 @@ public interface DictionaryFactory {
 
   DynamoDbTable<JapaneseDictionaryItem> japaneseDictionaryTable();
 
-  static DictionaryFactory create() {
-    return DaggerDictionaryFactory.create();
+  RomajiNormaliser romajiNormaliser();
+
+  static JapaneseDictionaryFactory create() {
+    return DaggerJapaneseDictionaryFactory.create();
   }
 }

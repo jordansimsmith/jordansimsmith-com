@@ -16,7 +16,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers
-public class DictionaryE2ETest {
+public class JapaneseDictionaryE2ETest {
 
   @Container
   private static final JapaneseDictionaryContainer japaneseDictionaryContainer =
@@ -52,7 +52,9 @@ public class DictionaryE2ETest {
 
     assertThat(response.statusCode()).isEqualTo(200);
     var body = objectMapper.readValue(response.body(), SearchHandler.SearchResponse.class);
-    assertThat(body.results()).extracting(SearchResult::sequence).containsExactly(3L, 2L, 1L);
+    assertThat(body.results())
+        .extracting(SearchHandler.SearchResult::sequence)
+        .containsExactly(3L, 2L, 1L);
     assertThat(body.results().get(0).expression()).isEqualTo("新しい");
     assertThat(body.results().get(0).reading()).isEqualTo("あたらしい");
     assertThat(body.results().get(0).readingRomaji()).isEqualTo("atarashii");
@@ -72,7 +74,9 @@ public class DictionaryE2ETest {
 
     assertThat(response.statusCode()).isEqualTo(200);
     var body = objectMapper.readValue(response.body(), SearchHandler.SearchResponse.class);
-    assertThat(body.results()).extracting(SearchResult::sequence).containsExactly(4L, 2L, 1L, 5L);
+    assertThat(body.results())
+        .extracting(SearchHandler.SearchResult::sequence)
+        .containsExactly(4L, 2L, 1L, 5L);
   }
 
   @Test
@@ -88,7 +92,9 @@ public class DictionaryE2ETest {
 
     assertThat(response.statusCode()).isEqualTo(200);
     var body = objectMapper.readValue(response.body(), SearchHandler.SearchResponse.class);
-    assertThat(body.results()).extracting(SearchResult::sequence).containsExactly(4L, 2L, 1L, 5L);
+    assertThat(body.results())
+        .extracting(SearchHandler.SearchResult::sequence)
+        .containsExactly(4L, 2L, 1L, 5L);
   }
 
   @Test

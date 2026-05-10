@@ -385,8 +385,8 @@ No third-party API keys (the dictionary corpus is locally produced — no runtim
 
 ## Testing and quality gates
 
-- Unit tests cover `AuthHandler` allow/deny + Base64 edge cases, `RomajiNormaliser` per-rule cases plus idempotency, `PitchPosition` mora counting + validation, `JapaneseDictionaryItem` key formatting, `SearchHandler` input validation + sort ordering + dedup + top-N truncation against fake DynamoDB clients.
-- Integration tests run `SearchHandler` against DynamoDB Testcontainers with ~5 hand-picked seed terms covering: kanji-only, kana-only, kanji+reading with non-NULL `frequency_rank`, term with non-NULL `pitch`, term whose glossary references an image (placeholder rendering case). Asserts prefix match across all three dimensions, frequency-asc ordering, top-10 cap, empty `q` short-circuit, dedup correctness when a term is reachable via multiple GSIs.
+- Unit tests cover `AuthHandler` allow/deny + Base64 edge cases, `RomajiNormaliser` per-rule cases plus idempotency, and `JapaneseDictionaryItem` key formatting.
+- Integration tests run `SearchHandler` against DynamoDB Testcontainers with hand-picked seed terms covering: kanji-only, kana-only, kanji+reading with non-NULL `frequency_rank`, term with non-NULL `pitch`, term whose glossary references an image (placeholder rendering case). Asserts prefix match across all three dimensions, frequency-asc ordering with NULLs last, top-10 cap, dedup when a term is reachable via multiple GSIs, kunrei romaji normalisation, and validation paths (`q` too long, missing/empty/whitespace `q`, NFC + trim before length check).
 - E2E tests use LocalStack (API Gateway + Lambda + DynamoDB + Secrets Manager) and exercise the full HTTP flow: `GET /search?q=新` returns the seed fixture, `GET /search?q=` returns `[]`, missing `Authorization` returns `401`, `q` length > 64 returns `400`. Deterministic; no outbound internet; no real AWS credentials.
 - Required service checks:
   - `bazel build //japanese_dictionary_api:all`

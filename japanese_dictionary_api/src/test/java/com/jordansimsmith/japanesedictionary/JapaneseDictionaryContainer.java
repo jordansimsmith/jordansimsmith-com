@@ -11,7 +11,7 @@ public class JapaneseDictionaryContainer extends LocalStackContainer<JapaneseDic
   @SuppressWarnings("HttpUrlsUsage")
   public URI getApiUrl() {
     return URI.create(
-        "http://%s:%d/_aws/execute-api/japanese_dictionary/local"
+        "http://%s:%d/restapis/japanese_dictionary/local/_user_request_"
             .formatted(this.getHost(), this.getLocalstackPort()));
   }
 }

@@ -38,11 +38,11 @@ public class AuthHandler implements RequestHandler<AuthorizerEvent, AuthorizerRe
       @JsonProperty("user") String user, @JsonProperty("password") String password) {}
 
   public AuthHandler() {
-    this(DictionaryFactory.create());
+    this(JapaneseDictionaryFactory.create());
   }
 
   @VisibleForTesting
-  AuthHandler(DictionaryFactory factory) {
+  AuthHandler(JapaneseDictionaryFactory factory) {
     this.secrets = factory.secrets();
     this.objectMapper = factory.objectMapper();
   }

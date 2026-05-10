@@ -18,17 +18,18 @@ import javax.inject.Singleton;
       SecretsTestModule.class,
       DynamoDbTestModule.class,
       RequestContextModule.class,
-      DictionaryModule.class
+      JapaneseDictionaryModule.class
     })
-public interface DictionaryTestFactory extends DictionaryFactory {
+public interface JapaneseDictionaryTestFactory extends JapaneseDictionaryFactory {
   FakeSecrets fakeSecrets();
 
   @Component.Factory
   interface Factory {
-    DictionaryTestFactory create(@BindsInstance @Named("dynamoDbEndpoint") URI dynamoDbEndpoint);
+    JapaneseDictionaryTestFactory create(
+        @BindsInstance @Named("dynamoDbEndpoint") URI dynamoDbEndpoint);
   }
 
-  static DictionaryTestFactory create(URI dynamoDbEndpoint) {
-    return DaggerDictionaryTestFactory.factory().create(dynamoDbEndpoint);
+  static JapaneseDictionaryTestFactory create(URI dynamoDbEndpoint) {
+    return DaggerJapaneseDictionaryTestFactory.factory().create(dynamoDbEndpoint);
   }
 }

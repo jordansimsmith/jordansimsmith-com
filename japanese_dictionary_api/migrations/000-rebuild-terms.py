@@ -4,8 +4,7 @@
 Destructively rebuild the japanese_dictionary DynamoDB table from upstream
 Yomitan zips (Jitendex, JPDB, Kanjium).
 
-The pipeline mirrors tmp/build_terms.py, then chunked BatchWriteItem against
-DynamoDB:
+Pipeline:
 
   1. Load Jitendex term_bank entries; keep argmax(score) per JMdict sequence.
   2. Load JPDB term_meta_bank frequencies; key by (term, reading) -> min(value).
@@ -46,9 +45,7 @@ TERM_META_BANK_RE = re.compile(r"^term_meta_bank_\d+\.json$")
 
 
 # --------------------------------------------------------------------------
-# Modified Hepburn (vowel-doubled) computed at ingest. Lifted from
-# tmp/build_terms.py; deliberately a duplicate so the migration is
-# self-contained.
+# Modified Hepburn (vowel-doubled) computed at ingest.
 # --------------------------------------------------------------------------
 
 _BASE = {

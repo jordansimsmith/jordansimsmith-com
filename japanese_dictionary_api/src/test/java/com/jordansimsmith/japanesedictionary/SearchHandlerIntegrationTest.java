@@ -26,14 +26,14 @@ public class SearchHandlerIntegrationTest {
 
   @BeforeAll
   static void setUpBeforeClass() {
-    var factory = DictionaryTestFactory.create(dynamoDbContainer.getEndpoint());
+    var factory = JapaneseDictionaryTestFactory.create(dynamoDbContainer.getEndpoint());
     var table = factory.japaneseDictionaryTable();
     DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
   }
 
   @BeforeEach
   void setUp() {
-    var factory = DictionaryTestFactory.create(dynamoDbContainer.getEndpoint());
+    var factory = JapaneseDictionaryTestFactory.create(dynamoDbContainer.getEndpoint());
 
     objectMapper = factory.objectMapper();
     japaneseDictionaryTable = factory.japaneseDictionaryTable();
@@ -94,11 +94,47 @@ public class SearchHandlerIntegrationTest {
   }
 
   @Test
+  void handleRequestShouldShortCircuitWhenQueryStringIsAbsent() throws Exception {
+    var event = APIGatewayV2HTTPEvent.builder().build();
+
+    var response = searchHandler.handleRequest(event, null);
+
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = objectMapper.readValue(response.getBody(), SearchHandler.SearchResponse.class);
+    assertThat(body.results()).isEmpty();
+  }
+
+  @Test
+  void handleRequestShouldShortCircuitWhenQIsOnlyWhitespace() throws Exception {
+    var event =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("q", "   ")).build();
+
+    var response = searchHandler.handleRequest(event, null);
+
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = objectMapper.readValue(response.getBody(), SearchHandler.SearchResponse.class);
+    assertThat(body.results()).isEmpty();
+  }
+
+  @Test
   void handleRequestShouldRejectQTooLong() throws Exception {
     var event =
         APIGatewayV2HTTPEvent.builder()
             .withQueryStringParameters(Map.of("q", "x".repeat(65)))
             .build();
+
+    var response = searchHandler.handleRequest(event, null);
+
+    assertThat(response.getStatusCode()).isEqualTo(400);
+    var body = objectMapper.readValue(response.getBody(), SearchHandler.ErrorResponse.class);
+    assertThat(body.message()).isEqualTo("q too long");
+  }
+
+  @Test
+  void handleRequestShouldTrimBeforeLengthCheck() throws Exception {
+    var padded = "  " + "x".repeat(65) + "  ";
+    var event =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("q", padded)).build();
 
     var response = searchHandler.handleRequest(event, null);
 
@@ -115,7 +151,7 @@ public class SearchHandlerIntegrationTest {
     var body = objectMapper.readValue(response.getBody(), SearchHandler.SearchResponse.class);
 
     assertThat(body.results())
-        .extracting(SearchResult::sequence)
+        .extracting(SearchHandler.SearchResult::sequence)
         .containsExactly(3L, 7L, 11L, 6L, 2L, 1L);
   }
 
@@ -128,7 +164,7 @@ public class SearchHandlerIntegrationTest {
     var body = objectMapper.readValue(response.getBody(), SearchHandler.SearchResponse.class);
 
     assertThat(body.results())
-        .extracting(SearchResult::sequence)
+        .extracting(SearchHandler.SearchResult::sequence)
         .containsExactly(7L, 12L, 10L, 9L, 4L, 13L, 8L, 11L, 6L, 2L);
   }
 
@@ -141,7 +177,7 @@ public class SearchHandlerIntegrationTest {
     var body = objectMapper.readValue(response.getBody(), SearchHandler.SearchResponse.class);
 
     assertThat(body.results())
-        .extracting(SearchResult::sequence)
+        .extracting(SearchHandler.SearchResult::sequence)
         .containsExactly(7L, 12L, 10L, 9L, 4L, 13L, 8L, 11L, 6L, 2L);
   }
 
@@ -154,7 +190,7 @@ public class SearchHandlerIntegrationTest {
     var body = objectMapper.readValue(response.getBody(), SearchHandler.SearchResponse.class);
 
     assertThat(body.results())
-        .extracting(SearchResult::sequence)
+        .extracting(SearchHandler.SearchResult::sequence)
         .containsExactly(7L, 12L, 10L, 9L, 4L, 13L, 8L, 11L, 6L, 2L);
   }
 
@@ -165,7 +201,7 @@ public class SearchHandlerIntegrationTest {
     var response = searchHandler.handleRequest(event, null);
     var body = objectMapper.readValue(response.getBody(), SearchHandler.SearchResponse.class);
 
-    var ranks = body.results().stream().map(SearchResult::frequencyRank).toList();
+    var ranks = body.results().stream().map(SearchHandler.SearchResult::frequencyRank).toList();
     assertThat(ranks).containsExactly(200, 1000, 12000, 15000, 18472, null);
   }
 
@@ -188,7 +224,7 @@ public class SearchHandlerIntegrationTest {
     var response = searchHandler.handleRequest(event, null);
     var body = objectMapper.readValue(response.getBody(), SearchHandler.SearchResponse.class);
 
-    assertThat(body.results()).extracting(SearchResult::sequence).containsExactly(4L);
+    assertThat(body.results()).extracting(SearchHandler.SearchResult::sequence).containsExactly(4L);
   }
 
   @Test
