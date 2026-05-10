@@ -1,5 +1,6 @@
 import { createElement, type MouseEvent, type ReactNode } from 'react';
 import type { SCElement, SCNode } from '../api/client';
+import './glossary.css';
 
 const PASS_THROUGH_TAGS = new Set([
   'div',
