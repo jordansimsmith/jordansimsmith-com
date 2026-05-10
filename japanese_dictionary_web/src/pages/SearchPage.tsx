@@ -115,7 +115,7 @@ export function SearchPage() {
     trimmedQuery.length > 0;
 
   return (
-    <Container size="md" py="xl">
+    <Container size="md" px="md" py={{ base: 'md', sm: 'xl' }}>
       <Stack>
         <Title order={1}>Japanese dictionary</Title>
         <TextInput
@@ -123,6 +123,7 @@ export function SearchPage() {
           placeholder="Type a word in romaji, kana or kanji"
           value={query}
           onChange={(e) => handleChange(e.currentTarget.value)}
+          size="md"
           autoFocus
         />
         {error && (

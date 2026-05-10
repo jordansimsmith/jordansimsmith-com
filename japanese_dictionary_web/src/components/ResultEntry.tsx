@@ -14,13 +14,26 @@ export function ResultEntry({ result, onInternalNavigate }: ResultEntryProps) {
 
   return (
     <Stack gap="xs">
-      <Group justify="space-between" wrap="nowrap" align="flex-end">
-        <Group gap="md" align="baseline" wrap="wrap">
-          <Title order={2} lang="ja" style={{ fontSize: '1.75rem' }}>
+      <Group justify="space-between" wrap="wrap" align="flex-end" gap="xs">
+        <Group gap="md" align="baseline" wrap="wrap" style={{ minWidth: 0 }}>
+          <Title
+            order={2}
+            lang="ja"
+            style={{
+              fontSize: '1.75rem',
+              wordBreak: 'break-word',
+              overflowWrap: 'anywhere',
+            }}
+          >
             {result.expression}
           </Title>
           {showReading && (
-            <Text lang="ja" size="lg" c="dimmed">
+            <Text
+              lang="ja"
+              size="lg"
+              c="dimmed"
+              style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}
+            >
               {result.reading}
             </Text>
           )}
@@ -35,14 +48,14 @@ export function ResultEntry({ result, onInternalNavigate }: ResultEntryProps) {
         )}
       </Group>
       {result.pitch !== null && (
-        <Group gap="sm" align="center">
+        <Group gap="sm" align="center" wrap="wrap">
           <PitchGraph reading={result.reading} pitch={result.pitch} />
           <Text size="xs" c="dimmed">
             {getPitchPattern(result.reading, result.pitch)}
           </Text>
         </Group>
       )}
-      <div>
+      <div style={{ overflowWrap: 'anywhere' }}>
         <GlossaryRenderer
           node={result.glossary_raw}
           onInternalNavigate={onInternalNavigate}
