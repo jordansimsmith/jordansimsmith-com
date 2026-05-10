@@ -397,12 +397,6 @@ def record_to_item(record):
     item = {
         "pk": {"S": pk},
         "sk": {"S": pk},
-        "gsi1pk": {"S": "EXPRESSION"},
-        "gsi1sk": {"S": record["expression"]},
-        "gsi2pk": {"S": "READING"},
-        "gsi2sk": {"S": record["reading"]},
-        "gsi3pk": {"S": "ROMAJI"},
-        "gsi3sk": {"S": record["reading_romaji"]},
         "sequence": {"N": str(sequence)},
         "expression": {"S": record["expression"]},
         "reading": {"S": record["reading"]},
@@ -413,6 +407,18 @@ def record_to_item(record):
         item["frequency_rank"] = {"N": str(record["frequency_rank"])}
     if record["pitch"] is not None:
         item["pitch"] = {"N": str(record["pitch"])}
+    # sparse GSIs: only index the item where the sort value is non-empty.
+    # DynamoDB rejects empty strings for index key attributes; an item
+    # with no romaji simply will not appear in the romaji index.
+    if record["expression"]:
+        item["gsi1pk"] = {"S": "EXPRESSION"}
+        item["gsi1sk"] = {"S": record["expression"]}
+    if record["reading"]:
+        item["gsi2pk"] = {"S": "READING"}
+        item["gsi2sk"] = {"S": record["reading"]}
+    if record["reading_romaji"]:
+        item["gsi3pk"] = {"S": "ROMAJI"}
+        item["gsi3sk"] = {"S": record["reading_romaji"]}
     return item
 
 
