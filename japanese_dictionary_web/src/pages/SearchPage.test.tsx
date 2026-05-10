@@ -141,11 +141,12 @@ describe('SearchPage', () => {
     });
   });
 
-  it('shows the empty-state hint when no query is entered', () => {
+  it('shows example queries in the empty-state hint when no query is entered', () => {
     renderSearchPage();
-    expect(
-      screen.getByText(/type a word in romaji, kana or kanji/i),
-    ).toBeDefined();
+    expect(screen.getByText(/^Try /)).toBeDefined();
+    expect(screen.getByText('shi')).toBeDefined();
+    expect(screen.getByText('しん')).toBeDefined();
+    expect(screen.getByText('新')).toBeDefined();
   });
 
   it('shows a loading indicator while the search is in flight', async () => {

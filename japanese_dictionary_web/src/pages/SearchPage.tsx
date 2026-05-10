@@ -138,7 +138,18 @@ export function SearchPage() {
           )}
           {!loading && !error && showEmptyHint && (
             <Text c="dimmed" ta="center" py="md">
-              Type a word in romaji, kana or kanji
+              Try{' '}
+              <Text span ff="monospace">
+                shi
+              </Text>
+              ,{' '}
+              <Text span ff="monospace" lang="ja">
+                しん
+              </Text>
+              , or{' '}
+              <Text span ff="monospace" lang="ja">
+                新
+              </Text>
             </Text>
           )}
           {showNoResults && (
