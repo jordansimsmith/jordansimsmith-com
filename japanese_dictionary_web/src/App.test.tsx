@@ -1,10 +1,18 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, cleanup } from '@testing-library/react';
 import { MantineProvider } from '@mantine/core';
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { App } from './App';
 
 describe('App', () => {
-  it('renders the title', () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('renders the login page when unauthenticated', () => {
     render(
       <MantineProvider>
         <App />
@@ -14,5 +22,6 @@ describe('App', () => {
     expect(
       screen.getByRole('heading', { name: /japanese dictionary/i }),
     ).toBeDefined();
+    expect(screen.getByLabelText(/username/i)).toBeDefined();
   });
 });
