@@ -209,7 +209,7 @@ describe('SearchPage', () => {
     renderSearchPage();
 
     const user = userEvent.setup();
-    await user.click(screen.getByLabelText(/log out/i));
+    await user.click(screen.getByRole('button', { name: /log out/i }));
 
     await waitFor(() => {
       expect(screen.getByText('Login page')).toBeDefined();

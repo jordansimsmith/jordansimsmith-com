@@ -1,22 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActionIcon,
   Alert,
   Container,
   Divider,
-  Group,
   Loader,
   Stack,
   Text,
   TextInput,
-  Title,
-  Tooltip,
 } from '@mantine/core';
-import { IconLogout } from '@tabler/icons-react';
-import { useNavigate } from 'react-router-dom';
 import { apiClient } from '../api/client';
 import type { SearchResult } from '../api/client';
-import { clearSession } from '../auth/session';
+import { AppShellLayout } from '../layouts/AppShellLayout';
 import { ResultEntry } from '../components/ResultEntry';
 
 const DEBOUNCE_MS = 250;
@@ -32,7 +26,6 @@ function syncUrl(query: string) {
 }
 
 export function SearchPage() {
-  const navigate = useNavigate();
   const initialQuery =
     typeof window !== 'undefined'
       ? (new URLSearchParams(window.location.search).get('q') ?? '')
@@ -112,11 +105,6 @@ export function SearchPage() {
     runSearch(newQuery);
   };
 
-  const handleLogout = () => {
-    clearSession();
-    navigate('/');
-  };
-
   const trimmedQuery = query.trim();
   const showEmptyHint = trimmedQuery.length === 0 && !loading;
   const showNoResults =
@@ -127,64 +115,52 @@ export function SearchPage() {
     trimmedQuery.length > 0;
 
   return (
-    <Container size="md" px="md" py={{ base: 'md', sm: 'xl' }}>
-      <Stack>
-        <Group justify="space-between" align="center" wrap="nowrap">
-          <Title order={1}>Japanese dictionary</Title>
-          <Tooltip label="Log out" position="left">
-            <ActionIcon
-              variant="subtle"
-              color="gray"
-              size="lg"
-              onClick={handleLogout}
-              aria-label="Log out"
-            >
-              <IconLogout size={20} />
-            </ActionIcon>
-          </Tooltip>
-        </Group>
-        <TextInput
-          aria-label="Search"
-          placeholder="Type a word in romaji, kana or kanji"
-          value={query}
-          onChange={(e) => handleChange(e.currentTarget.value)}
-          size="md"
-          autoFocus
-        />
-        {error && (
-          <Alert color="red" role="alert">
-            {error}
-          </Alert>
-        )}
-        {loading && (
-          <Stack align="center" py="md">
-            <Loader size="sm" />
-          </Stack>
-        )}
-        {!loading && !error && showEmptyHint && (
-          <Text c="dimmed" ta="center" py="md">
-            Type a word in romaji, kana or kanji
-          </Text>
-        )}
-        {showNoResults && (
-          <Text c="dimmed" ta="center" py="md">
-            No matches
-          </Text>
-        )}
-        {!loading && !error && results.length > 0 && (
-          <Stack gap="lg">
-            {results.map((result, index) => (
-              <div key={result.sequence}>
-                <ResultEntry
-                  result={result}
-                  onInternalNavigate={handleInternalNavigate}
-                />
-                {index < results.length - 1 && <Divider mt="lg" />}
-              </div>
-            ))}
-          </Stack>
-        )}
-      </Stack>
-    </Container>
+    <AppShellLayout>
+      <Container size="md" py={{ base: 'md', sm: 'xl' }}>
+        <Stack>
+          <TextInput
+            aria-label="Search"
+            placeholder="Type a word in romaji, kana or kanji"
+            value={query}
+            onChange={(e) => handleChange(e.currentTarget.value)}
+            size="md"
+            autoFocus
+          />
+          {error && (
+            <Alert color="red" role="alert">
+              {error}
+            </Alert>
+          )}
+          {loading && (
+            <Stack align="center" py="md">
+              <Loader size="sm" />
+            </Stack>
+          )}
+          {!loading && !error && showEmptyHint && (
+            <Text c="dimmed" ta="center" py="md">
+              Type a word in romaji, kana or kanji
+            </Text>
+          )}
+          {showNoResults && (
+            <Text c="dimmed" ta="center" py="md">
+              No matches
+            </Text>
+          )}
+          {!loading && !error && results.length > 0 && (
+            <Stack gap="lg">
+              {results.map((result, index) => (
+                <div key={result.sequence}>
+                  <ResultEntry
+                    result={result}
+                    onInternalNavigate={handleInternalNavigate}
+                  />
+                  {index < results.length - 1 && <Divider mt="lg" />}
+                </div>
+              ))}
+            </Stack>
+          )}
+        </Stack>
+      </Container>
+    </AppShellLayout>
   );
 }

@@ -1,5 +1,4 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Box } from '@mantine/core';
 import { LoginPage } from './pages/LoginPage';
 import { SearchPage } from './pages/SearchPage';
 import { getSession } from './auth/session';
@@ -23,20 +22,18 @@ function HomeRoute() {
 export function App() {
   return (
     <BrowserRouter>
-      <Box mih="100vh">
-        <Routes>
-          <Route path="/" element={<HomeRoute />} />
-          <Route
-            path="/search"
-            element={
-              <RequireAuth>
-                <SearchPage />
-              </RequireAuth>
-            }
-          />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </Box>
+      <Routes>
+        <Route path="/" element={<HomeRoute />} />
+        <Route
+          path="/search"
+          element={
+            <RequireAuth>
+              <SearchPage />
+            </RequireAuth>
+          }
+        />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
     </BrowserRouter>
   );
 }
