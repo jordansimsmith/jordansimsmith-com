@@ -1,5 +1,6 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 load("@rules_java//java:defs.bzl", "java_binary", "java_library")
+load("//lib/localstack:defs.bzl", "localstack_image")
 
 HANDLERS = glob(
     ["src/main/java/**/*Handler.java"],
@@ -96,6 +97,9 @@ java_library(
         allow_empty = True,
         exclude = INTEGRATION_TESTS + E2E_TESTS + UNIT_TESTS,
     ),
+    data = [
+        ":local-load",
+    ],
     resources = [
         "src/test/resources/logback-test.xml",
         "src/test/resources/test.properties",
@@ -105,6 +109,7 @@ java_library(
         "//lib/dynamodb:test-lib",
         "//lib/http:lib",
         "//lib/json:lib",
+        "//lib/localstack:lib",
         "//lib/secrets:test-lib",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
@@ -170,6 +175,16 @@ java_test_suite(
     ],
 )
 
+localstack_image(
+    name = "local",
+    handler_jars = [
+        ":auth-handler_deploy.jar",
+        ":search-handler_deploy.jar",
+    ],
+    init_resources = "src/test/resources/init_resources.py",
+    repo_tag = "bazel/japanese-dictionary-local:latest",
+)
+
 java_test_suite(
     name = "e2e-tests",
     size = "large",
@@ -183,12 +198,19 @@ java_test_suite(
         "src/test/resources/logback-test.xml",
     ],
     runner = "junit5",
+    tags = [
+        "no-cache",
+    ],
     test_suffixes = ["E2ETest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":auth-handler",
         ":lib",
+        ":search-handler",
         ":test-lib",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_testcontainers_junit_jupiter",
     ],
 )
