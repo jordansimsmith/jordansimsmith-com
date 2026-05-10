@@ -32,9 +32,10 @@ interface PitchGraphProps {
 }
 
 const STEP = 50;
-const RADIUS = 15;
+const RADIUS = 10;
 const HIGH_Y = 25;
 const LOW_Y = 75;
+const PIXEL_HEIGHT = 24;
 
 export function PitchGraph({ reading, pitch }: PitchGraphProps) {
   const morae = splitMorae(reading);
@@ -68,7 +69,11 @@ export function PitchGraph({ reading, pitch }: PitchGraphProps) {
       data-pitch-pattern={pattern}
       xmlns="http://www.w3.org/2000/svg"
       viewBox={`0 0 ${width} 100`}
-      style={{ display: 'block', maxWidth: width, height: 50 }}
+      style={{
+        display: 'block',
+        height: PIXEL_HEIGHT,
+        width: (width / 100) * PIXEL_HEIGHT,
+      }}
     >
       <path
         className="pitch-graph-line"
