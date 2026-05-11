@@ -4,3 +4,4 @@ packages:
   - personal_website_web
   - packing_list_web
   - book_tracker_web
+  - lib/ui

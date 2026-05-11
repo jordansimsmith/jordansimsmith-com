@@ -1,5 +1,8 @@
 {
   "name": "@jordansimsmith_com/japanese_dictionary_web",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "@jordansimsmith_com/ui": "workspace:*"
+  }
 }

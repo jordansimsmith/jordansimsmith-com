@@ -53,6 +53,7 @@ ts_project(
     transpiler = "tsc",
     tsconfig = "tsconfig.json",
     deps = [
+        ":node_modules/@jordansimsmith_com/ui",
         "//:node_modules/@mantine/core",
         "//:node_modules/@mantine/form",
         "//:node_modules/@mantine/hooks",
@@ -110,6 +111,7 @@ js_library(
     ),
     data = [":assets"],
     deps = [
+        ":node_modules/@jordansimsmith_com/ui",
         "//:node_modules/@mantine/core",
         "//:node_modules/@mantine/form",
         "//:node_modules/@mantine/hooks",

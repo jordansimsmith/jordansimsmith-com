@@ -81,13 +81,31 @@ importers:
         specifier: ^4.0.18
         version: 4.0.18(jsdom@28.1.0)(sugarss@5.0.1(postcss@8.5.14))
 
-  book_tracker_web: {}
+  book_tracker_web:
+    dependencies:
+      '@jordansimsmith_com/ui':
+        specifier: workspace:*
+        version: link:../lib/ui
 
-  immersion_tracker_web: {}
+  immersion_tracker_web:
+    dependencies:
+      '@jordansimsmith_com/ui':
+        specifier: workspace:*
+        version: link:../lib/ui
 
-  japanese_dictionary_web: {}
+  japanese_dictionary_web:
+    dependencies:
+      '@jordansimsmith_com/ui':
+        specifier: workspace:*
+        version: link:../lib/ui
 
-  packing_list_web: {}
+  lib/ui: {}
+
+  packing_list_web:
+    dependencies:
+      '@jordansimsmith_com/ui':
+        specifier: workspace:*
+        version: link:../lib/ui
 
   personal_website_web: {}
 
