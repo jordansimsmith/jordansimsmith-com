@@ -11,11 +11,14 @@ import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.time.Clock;
 import java.time.ZoneId;
+import java.util.HashSet;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 public class SyncSpotifyHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
@@ -30,7 +33,9 @@ public class SyncSpotifyHandler
   private final SpotifyClient spotifyClient;
 
   @VisibleForTesting
-  record SyncSpotifyRequest(@JsonProperty("episode_ids") List<String> episodeIds) {}
+  record SyncSpotifyRequest(
+      @JsonProperty("episode_ids") List<String> episodeIds,
+      @JsonProperty("backfill") Boolean backfill) {}
 
   @VisibleForTesting
   record SyncSpotifyResponse(@JsonProperty("episodes_added") int episodesAdded) {}
@@ -63,41 +68,71 @@ public class SyncSpotifyHandler
     var user = requestContextFactory.createCtx(event).user();
 
     var body = objectMapper.readValue(event.getBody(), SyncSpotifyRequest.class);
+    var backfill = Boolean.TRUE.equals(body.backfill());
 
     var now = clock.now().atZone(ZONE_ID).toInstant();
+
+    var existingEpisodeIds = new HashSet<String>();
+    var existingShowIds = new HashSet<String>();
+    var existingItems =
+        immersionTrackerTable
+            .query(
+                QueryEnhancedRequest.builder()
+                    .queryConditional(
+                        QueryConditional.sortBeginsWith(
+                            Key.builder()
+                                .partitionValue(ImmersionTrackerItem.formatPk(user))
+                                .sortValue("SPOTIFY")
+                                .build()))
+                    .build())
+            .items();
+    for (var item : existingItems) {
+      var sk = item.getSk();
+      if (sk.startsWith(ImmersionTrackerItem.SPOTIFYEPISODE_PREFIX)) {
+        existingEpisodeIds.add(item.getSpotifyEpisodeId());
+      } else if (sk.startsWith(ImmersionTrackerItem.SPOTIFYSHOW_PREFIX)) {
+        existingShowIds.add(item.getSpotifyShowId());
+      }
+    }
+
     var episodesAdded = 0;
 
     for (var episodeId : body.episodeIds) {
-      var existingEpisode =
-          immersionTrackerTable.getItem(
-              Key.builder()
-                  .partitionValue(ImmersionTrackerItem.formatPk(user))
-                  .sortValue(ImmersionTrackerItem.formatSpotifyEpisodeSk(episodeId))
-                  .build());
-
-      if (existingEpisode != null) {
+      if (!backfill && existingEpisodeIds.contains(episodeId)) {
         continue;
       }
 
-      var episode = spotifyClient.getEpisode(episodeId);
-      var episodeItem =
-          ImmersionTrackerItem.createSpotifyEpisode(
-              user, episode.showId(), episode.id(), episode.title(), episode.duration(), now);
-      immersionTrackerTable.putItem(episodeItem);
-      episodesAdded++;
+      var target = spotifyClient.getEpisode(episodeId);
 
-      var existingShow =
-          immersionTrackerTable.getItem(
-              Key.builder()
-                  .partitionValue(ImmersionTrackerItem.formatPk(user))
-                  .sortValue(ImmersionTrackerItem.formatSpotifyShowSk(episode.showId()))
-                  .build());
-
-      if (existingShow == null) {
-        var showItem =
+      if (existingShowIds.add(target.showId())) {
+        immersionTrackerTable.putItem(
             ImmersionTrackerItem.createSpotifyShow(
-                user, episode.showId(), episode.showName(), episode.showArtworkUrl());
-        immersionTrackerTable.putItem(showItem);
+                user, target.showId(), target.showName(), target.showArtworkUrl()));
+      }
+
+      if (existingEpisodeIds.add(target.id())) {
+        immersionTrackerTable.putItem(
+            ImmersionTrackerItem.createSpotifyEpisode(
+                user, target.showId(), target.id(), target.title(), target.duration(), now));
+        episodesAdded++;
+      }
+
+      if (!backfill) {
+        continue;
+      }
+
+      var siblings = spotifyClient.findShowEpisodes(target.showId());
+      for (var sibling : siblings) {
+        if (sibling.releaseDate().isAfter(target.releaseDate())) {
+          continue;
+        }
+
+        if (existingEpisodeIds.add(sibling.id())) {
+          immersionTrackerTable.putItem(
+              ImmersionTrackerItem.createSpotifyEpisode(
+                  user, target.showId(), sibling.id(), sibling.title(), sibling.duration(), now));
+          episodesAdded++;
+        }
       }
     }
 

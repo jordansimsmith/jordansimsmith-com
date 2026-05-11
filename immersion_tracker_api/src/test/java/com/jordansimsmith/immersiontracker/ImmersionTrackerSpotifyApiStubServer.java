@@ -13,6 +13,8 @@ public final class ImmersionTrackerSpotifyApiStubServer {
         "id": "4qjerzMw8jfD30VOG0tjpK",
         "name": "No 1 紹介(しょうかい) Introduction",
         "duration_ms": 388000,
+        "release_date": "2021-03-28",
+        "release_date_precision": "day",
         "show": {
           "id": "6Nl8RDfPxsk4h4bfWe76Kg",
           "name": "The Miku Real Japanese Podcast | Japanese conversation | Japanese culture",
@@ -31,6 +33,8 @@ public final class ImmersionTrackerSpotifyApiStubServer {
         "id": "5TmVVWd9TOCaF2bEtyYDwv",
         "name": "No 2 Listening Training",
         "duration_ms": 3015000,
+        "release_date": "2021-04-04",
+        "release_date_precision": "day",
         "show": {
           "id": "6Nl8RDfPxsk4h4bfWe76Kg",
           "name": "The Miku Real Japanese Podcast | Japanese conversation | Japanese culture",
@@ -40,6 +44,29 @@ public final class ImmersionTrackerSpotifyApiStubServer {
             }
           ]
         }
+      }
+      """;
+
+  private static final String SHOW_6NL8RDFPXSK4H4BFWE76KG_EPISODES_RESPONSE =
+      """
+      {
+        "items": [
+          {
+            "id": "5TmVVWd9TOCaF2bEtyYDwv",
+            "name": "No 2 Listening Training",
+            "duration_ms": 3015000,
+            "release_date": "2021-04-04",
+            "release_date_precision": "day"
+          },
+          {
+            "id": "4qjerzMw8jfD30VOG0tjpK",
+            "name": "No 1 紹介(しょうかい) Introduction",
+            "duration_ms": 388000,
+            "release_date": "2021-03-28",
+            "release_date_precision": "day"
+          }
+        ],
+        "next": null
       }
       """;
 
@@ -63,6 +90,13 @@ public final class ImmersionTrackerSpotifyApiStubServer {
                 exchange,
                 "application/json; charset=utf-8",
                 EPISODE_5TMVVWD9TOCAF2BETYYDWV_RESPONSE));
+    server.createContext(
+        "/v1/shows/6Nl8RDfPxsk4h4bfWe76Kg/episodes",
+        exchange ->
+            respond(
+                exchange,
+                "application/json; charset=utf-8",
+                SHOW_6NL8RDFPXSK4H4BFWE76KG_EPISODES_RESPONSE));
     server.start();
     Thread.currentThread().join();
   }

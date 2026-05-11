@@ -10,6 +10,7 @@ import com.jordansimsmith.time.FakeClock;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -61,36 +62,27 @@ public class SyncSpotifyHandlerIntegrationTest {
     clock.setTime(Instant.ofEpochMilli(123_000));
     var user = "alice";
 
-    fakeSpotifyClient.setEpisode(
+    fakeSpotifyClient.setEpisodeDetails(
         "4qjerzMw8jfD30VOG0tjpK",
         "No 1 紹介(しょうかい) Introduction",
         "6Nl8RDfPxsk4h4bfWe76Kg",
         "The Miku Real Japanese Podcast",
         "https://i.scdn.co/image/miku-podcast-cover",
-        Duration.ofMinutes(6).plusSeconds(28));
-    fakeSpotifyClient.setEpisode(
+        Duration.ofMinutes(6).plusSeconds(28),
+        LocalDate.of(2021, 3, 28));
+    fakeSpotifyClient.setEpisodeDetails(
         "anotherEpisodeId",
         "Test Episode",
         "testShowId",
         "Test Show",
         "https://i.scdn.co/image/test-show-cover",
-        Duration.ofMinutes(30).plusSeconds(15));
+        Duration.ofMinutes(30).plusSeconds(15),
+        LocalDate.of(2022, 1, 1));
 
-    var episodeIds = List.of("4qjerzMw8jfD30VOG0tjpK", "anotherEpisodeId");
-    var body =
-        objectMapper.writeValueAsString(new SyncSpotifyHandler.SyncSpotifyRequest(episodeIds));
+    var body = sendRequest(user, List.of("4qjerzMw8jfD30VOG0tjpK", "anotherEpisodeId"), false);
 
     // act
-    var authHeader =
-        "Basic "
-            + Base64.getEncoder()
-                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
-    var req =
-        APIGatewayV2HTTPEvent.builder()
-            .withHeaders(Map.of("Authorization", authHeader))
-            .withBody(body)
-            .build();
-    var res = syncSpotifyHandler.handleRequest(req, null);
+    var res = syncSpotifyHandler.handleRequest(body, null);
 
     // assert
     assertThat(res.getStatusCode()).isEqualTo(200);
@@ -100,20 +92,7 @@ public class SyncSpotifyHandlerIntegrationTest {
         objectMapper.readValue(res.getBody(), SyncSpotifyHandler.SyncSpotifyResponse.class);
     assertThat(episodesAdded.episodesAdded()).isEqualTo(2);
 
-    var items =
-        immersionTrackerTable
-            .query(
-                QueryEnhancedRequest.builder()
-                    .queryConditional(
-                        QueryConditional.keyEqualTo(
-                            Key.builder()
-                                .partitionValue(ImmersionTrackerItem.formatPk(user))
-                                .build()))
-                    .build())
-            .items()
-            .stream()
-            .toList();
-
+    var items = queryUserItems(user);
     assertThat(items).hasSize(4);
 
     var episode1 =
@@ -156,15 +135,15 @@ public class SyncSpotifyHandlerIntegrationTest {
     clock.setTime(Instant.ofEpochMilli(123_000));
     var user = "alice";
 
-    fakeSpotifyClient.setEpisode(
+    fakeSpotifyClient.setEpisodeDetails(
         "4qjerzMw8jfD30VOG0tjpK",
         "No 1 紹介(しょうかい) Introduction",
         "6Nl8RDfPxsk4h4bfWe76Kg",
         "The Miku Real Japanese Podcast",
         "https://i.scdn.co/image/miku-podcast-cover",
-        Duration.ofMinutes(6).plusSeconds(28));
+        Duration.ofMinutes(6).plusSeconds(28),
+        LocalDate.of(2021, 3, 28));
 
-    // Pre-populate with existing episode
     var existingEpisode =
         ImmersionTrackerItem.createSpotifyEpisode(
             user,
@@ -175,21 +154,10 @@ public class SyncSpotifyHandlerIntegrationTest {
             Instant.EPOCH);
     immersionTrackerTable.putItem(existingEpisode);
 
-    var episodeIds = List.of("4qjerzMw8jfD30VOG0tjpK");
-    var body =
-        objectMapper.writeValueAsString(new SyncSpotifyHandler.SyncSpotifyRequest(episodeIds));
+    var body = sendRequest(user, List.of("4qjerzMw8jfD30VOG0tjpK"), false);
 
     // act
-    var authHeader =
-        "Basic "
-            + Base64.getEncoder()
-                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
-    var req =
-        APIGatewayV2HTTPEvent.builder()
-            .withHeaders(Map.of("Authorization", authHeader))
-            .withBody(body)
-            .build();
-    var res = syncSpotifyHandler.handleRequest(req, null);
+    var res = syncSpotifyHandler.handleRequest(body, null);
 
     // assert
     assertThat(res.getStatusCode()).isEqualTo(200);
@@ -198,21 +166,7 @@ public class SyncSpotifyHandlerIntegrationTest {
         objectMapper.readValue(res.getBody(), SyncSpotifyHandler.SyncSpotifyResponse.class);
     assertThat(episodesAdded.episodesAdded()).isEqualTo(0);
 
-    var items =
-        immersionTrackerTable
-            .query(
-                QueryEnhancedRequest.builder()
-                    .queryConditional(
-                        QueryConditional.keyEqualTo(
-                            Key.builder()
-                                .partitionValue(ImmersionTrackerItem.formatPk(user))
-                                .build()))
-                    .build())
-            .items()
-            .stream()
-            .toList();
-
-    // Should still have only the original episode
+    var items = queryUserItems(user);
     assertThat(items).hasSize(1);
     assertThat(items.get(0)).isEqualTo(existingEpisode);
   }
@@ -223,36 +177,27 @@ public class SyncSpotifyHandlerIntegrationTest {
     clock.setTime(Instant.ofEpochMilli(123_000));
     var user = "alice";
 
-    fakeSpotifyClient.setEpisode(
+    fakeSpotifyClient.setEpisodeDetails(
         "episode1",
         "Episode 1",
         "testShowId",
         "Test Show",
         "https://i.scdn.co/image/test-show-cover",
-        Duration.ofMinutes(30).plusSeconds(15));
-    fakeSpotifyClient.setEpisode(
+        Duration.ofMinutes(30).plusSeconds(15),
+        LocalDate.of(2021, 3, 28));
+    fakeSpotifyClient.setEpisodeDetails(
         "episode2",
         "Episode 2",
         "testShowId",
         "Test Show",
         "https://i.scdn.co/image/test-show-cover",
-        Duration.ofMinutes(25).plusSeconds(20));
+        Duration.ofMinutes(25).plusSeconds(20),
+        LocalDate.of(2021, 4, 4));
 
-    var episodeIds = List.of("episode1", "episode2");
-    var body =
-        objectMapper.writeValueAsString(new SyncSpotifyHandler.SyncSpotifyRequest(episodeIds));
+    var body = sendRequest(user, List.of("episode1", "episode2"), false);
 
     // act
-    var authHeader =
-        "Basic "
-            + Base64.getEncoder()
-                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
-    var req =
-        APIGatewayV2HTTPEvent.builder()
-            .withHeaders(Map.of("Authorization", authHeader))
-            .withBody(body)
-            .build();
-    var res = syncSpotifyHandler.handleRequest(req, null);
+    var res = syncSpotifyHandler.handleRequest(body, null);
 
     // assert
     assertThat(res.getStatusCode()).isEqualTo(200);
@@ -261,20 +206,7 @@ public class SyncSpotifyHandlerIntegrationTest {
         objectMapper.readValue(res.getBody(), SyncSpotifyHandler.SyncSpotifyResponse.class);
     assertThat(episodesAdded.episodesAdded()).isEqualTo(2);
 
-    var items =
-        immersionTrackerTable
-            .query(
-                QueryEnhancedRequest.builder()
-                    .queryConditional(
-                        QueryConditional.keyEqualTo(
-                            Key.builder()
-                                .partitionValue(ImmersionTrackerItem.formatPk(user))
-                                .build()))
-                    .build())
-            .items()
-            .stream()
-            .toList();
-
+    var items = queryUserItems(user);
     assertThat(items).hasSize(3);
 
     var episode1 =
@@ -301,5 +233,274 @@ public class SyncSpotifyHandlerIntegrationTest {
         ImmersionTrackerItem.createSpotifyShow(
             user, "testShowId", "Test Show", "https://i.scdn.co/image/test-show-cover");
     assertThat(items).contains(show);
+  }
+
+  @Test
+  void handleRequestShouldBackfillEpisodesOnOrBeforeTargetReleaseDate() throws Exception {
+    // arrange
+    clock.setTime(Instant.ofEpochMilli(123_000));
+    var user = "alice";
+
+    fakeSpotifyClient.setEpisodeDetails(
+        "targetEpisodeId",
+        "Episode 3",
+        "showId",
+        "Show Name",
+        "https://i.scdn.co/image/show-cover",
+        Duration.ofMinutes(10),
+        LocalDate.of(2021, 4, 4));
+    fakeSpotifyClient.setShowEpisodes(
+        "showId",
+        List.of(
+            new SpotifyClient.Episode(
+                "futureEpisodeId", "Episode 4", Duration.ofMinutes(11), LocalDate.of(2021, 4, 11)),
+            new SpotifyClient.Episode(
+                "targetEpisodeId", "Episode 3", Duration.ofMinutes(10), LocalDate.of(2021, 4, 4)),
+            new SpotifyClient.Episode(
+                "siblingEpisode2", "Episode 2", Duration.ofMinutes(9), LocalDate.of(2021, 3, 28)),
+            new SpotifyClient.Episode(
+                "siblingEpisode1", "Episode 1", Duration.ofMinutes(8), LocalDate.of(2021, 3, 21))));
+
+    var body = sendRequest(user, List.of("targetEpisodeId"), true);
+
+    // act
+    var res = syncSpotifyHandler.handleRequest(body, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(200);
+
+    var episodesAdded =
+        objectMapper.readValue(res.getBody(), SyncSpotifyHandler.SyncSpotifyResponse.class);
+    assertThat(episodesAdded.episodesAdded()).isEqualTo(3);
+
+    var items = queryUserItems(user);
+    assertThat(items).hasSize(4);
+
+    var target =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user, "showId", "targetEpisodeId", "Episode 3", Duration.ofMinutes(10), clock.now());
+    var sibling2 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user, "showId", "siblingEpisode2", "Episode 2", Duration.ofMinutes(9), clock.now());
+    var sibling1 =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user, "showId", "siblingEpisode1", "Episode 1", Duration.ofMinutes(8), clock.now());
+    var show =
+        ImmersionTrackerItem.createSpotifyShow(
+            user, "showId", "Show Name", "https://i.scdn.co/image/show-cover");
+
+    assertThat(items).contains(target, sibling1, sibling2, show);
+    assertThat(items.stream().map(ImmersionTrackerItem::getSpotifyEpisodeId))
+        .doesNotContain("futureEpisodeId");
+  }
+
+  @Test
+  void handleRequestShouldSkipBackfilledSiblingsAlreadyPresent() throws Exception {
+    // arrange
+    clock.setTime(Instant.ofEpochMilli(123_000));
+    var user = "alice";
+
+    fakeSpotifyClient.setEpisodeDetails(
+        "targetEpisodeId",
+        "Episode 2",
+        "showId",
+        "Show Name",
+        "https://i.scdn.co/image/show-cover",
+        Duration.ofMinutes(10),
+        LocalDate.of(2021, 3, 28));
+    fakeSpotifyClient.setShowEpisodes(
+        "showId",
+        List.of(
+            new SpotifyClient.Episode(
+                "targetEpisodeId", "Episode 2", Duration.ofMinutes(10), LocalDate.of(2021, 3, 28)),
+            new SpotifyClient.Episode(
+                "existingSibling", "Episode 1", Duration.ofMinutes(9), LocalDate.of(2021, 3, 21))));
+
+    var existingSibling =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user,
+            "showId",
+            "existingSibling",
+            "Episode 1 (older)",
+            Duration.ofMinutes(8),
+            Instant.EPOCH);
+    immersionTrackerTable.putItem(existingSibling);
+
+    var body = sendRequest(user, List.of("targetEpisodeId"), true);
+
+    // act
+    var res = syncSpotifyHandler.handleRequest(body, null);
+
+    // assert
+    var episodesAdded =
+        objectMapper.readValue(res.getBody(), SyncSpotifyHandler.SyncSpotifyResponse.class);
+    assertThat(episodesAdded.episodesAdded()).isEqualTo(1);
+
+    var items = queryUserItems(user);
+    assertThat(items).hasSize(3);
+
+    var target =
+        ImmersionTrackerItem.createSpotifyEpisode(
+            user, "showId", "targetEpisodeId", "Episode 2", Duration.ofMinutes(10), clock.now());
+    var show =
+        ImmersionTrackerItem.createSpotifyShow(
+            user, "showId", "Show Name", "https://i.scdn.co/image/show-cover");
+
+    assertThat(items).contains(target, show, existingSibling);
+  }
+
+  @Test
+  void handleRequestShouldBackfillAcrossMultipleTargets() throws Exception {
+    // arrange
+    clock.setTime(Instant.ofEpochMilli(123_000));
+    var user = "alice";
+
+    fakeSpotifyClient.setEpisodeDetails(
+        "showAEp2",
+        "A2",
+        "showA",
+        "Show A",
+        "https://i.scdn.co/image/show-a-cover",
+        Duration.ofMinutes(10),
+        LocalDate.of(2021, 1, 8));
+    fakeSpotifyClient.setEpisodeDetails(
+        "showBEp1",
+        "B1",
+        "showB",
+        "Show B",
+        "https://i.scdn.co/image/show-b-cover",
+        Duration.ofMinutes(15),
+        LocalDate.of(2022, 5, 1));
+    fakeSpotifyClient.setShowEpisodes(
+        "showA",
+        List.of(
+            new SpotifyClient.Episode(
+                "showAEp2", "A2", Duration.ofMinutes(10), LocalDate.of(2021, 1, 8)),
+            new SpotifyClient.Episode(
+                "showAEp1", "A1", Duration.ofMinutes(9), LocalDate.of(2021, 1, 1))));
+    fakeSpotifyClient.setShowEpisodes(
+        "showB",
+        List.of(
+            new SpotifyClient.Episode(
+                "showBEp1", "B1", Duration.ofMinutes(15), LocalDate.of(2022, 5, 1))));
+
+    var body = sendRequest(user, List.of("showAEp2", "showBEp1"), true);
+
+    // act
+    var res = syncSpotifyHandler.handleRequest(body, null);
+
+    // assert
+    var episodesAdded =
+        objectMapper.readValue(res.getBody(), SyncSpotifyHandler.SyncSpotifyResponse.class);
+    assertThat(episodesAdded.episodesAdded()).isEqualTo(3);
+
+    var items = queryUserItems(user);
+    assertThat(items).hasSize(5);
+    assertThat(items.stream().map(ImmersionTrackerItem::getSpotifyShowId).filter(s -> s != null))
+        .contains("showA", "showB");
+  }
+
+  @Test
+  void handleRequestShouldHandleMixedReleaseDatePrecisionWhenBackfilling() throws Exception {
+    // arrange
+    clock.setTime(Instant.ofEpochMilli(123_000));
+    var user = "alice";
+
+    fakeSpotifyClient.setEpisodeDetails(
+        "targetEpisodeId",
+        "Latest",
+        "showId",
+        "Show Name",
+        "https://i.scdn.co/image/show-cover",
+        Duration.ofMinutes(10),
+        LocalDate.of(2021, 6, 1));
+    fakeSpotifyClient.setShowEpisodes(
+        "showId",
+        List.of(
+            new SpotifyClient.Episode(
+                "targetEpisodeId", "Latest", Duration.ofMinutes(10), LocalDate.of(2021, 6, 1)),
+            new SpotifyClient.Episode(
+                "monthEpisode", "Month", Duration.ofMinutes(9), LocalDate.of(2020, 6, 1)),
+            new SpotifyClient.Episode(
+                "yearEpisode", "Year", Duration.ofMinutes(8), LocalDate.of(2019, 1, 1))));
+
+    var body = sendRequest(user, List.of("targetEpisodeId"), true);
+
+    // act
+    var res = syncSpotifyHandler.handleRequest(body, null);
+
+    // assert
+    var episodesAdded =
+        objectMapper.readValue(res.getBody(), SyncSpotifyHandler.SyncSpotifyResponse.class);
+    assertThat(episodesAdded.episodesAdded()).isEqualTo(3);
+
+    var items = queryUserItems(user);
+    assertThat(items.stream().map(ImmersionTrackerItem::getSpotifyEpisodeId).filter(s -> s != null))
+        .contains("targetEpisodeId", "monthEpisode", "yearEpisode");
+  }
+
+  @Test
+  void handleRequestShouldNotBackfillWhenFlagIsFalseOrAbsent() throws Exception {
+    // arrange
+    clock.setTime(Instant.ofEpochMilli(123_000));
+    var user = "alice";
+
+    fakeSpotifyClient.setEpisodeDetails(
+        "targetEpisodeId",
+        "Episode 2",
+        "showId",
+        "Show Name",
+        "https://i.scdn.co/image/show-cover",
+        Duration.ofMinutes(10),
+        LocalDate.of(2021, 3, 28));
+    fakeSpotifyClient.setShowEpisodes(
+        "showId",
+        List.of(
+            new SpotifyClient.Episode(
+                "targetEpisodeId", "Episode 2", Duration.ofMinutes(10), LocalDate.of(2021, 3, 28)),
+            new SpotifyClient.Episode(
+                "siblingEpisode", "Episode 1", Duration.ofMinutes(8), LocalDate.of(2021, 3, 21))));
+
+    var body = sendRequest(user, List.of("targetEpisodeId"), false);
+
+    // act
+    var res = syncSpotifyHandler.handleRequest(body, null);
+
+    // assert
+    var episodesAdded =
+        objectMapper.readValue(res.getBody(), SyncSpotifyHandler.SyncSpotifyResponse.class);
+    assertThat(episodesAdded.episodesAdded()).isEqualTo(1);
+
+    var items = queryUserItems(user);
+    assertThat(items.stream().map(ImmersionTrackerItem::getSpotifyEpisodeId).filter(s -> s != null))
+        .containsExactly("targetEpisodeId");
+  }
+
+  private APIGatewayV2HTTPEvent sendRequest(String user, List<String> episodeIds, boolean backfill)
+      throws Exception {
+    var body =
+        objectMapper.writeValueAsString(
+            new SyncSpotifyHandler.SyncSpotifyRequest(episodeIds, backfill));
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
+    return APIGatewayV2HTTPEvent.builder()
+        .withHeaders(Map.of("Authorization", authHeader))
+        .withBody(body)
+        .build();
+  }
+
+  private List<ImmersionTrackerItem> queryUserItems(String user) {
+    return immersionTrackerTable
+        .query(
+            QueryEnhancedRequest.builder()
+                .queryConditional(
+                    QueryConditional.keyEqualTo(
+                        Key.builder().partitionValue(ImmersionTrackerItem.formatPk(user)).build()))
+                .build())
+        .items()
+        .stream()
+        .toList();
   }
 }

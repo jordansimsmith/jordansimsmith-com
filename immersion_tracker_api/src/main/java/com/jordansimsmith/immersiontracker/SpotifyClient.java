@@ -1,15 +1,22 @@
 package com.jordansimsmith.immersiontracker;
 
 import java.time.Duration;
+import java.time.LocalDate;
+import java.util.List;
 
 public interface SpotifyClient {
-  record Episode(
+  record EpisodeDetails(
       String id,
       String title,
       String showId,
       String showName,
       String showArtworkUrl,
-      Duration duration) {}
+      Duration duration,
+      LocalDate releaseDate) {}
 
-  Episode getEpisode(String episodeId);
+  record Episode(String id, String title, Duration duration, LocalDate releaseDate) {}
+
+  EpisodeDetails getEpisode(String episodeId);
+
+  List<Episode> findShowEpisodes(String showId);
 }

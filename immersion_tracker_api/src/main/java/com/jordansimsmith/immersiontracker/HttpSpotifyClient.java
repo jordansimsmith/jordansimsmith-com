@@ -12,11 +12,16 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.LocalDate;
+import java.time.YearMonth;
+import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 
 public class HttpSpotifyClient implements SpotifyClient {
   @VisibleForTesting static final String SECRET = "immersion_tracker_api";
+  private static final int LIST_PAGE_SIZE = 50;
 
   private final URI apiBaseUri;
   private final URI accountsBaseUri;
@@ -45,6 +50,8 @@ public class HttpSpotifyClient implements SpotifyClient {
       @JsonProperty("id") String id,
       @JsonProperty("name") String name,
       @JsonProperty("duration_ms") Long durationMs,
+      @JsonProperty("release_date") String releaseDate,
+      @JsonProperty("release_date_precision") String releaseDatePrecision,
       @JsonProperty("show") EpisodeShow show) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -56,8 +63,20 @@ public class HttpSpotifyClient implements SpotifyClient {
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record SpotifyImage(@JsonProperty("url") String url) {}
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record ShowEpisodesResponse(
+      @JsonProperty("items") List<ShowEpisodeItem> items, @JsonProperty("next") String next) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record ShowEpisodeItem(
+      @JsonProperty("id") String id,
+      @JsonProperty("name") String name,
+      @JsonProperty("duration_ms") Long durationMs,
+      @JsonProperty("release_date") String releaseDate,
+      @JsonProperty("release_date_precision") String releaseDatePrecision) {}
+
   @Override
-  public Episode getEpisode(String episodeId) {
+  public EpisodeDetails getEpisode(String episodeId) {
     try {
       return doGetEpisode(episodeId);
     } catch (InterruptedException e) {
@@ -68,7 +87,19 @@ public class HttpSpotifyClient implements SpotifyClient {
     }
   }
 
-  private Episode doGetEpisode(String episodeId) throws IOException, InterruptedException {
+  @Override
+  public List<Episode> findShowEpisodes(String showId) {
+    try {
+      return doFindShowEpisodes(showId);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private EpisodeDetails doGetEpisode(String episodeId) throws IOException, InterruptedException {
     var accessToken = getAccessToken();
 
     var request =
@@ -102,17 +133,72 @@ public class HttpSpotifyClient implements SpotifyClient {
     Preconditions.checkNotNull(episodeResponse.show().id(), "Show ID is null");
     Preconditions.checkNotNull(episodeResponse.show().name(), "Show name is null");
     Preconditions.checkNotNull(episodeResponse.durationMs(), "Episode duration is null");
+    Preconditions.checkNotNull(episodeResponse.releaseDate(), "Episode release date is null");
+    Preconditions.checkNotNull(
+        episodeResponse.releaseDatePrecision(), "Episode release date precision is null");
 
     var duration = Duration.ofMillis(episodeResponse.durationMs());
     var showArtworkUrl = selectFirstImageUrl(episodeResponse.show().images());
+    var releaseDate =
+        parseReleaseDate(episodeResponse.releaseDate(), episodeResponse.releaseDatePrecision());
 
-    return new Episode(
+    return new EpisodeDetails(
         episodeResponse.id(),
         episodeResponse.name(),
         episodeResponse.show().id(),
         episodeResponse.show().name(),
         showArtworkUrl,
-        duration);
+        duration,
+        releaseDate);
+  }
+
+  private List<Episode> doFindShowEpisodes(String showId) throws IOException, InterruptedException {
+    var accessToken = getAccessToken();
+    var episodes = new ArrayList<Episode>();
+
+    var nextUri = apiBaseUri.resolve("/v1/shows/" + showId + "/episodes?limit=" + LIST_PAGE_SIZE);
+    while (nextUri != null) {
+      var request =
+          HttpRequest.newBuilder()
+              .uri(nextUri)
+              .header("Accept", "application/json")
+              .header("Authorization", "Bearer " + accessToken)
+              .GET()
+              .build();
+
+      var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+      if (response.statusCode() != 200) {
+        throw new IOException(
+            "Spotify API request failed with status code "
+                + response.statusCode()
+                + " and body: "
+                + response.body());
+      }
+
+      var pageResponse = objectMapper.readValue(response.body(), ShowEpisodesResponse.class);
+      var items = pageResponse.items() != null ? pageResponse.items() : List.<ShowEpisodeItem>of();
+
+      for (var item : items) {
+        Preconditions.checkNotNull(item.id(), "Show episode ID is null");
+        Preconditions.checkNotNull(item.name(), "Show episode name is null");
+        Preconditions.checkNotNull(item.durationMs(), "Show episode duration is null");
+        Preconditions.checkNotNull(item.releaseDate(), "Show episode release date is null");
+        Preconditions.checkNotNull(
+            item.releaseDatePrecision(), "Show episode release date precision is null");
+
+        episodes.add(
+            new Episode(
+                item.id(),
+                item.name(),
+                Duration.ofMillis(item.durationMs()),
+                parseReleaseDate(item.releaseDate(), item.releaseDatePrecision())));
+      }
+
+      nextUri = pageResponse.next() != null ? URI.create(pageResponse.next()) : null;
+    }
+
+    return episodes;
   }
 
   private String selectFirstImageUrl(List<SpotifyImage> images) {
@@ -121,6 +207,22 @@ public class HttpSpotifyClient implements SpotifyClient {
     }
     var first = images.get(0);
     return first != null ? first.url() : null;
+  }
+
+  @VisibleForTesting
+  static LocalDate parseReleaseDate(String releaseDate, String precision) {
+    try {
+      return switch (precision) {
+        case "day" -> LocalDate.parse(releaseDate);
+        case "month" -> YearMonth.parse(releaseDate).atDay(1);
+        case "year" -> LocalDate.of(Integer.parseInt(releaseDate), 1, 1);
+        default ->
+            throw new IllegalArgumentException("Unknown release_date_precision: " + precision);
+      };
+    } catch (DateTimeParseException | NumberFormatException e) {
+      throw new IllegalArgumentException(
+          "Invalid release_date '" + releaseDate + "' for precision '" + precision + "'", e);
+    }
   }
 
   private String getAccessToken() throws IOException, InterruptedException {

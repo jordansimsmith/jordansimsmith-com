@@ -98,7 +98,7 @@ sequenceDiagram
 
 - **TVDB API (default origin `https://api4.thetvdb.com`)**: `HttpTvdbClient` logs in with secret key `tvdb_api_key` (`POST /v4/login`) then calls `GET /v4/series/{id}` and `GET /v4/movies/{id}` during `PUT /show` and `POST /syncmovies`. Base origin is configurable with `IMMERSION_TRACKER_TVDB_BASE_URL`; when unset it uses the default production origin. Required response data for writes is `name`, `image`, and runtime (`averageRuntime` for series, `runtime` for movies). Non-200 or non-`success` responses fail the request.
 - **YouTube Data API v3 (default origin `https://www.googleapis.com`)**: `HttpYoutubeClient` uses `youtube_api_key` as query parameter and calls `GET /youtube/v3/videos` and `GET /youtube/v3/channels` for each new video ID in `POST /syncyoutube`. Base origin is configurable with `IMMERSION_TRACKER_YOUTUBE_BASE_URL`; when unset it uses the default production origin. Required video data is `id`, `snippet.title`, `snippet.channelId`, and `contentDetails.duration`; channel metadata includes title and thumbnail URL preference (high, then medium, then default). Non-200 or invalid payload shape fails the request.
-- **Spotify Web API (default origins `https://accounts.spotify.com` and `https://api.spotify.com`)**: `HttpSpotifyClient` exchanges `spotify_client_id` and `spotify_client_secret` for an access token using client credentials (`POST /api/token` on accounts origin), then calls `GET /v1/episodes/{episode_id}` on API origin for each new episode ID in `POST /syncspotify`. Origins are configurable with `IMMERSION_TRACKER_SPOTIFY_ACCOUNTS_BASE_URL` and `IMMERSION_TRACKER_SPOTIFY_API_BASE_URL`; when unset they use production defaults. Required data includes episode `id`, `name`, `duration_ms`, `show.id`, and `show.name`; first show image URL is used when present. Non-200 or invalid payload shape fails the request.
+- **Spotify Web API (default origins `https://accounts.spotify.com` and `https://api.spotify.com`)**: `HttpSpotifyClient` exchanges `spotify_client_id` and `spotify_client_secret` for an access token using client credentials (`POST /api/token` on accounts origin), then calls `GET /v1/episodes/{episode_id}` on API origin for each target episode ID in `POST /syncspotify`. When `backfill` is true, additionally calls `GET /v1/shows/{show_id}/episodes?limit=50` (following `next` for pagination) to enumerate every episode in the target's show. Origins are configurable with `IMMERSION_TRACKER_SPOTIFY_ACCOUNTS_BASE_URL` and `IMMERSION_TRACKER_SPOTIFY_API_BASE_URL`; when unset they use production defaults. Required episode data includes `id`, `name`, `duration_ms`, `release_date`, `release_date_precision`, `show.id`, and `show.name`; first show image URL is used when present. `release_date_precision` accepts any of `"day"`, `"month"`, `"year"`; less precise values are parsed to a lower-bound `LocalDate` (year → Jan 1, month → 1st of month, day → exact). Non-200 or invalid payload shape fails the request.
 
 ## API contracts
 
@@ -152,8 +152,9 @@ sequenceDiagram
   - Request body: `{ "video_ids": [string] }`
   - Response `200`: `{ "videos_added": number }`
 - `POST /syncspotify`
-  - Request body: `{ "episode_ids": [string] }`
+  - Request body: `{ "episode_ids": [string], "backfill": boolean (optional, default false) }`
   - Response `200`: `{ "episodes_added": number }`
+  - Behavior note: when `backfill` is true, each `episode_id` is treated as the most recent watched marker for its show; the handler additionally inserts every other episode in that show whose `release_date` is on or before the target's `release_date`, reusing the target's show metadata for those siblings.
 - `POST /syncmovies`
   - Request body: `{ "movies": [{ "file_name": string, "tvdb_id": number }] }`
   - Response `200`: `{ "movies_added": number }`
@@ -305,6 +306,9 @@ Movie item:
 - User identity for reads and writes is derived from the HTTP Basic username in `Authorization`.
 - A sync request only inserts new items; existing `pk`/`sk` records are skipped and not overwritten.
 - `POST /sync` creates a `SHOW` item when missing before creating `EPISODE` items.
+- `POST /syncspotify` performs one DynamoDB query (`sk begins_with "SPOTIFY"`) per request to determine which episode and show items already exist for the user, then inserts only missing items.
+- `POST /syncspotify` backfilled siblings are stamped with the request-time `clock.now()` (not the Spotify `release_date`), so a backfill burst counts toward the request day's totals.
+- `POST /syncspotify` release-date filtering is inclusive (`<=`) and uses the lower-bound `LocalDate` parsed from `release_date_precision` (year/month values are treated as Jan 1 / 1st of month).
 - `PUT /show` requires an existing show record; otherwise the request fails.
 - `GetProgressHandler` uses `Pacific/Auckland` for day boundaries (`today`, daily activity windows, weekly trend periods).
 - Episode duration in progress analytics uses show `tvdb_average_runtime` when present; otherwise fallback is 20 minutes.
@@ -417,8 +421,8 @@ Local script and test variables:
 
 ### Scenario 2: sync watched links from watched.txt
 
-1. User adds YouTube and Spotify links to `watched.txt`.
-2. Script extracts video and episode IDs, then calls `POST /syncyoutube` and `POST /syncspotify`.
-3. API fetches metadata from YouTube and Spotify and stores both content and channel/show records.
-4. User requests `GET /progress` and sees updated `youtube_channels` and `spotify_shows`.
+1. User adds YouTube and Spotify links to `watched.txt` (typically the latest episode of each Spotify podcast they listened sequentially).
+2. Script extracts video and episode IDs, then calls `POST /syncyoutube` and `POST /syncspotify` with `backfill: true` for Spotify.
+3. API fetches metadata from YouTube and Spotify; for each Spotify episode it lists the show's full episode catalogue and inserts every episode released on or before the supplied marker, reusing the target's show metadata for siblings.
+4. User requests `GET /progress` and sees updated `youtube_channels` and `spotify_shows` including the backfilled sibling episodes.
 5. Script clears `watched.txt` after successful sync.

@@ -17,6 +17,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.time.LocalDate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -86,6 +87,8 @@ public class HttpSpotifyClientTest {
         "id": "testEpisodeId",
         "name": "Short Episode",
         "duration_ms": 1000,
+        "release_date": "2021-03-28",
+        "release_date_precision": "day",
         "show": {
           "id": "testShowId",
           "name": "Test Show"
@@ -99,6 +102,8 @@ public class HttpSpotifyClientTest {
         "id": "testEpisodeId",
         "name": "Long Episode",
         "duration_ms": 3600000,
+        "release_date": "2021-03-28",
+        "release_date_precision": "day",
         "show": {
           "id": "testShowId",
           "name": "Test Show"
@@ -133,15 +138,9 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldReturnEpisodeWithAllFields() throws IOException, InterruptedException {
+  void getEpisodeShouldReturnEpisodeWithAllFields() throws Exception {
     // arrange
-    var secretJson =
-        objectMapper
-            .createObjectNode()
-            .put("spotify_client_id", "testClientId")
-            .put("spotify_client_secret", "testClientSecret");
-    ((FakeSecrets) secrets)
-        .set("immersion_tracker_api", objectMapper.writeValueAsString(secretJson));
+    seedSpotifySecret();
 
     var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
     var episodeResponse = createMockResponse(200, EPISODE_RESPONSE);
@@ -160,18 +159,13 @@ public class HttpSpotifyClientTest {
     assertThat(episode.showName()).isEqualTo("The Miku Real Japanese Podcast");
     assertThat(episode.showArtworkUrl()).isEqualTo("https://i.scdn.co/image/ab6765630000ba8a1234");
     assertThat(episode.duration()).isEqualTo(Duration.ofMillis(388284));
+    assertThat(episode.releaseDate()).isEqualTo(LocalDate.of(2021, 3, 28));
   }
 
   @Test
-  void getEpisodeShouldConvertShortDuration() throws IOException, InterruptedException {
+  void getEpisodeShouldConvertShortDuration() throws Exception {
     // arrange
-    var secretJson =
-        objectMapper
-            .createObjectNode()
-            .put("spotify_client_id", "testClientId")
-            .put("spotify_client_secret", "testClientSecret");
-    ((FakeSecrets) secrets)
-        .set("immersion_tracker_api", objectMapper.writeValueAsString(secretJson));
+    seedSpotifySecret();
 
     var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
     var episodeResponse = createMockResponse(200, EPISODE_RESPONSE_SHORT_DURATION);
@@ -188,15 +182,9 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldConvertLongDuration() throws IOException, InterruptedException {
+  void getEpisodeShouldConvertLongDuration() throws Exception {
     // arrange
-    var secretJson =
-        objectMapper
-            .createObjectNode()
-            .put("spotify_client_id", "testClientId")
-            .put("spotify_client_secret", "testClientSecret");
-    ((FakeSecrets) secrets)
-        .set("immersion_tracker_api", objectMapper.writeValueAsString(secretJson));
+    seedSpotifySecret();
 
     var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
     var episodeResponse = createMockResponse(200, EPISODE_RESPONSE_LONG_DURATION);
@@ -213,15 +201,77 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldThrowWhenTokenRequestFails() throws IOException, InterruptedException {
+  void getEpisodeShouldParseMonthPrecisionReleaseDate() throws Exception {
     // arrange
-    var secretJson =
-        objectMapper
-            .createObjectNode()
-            .put("spotify_client_id", "testClientId")
-            .put("spotify_client_secret", "testClientSecret");
-    ((FakeSecrets) secrets)
-        .set("immersion_tracker_api", objectMapper.writeValueAsString(secretJson));
+    seedSpotifySecret();
+
+    var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
+    var episodeResponse =
+        createMockResponse(
+            200,
+            """
+            {
+              "id": "testEpisodeId",
+              "name": "Test Episode",
+              "duration_ms": 388284,
+              "release_date": "2021-03",
+              "release_date_precision": "month",
+              "show": {
+                "id": "testShowId",
+                "name": "Test Show"
+              }
+            }
+            """);
+
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(tokenResponse)
+        .thenReturn(episodeResponse);
+
+    // act
+    var episode = client.getEpisode("testEpisodeId");
+
+    // assert
+    assertThat(episode.releaseDate()).isEqualTo(LocalDate.of(2021, 3, 1));
+  }
+
+  @Test
+  void getEpisodeShouldParseYearPrecisionReleaseDate() throws Exception {
+    // arrange
+    seedSpotifySecret();
+
+    var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
+    var episodeResponse =
+        createMockResponse(
+            200,
+            """
+            {
+              "id": "testEpisodeId",
+              "name": "Test Episode",
+              "duration_ms": 388284,
+              "release_date": "2021",
+              "release_date_precision": "year",
+              "show": {
+                "id": "testShowId",
+                "name": "Test Show"
+              }
+            }
+            """);
+
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(tokenResponse)
+        .thenReturn(episodeResponse);
+
+    // act
+    var episode = client.getEpisode("testEpisodeId");
+
+    // assert
+    assertThat(episode.releaseDate()).isEqualTo(LocalDate.of(2021, 1, 1));
+  }
+
+  @Test
+  void getEpisodeShouldThrowWhenTokenRequestFails() throws Exception {
+    // arrange
+    seedSpotifySecret();
 
     var tokenResponse = createMockResponse(401, "{\"error\":\"invalid_client\"}");
 
@@ -236,15 +286,9 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldThrowWhenEpisodeRequestFails() throws IOException, InterruptedException {
+  void getEpisodeShouldThrowWhenEpisodeRequestFails() throws Exception {
     // arrange
-    var secretJson =
-        objectMapper
-            .createObjectNode()
-            .put("spotify_client_id", "testClientId")
-            .put("spotify_client_secret", "testClientSecret");
-    ((FakeSecrets) secrets)
-        .set("immersion_tracker_api", objectMapper.writeValueAsString(secretJson));
+    seedSpotifySecret();
 
     var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
     var episodeResponse =
@@ -262,15 +306,9 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldThrowWhenEpisodeNameIsNull() throws IOException, InterruptedException {
+  void getEpisodeShouldThrowWhenEpisodeNameIsNull() throws Exception {
     // arrange
-    var secretJson =
-        objectMapper
-            .createObjectNode()
-            .put("spotify_client_id", "testClientId")
-            .put("spotify_client_secret", "testClientSecret");
-    ((FakeSecrets) secrets)
-        .set("immersion_tracker_api", objectMapper.writeValueAsString(secretJson));
+    seedSpotifySecret();
 
     var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
     var episodeResponse =
@@ -281,6 +319,8 @@ public class HttpSpotifyClientTest {
               "id": "testEpisodeId",
               "name": null,
               "duration_ms": 388284,
+              "release_date": "2021-03-28",
+              "release_date_precision": "day",
               "show": {
                 "id": "testShowId",
                 "name": "Test Show"
@@ -300,15 +340,9 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldThrowWhenShowIsNull() throws IOException, InterruptedException {
+  void getEpisodeShouldThrowWhenShowIsNull() throws Exception {
     // arrange
-    var secretJson =
-        objectMapper
-            .createObjectNode()
-            .put("spotify_client_id", "testClientId")
-            .put("spotify_client_secret", "testClientSecret");
-    ((FakeSecrets) secrets)
-        .set("immersion_tracker_api", objectMapper.writeValueAsString(secretJson));
+    seedSpotifySecret();
 
     var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
     var episodeResponse =
@@ -319,6 +353,8 @@ public class HttpSpotifyClientTest {
               "id": "testEpisodeId",
               "name": "Test Episode",
               "duration_ms": 388284,
+              "release_date": "2021-03-28",
+              "release_date_precision": "day",
               "show": null
             }
             """);
@@ -335,15 +371,9 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldThrowWhenShowIdIsNull() throws IOException, InterruptedException {
+  void getEpisodeShouldThrowWhenShowIdIsNull() throws Exception {
     // arrange
-    var secretJson =
-        objectMapper
-            .createObjectNode()
-            .put("spotify_client_id", "testClientId")
-            .put("spotify_client_secret", "testClientSecret");
-    ((FakeSecrets) secrets)
-        .set("immersion_tracker_api", objectMapper.writeValueAsString(secretJson));
+    seedSpotifySecret();
 
     var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
     var episodeResponse =
@@ -354,6 +384,8 @@ public class HttpSpotifyClientTest {
               "id": "testEpisodeId",
               "name": "Test Episode",
               "duration_ms": 388284,
+              "release_date": "2021-03-28",
+              "release_date_precision": "day",
               "show": {
                 "id": null,
                 "name": "Test Show"
@@ -373,15 +405,9 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldThrowWhenShowNameIsNull() throws IOException, InterruptedException {
+  void getEpisodeShouldThrowWhenShowNameIsNull() throws Exception {
     // arrange
-    var secretJson =
-        objectMapper
-            .createObjectNode()
-            .put("spotify_client_id", "testClientId")
-            .put("spotify_client_secret", "testClientSecret");
-    ((FakeSecrets) secrets)
-        .set("immersion_tracker_api", objectMapper.writeValueAsString(secretJson));
+    seedSpotifySecret();
 
     var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
     var episodeResponse =
@@ -392,6 +418,8 @@ public class HttpSpotifyClientTest {
               "id": "testEpisodeId",
               "name": "Test Episode",
               "duration_ms": 388284,
+              "release_date": "2021-03-28",
+              "release_date_precision": "day",
               "show": {
                 "id": "testShowId",
                 "name": null
@@ -411,15 +439,9 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldThrowWhenDurationIsNull() throws IOException, InterruptedException {
+  void getEpisodeShouldThrowWhenDurationIsNull() throws Exception {
     // arrange
-    var secretJson =
-        objectMapper
-            .createObjectNode()
-            .put("spotify_client_id", "testClientId")
-            .put("spotify_client_secret", "testClientSecret");
-    ((FakeSecrets) secrets)
-        .set("immersion_tracker_api", objectMapper.writeValueAsString(secretJson));
+    seedSpotifySecret();
 
     var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
     var episodeResponse =
@@ -430,6 +452,8 @@ public class HttpSpotifyClientTest {
               "id": "testEpisodeId",
               "name": "Test Episode",
               "duration_ms": null,
+              "release_date": "2021-03-28",
+              "release_date_precision": "day",
               "show": {
                 "id": "testShowId",
                 "name": "Test Show"
@@ -449,15 +473,43 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldThrowWhenAccessTokenIsNull() throws IOException, InterruptedException {
+  void getEpisodeShouldThrowWhenReleaseDateIsNull() throws Exception {
     // arrange
-    var secretJson =
-        objectMapper
-            .createObjectNode()
-            .put("spotify_client_id", "testClientId")
-            .put("spotify_client_secret", "testClientSecret");
-    ((FakeSecrets) secrets)
-        .set("immersion_tracker_api", objectMapper.writeValueAsString(secretJson));
+    seedSpotifySecret();
+
+    var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
+    var episodeResponse =
+        createMockResponse(
+            200,
+            """
+            {
+              "id": "testEpisodeId",
+              "name": "Test Episode",
+              "duration_ms": 388284,
+              "release_date": null,
+              "release_date_precision": "day",
+              "show": {
+                "id": "testShowId",
+                "name": "Test Show"
+              }
+            }
+            """);
+
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(tokenResponse)
+        .thenReturn(episodeResponse);
+
+    // act & assert
+    assertThatThrownBy(() -> client.getEpisode("testEpisodeId"))
+        .isInstanceOf(RuntimeException.class)
+        .hasCauseInstanceOf(NullPointerException.class)
+        .hasMessageContaining("Episode release date is null");
+  }
+
+  @Test
+  void getEpisodeShouldThrowWhenAccessTokenIsNull() throws Exception {
+    // arrange
+    seedSpotifySecret();
 
     var tokenResponse = createMockResponse(200, "{\"access_token\":null}");
 
@@ -472,15 +524,9 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldThrowWhenEpisodeIdMismatch() throws IOException, InterruptedException {
+  void getEpisodeShouldThrowWhenEpisodeIdMismatch() throws Exception {
     // arrange
-    var secretJson =
-        objectMapper
-            .createObjectNode()
-            .put("spotify_client_id", "testClientId")
-            .put("spotify_client_secret", "testClientSecret");
-    ((FakeSecrets) secrets)
-        .set("immersion_tracker_api", objectMapper.writeValueAsString(secretJson));
+    seedSpotifySecret();
 
     var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
     var episodeResponse =
@@ -491,6 +537,8 @@ public class HttpSpotifyClientTest {
               "id": "differentEpisodeId",
               "name": "Test Episode",
               "duration_ms": 388284,
+              "release_date": "2021-03-28",
+              "release_date_precision": "day",
               "show": {
                 "id": "testShowId",
                 "name": "Test Show"
@@ -507,6 +555,250 @@ public class HttpSpotifyClientTest {
         .isInstanceOf(RuntimeException.class)
         .hasCauseInstanceOf(IllegalStateException.class)
         .hasMessageContaining("Expected episode ID testEpisodeId, got differentEpisodeId");
+  }
+
+  @Test
+  void findShowEpisodesShouldReturnSinglePageOfEpisodes() throws Exception {
+    // arrange
+    seedSpotifySecret();
+
+    var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
+    var pageResponse =
+        createMockResponse(
+            200,
+            """
+            {
+              "items": [
+                {
+                  "id": "episode1",
+                  "name": "Episode 1",
+                  "duration_ms": 60000,
+                  "release_date": "2021-03-28",
+                  "release_date_precision": "day"
+                },
+                {
+                  "id": "episode2",
+                  "name": "Episode 2",
+                  "duration_ms": 120000,
+                  "release_date": "2021-04-04",
+                  "release_date_precision": "day"
+                }
+              ],
+              "next": null
+            }
+            """);
+
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(tokenResponse)
+        .thenReturn(pageResponse);
+
+    // act
+    var episodes = client.findShowEpisodes("testShowId");
+
+    // assert
+    assertThat(episodes).hasSize(2);
+    assertThat(episodes.get(0).id()).isEqualTo("episode1");
+    assertThat(episodes.get(0).title()).isEqualTo("Episode 1");
+    assertThat(episodes.get(0).duration()).isEqualTo(Duration.ofMinutes(1));
+    assertThat(episodes.get(0).releaseDate()).isEqualTo(LocalDate.of(2021, 3, 28));
+    assertThat(episodes.get(1).id()).isEqualTo("episode2");
+    assertThat(episodes.get(1).releaseDate()).isEqualTo(LocalDate.of(2021, 4, 4));
+  }
+
+  @Test
+  void findShowEpisodesShouldFollowNextPaginationLink() throws Exception {
+    // arrange
+    seedSpotifySecret();
+
+    var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
+    var firstPage =
+        createMockResponse(
+            200,
+            """
+            {
+              "items": [
+                {
+                  "id": "episode1",
+                  "name": "Episode 1",
+                  "duration_ms": 60000,
+                  "release_date": "2021-03-28",
+                  "release_date_precision": "day"
+                }
+              ],
+              "next": "https://api.spotify.com/v1/shows/testShowId/episodes?limit=50&offset=50"
+            }
+            """);
+    var secondPage =
+        createMockResponse(
+            200,
+            """
+            {
+              "items": [
+                {
+                  "id": "episode2",
+                  "name": "Episode 2",
+                  "duration_ms": 120000,
+                  "release_date": "2021-04-04",
+                  "release_date_precision": "day"
+                }
+              ],
+              "next": null
+            }
+            """);
+
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(tokenResponse)
+        .thenReturn(firstPage)
+        .thenReturn(secondPage);
+
+    // act
+    var episodes = client.findShowEpisodes("testShowId");
+
+    // assert
+    assertThat(episodes).hasSize(2);
+    assertThat(episodes.get(0).id()).isEqualTo("episode1");
+    assertThat(episodes.get(1).id()).isEqualTo("episode2");
+  }
+
+  @Test
+  void findShowEpisodesShouldParseMixedReleaseDatePrecisions() throws Exception {
+    // arrange
+    seedSpotifySecret();
+
+    var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
+    var pageResponse =
+        createMockResponse(
+            200,
+            """
+            {
+              "items": [
+                {
+                  "id": "dayEpisode",
+                  "name": "Day Episode",
+                  "duration_ms": 60000,
+                  "release_date": "2021-03-28",
+                  "release_date_precision": "day"
+                },
+                {
+                  "id": "monthEpisode",
+                  "name": "Month Episode",
+                  "duration_ms": 60000,
+                  "release_date": "2020-06",
+                  "release_date_precision": "month"
+                },
+                {
+                  "id": "yearEpisode",
+                  "name": "Year Episode",
+                  "duration_ms": 60000,
+                  "release_date": "2019",
+                  "release_date_precision": "year"
+                }
+              ],
+              "next": null
+            }
+            """);
+
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(tokenResponse)
+        .thenReturn(pageResponse);
+
+    // act
+    var episodes = client.findShowEpisodes("testShowId");
+
+    // assert
+    assertThat(episodes).hasSize(3);
+    assertThat(episodes.get(0).releaseDate()).isEqualTo(LocalDate.of(2021, 3, 28));
+    assertThat(episodes.get(1).releaseDate()).isEqualTo(LocalDate.of(2020, 6, 1));
+    assertThat(episodes.get(2).releaseDate()).isEqualTo(LocalDate.of(2019, 1, 1));
+  }
+
+  @Test
+  void findShowEpisodesShouldThrowWhenRequestFails() throws Exception {
+    // arrange
+    seedSpotifySecret();
+
+    var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
+    var pageResponse =
+        createMockResponse(404, "{\"error\":{\"status\":404,\"message\":\"Not found.\"}}");
+
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(tokenResponse)
+        .thenReturn(pageResponse);
+
+    // act & assert
+    assertThatThrownBy(() -> client.findShowEpisodes("nonexistentShow"))
+        .isInstanceOf(RuntimeException.class)
+        .hasCauseInstanceOf(IOException.class)
+        .hasMessageContaining("Spotify API request failed with status code 404");
+  }
+
+  @Test
+  void findShowEpisodesShouldThrowWhenItemReleaseDateIsNull() throws Exception {
+    // arrange
+    seedSpotifySecret();
+
+    var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
+    var pageResponse =
+        createMockResponse(
+            200,
+            """
+            {
+              "items": [
+                {
+                  "id": "episode1",
+                  "name": "Episode 1",
+                  "duration_ms": 60000,
+                  "release_date": null,
+                  "release_date_precision": "day"
+                }
+              ],
+              "next": null
+            }
+            """);
+
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(tokenResponse)
+        .thenReturn(pageResponse);
+
+    // act & assert
+    assertThatThrownBy(() -> client.findShowEpisodes("testShowId"))
+        .isInstanceOf(RuntimeException.class)
+        .hasCauseInstanceOf(NullPointerException.class)
+        .hasMessageContaining("Show episode release date is null");
+  }
+
+  @Test
+  void parseReleaseDateShouldHandleAllPrecisions() {
+    assertThat(HttpSpotifyClient.parseReleaseDate("2021-03-28", "day"))
+        .isEqualTo(LocalDate.of(2021, 3, 28));
+    assertThat(HttpSpotifyClient.parseReleaseDate("2021-03", "month"))
+        .isEqualTo(LocalDate.of(2021, 3, 1));
+    assertThat(HttpSpotifyClient.parseReleaseDate("2021", "year"))
+        .isEqualTo(LocalDate.of(2021, 1, 1));
+  }
+
+  @Test
+  void parseReleaseDateShouldThrowOnUnknownPrecision() {
+    assertThatThrownBy(() -> HttpSpotifyClient.parseReleaseDate("2021-03-28", "decade"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Unknown release_date_precision: decade");
+  }
+
+  @Test
+  void parseReleaseDateShouldThrowOnMalformedValue() {
+    assertThatThrownBy(() -> HttpSpotifyClient.parseReleaseDate("not-a-date", "day"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("Invalid release_date 'not-a-date' for precision 'day'");
+  }
+
+  private void seedSpotifySecret() throws Exception {
+    var secretJson =
+        objectMapper
+            .createObjectNode()
+            .put("spotify_client_id", "testClientId")
+            .put("spotify_client_secret", "testClientSecret");
+    ((FakeSecrets) secrets)
+        .set("immersion_tracker_api", objectMapper.writeValueAsString(secretJson));
   }
 
   @SuppressWarnings("unchecked")

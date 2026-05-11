@@ -346,7 +346,9 @@ def sync_youtube_videos_watched(video_ids):
 def sync_spotify_episodes_watched(episode_ids):
     print(f"Syncing {len(episode_ids)} Spotify episodes watched...")
 
-    res = send_request("POST", "syncspotify", {"episode_ids": episode_ids})
+    res = send_request(
+        "POST", "syncspotify", {"episode_ids": episode_ids, "backfill": True}
+    )
     episodes_added = res["episodes_added"]
     print(
         f"Successfully added {episodes_added} new Spotify episodes to the remote server."
