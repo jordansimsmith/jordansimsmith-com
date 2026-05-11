@@ -9,6 +9,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -86,59 +87,53 @@ public class ImmersionTrackerE2ETest {
             "%-11s", quarterStart.format(DateTimeFormatter.ofPattern("MMM uuuu", Locale.ENGLISH)));
   }
 
-  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Test
   void scriptShouldSyncEpisodes() throws IOException, InterruptedException {
     // arrange
     var tmp = new File(System.getProperty("java.io.tmpdir"));
 
     var shows = Path.of(tmp.getPath(), "shows").toFile();
-    shows.mkdir();
+    Files.createDirectories(shows.toPath());
 
     var show1 = Path.of(shows.getPath(), "1 [123] Free!").toFile();
-    show1.mkdir();
+    Files.createDirectories(show1.toPath());
     var watched1 = Path.of(show1.getPath(), "watched").toFile();
-    watched1.mkdir();
+    Files.createDirectories(watched1.toPath());
     var show1Episode1 = Path.of(watched1.getPath(), "[123] Free! episode 1.mp4").toFile();
-    show1Episode1.createNewFile();
     try (var show1Episode1RandomAccessFile = new RandomAccessFile(show1Episode1, "rw")) {
       show1Episode1RandomAccessFile.setLength(560 * 1024 * 1024);
     }
     var show1Episode2 = Path.of(watched1.getPath(), "[123] Free! episode 10.mp4").toFile();
-    show1Episode2.createNewFile();
     try (var show1Episode2RandomAccessFile = new RandomAccessFile(show1Episode2, "rw")) {
       show1Episode2RandomAccessFile.setLength(220 * 1024 * 1024);
     }
     var dsStore = Path.of(watched1.getPath(), ".DS_Store").toFile();
-    dsStore.createNewFile();
+    Files.createFile(dsStore.toPath());
 
     var show2 = Path.of(shows.getPath(), "2 (123) Haikyuu Part 1").toFile();
-    show2.mkdir();
+    Files.createDirectories(show2.toPath());
     var watched2 = Path.of(show2.getPath(), "watched").toFile();
-    watched2.mkdir();
+    Files.createDirectories(watched2.toPath());
     var show2Episode1 = Path.of(watched2.getPath(), "(123) Haikyuu S01E01.mkv").toFile();
-    show2Episode1.createNewFile();
     try (var show2Episode1RandomAccessFile = new RandomAccessFile(show2Episode1, "rw")) {
       show2Episode1RandomAccessFile.setLength(130 * 1024 * 1024);
     }
 
     var show3 = Path.of(shows.getPath(), "3 (123) Haikyuu Part 2").toFile();
-    show3.mkdir();
+    Files.createDirectories(show3.toPath());
     var watched3 = Path.of(show3.getPath(), "watched").toFile();
-    watched3.mkdir();
+    Files.createDirectories(watched3.toPath());
     var show3Episode1 = Path.of(watched3.getPath(), "(123) Haikyuu S01E013.mkv").toFile();
-    show3Episode1.createNewFile();
     try (var show3Episode1RandomAccessFile = new RandomAccessFile(show3Episode1, "rw")) {
       show3Episode1RandomAccessFile.setLength(770 * 1024 * 1024);
     }
     var show3Episode2 = Path.of(show3.getPath(), "(123) Haikyuu S01E014.mkv").toFile();
-    show3Episode2.createNewFile();
     try (var show3Episode2RandomAccessFile = new RandomAccessFile(show3Episode2, "rw")) {
       show3Episode2RandomAccessFile.setLength(440 * 1024 * 1024);
     }
 
     var show4 = Path.of(shows.getPath(), "4 {123} Attack on Titan?").toFile();
-    show4.mkdir();
+    Files.createDirectories(show4.toPath());
 
     // act
     var script = Path.of("immersion_tracker_api/sync-episodes-script.py");
@@ -232,23 +227,20 @@ public class ImmersionTrackerE2ETest {
     assertThat(show4).exists();
   }
 
-  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Test
   void scriptShouldSyncMovies() throws IOException, InterruptedException {
     // arrange
     var tmp = new File(System.getProperty("java.io.tmpdir"));
 
     var movies = Path.of(tmp.getPath(), "movies").toFile();
-    movies.mkdir();
+    Files.createDirectories(movies.toPath());
     var watched = Path.of(movies.getPath(), "watched").toFile();
-    watched.mkdir();
+    Files.createDirectories(watched.toPath());
     var suzume = Path.of(watched.getPath(), "suzume.mp4").toFile();
-    suzume.createNewFile();
     try (var suzumeRandomAccessFile = new RandomAccessFile(suzume, "rw")) {
       suzumeRandomAccessFile.setLength(1024L * 1024 * 1024);
     }
     var yourName = Path.of(watched.getPath(), "your_name.mkv").toFile();
-    yourName.createNewFile();
     try (var yourNameRandomAccessFile = new RandomAccessFile(yourName, "rw")) {
       yourNameRandomAccessFile.setLength(1024L * 1024 * 1024 * 2);
     }
@@ -331,14 +323,12 @@ public class ImmersionTrackerE2ETest {
     assertThat(movies).exists();
   }
 
-  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Test
   void scriptShouldSyncYoutubeVideos() throws IOException, InterruptedException {
     // arrange
     var tmp = new File(System.getProperty("java.io.tmpdir"));
 
     var youtubeWatchedFile = Path.of(tmp.getPath(), "watched.txt").toFile();
-    youtubeWatchedFile.createNewFile();
     try (var writer = new FileWriter(youtubeWatchedFile)) {
       writer.write("https://www.youtube.com/watch?v=9bZkp7q19f0\n");
       writer.write("https://www.youtube.com/watch?v=kJQP7kiw5Fk&t=30s\n");
@@ -416,14 +406,12 @@ public class ImmersionTrackerE2ETest {
     assertThat(youtubeWatchedFile.length()).isEqualTo(0);
   }
 
-  @SuppressWarnings("ResultOfMethodCallIgnored")
   @Test
   void scriptShouldSyncSpotifyEpisodes() throws IOException, InterruptedException {
     // arrange
     var tmp = new File(System.getProperty("java.io.tmpdir"));
 
     var spotifyWatchedFile = Path.of(tmp.getPath(), "watched.txt").toFile();
-    spotifyWatchedFile.createNewFile();
     try (var writer = new FileWriter(spotifyWatchedFile)) {
       writer.write("https://open.spotify.com/episode/5TmVVWd9TOCaF2bEtyYDwv?si=42fd92c2accd4ea9\n");
     }
