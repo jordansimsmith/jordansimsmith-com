@@ -1,4 +1,10 @@
-import { render, screen, waitFor, cleanup } from '@testing-library/react';
+import {
+  render,
+  screen,
+  waitFor,
+  cleanup,
+  fireEvent,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -84,12 +90,14 @@ describe('SearchPage', () => {
   });
 
   it('cancels the debounced call when input changes within the window', async () => {
-    const user = userEvent.setup();
-
     renderSearchPage();
     const input = screen.getByLabelText('Search');
-    await user.type(input, 'sh');
-    await user.type(input, 'i');
+
+    // fireEvent.change is synchronous so the two changes happen well within
+    // the 250 ms debounce window regardless of ci speed; using user.type here
+    // would race against wall-clock time on slow runners.
+    fireEvent.change(input, { target: { value: 'sh' } });
+    fireEvent.change(input, { target: { value: 'shi' } });
 
     await waitFor(
       () => {
