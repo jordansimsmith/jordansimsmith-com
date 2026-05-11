@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -37,7 +38,7 @@ public class BiweeklySubfootballClientTest {
   }
 
   @Test
-  void findFixturesShouldExtractAllFieldsCorrectly() throws Exception {
+  void findFixturesShouldExtractAllFieldsCorrectly() throws IOException, InterruptedException {
     // arrange
     var ical =
         """
@@ -123,7 +124,8 @@ public class BiweeklySubfootballClientTest {
   }
 
   @Test
-  void findFixturesShouldHandleEscapedCharactersInLocation() throws Exception {
+  void findFixturesShouldHandleEscapedCharactersInLocation()
+      throws IOException, InterruptedException {
     // arrange
     var ical =
         """
@@ -152,7 +154,8 @@ public class BiweeklySubfootballClientTest {
   }
 
   @Test
-  void findFixturesShouldParseTeamsFromSummaryWithRoundPrefix() throws Exception {
+  void findFixturesShouldParseTeamsFromSummaryWithRoundPrefix()
+      throws IOException, InterruptedException {
     // arrange
     var ical =
         """
@@ -181,7 +184,8 @@ public class BiweeklySubfootballClientTest {
   }
 
   @Test
-  void findFixturesShouldHandleMultipleEventsOnDifferentDates() throws Exception {
+  void findFixturesShouldHandleMultipleEventsOnDifferentDates()
+      throws IOException, InterruptedException {
     // arrange
     var ical =
         """
@@ -246,7 +250,7 @@ public class BiweeklySubfootballClientTest {
   }
 
   @Test
-  void findFixturesShouldSkipEventsWithMissingFields() throws Exception {
+  void findFixturesShouldSkipEventsWithMissingFields() throws IOException, InterruptedException {
     // arrange
     var ical =
         """

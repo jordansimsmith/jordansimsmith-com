@@ -8,7 +8,6 @@ import java.nio.charset.StandardCharsets;
 
 public final class ImmersionTrackerYoutubeStubServer {
   private static final String OFFICIALPSY_CHANNEL_ID = "UCffDXn7ycAzwL2LDlbyWOTw";
-  private static final String LUIS_FONSI_CHANNEL_ID = "UCLp8RBhQHu9wSsq62j_Md6A";
 
   private static final String VIDEO_9BZKP7Q19F0_RESPONSE =
       """

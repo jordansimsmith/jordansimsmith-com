@@ -133,7 +133,7 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldReturnEpisodeWithAllFields() throws Exception {
+  void getEpisodeShouldReturnEpisodeWithAllFields() throws IOException, InterruptedException {
     // arrange
     var secretJson =
         objectMapper
@@ -163,7 +163,7 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldConvertShortDuration() throws Exception {
+  void getEpisodeShouldConvertShortDuration() throws IOException, InterruptedException {
     // arrange
     var secretJson =
         objectMapper
@@ -188,7 +188,7 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldConvertLongDuration() throws Exception {
+  void getEpisodeShouldConvertLongDuration() throws IOException, InterruptedException {
     // arrange
     var secretJson =
         objectMapper
@@ -213,7 +213,7 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldThrowWhenTokenRequestFails() throws Exception {
+  void getEpisodeShouldThrowWhenTokenRequestFails() throws IOException, InterruptedException {
     // arrange
     var secretJson =
         objectMapper
@@ -236,7 +236,7 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldThrowWhenEpisodeRequestFails() throws Exception {
+  void getEpisodeShouldThrowWhenEpisodeRequestFails() throws IOException, InterruptedException {
     // arrange
     var secretJson =
         objectMapper
@@ -262,7 +262,7 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldThrowWhenEpisodeNameIsNull() throws Exception {
+  void getEpisodeShouldThrowWhenEpisodeNameIsNull() throws IOException, InterruptedException {
     // arrange
     var secretJson =
         objectMapper
@@ -300,7 +300,7 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldThrowWhenShowIsNull() throws Exception {
+  void getEpisodeShouldThrowWhenShowIsNull() throws IOException, InterruptedException {
     // arrange
     var secretJson =
         objectMapper
@@ -335,7 +335,7 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldThrowWhenShowIdIsNull() throws Exception {
+  void getEpisodeShouldThrowWhenShowIdIsNull() throws IOException, InterruptedException {
     // arrange
     var secretJson =
         objectMapper
@@ -373,7 +373,7 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldThrowWhenShowNameIsNull() throws Exception {
+  void getEpisodeShouldThrowWhenShowNameIsNull() throws IOException, InterruptedException {
     // arrange
     var secretJson =
         objectMapper
@@ -411,7 +411,7 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldThrowWhenDurationIsNull() throws Exception {
+  void getEpisodeShouldThrowWhenDurationIsNull() throws IOException, InterruptedException {
     // arrange
     var secretJson =
         objectMapper
@@ -449,7 +449,7 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldThrowWhenAccessTokenIsNull() throws Exception {
+  void getEpisodeShouldThrowWhenAccessTokenIsNull() throws IOException, InterruptedException {
     // arrange
     var secretJson =
         objectMapper
@@ -472,7 +472,7 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
-  void getEpisodeShouldThrowWhenEpisodeIdMismatch() throws Exception {
+  void getEpisodeShouldThrowWhenEpisodeIdMismatch() throws IOException, InterruptedException {
     // arrange
     var secretJson =
         objectMapper

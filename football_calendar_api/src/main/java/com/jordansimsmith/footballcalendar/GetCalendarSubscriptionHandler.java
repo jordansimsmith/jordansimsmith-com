@@ -40,14 +40,14 @@ public class GetCalendarSubscriptionHandler
   @Override
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     try {
-      return doHandleRequest(event, context);
+      return doHandleRequest();
     } catch (Exception e) {
       LOGGER.error("Error processing football calendar subscription request", e);
       throw new RuntimeException(e);
     }
   }
 
-  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event, Context context) {
+  private APIGatewayV2HTTPResponse doHandleRequest() {
     // create calendar
     var calendar = new ICalendar();
     calendar.setProductId("-//jordansimsmith.com//Football Calendar//EN");

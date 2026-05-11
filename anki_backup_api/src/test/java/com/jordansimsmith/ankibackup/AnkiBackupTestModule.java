@@ -13,14 +13,13 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 public class AnkiBackupTestModule {
   @Provides
   @Singleton
-  public HttpResponseFactory httpResponseFactory(ObjectMapper objectMapper) {
+  HttpResponseFactory httpResponseFactory(ObjectMapper objectMapper) {
     return new HttpResponseFactory.Builder(objectMapper).build();
   }
 
   @Provides
   @Singleton
-  public DynamoDbTable<AnkiBackupItem> ankiBackupTable(
-      DynamoDbEnhancedClient dynamoDbEnhancedClient) {
+  DynamoDbTable<AnkiBackupItem> ankiBackupTable(DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(AnkiBackupItem.class);
     return dynamoDbEnhancedClient.table("anki_backup", schema);
   }

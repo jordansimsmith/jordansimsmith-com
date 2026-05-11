@@ -48,15 +48,14 @@ public class UpdateShowHandler
   @Override
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     try {
-      return doHandleRequest(event, context);
+      return doHandleRequest(event);
     } catch (Exception e) {
       LOGGER.error("Error processing update show request", e);
       throw new RuntimeException(e);
     }
   }
 
-  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event, Context context)
-      throws Exception {
+  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) throws Exception {
     var user = requestContextFactory.createCtx(event).user();
 
     var body = objectMapper.readValue(event.getBody(), UpdateShowRequest.class);

@@ -80,7 +80,7 @@ public class HttpTvdbClientTest {
   }
 
   @Test
-  void getShowShouldReturnShow() throws Exception {
+  void getShowShouldReturnShow() throws IOException, InterruptedException {
     // arrange
     var secretJson = objectMapper.createObjectNode().put("tvdb_api_key", "test-api-key");
     ((FakeSecrets) secrets).set(HttpTvdbClient.SECRET, objectMapper.writeValueAsString(secretJson));
@@ -103,7 +103,7 @@ public class HttpTvdbClientTest {
   }
 
   @Test
-  void getShowShouldThrowWhenRuntimeMissing() throws Exception {
+  void getShowShouldThrowWhenRuntimeMissing() throws IOException, InterruptedException {
     // arrange
     var secretJson = objectMapper.createObjectNode().put("tvdb_api_key", "test-api-key");
     ((FakeSecrets) secrets).set(HttpTvdbClient.SECRET, objectMapper.writeValueAsString(secretJson));
@@ -133,7 +133,7 @@ public class HttpTvdbClientTest {
   }
 
   @Test
-  void getMovieShouldReturnMovie() throws Exception {
+  void getMovieShouldReturnMovie() throws IOException, InterruptedException {
     // arrange
     var secretJson = objectMapper.createObjectNode().put("tvdb_api_key", "test-api-key");
     ((FakeSecrets) secrets).set(HttpTvdbClient.SECRET, objectMapper.writeValueAsString(secretJson));
@@ -156,7 +156,7 @@ public class HttpTvdbClientTest {
   }
 
   @Test
-  void getShowShouldThrowWhenLoginFails() throws Exception {
+  void getShowShouldThrowWhenLoginFails() throws IOException, InterruptedException {
     // arrange
     var secretJson = objectMapper.createObjectNode().put("tvdb_api_key", "test-api-key");
     ((FakeSecrets) secrets).set(HttpTvdbClient.SECRET, objectMapper.writeValueAsString(secretJson));

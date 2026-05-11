@@ -60,12 +60,15 @@ public class HttpSpotifyClient implements SpotifyClient {
   public Episode getEpisode(String episodeId) {
     try {
       return doGetEpisode(episodeId);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
 
-  private Episode doGetEpisode(String episodeId) throws Exception {
+  private Episode doGetEpisode(String episodeId) throws IOException, InterruptedException {
     var accessToken = getAccessToken();
 
     var request =
@@ -120,7 +123,7 @@ public class HttpSpotifyClient implements SpotifyClient {
     return first != null ? first.url() : null;
   }
 
-  private String getAccessToken() throws Exception {
+  private String getAccessToken() throws IOException, InterruptedException {
     var secret = secrets.get(SECRET);
     var secretTree = objectMapper.readTree(secret);
     var clientId = secretTree.get("spotify_client_id").asText(null);

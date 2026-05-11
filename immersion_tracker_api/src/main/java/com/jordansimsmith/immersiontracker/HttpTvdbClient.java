@@ -62,6 +62,9 @@ public class HttpTvdbClient implements TvdbClient {
   public Show getShow(int id) {
     try {
       return doGetShow(id);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -71,12 +74,15 @@ public class HttpTvdbClient implements TvdbClient {
   public Movie getMovie(int id) {
     try {
       return doGetMovie(id);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
 
-  private Show doGetShow(int id) throws Exception {
+  private Show doGetShow(int id) throws IOException, InterruptedException {
     var token = getToken();
 
     var seriesReq =
@@ -109,7 +115,7 @@ public class HttpTvdbClient implements TvdbClient {
         Duration.ofMinutes(seriesResBody.data.averageRuntimeMinutes));
   }
 
-  private Movie doGetMovie(int id) throws Exception {
+  private Movie doGetMovie(int id) throws IOException, InterruptedException {
     var token = getToken();
 
     var movieReq =
@@ -139,7 +145,7 @@ public class HttpTvdbClient implements TvdbClient {
     return new Movie(id, movieResBody.data.name, movieResBody.data.image, duration);
   }
 
-  private String getToken() throws Exception {
+  private String getToken() throws IOException, InterruptedException {
     var secret = secrets.get(SECRET);
     var apikey = objectMapper.readTree(secret).get("tvdb_api_key").asText(null);
     Preconditions.checkNotNull(apikey);

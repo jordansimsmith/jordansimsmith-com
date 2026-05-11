@@ -10,7 +10,7 @@ public class SecretsModule {
 
   @Provides
   @Singleton
-  public Secrets secrets() {
+  Secrets secrets() {
     var secretsManger = SecretsManagerClient.builder().build();
     return new SecretsManagerSecrets(secretsManger);
   }

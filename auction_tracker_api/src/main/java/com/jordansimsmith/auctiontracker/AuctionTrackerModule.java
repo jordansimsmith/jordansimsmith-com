@@ -12,7 +12,7 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 public class AuctionTrackerModule {
   @Provides
   @Singleton
-  public DynamoDbTable<AuctionTrackerItem> auctionTrackerTable(
+  DynamoDbTable<AuctionTrackerItem> auctionTrackerTable(
       DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(AuctionTrackerItem.class);
     return dynamoDbEnhancedClient.table("auction_tracker", schema);
@@ -20,7 +20,7 @@ public class AuctionTrackerModule {
 
   @Provides
   @Singleton
-  public SearchFactory searchFactory() {
+  SearchFactory searchFactory() {
     var baseUrl = System.getenv("AUCTION_TRACKER_TRADEME_BASE_URL");
     if (baseUrl == null || baseUrl.isBlank()) {
       baseUrl = "https://www.trademe.co.nz";
@@ -30,7 +30,7 @@ public class AuctionTrackerModule {
 
   @Provides
   @Singleton
-  public TradeMeClient tradeMeClient() {
+  TradeMeClient tradeMeClient() {
     return new JsoupTradeMeClient();
   }
 }

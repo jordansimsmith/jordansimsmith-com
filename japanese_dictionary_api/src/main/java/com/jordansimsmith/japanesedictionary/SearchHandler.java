@@ -76,15 +76,14 @@ public class SearchHandler
   @Override
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     try {
-      return doHandleRequest(event, context);
+      return doHandleRequest(event);
     } catch (Exception e) {
       LOGGER.error("error processing search request", e);
       throw new RuntimeException(e);
     }
   }
 
-  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event, Context context)
-      throws Exception {
+  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) throws Exception {
     var raw =
         event.getQueryStringParameters() == null ? null : event.getQueryStringParameters().get("q");
     var q = raw == null ? "" : Normalizer.normalize(raw, Normalizer.Form.NFC).trim();

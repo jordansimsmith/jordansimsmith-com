@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -51,7 +52,7 @@ public class AnkiBackupE2ETest {
   }
 
   @Test
-  void shouldCreateUploadCompleteListAndGetBackup() throws Exception {
+  void shouldCreateUploadCompleteListAndGetBackup() throws IOException, InterruptedException {
     var authHeader =
         "Basic "
             + Base64.getEncoder().encodeToString("alice:password".getBytes(StandardCharsets.UTF_8));

@@ -3,6 +3,7 @@ package com.jordansimsmith.footballcalendar;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -39,14 +40,17 @@ public class HttpNrfClient implements NrfClient {
       Instant to) {
     try {
       return doGetFixtures(compIds, orgIds, gradeIds, from, to);
-    } catch (Exception e) {
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Failed to get football fixtures", e);
+    } catch (IOException e) {
       throw new RuntimeException("Failed to get football fixtures", e);
     }
   }
 
   private List<NrfFixture> doGetFixtures(
       List<Integer> compIds, List<Integer> orgIds, List<Integer> gradeIds, Instant from, Instant to)
-      throws Exception {
+      throws IOException, InterruptedException {
 
     var fromLocal = LocalDateTime.ofInstant(from, AUCKLAND_ZONE).format(DATE_FORMATTER);
     var toLocal = LocalDateTime.ofInstant(to, AUCKLAND_ZONE).format(DATE_FORMATTER);

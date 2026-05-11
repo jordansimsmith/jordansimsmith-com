@@ -76,12 +76,15 @@ public class HttpYoutubeClient implements YoutubeClient {
   public Video getVideo(String videoId) {
     try {
       return doGetVideo(videoId);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
 
-  private Video doGetVideo(String videoId) throws Exception {
+  private Video doGetVideo(String videoId) throws IOException, InterruptedException {
     var secret = secrets.get(SECRET);
     var apiKey = objectMapper.readTree(secret).get("youtube_api_key").asText(null);
     Preconditions.checkNotNull(apiKey, "youtube_api_key not found in secret");
@@ -140,12 +143,15 @@ public class HttpYoutubeClient implements YoutubeClient {
   public Channel getChannel(String channelId) {
     try {
       return doGetChannel(channelId);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
 
-  private Channel doGetChannel(String channelId) throws Exception {
+  private Channel doGetChannel(String channelId) throws IOException, InterruptedException {
     var secret = secrets.get(SECRET);
     var apiKey = objectMapper.readTree(secret).get("youtube_api_key").asText(null);
     Preconditions.checkNotNull(apiKey, "youtube_api_key not found in secret");

@@ -9,7 +9,7 @@ import software.amazon.awssdk.services.sns.SnsClient;
 public class NotificationModule {
   @Provides
   @Singleton
-  public NotificationPublisher notificationPublisher() {
+  NotificationPublisher notificationPublisher() {
     var snsClient = SnsClient.builder().build();
     return new SnsNotificationPublisher(snsClient);
   }

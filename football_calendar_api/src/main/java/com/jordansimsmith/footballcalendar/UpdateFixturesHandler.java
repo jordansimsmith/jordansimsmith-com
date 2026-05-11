@@ -54,14 +54,14 @@ public class UpdateFixturesHandler implements RequestHandler<ScheduledEvent, Voi
   @Override
   public Void handleRequest(ScheduledEvent event, Context context) {
     try {
-      return doHandleRequest(event, context);
+      return doHandleRequest();
     } catch (Exception e) {
       LOGGER.error("Error processing football fixtures update", e);
       throw new RuntimeException(e);
     }
   }
 
-  private Void doHandleRequest(ScheduledEvent event, Context context) {
+  private Void doHandleRequest() {
     var now = clock.now();
     var upcomingEnd = now.plus(UPCOMING_WINDOW);
     var changes = new ArrayList<String>();

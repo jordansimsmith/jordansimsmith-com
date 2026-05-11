@@ -11,33 +11,32 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 public class PriceTrackerTestModule {
   @Provides
   @Singleton
-  public DynamoDbTable<PriceTrackerItem> priceTrackerTable(
-      DynamoDbEnhancedClient dynamoDbEnhancedClient) {
+  DynamoDbTable<PriceTrackerItem> priceTrackerTable(DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(PriceTrackerItem.class);
     return dynamoDbEnhancedClient.table("price_tracker", schema);
   }
 
   @Provides
   @Singleton
-  public FakePriceClient fakePriceClient() {
+  FakePriceClient fakePriceClient() {
     return new FakePriceClient();
   }
 
   @Provides
   @Singleton
-  public PriceClient priceClient(FakePriceClient fakePriceClient) {
+  PriceClient priceClient(FakePriceClient fakePriceClient) {
     return fakePriceClient;
   }
 
   @Provides
   @Singleton
-  public FakeProductsFactory fakeProductsFactory() {
+  FakeProductsFactory fakeProductsFactory() {
     return new FakeProductsFactory();
   }
 
   @Provides
   @Singleton
-  public ProductsFactory productsFactory(FakeProductsFactory fakeProductsFactory) {
+  ProductsFactory productsFactory(FakeProductsFactory fakeProductsFactory) {
     return fakeProductsFactory;
   }
 }

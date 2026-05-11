@@ -6,7 +6,6 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
-import com.jordansimsmith.time.FakeClock;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -22,7 +21,6 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 
 @Testcontainers
 public class GetTripHandlerIntegrationTest {
-  private FakeClock fakeClock;
   private ObjectMapper objectMapper;
   private DynamoDbTable<PackingListItem> packingListTable;
 
@@ -41,7 +39,6 @@ public class GetTripHandlerIntegrationTest {
   void setUp() {
     var factory = PackingListTestFactory.create(dynamoDbContainer.getEndpoint());
 
-    fakeClock = factory.fakeClock();
     objectMapper = factory.objectMapper();
     packingListTable = factory.packingListTable();
 

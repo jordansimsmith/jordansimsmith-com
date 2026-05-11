@@ -8,7 +8,7 @@ import javax.inject.Singleton;
 public class ClockModule {
   @Provides
   @Singleton
-  public Clock clock() {
+  Clock clock() {
     return new SystemClock();
   }
 }

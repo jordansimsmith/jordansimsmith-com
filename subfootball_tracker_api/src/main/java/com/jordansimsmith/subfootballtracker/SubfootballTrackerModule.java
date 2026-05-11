@@ -12,7 +12,7 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 public class SubfootballTrackerModule {
   @Provides
   @Singleton
-  public DynamoDbTable<SubfootballTrackerItem> subfootballTrackerTable(
+  DynamoDbTable<SubfootballTrackerItem> subfootballTrackerTable(
       DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(SubfootballTrackerItem.class);
     return dynamoDbEnhancedClient.table("subfootball_tracker", schema);
@@ -20,7 +20,7 @@ public class SubfootballTrackerModule {
 
   @Provides
   @Singleton
-  public SubfootballClient subfootballClient() {
+  SubfootballClient subfootballClient() {
     var baseUrl = System.getenv("SUBFOOTBALL_TRACKER_SUBFOOTBALL_BASE_URL");
     if (baseUrl == null || baseUrl.isBlank()) {
       baseUrl = "https://subfootball.com";

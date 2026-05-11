@@ -42,14 +42,14 @@ public class GetBookHandler
   @Override
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     try {
-      return doHandleRequest(event, context);
+      return doHandleRequest(event);
     } catch (Exception e) {
       LOGGER.error("error processing get book request", e);
       throw new RuntimeException(e);
     }
   }
 
-  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event, Context context) {
+  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
     var user = requestContextFactory.createCtx(event).user();
     var openLibraryWorkId = event.getPathParameters().get("open_library_work_id");
 

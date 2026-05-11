@@ -10,6 +10,7 @@ import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.*;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -44,7 +45,8 @@ public class HttpNrfClientTest {
   }
 
   @Test
-  void findFixturesShouldReturnParsedFixturesWhenSuccessful() throws Exception {
+  void findFixturesShouldReturnParsedFixturesWhenSuccessful()
+      throws IOException, InterruptedException {
     // arrange
     var mockResponse = createMockResponse(200, readFixturesResponse());
     when(mockHttpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
@@ -88,7 +90,8 @@ public class HttpNrfClientTest {
   }
 
   @Test
-  void findFixturesShouldThrowExceptionWhenApiReturnsErrorStatus() throws Exception {
+  void findFixturesShouldThrowExceptionWhenApiReturnsErrorStatus()
+      throws IOException, InterruptedException {
     // arrange
     var mockResponse = createMockResponse(500, "Server error");
     when(mockHttpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))

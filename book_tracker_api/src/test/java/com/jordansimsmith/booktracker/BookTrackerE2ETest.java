@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -48,7 +49,7 @@ public class BookTrackerE2ETest {
   }
 
   @Test
-  void shouldCreateListGetUpdateAndDeleteBook() throws Exception {
+  void shouldCreateListGetUpdateAndDeleteBook() throws IOException, InterruptedException {
     var coverUrl = "https://covers.openlibrary.org/b/id/14625765-L.jpg";
     var createBody =
         """

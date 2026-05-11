@@ -42,15 +42,14 @@ public class FindTripsHandler
   @Override
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     try {
-      return doHandleRequest(event, context);
+      return doHandleRequest(event);
     } catch (Exception e) {
       LOGGER.error("error processing find trips request", e);
       throw new RuntimeException(e);
     }
   }
 
-  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event, Context context)
-      throws Exception {
+  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
     var user = requestContextFactory.createCtx(event).user();
 
     DynamoDbIndex<PackingListItem> gsi1Index = packingListTable.index(PackingListItem.GSI1_NAME);

@@ -11,7 +11,7 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 public class EventCalendarTestModule {
   @Provides
   @Singleton
-  public DynamoDbTable<EventCalendarItem> eventCalendarTable(
+  DynamoDbTable<EventCalendarItem> eventCalendarTable(
       DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(EventCalendarItem.class);
     return dynamoDbEnhancedClient.table("event_calendar", schema);
@@ -19,37 +19,37 @@ public class EventCalendarTestModule {
 
   @Provides
   @Singleton
-  public FakeGoMediaEventClient fakeGoMediaEventClient() {
+  FakeGoMediaEventClient fakeGoMediaEventClient() {
     return new FakeGoMediaEventClient();
   }
 
   @Provides
   @Singleton
-  public GoMediaEventClient goMediaEventClient(FakeGoMediaEventClient fakeGoMediaEventClient) {
+  GoMediaEventClient goMediaEventClient(FakeGoMediaEventClient fakeGoMediaEventClient) {
     return fakeGoMediaEventClient;
   }
 
   @Provides
   @Singleton
-  public FakeMeetupClient fakeMeetupClient() {
+  FakeMeetupClient fakeMeetupClient() {
     return new FakeMeetupClient();
   }
 
   @Provides
   @Singleton
-  public MeetupClient meetupClient(FakeMeetupClient fakeMeetupClient) {
+  MeetupClient meetupClient(FakeMeetupClient fakeMeetupClient) {
     return fakeMeetupClient;
   }
 
   @Provides
   @Singleton
-  public FakeMeetupsFactory fakeMeetupsFactory() {
+  FakeMeetupsFactory fakeMeetupsFactory() {
     return new FakeMeetupsFactory();
   }
 
   @Provides
   @Singleton
-  public MeetupsFactory meetupsFactory(FakeMeetupsFactory fakeMeetupsFactory) {
+  MeetupsFactory meetupsFactory(FakeMeetupsFactory fakeMeetupsFactory) {
     return fakeMeetupsFactory;
   }
 }

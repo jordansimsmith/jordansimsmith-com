@@ -15,7 +15,7 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 public class EventCalendarModule {
   @Provides
   @Singleton
-  public DynamoDbTable<EventCalendarItem> eventCalendarTable(
+  DynamoDbTable<EventCalendarItem> eventCalendarTable(
       DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(EventCalendarItem.class);
     return dynamoDbEnhancedClient.table("event_calendar", schema);
@@ -23,7 +23,7 @@ public class EventCalendarModule {
 
   @Provides
   @Singleton
-  public GoMediaEventClient goMediaEventClient() {
+  GoMediaEventClient goMediaEventClient() {
     var baseUrl = System.getenv("EVENT_CALENDAR_GOMEDIA_BASE_URL");
     if (baseUrl == null || baseUrl.isBlank()) {
       baseUrl = "https://www.aucklandstadiums.co.nz";
@@ -33,13 +33,13 @@ public class EventCalendarModule {
 
   @Provides
   @Singleton
-  public ObjectMapper objectMapper() {
+  ObjectMapper objectMapper() {
     return new ObjectMapper();
   }
 
   @Provides
   @Singleton
-  public MeetupClient meetupClient(Clock clock, ObjectMapper objectMapper) {
+  MeetupClient meetupClient(Clock clock, ObjectMapper objectMapper) {
     var baseUrl = System.getenv("EVENT_CALENDAR_MEETUP_BASE_URL");
     if (baseUrl == null || baseUrl.isBlank()) {
       baseUrl = "https://www.meetup.com";
@@ -50,7 +50,7 @@ public class EventCalendarModule {
 
   @Provides
   @Singleton
-  public MeetupsFactory meetupsFactory() {
+  MeetupsFactory meetupsFactory() {
     return new MeetupsFactoryImpl();
   }
 }

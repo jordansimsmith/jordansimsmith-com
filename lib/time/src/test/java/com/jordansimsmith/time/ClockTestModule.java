@@ -8,13 +8,13 @@ import javax.inject.Singleton;
 public class ClockTestModule {
   @Provides
   @Singleton
-  public FakeClock fakeClock() {
+  FakeClock fakeClock() {
     return new FakeClock();
   }
 
   @Provides
   @Singleton
-  public Clock clock(FakeClock fakeClock) {
+  Clock clock(FakeClock fakeClock) {
     return fakeClock;
   }
 }

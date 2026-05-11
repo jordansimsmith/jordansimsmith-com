@@ -9,6 +9,7 @@ import static org.mockito.MockitoAnnotations.openMocks;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.time.Clock;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -117,7 +118,7 @@ public class HttpMeetupClientTest {
   }
 
   @Test
-  void getEventsShouldReturnEventsWithCompleteVenue() throws Exception {
+  void getEventsShouldReturnEventsWithCompleteVenue() throws IOException, InterruptedException {
     // arrange
     when(clock.now()).thenReturn(Instant.parse("2025-10-25T05:00:00Z"));
 
@@ -152,7 +153,7 @@ public class HttpMeetupClientTest {
   }
 
   @Test
-  void getEventsShouldHandleNullVenue() throws Exception {
+  void getEventsShouldHandleNullVenue() throws IOException, InterruptedException {
     // arrange
     when(clock.now()).thenReturn(Instant.parse("2025-10-25T05:00:00Z"));
 
@@ -173,7 +174,7 @@ public class HttpMeetupClientTest {
   }
 
   @Test
-  void getEventsShouldCombineUpcomingAndPastEvents() throws Exception {
+  void getEventsShouldCombineUpcomingAndPastEvents() throws IOException, InterruptedException {
     // arrange
     when(clock.now()).thenReturn(Instant.parse("2025-10-25T05:00:00Z"));
 
@@ -194,7 +195,7 @@ public class HttpMeetupClientTest {
   }
 
   @Test
-  void getEventsShouldParseTimestampsWithTimezone() throws Exception {
+  void getEventsShouldParseTimestampsWithTimezone() throws IOException, InterruptedException {
     // arrange
     when(clock.now()).thenReturn(Instant.parse("2025-10-25T05:00:00Z"));
 

@@ -6,6 +6,7 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.RandomAccessFile;
 import java.nio.file.Path;
@@ -87,7 +88,7 @@ public class ImmersionTrackerE2ETest {
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
   @Test
-  void scriptShouldSyncEpisodes() throws Exception {
+  void scriptShouldSyncEpisodes() throws IOException, InterruptedException {
     // arrange
     var tmp = new File(System.getProperty("java.io.tmpdir"));
 
@@ -233,7 +234,7 @@ public class ImmersionTrackerE2ETest {
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
   @Test
-  void scriptShouldSyncMovies() throws Exception {
+  void scriptShouldSyncMovies() throws IOException, InterruptedException {
     // arrange
     var tmp = new File(System.getProperty("java.io.tmpdir"));
 
@@ -332,7 +333,7 @@ public class ImmersionTrackerE2ETest {
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
   @Test
-  void scriptShouldSyncYoutubeVideos() throws Exception {
+  void scriptShouldSyncYoutubeVideos() throws IOException, InterruptedException {
     // arrange
     var tmp = new File(System.getProperty("java.io.tmpdir"));
 
@@ -417,7 +418,7 @@ public class ImmersionTrackerE2ETest {
 
   @SuppressWarnings("ResultOfMethodCallIgnored")
   @Test
-  void scriptShouldSyncSpotifyEpisodes() throws Exception {
+  void scriptShouldSyncSpotifyEpisodes() throws IOException, InterruptedException {
     // arrange
     var tmp = new File(System.getProperty("java.io.tmpdir"));
 

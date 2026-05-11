@@ -36,14 +36,14 @@ public class UpdateEventsHandler implements RequestHandler<ScheduledEvent, Void>
   @Override
   public Void handleRequest(ScheduledEvent event, Context context) {
     try {
-      return doHandleRequest(event, context);
+      return doHandleRequest();
     } catch (Exception e) {
       logger.error("Error processing event calendar update", e);
       throw new RuntimeException(e);
     }
   }
 
-  private Void doHandleRequest(ScheduledEvent event, Context context) {
+  private Void doHandleRequest() {
     // find and combine all events from various sources
     var allEvents = new ArrayList<EventCalendarItem>();
     allEvents.addAll(findGoMediaEvents());

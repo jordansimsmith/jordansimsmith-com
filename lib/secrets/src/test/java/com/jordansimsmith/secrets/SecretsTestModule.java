@@ -9,13 +9,13 @@ public class SecretsTestModule {
 
   @Provides
   @Singleton
-  public FakeSecrets fakeSecrets() {
+  FakeSecrets fakeSecrets() {
     return new FakeSecrets();
   }
 
   @Provides
   @Singleton
-  public Secrets secrets(FakeSecrets fakeSecrets) {
+  Secrets secrets(FakeSecrets fakeSecrets) {
     return fakeSecrets;
   }
 }

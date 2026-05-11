@@ -11,7 +11,7 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 public class SubfootballTrackerTestModule {
   @Provides
   @Singleton
-  public DynamoDbTable<SubfootballTrackerItem> subfootballTrackerTable(
+  DynamoDbTable<SubfootballTrackerItem> subfootballTrackerTable(
       DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(SubfootballTrackerItem.class);
     return dynamoDbEnhancedClient.table("subfootball_tracker", schema);
@@ -19,13 +19,13 @@ public class SubfootballTrackerTestModule {
 
   @Provides
   @Singleton
-  public FakeSubfootballClient fakeSubfootballClient() {
+  FakeSubfootballClient fakeSubfootballClient() {
     return new FakeSubfootballClient();
   }
 
   @Provides
   @Singleton
-  public SubfootballClient subfootballClient(FakeSubfootballClient fakeSubfootballClient) {
+  SubfootballClient subfootballClient(FakeSubfootballClient fakeSubfootballClient) {
     return fakeSubfootballClient;
   }
 }

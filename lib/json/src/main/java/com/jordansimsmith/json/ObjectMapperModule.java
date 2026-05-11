@@ -7,7 +7,7 @@ import dagger.Provides;
 @Module
 public class ObjectMapperModule {
   @Provides
-  public ObjectMapper objectMapper() {
+  ObjectMapper objectMapper() {
     return new ObjectMapper();
   }
 }

@@ -11,7 +11,7 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 public class AuctionTrackerTestModule {
   @Provides
   @Singleton
-  public DynamoDbTable<AuctionTrackerItem> auctionTrackerTable(
+  DynamoDbTable<AuctionTrackerItem> auctionTrackerTable(
       DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(AuctionTrackerItem.class);
     return dynamoDbEnhancedClient.table("auction_tracker", schema);
@@ -19,25 +19,25 @@ public class AuctionTrackerTestModule {
 
   @Provides
   @Singleton
-  public FakeSearchFactory fakeSearchFactory() {
+  FakeSearchFactory fakeSearchFactory() {
     return new FakeSearchFactory();
   }
 
   @Provides
   @Singleton
-  public SearchFactory searchFactory(FakeSearchFactory fakeSearchFactory) {
+  SearchFactory searchFactory(FakeSearchFactory fakeSearchFactory) {
     return fakeSearchFactory;
   }
 
   @Provides
   @Singleton
-  public FakeTradeMeClient fakeTradeMeClient() {
+  FakeTradeMeClient fakeTradeMeClient() {
     return new FakeTradeMeClient();
   }
 
   @Provides
   @Singleton
-  public TradeMeClient tradeMeClient(FakeTradeMeClient fakeTradeMeClient) {
+  TradeMeClient tradeMeClient(FakeTradeMeClient fakeTradeMeClient) {
     return fakeTradeMeClient;
   }
 }

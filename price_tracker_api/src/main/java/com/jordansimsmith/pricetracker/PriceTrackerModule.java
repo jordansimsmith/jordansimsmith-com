@@ -16,7 +16,7 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 public class PriceTrackerModule {
   @Provides
   @Singleton
-  public DynamoDbTable<PriceTrackerItem> immersionTrackerTable(
+  DynamoDbTable<PriceTrackerItem> immersionTrackerTable(
       DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(PriceTrackerItem.class);
     return dynamoDbEnhancedClient.table("price_tracker", schema);
@@ -25,7 +25,7 @@ public class PriceTrackerModule {
   @Provides
   @Singleton
   @Named("chemistWarehouseBaseUri")
-  public URI chemistWarehouseBaseUri() {
+  URI chemistWarehouseBaseUri() {
     var chemistWarehouseBaseUrl = System.getenv("PRICE_TRACKER_CHEMIST_WAREHOUSE_BASE_URL");
     if (chemistWarehouseBaseUrl == null || chemistWarehouseBaseUrl.isBlank()) {
       chemistWarehouseBaseUrl = "https://www.chemistwarehouse.co.nz";
@@ -36,7 +36,7 @@ public class PriceTrackerModule {
   @Provides
   @Singleton
   @Named("nzProteinBaseUri")
-  public URI nzProteinBaseUri() {
+  URI nzProteinBaseUri() {
     var nzProteinBaseUrl = System.getenv("PRICE_TRACKER_NZ_PROTEIN_BASE_URL");
     if (nzProteinBaseUrl == null || nzProteinBaseUrl.isBlank()) {
       nzProteinBaseUrl = "https://www.nzprotein.co.nz";
@@ -47,7 +47,7 @@ public class PriceTrackerModule {
   @Provides
   @Singleton
   @Named("nzMuscleBaseUri")
-  public URI nzMuscleBaseUri() {
+  URI nzMuscleBaseUri() {
     var nzMuscleBaseUrl = System.getenv("PRICE_TRACKER_NZ_MUSCLE_BASE_URL");
     if (nzMuscleBaseUrl == null || nzMuscleBaseUrl.isBlank()) {
       nzMuscleBaseUrl = "https://nzmuscle.co.nz";
@@ -57,7 +57,7 @@ public class PriceTrackerModule {
 
   @Provides
   @Singleton
-  public PriceClient priceClient(
+  PriceClient priceClient(
       @Named("chemistWarehouseBaseUri") URI chemistWarehouseBaseUri,
       @Named("nzProteinBaseUri") URI nzProteinBaseUri,
       @Named("nzMuscleBaseUri") URI nzMuscleBaseUri) {
@@ -77,7 +77,7 @@ public class PriceTrackerModule {
 
   @Provides
   @Singleton
-  public ProductsFactory productsFactory(
+  ProductsFactory productsFactory(
       @Named("chemistWarehouseBaseUri") URI chemistWarehouseBaseUri,
       @Named("nzProteinBaseUri") URI nzProteinBaseUri,
       @Named("nzMuscleBaseUri") URI nzMuscleBaseUri) {

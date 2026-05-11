@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.time.Clock;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -36,12 +37,15 @@ public class HttpMeetupClient implements MeetupClient {
   public List<MeetupEvent> findEvents(URI groupUrl) {
     try {
       return doGetEvents(groupUrl);
-    } catch (Exception e) {
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException("Failed to get meetup events for group: " + groupUrl, e);
+    } catch (IOException e) {
       throw new RuntimeException("Failed to get meetup events for group: " + groupUrl, e);
     }
   }
 
-  private List<MeetupEvent> doGetEvents(URI groupUrl) throws Exception {
+  private List<MeetupEvent> doGetEvents(URI groupUrl) throws IOException, InterruptedException {
     var events = new ArrayList<MeetupEvent>();
     var currentTime = clock.now().toString();
     var groupUrlname = extractGroupUrlname(groupUrl);
@@ -59,7 +63,7 @@ public class HttpMeetupClient implements MeetupClient {
     return events;
   }
 
-  private GraphQLResponse fetchEvents(String jsonBody) throws Exception {
+  private GraphQLResponse fetchEvents(String jsonBody) throws IOException, InterruptedException {
     var endpoint = apiBaseUri.resolve(GRAPHQL_PATH);
     var request =
         HttpRequest.newBuilder()

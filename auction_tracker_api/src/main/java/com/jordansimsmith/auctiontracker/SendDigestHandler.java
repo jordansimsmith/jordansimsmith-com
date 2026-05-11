@@ -43,14 +43,14 @@ public class SendDigestHandler implements RequestHandler<ScheduledEvent, Void> {
   @Override
   public Void handleRequest(ScheduledEvent event, Context context) {
     try {
-      return doHandleRequest(event, context);
+      return doHandleRequest();
     } catch (Exception e) {
       LOGGER.error("Error sending auction digest", e);
       throw new RuntimeException(e);
     }
   }
 
-  private Void doHandleRequest(ScheduledEvent event, Context context) {
+  private Void doHandleRequest() {
     var searches = searchFactory.findSearches();
     var currentTime = clock.now();
     var yesterdayTime = currentTime.minus(1, ChronoUnit.DAYS);

@@ -3,6 +3,7 @@ package com.jordansimsmith.footballcalendar;
 import biweekly.Biweekly;
 import biweekly.component.VEvent;
 import biweekly.property.Description;
+import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -28,12 +29,16 @@ public class BiweeklySubfootballClient implements SubfootballClient {
   public List<SubfootballFixture> findFixtures(String teamId) {
     try {
       return doGetFixtures(teamId);
-    } catch (Exception e) {
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    } catch (IOException e) {
       throw new RuntimeException(e);
     }
   }
 
-  private List<SubfootballFixture> doGetFixtures(String teamId) throws Exception {
+  private List<SubfootballFixture> doGetFixtures(String teamId)
+      throws IOException, InterruptedException {
     var icalContent = fetchIcal(teamId);
     var calendars = Biweekly.parse(icalContent).all();
 
@@ -51,7 +56,7 @@ public class BiweeklySubfootballClient implements SubfootballClient {
     return fixtures;
   }
 
-  private String fetchIcal(String teamId) throws Exception {
+  private String fetchIcal(String teamId) throws IOException, InterruptedException {
     var url = baseUri.resolve(CALENDAR_PATH + teamId);
     var request =
         HttpRequest.newBuilder()

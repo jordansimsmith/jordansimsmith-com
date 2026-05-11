@@ -8,7 +8,7 @@ import javax.inject.Singleton;
 public class RequestContextModule {
   @Provides
   @Singleton
-  public RequestContextFactory requestContextFactory() {
+  RequestContextFactory requestContextFactory() {
     return new RequestContextFactory();
   }
 }

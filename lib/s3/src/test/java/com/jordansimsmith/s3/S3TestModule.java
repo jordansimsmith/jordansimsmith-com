@@ -18,7 +18,7 @@ public class S3TestModule {
 
   @Provides
   @Singleton
-  public S3Client s3Client(@Named("s3Endpoint") URI s3Endpoint) {
+  S3Client s3Client(@Named("s3Endpoint") URI s3Endpoint) {
     return S3Client.builder()
         .endpointOverride(s3Endpoint)
         .forcePathStyle(true)
@@ -28,7 +28,7 @@ public class S3TestModule {
 
   @Provides
   @Singleton
-  public S3Presigner s3Presigner(@Named("s3Endpoint") URI s3Endpoint) {
+  S3Presigner s3Presigner(@Named("s3Endpoint") URI s3Endpoint) {
     return S3Presigner.builder()
         .endpointOverride(s3Endpoint)
         .credentialsProvider(CREDENTIALS)

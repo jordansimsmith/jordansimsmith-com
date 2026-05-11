@@ -10,13 +10,13 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 public class DynamoDbModule {
   @Provides
   @Singleton
-  public DynamoDbClient dynamoDbClient() {
+  DynamoDbClient dynamoDbClient() {
     return DynamoDbClient.builder().build();
   }
 
   @Provides
   @Singleton
-  public DynamoDbEnhancedClient dynamoDbEnhancedClient(DynamoDbClient dynamoDbClient) {
+  DynamoDbEnhancedClient dynamoDbEnhancedClient(DynamoDbClient dynamoDbClient) {
     return DynamoDbEnhancedClient.builder().dynamoDbClient(dynamoDbClient).build();
   }
 }

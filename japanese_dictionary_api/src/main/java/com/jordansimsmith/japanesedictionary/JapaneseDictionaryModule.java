@@ -13,7 +13,7 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 public class JapaneseDictionaryModule {
   @Provides
   @Singleton
-  public HttpResponseFactory httpResponseFactory(ObjectMapper objectMapper) {
+  HttpResponseFactory httpResponseFactory(ObjectMapper objectMapper) {
     return new HttpResponseFactory.Builder(objectMapper)
         .withAllowedOrigin("https://japanese-dictionary.jordansimsmith.com")
         .build();
@@ -21,7 +21,7 @@ public class JapaneseDictionaryModule {
 
   @Provides
   @Singleton
-  public DynamoDbTable<JapaneseDictionaryItem> japaneseDictionaryTable(
+  DynamoDbTable<JapaneseDictionaryItem> japaneseDictionaryTable(
       DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(JapaneseDictionaryItem.class);
     return dynamoDbEnhancedClient.table(JapaneseDictionaryItem.TABLE_NAME, schema);
@@ -29,7 +29,7 @@ public class JapaneseDictionaryModule {
 
   @Provides
   @Singleton
-  public RomajiNormaliser romajiNormaliser() {
+  RomajiNormaliser romajiNormaliser() {
     return new RomajiNormaliser();
   }
 }

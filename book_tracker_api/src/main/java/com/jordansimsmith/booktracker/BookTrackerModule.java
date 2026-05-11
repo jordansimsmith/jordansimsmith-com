@@ -13,7 +13,7 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 public class BookTrackerModule {
   @Provides
   @Singleton
-  public HttpResponseFactory httpResponseFactory(ObjectMapper objectMapper) {
+  HttpResponseFactory httpResponseFactory(ObjectMapper objectMapper) {
     return new HttpResponseFactory.Builder(objectMapper)
         .withAllowedOrigin("https://book-tracker.jordansimsmith.com")
         .build();
@@ -21,8 +21,7 @@ public class BookTrackerModule {
 
   @Provides
   @Singleton
-  public DynamoDbTable<BookTrackerItem> bookTrackerTable(
-      DynamoDbEnhancedClient dynamoDbEnhancedClient) {
+  DynamoDbTable<BookTrackerItem> bookTrackerTable(DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(BookTrackerItem.class);
     return dynamoDbEnhancedClient.table(BookTrackerItem.TABLE_NAME, schema);
   }

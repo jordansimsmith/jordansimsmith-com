@@ -11,7 +11,7 @@ public class DynamoDbUtils {
     table.createTable();
 
     try (var waiter = DynamoDbWaiter.builder().client(dynamoDbClient).build()) {
-      var res = waiter.waitUntilTableExists(b -> b.tableName(table.tableName()).build()).matched();
+      waiter.waitUntilTableExists(b -> b.tableName(table.tableName()).build()).matched();
     }
   }
 

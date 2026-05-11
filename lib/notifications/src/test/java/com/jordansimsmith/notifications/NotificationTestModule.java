@@ -9,14 +9,13 @@ public class NotificationTestModule {
 
   @Provides
   @Singleton
-  public FakeNotificationPublisher fakeNotificationPublisher() {
+  FakeNotificationPublisher fakeNotificationPublisher() {
     return new FakeNotificationPublisher();
   }
 
   @Provides
   @Singleton
-  public NotificationPublisher notificationPublisher(
-      FakeNotificationPublisher fakeNotificationPublisher) {
+  NotificationPublisher notificationPublisher(FakeNotificationPublisher fakeNotificationPublisher) {
     return fakeNotificationPublisher;
   }
 }

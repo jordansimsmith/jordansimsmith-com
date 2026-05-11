@@ -13,7 +13,7 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 public class PackingListTestModule {
   @Provides
   @Singleton
-  public HttpResponseFactory httpResponseFactory(ObjectMapper objectMapper) {
+  HttpResponseFactory httpResponseFactory(ObjectMapper objectMapper) {
     return new HttpResponseFactory.Builder(objectMapper)
         .withAllowedOrigin("https://packing-list.jordansimsmith.com")
         .build();
@@ -21,20 +21,19 @@ public class PackingListTestModule {
 
   @Provides
   @Singleton
-  public FakeTemplatesFactory fakeTemplatesFactory() {
+  FakeTemplatesFactory fakeTemplatesFactory() {
     return new FakeTemplatesFactory();
   }
 
   @Provides
   @Singleton
-  public TemplatesFactory templatesFactory(FakeTemplatesFactory fakeTemplatesFactory) {
+  TemplatesFactory templatesFactory(FakeTemplatesFactory fakeTemplatesFactory) {
     return fakeTemplatesFactory;
   }
 
   @Provides
   @Singleton
-  public DynamoDbTable<PackingListItem> packingListTable(
-      DynamoDbEnhancedClient dynamoDbEnhancedClient) {
+  DynamoDbTable<PackingListItem> packingListTable(DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(PackingListItem.class);
     return dynamoDbEnhancedClient.table(PackingListItem.TABLE_NAME, schema);
   }

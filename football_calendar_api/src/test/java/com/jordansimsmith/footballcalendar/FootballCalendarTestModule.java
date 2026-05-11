@@ -12,7 +12,7 @@ public class FootballCalendarTestModule {
 
   @Provides
   @Singleton
-  public DynamoDbTable<FootballCalendarItem> footballCalendarTable(
+  DynamoDbTable<FootballCalendarItem> footballCalendarTable(
       DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(FootballCalendarItem.class);
     return dynamoDbEnhancedClient.table("football_calendar", schema);
@@ -20,49 +20,49 @@ public class FootballCalendarTestModule {
 
   @Provides
   @Singleton
-  public FakeNrfClient fakeNrfClient() {
+  FakeNrfClient fakeNrfClient() {
     return new FakeNrfClient();
   }
 
   @Provides
   @Singleton
-  public NrfClient nrfClient(FakeNrfClient fakeNrfClient) {
+  NrfClient nrfClient(FakeNrfClient fakeNrfClient) {
     return fakeNrfClient;
   }
 
   @Provides
   @Singleton
-  public FakeFootballFixClient fakeFootballFixClient() {
+  FakeFootballFixClient fakeFootballFixClient() {
     return new FakeFootballFixClient();
   }
 
   @Provides
   @Singleton
-  public FootballFixClient footballFixClient(FakeFootballFixClient fakeFootballFixClient) {
+  FootballFixClient footballFixClient(FakeFootballFixClient fakeFootballFixClient) {
     return fakeFootballFixClient;
   }
 
   @Provides
   @Singleton
-  public FakeSubfootballClient fakeSubfootballClient() {
+  FakeSubfootballClient fakeSubfootballClient() {
     return new FakeSubfootballClient();
   }
 
   @Provides
   @Singleton
-  public SubfootballClient subfootballClient(FakeSubfootballClient fakeSubfootballClient) {
+  SubfootballClient subfootballClient(FakeSubfootballClient fakeSubfootballClient) {
     return fakeSubfootballClient;
   }
 
   @Provides
   @Singleton
-  public FakeTeamsFactory fakeTeamsFactory() {
+  FakeTeamsFactory fakeTeamsFactory() {
     return new FakeTeamsFactory();
   }
 
   @Provides
   @Singleton
-  public TeamsFactory teamsFactory(FakeTeamsFactory fakeTeamsFactory) {
+  TeamsFactory teamsFactory(FakeTeamsFactory fakeTeamsFactory) {
     return fakeTeamsFactory;
   }
 }

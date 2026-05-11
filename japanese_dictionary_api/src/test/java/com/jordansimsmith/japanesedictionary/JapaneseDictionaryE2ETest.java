@@ -3,6 +3,7 @@ package com.jordansimsmith.japanesedictionary;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;
 import java.net.http.HttpClient;
@@ -39,7 +40,8 @@ public class JapaneseDictionaryE2ETest {
   }
 
   @Test
-  void getSearchShouldReturnMatchingFixturesForKanjiPrefix() throws Exception {
+  void getSearchShouldReturnMatchingFixturesForKanjiPrefix()
+      throws IOException, InterruptedException {
     var encoded = URLEncoder.encode("新", StandardCharsets.UTF_8);
     var request =
         HttpRequest.newBuilder()
@@ -61,7 +63,8 @@ public class JapaneseDictionaryE2ETest {
   }
 
   @Test
-  void getSearchShouldReturnMatchingFixturesForKanaPrefix() throws Exception {
+  void getSearchShouldReturnMatchingFixturesForKanaPrefix()
+      throws IOException, InterruptedException {
     var encoded = URLEncoder.encode("しん", StandardCharsets.UTF_8);
     var request =
         HttpRequest.newBuilder()
@@ -80,7 +83,8 @@ public class JapaneseDictionaryE2ETest {
   }
 
   @Test
-  void getSearchShouldReturnMatchingFixturesForRomajiPrefix() throws Exception {
+  void getSearchShouldReturnMatchingFixturesForRomajiPrefix()
+      throws IOException, InterruptedException {
     var request =
         HttpRequest.newBuilder()
             .uri(URI.create(apiUrl + "/search?q=shin"))
@@ -98,7 +102,7 @@ public class JapaneseDictionaryE2ETest {
   }
 
   @Test
-  void getSearchShouldReturnEmptyResultsForEmptyQ() throws Exception {
+  void getSearchShouldReturnEmptyResultsForEmptyQ() throws IOException, InterruptedException {
     var request =
         HttpRequest.newBuilder()
             .uri(URI.create(apiUrl + "/search?q="))
@@ -114,7 +118,7 @@ public class JapaneseDictionaryE2ETest {
   }
 
   @Test
-  void getSearchShouldRejectQLongerThan64() throws Exception {
+  void getSearchShouldRejectQLongerThan64() throws IOException, InterruptedException {
     var request =
         HttpRequest.newBuilder()
             .uri(URI.create(apiUrl + "/search?q=" + "x".repeat(65)))
@@ -134,7 +138,8 @@ public class JapaneseDictionaryE2ETest {
   // in AuthHandlerTest and the wiring is asserted in the infra Terraform plan.
 
   @Test
-  void getSearchShouldHydrateGlossaryTreeForImageBearingFixture() throws Exception {
+  void getSearchShouldHydrateGlossaryTreeForImageBearingFixture()
+      throws IOException, InterruptedException {
     var encoded = URLEncoder.encode("心", StandardCharsets.UTF_8);
     var request =
         HttpRequest.newBuilder()
