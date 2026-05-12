@@ -18,7 +18,7 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 @Testcontainers
 public class SearchHandlerIntegrationTest {
   private ObjectMapper objectMapper;
-  private DynamoDbTable<JapaneseDictionaryItem> japaneseDictionaryTable;
+  private DynamoDbTable<TermItem> termTable;
 
   private SearchHandler searchHandler;
 
@@ -27,7 +27,7 @@ public class SearchHandlerIntegrationTest {
   @BeforeAll
   static void setUpBeforeClass() {
     var factory = JapaneseDictionaryTestFactory.create(dynamoDbContainer.getEndpoint());
-    var table = factory.japaneseDictionaryTable();
+    var table = factory.termTable();
     DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
   }
 
@@ -36,7 +36,7 @@ public class SearchHandlerIntegrationTest {
     var factory = JapaneseDictionaryTestFactory.create(dynamoDbContainer.getEndpoint());
 
     objectMapper = factory.objectMapper();
-    japaneseDictionaryTable = factory.japaneseDictionaryTable();
+    termTable = factory.termTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
 
@@ -77,9 +77,9 @@ public class SearchHandlerIntegrationTest {
       @Nullable Integer pitch,
       String glossaryRaw) {
     var item =
-        JapaneseDictionaryItem.create(
+        TermItem.create(
             sequence, expression, reading, readingRomaji, frequencyRank, pitch, glossaryRaw);
-    japaneseDictionaryTable.putItem(item);
+    termTable.putItem(item);
   }
 
   @Test

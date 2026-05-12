@@ -157,4 +157,53 @@ public class JapaneseDictionaryE2ETest {
     assertThat(image.get("tag").asText()).isEqualTo("img");
     assertThat(image.get("path").asText()).isEqualTo("jitendex/graphics/heart.png");
   }
+
+  @Test
+  void putBookmarkThenGetBookmarksShouldReturnTheBookmarkedSequence()
+      throws IOException, InterruptedException {
+    var putRequest =
+        HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl + "/bookmarks/2"))
+            .header("Authorization", authHeader)
+            .PUT(HttpRequest.BodyPublishers.noBody())
+            .build();
+    var putResponse = httpClient.send(putRequest, HttpResponse.BodyHandlers.ofString());
+
+    assertThat(putResponse.statusCode()).isEqualTo(201);
+    var putBody =
+        objectMapper.readValue(
+            putResponse.body(), CreateBookmarkHandler.CreateBookmarkResponse.class);
+    assertThat(putBody.sequence()).isEqualTo(2L);
+    assertThat(putBody.createdAt()).isPositive();
+
+    var getRequest =
+        HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl + "/bookmarks"))
+            .header("Authorization", authHeader)
+            .GET()
+            .build();
+    var getResponse = httpClient.send(getRequest, HttpResponse.BodyHandlers.ofString());
+
+    assertThat(getResponse.statusCode()).isEqualTo(200);
+    var getBody =
+        objectMapper.readValue(
+            getResponse.body(), FindBookmarksHandler.FindBookmarksResponse.class);
+    assertThat(getBody.sequences()).contains(2L);
+  }
+
+  @Test
+  void putBookmarkShouldRejectNonNumericSequence() throws IOException, InterruptedException {
+    var request =
+        HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl + "/bookmarks/abc"))
+            .header("Authorization", authHeader)
+            .PUT(HttpRequest.BodyPublishers.noBody())
+            .build();
+
+    var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    assertThat(response.statusCode()).isEqualTo(400);
+    var body = objectMapper.readValue(response.body(), CreateBookmarkHandler.ErrorResponse.class);
+    assertThat(body.message()).isEqualTo("sequence must be a positive integer");
+  }
 }

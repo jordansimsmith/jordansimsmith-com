@@ -205,14 +205,37 @@ lambdas = {
         "handler": "com.jordansimsmith.japanesedictionary.SearchHandler",
         "zip_file": "search-handler_deploy.jar",
     },
+    "create_bookmark": {
+        "handler": "com.jordansimsmith.japanesedictionary.CreateBookmarkHandler",
+        "zip_file": "create-bookmark-handler_deploy.jar",
+    },
+    "find_bookmarks": {
+        "handler": "com.jordansimsmith.japanesedictionary.FindBookmarksHandler",
+        "zip_file": "find-bookmarks-handler_deploy.jar",
+    },
 }
 
 root_resources = {
     "search": {"path": "search"},
+    "bookmarks": {"path": "bookmarks"},
+}
+
+child_resources = {
+    "bookmark": {"path": "{sequence}", "parent": "bookmarks"},
 }
 
 endpoints = {
     "search": {"resource": "search", "method": "GET", "lambda": "search"},
+    "find_bookmarks": {
+        "resource": "bookmarks",
+        "method": "GET",
+        "lambda": "find_bookmarks",
+    },
+    "create_bookmark": {
+        "resource": "bookmark",
+        "method": "PUT",
+        "lambda": "create_bookmark",
+    },
 }
 
 for function_name, config in lambdas.items():
@@ -263,6 +286,12 @@ resource_ids = {}
 for name, config in root_resources.items():
     resource_ids[name] = apigateway_client.create_resource(
         restApiId=api_id, parentId=root_id, pathPart=config["path"]
+    )["id"]
+for name, config in child_resources.items():
+    resource_ids[name] = apigateway_client.create_resource(
+        restApiId=api_id,
+        parentId=resource_ids[config["parent"]],
+        pathPart=config["path"],
     )["id"]
 
 for endpoint in endpoints.values():

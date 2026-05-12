@@ -4,29 +4,27 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import org.junit.jupiter.api.Test;
 
-public class JapaneseDictionaryItemTest {
+public class TermItemTest {
 
   @Test
   void formatPkAndSkShouldUseTermPrefix() {
-    assertThat(JapaneseDictionaryItem.formatPk(1316830L)).isEqualTo("TERM#1316830");
-    assertThat(JapaneseDictionaryItem.formatSk(1316830L)).isEqualTo("TERM#1316830");
+    assertThat(TermItem.formatPk(1316830L)).isEqualTo("TERM#1316830");
+    assertThat(TermItem.formatSk(1316830L)).isEqualTo("TERM#1316830");
   }
 
   @Test
   void formatGsiKeysShouldReturnRawIndexedValues() {
-    assertThat(JapaneseDictionaryItem.formatGsi1pk()).isEqualTo("EXPRESSION");
-    assertThat(JapaneseDictionaryItem.formatGsi1sk("新橋")).isEqualTo("新橋");
-    assertThat(JapaneseDictionaryItem.formatGsi2pk()).isEqualTo("READING");
-    assertThat(JapaneseDictionaryItem.formatGsi2sk("しんばし")).isEqualTo("しんばし");
-    assertThat(JapaneseDictionaryItem.formatGsi3pk()).isEqualTo("ROMAJI");
-    assertThat(JapaneseDictionaryItem.formatGsi3sk("shinbashi")).isEqualTo("shinbashi");
+    assertThat(TermItem.formatGsi1pk()).isEqualTo("EXPRESSION");
+    assertThat(TermItem.formatGsi1sk("新橋")).isEqualTo("新橋");
+    assertThat(TermItem.formatGsi2pk()).isEqualTo("READING");
+    assertThat(TermItem.formatGsi2sk("しんばし")).isEqualTo("しんばし");
+    assertThat(TermItem.formatGsi3pk()).isEqualTo("ROMAJI");
+    assertThat(TermItem.formatGsi3sk("shinbashi")).isEqualTo("shinbashi");
   }
 
   @Test
   void createShouldPopulateAllRequiredAttributes() {
-    var item =
-        JapaneseDictionaryItem.create(
-            1316830L, "新橋", "しんばし", "shinbashi", 18472, 0, "{\"tag\":\"div\"}");
+    var item = TermItem.create(1316830L, "新橋", "しんばし", "shinbashi", 18472, 0, "{\"tag\":\"div\"}");
 
     assertThat(item.getPk()).isEqualTo("TERM#1316830");
     assertThat(item.getSk()).isEqualTo("TERM#1316830");
@@ -47,9 +45,7 @@ public class JapaneseDictionaryItemTest {
 
   @Test
   void createShouldAllowNullableFrequencyAndPitch() {
-    var item =
-        JapaneseDictionaryItem.create(
-            1234L, "範疇文法", "はんちゅうぶんぽう", "hanchuubunpou", null, null, "{}");
+    var item = TermItem.create(1234L, "範疇文法", "はんちゅうぶんぽう", "hanchuubunpou", null, null, "{}");
 
     assertThat(item.getFrequencyRank()).isNull();
     assertThat(item.getPitch()).isNull();
@@ -58,8 +54,8 @@ public class JapaneseDictionaryItemTest {
 
   @Test
   void equalsShouldRoundTripIdenticalItems() {
-    var a = JapaneseDictionaryItem.create(1L, "猫", "ねこ", "neko", 100, 2, "{}");
-    var b = JapaneseDictionaryItem.create(1L, "猫", "ねこ", "neko", 100, 2, "{}");
+    var a = TermItem.create(1L, "猫", "ねこ", "neko", 100, 2, "{}");
+    var b = TermItem.create(1L, "猫", "ねこ", "neko", 100, 2, "{}");
 
     assertThat(a).isEqualTo(b);
     assertThat(a.hashCode()).isEqualTo(b.hashCode());

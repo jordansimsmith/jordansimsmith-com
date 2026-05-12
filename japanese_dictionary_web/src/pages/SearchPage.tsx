@@ -35,6 +35,7 @@ export function SearchPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [bookmarks, setBookmarks] = useState<Set<number>>(() => new Set());
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestId = useRef(0);
 
@@ -76,6 +77,14 @@ export function SearchPage() {
     if (initialQuery) {
       runSearch(initialQuery);
     }
+    apiClient
+      .findBookmarks()
+      .then((response) => {
+        setBookmarks(new Set(response.sequences));
+      })
+      .catch((e) => {
+        console.warn('failed to load bookmarks', e);
+      });
     return () => {
       if (debounceTimer.current !== null) {
         clearTimeout(debounceTimer.current);
@@ -83,6 +92,28 @@ export function SearchPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleBookmark = async (sequence: number) => {
+    if (bookmarks.has(sequence)) {
+      return;
+    }
+    setBookmarks((prev) => {
+      const next = new Set(prev);
+      next.add(sequence);
+      return next;
+    });
+    try {
+      await apiClient.createBookmark(sequence);
+    } catch (e) {
+      setBookmarks((prev) => {
+        const next = new Set(prev);
+        next.delete(sequence);
+        return next;
+      });
+      const message = e instanceof Error ? e.message : 'Failed to bookmark';
+      setError(message);
+    }
+  };
 
   const handleChange = (value: string) => {
     setQuery(value);
@@ -171,12 +202,14 @@ export function SearchPage() {
               No matches
             </Text>
           )}
-          {!loading && !error && results.length > 0 && (
+          {!loading && results.length > 0 && (
             <Stack gap="lg">
               {results.map((result, index) => (
                 <div key={result.sequence}>
                   <ResultEntry
                     result={result}
+                    bookmarked={bookmarks.has(result.sequence)}
+                    onBookmark={handleBookmark}
                     onInternalNavigate={handleInternalNavigate}
                   />
                   {index < results.length - 1 && <Divider mt="lg" />}

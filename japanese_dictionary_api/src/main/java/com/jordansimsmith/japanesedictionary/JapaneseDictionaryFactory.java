@@ -8,6 +8,8 @@ import com.jordansimsmith.http.RequestContextModule;
 import com.jordansimsmith.json.ObjectMapperModule;
 import com.jordansimsmith.secrets.Secrets;
 import com.jordansimsmith.secrets.SecretsModule;
+import com.jordansimsmith.time.Clock;
+import com.jordansimsmith.time.ClockModule;
 import dagger.Component;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
@@ -19,6 +21,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
     modules = {
       ObjectMapperModule.class,
       SecretsModule.class,
+      ClockModule.class,
       DynamoDbModule.class,
       RequestContextModule.class,
       JapaneseDictionaryModule.class
@@ -28,6 +31,8 @@ public interface JapaneseDictionaryFactory {
 
   Secrets secrets();
 
+  Clock clock();
+
   RequestContextFactory requestContextFactory();
 
   HttpResponseFactory httpResponseFactory();
@@ -36,7 +41,9 @@ public interface JapaneseDictionaryFactory {
 
   DynamoDbEnhancedClient dynamoDbEnhancedClient();
 
-  DynamoDbTable<JapaneseDictionaryItem> japaneseDictionaryTable();
+  DynamoDbTable<TermItem> termTable();
+
+  DynamoDbTable<BookmarkItem> bookmarkTable();
 
   RomajiNormaliser romajiNormaliser();
 

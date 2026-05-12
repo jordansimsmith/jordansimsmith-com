@@ -1,16 +1,28 @@
-import { Group, Skeleton, Stack, Text, Title } from '@mantine/core';
+import { ActionIcon, Group, Skeleton, Stack, Text, Title } from '@mantine/core';
+import { IconBookmark, IconBookmarkFilled } from '@tabler/icons-react';
 import type { SearchResult } from '../api/client';
 import { GlossaryRenderer } from './GlossaryRenderer';
 import { PitchGraph, getPitchPattern } from './PitchGraph';
 
 interface ResultEntryProps {
   result: SearchResult;
+  bookmarked?: boolean;
+  onBookmark?: (sequence: number) => void;
   onInternalNavigate?: (q: string) => void;
 }
 
-export function ResultEntry({ result, onInternalNavigate }: ResultEntryProps) {
+export function ResultEntry({
+  result,
+  bookmarked = false,
+  onBookmark,
+  onInternalNavigate,
+}: ResultEntryProps) {
   const showReading =
     result.reading.length > 0 && result.reading !== result.expression;
+
+  const bookmarkLabel = bookmarked
+    ? `${result.expression} bookmarked`
+    : `Bookmark ${result.expression}`;
 
   return (
     <Stack gap="xs">
@@ -41,11 +53,27 @@ export function ResultEntry({ result, onInternalNavigate }: ResultEntryProps) {
             {result.reading_romaji}
           </Text>
         </Group>
-        {result.frequency_rank !== null && (
-          <Text size="sm" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
-            #{result.frequency_rank}
-          </Text>
-        )}
+        <Group gap="xs" wrap="nowrap" align="center">
+          {result.frequency_rank !== null && (
+            <Text size="sm" c="dimmed" style={{ whiteSpace: 'nowrap' }}>
+              #{result.frequency_rank}
+            </Text>
+          )}
+          <ActionIcon
+            variant="subtle"
+            color={bookmarked ? 'yellow' : 'gray'}
+            disabled={bookmarked}
+            aria-label={bookmarkLabel}
+            aria-pressed={bookmarked}
+            onClick={() => onBookmark?.(result.sequence)}
+          >
+            {bookmarked ? (
+              <IconBookmarkFilled size={18} />
+            ) : (
+              <IconBookmark size={18} />
+            )}
+          </ActionIcon>
+        </Group>
       </Group>
       {result.pitch !== null && (
         <Group gap="sm" align="center" wrap="wrap">

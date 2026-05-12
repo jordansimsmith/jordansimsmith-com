@@ -11,6 +11,8 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 
 @Module
 public class JapaneseDictionaryModule {
+  private static final String TABLE_NAME = "japanese_dictionary";
+
   @Provides
   @Singleton
   HttpResponseFactory httpResponseFactory(ObjectMapper objectMapper) {
@@ -21,10 +23,16 @@ public class JapaneseDictionaryModule {
 
   @Provides
   @Singleton
-  DynamoDbTable<JapaneseDictionaryItem> japaneseDictionaryTable(
-      DynamoDbEnhancedClient dynamoDbEnhancedClient) {
-    var schema = TableSchema.fromBean(JapaneseDictionaryItem.class);
-    return dynamoDbEnhancedClient.table(JapaneseDictionaryItem.TABLE_NAME, schema);
+  DynamoDbTable<TermItem> termTable(DynamoDbEnhancedClient dynamoDbEnhancedClient) {
+    var schema = TableSchema.fromBean(TermItem.class);
+    return dynamoDbEnhancedClient.table(TABLE_NAME, schema);
+  }
+
+  @Provides
+  @Singleton
+  DynamoDbTable<BookmarkItem> bookmarkTable(DynamoDbEnhancedClient dynamoDbEnhancedClient) {
+    var schema = TableSchema.fromBean(BookmarkItem.class);
+    return dynamoDbEnhancedClient.table(TABLE_NAME, schema);
   }
 
   @Provides

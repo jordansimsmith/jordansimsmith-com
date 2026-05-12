@@ -57,21 +57,61 @@ locals {
       memory_size = 1024
       timeout     = 5
     }
+    create_bookmark = {
+      target      = "//japanese_dictionary_api:create-bookmark-handler_deploy.jar"
+      handler     = "com.jordansimsmith.japanesedictionary.CreateBookmarkHandler"
+      memory_size = 512
+      timeout     = 10
+    }
+    find_bookmarks = {
+      target      = "//japanese_dictionary_api:find-bookmarks-handler_deploy.jar"
+      handler     = "com.jordansimsmith.japanesedictionary.FindBookmarksHandler"
+      memory_size = 512
+      timeout     = 10
+    }
   }
 
   root_resources = {
-    search = { path = "search" }
+    search    = { path = "search" }
+    bookmarks = { path = "bookmarks" }
   }
 
+  child_resources = {
+    bookmark = { path = "{sequence}", parent = "bookmarks" }
+  }
+
+  all_resources = merge(local.root_resources, local.child_resources)
+
   endpoints = {
-    search = { resource = "search", method = "GET", lambda = "search" }
+    search          = { resource = "search", method = "GET", lambda = "search" }
+    find_bookmarks  = { resource = "bookmarks", method = "GET", lambda = "find_bookmarks" }
+    create_bookmark = { resource = "bookmark", method = "PUT", lambda = "create_bookmark" }
+  }
+
+  all_resource_ids = merge(
+    { for k, v in aws_api_gateway_resource.root_resource : k => v.id },
+    { for k, v in aws_api_gateway_resource.child_resource : k => v.id }
+  )
+}
+
+check "unique_resource_paths" {
+  assert {
+    condition     = length(local.all_resources) == length(distinct([for r in local.all_resources : r.path]))
+    error_message = "Resource paths must be unique"
   }
 }
 
 check "valid_endpoint_resources" {
   assert {
-    condition     = alltrue([for e in local.endpoints : contains(keys(local.root_resources), e.resource)])
+    condition     = alltrue([for e in local.endpoints : contains(keys(local.all_resources), e.resource)])
     error_message = "All endpoint resources must reference a valid resource key"
+  }
+}
+
+check "valid_child_resource_parents" {
+  assert {
+    condition     = alltrue([for r in local.child_resources : contains(keys(local.root_resources), r.parent)])
+    error_message = "All child resource parents must reference a valid root resource key"
   }
 }
 
@@ -316,11 +356,19 @@ resource "aws_api_gateway_resource" "root_resource" {
   path_part   = each.value.path
 }
 
+resource "aws_api_gateway_resource" "child_resource" {
+  for_each = local.child_resources
+
+  rest_api_id = aws_api_gateway_rest_api.japanese_dictionary.id
+  parent_id   = aws_api_gateway_resource.root_resource[each.value.parent].id
+  path_part   = each.value.path
+}
+
 resource "aws_api_gateway_method" "method" {
   for_each = local.endpoints
 
   rest_api_id   = aws_api_gateway_rest_api.japanese_dictionary.id
-  resource_id   = aws_api_gateway_resource.root_resource[each.value.resource].id
+  resource_id   = local.all_resource_ids[each.value.resource]
   http_method   = each.value.method
   authorization = "CUSTOM"
   authorizer_id = aws_api_gateway_authorizer.japanese_dictionary.id
@@ -330,7 +378,7 @@ resource "aws_api_gateway_integration" "integration" {
   for_each = local.endpoints
 
   rest_api_id             = aws_api_gateway_rest_api.japanese_dictionary.id
-  resource_id             = aws_api_gateway_resource.root_resource[each.value.resource].id
+  resource_id             = local.all_resource_ids[each.value.resource]
   http_method             = aws_api_gateway_method.method[each.key].http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
@@ -338,19 +386,19 @@ resource "aws_api_gateway_integration" "integration" {
 }
 
 resource "aws_api_gateway_method" "options" {
-  for_each = local.root_resources
+  for_each = local.all_resources
 
   rest_api_id   = aws_api_gateway_rest_api.japanese_dictionary.id
-  resource_id   = aws_api_gateway_resource.root_resource[each.key].id
+  resource_id   = local.all_resource_ids[each.key]
   http_method   = "OPTIONS"
   authorization = "NONE"
 }
 
 resource "aws_api_gateway_integration" "options" {
-  for_each = local.root_resources
+  for_each = local.all_resources
 
   rest_api_id = aws_api_gateway_rest_api.japanese_dictionary.id
-  resource_id = aws_api_gateway_resource.root_resource[each.key].id
+  resource_id = local.all_resource_ids[each.key]
   http_method = aws_api_gateway_method.options[each.key].http_method
   type        = "MOCK"
 
@@ -360,10 +408,10 @@ resource "aws_api_gateway_integration" "options" {
 }
 
 resource "aws_api_gateway_method_response" "options" {
-  for_each = local.root_resources
+  for_each = local.all_resources
 
   rest_api_id = aws_api_gateway_rest_api.japanese_dictionary.id
-  resource_id = aws_api_gateway_resource.root_resource[each.key].id
+  resource_id = local.all_resource_ids[each.key]
   http_method = aws_api_gateway_method.options[each.key].http_method
   status_code = "200"
 
@@ -379,16 +427,16 @@ resource "aws_api_gateway_method_response" "options" {
 }
 
 resource "aws_api_gateway_integration_response" "options" {
-  for_each = local.root_resources
+  for_each = local.all_resources
 
   rest_api_id = aws_api_gateway_rest_api.japanese_dictionary.id
-  resource_id = aws_api_gateway_resource.root_resource[each.key].id
+  resource_id = local.all_resource_ids[each.key]
   http_method = aws_api_gateway_method.options[each.key].http_method
   status_code = aws_api_gateway_method_response.options[each.key].status_code
 
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Authorization,Content-Type'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,PUT,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'${local.cors_origins[0]}'"
   }
 }
@@ -401,6 +449,7 @@ resource "aws_api_gateway_deployment" "japanese_dictionary" {
       aws_api_gateway_authorizer.japanese_dictionary,
       aws_api_gateway_gateway_response.unauthorized,
       aws_api_gateway_resource.root_resource,
+      aws_api_gateway_resource.child_resource,
       aws_api_gateway_method.method,
       aws_api_gateway_integration.integration,
       aws_api_gateway_method.options,

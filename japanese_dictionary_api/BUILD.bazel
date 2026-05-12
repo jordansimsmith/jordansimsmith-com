@@ -34,6 +34,7 @@ java_library(
         "//lib/http:lib",
         "//lib/json:lib",
         "//lib/secrets:lib",
+        "//lib/time:lib",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_annotations",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
@@ -89,6 +90,51 @@ java_binary(
     ],
 )
 
+java_binary(
+    name = "create-bookmark-handler",
+    srcs = glob(["src/main/java/com/jordansimsmith/japanesedictionary/CreateBookmarkHandler.java"]),
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "//lib/time:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "find-bookmarks-handler",
+    srcs = glob(["src/main/java/com/jordansimsmith/japanesedictionary/FindBookmarksHandler.java"]),
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
 java_library(
     name = "test-lib",
     testonly = True,
@@ -111,6 +157,7 @@ java_library(
         "//lib/json:lib",
         "//lib/localstack:lib",
         "//lib/secrets:test-lib",
+        "//lib/time:test-lib",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:org_testcontainers_testcontainers",
@@ -155,10 +202,13 @@ java_test_suite(
     test_suffixes = ["IntegrationTest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":create-bookmark-handler",
+        ":find-bookmarks-handler",
         ":lib",
         ":search-handler",
         ":test-lib",
         "//lib/dynamodb:test-lib",
+        "//lib/time:test-lib",
         "@maven//:com_amazonaws_aws_lambda_java_core",
         "@maven//:com_amazonaws_aws_lambda_java_events",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
@@ -174,6 +224,8 @@ localstack_image(
     name = "local",
     handler_jars = [
         ":auth-handler_deploy.jar",
+        ":create-bookmark-handler_deploy.jar",
+        ":find-bookmarks-handler_deploy.jar",
         ":search-handler_deploy.jar",
     ],
     init_resources = "src/test/resources/init_resources.py",
@@ -200,6 +252,8 @@ java_test_suite(
     runtime_deps = JUNIT5_DEPS,
     deps = [
         ":auth-handler",
+        ":create-bookmark-handler",
+        ":find-bookmarks-handler",
         ":lib",
         ":search-handler",
         ":test-lib",

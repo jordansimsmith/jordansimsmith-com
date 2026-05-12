@@ -1,4 +1,10 @@
-import type { ApiClient, SCNode, SearchResponse, SearchResult } from './client';
+import type {
+  ApiClient,
+  BookmarksResponse,
+  SCNode,
+  SearchResponse,
+  SearchResult,
+} from './client';
 
 function senseGroup(partOfSpeech: string, glosses: string[]): SCNode {
   return {
@@ -408,8 +414,12 @@ function compareResults(a: SearchResult, b: SearchResult): number {
 }
 
 const FAKE_LATENCY_MS = 250;
+const FAKE_BOOKMARK_LATENCY_MS = 50;
 
 export function createFakeClient(): ApiClient {
+  const bookmarks = new Map<number, number>();
+  let nextCreatedAt = 1700000000;
+
   return {
     async search(q: string): Promise<SearchResponse> {
       const trimmed = q.trim();
@@ -420,6 +430,32 @@ export function createFakeClient(): ApiClient {
       const matched = fixtures.filter((r) => matches(r, trimmed));
       const sorted = [...matched].sort(compareResults).slice(0, 10);
       return { results: sorted };
+    },
+
+    async findBookmarks(): Promise<BookmarksResponse> {
+      await new Promise((resolve) =>
+        setTimeout(resolve, FAKE_BOOKMARK_LATENCY_MS),
+      );
+      const sequences = [...bookmarks.entries()]
+        .sort((a, b) => {
+          if (a[1] !== b[1]) {
+            return b[1] - a[1];
+          }
+          return a[0] - b[0];
+        })
+        .map(([sequence]) => sequence);
+      return { sequences };
+    },
+
+    async createBookmark(sequence: number): Promise<void> {
+      if (!Number.isInteger(sequence) || sequence <= 0) {
+        throw new Error('sequence must be a positive integer');
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, FAKE_BOOKMARK_LATENCY_MS),
+      );
+      nextCreatedAt += 1;
+      bookmarks.set(sequence, nextCreatedAt);
     },
   };
 }

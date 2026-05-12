@@ -56,7 +56,7 @@ public class SearchHandler
 
   private final ObjectMapper objectMapper;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<JapaneseDictionaryItem> japaneseDictionaryTable;
+  private final DynamoDbTable<TermItem> termTable;
   private final DynamoDbEnhancedClient dynamoDbEnhancedClient;
   private final RomajiNormaliser romajiNormaliser;
 
@@ -68,7 +68,7 @@ public class SearchHandler
   SearchHandler(JapaneseDictionaryFactory factory) {
     this.objectMapper = factory.objectMapper();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.japaneseDictionaryTable = factory.japaneseDictionaryTable();
+    this.termTable = factory.termTable();
     this.dynamoDbEnhancedClient = factory.dynamoDbEnhancedClient();
     this.romajiNormaliser = factory.romajiNormaliser();
   }
@@ -116,62 +116,52 @@ public class SearchHandler
     return httpResponseFactory.ok(new SearchResponse(results));
   }
 
-  private List<JapaneseDictionaryItem> runParallelQueries(String q, String qRomaji) {
+  private List<TermItem> runParallelQueries(String q, String qRomaji) {
     var f1 =
         CompletableFuture.supplyAsync(
-            () ->
-                queryIndex(
-                    JapaneseDictionaryItem.GSI1_NAME, JapaneseDictionaryItem.formatGsi1pk(), q));
+            () -> queryIndex(TermItem.GSI1_NAME, TermItem.formatGsi1pk(), q));
     var f2 =
         CompletableFuture.supplyAsync(
-            () ->
-                queryIndex(
-                    JapaneseDictionaryItem.GSI2_NAME, JapaneseDictionaryItem.formatGsi2pk(), q));
+            () -> queryIndex(TermItem.GSI2_NAME, TermItem.formatGsi2pk(), q));
     var f3 =
         CompletableFuture.supplyAsync(
-            () ->
-                queryIndex(
-                    JapaneseDictionaryItem.GSI3_NAME,
-                    JapaneseDictionaryItem.formatGsi3pk(),
-                    qRomaji));
+            () -> queryIndex(TermItem.GSI3_NAME, TermItem.formatGsi3pk(), qRomaji));
 
     CompletableFuture.allOf(f1, f2, f3).join();
 
-    var combined = new ArrayList<JapaneseDictionaryItem>();
+    var combined = new ArrayList<TermItem>();
     combined.addAll(f1.join());
     combined.addAll(f2.join());
     combined.addAll(f3.join());
     return combined;
   }
 
-  private List<JapaneseDictionaryItem> queryIndex(
-      String indexName, String partitionValue, String sortPrefix) {
-    DynamoDbIndex<JapaneseDictionaryItem> index = japaneseDictionaryTable.index(indexName);
+  private List<TermItem> queryIndex(String indexName, String partitionValue, String sortPrefix) {
+    DynamoDbIndex<TermItem> index = termTable.index(indexName);
     var request =
         QueryEnhancedRequest.builder()
             .queryConditional(
                 QueryConditional.sortBeginsWith(
                     Key.builder().partitionValue(partitionValue).sortValue(sortPrefix).build()))
             .build();
-    var items = new ArrayList<JapaneseDictionaryItem>();
+    var items = new ArrayList<TermItem>();
     for (var page : index.query(request)) {
       items.addAll(page.items());
     }
     return items;
   }
 
-  private static List<Long> rankTopN(List<JapaneseDictionaryItem> candidates, int limit) {
-    var dedup = new LinkedHashMap<Long, JapaneseDictionaryItem>();
+  private static List<Long> rankTopN(List<TermItem> candidates, int limit) {
+    var dedup = new LinkedHashMap<Long, TermItem>();
     for (var item : candidates) {
       dedup.putIfAbsent(item.getSequence(), item);
     }
 
     var ranked = new ArrayList<>(dedup.values());
     ranked.sort(
-        Comparator.<JapaneseDictionaryItem, Integer>comparing(
-                JapaneseDictionaryItem::getFrequencyRank,
-                Comparator.nullsLast(Comparator.naturalOrder()))
-            .thenComparing(JapaneseDictionaryItem::getSequence));
+        Comparator.<TermItem, Integer>comparing(
+                TermItem::getFrequencyRank, Comparator.nullsLast(Comparator.naturalOrder()))
+            .thenComparing(TermItem::getSequence));
 
     var top = new ArrayList<Long>(Math.min(limit, ranked.size()));
     for (var i = 0; i < ranked.size() && i < limit; i++) {
@@ -180,35 +170,33 @@ public class SearchHandler
     return top;
   }
 
-  private List<JapaneseDictionaryItem> batchGet(List<Long> sequences) {
-    var readBatch =
-        ReadBatch.builder(JapaneseDictionaryItem.class)
-            .mappedTableResource(japaneseDictionaryTable);
+  private List<TermItem> batchGet(List<Long> sequences) {
+    var readBatch = ReadBatch.builder(TermItem.class).mappedTableResource(termTable);
     for (var seq : sequences) {
       readBatch.addGetItem(
           Key.builder()
-              .partitionValue(JapaneseDictionaryItem.formatPk(seq))
-              .sortValue(JapaneseDictionaryItem.formatSk(seq))
+              .partitionValue(TermItem.formatPk(seq))
+              .sortValue(TermItem.formatSk(seq))
               .build());
     }
 
     var request = BatchGetItemEnhancedRequest.builder().readBatches(readBatch.build()).build();
 
-    var items = new ArrayList<JapaneseDictionaryItem>(sequences.size());
+    var items = new ArrayList<TermItem>(sequences.size());
     for (var page : dynamoDbEnhancedClient.batchGetItem(request)) {
-      page.resultsForTable(japaneseDictionaryTable).forEach(items::add);
+      page.resultsForTable(termTable).forEach(items::add);
     }
     return items;
   }
 
-  private static List<JapaneseDictionaryItem> orderHydrated(
-      List<JapaneseDictionaryItem> hydrated, List<Long> orderedSequences) {
-    var bySequence = new HashMap<Long, JapaneseDictionaryItem>();
+  private static List<TermItem> orderHydrated(
+      List<TermItem> hydrated, List<Long> orderedSequences) {
+    var bySequence = new HashMap<Long, TermItem>();
     for (var item : hydrated) {
       bySequence.put(item.getSequence(), item);
     }
 
-    var ordered = new ArrayList<JapaneseDictionaryItem>(orderedSequences.size());
+    var ordered = new ArrayList<TermItem>(orderedSequences.size());
     var seen = new HashSet<Long>();
     for (var seq : orderedSequences) {
       var item = bySequence.get(seq);
@@ -219,7 +207,7 @@ public class SearchHandler
     return Collections.unmodifiableList(ordered);
   }
 
-  private SearchResult toSearchResult(JapaneseDictionaryItem item) throws Exception {
+  private SearchResult toSearchResult(TermItem item) throws Exception {
     var raw = item.getGlossaryRaw();
     var glossaryNode = raw == null ? objectMapper.nullNode() : objectMapper.readTree(raw);
     return new SearchResult(

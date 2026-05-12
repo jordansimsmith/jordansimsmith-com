@@ -57,6 +57,8 @@ function makeResult(overrides: Partial<SearchResult>): SearchResult {
 
 describe('SearchPage', () => {
   let searchSpy: MockInstance;
+  let findBookmarksSpy: MockInstance;
+  let createBookmarkSpy: MockInstance;
 
   beforeEach(() => {
     setUrlQuery('');
@@ -64,6 +66,12 @@ describe('SearchPage', () => {
     searchSpy = vi
       .spyOn(clientModule.apiClient, 'search')
       .mockResolvedValue({ results: [] });
+    findBookmarksSpy = vi
+      .spyOn(clientModule.apiClient, 'findBookmarks')
+      .mockResolvedValue({ sequences: [] });
+    createBookmarkSpy = vi
+      .spyOn(clientModule.apiClient, 'createBookmark')
+      .mockResolvedValue();
   });
 
   afterEach(() => {
@@ -225,6 +233,94 @@ describe('SearchPage', () => {
       expect(screen.getByText('Login page')).toBeDefined();
     });
     expect(localStorage.getItem('japanese_dictionary_auth')).toBeNull();
+  });
+
+  it('fetches the bookmark set on mount', async () => {
+    findBookmarksSpy.mockResolvedValue({ sequences: [100, 200] });
+
+    renderSearchPage();
+
+    await waitFor(() => {
+      expect(findBookmarksSpy).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('renders the bookmark icon in filled/disabled state for bookmarked results', async () => {
+    findBookmarksSpy.mockResolvedValue({ sequences: [200] });
+    searchSpy.mockResolvedValue({
+      results: [
+        makeResult({ sequence: 100, expression: '新聞', reading: 'しんぶん' }),
+        makeResult({ sequence: 200, expression: '新年', reading: 'しんねん' }),
+      ],
+    });
+    setUrlQuery('しん');
+    renderSearchPage();
+
+    await waitFor(() => {
+      expect(screen.getByText('新聞')).toBeDefined();
+    });
+
+    await waitFor(() => {
+      const bookmarkedButton = screen.getByRole('button', {
+        name: /新年 bookmarked/i,
+      });
+      expect(bookmarkedButton).toBeDefined();
+      expect((bookmarkedButton as HTMLButtonElement).disabled).toBe(true);
+    });
+
+    const unbookmarkedButton = screen.getByRole('button', {
+      name: /^Bookmark 新聞/i,
+    });
+    expect((unbookmarkedButton as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it('optimistically marks a result as bookmarked on click and calls createBookmark', async () => {
+    searchSpy.mockResolvedValue({
+      results: [
+        makeResult({ sequence: 100, expression: '新聞', reading: 'しんぶん' }),
+      ],
+    });
+    setUrlQuery('しんぶん');
+    renderSearchPage();
+
+    const button = await screen.findByRole('button', {
+      name: /^Bookmark 新聞/i,
+    });
+    const user = userEvent.setup();
+    await user.click(button);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /新聞 bookmarked/i }),
+      ).toBeDefined();
+    });
+    expect(createBookmarkSpy).toHaveBeenCalledWith(100);
+  });
+
+  it('reverts the bookmark on createBookmark failure and surfaces the error', async () => {
+    createBookmarkSpy.mockRejectedValue(new Error('server exploded'));
+    searchSpy.mockResolvedValue({
+      results: [
+        makeResult({ sequence: 100, expression: '新聞', reading: 'しんぶん' }),
+      ],
+    });
+    setUrlQuery('しんぶん');
+    renderSearchPage();
+
+    const button = await screen.findByRole('button', {
+      name: /^Bookmark 新聞/i,
+    });
+    const user = userEvent.setup();
+    await user.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain(
+        'server exploded',
+      );
+    });
+    expect(
+      screen.getByRole('button', { name: /^Bookmark 新聞/i }),
+    ).toBeDefined();
   });
 
   it('runs an immediate search when an internal link triggers navigation', async () => {

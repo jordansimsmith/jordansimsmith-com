@@ -18,6 +18,8 @@ The Japanese dictionary web service is a single-page app that lets an authentica
 - As a learner reviewing a result, I want the entry rendered fully inline with its glossary, frequency rank, and pitch dot graph, so that I can read the full entry without an extra click.
 - As a returning user, I want my login session to persist across browser reloads, so that I can resume looking up words without re-authing each time.
 - As a user sharing a result, I want the URL to reflect the current query (e.g., `?q=しん`), so that I can bookmark or copy a specific lookup.
+- As a learner doing lookups, I want a bookmark button on each search result, so that I can flag a word for later flashcard creation in one tap.
+- As a returning learner, I want each result that I have already bookmarked to render in a "bookmarked" state, so that I don't bookmark the same word twice.
 
 ## Features and scope boundaries
 
@@ -31,18 +33,21 @@ The Japanese dictionary web service is a single-page app that lets an authentica
 - Per-entry header showing `expression`, `reading`, `reading_romaji`, and the raw `frequency_rank` integer.
 - Per-entry body rendering the Yomitan structured-content `glossary_raw` JSON tree with hand-authored CSS targeting `data-sc-*` selectors.
 - Per-entry pitch dot graph (SVG port of Yomitan's `pronunciation-generator.js`) when `pitch` is non-NULL, plus the pitch-pattern label (heiban / atamadaka / nakadaka / odaka).
+- Per-entry bookmark icon button: outline icon when unbookmarked (clickable), filled icon when bookmarked (disabled).
+- Pre-load the user's full bookmark set once on `SearchPage` mount and keep it in memory; new bookmarks update the local set optimistically and revert on API error.
 - Mobile-first responsive layout that reflows to desktop with a max-width container.
 - Empty-state, no-results-state, loading-state, and error-state UI for the search page.
 
 ### Out of scope
 
 - Multi-user accounts, shared sessions, or per-user history.
-- Saved words, favourites, or search history features.
+- Un-bookmarking from the SPA in v1; the bookmark button is one-way.
+- A "view my bookmarks" page; v1 only surfaces the bookmark state inline on search results.
 - A separate detail page or per-entry route (`/term/<id>`); the only sharable URL form is `/search?q=<query>`.
 - Pagination or "load more"; the top 10 results are the entire response.
 - Image binaries from Jitendex (~595 entries reference image files); image nodes render as inline placeholder text in v1.
 - Anki / flashcard rendering, audio playback, IME-style conversion, or in-app deinflection.
-- Offline support, service workers, or local caching of dictionary data.
+- Offline support, service workers, or local caching of dictionary or bookmark data.
 
 ## Architecture
 
@@ -62,16 +67,27 @@ sequenceDiagram
   participant web as japanese_dictionary_web
   participant api as japanese_dictionary_api
 
+  Note over web: SearchPage mount
+  web->>api: GET /bookmarks (Authorization Basic)
+  api-->>web: { sequences: [...] }
+  Note over web: store as Set<number>
+
   user->>web: type "shin"
   Note right of web: 250 ms debounce + URL replaceState (?q=shin)
   web->>api: GET /search?q=shin (Authorization Basic)
   api-->>web: { results: [...] } (top 10 by frequency_rank)
-  web-->>user: render 10 expanded entries inline
+  web-->>user: render 10 expanded entries inline (icon filled if bookmarked)
+
+  user->>web: tap bookmark icon on result #1316830
+  Note right of web: optimistic add to Set<number>
+  web->>api: PUT /bookmarks/1316830 (Authorization Basic)
+  api-->>web: 201 { sequence, created_at }
+  Note right of web: on error, revert local set + show alert
 ```
 
 ## Main technical decisions
 
-- Use a typed `ApiClient` interface with swappable implementations (`createHttpClient()` / `createFakeClient()`) keyed off `import.meta.env.PROD`, matching `packing_list_web`. Production builds hit the real backend; development uses an in-memory fake with ~30 hand-picked fixture terms.
+- Use a typed `ApiClient` interface with swappable implementations (`createHttpClient()` / `createFakeClient()`) keyed off `import.meta.env.PROD`, matching `packing_list_web`. Production builds hit the real backend; development uses an in-memory fake with ~30 hand-picked fixture terms and an in-memory bookmark set.
 - Store session data in `localStorage` under key `japanese_dictionary_auth` so authentication persists across browser reloads.
 - Mirror the current query to the URL via `replaceState` (no history spam) so any lookup is bookmarkable; read `?q=` on mount to pre-populate the input.
 - Use a 250 ms debounce on input changes to keep keystroke-to-results latency snappy without spamming the API for in-flight typing.
@@ -80,11 +96,15 @@ sequenceDiagram
 - Skip image binaries in v1; the renderer emits placeholder text for `<img>` nodes (`[image: <description>]`). Image hosting is deferred — see `japanese_dictionary_api/README.md` for the upgrade path.
 - Port Yomitan's `pronunciation-generator.js` SVG dot-graph into a small React component with the mora-counting helper extracted to `src/domain/morae.ts`.
 - Use Mantine's responsive breakpoints (`useMediaQuery` + `em()`) for mobile-vs-desktop reflow without a custom layout abstraction.
+- Fetch the user's full bookmark set once on `SearchPage` mount and hold it as a React `Set<number>` for O(1) membership checks against rendered results. Re-fetching after every search would couple search to bookmarks unnecessarily; the bookmark count is bounded (single-user app) so the upfront cost is negligible.
+- Apply the bookmark write optimistically: add the sequence to the local set immediately on click and revert on API error. The button is disabled while bookmarked; a failed write removes the local entry and surfaces the message in the existing alert region so the user can retry.
+- Treat a bookmark fetch failure on mount as soft: log the error and render every result as not-bookmarked. Search continues to work; the worst case is a duplicate `PUT` that the API resolves idempotently.
+- Extend the existing `ApiClient` interface rather than introducing a separate `BookmarkClient`. The HTTP and fake implementations stay co-located, and the SPA only ever holds a single client instance.
 
 ## Domain glossary
 
 - **Term**: one canonical JMdict headword as returned by the API (`SearchResult` shape).
-- **Sequence**: integer JMdict ID, used internally as the React `key` for each rendered entry.
+- **Sequence**: integer JMdict ID, used internally as the React `key` for each rendered entry and as the lookup key into the bookmark set.
 - **Expression**: the canonical writing of a term (kanji or kana mixture). Rendered prominently in the entry header.
 - **Reading**: the canonical kana-only reading. Rendered next to the expression in the header.
 - **Reading romaji**: Modified Hepburn vowel-doubled form. Rendered as a small grey caption in the header.
@@ -93,6 +113,7 @@ sequenceDiagram
 - **Pitch pattern**: human-readable label derived from `pitch` and the mora count of `reading`. Rendered alongside the dot graph.
 - **Glossary raw**: the Yomitan structured-content JSON tree returned by the API. Rendered by `GlossaryRenderer` as nested HTML preserving `data-sc-*` attributes.
 - **Structured-content node** (`SCNode`): a recursive type matching the JSON shape — `string | SCNode[] | { tag, content, data?, ...attrs }`.
+- **Bookmark**: a per-user flag indicating that the calling user has saved a `sequence` for later. Held client-side as a `Set<number>` of bookmarked sequences, hydrated on `SearchPage` mount via `GET /bookmarks`.
 
 ## Integration contracts
 
@@ -104,11 +125,13 @@ sequenceDiagram
 
 ### Consumed backend endpoints
 
-| Method | Path      | Purpose                                                      |
-| ------ | --------- | ------------------------------------------------------------ |
-| `GET`  | `/search` | run a prefix search and return up to 10 ranked term records. |
+| Method | Path                    | Purpose                                                                      |
+| ------ | ----------------------- | ---------------------------------------------------------------------------- |
+| `GET`  | `/search`               | run a prefix search and return up to 10 ranked term records.                 |
+| `GET`  | `/bookmarks`            | fetch every bookmarked sequence for the calling user (called once on mount). |
+| `PUT`  | `/bookmarks/{sequence}` | bookmark a single term for the calling user (idempotent).                    |
 
-The same endpoint serves two purposes: an empty `q` is a session-validation probe used at login (analogous to `GET /templates` in `packing_list_web`), and a non-empty `q` returns search results.
+`GET /search` serves two purposes: an empty `q` is a session-validation probe used at login (analogous to `GET /templates` in `packing_list_web`), and a non-empty `q` returns search results. `GET /bookmarks` is invoked exactly once when `SearchPage` mounts to seed the in-memory bookmark set.
 
 ### UI contract expectations
 
@@ -123,10 +146,16 @@ The same endpoint serves two purposes: an empty `q` is a session-validation prob
 ```ts
 export interface ApiClient {
   search(q: string): Promise<SearchResponse>;
+  findBookmarks(): Promise<BookmarksResponse>;
+  createBookmark(sequence: number): Promise<void>;
 }
 ```
 
-`SearchResponse` is `{ results: SearchResult[] }`. `SearchResult` carries `sequence`, `expression`, `reading`, `reading_romaji`, `frequency_rank | null`, `pitch | null`, and `glossary_raw` (recursive `SCNode`). Implementation selection at module load:
+`SearchResponse` is `{ results: SearchResult[] }`. `SearchResult` carries `sequence`, `expression`, `reading`, `reading_romaji`, `frequency_rank | null`, `pitch | null`, and `glossary_raw` (recursive `SCNode`).
+
+`BookmarksResponse` is `{ sequences: number[] }` — bare integers in `created_at` descending order from the API. `createBookmark` resolves on success and rejects with the `message` field from a non-2xx body so the caller can surface it.
+
+Implementation selection at module load:
 
 ```ts
 export const apiClient: ApiClient = import.meta.env.PROD
@@ -138,17 +167,17 @@ export const apiClient: ApiClient = import.meta.env.PROD
 
 ### Browser storage
 
-| Location              | Key                        | Purpose                                                                                               | Retention                  |
-| --------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------- |
-| `localStorage`        | `japanese_dictionary_auth` | persisted session `{ "username": string, "token": string }` where token is base64 `username:password` | until explicit logout      |
-| URL query             | `?q=<query>`               | current search query (mirrored via `replaceState`)                                                    | per-page-load              |
-| in-memory React state | n/a                        | current input value, pending debounce timer, in-flight request, last results, loading/error flags     | reset on full page refresh |
+| Location              | Key                        | Purpose                                                                                                                               | Retention                  |
+| --------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | -------------------------- |
+| `localStorage`        | `japanese_dictionary_auth` | persisted session `{ "username": string, "token": string }` where token is base64 `username:password`                                 | until explicit logout      |
+| URL query             | `?q=<query>`               | current search query (mirrored via `replaceState`)                                                                                    | per-page-load              |
+| in-memory React state | n/a                        | current input value, pending debounce timer, in-flight request, last results, loading/error flags, bookmarked-sequences `Set<number>` | reset on full page refresh |
 
 ### Data ownership expectations
 
-- `japanese_dictionary_api` is authoritative for term records and search ordering.
-- The web client never persists term records, search history, or favourites locally.
-- In development mode, fake-client data is in-memory only and resets on browser refresh.
+- `japanese_dictionary_api` is authoritative for term records, search ordering, and the canonical bookmark set.
+- The web client never persists term records, search history, or bookmarks locally; the bookmark set is recomputed from `GET /bookmarks` on every fresh page load.
+- In development mode, fake-client data (terms and bookmarks) is in-memory only and resets on browser refresh.
 - Session token is the only persisted state; cleared on logout.
 
 ## Behavioral invariants and time semantics
@@ -156,24 +185,28 @@ export const apiClient: ApiClient = import.meta.env.PROD
 - Input changes trigger a debounced search after 250 ms of no further keystrokes; subsequent keystrokes within the debounce window cancel and reset the timer.
 - Empty input produces no API call and clears the result list; renders the empty-state hint.
 - The current input value is mirrored to `?q=<value>` on the URL via `replaceState` (no browser history spam) on every input change.
-- On `SearchPage` mount, `?q` is read from `URLSearchParams` and used to pre-populate the input; if non-empty, fires an immediate (non-debounced) search.
-- Internal links in rendered glossary content (`<a href="?q=...">` produced by Yomitan) are intercepted as React Router navigation that updates `?q=` and re-runs the search.
+- On `SearchPage` mount: (a) `?q` is read from `URLSearchParams` and used to pre-populate the input, firing an immediate (non-debounced) search if non-empty; (b) `findBookmarks()` is called once to seed the in-memory bookmark `Set<number>`. The two requests run independently — search does not wait on bookmarks.
+- Internal links in rendered glossary content (`<a href="?q=...">` produced by Yomitan) are intercepted as React Router navigation that updates `?q=` and re-runs the search. The bookmark set persists across these intra-page navigations and is not re-fetched.
 - External links in rendered glossary content open in a new tab.
 - Image nodes (`<img>` in structured content) render as inline placeholder text — `[image: <description-or-basename>]` — never as actual `<img>` elements in v1.
 - Result entries always render fully expanded; there is no collapsed state, accordion, or per-entry detail page.
 - Result ordering is taken from the API response unchanged; the SPA does not re-sort.
-- Logout clears `japanese_dictionary_auth` from `localStorage` and navigates to `/`; the next page render shows the login form.
+- Each rendered `ResultEntry` shows a bookmark icon: outline + clickable when `sequence` is not in the bookmark set; filled + disabled when it is.
+- Clicking the bookmark icon optimistically inserts `sequence` into the local set, fires `createBookmark(sequence)`, and on rejection removes it back from the set and surfaces the message in the existing alert region. The button does not display a per-row spinner or async state.
+- A failure of the on-mount `findBookmarks()` call is non-fatal: the bookmark set is left empty and a one-off console warning is logged. Subsequent `PUT`s remain idempotent on the API, so retrying via a page reload recovers the state.
+- Logout clears `japanese_dictionary_auth` from `localStorage` and navigates to `/`; the next page render shows the login form. The bookmark set is in-memory only, so logging out and back in re-fetches a fresh copy.
 
 ## Source of truth
 
-| Entity                | Authoritative source                              | Notes                                                                              |
-| --------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Credential validity   | `japanese_dictionary_api` auth-protected response | login is treated as successful after authenticated `GET /search?q=` returns 200    |
-| Search results        | `japanese_dictionary_api`                         | the SPA renders the API response unchanged; no client-side filtering or re-sorting |
-| Entry rendering       | local React renderer over server JSON             | `GlossaryRenderer` walks the `glossary_raw` tree at render time                    |
-| Pitch graph rendering | local React/SVG component                         | derived from `(reading, pitch)` in the API response                                |
-| Session persistence   | browser `localStorage`                            | cleared on logout via `clearSession()`                                             |
-| Current search query  | URL `?q=` query param                             | mirrored from input via `replaceState`; read on mount                              |
+| Entity                | Authoritative source                              | Notes                                                                                 |
+| --------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Credential validity   | `japanese_dictionary_api` auth-protected response | login is treated as successful after authenticated `GET /search?q=` returns 200       |
+| Search results        | `japanese_dictionary_api`                         | the SPA renders the API response unchanged; no client-side filtering or re-sorting    |
+| Bookmark membership   | `japanese_dictionary_api` `GET /bookmarks`        | the SPA mirrors the API set in a `Set<number>` and updates it optimistically on `PUT` |
+| Entry rendering       | local React renderer over server JSON             | `GlossaryRenderer` walks the `glossary_raw` tree at render time                       |
+| Pitch graph rendering | local React/SVG component                         | derived from `(reading, pitch)` in the API response                                   |
+| Session persistence   | browser `localStorage`                            | cleared on logout via `clearSession()`                                                |
+| Current search query  | URL `?q=` query param                             | mirrored from input via `replaceState`; read on mount                                 |
 
 ## Security and privacy
 
@@ -215,10 +248,12 @@ Build mode behaviour: production (`import.meta.env.PROD`) uses the HTTP client; 
 - Key coverage areas:
   - Login flow (credential capture, session probe, redirect on success).
   - `SearchPage` debounce semantics, `?q=` URL sync, empty / loading / no-results / error rendering.
+  - `SearchPage` bookmark behaviour: pre-loads `findBookmarks()` on mount, renders the bookmark icon as filled/disabled for matched sequences, optimistically marks new bookmarks on click and reverts on `createBookmark()` rejection.
   - `GlossaryRenderer` recursive rendering of representative structured-content trees (`<ul>`/`<li>`, `<ruby>`/`<rt>` furigana, internal link, external link, image placeholder, deeply-nested tree).
   - `PitchGraph` rendering for heiban / atamadaka / nakadaka / odaka patterns.
   - `morae.ts` mora-counting helper edge cases (small ya/yu/yo, `ん`, `っ`, `ー`).
-  - HTTP client URL construction, auth header inclusion, error message extraction.
+  - HTTP client URL construction, auth header inclusion, error message extraction (across `search`, `findBookmarks`, and `createBookmark`).
+  - Fake client bookmark behaviour: `findBookmarks` reflects prior `createBookmark` calls, idempotent on repeated `createBookmark`.
 - Required service checks:
   - `bazel test //japanese_dictionary_web:unit-tests`
   - `bazel build //japanese_dictionary_web:typecheck`
@@ -236,6 +271,8 @@ Build mode behaviour: production (`import.meta.env.PROD`) uses the HTTP client; 
   - Type `新` and verify kanji-prefix results.
   - Confirm the URL updates to `?q=<value>` on each keystroke.
   - Reload the page with `?q=新` and confirm the input pre-populates and the search fires immediately.
+  - Click the bookmark icon on a result and confirm it switches to the filled, disabled state.
+  - Reload the page and confirm the bookmark icon for that result is still rendered as filled and disabled.
   - Click an internal link inside a rendered glossary entry and confirm `?q=` updates and the search refreshes.
   - Logout and confirm the next reload shows the login screen.
 
@@ -263,7 +300,15 @@ Build mode behaviour: production (`import.meta.env.PROD`) uses the HTTP client; 
 3. `GlossaryRenderer` intercepts the click, calls React Router `navigate('/search?q=新聞紙')`, and the URL updates via `replaceState`.
 4. `SearchPage` re-runs the search for `新聞紙` and renders the new top-10 list.
 
-### Scenario 4: log out
+### Scenario 4: bookmark a term during a lookup
+
+1. User is on the search results page with several entries rendered, including `新橋`.
+2. User taps the bookmark icon next to the `新橋` entry.
+3. The icon immediately swaps to the filled, disabled state and the SPA fires `PUT /bookmarks/1316830` in the background.
+4. On `201`, no further UI update happens — the optimistic state is now confirmed.
+5. The user reloads the page; on mount, `GET /bookmarks` returns `{ "sequences": [..., 1316830, ...] }`, the bookmark `Set<number>` is seeded, and the same `新橋` entry renders pre-bookmarked.
+
+### Scenario 5: log out
 
 1. User taps the logout button on the search page.
 2. App calls `clearSession()` (removes `japanese_dictionary_auth` from `localStorage`).

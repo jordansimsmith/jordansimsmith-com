@@ -64,3 +64,46 @@ describe('fake-client', () => {
     }
   });
 });
+
+describe('fake-client bookmarks', () => {
+  it('starts with no bookmarks', async () => {
+    const fresh = createFakeClient();
+    const response = await fresh.findBookmarks();
+    expect(response.sequences).toEqual([]);
+  });
+
+  it('lists previously bookmarked sequences', async () => {
+    const fresh = createFakeClient();
+    await fresh.createBookmark(100);
+    await fresh.createBookmark(200);
+
+    const response = await fresh.findBookmarks();
+    expect(response.sequences).toContain(100);
+    expect(response.sequences).toContain(200);
+  });
+
+  it('returns bookmarks in created_at descending order (most recent first)', async () => {
+    const fresh = createFakeClient();
+    await fresh.createBookmark(11);
+    await fresh.createBookmark(22);
+    await fresh.createBookmark(33);
+
+    const response = await fresh.findBookmarks();
+    expect(response.sequences).toEqual([33, 22, 11]);
+  });
+
+  it('is idempotent on repeated createBookmark for the same sequence', async () => {
+    const fresh = createFakeClient();
+    await fresh.createBookmark(42);
+    await fresh.createBookmark(42);
+
+    const response = await fresh.findBookmarks();
+    expect(response.sequences).toEqual([42]);
+  });
+
+  it('rejects non-positive sequences', async () => {
+    const fresh = createFakeClient();
+    await expect(fresh.createBookmark(0)).rejects.toThrow();
+    await expect(fresh.createBookmark(-7)).rejects.toThrow();
+  });
+});

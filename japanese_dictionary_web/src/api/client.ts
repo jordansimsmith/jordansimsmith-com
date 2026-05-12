@@ -31,8 +31,14 @@ export interface SearchResponse {
   results: SearchResult[];
 }
 
+export interface BookmarksResponse {
+  sequences: number[];
+}
+
 export interface ApiClient {
   search(q: string): Promise<SearchResponse>;
+  findBookmarks(): Promise<BookmarksResponse>;
+  createBookmark(sequence: number): Promise<void>;
 }
 
 export const apiClient: ApiClient = import.meta.env.PROD

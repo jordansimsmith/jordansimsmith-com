@@ -10,7 +10,7 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecon
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
 
 @DynamoDbBean
-public class JapaneseDictionaryItem {
+public class TermItem {
   public static final String DELIMITER = "#";
   public static final String TERM_PREFIX = "TERM" + DELIMITER;
 
@@ -18,7 +18,6 @@ public class JapaneseDictionaryItem {
   public static final String READING_PARTITION = "READING";
   public static final String ROMAJI_PARTITION = "ROMAJI";
 
-  public static final String TABLE_NAME = "japanese_dictionary";
   public static final String GSI1_NAME = "gsi1";
   public static final String GSI2_NAME = "gsi2";
   public static final String GSI3_NAME = "gsi3";
@@ -204,7 +203,7 @@ public class JapaneseDictionaryItem {
   public boolean equals(Object o) {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
-    JapaneseDictionaryItem that = (JapaneseDictionaryItem) o;
+    TermItem that = (TermItem) o;
     return Objects.equals(pk, that.pk)
         && Objects.equals(sk, that.sk)
         && Objects.equals(gsi1pk, that.gsi1pk)
@@ -244,7 +243,7 @@ public class JapaneseDictionaryItem {
 
   @Override
   public String toString() {
-    return "JapaneseDictionaryItem{"
+    return "TermItem{"
         + "pk='"
         + pk
         + '\''
@@ -301,7 +300,7 @@ public class JapaneseDictionaryItem {
     return readingRomaji;
   }
 
-  public static JapaneseDictionaryItem create(
+  public static TermItem create(
       long sequence,
       String expression,
       String reading,
@@ -309,7 +308,7 @@ public class JapaneseDictionaryItem {
       @Nullable Integer frequencyRank,
       @Nullable Integer pitch,
       String glossaryRaw) {
-    var item = new JapaneseDictionaryItem();
+    var item = new TermItem();
     item.setPk(formatPk(sequence));
     item.setSk(formatSk(sequence));
     item.setGsi1pk(formatGsi1pk());
