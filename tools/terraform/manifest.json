@@ -71,7 +71,10 @@
       "path": "japanese_dictionary_api/infra",
       "artifacts": {
         "auth": "//japanese_dictionary_api:auth-handler_deploy.jar",
-        "search": "//japanese_dictionary_api:search-handler_deploy.jar"
+        "search": "//japanese_dictionary_api:search-handler_deploy.jar",
+        "create_bookmark": "//japanese_dictionary_api:create-bookmark-handler_deploy.jar",
+        "delete_bookmark": "//japanese_dictionary_api:delete-bookmark-handler_deploy.jar",
+        "find_bookmarks": "//japanese_dictionary_api:find-bookmarks-handler_deploy.jar"
       }
     },
     {
