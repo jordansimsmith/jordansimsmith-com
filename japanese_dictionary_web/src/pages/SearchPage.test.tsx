@@ -59,6 +59,7 @@ describe('SearchPage', () => {
   let searchSpy: MockInstance;
   let findBookmarksSpy: MockInstance;
   let createBookmarkSpy: MockInstance;
+  let deleteBookmarkSpy: MockInstance;
 
   beforeEach(() => {
     setUrlQuery('');
@@ -71,6 +72,9 @@ describe('SearchPage', () => {
       .mockResolvedValue({ sequences: [] });
     createBookmarkSpy = vi
       .spyOn(clientModule.apiClient, 'createBookmark')
+      .mockResolvedValue();
+    deleteBookmarkSpy = vi
+      .spyOn(clientModule.apiClient, 'deleteBookmark')
       .mockResolvedValue();
   });
 
@@ -245,7 +249,7 @@ describe('SearchPage', () => {
     });
   });
 
-  it('renders the bookmark icon in filled/disabled state for bookmarked results', async () => {
+  it('renders the bookmark icon in filled/pressed state for bookmarked results and keeps both clickable', async () => {
     findBookmarksSpy.mockResolvedValue({ sequences: [200] });
     searchSpy.mockResolvedValue({
       results: [
@@ -265,13 +269,15 @@ describe('SearchPage', () => {
         name: /新年 bookmarked/i,
       });
       expect(bookmarkedButton).toBeDefined();
-      expect((bookmarkedButton as HTMLButtonElement).disabled).toBe(true);
+      expect((bookmarkedButton as HTMLButtonElement).disabled).toBe(false);
+      expect(bookmarkedButton.getAttribute('aria-pressed')).toBe('true');
     });
 
     const unbookmarkedButton = screen.getByRole('button', {
       name: /^Bookmark 新聞/i,
     });
     expect((unbookmarkedButton as HTMLButtonElement).disabled).toBe(false);
+    expect(unbookmarkedButton.getAttribute('aria-pressed')).toBe('false');
   });
 
   it('optimistically marks a result as bookmarked on click and calls createBookmark', async () => {
@@ -320,6 +326,58 @@ describe('SearchPage', () => {
     });
     expect(
       screen.getByRole('button', { name: /^Bookmark 新聞/i }),
+    ).toBeDefined();
+  });
+
+  it('optimistically un-bookmarks a result on click and calls deleteBookmark', async () => {
+    findBookmarksSpy.mockResolvedValue({ sequences: [100] });
+    searchSpy.mockResolvedValue({
+      results: [
+        makeResult({ sequence: 100, expression: '新聞', reading: 'しんぶん' }),
+      ],
+    });
+    setUrlQuery('しんぶん');
+    renderSearchPage();
+
+    const button = await screen.findByRole('button', {
+      name: /新聞 bookmarked/i,
+    });
+    const user = userEvent.setup();
+    await user.click(button);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: /^Bookmark 新聞/i }),
+      ).toBeDefined();
+    });
+    expect(deleteBookmarkSpy).toHaveBeenCalledWith(100);
+    expect(createBookmarkSpy).not.toHaveBeenCalled();
+  });
+
+  it('reverts the un-bookmark on deleteBookmark failure and surfaces the error', async () => {
+    findBookmarksSpy.mockResolvedValue({ sequences: [100] });
+    deleteBookmarkSpy.mockRejectedValue(new Error('server exploded'));
+    searchSpy.mockResolvedValue({
+      results: [
+        makeResult({ sequence: 100, expression: '新聞', reading: 'しんぶん' }),
+      ],
+    });
+    setUrlQuery('しんぶん');
+    renderSearchPage();
+
+    const button = await screen.findByRole('button', {
+      name: /新聞 bookmarked/i,
+    });
+    const user = userEvent.setup();
+    await user.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByRole('alert').textContent).toContain(
+        'server exploded',
+      );
+    });
+    expect(
+      screen.getByRole('button', { name: /新聞 bookmarked/i }),
     ).toBeDefined();
   });
 

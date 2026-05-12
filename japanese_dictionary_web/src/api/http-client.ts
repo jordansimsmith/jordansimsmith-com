@@ -52,5 +52,11 @@ export function createHttpClient(): ApiClient {
         method: 'PUT',
       });
     },
+
+    async deleteBookmark(sequence: number): Promise<void> {
+      await request(`/bookmarks/${encodeURIComponent(String(sequence))}`, {
+        method: 'DELETE',
+      });
+    },
   };
 }

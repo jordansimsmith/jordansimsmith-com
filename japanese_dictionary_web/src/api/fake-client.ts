@@ -457,5 +457,15 @@ export function createFakeClient(): ApiClient {
       nextCreatedAt += 1;
       bookmarks.set(sequence, nextCreatedAt);
     },
+
+    async deleteBookmark(sequence: number): Promise<void> {
+      if (!Number.isInteger(sequence) || sequence <= 0) {
+        throw new Error('sequence must be a positive integer');
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, FAKE_BOOKMARK_LATENCY_MS),
+      );
+      bookmarks.delete(sequence);
+    },
   };
 }

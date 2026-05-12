@@ -209,6 +209,10 @@ lambdas = {
         "handler": "com.jordansimsmith.japanesedictionary.CreateBookmarkHandler",
         "zip_file": "create-bookmark-handler_deploy.jar",
     },
+    "delete_bookmark": {
+        "handler": "com.jordansimsmith.japanesedictionary.DeleteBookmarkHandler",
+        "zip_file": "delete-bookmark-handler_deploy.jar",
+    },
     "find_bookmarks": {
         "handler": "com.jordansimsmith.japanesedictionary.FindBookmarksHandler",
         "zip_file": "find-bookmarks-handler_deploy.jar",
@@ -235,6 +239,11 @@ endpoints = {
         "resource": "bookmark",
         "method": "PUT",
         "lambda": "create_bookmark",
+    },
+    "delete_bookmark": {
+        "resource": "bookmark",
+        "method": "DELETE",
+        "lambda": "delete_bookmark",
     },
 }
 

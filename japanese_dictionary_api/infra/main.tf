@@ -63,6 +63,12 @@ locals {
       memory_size = 512
       timeout     = 10
     }
+    delete_bookmark = {
+      target      = "//japanese_dictionary_api:delete-bookmark-handler_deploy.jar"
+      handler     = "com.jordansimsmith.japanesedictionary.DeleteBookmarkHandler"
+      memory_size = 512
+      timeout     = 10
+    }
     find_bookmarks = {
       target      = "//japanese_dictionary_api:find-bookmarks-handler_deploy.jar"
       handler     = "com.jordansimsmith.japanesedictionary.FindBookmarksHandler"
@@ -86,6 +92,7 @@ locals {
     search          = { resource = "search", method = "GET", lambda = "search" }
     find_bookmarks  = { resource = "bookmarks", method = "GET", lambda = "find_bookmarks" }
     create_bookmark = { resource = "bookmark", method = "PUT", lambda = "create_bookmark" }
+    delete_bookmark = { resource = "bookmark", method = "DELETE", lambda = "delete_bookmark" }
   }
 
   all_resource_ids = merge(
@@ -436,7 +443,7 @@ resource "aws_api_gateway_integration_response" "options" {
 
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = "'Authorization,Content-Type'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,PUT,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,PUT,DELETE,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'${local.cors_origins[0]}'"
   }
 }

@@ -94,23 +94,36 @@ export function SearchPage() {
   }, []);
 
   const handleBookmark = async (sequence: number) => {
-    if (bookmarks.has(sequence)) {
-      return;
-    }
+    const wasBookmarked = bookmarks.has(sequence);
     setBookmarks((prev) => {
       const next = new Set(prev);
-      next.add(sequence);
+      if (wasBookmarked) {
+        next.delete(sequence);
+      } else {
+        next.add(sequence);
+      }
       return next;
     });
     try {
-      await apiClient.createBookmark(sequence);
+      if (wasBookmarked) {
+        await apiClient.deleteBookmark(sequence);
+      } else {
+        await apiClient.createBookmark(sequence);
+      }
     } catch (e) {
       setBookmarks((prev) => {
         const next = new Set(prev);
-        next.delete(sequence);
+        if (wasBookmarked) {
+          next.add(sequence);
+        } else {
+          next.delete(sequence);
+        }
         return next;
       });
-      const message = e instanceof Error ? e.message : 'Failed to bookmark';
+      const fallback = wasBookmarked
+        ? 'Failed to un-bookmark'
+        : 'Failed to bookmark';
+      const message = e instanceof Error ? e.message : fallback;
       setError(message);
     }
   };

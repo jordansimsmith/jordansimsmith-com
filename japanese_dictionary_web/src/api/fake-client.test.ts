@@ -106,4 +106,28 @@ describe('fake-client bookmarks', () => {
     await expect(fresh.createBookmark(0)).rejects.toThrow();
     await expect(fresh.createBookmark(-7)).rejects.toThrow();
   });
+
+  it('removes a sequence from the listing on deleteBookmark', async () => {
+    const fresh = createFakeClient();
+    await fresh.createBookmark(11);
+    await fresh.createBookmark(22);
+    await fresh.deleteBookmark(11);
+
+    const response = await fresh.findBookmarks();
+    expect(response.sequences).toEqual([22]);
+  });
+
+  it('is idempotent on deleteBookmark for an unknown sequence', async () => {
+    const fresh = createFakeClient();
+    await fresh.deleteBookmark(999);
+
+    const response = await fresh.findBookmarks();
+    expect(response.sequences).toEqual([]);
+  });
+
+  it('rejects non-positive sequences on deleteBookmark', async () => {
+    const fresh = createFakeClient();
+    await expect(fresh.deleteBookmark(0)).rejects.toThrow();
+    await expect(fresh.deleteBookmark(-7)).rejects.toThrow();
+  });
 });

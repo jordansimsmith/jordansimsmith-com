@@ -206,4 +206,56 @@ public class JapaneseDictionaryE2ETest {
     var body = objectMapper.readValue(response.body(), CreateBookmarkHandler.ErrorResponse.class);
     assertThat(body.message()).isEqualTo("sequence must be a positive integer");
   }
+
+  @Test
+  void deleteBookmarkShouldRemoveExistingBookmark() throws IOException, InterruptedException {
+    var putRequest =
+        HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl + "/bookmarks/3"))
+            .header("Authorization", authHeader)
+            .PUT(HttpRequest.BodyPublishers.noBody())
+            .build();
+    assertThat(httpClient.send(putRequest, HttpResponse.BodyHandlers.ofString()).statusCode())
+        .isEqualTo(201);
+
+    var deleteRequest =
+        HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl + "/bookmarks/3"))
+            .header("Authorization", authHeader)
+            .DELETE()
+            .build();
+    var deleteResponse = httpClient.send(deleteRequest, HttpResponse.BodyHandlers.ofString());
+
+    assertThat(deleteResponse.statusCode()).isEqualTo(204);
+    assertThat(deleteResponse.body()).isEmpty();
+
+    var getRequest =
+        HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl + "/bookmarks"))
+            .header("Authorization", authHeader)
+            .GET()
+            .build();
+    var getResponse = httpClient.send(getRequest, HttpResponse.BodyHandlers.ofString());
+
+    assertThat(getResponse.statusCode()).isEqualTo(200);
+    var getBody =
+        objectMapper.readValue(
+            getResponse.body(), FindBookmarksHandler.FindBookmarksResponse.class);
+    assertThat(getBody.sequences()).doesNotContain(3L);
+  }
+
+  @Test
+  void deleteBookmarkShouldBeIdempotentWhenBookmarkDoesNotExist()
+      throws IOException, InterruptedException {
+    var request =
+        HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl + "/bookmarks/999999"))
+            .header("Authorization", authHeader)
+            .DELETE()
+            .build();
+
+    var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+
+    assertThat(response.statusCode()).isEqualTo(204);
+  }
 }

@@ -157,4 +157,37 @@ describe('http client', () => {
       'sequence must be a positive integer',
     );
   });
+
+  it('issues DELETE for deleteBookmark with the encoded sequence in the path', async () => {
+    setSession('alice', 'pw');
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    });
+
+    const client = createHttpClient();
+    await client.deleteBookmark(1316830);
+
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe(
+      'https://api.japanese-dictionary.jordansimsmith.com/bookmarks/1316830',
+    );
+    expect(init.method).toBe('DELETE');
+    expect(init.headers.Authorization).toBe(`Basic ${btoa('alice:pw')}`);
+  });
+
+  it('throws deleteBookmark with the server-provided message on a non-2xx response', async () => {
+    setSession('alice', 'pw');
+    fetchSpy.mockResolvedValue({
+      ok: false,
+      statusText: 'Bad Request',
+      json: async () => ({ message: 'sequence must be a positive integer' }),
+    });
+
+    const client = createHttpClient();
+
+    await expect(client.deleteBookmark(-1)).rejects.toThrow(
+      'sequence must be a positive integer',
+    );
+  });
 });

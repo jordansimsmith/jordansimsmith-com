@@ -20,6 +20,7 @@ The Japanese dictionary web service is a single-page app that lets an authentica
 - As a user sharing a result, I want the URL to reflect the current query (e.g., `?q=しん`), so that I can bookmark or copy a specific lookup.
 - As a learner doing lookups, I want a bookmark button on each search result, so that I can flag a word for later flashcard creation in one tap.
 - As a returning learner, I want each result that I have already bookmarked to render in a "bookmarked" state, so that I don't bookmark the same word twice.
+- As a learner who changes my mind, I want to tap a bookmarked result again to un-bookmark it, so that I can undo a misclick without leaving the page.
 
 ## Features and scope boundaries
 
@@ -33,15 +34,14 @@ The Japanese dictionary web service is a single-page app that lets an authentica
 - Per-entry header showing `expression`, `reading`, `reading_romaji`, and the raw `frequency_rank` integer.
 - Per-entry body rendering the Yomitan structured-content `glossary_raw` JSON tree with hand-authored CSS targeting `data-sc-*` selectors.
 - Per-entry pitch dot graph (SVG port of Yomitan's `pronunciation-generator.js`) when `pitch` is non-NULL, plus the pitch-pattern label (heiban / atamadaka / nakadaka / odaka).
-- Per-entry bookmark icon button: outline icon when unbookmarked (clickable), filled icon when bookmarked (disabled).
-- Pre-load the user's full bookmark set once on `SearchPage` mount and keep it in memory; new bookmarks update the local set optimistically and revert on API error.
+- Per-entry bookmark icon button: outline icon when unbookmarked, filled icon when bookmarked. Clicking the button toggles the state — adding a bookmark when empty, removing it when filled.
+- Pre-load the user's full bookmark set once on `SearchPage` mount and keep it in memory; bookmark adds and removes update the local set optimistically and revert on API error.
 - Mobile-first responsive layout that reflows to desktop with a max-width container.
 - Empty-state, no-results-state, loading-state, and error-state UI for the search page.
 
 ### Out of scope
 
 - Multi-user accounts, shared sessions, or per-user history.
-- Un-bookmarking from the SPA in v1; the bookmark button is one-way.
 - A "view my bookmarks" page; v1 only surfaces the bookmark state inline on search results.
 - A separate detail page or per-entry route (`/term/<id>`); the only sharable URL form is `/search?q=<query>`.
 - Pagination or "load more"; the top 10 results are the entire response.
@@ -83,6 +83,12 @@ sequenceDiagram
   web->>api: PUT /bookmarks/1316830 (Authorization Basic)
   api-->>web: 201 { sequence, created_at }
   Note right of web: on error, revert local set + show alert
+
+  user->>web: tap filled icon on result #1316830 to undo
+  Note right of web: optimistic remove from Set<number>
+  web->>api: DELETE /bookmarks/1316830 (Authorization Basic)
+  api-->>web: 204 No Content
+  Note right of web: on error, re-add to local set + show alert
 ```
 
 ## Main technical decisions
@@ -97,7 +103,7 @@ sequenceDiagram
 - Port Yomitan's `pronunciation-generator.js` SVG dot-graph into a small React component with the mora-counting helper extracted to `src/domain/morae.ts`.
 - Use Mantine's responsive breakpoints (`useMediaQuery` + `em()`) for mobile-vs-desktop reflow without a custom layout abstraction.
 - Fetch the user's full bookmark set once on `SearchPage` mount and hold it as a React `Set<number>` for O(1) membership checks against rendered results. Re-fetching after every search would couple search to bookmarks unnecessarily; the bookmark count is bounded (single-user app) so the upfront cost is negligible.
-- Apply the bookmark write optimistically: add the sequence to the local set immediately on click and revert on API error. The button is disabled while bookmarked; a failed write removes the local entry and surfaces the message in the existing alert region so the user can retry.
+- Apply bookmark writes optimistically in both directions: add or remove the sequence from the local set immediately on click and revert on API error. The button is always clickable so the icon doubles as the toggle affordance; a failed `PUT` removes the local entry and a failed `DELETE` re-inserts it, with the error surfaced in the existing alert region.
 - Treat a bookmark fetch failure on mount as soft: log the error and render every result as not-bookmarked. Search continues to work; the worst case is a duplicate `PUT` that the API resolves idempotently.
 - Extend the existing `ApiClient` interface rather than introducing a separate `BookmarkClient`. The HTTP and fake implementations stay co-located, and the SPA only ever holds a single client instance.
 
@@ -125,11 +131,12 @@ sequenceDiagram
 
 ### Consumed backend endpoints
 
-| Method | Path                    | Purpose                                                                      |
-| ------ | ----------------------- | ---------------------------------------------------------------------------- |
-| `GET`  | `/search`               | run a prefix search and return up to 10 ranked term records.                 |
-| `GET`  | `/bookmarks`            | fetch every bookmarked sequence for the calling user (called once on mount). |
-| `PUT`  | `/bookmarks/{sequence}` | bookmark a single term for the calling user (idempotent).                    |
+| Method   | Path                    | Purpose                                                                      |
+| -------- | ----------------------- | ---------------------------------------------------------------------------- |
+| `GET`    | `/search`               | run a prefix search and return up to 10 ranked term records.                 |
+| `GET`    | `/bookmarks`            | fetch every bookmarked sequence for the calling user (called once on mount). |
+| `PUT`    | `/bookmarks/{sequence}` | bookmark a single term for the calling user (idempotent).                    |
+| `DELETE` | `/bookmarks/{sequence}` | un-bookmark a single term for the calling user (idempotent).                 |
 
 `GET /search` serves two purposes: an empty `q` is a session-validation probe used at login (analogous to `GET /templates` in `packing_list_web`), and a non-empty `q` returns search results. `GET /bookmarks` is invoked exactly once when `SearchPage` mounts to seed the in-memory bookmark set.
 
@@ -148,12 +155,13 @@ export interface ApiClient {
   search(q: string): Promise<SearchResponse>;
   findBookmarks(): Promise<BookmarksResponse>;
   createBookmark(sequence: number): Promise<void>;
+  deleteBookmark(sequence: number): Promise<void>;
 }
 ```
 
 `SearchResponse` is `{ results: SearchResult[] }`. `SearchResult` carries `sequence`, `expression`, `reading`, `reading_romaji`, `frequency_rank | null`, `pitch | null`, and `glossary_raw` (recursive `SCNode`).
 
-`BookmarksResponse` is `{ sequences: number[] }` — bare integers in `created_at` descending order from the API. `createBookmark` resolves on success and rejects with the `message` field from a non-2xx body so the caller can surface it.
+`BookmarksResponse` is `{ sequences: number[] }` — bare integers in `created_at` descending order from the API. `createBookmark` and `deleteBookmark` resolve on success and reject with the `message` field from a non-2xx body so the caller can surface it.
 
 Implementation selection at module load:
 
@@ -191,22 +199,22 @@ export const apiClient: ApiClient = import.meta.env.PROD
 - Image nodes (`<img>` in structured content) render as inline placeholder text — `[image: <description-or-basename>]` — never as actual `<img>` elements in v1.
 - Result entries always render fully expanded; there is no collapsed state, accordion, or per-entry detail page.
 - Result ordering is taken from the API response unchanged; the SPA does not re-sort.
-- Each rendered `ResultEntry` shows a bookmark icon: outline + clickable when `sequence` is not in the bookmark set; filled + disabled when it is.
-- Clicking the bookmark icon optimistically inserts `sequence` into the local set, fires `createBookmark(sequence)`, and on rejection removes it back from the set and surfaces the message in the existing alert region. The button does not display a per-row spinner or async state.
+- Each rendered `ResultEntry` shows a bookmark icon: outline when `sequence` is not in the bookmark set, filled when it is. The icon is clickable in both states and acts as a toggle. `aria-pressed` reflects the current state for assistive tech.
+- Clicking an unbookmarked icon optimistically inserts `sequence` into the local set, fires `createBookmark(sequence)`, and on rejection removes it from the set and surfaces the message in the alert region. Clicking a bookmarked icon optimistically removes `sequence` from the set, fires `deleteBookmark(sequence)`, and on rejection re-inserts it and surfaces the message. The button does not display a per-row spinner or async state.
 - A failure of the on-mount `findBookmarks()` call is non-fatal: the bookmark set is left empty and a one-off console warning is logged. Subsequent `PUT`s remain idempotent on the API, so retrying via a page reload recovers the state.
 - Logout clears `japanese_dictionary_auth` from `localStorage` and navigates to `/`; the next page render shows the login form. The bookmark set is in-memory only, so logging out and back in re-fetches a fresh copy.
 
 ## Source of truth
 
-| Entity                | Authoritative source                              | Notes                                                                                 |
-| --------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------- |
-| Credential validity   | `japanese_dictionary_api` auth-protected response | login is treated as successful after authenticated `GET /search?q=` returns 200       |
-| Search results        | `japanese_dictionary_api`                         | the SPA renders the API response unchanged; no client-side filtering or re-sorting    |
-| Bookmark membership   | `japanese_dictionary_api` `GET /bookmarks`        | the SPA mirrors the API set in a `Set<number>` and updates it optimistically on `PUT` |
-| Entry rendering       | local React renderer over server JSON             | `GlossaryRenderer` walks the `glossary_raw` tree at render time                       |
-| Pitch graph rendering | local React/SVG component                         | derived from `(reading, pitch)` in the API response                                   |
-| Session persistence   | browser `localStorage`                            | cleared on logout via `clearSession()`                                                |
-| Current search query  | URL `?q=` query param                             | mirrored from input via `replaceState`; read on mount                                 |
+| Entity                | Authoritative source                              | Notes                                                                                            |
+| --------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| Credential validity   | `japanese_dictionary_api` auth-protected response | login is treated as successful after authenticated `GET /search?q=` returns 200                  |
+| Search results        | `japanese_dictionary_api`                         | the SPA renders the API response unchanged; no client-side filtering or re-sorting               |
+| Bookmark membership   | `japanese_dictionary_api` `GET /bookmarks`        | the SPA mirrors the API set in a `Set<number>` and updates it optimistically on `PUT` / `DELETE` |
+| Entry rendering       | local React renderer over server JSON             | `GlossaryRenderer` walks the `glossary_raw` tree at render time                                  |
+| Pitch graph rendering | local React/SVG component                         | derived from `(reading, pitch)` in the API response                                              |
+| Session persistence   | browser `localStorage`                            | cleared on logout via `clearSession()`                                                           |
+| Current search query  | URL `?q=` query param                             | mirrored from input via `replaceState`; read on mount                                            |
 
 ## Security and privacy
 
@@ -248,12 +256,12 @@ Build mode behaviour: production (`import.meta.env.PROD`) uses the HTTP client; 
 - Key coverage areas:
   - Login flow (credential capture, session probe, redirect on success).
   - `SearchPage` debounce semantics, `?q=` URL sync, empty / loading / no-results / error rendering.
-  - `SearchPage` bookmark behaviour: pre-loads `findBookmarks()` on mount, renders the bookmark icon as filled/disabled for matched sequences, optimistically marks new bookmarks on click and reverts on `createBookmark()` rejection.
+  - `SearchPage` bookmark behaviour: pre-loads `findBookmarks()` on mount, renders the bookmark icon as filled for matched sequences, optimistically marks new bookmarks on click and reverts on `createBookmark()` rejection, optimistically un-bookmarks on click of a filled icon and reverts on `deleteBookmark()` rejection.
   - `GlossaryRenderer` recursive rendering of representative structured-content trees (`<ul>`/`<li>`, `<ruby>`/`<rt>` furigana, internal link, external link, image placeholder, deeply-nested tree).
   - `PitchGraph` rendering for heiban / atamadaka / nakadaka / odaka patterns.
   - `morae.ts` mora-counting helper edge cases (small ya/yu/yo, `ん`, `っ`, `ー`).
-  - HTTP client URL construction, auth header inclusion, error message extraction (across `search`, `findBookmarks`, and `createBookmark`).
-  - Fake client bookmark behaviour: `findBookmarks` reflects prior `createBookmark` calls, idempotent on repeated `createBookmark`.
+  - HTTP client URL construction, auth header inclusion, error message extraction (across `search`, `findBookmarks`, `createBookmark`, and `deleteBookmark`).
+  - Fake client bookmark behaviour: `findBookmarks` reflects prior `createBookmark` calls, idempotent on repeated `createBookmark`, `deleteBookmark` removes from the listing and is idempotent on unknown sequences.
 - Required service checks:
   - `bazel test //japanese_dictionary_web:unit-tests`
   - `bazel build //japanese_dictionary_web:typecheck`
@@ -271,8 +279,10 @@ Build mode behaviour: production (`import.meta.env.PROD`) uses the HTTP client; 
   - Type `新` and verify kanji-prefix results.
   - Confirm the URL updates to `?q=<value>` on each keystroke.
   - Reload the page with `?q=新` and confirm the input pre-populates and the search fires immediately.
-  - Click the bookmark icon on a result and confirm it switches to the filled, disabled state.
-  - Reload the page and confirm the bookmark icon for that result is still rendered as filled and disabled.
+  - Click the bookmark icon on a result and confirm it switches to the filled state.
+  - Reload the page and confirm the bookmark icon for that result is still rendered as filled.
+  - Click the filled bookmark icon again and confirm it returns to the empty state.
+  - Reload the page and confirm the bookmark icon for that result is still rendered as empty.
   - Click an internal link inside a rendered glossary entry and confirm `?q=` updates and the search refreshes.
   - Logout and confirm the next reload shows the login screen.
 
@@ -304,11 +314,19 @@ Build mode behaviour: production (`import.meta.env.PROD`) uses the HTTP client; 
 
 1. User is on the search results page with several entries rendered, including `新橋`.
 2. User taps the bookmark icon next to the `新橋` entry.
-3. The icon immediately swaps to the filled, disabled state and the SPA fires `PUT /bookmarks/1316830` in the background.
+3. The icon immediately swaps to the filled state and the SPA fires `PUT /bookmarks/1316830` in the background.
 4. On `201`, no further UI update happens — the optimistic state is now confirmed.
 5. The user reloads the page; on mount, `GET /bookmarks` returns `{ "sequences": [..., 1316830, ...] }`, the bookmark `Set<number>` is seeded, and the same `新橋` entry renders pre-bookmarked.
 
-### Scenario 5: log out
+### Scenario 5: un-bookmark a term
+
+1. User is on the search results page with `新橋` rendered in the bookmarked (filled icon) state.
+2. User taps the filled bookmark icon to undo.
+3. The icon immediately swaps back to the empty state and the SPA fires `DELETE /bookmarks/1316830` in the background.
+4. On `204`, no further UI update happens.
+5. The user reloads the page; on mount, `GET /bookmarks` no longer includes `1316830`, and the `新橋` entry renders with the empty bookmark icon.
+
+### Scenario 6: log out
 
 1. User taps the logout button on the search page.
 2. App calls `clearSession()` (removes `japanese_dictionary_auth` from `localStorage`).

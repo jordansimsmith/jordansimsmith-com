@@ -62,7 +62,6 @@ export function ResultEntry({
           <ActionIcon
             variant="subtle"
             color={bookmarked ? 'yellow' : 'gray'}
-            disabled={bookmarked}
             aria-label={bookmarkLabel}
             aria-pressed={bookmarked}
             onClick={() => onBookmark?.(result.sequence)}
