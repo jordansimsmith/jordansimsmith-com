@@ -12,6 +12,14 @@ SUPPORTED_EXTENSIONS = [".mkv", ".mp4"]
 
 
 def main():
+    # on windows, double-clicking the script does not set cwd to the script's
+    # directory, so relative paths like shows/, movies/, and watched.txt do not
+    # resolve. force cwd to the script's directory so the same workflow works.
+    # __file__ is not defined in some contexts (e.g. interactive REPL), so
+    # guard against that.
+    if os.name == "nt" and "__file__" in globals():
+        os.chdir(os.path.dirname(os.path.abspath(__file__)))
+
     local_episodes_watched = find_local_episodes_watched()
     local_movies_watched = find_local_movies_watched()
     youtube_video_ids, spotify_episode_ids = find_watched_urls()

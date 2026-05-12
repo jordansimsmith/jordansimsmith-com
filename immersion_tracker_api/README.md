@@ -403,6 +403,7 @@ Local script and test variables:
   - Set `IMMERSION_TRACKER_USER` and `IMMERSION_TRACKER_PASSWORD`
   - Optionally set `IMMERSION_TRACKER_API_URL` to a local test stack URL
   - `watched.txt` is read from the current working directory where the script runs
+  - On Windows the script forces its working directory to the directory containing `sync_episodes.py` so double-clicking the file resolves `shows/`, `movies/`, and `watched.txt` next to the script
 - Fast smoke check pattern:
   - sync at least one item (`/sync`, `/syncmovies`, `/syncyoutube`, or `/syncspotify`)
   - request `/progress`
