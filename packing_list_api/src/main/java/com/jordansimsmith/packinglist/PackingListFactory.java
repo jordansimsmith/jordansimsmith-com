@@ -1,6 +1,8 @@
 package com.jordansimsmith.packinglist;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jordansimsmith.auth.AuthModule;
+import com.jordansimsmith.auth.RequestAuthorizer;
 import com.jordansimsmith.dynamodb.DynamoDbModule;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
@@ -22,6 +24,7 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
       ClockModule.class,
       DynamoDbModule.class,
       RequestContextModule.class,
+      AuthModule.class,
       PackingListModule.class
     })
 public interface PackingListFactory {
@@ -34,6 +37,8 @@ public interface PackingListFactory {
   RequestContextFactory requestContextFactory();
 
   HttpResponseFactory httpResponseFactory();
+
+  RequestAuthorizer requestAuthorizer();
 
   TemplatesFactory templatesFactory();
 

@@ -324,7 +324,7 @@ None in current scope. The service uses fixed v1 constants that match repository
 
 ## Testing and quality gates
 
-- Unit tests cover interval eligibility checks, multipart part calculations, checksum/metadata validation, and auth parsing behavior.
+- Unit tests cover interval eligibility checks, multipart part calculations, and checksum/metadata validation. Authorizer logic (Basic header parsing, password-with-colon, multi-user matching) is covered by `lib/auth`'s `RequestAuthorizerTest`.
 - Integration tests cover handler behavior against DynamoDB test containers with fake S3 presign/completion clients.
 - E2E tests cover LocalStack-backed flow: create backup -> multipart upload -> finalize -> list -> get.
 - Required checks before merge:

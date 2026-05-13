@@ -298,7 +298,7 @@ Expected secret JSON for `packing_list_api`:
 
 ## Testing and quality gates
 
-- Unit tests cover authentication, template response mapping, and trip validation rules.
+- Unit tests cover template response mapping and trip validation rules. Authorizer logic is covered by `lib/auth`'s `RequestAuthorizerTest`.
 - Integration tests cover create/list/get/update/delete handlers against DynamoDB Testcontainers.
 - E2E tests cover create -> list -> get -> update -> get -> delete -> verify gone flows with LocalStack.
 - Required service checks:

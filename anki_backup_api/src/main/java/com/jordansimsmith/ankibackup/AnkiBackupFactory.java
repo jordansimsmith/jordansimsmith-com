@@ -1,6 +1,8 @@
 package com.jordansimsmith.ankibackup;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jordansimsmith.auth.AuthModule;
+import com.jordansimsmith.auth.RequestAuthorizer;
 import com.jordansimsmith.dynamodb.DynamoDbModule;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
@@ -24,6 +26,7 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
       ObjectMapperModule.class,
       DynamoDbModule.class,
       RequestContextModule.class,
+      AuthModule.class,
       AnkiBackupModule.class
     })
 public interface AnkiBackupFactory {
@@ -36,6 +39,8 @@ public interface AnkiBackupFactory {
   RequestContextFactory requestContextFactory();
 
   HttpResponseFactory httpResponseFactory();
+
+  RequestAuthorizer requestAuthorizer();
 
   DynamoDbTable<AnkiBackupItem> ankiBackupTable();
 

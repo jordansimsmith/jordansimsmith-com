@@ -380,7 +380,7 @@ Expected JSON for secret `book_tracker_api`:
 
 ## Testing and quality gates
 
-- Unit tests cover `AuthHandler` (Basic header parsing, users-array matching, allow/deny policy output), `BookValidator` (every validation rule), and the cover-URL construction helper.
+- Unit tests cover `BookValidator` (every validation rule) and the cover-URL construction helper. Authorizer logic (Basic header parsing, users-array matching, allow/deny policy output) is covered by `lib/auth`'s `RequestAuthorizerTest`.
 - Integration tests run each handler against DynamoDB Testcontainers with fake secrets, covering happy paths, validation failures, duplicate-add `409`, `finished_date` edit with `gsi1sk` rewrite, `404` on missing items, and the rolling 12-month boundary against a pinned `Clock`.
 - End-to-end tests drive `POST` → `GET` list → `GET` one → `PUT` → `GET` → `DELETE` → verify-gone through a LocalStack stack (API Gateway + Lambda + DynamoDB).
 - Required checks before merge:

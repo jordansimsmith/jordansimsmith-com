@@ -28,7 +28,7 @@ Before drafting anything, read the closest existing analogs so every decision gr
 
 For a new backend service:
 
-- `packing_list_api/README.md`, `packing_list_api/BUILD.bazel`, one handler (for example `CreateTripHandler.java`), `AuthHandler.java`, `packing_list_api/infra/main.tf`, and `packing_list_api/src/test/resources/init_resources.py`.
+- `packing_list_api/README.md`, `packing_list_api/BUILD.bazel`, one handler (for example `CreateTripHandler.java`), `AuthHandler.java` (the slim service-specific shell that delegates to `lib/auth.RequestAuthorizer`), `packing_list_api/infra/main.tf`, and `packing_list_api/src/test/resources/init_resources.py`.
 - `immersion_tracker_api/src/main/java/com/jordansimsmith/immersiontracker/HttpYoutubeClient.java` when external HTTP integration is in scope.
 
 For a new frontend service:
@@ -124,7 +124,7 @@ Structure:
 Default phasing for a new service:
 
 - **Phase 1 — Frontend with fake mode**: scaffold, auth, API client + fake, timeline page, search + add, edit, delete, layout polish. Each task is commit-sized; fakes let the UX ship end-to-end before any backend exists.
-- **Phase 2 — Backend**: scaffold + `AuthHandler` + test infrastructure, one handler per task, LocalStack E2E.
+- **Phase 2 — Backend**: scaffold + slim `AuthHandler` (delegates to `lib/auth.RequestAuthorizer`) + test infrastructure, one handler per task, LocalStack E2E.
 - **Phase 3 — Infrastructure and wiring**: Terraform for API, wire real `http-client.ts`, Terraform for web.
 
 Rule of thumb: `1 task = 1 reviewable commit`. Resist splitting further when it would produce a commit with no user-visible output. Resist combining further when the scope starts to outgrow a comfortable review size.

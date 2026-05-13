@@ -1,6 +1,8 @@
 package com.jordansimsmith.japanesedictionary;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jordansimsmith.auth.AuthModule;
+import com.jordansimsmith.auth.RequestAuthorizer;
 import com.jordansimsmith.dynamodb.DynamoDbModule;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
@@ -24,6 +26,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
       ClockModule.class,
       DynamoDbModule.class,
       RequestContextModule.class,
+      AuthModule.class,
       JapaneseDictionaryModule.class
     })
 public interface JapaneseDictionaryFactory {
@@ -36,6 +39,8 @@ public interface JapaneseDictionaryFactory {
   RequestContextFactory requestContextFactory();
 
   HttpResponseFactory httpResponseFactory();
+
+  RequestAuthorizer requestAuthorizer();
 
   DynamoDbClient dynamoDbClient();
 

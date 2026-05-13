@@ -1,5 +1,6 @@
 package com.jordansimsmith.booktracker;
 
+import com.jordansimsmith.auth.AuthModule;
 import com.jordansimsmith.dynamodb.DynamoDbTestModule;
 import com.jordansimsmith.http.RequestContextModule;
 import com.jordansimsmith.json.ObjectMapperModule;
@@ -22,6 +23,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
       ClockTestModule.class,
       DynamoDbTestModule.class,
       RequestContextModule.class,
+      AuthModule.class,
       BookTrackerTestModule.class
     })
 public interface BookTrackerTestFactory extends BookTrackerFactory {

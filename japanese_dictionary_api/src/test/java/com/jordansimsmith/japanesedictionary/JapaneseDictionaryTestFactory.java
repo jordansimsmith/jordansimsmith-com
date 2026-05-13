@@ -1,5 +1,6 @@
 package com.jordansimsmith.japanesedictionary;
 
+import com.jordansimsmith.auth.AuthModule;
 import com.jordansimsmith.dynamodb.DynamoDbTestModule;
 import com.jordansimsmith.http.RequestContextModule;
 import com.jordansimsmith.json.ObjectMapperModule;
@@ -21,6 +22,7 @@ import javax.inject.Singleton;
       ClockTestModule.class,
       DynamoDbTestModule.class,
       RequestContextModule.class,
+      AuthModule.class,
       JapaneseDictionaryModule.class
     })
 public interface JapaneseDictionaryTestFactory extends JapaneseDictionaryFactory {
