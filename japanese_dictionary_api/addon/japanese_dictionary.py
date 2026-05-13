@@ -14,33 +14,13 @@ from aqt.utils import tooltip
 
 from addon import api_client, audio, dialog, kana_form, note_builder
 
-DEFAULT_CONFIG = {
-    "deck": "Mining",
-    "note_type": "Animecards",
-    "field_mapping": {
-        "Word": "Word",
-        "Reading": "Reading",
-        "Glossary": "Glossary",
-        "Audio": "Audio",
-        "Graph": "Graph",
-    },
-    "tag": "japanese_dictionary",
-    "duplicate_field": "Word",
-}
-
 
 def log(message):
     print(f"[japanese-dictionary] {message}", flush=True)
 
 
 def get_config():
-    config = mw.addonManager.getConfig(__name__) or {}
-    merged = dict(DEFAULT_CONFIG)
-    merged.update(config)
-    field_mapping = dict(DEFAULT_CONFIG["field_mapping"])
-    field_mapping.update(config.get("field_mapping", {}))
-    merged["field_mapping"] = field_mapping
-    return merged
+    return mw.addonManager.getConfig(__name__) or {}
 
 
 def on_menu_action_triggered():
