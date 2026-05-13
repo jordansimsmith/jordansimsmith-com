@@ -99,7 +99,7 @@ public class SearchHandler
     var qRomaji = romajiNormaliser.normalise(q);
 
     var candidates = runParallelQueries(q, qRomaji);
-    var topSequences = rankTopN(candidates, RESULT_LIMIT);
+    var topSequences = rankTopN(candidates, q, qRomaji, RESULT_LIMIT);
 
     if (topSequences.isEmpty()) {
       return httpResponseFactory.ok(new SearchResponse(List.of()));
@@ -151,7 +151,8 @@ public class SearchHandler
     return items;
   }
 
-  private static List<Long> rankTopN(List<TermItem> candidates, int limit) {
+  private static List<Long> rankTopN(
+      List<TermItem> candidates, String q, String qRomaji, int limit) {
     var dedup = new LinkedHashMap<Long, TermItem>();
     for (var item : candidates) {
       dedup.putIfAbsent(item.getSequence(), item);
@@ -159,7 +160,8 @@ public class SearchHandler
 
     var ranked = new ArrayList<>(dedup.values());
     ranked.sort(
-        Comparator.<TermItem, Integer>comparing(
+        Comparator.<TermItem, Integer>comparing(item -> isExactMatch(item, q, qRomaji) ? 0 : 1)
+            .thenComparing(
                 TermItem::getFrequencyRank, Comparator.nullsLast(Comparator.naturalOrder()))
             .thenComparing(TermItem::getSequence));
 
@@ -168,6 +170,12 @@ public class SearchHandler
       top.add(ranked.get(i).getSequence());
     }
     return top;
+  }
+
+  private static boolean isExactMatch(TermItem item, String q, String qRomaji) {
+    return q.equals(item.getExpression())
+        || q.equals(item.getReading())
+        || qRomaji.equals(item.getReadingRomaji());
   }
 
   private List<TermItem> batchGet(List<Long> sequences) {

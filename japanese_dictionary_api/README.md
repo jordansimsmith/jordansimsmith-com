@@ -1,6 +1,6 @@
 # Japanese dictionary API
 
-The Japanese dictionary API service provides an authenticated HTTP API for prefix-matching a single shared corpus of Japanese terms (~210k canonical headwords) by `expression`, `reading`, or `reading_romaji`, returning the top-10 matches ordered by frequency, plus per-user bookmarks for terms the user wants to revisit.
+The Japanese dictionary API service provides an authenticated HTTP API for prefix-matching a single shared corpus of Japanese terms (~210k canonical headwords) by `expression`, `reading`, or `reading_romaji`, returning the top-10 matches ordered by exact match then frequency, plus per-user bookmarks for terms the user wants to revisit.
 
 ## Overview
 
@@ -18,6 +18,7 @@ The Japanese dictionary API service provides an authenticated HTTP API for prefi
 - As a learner who knows only the reading, I want to look up by hiragana or katakana prefix, so that I can find an entry without knowing the kanji.
 - As a learner typing on a Latin keyboard, I want to look up by romaji prefix (Hepburn, kunrei, or wapuro), so that I can search without an IME.
 - As an authenticated user, I want frequency-ordered results, so that the most commonly used senses surface first.
+- As a learner who knows the exact word I'm looking for, I want a term that matches my query exactly to surface above prefix-only matches, so that I can find the canonical entry without scrolling past more frequent compounds.
 - As a learner doing lookups, I want to bookmark a term, so that I can come back to it later when building flashcards.
 - As a learner returning to the search page, I want my existing bookmarks to be visible, so that I don't accidentally bookmark the same term twice.
 - As an operator refreshing the corpus, I want a single command on my laptop that clears existing terms and re-uploads from local Yomitan zips, so that the dictionary stays current.
@@ -29,7 +30,7 @@ The Japanese dictionary API service provides an authenticated HTTP API for prefi
 - Require HTTP Basic authentication on every endpoint via the shared custom authorizer.
 - Run prefix searches against three dimensions in parallel (`expression`, `reading`, `reading_romaji`) and union the results.
 - Normalise incoming romaji queries (kunrei / wapuro / macron forms) to Modified Hepburn before matching.
-- Return up to 10 results ordered by `frequency_rank` ascending with NULLs last and `sequence` ascending tie-break.
+- Return up to 10 results: exact matches on `expression`, `reading`, or `reading_romaji` first, then by `frequency_rank` ascending with NULLs last, with `sequence` ascending as final tie-break.
 - Pass through Yomitan structured-content `glossary_raw` JSON unchanged for client-side rendering.
 - Validate query length (≤ 64 characters after NFC + trim); short-circuit empty queries to a 200 with no results.
 - Per-user bookmarks: idempotent `PUT /bookmarks/{sequence}` to flag a term, idempotent `DELETE /bookmarks/{sequence}` to remove the flag, `GET /bookmarks` to list every bookmarked sequence the calling user owns.
@@ -229,7 +230,7 @@ Query parameters:
 Behaviour:
 
 - Empty `q` → `200 { "results": [] }`. Used by the SPA's session-validation step at login, analogous to `GET /templates` in `packing_list_web`.
-- Non-empty `q` → run the parallel three-GSI query, union, dedup by `sequence`, sort by `frequency_rank` ASC nulls last with `sequence` ASC tie-break, take top 10, `BatchGetItem` full records, return.
+- Non-empty `q` → run the parallel three-GSI query, union, dedup by `sequence`, sort by exact-match-first (`q` equals `expression` OR `reading`, or normalised `qRomaji` equals `reading_romaji`) then `frequency_rank` ASC nulls last with `sequence` ASC tie-break, take top 10, `BatchGetItem` full records, return.
 - `q` length > 64 → `400 {"message": "q too long"}`.
 
 Example request:
@@ -493,7 +494,7 @@ Required attributes on every `BOOKMARK` item: `pk`, `sk`, `user`, `sequence`, `c
 - `q` is NFC-normalised and trimmed before length validation and matching.
 - Empty `q` deterministically returns `{"results": []}` without touching DynamoDB.
 - Non-empty `q` always runs all three GSI queries in parallel; the result is the union deduplicated by `sequence`.
-- Result ordering: `frequency_rank` ascending with NULLs last, `sequence` ascending as tie-break. Stable across requests for a fixed corpus.
+- Result ordering: exact matches first (`q` equals `expression` OR `reading`, or normalised `qRomaji` equals `reading_romaji`), then `frequency_rank` ascending with NULLs last, then `sequence` ascending as final tie-break. Stable across requests for a fixed corpus.
 - Top-10 cap is hard; clients cannot request more.
 - Romaji normalisation is idempotent: `normalise(normalise(x)) == normalise(x)`.
 - Bookmarks are partitioned per user; a `BOOKMARK#<sequence>` row is only ever visible to the user whose `pk` matches.
@@ -578,7 +579,7 @@ No third-party API keys (the dictionary corpus is locally produced — no runtim
 ## Testing and quality gates
 
 - Unit tests cover `RomajiNormaliser` per-rule cases plus idempotency, `TermItem` key formatting, and `BookmarkItem` key formatting. Authorizer logic (Basic header parsing, allow/deny + Base64 edge cases) is covered by `lib/auth`'s `RequestAuthorizerTest`.
-- Integration tests run `SearchHandler` against DynamoDB Testcontainers with hand-picked seed terms covering: kanji-only, kana-only, kanji+reading with non-NULL `frequency_rank`, term with non-NULL `pitch`, term whose glossary references an image (placeholder rendering case). Asserts prefix match across all three dimensions, frequency-asc ordering with NULLs last, top-10 cap, dedup when a term is reachable via multiple GSIs, kunrei romaji normalisation, and validation paths (`q` too long, missing/empty/whitespace `q`, NFC + trim before length check).
+- Integration tests run `SearchHandler` against DynamoDB Testcontainers with hand-picked seed terms covering: kanji-only, kana-only, kanji+reading with non-NULL `frequency_rank`, term with non-NULL `pitch`, term whose glossary references an image (placeholder rendering case). Asserts prefix match across all three dimensions, exact-match-first ordering followed by frequency-asc with NULLs last (including a defensive case proving a null-frequency exact match displaces high-frequency prefix-only matches from the top-10), top-10 cap, dedup when a term is reachable via multiple GSIs, kunrei romaji normalisation, and validation paths (`q` too long, missing/empty/whitespace `q`, NFC + trim before length check).
 - Integration tests for `CreateBookmarkHandler` cover: happy-path creation writes the row at `clock.now()`; second `PUT` for the same `(user, sequence)` is idempotent and refreshes `created_at`; non-integer / non-positive `{sequence}` returns `400`; bookmarks created by one user are invisible to a different user's listing; bookmark writes never touch `TERM#` rows.
 - Integration tests for `DeleteBookmarkHandler` cover: happy-path delete removes the row and returns `204`; second `DELETE` for the same `(user, sequence)` is idempotent and still returns `204`; non-integer / non-positive `{sequence}` returns `400`; deletes never affect another user's bookmarks; deletes never touch `TERM#` rows.
 - Integration tests for `FindBookmarksHandler` cover: empty list when the user has no bookmarks; only the calling user's rows are returned; sort order is `created_at` desc with `sequence` ascending tie-break; pre-seeded `TERM#` rows in the same table are ignored.
@@ -620,7 +621,7 @@ No third-party API keys (the dictionary corpus is locally produced — no runtim
 1. The user types `新` into `japanese_dictionary_web`.
 2. After 250 ms of no further keystrokes, the SPA sends `GET /search?q=%E6%96%B0`.
 3. API Gateway authorises the request via `AuthHandler`.
-4. `SearchHandler` runs three parallel GSI queries, finds matches in `gsi1` (`EXPRESSION` partition), unions and dedups, sorts by `frequency_rank` ASC nulls last.
+4. `SearchHandler` runs three parallel GSI queries, finds matches in `gsi1` (`EXPRESSION` partition), unions and dedups, sorts exact matches first then by `frequency_rank` ASC nulls last.
 5. `SearchHandler` `BatchGetItem`s the top 10 sequences and returns full term records including `glossary_raw`.
 6. The SPA renders 10 expanded entries.
 

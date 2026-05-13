@@ -152,7 +152,7 @@ public class SearchHandlerIntegrationTest {
 
     assertThat(body.results())
         .extracting(SearchHandler.SearchResult::sequence)
-        .containsExactly(3L, 7L, 11L, 6L, 2L, 1L);
+        .containsExactly(1L, 3L, 7L, 11L, 6L, 2L);
   }
 
   @Test
@@ -165,7 +165,7 @@ public class SearchHandlerIntegrationTest {
 
     assertThat(body.results())
         .extracting(SearchHandler.SearchResult::sequence)
-        .containsExactly(7L, 12L, 10L, 9L, 4L, 13L, 8L, 11L, 6L, 2L);
+        .containsExactly(1L, 5L, 7L, 12L, 10L, 9L, 4L, 13L, 8L, 11L);
   }
 
   @Test
@@ -178,7 +178,7 @@ public class SearchHandlerIntegrationTest {
 
     assertThat(body.results())
         .extracting(SearchHandler.SearchResult::sequence)
-        .containsExactly(7L, 12L, 10L, 9L, 4L, 13L, 8L, 11L, 6L, 2L);
+        .containsExactly(1L, 5L, 7L, 12L, 10L, 9L, 4L, 13L, 8L, 11L);
   }
 
   @Test
@@ -191,18 +191,18 @@ public class SearchHandlerIntegrationTest {
 
     assertThat(body.results())
         .extracting(SearchHandler.SearchResult::sequence)
-        .containsExactly(7L, 12L, 10L, 9L, 4L, 13L, 8L, 11L, 6L, 2L);
+        .containsExactly(1L, 5L, 7L, 12L, 10L, 9L, 4L, 13L, 8L, 11L);
   }
 
   @Test
-  void handleRequestShouldOrderByFrequencyAscWithNullsLast() throws Exception {
+  void handleRequestShouldOrderByExactMatchThenFrequencyAscWithNullsLast() throws Exception {
     var event = APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("q", "新")).build();
 
     var response = searchHandler.handleRequest(event, null);
     var body = objectMapper.readValue(response.getBody(), SearchHandler.SearchResponse.class);
 
     var ranks = body.results().stream().map(SearchHandler.SearchResult::frequencyRank).toList();
-    assertThat(ranks).containsExactly(200, 1000, 12000, 15000, 18472, null);
+    assertThat(ranks).containsExactly(null, 200, 1000, 12000, 15000, 18472);
   }
 
   @Test
@@ -214,6 +214,21 @@ public class SearchHandlerIntegrationTest {
     var body = objectMapper.readValue(response.getBody(), SearchHandler.SearchResponse.class);
 
     assertThat(body.results()).hasSize(10);
+  }
+
+  @Test
+  void handleRequestShouldKeepExactMatchInTopNDespiteEvictionPressure() throws Exception {
+    var event =
+        APIGatewayV2HTTPEvent.builder().withQueryStringParameters(Map.of("q", "しん")).build();
+
+    var response = searchHandler.handleRequest(event, null);
+    var body = objectMapper.readValue(response.getBody(), SearchHandler.SearchResponse.class);
+
+    assertThat(body.results()).hasSize(10);
+    assertThat(body.results())
+        .extracting(SearchHandler.SearchResult::sequence)
+        .startsWith(1L, 5L)
+        .doesNotContain(2L, 6L);
   }
 
   @Test
