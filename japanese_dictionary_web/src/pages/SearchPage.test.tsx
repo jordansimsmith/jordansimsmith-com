@@ -146,6 +146,45 @@ describe('SearchPage', () => {
     expect(new URL(window.location.href).searchParams.has('q')).toBe(false);
   });
 
+  it('hides the clear button when the input is empty and shows it once a value is typed', async () => {
+    const user = userEvent.setup();
+
+    renderSearchPage();
+    expect(screen.queryByRole('button', { name: /clear search/i })).toBeNull();
+
+    await user.type(screen.getByLabelText('Search'), 's');
+    expect(screen.getByRole('button', { name: /clear search/i })).toBeDefined();
+  });
+
+  it('clears the input via the clear button, removes ?q from the URL, and refocuses the input', async () => {
+    const user = userEvent.setup();
+
+    renderSearchPage();
+    const input = screen.getByLabelText('Search') as HTMLInputElement;
+    await user.type(input, 'shi');
+    expect(input.value).toBe('shi');
+
+    await user.click(screen.getByRole('button', { name: /clear search/i }));
+
+    expect(input.value).toBe('');
+    expect(new URL(window.location.href).searchParams.has('q')).toBe(false);
+    expect(document.activeElement).toBe(input);
+    expect(screen.queryByRole('button', { name: /clear search/i })).toBeNull();
+  });
+
+  it('cancels a pending debounced search when the clear button is pressed', async () => {
+    renderSearchPage();
+    const input = screen.getByLabelText('Search');
+
+    // synchronous fireEvent calls to beat the 250 ms debounce timer
+    // regardless of ci speed; user.click would race against wall-clock time.
+    fireEvent.change(input, { target: { value: 'sh' } });
+    fireEvent.click(screen.getByRole('button', { name: /clear search/i }));
+
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    expect(searchSpy).not.toHaveBeenCalled();
+  });
+
   it('pre-populates input from ?q= and fires immediate search on mount', async () => {
     setUrlQuery('test');
 

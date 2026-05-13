@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  CloseButton,
   Container,
   Divider,
   Stack,
@@ -38,6 +39,7 @@ export function SearchPage() {
   const [bookmarks, setBookmarks] = useState<Set<number>>(() => new Set());
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestId = useRef(0);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const runSearch = async (value: string) => {
     const trimmed = value.trim();
@@ -153,6 +155,11 @@ export function SearchPage() {
     runSearch(newQuery);
   };
 
+  const handleClear = () => {
+    handleChange('');
+    inputRef.current?.focus();
+  };
+
   const trimmedQuery = query.trim();
   const showEmptyHint =
     trimmedQuery.length === 0 && !loading && results.length === 0;
@@ -168,6 +175,7 @@ export function SearchPage() {
       <Container size="md" py={{ base: 'md', sm: 'xl' }}>
         <Stack>
           <TextInput
+            ref={inputRef}
             aria-label="Search"
             placeholder="Type a word in romaji, kana or kanji"
             value={query}
@@ -178,6 +186,11 @@ export function SearchPage() {
             autoCorrect="off"
             autoCapitalize="off"
             spellCheck={false}
+            rightSection={
+              query.length > 0 ? (
+                <CloseButton aria-label="Clear search" onClick={handleClear} />
+              ) : null
+            }
           />
           {error && (
             <Alert color="red" role="alert">

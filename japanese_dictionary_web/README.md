@@ -29,6 +29,7 @@ The Japanese dictionary web service is a single-page app that lets an authentica
 - Authenticate with username/password against the backend, persist a Basic auth token in `localStorage`.
 - Protect the search route and redirect unauthenticated users to the login form.
 - Single search page with a debounced (~250 ms) text input that mirrors `?q=<query>` to the URL via `replaceState`.
+- Inline clear button (Mantine `CloseButton`) inside the search input, shown only when the field has content. Tapping it empties the field, removes `?q` from the URL, cancels any pending debounced search, and returns focus to the input.
 - Run lookups via a typed `ApiClient` interface with HTTP and fake implementations swapped on `import.meta.env.PROD`.
 - Render up to 10 results, fully expanded inline, ordered by `frequency_rank` ascending with NULLs last.
 - Per-entry header showing `expression`, `reading`, and the raw `frequency_rank` integer.
@@ -192,6 +193,7 @@ export const apiClient: ApiClient = import.meta.env.PROD
 
 - Input changes trigger a debounced search after 250 ms of no further keystrokes; subsequent keystrokes within the debounce window cancel and reset the timer.
 - Empty input produces no API call and clears the result list; renders the empty-state hint.
+- The search input renders a clear button in its right section whenever the input has at least one character; the button is hidden when the field is empty. Activating the clear button is equivalent to emptying the field manually: it clears the input value, removes `?q` from the URL, cancels any pending debounced search, drops the current results, and returns focus to the input so the user can keep typing.
 - The current input value is mirrored to `?q=<value>` on the URL via `replaceState` (no browser history spam) on every input change.
 - On `SearchPage` mount: (a) `?q` is read from `URLSearchParams` and used to pre-populate the input, firing an immediate (non-debounced) search if non-empty; (b) `findBookmarks()` is called once to seed the in-memory bookmark `Set<number>`. The two requests run independently — search does not wait on bookmarks.
 - Internal links in rendered glossary content (`<a href="?q=...">` produced by Yomitan) are intercepted as React Router navigation that updates `?q=` and re-runs the search. The bookmark set persists across these intra-page navigations and is not re-fetched.
@@ -256,6 +258,7 @@ Build mode behaviour: production (`import.meta.env.PROD`) uses the HTTP client; 
 - Key coverage areas:
   - Login flow (credential capture, session probe, redirect on success).
   - `SearchPage` debounce semantics, `?q=` URL sync, empty / loading / no-results / error rendering.
+  - `SearchPage` clear-button behaviour: button is hidden when the input is empty, appears once the field has content, and clicking it empties the field, drops `?q` from the URL, cancels any pending debounced search, and refocuses the input.
   - `SearchPage` bookmark behaviour: pre-loads `findBookmarks()` on mount, renders the bookmark icon as filled for matched sequences, optimistically marks new bookmarks on click and reverts on `createBookmark()` rejection, optimistically un-bookmarks on click of a filled icon and reverts on `deleteBookmark()` rejection.
   - `GlossaryRenderer` recursive rendering of representative structured-content trees (`<ul>`/`<li>`, `<ruby>`/`<rt>` furigana, internal link, external link, image placeholder, deeply-nested tree).
   - `PitchGraph` rendering for heiban / atamadaka / nakadaka / odaka patterns.
@@ -278,6 +281,7 @@ Build mode behaviour: production (`import.meta.env.PROD`) uses the HTTP client; 
   - Type `しん` and verify kana-prefix results.
   - Type `新` and verify kanji-prefix results.
   - Confirm the URL updates to `?q=<value>` on each keystroke.
+  - With a value typed in, click the clear button inside the search input and confirm the field empties, `?q` disappears from the URL, the results clear back to the empty-state hint, and focus returns to the input.
   - Reload the page with `?q=新` and confirm the input pre-populates and the search fires immediately.
   - Click the bookmark icon on a result and confirm it switches to the filled state.
   - Reload the page and confirm the bookmark icon for that result is still rendered as filled.
