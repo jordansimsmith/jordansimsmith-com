@@ -31,7 +31,7 @@ The Japanese dictionary web service is a single-page app that lets an authentica
 - Single search page with a debounced (~250 ms) text input that mirrors `?q=<query>` to the URL via `replaceState`.
 - Run lookups via a typed `ApiClient` interface with HTTP and fake implementations swapped on `import.meta.env.PROD`.
 - Render up to 10 results, fully expanded inline, ordered by `frequency_rank` ascending with NULLs last.
-- Per-entry header showing `expression`, `reading`, `reading_romaji`, and the raw `frequency_rank` integer.
+- Per-entry header showing `expression`, `reading`, and the raw `frequency_rank` integer.
 - Per-entry body rendering the Yomitan structured-content `glossary_raw` JSON tree with hand-authored CSS targeting `data-sc-*` selectors.
 - Per-entry pitch dot graph (SVG port of Yomitan's `pronunciation-generator.js`) when `pitch` is non-NULL, plus the pitch-pattern label (heiban / atamadaka / nakadaka / odaka).
 - Per-entry bookmark icon button: outline icon when unbookmarked, filled icon when bookmarked. Clicking the button toggles the state — adding a bookmark when empty, removing it when filled.
@@ -113,7 +113,7 @@ sequenceDiagram
 - **Sequence**: integer JMdict ID, used internally as the React `key` for each rendered entry and as the lookup key into the bookmark set.
 - **Expression**: the canonical writing of a term (kanji or kana mixture). Rendered prominently in the entry header.
 - **Reading**: the canonical kana-only reading. Rendered next to the expression in the header.
-- **Reading romaji**: Modified Hepburn vowel-doubled form. Rendered as a small grey caption in the header.
+- **Reading romaji**: Modified Hepburn vowel-doubled form. Returned in the API response so the SPA can match it for romaji-prefix lookups, but not rendered in the result header.
 - **Frequency rank**: integer or `null`. Lower = more common. Rendered as `#<rank>` in the header right-aligned; omitted when null.
 - **Pitch**: integer or `null`. Position of the pitch downstep. Rendered as a horizontal SVG dot graph in the entry body when non-null.
 - **Pitch pattern**: human-readable label derived from `pitch` and the mora count of `reading`. Rendered alongside the dot graph.
@@ -294,7 +294,7 @@ Build mode behaviour: production (`import.meta.env.PROD`) uses the HTTP client; 
 2. App writes the session to `localStorage`, validates with `GET /search?q=` (returns `200 {"results": []}`), and routes to the search page.
 3. User types `新` and waits 250 ms.
 4. App fires `GET /search?q=%E6%96%B0`; response returns the top-10 most-common terms starting with 新.
-5. App renders 10 `ResultEntry` components stacked vertically; each shows the expression, reading, romaji, frequency rank, optional pitch graph, and full glossary.
+5. App renders 10 `ResultEntry` components stacked vertically; each shows the expression, reading, frequency rank, optional pitch graph, and full glossary.
 
 ### Scenario 2: bookmark and revisit a search
 

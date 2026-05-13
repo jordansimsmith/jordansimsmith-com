@@ -49,9 +49,6 @@ export function ResultEntry({
               {result.reading}
             </Text>
           )}
-          <Text size="xs" c="dimmed">
-            {result.reading_romaji}
-          </Text>
         </Group>
         <Group gap="xs" wrap="nowrap" align="center">
           {result.frequency_rank !== null && (
@@ -99,7 +96,6 @@ export function ResultEntrySkeleton() {
         <Group gap="md" align="baseline" wrap="wrap" style={{ minWidth: 0 }}>
           <Skeleton height={28} width={120} />
           <Skeleton height={20} width={80} />
-          <Skeleton height={14} width={60} />
         </Group>
         <Skeleton height={14} width={40} />
       </Group>
