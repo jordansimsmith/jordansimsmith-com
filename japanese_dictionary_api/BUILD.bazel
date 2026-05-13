@@ -179,7 +179,7 @@ pkg_zip(
 )
 
 py_library(
-    name = "addon-lib",
+    name = "addon-test-lib",
     testonly = True,
     srcs = glob(
         ["addon/*.py"],
@@ -202,7 +202,7 @@ py_test(
     imports = ["."],
     main = "addon/test_runner.py",
     deps = [
-        ":addon-lib",
+        ":addon-test-lib",
         "@pypi//pytest",
     ],
 )
