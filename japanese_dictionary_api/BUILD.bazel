@@ -1,5 +1,8 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 load("@rules_java//java:defs.bzl", "java_binary", "java_library")
+load("@rules_pkg//:pkg.bzl", "pkg_zip")
+load("@rules_pkg//pkg:mappings.bzl", "pkg_files", "strip_prefix")
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
 load("//lib/localstack:defs.bzl", "localstack_image")
 
 HANDLERS = glob(
@@ -150,6 +153,57 @@ java_binary(
         "@maven//:com_google_guava_guava",
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+pkg_files(
+    name = "addon-source-files",
+    srcs = glob(
+        ["addon/*.py"],
+        exclude = [
+            "addon/test_*.py",
+            "addon/test_runner.py",
+        ],
+    ) + [
+        "addon/config.json",
+        "addon/manifest.json",
+    ],
+    strip_prefix = strip_prefix.from_pkg("addon"),
+)
+
+pkg_zip(
+    name = "addon-package",
+    srcs = [":addon-source-files"],
+    out = "japanese-dictionary-importer.ankiaddon",
+    package_dir = "",
+)
+
+py_library(
+    name = "addon-lib",
+    testonly = True,
+    srcs = glob(
+        ["addon/*.py"],
+        exclude = [
+            "addon/test_*.py",
+            "addon/test_runner.py",
+        ],
+    ),
+    imports = ["."],
+    deps = ["@pypi//requests"],
+)
+
+py_test(
+    name = "addon-unit-tests",
+    size = "small",
+    srcs = ["addon/test_runner.py"] + glob(
+        ["addon/test_*.py"],
+        exclude = ["addon/test_runner.py"],
+    ),
+    imports = ["."],
+    main = "addon/test_runner.py",
+    deps = [
+        ":addon-lib",
+        "@pypi//pytest",
     ],
 )
 

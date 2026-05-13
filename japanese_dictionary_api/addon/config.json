@@ -1,0 +1,14 @@
+{
+  "deck": "Mining",
+  "note_type": "Animecards",
+  "field_mapping": {
+    "Word": "Word",
+    "Reading": "Reading",
+    "Glossary": "Glossary",
+    "Audio": "Audio",
+    "Graph": "Graph"
+  },
+  "tag": "japanese_dictionary",
+  "duplicate_field": "Word",
+  "api_url": "https://api.japanese-dictionary.jordansimsmith.com"
+}
