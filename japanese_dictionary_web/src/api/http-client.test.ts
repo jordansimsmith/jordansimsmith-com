@@ -107,11 +107,44 @@ describe('http client', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('fetches the bookmarks list with auth', async () => {
+  it('fetches the bookmarks list with auth and maps the wire shape to sequence ids', async () => {
     setSession('alice', 'pw');
     fetchSpy.mockResolvedValue({
       ok: true,
-      json: async () => ({ sequences: [1, 2, 3] }),
+      json: async () => ({
+        bookmarks: [
+          {
+            sequence: 1,
+            created_at: 1700000000,
+            expression: null,
+            reading: null,
+            reading_romaji: null,
+            frequency_rank: null,
+            pitch: null,
+            glossary_raw: null,
+          },
+          {
+            sequence: 2,
+            created_at: 1700000001,
+            expression: null,
+            reading: null,
+            reading_romaji: null,
+            frequency_rank: null,
+            pitch: null,
+            glossary_raw: null,
+          },
+          {
+            sequence: 3,
+            created_at: 1700000002,
+            expression: null,
+            reading: null,
+            reading_romaji: null,
+            frequency_rank: null,
+            pitch: null,
+            glossary_raw: null,
+          },
+        ],
+      }),
     });
 
     const client = createHttpClient();

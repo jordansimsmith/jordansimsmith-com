@@ -42,9 +42,10 @@ export function createHttpClient(): ApiClient {
       return response.json();
     },
 
-    async findBookmarks(): Promise<BookmarksResponse> {
+    async findBookmarks(): Promise<{ sequences: number[] }> {
       const response = await request('/bookmarks');
-      return response.json();
+      const data: BookmarksResponse = await response.json();
+      return { sequences: data.bookmarks.map((b) => b.sequence) };
     },
 
     async createBookmark(sequence: number): Promise<void> {

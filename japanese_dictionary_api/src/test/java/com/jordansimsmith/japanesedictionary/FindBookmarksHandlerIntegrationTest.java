@@ -3,6 +3,7 @@ package com.jordansimsmith.japanesedictionary;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
@@ -49,35 +50,36 @@ public class FindBookmarksHandlerIntegrationTest {
   @Test
   void handleRequestShouldReturnEmptyListWhenUserHasNoBookmarks() throws Exception {
     // arrange
-    var event = buildEvent("alice");
+    var event = buildEvent("alice", null);
 
     // act
     var response = findBookmarksHandler.handleRequest(event, null);
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
-    var body =
-        objectMapper.readValue(
-            response.getBody(), FindBookmarksHandler.FindBookmarksResponse.class);
-    assertThat(body.sequences()).isEmpty();
+    var body = parseBody(response.getBody());
+    assertThat(body.bookmarks()).isEmpty();
   }
 
   @Test
-  void handleRequestShouldReturnSequencesOrderedByCreatedAtDescending() throws Exception {
+  void handleRequestShouldReturnBookmarksOrderedByCreatedAtDescending() throws Exception {
     // arrange
     bookmarkTable.putItem(BookmarkItem.create("alice", 1L, Instant.ofEpochSecond(100L)));
     bookmarkTable.putItem(BookmarkItem.create("alice", 2L, Instant.ofEpochSecond(300L)));
     bookmarkTable.putItem(BookmarkItem.create("alice", 3L, Instant.ofEpochSecond(200L)));
 
     // act
-    var response = findBookmarksHandler.handleRequest(buildEvent("alice"), null);
+    var response = findBookmarksHandler.handleRequest(buildEvent("alice", null), null);
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
-    var body =
-        objectMapper.readValue(
-            response.getBody(), FindBookmarksHandler.FindBookmarksResponse.class);
-    assertThat(body.sequences()).containsExactly(2L, 3L, 1L);
+    var body = parseBody(response.getBody());
+    assertThat(body.bookmarks())
+        .extracting(FindBookmarksHandler.Bookmark::sequence)
+        .containsExactly(2L, 3L, 1L);
+    assertThat(body.bookmarks().get(0).createdAt()).isEqualTo(300L);
+    assertThat(body.bookmarks().get(0).expression()).isNull();
+    assertThat(isJsonNull(body.bookmarks().get(0).glossaryRaw())).isTrue();
   }
 
   @Test
@@ -89,13 +91,13 @@ public class FindBookmarksHandlerIntegrationTest {
     bookmarkTable.putItem(BookmarkItem.create("alice", 500L, sameTime));
 
     // act
-    var response = findBookmarksHandler.handleRequest(buildEvent("alice"), null);
+    var response = findBookmarksHandler.handleRequest(buildEvent("alice", null), null);
 
     // assert
-    var body =
-        objectMapper.readValue(
-            response.getBody(), FindBookmarksHandler.FindBookmarksResponse.class);
-    assertThat(body.sequences()).containsExactly(5L, 50L, 500L);
+    var body = parseBody(response.getBody());
+    assertThat(body.bookmarks())
+        .extracting(FindBookmarksHandler.Bookmark::sequence)
+        .containsExactly(5L, 50L, 500L);
   }
 
   @Test
@@ -106,19 +108,19 @@ public class FindBookmarksHandlerIntegrationTest {
     bookmarkTable.putItem(BookmarkItem.create("bob", 300L, Instant.ofEpochSecond(300L)));
 
     // act
-    var aliceResponse = findBookmarksHandler.handleRequest(buildEvent("alice"), null);
-    var bobResponse = findBookmarksHandler.handleRequest(buildEvent("bob"), null);
+    var aliceResponse = findBookmarksHandler.handleRequest(buildEvent("alice", null), null);
+    var bobResponse = findBookmarksHandler.handleRequest(buildEvent("bob", null), null);
 
     // assert
-    var aliceBody =
-        objectMapper.readValue(
-            aliceResponse.getBody(), FindBookmarksHandler.FindBookmarksResponse.class);
-    assertThat(aliceBody.sequences()).containsExactly(200L, 100L);
+    var aliceBody = parseBody(aliceResponse.getBody());
+    assertThat(aliceBody.bookmarks())
+        .extracting(FindBookmarksHandler.Bookmark::sequence)
+        .containsExactly(200L, 100L);
 
-    var bobBody =
-        objectMapper.readValue(
-            bobResponse.getBody(), FindBookmarksHandler.FindBookmarksResponse.class);
-    assertThat(bobBody.sequences()).containsExactly(300L);
+    var bobBody = parseBody(bobResponse.getBody());
+    assertThat(bobBody.bookmarks())
+        .extracting(FindBookmarksHandler.Bookmark::sequence)
+        .containsExactly(300L);
   }
 
   @Test
@@ -129,20 +131,110 @@ public class FindBookmarksHandlerIntegrationTest {
     bookmarkTable.putItem(BookmarkItem.create("alice", 42L, Instant.ofEpochSecond(123L)));
 
     // act
-    var response = findBookmarksHandler.handleRequest(buildEvent("alice"), null);
+    var response = findBookmarksHandler.handleRequest(buildEvent("alice", null), null);
 
     // assert
-    var body =
-        objectMapper.readValue(
-            response.getBody(), FindBookmarksHandler.FindBookmarksResponse.class);
-    assertThat(body.sequences()).containsExactly(42L);
+    var body = parseBody(response.getBody());
+    assertThat(body.bookmarks())
+        .extracting(FindBookmarksHandler.Bookmark::sequence)
+        .containsExactly(42L);
   }
 
-  private static APIGatewayV2HTTPEvent buildEvent(String user) {
+  @Test
+  void handleRequestShouldHydrateTermFieldsWhenIncludeTermIsSet() throws Exception {
+    // arrange
+    termTable.putItem(
+        TermItem.create(
+            1316830L,
+            "新橋",
+            "しんばし",
+            "shinbashi",
+            18472,
+            0,
+            "{\"tag\":\"div\",\"content\":\"Shinbashi\"}"));
+    bookmarkTable.putItem(BookmarkItem.create("alice", 1316830L, Instant.ofEpochSecond(500L)));
+
+    // act
+    var response = findBookmarksHandler.handleRequest(buildEvent("alice", "term"), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = parseBody(response.getBody());
+    assertThat(body.bookmarks()).hasSize(1);
+    var bookmark = body.bookmarks().get(0);
+    assertThat(bookmark.sequence()).isEqualTo(1316830L);
+    assertThat(bookmark.createdAt()).isEqualTo(500L);
+    assertThat(bookmark.expression()).isEqualTo("新橋");
+    assertThat(bookmark.reading()).isEqualTo("しんばし");
+    assertThat(bookmark.readingRomaji()).isEqualTo("shinbashi");
+    assertThat(bookmark.frequencyRank()).isEqualTo(18472);
+    assertThat(bookmark.pitch()).isEqualTo(0);
+    assertThat(bookmark.glossaryRaw().get("tag").asText()).isEqualTo("div");
+    assertThat(bookmark.glossaryRaw().get("content").asText()).isEqualTo("Shinbashi");
+  }
+
+  @Test
+  void handleRequestShouldDropDanglingBookmarksWhenIncludeTermIsSet() throws Exception {
+    // arrange
+    termTable.putItem(TermItem.create(1L, "新", "しん", "shin", null, 0, "{\"tag\":\"div\"}"));
+    bookmarkTable.putItem(BookmarkItem.create("alice", 1L, Instant.ofEpochSecond(200L)));
+    bookmarkTable.putItem(BookmarkItem.create("alice", 999L, Instant.ofEpochSecond(100L)));
+
+    // act
+    var response = findBookmarksHandler.handleRequest(buildEvent("alice", "term"), null);
+
+    // assert
+    var body = parseBody(response.getBody());
+    assertThat(body.bookmarks())
+        .extracting(FindBookmarksHandler.Bookmark::sequence)
+        .containsExactly(1L);
+  }
+
+  @Test
+  void handleRequestShouldReturnEmptyWhenIncludeTermIsSetAndUserHasNoBookmarks() throws Exception {
+    // arrange
+    var event = buildEvent("alice", "term");
+
+    // act
+    var response = findBookmarksHandler.handleRequest(event, null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = parseBody(response.getBody());
+    assertThat(body.bookmarks()).isEmpty();
+  }
+
+  @Test
+  void handleRequestShouldRejectUnknownIncludeValue() throws Exception {
+    // arrange
+    var event = buildEvent("alice", "audio");
+
+    // act
+    var response = findBookmarksHandler.handleRequest(event, null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(400);
+    var body = objectMapper.readValue(response.getBody(), FindBookmarksHandler.ErrorResponse.class);
+    assertThat(body.message()).isEqualTo("include parameter must be 'term' or omitted");
+  }
+
+  private FindBookmarksHandler.FindBookmarksResponse parseBody(String body) throws Exception {
+    return objectMapper.readValue(body, FindBookmarksHandler.FindBookmarksResponse.class);
+  }
+
+  private static boolean isJsonNull(JsonNode node) {
+    return node == null || node.isNull();
+  }
+
+  private static APIGatewayV2HTTPEvent buildEvent(String user, String include) {
     var authHeader =
         "Basic "
             + Base64.getEncoder()
                 .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
-    return APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
+    var builder = APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader));
+    if (include != null) {
+      builder.withQueryStringParameters(Map.of("include", include));
+    }
+    return builder.build();
   }
 }

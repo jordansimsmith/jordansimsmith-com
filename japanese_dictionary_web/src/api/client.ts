@@ -31,13 +31,24 @@ export interface SearchResponse {
   results: SearchResult[];
 }
 
+export interface Bookmark {
+  sequence: number;
+  created_at: number;
+  expression: string | null;
+  reading: string | null;
+  reading_romaji: string | null;
+  frequency_rank: number | null;
+  pitch: number | null;
+  glossary_raw: SCNode | null;
+}
+
 export interface BookmarksResponse {
-  sequences: number[];
+  bookmarks: Bookmark[];
 }
 
 export interface ApiClient {
   search(q: string): Promise<SearchResponse>;
-  findBookmarks(): Promise<BookmarksResponse>;
+  findBookmarks(): Promise<{ sequences: number[] }>;
   createBookmark(sequence: number): Promise<void>;
   deleteBookmark(sequence: number): Promise<void>;
 }

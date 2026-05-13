@@ -188,7 +188,47 @@ public class JapaneseDictionaryE2ETest {
     var getBody =
         objectMapper.readValue(
             getResponse.body(), FindBookmarksHandler.FindBookmarksResponse.class);
-    assertThat(getBody.sequences()).contains(2L);
+    assertThat(getBody.bookmarks())
+        .extracting(FindBookmarksHandler.Bookmark::sequence)
+        .contains(2L);
+    var bookmark =
+        getBody.bookmarks().stream().filter(b -> b.sequence() == 2L).findFirst().orElseThrow();
+    assertThat(bookmark.expression()).isNull();
+    assertThat(bookmark.glossaryRaw() == null || bookmark.glossaryRaw().isNull()).isTrue();
+  }
+
+  @Test
+  void getBookmarksWithIncludeTermShouldHydrateTermFields()
+      throws IOException, InterruptedException {
+    var putRequest =
+        HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl + "/bookmarks/2"))
+            .header("Authorization", authHeader)
+            .PUT(HttpRequest.BodyPublishers.noBody())
+            .build();
+    assertThat(httpClient.send(putRequest, HttpResponse.BodyHandlers.ofString()).statusCode())
+        .isEqualTo(201);
+
+    var getRequest =
+        HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl + "/bookmarks?include=term"))
+            .header("Authorization", authHeader)
+            .GET()
+            .build();
+    var getResponse = httpClient.send(getRequest, HttpResponse.BodyHandlers.ofString());
+
+    assertThat(getResponse.statusCode()).isEqualTo(200);
+    var body =
+        objectMapper.readValue(
+            getResponse.body(), FindBookmarksHandler.FindBookmarksResponse.class);
+    var bookmark =
+        body.bookmarks().stream().filter(b -> b.sequence() == 2L).findFirst().orElseThrow();
+    assertThat(bookmark.expression()).isEqualTo("新橋");
+    assertThat(bookmark.reading()).isEqualTo("しんばし");
+    assertThat(bookmark.readingRomaji()).isEqualTo("shinbashi");
+    assertThat(bookmark.frequencyRank()).isEqualTo(18472);
+    assertThat(bookmark.pitch()).isEqualTo(0);
+    assertThat(bookmark.glossaryRaw().get("tag").asText()).isEqualTo("div");
   }
 
   @Test
@@ -241,7 +281,9 @@ public class JapaneseDictionaryE2ETest {
     var getBody =
         objectMapper.readValue(
             getResponse.body(), FindBookmarksHandler.FindBookmarksResponse.class);
-    assertThat(getBody.sequences()).doesNotContain(3L);
+    assertThat(getBody.bookmarks())
+        .extracting(FindBookmarksHandler.Bookmark::sequence)
+        .doesNotContain(3L);
   }
 
   @Test

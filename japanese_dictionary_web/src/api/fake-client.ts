@@ -1,10 +1,4 @@
-import type {
-  ApiClient,
-  BookmarksResponse,
-  SCNode,
-  SearchResponse,
-  SearchResult,
-} from './client';
+import type { ApiClient, SCNode, SearchResponse, SearchResult } from './client';
 
 function senseGroup(partOfSpeech: string, glosses: string[]): SCNode {
   return {
@@ -585,7 +579,7 @@ export function createFakeClient(): ApiClient {
       return { results: sorted };
     },
 
-    async findBookmarks(): Promise<BookmarksResponse> {
+    async findBookmarks(): Promise<{ sequences: number[] }> {
       await new Promise((resolve) =>
         setTimeout(resolve, FAKE_BOOKMARK_LATENCY_MS),
       );

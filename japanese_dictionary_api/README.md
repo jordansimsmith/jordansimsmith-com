@@ -33,7 +33,7 @@ The Japanese dictionary API service provides an authenticated HTTP API for prefi
 - Return up to 10 results: exact matches on `expression`, `reading`, or `reading_romaji` first, then by `frequency_rank` ascending with NULLs last, with `sequence` ascending as final tie-break.
 - Pass through Yomitan structured-content `glossary_raw` JSON unchanged for client-side rendering.
 - Validate query length (≤ 64 characters after NFC + trim); short-circuit empty queries to a 200 with no results.
-- Per-user bookmarks: idempotent `PUT /bookmarks/{sequence}` to flag a term, idempotent `DELETE /bookmarks/{sequence}` to remove the flag, `GET /bookmarks` to list every bookmarked sequence the calling user owns.
+- Per-user bookmarks: idempotent `PUT /bookmarks/{sequence}` to flag a term, idempotent `DELETE /bookmarks/{sequence}` to remove the flag, `GET /bookmarks` to list bookmarks for the calling user (with optional `?include=term` mode to additionally hydrate each row with the matching term record).
 - Provide an operator migration script that destructively reloads the corpus from local Yomitan zips.
 
 ### Out of scope
@@ -47,8 +47,7 @@ The Japanese dictionary API service provides an authenticated HTTP API for prefi
 - Pagination or "load more" beyond the top-10 cap.
 - Per-user partitioning of the term corpus; corpus rows are read-shared. Per-user partitioning is in scope only for bookmark rows.
 - Image-binary hosting for the ~595 Jitendex entries that reference image files; v1 renders inline placeholder text in the consumer.
-- Hydrated bookmark listing (the listing endpoint returns sequence integers only — clients hydrate via `/search` or by holding existing result records).
-- Existence validation of `{sequence}` against the term corpus on bookmark write; dangling bookmarks are tolerated.
+- Existence validation of `{sequence}` against the term corpus on bookmark write; dangling bookmarks are tolerated. With `?include=term` on `GET /bookmarks`, dangling bookmarks whose `TERM#` row is absent are silently dropped from the listing.
 - Anki / flashcard rendering and audio playback; the bookmark feature is a queue for downstream flashcard tooling, not a card renderer.
 - Runtime corpus refresh endpoints.
 
@@ -120,7 +119,7 @@ sequenceDiagram
   Gateway->>Find: invoke FindBookmarksHandler
   Find->>Dynamo: query pk = USER#alice, begins_with(sk, "BOOKMARK#")
   Dynamo-->>Find: bookmark rows
-  Find-->>Web: 200 { sequences: [...] }
+  Find-->>Web: 200 { bookmarks: [{ sequence, created_at, ... }] }
 
   Note over Web: user clicks the bookmark icon on a result
   Web->>Gateway: PUT /bookmarks/1316830 (Authorization: Basic)
@@ -165,8 +164,8 @@ sequenceDiagram
 - Always run all three GSI queries in parallel and union the results, rather than auto-detecting input character class to query a single GSI. The wasted RCUs on empty queries are negligible (~3 RCU each), the wall-clock is `max(q1, q2, q3)` rather than the sum, and the union-and-dedup approach handles mixed-script input (e.g., `食べ`) without character-class branching.
 - Compute `reading_romaji` (Modified Hepburn with vowel-doubling) at ingest time and persist it; normalise incoming queries (kunrei / wapuro / macron) to the same form at request time before matching.
 - Key bookmark rows on the term `sequence` (not a server-generated UUID) so `(user, sequence)` is the natural primary key and `PUT /bookmarks/{sequence}` is idempotent without any read-before-write or conditional expression — a single `PutItem` upserts the row and refreshes `created_at`. `DELETE /bookmarks/{sequence}` is symmetrically idempotent: a single `DeleteItem` that always responds `204`, with no existence check.
-- Skip term-existence validation on bookmark write to keep the create path to a single `PutItem` round-trip. Dangling bookmarks (referencing a `sequence` no longer in the corpus after a Yomitan refresh) are tolerated; the listing endpoint returns the bare integer and the consumer simply won't render a button for a sequence it doesn't recognise.
-- Return `GET /bookmarks` as a flat sequence list rather than hydrated term records. The single stated client need is a fast in-memory membership check ("is this result already bookmarked?"), which is O(1) over a sequence `Set<number>`. Hydrated bookmarks would couple this endpoint to `BatchGetItem` and inflate per-call cost; a future "my bookmarks" page can add a hydrated variant without breaking the existing contract.
+- Skip term-existence validation on bookmark write to keep the create path to a single `PutItem` round-trip. Dangling bookmarks (referencing a `sequence` no longer in the corpus after a Yomitan refresh) are tolerated; the default listing mode returns the bare `(sequence, created_at)` pair and the consumer simply won't render a button for a sequence it doesn't recognise. With `?include=term`, dangling rows are silently dropped from the response.
+- Return `GET /bookmarks` with a unified `{ "bookmarks": [Bookmark] }` shape across both modes. Without `?include=term`, only `sequence` and `created_at` are populated; the term-related fields are `null`. With `?include=term`, the handler issues a `BatchGetItem` against the main table to populate the term fields per row. One endpoint, one wrapper, declarative field selection (matches GitHub's `?expand=` and Stripe's `?expand[]=` convention). The default mode pays a few extra bytes per row (null placeholders) which is negligible at expected scale (hundreds of bookmarks max).
 - Sort the bookmark listing by `created_at` descending in-memory rather than encoding the timestamp into the sort key. Per-user bookmark counts are bounded (single-user app, hundreds at most), so the sort is cheap and the `(user, sequence)` uniqueness guarantee from the simpler sort key is more valuable than a server-side ordered scan.
 - Make the migration script the only data-loading mechanism for term rows. No `POST /term` write API; `BatchWriteItem` direct from the operator's laptop, with a destructive clear-then-rebuild semantics keyed on `begins_with(pk, "TERM#")`. Matches the existing `migrations/NNN-*.py` pattern in `immersion_tracker_api/` and `event_calendar_api/`.
 
@@ -212,12 +211,12 @@ sequenceDiagram
 
 ### Endpoint summary
 
-| Method   | Path                    | Purpose                                                    |
-| -------- | ----------------------- | ---------------------------------------------------------- |
-| `GET`    | `/search`               | prefix-match a query and return up to 10 ranked terms      |
-| `GET`    | `/bookmarks`            | list every term sequence the calling user has bookmarked   |
-| `PUT`    | `/bookmarks/{sequence}` | bookmark a term for the calling user (idempotent upsert)   |
-| `DELETE` | `/bookmarks/{sequence}` | remove a bookmark for the calling user (idempotent delete) |
+| Method   | Path                    | Purpose                                                                          |
+| -------- | ----------------------- | -------------------------------------------------------------------------------- |
+| `GET`    | `/search`               | prefix-match a query and return up to 10 ranked terms                            |
+| `GET`    | `/bookmarks`            | list the calling user's bookmarks; optional `?include=term` hydrates term fields |
+| `PUT`    | `/bookmarks/{sequence}` | bookmark a term for the calling user (idempotent upsert)                         |
+| `DELETE` | `/bookmarks/{sequence}` | remove a bookmark for the calling user (idempotent delete)                       |
 
 ### `GET /search`
 
@@ -352,15 +351,21 @@ Representative key failures:
 
 ### `GET /bookmarks`
 
-Query parameters: none.
+Query parameters:
+
+| Name      | Required | Type   | Notes                                                            |
+| --------- | -------- | ------ | ---------------------------------------------------------------- |
+| `include` | no       | string | Optional. Only recognised value is `term`. Anything else: `400`. |
 
 Behaviour:
 
 - Lists every bookmark row owned by the calling user via a single primary-key `Query` (`pk = USER#<user> AND begins_with(sk, "BOOKMARK#")`).
-- Returns just the bare `sequence` integers in `created_at` descending order (most recent first), so a client can build a `Set<number>` in O(n) for membership checks against rendered search results.
+- Returns one `Bookmark` record per bookmark in `created_at` descending order (most recent first), with `sequence` ascending as tie-break. The wire wrapper is `{"bookmarks": [...]}` in both modes.
+- Without `?include=term`, each `Bookmark` carries `sequence` and `created_at`; the term-related fields are `null`. No `BatchGetItem`.
+- With `?include=term`, the handler additionally issues `BatchGetItem` (chunked at 100 per request) against the main table to populate `expression`, `reading`, `reading_romaji`, `frequency_rank`, `pitch`, `glossary_raw` on each row. Bookmarks whose `TERM#` row is absent (dangling) are silently dropped.
 - Empty list when the user has no bookmarks; never `404`.
 
-Example request:
+Example request (default mode):
 
 ```
 GET /bookmarks HTTP/1.1
@@ -372,15 +377,60 @@ Example response `200`:
 
 ```json
 {
-  "sequences": [1316830, 1362050, 1591600]
+  "bookmarks": [
+    {
+      "sequence": 1316830,
+      "created_at": 1731974400,
+      "expression": null,
+      "reading": null,
+      "reading_romaji": null,
+      "frequency_rank": null,
+      "pitch": null,
+      "glossary_raw": null
+    }
+  ]
 }
 ```
 
+Example request (term-populated mode):
+
+```
+GET /bookmarks?include=term HTTP/1.1
+Host: api.japanese-dictionary.jordansimsmith.com
+Authorization: Basic <base64>
+```
+
+Example response `200`:
+
+```json
+{
+  "bookmarks": [
+    {
+      "sequence": 1316830,
+      "created_at": 1731974400,
+      "expression": "新橋",
+      "reading": "しんばし",
+      "reading_romaji": "shinbashi",
+      "frequency_rank": 18472,
+      "pitch": 0,
+      "glossary_raw": { "tag": "div", "content": "..." }
+    }
+  ]
+}
+```
+
+Field semantics:
+
+- `sequence` — integer, the bookmarked term's JMdict sequence. Always populated.
+- `created_at` — integer, epoch seconds at which the bookmark was last written. Always populated.
+- `expression`, `reading`, `reading_romaji`, `frequency_rank`, `pitch`, `glossary_raw` — same shape as `GET /search` `SearchResult`. Populated only when `?include=term` is set; `null` otherwise.
+
 Representative key failures:
 
-| Status | Body                              | Cause                         |
-| ------ | --------------------------------- | ----------------------------- |
-| `401`  | `{"message":"<gateway message>"}` | Missing or invalid Basic auth |
+| Status | Body                                                        | Cause                         |
+| ------ | ----------------------------------------------------------- | ----------------------------- |
+| `400`  | `{"message":"include parameter must be 'term' or omitted"}` | Unknown `include` value       |
+| `401`  | `{"message":"<gateway message>"}`                           | Missing or invalid Basic auth |
 
 ### Validation rules
 
@@ -500,7 +550,8 @@ Required attributes on every `BOOKMARK` item: `pk`, `sk`, `user`, `sequence`, `c
 - Bookmarks are partitioned per user; a `BOOKMARK#<sequence>` row is only ever visible to the user whose `pk` matches.
 - `PUT /bookmarks/{sequence}` is idempotent in `(user, sequence)`. Repeated calls leave the same single row in place but refresh `created_at` to the current server time.
 - `DELETE /bookmarks/{sequence}` is idempotent in `(user, sequence)`. The handler always responds `204 No Content` and only ever deletes rows whose `pk` matches the calling user; rows for other users are never touched, and `TERM#` corpus rows are unreachable from this code path.
-- `GET /bookmarks` returns sequences in `created_at` descending order. Order is deterministic for a fixed write history; the in-memory sort uses `sequence` ascending as a tie-break for rows with identical timestamps.
+- `GET /bookmarks` returns bookmarks in `created_at` descending order. Order is deterministic for a fixed write history; the in-memory sort uses `sequence` ascending as a tie-break for rows with identical timestamps.
+- With `?include=term`, the response only includes bookmarks whose `TERM#` row currently exists in the corpus. Dangling bookmarks remain in DynamoDB but are silently dropped from the response.
 - Bookmarks survive corpus rebuilds. The migration script's clear step is keyed on `begins_with(pk, "TERM#")` so `USER#...` / `BOOKMARK#...` rows are not affected.
 - Each migration run fully replaces the corpus; there is no incremental upsert path. The act of running the script is the version bump (no `corpus_version` attribute).
 
@@ -571,7 +622,8 @@ No third-party API keys (the dictionary corpus is locally produced — no runtim
 - Bookmark path latency budget (warm path):
   - `PUT /bookmarks/{sequence}`: ~30 ms HTTPS RTT + ~10 ms `PutItem` ≈ ~50 ms.
   - `DELETE /bookmarks/{sequence}`: ~30 ms HTTPS RTT + ~10 ms `DeleteItem` ≈ ~50 ms.
-  - `GET /bookmarks`: ~30 ms HTTPS RTT + one primary-key `Query` (≤ 1 page at expected scale) ≈ ~50 ms total.
+  - `GET /bookmarks` (default mode): ~30 ms HTTPS RTT + one primary-key `Query` (≤ 1 page at expected scale) ≈ ~50 ms total.
+  - `GET /bookmarks?include=term`: same `Query` + one or two `BatchGetItem` round-trips (chunked at 100 sequences per call) ≈ ~100–200 ms total.
 - Cold start adds ~500 ms one-off.
 - Migration write path: ~1000 WCU sustained = ~1 MB/s. Full ~210k-item reload completes in ~10–15 minutes including retries.
 - No formal latency SLO at v1; sized for personal workload only.
@@ -582,8 +634,8 @@ No third-party API keys (the dictionary corpus is locally produced — no runtim
 - Integration tests run `SearchHandler` against DynamoDB Testcontainers with hand-picked seed terms covering: kanji-only, kana-only, kanji+reading with non-NULL `frequency_rank`, term with non-NULL `pitch`, term whose glossary references an image (placeholder rendering case). Asserts prefix match across all three dimensions, exact-match-first ordering followed by frequency-asc with NULLs last (including a defensive case proving a null-frequency exact match displaces high-frequency prefix-only matches from the top-10), top-10 cap, dedup when a term is reachable via multiple GSIs, kunrei romaji normalisation, and validation paths (`q` too long, missing/empty/whitespace `q`, NFC + trim before length check).
 - Integration tests for `CreateBookmarkHandler` cover: happy-path creation writes the row at `clock.now()`; second `PUT` for the same `(user, sequence)` is idempotent and refreshes `created_at`; non-integer / non-positive `{sequence}` returns `400`; bookmarks created by one user are invisible to a different user's listing; bookmark writes never touch `TERM#` rows.
 - Integration tests for `DeleteBookmarkHandler` cover: happy-path delete removes the row and returns `204`; second `DELETE` for the same `(user, sequence)` is idempotent and still returns `204`; non-integer / non-positive `{sequence}` returns `400`; deletes never affect another user's bookmarks; deletes never touch `TERM#` rows.
-- Integration tests for `FindBookmarksHandler` cover: empty list when the user has no bookmarks; only the calling user's rows are returned; sort order is `created_at` desc with `sequence` ascending tie-break; pre-seeded `TERM#` rows in the same table are ignored.
-- E2E tests use LocalStack (API Gateway + Lambda + DynamoDB + Secrets Manager) and exercise the full HTTP flow: `GET /search?q=新` returns the seed fixture, `GET /search?q=` returns `[]`, missing `Authorization` returns `401`, `q` length > 64 returns `400`, `PUT /bookmarks/{sequence}` creates a bookmark and `GET /bookmarks` lists it, `DELETE /bookmarks/{sequence}` removes the bookmark and is idempotent on a non-existent sequence. Deterministic; no outbound internet; no real AWS credentials.
+- Integration tests for `FindBookmarksHandler` cover: empty list when the user has no bookmarks; only the calling user's rows are returned; sort order is `created_at` desc with `sequence` ascending tie-break; pre-seeded `TERM#` rows in the same table are ignored in the default mode; `?include=term` happy path populates all term fields; `?include=term` drops dangling bookmarks; `?include=term` empty list for a user with no bookmarks; unknown `include` value → 400.
+- E2E tests use LocalStack (API Gateway + Lambda + DynamoDB + Secrets Manager) and exercise the full HTTP flow: `GET /search?q=新` returns the seed fixture, `GET /search?q=` returns `[]`, missing `Authorization` returns `401`, `q` length > 64 returns `400`, `PUT /bookmarks/{sequence}` creates a bookmark and `GET /bookmarks` lists it, `GET /bookmarks?include=term` returns the bookmark hydrated with term fields, `DELETE /bookmarks/{sequence}` removes the bookmark and is idempotent on a non-existent sequence. Deterministic; no outbound internet; no real AWS credentials.
 - Required service checks:
   - `bazel build //japanese_dictionary_api:all`
   - `bazel test //japanese_dictionary_api:all`
@@ -611,8 +663,9 @@ No third-party API keys (the dictionary corpus is locally produced — no runtim
   4. `GET /search?q=` returns `{"results": []}`.
   5. Missing `Authorization` header returns `401` with `WWW-Authenticate: Basic`.
   6. `PUT /bookmarks/1316830` returns `201 { "sequence": 1316830, "created_at": ... }`.
-  7. `GET /bookmarks` returns `{ "sequences": [1316830, ...] }` containing the sequence just written.
-  8. `DELETE /bookmarks/1316830` returns `204` with an empty body and the sequence no longer appears in a subsequent `GET /bookmarks`.
+  7. `GET /bookmarks` returns `{ "bookmarks": [{ "sequence": 1316830, "created_at": ..., "expression": null, ... }, ...] }` containing the bookmark just written.
+  8. `GET /bookmarks?include=term` returns the same bookmark with `expression`, `reading`, etc. populated from the term corpus.
+  9. `DELETE /bookmarks/1316830` returns `204` with an empty body and the sequence no longer appears in a subsequent `GET /bookmarks`.
 
 ## End-to-end scenarios
 
