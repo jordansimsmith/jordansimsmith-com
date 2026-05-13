@@ -55,6 +55,121 @@ function entry(
   ];
 }
 
+type FormCellClass =
+  | 'form-pri'
+  | 'form-rare'
+  | 'form-irr'
+  | 'form-old'
+  | 'form-out'
+  | 'form-valid';
+
+interface FormsRow {
+  reading: string;
+  cells: ({ class: FormCellClass; title: string } | null)[];
+}
+
+function formsBlock(
+  kanjiHeaders: ({ tag: 'special'; symbol: string; title: string } | string)[],
+  rows: FormsRow[],
+): SCNode {
+  return {
+    tag: 'li',
+    data: { content: 'forms' },
+    content: [
+      {
+        tag: 'span',
+        title: 'spelling and reading variants',
+        data: { class: 'tag', content: 'forms-label' },
+        content: 'forms',
+      },
+      {
+        tag: 'table',
+        content: [
+          {
+            tag: 'tr',
+            data: { content: 'forms-header-row' },
+            content: [
+              { tag: 'th' },
+              ...kanjiHeaders.map<SCNode>((h) =>
+                typeof h === 'string'
+                  ? { tag: 'th', content: h }
+                  : {
+                      tag: 'th',
+                      content: {
+                        tag: 'span',
+                        title: h.title,
+                        data: { class: 'form-special' },
+                        content: h.symbol,
+                      },
+                    },
+              ),
+            ],
+          },
+          ...rows.map<SCNode>((row) => ({
+            tag: 'tr',
+            content: [
+              { tag: 'th', content: row.reading },
+              ...row.cells.map<SCNode>((cell) =>
+                cell === null
+                  ? { tag: 'td' }
+                  : {
+                      tag: 'td',
+                      data: { class: cell.class },
+                      content: { tag: 'span', title: cell.title },
+                    },
+              ),
+            ],
+          })),
+        ],
+      },
+    ],
+  };
+}
+
+function senseGroupLi(partOfSpeech: string, glosses: string[]): SCNode {
+  return {
+    tag: 'li',
+    data: { content: 'sense-group' },
+    content: [
+      {
+        tag: 'span',
+        data: { class: 'tag', content: 'part-of-speech-info' },
+        content: partOfSpeech,
+      },
+      {
+        tag: 'ul',
+        data: { content: 'glossary' },
+        content: glosses.map<SCNode>((g) => ({ tag: 'li', content: g })),
+      },
+    ],
+  };
+}
+
+function entryWithForms(
+  sequence: number,
+  partOfSpeech: string,
+  glosses: string[],
+  forms: SCNode,
+): SCNode {
+  return [
+    {
+      tag: 'ul',
+      lang: 'ja',
+      data: { content: 'sense-groups' },
+      content: [senseGroupLi(partOfSpeech, glosses), forms],
+    },
+    {
+      tag: 'div',
+      data: { content: 'attribution' },
+      content: {
+        tag: 'a',
+        href: `https://www.edrdg.org/jmwsgi/entr.py?svc=jmdict&q=${sequence}`,
+        content: 'JMdict',
+      },
+    },
+  ];
+}
+
 const fixtures: SearchResult[] = [
   {
     sequence: 1362360,
@@ -351,6 +466,44 @@ const fixtures: SearchResult[] = [
     frequency_rank: 184,
     pitch: 3,
     glossary_raw: entry(1387990, 'noun', ['teacher', 'master', 'doctor']),
+  },
+  {
+    sequence: 1305380,
+    expression: '仕舞う',
+    reading: 'しまう',
+    reading_romaji: 'shimau',
+    frequency_rank: 487,
+    pitch: 0,
+    glossary_raw: entryWithForms(
+      1305380,
+      'godan verb',
+      ['to finish', 'to stop', 'to end', 'to put an end to'],
+      formsBlock(
+        [
+          {
+            tag: 'special',
+            symbol: '\u2205',
+            title: 'no associated kanji forms',
+          },
+          '仕舞う',
+          '終う',
+          '了う',
+          '蔵う',
+        ],
+        [
+          {
+            reading: 'しまう',
+            cells: [
+              { class: 'form-pri', title: 'high priority form' },
+              { class: 'form-rare', title: 'rarely used form' },
+              { class: 'form-rare', title: 'rarely used form' },
+              { class: 'form-rare', title: 'rarely used form' },
+              { class: 'form-rare', title: 'rarely used form' },
+            ],
+          },
+        ],
+      ),
+    ),
   },
   {
     sequence: 1591600,

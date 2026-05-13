@@ -138,3 +138,106 @@ ruby > rt {
   font-size: 0.65em;
   vertical-align: super;
 }
+
+[data-sc-content='forms'] {
+  margin-top: var(--mantine-spacing-sm);
+}
+
+[data-sc-content='forms'] table {
+  margin-top: var(--mantine-spacing-xs);
+  border-collapse: collapse;
+  border-radius: var(--mantine-radius-sm);
+  overflow: hidden;
+}
+
+[data-sc-content='forms'] th,
+[data-sc-content='forms'] td {
+  padding: 4px 8px;
+  border: 1px solid var(--mantine-color-gray-3);
+}
+
+[data-sc-content='forms'] th {
+  font-weight: normal;
+  text-align: left;
+  background-color: var(--mantine-color-gray-0);
+}
+
+[data-sc-content='forms'] td {
+  text-align: center;
+}
+
+tr[data-sc-content='forms-header-row'] th {
+  font-size: 1.1em;
+  text-align: center;
+  vertical-align: bottom;
+}
+
+[data-sc-class='form-special'] {
+  color: var(--mantine-color-red-7);
+}
+
+[data-sc-content='forms'] td > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6em;
+  min-height: 1.6em;
+  font-size: 0.85em;
+  font-weight: 600;
+  border: 1px solid;
+  border-radius: 50%;
+}
+
+td[data-sc-class='form-pri'] > span {
+  color: var(--mantine-color-green-8);
+  background-color: var(--mantine-color-green-0);
+  border-color: var(--mantine-color-green-3);
+}
+td[data-sc-class='form-pri'] > span::before {
+  content: '\25B3';
+}
+
+td[data-sc-class='form-rare'] > span {
+  color: var(--mantine-color-grape-8);
+  background-color: var(--mantine-color-grape-0);
+  border-color: var(--mantine-color-grape-3);
+}
+td[data-sc-class='form-rare'] > span::before {
+  content: '\25BD';
+}
+
+td[data-sc-class='form-irr'] > span {
+  color: var(--mantine-color-red-8);
+  background-color: var(--mantine-color-red-0);
+  border-color: var(--mantine-color-red-3);
+}
+td[data-sc-class='form-irr'] > span::before {
+  content: '\2715';
+}
+
+td[data-sc-class='form-old'] > span {
+  color: var(--mantine-color-indigo-8);
+  background-color: var(--mantine-color-indigo-0);
+  border-color: var(--mantine-color-indigo-3);
+}
+td[data-sc-class='form-old'] > span::before {
+  content: '\65E7';
+}
+
+td[data-sc-class='form-out'] > span {
+  color: var(--mantine-color-teal-8);
+  background-color: var(--mantine-color-teal-0);
+  border-color: var(--mantine-color-teal-3);
+}
+td[data-sc-class='form-out'] > span::before {
+  content: '\53E4';
+}
+
+td[data-sc-class='form-valid'] > span {
+  color: var(--mantine-color-gray-8);
+  background-color: var(--mantine-color-gray-0);
+  border-color: var(--mantine-color-gray-3);
+}
+td[data-sc-class='form-valid'] > span::before {
+  content: '\25C7';
+}
