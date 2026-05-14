@@ -11,7 +11,7 @@ from . import kana_form, pitch_graph, structured_content
 def build_note(col, model, deck_id, bookmark, config):
     is_kana = kana_form.detect(bookmark)
     word = bookmark.reading if is_kana else bookmark.expression
-    glossary_html, _ = structured_content.render(bookmark.glossary_raw)
+    glossary_html, _ = structured_content.render_field(bookmark.glossary_raw)
     graph_svg = (
         pitch_graph.render(bookmark.reading, bookmark.pitch)
         if bookmark.pitch is not None

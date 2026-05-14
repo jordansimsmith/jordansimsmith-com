@@ -4,7 +4,27 @@ Tag dispatch mirrors `_createStructuredContentGenericElement` in
 `tmp/yomitan/ext/js/display/structured-content-generator.js`. Class names
 (`gloss-sc-<tag>`) and the inline-style property whitelist are copied from
 Yomitan so the emitted HTML renders correctly inside the user's existing
-Animecards card template without any bundled CSS.
+Animecards card template.
+
+`render` produces the structured-content span only; `render_field` wraps
+that span in `<div class="yomitan-glossary">` and embeds two bundled
+stylesheets in a scoped `<style>` block: Yomitan's internal
+`structured-content-style.json` rules (the `.gloss-sc-*` table chrome
+and `.gloss-link-external-icon` hider that Yomitan normally inlines via
+`CssStyleApplier.applyClassStyles`) followed by the Jitendex `styles.css`
+visual styling. Together they mirror what stock Yomitan emits for
+`definition.type === "term"` in
+`tmp/yomitan/ext/data/templates/default-anki-field-templates.handlebars`.
+CSS scoping uses the modern `addScopeToCss` form from
+`tmp/yomitan/ext/js/core/utilities.js` — wrap both stylesheets in
+`.yomitan-glossary { … }` and rely on CSS nesting (Chromium 120+,
+Anki 25.02+) — rather than the legacy selector-by-selector rewrite,
+because Jitendex's own rules already use nesting (`& ul[...]`,
+`& span`, `&::before`) and the wrap-once form preserves them as-is.
+Yomitan's rules are emitted first so the more-specific Jitendex
+attribute selectors win on overlap. The note builder calls
+`render_field`; `render` is kept as a separate seam so
+`kana_form.detect` can walk the tree without paying the wrapper cost.
 
 Unknown / untagged elements (notably Jitendex's top-level
 `{"type": "structured-content", "content": [...]}` wrapper, which has no
@@ -16,7 +36,11 @@ the element; we diverge here because the addon receives raw Jitendex
 
 import xml.etree.ElementTree as ET
 
+from .jitendex_styles import JITENDEX_STYLES_CSS
+from .yomitan_styles import YOMITAN_STRUCTURED_CONTENT_CSS
+
 SPA_BASE_URL = "https://japanese-dictionary.jordansimsmith.com/search"
+GLOSSARY_WRAPPER_CLASS = "yomitan-glossary"
 
 _NO_STYLE_TAGS = {"br", "ruby", "rt", "rp"}
 _TABLE_GROUP_TAGS = {"thead", "tbody", "tfoot", "tr"}
@@ -67,15 +91,43 @@ _STYLE_NUMBER_FIELDS = [
 def render(content):
     """Render a Yomitan structured-content tree to an HTML string.
 
-    Returns `(html, kana_form_marker_seen)`. The boolean is True iff a
-    Jitendex "word usually written using kana alone" misc-info span was
-    encountered during the walk (see `_check_kana_marker` for the selector).
+    Returns `(html, kana_form_marker_seen)`. The HTML is a single
+    `<span class="structured-content">` element — no glossary wrapper, no
+    embedded stylesheet. Use `render_field` for the full Anki field
+    payload. The boolean is True iff a Jitendex "word usually written
+    using kana alone" misc-info span was encountered during the walk (see
+    `_check_kana_marker` for the selector).
     """
     state = {"kana_form_marker_seen": False}
     root = ET.Element("span")
     root.set("class", "structured-content")
     _walk(root, content, state)
     return ET.tostring(root, encoding="unicode"), state["kana_form_marker_seen"]
+
+
+def render_field(content):
+    """Render a Yomitan structured-content tree as an Anki Glossary field.
+
+    Wraps `render`'s output in a `<div class="yomitan-glossary">` and
+    appends a `<style>` block carrying both bundled stylesheets
+    (Yomitan structured-content rules first, then Jitendex `styles.css`)
+    scoped to `.yomitan-glossary` via CSS nesting. The CSS is emitted
+    verbatim (not XML-escaped) because HTML parses `<style>` content as
+    raw text — escaping `&` or `>` would corrupt selectors like
+    `& ul[...]` and `td[...] > span`.
+
+    Returns `(field_html, kana_form_marker_seen)`.
+    """
+    inner_html, kana_seen = render(content)
+    field_html = (
+        f'<div class="{GLOSSARY_WRAPPER_CLASS}" style="text-align: left;">'
+        f"{inner_html}"
+        f"<style>.{GLOSSARY_WRAPPER_CLASS} {{\n"
+        f"{YOMITAN_STRUCTURED_CONTENT_CSS}\n{JITENDEX_STYLES_CSS}"
+        f"}}</style>"
+        f"</div>"
+    )
+    return field_html, kana_seen
 
 
 def _walk(parent, node, state):

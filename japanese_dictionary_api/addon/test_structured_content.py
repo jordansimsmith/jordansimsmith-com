@@ -8,7 +8,9 @@ external links, and inline-style propagation.
 
 import xml.etree.ElementTree as ET
 
-from addon.structured_content import render
+from addon.jitendex_styles import JITENDEX_STYLES_CSS
+from addon.structured_content import GLOSSARY_WRAPPER_CLASS, render, render_field
+from addon.yomitan_styles import YOMITAN_STRUCTURED_CONTENT_CSS
 
 
 def _parse(html):
@@ -227,3 +229,64 @@ def test_data_attributes_carry_sc_prefix_and_kebab_case_key():
     assert span is not None
     assert span.get("data-sc-class") == "tag"
     assert span.get("data-sc-content") == "part-of-speech-info"
+
+
+def test_render_field_wraps_inner_span_in_yomitan_glossary_div():
+    field, _ = render_field({"tag": "div", "content": "hi"})
+    assert field.startswith(
+        f'<div class="{GLOSSARY_WRAPPER_CLASS}" style="text-align: left;">'
+    )
+    assert field.endswith("</div>")
+    assert '<span class="structured-content">' in field
+
+
+def test_render_field_appends_jitendex_stylesheet_scoped_to_wrapper_class():
+    field, _ = render_field({"tag": "div", "content": "hi"})
+    assert f"<style>.{GLOSSARY_WRAPPER_CLASS} {{\n" in field
+    assert "</style></div>" in field
+    assert JITENDEX_STYLES_CSS in field
+    assert 'span[data-sc-class="tag"]' in field
+    assert 'div[data-sc-content="example-sentence"]' in field
+
+
+def test_render_field_appends_yomitan_structured_content_rules():
+    field, _ = render_field({"tag": "div", "content": "hi"})
+    assert YOMITAN_STRUCTURED_CONTENT_CSS in field
+    assert ".gloss-link-external-icon" in field
+    assert ".gloss-sc-table" in field
+    assert ".gloss-sc-th" in field
+
+
+def test_render_field_emits_yomitan_rules_before_jitendex_rules():
+    field, _ = render_field({"tag": "div", "content": "hi"})
+    yomitan_index = field.index(YOMITAN_STRUCTURED_CONTENT_CSS)
+    jitendex_index = field.index(JITENDEX_STYLES_CSS)
+    assert yomitan_index < jitendex_index
+
+
+def test_render_field_does_not_xml_escape_css_selector_combinators():
+    field, _ = render_field({"tag": "div", "content": "hi"})
+    assert "& ul[data-sc-content=" in field
+    assert "> span" in field
+    assert "&amp;" not in field
+    assert "&gt;" not in field
+
+
+def test_render_field_propagates_kana_form_marker():
+    headword = {
+        "tag": "span",
+        "data": {"class": "tag", "code": "uk", "content": "misc-info"},
+        "content": "kana",
+    }
+    _, kana_seen = render_field(headword)
+    assert kana_seen is True
+
+
+def test_render_field_kana_marker_false_for_non_kana_entry():
+    headword = {
+        "tag": "span",
+        "data": {"class": "tag", "code": "n", "content": "part-of-speech-info"},
+        "content": "noun",
+    }
+    _, kana_seen = render_field(headword)
+    assert kana_seen is False
