@@ -6,27 +6,16 @@ Tag dispatch mirrors `_createStructuredContentGenericElement` in
 Yomitan so the emitted HTML renders correctly inside the user's existing
 Animecards card template.
 
-`render` produces the structured-content span only; `render_field` wraps
-that span in `<div class="yomitan-glossary">` and embeds two bundled
-stylesheets in a scoped `<style>` block: Yomitan's internal
-`structured-content-style.json` rules (the `.gloss-sc-*` table chrome
-and `.gloss-link-external-icon` hider that Yomitan normally inlines via
-`CssStyleApplier.applyClassStyles`) followed by the Jitendex `styles.css`
-visual styling. Together they mirror what stock Yomitan emits for
-`definition.type === "term"` in
-`tmp/yomitan/ext/data/templates/default-anki-field-templates.handlebars`.
-
-`css_scope.scope_css` replicates what Yomitan's `addScopeToCssLegacy`
-does in the browser: flatten all CSS nesting (`&` syntax) into flat
-selectors and prepend `.yomitan-glossary` to every rule. Anki's
-embedded Chromium does not reliably parse nested CSS inside `<style>`
-blocks in card fields, so the output must be fully flat. The flattened
-CSS is computed once at module load and reused for every card.
-
-Yomitan's rules are emitted first so the more-specific Jitendex
-attribute selectors win on overlap. The note builder calls
-`render_field`; `render` is kept as a separate seam so
-`kana_form.detect` can walk the tree without paying the wrapper cost.
+`render` builds the structured-content tree; `render_field` then runs
+`css_inline.inline_styles` over it to apply the bundled Yomitan
+`structured-content-style.json` and Jitendex `styles.css` rules as
+per-element `style` attributes, and strips the `gloss-sc-*` class
+attributes — matching what Yomitan's `CssStyleApplier.applyClassStyles`
+and `_normalizeHtml` do before serialising to Anki. Styles are inlined
+rather than shipped in a `<style>` block because the Animecards card
+template's cycling script replaces `#glossary-field` innerHTML with
+individual `<li>` contents, destroying any `<style>` block but
+preserving inline styles on elements within each `<li>`.
 
 Unknown / untagged elements (notably Jitendex's top-level
 `{"type": "structured-content", "content": [...]}` wrapper, which has no
@@ -38,17 +27,10 @@ the element; we diverge here because the addon receives raw Jitendex
 
 import xml.etree.ElementTree as ET
 
-from .css_scope import scope_css
-from .jitendex_styles import JITENDEX_STYLES_CSS
-from .yomitan_styles import YOMITAN_STRUCTURED_CONTENT_CSS
+from .css_inline import inline_styles
 
 SPA_BASE_URL = "https://japanese-dictionary.jordansimsmith.com/search"
 GLOSSARY_WRAPPER_CLASS = "yomitan-glossary"
-
-_SCOPED_CSS = scope_css(
-    YOMITAN_STRUCTURED_CONTENT_CSS + "\n" + JITENDEX_STYLES_CSS,
-    f".{GLOSSARY_WRAPPER_CLASS}",
-)
 
 _NO_STYLE_TAGS = {"br", "ruby", "rt", "rp"}
 _TABLE_GROUP_TAGS = {"thead", "tbody", "tfoot", "tr"}
@@ -116,25 +98,23 @@ def render(content):
 def render_field(content):
     """Render a Yomitan structured-content tree as an Anki Glossary field.
 
-    Wraps `render`'s output in a `<div class="yomitan-glossary">` and
-    appends a `<style>` block carrying both bundled stylesheets
-    (Yomitan structured-content rules first, then Jitendex `styles.css`),
-    flattened and scoped to `.yomitan-glossary` by `css_scope.scope_css`.
-    This mirrors what Yomitan's `addScopeToCssLegacy` does via the
-    browser's `CSSStyleSheet` API: resolve all CSS nesting into flat
-    selectors and prepend the scope selector to every rule. The
-    flattened CSS is computed once at module load and reused.
+    Builds the structured-content tree, inlines bundled CSS rules as
+    `style` attributes on each matching element, strips `class`
+    attributes, and wraps the result in
+    `<div class="yomitan-glossary" style="text-align: left;">`.
 
     Returns `(field_html, kana_form_marker_seen)`.
     """
-    inner_html, kana_seen = render(content)
+    state = {"kana_form_marker_seen": False}
+    root = ET.Element("span")
+    root.set("class", "structured-content")
+    _walk(root, content, state)
+    inline_styles(root)
+    html = ET.tostring(root, encoding="unicode", short_empty_elements=False)
     field_html = (
-        f'<div class="{GLOSSARY_WRAPPER_CLASS}" style="text-align: left;">'
-        f"{inner_html}"
-        f"<style>\n{_SCOPED_CSS}\n</style>"
-        f"</div>"
+        f'<div class="{GLOSSARY_WRAPPER_CLASS}" style="text-align: left;">{html}</div>'
     )
-    return field_html, kana_seen
+    return field_html, state["kana_form_marker_seen"]
 
 
 def _walk(parent, node, state):

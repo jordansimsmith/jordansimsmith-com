@@ -8,9 +8,7 @@ external links, and inline-style propagation.
 
 import xml.etree.ElementTree as ET
 
-from addon.jitendex_styles import JITENDEX_STYLES_CSS
 from addon.structured_content import GLOSSARY_WRAPPER_CLASS, render, render_field
-from addon.yomitan_styles import YOMITAN_STRUCTURED_CONTENT_CSS
 
 
 def _parse(html):
@@ -231,54 +229,65 @@ def test_data_attributes_carry_sc_prefix_and_kebab_case_key():
     assert span.get("data-sc-content") == "part-of-speech-info"
 
 
-def test_render_field_wraps_inner_span_in_yomitan_glossary_div():
+def test_render_field_wraps_in_yomitan_glossary_div():
     field, _ = render_field({"tag": "div", "content": "hi"})
     assert field.startswith(
         f'<div class="{GLOSSARY_WRAPPER_CLASS}" style="text-align: left;">'
     )
     assert field.endswith("</div>")
-    assert '<span class="structured-content">' in field
 
 
-def test_render_field_appends_flattened_scoped_stylesheet():
+def test_render_field_has_no_style_block():
     field, _ = render_field({"tag": "div", "content": "hi"})
-    assert "<style>" in field
-    assert "</style></div>" in field
-    assert f".{GLOSSARY_WRAPPER_CLASS} span[data-sc-class=" in field
-    assert f".{GLOSSARY_WRAPPER_CLASS} div[data-sc-content=" in field
+    assert "<style>" not in field
 
 
-def test_render_field_includes_yomitan_rules_scoped():
-    field, _ = render_field({"tag": "div", "content": "hi"})
-    assert f".{GLOSSARY_WRAPPER_CLASS} .gloss-link-external-icon" in field
-    assert f".{GLOSSARY_WRAPPER_CLASS} .gloss-sc-table" in field
+def test_render_field_strips_class_attributes_from_inner_elements():
+    field, _ = render_field(
+        {
+            "tag": "span",
+            "data": {"class": "tag", "content": "part-of-speech-info"},
+            "content": "noun",
+        }
+    )
+    assert 'class="gloss-sc-span"' not in field
+    assert "data-sc-class=" in field
 
 
-def test_render_field_emits_yomitan_rules_before_jitendex_rules():
-    field, _ = render_field({"tag": "div", "content": "hi"})
-    yomitan_idx = field.index(f".{GLOSSARY_WRAPPER_CLASS} .gloss-link-external-icon")
-    jitendex_idx = field.index(f".{GLOSSARY_WRAPPER_CLASS} span[data-sc-class=")
-    assert yomitan_idx < jitendex_idx
+def test_render_field_inlines_jitendex_tag_styles():
+    field, _ = render_field(
+        {
+            "tag": "span",
+            "title": "noun (common) (futsuumeishi)",
+            "data": {"class": "tag", "code": "n", "content": "part-of-speech-info"},
+            "content": "noun",
+        }
+    )
+    assert "background-color:" in field
+    assert "font-weight:" in field
+    assert "border-radius:" in field
 
 
-def test_render_field_css_is_flat_with_no_nesting():
-    field, _ = render_field({"tag": "div", "content": "hi"})
-    style_start = field.index("<style>") + len("<style>")
-    style_end = field.index("</style>")
-    css = field[style_start:style_end]
-    for line in css.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("&"):
-            raise AssertionError(f"Unresolved nesting: {stripped}")
-    # no nested braces - every { should be followed by declarations then }
-    # before another { appears (i.e., no rule blocks inside rule blocks)
-    in_block = False
-    for char in css:
-        if char == "{":
-            assert not in_block, "Nested braces found in flattened CSS"
-            in_block = True
-        elif char == "}":
-            in_block = False
+def test_render_field_inlines_external_icon_display_none():
+    field, _ = render_field(
+        {
+            "tag": "a",
+            "href": "https://example.com",
+            "content": "link",
+        }
+    )
+    assert "display: none;" in field or "display:none;" in field
+
+
+def test_render_field_no_self_closing_spans():
+    field, _ = render_field(
+        {
+            "tag": "a",
+            "href": "https://example.com",
+            "content": "link",
+        }
+    )
+    assert "/>" not in field
 
 
 def test_render_field_propagates_kana_form_marker():
