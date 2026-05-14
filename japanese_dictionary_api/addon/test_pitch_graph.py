@@ -61,6 +61,15 @@ def test_render_returns_well_formed_svg_with_pronunciation_graph_class():
     assert svg.get("class") == "pronunciation-graph"
 
 
+def test_render_emits_inline_style_constraining_height_to_one_line():
+    svg_text = render("しんぶん", 0)
+    svg = _parse(svg_text)
+    style = svg.get("style") or ""
+    assert "height:1.5em" in style
+    assert "display:inline-block" in style
+    assert "vertical-align:middle" in style
+
+
 def test_render_with_empty_reading_emits_valid_svg_without_paths():
     svg_text = render("", 0)
     svg = _parse(svg_text)

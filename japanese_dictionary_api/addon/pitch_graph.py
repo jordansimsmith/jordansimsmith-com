@@ -11,6 +11,11 @@ import xml.etree.ElementTree as ET
 
 _SMALL_KANA = set("ゃゅょゎァィゥェォャュョヮ")
 
+# mirrors `.pronunciation-graph` in Yomitan's `display-pronunciation.css`:
+# the SVG is sized to one line of text (1.5em tall, width derived from the
+# viewBox aspect ratio) so it sits inline next to the reading instead of
+# stretching to its intrinsic 50*(n+1) x 100 px box.
+_SVG_STYLE = "display:inline-block;vertical-align:middle;height:1.5em;"
 _LINE_STYLE = "fill:none;stroke:currentColor;stroke-width:5;"
 _TAIL_STYLE = "fill:none;stroke:currentColor;stroke-width:5;stroke-dasharray:5 5;"
 _TRIANGLE_STYLE = "fill:none;stroke:currentColor;stroke-width:5;"
@@ -51,6 +56,7 @@ def render(reading, pitch):
     svg.set("class", "pronunciation-graph")
     svg.set("focusable", "false")
     svg.set("viewBox", f"0 0 {50 * (n + 1)} 100")
+    svg.set("style", _SVG_STYLE)
     if n == 0:
         return ET.tostring(svg, encoding="unicode")
 

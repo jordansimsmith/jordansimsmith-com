@@ -2,7 +2,8 @@
 
 URL builder cases are table-driven. `download` is exercised via
 `unittest.mock.patch` over `requests.get` covering happy path, 404,
-timeout, and non-audio content type.
+timeout, non-audio content type, and the jpod101 "audio not available"
+stub.
 """
 
 from unittest.mock import patch
@@ -10,7 +11,13 @@ from unittest.mock import patch
 import pytest
 import requests
 
-from addon.audio import download, jpod101_url, media_filename
+from addon.audio import (
+    JPOD101_INVALID_AUDIO_SHA256,
+    USER_AGENT,
+    download,
+    jpod101_url,
+    media_filename,
+)
 
 
 @pytest.mark.parametrize(
@@ -95,3 +102,31 @@ def test_download_returns_none_on_non_audio_content_type():
     with patch("addon.audio.requests.get") as get:
         get.return_value = _FakeResponse(200, b"<html>", "text/html")
         assert download("https://example.com/notaudio.mp3") is None
+
+
+def test_download_sends_browser_user_agent_to_avoid_cloudfront_403():
+    with patch("addon.audio.requests.get") as get:
+        get.return_value = _FakeResponse(200, b"\x00\x01\x02", "audio/mpeg")
+        download("https://example.com/audio.mp3")
+    _, kwargs = get.call_args
+    assert kwargs["headers"]["User-Agent"] == USER_AGENT
+
+
+def test_download_returns_none_when_jpod101_returns_invalid_audio_stub():
+    stub_bytes = b"jpod101 audio not available stub"
+    fake_digest = type(
+        "FakeDigest", (), {"hexdigest": lambda self: JPOD101_INVALID_AUDIO_SHA256}
+    )()
+    with (
+        patch("addon.audio.requests.get") as get,
+        patch("addon.audio.hashlib.sha256", return_value=fake_digest),
+    ):
+        get.return_value = _FakeResponse(200, stub_bytes, "audio/mpeg")
+        assert download("https://example.com/notavailable.mp3") is None
+
+
+def test_download_accepts_real_audio_when_sha256_does_not_match_stub():
+    with patch("addon.audio.requests.get") as get:
+        get.return_value = _FakeResponse(200, b"\x00\x01\x02", "audio/mpeg")
+        result = download("https://example.com/real.mp3")
+    assert result == (b"\x00\x01\x02", "audio/mpeg")

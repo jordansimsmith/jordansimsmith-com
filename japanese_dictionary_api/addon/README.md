@@ -8,8 +8,8 @@ The Japanese dictionary Anki desktop add-on imports terms the user has bookmarke
 - **Interface**: Tools menu action `Import Japanese dictionary bookmarks`
 - **Distribution**: Bazel-built `.ankiaddon` zip (`bazel build //japanese_dictionary_api:addon-package`)
 - **Auth**: HTTP Basic via `JAPANESE_DICTIONARY_USER` / `JAPANESE_DICTIONARY_PASSWORD` environment variables, same credentials as the SPA
-- **API surface consumed**: `GET /bookmarks?include=term`, `DELETE /bookmarks/{sequence}` on `japanese_dictionary_api`; jpod101 audio CDN (`https://assets.languagepod101.com/...`)
-- **Anki API surface consumed**: `aqt.mw`, `aqt.gui_hooks.main_window_did_init`, `aqt.qt.QAction`, `aqt.utils.tooltip`, `aqt.operations.QueryOp`, plus `mw.col.find_notes`, `mw.col.add_note`, `mw.col.media.write_data`, `mw.col.decks.all_names_and_ids`, `mw.col.models.all_names_and_ids`
+- **API surface consumed**: `GET /bookmarks?include=term`, `DELETE /bookmarks/{sequence}` on `japanese_dictionary_api`; jpod101 audio CDN (`https://assets.languagepod101.com/...` redirecting to `https://cdn.innovativelanguage.com/...`)
+- **Anki API surface consumed**: `aqt.mw`, `aqt.gui_hooks.main_window_did_init`, `aqt.qt.QAction`, `aqt.utils.tooltip`, `aqt.utils.askUser`, `aqt.operations.QueryOp`, plus `mw.col.find_notes`, `mw.col.add_note`, `mw.col.media.write_data`, `mw.col.decks.all_names_and_ids`, `mw.col.models.all_names_and_ids`
 
 ## User stories
 
@@ -28,7 +28,10 @@ The Japanese dictionary Anki desktop add-on imports terms the user has bookmarke
 - Derive `kana_form` per bookmark by walking `glossary_raw` (looking for the Jitendex `"uk"` misc-info marker), falling back to `expression == reading`.
 - Build the prospective note in memory: `Word` (kana form picks `reading`, otherwise `expression`), `Reading`, `Glossary` (Python port of Yomitan's `structured-content-generator.js`, inline styles, no bundled CSS), `Graph` (Python port of Yomitan's `pronunciation-generator.js` simple-style SVG, inline styles), `Audio` (jpod101 URL → MP3 download → `[sound:<filename>]`).
 - Open one modal dialog with the bookmark list, checkboxes (all checked except duplicates), deck and note-type pickers, footer warning + drop-count when any rows are unchecked, and a `Cancel` / commit button pair.
-- On commit, run a three-phase background `QueryOp`: (1) parallel audio download + sequential `mw.col.media.write_data`, (2) sequential `mw.col.add_note`, (3) sequential `DELETE /bookmarks/{sequence}` for both successful imports and explicitly-dropped rows.
+- On commit, run a two-step background pipeline split by an explicit user confirmation:
+  - **Import** `QueryOp`: parallel audio download + sequential `mw.col.media.write_data`, then sequential `mw.col.add_note`.
+  - Show a confirmation dialog summarising imports / dropped / failed counts; the user picks `Yes` to clear or `No` to keep bookmarks queued for a re-run.
+  - **Cleanup** `QueryOp` (only on `Yes`): sequential `DELETE /bookmarks/{sequence}` for both successful imports and explicitly-dropped rows.
 - Tag every imported note with `japanese_dictionary`.
 - Detect duplicates locally with `mw.col.find_notes(f'deck:"<deck>" "<duplicate_field>:<word>"')` at dialog-open time only.
 - Surface a summary tooltip on completion (imported / imported-without-audio / dropped / duplicates skipped / failed).
@@ -73,6 +76,7 @@ sequenceDiagram
   participant C as mw.col
 
   U->>A: Tools > Import Japanese dictionary bookmarks
+  Note over A: QueryOp: fetch + duplicate detection
   A->>API: GET /bookmarks?include=term
   API-->>A: { bookmarks: [{ sequence, created_at, expression, ..., glossary_raw }] }
   loop per bookmark
@@ -81,23 +85,27 @@ sequenceDiagram
   end
   A-->>U: open dialog (count, dupe pills, deck/model picker, checkboxes)
   U->>A: review checkboxes, click commit
-  Note over A,J: Phase 1 - audio download + media write
+  Note over A,C: QueryOp: import (audio + add_note)
   par per selected row
-    A->>J: GET audio mp3
-    J-->>A: bytes (or 404/timeout)
+    A->>J: GET audio mp3 (User-Agent: browser-style)
+    J-->>A: bytes (or 403/404/timeout/jpod101 invalid-audio stub)
   end
   loop per successful download
     A->>C: media.write_data(filename, bytes)
   end
-  Note over A,C: Phase 2 - add notes
   loop per selected row
     A->>C: add_note(note, deck_id, tags=["japanese_dictionary"])
   end
-  Note over A,API: Phase 3 - clear bookmarks
-  loop per (successful | dropped) row
-    A->>API: DELETE /bookmarks/{sequence}
+  A-->>U: confirmation dialog (imported / dropped / failed) -> clear server bookmarks?
+  alt user confirms
+    Note over A,API: QueryOp: cleanup
+    loop per (successful | dropped) row
+      A->>API: DELETE /bookmarks/{sequence}
+    end
+    A-->>U: summary tooltip
+  else user keeps bookmarks
+    A-->>U: tooltip noting bookmarks were kept for re-run
   end
-  A-->>U: summary tooltip
 ```
 
 ## Main technical decisions
@@ -106,10 +114,14 @@ sequenceDiagram
 - **Single dialog, no per-row preview**: the dialog renders one row per bookmark with Word / Reading / freq / duplicate pill. No per-row expansion. Rationale: the user already reviewed each term when bookmarking on phone; the dialog's job is to confirm and let them drop entries they no longer want.
 - **Default-checked except duplicates**: every row is pre-checked unless `mw.col.find_notes` flags it as already present in the configured deck. The user can flip any checkbox manually.
 - **Drop-on-commit semantics**: unchecked rows are unbookmarked at the API on commit (just like imported rows). Treats the dialog as a complete review pass. Cancel always preserves all bookmarks. Signposted in three ways: commit button label includes drop count when non-zero (`"Import 7 (drop 3)"`), footer warning label visible when any rows are unchecked, summary tooltip reports drops separately from imports.
+- **Confirm-before-delete checkpoint**: between the import and cleanup `QueryOp`s the addon shows the user the import summary and asks `Delete N bookmarks from the server?`. The user picks `Yes` (run cleanup) or `No` (keep bookmarks queued for a re-run). Notes are still added to Anki regardless of the answer; `No` only suppresses the server-side `DELETE /bookmarks/{sequence}` calls. Rationale: a single dropped row or wrong deck pick used to be silently destructive because the bookmark was wiped before the user could see the imported note; a one-click checkpoint catches it.
 - **Client-side `kana_form` derivation**: walk `glossary_raw` for the Jitendex `"uk"` misc-info marker; fall back to `expression == reading`. No new API field, no migration. If the heuristic ever proves fragile across Jitendex versions, we can promote `kana_form` to a `TermItem` attribute via a one-line migration update without changing the add-on's public seam.
-- **Faithful Yomitan port for glossary HTML and pitch graph SVG**: matches the visual style of cards the user already makes with Yomitan + AnkiConnect. Inline styles in emitted HTML/SVG so no CSS bundling is required.
-- **jpod101 only for audio**: deterministic URL `https://assets.languagepod101.com/dictionary/japanese/audiomp3.php?kanji=<expression>&kana=<reading>` (kanji omitted when `kana_form`). Per `_getInfoJpod101` in Yomitan's `audio-downloader.js`. Audio download failure is degraded gracefully — the note is imported without the Audio field populated and counted as `imported_without_audio`.
-- **Three-phase commit pipeline**: (1) parallel audio download via `ThreadPoolExecutor` + sequential `mw.col.media.write_data` on the main thread (since `mw.col` is not thread-safe), (2) sequential `mw.col.add_note`, (3) sequential `DELETE /bookmarks/{sequence}` for both successful imports and dropped unchecked rows. Per-phase loops are easier to reason about than mixed per-row chains; parallel audio download cuts commit wall-clock from `sum` to `max` across rows.
+- **Faithful Yomitan port for glossary HTML and pitch graph SVG**: matches the visual style of cards the user already makes with Yomitan + AnkiConnect. Inline styles in emitted HTML/SVG so no CSS bundling is required. The pitch-graph SVG carries an inline `style="display:inline-block;vertical-align:middle;height:1.5em;"` matching Yomitan's `display-pronunciation.css` so the graph sits at one line of text height instead of stretching to its intrinsic 100px viewBox.
+- **jpod101 only for audio, with stub-detection**: deterministic URL `https://assets.languagepod101.com/dictionary/japanese/audiomp3.php?kanji=<expression>&kana=<reading>` (kanji omitted when `kana_form`). Per `_getInfoJpod101` in Yomitan's `audio-downloader.js`. Two non-obvious behaviours of the upstream that the addon mirrors from Yomitan:
+  - jpod101 redirects matched terms to `cdn.innovativelanguage.com` on CloudFront, which rejects the default `python-requests/X.Y.Z` User-Agent with `403`. The downloader sends a browser-style `User-Agent` to bypass this.
+  - jpod101 returns `200` + `audio/mpeg` for terms with no recording, but the body is a fixed "audio not available" stub. The downloader filters this by SHA-256 (`ae6398b5...17098906`) so the stub never lands in the user's media store.
+  - Audio download failure (network error, non-2xx after the redirect, non-`audio/*` content type, or stub) is degraded gracefully — the note is imported without the Audio field populated and counted as `imported_without_audio`.
+- **Non-blocking pipeline via chained `QueryOp`s**: every step that touches the network or `mw.col` runs in a background `QueryOp` so the Anki UI stays responsive. The chain is fetch+dupe → dialog (foreground) → audio+add_note → confirmation dialog (foreground) → cleanup deletes. Per-step parallelism: audio download is parallelised via `ThreadPoolExecutor`; `mw.col.media.write_data` and `mw.col.add_note` stay sequential because the collection is not thread-safe; `DELETE /bookmarks/{sequence}` stays sequential because the API is cheap and ordering keeps log output legible.
 - **Tests via pytest, py_test target**: pure-function ports (`structured_content`, `pitch_graph`, `kana_form`, `audio`) have unit tests using `@pytest.mark.parametrize` for table-driven cases. UI (dialog) and integration (entry point, HTTP, file I/O) code is exercised by manual smoke in Anki rather than automated tests.
 
 ## Configuration and secrets reference
@@ -150,8 +162,9 @@ Users edit via Anki's standard `Config` button on the Add-ons screen.
 ## Behavioral invariants
 
 - A bookmark is either present (queued) or absent (resolved). There is no `imported` flag server-side; the Anki collection is the source of truth for what's been imported.
-- Successful imports and explicit drops both clear the bookmark at the API. Failures (e.g. `add_note` rejected, jpod101 timeout when audio is required) leave the bookmark in place.
-- A row is counted as `imported_without_audio` when `add_note` succeeds but the Audio field could not be populated (download or content-type check failed). The bookmark is still cleared.
+- Successful imports and explicit drops both clear the bookmark at the API on `Yes` to the post-import confirmation. `No` to the confirmation skips all server `DELETE`s; the imported notes still land in Anki and the bookmarks stay queued for the next run (where they will be flagged as duplicates).
+- Failures (e.g. `add_note` rejected, jpod101 timeout when audio is required) leave the bookmark in place even on `Yes` because failed sequences are not added to the cleanup list.
+- A row is counted as `imported_without_audio` when `add_note` succeeds but the Audio field could not be populated (download or content-type check failed, or the response matched the jpod101 invalid-audio stub). The bookmark is still cleared on `Yes`.
 - Dangling bookmarks (sequence absent from the corpus, e.g. after a Jitendex refresh) are silently omitted from the dialog. They remain bookmarked at the API and will only re-surface if a future corpus refresh re-adds the term.
 - Duplicate detection runs once at dialog open, not at commit time. The user can manually re-enable a duplicate to force-add it; Anki's own duplicate-detection on `add_note` will then decide whether to accept.
 - The add-on never modifies the `Animecards` model, deck templates, or styling. It only reads existing model / field metadata and writes new notes.
@@ -177,8 +190,9 @@ Users edit via Anki's standard `Config` button on the Add-ons screen.
 
 ## Performance envelope
 
-- **Dialog open**: `GET /bookmarks?include=term` (~150–300 ms warm path) + per-row local `find_notes` queries (~1 ms each, ~100 ms for 100 bookmarks). Dialog renders inside Anki's "instant" budget at expected scale.
-- **Commit**: dominated by Phase 1 (jpod101 audio download, ~200–800 ms per row). Parallelised via `ThreadPoolExecutor`; wall-clock ≈ `max(per-row download)` capped at the executor pool size. For 10 rows, Phase 1 is ~1 s instead of ~5 s sequential. Phase 2 is ~10 ms × N rows for `add_note`. Phase 3 is ~50 ms × N rows for sequential `DELETE`s. Total for 10 rows: ~2 s vs the per-row chain's ~10 s.
+- **Dialog open**: runs in the background `QueryOp`, so the Anki UI stays responsive while the addon does `GET /bookmarks?include=term` (~150–300 ms warm path) + per-row `find_notes` queries (~1 ms each, ~100 ms for 100 bookmarks). The dialog itself appears within Anki's "instant" budget once the background work returns.
+- **Import**: dominated by audio download (~200–800 ms per row). Parallelised via `ThreadPoolExecutor`; wall-clock ≈ `max(per-row download)` capped at the executor pool size. For 10 rows, audio is ~1 s instead of ~5 s sequential. `add_note` is ~10 ms × N rows. Total import phase for 10 rows: ~2 s.
+- **Cleanup**: ~50 ms × N rows for sequential `DELETE`s. ~500 ms for 10 rows. Skipped entirely if the user picks `No` at the confirmation.
 - **Glossary HTML render**: single-pass tree walk, ~5–20 ms per term in pure Python with `xml.etree.ElementTree`. Done in memory before dialog opens.
 - **Pitch graph SVG render**: ~1 ms per term. Negligible.
 - **Memory footprint**: hundred bookmarks × ~5 KB per `Bookmark` ≈ 500 KB at dialog open. Trivial.
@@ -210,10 +224,13 @@ No formal SLO; sized for personal workload only.
   1. Export `JAPANESE_DICTIONARY_USER` and `JAPANESE_DICTIONARY_PASSWORD` in the shell that launches Anki.
   2. Use the SPA on phone to bookmark a few terms.
   3. In Anki desktop, click Tools → Import Japanese dictionary bookmarks.
-  4. The dialog should show one row per bookmark with Word / Reading / freq, duplicates flagged.
-  5. Confirm; the progress dialog runs, then the summary tooltip appears.
-  6. Check the Mining deck — new `Animecards`-tagged notes appear with Word, Reading, Glossary, Audio, Graph populated.
-  7. Reload the SPA on phone — the imported bookmarks are gone from the queue.
+  4. The progress bar `Fetching Japanese dictionary bookmarks...` appears (UI stays interactive).
+  5. The dialog should show one row per bookmark with Word / Reading / freq, duplicates flagged.
+  6. Confirm; the import progress bar runs, then the confirmation dialog appears summarising imports / drops / failures.
+  7. Pick `Yes` — the cleanup progress bar runs, then the summary tooltip appears.
+  8. Check the Mining deck — new `Animecards`-tagged notes appear with Word, Reading, Glossary, Audio, Graph populated.
+  9. Reload the SPA on phone — the imported bookmarks are gone from the queue.
+  10. Repeat with `No` at the confirmation step to verify bookmarks stay queued and re-appear (flagged as duplicates) on the next run.
 
 ## End-to-end scenarios
 
@@ -221,11 +238,12 @@ No formal SLO; sized for personal workload only.
 
 1. The user bookmarks 10 terms via the SPA on phone over the course of a day.
 2. At their laptop, they launch Anki with `JAPANESE_DICTIONARY_USER` / `_PASSWORD` exported.
-3. They click Tools → Import Japanese dictionary bookmarks.
+3. They click Tools → Import Japanese dictionary bookmarks. The fetch progress bar appears.
 4. The dialog opens with all 10 rows pre-checked.
-5. They commit. The progress dialog reports phase 1 (audio download), phase 2 (notes added), phase 3 (bookmarks cleared at the API).
-6. Summary tooltip: `"Imported 10"`.
-7. Reloading the SPA on phone shows zero queued bookmarks.
+5. They commit. The import progress bar runs (audio download + notes added).
+6. The confirmation dialog appears: `"Imported 10 note(s) into Anki. Delete 10 bookmark(s) from the server now?"`.
+7. They pick `Yes`. Cleanup progress bar runs, then the summary tooltip: `"Imported 10"`.
+8. Reloading the SPA on phone shows zero queued bookmarks.
 
 ### Scenario 2: duplicate handling
 
@@ -233,16 +251,17 @@ No formal SLO; sized for personal workload only.
 2. They run the import flow on desktop.
 3. The dialog shows the row unchecked, with a `[duplicate]` tag (the configured deck already has a note where `Word == 新橋`).
 4. The user leaves it unchecked and clicks commit.
-5. Phase 3 runs `DELETE /bookmarks/1316830`, removing the stale bookmark; no Anki write.
-6. Summary tooltip: `"Imported 0 (1 dropped, 1 duplicate skipped)"`.
+5. The import phase adds nothing to Anki; the confirmation dialog asks whether to clear the 1 dropped row.
+6. They pick `Yes`. Cleanup runs `DELETE /bookmarks/1316830`, removing the stale bookmark.
+7. Summary tooltip: `"Imported 0 (1 dropped)"`.
 
 ### Scenario 3: audio failure degrades gracefully
 
-1. The user bookmarks a rare term whose jpod101 audio file 404s.
+1. The user bookmarks a rare term whose jpod101 audio is missing (network error, non-2xx after redirect, or the jpod101 invalid-audio stub matched by SHA-256).
 2. They run the import flow.
-3. Phase 1 logs the audio failure; `audio_files[sequence]` is `None`.
-4. Phase 2 calls `add_note` without populating the Audio field.
-5. Phase 3 runs `DELETE /bookmarks/{sequence}` — the import succeeded structurally.
+3. The audio download returns `None`; the Audio field is left blank.
+4. `add_note` succeeds. The confirmation dialog summary notes `1 imported without audio`.
+5. They pick `Yes`. Cleanup runs `DELETE /bookmarks/{sequence}` — the import succeeded structurally.
 6. Summary tooltip: `"Imported 1 (1 without audio)"`. The user can re-record audio in Anki later.
 
 ### Scenario 4: dangling bookmark after corpus refresh
@@ -252,3 +271,12 @@ No formal SLO; sized for personal workload only.
 3. `GET /bookmarks?include=term` silently drops the dangling row server-side.
 4. The dialog shows the user's other bookmarks but not the dangling one.
 5. The dangling bookmark stays in DynamoDB; no surface to clean it up in v1. It would only re-appear if a future corpus refresh re-adds the term.
+
+### Scenario 5: user spots a mistake at the confirmation checkpoint
+
+1. The user runs the import flow and accidentally picks the wrong deck before clicking commit.
+2. The import phase finishes; notes have already been added to the wrong deck.
+3. The confirmation dialog appears: `"Imported 5 note(s) into Anki. Delete 5 bookmark(s) from the server now?"`.
+4. They pick `No`. The cleanup phase is skipped.
+5. Summary tooltip: `"Imported 5; 5 bookmarks kept on server"`.
+6. They delete the wrongly-decked notes from Anki, then re-run the import flow with the correct deck. The dialog re-appears with the original 5 bookmarks (now flagged as duplicates because the wrongly-decked notes still exist if they didn't delete them; otherwise they re-import cleanly).
