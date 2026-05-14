@@ -240,36 +240,45 @@ def test_render_field_wraps_inner_span_in_yomitan_glossary_div():
     assert '<span class="structured-content">' in field
 
 
-def test_render_field_appends_jitendex_stylesheet_scoped_to_wrapper_class():
+def test_render_field_appends_flattened_scoped_stylesheet():
     field, _ = render_field({"tag": "div", "content": "hi"})
-    assert f"<style>.{GLOSSARY_WRAPPER_CLASS} {{\n" in field
+    assert "<style>" in field
     assert "</style></div>" in field
-    assert JITENDEX_STYLES_CSS in field
-    assert 'span[data-sc-class="tag"]' in field
-    assert 'div[data-sc-content="example-sentence"]' in field
+    assert f".{GLOSSARY_WRAPPER_CLASS} span[data-sc-class=" in field
+    assert f".{GLOSSARY_WRAPPER_CLASS} div[data-sc-content=" in field
 
 
-def test_render_field_appends_yomitan_structured_content_rules():
+def test_render_field_includes_yomitan_rules_scoped():
     field, _ = render_field({"tag": "div", "content": "hi"})
-    assert YOMITAN_STRUCTURED_CONTENT_CSS in field
-    assert ".gloss-link-external-icon" in field
-    assert ".gloss-sc-table" in field
-    assert ".gloss-sc-th" in field
+    assert f".{GLOSSARY_WRAPPER_CLASS} .gloss-link-external-icon" in field
+    assert f".{GLOSSARY_WRAPPER_CLASS} .gloss-sc-table" in field
 
 
 def test_render_field_emits_yomitan_rules_before_jitendex_rules():
     field, _ = render_field({"tag": "div", "content": "hi"})
-    yomitan_index = field.index(YOMITAN_STRUCTURED_CONTENT_CSS)
-    jitendex_index = field.index(JITENDEX_STYLES_CSS)
-    assert yomitan_index < jitendex_index
+    yomitan_idx = field.index(f".{GLOSSARY_WRAPPER_CLASS} .gloss-link-external-icon")
+    jitendex_idx = field.index(f".{GLOSSARY_WRAPPER_CLASS} span[data-sc-class=")
+    assert yomitan_idx < jitendex_idx
 
 
-def test_render_field_does_not_xml_escape_css_selector_combinators():
+def test_render_field_css_is_flat_with_no_nesting():
     field, _ = render_field({"tag": "div", "content": "hi"})
-    assert "& ul[data-sc-content=" in field
-    assert "> span" in field
-    assert "&amp;" not in field
-    assert "&gt;" not in field
+    style_start = field.index("<style>") + len("<style>")
+    style_end = field.index("</style>")
+    css = field[style_start:style_end]
+    for line in css.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("&"):
+            raise AssertionError(f"Unresolved nesting: {stripped}")
+    # no nested braces - every { should be followed by declarations then }
+    # before another { appears (i.e., no rule blocks inside rule blocks)
+    in_block = False
+    for char in css:
+        if char == "{":
+            assert not in_block, "Nested braces found in flattened CSS"
+            in_block = True
+        elif char == "}":
+            in_block = False
 
 
 def test_render_field_propagates_kana_form_marker():

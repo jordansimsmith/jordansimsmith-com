@@ -15,12 +15,14 @@ and `.gloss-link-external-icon` hider that Yomitan normally inlines via
 visual styling. Together they mirror what stock Yomitan emits for
 `definition.type === "term"` in
 `tmp/yomitan/ext/data/templates/default-anki-field-templates.handlebars`.
-CSS scoping uses the modern `addScopeToCss` form from
-`tmp/yomitan/ext/js/core/utilities.js` — wrap both stylesheets in
-`.yomitan-glossary { … }` and rely on CSS nesting (Chromium 120+,
-Anki 25.02+) — rather than the legacy selector-by-selector rewrite,
-because Jitendex's own rules already use nesting (`& ul[...]`,
-`& span`, `&::before`) and the wrap-once form preserves them as-is.
+
+`css_scope.scope_css` replicates what Yomitan's `addScopeToCssLegacy`
+does in the browser: flatten all CSS nesting (`&` syntax) into flat
+selectors and prepend `.yomitan-glossary` to every rule. Anki's
+embedded Chromium does not reliably parse nested CSS inside `<style>`
+blocks in card fields, so the output must be fully flat. The flattened
+CSS is computed once at module load and reused for every card.
+
 Yomitan's rules are emitted first so the more-specific Jitendex
 attribute selectors win on overlap. The note builder calls
 `render_field`; `render` is kept as a separate seam so
@@ -36,11 +38,17 @@ the element; we diverge here because the addon receives raw Jitendex
 
 import xml.etree.ElementTree as ET
 
+from .css_scope import scope_css
 from .jitendex_styles import JITENDEX_STYLES_CSS
 from .yomitan_styles import YOMITAN_STRUCTURED_CONTENT_CSS
 
 SPA_BASE_URL = "https://japanese-dictionary.jordansimsmith.com/search"
 GLOSSARY_WRAPPER_CLASS = "yomitan-glossary"
+
+_SCOPED_CSS = scope_css(
+    YOMITAN_STRUCTURED_CONTENT_CSS + "\n" + JITENDEX_STYLES_CSS,
+    f".{GLOSSARY_WRAPPER_CLASS}",
+)
 
 _NO_STYLE_TAGS = {"br", "ruby", "rt", "rp"}
 _TABLE_GROUP_TAGS = {"thead", "tbody", "tfoot", "tr"}
@@ -110,11 +118,12 @@ def render_field(content):
 
     Wraps `render`'s output in a `<div class="yomitan-glossary">` and
     appends a `<style>` block carrying both bundled stylesheets
-    (Yomitan structured-content rules first, then Jitendex `styles.css`)
-    scoped to `.yomitan-glossary` via CSS nesting. The CSS is emitted
-    verbatim (not XML-escaped) because HTML parses `<style>` content as
-    raw text — escaping `&` or `>` would corrupt selectors like
-    `& ul[...]` and `td[...] > span`.
+    (Yomitan structured-content rules first, then Jitendex `styles.css`),
+    flattened and scoped to `.yomitan-glossary` by `css_scope.scope_css`.
+    This mirrors what Yomitan's `addScopeToCssLegacy` does via the
+    browser's `CSSStyleSheet` API: resolve all CSS nesting into flat
+    selectors and prepend the scope selector to every rule. The
+    flattened CSS is computed once at module load and reused.
 
     Returns `(field_html, kana_form_marker_seen)`.
     """
@@ -122,9 +131,7 @@ def render_field(content):
     field_html = (
         f'<div class="{GLOSSARY_WRAPPER_CLASS}" style="text-align: left;">'
         f"{inner_html}"
-        f"<style>.{GLOSSARY_WRAPPER_CLASS} {{\n"
-        f"{YOMITAN_STRUCTURED_CONTENT_CSS}\n{JITENDEX_STYLES_CSS}"
-        f"}}</style>"
+        f"<style>\n{_SCOPED_CSS}\n</style>"
         f"</div>"
     )
     return field_html, kana_seen
