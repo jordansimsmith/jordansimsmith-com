@@ -39,7 +39,7 @@ public class CreateBackupHandler
   private static final Logger LOGGER = LoggerFactory.getLogger(CreateBackupHandler.class);
 
   @VisibleForTesting static final String BUCKET = "anki-backup.jordansimsmith.com";
-  @VisibleForTesting static final long PART_SIZE_BYTES = 67_108_864L;
+  @VisibleForTesting static final long PART_SIZE_BYTES = 33_554_432L;
   @VisibleForTesting static final int BACKUP_INTERVAL_HOURS = 24;
   @VisibleForTesting static final int RETENTION_DAYS = 90;
   @VisibleForTesting static final int UPLOAD_URL_TTL_SECONDS = 3600;

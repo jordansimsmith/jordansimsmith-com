@@ -25,7 +25,7 @@ The Anki backup API provides an authenticated backend for creating immutable, ve
 - Authenticate every API route with HTTP Basic credentials validated by a custom API Gateway authorizer.
 - Let the add-on trigger backup from a manual Tools menu action while the server enforces frequency gating.
 - Create backup artifacts as full `.colpkg` packages (collection database plus media files).
-- Use S3 multipart upload only, with `64 MB` part size and server-driven completion.
+- Use S3 multipart upload only, with `32 MB` part size and server-driven completion.
 - Persist backup metadata in DynamoDB with per-user partitioning and immutable completed records.
 - Keep daily backup history for 90 days using S3 lifecycle expiration and DynamoDB TTL.
 - Support restore through API-assisted history listing and short-lived presigned download URLs.
@@ -77,7 +77,7 @@ sequenceDiagram
   else eligible
     G->>D: create pending backup item
     G-->>C: 201 ready + presigned upload part URLs
-    loop each 64 MB part
+    loop each 32 MB part
       C->>S: UploadPart (presigned URL)
       S-->>C: ETag
     end
@@ -185,7 +185,7 @@ sequenceDiagram
     "download_url_expires_at": null
   },
   "upload": {
-    "part_size_bytes": 67108864,
+    "part_size_bytes": 33554432,
     "expires_at": "2026-03-01T11:23:01Z",
     "parts": [
       {
@@ -248,7 +248,7 @@ Representative completed item:
   "s3_bucket": "anki-backup.jordansimsmith.com",
   "s3_key": "users/alice/profiles/main/backups/2026/03/01/550e8400-e29b-41d4-a716-446655440000.colpkg",
   "upload_id": "2~aBcDef...",
-  "part_size_bytes": 67108864,
+  "part_size_bytes": 33554432,
   "size_bytes": 534773760,
   "sha256": "0f7a6f8f64028f5f2f1f5a9a2b745f9028ce8f5df5c9a2c7d61f73b05c5ce12b",
   "created_at": 1772360660,
@@ -298,7 +298,7 @@ None in current scope. The service uses fixed v1 constants that match repository
 - Secrets Manager secret id: `anki_backup_api`
 - Backup interval: `24` hours
 - Retention: `90` days
-- Multipart part size: `67108864` bytes (`64 MB`)
+- Multipart part size: `33554432` bytes (`32 MB`)
 - Upload URL TTL: `3600` seconds (1 hour)
 - Download URL TTL: `3600` seconds (1 hour)
 
@@ -318,7 +318,7 @@ None in current scope. The service uses fixed v1 constants that match repository
 ## Performance envelope
 
 - Artifact size target is `~500 MB` today with support up to `5 GB` through multipart upload.
-- Multipart part size is `64 MB`, producing roughly `80` parts for a `5 GB` backup.
+- Multipart part size is `32 MB`, producing roughly `160` parts for a `5 GB` backup.
 - Normal cadence target is one successful backup per interval (24 hours by default), with accepted occasional duplicate backups in rare races.
 - Retention and projected dataset size are designed to keep storage cost around or below the personal-use budget target.
 

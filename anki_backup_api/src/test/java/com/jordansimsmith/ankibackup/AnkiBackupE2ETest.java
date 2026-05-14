@@ -88,7 +88,7 @@ public class AnkiBackupE2ETest {
     assertThat(createResponse.backup().sha256()).isEqualTo("test-sha256");
     assertThat(createResponse.backup().completedAt()).isNull();
     assertThat(createResponse.backup().downloadUrl()).isNull();
-    assertThat(createResponse.upload().partSizeBytes()).isEqualTo(67_108_864L);
+    assertThat(createResponse.upload().partSizeBytes()).isEqualTo(33_554_432L);
     assertThat(createResponse.upload().parts()).hasSize(1);
 
     var backupId = createResponse.backup().backupId();

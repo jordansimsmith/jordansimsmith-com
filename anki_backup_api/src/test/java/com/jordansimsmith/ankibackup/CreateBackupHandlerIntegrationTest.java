@@ -310,7 +310,7 @@ public class CreateBackupHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldReturnEightPartsWhenFiveHundredMegabyteArtifact() throws Exception {
+  void handleRequestShouldReturnSixteenPartsWhenFiveHundredMegabyteArtifact() throws Exception {
     // arrange
     var user = "alice";
     var now = Instant.parse("2026-03-01T10:00:00Z");
@@ -330,9 +330,9 @@ public class CreateBackupHandlerIntegrationTest {
     assertThat(res.getStatusCode()).isEqualTo(201);
     var tree = objectMapper.readTree(res.getBody());
     assertThat(tree.get("status").asText()).isEqualTo("ready");
-    assertThat(tree.get("upload").get("parts")).hasSize(8);
+    assertThat(tree.get("upload").get("parts")).hasSize(16);
     assertThat(tree.get("upload").get("parts").get(0).get("part_number").asInt()).isEqualTo(1);
-    assertThat(tree.get("upload").get("parts").get(7).get("part_number").asInt()).isEqualTo(8);
+    assertThat(tree.get("upload").get("parts").get(15).get("part_number").asInt()).isEqualTo(16);
   }
 
   @Test
