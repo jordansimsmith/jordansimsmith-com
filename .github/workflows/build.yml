@@ -20,3 +20,15 @@ jobs:
         run: bazel build //...
       - name: Bazel test
         run: bazel test //...
+      - name: Upload anki-backup addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: anki-backup-addon
+          path: bazel-bin/anki_backup_api/anki-backup.ankiaddon
+          if-no-files-found: error
+      - name: Upload japanese-dictionary-importer addon
+        uses: actions/upload-artifact@v4
+        with:
+          name: japanese-dictionary-importer-addon
+          path: bazel-bin/japanese_dictionary_api/japanese-dictionary-importer.ankiaddon
+          if-no-files-found: error
