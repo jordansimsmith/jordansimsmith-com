@@ -40,12 +40,15 @@ def _parse_rules(css):
     Each entry is either:
       - (selectors_str, declarations_str)  for a leaf rule
       - (selectors_str, [children])        for a rule with nested blocks
+
+    When a block has both own declarations and nested child rules (e.g.
+    `li { padding: 0.25em; & ul { ... } }`), the own declarations are
+    emitted as a leaf entry *before* the entry with nested children.
     """
     rules = []
     i = 0
     n = len(css)
     while i < n:
-        # skip whitespace
         while i < n and css[i] in " \t\r\n":
             i += 1
         if i >= n:
@@ -63,12 +66,45 @@ def _parse_rules(css):
         block_content, end = _extract_block(css, brace)
         i = end
 
-        children = _parse_rules(block_content) if "{" in block_content else None
-        if children:
-            rules.append((selector, children))
+        if "{" in block_content:
+            own_decls = _extract_leading_declarations(block_content)
+            nested_content = _strip_leading_declarations(block_content)
+            children = _parse_rules(nested_content)
+            if own_decls:
+                rules.append((selector, own_decls))
+            if children:
+                rules.append((selector, children))
         else:
-            rules.append((selector, block_content.strip()))
+            body = block_content.strip()
+            if body:
+                rules.append((selector, body))
     return rules
+
+
+def _extract_leading_declarations(block_content):
+    """Extract property declarations that appear before the first nested block."""
+    brace = block_content.find("{")
+    if brace == -1:
+        return block_content.strip()
+    before = block_content[:brace]
+    last_semi = before.rfind(";")
+    if last_semi == -1:
+        return ""
+    return before[: last_semi + 1].strip()
+
+
+def _strip_leading_declarations(block_content):
+    """Remove property declarations that appear before the first nested block."""
+    brace = block_content.find("{")
+    if brace == -1:
+        return ""
+    before = block_content[:brace]
+    last_semi = before.rfind(";")
+    if last_semi == -1:
+        return block_content
+    # find the start of the selector after the last semicolon
+    rest = block_content[last_semi + 1 :]
+    return rest
 
 
 def _extract_block(css, open_brace):

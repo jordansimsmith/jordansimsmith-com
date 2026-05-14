@@ -64,12 +64,18 @@ def _get_rules():
 def inline_styles(root):
     """Apply CSS rules as inline styles on *root* and its descendants.
 
+    Rules are applied in specificity order (least-specific first) so that
+    more-specific selectors override less-specific ones via last-write-wins
+    on the concatenated `style` attribute. Specificity is approximated by
+    the number of simple-selector parts in the parsed selector chain.
+
     Modifies the tree in place. Strips the `class` attribute from all
     elements after inlining (matching Yomitan's `_normalizeHtml`).
     """
     rules = _get_rules()
+    rules_sorted = sorted(rules, key=lambda r: len(r[0]))
     index = _build_index(root)
-    for selector_parts, declarations in rules:
+    for selector_parts, declarations in rules_sorted:
         for el in _select(selector_parts, root, index):
             _merge_style(el, declarations)
     _strip_classes(root)
@@ -102,18 +108,18 @@ def _merge_style(el, declarations):
 
 # --- CSS parsing ---
 
-_RULE_RE = re.compile(r"([^{}]+)\{([^{}]+)\}")
-
 
 def _parse_flat_css(css):
     """Parse flat (no nesting) CSS into [(selector_parts, declarations)]."""
+    from .css_scope import _parse_rules as _brace_parse
+
     rules = []
-    for match in _RULE_RE.finditer(css):
-        selectors_str = match.group(1).strip()
-        declarations = match.group(2).strip()
+    for selectors_str, body in _brace_parse(css):
+        if isinstance(body, list):
+            continue
+        declarations = body.strip()
         if not declarations:
             continue
-        # normalise declarations to a single line
         decl = " ".join(declarations.split())
         for selector in selectors_str.split(","):
             selector = selector.strip()
@@ -128,12 +134,12 @@ def _parse_flat_css(css):
 _SIMPLE_SEL_RE = re.compile(
     r"^([a-z][a-z0-9-]*)?"  # optional tag
     r"(\.[a-z][a-z0-9-]*)?"  # optional .class
-    r'(\[[a-z][a-z0-9-]*="[^"]*"\])*'  # optional [attr="val"]
+    r'(\[[a-z][a-z0-9-]*(?:="[^"]*")?\])*'  # optional [attr] or [attr="val"]
     r"(:first-child)?$",  # optional :first-child
     re.IGNORECASE,
 )
 
-_ATTR_RE = re.compile(r'\[([a-z][a-z0-9-]*)="([^"]*)"\]', re.IGNORECASE)
+_ATTR_RE = re.compile(r'\[([a-z][a-z0-9-]*)(?:="([^"]*)")?\]', re.IGNORECASE)
 
 
 def _parse_selector(selector):
@@ -175,7 +181,11 @@ def _parse_simple_selector(sel):
     if m.group(2):
         result["class"] = m.group(2)[1:]  # strip leading dot
     if m.group(3):
-        result["attrs"] = _ATTR_RE.findall(m.group(3))
+        attrs = []
+        for attr_name, attr_val in _ATTR_RE.findall(m.group(3)):
+            # attr_val is "" for bare [attr] (presence check) vs "val" for [attr="val"]
+            attrs.append((attr_name, attr_val if attr_val else None))
+        result["attrs"] = attrs
     if m.group(4):
         result["first_child"] = True
     return result
@@ -241,8 +251,12 @@ def _matches_simple(el, simple, index):
             return False
     if "attrs" in simple:
         for attr, val in simple["attrs"]:
-            if el.get(attr) != val:
-                return False
+            if val is None:
+                if el.get(attr) is None:
+                    return False
+            else:
+                if el.get(attr) != val:
+                    return False
     if simple.get("first_child"):
         parent = index["parent"].get(el)
         if parent is not None:
