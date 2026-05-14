@@ -180,6 +180,10 @@ public class HttpSpotifyClient implements SpotifyClient {
       var items = pageResponse.items() != null ? pageResponse.items() : List.<ShowEpisodeItem>of();
 
       for (var item : items) {
+        // spotify api returns null items for unavailable/geo-restricted episodes
+        if (item == null) {
+          continue;
+        }
         Preconditions.checkNotNull(item.id(), "Show episode ID is null");
         Preconditions.checkNotNull(item.name(), "Show episode name is null");
         Preconditions.checkNotNull(item.durationMs(), "Show episode duration is null");

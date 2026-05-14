@@ -733,6 +733,51 @@ public class HttpSpotifyClientTest {
   }
 
   @Test
+  void findShowEpisodesShouldSkipNullItemsInResponse() throws Exception {
+    // arrange
+    seedSpotifySecret();
+
+    var tokenResponse = createMockResponse(200, TOKEN_RESPONSE);
+    var pageResponse =
+        createMockResponse(
+            200,
+            """
+            {
+              "items": [
+                {
+                  "id": "episode1",
+                  "name": "Episode 1",
+                  "duration_ms": 60000,
+                  "release_date": "2021-03-28",
+                  "release_date_precision": "day"
+                },
+                null,
+                {
+                  "id": "episode3",
+                  "name": "Episode 3",
+                  "duration_ms": 90000,
+                  "release_date": "2021-05-10",
+                  "release_date_precision": "day"
+                }
+              ],
+              "next": null
+            }
+            """);
+
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(tokenResponse)
+        .thenReturn(pageResponse);
+
+    // act
+    var episodes = client.findShowEpisodes("testShowId");
+
+    // assert
+    assertThat(episodes).hasSize(2);
+    assertThat(episodes.get(0).id()).isEqualTo("episode1");
+    assertThat(episodes.get(1).id()).isEqualTo("episode3");
+  }
+
+  @Test
   void findShowEpisodesShouldThrowWhenItemReleaseDateIsNull() throws Exception {
     // arrange
     seedSpotifySecret();
