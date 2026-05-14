@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 import tempfile
+import time
 import urllib.parse
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -18,6 +19,22 @@ REQUEST_TIMEOUT_SECONDS = 60
 
 def log(message):
     print(f"[anki-backup] {message}", flush=True)
+
+
+def _format_duration(seconds):
+    if seconds < 1:
+        return f"{seconds * 1000:.0f}ms"
+    return f"{seconds:.2f}s"
+
+
+def _format_size(num_bytes):
+    return f"{num_bytes / (1024 * 1024):.2f} MB"
+
+
+def _format_throughput(num_bytes, seconds):
+    if seconds <= 0:
+        return "n/a"
+    return f"{(num_bytes / (1024 * 1024)) / seconds:.2f} MB/s"
 
 
 def send_request(method, path, body=None):
@@ -71,10 +88,16 @@ def update_backup(backup_id, status):
 def describe_artifact(path):
     filename = os.path.basename(path)
     size_bytes = os.path.getsize(path)
+    hash_start = time.monotonic()
     sha = hashlib.sha256()
     with open(path, "rb") as file:
         for chunk in iter(lambda: file.read(8192), b""):
             sha.update(chunk)
+    hash_duration = time.monotonic() - hash_start
+    log(
+        f"Hashed {_format_size(size_bytes)} in {_format_duration(hash_duration)} "
+        f"({_format_throughput(size_bytes, hash_duration)})"
+    )
 
     return {
         "filename": filename,
@@ -85,47 +108,78 @@ def describe_artifact(path):
 
 def export_colpkg(col):
     log("Creating collection export package...")
+    export_start = time.monotonic()
     temp_dir = tempfile.mkdtemp()
     filename = f"collection-{uuid.uuid4()}.colpkg"
     out_path = os.path.join(temp_dir, filename)
     col.export_collection_package(out_path, include_media=True, legacy=False)
-    log("Collection export package created.")
+    export_duration = time.monotonic() - export_start
+    size_bytes = os.path.getsize(out_path)
+    log(
+        f"Collection export package created "
+        f"({_format_size(size_bytes)} in {_format_duration(export_duration)})"
+    )
 
     return out_path
 
 
 def upload_part(part, data):
+    start = time.monotonic()
     response = requests.put(
         part["upload_url"],
         data=data,
         timeout=REQUEST_TIMEOUT_SECONDS,
     )
+    duration = time.monotonic() - start
     if response.status_code != 200:
         raise Exception(
             f"failed to upload part {part['part_number']} with code {response.status_code} and body {response.text}"
         )
+    log(
+        f"Uploaded part {part['part_number']} "
+        f"({_format_size(len(data))} in {_format_duration(duration)} = "
+        f"{_format_throughput(len(data), duration)})"
+    )
 
 
 def upload_and_complete(colpkg_path, backup_id, upload):
     part_size = upload["part_size_bytes"]
     parts = upload["parts"]
 
+    read_start = time.monotonic()
     part_data = []
     with open(colpkg_path, "rb") as file:
         for part in parts:
             part_data.append((part, file.read(part_size)))
+    read_duration = time.monotonic() - read_start
+    total_bytes = sum(len(data) for _, data in part_data)
+    log(
+        f"Read {len(parts)} part(s) ({_format_size(total_bytes)}) "
+        f"into memory in {_format_duration(read_duration)}"
+    )
 
+    upload_start = time.monotonic()
     with ThreadPoolExecutor() as executor:
         futures = [executor.submit(upload_part, part, data) for part, data in part_data]
         for future in as_completed(futures):
             future.result()
+    upload_duration = time.monotonic() - upload_start
+    log(
+        f"Uploaded {len(parts)} part(s) ({_format_size(total_bytes)}) in "
+        f"{_format_duration(upload_duration)} "
+        f"(aggregate {_format_throughput(total_bytes, upload_duration)})"
+    )
 
     log("Finalizing backup...")
+    finalize_start = time.monotonic()
     update_backup(backup_id, "COMPLETED")
+    finalize_duration = time.monotonic() - finalize_start
+    log(f"Backup finalized in {_format_duration(finalize_duration)}")
 
 
 def run_backup(col, profile_id):
     colpkg_path = None
+    backup_start = time.monotonic()
     try:
         if not os.getenv("ANKI_BACKUP_USER"):
             raise Exception("ANKI_BACKUP_USER is not set.")
@@ -137,7 +191,10 @@ def run_backup(col, profile_id):
         artifact = describe_artifact(colpkg_path)
 
         log("Creating backup record...")
+        create_start = time.monotonic()
         result = create_backup(profile_id, artifact)
+        create_duration = time.monotonic() - create_start
+        log(f"Backup record created in {_format_duration(create_duration)}")
 
         if result["status"] == "skipped":
             log("Backup skipped by server (already backed up recently).")
@@ -147,7 +204,8 @@ def run_backup(col, profile_id):
         upload = result["upload"]
         log(f"Uploading {len(upload['parts'])} part(s) to S3...")
         upload_and_complete(colpkg_path, backup_id, upload)
-        log("Backup completed successfully.")
+        total_duration = time.monotonic() - backup_start
+        log(f"Backup completed successfully in {_format_duration(total_duration)}")
 
         return "completed"
     finally:
