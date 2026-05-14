@@ -5,7 +5,7 @@ populates it (or leaves it empty when audio download fails) before calling
 `mw.col.add_note`.
 """
 
-from addon import kana_form, pitch_graph, structured_content
+from . import kana_form, pitch_graph, structured_content
 
 
 def build_note(col, model, deck_id, bookmark, config):

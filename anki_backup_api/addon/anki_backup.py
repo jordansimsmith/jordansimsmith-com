@@ -206,6 +206,3 @@ def register_menu_action():
     backup_action = QAction("Run backup now", mw)
     backup_action.triggered.connect(on_manual_backup_action_triggered)
     mw.form.menuTools.addAction(backup_action)
-
-
-gui_hooks.main_window_did_init.append(register_menu_action)

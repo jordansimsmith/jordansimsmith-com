@@ -7,12 +7,12 @@ background.
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from aqt import gui_hooks, mw
+from aqt import mw
 from aqt.operations import QueryOp
 from aqt.qt import QAction
 from aqt.utils import tooltip
 
-from addon import api_client, audio, dialog, kana_form, note_builder
+from . import api_client, audio, dialog, kana_form, note_builder
 
 
 def log(message):
@@ -168,6 +168,3 @@ def register_menu_action():
     action = QAction("Import Japanese dictionary bookmarks", mw)
     action.triggered.connect(on_menu_action_triggered)
     mw.form.menuTools.addAction(action)
-
-
-gui_hooks.main_window_did_init.append(register_menu_action)

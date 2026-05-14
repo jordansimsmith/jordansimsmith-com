@@ -5,7 +5,7 @@ the `Word = reading` branch in the note builder and the kana-only branch in
 the jpod101 URL.
 """
 
-from addon import structured_content
+from . import structured_content
 
 
 def detect(bookmark):
