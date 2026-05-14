@@ -6,21 +6,22 @@ chain of background `QueryOp`s so the Anki UI never blocks:
 1. Fetch bookmarks + run duplicate detection in the background.
 2. Open the import dialog on the main thread.
 3. On commit, run the audio download + `add_note` phase in the background.
-4. Show a confirmation dialog summarising the import on the main thread,
-   so the user can review what was added before any bookmarks are wiped.
+4. Show a non-modal confirmation dialog summarising the import. The user
+   can browse their deck to inspect the imported cards while the dialog
+   stays open, then click to clear or keep the server bookmarks.
 5. On confirm, run the bookmark-delete phase in the background.
 
-Splitting the commit at step 4 means a user who notices something off
-(e.g. wrong deck, dropped a row by mistake) can keep the queue intact and
-re-run the importer instead of losing the source bookmarks.
+The non-modal dialog at step 4 means a user who notices something off
+(e.g. wrong deck, missing audio) can keep the queue intact and re-run
+the importer instead of losing the source bookmarks.
 """
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from aqt import mw
 from aqt.operations import QueryOp
-from aqt.qt import QAction
-from aqt.utils import askUser, tooltip
+from aqt.qt import QAction, QMessageBox
+from aqt.utils import tooltip
 
 from . import api_client, audio, dialog, kana_form, note_builder
 
@@ -128,14 +129,31 @@ def _confirm_and_delete(summary, config):
         tooltip(_format_summary(summary, delete_failures=[]), parent=mw)
         return
 
-    if not askUser(_format_confirmation(summary), parent=mw):
-        tooltip(
-            f"{_format_summary(summary, delete_failures=[])}; "
-            f"{len(sequences_to_clear)} bookmarks kept on server",
-            parent=mw,
-        )
-        return
+    msg = QMessageBox(mw)
+    msg.setWindowTitle("Import complete")
+    msg.setText(_format_confirmation(summary))
+    msg.setIcon(QMessageBox.Icon.Question)
+    clear_btn = msg.addButton(
+        "Clear bookmarks from server", QMessageBox.ButtonRole.AcceptRole
+    )
+    msg.addButton("Keep bookmarks queued", QMessageBox.ButtonRole.RejectRole)
+    msg.setModal(False)
 
+    def on_clicked(button):
+        if button == clear_btn:
+            _run_delete(sequences_to_clear, summary)
+        else:
+            tooltip(
+                f"{_format_summary(summary, delete_failures=[])}; "
+                f"{len(sequences_to_clear)} bookmarks kept on server",
+                parent=mw,
+            )
+
+    msg.buttonClicked.connect(on_clicked)
+    msg.show()
+
+
+def _run_delete(sequences_to_clear, summary):
     def background(_col):
         return _delete_bookmarks(sequences_to_clear)
 
@@ -203,15 +221,19 @@ def _format_confirmation(summary):
 
     lines = [f"Imported {imported} note(s) into Anki."]
     if no_audio:
-        lines.append(f"  - {no_audio} imported without audio")
+        lines.append(f"  {no_audio} without audio.")
     if dropped:
-        lines.append(f"Dropping {dropped} bookmark(s) you unchecked.")
+        lines.append(f"Dropping {dropped} unchecked bookmark(s).")
     if failed:
-        lines.append(f"{failed} note(s) failed to add and will be retried next time.")
+        lines.append(f"{failed} failed (will retry next time).")
     lines.append("")
     lines.append(
-        f"Delete {imported + dropped} bookmark(s) from the server now?\n"
-        "Choose No to keep them queued so you can re-run the importer."
+        "You can browse your deck to review the imported cards before deciding.\n"
+        "This dialog will stay open.\n"
+    )
+    lines.append(
+        f"Clear {imported + dropped} bookmark(s) from the server,\n"
+        "or keep them queued for a re-run?"
     )
     return "\n".join(lines)
 

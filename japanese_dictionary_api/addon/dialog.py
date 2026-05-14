@@ -82,8 +82,8 @@ def show_import_dialog(bookmarks, duplicate_sequences, config, on_commit):
         )
         if drops > 0:
             footer.setText(
-                f"Importing {imports} will also drop {drops} unchecked "
-                "bookmarks. Cancel to keep all bookmarks."
+                f"{drops} unchecked bookmark(s) will be cleared from the "
+                "server after import. Cancel to keep all bookmarks."
             )
             footer.setVisible(True)
         else:
