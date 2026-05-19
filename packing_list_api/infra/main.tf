@@ -313,7 +313,7 @@ resource "aws_api_gateway_authorizer" "packing_list" {
   authorizer_uri                   = aws_lambda_function.lambda["auth"].qualified_invoke_arn
   type                             = "REQUEST"
   identity_source                  = "method.request.header.Authorization"
-  authorizer_result_ttl_in_seconds = 0
+  authorizer_result_ttl_in_seconds = 300
 }
 
 resource "aws_api_gateway_gateway_response" "unauthorized" {
