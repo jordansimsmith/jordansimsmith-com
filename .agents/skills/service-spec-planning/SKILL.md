@@ -131,7 +131,7 @@ Rule of thumb: `1 task = 1 reviewable commit`. Resist splitting further when it 
 
 ### Phase 5: Promote to canonical READMEs
 
-Use the `service-readme-authoring` skill at `.cursor/skills/service-readme-authoring/SKILL.md` to author `<service>_api/README.md` and `<service>_web/README.md`. Read its reference examples (`example-service-readme-api.md` and `example-service-readme-web.md`) before drafting.
+Use the `service-readme-authoring` skill at `.agents/skills/service-readme-authoring/SKILL.md` to author `<service>_api/README.md` and `<service>_web/README.md`. Read its reference examples (`example-service-readme-api.md` and `example-service-readme-web.md`) before drafting.
 
 Derive README content from the product and tech specs; do not start from scratch. Every section in the README template must be populated with concrete contracts (exact endpoint tables, representative records, validation rules, invariants, example request/response payloads).
 
