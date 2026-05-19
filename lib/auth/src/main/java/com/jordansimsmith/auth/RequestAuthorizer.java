@@ -40,8 +40,15 @@ public class RequestAuthorizer {
     return buildResponse(user.user(), effect, methodArn);
   }
 
-  private AuthorizerResponse buildResponse(String principal, IamEffect effect, String resource)
+  private AuthorizerResponse buildResponse(String principal, IamEffect effect, String methodArn)
       throws Exception {
+    // methodArn is arn:aws:execute-api:region:account:apiId/stage/METHOD/path.
+    // Broaden to apiId/stage/*/* so the cached policy applies to every endpoint
+    // in the same API stage; otherwise authorizer_result_ttl_in_seconds > 0
+    // serves a policy scoped to the first methodArn for subsequent requests.
+    var stageEnd = methodArn.indexOf('/', methodArn.indexOf('/') + 1);
+    var resource = stageEnd > 0 ? methodArn.substring(0, stageEnd) + "/*/*" : methodArn;
+
     var policy =
         IamPolicy.builder()
             .version("2012-10-17")

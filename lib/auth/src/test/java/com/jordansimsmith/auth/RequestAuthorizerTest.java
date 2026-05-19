@@ -16,6 +16,10 @@ import software.amazon.awssdk.policybuilder.iam.IamResource;
 
 public class RequestAuthorizerTest {
   private static final String SECRET_NAME = "test_secret";
+  private static final String METHOD_ARN =
+      "arn:aws:execute-api:ap-southeast-2:123456789012:abc123/prod/GET/trips";
+  private static final String EXPECTED_RESOURCE =
+      "arn:aws:execute-api:ap-southeast-2:123456789012:abc123/prod/*/*";
 
   private FakeSecrets fakeSecrets;
   private ObjectMapper objectMapper;
@@ -46,7 +50,7 @@ public class RequestAuthorizerTest {
     var token = basicAuth("alice", "123");
 
     // act
-    var res = authorizer.authorize(token, SECRET_NAME, "method");
+    var res = authorizer.authorize(token, SECRET_NAME, METHOD_ARN);
 
     // assert
     assertThat(res.principalId()).isEqualTo("alice");
@@ -56,7 +60,7 @@ public class RequestAuthorizerTest {
     var statement = policy.statements().get(0);
     assertThat(statement.actions()).contains(IamAction.create("execute-api:Invoke"));
     assertThat(statement.effect()).isEqualTo(IamEffect.ALLOW);
-    assertThat(statement.resources()).contains(IamResource.create("method"));
+    assertThat(statement.resources()).contains(IamResource.create(EXPECTED_RESOURCE));
   }
 
   @Test
@@ -76,7 +80,7 @@ public class RequestAuthorizerTest {
     var token = basicAuth("alice", "456");
 
     // act
-    var res = authorizer.authorize(token, SECRET_NAME, "method");
+    var res = authorizer.authorize(token, SECRET_NAME, METHOD_ARN);
 
     // assert
     assertThat(res.principalId()).isEqualTo("alice");
@@ -100,7 +104,7 @@ public class RequestAuthorizerTest {
     var token = basicAuth("bob", "456");
 
     // act
-    var res = authorizer.authorize(token, SECRET_NAME, "method");
+    var res = authorizer.authorize(token, SECRET_NAME, METHOD_ARN);
 
     // assert
     assertThat(res.principalId()).isEqualTo("bob");
@@ -128,7 +132,7 @@ public class RequestAuthorizerTest {
     var token = basicAuth("bob", "bob-pass");
 
     // act
-    var res = authorizer.authorize(token, SECRET_NAME, "method");
+    var res = authorizer.authorize(token, SECRET_NAME, METHOD_ARN);
 
     // assert
     assertThat(res.principalId()).isEqualTo("bob");
@@ -156,7 +160,7 @@ public class RequestAuthorizerTest {
     var token = basicAuth("alice", "bob-pass");
 
     // act
-    var res = authorizer.authorize(token, SECRET_NAME, "method");
+    var res = authorizer.authorize(token, SECRET_NAME, METHOD_ARN);
 
     // assert
     assertThat(res.principalId()).isEqualTo("alice");
@@ -180,7 +184,7 @@ public class RequestAuthorizerTest {
     var token = basicAuth("alice", "pass:word:123");
 
     // act
-    var res = authorizer.authorize(token, SECRET_NAME, "method");
+    var res = authorizer.authorize(token, SECRET_NAME, METHOD_ARN);
 
     // assert
     assertThat(res.principalId()).isEqualTo("alice");
@@ -188,9 +192,35 @@ public class RequestAuthorizerTest {
   }
 
   @Test
+  void authorizeShouldReturnWildcardResourceForDeepMethodArn() throws Exception {
+    // arrange
+    seedUsers(
+        """
+        {
+          "users": [
+            {
+              "user": "alice",
+              "password": "123"
+            }
+          ]
+        }
+        """);
+    var token = basicAuth("alice", "123");
+    var deepMethodArn =
+        "arn:aws:execute-api:ap-southeast-2:123456789012:abc123/prod/DELETE/trips/abc-def";
+
+    // act
+    var res = authorizer.authorize(token, SECRET_NAME, deepMethodArn);
+
+    // assert
+    assertThat(parsePolicy(res).statements().get(0).resources())
+        .contains(IamResource.create(EXPECTED_RESOURCE));
+  }
+
+  @Test
   void authorizeShouldThrowWhenAuthorizationHeaderIsNull() {
     // act and assert
-    assertThatThrownBy(() -> authorizer.authorize(null, SECRET_NAME, "method"))
+    assertThatThrownBy(() -> authorizer.authorize(null, SECRET_NAME, METHOD_ARN))
         .isInstanceOf(RuntimeException.class)
         .hasMessage("Unauthorized");
   }
@@ -198,7 +228,7 @@ public class RequestAuthorizerTest {
   @Test
   void authorizeShouldThrowWhenAuthorizationHeaderIsEmpty() {
     // act and assert
-    assertThatThrownBy(() -> authorizer.authorize("", SECRET_NAME, "method"))
+    assertThatThrownBy(() -> authorizer.authorize("", SECRET_NAME, METHOD_ARN))
         .isInstanceOf(RuntimeException.class)
         .hasMessage("Unauthorized");
   }
@@ -219,7 +249,7 @@ public class RequestAuthorizerTest {
         """);
 
     // act and assert
-    assertThatThrownBy(() -> authorizer.authorize("Basic not_base_64!!", SECRET_NAME, "method"))
+    assertThatThrownBy(() -> authorizer.authorize("Basic not_base_64!!", SECRET_NAME, METHOD_ARN))
         .isInstanceOf(RuntimeException.class);
   }
 
