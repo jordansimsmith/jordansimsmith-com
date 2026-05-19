@@ -319,7 +319,13 @@ describe('SearchPage', () => {
     expect(unbookmarkedButton.getAttribute('aria-pressed')).toBe('false');
   });
 
-  it('optimistically marks a result as bookmarked on click and calls createBookmark', async () => {
+  it('shows the bookmark button in a loading state until createBookmark resolves and only then marks it bookmarked', async () => {
+    let resolveCreate: () => void = () => {};
+    createBookmarkSpy.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveCreate = resolve;
+      }),
+    );
     searchSpy.mockResolvedValue({
       results: [
         makeResult({ sequence: 100, expression: '新聞', reading: 'しんぶん' }),
@@ -335,14 +341,57 @@ describe('SearchPage', () => {
     await user.click(button);
 
     await waitFor(() => {
+      expect((button as HTMLButtonElement).disabled).toBe(true);
+    });
+    expect(button.getAttribute('data-loading')).toBe('true');
+    expect(button.getAttribute('aria-pressed')).toBe('false');
+    expect(createBookmarkSpy).toHaveBeenCalledWith(100);
+
+    resolveCreate();
+
+    await waitFor(() => {
       expect(
         screen.getByRole('button', { name: /新聞 bookmarked/i }),
       ).toBeDefined();
     });
-    expect(createBookmarkSpy).toHaveBeenCalledWith(100);
+    const bookmarkedButton = screen.getByRole('button', {
+      name: /新聞 bookmarked/i,
+    });
+    expect((bookmarkedButton as HTMLButtonElement).disabled).toBe(false);
+    expect(bookmarkedButton.getAttribute('data-loading')).not.toBe('true');
   });
 
-  it('reverts the bookmark on createBookmark failure and surfaces the error', async () => {
+  it('ignores clicks on the bookmark button while a request is already in flight', async () => {
+    let resolveCreate: () => void = () => {};
+    createBookmarkSpy.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveCreate = resolve;
+      }),
+    );
+    searchSpy.mockResolvedValue({
+      results: [
+        makeResult({ sequence: 100, expression: '新聞', reading: 'しんぶん' }),
+      ],
+    });
+    setUrlQuery('しんぶん');
+    renderSearchPage();
+
+    const button = await screen.findByRole('button', {
+      name: /^Bookmark 新聞/i,
+    });
+    const user = userEvent.setup();
+    await user.click(button);
+    await user.click(button);
+
+    await waitFor(() => {
+      expect((button as HTMLButtonElement).disabled).toBe(true);
+    });
+    expect(createBookmarkSpy).toHaveBeenCalledTimes(1);
+
+    resolveCreate();
+  });
+
+  it('does not bookmark on createBookmark failure and surfaces the error', async () => {
     createBookmarkSpy.mockRejectedValue(new Error('server exploded'));
     searchSpy.mockResolvedValue({
       results: [
@@ -363,12 +412,20 @@ describe('SearchPage', () => {
         'server exploded',
       );
     });
-    expect(
-      screen.getByRole('button', { name: /^Bookmark 新聞/i }),
-    ).toBeDefined();
+    const stillUnbookmarked = screen.getByRole('button', {
+      name: /^Bookmark 新聞/i,
+    });
+    expect((stillUnbookmarked as HTMLButtonElement).disabled).toBe(false);
+    expect(stillUnbookmarked.getAttribute('data-loading')).not.toBe('true');
   });
 
-  it('optimistically un-bookmarks a result on click and calls deleteBookmark', async () => {
+  it('shows the bookmark button in a loading state until deleteBookmark resolves and only then un-bookmarks it', async () => {
+    let resolveDelete: () => void = () => {};
+    deleteBookmarkSpy.mockReturnValue(
+      new Promise<void>((resolve) => {
+        resolveDelete = resolve;
+      }),
+    );
     findBookmarksSpy.mockResolvedValue({ sequences: [100] });
     searchSpy.mockResolvedValue({
       results: [
@@ -385,15 +442,28 @@ describe('SearchPage', () => {
     await user.click(button);
 
     await waitFor(() => {
+      expect((button as HTMLButtonElement).disabled).toBe(true);
+    });
+    expect(button.getAttribute('data-loading')).toBe('true');
+    expect(button.getAttribute('aria-pressed')).toBe('true');
+    expect(deleteBookmarkSpy).toHaveBeenCalledWith(100);
+    expect(createBookmarkSpy).not.toHaveBeenCalled();
+
+    resolveDelete();
+
+    await waitFor(() => {
       expect(
         screen.getByRole('button', { name: /^Bookmark 新聞/i }),
       ).toBeDefined();
     });
-    expect(deleteBookmarkSpy).toHaveBeenCalledWith(100);
-    expect(createBookmarkSpy).not.toHaveBeenCalled();
+    const unbookmarkedButton = screen.getByRole('button', {
+      name: /^Bookmark 新聞/i,
+    });
+    expect((unbookmarkedButton as HTMLButtonElement).disabled).toBe(false);
+    expect(unbookmarkedButton.getAttribute('data-loading')).not.toBe('true');
   });
 
-  it('reverts the un-bookmark on deleteBookmark failure and surfaces the error', async () => {
+  it('does not un-bookmark on deleteBookmark failure and surfaces the error', async () => {
     findBookmarksSpy.mockResolvedValue({ sequences: [100] });
     deleteBookmarkSpy.mockRejectedValue(new Error('server exploded'));
     searchSpy.mockResolvedValue({
@@ -415,9 +485,11 @@ describe('SearchPage', () => {
         'server exploded',
       );
     });
-    expect(
-      screen.getByRole('button', { name: /新聞 bookmarked/i }),
-    ).toBeDefined();
+    const stillBookmarked = screen.getByRole('button', {
+      name: /新聞 bookmarked/i,
+    });
+    expect((stillBookmarked as HTMLButtonElement).disabled).toBe(false);
+    expect(stillBookmarked.getAttribute('data-loading')).not.toBe('true');
   });
 
   it('runs an immediate search when an internal link triggers navigation', async () => {

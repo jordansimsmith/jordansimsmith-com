@@ -37,6 +37,9 @@ export function SearchPage() {
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [bookmarks, setBookmarks] = useState<Set<number>>(() => new Set());
+  const [pendingBookmarks, setPendingBookmarks] = useState<Set<number>>(
+    () => new Set(),
+  );
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestId = useRef(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -96,14 +99,13 @@ export function SearchPage() {
   }, []);
 
   const handleBookmark = async (sequence: number) => {
+    if (pendingBookmarks.has(sequence)) {
+      return;
+    }
     const wasBookmarked = bookmarks.has(sequence);
-    setBookmarks((prev) => {
+    setPendingBookmarks((prev) => {
       const next = new Set(prev);
-      if (wasBookmarked) {
-        next.delete(sequence);
-      } else {
-        next.add(sequence);
-      }
+      next.add(sequence);
       return next;
     });
     try {
@@ -112,21 +114,27 @@ export function SearchPage() {
       } else {
         await apiClient.createBookmark(sequence);
       }
-    } catch (e) {
       setBookmarks((prev) => {
         const next = new Set(prev);
         if (wasBookmarked) {
-          next.add(sequence);
-        } else {
           next.delete(sequence);
+        } else {
+          next.add(sequence);
         }
         return next;
       });
+    } catch (e) {
       const fallback = wasBookmarked
         ? 'Failed to un-bookmark'
         : 'Failed to bookmark';
       const message = e instanceof Error ? e.message : fallback;
       setError(message);
+    } finally {
+      setPendingBookmarks((prev) => {
+        const next = new Set(prev);
+        next.delete(sequence);
+        return next;
+      });
     }
   };
 
@@ -235,6 +243,7 @@ export function SearchPage() {
                   <ResultEntry
                     result={result}
                     bookmarked={bookmarks.has(result.sequence)}
+                    bookmarkPending={pendingBookmarks.has(result.sequence)}
                     onBookmark={handleBookmark}
                     onInternalNavigate={handleInternalNavigate}
                   />

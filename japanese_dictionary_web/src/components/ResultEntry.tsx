@@ -7,6 +7,7 @@ import { PitchGraph, getPitchPattern } from './PitchGraph';
 interface ResultEntryProps {
   result: SearchResult;
   bookmarked?: boolean;
+  bookmarkPending?: boolean;
   onBookmark?: (sequence: number) => void;
   onInternalNavigate?: (q: string) => void;
 }
@@ -14,6 +15,7 @@ interface ResultEntryProps {
 export function ResultEntry({
   result,
   bookmarked = false,
+  bookmarkPending = false,
   onBookmark,
   onInternalNavigate,
 }: ResultEntryProps) {
@@ -61,6 +63,7 @@ export function ResultEntry({
             color={bookmarked ? 'yellow' : 'gray'}
             aria-label={bookmarkLabel}
             aria-pressed={bookmarked}
+            loading={bookmarkPending}
             onClick={() => onBookmark?.(result.sequence)}
           >
             {bookmarked ? (
