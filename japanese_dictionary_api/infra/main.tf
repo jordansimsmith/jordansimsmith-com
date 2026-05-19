@@ -48,31 +48,31 @@ locals {
     auth = {
       target      = "//japanese_dictionary_api:auth-handler_deploy.jar"
       handler     = "com.jordansimsmith.japanesedictionary.AuthHandler"
-      memory_size = 512
+      memory_size = 1769
       timeout     = 10
     }
     search = {
       target      = "//japanese_dictionary_api:search-handler_deploy.jar"
       handler     = "com.jordansimsmith.japanesedictionary.SearchHandler"
-      memory_size = 1024
+      memory_size = 1769
       timeout     = 5
     }
     create_bookmark = {
       target      = "//japanese_dictionary_api:create-bookmark-handler_deploy.jar"
       handler     = "com.jordansimsmith.japanesedictionary.CreateBookmarkHandler"
-      memory_size = 512
+      memory_size = 1769
       timeout     = 10
     }
     delete_bookmark = {
       target      = "//japanese_dictionary_api:delete-bookmark-handler_deploy.jar"
       handler     = "com.jordansimsmith.japanesedictionary.DeleteBookmarkHandler"
-      memory_size = 512
+      memory_size = 1769
       timeout     = 10
     }
     find_bookmarks = {
       target      = "//japanese_dictionary_api:find-bookmarks-handler_deploy.jar"
       handler     = "com.jordansimsmith.japanesedictionary.FindBookmarksHandler"
-      memory_size = 512
+      memory_size = 1769
       timeout     = 10
     }
   }

@@ -210,7 +210,7 @@ resource "aws_lambda_function" "lambda" {
   source_code_hash = filebase64sha256(var.artifacts[each.key])
   handler          = each.value.handler
   runtime          = "java21"
-  memory_size      = 1024
+  memory_size      = 1769
   timeout          = each.value.timeout
   architectures    = ["x86_64"]
   publish          = true
