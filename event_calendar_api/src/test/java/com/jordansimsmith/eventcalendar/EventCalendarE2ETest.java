@@ -16,10 +16,7 @@ import software.amazon.awssdk.services.lambda.model.InvocationType;
 import software.amazon.awssdk.services.lambda.model.InvokeRequest;
 
 public class EventCalendarE2ETest {
-  private static final String NETWORK_NAME = "event-calendar-e2e";
-
-  private static final Network NETWORK =
-      Network.builder().createNetworkCmdModifier(cmd -> cmd.withName(NETWORK_NAME)).build();
+  private static final Network NETWORK = Network.newNetwork();
 
   private static final GoMediaStubContainer goMediaStubContainer =
       new GoMediaStubContainer().withNetwork(NETWORK);
@@ -30,7 +27,7 @@ public class EventCalendarE2ETest {
   private static final EventCalendarContainer eventCalendarContainer =
       new EventCalendarContainer()
           .withNetwork(NETWORK)
-          .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK_NAME)
+          .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK.getId())
           .withEnv("EVENT_CALENDAR_GOMEDIA_BASE_URL", goMediaStubContainer.getEndpoint().toString())
           .withEnv("EVENT_CALENDAR_MEETUP_BASE_URL", meetupStubContainer.getEndpoint().toString());
 

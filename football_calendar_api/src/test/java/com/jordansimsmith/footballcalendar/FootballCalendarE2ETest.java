@@ -24,10 +24,7 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 
 @Testcontainers
 public class FootballCalendarE2ETest {
-  private static final String NETWORK_NAME = "football-calendar-e2e";
-
-  private static final Network NETWORK =
-      Network.builder().createNetworkCmdModifier(cmd -> cmd.withName(NETWORK_NAME)).build();
+  private static final Network NETWORK = Network.newNetwork();
 
   @Container
   private static final NrfStubContainer nrfStubContainer =
@@ -47,7 +44,7 @@ public class FootballCalendarE2ETest {
   private static final FootballCalendarContainer footballCalendarContainer =
       new FootballCalendarContainer()
           .withNetwork(NETWORK)
-          .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK_NAME)
+          .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK.getId())
           .withEnv("FOOTBALL_CALENDAR_NRF_API_URL", nrfStubContainer.getEndpoint().toString())
           .withEnv(
               "FOOTBALL_CALENDAR_FOOTBALL_FIX_BASE_URL",

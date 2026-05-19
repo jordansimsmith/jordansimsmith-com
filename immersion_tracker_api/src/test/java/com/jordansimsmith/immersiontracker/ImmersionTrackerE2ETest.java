@@ -26,10 +26,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 @Testcontainers
 public class ImmersionTrackerE2ETest {
 
-  private static final String NETWORK_NAME = "immersion-tracker-e2e";
-
-  private static final Network NETWORK =
-      Network.builder().createNetworkCmdModifier(cmd -> cmd.withName(NETWORK_NAME)).build();
+  private static final Network NETWORK = Network.newNetwork();
 
   @Container
   private static final ImmersionTrackerTvdbStubContainer immersionTrackerTvdbStubContainer =
@@ -53,7 +50,7 @@ public class ImmersionTrackerE2ETest {
   private static final ImmersionTrackerContainer immersionTrackerContainer =
       new ImmersionTrackerContainer()
           .withNetwork(NETWORK)
-          .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK_NAME)
+          .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK.getId())
           .withEnv(
               "IMMERSION_TRACKER_TVDB_BASE_URL",
               immersionTrackerTvdbStubContainer.getEndpoint().toString())

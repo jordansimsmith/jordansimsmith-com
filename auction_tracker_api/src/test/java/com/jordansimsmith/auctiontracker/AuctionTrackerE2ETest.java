@@ -21,11 +21,9 @@ import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 
 public class AuctionTrackerE2ETest {
-  private static final String NETWORK_NAME = "auction-tracker-e2e";
   private static final Logger LOGGER = LoggerFactory.getLogger(AuctionTrackerE2ETest.class);
 
-  private static final Network NETWORK =
-      Network.builder().createNetworkCmdModifier(cmd -> cmd.withName(NETWORK_NAME)).build();
+  private static final Network NETWORK = Network.newNetwork();
 
   private static final TradeMeWebsiteStubContainer tradeMeWebsiteStubContainer =
       new TradeMeWebsiteStubContainer().withNetwork(NETWORK);
@@ -33,7 +31,7 @@ public class AuctionTrackerE2ETest {
   private static final AuctionTrackerContainer auctionTrackerContainer =
       new AuctionTrackerContainer()
           .withNetwork(NETWORK)
-          .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK_NAME)
+          .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK.getId())
           .withEnv(
               "AUCTION_TRACKER_TRADEME_BASE_URL",
               tradeMeWebsiteStubContainer.getEndpoint().toString());

@@ -20,13 +20,11 @@ import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 
 public class PriceTrackerE2ETest {
-  private static final String NETWORK_NAME = "price-tracker-e2e";
   private static final String CHEMIST_WAREHOUSE_STUB_ALIAS = "chemist-warehouse-stub";
   private static final String NZ_PROTEIN_STUB_ALIAS = "nz-protein-stub";
   private static final String NZ_MUSCLE_STUB_ALIAS = "nz-muscle-stub";
 
-  private static final Network NETWORK =
-      Network.builder().createNetworkCmdModifier(cmd -> cmd.withName(NETWORK_NAME)).build();
+  private static final Network NETWORK = Network.newNetwork();
 
   private static final PriceTrackerWebsiteStubContainer priceTrackerWebsiteStubContainer =
       new PriceTrackerWebsiteStubContainer()
@@ -37,7 +35,7 @@ public class PriceTrackerE2ETest {
   private static final PriceTrackerContainer priceTrackerContainer =
       new PriceTrackerContainer()
           .withNetwork(NETWORK)
-          .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK_NAME)
+          .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK.getId())
           .withEnv(
               "PRICE_TRACKER_CHEMIST_WAREHOUSE_BASE_URL",
               "http://" + CHEMIST_WAREHOUSE_STUB_ALIAS + ":8080")

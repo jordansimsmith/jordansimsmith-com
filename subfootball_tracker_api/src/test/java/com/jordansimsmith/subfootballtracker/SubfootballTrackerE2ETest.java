@@ -23,10 +23,7 @@ import software.amazon.awssdk.services.sqs.SqsClient;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 
 public class SubfootballTrackerE2ETest {
-  private static final String NETWORK_NAME = "subfootball-tracker-e2e";
-
-  private static final Network NETWORK =
-      Network.builder().createNetworkCmdModifier(cmd -> cmd.withName(NETWORK_NAME)).build();
+  private static final Network NETWORK = Network.newNetwork();
 
   private static final SubfootballWebsiteStubContainer subfootballWebsiteStubContainer =
       new SubfootballWebsiteStubContainer().withNetwork(NETWORK);
@@ -34,7 +31,7 @@ public class SubfootballTrackerE2ETest {
   private static final SubfootballTrackerContainer subfootballTrackerContainer =
       new SubfootballTrackerContainer()
           .withNetwork(NETWORK)
-          .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK_NAME)
+          .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK.getId())
           .withEnv(
               "SUBFOOTBALL_TRACKER_SUBFOOTBALL_BASE_URL",
               subfootballWebsiteStubContainer.getEndpoint().toString());
