@@ -8,6 +8,7 @@ java_library(
     ],
     deps = [
         "//third_party/dagger",
+        "@maven//:software_amazon_awssdk_aws_crt_client",
         "@maven//:software_amazon_awssdk_regions",
         "@maven//:software_amazon_awssdk_s3",
     ],

@@ -4,6 +4,7 @@ import dagger.Module;
 import dagger.Provides;
 import java.net.URI;
 import javax.inject.Singleton;
+import software.amazon.awssdk.http.crt.AwsCrtHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
@@ -18,6 +19,7 @@ public class S3Module {
         S3Client.builder()
             .region(Region.of(System.getenv("AWS_REGION")))
             .forcePathStyle(true)
+            .httpClientBuilder(AwsCrtHttpClient.builder())
             .build();
     // prime the snapshot to optimise cold start times
     client.listBuckets();

@@ -196,6 +196,7 @@ java_test_suite(
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
         "@maven//:software_amazon_awssdk_lambda",
+        "@maven//:software_amazon_awssdk_sdk_core",
         "@maven//:software_amazon_awssdk_sqs",
     ],
 )

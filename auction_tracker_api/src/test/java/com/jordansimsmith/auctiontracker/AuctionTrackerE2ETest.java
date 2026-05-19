@@ -12,6 +12,7 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Network;
+import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.lambda.LambdaClient;
 import software.amazon.awssdk.services.lambda.model.InvocationType;
@@ -76,6 +77,7 @@ public class AuctionTrackerE2ETest {
             .functionName("update_items_handler")
             .invocationType(InvocationType.REQUEST_RESPONSE)
             .logType(LogType.TAIL)
+            .payload(SdkBytes.fromUtf8String("{}"))
             .build();
     var updateResponse = lambdaClient.invoke(updateRequest);
     LOGGER.info(new String(Base64.getDecoder().decode(updateResponse.logResult())));
@@ -90,6 +92,7 @@ public class AuctionTrackerE2ETest {
             .functionName("send_digest_handler")
             .invocationType(InvocationType.REQUEST_RESPONSE)
             .logType(LogType.TAIL)
+            .payload(SdkBytes.fromUtf8String("{}"))
             .build();
     var digestResponse = lambdaClient.invoke(digestRequest);
     LOGGER.info(new String(Base64.getDecoder().decode(digestResponse.logResult())));

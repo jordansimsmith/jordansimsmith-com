@@ -31,10 +31,13 @@
     "org.testcontainers:junit-jupiter": -894562560,
     "org.testcontainers:testcontainers": 1762957219,
     "repositories": 514854214,
+    "software.amazon.awssdk:apache-client": 505595950,
+    "software.amazon.awssdk:aws-crt-client": 845919089,
     "software.amazon.awssdk:dynamodb": 1191599916,
     "software.amazon.awssdk:dynamodb-enhanced": -532698129,
     "software.amazon.awssdk:iam-policy-builder": 656914716,
     "software.amazon.awssdk:lambda": -103380819,
+    "software.amazon.awssdk:netty-nio-client": -232414039,
     "software.amazon.awssdk:s3": 1317115508,
     "software.amazon.awssdk:secretsmanager": 1594062026,
     "software.amazon.awssdk:sns": -947429678,
@@ -68,17 +71,6 @@
     "com.squareup:kotlinpoet": 1627672446,
     "commons-codec:commons-codec": -835030550,
     "commons-io:commons-io": -1021273518,
-    "commons-logging:commons-logging": 616060772,
-    "io.netty:netty-buffer": 99853522,
-    "io.netty:netty-codec": -26573322,
-    "io.netty:netty-codec-http": 1815072968,
-    "io.netty:netty-codec-http2": 1003565694,
-    "io.netty:netty-common": 1764608790,
-    "io.netty:netty-handler": -1049204802,
-    "io.netty:netty-resolver": -47412351,
-    "io.netty:netty-transport": -1728953152,
-    "io.netty:netty-transport-classes-epoll": 1010650306,
-    "io.netty:netty-transport-native-unix-common": 1888838918,
     "jakarta.inject:jakarta.inject-api": -1569563684,
     "javax.inject:javax.inject": -1284481446,
     "joda-time:joda-time": 230482511,
@@ -89,8 +81,6 @@
     "net.sf.biweekly:biweekly": -562644862,
     "org.apache.commons:commons-compress": -1752394903,
     "org.apache.commons:commons-lang3": 1110126408,
-    "org.apache.httpcomponents:httpclient": -1757413615,
-    "org.apache.httpcomponents:httpcore": -353060362,
     "org.apiguardian:apiguardian-api": -1579303244,
     "org.assertj:assertj-core": -1692391089,
     "org.checkerframework:checker-compat-qual": 205736368,
@@ -118,19 +108,20 @@
     "org.slf4j:slf4j-api": -2086218377,
     "org.testcontainers:junit-jupiter": -881405238,
     "org.testcontainers:testcontainers": -1378039203,
+    "software.amazon.awssdk.crt:aws-crt": 24195191,
     "software.amazon.awssdk:annotations": -1638222775,
-    "software.amazon.awssdk:apache-client": -238975964,
     "software.amazon.awssdk:arns": -211998673,
     "software.amazon.awssdk:auth": 195673911,
     "software.amazon.awssdk:aws-core": 763472582,
+    "software.amazon.awssdk:aws-crt-client": 627360490,
     "software.amazon.awssdk:aws-json-protocol": -566185107,
     "software.amazon.awssdk:aws-query-protocol": 2033527222,
     "software.amazon.awssdk:aws-xml-protocol": -1534320407,
     "software.amazon.awssdk:checksums": 431854774,
     "software.amazon.awssdk:checksums-spi": -342152145,
     "software.amazon.awssdk:crt-core": -374675663,
-    "software.amazon.awssdk:dynamodb": -1373328953,
-    "software.amazon.awssdk:dynamodb-enhanced": -727300967,
+    "software.amazon.awssdk:dynamodb": -2096956672,
+    "software.amazon.awssdk:dynamodb-enhanced": -1334092881,
     "software.amazon.awssdk:endpoints-spi": 712137145,
     "software.amazon.awssdk:http-auth": 265161226,
     "software.amazon.awssdk:http-auth-aws": 820586168,
@@ -140,19 +131,18 @@
     "software.amazon.awssdk:iam-policy-builder": 407421859,
     "software.amazon.awssdk:identity-spi": -1063829193,
     "software.amazon.awssdk:json-utils": -2139552351,
-    "software.amazon.awssdk:lambda": -1961017734,
+    "software.amazon.awssdk:lambda": -888812689,
     "software.amazon.awssdk:metrics-spi": -1189733186,
-    "software.amazon.awssdk:netty-nio-client": -636473667,
     "software.amazon.awssdk:profiles": 1889259095,
     "software.amazon.awssdk:protocol-core": -1206733970,
     "software.amazon.awssdk:regions": -1174143143,
     "software.amazon.awssdk:retries": 913324704,
     "software.amazon.awssdk:retries-spi": -381418401,
-    "software.amazon.awssdk:s3": -2083568001,
+    "software.amazon.awssdk:s3": 1838842584,
     "software.amazon.awssdk:sdk-core": -278146847,
-    "software.amazon.awssdk:secretsmanager": -1086069930,
-    "software.amazon.awssdk:sns": 271876946,
-    "software.amazon.awssdk:sqs": 1031756312,
+    "software.amazon.awssdk:secretsmanager": -928167605,
+    "software.amazon.awssdk:sns": 784945073,
+    "software.amazon.awssdk:sqs": 1327449997,
     "software.amazon.awssdk:third-party-jackson-core": 1735840763,
     "software.amazon.awssdk:utils": -1735316165,
     "software.amazon.awssdk:utils-lite": -760706402,
@@ -325,72 +315,6 @@
       },
       "version": "2.20.0"
     },
-    "commons-logging:commons-logging": {
-      "shasums": {
-        "jar": "daddea1ea0be0f56978ab3006b8ac92834afeefbd9b7e4e6316fca57df0fa636"
-      },
-      "version": "1.2"
-    },
-    "io.netty:netty-buffer": {
-      "shasums": {
-        "jar": "00a522b67ea35cb7b4dd9cf27f85c6c58f5e306785aa045302e5f6b2d4944a87"
-      },
-      "version": "4.1.130.Final"
-    },
-    "io.netty:netty-codec": {
-      "shasums": {
-        "jar": "52636bc29bd62120b97bbe5d1d21eab9b1cb2bef8efbb54d2221c5f3fa08d8cd"
-      },
-      "version": "4.1.130.Final"
-    },
-    "io.netty:netty-codec-http": {
-      "shasums": {
-        "jar": "5b6addc1df7b3397a193bd6544a8bfdb18ecac99fd13bee4ec75b1781a664e5e"
-      },
-      "version": "4.1.130.Final"
-    },
-    "io.netty:netty-codec-http2": {
-      "shasums": {
-        "jar": "f8ffdb550368fd5dee7c7f1393fa49552522f280ed8de96aebf4269cab0dc8f3"
-      },
-      "version": "4.1.130.Final"
-    },
-    "io.netty:netty-common": {
-      "shasums": {
-        "jar": "53921f28dd5a352b1bed0e1cbcc54d013dc60ffebeae9b2b1e53eabef317e581"
-      },
-      "version": "4.1.130.Final"
-    },
-    "io.netty:netty-handler": {
-      "shasums": {
-        "jar": "98c78ec187ca30a4b9775bf6f632f5c9929db6bf06a60e6971f945813880ca0f"
-      },
-      "version": "4.1.130.Final"
-    },
-    "io.netty:netty-resolver": {
-      "shasums": {
-        "jar": "48c5b218a89d184e1b601d46433957f515fcefdb4464182b1348bce4f5a18f35"
-      },
-      "version": "4.1.130.Final"
-    },
-    "io.netty:netty-transport": {
-      "shasums": {
-        "jar": "1bf573266d271f856705a9984d25449c56a1d73c02a16af12033ceccfe555dbb"
-      },
-      "version": "4.1.130.Final"
-    },
-    "io.netty:netty-transport-classes-epoll": {
-      "shasums": {
-        "jar": "1c352508d70aca1ccc3068daac907ad1e9d8dc68b07148d57426730bf0d0c8b6"
-      },
-      "version": "4.1.130.Final"
-    },
-    "io.netty:netty-transport-native-unix-common": {
-      "shasums": {
-        "jar": "cf5efc4168597d7cd14695b469418cac2a1134533f9a0c82ef0538d796fd39e1"
-      },
-      "version": "4.1.130.Final"
-    },
     "jakarta.inject:jakarta.inject-api": {
       "shasums": {
         "jar": "f7dc98062fccf14126abb751b64fab12c312566e8cbdc8483598bffcea93af7c"
@@ -450,18 +374,6 @@
         "jar": "4eeeae8d20c078abb64b015ec158add383ac581571cddc45c68f0c9ae0230720"
       },
       "version": "3.18.0"
-    },
-    "org.apache.httpcomponents:httpclient": {
-      "shasums": {
-        "jar": "6fe9026a566c6a5001608cf3fc32196641f6c1e5e1986d1037ccdbd5f31ef743"
-      },
-      "version": "4.5.13"
-    },
-    "org.apache.httpcomponents:httpcore": {
-      "shasums": {
-        "jar": "6c9b3dd142a09dc468e23ad39aad6f75a0f2b85125104469f026e52a474e464f"
-      },
-      "version": "4.4.16"
     },
     "org.apiguardian:apiguardian-api": {
       "shasums": {
@@ -625,15 +537,15 @@
       },
       "version": "2.0.3"
     },
+    "software.amazon.awssdk.crt:aws-crt": {
+      "shasums": {
+        "jar": "fc623db65b893aff7b403a0254662367e10688067325237a7a77694dc4b01f21"
+      },
+      "version": "0.40.3"
+    },
     "software.amazon.awssdk:annotations": {
       "shasums": {
         "jar": "1ec9e8d8a3821769bfb8892bdb833787359ead8c91b49c09260e42645bd44f49"
-      },
-      "version": "2.41.32"
-    },
-    "software.amazon.awssdk:apache-client": {
-      "shasums": {
-        "jar": "73ce6cfb40f532e1b6d4695d58ce73675f5025ba6d8bdc01fef1f58cbf30ef67"
       },
       "version": "2.41.32"
     },
@@ -652,6 +564,12 @@
     "software.amazon.awssdk:aws-core": {
       "shasums": {
         "jar": "18e5c7ec05b43ee1cd2328f2f1ea9050c1ce2bb54b78aeedfd3736cacd2256a0"
+      },
+      "version": "2.41.32"
+    },
+    "software.amazon.awssdk:aws-crt-client": {
+      "shasums": {
+        "jar": "fa7e558b733640091643a15b3bed7a31fa665ecbeb397a3440db2b30a9a158a1"
       },
       "version": "2.41.32"
     },
@@ -766,12 +684,6 @@
     "software.amazon.awssdk:metrics-spi": {
       "shasums": {
         "jar": "806030b6e66fcce5e18a430558da4e111763a0e2bdad4600b6b63b19c467bd23"
-      },
-      "version": "2.41.32"
-    },
-    "software.amazon.awssdk:netty-nio-client": {
-      "shasums": {
-        "jar": "cc4fbe54b42b76718e1aa93975bb63feab98c89513e8358cf6910bd1051c1fdc"
       },
       "version": "2.41.32"
     },
@@ -926,52 +838,6 @@
       "org.jetbrains.kotlin:kotlin-reflect",
       "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
     ],
-    "io.netty:netty-buffer": ["io.netty:netty-common"],
-    "io.netty:netty-codec": [
-      "io.netty:netty-buffer",
-      "io.netty:netty-common",
-      "io.netty:netty-transport"
-    ],
-    "io.netty:netty-codec-http": [
-      "io.netty:netty-buffer",
-      "io.netty:netty-codec",
-      "io.netty:netty-common",
-      "io.netty:netty-handler",
-      "io.netty:netty-transport"
-    ],
-    "io.netty:netty-codec-http2": [
-      "io.netty:netty-buffer",
-      "io.netty:netty-codec",
-      "io.netty:netty-codec-http",
-      "io.netty:netty-common",
-      "io.netty:netty-handler",
-      "io.netty:netty-transport"
-    ],
-    "io.netty:netty-handler": [
-      "io.netty:netty-buffer",
-      "io.netty:netty-codec",
-      "io.netty:netty-common",
-      "io.netty:netty-resolver",
-      "io.netty:netty-transport",
-      "io.netty:netty-transport-native-unix-common"
-    ],
-    "io.netty:netty-resolver": ["io.netty:netty-common"],
-    "io.netty:netty-transport": [
-      "io.netty:netty-buffer",
-      "io.netty:netty-common",
-      "io.netty:netty-resolver"
-    ],
-    "io.netty:netty-transport-classes-epoll": [
-      "io.netty:netty-buffer",
-      "io.netty:netty-common",
-      "io.netty:netty-transport",
-      "io.netty:netty-transport-native-unix-common"
-    ],
-    "io.netty:netty-transport-native-unix-common": [
-      "io.netty:netty-buffer",
-      "io.netty:netty-common",
-      "io.netty:netty-transport"
-    ],
     "net.sf.biweekly:biweekly": [
       "com.fasterxml.jackson.core:jackson-core",
       "com.github.mangstadt:vinnie"
@@ -980,11 +846,6 @@
       "commons-codec:commons-codec",
       "commons-io:commons-io",
       "org.apache.commons:commons-lang3"
-    ],
-    "org.apache.httpcomponents:httpclient": [
-      "commons-codec:commons-codec",
-      "commons-logging:commons-logging",
-      "org.apache.httpcomponents:httpcore"
     ],
     "org.assertj:assertj-core": ["net.bytebuddy:byte-buddy"],
     "org.jetbrains.kotlin:kotlin-metadata-jvm": [
@@ -1056,15 +917,6 @@
       "org.rnorth.duct-tape:duct-tape",
       "org.slf4j:slf4j-api"
     ],
-    "software.amazon.awssdk:apache-client": [
-      "commons-codec:commons-codec",
-      "org.apache.httpcomponents:httpclient",
-      "org.apache.httpcomponents:httpcore",
-      "software.amazon.awssdk:annotations",
-      "software.amazon.awssdk:http-client-spi",
-      "software.amazon.awssdk:metrics-spi",
-      "software.amazon.awssdk:utils"
-    ],
     "software.amazon.awssdk:arns": [
       "software.amazon.awssdk:annotations",
       "software.amazon.awssdk:utils"
@@ -1102,6 +954,14 @@
       "software.amazon.awssdk:utils",
       "software.amazon.awssdk:utils-lite",
       "software.amazon.eventstream:eventstream"
+    ],
+    "software.amazon.awssdk:aws-crt-client": [
+      "software.amazon.awssdk.crt:aws-crt",
+      "software.amazon.awssdk:annotations",
+      "software.amazon.awssdk:crt-core",
+      "software.amazon.awssdk:http-client-spi",
+      "software.amazon.awssdk:metrics-spi",
+      "software.amazon.awssdk:utils"
     ],
     "software.amazon.awssdk:aws-json-protocol": [
       "software.amazon.awssdk:annotations",
@@ -1144,7 +1004,6 @@
     ],
     "software.amazon.awssdk:dynamodb": [
       "software.amazon.awssdk:annotations",
-      "software.amazon.awssdk:apache-client",
       "software.amazon.awssdk:auth",
       "software.amazon.awssdk:aws-core",
       "software.amazon.awssdk:aws-json-protocol",
@@ -1156,7 +1015,6 @@
       "software.amazon.awssdk:identity-spi",
       "software.amazon.awssdk:json-utils",
       "software.amazon.awssdk:metrics-spi",
-      "software.amazon.awssdk:netty-nio-client",
       "software.amazon.awssdk:profiles",
       "software.amazon.awssdk:protocol-core",
       "software.amazon.awssdk:regions",
@@ -1231,7 +1089,6 @@
     ],
     "software.amazon.awssdk:lambda": [
       "software.amazon.awssdk:annotations",
-      "software.amazon.awssdk:apache-client",
       "software.amazon.awssdk:auth",
       "software.amazon.awssdk:aws-core",
       "software.amazon.awssdk:aws-json-protocol",
@@ -1243,7 +1100,6 @@
       "software.amazon.awssdk:identity-spi",
       "software.amazon.awssdk:json-utils",
       "software.amazon.awssdk:metrics-spi",
-      "software.amazon.awssdk:netty-nio-client",
       "software.amazon.awssdk:protocol-core",
       "software.amazon.awssdk:regions",
       "software.amazon.awssdk:retries-spi",
@@ -1252,23 +1108,6 @@
     ],
     "software.amazon.awssdk:metrics-spi": [
       "software.amazon.awssdk:annotations",
-      "software.amazon.awssdk:utils"
-    ],
-    "software.amazon.awssdk:netty-nio-client": [
-      "io.netty:netty-buffer",
-      "io.netty:netty-codec",
-      "io.netty:netty-codec-http",
-      "io.netty:netty-codec-http2",
-      "io.netty:netty-common",
-      "io.netty:netty-handler",
-      "io.netty:netty-resolver",
-      "io.netty:netty-transport",
-      "io.netty:netty-transport-classes-epoll",
-      "org.reactivestreams:reactive-streams",
-      "org.slf4j:slf4j-api",
-      "software.amazon.awssdk:annotations",
-      "software.amazon.awssdk:http-client-spi",
-      "software.amazon.awssdk:metrics-spi",
       "software.amazon.awssdk:utils"
     ],
     "software.amazon.awssdk:profiles": [
@@ -1300,7 +1139,6 @@
     ],
     "software.amazon.awssdk:s3": [
       "software.amazon.awssdk:annotations",
-      "software.amazon.awssdk:apache-client",
       "software.amazon.awssdk:arns",
       "software.amazon.awssdk:auth",
       "software.amazon.awssdk:aws-core",
@@ -1316,7 +1154,6 @@
       "software.amazon.awssdk:identity-spi",
       "software.amazon.awssdk:json-utils",
       "software.amazon.awssdk:metrics-spi",
-      "software.amazon.awssdk:netty-nio-client",
       "software.amazon.awssdk:profiles",
       "software.amazon.awssdk:protocol-core",
       "software.amazon.awssdk:regions",
@@ -1343,7 +1180,6 @@
     ],
     "software.amazon.awssdk:secretsmanager": [
       "software.amazon.awssdk:annotations",
-      "software.amazon.awssdk:apache-client",
       "software.amazon.awssdk:auth",
       "software.amazon.awssdk:aws-core",
       "software.amazon.awssdk:aws-json-protocol",
@@ -1355,7 +1191,6 @@
       "software.amazon.awssdk:identity-spi",
       "software.amazon.awssdk:json-utils",
       "software.amazon.awssdk:metrics-spi",
-      "software.amazon.awssdk:netty-nio-client",
       "software.amazon.awssdk:protocol-core",
       "software.amazon.awssdk:regions",
       "software.amazon.awssdk:retries-spi",
@@ -1364,7 +1199,6 @@
     ],
     "software.amazon.awssdk:sns": [
       "software.amazon.awssdk:annotations",
-      "software.amazon.awssdk:apache-client",
       "software.amazon.awssdk:auth",
       "software.amazon.awssdk:aws-core",
       "software.amazon.awssdk:aws-query-protocol",
@@ -1376,7 +1210,6 @@
       "software.amazon.awssdk:identity-spi",
       "software.amazon.awssdk:json-utils",
       "software.amazon.awssdk:metrics-spi",
-      "software.amazon.awssdk:netty-nio-client",
       "software.amazon.awssdk:protocol-core",
       "software.amazon.awssdk:regions",
       "software.amazon.awssdk:retries-spi",
@@ -1385,7 +1218,6 @@
     ],
     "software.amazon.awssdk:sqs": [
       "software.amazon.awssdk:annotations",
-      "software.amazon.awssdk:apache-client",
       "software.amazon.awssdk:auth",
       "software.amazon.awssdk:aws-core",
       "software.amazon.awssdk:aws-json-protocol",
@@ -1397,7 +1229,6 @@
       "software.amazon.awssdk:identity-spi",
       "software.amazon.awssdk:json-utils",
       "software.amazon.awssdk:metrics-spi",
-      "software.amazon.awssdk:netty-nio-client",
       "software.amazon.awssdk:protocol-core",
       "software.amazon.awssdk:regions",
       "software.amazon.awssdk:retries-spi",
@@ -1759,81 +1590,6 @@
       "org.apache.commons.io.output",
       "org.apache.commons.io.serialization"
     ],
-    "commons-logging:commons-logging": [
-      "org.apache.commons.logging",
-      "org.apache.commons.logging.impl"
-    ],
-    "io.netty:netty-buffer": ["io.netty.buffer", "io.netty.buffer.search"],
-    "io.netty:netty-codec": [
-      "io.netty.handler.codec",
-      "io.netty.handler.codec.base64",
-      "io.netty.handler.codec.bytes",
-      "io.netty.handler.codec.compression",
-      "io.netty.handler.codec.json",
-      "io.netty.handler.codec.marshalling",
-      "io.netty.handler.codec.protobuf",
-      "io.netty.handler.codec.serialization",
-      "io.netty.handler.codec.string",
-      "io.netty.handler.codec.xml"
-    ],
-    "io.netty:netty-codec-http": [
-      "io.netty.handler.codec.http",
-      "io.netty.handler.codec.http.cookie",
-      "io.netty.handler.codec.http.cors",
-      "io.netty.handler.codec.http.multipart",
-      "io.netty.handler.codec.http.websocketx",
-      "io.netty.handler.codec.http.websocketx.extensions",
-      "io.netty.handler.codec.http.websocketx.extensions.compression",
-      "io.netty.handler.codec.rtsp",
-      "io.netty.handler.codec.spdy"
-    ],
-    "io.netty:netty-codec-http2": ["io.netty.handler.codec.http2"],
-    "io.netty:netty-common": [
-      "io.netty.util",
-      "io.netty.util.collection",
-      "io.netty.util.concurrent",
-      "io.netty.util.internal",
-      "io.netty.util.internal.logging",
-      "io.netty.util.internal.shaded.org.jctools.counters",
-      "io.netty.util.internal.shaded.org.jctools.maps",
-      "io.netty.util.internal.shaded.org.jctools.queues",
-      "io.netty.util.internal.shaded.org.jctools.queues.atomic",
-      "io.netty.util.internal.shaded.org.jctools.queues.atomic.unpadded",
-      "io.netty.util.internal.shaded.org.jctools.queues.unpadded",
-      "io.netty.util.internal.shaded.org.jctools.util",
-      "io.netty.util.internal.svm"
-    ],
-    "io.netty:netty-handler": [
-      "io.netty.handler.address",
-      "io.netty.handler.flow",
-      "io.netty.handler.flush",
-      "io.netty.handler.ipfilter",
-      "io.netty.handler.logging",
-      "io.netty.handler.pcap",
-      "io.netty.handler.ssl",
-      "io.netty.handler.ssl.ocsp",
-      "io.netty.handler.ssl.util",
-      "io.netty.handler.stream",
-      "io.netty.handler.timeout",
-      "io.netty.handler.traffic"
-    ],
-    "io.netty:netty-resolver": ["io.netty.resolver"],
-    "io.netty:netty-transport": [
-      "io.netty.bootstrap",
-      "io.netty.channel",
-      "io.netty.channel.embedded",
-      "io.netty.channel.group",
-      "io.netty.channel.internal",
-      "io.netty.channel.local",
-      "io.netty.channel.nio",
-      "io.netty.channel.oio",
-      "io.netty.channel.pool",
-      "io.netty.channel.socket",
-      "io.netty.channel.socket.nio",
-      "io.netty.channel.socket.oio"
-    ],
-    "io.netty:netty-transport-classes-epoll": ["io.netty.channel.epoll"],
-    "io.netty:netty-transport-native-unix-common": ["io.netty.channel.unix"],
     "jakarta.inject:jakarta.inject-api": ["jakarta.inject"],
     "javax.inject:javax.inject": ["javax.inject"],
     "joda-time:joda-time": [
@@ -1976,51 +1732,6 @@
       "org.apache.commons.lang3.time",
       "org.apache.commons.lang3.tuple",
       "org.apache.commons.lang3.util"
-    ],
-    "org.apache.httpcomponents:httpclient": [
-      "org.apache.http.auth",
-      "org.apache.http.auth.params",
-      "org.apache.http.client",
-      "org.apache.http.client.config",
-      "org.apache.http.client.entity",
-      "org.apache.http.client.methods",
-      "org.apache.http.client.params",
-      "org.apache.http.client.protocol",
-      "org.apache.http.client.utils",
-      "org.apache.http.conn",
-      "org.apache.http.conn.params",
-      "org.apache.http.conn.routing",
-      "org.apache.http.conn.scheme",
-      "org.apache.http.conn.socket",
-      "org.apache.http.conn.ssl",
-      "org.apache.http.conn.util",
-      "org.apache.http.cookie",
-      "org.apache.http.cookie.params",
-      "org.apache.http.impl.auth",
-      "org.apache.http.impl.client",
-      "org.apache.http.impl.conn",
-      "org.apache.http.impl.conn.tsccm",
-      "org.apache.http.impl.cookie",
-      "org.apache.http.impl.execchain"
-    ],
-    "org.apache.httpcomponents:httpcore": [
-      "org.apache.http",
-      "org.apache.http.annotation",
-      "org.apache.http.concurrent",
-      "org.apache.http.config",
-      "org.apache.http.entity",
-      "org.apache.http.impl",
-      "org.apache.http.impl.bootstrap",
-      "org.apache.http.impl.entity",
-      "org.apache.http.impl.io",
-      "org.apache.http.impl.pool",
-      "org.apache.http.io",
-      "org.apache.http.message",
-      "org.apache.http.params",
-      "org.apache.http.pool",
-      "org.apache.http.protocol",
-      "org.apache.http.ssl",
-      "org.apache.http.util"
     ],
     "org.apiguardian:apiguardian-api": ["org.apiguardian.api"],
     "org.assertj:assertj-core": [
@@ -2837,16 +2548,25 @@
       "org.testcontainers.shaded.org.zeroturnaround.exec.stream.slf4j",
       "org.testcontainers.utility"
     ],
+    "software.amazon.awssdk.crt:aws-crt": [
+      "software.amazon.awssdk.crt",
+      "software.amazon.awssdk.crt.auth.credentials",
+      "software.amazon.awssdk.crt.auth.signing",
+      "software.amazon.awssdk.crt.cal",
+      "software.amazon.awssdk.crt.checksums",
+      "software.amazon.awssdk.crt.eventstream",
+      "software.amazon.awssdk.crt.http",
+      "software.amazon.awssdk.crt.internal",
+      "software.amazon.awssdk.crt.io",
+      "software.amazon.awssdk.crt.iot",
+      "software.amazon.awssdk.crt.mqtt",
+      "software.amazon.awssdk.crt.mqtt5",
+      "software.amazon.awssdk.crt.mqtt5.packets",
+      "software.amazon.awssdk.crt.s3",
+      "software.amazon.awssdk.crt.utils"
+    ],
     "software.amazon.awssdk:annotations": [
       "software.amazon.awssdk.annotations"
-    ],
-    "software.amazon.awssdk:apache-client": [
-      "software.amazon.awssdk.http.apache",
-      "software.amazon.awssdk.http.apache.internal",
-      "software.amazon.awssdk.http.apache.internal.conn",
-      "software.amazon.awssdk.http.apache.internal.impl",
-      "software.amazon.awssdk.http.apache.internal.net",
-      "software.amazon.awssdk.http.apache.internal.utils"
     ],
     "software.amazon.awssdk:arns": ["software.amazon.awssdk.arns"],
     "software.amazon.awssdk:auth": [
@@ -2888,6 +2608,12 @@
       "software.amazon.awssdk.awscore.retry",
       "software.amazon.awssdk.awscore.retry.conditions",
       "software.amazon.awssdk.awscore.util"
+    ],
+    "software.amazon.awssdk:aws-crt-client": [
+      "software.amazon.awssdk.http.crt",
+      "software.amazon.awssdk.http.crt.internal",
+      "software.amazon.awssdk.http.crt.internal.request",
+      "software.amazon.awssdk.http.crt.internal.response"
     ],
     "software.amazon.awssdk:aws-json-protocol": [
       "software.amazon.awssdk.protocols.json",
@@ -3026,13 +2752,6 @@
     "software.amazon.awssdk:metrics-spi": [
       "software.amazon.awssdk.metrics",
       "software.amazon.awssdk.metrics.internal"
-    ],
-    "software.amazon.awssdk:netty-nio-client": [
-      "software.amazon.awssdk.http.nio.netty",
-      "software.amazon.awssdk.http.nio.netty.internal",
-      "software.amazon.awssdk.http.nio.netty.internal.http2",
-      "software.amazon.awssdk.http.nio.netty.internal.nrs",
-      "software.amazon.awssdk.http.nio.netty.internal.utils"
     ],
     "software.amazon.awssdk:profiles": [
       "software.amazon.awssdk.profiles",
@@ -3256,17 +2975,6 @@
       "com.squareup:kotlinpoet",
       "commons-codec:commons-codec",
       "commons-io:commons-io",
-      "commons-logging:commons-logging",
-      "io.netty:netty-buffer",
-      "io.netty:netty-codec",
-      "io.netty:netty-codec-http",
-      "io.netty:netty-codec-http2",
-      "io.netty:netty-common",
-      "io.netty:netty-handler",
-      "io.netty:netty-resolver",
-      "io.netty:netty-transport",
-      "io.netty:netty-transport-classes-epoll",
-      "io.netty:netty-transport-native-unix-common",
       "jakarta.inject:jakarta.inject-api",
       "javax.inject:javax.inject",
       "joda-time:joda-time",
@@ -3277,8 +2985,6 @@
       "net.sf.biweekly:biweekly",
       "org.apache.commons:commons-compress",
       "org.apache.commons:commons-lang3",
-      "org.apache.httpcomponents:httpclient",
-      "org.apache.httpcomponents:httpcore",
       "org.apiguardian:apiguardian-api",
       "org.assertj:assertj-core",
       "org.checkerframework:checker-compat-qual",
@@ -3306,11 +3012,12 @@
       "org.slf4j:slf4j-api",
       "org.testcontainers:junit-jupiter",
       "org.testcontainers:testcontainers",
+      "software.amazon.awssdk.crt:aws-crt",
       "software.amazon.awssdk:annotations",
-      "software.amazon.awssdk:apache-client",
       "software.amazon.awssdk:arns",
       "software.amazon.awssdk:auth",
       "software.amazon.awssdk:aws-core",
+      "software.amazon.awssdk:aws-crt-client",
       "software.amazon.awssdk:aws-json-protocol",
       "software.amazon.awssdk:aws-query-protocol",
       "software.amazon.awssdk:aws-xml-protocol",
@@ -3330,7 +3037,6 @@
       "software.amazon.awssdk:json-utils",
       "software.amazon.awssdk:lambda",
       "software.amazon.awssdk:metrics-spi",
-      "software.amazon.awssdk:netty-nio-client",
       "software.amazon.awssdk:profiles",
       "software.amazon.awssdk:protocol-core",
       "software.amazon.awssdk:regions",
@@ -3380,11 +3086,6 @@
       ],
       "javax.tools.Tool": [
         "com.google.googlejavaformat.java.GoogleJavaFormatTool"
-      ]
-    },
-    "io.netty:netty-common": {
-      "reactor.blockhound.integration.BlockHoundIntegration": [
-        "io.netty.util.internal.Hidden$NettyBlockHoundIntegration"
       ]
     },
     "org.jetbrains.kotlin:kotlin-metadata-jvm": {
@@ -3454,14 +3155,12 @@
         "org.testcontainers.shaded.com.fasterxml.jackson.databind.ObjectMapper"
       ]
     },
-    "software.amazon.awssdk:apache-client": {
+    "software.amazon.awssdk:aws-crt-client": {
       "software.amazon.awssdk.http.SdkHttpService": [
-        "software.amazon.awssdk.http.apache.ApacheSdkHttpService"
-      ]
-    },
-    "software.amazon.awssdk:netty-nio-client": {
+        "software.amazon.awssdk.http.crt.AwsCrtSdkHttpService"
+      ],
       "software.amazon.awssdk.http.async.SdkAsyncHttpService": [
-        "software.amazon.awssdk.http.nio.netty.NettySdkAsyncHttpService"
+        "software.amazon.awssdk.http.crt.AwsCrtSdkHttpService"
       ]
     },
     "software.amazon.awssdk:third-party-jackson-core": {

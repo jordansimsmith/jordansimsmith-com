@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.Network;
+import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -91,6 +92,7 @@ public class PriceTrackerE2ETest {
         InvokeRequest.builder()
             .functionName("update_prices_handler")
             .invocationType(InvocationType.REQUEST_RESPONSE)
+            .payload(SdkBytes.fromUtf8String("{}"))
             .build();
     var lambdaResponse = lambdaClient.invoke(request);
     assertThat(lambdaResponse.statusCode()).isEqualTo(200);
@@ -146,6 +148,7 @@ public class PriceTrackerE2ETest {
         InvokeRequest.builder()
             .functionName("update_prices_handler")
             .invocationType(InvocationType.REQUEST_RESPONSE)
+            .payload(SdkBytes.fromUtf8String("{}"))
             .build();
     var lambdaResponse = lambdaClient.invoke(request);
     assertThat(lambdaResponse.statusCode()).isEqualTo(200);
@@ -202,6 +205,7 @@ public class PriceTrackerE2ETest {
         InvokeRequest.builder()
             .functionName("update_prices_handler")
             .invocationType(InvocationType.REQUEST_RESPONSE)
+            .payload(SdkBytes.fromUtf8String("{}"))
             .build();
     var lambdaResponse = lambdaClient.invoke(request);
     assertThat(lambdaResponse.statusCode()).isEqualTo(200);

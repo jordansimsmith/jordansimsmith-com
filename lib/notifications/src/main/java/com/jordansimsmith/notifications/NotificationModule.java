@@ -3,6 +3,7 @@ package com.jordansimsmith.notifications;
 import dagger.Module;
 import dagger.Provides;
 import javax.inject.Singleton;
+import software.amazon.awssdk.http.crt.AwsCrtHttpClient;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.sns.SnsClient;
 
@@ -11,7 +12,11 @@ public class NotificationModule {
   @Provides
   @Singleton
   NotificationPublisher notificationPublisher() {
-    var snsClient = SnsClient.builder().region(Region.of(System.getenv("AWS_REGION"))).build();
+    var snsClient =
+        SnsClient.builder()
+            .region(Region.of(System.getenv("AWS_REGION")))
+            .httpClientBuilder(AwsCrtHttpClient.builder())
+            .build();
     // prime the snapshot to optimise cold start times
     snsClient.listTopics();
     return new SnsNotificationPublisher(snsClient);

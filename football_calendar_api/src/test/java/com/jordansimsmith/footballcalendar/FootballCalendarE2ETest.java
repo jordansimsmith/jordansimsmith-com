@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.Network;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -79,6 +80,7 @@ public class FootballCalendarE2ETest {
         InvokeRequest.builder()
             .functionName("update_fixtures_handler")
             .invocationType(InvocationType.REQUEST_RESPONSE)
+            .payload(SdkBytes.fromUtf8String("{}"))
             .build();
     var updateResponse = lambdaClient.invoke(updateRequest);
     assertThat(updateResponse.statusCode()).isEqualTo(200);
@@ -91,6 +93,7 @@ public class FootballCalendarE2ETest {
         InvokeRequest.builder()
             .functionName("get_calendar_subscription_handler")
             .invocationType(InvocationType.REQUEST_RESPONSE)
+            .payload(SdkBytes.fromUtf8String("{}"))
             .build();
     var subscriptionResponse = lambdaClient.invoke(subscriptionRequest);
     assertThat(subscriptionResponse.statusCode()).isEqualTo(200);
@@ -166,6 +169,7 @@ public class FootballCalendarE2ETest {
         InvokeRequest.builder()
             .functionName("update_fixtures_handler")
             .invocationType(InvocationType.REQUEST_RESPONSE)
+            .payload(SdkBytes.fromUtf8String("{}"))
             .build();
     var updateResponse = lambdaClient.invoke(updateRequest);
     assertThat(updateResponse.statusCode()).isEqualTo(200);

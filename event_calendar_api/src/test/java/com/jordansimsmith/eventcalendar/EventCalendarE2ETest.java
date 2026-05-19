@@ -10,6 +10,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.Network;
+import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.lambda.LambdaClient;
 import software.amazon.awssdk.services.lambda.model.InvocationType;
@@ -69,6 +70,7 @@ public class EventCalendarE2ETest {
         InvokeRequest.builder()
             .functionName("update_events_handler")
             .invocationType(InvocationType.REQUEST_RESPONSE)
+            .payload(SdkBytes.fromUtf8String("{}"))
             .build();
     var updateResponse = lambdaClient.invoke(updateRequest);
     assertThat(updateResponse.statusCode()).isEqualTo(200);
@@ -81,6 +83,7 @@ public class EventCalendarE2ETest {
         InvokeRequest.builder()
             .functionName("get_calendar_subscription_handler")
             .invocationType(InvocationType.REQUEST_RESPONSE)
+            .payload(SdkBytes.fromUtf8String("{}"))
             .build();
     var subscriptionResponse = lambdaClient.invoke(subscriptionRequest);
     assertThat(subscriptionResponse.statusCode()).isEqualTo(200);
