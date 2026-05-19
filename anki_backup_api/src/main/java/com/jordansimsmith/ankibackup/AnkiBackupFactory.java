@@ -8,6 +8,7 @@ import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.http.RequestContextModule;
 import com.jordansimsmith.json.ObjectMapperModule;
+import com.jordansimsmith.s3.S3Module;
 import com.jordansimsmith.secrets.Secrets;
 import com.jordansimsmith.secrets.SecretsModule;
 import com.jordansimsmith.time.Clock;
@@ -27,6 +28,7 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
       DynamoDbModule.class,
       RequestContextModule.class,
       AuthModule.class,
+      S3Module.class,
       AnkiBackupModule.class
     })
 public interface AnkiBackupFactory {

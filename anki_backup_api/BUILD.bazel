@@ -33,6 +33,7 @@ java_library(
         "//lib/dynamodb:lib",
         "//lib/http:lib",
         "//lib/json:lib",
+        "//lib/s3:lib",
         "//lib/secrets:lib",
         "//lib/time:lib",
         "//third_party/dagger",
@@ -42,7 +43,6 @@ java_library(
         "@maven//:com_google_guava_guava",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-        "@maven//:software_amazon_awssdk_regions",
         "@maven//:software_amazon_awssdk_s3",
     ],
 )

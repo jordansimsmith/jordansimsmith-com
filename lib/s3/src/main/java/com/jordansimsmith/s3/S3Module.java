@@ -1,0 +1,37 @@
+package com.jordansimsmith.s3;
+
+import dagger.Module;
+import dagger.Provides;
+import java.net.URI;
+import javax.inject.Singleton;
+import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+
+@Module
+public class S3Module {
+  @Provides
+  @Singleton
+  S3Client s3Client() {
+    var client = S3Client.builder().forcePathStyle(true).build();
+    // prime the snapshot to optimise cold start times
+    client.listBuckets();
+    return client;
+  }
+
+  @Provides
+  @Singleton
+  S3Presigner s3Presigner() {
+    // S3Presigner does not auto-detect AWS_ENDPOINT_URL unlike S3Client
+    var builder = S3Presigner.builder();
+    var endpointUrl = System.getenv("AWS_ENDPOINT_URL");
+    if (endpointUrl != null && !endpointUrl.isBlank()) {
+      builder
+          .endpointOverride(URI.create(endpointUrl))
+          .region(Region.of(System.getenv("AWS_REGION")))
+          .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build());
+    }
+    return builder.build();
+  }
+}
