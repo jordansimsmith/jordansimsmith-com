@@ -193,6 +193,11 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+resource "aws_iam_role_policy_attachment" "lambda_xray" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
+}
+
 data "aws_iam_policy_document" "lambda_secretsmanager_allow_policy_document" {
   statement {
     effect = "Allow"
@@ -248,6 +253,10 @@ resource "aws_lambda_function" "lambda" {
 
   snap_start {
     apply_on = "PublishedVersions"
+  }
+
+  tracing_config {
+    mode = "Active"
   }
 }
 
@@ -428,9 +437,10 @@ resource "aws_api_gateway_deployment" "immersion_tracker" {
 }
 
 resource "aws_api_gateway_stage" "prod" {
-  deployment_id = aws_api_gateway_deployment.immersion_tracker.id
-  rest_api_id   = aws_api_gateway_rest_api.immersion_tracker.id
-  stage_name    = "prod"
+  deployment_id        = aws_api_gateway_deployment.immersion_tracker.id
+  rest_api_id          = aws_api_gateway_rest_api.immersion_tracker.id
+  stage_name           = "prod"
+  xray_tracing_enabled = true
 }
 
 resource "aws_acm_certificate" "immersion_tracker" {

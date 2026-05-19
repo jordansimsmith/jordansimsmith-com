@@ -142,6 +142,11 @@ resource "aws_iam_role_policy_attachment" "lambda_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
+resource "aws_iam_role_policy_attachment" "lambda_xray" {
+  role       = aws_iam_role.lambda_role.name
+  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
+}
+
 resource "aws_sns_topic" "fixture_updates" {
   name = "${local.application_id}_fixture_updates"
 }
@@ -206,6 +211,10 @@ resource "aws_lambda_function" "lambda" {
 
   snap_start {
     apply_on = "PublishedVersions"
+  }
+
+  tracing_config {
+    mode = "Active"
   }
 }
 
@@ -299,9 +308,10 @@ resource "aws_api_gateway_deployment" "football_calendar" {
 }
 
 resource "aws_api_gateway_stage" "prod" {
-  deployment_id = aws_api_gateway_deployment.football_calendar.id
-  rest_api_id   = aws_api_gateway_rest_api.football_calendar.id
-  stage_name    = "prod"
+  deployment_id        = aws_api_gateway_deployment.football_calendar.id
+  rest_api_id          = aws_api_gateway_rest_api.football_calendar.id
+  stage_name           = "prod"
+  xray_tracing_enabled = true
 }
 
 resource "aws_acm_certificate" "football_calendar" {
