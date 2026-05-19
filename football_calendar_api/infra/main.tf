@@ -202,6 +202,11 @@ resource "aws_lambda_function" "lambda" {
   memory_size      = 1024
   timeout          = 30
   architectures    = ["x86_64"]
+  publish          = true
+
+  snap_start {
+    apply_on = "PublishedVersions"
+  }
 }
 
 resource "aws_cloudwatch_event_rule" "update_fixtures" {
@@ -213,15 +218,20 @@ resource "aws_cloudwatch_event_rule" "update_fixtures" {
 resource "aws_cloudwatch_event_target" "update_fixtures_lambda" {
   rule      = aws_cloudwatch_event_rule.update_fixtures.name
   target_id = "UpdateFixturesHandler"
-  arn       = aws_lambda_function.lambda["update_fixtures"].arn
+  arn       = aws_lambda_function.lambda["update_fixtures"].qualified_arn
 }
 
 resource "aws_lambda_permission" "allow_eventbridge" {
   statement_id  = "AllowEventBridgeInvoke"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.lambda["update_fixtures"].function_name
+  qualifier     = aws_lambda_function.lambda["update_fixtures"].version
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.update_fixtures.arn
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 
@@ -231,8 +241,13 @@ resource "aws_lambda_permission" "api_gateway" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.lambda[each.key].function_name
+  qualifier     = aws_lambda_function.lambda[each.key].version
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.football_calendar.execution_arn}/*/*"
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_api_gateway_rest_api" "football_calendar" {
@@ -264,7 +279,7 @@ resource "aws_api_gateway_integration" "integration" {
   http_method             = aws_api_gateway_method.method[each.key].http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.lambda[each.key].invoke_arn
+  uri                     = aws_lambda_function.lambda[each.key].qualified_invoke_arn
 }
 
 resource "aws_api_gateway_deployment" "football_calendar" {

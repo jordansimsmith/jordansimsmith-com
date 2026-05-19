@@ -179,6 +179,11 @@ resource "aws_lambda_function" "lambda" {
   memory_size      = 1024
   timeout          = 120
   architectures    = ["x86_64"]
+  publish          = true
+
+  snap_start {
+    apply_on = "PublishedVersions"
+  }
 }
 
 resource "aws_cloudwatch_event_rule" "update_prices" {
@@ -190,13 +195,18 @@ resource "aws_cloudwatch_event_rule" "update_prices" {
 resource "aws_cloudwatch_event_target" "trigger" {
   rule      = aws_cloudwatch_event_rule.update_prices.name
   target_id = "lambda"
-  arn       = aws_lambda_function.lambda["update_prices"].arn
+  arn       = aws_lambda_function.lambda["update_prices"].qualified_arn
 }
 
 resource "aws_lambda_permission" "cloudwatch_trigger" {
   statement_id  = "AllowExecutionFromCloudWatch"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.lambda["update_prices"].function_name
+  qualifier     = aws_lambda_function.lambda["update_prices"].version
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.update_prices.arn
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }

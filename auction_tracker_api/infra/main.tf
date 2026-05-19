@@ -213,6 +213,11 @@ resource "aws_lambda_function" "lambda" {
   memory_size      = 1024
   timeout          = each.value.timeout
   architectures    = ["x86_64"]
+  publish          = true
+
+  snap_start {
+    apply_on = "PublishedVersions"
+  }
 }
 
 resource "aws_cloudwatch_event_rule" "update_items" {
@@ -224,15 +229,20 @@ resource "aws_cloudwatch_event_rule" "update_items" {
 resource "aws_cloudwatch_event_target" "update_items_lambda" {
   rule      = aws_cloudwatch_event_rule.update_items.name
   target_id = "UpdateItemsHandler"
-  arn       = aws_lambda_function.lambda["update_items_handler"].arn
+  arn       = aws_lambda_function.lambda["update_items_handler"].qualified_arn
 }
 
 resource "aws_lambda_permission" "allow_eventbridge_update_items" {
   statement_id  = "AllowEventBridgeInvokeUpdateItems"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.lambda["update_items_handler"].function_name
+  qualifier     = aws_lambda_function.lambda["update_items_handler"].version
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.update_items.arn
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_cloudwatch_event_rule" "send_digest" {
@@ -244,13 +254,18 @@ resource "aws_cloudwatch_event_rule" "send_digest" {
 resource "aws_cloudwatch_event_target" "send_digest_lambda" {
   rule      = aws_cloudwatch_event_rule.send_digest.name
   target_id = "SendDigestHandler"
-  arn       = aws_lambda_function.lambda["send_digest_handler"].arn
+  arn       = aws_lambda_function.lambda["send_digest_handler"].qualified_arn
 }
 
 resource "aws_lambda_permission" "allow_eventbridge_send_digest" {
   statement_id  = "AllowEventBridgeInvokeSendDigest"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.lambda["send_digest_handler"].function_name
+  qualifier     = aws_lambda_function.lambda["send_digest_handler"].version
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.send_digest.arn
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }

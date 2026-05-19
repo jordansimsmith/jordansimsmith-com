@@ -155,6 +155,11 @@ resource "aws_lambda_function" "lambda" {
   memory_size      = 1024
   timeout          = each.value.timeout
   architectures    = ["x86_64"]
+  publish          = true
+
+  snap_start {
+    apply_on = "PublishedVersions"
+  }
 }
 
 resource "aws_cloudwatch_event_rule" "update_events" {
@@ -166,15 +171,20 @@ resource "aws_cloudwatch_event_rule" "update_events" {
 resource "aws_cloudwatch_event_target" "update_events_lambda" {
   rule      = aws_cloudwatch_event_rule.update_events.name
   target_id = "UpdateEventsHandler"
-  arn       = aws_lambda_function.lambda["update_events"].arn
+  arn       = aws_lambda_function.lambda["update_events"].qualified_arn
 }
 
 resource "aws_lambda_permission" "allow_eventbridge" {
   statement_id  = "AllowEventBridgeInvoke"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.lambda["update_events"].function_name
+  qualifier     = aws_lambda_function.lambda["update_events"].version
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.update_events.arn
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 
@@ -184,8 +194,13 @@ resource "aws_lambda_permission" "api_gateway" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.lambda[each.key].function_name
+  qualifier     = aws_lambda_function.lambda[each.key].version
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.event_calendar.execution_arn}/*/*"
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_api_gateway_rest_api" "event_calendar" {
@@ -217,7 +232,7 @@ resource "aws_api_gateway_integration" "integration" {
   http_method             = aws_api_gateway_method.method[each.key].http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.lambda[each.key].invoke_arn
+  uri                     = aws_lambda_function.lambda[each.key].qualified_invoke_arn
 }
 
 resource "aws_api_gateway_deployment" "event_calendar" {

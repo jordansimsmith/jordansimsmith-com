@@ -179,6 +179,11 @@ resource "aws_lambda_function" "lambda" {
   memory_size      = 1024
   timeout          = 30
   architectures    = ["x86_64"]
+  publish          = true
+
+  snap_start {
+    apply_on = "PublishedVersions"
+  }
 }
 
 resource "aws_cloudwatch_event_rule" "update_page_content" {
@@ -190,13 +195,18 @@ resource "aws_cloudwatch_event_rule" "update_page_content" {
 resource "aws_cloudwatch_event_target" "trigger" {
   rule      = aws_cloudwatch_event_rule.update_page_content.name
   target_id = "lambda"
-  arn       = aws_lambda_function.lambda["update_page_content"].arn
+  arn       = aws_lambda_function.lambda["update_page_content"].qualified_arn
 }
 
 resource "aws_lambda_permission" "cloudwatch_trigger" {
   statement_id  = "AllowExecutionFromCloudWatch"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.lambda["update_page_content"].function_name
+  qualifier     = aws_lambda_function.lambda["update_page_content"].version
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.update_page_content.arn
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }

@@ -281,6 +281,11 @@ resource "aws_lambda_function" "lambda" {
   memory_size      = 512
   timeout          = 10
   architectures    = ["x86_64"]
+  publish          = true
+
+  snap_start {
+    apply_on = "PublishedVersions"
+  }
 }
 
 resource "aws_lambda_permission" "api_gateway" {
@@ -289,8 +294,13 @@ resource "aws_lambda_permission" "api_gateway" {
   statement_id  = "AllowAPIGatewayInvoke"
   action        = "lambda:InvokeFunction"
   function_name = aws_lambda_function.lambda[each.key].function_name
+  qualifier     = aws_lambda_function.lambda[each.key].version
   principal     = "apigateway.amazonaws.com"
   source_arn    = "${aws_api_gateway_rest_api.packing_list.execution_arn}/*/*"
+
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_api_gateway_rest_api" "packing_list" {
@@ -300,7 +310,7 @@ resource "aws_api_gateway_rest_api" "packing_list" {
 resource "aws_api_gateway_authorizer" "packing_list" {
   name                             = "${local.application_id}_authorizer"
   rest_api_id                      = aws_api_gateway_rest_api.packing_list.id
-  authorizer_uri                   = aws_lambda_function.lambda["auth"].invoke_arn
+  authorizer_uri                   = aws_lambda_function.lambda["auth"].qualified_invoke_arn
   type                             = "REQUEST"
   identity_source                  = "method.request.header.Authorization"
   authorizer_result_ttl_in_seconds = 0
@@ -354,7 +364,7 @@ resource "aws_api_gateway_integration" "integration" {
   http_method             = aws_api_gateway_method.method[each.key].http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.lambda[each.value.lambda].invoke_arn
+  uri                     = aws_lambda_function.lambda[each.value.lambda].qualified_invoke_arn
 }
 
 resource "aws_api_gateway_method" "options" {
