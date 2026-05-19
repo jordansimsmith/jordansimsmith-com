@@ -32,7 +32,10 @@ public class AnkiBackupModule {
   @Provides
   @Singleton
   S3Client s3Client() {
-    return S3Client.builder().forcePathStyle(true).build();
+    var client = S3Client.builder().forcePathStyle(true).build();
+    // prime the snapshot to optimise cold start times
+    client.listBuckets();
+    return client;
   }
 
   @Provides

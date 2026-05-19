@@ -238,6 +238,12 @@ data "aws_iam_policy_document" "lambda_dynamodb_allow_policy_document" {
       "dynamodb:Query",
     ]
   }
+
+  statement {
+    effect    = "Allow"
+    resources = ["*"]
+    actions   = ["dynamodb:ListTables"]
+  }
 }
 
 resource "aws_iam_policy" "lambda_dynamodb" {
@@ -303,6 +309,12 @@ data "aws_iam_policy_document" "lambda_s3_allow_policy_document" {
       "s3:AbortMultipartUpload",
       "s3:ListMultipartUploadParts",
     ]
+  }
+
+  statement {
+    effect    = "Allow"
+    resources = ["*"]
+    actions   = ["s3:ListAllMyBuckets"]
   }
 }
 

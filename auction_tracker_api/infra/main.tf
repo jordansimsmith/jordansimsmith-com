@@ -184,6 +184,13 @@ data "aws_iam_policy_document" "lambda_permissions_policy_document" {
 
     resources = ["*"]
   }
+
+  statement {
+    sid       = "DynamoDBListTables"
+    effect    = "Allow"
+    actions   = ["dynamodb:ListTables"]
+    resources = ["*"]
+  }
 }
 
 resource "aws_iam_policy" "lambda_permissions" {

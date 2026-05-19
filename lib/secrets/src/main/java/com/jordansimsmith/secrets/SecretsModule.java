@@ -4,6 +4,7 @@ import dagger.Module;
 import dagger.Provides;
 import javax.inject.Singleton;
 import software.amazon.awssdk.services.secretsmanager.SecretsManagerClient;
+import software.amazon.awssdk.services.secretsmanager.model.ListSecretsRequest;
 
 @Module
 public class SecretsModule {
@@ -11,7 +12,9 @@ public class SecretsModule {
   @Provides
   @Singleton
   Secrets secrets() {
-    var secretsManger = SecretsManagerClient.builder().build();
-    return new SecretsManagerSecrets(secretsManger);
+    var secretsManager = SecretsManagerClient.builder().build();
+    // prime the snapshot to optimise cold start times
+    secretsManager.listSecrets(ListSecretsRequest.builder().maxResults(1).build());
+    return new SecretsManagerSecrets(secretsManager);
   }
 }

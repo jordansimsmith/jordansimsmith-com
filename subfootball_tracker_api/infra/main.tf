@@ -112,6 +112,12 @@ data "aws_iam_policy_document" "lambda_dynamodb" {
       "dynamodb:ConditionCheckItem",
     ]
   }
+
+  statement {
+    effect    = "Allow"
+    resources = ["*"]
+    actions   = ["dynamodb:ListTables"]
+  }
 }
 
 resource "aws_iam_policy" "lambda_dynamodb" {

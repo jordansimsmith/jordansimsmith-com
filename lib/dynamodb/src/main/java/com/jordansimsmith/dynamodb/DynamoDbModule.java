@@ -5,13 +5,17 @@ import dagger.Provides;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.ListTablesRequest;
 
 @Module
 public class DynamoDbModule {
   @Provides
   @Singleton
   DynamoDbClient dynamoDbClient() {
-    return DynamoDbClient.builder().build();
+    var client = DynamoDbClient.builder().build();
+    // prime the snapshot to optimise cold start times
+    client.listTables(ListTablesRequest.builder().limit(1).build());
+    return client;
   }
 
   @Provides

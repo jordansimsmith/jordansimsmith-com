@@ -11,6 +11,8 @@ public class NotificationModule {
   @Singleton
   NotificationPublisher notificationPublisher() {
     var snsClient = SnsClient.builder().build();
+    // prime the snapshot to optimise cold start times
+    snsClient.listTopics();
     return new SnsNotificationPublisher(snsClient);
   }
 }
