@@ -289,7 +289,32 @@ resource "aws_api_gateway_gateway_response" "unauthorized" {
   }
 
   response_parameters = {
-    "gatewayresponse.header.WWW-Authenticate" = "'Basic'"
+    "gatewayresponse.header.WWW-Authenticate"             = "'Basic'"
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${local.cors_origins[0]}'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Authorization,Content-Type'"
+    "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,OPTIONS'"
+  }
+}
+
+resource "aws_api_gateway_gateway_response" "default_4xx" {
+  rest_api_id   = aws_api_gateway_rest_api.immersion_tracker.id
+  response_type = "DEFAULT_4XX"
+
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${local.cors_origins[0]}'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Authorization,Content-Type'"
+    "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,OPTIONS'"
+  }
+}
+
+resource "aws_api_gateway_gateway_response" "default_5xx" {
+  rest_api_id   = aws_api_gateway_rest_api.immersion_tracker.id
+  response_type = "DEFAULT_5XX"
+
+  response_parameters = {
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${local.cors_origins[0]}'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Authorization,Content-Type'"
+    "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,OPTIONS'"
   }
 }
 
@@ -385,6 +410,8 @@ resource "aws_api_gateway_deployment" "immersion_tracker" {
     redeployment = sha1(jsonencode([
       aws_api_gateway_authorizer.immersion_tracker,
       aws_api_gateway_gateway_response.unauthorized,
+      aws_api_gateway_gateway_response.default_4xx,
+      aws_api_gateway_gateway_response.default_5xx,
       aws_api_gateway_resource.resource,
       aws_api_gateway_method.method,
       aws_api_gateway_integration.integration,
