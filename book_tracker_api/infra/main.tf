@@ -42,84 +42,52 @@ variable "artifacts" {
 
 locals {
   application_id = "book_tracker_api"
-  cors_origins   = ["https://book-tracker.jordansimsmith.com"]
+}
+
+module "java_api" {
+  source = "../../infra/modules/java_api"
+
+  application_id = local.application_id
+  domain_name    = "api.book-tracker.jordansimsmith.com"
+  cors_origin    = "https://book-tracker.jordansimsmith.com"
 
   lambdas = {
     auth = {
-      target  = "//book_tracker_api:auth-handler_deploy.jar"
-      handler = "com.jordansimsmith.booktracker.AuthHandler"
+      handler  = "com.jordansimsmith.booktracker.AuthHandler"
+      artifact = var.artifacts["auth"]
     }
     create_book = {
-      target  = "//book_tracker_api:create-book-handler_deploy.jar"
-      handler = "com.jordansimsmith.booktracker.CreateBookHandler"
+      handler  = "com.jordansimsmith.booktracker.CreateBookHandler"
+      artifact = var.artifacts["create_book"]
     }
     find_books = {
-      target  = "//book_tracker_api:find-books-handler_deploy.jar"
-      handler = "com.jordansimsmith.booktracker.FindBooksHandler"
+      handler  = "com.jordansimsmith.booktracker.FindBooksHandler"
+      artifact = var.artifacts["find_books"]
     }
     get_book = {
-      target  = "//book_tracker_api:get-book-handler_deploy.jar"
-      handler = "com.jordansimsmith.booktracker.GetBookHandler"
+      handler  = "com.jordansimsmith.booktracker.GetBookHandler"
+      artifact = var.artifacts["get_book"]
     }
     update_book = {
-      target  = "//book_tracker_api:update-book-handler_deploy.jar"
-      handler = "com.jordansimsmith.booktracker.UpdateBookHandler"
+      handler  = "com.jordansimsmith.booktracker.UpdateBookHandler"
+      artifact = var.artifacts["update_book"]
     }
     delete_book = {
-      target  = "//book_tracker_api:delete-book-handler_deploy.jar"
-      handler = "com.jordansimsmith.booktracker.DeleteBookHandler"
+      handler  = "com.jordansimsmith.booktracker.DeleteBookHandler"
+      artifact = var.artifacts["delete_book"]
     }
   }
 
-  root_resources = {
-    books = { path = "books" }
-  }
-
-  child_resources = {
-    book = { path = "{open_library_work_id}", parent = "books" }
-  }
-
-  all_resources = merge(local.root_resources, local.child_resources)
-
   endpoints = {
-    create_book = { resource = "books", method = "POST", lambda = "create_book" }
-    find_books  = { resource = "books", method = "GET", lambda = "find_books" }
-    get_book    = { resource = "book", method = "GET", lambda = "get_book" }
-    update_book = { resource = "book", method = "PUT", lambda = "update_book" }
-    delete_book = { resource = "book", method = "DELETE", lambda = "delete_book" }
+    create_book = { path = "books", method = "POST", lambda = "create_book" }
+    find_books  = { path = "books", method = "GET", lambda = "find_books" }
+    get_book    = { path = "books/{open_library_work_id}", method = "GET", lambda = "get_book" }
+    update_book = { path = "books/{open_library_work_id}", method = "PUT", lambda = "update_book" }
+    delete_book = { path = "books/{open_library_work_id}", method = "DELETE", lambda = "delete_book" }
   }
 
-  all_resource_ids = merge(
-    { for k, v in aws_api_gateway_resource.root_resource : k => v.id },
-    { for k, v in aws_api_gateway_resource.child_resource : k => v.id }
-  )
-}
-
-check "unique_resource_paths" {
-  assert {
-    condition     = length(local.all_resources) == length(distinct([for r in local.all_resources : r.path]))
-    error_message = "Resource paths must be unique"
-  }
-}
-
-check "valid_endpoint_resources" {
-  assert {
-    condition     = alltrue([for e in local.endpoints : contains(keys(local.all_resources), e.resource)])
-    error_message = "All endpoint resources must reference a valid resource key"
-  }
-}
-
-check "valid_child_resource_parents" {
-  assert {
-    condition     = alltrue([for r in local.child_resources : contains(keys(local.root_resources), r.parent)])
-    error_message = "All child resource parents must reference a valid root resource key"
-  }
-}
-
-check "valid_endpoint_lambdas" {
-  assert {
-    condition     = alltrue([for e in local.endpoints : contains(keys(local.lambdas), e.lambda)])
-    error_message = "All endpoint lambdas must reference a valid lambda key"
+  providers = {
+    aws.us_east_1 = aws.us_east_1
   }
 }
 
@@ -168,34 +136,6 @@ resource "aws_dynamodb_table" "book_tracker" {
   deletion_protection_enabled = true
 }
 
-data "aws_iam_policy_document" "lambda_sts_allow_policy_document" {
-  statement {
-    effect = "Allow"
-
-    principals {
-      identifiers = ["lambda.amazonaws.com"]
-      type        = "Service"
-    }
-
-    actions = ["sts:AssumeRole"]
-  }
-}
-
-resource "aws_iam_role" "lambda_role" {
-  name               = "${local.application_id}_lambda_exec"
-  assume_role_policy = data.aws_iam_policy_document.lambda_sts_allow_policy_document.json
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_basic" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_xray" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
-}
-
 data "aws_iam_policy_document" "lambda_secretsmanager_allow_policy_document" {
   statement {
     effect = "Allow"
@@ -231,7 +171,7 @@ resource "aws_iam_policy" "lambda_secretsmanager" {
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_secretsmanager" {
-  role       = aws_iam_role.lambda_role.name
+  role       = module.java_api.lambda_role_name
   policy_arn = aws_iam_policy.lambda_secretsmanager.arn
 }
 
@@ -270,250 +210,6 @@ resource "aws_iam_policy" "lambda_dynamodb" {
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
-  role       = aws_iam_role.lambda_role.name
+  role       = module.java_api.lambda_role_name
   policy_arn = aws_iam_policy.lambda_dynamodb.arn
-}
-
-resource "aws_lambda_function" "lambda" {
-  for_each = local.lambdas
-
-  filename         = var.artifacts[each.key]
-  function_name    = "${local.application_id}_${each.key}"
-  role             = aws_iam_role.lambda_role.arn
-  source_code_hash = filebase64sha256(var.artifacts[each.key])
-  handler          = each.value.handler
-  runtime          = "java21"
-  memory_size      = 1769
-  timeout          = 10
-  architectures    = ["x86_64"]
-  publish          = true
-
-  snap_start {
-    apply_on = "PublishedVersions"
-  }
-
-  tracing_config {
-    mode = "Active"
-  }
-}
-
-resource "aws_lambda_permission" "api_gateway" {
-  for_each = local.lambdas
-
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.lambda[each.key].function_name
-  qualifier     = aws_lambda_function.lambda[each.key].version
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.book_tracker.execution_arn}/*/*"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_api_gateway_rest_api" "book_tracker" {
-  name = "${local.application_id}_gateway"
-}
-
-resource "aws_api_gateway_authorizer" "book_tracker" {
-  name                             = "${local.application_id}_authorizer"
-  rest_api_id                      = aws_api_gateway_rest_api.book_tracker.id
-  authorizer_uri                   = aws_lambda_function.lambda["auth"].qualified_invoke_arn
-  type                             = "REQUEST"
-  identity_source                  = "method.request.header.Authorization"
-  authorizer_result_ttl_in_seconds = 300
-}
-
-resource "aws_api_gateway_gateway_response" "unauthorized" {
-  rest_api_id   = aws_api_gateway_rest_api.book_tracker.id
-  status_code   = "401"
-  response_type = "UNAUTHORIZED"
-
-  response_templates = {
-    "application/json" = "{\"message\":$context.error.messageString}"
-  }
-
-  response_parameters = {
-    "gatewayresponse.header.WWW-Authenticate"             = "'Basic'"
-    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${local.cors_origins[0]}'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Authorization,Content-Type'"
-    "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
-  }
-}
-
-resource "aws_api_gateway_gateway_response" "default_4xx" {
-  rest_api_id   = aws_api_gateway_rest_api.book_tracker.id
-  response_type = "DEFAULT_4XX"
-
-  response_templates = {
-    "application/json" = "{\"message\":$context.error.messageString}"
-  }
-
-  response_parameters = {
-    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${local.cors_origins[0]}'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Authorization,Content-Type'"
-    "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
-  }
-}
-
-resource "aws_api_gateway_gateway_response" "default_5xx" {
-  rest_api_id   = aws_api_gateway_rest_api.book_tracker.id
-  response_type = "DEFAULT_5XX"
-
-  response_templates = {
-    "application/json" = "{\"message\":$context.error.messageString}"
-  }
-
-  response_parameters = {
-    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${local.cors_origins[0]}'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Authorization,Content-Type'"
-    "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
-  }
-}
-
-resource "aws_api_gateway_resource" "root_resource" {
-  for_each = local.root_resources
-
-  rest_api_id = aws_api_gateway_rest_api.book_tracker.id
-  parent_id   = aws_api_gateway_rest_api.book_tracker.root_resource_id
-  path_part   = each.value.path
-}
-
-resource "aws_api_gateway_resource" "child_resource" {
-  for_each = local.child_resources
-
-  rest_api_id = aws_api_gateway_rest_api.book_tracker.id
-  parent_id   = aws_api_gateway_resource.root_resource[each.value.parent].id
-  path_part   = each.value.path
-}
-
-resource "aws_api_gateway_method" "method" {
-  for_each = local.endpoints
-
-  rest_api_id   = aws_api_gateway_rest_api.book_tracker.id
-  resource_id   = local.all_resource_ids[each.value.resource]
-  http_method   = each.value.method
-  authorization = "CUSTOM"
-  authorizer_id = aws_api_gateway_authorizer.book_tracker.id
-}
-
-resource "aws_api_gateway_integration" "integration" {
-  for_each = local.endpoints
-
-  rest_api_id             = aws_api_gateway_rest_api.book_tracker.id
-  resource_id             = local.all_resource_ids[each.value.resource]
-  http_method             = aws_api_gateway_method.method[each.key].http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.lambda[each.value.lambda].qualified_invoke_arn
-}
-
-resource "aws_api_gateway_method" "options" {
-  for_each = local.all_resources
-
-  rest_api_id   = aws_api_gateway_rest_api.book_tracker.id
-  resource_id   = local.all_resource_ids[each.key]
-  http_method   = "OPTIONS"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "options" {
-  for_each = local.all_resources
-
-  rest_api_id = aws_api_gateway_rest_api.book_tracker.id
-  resource_id = local.all_resource_ids[each.key]
-  http_method = aws_api_gateway_method.options[each.key].http_method
-  type        = "MOCK"
-
-  request_templates = {
-    "application/json" = "{\"statusCode\": 200}"
-  }
-}
-
-resource "aws_api_gateway_method_response" "options" {
-  for_each = local.all_resources
-
-  rest_api_id = aws_api_gateway_rest_api.book_tracker.id
-  resource_id = local.all_resource_ids[each.key]
-  http_method = aws_api_gateway_method.options[each.key].http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Origin"  = true
-  }
-
-  response_models = {
-    "application/json" = "Empty"
-  }
-}
-
-resource "aws_api_gateway_integration_response" "options" {
-  for_each = local.all_resources
-
-  rest_api_id = aws_api_gateway_rest_api.book_tracker.id
-  resource_id = local.all_resource_ids[each.key]
-  http_method = aws_api_gateway_method.options[each.key].http_method
-  status_code = aws_api_gateway_method_response.options[each.key].status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Authorization,Content-Type'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'https://book-tracker.jordansimsmith.com'"
-  }
-}
-
-resource "aws_api_gateway_deployment" "book_tracker" {
-  rest_api_id = aws_api_gateway_rest_api.book_tracker.id
-
-  triggers = {
-    redeployment = sha1(jsonencode([
-      aws_api_gateway_authorizer.book_tracker,
-      aws_api_gateway_gateway_response.unauthorized,
-      aws_api_gateway_gateway_response.default_4xx,
-      aws_api_gateway_gateway_response.default_5xx,
-      aws_api_gateway_resource.root_resource,
-      aws_api_gateway_resource.child_resource,
-      aws_api_gateway_method.method,
-      aws_api_gateway_integration.integration,
-      aws_api_gateway_method.options,
-      aws_api_gateway_integration.options,
-      aws_api_gateway_method_response.options,
-      aws_api_gateway_integration_response.options,
-    ]))
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_api_gateway_stage" "prod" {
-  deployment_id        = aws_api_gateway_deployment.book_tracker.id
-  rest_api_id          = aws_api_gateway_rest_api.book_tracker.id
-  stage_name           = "prod"
-  xray_tracing_enabled = true
-}
-
-resource "aws_acm_certificate" "book_tracker" {
-  provider          = aws.us_east_1
-  domain_name       = "api.book-tracker.jordansimsmith.com"
-  validation_method = "DNS"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_api_gateway_domain_name" "book_tracker" {
-  domain_name     = aws_acm_certificate.book_tracker.domain_name
-  certificate_arn = aws_acm_certificate.book_tracker.arn
-}
-
-resource "aws_api_gateway_base_path_mapping" "book_tracker" {
-  api_id      = aws_api_gateway_rest_api.book_tracker.id
-  stage_name  = aws_api_gateway_stage.prod.stage_name
-  domain_name = aws_api_gateway_domain_name.book_tracker.domain_name
 }

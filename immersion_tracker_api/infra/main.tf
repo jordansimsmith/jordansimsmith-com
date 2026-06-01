@@ -42,72 +42,62 @@ variable "artifacts" {
 
 locals {
   application_id = "immersion_tracker_api"
-  cors_origins   = ["https://immersion-tracker.jordansimsmith.com"]
+}
+
+module "java_api" {
+  source = "../../infra/modules/java_api"
+
+  application_id = local.application_id
+  domain_name    = "api.immersion-tracker.jordansimsmith.com"
+  cors_origin    = "https://immersion-tracker.jordansimsmith.com"
 
   lambdas = {
     auth = {
-      target  = "//immersion_tracker_api:auth-handler_deploy.jar"
-      handler = "com.jordansimsmith.immersiontracker.AuthHandler"
+      handler  = "com.jordansimsmith.immersiontracker.AuthHandler"
+      artifact = var.artifacts["auth"]
     }
     get_progress = {
-      target  = "//immersion_tracker_api:get-progress-handler_deploy.jar"
-      handler = "com.jordansimsmith.immersiontracker.GetProgressHandler"
+      handler  = "com.jordansimsmith.immersiontracker.GetProgressHandler"
+      artifact = var.artifacts["get_progress"]
     }
     get_shows = {
-      target  = "//immersion_tracker_api:get-shows-handler_deploy.jar"
-      handler = "com.jordansimsmith.immersiontracker.GetShowsHandler"
+      handler  = "com.jordansimsmith.immersiontracker.GetShowsHandler"
+      artifact = var.artifacts["get_shows"]
     }
     sync_episodes = {
-      target  = "//immersion_tracker_api:sync-episodes-handler_deploy.jar"
-      handler = "com.jordansimsmith.immersiontracker.SyncEpisodesHandler"
+      handler  = "com.jordansimsmith.immersiontracker.SyncEpisodesHandler"
+      artifact = var.artifacts["sync_episodes"]
     }
     update_shows = {
-      target  = "//immersion_tracker_api:update-show-handler_deploy.jar"
-      handler = "com.jordansimsmith.immersiontracker.UpdateShowHandler"
+      handler  = "com.jordansimsmith.immersiontracker.UpdateShowHandler"
+      artifact = var.artifacts["update_shows"]
     }
     sync_youtube = {
-      target  = "//immersion_tracker_api:sync-youtube-handler_deploy.jar"
-      handler = "com.jordansimsmith.immersiontracker.SyncYoutubeHandler"
+      handler  = "com.jordansimsmith.immersiontracker.SyncYoutubeHandler"
+      artifact = var.artifacts["sync_youtube"]
     }
     sync_spotify = {
-      target  = "//immersion_tracker_api:sync-spotify-handler_deploy.jar"
-      handler = "com.jordansimsmith.immersiontracker.SyncSpotifyHandler"
+      handler  = "com.jordansimsmith.immersiontracker.SyncSpotifyHandler"
+      artifact = var.artifacts["sync_spotify"]
     }
     sync_movies = {
-      target  = "//immersion_tracker_api:sync-movies-handler_deploy.jar"
-      handler = "com.jordansimsmith.immersiontracker.SyncMoviesHandler"
+      handler  = "com.jordansimsmith.immersiontracker.SyncMoviesHandler"
+      artifact = var.artifacts["sync_movies"]
     }
   }
 
   endpoints = {
-    get_progress = {
-      path   = "progress"
-      method = "GET"
-    }
-    get_shows = {
-      path   = "shows"
-      method = "GET"
-    }
-    sync_episodes = {
-      path   = "sync"
-      method = "POST"
-    }
-    update_shows = {
-      path   = "show"
-      method = "PUT"
-    }
-    sync_youtube = {
-      path   = "syncyoutube"
-      method = "POST"
-    }
-    sync_spotify = {
-      path   = "syncspotify"
-      method = "POST"
-    }
-    sync_movies = {
-      path   = "syncmovies"
-      method = "POST"
-    }
+    get_progress  = { path = "progress", method = "GET", lambda = "get_progress" }
+    get_shows     = { path = "shows", method = "GET", lambda = "get_shows" }
+    sync_episodes = { path = "sync", method = "POST", lambda = "sync_episodes" }
+    update_shows  = { path = "show", method = "PUT", lambda = "update_shows" }
+    sync_youtube  = { path = "syncyoutube", method = "POST", lambda = "sync_youtube" }
+    sync_spotify  = { path = "syncspotify", method = "POST", lambda = "sync_spotify" }
+    sync_movies   = { path = "syncmovies", method = "POST", lambda = "sync_movies" }
+  }
+
+  providers = {
+    aws.us_east_1 = aws.us_east_1
   }
 }
 
@@ -137,24 +127,6 @@ resource "aws_dynamodb_table" "immersion_tracker_table" {
 resource "aws_secretsmanager_secret" "immersion_tracker" {
   name                    = local.application_id
   recovery_window_in_days = 0
-}
-
-data "aws_iam_policy_document" "lambda_sts_allow_policy_document" {
-  statement {
-    effect = "Allow"
-
-    principals {
-      identifiers = ["lambda.amazonaws.com"]
-      type        = "Service"
-    }
-
-    actions = ["sts:AssumeRole"]
-  }
-}
-
-resource "aws_iam_role" "lambda_role" {
-  name               = "${local.application_id}_lambda_exec"
-  assume_role_policy = data.aws_iam_policy_document.lambda_sts_allow_policy_document.json
 }
 
 data "aws_iam_policy_document" "lambda_dynamodb_allow_policy_document" {
@@ -190,18 +162,8 @@ resource "aws_iam_policy" "lambda_dynamodb" {
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
-  role       = aws_iam_role.lambda_role.name
+  role       = module.java_api.lambda_role_name
   policy_arn = aws_iam_policy.lambda_dynamodb.arn
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_basic" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_xray" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
 }
 
 data "aws_iam_policy_document" "lambda_secretsmanager_allow_policy_document" {
@@ -239,241 +201,6 @@ resource "aws_iam_policy" "lambda_secretsmanager" {
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_secretsmanager" {
-  role       = aws_iam_role.lambda_role.name
+  role       = module.java_api.lambda_role_name
   policy_arn = aws_iam_policy.lambda_secretsmanager.arn
-}
-
-resource "aws_lambda_function" "lambda" {
-  for_each = local.lambdas
-
-  filename         = var.artifacts[each.key]
-  function_name    = "${local.application_id}_${each.key}"
-  role             = aws_iam_role.lambda_role.arn
-  source_code_hash = filebase64sha256(var.artifacts[each.key])
-  handler          = each.value.handler
-  runtime          = "java21"
-  memory_size      = 1769
-  timeout          = 10
-  architectures    = ["x86_64"]
-  publish          = true
-
-  snap_start {
-    apply_on = "PublishedVersions"
-  }
-
-  tracing_config {
-    mode = "Active"
-  }
-}
-
-resource "aws_lambda_permission" "api_gateway" {
-  for_each = local.lambdas
-
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.lambda[each.key].function_name
-  qualifier     = aws_lambda_function.lambda[each.key].version
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.immersion_tracker.execution_arn}/*/*"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_api_gateway_rest_api" "immersion_tracker" {
-  name = "${local.application_id}_gateway"
-}
-
-resource "aws_api_gateway_authorizer" "immersion_tracker" {
-  name                             = "${local.application_id}_authorizer"
-  rest_api_id                      = aws_api_gateway_rest_api.immersion_tracker.id
-  authorizer_uri                   = aws_lambda_function.lambda["auth"].qualified_invoke_arn
-  type                             = "REQUEST"
-  identity_source                  = "method.request.header.Authorization"
-  authorizer_result_ttl_in_seconds = 300
-}
-
-resource "aws_api_gateway_gateway_response" "unauthorized" {
-  rest_api_id   = aws_api_gateway_rest_api.immersion_tracker.id
-  status_code   = "401"
-  response_type = "UNAUTHORIZED"
-
-  response_templates = {
-    "application/json" = "{\"message\":$context.error.messageString}"
-  }
-
-  response_parameters = {
-    "gatewayresponse.header.WWW-Authenticate"             = "'Basic'"
-    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${local.cors_origins[0]}'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Authorization,Content-Type'"
-    "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,OPTIONS'"
-  }
-}
-
-resource "aws_api_gateway_gateway_response" "default_4xx" {
-  rest_api_id   = aws_api_gateway_rest_api.immersion_tracker.id
-  response_type = "DEFAULT_4XX"
-
-  response_templates = {
-    "application/json" = "{\"message\":$context.error.messageString}"
-  }
-
-  response_parameters = {
-    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${local.cors_origins[0]}'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Authorization,Content-Type'"
-    "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,OPTIONS'"
-  }
-}
-
-resource "aws_api_gateway_gateway_response" "default_5xx" {
-  rest_api_id   = aws_api_gateway_rest_api.immersion_tracker.id
-  response_type = "DEFAULT_5XX"
-
-  response_templates = {
-    "application/json" = "{\"message\":$context.error.messageString}"
-  }
-
-  response_parameters = {
-    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${local.cors_origins[0]}'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Authorization,Content-Type'"
-    "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,OPTIONS'"
-  }
-}
-
-resource "aws_api_gateway_resource" "resource" {
-  for_each = local.endpoints
-
-  rest_api_id = aws_api_gateway_rest_api.immersion_tracker.id
-  parent_id   = aws_api_gateway_rest_api.immersion_tracker.root_resource_id
-  path_part   = each.value.path
-}
-
-resource "aws_api_gateway_method" "method" {
-  for_each = local.endpoints
-
-  rest_api_id   = aws_api_gateway_rest_api.immersion_tracker.id
-  resource_id   = aws_api_gateway_resource.resource[each.key].id
-  http_method   = each.value.method
-  authorization = "CUSTOM"
-  authorizer_id = aws_api_gateway_authorizer.immersion_tracker.id
-}
-
-resource "aws_api_gateway_integration" "integration" {
-  for_each = local.endpoints
-
-  rest_api_id             = aws_api_gateway_rest_api.immersion_tracker.id
-  resource_id             = aws_api_gateway_resource.resource[each.key].id
-  http_method             = aws_api_gateway_method.method[each.key].http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.lambda[each.key].qualified_invoke_arn
-}
-
-resource "aws_api_gateway_method" "options" {
-  for_each = local.endpoints
-
-  rest_api_id   = aws_api_gateway_rest_api.immersion_tracker.id
-  resource_id   = aws_api_gateway_resource.resource[each.key].id
-  http_method   = "OPTIONS"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "options" {
-  for_each = local.endpoints
-
-  rest_api_id = aws_api_gateway_rest_api.immersion_tracker.id
-  resource_id = aws_api_gateway_resource.resource[each.key].id
-  http_method = aws_api_gateway_method.options[each.key].http_method
-  type        = "MOCK"
-
-  request_templates = {
-    "application/json" = "{\"statusCode\": 200}"
-  }
-}
-
-resource "aws_api_gateway_method_response" "options" {
-  for_each = local.endpoints
-
-  rest_api_id = aws_api_gateway_rest_api.immersion_tracker.id
-  resource_id = aws_api_gateway_resource.resource[each.key].id
-  http_method = aws_api_gateway_method.options[each.key].http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Origin"  = true
-  }
-
-  response_models = {
-    "application/json" = "Empty"
-  }
-}
-
-resource "aws_api_gateway_integration_response" "options" {
-  for_each = local.endpoints
-
-  rest_api_id = aws_api_gateway_rest_api.immersion_tracker.id
-  resource_id = aws_api_gateway_resource.resource[each.key].id
-  http_method = aws_api_gateway_method.options[each.key].http_method
-  status_code = aws_api_gateway_method_response.options[each.key].status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Authorization,Content-Type'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'https://immersion-tracker.jordansimsmith.com'"
-  }
-}
-
-resource "aws_api_gateway_deployment" "immersion_tracker" {
-  rest_api_id = aws_api_gateway_rest_api.immersion_tracker.id
-
-  triggers = {
-    redeployment = sha1(jsonencode([
-      aws_api_gateway_authorizer.immersion_tracker,
-      aws_api_gateway_gateway_response.unauthorized,
-      aws_api_gateway_gateway_response.default_4xx,
-      aws_api_gateway_gateway_response.default_5xx,
-      aws_api_gateway_resource.resource,
-      aws_api_gateway_method.method,
-      aws_api_gateway_integration.integration,
-      aws_api_gateway_method.options,
-      aws_api_gateway_integration.options,
-      aws_api_gateway_method_response.options,
-      aws_api_gateway_integration_response.options,
-    ]))
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_api_gateway_stage" "prod" {
-  deployment_id        = aws_api_gateway_deployment.immersion_tracker.id
-  rest_api_id          = aws_api_gateway_rest_api.immersion_tracker.id
-  stage_name           = "prod"
-  xray_tracing_enabled = true
-}
-
-resource "aws_acm_certificate" "immersion_tracker" {
-  provider          = aws.us_east_1
-  domain_name       = "api.immersion-tracker.jordansimsmith.com"
-  validation_method = "DNS"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_api_gateway_domain_name" "immersion_tracker" {
-  domain_name     = aws_acm_certificate.immersion_tracker.domain_name
-  certificate_arn = aws_acm_certificate.immersion_tracker.arn
-}
-
-resource "aws_api_gateway_base_path_mapping" "immersion_tracker" {
-  api_id      = aws_api_gateway_rest_api.immersion_tracker.id
-  stage_name  = aws_api_gateway_stage.prod.stage_name
-  domain_name = aws_api_gateway_domain_name.immersion_tracker.domain_name
 }

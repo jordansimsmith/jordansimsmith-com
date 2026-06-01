@@ -42,90 +42,57 @@ variable "artifacts" {
 
 locals {
   application_id = "packing_list_api"
-  cors_origins   = ["https://packing-list.jordansimsmith.com"]
+}
+
+module "java_api" {
+  source = "../../infra/modules/java_api"
+
+  application_id = local.application_id
+  domain_name    = "api.packing-list.jordansimsmith.com"
+  cors_origin    = "https://packing-list.jordansimsmith.com"
 
   lambdas = {
     auth = {
-      target  = "//packing_list_api:auth-handler_deploy.jar"
-      handler = "com.jordansimsmith.packinglist.AuthHandler"
+      handler  = "com.jordansimsmith.packinglist.AuthHandler"
+      artifact = var.artifacts["auth"]
     }
     get_templates = {
-      target  = "//packing_list_api:get-templates-handler_deploy.jar"
-      handler = "com.jordansimsmith.packinglist.GetTemplatesHandler"
+      handler  = "com.jordansimsmith.packinglist.GetTemplatesHandler"
+      artifact = var.artifacts["get_templates"]
     }
     create_trip = {
-      target  = "//packing_list_api:create-trip-handler_deploy.jar"
-      handler = "com.jordansimsmith.packinglist.CreateTripHandler"
+      handler  = "com.jordansimsmith.packinglist.CreateTripHandler"
+      artifact = var.artifacts["create_trip"]
     }
     find_trips = {
-      target  = "//packing_list_api:find-trips-handler_deploy.jar"
-      handler = "com.jordansimsmith.packinglist.FindTripsHandler"
+      handler  = "com.jordansimsmith.packinglist.FindTripsHandler"
+      artifact = var.artifacts["find_trips"]
     }
     get_trip = {
-      target  = "//packing_list_api:get-trip-handler_deploy.jar"
-      handler = "com.jordansimsmith.packinglist.GetTripHandler"
+      handler  = "com.jordansimsmith.packinglist.GetTripHandler"
+      artifact = var.artifacts["get_trip"]
     }
     update_trip = {
-      target  = "//packing_list_api:update-trip-handler_deploy.jar"
-      handler = "com.jordansimsmith.packinglist.UpdateTripHandler"
+      handler  = "com.jordansimsmith.packinglist.UpdateTripHandler"
+      artifact = var.artifacts["update_trip"]
     }
     delete_trip = {
-      target  = "//packing_list_api:delete-trip-handler_deploy.jar"
-      handler = "com.jordansimsmith.packinglist.DeleteTripHandler"
+      handler  = "com.jordansimsmith.packinglist.DeleteTripHandler"
+      artifact = var.artifacts["delete_trip"]
     }
   }
 
-  root_resources = {
-    templates = { path = "templates" }
-    trips     = { path = "trips" }
-  }
-
-  child_resources = {
-    trip = { path = "{trip_id}", parent = "trips" }
-  }
-
-  all_resources = merge(local.root_resources, local.child_resources)
-
   endpoints = {
-    get_templates = { resource = "templates", method = "GET", lambda = "get_templates" }
-    create_trip   = { resource = "trips", method = "POST", lambda = "create_trip" }
-    find_trips    = { resource = "trips", method = "GET", lambda = "find_trips" }
-    get_trip      = { resource = "trip", method = "GET", lambda = "get_trip" }
-    update_trip   = { resource = "trip", method = "PUT", lambda = "update_trip" }
-    delete_trip   = { resource = "trip", method = "DELETE", lambda = "delete_trip" }
+    get_templates = { path = "templates", method = "GET", lambda = "get_templates" }
+    create_trip   = { path = "trips", method = "POST", lambda = "create_trip" }
+    find_trips    = { path = "trips", method = "GET", lambda = "find_trips" }
+    get_trip      = { path = "trips/{trip_id}", method = "GET", lambda = "get_trip" }
+    update_trip   = { path = "trips/{trip_id}", method = "PUT", lambda = "update_trip" }
+    delete_trip   = { path = "trips/{trip_id}", method = "DELETE", lambda = "delete_trip" }
   }
 
-  all_resource_ids = merge(
-    { for k, v in aws_api_gateway_resource.root_resource : k => v.id },
-    { for k, v in aws_api_gateway_resource.child_resource : k => v.id }
-  )
-}
-
-check "unique_resource_paths" {
-  assert {
-    condition     = length(local.all_resources) == length(distinct([for r in local.all_resources : r.path]))
-    error_message = "Resource paths must be unique"
-  }
-}
-
-check "valid_endpoint_resources" {
-  assert {
-    condition     = alltrue([for e in local.endpoints : contains(keys(local.all_resources), e.resource)])
-    error_message = "All endpoint resources must reference a valid resource key"
-  }
-}
-
-check "valid_child_resource_parents" {
-  assert {
-    condition     = alltrue([for r in local.child_resources : contains(keys(local.root_resources), r.parent)])
-    error_message = "All child resource parents must reference a valid root resource key"
-  }
-}
-
-check "valid_endpoint_lambdas" {
-  assert {
-    condition     = alltrue([for e in local.endpoints : contains(keys(local.lambdas), e.lambda)])
-    error_message = "All endpoint lambdas must reference a valid lambda key"
+  providers = {
+    aws.us_east_1 = aws.us_east_1
   }
 }
 
@@ -174,34 +141,6 @@ resource "aws_dynamodb_table" "packing_list" {
   deletion_protection_enabled = true
 }
 
-data "aws_iam_policy_document" "lambda_sts_allow_policy_document" {
-  statement {
-    effect = "Allow"
-
-    principals {
-      identifiers = ["lambda.amazonaws.com"]
-      type        = "Service"
-    }
-
-    actions = ["sts:AssumeRole"]
-  }
-}
-
-resource "aws_iam_role" "lambda_role" {
-  name               = "${local.application_id}_lambda_exec"
-  assume_role_policy = data.aws_iam_policy_document.lambda_sts_allow_policy_document.json
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_basic" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_xray" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
-}
-
 data "aws_iam_policy_document" "lambda_secretsmanager_allow_policy_document" {
   statement {
     effect = "Allow"
@@ -237,7 +176,7 @@ resource "aws_iam_policy" "lambda_secretsmanager" {
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_secretsmanager" {
-  role       = aws_iam_role.lambda_role.name
+  role       = module.java_api.lambda_role_name
   policy_arn = aws_iam_policy.lambda_secretsmanager.arn
 }
 
@@ -276,250 +215,6 @@ resource "aws_iam_policy" "lambda_dynamodb" {
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
-  role       = aws_iam_role.lambda_role.name
+  role       = module.java_api.lambda_role_name
   policy_arn = aws_iam_policy.lambda_dynamodb.arn
-}
-
-resource "aws_lambda_function" "lambda" {
-  for_each = local.lambdas
-
-  filename         = var.artifacts[each.key]
-  function_name    = "${local.application_id}_${each.key}"
-  role             = aws_iam_role.lambda_role.arn
-  source_code_hash = filebase64sha256(var.artifacts[each.key])
-  handler          = each.value.handler
-  runtime          = "java21"
-  memory_size      = 1769
-  timeout          = 10
-  architectures    = ["x86_64"]
-  publish          = true
-
-  snap_start {
-    apply_on = "PublishedVersions"
-  }
-
-  tracing_config {
-    mode = "Active"
-  }
-}
-
-resource "aws_lambda_permission" "api_gateway" {
-  for_each = local.lambdas
-
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.lambda[each.key].function_name
-  qualifier     = aws_lambda_function.lambda[each.key].version
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.packing_list.execution_arn}/*/*"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_api_gateway_rest_api" "packing_list" {
-  name = "${local.application_id}_gateway"
-}
-
-resource "aws_api_gateway_authorizer" "packing_list" {
-  name                             = "${local.application_id}_authorizer"
-  rest_api_id                      = aws_api_gateway_rest_api.packing_list.id
-  authorizer_uri                   = aws_lambda_function.lambda["auth"].qualified_invoke_arn
-  type                             = "REQUEST"
-  identity_source                  = "method.request.header.Authorization"
-  authorizer_result_ttl_in_seconds = 300
-}
-
-resource "aws_api_gateway_gateway_response" "unauthorized" {
-  rest_api_id   = aws_api_gateway_rest_api.packing_list.id
-  status_code   = "401"
-  response_type = "UNAUTHORIZED"
-
-  response_templates = {
-    "application/json" = "{\"message\":$context.error.messageString}"
-  }
-
-  response_parameters = {
-    "gatewayresponse.header.WWW-Authenticate"             = "'Basic'"
-    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${local.cors_origins[0]}'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Authorization,Content-Type'"
-    "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
-  }
-}
-
-resource "aws_api_gateway_gateway_response" "default_4xx" {
-  rest_api_id   = aws_api_gateway_rest_api.packing_list.id
-  response_type = "DEFAULT_4XX"
-
-  response_templates = {
-    "application/json" = "{\"message\":$context.error.messageString}"
-  }
-
-  response_parameters = {
-    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${local.cors_origins[0]}'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Authorization,Content-Type'"
-    "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
-  }
-}
-
-resource "aws_api_gateway_gateway_response" "default_5xx" {
-  rest_api_id   = aws_api_gateway_rest_api.packing_list.id
-  response_type = "DEFAULT_5XX"
-
-  response_templates = {
-    "application/json" = "{\"message\":$context.error.messageString}"
-  }
-
-  response_parameters = {
-    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'${local.cors_origins[0]}'"
-    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Authorization,Content-Type'"
-    "gatewayresponse.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
-  }
-}
-
-resource "aws_api_gateway_resource" "root_resource" {
-  for_each = local.root_resources
-
-  rest_api_id = aws_api_gateway_rest_api.packing_list.id
-  parent_id   = aws_api_gateway_rest_api.packing_list.root_resource_id
-  path_part   = each.value.path
-}
-
-resource "aws_api_gateway_resource" "child_resource" {
-  for_each = local.child_resources
-
-  rest_api_id = aws_api_gateway_rest_api.packing_list.id
-  parent_id   = aws_api_gateway_resource.root_resource[each.value.parent].id
-  path_part   = each.value.path
-}
-
-resource "aws_api_gateway_method" "method" {
-  for_each = local.endpoints
-
-  rest_api_id   = aws_api_gateway_rest_api.packing_list.id
-  resource_id   = local.all_resource_ids[each.value.resource]
-  http_method   = each.value.method
-  authorization = "CUSTOM"
-  authorizer_id = aws_api_gateway_authorizer.packing_list.id
-}
-
-resource "aws_api_gateway_integration" "integration" {
-  for_each = local.endpoints
-
-  rest_api_id             = aws_api_gateway_rest_api.packing_list.id
-  resource_id             = local.all_resource_ids[each.value.resource]
-  http_method             = aws_api_gateway_method.method[each.key].http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.lambda[each.value.lambda].qualified_invoke_arn
-}
-
-resource "aws_api_gateway_method" "options" {
-  for_each = local.all_resources
-
-  rest_api_id   = aws_api_gateway_rest_api.packing_list.id
-  resource_id   = local.all_resource_ids[each.key]
-  http_method   = "OPTIONS"
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "options" {
-  for_each = local.all_resources
-
-  rest_api_id = aws_api_gateway_rest_api.packing_list.id
-  resource_id = local.all_resource_ids[each.key]
-  http_method = aws_api_gateway_method.options[each.key].http_method
-  type        = "MOCK"
-
-  request_templates = {
-    "application/json" = "{\"statusCode\": 200}"
-  }
-}
-
-resource "aws_api_gateway_method_response" "options" {
-  for_each = local.all_resources
-
-  rest_api_id = aws_api_gateway_rest_api.packing_list.id
-  resource_id = local.all_resource_ids[each.key]
-  http_method = aws_api_gateway_method.options[each.key].http_method
-  status_code = "200"
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = true
-    "method.response.header.Access-Control-Allow-Methods" = true
-    "method.response.header.Access-Control-Allow-Origin"  = true
-  }
-
-  response_models = {
-    "application/json" = "Empty"
-  }
-}
-
-resource "aws_api_gateway_integration_response" "options" {
-  for_each = local.all_resources
-
-  rest_api_id = aws_api_gateway_rest_api.packing_list.id
-  resource_id = local.all_resource_ids[each.key]
-  http_method = aws_api_gateway_method.options[each.key].http_method
-  status_code = aws_api_gateway_method_response.options[each.key].status_code
-
-  response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Authorization,Content-Type'"
-    "method.response.header.Access-Control-Allow-Methods" = "'GET,POST,PUT,DELETE,OPTIONS'"
-    "method.response.header.Access-Control-Allow-Origin"  = "'https://packing-list.jordansimsmith.com'"
-  }
-}
-
-resource "aws_api_gateway_deployment" "packing_list" {
-  rest_api_id = aws_api_gateway_rest_api.packing_list.id
-
-  triggers = {
-    redeployment = sha1(jsonencode([
-      aws_api_gateway_authorizer.packing_list,
-      aws_api_gateway_gateway_response.unauthorized,
-      aws_api_gateway_gateway_response.default_4xx,
-      aws_api_gateway_gateway_response.default_5xx,
-      aws_api_gateway_resource.root_resource,
-      aws_api_gateway_resource.child_resource,
-      aws_api_gateway_method.method,
-      aws_api_gateway_integration.integration,
-      aws_api_gateway_method.options,
-      aws_api_gateway_integration.options,
-      aws_api_gateway_method_response.options,
-      aws_api_gateway_integration_response.options,
-    ]))
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_api_gateway_stage" "prod" {
-  deployment_id        = aws_api_gateway_deployment.packing_list.id
-  rest_api_id          = aws_api_gateway_rest_api.packing_list.id
-  stage_name           = "prod"
-  xray_tracing_enabled = true
-}
-
-resource "aws_acm_certificate" "packing_list" {
-  provider          = aws.us_east_1
-  domain_name       = "api.packing-list.jordansimsmith.com"
-  validation_method = "DNS"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_api_gateway_domain_name" "packing_list" {
-  domain_name     = aws_acm_certificate.packing_list.domain_name
-  certificate_arn = aws_acm_certificate.packing_list.arn
-}
-
-resource "aws_api_gateway_base_path_mapping" "packing_list" {
-  api_id      = aws_api_gateway_rest_api.packing_list.id
-  stage_name  = aws_api_gateway_stage.prod.stage_name
-  domain_name = aws_api_gateway_domain_name.packing_list.domain_name
 }

@@ -42,25 +42,34 @@ variable "artifacts" {
 
 locals {
   application_id = "event_calendar_api"
+}
+
+module "java_api" {
+  source = "../../infra/modules/java_api"
+
+  application_id = local.application_id
+  domain_name    = "api.event-calendar.jordansimsmith.com"
+  authorization  = "NONE"
 
   lambdas = {
     get_calendar_subscription = {
-      target  = "//event_calendar_api:get-calendar-subscription-handler_deploy.jar"
-      handler = "com.jordansimsmith.eventcalendar.GetCalendarSubscriptionHandler"
-      timeout = 30
+      handler  = "com.jordansimsmith.eventcalendar.GetCalendarSubscriptionHandler"
+      artifact = var.artifacts["get_calendar_subscription"]
+      timeout  = 30
     }
     update_events = {
-      target  = "//event_calendar_api:update-events-handler_deploy.jar"
-      handler = "com.jordansimsmith.eventcalendar.UpdateEventsHandler"
-      timeout = 120
+      handler  = "com.jordansimsmith.eventcalendar.UpdateEventsHandler"
+      artifact = var.artifacts["update_events"]
+      timeout  = 120
     }
   }
 
   endpoints = {
-    get_calendar_subscription = {
-      path   = "calendar"
-      method = "GET"
-    }
+    get_calendar_subscription = { path = "calendar", method = "GET", lambda = "get_calendar_subscription" }
+  }
+
+  providers = {
+    aws.us_east_1 = aws.us_east_1
   }
 }
 
@@ -85,24 +94,6 @@ resource "aws_dynamodb_table" "event_calendar_table" {
   }
 
   deletion_protection_enabled = true
-}
-
-data "aws_iam_policy_document" "lambda_sts_allow_policy_document" {
-  statement {
-    effect = "Allow"
-
-    principals {
-      identifiers = ["lambda.amazonaws.com"]
-      type        = "Service"
-    }
-
-    actions = ["sts:AssumeRole"]
-  }
-}
-
-resource "aws_iam_role" "lambda_role" {
-  name               = "${local.application_id}_lambda_exec"
-  assume_role_policy = data.aws_iam_policy_document.lambda_sts_allow_policy_document.json
 }
 
 data "aws_iam_policy_document" "lambda_dynamodb_allow_policy_document" {
@@ -139,42 +130,8 @@ resource "aws_iam_policy" "lambda_dynamodb" {
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
-  role       = aws_iam_role.lambda_role.name
+  role       = module.java_api.lambda_role_name
   policy_arn = aws_iam_policy.lambda_dynamodb.arn
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_basic" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_xray" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
-}
-
-
-resource "aws_lambda_function" "lambda" {
-  for_each = local.lambdas
-
-  filename         = var.artifacts[each.key]
-  function_name    = "${local.application_id}_${each.key}"
-  role             = aws_iam_role.lambda_role.arn
-  source_code_hash = filebase64sha256(var.artifacts[each.key])
-  handler          = each.value.handler
-  runtime          = "java21"
-  memory_size      = 1769
-  timeout          = each.value.timeout
-  architectures    = ["x86_64"]
-  publish          = true
-
-  snap_start {
-    apply_on = "PublishedVersions"
-  }
-
-  tracing_config {
-    mode = "Active"
-  }
 }
 
 resource "aws_cloudwatch_event_rule" "update_events" {
@@ -186,110 +143,18 @@ resource "aws_cloudwatch_event_rule" "update_events" {
 resource "aws_cloudwatch_event_target" "update_events_lambda" {
   rule      = aws_cloudwatch_event_rule.update_events.name
   target_id = "UpdateEventsHandler"
-  arn       = aws_lambda_function.lambda["update_events"].qualified_arn
+  arn       = module.java_api.lambda_functions["update_events"].qualified_arn
 }
 
 resource "aws_lambda_permission" "allow_eventbridge" {
   statement_id  = "AllowEventBridgeInvoke"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.lambda["update_events"].function_name
-  qualifier     = aws_lambda_function.lambda["update_events"].version
+  function_name = module.java_api.lambda_functions["update_events"].function_name
+  qualifier     = module.java_api.lambda_functions["update_events"].version
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.update_events.arn
 
   lifecycle {
     create_before_destroy = true
   }
-}
-
-
-resource "aws_lambda_permission" "api_gateway" {
-  for_each = local.endpoints
-
-  statement_id  = "AllowAPIGatewayInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.lambda[each.key].function_name
-  qualifier     = aws_lambda_function.lambda[each.key].version
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${aws_api_gateway_rest_api.event_calendar.execution_arn}/*/*"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_api_gateway_rest_api" "event_calendar" {
-  name = "${local.application_id}_gateway"
-}
-
-resource "aws_api_gateway_resource" "resource" {
-  for_each = local.endpoints
-
-  rest_api_id = aws_api_gateway_rest_api.event_calendar.id
-  parent_id   = aws_api_gateway_rest_api.event_calendar.root_resource_id
-  path_part   = each.value.path
-}
-
-resource "aws_api_gateway_method" "method" {
-  for_each = local.endpoints
-
-  rest_api_id   = aws_api_gateway_rest_api.event_calendar.id
-  resource_id   = aws_api_gateway_resource.resource[each.key].id
-  http_method   = each.value.method
-  authorization = "NONE"
-}
-
-resource "aws_api_gateway_integration" "integration" {
-  for_each = local.endpoints
-
-  rest_api_id             = aws_api_gateway_rest_api.event_calendar.id
-  resource_id             = aws_api_gateway_resource.resource[each.key].id
-  http_method             = aws_api_gateway_method.method[each.key].http_method
-  integration_http_method = "POST"
-  type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.lambda[each.key].qualified_invoke_arn
-}
-
-resource "aws_api_gateway_deployment" "event_calendar" {
-  rest_api_id = aws_api_gateway_rest_api.event_calendar.id
-
-  triggers = {
-    redeployment = sha1(jsonencode([
-      aws_api_gateway_resource.resource,
-      aws_api_gateway_method.method,
-      aws_api_gateway_integration.integration,
-    ]))
-  }
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_api_gateway_stage" "prod" {
-  deployment_id        = aws_api_gateway_deployment.event_calendar.id
-  rest_api_id          = aws_api_gateway_rest_api.event_calendar.id
-  stage_name           = "prod"
-  xray_tracing_enabled = true
-}
-
-resource "aws_acm_certificate" "event_calendar" {
-  provider          = aws.us_east_1
-  domain_name       = "api.event-calendar.jordansimsmith.com"
-  validation_method = "DNS"
-
-  lifecycle {
-    create_before_destroy = true
-  }
-}
-
-resource "aws_api_gateway_domain_name" "event_calendar" {
-  domain_name     = aws_acm_certificate.event_calendar.domain_name
-  certificate_arn = aws_acm_certificate.event_calendar.arn
-}
-
-resource "aws_api_gateway_base_path_mapping" "event_calendar" {
-  api_id      = aws_api_gateway_rest_api.event_calendar.id
-  stage_name  = aws_api_gateway_stage.prod.stage_name
-  domain_name = aws_api_gateway_domain_name.event_calendar.domain_name
 }
