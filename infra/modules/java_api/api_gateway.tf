@@ -58,7 +58,7 @@ resource "aws_api_gateway_authorizer" "this" {
 
   name                             = "${var.application_id}_authorizer"
   rest_api_id                      = aws_api_gateway_rest_api.this.id
-  authorizer_uri                   = aws_lambda_function.lambda["auth"].qualified_invoke_arn
+  authorizer_uri                   = module.lambda.lambda_functions["auth"].qualified_invoke_arn
   type                             = "REQUEST"
   identity_source                  = "method.request.header.Authorization"
   authorizer_result_ttl_in_seconds = 300
@@ -82,7 +82,7 @@ resource "aws_api_gateway_integration" "integration" {
   http_method             = aws_api_gateway_method.method[each.key].http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.lambda[each.value.lambda].qualified_invoke_arn
+  uri                     = module.lambda.lambda_functions[each.value.lambda].qualified_invoke_arn
 }
 
 resource "aws_api_gateway_gateway_response" "unauthorized" {
