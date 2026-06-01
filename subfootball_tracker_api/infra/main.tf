@@ -31,43 +31,21 @@ variable "artifacts" {
 
 locals {
   application_id = "subfootball_tracker_api"
+  subscriptions  = ["jordansimsmith@gmail.com"]
+}
+
+module "java_lambda" {
+  source = "../../infra/modules/java_lambda"
+
+  application_id = local.application_id
 
   lambdas = {
     update_page_content = {
-      target  = "//subfootball_tracker_api:update-page-content-handler_deploy.jar"
-      handler = "com.jordansimsmith.subfootballtracker.UpdatePageContentHandler"
+      handler  = "com.jordansimsmith.subfootballtracker.UpdatePageContentHandler"
+      artifact = var.artifacts["update_page_content"]
+      timeout  = 30
     }
   }
-
-  subscriptions = ["jordansimsmith@gmail.com"]
-}
-
-data "aws_iam_policy_document" "lambda_sts_allow_policy_document" {
-  statement {
-    effect = "Allow"
-
-    principals {
-      identifiers = ["lambda.amazonaws.com"]
-      type        = "Service"
-    }
-
-    actions = ["sts:AssumeRole"]
-  }
-}
-
-resource "aws_iam_role" "lambda_role" {
-  name               = "${local.application_id}_lambda_exec"
-  assume_role_policy = data.aws_iam_policy_document.lambda_sts_allow_policy_document.json
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_basic" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_xray" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
 }
 
 resource "aws_dynamodb_table" "subfootball_tracker" {
@@ -126,7 +104,7 @@ resource "aws_iam_policy" "lambda_dynamodb" {
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
-  role       = aws_iam_role.lambda_role.name
+  role       = module.java_lambda.lambda_role_name
   policy_arn = aws_iam_policy.lambda_dynamodb.arn
 }
 
@@ -174,31 +152,8 @@ resource "aws_iam_policy" "lambda_sns" {
 }
 
 resource "aws_iam_role_policy_attachment" "lambda_sns" {
-  role       = aws_iam_role.lambda_role.name
+  role       = module.java_lambda.lambda_role_name
   policy_arn = aws_iam_policy.lambda_sns.arn
-}
-
-resource "aws_lambda_function" "lambda" {
-  for_each = local.lambdas
-
-  filename         = var.artifacts[each.key]
-  function_name    = "${local.application_id}_${each.key}"
-  role             = aws_iam_role.lambda_role.arn
-  source_code_hash = filebase64sha256(var.artifacts[each.key])
-  handler          = each.value.handler
-  runtime          = "java21"
-  memory_size      = 1769
-  timeout          = 30
-  architectures    = ["x86_64"]
-  publish          = true
-
-  snap_start {
-    apply_on = "PublishedVersions"
-  }
-
-  tracing_config {
-    mode = "Active"
-  }
 }
 
 resource "aws_cloudwatch_event_rule" "update_page_content" {
@@ -210,14 +165,14 @@ resource "aws_cloudwatch_event_rule" "update_page_content" {
 resource "aws_cloudwatch_event_target" "trigger" {
   rule      = aws_cloudwatch_event_rule.update_page_content.name
   target_id = "lambda"
-  arn       = aws_lambda_function.lambda["update_page_content"].qualified_arn
+  arn       = module.java_lambda.lambda_functions["update_page_content"].qualified_arn
 }
 
 resource "aws_lambda_permission" "cloudwatch_trigger" {
   statement_id  = "AllowExecutionFromCloudWatch"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.lambda["update_page_content"].function_name
-  qualifier     = aws_lambda_function.lambda["update_page_content"].version
+  function_name = module.java_lambda.lambda_functions["update_page_content"].function_name
+  qualifier     = module.java_lambda.lambda_functions["update_page_content"].version
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.update_page_content.arn
 

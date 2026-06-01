@@ -25,38 +25,32 @@ provider "aws" {
   }
 }
 
-provider "aws" {
-  alias  = "us_east_1"
-  region = "us-east-1"
-
-  default_tags {
-    tags = {
-      application_id = local.application_id
-    }
-  }
-}
-
 variable "artifacts" {
   type = map(string)
 }
 
 locals {
   application_id = "auction_tracker_api"
+  subscriptions  = ["jordansimsmith@gmail.com"]
+}
+
+module "java_lambda" {
+  source = "../../infra/modules/java_lambda"
+
+  application_id = local.application_id
 
   lambdas = {
     update_items_handler = {
-      target  = "//auction_tracker_api:update-items-handler_deploy.jar"
-      handler = "com.jordansimsmith.auctiontracker.UpdateItemsHandler"
-      timeout = 120
+      handler  = "com.jordansimsmith.auctiontracker.UpdateItemsHandler"
+      artifact = var.artifacts["update_items_handler"]
+      timeout  = 120
     }
     send_digest_handler = {
-      target  = "//auction_tracker_api:send-digest-handler_deploy.jar"
-      handler = "com.jordansimsmith.auctiontracker.SendDigestHandler"
-      timeout = 30
+      handler  = "com.jordansimsmith.auctiontracker.SendDigestHandler"
+      artifact = var.artifacts["send_digest_handler"]
+      timeout  = 30
     }
   }
-
-  subscriptions = ["jordansimsmith@gmail.com"]
 }
 
 resource "aws_dynamodb_table" "auction_tracker_table" {
@@ -108,39 +102,14 @@ resource "aws_dynamodb_table" "auction_tracker_table" {
   }
 }
 
-resource "aws_sns_topic" "auction_tracker_digest" {
-  name = "auction_tracker_api_digest"
-}
-
-resource "aws_sns_topic_subscription" "auction_tracker_digest" {
-  for_each  = toset(local.subscriptions)
-  topic_arn = aws_sns_topic.auction_tracker_digest.arn
-  protocol  = "email"
-  endpoint  = each.value
-}
-
-data "aws_iam_policy_document" "lambda_assume_role" {
+data "aws_iam_policy_document" "lambda_dynamodb" {
   statement {
     effect = "Allow"
 
-    principals {
-      type        = "Service"
-      identifiers = ["lambda.amazonaws.com"]
-    }
-
-    actions = ["sts:AssumeRole"]
-  }
-}
-
-resource "aws_iam_role" "lambda_role" {
-  name               = "${local.application_id}_lambda_role"
-  assume_role_policy = data.aws_iam_policy_document.lambda_assume_role.json
-}
-
-data "aws_iam_policy_document" "lambda_permissions_policy_document" {
-  statement {
-    sid    = "DynamoDBFullAccess"
-    effect = "Allow"
+    resources = [
+      aws_dynamodb_table.auction_tracker_table.arn,
+      "${aws_dynamodb_table.auction_tracker_table.arn}/index/*"
+    ]
 
     actions = [
       "dynamodb:BatchGetItem",
@@ -154,86 +123,64 @@ data "aws_iam_policy_document" "lambda_permissions_policy_document" {
       "dynamodb:Query",
       "dynamodb:UpdateItem"
     ]
-
-    resources = [
-      aws_dynamodb_table.auction_tracker_table.arn,
-      "${aws_dynamodb_table.auction_tracker_table.arn}/index/*"
-    ]
   }
 
   statement {
-    sid    = "SNSPublishAccess"
-    effect = "Allow"
+    effect    = "Allow"
+    resources = ["*"]
+    actions   = ["dynamodb:ListTables"]
+  }
+}
 
-    actions = [
-      "sns:Publish"
-    ]
+resource "aws_iam_policy" "lambda_dynamodb" {
+  name   = "${local.application_id}_lambda_dynamodb"
+  policy = data.aws_iam_policy_document.lambda_dynamodb.json
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
+  role       = module.java_lambda.lambda_role_name
+  policy_arn = aws_iam_policy.lambda_dynamodb.arn
+}
+
+resource "aws_sns_topic" "auction_tracker_digest" {
+  name = "auction_tracker_api_digest"
+}
+
+resource "aws_sns_topic_subscription" "auction_tracker_digest" {
+  for_each  = toset(local.subscriptions)
+  topic_arn = aws_sns_topic.auction_tracker_digest.arn
+  protocol  = "email"
+  endpoint  = each.value
+}
+
+data "aws_iam_policy_document" "lambda_sns" {
+  statement {
+    effect = "Allow"
 
     resources = [
       aws_sns_topic.auction_tracker_digest.arn
     ]
-  }
-
-  statement {
-    sid    = "SNSListTopicsAccess"
-    effect = "Allow"
 
     actions = [
-      "sns:ListTopics"
+      "sns:Publish"
     ]
-
-    resources = ["*"]
   }
 
   statement {
-    sid       = "DynamoDBListTables"
     effect    = "Allow"
-    actions   = ["dynamodb:ListTables"]
     resources = ["*"]
+    actions   = ["sns:ListTopics"]
   }
 }
 
-resource "aws_iam_policy" "lambda_permissions" {
-  name   = "${local.application_id}_lambda_permissions"
-  policy = data.aws_iam_policy_document.lambda_permissions_policy_document.json
+resource "aws_iam_policy" "lambda_sns" {
+  name   = "${local.application_id}_lambda_sns"
+  policy = data.aws_iam_policy_document.lambda_sns.json
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_permissions" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = aws_iam_policy.lambda_permissions.arn
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_basic" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_xray" {
-  role       = aws_iam_role.lambda_role.name
-  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
-}
-
-resource "aws_lambda_function" "lambda" {
-  for_each = local.lambdas
-
-  filename         = var.artifacts[each.key]
-  function_name    = "${local.application_id}_${each.key}"
-  role             = aws_iam_role.lambda_role.arn
-  source_code_hash = filebase64sha256(var.artifacts[each.key])
-  handler          = each.value.handler
-  runtime          = "java21"
-  memory_size      = 1769
-  timeout          = each.value.timeout
-  architectures    = ["x86_64"]
-  publish          = true
-
-  snap_start {
-    apply_on = "PublishedVersions"
-  }
-
-  tracing_config {
-    mode = "Active"
-  }
+resource "aws_iam_role_policy_attachment" "lambda_sns" {
+  role       = module.java_lambda.lambda_role_name
+  policy_arn = aws_iam_policy.lambda_sns.arn
 }
 
 resource "aws_cloudwatch_event_rule" "update_items" {
@@ -245,14 +192,14 @@ resource "aws_cloudwatch_event_rule" "update_items" {
 resource "aws_cloudwatch_event_target" "update_items_lambda" {
   rule      = aws_cloudwatch_event_rule.update_items.name
   target_id = "UpdateItemsHandler"
-  arn       = aws_lambda_function.lambda["update_items_handler"].qualified_arn
+  arn       = module.java_lambda.lambda_functions["update_items_handler"].qualified_arn
 }
 
 resource "aws_lambda_permission" "allow_eventbridge_update_items" {
   statement_id  = "AllowEventBridgeInvokeUpdateItems"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.lambda["update_items_handler"].function_name
-  qualifier     = aws_lambda_function.lambda["update_items_handler"].version
+  function_name = module.java_lambda.lambda_functions["update_items_handler"].function_name
+  qualifier     = module.java_lambda.lambda_functions["update_items_handler"].version
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.update_items.arn
 
@@ -270,14 +217,14 @@ resource "aws_cloudwatch_event_rule" "send_digest" {
 resource "aws_cloudwatch_event_target" "send_digest_lambda" {
   rule      = aws_cloudwatch_event_rule.send_digest.name
   target_id = "SendDigestHandler"
-  arn       = aws_lambda_function.lambda["send_digest_handler"].qualified_arn
+  arn       = module.java_lambda.lambda_functions["send_digest_handler"].qualified_arn
 }
 
 resource "aws_lambda_permission" "allow_eventbridge_send_digest" {
   statement_id  = "AllowEventBridgeInvokeSendDigest"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.lambda["send_digest_handler"].function_name
-  qualifier     = aws_lambda_function.lambda["send_digest_handler"].version
+  function_name = module.java_lambda.lambda_functions["send_digest_handler"].function_name
+  qualifier     = module.java_lambda.lambda_functions["send_digest_handler"].version
   principal     = "events.amazonaws.com"
   source_arn    = aws_cloudwatch_event_rule.send_digest.arn
 
