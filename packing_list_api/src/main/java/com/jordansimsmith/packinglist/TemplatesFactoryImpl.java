@@ -243,6 +243,20 @@ public class TemplatesFactoryImpl implements TemplatesFactory {
                 new TemplateItem("gel seat", "gear", 1, List.of()),
                 new TemplateItem("panniers", "gear", 1, List.of())));
 
+    var work =
+        new Variation(
+            "work",
+            "work",
+            List.of(
+                // travel
+                new TemplateItem("id badge", "travel", 1, List.of()),
+                // electronics
+                new TemplateItem("work laptop", "electronics", 1, List.of("hand luggage")),
+                new TemplateItem("work laptop charger", "electronics", 1, List.of("hand luggage")),
+                new TemplateItem("keyboard", "electronics", 1, List.of("optional")),
+                new TemplateItem("mouse", "electronics", 1, List.of("optional")),
+                new TemplateItem("laptop stand", "electronics", 1, List.of("optional"))));
+
     var international =
         new Variation(
             "international",
@@ -258,6 +272,6 @@ public class TemplatesFactoryImpl implements TemplatesFactory {
                 // electronics
                 new TemplateItem("foreign plugs", "electronics", 1, List.of())));
 
-    return List.of(tramping, camping, skiing, cycling, international);
+    return List.of(tramping, camping, skiing, cycling, work, international);
   }
 }
