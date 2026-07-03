@@ -23,15 +23,13 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 public class PriceTrackerE2ETest {
   private static final String CHEMIST_WAREHOUSE_STUB_ALIAS = "chemist-warehouse-stub";
   private static final String NZ_PROTEIN_STUB_ALIAS = "nz-protein-stub";
-  private static final String NZ_MUSCLE_STUB_ALIAS = "nz-muscle-stub";
 
   private static final Network NETWORK = Network.newNetwork();
 
   private static final PriceTrackerWebsiteStubContainer priceTrackerWebsiteStubContainer =
       new PriceTrackerWebsiteStubContainer()
           .withNetwork(NETWORK)
-          .withNetworkAliases(
-              CHEMIST_WAREHOUSE_STUB_ALIAS, NZ_PROTEIN_STUB_ALIAS, NZ_MUSCLE_STUB_ALIAS);
+          .withNetworkAliases(CHEMIST_WAREHOUSE_STUB_ALIAS, NZ_PROTEIN_STUB_ALIAS);
 
   private static final PriceTrackerContainer priceTrackerContainer =
       new PriceTrackerContainer()
@@ -40,8 +38,8 @@ public class PriceTrackerE2ETest {
           .withEnv(
               "PRICE_TRACKER_CHEMIST_WAREHOUSE_BASE_URL",
               "http://" + CHEMIST_WAREHOUSE_STUB_ALIAS + ":8080")
-          .withEnv("PRICE_TRACKER_NZ_PROTEIN_BASE_URL", "http://" + NZ_PROTEIN_STUB_ALIAS + ":8080")
-          .withEnv("PRICE_TRACKER_NZ_MUSCLE_BASE_URL", "http://" + NZ_MUSCLE_STUB_ALIAS + ":8080");
+          .withEnv(
+              "PRICE_TRACKER_NZ_PROTEIN_BASE_URL", "http://" + NZ_PROTEIN_STUB_ALIAS + ":8080");
 
   @BeforeAll
   static void setUpBeforeClass() {
@@ -177,63 +175,6 @@ public class PriceTrackerE2ETest {
                         && messageBody.contains(productName)
                         && messageBody.contains(productUrl)
                         && messageBody.contains("$4567.89 -> $84.95"));
-    assertThat(hasExpectedMessage).isTrue();
-  }
-
-  @Test
-  void shouldTrackNzMusclePricesAndSendNotifications() throws Exception {
-    // arrange
-    var dynamoDbClient =
-        DynamoDbClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
-    var enhancedClient = DynamoDbEnhancedClient.builder().dynamoDbClient(dynamoDbClient).build();
-    var priceTrackerTable =
-        enhancedClient.table("price_tracker", TableSchema.fromBean(PriceTrackerItem.class));
-    var lambdaClient =
-        LambdaClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
-    var sqsClient =
-        SqsClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
-
-    var productUrl =
-        "http://nz-muscle-stub:8080/products/shotgun-whey-protein?variant=51471561195701";
-    var productName = "Shotgun Whey Protein Chocolate 2kg";
-    var productHistory =
-        PriceTrackerItem.create(productUrl, productName, Instant.ofEpochSecond(1_000_000), 8901.23);
-    priceTrackerTable.putItem(productHistory);
-
-    // act
-    var request =
-        InvokeRequest.builder()
-            .functionName("update_prices_handler")
-            .invocationType(InvocationType.REQUEST_RESPONSE)
-            .payload(SdkBytes.fromUtf8String("{}"))
-            .build();
-    var lambdaResponse = lambdaClient.invoke(request);
-    assertThat(lambdaResponse.statusCode()).isEqualTo(200);
-    assertThat(lambdaResponse.functionError())
-        .withFailMessage(new String(lambdaResponse.payload().asByteArray()))
-        .isNull();
-
-    // assert
-    var queueName = "price-tracker-test-queue";
-    var queueUrl = sqsClient.getQueueUrl(b -> b.queueName(queueName).build()).queueUrl();
-    var receiveRequest =
-        ReceiveMessageRequest.builder()
-            .queueUrl(queueUrl)
-            .maxNumberOfMessages(10)
-            .waitTimeSeconds(10)
-            .build();
-    var messages = sqsClient.receiveMessage(receiveRequest).messages();
-    assertThat(messages).isNotEmpty();
-
-    var hasExpectedMessage =
-        messages.stream()
-            .map(message -> message.body())
-            .anyMatch(
-                messageBody ->
-                    messageBody.contains("price decreased")
-                        && messageBody.contains(productName)
-                        && messageBody.contains(productUrl)
-                        && messageBody.contains("$8901.23 -> $92.50"));
     assertThat(hasExpectedMessage).isTrue();
   }
 }

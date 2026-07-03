@@ -11,9 +11,7 @@ public class ProductsFactoryImplTest {
     // arrange
     var productsFactory =
         new ProductsFactoryImpl(
-            URI.create("http://chemist.example:8080"),
-            URI.create("http://protein.example:8080"),
-            URI.create("http://muscle.example:8080"));
+            URI.create("http://chemist.example:8080"), URI.create("http://protein.example:8080"));
 
     // act
     var remappedProduct =
@@ -31,35 +29,11 @@ public class ProductsFactoryImplTest {
   }
 
   @Test
-  void findProductsShouldPreservePathAndQueryWhenBuildingNzMuscleUrls() {
-    // arrange
-    var productsFactory =
-        new ProductsFactoryImpl(
-            URI.create("http://chemist.example:8080"),
-            URI.create("http://protein.example:8080"),
-            URI.create("http://muscle.example:8080"));
-
-    // act
-    var remappedProduct =
-        productsFactory.findProducts().stream()
-            .filter(product -> product.name().equals("Shotgun Whey Protein Chocolate 2kg"))
-            .findFirst()
-            .orElseThrow();
-
-    // assert
-    assertThat(remappedProduct.url().toString())
-        .isEqualTo(
-            "http://muscle.example:8080/products/shotgun-whey-protein?variant=51471561195701");
-  }
-
-  @Test
   void findProductsShouldBuildUrlsFromConfiguredNzProteinBaseUrl() {
     // arrange
     var productsFactory =
         new ProductsFactoryImpl(
-            URI.create("http://chemist.example:8080"),
-            URI.create("http://protein.example:8080"),
-            URI.create("http://muscle.example:8080"));
+            URI.create("http://chemist.example:8080"), URI.create("http://protein.example:8080"));
 
     // act
     var remappedProduct =

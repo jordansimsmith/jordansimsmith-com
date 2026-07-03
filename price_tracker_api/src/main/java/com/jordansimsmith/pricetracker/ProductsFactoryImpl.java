@@ -9,7 +9,6 @@ public class ProductsFactoryImpl implements ProductsFactory {
 
   private final URI chemistWarehouseBaseUri;
   private final URI nzProteinBaseUri;
-  private final URI nzMuscleBaseUri;
 
   private static final List<CatalogProduct> CHEMIST_WAREHOUSE_PRODUCTS =
       List.of(
@@ -107,86 +106,9 @@ public class ProductsFactoryImpl implements ProductsFactory {
       List.of(
           new CatalogProduct("/product/nz-whey-1kg-2-2lbs", "NZ Protein - NZ Whey 1kg (2.2lbs)"));
 
-  private static final List<CatalogProduct> NZ_MUSCLE_PRODUCTS =
-      List.of(
-          new CatalogProduct(
-              "/products/shotgun-whey-protein?variant=51471561195701",
-              "Shotgun Whey Protein Chocolate 2kg"),
-          new CatalogProduct(
-              "/products/shotgun-whey-protein?variant=51471561162933",
-              "Shotgun Whey Protein Vanilla 2kg"),
-          new CatalogProduct(
-              "/products/shotgun-whey-protein?variant=51471561228469",
-              "Shotgun Whey Protein Strawberry 2kg"),
-          new CatalogProduct(
-              "/products/shotgun-whey-protein?variant=51471561261237",
-              "Shotgun Whey Protein Banana 2kg"),
-          new CatalogProduct(
-              "/products/musashi-high-protein-bars?variant=51471487467701",
-              "Musashi High Protein Bar Cookies N Cream"),
-          new CatalogProduct(
-              "/products/musashi-high-protein-bars?variant=51471487631541",
-              "Musashi High Protein Bar Peanut Butter"),
-          new CatalogProduct(
-              "/products/musashi-high-protein-bars?variant=51471487664309",
-              "Musashi High Protein Bar White Choc Caramel"),
-          new CatalogProduct(
-              "/products/musashi-high-protein-bars?variant=51471487500469",
-              "Musashi High Protein Bar Milk Chocolate Brownie"),
-          new CatalogProduct(
-              "/products/musashi-high-protein-bars?variant=51471487533237",
-              "Musashi High Protein Bar Dark Choc Salted Caramel"),
-          new CatalogProduct(
-              "/products/musashi-high-protein-bars?variant=51471487729845",
-              "Musashi High Protein Bar White Choc Lemon Cheesecake"),
-          new CatalogProduct(
-              "/products/quest-nutrition-protein-bars?variant=51471548514485",
-              "Quest Nutrition Protein Bar Choc Peanut Butter"),
-          new CatalogProduct(
-              "/products/quest-nutrition-protein-bars?variant=51471548383413",
-              "Quest Nutrition Protein Bar Caramel Choc Chunk"),
-          new CatalogProduct(
-              "/products/quest-nutrition-protein-bars?variant=51471548481717",
-              "Quest Nutrition Protein Bar Cookies & Cream"),
-          new CatalogProduct(
-              "/products/quest-nutrition-protein-bars?variant=51471548416181",
-              "Quest Nutrition Protein Bar Choc Chip Cookie Dough"),
-          new CatalogProduct(
-              "/products/quest-nutrition-protein-bars?variant=51471548580021",
-              "Quest Nutrition Protein Bar White Chocolate Raspberry"),
-          new CatalogProduct(
-              "/products/quest-nutrition-protein-bars?variant=51471548448949",
-              "Quest Nutrition Protein Bar Chocolate Brownie"),
-          new CatalogProduct(
-              "/products/quest-nutrition-protein-bars?variant=51471548547253",
-              "Quest Nutrition Protein Bar Smores"),
-          new CatalogProduct(
-              "/products/quest-nutrition-protein-bars?variant=51471548350645",
-              "Quest Nutrition Protein Bar Birthday Cake"),
-          new CatalogProduct(
-              "/products/nz-muscle-protein-water?variant=51471524823221",
-              "NZ Muscle Protein Water Tropical 375g"),
-          new CatalogProduct(
-              "/products/nz-muscle-protein-water?variant=51471524855989",
-              "NZ Muscle Protein Water Pineapple Popsicle 375g"),
-          new CatalogProduct(
-              "/products/nz-muscle-protein-water?variant=51471524888757",
-              "NZ Muscle Protein Water Raspberry Lemonade 375g"),
-          new CatalogProduct(
-              "/products/nz-muscle-protein-water?variant=51471524921525",
-              "NZ Muscle Protein Water Passionfruit 375g"),
-          new CatalogProduct(
-              "/products/nz-muscle-protein-water?variant=51471524954293",
-              "NZ Muscle Protein Water Watermelon Burst 375g"),
-          new CatalogProduct(
-              "/products/nz-muscle-protein-water?variant=51471524987061",
-              "NZ Muscle Protein Water Peach Iced Tea 375g"));
-
-  public ProductsFactoryImpl(
-      URI chemistWarehouseBaseUri, URI nzProteinBaseUri, URI nzMuscleBaseUri) {
+  public ProductsFactoryImpl(URI chemistWarehouseBaseUri, URI nzProteinBaseUri) {
     this.chemistWarehouseBaseUri = chemistWarehouseBaseUri;
     this.nzProteinBaseUri = nzProteinBaseUri;
-    this.nzMuscleBaseUri = nzMuscleBaseUri;
   }
 
   @Override
@@ -194,7 +116,6 @@ public class ProductsFactoryImpl implements ProductsFactory {
     var allProducts = new ArrayList<Product>();
     allProducts.addAll(buildProducts(chemistWarehouseBaseUri, CHEMIST_WAREHOUSE_PRODUCTS));
     allProducts.addAll(buildProducts(nzProteinBaseUri, NZ_PROTEIN_PRODUCTS));
-    allProducts.addAll(buildProducts(nzMuscleBaseUri, NZ_MUSCLE_PRODUCTS));
     return allProducts;
   }
 

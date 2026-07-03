@@ -36,11 +36,10 @@ The price tracker service runs an hourly scheduled workflow that scrapes curated
 
 ### Current catalog summary
 
-| Retailer                                         | Product count | Representative examples                                                  |
-| ------------------------------------------------ | ------------- | ------------------------------------------------------------------------ |
-| Chemist Warehouse (`www.chemistwarehouse.co.nz`) | `32`          | Dynamic Whey 2kg, Quest Protein Bars, INC Creatine                       |
-| NZ Protein (`www.nzprotein.co.nz`)               | `1`           | NZ Whey 1kg                                                              |
-| NZ Muscle (`nzmuscle.co.nz`)                     | `24`          | Shotgun Whey variants, Musashi bars, Quest bars, NZ Muscle Protein Water |
+| Retailer                                         | Product count | Representative examples                            |
+| ------------------------------------------------ | ------------- | -------------------------------------------------- |
+| Chemist Warehouse (`www.chemistwarehouse.co.nz`) | `32`          | Dynamic Whey 2kg, Quest Protein Bars, INC Creatine |
+| NZ Protein (`www.nzprotein.co.nz`)               | `1`           | NZ Whey 1kg                                        |
 
 ## Architecture
 
@@ -51,7 +50,6 @@ flowchart TD
   updateHandler --> priceClient[JsoupPriceClient]
   priceClient --> chemistWarehouse[chemistwarehouse.co.nz]
   priceClient --> nzProtein[nzprotein.co.nz]
-  priceClient --> nzMuscle[nzmuscle.co.nz]
   updateHandler --> dynamoDb[(DynamoDB price_tracker)]
   updateHandler --> snsTopic[SNS price_tracker_api_price_updates]
   snsTopic --> subscribers[Email subscribers]
@@ -85,7 +83,7 @@ sequenceDiagram
 
 - Keep the service as a scheduled Lambda worker (not an HTTP API) because workload is periodic polling, not request/response serving.
 - Store the tracked catalog directly in `ProductsFactoryImpl` so monitored products are explicit and versioned with code changes.
-- Route parsing by URL host to dedicated extractors (`Chemist Warehouse`, `NZ Protein`, `NZ Muscle`) for deterministic selector behavior per site.
+- Route parsing by URL host to dedicated extractors (`Chemist Warehouse`, `NZ Protein`) for deterministic selector behavior per site.
 - Persist snapshots as append-only DynamoDB items keyed by product URL + timestamp to preserve full historical price series.
 - Publish one aggregated SNS message per run to reduce notification noise when multiple products decrease together.
 
@@ -102,7 +100,6 @@ sequenceDiagram
 
 - **Chemist Warehouse website** (`www.chemistwarehouse.co.nz`): outbound HTTPS `GET` using Jsoup with browser-like headers and `30s` timeout. Required request field is the full product URL in the curated catalog. Auth method is none. Cadence is hourly per product. Failures return `null` when selector/price parsing fails and the product is skipped for that run.
 - **NZ Protein website** (`www.nzprotein.co.nz`): outbound HTTPS `GET` with the same client behavior. Required request field is the full product URL in the curated catalog. Auth method is none. Cadence is hourly. Failures follow the same skip-on-null behavior.
-- **NZ Muscle website** (`nzmuscle.co.nz`): outbound HTTPS `GET` with the same client behavior. Required request field is the full product URL in the curated catalog. Auth method is none. Cadence is hourly. Failures follow the same skip-on-null behavior.
 - **Amazon SNS** (`price_tracker_api_price_updates`): outbound publish integration for price decrease notifications. Required publish fields are topic name, subject, and message body lines containing product name, previous price, current price, and URL. Auth uses Lambda IAM role. When no matching topic ARN exists, publish fails and the invocation fails.
 
 ## API contracts
@@ -210,7 +207,6 @@ Representative item:
 | --------------------------------------------- | ---------------------------------------------- | --------------------------------------------- | ---------------------------------------------------------- |
 | `PRICE_TRACKER_CHEMIST_WAREHOUSE_BASE_URL`    | optional                                       | Override Chemist Warehouse product URL base   | `https://www.chemistwarehouse.co.nz`                       |
 | `PRICE_TRACKER_NZ_PROTEIN_BASE_URL`           | optional                                       | Override NZ Protein product URL base          | `https://www.nzprotein.co.nz`                              |
-| `PRICE_TRACKER_NZ_MUSCLE_BASE_URL`            | optional                                       | Override NZ Muscle product URL base           | `https://nzmuscle.co.nz`                                   |
 | `AWS_REGION`                                  | runtime-provided in AWS; test-provided locally | Region for AWS SDK clients                    | Terraform and tests use `ap-southeast-2`                   |
 | `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | local tests only                               | AWS SDK credentials for local test containers | Not required in production Lambda (execution role is used) |
 
@@ -221,7 +217,7 @@ Representative item:
 ## Performance envelope
 
 - Execution cadence is fixed at one scheduled run per hour (`rate(1 hour)`).
-- Current catalog size is `57` product URLs processed sequentially in each run.
+- Current catalog size is `33` product URLs processed sequentially in each run.
 - Each fetch uses up to `3` attempts, `30s` request timeout, and exponential backoff with jitter.
 - Lambda timeout is `120s`; catalog size and scrape behavior are tuned for personal-scale workloads.
 - DynamoDB table uses `PAY_PER_REQUEST` billing mode for elastic low-volume operation.

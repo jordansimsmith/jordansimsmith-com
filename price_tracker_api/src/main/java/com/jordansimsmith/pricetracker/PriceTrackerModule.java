@@ -46,21 +46,9 @@ public class PriceTrackerModule {
 
   @Provides
   @Singleton
-  @Named("nzMuscleBaseUri")
-  URI nzMuscleBaseUri() {
-    var nzMuscleBaseUrl = System.getenv("PRICE_TRACKER_NZ_MUSCLE_BASE_URL");
-    if (nzMuscleBaseUrl == null || nzMuscleBaseUrl.isBlank()) {
-      nzMuscleBaseUrl = "https://nzmuscle.co.nz";
-    }
-    return URI.create(nzMuscleBaseUrl);
-  }
-
-  @Provides
-  @Singleton
   PriceClient priceClient(
       @Named("chemistWarehouseBaseUri") URI chemistWarehouseBaseUri,
-      @Named("nzProteinBaseUri") URI nzProteinBaseUri,
-      @Named("nzMuscleBaseUri") URI nzMuscleBaseUri) {
+      @Named("nzProteinBaseUri") URI nzProteinBaseUri) {
     RandomGenerator randomGenerator = new Random();
 
     var extractors =
@@ -68,9 +56,7 @@ public class PriceTrackerModule {
             chemistWarehouseBaseUri.getHost(),
             new ChemistWarehousePriceExtractor(),
             nzProteinBaseUri.getHost(),
-            new NzProteinPriceExtractor(),
-            nzMuscleBaseUri.getHost(),
-            new NzMusclePriceExtractor());
+            new NzProteinPriceExtractor());
 
     return new JsoupPriceClient(randomGenerator, extractors);
   }
@@ -79,8 +65,7 @@ public class PriceTrackerModule {
   @Singleton
   ProductsFactory productsFactory(
       @Named("chemistWarehouseBaseUri") URI chemistWarehouseBaseUri,
-      @Named("nzProteinBaseUri") URI nzProteinBaseUri,
-      @Named("nzMuscleBaseUri") URI nzMuscleBaseUri) {
-    return new ProductsFactoryImpl(chemistWarehouseBaseUri, nzProteinBaseUri, nzMuscleBaseUri);
+      @Named("nzProteinBaseUri") URI nzProteinBaseUri) {
+    return new ProductsFactoryImpl(chemistWarehouseBaseUri, nzProteinBaseUri);
   }
 }
