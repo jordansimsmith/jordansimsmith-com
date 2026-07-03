@@ -26,6 +26,12 @@ public class SearchFactoryImpl implements SearchFactory {
               "g.skill trident z 32gb ddr4",
               null,
               200.0,
+              Condition.USED),
+          new SearchDefinition(
+              "/a/marketplace/gaming/trading-cards/magic/search",
+              "bulk",
+              null,
+              100.0,
               Condition.USED));
 
   private final URI baseUri;
