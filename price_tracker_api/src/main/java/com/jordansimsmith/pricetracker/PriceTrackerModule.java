@@ -46,9 +46,21 @@ public class PriceTrackerModule {
 
   @Provides
   @Singleton
+  @Named("sportsfuelBaseUri")
+  URI sportsfuelBaseUri() {
+    var sportsfuelBaseUrl = System.getenv("PRICE_TRACKER_SPORTSFUEL_BASE_URL");
+    if (sportsfuelBaseUrl == null || sportsfuelBaseUrl.isBlank()) {
+      sportsfuelBaseUrl = "https://www.sportsfuel.co.nz";
+    }
+    return URI.create(sportsfuelBaseUrl);
+  }
+
+  @Provides
+  @Singleton
   PriceClient priceClient(
       @Named("chemistWarehouseBaseUri") URI chemistWarehouseBaseUri,
-      @Named("nzProteinBaseUri") URI nzProteinBaseUri) {
+      @Named("nzProteinBaseUri") URI nzProteinBaseUri,
+      @Named("sportsfuelBaseUri") URI sportsfuelBaseUri) {
     RandomGenerator randomGenerator = new Random();
 
     var extractors =
@@ -56,7 +68,9 @@ public class PriceTrackerModule {
             chemistWarehouseBaseUri.getHost(),
             new ChemistWarehousePriceExtractor(),
             nzProteinBaseUri.getHost(),
-            new NzProteinPriceExtractor());
+            new NzProteinPriceExtractor(),
+            sportsfuelBaseUri.getHost(),
+            new SportsfuelPriceExtractor());
 
     return new JsoupPriceClient(randomGenerator, extractors);
   }
@@ -65,7 +79,8 @@ public class PriceTrackerModule {
   @Singleton
   ProductsFactory productsFactory(
       @Named("chemistWarehouseBaseUri") URI chemistWarehouseBaseUri,
-      @Named("nzProteinBaseUri") URI nzProteinBaseUri) {
-    return new ProductsFactoryImpl(chemistWarehouseBaseUri, nzProteinBaseUri);
+      @Named("nzProteinBaseUri") URI nzProteinBaseUri,
+      @Named("sportsfuelBaseUri") URI sportsfuelBaseUri) {
+    return new ProductsFactoryImpl(chemistWarehouseBaseUri, nzProteinBaseUri, sportsfuelBaseUri);
   }
 }

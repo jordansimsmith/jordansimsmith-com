@@ -9,6 +9,7 @@ public class ProductsFactoryImpl implements ProductsFactory {
 
   private final URI chemistWarehouseBaseUri;
   private final URI nzProteinBaseUri;
+  private final URI sportsfuelBaseUri;
 
   private static final List<CatalogProduct> CHEMIST_WAREHOUSE_PRODUCTS =
       List.of(
@@ -106,9 +107,35 @@ public class ProductsFactoryImpl implements ProductsFactory {
       List.of(
           new CatalogProduct("/product/nz-whey-1kg-2-2lbs", "NZ Protein - NZ Whey 1kg (2.2lbs)"));
 
-  public ProductsFactoryImpl(URI chemistWarehouseBaseUri, URI nzProteinBaseUri) {
+  private static final List<CatalogProduct> SPORTSFUEL_PRODUCTS =
+      List.of(
+          new CatalogProduct(
+              "/products/clean-nutrition-whey-protein-1kg?variant=14788899504195",
+              "Sportsfuel - Clean Nutrition Whey Protein 1kg - Vanilla"),
+          new CatalogProduct(
+              "/products/clean-nutrition-whey-protein-1kg?variant=14788899536963",
+              "Sportsfuel - Clean Nutrition Whey Protein 1kg - Chocolate"),
+          new CatalogProduct(
+              "/products/clean-nutrition-whey-protein-1kg?variant=14788899569731",
+              "Sportsfuel - Clean Nutrition Whey Protein 1kg - Banana"),
+          new CatalogProduct(
+              "/products/clean-nutrition-whey-protein-1kg?variant=14788899602499",
+              "Sportsfuel - Clean Nutrition Whey Protein 1kg - Strawberry"),
+          new CatalogProduct(
+              "/products/clean-nutrition-whey-protein-1kg?variant=14788899635267",
+              "Sportsfuel - Clean Nutrition Whey Protein 1kg - Cookies and Cream"),
+          new CatalogProduct(
+              "/products/clean-nutrition-whey-protein-1kg?variant=14788899668035",
+              "Sportsfuel - Clean Nutrition Whey Protein 1kg - Unflavoured"),
+          new CatalogProduct(
+              "/products/clean-nutrition-whey-protein-1kg?variant=29421064126531",
+              "Sportsfuel - Clean Nutrition Whey Protein 1kg - Salted Caramel"));
+
+  public ProductsFactoryImpl(
+      URI chemistWarehouseBaseUri, URI nzProteinBaseUri, URI sportsfuelBaseUri) {
     this.chemistWarehouseBaseUri = chemistWarehouseBaseUri;
     this.nzProteinBaseUri = nzProteinBaseUri;
+    this.sportsfuelBaseUri = sportsfuelBaseUri;
   }
 
   @Override
@@ -116,6 +143,7 @@ public class ProductsFactoryImpl implements ProductsFactory {
     var allProducts = new ArrayList<Product>();
     allProducts.addAll(buildProducts(chemistWarehouseBaseUri, CHEMIST_WAREHOUSE_PRODUCTS));
     allProducts.addAll(buildProducts(nzProteinBaseUri, NZ_PROTEIN_PRODUCTS));
+    allProducts.addAll(buildProducts(sportsfuelBaseUri, SPORTSFUEL_PRODUCTS));
     return allProducts;
   }
 

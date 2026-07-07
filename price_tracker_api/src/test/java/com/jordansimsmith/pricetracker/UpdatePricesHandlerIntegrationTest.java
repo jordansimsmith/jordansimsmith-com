@@ -209,4 +209,50 @@ public class UpdatePricesHandlerIntegrationTest {
             "NZ Protein - NZ Whey 1kg (2.2lbs) $55.99 -> $52.00"
                 + " https://www.nzprotein.co.nz/product/nz-whey-1kg-2-2lbs");
   }
+
+  @Test
+  void handleRequestShouldUpdateSportsfuelPrices() {
+    // arrange
+    var product1 =
+        new ProductsFactory.Product(
+            URI.create(
+                "https://www.sportsfuel.co.nz/products/clean-nutrition-whey-protein-1kg?variant=14788899504195"),
+            "Sportsfuel - Clean Nutrition Whey Protein 1kg - Vanilla");
+    fakeProductsFactory.addSportsfuelProducts(List.of(product1));
+
+    var product1Price = 61.11;
+    fakePriceClient.setPrice(product1.url(), product1Price);
+
+    var product1History =
+        PriceTrackerItem.create(
+            product1.url().toString(), product1.name(), Instant.ofEpochSecond(2_000), 67.90);
+    priceTrackerTable.putItem(product1History);
+
+    fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
+
+    // act
+    updatePricesHandler.handleRequest(new ScheduledEvent(), null);
+
+    // assert
+    var product1New =
+        priceTrackerTable.getItem(
+            Key.builder()
+                .partitionValue(PriceTrackerItem.formatPk(product1.url().toString()))
+                .sortValue(PriceTrackerItem.formatSk(fakeClock.now()))
+                .build());
+    assertThat(product1New).isNotNull();
+    assertThat(product1New.getName()).isEqualTo(product1.name());
+    assertThat(product1New.getUrl()).isEqualTo(product1.url().toString());
+    assertThat(product1New.getPrice()).isEqualTo(product1Price);
+    assertThat(product1New.getTimestamp()).isEqualTo(fakeClock.now());
+
+    var notifications = fakeNotificationPublisher.findNotifications(UpdatePricesHandler.TOPIC);
+    assertThat(notifications.size()).isEqualTo(1);
+    var notification = notifications.get(0);
+    assertThat(notification.subject()).isEqualTo("1 price decreased");
+    assertThat(notification.message())
+        .isEqualTo(
+            "Sportsfuel - Clean Nutrition Whey Protein 1kg - Vanilla $67.90 -> $61.11"
+                + " https://www.sportsfuel.co.nz/products/clean-nutrition-whey-protein-1kg?variant=14788899504195");
+  }
 }

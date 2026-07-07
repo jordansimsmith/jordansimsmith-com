@@ -6,12 +6,14 @@ import java.util.List;
 public class FakeProductsFactory implements ProductsFactory {
   private final List<Product> chemistWarehouseProducts = new ArrayList<>();
   private final List<Product> nzProteinProducts = new ArrayList<>();
+  private final List<Product> sportsfuelProducts = new ArrayList<>();
 
   @Override
   public List<Product> findProducts() {
     var allProducts = new ArrayList<Product>();
     allProducts.addAll(chemistWarehouseProducts);
     allProducts.addAll(nzProteinProducts);
+    allProducts.addAll(sportsfuelProducts);
     return allProducts;
   }
 
@@ -23,8 +25,13 @@ public class FakeProductsFactory implements ProductsFactory {
     nzProteinProducts.addAll(products);
   }
 
+  public void addSportsfuelProducts(List<Product> products) {
+    sportsfuelProducts.addAll(products);
+  }
+
   public void reset() {
     chemistWarehouseProducts.clear();
     nzProteinProducts.clear();
+    sportsfuelProducts.clear();
   }
 }
