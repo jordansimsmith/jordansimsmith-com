@@ -1,5 +1,6 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 load("@rules_java//java:defs.bzl", "java_binary", "java_library")
+load("@rules_python//python:defs.bzl", "py_binary")
 load("//lib/http:defs.bzl", "stub_server_image")
 load("//lib/localstack:defs.bzl", "localstack_image")
 
@@ -76,6 +77,17 @@ java_binary(
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
     ],
+)
+
+py_binary(
+    name = "run-eval",
+    srcs = ["evals/run_eval.py"],
+    data = glob([
+        "evals/dataset/*.json",
+        "evals/prompts/*.md",
+    ]),
+    main = "evals/run_eval.py",
+    deps = ["@pypi//openai"],
 )
 
 java_binary(

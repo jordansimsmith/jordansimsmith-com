@@ -1,0 +1,452 @@
+{
+  "6005415727": {
+    "mtg_cards": "pass",
+    "bulk_scale": "fail",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "not bulk scale. LOTR is acceptable as an exception to not universes beyond"
+  },
+  "6005420243": {
+    "mtg_cards": "pass",
+    "bulk_scale": "fail",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": null
+  },
+  "6005425400": {
+    "mtg_cards": "pass",
+    "bulk_scale": "fail",
+    "not_basic_lands": "fail",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "\"land cards\" assumed to mean basic lands (default: lands are basic unless specified otherwise)"
+  },
+  "6008004664": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "pass",
+    "notes": "this is a great listing"
+  },
+  "6009724845": {
+    "mtg_cards": "pass",
+    "bulk_scale": "fail",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "fail",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "single card from store"
+  },
+  "6009743124": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "pass",
+    "notes": "great listing, someone trying to dump their collection without caring too much about it"
+  },
+  "6011078843": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "pass",
+    "notes": null
+  },
+  "6011120058": {
+    "mtg_cards": "pass",
+    "bulk_scale": "fail",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "fail",
+    "fixed_collection": "fail",
+    "overall": "fail",
+    "notes": null
+  },
+  "6011401445": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "fail",
+    "fixed_collection": "fail",
+    "overall": "fail",
+    "notes": null
+  },
+  "6012209428": {
+    "mtg_cards": "pass",
+    "bulk_scale": "fail",
+    "not_basic_lands": "fail",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "fail",
+    "overall": "fail",
+    "notes": null
+  },
+  "6012890795": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "pass",
+    "notes": "great listing"
+  },
+  "6013070383": {
+    "mtg_cards": "pass",
+    "bulk_scale": "fail",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "single card"
+  },
+  "6013169027": {
+    "mtg_cards": "pass",
+    "bulk_scale": "fail",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "enumerated rares - no change of values since the seller already has gone through them"
+  },
+  "6013179958": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "pass",
+    "notes": "great listing"
+  },
+  "6013731162": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "fail",
+    "overall": "fail",
+    "notes": "not a fixed collection, probably chaff/sifted"
+  },
+  "6014022009": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "pass",
+    "notes": null
+  },
+  "6014570814": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "pass",
+    "notes": "50/50 on civilian seller tbh but better to be optimistic here rather than over aggressively filtering"
+  },
+  "6015889153": {
+    "mtg_cards": "fail",
+    "bulk_scale": null,
+    "not_basic_lands": null,
+    "not_universes_beyond": null,
+    "civilian_seller": null,
+    "fixed_collection": null,
+    "overall": "fail",
+    "notes": "not magic cards"
+  },
+  "6016230487": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "fail",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "basic lands"
+  },
+  "6019029453": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "pass",
+    "notes": "great listing!"
+  },
+  "6019440661": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "pass",
+    "notes": "great listing!"
+  },
+  "6020487641": {
+    "mtg_cards": "pass",
+    "bulk_scale": "fail",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "not enough volume, otherwise a good listing"
+  },
+  "s001": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "fail",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "synthetic: UB (Marvel) fail, otherwise good bulk"
+  },
+  "s002": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "fail",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "synthetic: UB (TMNT + Marvel) fail"
+  },
+  "s003": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "fail",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "synthetic: UB (Doctor Who) fail"
+  },
+  "s004": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "fail",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "synthetic: UB (Fallout) fail, informal civilian style"
+  },
+  "s005": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "fail",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "synthetic: primarily-UB mixed lot fail (tests 'primarily' threshold)"
+  },
+  "s006": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "pass",
+    "notes": "synthetic: UB mentioned but not primary - must pass (adversarial pass)"
+  },
+  "s007": {
+    "mtg_cards": "fail",
+    "bulk_scale": null,
+    "not_basic_lands": null,
+    "not_universes_beyond": null,
+    "civilian_seller": null,
+    "fixed_collection": null,
+    "overall": "fail",
+    "notes": "synthetic: not MTG (Pokemon), miscategorized"
+  },
+  "s008": {
+    "mtg_cards": "fail",
+    "bulk_scale": null,
+    "not_basic_lands": null,
+    "not_universes_beyond": null,
+    "civilian_seller": null,
+    "fixed_collection": null,
+    "overall": "fail",
+    "notes": "synthetic: not MTG (Yu-Gi-Oh) despite mentioning Magic"
+  },
+  "s009": {
+    "mtg_cards": "fail",
+    "bulk_scale": null,
+    "not_basic_lands": null,
+    "not_universes_beyond": null,
+    "civilian_seller": null,
+    "fixed_collection": null,
+    "overall": "fail",
+    "notes": "synthetic: MTG branded but zero cards (adversarial - says Magic everywhere)"
+  },
+  "s010": {
+    "mtg_cards": "fail",
+    "bulk_scale": null,
+    "not_basic_lands": null,
+    "not_universes_beyond": null,
+    "civilian_seller": null,
+    "fixed_collection": null,
+    "overall": "fail",
+    "notes": "synthetic: not MTG (Flesh and Blood)"
+  },
+  "s011": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "fail",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "synthetic: unqualified 'lands' assumed basic - fail"
+  },
+  "s012": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "fail",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "synthetic: primarily basic lands mixed lot - fail"
+  },
+  "s013": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "pass",
+    "notes": "synthetic: lands lot explicitly nonbasic - must pass (adversarial pass)"
+  },
+  "s014": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "fail",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "synthetic: card store explicitly sifted bulk - civilian fail"
+  },
+  "s015": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "fail",
+    "fixed_collection": "fail",
+    "overall": "fail",
+    "notes": "synthetic: wholesaler + multiple lots - civilian and fixed_collection fail"
+  },
+  "s016": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "fail",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "synthetic: card-business machinery (scryfall stock photo, in-cart threshold)"
+  },
+  "s017": {
+    "mtg_cards": "pass",
+    "bulk_scale": "fail",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "fail",
+    "overall": "fail",
+    "notes": "synthetic: on-demand repack, also fails bulk_scale (50 cards)"
+  },
+  "s018": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "fail",
+    "overall": "fail",
+    "notes": "synthetic: assembled per order from civilian - fixed_collection fail only"
+  },
+  "s019": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "pass",
+    "notes": "synthetic: pass with named highlights (tests highlights_ok decision)"
+  },
+  "s020": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "pass",
+    "notes": "synthetic: clean pass, unsifted attic find"
+  },
+  "s021": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "pass",
+    "notes": "synthetic: clean pass, weight-based volume"
+  },
+  "s022": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "pass",
+    "notes": "synthetic: power-seller boilerplate around one-off estate lot - civilian must pass (adversarial pass)"
+  },
+  "s023": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "pass",
+    "notes": "synthetic: clean pass"
+  }
+}
