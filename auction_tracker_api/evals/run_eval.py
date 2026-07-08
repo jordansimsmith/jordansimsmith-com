@@ -72,7 +72,7 @@ def build_system_prompt(prompt_path, fixtures, labels, train_ids):
     return prompt + "\n".join(lines)
 
 
-def judge_once(client, model, system_prompt, fixture):
+def judge_once(client, model, system_prompt, fixture, reasoning_effort):
     user = (
         "Judge this listing. Respond with the JSON object described in your instructions.\n\n"
         f"Title: {fixture['title']}\n"
@@ -86,6 +86,8 @@ def judge_once(client, model, system_prompt, fixture):
         ],
         response_format={"type": "json_object"},
     )
+    if reasoning_effort:
+        kwargs["reasoning_effort"] = reasoning_effort
     start = time.monotonic()
     try:
         response = client.chat.completions.create(temperature=0, **kwargs)
@@ -115,9 +117,10 @@ def judge_once(client, model, system_prompt, fixture):
     }
 
 
-def judge_listing(client, model, system_prompt, fixture, trials):
+def judge_listing(client, model, system_prompt, fixture, trials, reasoning_effort):
     attempts = [
-        judge_once(client, model, system_prompt, fixture) for _ in range(trials)
+        judge_once(client, model, system_prompt, fixture, reasoning_effort)
+        for _ in range(trials)
     ]
     voted = {}
     for c in CRITERIA:
@@ -180,6 +183,11 @@ def main():
         "--split", default="dev", choices=["train", "dev", "test", "all"]
     )
     parser.add_argument("--prompt", default="prompts/v1.md")
+    parser.add_argument(
+        "--reasoning-effort",
+        choices=["minimal", "low", "medium", "high"],
+        help="reasoning effort for models that support it (omit for model default)",
+    )
     parser.add_argument("--trials", type=int, default=1)
     parser.add_argument("--limit", type=int)
     parser.add_argument("--workers", type=int, default=8)
@@ -209,6 +217,7 @@ def main():
                 system_prompt,
                 fixtures[i],
                 args.trials,
+                args.reasoning_effort,
             ): i
             for i in ids
         }
@@ -231,10 +240,12 @@ def main():
         ) / 1e6
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-    run_dir = RUNS_DIR / f"{timestamp}-{args.model}-{args.split}"
+    effort_tag = f"-{args.reasoning_effort}" if args.reasoning_effort else ""
+    run_dir = RUNS_DIR / f"{timestamp}-{args.model}{effort_tag}-{args.split}"
     run_dir.mkdir(parents=True)
     config = {
         "model": args.model,
+        "reasoning_effort": args.reasoning_effort,
         "split": args.split,
         "trials": args.trials,
         "limit": args.limit,
@@ -273,7 +284,8 @@ def main():
     (run_dir / "metrics.json").write_text(json.dumps(summary, indent=2) + "\n")
 
     print(
-        f"\nmodel={args.model} split={args.split} trials={args.trials} examples={len(records)} errors={len(errors)}"
+        f"\nmodel={args.model} effort={args.reasoning_effort or 'default'} split={args.split}"
+        f" trials={args.trials} examples={len(records)} errors={len(errors)}"
     )
     print("TPR = junk caught (of labeled fails, % judged fail)")
     print("TNR = keepers kept (of labeled passes, % judged pass)")
