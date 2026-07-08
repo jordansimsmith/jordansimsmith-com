@@ -185,7 +185,7 @@ def main():
     parser.add_argument("--prompt", default="prompts/v1.md")
     parser.add_argument(
         "--reasoning-effort",
-        choices=["minimal", "low", "medium", "high"],
+        choices=["none", "low", "medium", "high", "xhigh"],
         help="reasoning effort for models that support it (omit for model default)",
     )
     parser.add_argument("--trials", type=int, default=1)
@@ -295,9 +295,10 @@ def main():
         print(
             f"{key:22} {fmt_rate(m['tpr'])} {fmt_rate(m['tnr'])}   ({m['labeled_fail']} / {m['labeled_pass']})"
         )
-    print(
-        f"\nmean latency {summary['mean_latency_s']:.2f}s | p95 {summary['p95_latency_s']:.2f}s"
-    )
+    if latencies:
+        print(
+            f"\nmean latency {summary['mean_latency_s']:.2f}s | p95 {summary['p95_latency_s']:.2f}s"
+        )
     print(f"tokens: {input_tokens} in / {output_tokens} out", end="")
     if cost is not None:
         print(f" | cost ${cost:.4f} (${summary['cost_per_listing_usd']:.5f}/listing)")

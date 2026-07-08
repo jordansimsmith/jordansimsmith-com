@@ -33,7 +33,7 @@ The lot is not primarily Universes Beyond crossover sets (Marvel, TMNT, Doctor W
 
 ### civilian_seller
 
-The cards come from a private individual's collection, not a card retailer or wholesaler's sifted inventory. Judged on the cards' provenance, not the seller's selling style: generic power-seller boilerplate (auction T&Cs, warranty text, courier policies) around a one-off personal lot passes. Card-business machinery fails: card-database stock photos ("Card image from scryfall.com"), in-cart order thresholds, productized bulk lines, explicit sifting or wholesale framing. Lean optimistic; no signal passes.
+The cards come from a private individual's collection, not a card retailer or wholesaler's sifted inventory. Judged on the cards' provenance, not the seller's selling style: generic power-seller boilerplate (auction T&Cs, warranty text, courier policies) around a one-off personal lot passes. Card-business machinery fails: card-database stock photos ("Card image from scryfall.com"), in-cart order thresholds, productized bulk lines, explicit sifting or wholesale framing. Rarity-guarantee repacking ("Minimum 1 Rare guaranteed") also fails, even from a hobbyist: composing lots by rarity implies the seller sorts and knows cards. A business that is not a card business (games store, general second-hand dealer) selling a one-off MTG lot passes. Lean optimistic; no signal passes.
 
 ### fixed_collection
 

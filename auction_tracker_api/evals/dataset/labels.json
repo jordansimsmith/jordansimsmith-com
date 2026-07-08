@@ -384,10 +384,10 @@
     "bulk_scale": "fail",
     "not_basic_lands": "pass",
     "not_universes_beyond": "pass",
-    "civilian_seller": "pass",
+    "civilian_seller": "fail",
     "fixed_collection": "fail",
     "overall": "fail",
-    "notes": "synthetic: on-demand repack, also fails bulk_scale (50 cards)"
+    "notes": "synthetic: on-demand repack; fails fixed_collection, bulk_scale (50 cards), and civilian_seller (rarity-guarantee repacking implies sifting, per 6011120058 precedent)"
   },
   "s018": {
     "mtg_cards": "pass",
