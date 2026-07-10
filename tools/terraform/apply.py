@@ -19,10 +19,16 @@ def parse_args():
         help="Path to a file in the workspace root (kept for Bazel run compatibility).",
     )
     parser.add_argument("manifest", type=Path, help="Path to terraform manifest file")
+    parser.add_argument(
+        "--path",
+        action="append",
+        dest="paths",
+        help="Limit to a manifest terraform root path (e.g. auth_api/infra); repeatable.",
+    )
     return parser.parse_args()
 
 
-def load_terraform_roots(workspace_root, manifest_path):
+def load_terraform_roots(workspace_root, manifest_path, paths):
     manifest = json.loads(manifest_path.read_text())
     terraform_roots = []
     for entry in manifest["terraform_roots"]:
@@ -35,6 +41,18 @@ def load_terraform_roots(workspace_root, manifest_path):
                 "artifacts": entry["artifacts"],
             }
         )
+
+    if paths:
+        known_paths = {str(root["relative_path"]) for root in terraform_roots}
+        unknown_paths = set(paths) - known_paths
+        if unknown_paths:
+            raise ValueError(
+                f"Paths not found in manifest: {sorted(unknown_paths)}. "
+                f"Known paths: {sorted(known_paths)}"
+            )
+        terraform_roots = [
+            root for root in terraform_roots if str(root["relative_path"]) in paths
+        ]
 
     return terraform_roots
 
@@ -199,7 +217,7 @@ def apply_changes(with_changes):
 def main():
     args = parse_args()
     workspace_root = args.workspace_file.resolve().parent
-    terraform_roots = load_terraform_roots(workspace_root, args.manifest)
+    terraform_roots = load_terraform_roots(workspace_root, args.manifest, args.paths)
     print(
         f"Loaded {len(terraform_roots)} Terraform roots from manifest {args.manifest}"
     )
