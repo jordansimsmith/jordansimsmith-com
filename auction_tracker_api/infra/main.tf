@@ -43,7 +43,7 @@ module "java_lambda" {
     update_items_handler = {
       handler  = "com.jordansimsmith.auctiontracker.UpdateItemsHandler"
       artifact = var.artifacts["update_items_handler"]
-      timeout  = 120
+      timeout  = 300
     }
     send_digest_handler = {
       handler  = "com.jordansimsmith.auctiontracker.SendDigestHandler"
@@ -140,6 +140,44 @@ resource "aws_iam_policy" "lambda_dynamodb" {
 resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
   role       = module.java_lambda.lambda_role_name
   policy_arn = aws_iam_policy.lambda_dynamodb.arn
+}
+
+resource "aws_secretsmanager_secret" "auction_tracker" {
+  name                    = local.application_id
+  recovery_window_in_days = 0
+}
+
+data "aws_iam_policy_document" "lambda_secretsmanager" {
+  statement {
+    effect = "Allow"
+
+    resources = [
+      aws_secretsmanager_secret.auction_tracker.arn
+    ]
+
+    actions = [
+      "secretsmanager:GetResourcePolicy",
+      "secretsmanager:GetSecretValue",
+      "secretsmanager:DescribeSecret",
+      "secretsmanager:ListSecretVersionIds"
+    ]
+  }
+
+  statement {
+    effect    = "Allow"
+    resources = ["*"]
+    actions   = ["secretsmanager:ListSecrets"]
+  }
+}
+
+resource "aws_iam_policy" "lambda_secretsmanager" {
+  name   = "${local.application_id}_lambda_secretsmanager"
+  policy = data.aws_iam_policy_document.lambda_secretsmanager.json
+}
+
+resource "aws_iam_role_policy_attachment" "lambda_secretsmanager" {
+  role       = module.java_lambda.lambda_role_name
+  policy_arn = aws_iam_policy.lambda_secretsmanager.arn
 }
 
 resource "aws_sns_topic" "auction_tracker_digest" {

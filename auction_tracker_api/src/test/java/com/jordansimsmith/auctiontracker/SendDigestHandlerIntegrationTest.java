@@ -63,7 +63,7 @@ public class SendDigestHandlerIntegrationTest {
         "https://www.trademe.co.nz/search?search_string=wedge&condition=used&sort_order=expirydesc";
     var search =
         new SearchFactory.Search(
-            URI.create(baseUrl), "wedge", null, null, SearchFactory.Condition.USED);
+            URI.create(baseUrl), "wedge", null, null, SearchFactory.Condition.USED, null);
     fakeSearchFactory.addSearches(List.of(search));
 
     // create items - some within 24h, some older
@@ -72,18 +72,22 @@ public class SendDigestHandlerIntegrationTest {
             expectedSearchUrl,
             "https://www.trademe.co.nz/listing/123",
             "Recent Wedge 1",
-            yesterdayTime.plus(1, ChronoUnit.HOURS) // 23 hours ago
-            );
+            yesterdayTime.plus(1, ChronoUnit.HOURS), // 23 hours ago
+            null);
     var recentItem2 =
         AuctionTrackerItem.create(
             expectedSearchUrl,
             "https://www.trademe.co.nz/listing/456",
             "Recent Wedge 2",
-            yesterdayTime.plus(2, ChronoUnit.HOURS) // 22 hours ago
-            );
+            yesterdayTime.plus(2, ChronoUnit.HOURS), // 22 hours ago
+            null);
     var oldItem =
         AuctionTrackerItem.create(
-            expectedSearchUrl, "https://www.trademe.co.nz/listing/789", "Old Wedge", twoDaysAgo);
+            expectedSearchUrl,
+            "https://www.trademe.co.nz/listing/789",
+            "Old Wedge",
+            twoDaysAgo,
+            null);
 
     auctionTrackerTable.putItem(recentItem1);
     auctionTrackerTable.putItem(recentItem2);
@@ -122,10 +126,10 @@ public class SendDigestHandlerIntegrationTest {
 
     var search1 =
         new SearchFactory.Search(
-            URI.create(baseUrl1), "item", null, null, SearchFactory.Condition.ALL);
+            URI.create(baseUrl1), "item", null, null, SearchFactory.Condition.ALL, null);
     var search2 =
         new SearchFactory.Search(
-            URI.create(baseUrl2), "item", null, null, SearchFactory.Condition.ALL);
+            URI.create(baseUrl2), "item", null, null, SearchFactory.Condition.ALL, null);
     fakeSearchFactory.addSearches(List.of(search1, search2));
 
     var duplicateListingUrl = "https://www.trademe.co.nz/listing/123";
@@ -137,7 +141,8 @@ public class SendDigestHandlerIntegrationTest {
             expectedSearchUrl1,
             duplicateListingUrl,
             "Duplicate Item",
-            yesterdayTime.plus(1, ChronoUnit.HOURS));
+            yesterdayTime.plus(1, ChronoUnit.HOURS),
+            null);
 
     // same listing found in search 2
     var itemFromSearch2 =
@@ -145,7 +150,8 @@ public class SendDigestHandlerIntegrationTest {
             expectedSearchUrl2,
             duplicateListingUrl,
             "Duplicate Item",
-            yesterdayTime.plus(2, ChronoUnit.HOURS));
+            yesterdayTime.plus(2, ChronoUnit.HOURS),
+            null);
 
     // unique listing only in search 2
     var uniqueItem =
@@ -153,7 +159,8 @@ public class SendDigestHandlerIntegrationTest {
             expectedSearchUrl2,
             uniqueListingUrl,
             "Unique Item",
-            yesterdayTime.plus(3, ChronoUnit.HOURS));
+            yesterdayTime.plus(3, ChronoUnit.HOURS),
+            null);
 
     auctionTrackerTable.putItem(itemFromSearch1);
     auctionTrackerTable.putItem(itemFromSearch2);
@@ -188,13 +195,17 @@ public class SendDigestHandlerIntegrationTest {
         "https://www.trademe.co.nz/search?search_string=wedge&condition=used&sort_order=expirydesc";
     var search =
         new SearchFactory.Search(
-            URI.create(baseUrl), "wedge", null, null, SearchFactory.Condition.USED);
+            URI.create(baseUrl), "wedge", null, null, SearchFactory.Condition.USED, null);
     fakeSearchFactory.addSearches(List.of(search));
 
     // create only old items
     var oldItem =
         AuctionTrackerItem.create(
-            expectedSearchUrl, "https://www.trademe.co.nz/listing/789", "Old Wedge", twoDaysAgo);
+            expectedSearchUrl,
+            "https://www.trademe.co.nz/listing/789",
+            "Old Wedge",
+            twoDaysAgo,
+            null);
     auctionTrackerTable.putItem(oldItem);
 
     // act
@@ -203,5 +214,59 @@ public class SendDigestHandlerIntegrationTest {
     // assert
     var notifications = fakeNotificationPublisher.findNotifications("auction_tracker_api_digest");
     assertThat(notifications).isEmpty();
+  }
+
+  @Test
+  void handleRequestShouldExcludeFailJudgedItemsFromDigest() {
+    // arrange
+    var currentTime = Instant.ofEpochSecond(2_000_000);
+    fakeClock.setTime(currentTime);
+    var yesterdayTime = currentTime.minus(1, ChronoUnit.DAYS);
+
+    var baseUrl = "https://www.trademe.co.nz/a/marketplace/gaming/trading-cards/magic/search";
+    var expectedSearchUrl =
+        baseUrl + "?search_string=bulk&price_max=100&condition=used&sort_order=expirydesc";
+    var search =
+        new SearchFactory.Search(
+            URI.create(baseUrl),
+            "bulk",
+            null,
+            100.0,
+            SearchFactory.Condition.USED,
+            "prompts/mtg-bulk-judge.md");
+    fakeSearchFactory.addSearches(List.of(search));
+
+    var passItem =
+        AuctionTrackerItem.create(
+            expectedSearchUrl,
+            "https://www.trademe.co.nz/listing/123",
+            "MTG bulk lot",
+            yesterdayTime.plus(1, ChronoUnit.HOURS),
+            AuctionTrackerItem.Judgment.PASS);
+    var failItem =
+        AuctionTrackerItem.create(
+            expectedSearchUrl,
+            "https://www.trademe.co.nz/listing/456",
+            "Pokemon bulk lot",
+            yesterdayTime.plus(2, ChronoUnit.HOURS),
+            AuctionTrackerItem.Judgment.FAIL);
+
+    auctionTrackerTable.putItem(passItem);
+    auctionTrackerTable.putItem(failItem);
+
+    // act
+    sendDigestHandler.handleRequest(new ScheduledEvent(), null);
+
+    // assert
+    var notifications = fakeNotificationPublisher.findNotifications("auction_tracker_api_digest");
+    assertThat(notifications).hasSize(1);
+
+    var notification = notifications.get(0);
+    assertThat(notification.subject()).isEqualTo("Auction Tracker Daily Digest - 1 new items");
+    assertThat(notification.message())
+        .contains("MTG bulk lot")
+        .contains("https://www.trademe.co.nz/listing/123")
+        .doesNotContain("Pokemon bulk lot")
+        .doesNotContain("https://www.trademe.co.nz/listing/456");
   }
 }

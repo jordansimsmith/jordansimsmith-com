@@ -3,7 +3,7 @@
 load("@rules_oci//oci:defs.bzl", "oci_image", "oci_load")
 load("@rules_pkg//:pkg.bzl", "pkg_tar")
 
-def stub_server_image(name, deploy_jar, repo_tag = None):
+def stub_server_image(name, deploy_jar, repo_tag = None, visibility = None):
     """Creates a JRE-based OCI image for a stub HTTP server.
 
     Generates the following targets:
@@ -15,6 +15,7 @@ def stub_server_image(name, deploy_jar, repo_tag = None):
         name: Base name for the generated targets and the container directory.
         deploy_jar: Label for the deploy JAR to include.
         repo_tag: Docker repo tag for the loaded image. Defaults to "bazel/{name}:latest".
+        visibility: Visibility for the {name}-load target.
     """
     if not repo_tag:
         repo_tag = "bazel/" + name + ":latest"
@@ -40,4 +41,5 @@ def stub_server_image(name, deploy_jar, repo_tag = None):
         testonly = True,
         image = ":" + name + "-image",
         repo_tags = [repo_tag],
+        visibility = visibility,
     )

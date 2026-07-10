@@ -62,6 +62,7 @@ public class SendDigestHandler implements RequestHandler<ScheduledEvent, Void> {
                     findNewItemsForSearch(
                         tradeMeClient.getSearchUrl(search).toString(), yesterdayTime)
                         .stream())
+            .filter(item -> item.getJudgment() != AuctionTrackerItem.Judgment.FAIL)
             .collect(Collectors.groupingBy(AuctionTrackerItem::getUrl))
             .values()
             .stream()

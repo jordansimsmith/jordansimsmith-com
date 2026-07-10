@@ -16,7 +16,8 @@ public interface SearchFactory {
       String searchTerm,
       @Nullable Double minPrice,
       @Nullable Double maxPrice,
-      Condition condition) {}
+      Condition condition,
+      @Nullable String judgePrompt) {}
 
   List<Search> findSearches();
 }

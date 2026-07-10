@@ -1,6 +1,7 @@
 package com.jordansimsmith.auctiontracker;
 
 import com.jordansimsmith.dynamodb.DynamoDbTestModule;
+import com.jordansimsmith.llm.FakeLlmClient;
 import com.jordansimsmith.notifications.FakeNotificationPublisher;
 import com.jordansimsmith.notifications.NotificationTestModule;
 import com.jordansimsmith.time.ClockTestModule;
@@ -30,6 +31,8 @@ public interface AuctionTrackerTestFactory extends AuctionTrackerFactory {
   FakeSearchFactory fakeSearchFactory();
 
   FakeTradeMeClient fakeTradeMeClient();
+
+  FakeLlmClient fakeLlmClient();
 
   @Component.Factory
   interface Factory {

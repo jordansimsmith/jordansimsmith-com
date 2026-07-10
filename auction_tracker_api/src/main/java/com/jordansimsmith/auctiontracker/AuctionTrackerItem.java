@@ -3,13 +3,45 @@ package com.jordansimsmith.auctiontracker;
 import com.jordansimsmith.dynamodb.EpochSecondConverter;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.Locale;
 import java.util.Objects;
 import javax.annotation.Nullable;
+import software.amazon.awssdk.enhanced.dynamodb.AttributeConverter;
+import software.amazon.awssdk.enhanced.dynamodb.AttributeValueType;
+import software.amazon.awssdk.enhanced.dynamodb.EnhancedType;
 import software.amazon.awssdk.enhanced.dynamodb.extensions.annotations.DynamoDbVersionAttribute;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.*;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 @DynamoDbBean
 public class AuctionTrackerItem {
+  public enum Judgment {
+    PASS,
+    FAIL
+  }
+
+  public static class JudgmentConverter implements AttributeConverter<Judgment> {
+    @Override
+    public AttributeValue transformFrom(Judgment judgment) {
+      return AttributeValue.builder().s(judgment.name().toLowerCase(Locale.ROOT)).build();
+    }
+
+    @Override
+    public Judgment transformTo(AttributeValue attributeValue) {
+      return Judgment.valueOf(attributeValue.s().toUpperCase(Locale.ROOT));
+    }
+
+    @Override
+    public EnhancedType<Judgment> type() {
+      return EnhancedType.of(Judgment.class);
+    }
+
+    @Override
+    public AttributeValueType attributeValueType() {
+      return AttributeValueType.S;
+    }
+  }
+
   public static final String DELIMITER = "#";
   public static final String SEARCH_PREFIX = "SEARCH" + DELIMITER;
   public static final String TIMESTAMP_PREFIX = "TIMESTAMP" + DELIMITER;
@@ -20,6 +52,7 @@ public class AuctionTrackerItem {
   public static final String TITLE = "title";
   public static final String TIMESTAMP = "timestamp";
   public static final String URL = "url";
+  public static final String JUDGMENT = "judgment";
   public static final String TTL = "ttl";
   public static final String VERSION = "version";
   public static final String GSI1PK = "gsi1pk";
@@ -30,6 +63,7 @@ public class AuctionTrackerItem {
   private String title;
   private Instant timestamp;
   private String url;
+  private Judgment judgment;
   private Long ttl;
   private Long version;
   private String gsi1pk;
@@ -81,6 +115,17 @@ public class AuctionTrackerItem {
 
   public void setUrl(String url) {
     this.url = url;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(JUDGMENT)
+  @DynamoDbConvertedBy(JudgmentConverter.class)
+  public Judgment getJudgment() {
+    return judgment;
+  }
+
+  public void setJudgment(@Nullable Judgment judgment) {
+    this.judgment = judgment;
   }
 
   @DynamoDbAttribute(TTL)
@@ -140,6 +185,9 @@ public class AuctionTrackerItem {
         + ", url='"
         + url
         + '\''
+        + ", judgment='"
+        + judgment
+        + '\''
         + ", ttl='"
         + ttl
         + '\''
@@ -164,6 +212,7 @@ public class AuctionTrackerItem {
         && Objects.equals(title, auctionTrackerItem.title)
         && Objects.equals(timestamp, auctionTrackerItem.timestamp)
         && Objects.equals(url, auctionTrackerItem.url)
+        && Objects.equals(judgment, auctionTrackerItem.judgment)
         && Objects.equals(ttl, auctionTrackerItem.ttl)
         && Objects.equals(version, auctionTrackerItem.version)
         && Objects.equals(gsi1pk, auctionTrackerItem.gsi1pk)
@@ -172,7 +221,7 @@ public class AuctionTrackerItem {
 
   @Override
   public int hashCode() {
-    return Objects.hash(pk, sk, title, timestamp, url, ttl, version, gsi1pk, gsi1sk);
+    return Objects.hash(pk, sk, title, timestamp, url, judgment, ttl, version, gsi1pk, gsi1sk);
   }
 
   public static String formatPk(String searchUrl) {
@@ -196,13 +245,18 @@ public class AuctionTrackerItem {
   }
 
   public static AuctionTrackerItem create(
-      String searchUrl, String itemUrl, String title, Instant timestamp) {
+      String searchUrl,
+      String itemUrl,
+      String title,
+      Instant timestamp,
+      @Nullable Judgment judgment) {
     var auctionTrackerItem = new AuctionTrackerItem();
     auctionTrackerItem.setPk(formatPk(searchUrl));
     auctionTrackerItem.setSk(formatSk(timestamp, itemUrl));
     auctionTrackerItem.setTitle(title);
     auctionTrackerItem.setTimestamp(timestamp);
     auctionTrackerItem.setUrl(itemUrl);
+    auctionTrackerItem.setJudgment(judgment);
     auctionTrackerItem.setTtl(timestamp.plus(30, ChronoUnit.DAYS).getEpochSecond());
     auctionTrackerItem.setGsi1pk(formatGsi1pk(searchUrl));
     auctionTrackerItem.setGsi1sk(formatGsi1sk(itemUrl));

@@ -1,8 +1,14 @@
 package com.jordansimsmith.auctiontracker;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jordansimsmith.llm.LlmClient;
+import com.jordansimsmith.llm.OpenAiLlmClient;
+import com.jordansimsmith.prompts.PromptRegistry;
+import com.jordansimsmith.secrets.Secrets;
 import dagger.Module;
 import dagger.Provides;
 import java.net.URI;
+import java.net.http.HttpClient;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -32,5 +38,24 @@ public class AuctionTrackerModule {
   @Singleton
   TradeMeClient tradeMeClient() {
     return new JsoupTradeMeClient();
+  }
+
+  @Provides
+  @Singleton
+  LlmClient llmClient(ObjectMapper objectMapper, Secrets secrets) {
+    var openAiBaseUrl = System.getenv("AUCTION_TRACKER_OPENAI_BASE_URL");
+    if (openAiBaseUrl == null || openAiBaseUrl.isBlank()) {
+      openAiBaseUrl = "https://api.openai.com";
+    }
+    var httpClient = HttpClient.newBuilder().build();
+    return new OpenAiLlmClient(
+        URI.create(openAiBaseUrl), objectMapper, secrets, "auction_tracker_api", httpClient);
+  }
+
+  @Provides
+  @Singleton
+  ListingJudge listingJudge(
+      PromptRegistry promptRegistry, LlmClient llmClient, ObjectMapper objectMapper) {
+    return new LlmListingJudge(promptRegistry, llmClient, objectMapper);
   }
 }

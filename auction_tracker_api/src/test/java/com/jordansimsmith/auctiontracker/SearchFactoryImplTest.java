@@ -21,4 +21,26 @@ public class SearchFactoryImplTest {
     assertThat(searches)
         .allSatisfy(search -> assertThat(search.baseUrl().getHost()).isEqualTo("trademe-stub"));
   }
+
+  @Test
+  void findSearchesShouldAttachJudgePromptToMtgSearches() {
+    // arrange
+    var factory = new SearchFactoryImpl(URI.create("https://www.trademe.co.nz"));
+
+    // act
+    var searches = factory.findSearches();
+
+    // assert
+    var judged = searches.stream().filter(search -> search.judgePrompt() != null).toList();
+    assertThat(judged)
+        .extracting(SearchFactory.Search::searchTerm)
+        .containsExactly("bulk", "collection", "assorted");
+    assertThat(judged)
+        .allSatisfy(
+            search -> {
+              assertThat(search.judgePrompt()).isEqualTo("prompts/mtg-bulk-judge.md");
+              assertThat(search.baseUrl().getPath())
+                  .isEqualTo("/a/marketplace/gaming/trading-cards/magic/search");
+            });
+  }
 }

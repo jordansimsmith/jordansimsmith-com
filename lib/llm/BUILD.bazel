@@ -1,5 +1,6 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
-load("@rules_java//java:defs.bzl", "java_library")
+load("@rules_java//java:defs.bzl", "java_binary", "java_library")
+load("//lib/http:defs.bzl", "stub_server_image")
 
 java_library(
     name = "lib",
@@ -16,6 +17,21 @@ java_library(
     ],
 )
 
+java_binary(
+    name = "openai-stub-server",
+    testonly = True,
+    srcs = ["src/test/java/com/jordansimsmith/llm/OpenAiStubServer.java"],
+    create_executable = False,
+)
+
+stub_server_image(
+    name = "openai-stub",
+    deploy_jar = ":openai-stub-server_deploy.jar",
+    visibility = [
+        "//visibility:public",
+    ],
+)
+
 java_library(
     name = "test-lib",
     testonly = True,
@@ -23,12 +39,18 @@ java_library(
         ["src/test/java/**/*.java"],
         exclude = ["src/test/java/**/*Test.java"],
     ),
+    data = [
+        ":openai-stub-load",
+    ],
+    resources = glob(["src/test/resources/**/*.properties"]),
     visibility = [
         "//visibility:public",
     ],
     deps = [
         ":lib",
+        "//lib/http:test-lib",
         "@maven//:com_google_guava_guava",
+        "@maven//:org_testcontainers_testcontainers",
     ],
 )
 

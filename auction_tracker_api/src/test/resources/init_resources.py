@@ -15,6 +15,14 @@ dynamodb_client = boto3.client(
 )
 sqs_client = boto3.client("sqs", endpoint_url=endpoint_url, region_name=region_name)
 sns_client = boto3.client("sns", endpoint_url=endpoint_url, region_name=region_name)
+secretsmanager_client = boto3.client(
+    "secretsmanager", endpoint_url=endpoint_url, region_name=region_name
+)
+
+secretsmanager_client.create_secret(
+    Name="auction_tracker_api",
+    SecretString=json.dumps({"openai_api_key": "fake-openai-api-key"}),
+)
 
 topic_name = "auction_tracker_api_digest"
 topic_response = sns_client.create_topic(Name=topic_name)
@@ -121,7 +129,8 @@ configs = [
 lambda_env = {
     "AUCTION_TRACKER_TRADEME_BASE_URL": os.getenv(
         "AUCTION_TRACKER_TRADEME_BASE_URL", ""
-    )
+    ),
+    "AUCTION_TRACKER_OPENAI_BASE_URL": os.getenv("AUCTION_TRACKER_OPENAI_BASE_URL", ""),
 }
 
 # create all lambda functions

@@ -1,5 +1,9 @@
 package com.jordansimsmith.auctiontracker;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jordansimsmith.llm.FakeLlmClient;
+import com.jordansimsmith.llm.LlmClient;
+import com.jordansimsmith.prompts.ClasspathPromptRegistry;
 import dagger.Module;
 import dagger.Provides;
 import javax.inject.Singleton;
@@ -39,5 +43,23 @@ public class AuctionTrackerTestModule {
   @Singleton
   TradeMeClient tradeMeClient(FakeTradeMeClient fakeTradeMeClient) {
     return fakeTradeMeClient;
+  }
+
+  @Provides
+  @Singleton
+  FakeLlmClient fakeLlmClient() {
+    return new FakeLlmClient();
+  }
+
+  @Provides
+  @Singleton
+  LlmClient llmClient(FakeLlmClient fakeLlmClient) {
+    return fakeLlmClient;
+  }
+
+  @Provides
+  @Singleton
+  ListingJudge listingJudge(LlmClient llmClient) {
+    return new LlmListingJudge(new ClasspathPromptRegistry(), llmClient, new ObjectMapper());
   }
 }

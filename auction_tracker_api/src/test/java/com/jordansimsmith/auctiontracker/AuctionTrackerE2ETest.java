@@ -3,6 +3,7 @@ package com.jordansimsmith.auctiontracker;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.llm.OpenAiStubContainer;
 import com.jordansimsmith.queue.QueueUtils;
 import java.util.Base64;
 import org.junit.jupiter.api.AfterAll;
@@ -24,10 +25,25 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 public class AuctionTrackerE2ETest {
   private static final Logger LOGGER = LoggerFactory.getLogger(AuctionTrackerE2ETest.class);
 
+  private static final String PASS_JUDGMENT =
+      """
+      {
+        "mtg_cards": {"reasoning": "ok", "result": "pass"},
+        "bulk_scale": {"reasoning": "ok", "result": "pass"},
+        "not_basic_lands": {"reasoning": "ok", "result": "pass"},
+        "not_universes_beyond": {"reasoning": "ok", "result": "pass"},
+        "civilian_seller": {"reasoning": "ok", "result": "pass"},
+        "fixed_collection": {"reasoning": "ok", "result": "pass"}
+      }
+      """;
+
   private static final Network NETWORK = Network.newNetwork();
 
   private static final TradeMeWebsiteStubContainer tradeMeWebsiteStubContainer =
       new TradeMeWebsiteStubContainer().withNetwork(NETWORK);
+
+  private static final OpenAiStubContainer openAiStubContainer =
+      new OpenAiStubContainer().withResponseContent(PASS_JUDGMENT).withNetwork(NETWORK);
 
   private static final AuctionTrackerContainer auctionTrackerContainer =
       new AuctionTrackerContainer()
@@ -35,17 +51,20 @@ public class AuctionTrackerE2ETest {
           .withEnv("LAMBDA_DOCKER_NETWORK", NETWORK.getId())
           .withEnv(
               "AUCTION_TRACKER_TRADEME_BASE_URL",
-              tradeMeWebsiteStubContainer.getEndpoint().toString());
+              tradeMeWebsiteStubContainer.getEndpoint().toString())
+          .withEnv("AUCTION_TRACKER_OPENAI_BASE_URL", openAiStubContainer.getEndpoint().toString());
 
   @BeforeAll
   static void setUpBeforeClass() {
     tradeMeWebsiteStubContainer.start();
+    openAiStubContainer.start();
     auctionTrackerContainer.start();
   }
 
   @AfterAll
   static void tearDownAfterClass() {
     auctionTrackerContainer.stop();
+    openAiStubContainer.stop();
     tradeMeWebsiteStubContainer.stop();
     NETWORK.close();
   }

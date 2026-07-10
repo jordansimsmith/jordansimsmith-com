@@ -5,6 +5,8 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.time.Clock;
+import java.util.HashMap;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbIndex;
@@ -19,6 +21,7 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
   private final Clock clock;
   private final SearchFactory searchFactory;
   private final TradeMeClient tradeMeClient;
+  private final ListingJudge listingJudge;
   private final DynamoDbTable<AuctionTrackerItem> auctionTrackerTable;
   private final DynamoDbIndex<AuctionTrackerItem> gsi1;
 
@@ -31,6 +34,7 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
     this.clock = factory.clock();
     this.searchFactory = factory.searchFactory();
     this.tradeMeClient = factory.tradeMeClient();
+    this.listingJudge = factory.listingJudge();
     this.auctionTrackerTable = factory.auctionTrackerTable();
     this.gsi1 = auctionTrackerTable.index("gsi1");
   }
@@ -48,14 +52,16 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
   private Void doHandleRequest() {
     var searches = searchFactory.findSearches();
 
+    // memoize judgments so a listing found by multiple judged searches is judged once per run
+    var judgments = new HashMap<String, Boolean>();
     for (var search : searches) {
-      processSearch(search);
+      processSearch(search, judgments);
     }
 
     return null;
   }
 
-  private void processSearch(SearchFactory.Search search) {
+  private void processSearch(SearchFactory.Search search, Map<String, Boolean> judgments) {
     var tradeMeItems =
         tradeMeClient.searchItems(
             search.baseUrl(),
@@ -72,8 +78,20 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
         continue;
       }
 
+      AuctionTrackerItem.Judgment judgment = null;
+      if (search.judgePrompt() != null) {
+        var pass =
+            judgments.computeIfAbsent(
+                search.judgePrompt() + AuctionTrackerItem.DELIMITER + tradeMeItem.url(),
+                key ->
+                    listingJudge.judge(
+                        search.judgePrompt(), tradeMeItem.title(), tradeMeItem.description()));
+        judgment = pass ? AuctionTrackerItem.Judgment.PASS : AuctionTrackerItem.Judgment.FAIL;
+      }
+
       var auctionTrackerItem =
-          AuctionTrackerItem.create(searchUrl, tradeMeItem.url(), tradeMeItem.title(), currentTime);
+          AuctionTrackerItem.create(
+              searchUrl, tradeMeItem.url(), tradeMeItem.title(), currentTime, judgment);
       auctionTrackerTable.putItem(auctionTrackerItem);
     }
   }
