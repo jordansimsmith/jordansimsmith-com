@@ -1,0 +1,79 @@
+load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
+load("@rules_java//java:defs.bzl", "java_binary", "java_library")
+
+HANDLERS = glob(["src/main/java/**/*Handler.java"])
+
+UNIT_TESTS = glob(["src/test/java/**/*Test.java"])
+
+java_library(
+    name = "lib",
+    srcs = glob(
+        ["src/main/java/**/*.java"],
+        exclude = HANDLERS,
+    ),
+    deps = [
+        "//lib/json:lib",
+        "//lib/secrets:lib",
+        "//third_party/dagger",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+    ],
+)
+
+java_binary(
+    name = "auth-handler",
+    srcs = ["src/main/java/com/jordansimsmith/auth/AuthHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/secrets:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_iam_policy_builder",
+    ],
+)
+
+java_library(
+    name = "test-lib",
+    testonly = True,
+    srcs = glob(
+        ["src/test/java/**/*.java"],
+        exclude = UNIT_TESTS,
+    ),
+    deps = [
+        ":lib",
+        "//lib/json:lib",
+        "//lib/secrets:test-lib",
+        "//third_party/dagger",
+    ],
+)
+
+java_test_suite(
+    name = "unit-tests",
+    size = "small",
+    srcs = UNIT_TESTS,
+    resources = [
+        "src/test/resources/logback-test.xml",
+    ],
+    runner = "junit5",
+    test_suffixes = ["Test.java"],
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        ":auth-handler",
+        ":lib",
+        ":test-lib",
+        "//lib/secrets:test-lib",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:software_amazon_awssdk_iam_policy_builder",
+    ],
+)

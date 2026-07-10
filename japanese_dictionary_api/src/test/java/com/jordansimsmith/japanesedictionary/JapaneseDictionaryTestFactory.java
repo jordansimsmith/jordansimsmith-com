@@ -1,11 +1,8 @@
 package com.jordansimsmith.japanesedictionary;
 
-import com.jordansimsmith.auth.AuthModule;
 import com.jordansimsmith.dynamodb.DynamoDbTestModule;
 import com.jordansimsmith.http.RequestContextModule;
 import com.jordansimsmith.json.ObjectMapperModule;
-import com.jordansimsmith.secrets.FakeSecrets;
-import com.jordansimsmith.secrets.SecretsTestModule;
 import com.jordansimsmith.time.ClockTestModule;
 import com.jordansimsmith.time.FakeClock;
 import dagger.BindsInstance;
@@ -18,16 +15,12 @@ import javax.inject.Singleton;
 @Component(
     modules = {
       ObjectMapperModule.class,
-      SecretsTestModule.class,
       ClockTestModule.class,
       DynamoDbTestModule.class,
       RequestContextModule.class,
-      AuthModule.class,
       JapaneseDictionaryModule.class
     })
 public interface JapaneseDictionaryTestFactory extends JapaneseDictionaryFactory {
-  FakeSecrets fakeSecrets();
-
   FakeClock fakeClock();
 
   @Component.Factory

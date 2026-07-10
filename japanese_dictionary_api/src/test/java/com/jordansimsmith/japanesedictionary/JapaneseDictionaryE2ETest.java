@@ -135,7 +135,7 @@ public class JapaneseDictionaryE2ETest {
 
   // missing-Authorization handling cannot be exercised here because LocalStack community does
   // not enforce CUSTOM API Gateway authorizers; the authorizer logic is covered exhaustively
-  // in lib/auth's RequestAuthorizerTest and the wiring is asserted in the infra Terraform plan.
+  // in auth_api's AuthHandlerTest and the wiring is asserted in the infra Terraform plan.
 
   @Test
   void getSearchShouldHydrateGlossaryTreeForImageBearingFixture()

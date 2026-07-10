@@ -22,7 +22,6 @@ java_library(
         exclude = HANDLERS,
     ),
     deps = [
-        "//lib/auth:lib",
         "//lib/dynamodb:lib",
         "//lib/http:lib",
         "//lib/json:lib",
@@ -35,23 +34,6 @@ java_library(
         "@maven//:com_google_guava_guava",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-    ],
-)
-
-java_binary(
-    name = "auth-handler",
-    srcs = glob(["src/main/java/com/jordansimsmith/immersiontracker/AuthHandler.java"]),
-    create_executable = False,
-    resources = [
-        "src/main/resources/logback.xml",
-    ],
-    deps = [
-        ":lib",
-        "//lib/auth:lib",
-        "@maven//:ch_qos_logback_logback_classic",
-        "@maven//:ch_qos_logback_logback_core",
-        "@maven//:com_amazonaws_aws_lambda_java_core",
-        "@maven//:org_slf4j_slf4j_api",
     ],
 )
 
@@ -282,7 +264,6 @@ java_library(
     resources = ["src/test/resources/test.properties"],
     deps = [
         ":lib",
-        "//lib/auth:lib",
         "//lib/dynamodb:test-lib",
         "//lib/http:lib",
         "//lib/http:test-lib",

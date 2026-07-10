@@ -1,8 +1,6 @@
 package com.jordansimsmith.immersiontracker;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jordansimsmith.auth.AuthModule;
-import com.jordansimsmith.auth.RequestAuthorizer;
 import com.jordansimsmith.dynamodb.DynamoDbModule;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
@@ -24,7 +22,6 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
       ObjectMapperModule.class,
       DynamoDbModule.class,
       RequestContextModule.class,
-      AuthModule.class,
       ImmersionTrackerModule.class
     })
 public interface ImmersionTrackerFactory {
@@ -37,8 +34,6 @@ public interface ImmersionTrackerFactory {
   RequestContextFactory requestContextFactory();
 
   HttpResponseFactory httpResponseFactory();
-
-  RequestAuthorizer requestAuthorizer();
 
   DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable();
 

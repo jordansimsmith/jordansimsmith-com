@@ -23,7 +23,6 @@ secretsmanager_client.create_secret(
     Name="immersion_tracker_api",
     SecretString=json.dumps(
         {
-            "users": [],
             "tvdb_api_key": "fake-tvdb-key",
             "youtube_api_key": "fake-youtube-key",
             "spotify_client_id": "fake-spotify-client-id",

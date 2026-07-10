@@ -51,11 +51,6 @@ module "java_api" {
   domain_name    = "api.anki-backup.jordansimsmith.com"
 
   lambdas = {
-    auth = {
-      handler  = "com.jordansimsmith.ankibackup.AuthHandler"
-      artifact = var.artifacts["auth"]
-      timeout  = 30
-    }
     create_backup = {
       handler  = "com.jordansimsmith.ankibackup.CreateBackupHandler"
       artifact = var.artifacts["create_backup"]
@@ -167,11 +162,6 @@ resource "aws_dynamodb_table" "anki_backup" {
   deletion_protection_enabled = true
 }
 
-resource "aws_secretsmanager_secret" "anki_backup" {
-  name                    = local.application_id
-  recovery_window_in_days = 0
-}
-
 data "aws_iam_policy_document" "lambda_dynamodb_allow_policy_document" {
   statement {
     effect = "Allow"
@@ -203,45 +193,6 @@ resource "aws_iam_policy" "lambda_dynamodb" {
 resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
   role       = module.java_api.lambda_role_name
   policy_arn = aws_iam_policy.lambda_dynamodb.arn
-}
-
-data "aws_iam_policy_document" "lambda_secretsmanager_allow_policy_document" {
-  statement {
-    effect = "Allow"
-
-    resources = [
-      aws_secretsmanager_secret.anki_backup.arn
-    ]
-
-    actions = [
-      "secretsmanager:GetResourcePolicy",
-      "secretsmanager:GetSecretValue",
-      "secretsmanager:DescribeSecret",
-      "secretsmanager:ListSecretVersionIds"
-    ]
-  }
-
-  statement {
-    effect = "Allow"
-
-    resources = [
-      "*"
-    ]
-
-    actions = [
-      "secretsmanager:ListSecrets"
-    ]
-  }
-}
-
-resource "aws_iam_policy" "lambda_secretsmanager" {
-  name   = "${local.application_id}_lambda_secretsmanager"
-  policy = data.aws_iam_policy_document.lambda_secretsmanager_allow_policy_document.json
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_secretsmanager" {
-  role       = module.java_api.lambda_role_name
-  policy_arn = aws_iam_policy.lambda_secretsmanager.arn
 }
 
 data "aws_iam_policy_document" "lambda_s3_allow_policy_document" {

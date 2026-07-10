@@ -52,10 +52,6 @@ module "java_api" {
   cors_origin    = "https://packing-list.jordansimsmith.com"
 
   lambdas = {
-    auth = {
-      handler  = "com.jordansimsmith.packinglist.AuthHandler"
-      artifact = var.artifacts["auth"]
-    }
     get_templates = {
       handler  = "com.jordansimsmith.packinglist.GetTemplatesHandler"
       artifact = var.artifacts["get_templates"]
@@ -96,11 +92,6 @@ module "java_api" {
   }
 }
 
-resource "aws_secretsmanager_secret" "packing_list" {
-  name                    = local.application_id
-  recovery_window_in_days = 0
-}
-
 resource "aws_dynamodb_table" "packing_list" {
   name         = "packing_list"
   billing_mode = "PAY_PER_REQUEST"
@@ -139,45 +130,6 @@ resource "aws_dynamodb_table" "packing_list" {
   }
 
   deletion_protection_enabled = true
-}
-
-data "aws_iam_policy_document" "lambda_secretsmanager_allow_policy_document" {
-  statement {
-    effect = "Allow"
-
-    resources = [
-      aws_secretsmanager_secret.packing_list.arn
-    ]
-
-    actions = [
-      "secretsmanager:GetResourcePolicy",
-      "secretsmanager:GetSecretValue",
-      "secretsmanager:DescribeSecret",
-      "secretsmanager:ListSecretVersionIds"
-    ]
-  }
-
-  statement {
-    effect = "Allow"
-
-    resources = [
-      "*"
-    ]
-
-    actions = [
-      "secretsmanager:ListSecrets"
-    ]
-  }
-}
-
-resource "aws_iam_policy" "lambda_secretsmanager" {
-  name   = "${local.application_id}_lambda_secretsmanager"
-  policy = data.aws_iam_policy_document.lambda_secretsmanager_allow_policy_document.json
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_secretsmanager" {
-  role       = module.java_api.lambda_role_name
-  policy_arn = aws_iam_policy.lambda_secretsmanager.arn
 }
 
 data "aws_iam_policy_document" "lambda_dynamodb_allow_policy_document" {

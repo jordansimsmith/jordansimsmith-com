@@ -1,13 +1,18 @@
+data "aws_region" "current" {}
+
+data "aws_caller_identity" "current" {}
+
 locals {
   cors_enabled = var.cors_origin != null
 
   cors_allow_headers = "Authorization,Content-Type"
   cors_allow_methods = "GET,POST,PUT,DELETE,OPTIONS"
 
-  api_lambdas = toset(concat(
-    [for endpoint in var.endpoints : endpoint.lambda],
-    var.authorization == "CUSTOM" ? ["auth"] : [],
-  ))
+  api_lambdas = toset([for endpoint in var.endpoints : endpoint.lambda])
+
+  # the shared authorizer is owned by the auth_api service and referenced
+  # by convention through its stable live alias
+  authorizer_uri = "arn:aws:apigateway:${data.aws_region.current.name}:lambda:path/2015-03-31/functions/arn:aws:lambda:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:function:auth_api_auth:live/invocations"
 
   resource_paths = toset(flatten([
     for endpoint in var.endpoints : [
@@ -58,7 +63,7 @@ resource "aws_api_gateway_authorizer" "this" {
 
   name                             = "${var.application_id}_authorizer"
   rest_api_id                      = aws_api_gateway_rest_api.this.id
-  authorizer_uri                   = module.lambda.lambda_functions["auth"].qualified_invoke_arn
+  authorizer_uri                   = local.authorizer_uri
   type                             = "REQUEST"
   identity_source                  = "method.request.header.Authorization"
   authorizer_result_ttl_in_seconds = 300

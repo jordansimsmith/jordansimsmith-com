@@ -12,16 +12,8 @@ lambda_client = boto3.client(
 apigateway_client = boto3.client(
     "apigateway", endpoint_url=endpoint_url, region_name=region_name
 )
-secretsmanager_client = boto3.client(
-    "secretsmanager", endpoint_url=endpoint_url, region_name=region_name
-)
 dynamodb_client = boto3.client(
     "dynamodb", endpoint_url=endpoint_url, region_name=region_name
-)
-
-secretsmanager_client.create_secret(
-    Name="book_tracker_api",
-    SecretString=json.dumps({"users": [{"user": "alice", "password": "password"}]}),
 )
 
 table_name = "book_tracker"

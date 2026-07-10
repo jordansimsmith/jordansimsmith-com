@@ -8,7 +8,7 @@ The book tracker API service provides an authenticated HTTP API for recording fi
 - **Interface**: REST over HTTPS (API Gateway REST + Lambda proxy integration)
 - **Runtime**: AWS Lambda (Java 21)
 - **Primary storage**: DynamoDB single-table (`book_tracker`) with one GSI (`gsi1`) for date-descending list queries
-- **Auth model**: API Gateway custom REQUEST authorizer (`AuthHandler`) backed by a Secrets Manager users array
+- **Auth model**: API Gateway custom REQUEST authorizer provided by the shared `auth_api` service (see `auth_api/README.md`)
 - **Primary consumer**: `book_tracker_web`
 
 ## User stories
@@ -23,7 +23,7 @@ The book tracker API service provides an authenticated HTTP API for recording fi
 
 ### In scope
 
-- Authenticate every non-`OPTIONS` endpoint via HTTP Basic credentials validated by the custom authorizer.
+- Authenticate every non-`OPTIONS` endpoint via HTTP Basic credentials validated by the shared `auth_api` authorizer.
 - Create one finished-book entry per Open Library work per authenticated user.
 - Reject duplicate adds with `409` and a body referencing the existing entry's `finished_date`.
 - List a user's finished books ordered by `finished_date` descending, with a server-computed `rolling_12_month_count`.
@@ -48,8 +48,8 @@ The book tracker API service provides an authenticated HTTP API for recording fi
 ```mermaid
 flowchart TD
   webClient["book_tracker_web"] -->|"HTTPS Basic auth"| apiGateway["API Gateway REST"]
-  apiGateway -->|"Custom REQUEST authorizer"| authLambda["AuthHandler Lambda"]
-  authLambda -->|"Read users"| secretsManager["Secrets Manager: book_tracker_api"]
+  apiGateway -->|"Custom REQUEST authorizer"| authLambda["auth_api_auth Lambda (shared)"]
+  authLambda -->|"Read users"| secretsManager["Secrets Manager: auth_api"]
   apiGateway -->|"Lambda proxy integration"| bookHandlers["Book handlers"]
   bookHandlers -->|"Read/write book items"| dynamoTable["DynamoDB: book_tracker"]
 ```
@@ -60,7 +60,7 @@ flowchart TD
 sequenceDiagram
   participant Web as book_tracker_web
   participant Gateway as API Gateway
-  participant Auth as AuthHandler
+  participant Auth as auth_api authorizer
   participant Create as CreateBookHandler
   participant Find as FindBooksHandler
   participant Dynamo as DynamoDB
@@ -327,21 +327,21 @@ Item attributes:
 
 ## Source of truth
 
-| Entity                 | Authoritative source                                | Notes                                                                        |
-| ---------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------- |
-| User identity          | Basic auth username                                 | parsed from `Authorization` header in authorizer and handler request context |
-| Finished-book entries  | DynamoDB `BOOK#<open_library_work_id>` items        | client values are accepted only after server validation                      |
-| Open Library metadata  | browser capture at add time, persisted by API       | frozen snapshot; backend does not re-fetch Open Library in v1                |
-| Rolling 12-month count | derived at read time from persisted entries         | never materialized; uses server clock                                        |
-| Cover URL              | browser-constructed at add time, persisted verbatim | backend does not re-derive or re-format; `null` when no cover was available  |
-| Credential set         | Secrets Manager `book_tracker_api` secret           | no credential material in code or Terraform state                            |
+| Entity                 | Authoritative source                                    | Notes                                                                        |
+| ---------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| User identity          | Basic auth username                                     | parsed from `Authorization` header in authorizer and handler request context |
+| Finished-book entries  | DynamoDB `BOOK#<open_library_work_id>` items            | client values are accepted only after server validation                      |
+| Open Library metadata  | browser capture at add time, persisted by API           | frozen snapshot; backend does not re-fetch Open Library in v1                |
+| Rolling 12-month count | derived at read time from persisted entries             | never materialized; uses server clock                                        |
+| Cover URL              | browser-constructed at add time, persisted verbatim     | backend does not re-derive or re-format; `null` when no cover was available  |
+| Credential set         | Secrets Manager `auth_api` secret (owned by `auth_api`) | no credential material in code or Terraform state                            |
 
 ## Security and privacy
 
-- All non-`OPTIONS` methods use API Gateway `CUSTOM` authorization routed to `AuthHandler`.
+- All non-`OPTIONS` methods use API Gateway `CUSTOM` authorization routed to the shared `auth_api` authorizer Lambda.
 - Unauthorized requests return `401` with `WWW-Authenticate: Basic`.
 - Per-user partitioning (`pk = USER#<user>`) prevents cross-user reads and writes.
-- Credentials and application users are stored in AWS Secrets Manager, not in source or Terraform state.
+- Credentials live in the shared `auth_api` Secrets Manager secret owned by the `auth_api` service, not in source or Terraform state.
 - Transport is HTTPS only via the custom domain `api.book-tracker.jordansimsmith.com`.
 - Handler logs must not include the `Authorization` header, raw password values, or secret payloads.
 
@@ -351,24 +351,13 @@ Item attributes:
 
 No service-specific environment variables are consumed by handlers in current scope.
 
-| Name     | Required | Purpose                                                                   | Default behavior                                              |
-| -------- | -------- | ------------------------------------------------------------------------- | ------------------------------------------------------------- |
-| `(none)` | n/a      | behavior is configured via code constants and Terraform-managed resources | table name, secret name, and CORS origin come from code/infra |
+| Name     | Required | Purpose                                                                   | Default behavior                                |
+| -------- | -------- | ------------------------------------------------------------------------- | ----------------------------------------------- |
+| `(none)` | n/a      | behavior is configured via code constants and Terraform-managed resources | table name and CORS origin come from code/infra |
 
 ### Secret shape
 
-Expected JSON for secret `book_tracker_api`:
-
-```json
-{
-  "users": [
-    {
-      "user": "alice",
-      "password": "strong-password"
-    }
-  ]
-}
-```
+This service reads no secrets at runtime. Basic auth credentials live in the shared `auth_api` secret owned by the `auth_api` service (see `auth_api/README.md`).
 
 ## Performance envelope
 
@@ -380,8 +369,8 @@ Expected JSON for secret `book_tracker_api`:
 
 ## Testing and quality gates
 
-- Unit tests cover `BookValidator` (every validation rule) and the cover-URL construction helper. Authorizer logic (Basic header parsing, users-array matching, allow/deny policy output) is covered by `lib/auth`'s `RequestAuthorizerTest`.
-- Integration tests run each handler against DynamoDB Testcontainers with fake secrets, covering happy paths, validation failures, duplicate-add `409`, `finished_date` edit with `gsi1sk` rewrite, `404` on missing items, and the rolling 12-month boundary against a pinned `Clock`.
+- Unit tests cover `BookValidator` (every validation rule) and the cover-URL construction helper. Authorizer logic (Basic header parsing, users-array matching, allow/deny policy output) is covered by `auth_api`'s `AuthHandlerTest`.
+- Integration tests run each handler against DynamoDB Testcontainers, covering happy paths, validation failures, duplicate-add `409`, `finished_date` edit with `gsi1sk` rewrite, `404` on missing items, and the rolling 12-month boundary against a pinned `Clock`.
 - End-to-end tests drive `POST` → `GET` list → `GET` one → `PUT` → `GET` → `DELETE` → verify-gone through a LocalStack stack (API Gateway + Lambda + DynamoDB).
 - Required checks before merge:
   - `bazel build //book_tracker_api:all`

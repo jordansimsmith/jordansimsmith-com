@@ -13,11 +13,6 @@ variable "lambdas" {
     memory_size = optional(number, 1769)
     timeout     = optional(number, 10)
   }))
-
-  validation {
-    condition     = var.authorization != "CUSTOM" || contains(keys(var.lambdas), "auth")
-    error_message = "A lambda named \"auth\" is required when authorization is CUSTOM."
-  }
 }
 
 variable "endpoints" {

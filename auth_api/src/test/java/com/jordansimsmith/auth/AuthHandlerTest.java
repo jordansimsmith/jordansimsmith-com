@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.secrets.FakeSecrets;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import software.amazon.awssdk.policybuilder.iam.IamAction;
@@ -14,8 +15,8 @@ import software.amazon.awssdk.policybuilder.iam.IamEffect;
 import software.amazon.awssdk.policybuilder.iam.IamPolicy;
 import software.amazon.awssdk.policybuilder.iam.IamResource;
 
-public class RequestAuthorizerTest {
-  private static final String SECRET_NAME = "test_secret";
+public class AuthHandlerTest {
+  private static final String SECRET_NAME = "auth_api";
   private static final String METHOD_ARN =
       "arn:aws:execute-api:ap-southeast-2:123456789012:abc123/prod/GET/trips";
   private static final String EXPECTED_RESOURCE =
@@ -24,17 +25,18 @@ public class RequestAuthorizerTest {
   private FakeSecrets fakeSecrets;
   private ObjectMapper objectMapper;
 
-  private RequestAuthorizer authorizer;
+  private AuthHandler authHandler;
 
   @BeforeEach
   void setUp() {
-    fakeSecrets = new FakeSecrets();
-    objectMapper = new ObjectMapper();
-    authorizer = new RequestAuthorizer(fakeSecrets, objectMapper);
+    var factory = AuthTestFactory.create();
+    fakeSecrets = factory.fakeSecrets();
+    objectMapper = factory.objectMapper();
+    authHandler = new AuthHandler(factory);
   }
 
   @Test
-  void authorizeShouldAllowCorrectUser() throws Exception {
+  void handleRequestShouldAllowCorrectUser() throws Exception {
     // arrange
     seedUsers(
         """
@@ -47,10 +49,10 @@ public class RequestAuthorizerTest {
           ]
         }
         """);
-    var token = basicAuth("alice", "123");
+    var event = event(basicAuth("alice", "123"), METHOD_ARN);
 
     // act
-    var res = authorizer.authorize(token, SECRET_NAME, METHOD_ARN);
+    var res = authHandler.handleRequest(event, null);
 
     // assert
     assertThat(res.principalId()).isEqualTo("alice");
@@ -64,7 +66,7 @@ public class RequestAuthorizerTest {
   }
 
   @Test
-  void authorizeShouldDenyIncorrectPassword() throws Exception {
+  void handleRequestShouldDenyIncorrectPassword() throws Exception {
     // arrange
     seedUsers(
         """
@@ -77,10 +79,10 @@ public class RequestAuthorizerTest {
           ]
         }
         """);
-    var token = basicAuth("alice", "456");
+    var event = event(basicAuth("alice", "456"), METHOD_ARN);
 
     // act
-    var res = authorizer.authorize(token, SECRET_NAME, METHOD_ARN);
+    var res = authHandler.handleRequest(event, null);
 
     // assert
     assertThat(res.principalId()).isEqualTo("alice");
@@ -88,7 +90,7 @@ public class RequestAuthorizerTest {
   }
 
   @Test
-  void authorizeShouldDenyUnknownUser() throws Exception {
+  void handleRequestShouldDenyUnknownUser() throws Exception {
     // arrange
     seedUsers(
         """
@@ -101,10 +103,10 @@ public class RequestAuthorizerTest {
           ]
         }
         """);
-    var token = basicAuth("bob", "456");
+    var event = event(basicAuth("bob", "456"), METHOD_ARN);
 
     // act
-    var res = authorizer.authorize(token, SECRET_NAME, METHOD_ARN);
+    var res = authHandler.handleRequest(event, null);
 
     // assert
     assertThat(res.principalId()).isEqualTo("bob");
@@ -112,7 +114,7 @@ public class RequestAuthorizerTest {
   }
 
   @Test
-  void authorizeShouldAllowWhenSecondUserInList() throws Exception {
+  void handleRequestShouldAllowWhenSecondUserInList() throws Exception {
     // arrange
     seedUsers(
         """
@@ -129,10 +131,10 @@ public class RequestAuthorizerTest {
           ]
         }
         """);
-    var token = basicAuth("bob", "bob-pass");
+    var event = event(basicAuth("bob", "bob-pass"), METHOD_ARN);
 
     // act
-    var res = authorizer.authorize(token, SECRET_NAME, METHOD_ARN);
+    var res = authHandler.handleRequest(event, null);
 
     // assert
     assertThat(res.principalId()).isEqualTo("bob");
@@ -140,7 +142,7 @@ public class RequestAuthorizerTest {
   }
 
   @Test
-  void authorizeShouldDenyWhenPasswordSwappedBetweenUsers() throws Exception {
+  void handleRequestShouldDenyWhenPasswordSwappedBetweenUsers() throws Exception {
     // arrange
     seedUsers(
         """
@@ -157,10 +159,10 @@ public class RequestAuthorizerTest {
           ]
         }
         """);
-    var token = basicAuth("alice", "bob-pass");
+    var event = event(basicAuth("alice", "bob-pass"), METHOD_ARN);
 
     // act
-    var res = authorizer.authorize(token, SECRET_NAME, METHOD_ARN);
+    var res = authHandler.handleRequest(event, null);
 
     // assert
     assertThat(res.principalId()).isEqualTo("alice");
@@ -168,7 +170,7 @@ public class RequestAuthorizerTest {
   }
 
   @Test
-  void authorizeShouldAllowWhenPasswordContainsColon() throws Exception {
+  void handleRequestShouldAllowWhenPasswordContainsColon() throws Exception {
     // arrange
     seedUsers(
         """
@@ -181,10 +183,10 @@ public class RequestAuthorizerTest {
           ]
         }
         """);
-    var token = basicAuth("alice", "pass:word:123");
+    var event = event(basicAuth("alice", "pass:word:123"), METHOD_ARN);
 
     // act
-    var res = authorizer.authorize(token, SECRET_NAME, METHOD_ARN);
+    var res = authHandler.handleRequest(event, null);
 
     // assert
     assertThat(res.principalId()).isEqualTo("alice");
@@ -192,7 +194,7 @@ public class RequestAuthorizerTest {
   }
 
   @Test
-  void authorizeShouldReturnWildcardResourceForDeepMethodArn() throws Exception {
+  void handleRequestShouldReturnWildcardResourceForDeepMethodArn() throws Exception {
     // arrange
     seedUsers(
         """
@@ -205,12 +207,12 @@ public class RequestAuthorizerTest {
           ]
         }
         """);
-    var token = basicAuth("alice", "123");
     var deepMethodArn =
         "arn:aws:execute-api:ap-southeast-2:123456789012:abc123/prod/DELETE/trips/abc-def";
+    var event = event(basicAuth("alice", "123"), deepMethodArn);
 
     // act
-    var res = authorizer.authorize(token, SECRET_NAME, deepMethodArn);
+    var res = authHandler.handleRequest(event, null);
 
     // assert
     assertThat(parsePolicy(res).statements().get(0).resources())
@@ -218,23 +220,29 @@ public class RequestAuthorizerTest {
   }
 
   @Test
-  void authorizeShouldThrowWhenAuthorizationHeaderIsNull() {
+  void handleRequestShouldThrowWhenAuthorizationHeaderIsMissing() {
+    // arrange
+    var event = new AuthHandler.AuthorizerEvent(Map.of(), Map.of(), METHOD_ARN);
+
     // act and assert
-    assertThatThrownBy(() -> authorizer.authorize(null, SECRET_NAME, METHOD_ARN))
+    assertThatThrownBy(() -> authHandler.handleRequest(event, null))
         .isInstanceOf(RuntimeException.class)
         .hasMessage("Unauthorized");
   }
 
   @Test
-  void authorizeShouldThrowWhenAuthorizationHeaderIsEmpty() {
+  void handleRequestShouldThrowWhenAuthorizationHeaderIsEmpty() {
+    // arrange
+    var event = event("", METHOD_ARN);
+
     // act and assert
-    assertThatThrownBy(() -> authorizer.authorize("", SECRET_NAME, METHOD_ARN))
+    assertThatThrownBy(() -> authHandler.handleRequest(event, null))
         .isInstanceOf(RuntimeException.class)
         .hasMessage("Unauthorized");
   }
 
   @Test
-  void authorizeShouldThrowWhenAuthorizationHeaderIsMalformedBase64() {
+  void handleRequestShouldThrowWhenAuthorizationHeaderIsMalformedBase64() {
     // arrange
     seedUsers(
         """
@@ -247,14 +255,20 @@ public class RequestAuthorizerTest {
           ]
         }
         """);
+    var event = event("Basic not_base_64!!", METHOD_ARN);
 
     // act and assert
-    assertThatThrownBy(() -> authorizer.authorize("Basic not_base_64!!", SECRET_NAME, METHOD_ARN))
+    assertThatThrownBy(() -> authHandler.handleRequest(event, null))
         .isInstanceOf(RuntimeException.class);
   }
 
   private void seedUsers(String secretBody) {
     fakeSecrets.set(SECRET_NAME, secretBody);
+  }
+
+  private static AuthHandler.AuthorizerEvent event(String authorizationHeader, String methodArn) {
+    return new AuthHandler.AuthorizerEvent(
+        Map.of("Authorization", authorizationHeader), Map.of(), methodArn);
   }
 
   private static String basicAuth(String user, String password) {
@@ -263,7 +277,7 @@ public class RequestAuthorizerTest {
         + Base64.getEncoder().encodeToString(credentials.getBytes(StandardCharsets.UTF_8));
   }
 
-  private IamPolicy parsePolicy(AuthorizerResponse response) throws Exception {
+  private IamPolicy parsePolicy(AuthHandler.AuthorizerResponse response) throws Exception {
     return IamPolicy.fromJson(objectMapper.writeValueAsString(response.policyDocument()));
   }
 }

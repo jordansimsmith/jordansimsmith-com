@@ -52,10 +52,6 @@ module "java_api" {
   cors_origin    = "https://immersion-tracker.jordansimsmith.com"
 
   lambdas = {
-    auth = {
-      handler  = "com.jordansimsmith.immersiontracker.AuthHandler"
-      artifact = var.artifacts["auth"]
-    }
     get_progress = {
       handler  = "com.jordansimsmith.immersiontracker.GetProgressHandler"
       artifact = var.artifacts["get_progress"]

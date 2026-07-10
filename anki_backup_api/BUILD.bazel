@@ -29,12 +29,10 @@ java_library(
         exclude = HANDLERS,
     ),
     deps = [
-        "//lib/auth:lib",
         "//lib/dynamodb:lib",
         "//lib/http:lib",
         "//lib/json:lib",
         "//lib/s3:lib",
-        "//lib/secrets:lib",
         "//lib/time:lib",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_annotations",
@@ -44,23 +42,6 @@ java_library(
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
         "@maven//:software_amazon_awssdk_s3",
-    ],
-)
-
-java_binary(
-    name = "auth-handler",
-    srcs = ["src/main/java/com/jordansimsmith/ankibackup/AuthHandler.java"],
-    create_executable = False,
-    resources = [
-        "src/main/resources/logback.xml",
-    ],
-    deps = [
-        ":lib",
-        "//lib/auth:lib",
-        "@maven//:ch_qos_logback_logback_classic",
-        "@maven//:ch_qos_logback_logback_core",
-        "@maven//:com_amazonaws_aws_lambda_java_core",
-        "@maven//:org_slf4j_slf4j_api",
     ],
 )
 
@@ -196,14 +177,12 @@ java_library(
     ],
     deps = [
         ":lib",
-        "//lib/auth:lib",
         "//lib/dynamodb:test-lib",
         "//lib/http:lib",
         "//lib/http:test-lib",
         "//lib/json:lib",
         "//lib/localstack:lib",
         "//lib/s3:test-lib",
-        "//lib/secrets:test-lib",
         "//lib/testcontainers:test-lib",
         "//lib/time:test-lib",
         "//third_party/dagger",
@@ -250,7 +229,6 @@ java_test_suite(
     test_suffixes = ["IntegrationTest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
-        ":auth-handler",
         ":create-backup-handler",
         ":find-backups-handler",
         ":get-backup-handler",
@@ -261,7 +239,6 @@ java_test_suite(
         "//lib/http:lib",
         "//lib/json:lib",
         "//lib/s3:test-lib",
-        "//lib/secrets:test-lib",
         "//lib/testcontainers:test-lib",
         "//lib/time:test-lib",
         "@maven//:ch_qos_logback_logback_classic",
@@ -275,7 +252,6 @@ java_test_suite(
         "@maven//:org_testcontainers_junit_jupiter",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-        "@maven//:software_amazon_awssdk_iam_policy_builder",
         "@maven//:software_amazon_awssdk_s3",
         "@maven//:software_amazon_awssdk_sdk_core",
     ],

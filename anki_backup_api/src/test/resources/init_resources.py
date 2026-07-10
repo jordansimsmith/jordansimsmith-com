@@ -11,9 +11,6 @@ lambda_client = boto3.client(
 apigateway_client = boto3.client(
     "apigateway", endpoint_url=endpoint_url, region_name=region_name
 )
-secretsmanager_client = boto3.client(
-    "secretsmanager", endpoint_url=endpoint_url, region_name=region_name
-)
 dynamodb_client = boto3.client(
     "dynamodb", endpoint_url=endpoint_url, region_name=region_name
 )
@@ -22,11 +19,6 @@ s3_client = boto3.client("s3", endpoint_url=endpoint_url, region_name=region_nam
 s3_client.create_bucket(
     Bucket="anki-backup.jordansimsmith.com",
     CreateBucketConfiguration={"LocationConstraint": region_name},
-)
-
-secretsmanager_client.create_secret(
-    Name="anki_backup_api",
-    SecretString=json.dumps({"users": [{"user": "alice", "password": "password"}]}),
 )
 
 table_name = "anki_backup"

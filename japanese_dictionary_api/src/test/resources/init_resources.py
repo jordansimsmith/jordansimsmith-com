@@ -13,16 +13,8 @@ lambda_client = boto3.client(
 apigateway_client = boto3.client(
     "apigateway", endpoint_url=endpoint_url, region_name=region_name
 )
-secretsmanager_client = boto3.client(
-    "secretsmanager", endpoint_url=endpoint_url, region_name=region_name
-)
 dynamodb_client = boto3.client(
     "dynamodb", endpoint_url=endpoint_url, region_name=region_name
-)
-
-secretsmanager_client.create_secret(
-    Name="japanese_dictionary_api",
-    SecretString=json.dumps({"users": [{"user": "testuser", "password": "testpass"}]}),
 )
 
 table_name = "japanese_dictionary"
@@ -197,10 +189,6 @@ iam_client.put_role_policy(
 )
 
 lambdas = {
-    "auth": {
-        "handler": "com.jordansimsmith.japanesedictionary.AuthHandler",
-        "zip_file": "auth-handler_deploy.jar",
-    },
     "search": {
         "handler": "com.jordansimsmith.japanesedictionary.SearchHandler",
         "zip_file": "search-handler_deploy.jar",
@@ -267,30 +255,6 @@ for function_name, config in lambdas.items():
         Principal="apigateway.amazonaws.com",
     )
 
-authorizer_id = apigateway_client.create_authorizer(
-    restApiId=api_id,
-    name="japanese_dictionary_authorizer",
-    type="REQUEST",
-    authorizerUri=(
-        f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/"
-        f"arn:aws:lambda:{region_name}:000000000000:function:auth/invocations"
-    ),
-    identitySource="method.request.header.Authorization",
-    authorizerResultTtlInSeconds=0,
-)["id"]
-
-apigateway_client.put_gateway_response(
-    restApiId=api_id,
-    responseType="UNAUTHORIZED",
-    statusCode="401",
-    responseParameters={
-        "gatewayresponse.header.WWW-Authenticate": "'Basic'",
-    },
-    responseTemplates={
-        "application/json": '{"message":$context.error.messageString}',
-    },
-)
-
 resource_ids = {}
 for name, config in root_resources.items():
     resource_ids[name] = apigateway_client.create_resource(
@@ -308,8 +272,7 @@ for endpoint in endpoints.values():
         restApiId=api_id,
         resourceId=resource_ids[endpoint["resource"]],
         httpMethod=endpoint["method"],
-        authorizationType="CUSTOM",
-        authorizerId=authorizer_id,
+        authorizationType="NONE",
     )
     apigateway_client.put_integration(
         restApiId=api_id,

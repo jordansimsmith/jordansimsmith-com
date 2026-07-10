@@ -8,7 +8,7 @@ The Japanese dictionary API service provides an authenticated HTTP API for prefi
 - **Interface**: REST over HTTPS
 - **Runtime**: AWS Lambda (Java 21) behind API Gateway REST
 - **Primary storage**: DynamoDB single table `japanese_dictionary` with three GSIs; shared `TERM#<sequence>` corpus rows and per-user `USER#<user>` bookmark rows coexist in the same table.
-- **Auth model**: API Gateway custom REQUEST authorizer backed by `AuthHandler`
+- **Auth model**: API Gateway custom REQUEST authorizer provided by the shared `auth_api` service (see `auth_api/README.md`)
 - **Primary consumer**: `japanese_dictionary_web`
 - **Data refresh path**: standalone Python migration script (`migrations/000-rebuild-terms.py`) running with local AWS credentials; no Lambda-side ingest API
 
@@ -27,7 +27,7 @@ The Japanese dictionary API service provides an authenticated HTTP API for prefi
 
 ### In scope
 
-- Require HTTP Basic authentication on every endpoint via the shared custom authorizer.
+- Require HTTP Basic authentication on every endpoint via the shared `auth_api` custom authorizer.
 - Run prefix searches against three dimensions in parallel (`expression`, `reading`, `reading_romaji`) and union the results.
 - Normalise incoming romaji queries (kunrei / wapuro / macron forms) to Modified Hepburn before matching.
 - Return up to 10 results: exact matches on `expression`, `reading`, or `reading_romaji` first, then by `frequency_rank` ascending with NULLs last, with `sequence` ascending as final tie-break.
@@ -56,8 +56,8 @@ The Japanese dictionary API service provides an authenticated HTTP API for prefi
 ```mermaid
 flowchart TD
   webClient["japanese_dictionary_web"] -->|"HTTPS Basic auth"| apiGateway["API Gateway REST"]
-  apiGateway -->|"Custom REQUEST authorizer"| authLambda["AuthHandler Lambda"]
-  authLambda -->|"Read users"| secretsManager["Secrets Manager: japanese_dictionary_api"]
+  apiGateway -->|"Custom REQUEST authorizer"| authLambda["auth_api_auth Lambda (shared)"]
+  authLambda -->|"Read users"| secretsManager["Secrets Manager: auth_api"]
   apiGateway -->|"Lambda proxy integration"| searchLambda["SearchHandler Lambda"]
   apiGateway -->|"Lambda proxy integration"| createBookmarkLambda["CreateBookmarkHandler Lambda"]
   apiGateway -->|"Lambda proxy integration"| deleteBookmarkLambda["DeleteBookmarkHandler Lambda"]
@@ -78,7 +78,7 @@ sequenceDiagram
   participant User as User
   participant Web as japanese_dictionary_web
   participant Gateway as API Gateway
-  participant Auth as AuthHandler
+  participant Auth as auth_api authorizer
   participant Search as SearchHandler
   participant Dynamo as DynamoDB
 
@@ -560,7 +560,7 @@ Required attributes on every `BOOKMARK` item: `pk`, `sk`, `user`, `sequence`, `c
 | Entity                 | Authoritative source                                          | Notes                                                                             |
 | ---------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | User identity          | Basic auth username                                           | parsed from `Authorization` header in authorizer and request context              |
-| Credential set         | Secrets Manager secret `japanese_dictionary_api`              | read by `AuthHandler`; never logged                                               |
+| Credential set         | Secrets Manager secret `auth_api`                             | owned by the shared `auth_api` authorizer service; never logged                   |
 | Term records           | DynamoDB `TERM#<sequence>` items                              | populated exclusively by `migrations/000-rebuild-terms.py`                        |
 | Frequency rank values  | JPDB Frequency Kana zip (consumed at ingest)                  | persisted on each term as `frequency_rank`; `null` when not in JPDB               |
 | Pitch values           | Kanjium Pitch Accents zip (consumed at ingest)                | persisted on each term as `pitch`; `null` when no kanjium match or no valid pitch |
@@ -573,8 +573,8 @@ Required attributes on every `BOOKMARK` item: `pk`, `sk`, `user`, `sequence`, `c
 
 ## Security and privacy
 
-- API Gateway custom REQUEST authorizer (`AuthHandler`) enforces HTTP Basic authentication before any handler executes. `OPTIONS` preflight is `NONE` (MOCK integration with CORS headers).
-- Credentials live in AWS Secrets Manager (`japanese_dictionary_api`); read by `AuthHandler` at runtime via least-privilege IAM. Never logged.
+- The shared `auth_api` custom REQUEST authorizer enforces HTTP Basic authentication before any handler executes. `OPTIONS` preflight is `NONE` (MOCK integration with CORS headers).
+- Credentials live in the shared `auth_api` Secrets Manager secret owned by the `auth_api` service. Never logged.
 - The migration script uses the operator's local AWS credentials (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`); no in-AWS credential is involved in the data load.
 - The term corpus is shared and the Basic auth gate exists as access control. Bookmark rows are partitioned by Basic-auth username; bookmark queries always pin `pk = USER#<authenticated user>` so a user cannot read or write another user's bookmarks.
 - No PII; the corpus is publicly available Japanese language data and the bookmark records carry only `(user, sequence, created_at)` triples.
@@ -586,32 +586,19 @@ Required attributes on every `BOOKMARK` item: `pk`, `sk`, `user`, `sequence`, `c
 
 ### Environment variables
 
-No service-specific environment variables are consumed by handlers in current scope. Behaviour is configured via code constants and Terraform-managed resources (table name, secret name, CORS origin).
+No service-specific environment variables are consumed by handlers in current scope. Behaviour is configured via code constants and Terraform-managed resources (table name, CORS origin).
 
-| Name     | Required | Purpose                                                                  | Default behaviour                                           |
-| -------- | -------- | ------------------------------------------------------------------------ | ----------------------------------------------------------- |
-| `(none)` | n/a      | configuration is via code constants and Terraform-managed resources only | table name, secret name, and CORS origin come from defaults |
+| Name     | Required | Purpose                                                                  | Default behaviour                             |
+| -------- | -------- | ------------------------------------------------------------------------ | --------------------------------------------- |
+| `(none)` | n/a      | configuration is via code constants and Terraform-managed resources only | table name and CORS origin come from defaults |
 
 ### Secret shape
 
-Expected JSON payload for the `japanese_dictionary_api` Secrets Manager secret:
-
-```json
-{
-  "users": [
-    {
-      "user": "alice",
-      "password": "strong-password"
-    }
-  ]
-}
-```
-
-No third-party API keys (the dictionary corpus is locally produced — no runtime calls to external APIs).
+This service reads no secrets at runtime. Basic auth credentials live in the shared `auth_api` secret owned by the `auth_api` service (see `auth_api/README.md`). No third-party API keys (the dictionary corpus is locally produced — no runtime calls to external APIs).
 
 ## Performance envelope
 
-- Lambda sizing: `AuthHandler` runs at `512 MB` memory / `10 s` timeout (repo default); `SearchHandler` at `1024 MB` memory / `5 s` timeout (bumped above default for parallel SDK calls + Jackson tree parsing); `CreateBookmarkHandler`, `DeleteBookmarkHandler`, and `FindBookmarksHandler` run at the repo default `512 MB` / `10 s`.
+- Lambda sizing: `SearchHandler` runs at `1024 MB` memory / `5 s` timeout (bumped above default for parallel SDK calls + Jackson tree parsing); `CreateBookmarkHandler`, `DeleteBookmarkHandler`, and `FindBookmarksHandler` run at the repo default `512 MB` / `10 s`.
 - DynamoDB: `PAY_PER_REQUEST` billing. Three GSIs with slim `INCLUDE` projection. Estimated table size: ~600 MB main + ~50 MB GSI projections = ~650 MB. Bookmark rows add a negligible amount (≪ 1 KB per row, single-user app).
 - Read path latency budget (warm path):
   - 30–50 ms HTTPS round-trip (Auckland → ap-southeast-2)
@@ -630,12 +617,12 @@ No third-party API keys (the dictionary corpus is locally produced — no runtim
 
 ## Testing and quality gates
 
-- Unit tests cover `RomajiNormaliser` per-rule cases plus idempotency, `TermItem` key formatting, and `BookmarkItem` key formatting. Authorizer logic (Basic header parsing, allow/deny + Base64 edge cases) is covered by `lib/auth`'s `RequestAuthorizerTest`.
+- Unit tests cover `RomajiNormaliser` per-rule cases plus idempotency, `TermItem` key formatting, and `BookmarkItem` key formatting. Authorizer logic (Basic header parsing, allow/deny + Base64 edge cases) is covered by `auth_api`'s `AuthHandlerTest`.
 - Integration tests run `SearchHandler` against DynamoDB Testcontainers with hand-picked seed terms covering: kanji-only, kana-only, kanji+reading with non-NULL `frequency_rank`, term with non-NULL `pitch`, term whose glossary references an image (placeholder rendering case). Asserts prefix match across all three dimensions, exact-match-first ordering followed by frequency-asc with NULLs last (including a defensive case proving a null-frequency exact match displaces high-frequency prefix-only matches from the top-10), top-10 cap, dedup when a term is reachable via multiple GSIs, kunrei romaji normalisation, and validation paths (`q` too long, missing/empty/whitespace `q`, NFC + trim before length check).
 - Integration tests for `CreateBookmarkHandler` cover: happy-path creation writes the row at `clock.now()`; second `PUT` for the same `(user, sequence)` is idempotent and refreshes `created_at`; non-integer / non-positive `{sequence}` returns `400`; bookmarks created by one user are invisible to a different user's listing; bookmark writes never touch `TERM#` rows.
 - Integration tests for `DeleteBookmarkHandler` cover: happy-path delete removes the row and returns `204`; second `DELETE` for the same `(user, sequence)` is idempotent and still returns `204`; non-integer / non-positive `{sequence}` returns `400`; deletes never affect another user's bookmarks; deletes never touch `TERM#` rows.
 - Integration tests for `FindBookmarksHandler` cover: empty list when the user has no bookmarks; only the calling user's rows are returned; sort order is `created_at` desc with `sequence` ascending tie-break; pre-seeded `TERM#` rows in the same table are ignored in the default mode; `?include=term` happy path populates all term fields; `?include=term` drops dangling bookmarks; `?include=term` empty list for a user with no bookmarks; unknown `include` value → 400.
-- E2E tests use LocalStack (API Gateway + Lambda + DynamoDB + Secrets Manager) and exercise the full HTTP flow: `GET /search?q=新` returns the seed fixture, `GET /search?q=` returns `[]`, missing `Authorization` returns `401`, `q` length > 64 returns `400`, `PUT /bookmarks/{sequence}` creates a bookmark and `GET /bookmarks` lists it, `GET /bookmarks?include=term` returns the bookmark hydrated with term fields, `DELETE /bookmarks/{sequence}` removes the bookmark and is idempotent on a non-existent sequence. Deterministic; no outbound internet; no real AWS credentials.
+- E2E tests use LocalStack (API Gateway + Lambda + DynamoDB) with no authorizer wired (LocalStack community does not enforce CUSTOM authorizers; authorizer coverage lives in `auth_api`) and exercise the full HTTP flow: `GET /search?q=新` returns the seed fixture, `GET /search?q=` returns `[]`, `q` length > 64 returns `400`, `PUT /bookmarks/{sequence}` creates a bookmark and `GET /bookmarks` lists it, `GET /bookmarks?include=term` returns the bookmark hydrated with term fields, `DELETE /bookmarks/{sequence}` removes the bookmark and is idempotent on a non-existent sequence. Deterministic; no outbound internet; no real AWS credentials.
 - Required service checks:
   - `bazel build //japanese_dictionary_api:all`
   - `bazel test //japanese_dictionary_api:all`
@@ -673,7 +660,7 @@ No third-party API keys (the dictionary corpus is locally produced — no runtim
 
 1. The user types `新` into `japanese_dictionary_web`.
 2. After 250 ms of no further keystrokes, the SPA sends `GET /search?q=%E6%96%B0`.
-3. API Gateway authorises the request via `AuthHandler`.
+3. API Gateway authorises the request via the shared `auth_api` authorizer.
 4. `SearchHandler` runs three parallel GSI queries, finds matches in `gsi1` (`EXPRESSION` partition), unions and dedups, sorts exact matches first then by `frequency_rank` ASC nulls last.
 5. `SearchHandler` `BatchGetItem`s the top 10 sequences and returns full term records including `glossary_raw`.
 6. The SPA renders 10 expanded entries.
@@ -690,7 +677,7 @@ No third-party API keys (the dictionary corpus is locally produced — no runtim
 
 1. The user types `新橋` in `japanese_dictionary_web` and the search returns the matching entry.
 2. The user clicks the bookmark icon next to the result. The SPA optimistically marks the entry as bookmarked and sends `PUT /bookmarks/1316830`.
-3. API Gateway authorises the request via `AuthHandler`, then routes to `CreateBookmarkHandler`.
+3. API Gateway authorises the request via the shared `auth_api` authorizer, then routes to `CreateBookmarkHandler`.
 4. The handler reads the username from the request context, computes `created_at = clock.now()`, and `PutItem`s a single `pk = USER#alice / sk = BOOKMARK#1316830` row.
 5. Handler responds `201 { "sequence": 1316830, "created_at": <epoch> }`.
 6. On the next page load, the SPA's mount-time `GET /bookmarks` returns `{ "sequences": [1316830, ...] }`, and the bookmark icon for that result is rendered as already bookmarked.
@@ -699,7 +686,7 @@ No third-party API keys (the dictionary corpus is locally produced — no runtim
 
 1. The user is on the search results page with `新橋` rendered in the bookmarked (filled icon) state.
 2. The user clicks the filled bookmark icon to undo. The SPA optimistically clears the local bookmark and sends `DELETE /bookmarks/1316830`.
-3. API Gateway authorises the request via `AuthHandler`, then routes to `DeleteBookmarkHandler`.
+3. API Gateway authorises the request via the shared `auth_api` authorizer, then routes to `DeleteBookmarkHandler`.
 4. The handler reads the username from the request context and `DeleteItem`s the `pk = USER#alice / sk = BOOKMARK#1316830` row.
 5. Handler responds `204 No Content`.
 6. On the next page load, the SPA's mount-time `GET /bookmarks` no longer includes `1316830`, and the `新橋` entry renders with the empty bookmark icon.

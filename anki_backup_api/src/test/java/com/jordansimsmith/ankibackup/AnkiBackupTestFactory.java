@@ -1,12 +1,9 @@
 package com.jordansimsmith.ankibackup;
 
-import com.jordansimsmith.auth.AuthModule;
 import com.jordansimsmith.dynamodb.DynamoDbTestModule;
 import com.jordansimsmith.http.RequestContextModule;
 import com.jordansimsmith.json.ObjectMapperModule;
 import com.jordansimsmith.s3.S3TestModule;
-import com.jordansimsmith.secrets.FakeSecrets;
-import com.jordansimsmith.secrets.SecretsTestModule;
 import com.jordansimsmith.time.ClockTestModule;
 import com.jordansimsmith.time.FakeClock;
 import dagger.BindsInstance;
@@ -20,18 +17,14 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 @Component(
     modules = {
       ClockTestModule.class,
-      SecretsTestModule.class,
       ObjectMapperModule.class,
       DynamoDbTestModule.class,
       S3TestModule.class,
       RequestContextModule.class,
-      AuthModule.class,
       AnkiBackupTestModule.class
     })
 public interface AnkiBackupTestFactory extends AnkiBackupFactory {
   FakeClock fakeClock();
-
-  FakeSecrets fakeSecrets();
 
   DynamoDbClient dynamoDbClient();
 

@@ -52,10 +52,6 @@ module "java_api" {
   cors_origin    = "https://book-tracker.jordansimsmith.com"
 
   lambdas = {
-    auth = {
-      handler  = "com.jordansimsmith.booktracker.AuthHandler"
-      artifact = var.artifacts["auth"]
-    }
     create_book = {
       handler  = "com.jordansimsmith.booktracker.CreateBookHandler"
       artifact = var.artifacts["create_book"]
@@ -89,11 +85,6 @@ module "java_api" {
   providers = {
     aws.us_east_1 = aws.us_east_1
   }
-}
-
-resource "aws_secretsmanager_secret" "book_tracker" {
-  name                    = local.application_id
-  recovery_window_in_days = 0
 }
 
 resource "aws_dynamodb_table" "book_tracker" {
@@ -134,45 +125,6 @@ resource "aws_dynamodb_table" "book_tracker" {
   }
 
   deletion_protection_enabled = true
-}
-
-data "aws_iam_policy_document" "lambda_secretsmanager_allow_policy_document" {
-  statement {
-    effect = "Allow"
-
-    resources = [
-      aws_secretsmanager_secret.book_tracker.arn
-    ]
-
-    actions = [
-      "secretsmanager:GetResourcePolicy",
-      "secretsmanager:GetSecretValue",
-      "secretsmanager:DescribeSecret",
-      "secretsmanager:ListSecretVersionIds"
-    ]
-  }
-
-  statement {
-    effect = "Allow"
-
-    resources = [
-      "*"
-    ]
-
-    actions = [
-      "secretsmanager:ListSecrets"
-    ]
-  }
-}
-
-resource "aws_iam_policy" "lambda_secretsmanager" {
-  name   = "${local.application_id}_lambda_secretsmanager"
-  policy = data.aws_iam_policy_document.lambda_secretsmanager_allow_policy_document.json
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_secretsmanager" {
-  role       = module.java_api.lambda_role_name
-  policy_arn = aws_iam_policy.lambda_secretsmanager.arn
 }
 
 data "aws_iam_policy_document" "lambda_dynamodb_allow_policy_document" {

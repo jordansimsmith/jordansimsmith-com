@@ -21,7 +21,7 @@ The immersion tracker API provides an authenticated backend for recording watche
 
 ### In scope
 
-- Authenticate every API route with a custom API Gateway Lambda authorizer using HTTP Basic credentials.
+- Authenticate every API route with HTTP Basic credentials validated by the shared `auth_api` authorizer.
 - Sync watched local episodes, movies, YouTube videos, and Spotify episodes into per-user DynamoDB partitions.
 - Enrich content metadata from TVDB (shows and movies), YouTube (videos and channels), and Spotify (episodes and shows).
 - Return aggregate progress metrics, daily activity, weekly trend, and grouped progress summaries from persisted data.
@@ -39,7 +39,7 @@ The immersion tracker API provides an authenticated backend for recording watche
 ```mermaid
 flowchart TD
   syncClient[Sync script and API clients] -->|"HTTPS Basic auth"| apiGateway[API Gateway REST API]
-  apiGateway -->|"CUSTOM authorizer"| authLambda[AuthHandler Lambda]
+  apiGateway -->|"CUSTOM authorizer"| authLambda["auth_api_auth Lambda (shared)"]
   apiGateway --> handlers[Handler Lambdas]
   handlers --> ddb[DynamoDB immersion_tracker]
   handlers --> secrets[Secrets Manager immersion_tracker_api]
@@ -78,7 +78,7 @@ sequenceDiagram
 
 - Use API Gateway + Lambda for a low-ops serverless API that matches other services in this repository.
 - Use one DynamoDB table with key prefixes (`EPISODE#`, `SHOW#`, `MOVIE#`, `YOUTUBEVIDEO#`, `YOUTUBECHANNEL#`, `SPOTIFYEPISODE#`, `SPOTIFYSHOW#`) to keep read and write paths simple for per-user workloads.
-- Use HTTP Basic authentication via API Gateway custom authorizer and Secrets Manager-backed credentials for straightforward script and CLI usage.
+- Use HTTP Basic authentication via the shared `auth_api` custom authorizer for straightforward script and CLI usage; the service keeps its own secret for third-party provider keys only.
 - Enrich and persist provider metadata during sync operations so progress queries avoid extra outbound calls.
 - Compute progress and trend metrics at read time from canonical items; this keeps writes simple but makes read cost proportional to user data volume.
 
@@ -327,14 +327,15 @@ Movie item:
 | Spotify watch records             | Client-provided episode IDs plus Spotify API metadata      | Episode and show metadata persisted at sync time                     |
 | TV show and movie metadata        | TVDB API lookups                                           | Persisted into `SHOW` and `MOVIE` records                            |
 | Progress metrics                  | Derived at read time from DynamoDB user partition          | No separate aggregate cache table                                    |
-| Credential set                    | Secrets Manager secret `immersion_tracker_api`             | Referenced by authorizer and provider clients                        |
+| Credential set                    | Secrets Manager secret `auth_api`                          | Owned by the shared `auth_api` authorizer service                    |
+| Provider API keys                 | Secrets Manager secret `immersion_tracker_api`             | Read by TVDB, YouTube, and Spotify clients                           |
 
 ## Security and privacy
 
-- All non-OPTIONS API methods use custom API Gateway authorization (`CUSTOM`) with `AuthHandler`.
+- All non-OPTIONS API methods use custom API Gateway authorization (`CUSTOM`) routed to the shared `auth_api` authorizer Lambda.
 - Unauthorized requests return `401` and `WWW-Authenticate: Basic`.
 - Per-user partitioning (`pk = USER#<user>`) scopes records by authenticated identity.
-- Runtime credentials and provider keys are loaded from AWS Secrets Manager, not hardcoded in source.
+- Basic auth credentials live in the shared `auth_api` secret; provider keys are loaded from this service's own Secrets Manager secret, not hardcoded in source.
 - Transport is HTTPS through the custom API domain `api.immersion-tracker.jordansimsmith.com`.
 - CORS is restricted to `https://immersion-tracker.jordansimsmith.com`.
 
@@ -361,14 +362,10 @@ Local script and test variables:
 
 ### Secret shape
 
+Expected JSON for the `immersion_tracker_api` secret (third-party provider keys only; Basic auth credentials live in the shared `auth_api` secret — see `auth_api/README.md`):
+
 ```json
 {
-  "users": [
-    {
-      "user": "alice",
-      "password": "strong-password"
-    }
-  ],
   "tvdb_api_key": "string",
   "youtube_api_key": "string",
   "spotify_client_id": "string",

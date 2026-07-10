@@ -1,6 +1,5 @@
 package com.jordansimsmith.immersiontracker;
 
-import com.jordansimsmith.auth.AuthModule;
 import com.jordansimsmith.dynamodb.DynamoDbTestModule;
 import com.jordansimsmith.http.RequestContextModule;
 import com.jordansimsmith.json.ObjectMapperModule;
@@ -23,7 +22,6 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
       ObjectMapperModule.class,
       DynamoDbTestModule.class,
       RequestContextModule.class,
-      AuthModule.class,
       ImmersionTrackerTestModule.class
     })
 public interface ImmersionTrackerTestFactory extends ImmersionTrackerFactory {

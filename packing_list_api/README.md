@@ -8,7 +8,7 @@ The packing list API service provides an authenticated HTTP API for reading shar
 - **Interface**: REST over HTTPS
 - **Runtime**: AWS Lambda (Java 21) behind API Gateway REST
 - **Primary storage**: DynamoDB table `packing_list` with `gsi1` index
-- **Auth model**: API Gateway custom REQUEST authorizer backed by `AuthHandler`
+- **Auth model**: API Gateway custom REQUEST authorizer provided by the shared `auth_api` service (see `auth_api/README.md`)
 - **Primary consumer**: `packing_list_web`
 
 ## User stories
@@ -44,8 +44,8 @@ The packing list API service provides an authenticated HTTP API for reading shar
 ```mermaid
 flowchart TD
   webClient["packing_list_web"] -->|"HTTPS Basic auth"| apiGateway["API Gateway REST"]
-  apiGateway -->|"Custom authorizer"| authLambda["AuthHandler Lambda"]
-  authLambda -->|"Read users"| secretsManager["Secrets Manager: packing_list_api"]
+  apiGateway -->|"Custom authorizer"| authLambda["auth_api_auth Lambda (shared)"]
+  authLambda -->|"Read users"| secretsManager["Secrets Manager: auth_api"]
   apiGateway -->|"Lambda proxy integration"| tripHandlers["Trip handlers"]
   tripHandlers -->|"Read/write trips"| dynamoTable["DynamoDB: packing_list"]
 ```
@@ -57,7 +57,7 @@ sequenceDiagram
   participant User as User
   participant Web as packing_list_web
   participant Gateway as API Gateway
-  participant Auth as AuthHandler
+  participant Auth as auth_api authorizer
   participant Secrets as Secrets Manager
   participant Create as CreateTripHandler
   participant Dynamo as DynamoDB
@@ -65,7 +65,7 @@ sequenceDiagram
   User->>Web: confirm generated packing items
   Web->>Gateway: POST /trips with Basic auth
   Gateway->>Auth: validate authorization header
-  Auth->>Secrets: get packing_list_api secret
+  Auth->>Secrets: get auth_api secret
   Secrets-->>Auth: users and passwords
   Auth-->>Gateway: allow request
   Gateway->>Create: invoke create handler
@@ -251,15 +251,15 @@ Representative key failures for delete:
 | Entity                  | Authoritative source                        | Notes                                                   |
 | ----------------------- | ------------------------------------------- | ------------------------------------------------------- |
 | Template catalog        | `TemplatesFactoryImpl` in service code      | returned by `GET /templates`; not persisted in DynamoDB |
-| User credentials        | Secrets Manager secret `packing_list_api`   | read by `AuthHandler` authorizer                        |
+| User credentials        | Secrets Manager secret `auth_api`           | owned by the shared `auth_api` authorizer service       |
 | Request user identity   | Basic username from `Authorization` header  | used to scope all DynamoDB keys                         |
 | Trip metadata and items | DynamoDB `TRIP#...` items in `packing_list` | canonical state for create/list/get/update/delete       |
 | Trip list ordering      | DynamoDB `gsi1sk` key format                | derived from persisted `departure_date` and `trip_id`   |
 
 ## Security and privacy
 
-- API Gateway custom REQUEST authorizer enforces Basic authentication before handler execution.
-- Credentials are stored in AWS Secrets Manager and read at runtime by `AuthHandler`.
+- The shared `auth_api` custom REQUEST authorizer enforces Basic authentication before handler execution.
+- Credentials are stored in the shared `auth_api` Secrets Manager secret owned by the `auth_api` service.
 - Per-user data partitioning (`pk = USER#<user>`) prevents cross-user reads and writes.
 - Transport is HTTPS via API Gateway custom domain `api.packing-list.jordansimsmith.com`.
 - Handler logs should not include raw credentials, authorization headers, or secret payloads.
@@ -270,24 +270,13 @@ Representative key failures for delete:
 
 No service-specific environment variables are consumed by handlers in current scope.
 
-| Name     | Required | Purpose                                                                   | Default behavior                                                       |
-| -------- | -------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `(none)` | n/a      | behavior is configured via code constants and Terraform-managed resources | table name, secret name, and CORS origin come from code/infra defaults |
+| Name     | Required | Purpose                                                                   | Default behavior                                         |
+| -------- | -------- | ------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `(none)` | n/a      | behavior is configured via code constants and Terraform-managed resources | table name and CORS origin come from code/infra defaults |
 
 ### Secret shape
 
-Expected secret JSON for `packing_list_api`:
-
-```json
-{
-  "users": [
-    {
-      "user": "alice",
-      "password": "strong-password"
-    }
-  ]
-}
-```
+This service reads no secrets at runtime. Basic auth credentials live in the shared `auth_api` secret owned by the `auth_api` service (see `auth_api/README.md`).
 
 ## Performance envelope
 
@@ -298,7 +287,7 @@ Expected secret JSON for `packing_list_api`:
 
 ## Testing and quality gates
 
-- Unit tests cover template response mapping and trip validation rules. Authorizer logic is covered by `lib/auth`'s `RequestAuthorizerTest`.
+- Unit tests cover template response mapping and trip validation rules. Authorizer logic is covered by `auth_api`'s `AuthHandlerTest`.
 - Integration tests cover create/list/get/update/delete handlers against DynamoDB Testcontainers.
 - E2E tests cover create -> list -> get -> update -> get -> delete -> verify gone flows with LocalStack.
 - Required service checks:

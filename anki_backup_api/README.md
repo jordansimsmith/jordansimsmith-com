@@ -8,7 +8,7 @@ The Anki backup API provides an authenticated backend for creating immutable, ve
 - **Interface**: REST over HTTPS (API Gateway -> Lambda proxy integration)
 - **Runtime**: AWS Lambda (Java 21)
 - **Primary storage**: DynamoDB table `anki_backup` + S3 bucket `anki-backup.jordansimsmith.com`
-- **Auth model**: HTTP Basic via API Gateway custom authorizer backed by Secrets Manager
+- **Auth model**: HTTP Basic via the shared `auth_api` API Gateway custom authorizer (see `auth_api/README.md`)
 - **Primary client**: desktop Anki add-on with a Tools menu action (`Run backup now`)
 - **v1 user profile**: single personal user, with multi-user partitioning path built into key design
 
@@ -22,7 +22,7 @@ The Anki backup API provides an authenticated backend for creating immutable, ve
 
 ### In scope
 
-- Authenticate every API route with HTTP Basic credentials validated by a custom API Gateway authorizer.
+- Authenticate every API route with HTTP Basic credentials validated by the shared `auth_api` authorizer.
 - Let the add-on trigger backup from a manual Tools menu action while the server enforces frequency gating.
 - Create backup artifacts as full `.colpkg` packages (collection database plus media files).
 - Use S3 multipart upload only, with `32 MB` part size and server-driven completion.
@@ -45,7 +45,7 @@ The Anki backup API provides an authenticated backend for creating immutable, ve
 flowchart TD
   anki[Anki desktop Tools menu action] --> addon[Backup add-on]
   addon -->|POST /backups| gateway[API Gateway]
-  gateway --> auth[AuthHandler Lambda]
+  gateway --> auth["auth_api_auth Lambda (shared)"]
   gateway --> create[CreateBackup Lambda]
   create --> ddb[DynamoDB anki_backup]
   create --> presign[S3 presign operations]
@@ -276,12 +276,12 @@ Representative completed item:
 | Backup metadata and status | DynamoDB `BACKUP#<backup_id>` items              | authoritative status (`PENDING`/`COMPLETED`) and retention metadata |
 | Backup artifact bytes      | S3 object at `s3_bucket + s3_key`                | immutable once multipart upload is completed                        |
 | Backup eligibility window  | DynamoDB completed backups + configured interval | evaluated server-side at `POST /backups`                            |
-| Credential set             | Secrets Manager secret `anki_backup_api`         | credentials are never embedded in source or Terraform state         |
+| Credential set             | Secrets Manager secret `auth_api`                | owned by the shared `auth_api` authorizer service                   |
 
 ## Security and privacy
 
-- API Gateway custom authorizer enforces Basic auth before backup handlers execute.
-- Secrets are loaded from AWS Secrets Manager and not persisted in code, logs, or Terraform state.
+- The shared `auth_api` custom authorizer enforces Basic auth before backup handlers execute.
+- Credentials live in the shared `auth_api` Secrets Manager secret owned by the `auth_api` service, not in code, logs, or Terraform state.
 - S3 public access is blocked; object access is via IAM for service internals and short-lived presigned URLs for clients.
 - Transport is HTTPS only.
 - Logs must redact or omit raw auth headers, credentials, presigned URLs, and local file path details.
@@ -295,7 +295,6 @@ None in current scope. The service uses fixed v1 constants that match repository
 
 - DynamoDB table: `anki_backup`
 - S3 bucket: `anki-backup.jordansimsmith.com`
-- Secrets Manager secret id: `anki_backup_api`
 - Backup interval: `24` hours
 - Retention: `90` days
 - Multipart part size: `33554432` bytes (`32 MB`)
@@ -304,16 +303,7 @@ None in current scope. The service uses fixed v1 constants that match repository
 
 ### Secret shape
 
-```json
-{
-  "users": [
-    {
-      "user": "alice",
-      "password": "strong-password"
-    }
-  ]
-}
-```
+This service reads no secrets at runtime. Basic auth credentials live in the shared `auth_api` secret owned by the `auth_api` service (see `auth_api/README.md`).
 
 ## Performance envelope
 
@@ -324,7 +314,7 @@ None in current scope. The service uses fixed v1 constants that match repository
 
 ## Testing and quality gates
 
-- Unit tests cover interval eligibility checks, multipart part calculations, and checksum/metadata validation. Authorizer logic (Basic header parsing, password-with-colon, multi-user matching) is covered by `lib/auth`'s `RequestAuthorizerTest`.
+- Unit tests cover interval eligibility checks, multipart part calculations, and checksum/metadata validation. Authorizer logic (Basic header parsing, password-with-colon, multi-user matching) is covered by `auth_api`'s `AuthHandlerTest`.
 - Integration tests cover handler behavior against DynamoDB test containers with fake S3 presign/completion clients.
 - E2E tests cover LocalStack-backed flow: create backup -> multipart upload -> finalize -> list -> get.
 - Required checks before merge:

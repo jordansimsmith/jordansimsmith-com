@@ -1,11 +1,8 @@
 package com.jordansimsmith.packinglist;
 
-import com.jordansimsmith.auth.AuthModule;
 import com.jordansimsmith.dynamodb.DynamoDbTestModule;
 import com.jordansimsmith.http.RequestContextModule;
 import com.jordansimsmith.json.ObjectMapperModule;
-import com.jordansimsmith.secrets.FakeSecrets;
-import com.jordansimsmith.secrets.SecretsTestModule;
 import com.jordansimsmith.time.ClockTestModule;
 import com.jordansimsmith.time.FakeClock;
 import dagger.BindsInstance;
@@ -19,16 +16,12 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 @Component(
     modules = {
       ObjectMapperModule.class,
-      SecretsTestModule.class,
       ClockTestModule.class,
       DynamoDbTestModule.class,
       RequestContextModule.class,
-      AuthModule.class,
       PackingListTestModule.class
     })
 public interface PackingListTestFactory extends PackingListFactory {
-  FakeSecrets fakeSecrets();
-
   FakeClock fakeClock();
 
   FakeTemplatesFactory fakeTemplatesFactory();
