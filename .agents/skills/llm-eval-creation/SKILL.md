@@ -7,7 +7,7 @@ description: Builds ground-truth eval frameworks for LLM features in this repo -
 
 Builds the evaluation framework for an LLM feature before (or alongside) the feature itself, so that changes to system prompts and base models can be compared on measured quality and cost instead of vibes.
 
-The canonical worked example is `auction_tracker_api/evals/`: read its dataset codebook (`dataset/README.md`), harness (`run_eval.py`), and prompts (`prompts/`) before building a new eval, and follow their structure. The underlying principles this workflow relies on are distilled in [references/methodology.md](references/methodology.md) — read it before starting.
+The canonical worked example is `auction_tracker_api/evals/mtg_bulk/`: read its dataset codebook (`dataset/README.md`), the shared harness (`evals/run_eval.py`), and prompts (`prompts/`) before building a new eval, and follow their structure. A service's `evals/` directory holds one subdirectory per judge, all served by the one harness. The underlying principles this workflow relies on are distilled in [references/methodology.md](references/methodology.md) — read it before starting.
 
 ## Framing
 
@@ -24,7 +24,7 @@ Work through the steps in order. Each has a "done when" check.
 
 ### 1. Write the criteria as binary checks
 
-Before any code, decompose the owner's intent into independent, per-criterion binary checks, each judgeable from the input contract alone. For each criterion write: what it measures, what pass vs fail looks like, the default when the listing gives no signal (disqualifier criteria default to pass), and 2-3 annotated real examples ("this fails because ..."). Never one blended holistic judgment. Record everything in the dataset codebook (`dataset/README.md`) — the codebook is the label spec and must be committed next to the labels.
+Before any code, decompose the owner's intent into independent, per-criterion binary checks, each judgeable from the input contract alone. For each criterion write: what it measures, what pass vs fail looks like, the default when the listing gives no signal (disqualifier criteria default to pass), and 2-3 annotated real examples ("this fails because ..."). Never one blended holistic judgment. Record everything in the dataset codebook (`dataset/README.md`) — the codebook is the label spec and must be committed next to the labels — and list the criterion names in `dataset/criteria.json`, which the harness reads.
 
 Done when: every criterion is independently checkable from input text alone, and the overall verdict rule (usually the AND of all criteria) is written down.
 
@@ -66,11 +66,12 @@ Done when: `splits.json` is committed with the seed and strategy recorded.
 
 ### 6. Build the harness
 
-A single Python script, `run_eval.py`, exposed as a Bazel `py_binary` (see `run-eval` in `auction_tracker_api/BUILD.bazel`):
+A single Python script per service, `evals/run_eval.py`, shared by all of the service's judges and exposed as a Bazel `py_binary` (see `run-eval` in `auction_tracker_api/BUILD.bazel`). When adding a judge to a service that already has a harness, reuse it — only add a judge subdirectory and, if needed, judge-specific flags.
 
 - Dependencies go through the root pip lock: add to `requirements.in`, run `bazel run //:requirements.update`.
-- Dataset and prompt files are `data` deps read from runfiles; run records are written to the source tree via `BUILD_WORKSPACE_DIRECTORY`. The `runs/` directory is already gitignored repo-wide (`**/evals/runs/`).
-- Flags: `--model` (required), `--split` (default dev), `--prompt` (default `prompts/v1.md`), `--trials` (majority vote), `--limit`, `--reasoning-effort`, `--price-input`/`--price-output` (USD per 1M tokens).
+- Dataset and prompt files are `data` deps read from runfiles; run records are written to the source tree via `BUILD_WORKSPACE_DIRECTORY`. Per-judge `runs/` directories are already gitignored repo-wide (`**/evals/**/runs/`).
+- Flags: `--judge` (required, the judge's subdirectory name), `--model` (required), `--split` (default dev), `--prompt` (default `prompts/v1.md`, relative to the judge directory), `--trials` (majority vote), `--limit`, `--reasoning-effort`, `--price-input`/`--price-output` (USD per 1M tokens).
+- Criteria are read from the judge's `dataset/criteria.json`, never hardcoded.
 - The judge call uses temperature 0 and structured JSON output: per criterion an object with `reasoning` and `result` ("pass"/"fail"). The overall verdict is derived in code as the AND of criteria, never asked of the model.
 - Report per-criterion TPR and TNR (positive = fail/disqualified), never accuracy, with the plain-language framing printed on every run (e.g. "TPR = junk caught, TNR = keepers kept"), plus mean/p95 latency, token counts, and cost when prices are given.
 - Print every disagreement with the judge's reasoning — this is the error-analysis feed.
@@ -79,7 +80,7 @@ A single Python script, `run_eval.py`, exposed as a Bazel `py_binary` (see `run-
 Usage shape:
 
 ```bash
-OPENAI_API_KEY=... bazel run //<service>_api:run-eval -- --model <model> --split dev
+OPENAI_API_KEY=... bazel run //<service>_api:run-eval -- --judge <judge> --model <model> --split dev
 ```
 
 Done when: a small `--limit` smoke run works end-to-end through `bazel run` and the run record lands in the source tree.
@@ -104,16 +105,17 @@ In this order — fix the yardstick, then the biggest lever, then sweep:
 
 ```
 <service>_api/evals/
-  dataset/           # <id>.json fixtures, s<nnn>.json synthetics,
+  run_eval.py        # shared harness, exposed as bazel run //<service>_api:run-eval
+  <judge>/           # one subdirectory per judge (e.g. mtg_bulk/, ram/)
+    dataset/         # <id>.json fixtures, s<nnn>.json synthetics, criteria.json,
                      # labels.json, splits.json, README.md codebook
-  prompts/           # v1.md, v2.md, ... (versioned, the thing under test)
-  run_eval.py        # harness, exposed as bazel run //<service>_api:run-eval
-  runs/              # gitignored run records
+    prompts/         # v1.md, v2.md, ... (versioned, the thing under test)
+    runs/            # gitignored run records
 ```
 
 ## Commit hygiene
 
 Commit the reproducible core and nothing ephemeral:
 
-- **Commit:** fixtures, `labels.json`, `splits.json`, the dataset `README.md` codebook, `prompts/*.md`, `run_eval.py`, the `py_binary` target, requirements changes. Treat the golden dataset like code — the hand labels are the most expensive artifact to recreate, and labels without their codebook rot.
+- **Commit:** fixtures, `criteria.json`, `labels.json`, `splits.json`, the dataset `README.md` codebook, `prompts/*.md`, `run_eval.py`, the `py_binary` target, requirements changes. Treat the golden dataset like code — the hand labels are the most expensive artifact to recreate, and labels without their codebook rot.
 - **Keep local:** `runs/` (gitignored; reproducible from pinned SHAs), labeling worksheets once parsed into `labels.json`, scrape/generation throwaway scripts, and session planning docs (`tmp/`).

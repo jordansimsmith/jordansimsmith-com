@@ -89,8 +89,8 @@ py_binary(
     name = "run-eval",
     srcs = ["evals/run_eval.py"],
     data = glob([
-        "evals/dataset/*.json",
-        "evals/prompts/*.md",
+        "evals/*/dataset/*.json",
+        "evals/*/prompts/*.md",
     ]),
     main = "evals/run_eval.py",
     deps = ["@pypi//openai"],

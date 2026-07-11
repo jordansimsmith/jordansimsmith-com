@@ -1,16 +1,21 @@
-"""Eval harness for the auction tracker LLM judge.
+"""Eval harness for the auction tracker LLM judges.
 
-Runs a candidate (model x system prompt) over a dataset split and reports
-per-criterion TPR/TNR (positive = fail, i.e. the listing is disqualified),
-overall verdict metrics, latency, and token usage / cost.
+Runs a candidate (model x system prompt) over a judge's dataset split and
+reports per-criterion TPR/TNR (positive = fail, i.e. the listing is
+disqualified), overall verdict metrics, latency, and token usage / cost.
+
+Each judge lives in its own subdirectory of evals/ (e.g. mtg_bulk/) with
+dataset/ (fixtures, criteria.json, labels.json, splits.json, README.md
+codebook) and prompts/ (versioned system prompts).
 
 Usage:
     OPENAI_API_KEY=... bazel run //auction_tracker_api:run-eval -- \
-        --model MODEL [--split dev] [--prompt prompts/v1.md] [--trials 1]
-        [--limit N] [--price-input $/1M] [--price-output $/1M]
+        --judge mtg_bulk --model MODEL [--split dev] [--prompt prompts/v1.md]
+        [--trials 1] [--limit N] [--price-input $/1M] [--price-output $/1M]
 
 Few-shot examples always come from the train split, regardless of the split
-being evaluated. Results are written to auction_tracker_api/evals/runs/.
+being evaluated. Results are written to
+auction_tracker_api/evals/<judge>/runs/.
 """
 
 import argparse
@@ -28,39 +33,27 @@ from openai import OpenAI
 # under bazel run, __file__ lives in the runfiles tree (dataset and prompts are
 # data deps) and run records are written back to the source tree
 HERE = pathlib.Path(__file__).resolve().parent
-DATASET = HERE / "dataset"
-RUNS_DIR = (
-    pathlib.Path(os.environ["BUILD_WORKSPACE_DIRECTORY"])
-    / "auction_tracker_api"
-    / "evals"
-    / "runs"
-)
-CRITERIA = [
-    "mtg_cards",
-    "bulk_scale",
-    "not_basic_lands",
-    "not_universes_beyond",
-    "civilian_seller",
-    "fixed_collection",
-]
 
 
-def load_dataset():
-    labels = json.loads((DATASET / "labels.json").read_text())
-    splits = json.loads((DATASET / "splits.json").read_text())
+def load_dataset(dataset_dir):
+    criteria = json.loads((dataset_dir / "criteria.json").read_text())
+    labels = json.loads((dataset_dir / "labels.json").read_text())
+    splits = json.loads((dataset_dir / "splits.json").read_text())
     fixtures = {}
     for listing_id in labels:
-        fixtures[listing_id] = json.loads((DATASET / f"{listing_id}.json").read_text())
-    return fixtures, labels, splits
+        fixtures[listing_id] = json.loads(
+            (dataset_dir / f"{listing_id}.json").read_text()
+        )
+    return criteria, fixtures, labels, splits
 
 
-def build_system_prompt(prompt_path, fixtures, labels, train_ids):
+def build_system_prompt(prompt_path, criteria, fixtures, labels, train_ids):
     prompt = prompt_path.read_text()
     lines = ["\n## Examples\n"]
     for listing_id in train_ids:
         f, lab = fixtures[listing_id], labels[listing_id]
         expected = {}
-        for c in CRITERIA:
+        for c in criteria:
             # null labels (inapplicable) are shown as pass per the prompt's rule
             expected[c] = lab[c] or "pass"
         lines.append(f"Title: {f['title']}")
@@ -72,7 +65,7 @@ def build_system_prompt(prompt_path, fixtures, labels, train_ids):
     return prompt + "\n".join(lines)
 
 
-def judge_once(client, model, system_prompt, fixture, reasoning_effort):
+def judge_once(client, model, system_prompt, criteria, fixture, reasoning_effort):
     user = (
         "Judge this listing. Respond with the JSON object described in your instructions.\n\n"
         f"Title: {fixture['title']}\n"
@@ -100,7 +93,7 @@ def judge_once(client, model, system_prompt, fixture, reasoning_effort):
 
     parsed = json.loads(response.choices[0].message.content)
     results = {}
-    for c in CRITERIA:
+    for c in criteria:
         value = parsed.get(c)
         if not isinstance(value, dict) or value.get("result") not in ("pass", "fail"):
             raise ValueError(f"malformed judgment for criterion '{c}': {value!r}")
@@ -117,13 +110,15 @@ def judge_once(client, model, system_prompt, fixture, reasoning_effort):
     }
 
 
-def judge_listing(client, model, system_prompt, fixture, trials, reasoning_effort):
+def judge_listing(
+    client, model, system_prompt, criteria, fixture, trials, reasoning_effort
+):
     attempts = [
-        judge_once(client, model, system_prompt, fixture, reasoning_effort)
+        judge_once(client, model, system_prompt, criteria, fixture, reasoning_effort)
         for _ in range(trials)
     ]
     voted = {}
-    for c in CRITERIA:
+    for c in criteria:
         fails = sum(1 for a in attempts if a["criteria"][c]["result"] == "fail")
         result = "fail" if fails * 2 > trials else "pass"
         reasoning = next(
@@ -132,7 +127,7 @@ def judge_listing(client, model, system_prompt, fixture, trials, reasoning_effor
             if a["criteria"][c]["result"] == result
         )
         voted[c] = {"result": result, "reasoning": reasoning, "fail_votes": fails}
-    overall = "pass" if all(voted[c]["result"] == "pass" for c in CRITERIA) else "fail"
+    overall = "pass" if all(voted[c]["result"] == "pass" for c in criteria) else "fail"
     return {
         "criteria": voted,
         "overall": overall,
@@ -143,9 +138,9 @@ def judge_listing(client, model, system_prompt, fixture, trials, reasoning_effor
     }
 
 
-def compute_metrics(records, labels):
+def compute_metrics(records, criteria, labels):
     metrics = {}
-    for key in CRITERIA + ["overall"]:
+    for key in criteria + ["overall"]:
         tp = tn = fp = fn = skipped = 0
         for listing_id, rec in records.items():
             expected = labels[listing_id].get(key)
@@ -178,11 +173,14 @@ def fmt_rate(value):
 
 def main():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--judge", required=True, help="judge subdirectory of evals/")
     parser.add_argument("--model", required=True)
     parser.add_argument(
         "--split", default="dev", choices=["train", "dev", "test", "all"]
     )
-    parser.add_argument("--prompt", default="prompts/v1.md")
+    parser.add_argument(
+        "--prompt", default="prompts/v1.md", help="path relative to the judge directory"
+    )
     parser.add_argument(
         "--reasoning-effort",
         choices=["none", "low", "medium", "high", "xhigh"],
@@ -195,7 +193,9 @@ def main():
     parser.add_argument("--price-output", type=float, help="USD per 1M output tokens")
     args = parser.parse_args()
 
-    fixtures, labels, splits = load_dataset()
+    judge_dir = HERE / args.judge
+    dataset_dir = judge_dir / "dataset"
+    criteria, fixtures, labels, splits = load_dataset(dataset_dir)
     if args.split == "all":
         ids = splits["train"] + splits["dev"] + splits["test"]
     else:
@@ -203,8 +203,10 @@ def main():
     if args.limit:
         ids = ids[: args.limit]
 
-    prompt_path = HERE / args.prompt
-    system_prompt = build_system_prompt(prompt_path, fixtures, labels, splits["train"])
+    prompt_path = judge_dir / args.prompt
+    system_prompt = build_system_prompt(
+        prompt_path, criteria, fixtures, labels, splits["train"]
+    )
 
     client = OpenAI()
     records, errors = {}, {}
@@ -215,6 +217,7 @@ def main():
                 client,
                 args.model,
                 system_prompt,
+                criteria,
                 fixtures[i],
                 args.trials,
                 args.reasoning_effort,
@@ -229,7 +232,7 @@ def main():
                 errors[listing_id] = str(e)
                 print(f"ERROR {listing_id}: {e}")
 
-    metrics = compute_metrics(records, labels)
+    metrics = compute_metrics(records, criteria, labels)
     latencies = [r["latency_s"] / r["trials"] for r in records.values()]
     input_tokens = sum(r["input_tokens"] for r in records.values())
     output_tokens = sum(r["output_tokens"] for r in records.values())
@@ -241,9 +244,17 @@ def main():
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     effort_tag = f"-{args.reasoning_effort}" if args.reasoning_effort else ""
-    run_dir = RUNS_DIR / f"{timestamp}-{args.model}{effort_tag}-{args.split}"
+    runs_dir = (
+        pathlib.Path(os.environ["BUILD_WORKSPACE_DIRECTORY"])
+        / "auction_tracker_api"
+        / "evals"
+        / args.judge
+        / "runs"
+    )
+    run_dir = runs_dir / f"{timestamp}-{args.model}{effort_tag}-{args.split}"
     run_dir.mkdir(parents=True)
     config = {
+        "judge": args.judge,
         "model": args.model,
         "reasoning_effort": args.reasoning_effort,
         "split": args.split,
@@ -252,10 +263,10 @@ def main():
         "prompt_file": args.prompt,
         "prompt_sha256": hashlib.sha256(system_prompt.encode()).hexdigest(),
         "labels_sha256": hashlib.sha256(
-            (DATASET / "labels.json").read_bytes()
+            (dataset_dir / "labels.json").read_bytes()
         ).hexdigest(),
         "splits_sha256": hashlib.sha256(
-            (DATASET / "splits.json").read_bytes()
+            (dataset_dir / "splits.json").read_bytes()
         ).hexdigest(),
         "timestamp": timestamp,
         "errors": errors,
@@ -284,13 +295,14 @@ def main():
     (run_dir / "metrics.json").write_text(json.dumps(summary, indent=2) + "\n")
 
     print(
-        f"\nmodel={args.model} effort={args.reasoning_effort or 'default'} split={args.split}"
+        f"\njudge={args.judge} model={args.model}"
+        f" effort={args.reasoning_effort or 'default'} split={args.split}"
         f" trials={args.trials} examples={len(records)} errors={len(errors)}"
     )
     print("TPR = junk caught (of labeled fails, % judged fail)")
     print("TNR = keepers kept (of labeled passes, % judged pass)")
     print(f"{'criterion':22} {'TPR':>5} {'TNR':>5}   (fail n / pass n)")
-    for key in CRITERIA + ["overall"]:
+    for key in criteria + ["overall"]:
         m = metrics[key]
         print(
             f"{key:22} {fmt_rate(m['tpr'])} {fmt_rate(m['tnr'])}   ({m['labeled_fail']} / {m['labeled_pass']})"
@@ -308,7 +320,7 @@ def main():
     # disagreements for error analysis
     disagreements = []
     for listing_id, rec in sorted(records.items()):
-        for c in CRITERIA + ["overall"]:
+        for c in criteria + ["overall"]:
             expected = labels[listing_id].get(c)
             got = rec["overall"] if c == "overall" else rec["criteria"][c]["result"]
             if expected is not None and got != expected:

@@ -6,6 +6,7 @@ Labeled dataset for evaluating an LLM judge that filters Trade Me auction listin
 
 - `<listing_id>.json`: fixture scraped from a real Trade Me listing. Fields `url`, `title`, `description` match what `JsoupTradeMeClient.parseItemPage` extracts (same selectors, whitespace collapsing, 1000-character truncation, query params stripped). Descriptions include listing-page boilerplate (condition, shipping, payment); that boilerplate is signal, not noise.
 - `s<nnn>.json`: synthetic fixture (`"synthetic": true`, url `synthetic://<id>`) authored in the same style to fill label gaps, pre-labeled by construction and human-reviewed.
+- `criteria.json`: ordered list of the criterion names below, read by the eval harness.
 - `labels.json`: one entry per fixture with a `pass`/`fail` label per criterion, an `overall` verdict, and optional `notes`. When `mtg_cards` is `fail`, the other five criteria are `null` (inapplicable) and are skipped when scoring.
 - `splits.json`: train/dev/test membership (roughly 20/40/40, seed 42), stratified so per-criterion fail counts and the synthetic fraction are balanced. Near-duplicate listings from the same seller share a split to avoid few-shot leakage. Train supplies few-shot prompt examples; dev is for iterating on prompts and models; test is reserved for final candidate comparison.
 

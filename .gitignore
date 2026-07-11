@@ -11,5 +11,5 @@ pnpm-debug.log*
 .ruff_cache/
 **/.DS_Store
 **/__pycache__/
-**/evals/runs/
+**/evals/**/runs/
 tmp/

@@ -94,7 +94,7 @@ sequenceDiagram
 - Treat digest timing as a daily NZ-local intent while current infrastructure executes at `21:00 UTC` (`cron(0 21 * * ? *)`).
 - Use browser-like headers and cookies in scrape requests to improve compatibility with Trade Me page delivery.
 - Judge listings at scrape time (the only moment descriptions exist in memory) and persist the verdict, so each listing is judged at most once per search and the digest filters purely from storage.
-- Use `gpt-5.4-mini` with reasoning effort `none` via the shared `lib/llm` client; the model, effort, and prompt were selected by the eval harness in `evals/` (perfect test-split TPR/TNR at the lowest cost and latency).
+- Use `gpt-5.4-mini` with reasoning effort `none` via the shared `lib/llm` client; the model, effort, and prompt were selected by the eval harness in `evals/mtg_bulk/` (perfect test-split TPR/TNR at the lowest cost and latency).
 - Freeze the production system prompt (judge prompt v2 plus train-split few-shot examples) as a checked-in resource `src/main/resources/prompts/mtg-bulk-judge.md`, loaded through `lib/prompts`.
 - Fail closed on judge errors: exceptions fail the invocation and the run retries on the next 15-minute tick; already-persisted items are not re-judged.
 - Memoize judgments per `(judge prompt, listing URL)` within an invocation so overlapping judged searches trigger one LLM call per listing.
@@ -214,15 +214,15 @@ Representative record:
 
 ## Source of truth
 
-| Entity                     | Authoritative source                           | Notes                                                              |
-| -------------------------- | ---------------------------------------------- | ------------------------------------------------------------------ |
-| Search definitions         | `SearchFactoryImpl` in service code            | current definitions are static and code-controlled                 |
-| Listing content snapshot   | Trade Me listing pages at scrape time          | title/url are persisted; description is transient in scrape logic  |
-| Judge prompt               | `src/main/resources/prompts/mtg-bulk-judge.md` | frozen system prompt validated by the eval harness in `evals/`     |
-| Judge model and effort     | `LlmListingJudge` constants in service code    | `gpt-5.4-mini`, reasoning effort `none`                            |
-| Persisted discovered items | DynamoDB `auction_tracker` table               | canonical history used for duplicate checks, verdicts, and digests |
-| Digest recipients          | SNS topic subscriptions in Terraform           | email endpoints are infra-managed                                  |
-| Schedule cadence           | EventBridge rules in Terraform                 | update `rate(15 minutes)`, digest `cron(0 21 * * ? *)`             |
+| Entity                     | Authoritative source                           | Notes                                                                   |
+| -------------------------- | ---------------------------------------------- | ----------------------------------------------------------------------- |
+| Search definitions         | `SearchFactoryImpl` in service code            | current definitions are static and code-controlled                      |
+| Listing content snapshot   | Trade Me listing pages at scrape time          | title/url are persisted; description is transient in scrape logic       |
+| Judge prompt               | `src/main/resources/prompts/mtg-bulk-judge.md` | frozen system prompt validated by the eval harness in `evals/mtg_bulk/` |
+| Judge model and effort     | `LlmListingJudge` constants in service code    | `gpt-5.4-mini`, reasoning effort `none`                                 |
+| Persisted discovered items | DynamoDB `auction_tracker` table               | canonical history used for duplicate checks, verdicts, and digests      |
+| Digest recipients          | SNS topic subscriptions in Terraform           | email endpoints are infra-managed                                       |
+| Schedule cadence           | EventBridge rules in Terraform                 | update `rate(15 minutes)`, digest `cron(0 21 * * ? *)`                  |
 
 ## Security and privacy
 
