@@ -151,6 +151,19 @@ public class OpenAiLlmClientTest {
         .hasMessageContaining("status code 500");
   }
 
+  @Test
+  void completeShouldThrowWhenApiKeyMissingFromSecret() {
+    // arrange
+    fakeSecrets.set("my_service_api", "{\"other_key\": \"value\"}");
+
+    var request = new LlmRequest("gpt-5.4-mini", null, true, List.of(LlmMessage.user("hello")));
+
+    // act & assert
+    assertThatThrownBy(() -> client.complete(request))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessageContaining("openai_api_key not found in secret my_service_api");
+  }
+
   @SuppressWarnings("unchecked")
   private HttpResponse<String> createMockResponse(int statusCode, String body) {
     HttpResponse<String> mockResponse = mock(HttpResponse.class);

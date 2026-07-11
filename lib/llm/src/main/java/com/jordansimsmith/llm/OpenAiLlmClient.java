@@ -76,7 +76,7 @@ public class OpenAiLlmClient implements LlmClient {
 
   private LlmResponse doComplete(LlmRequest request) throws IOException, InterruptedException {
     var secret = secrets.get(secretName);
-    var apiKey = objectMapper.readTree(secret).get("openai_api_key").asText(null);
+    var apiKey = objectMapper.readTree(secret).path("openai_api_key").asText(null);
     Verify.verifyNotNull(apiKey, "openai_api_key not found in secret %s", secretName);
 
     var messages =
