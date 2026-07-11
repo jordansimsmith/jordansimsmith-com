@@ -3,18 +3,23 @@ package com.jordansimsmith.pricetracker;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.net.URI;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeParseException;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.random.RandomGenerator;
 import javax.annotation.Nullable;
+import org.jsoup.Connection;
+import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
-import org.jsoup.nodes.Document;
 
 public class JsoupPriceClient implements PriceClient {
   private static final int MAX_RETRIES = 3;
   private static final long INITIAL_BACKOFF_MS = 1000;
   private static final double BACKOFF_MULTIPLIER = 2.0;
   private static final double JITTER_FACTOR = 0.5;
+  private static final long MAX_RETRY_AFTER_MS = 60_000;
 
   private final RandomGenerator random;
   private final Map<String, PriceExtractor> priceExtractors;
@@ -36,9 +41,18 @@ public class JsoupPriceClient implements PriceClient {
     Exception lastException = null;
 
     for (var attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      Long retryAfterMs = null;
+
       try {
-        var document = fetchDocument(url.toString());
-        var price = extractor.extractPrice(document);
+        var response = fetchResponse(url.toString());
+        if (response.statusCode() >= 400) {
+          if (response.statusCode() == 429) {
+            retryAfterMs = parseRetryAfterMs(response.header("Retry-After"));
+          }
+          throw new HttpStatusException(
+              "HTTP error fetching URL", response.statusCode(), url.toString());
+        }
+        var price = extractor.extractPrice(response.parse());
         if (price != null) {
           return price;
         }
@@ -47,8 +61,13 @@ public class JsoupPriceClient implements PriceClient {
       }
 
       if (attempt < MAX_RETRIES - 1) {
-        var jitterMs = (long) (random.nextDouble() * JITTER_FACTOR * backoffMs);
-        var sleepTimeMs = backoffMs + jitterMs;
+        long sleepTimeMs;
+        if (retryAfterMs != null) {
+          sleepTimeMs = Math.min(retryAfterMs, MAX_RETRY_AFTER_MS);
+        } else {
+          var jitterMs = (long) (random.nextDouble() * JITTER_FACTOR * backoffMs);
+          sleepTimeMs = backoffMs + jitterMs;
+        }
 
         try {
           TimeUnit.MILLISECONDS.sleep(sleepTimeMs);
@@ -69,7 +88,7 @@ public class JsoupPriceClient implements PriceClient {
   }
 
   @VisibleForTesting
-  protected Document fetchDocument(String url) throws IOException {
+  protected Connection.Response fetchResponse(String url) throws IOException {
     return Jsoup.connect(url)
         .header(
             "Accept",
@@ -86,7 +105,29 @@ public class JsoupPriceClient implements PriceClient {
             "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko)"
                 + " Chrome/138.0.0.0 Safari/537.36")
         .timeout(30000)
-        .get();
+        .ignoreHttpErrors(true)
+        .execute();
+  }
+
+  // retry-after is either delay-seconds or an http-date per rfc 9110
+  @Nullable
+  private Long parseRetryAfterMs(@Nullable String retryAfter) {
+    if (retryAfter == null || retryAfter.isBlank()) {
+      return null;
+    }
+
+    try {
+      return TimeUnit.SECONDS.toMillis(Long.parseLong(retryAfter.trim()));
+    } catch (NumberFormatException e) {
+      // fall through to http-date parsing
+    }
+
+    try {
+      var date = ZonedDateTime.parse(retryAfter.trim(), DateTimeFormatter.RFC_1123_DATE_TIME);
+      return Math.max(0, date.toInstant().toEpochMilli() - System.currentTimeMillis());
+    } catch (DateTimeParseException e) {
+      return null;
+    }
   }
 
   @Nullable

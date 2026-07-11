@@ -43,7 +43,7 @@ module "java_lambda" {
     update_prices = {
       handler  = "com.jordansimsmith.pricetracker.UpdatePricesHandler"
       artifact = var.artifacts["update_prices"]
-      timeout  = 120
+      timeout  = 300
     }
   }
 }
