@@ -32,14 +32,19 @@ public class SearchFactoryImplTest {
     var searches = factory.findSearches();
 
     // assert
-    var judged = searches.stream().filter(search -> search.judge() != null).toList();
+    var judged =
+        searches.stream()
+            .filter(
+                search ->
+                    search.judge() != null
+                        && search.judge().prompt().equals("prompts/mtg-bulk-judge.md"))
+            .toList();
     assertThat(judged)
         .extracting(SearchFactory.Search::searchTerm)
         .containsExactly("bulk", "collection", "assorted");
     assertThat(judged)
         .allSatisfy(
             search -> {
-              assertThat(search.judge().prompt()).isEqualTo("prompts/mtg-bulk-judge.md");
               assertThat(search.judge().model()).isEqualTo("gpt-5.4-mini");
               assertThat(search.judge().reasoningEffort()).isEqualTo("none");
               assertThat(search.judge().criteria())
@@ -50,8 +55,63 @@ public class SearchFactoryImplTest {
                       "not_universes_beyond",
                       "civilian_seller",
                       "fixed_collection");
+              assertThat(search.maxPrice()).isEqualTo(100.0);
+              assertThat(search.condition()).isEqualTo(SearchFactory.Condition.USED);
               assertThat(search.baseUrl().getPath())
                   .isEqualTo("/a/marketplace/gaming/trading-cards/magic/search");
             });
+  }
+
+  @Test
+  void findSearchesShouldAttachSharedJudgeConfigToRamSearches() {
+    // arrange
+    var factory = new SearchFactoryImpl(URI.create("https://www.trademe.co.nz"));
+
+    // act
+    var searches = factory.findSearches();
+
+    // assert
+    var judged =
+        searches.stream()
+            .filter(
+                search ->
+                    search.judge() != null
+                        && search.judge().prompt().equals("prompts/ram-judge.md"))
+            .toList();
+    assertThat(judged)
+        .extracting(SearchFactory.Search::searchTerm)
+        .containsExactly("g.skill", "gskill", "trident z");
+    assertThat(judged)
+        .allSatisfy(
+            search -> {
+              assertThat(search.judge().model()).isEqualTo("gpt-5.4-nano");
+              assertThat(search.judge().reasoningEffort()).isEqualTo("low");
+              assertThat(search.judge().criteria())
+                  .containsExactly(
+                      "trident_z_family",
+                      "ddr4",
+                      "kit_2x16gb",
+                      "speed_3200",
+                      "timings_cl16",
+                      "desktop_udimm");
+              assertThat(search.minPrice()).isNull();
+              assertThat(search.maxPrice()).isEqualTo(200.0);
+              assertThat(search.condition()).isEqualTo(SearchFactory.Condition.USED);
+              assertThat(search.baseUrl().getPath())
+                  .isEqualTo("/a/marketplace/computers/components/memory-ram/16gb-or-more/search");
+            });
+  }
+
+  @Test
+  void findSearchesShouldJudgeEverySearch() {
+    // arrange
+    var factory = new SearchFactoryImpl(URI.create("https://www.trademe.co.nz"));
+
+    // act
+    var searches = factory.findSearches();
+
+    // assert
+    assertThat(searches).hasSize(6);
+    assertThat(searches).allSatisfy(search -> assertThat(search.judge()).isNotNull());
   }
 }

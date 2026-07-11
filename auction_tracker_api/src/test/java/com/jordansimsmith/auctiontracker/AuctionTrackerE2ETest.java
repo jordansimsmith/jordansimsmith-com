@@ -25,6 +25,7 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 public class AuctionTrackerE2ETest {
   private static final Logger LOGGER = LoggerFactory.getLogger(AuctionTrackerE2ETest.class);
 
+  // union of the MTG and RAM judges' criteria so the one stubbed response satisfies both judges
   private static final String PASS_JUDGMENT =
       """
       {
@@ -33,7 +34,13 @@ public class AuctionTrackerE2ETest {
         "not_basic_lands": {"reasoning": "ok", "result": "pass"},
         "not_universes_beyond": {"reasoning": "ok", "result": "pass"},
         "civilian_seller": {"reasoning": "ok", "result": "pass"},
-        "fixed_collection": {"reasoning": "ok", "result": "pass"}
+        "fixed_collection": {"reasoning": "ok", "result": "pass"},
+        "trident_z_family": {"reasoning": "ok", "result": "pass"},
+        "ddr4": {"reasoning": "ok", "result": "pass"},
+        "kit_2x16gb": {"reasoning": "ok", "result": "pass"},
+        "speed_3200": {"reasoning": "ok", "result": "pass"},
+        "timings_cl16": {"reasoning": "ok", "result": "pass"},
+        "desktop_udimm": {"reasoning": "ok", "result": "pass"}
       }
       """;
 
