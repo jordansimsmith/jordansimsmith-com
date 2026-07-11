@@ -38,7 +38,7 @@ The auction tracker API service runs scheduled backend workflows that scrape Tra
 - Persisting listing descriptions in DynamoDB (descriptions are extracted during scraping, passed to the judge, but not stored).
 - Custom retry orchestration beyond default AWS retry behavior and Lambda re-invocation semantics.
 - Re-judging listings after their first verdict (judgments are permanent for a record's lifetime).
-- Judging listings on searches without a configured judge prompt (the PC-hardware searches).
+- Judging listings on searches without a configured judge prompt (the RAM search).
 
 ## Architecture
 
