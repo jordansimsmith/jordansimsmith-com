@@ -25,6 +25,19 @@ public class LlmListingJudgeTest {
               "civilian_seller",
               "fixed_collection"));
 
+  private static final SearchFactory.Judge RAM_JUDGE =
+      new SearchFactory.Judge(
+          "prompts/ram-judge.md",
+          "gpt-5.4-nano",
+          "low",
+          List.of(
+              "trident_z_family",
+              "ddr4",
+              "kit_2x16gb",
+              "speed_3200",
+              "timings_cl16",
+              "desktop_udimm"));
+
   private FakeLlmClient fakeLlmClient;
   private LlmListingJudge listingJudge;
 
@@ -96,16 +109,63 @@ public class LlmListingJudgeTest {
         .isInstanceOf(RuntimeException.class);
   }
 
+  @Test
+  void judgeShouldUseRamJudgeConfiguration() {
+    // arrange
+    fakeLlmClient.addResponse(ramJudgmentJson());
+
+    // act
+    var pass =
+        listingJudge.judge(
+            RAM_JUDGE, "G.Skill Trident Z RGB 32GB", "2x16GB DDR4 3200MHz CL16-18-18-38");
+
+    // assert
+    assertThat(pass).isTrue();
+
+    var requests = fakeLlmClient.findRequests();
+    assertThat(requests).hasSize(1);
+    var request = requests.get(0);
+    assertThat(request.model()).isEqualTo("gpt-5.4-nano");
+    assertThat(request.reasoningEffort()).isEqualTo("low");
+    assertThat(request.jsonResponse()).isTrue();
+    assertThat(request.messages().get(0).content())
+        .startsWith("You judge Trade Me auction listings")
+        .contains("G.Skill Trident Z (plain or RGB), DDR4, 2x16GB (32GB total)")
+        .contains("## Examples");
+  }
+
+  @Test
+  void judgeShouldReturnFailWhenRamCriterionFails() {
+    // arrange
+    fakeLlmClient.addResponse(ramJudgmentJson("speed_3200"));
+
+    // act
+    var pass = listingJudge.judge(RAM_JUDGE, "G.Skill Trident Z RGB 32GB", "2x16GB DDR4 3600MHz");
+
+    // assert
+    assertThat(pass).isFalse();
+  }
+
+  @Test
+  void judgeShouldThrowWhenRamCriterionMissing() {
+    // arrange
+    fakeLlmClient.addResponse(judgmentJson());
+
+    // act & assert
+    assertThatThrownBy(() -> listingJudge.judge(RAM_JUDGE, "G.Skill Trident Z RGB 32GB", "2x16GB"))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessageContaining("trident_z_family");
+  }
+
+  private static String ramJudgmentJson(String... failingCriteria) {
+    return judgmentJson(RAM_JUDGE.criteria(), List.of(failingCriteria));
+  }
+
   private static String judgmentJson(String... failingCriteria) {
-    var failing = List.of(failingCriteria);
-    var criteria =
-        List.of(
-            "mtg_cards",
-            "bulk_scale",
-            "not_basic_lands",
-            "not_universes_beyond",
-            "civilian_seller",
-            "fixed_collection");
+    return judgmentJson(JUDGE.criteria(), List.of(failingCriteria));
+  }
+
+  private static String judgmentJson(List<String> criteria, List<String> failing) {
     var builder = new StringBuilder("{");
     for (var i = 0; i < criteria.size(); i++) {
       var criterion = criteria.get(i);
