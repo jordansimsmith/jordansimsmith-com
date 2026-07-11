@@ -30,7 +30,12 @@ Done when: every criterion is independently checkable from input text alone, and
 
 ### 2. Snapshot the dataset immediately
 
-Source data is often a wasting asset (auction listings expire, pages change). Scrape or export the raw examples into one JSON fixture per example, named by source id, with fields matching the production extraction exactly — same selectors, same whitespace handling, same truncation, same URL cleaning. Boilerplate the production code would include is signal, not noise; keep it.
+Source data is often a wasting asset (auction listings expire, pages change). Snapshot in two passes:
+
+- **Owner-provided examples first.** Ask the owner for the source links they have collected (listing URLs, exported ids) before scraping anything yourself — these carry the failure modes the owner actually cares about and often includes edge cases a query cannot find. Prompt for them early, since they expire like everything else.
+- **Agent-discovered examples to fill out the pool.** Broaden the production search (relax price/condition filters, loosen the search term, sibling queries in the same category) and scrape what it returns. This supplies the ordinary background distribution — both typical passes and typical junk — that owner-curated links underrepresent.
+
+Scrape every example into one JSON fixture per example, named by source id, with fields matching the production extraction exactly — same selectors, same whitespace handling, same truncation, same URL cleaning. Boilerplate the production code would include is signal, not noise; keep it.
 
 Done when: fixtures are committed and re-running the eval never depends on the live source.
 

@@ -1,0 +1,626 @@
+{
+  "5719656155": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": "fail",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "5791751431": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": null,
+    "timings_cl16": null,
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "5808021713": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "fail",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "neo and slightly different timings than 16-18-18-38"
+  },
+  "5905364194": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "fail",
+    "timings_cl16": null,
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6019323734": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": "pass",
+    "timings_cl16": null,
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "royal"
+  },
+  "6019901514": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": null,
+    "timings_cl16": null,
+    "desktop_udimm": "fail",
+    "overall": "fail"
+  },
+  "6019982250": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": null,
+    "speed_3200": null,
+    "timings_cl16": null,
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "neo"
+  },
+  "6020507453": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": "fail",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "neo"
+  },
+  "6020700530": {
+    "trident_z_family": "fail",
+    "ddr4": "fail",
+    "kit_2x16gb": "pass",
+    "speed_3200": "fail",
+    "timings_cl16": null,
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6020700592": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "fail",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6020701173": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": "fail",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "c19 timing probably"
+  },
+  "6020797024": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "fail",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "neo, timing c16 but slightly off 16-18-18-38"
+  },
+  "6020830194": {
+    "trident_z_family": "fail",
+    "ddr4": "fail",
+    "kit_2x16gb": "pass",
+    "speed_3200": "fail",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6021068148": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "pass",
+    "notes": "probably c16 timing based on the product number"
+  },
+  "6021723909": {
+    "trident_z_family": "fail",
+    "ddr4": "fail",
+    "kit_2x16gb": "pass",
+    "speed_3200": "fail",
+    "timings_cl16": null,
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6022085237": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6022204522": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": "fail",
+    "timings_cl16": null,
+    "desktop_udimm": "fail",
+    "overall": "fail"
+  },
+  "6022318502": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "c16 but slightly off my model 16-18-18-38"
+  },
+  "6022401837": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "fail",
+    "timings_cl16": null,
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6022836583": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "pass",
+    "notes": "Trident Z RGB (For AMD) / GTZRX is not Neo - regular RGB line, passes (owner ruling)"
+  },
+  "6023438300": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": "fail",
+    "timings_cl16": null,
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6023439379": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": null,
+    "timings_cl16": null,
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "not sure if its trident z but will give the benefit of the doubt"
+  },
+  "6023647468": {
+    "trident_z_family": "fail",
+    "ddr4": "fail",
+    "kit_2x16gb": "fail",
+    "speed_3200": "fail",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6023676047": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": "pass",
+    "timings_cl16": null,
+    "desktop_udimm": "fail",
+    "overall": "fail",
+    "notes": "1x32 not 2x16"
+  },
+  "6023701974": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "pass",
+    "notes": "Trident Z RGB (For AMD) / GTZRX is not Neo - regular RGB line, passes (owner ruling)"
+  },
+  "6023770695": {
+    "trident_z_family": "fail",
+    "ddr4": "fail",
+    "kit_2x16gb": "fail",
+    "speed_3200": "fail",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6023870820": {
+    "trident_z_family": "fail",
+    "ddr4": "fail",
+    "kit_2x16gb": "fail",
+    "speed_3200": "fail",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6023896449": {
+    "trident_z_family": "fail",
+    "ddr4": "fail",
+    "kit_2x16gb": "fail",
+    "speed_3200": "fail",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "i think it is ddr5 given the 6000mhz"
+  },
+  "6023897063": {
+    "trident_z_family": "fail",
+    "ddr4": "fail",
+    "kit_2x16gb": "fail",
+    "speed_3200": "fail",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "at DDR5-era speeds \"Trident Z\" means the Z5 family - fails family (owner ruling); "
+  },
+  "6024042596": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": null,
+    "desktop_udimm": "fail",
+    "overall": "fail"
+  },
+  "6024908813": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": "pass",
+    "timings_cl16": null,
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "4x8gb rather than 2x16gb"
+  },
+  "6024908887": {
+    "trident_z_family": "fail",
+    "ddr4": "fail",
+    "kit_2x16gb": "fail",
+    "speed_3200": null,
+    "timings_cl16": null,
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6024908906": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "would be a good listing tbh but 4x16gb would be surplus to requrieemnts given i only need 2x16 and would be much more expensive"
+  },
+  "6024908990": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": "pass",
+    "timings_cl16": null,
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6024942755": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6025521674": {
+    "trident_z_family": "fail",
+    "ddr4": "fail",
+    "kit_2x16gb": "pass",
+    "speed_3200": "fail",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6025547161": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": null,
+    "timings_cl16": null,
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "mixed multi-kit listing fails kit_2x16gb (owner ruling)"
+  },
+  "6025647931": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "probably c16 based on the C16 suffix of the product code"
+  },
+  "6025671623": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": "fail",
+    "timings_cl16": null,
+    "desktop_udimm": "fail",
+    "overall": "fail",
+    "notes": "failing the desktop criteria - i don't want ecc ram"
+  },
+  "6025690168": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": null,
+    "speed_3200": "pass",
+    "timings_cl16": null,
+    "desktop_udimm": "fail",
+    "overall": "fail"
+  },
+  "6027321703": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6027322226": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": "fail",
+    "timings_cl16": null,
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "1x32gb"
+  },
+  "6027615276": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": "fail",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "trident royal"
+  },
+  "6027923716": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "given the benefit of the doubt that this is trident z"
+  },
+  "6027978165": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6028136398": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "fail",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6028190978": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "pass"
+  },
+  "6028559003": {
+    "trident_z_family": "fail",
+    "ddr4": "fail",
+    "kit_2x16gb": "fail",
+    "speed_3200": "fail",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail"
+  },
+  "6028999123": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "probably c16 based on the model number C16"
+  },
+  "6029096718": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "fail",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "timing slightly off, i'm after 16-18-18-38"
+  },
+  "s001": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "pass",
+    "notes": "target: clean full-spec pass, plain (non-RGB) Trident Z"
+  },
+  "s002": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "pass",
+    "notes": "target: pass with all specs implied by the model code only"
+  },
+  "s003": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "pass",
+    "notes": "target: GTZRX 'For AMD' passes - owner ruling that it is not Neo"
+  },
+  "s004": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "pass",
+    "notes": "target: pass with timings unstated (default pass)"
+  },
+  "s005": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "pass",
+    "notes": "target: adversarial pass - DDR5 mentioned as context, product is DDR4"
+  },
+  "s006": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "pass",
+    "notes": "target: adversarial pass - identical sticks bought separately still a matched pair"
+  },
+  "s007": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "pass",
+    "notes": "target: adversarial pass - brand unstated, trident_z_family defaults to pass"
+  },
+  "s008": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "pass",
+    "notes": "target: pass from SKU-style store listing (seller type never matters)"
+  },
+  "s009": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "pass",
+    "notes": "target: adversarial pass - rated speed is 3200, overclock talk is not the rated spec"
+  },
+  "s010": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "target: near-miss - Neo with otherwise perfect specs fails family only"
+  },
+  "s011": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "target: near-miss - Royal fails family only"
+  },
+  "s012": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "target: near-miss - tighter CL14 timings still fail timings_cl16"
+  },
+  "s013": {
+    "trident_z_family": "pass",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "fail",
+    "timings_cl16": "fail",
+    "desktop_udimm": "pass",
+    "overall": "fail",
+    "notes": "target: near-miss - faster 3600 kit fails speed (and its 16-19-19-39 timings fail)"
+  },
+  "s014": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "fail",
+    "desktop_udimm": "fail",
+    "overall": "fail",
+    "notes": "target: SODIMM fails desktop_udimm"
+  },
+  "s015": {
+    "trident_z_family": "fail",
+    "ddr4": "pass",
+    "kit_2x16gb": "pass",
+    "speed_3200": "pass",
+    "timings_cl16": "pass",
+    "desktop_udimm": "fail",
+    "overall": "fail",
+    "notes": "target: ECC RDIMM fails desktop_udimm"
+  }
+}
