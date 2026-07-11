@@ -11,13 +11,15 @@ public interface SearchFactory {
     USED
   }
 
+  record Judge(String prompt, String model, String reasoningEffort, List<String> criteria) {}
+
   record Search(
       URI baseUrl,
       String searchTerm,
       @Nullable Double minPrice,
       @Nullable Double maxPrice,
       Condition condition,
-      @Nullable String judgePrompt) {}
+      @Nullable Judge judge) {}
 
   List<Search> findSearches();
 }

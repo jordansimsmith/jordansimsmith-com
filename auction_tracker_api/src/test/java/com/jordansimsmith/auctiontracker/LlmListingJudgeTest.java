@@ -12,7 +12,18 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 public class LlmListingJudgeTest {
-  private static final String PROMPT = "prompts/mtg-bulk-judge.md";
+  private static final SearchFactory.Judge JUDGE =
+      new SearchFactory.Judge(
+          "prompts/mtg-bulk-judge.md",
+          "gpt-5.4-mini",
+          "none",
+          List.of(
+              "mtg_cards",
+              "bulk_scale",
+              "not_basic_lands",
+              "not_universes_beyond",
+              "civilian_seller",
+              "fixed_collection"));
 
   private FakeLlmClient fakeLlmClient;
   private LlmListingJudge listingJudge;
@@ -30,7 +41,7 @@ public class LlmListingJudgeTest {
     fakeLlmClient.addResponse(judgmentJson());
 
     // act
-    var pass = listingJudge.judge(PROMPT, "MTG bulk lot", "500 assorted cards");
+    var pass = listingJudge.judge(JUDGE, "MTG bulk lot", "500 assorted cards");
 
     // assert
     assertThat(pass).isTrue();
@@ -58,7 +69,7 @@ public class LlmListingJudgeTest {
     fakeLlmClient.addResponse(judgmentJson("civilian_seller"));
 
     // act
-    var pass = listingJudge.judge(PROMPT, "MTG bulk lot", "store repack, 1 rare guaranteed");
+    var pass = listingJudge.judge(JUDGE, "MTG bulk lot", "store repack, 1 rare guaranteed");
 
     // assert
     assertThat(pass).isFalse();
@@ -70,7 +81,7 @@ public class LlmListingJudgeTest {
     fakeLlmClient.addResponse("{\"mtg_cards\": {\"reasoning\": \"ok\", \"result\": \"pass\"}}");
 
     // act & assert
-    assertThatThrownBy(() -> listingJudge.judge(PROMPT, "MTG bulk lot", "500 cards"))
+    assertThatThrownBy(() -> listingJudge.judge(JUDGE, "MTG bulk lot", "500 cards"))
         .isInstanceOf(RuntimeException.class)
         .hasMessageContaining("bulk_scale");
   }
@@ -81,7 +92,7 @@ public class LlmListingJudgeTest {
     fakeLlmClient.addResponse(judgmentJson().replace("\"pass\"", "\"maybe\""));
 
     // act & assert
-    assertThatThrownBy(() -> listingJudge.judge(PROMPT, "MTG bulk lot", "500 cards"))
+    assertThatThrownBy(() -> listingJudge.judge(JUDGE, "MTG bulk lot", "500 cards"))
         .isInstanceOf(RuntimeException.class);
   }
 

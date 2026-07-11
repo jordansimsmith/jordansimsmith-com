@@ -79,13 +79,13 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
       }
 
       AuctionTrackerItem.Judgment judgment = null;
-      if (search.judgePrompt() != null) {
+      if (search.judge() != null) {
         var pass =
             judgments.computeIfAbsent(
-                search.judgePrompt() + AuctionTrackerItem.DELIMITER + tradeMeItem.url(),
+                search.judge().prompt() + AuctionTrackerItem.DELIMITER + tradeMeItem.url(),
                 key ->
                     listingJudge.judge(
-                        search.judgePrompt(), tradeMeItem.title(), tradeMeItem.description()));
+                        search.judge(), tradeMeItem.title(), tradeMeItem.description()));
         judgment = pass ? AuctionTrackerItem.Judgment.PASS : AuctionTrackerItem.Judgment.FAIL;
       }
 

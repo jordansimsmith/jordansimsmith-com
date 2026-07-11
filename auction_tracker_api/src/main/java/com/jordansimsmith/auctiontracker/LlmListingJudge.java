@@ -1,7 +1,6 @@
 package com.jordansimsmith.auctiontracker;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Verify;
 import com.jordansimsmith.llm.LlmClient;
 import com.jordansimsmith.llm.LlmMessage;
@@ -13,18 +12,6 @@ import org.slf4j.LoggerFactory;
 
 public class LlmListingJudge implements ListingJudge {
   private static final Logger LOGGER = LoggerFactory.getLogger(LlmListingJudge.class);
-
-  @VisibleForTesting static final String MODEL = "gpt-5.4-mini";
-  @VisibleForTesting static final String REASONING_EFFORT = "none";
-
-  private static final List<String> CRITERIA =
-      List.of(
-          "mtg_cards",
-          "bulk_scale",
-          "not_basic_lands",
-          "not_universes_beyond",
-          "civilian_seller",
-          "fixed_collection");
 
   private final PromptRegistry promptRegistry;
   private final LlmClient llmClient;
@@ -38,16 +25,17 @@ public class LlmListingJudge implements ListingJudge {
   }
 
   @Override
-  public boolean judge(String promptName, String title, String description) {
+  public boolean judge(SearchFactory.Judge judge, String title, String description) {
     try {
-      return doJudge(promptName, title, description);
+      return doJudge(judge, title, description);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
   }
 
-  private boolean doJudge(String promptName, String title, String description) throws Exception {
-    var systemPrompt = promptRegistry.get(promptName);
+  private boolean doJudge(SearchFactory.Judge judge, String title, String description)
+      throws Exception {
+    var systemPrompt = promptRegistry.get(judge.prompt());
     var userMessage =
         "Judge this listing. Respond with the JSON object described in your instructions.\n\n"
             + "Title: "
@@ -59,14 +47,14 @@ public class LlmListingJudge implements ListingJudge {
     var response =
         llmClient.complete(
             new LlmRequest(
-                MODEL,
-                REASONING_EFFORT,
+                judge.model(),
+                judge.reasoningEffort(),
                 true,
                 List.of(LlmMessage.system(systemPrompt), LlmMessage.user(userMessage))));
 
     var judgment = objectMapper.readTree(response.content());
     var pass = true;
-    for (var criterion : CRITERIA) {
+    for (var criterion : judge.criteria()) {
       var value = judgment.get(criterion);
       Verify.verifyNotNull(value, "missing judgment for criterion %s", criterion);
       var result = value.path("result").asText(null);

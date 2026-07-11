@@ -226,14 +226,12 @@ public class SendDigestHandlerIntegrationTest {
     var baseUrl = "https://www.trademe.co.nz/a/marketplace/gaming/trading-cards/magic/search";
     var expectedSearchUrl =
         baseUrl + "?search_string=bulk&price_max=100&condition=used&sort_order=expirydesc";
+    var judge =
+        new SearchFactory.Judge(
+            "prompts/mtg-bulk-judge.md", "gpt-5.4-mini", "none", List.of("mtg_cards"));
     var search =
         new SearchFactory.Search(
-            URI.create(baseUrl),
-            "bulk",
-            null,
-            100.0,
-            SearchFactory.Condition.USED,
-            "prompts/mtg-bulk-judge.md");
+            URI.create(baseUrl), "bulk", null, 100.0, SearchFactory.Condition.USED, judge);
     fakeSearchFactory.addSearches(List.of(search));
 
     var passItem =

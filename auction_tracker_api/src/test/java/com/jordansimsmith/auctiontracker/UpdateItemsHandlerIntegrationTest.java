@@ -19,6 +19,19 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 
 @Testcontainers
 public class UpdateItemsHandlerIntegrationTest {
+  private static final SearchFactory.Judge MTG_JUDGE =
+      new SearchFactory.Judge(
+          "prompts/mtg-bulk-judge.md",
+          "gpt-5.4-mini",
+          "none",
+          List.of(
+              "mtg_cards",
+              "bulk_scale",
+              "not_basic_lands",
+              "not_universes_beyond",
+              "civilian_seller",
+              "fixed_collection"));
+
   private FakeClock fakeClock;
   private FakeSearchFactory fakeSearchFactory;
   private FakeTradeMeClient fakeTradeMeClient;
@@ -244,12 +257,7 @@ public class UpdateItemsHandlerIntegrationTest {
     var baseUrl = "https://www.trademe.co.nz/a/marketplace/gaming/trading-cards/magic/search";
     var search =
         new SearchFactory.Search(
-            URI.create(baseUrl),
-            "bulk",
-            null,
-            100.0,
-            SearchFactory.Condition.USED,
-            "prompts/mtg-bulk-judge.md");
+            URI.create(baseUrl), "bulk", null, 100.0, SearchFactory.Condition.USED, MTG_JUDGE);
     fakeSearchFactory.addSearches(List.of(search));
 
     fakeTradeMeClient.addSearchResponse(
@@ -286,12 +294,7 @@ public class UpdateItemsHandlerIntegrationTest {
         baseUrl + "?search_string=bulk&price_max=100&condition=used&sort_order=expirydesc";
     var search =
         new SearchFactory.Search(
-            URI.create(baseUrl),
-            "bulk",
-            null,
-            100.0,
-            SearchFactory.Condition.USED,
-            "prompts/mtg-bulk-judge.md");
+            URI.create(baseUrl), "bulk", null, 100.0, SearchFactory.Condition.USED, MTG_JUDGE);
     fakeSearchFactory.addSearches(List.of(search));
 
     fakeTradeMeClient.addSearchResponse(
@@ -328,12 +331,7 @@ public class UpdateItemsHandlerIntegrationTest {
     var baseUrl = "https://www.trademe.co.nz/a/marketplace/gaming/trading-cards/magic/search";
     var search1 =
         new SearchFactory.Search(
-            URI.create(baseUrl),
-            "bulk",
-            null,
-            100.0,
-            SearchFactory.Condition.USED,
-            "prompts/mtg-bulk-judge.md");
+            URI.create(baseUrl), "bulk", null, 100.0, SearchFactory.Condition.USED, MTG_JUDGE);
     var search2 =
         new SearchFactory.Search(
             URI.create(baseUrl),
@@ -341,7 +339,7 @@ public class UpdateItemsHandlerIntegrationTest {
             null,
             100.0,
             SearchFactory.Condition.USED,
-            "prompts/mtg-bulk-judge.md");
+            MTG_JUDGE);
     fakeSearchFactory.addSearches(List.of(search1, search2));
 
     var tradeMeItem =
@@ -375,18 +373,74 @@ public class UpdateItemsHandlerIntegrationTest {
   }
 
   @Test
+  void handleRequestShouldUseConfiguredModelPerJudge() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
+    var otherJudge =
+        new SearchFactory.Judge(
+            "prompts/mtg-bulk-judge.md", "gpt-5.4-nano", "low", List.of("mtg_cards"));
+    var search1 =
+        new SearchFactory.Search(
+            URI.create("https://www.trademe.co.nz/search1"),
+            "term1",
+            null,
+            null,
+            SearchFactory.Condition.USED,
+            MTG_JUDGE);
+    var search2 =
+        new SearchFactory.Search(
+            URI.create("https://www.trademe.co.nz/search2"),
+            "term2",
+            null,
+            null,
+            SearchFactory.Condition.USED,
+            otherJudge);
+    fakeSearchFactory.addSearches(List.of(search1, search2));
+
+    fakeTradeMeClient.addSearchResponse(
+        URI.create("https://www.trademe.co.nz/search1"),
+        "term1",
+        null,
+        null,
+        SearchFactory.Condition.USED,
+        List.of(new TradeMeClient.TradeMeItem("url1", "title1", "desc1")));
+    fakeTradeMeClient.addSearchResponse(
+        URI.create("https://www.trademe.co.nz/search2"),
+        "term2",
+        null,
+        null,
+        SearchFactory.Condition.USED,
+        List.of(new TradeMeClient.TradeMeItem("url2", "title2", "desc2")));
+    fakeLlmClient.addResponse(judgmentJson(true));
+    fakeLlmClient.addResponse(
+        "{\"mtg_cards\": {\"reasoning\": \"because\", \"result\": \"pass\"}}");
+
+    // act
+    updateItemsHandler.handleRequest(new ScheduledEvent(), null);
+
+    // assert
+    var requests = fakeLlmClient.findRequests();
+    assertThat(requests).hasSize(2);
+    assertThat(requests.get(0).model()).isEqualTo("gpt-5.4-mini");
+    assertThat(requests.get(0).reasoningEffort()).isEqualTo("none");
+    assertThat(requests.get(1).model()).isEqualTo("gpt-5.4-nano");
+    assertThat(requests.get(1).reasoningEffort()).isEqualTo("low");
+
+    var items = auctionTrackerTable.scan().items().stream().toList();
+    assertThat(items).hasSize(2);
+    assertThat(items)
+        .allSatisfy(
+            item -> assertThat(item.getJudgment()).isEqualTo(AuctionTrackerItem.Judgment.PASS));
+  }
+
+  @Test
   void handleRequestShouldThrowWhenJudgeFails() {
     // arrange
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var baseUrl = "https://www.trademe.co.nz/a/marketplace/gaming/trading-cards/magic/search";
     var search =
         new SearchFactory.Search(
-            URI.create(baseUrl),
-            "bulk",
-            null,
-            100.0,
-            SearchFactory.Condition.USED,
-            "prompts/mtg-bulk-judge.md");
+            URI.create(baseUrl), "bulk", null, 100.0, SearchFactory.Condition.USED, MTG_JUDGE);
     fakeSearchFactory.addSearches(List.of(search));
 
     fakeTradeMeClient.addSearchResponse(
