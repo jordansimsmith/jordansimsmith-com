@@ -186,6 +186,7 @@ Representative item:
 - Jsoup retries up to `3` attempts with exponential backoff (`1s`, `2s`, `4s`) plus jitter between retries.
 - HTTP error statuses (including `429`) are retried like other fetch failures until attempts are exhausted.
 - When a `429` response includes a `Retry-After` header (delay-seconds or HTTP-date), the retry waits that long instead of the exponential backoff delay, capped at `60s`.
+- When a `429` response has no `Retry-After` header, the exponential backoff delay is multiplied by `10` (`10s`, `20s`) plus jitter, capped at `60s`.
 
 ## Source of truth
 
@@ -225,7 +226,7 @@ Representative item:
 
 - Execution cadence is fixed at one scheduled run per hour (`rate(1 hour)`).
 - Current catalog size is `40` product URLs processed sequentially in each run.
-- Each fetch uses up to `3` attempts, `30s` request timeout, and exponential backoff with jitter (or the `Retry-After` delay on `429`, capped at `60s`).
+- Each fetch uses up to `3` attempts, `30s` request timeout, and exponential backoff with jitter (on `429`, the `Retry-After` delay or a `10x` backoff multiplier is used instead, capped at `60s`).
 - Lambda timeout is `300s`; catalog size and scrape behavior are tuned for personal-scale workloads.
 - DynamoDB table uses `PAY_PER_REQUEST` billing mode for elastic low-volume operation.
 

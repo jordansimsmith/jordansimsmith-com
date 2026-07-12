@@ -20,6 +20,7 @@ public class JsoupPriceClient implements PriceClient {
   private static final double BACKOFF_MULTIPLIER = 2.0;
   private static final double JITTER_FACTOR = 0.5;
   private static final long MAX_RETRY_AFTER_MS = 60_000;
+  private static final long RATE_LIMIT_BACKOFF_MULTIPLIER = 10;
 
   private final RandomGenerator random;
   private final Map<String, PriceExtractor> priceExtractors;
@@ -42,11 +43,13 @@ public class JsoupPriceClient implements PriceClient {
 
     for (var attempt = 0; attempt < MAX_RETRIES; attempt++) {
       Long retryAfterMs = null;
+      var rateLimited = false;
 
       try {
         var response = fetchResponse(url.toString());
         if (response.statusCode() >= 400) {
           if (response.statusCode() == 429) {
+            rateLimited = true;
             retryAfterMs = parseRetryAfterMs(response.header("Retry-After"));
           }
           throw new HttpStatusException(
@@ -65,8 +68,10 @@ public class JsoupPriceClient implements PriceClient {
         if (retryAfterMs != null) {
           sleepTimeMs = Math.min(retryAfterMs, MAX_RETRY_AFTER_MS);
         } else {
-          var jitterMs = (long) (random.nextDouble() * JITTER_FACTOR * backoffMs);
-          sleepTimeMs = backoffMs + jitterMs;
+          // back off much harder when rate limited without guidance from the server
+          var baseMs = rateLimited ? backoffMs * RATE_LIMIT_BACKOFF_MULTIPLIER : backoffMs;
+          var jitterMs = (long) (random.nextDouble() * JITTER_FACTOR * baseMs);
+          sleepTimeMs = Math.min(baseMs + jitterMs, MAX_RETRY_AFTER_MS);
         }
 
         try {
