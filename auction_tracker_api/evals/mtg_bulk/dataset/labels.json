@@ -219,6 +219,16 @@
     "overall": "fail",
     "notes": "not enough volume, otherwise a good listing"
   },
+  "6033736707": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "not_universes_beyond": "pass",
+    "civilian_seller": "fail",
+    "fixed_collection": "fail",
+    "overall": "fail",
+    "notes": "production miss: assembled-on-demand collection bundle with rarity guarantees (display-only photos, 'carefully assembled', guaranteed 20 rares / 60 uncommons)"
+  },
   "s001": {
     "mtg_cards": "pass",
     "bulk_scale": "pass",

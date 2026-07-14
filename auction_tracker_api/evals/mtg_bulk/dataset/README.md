@@ -38,7 +38,7 @@ The cards come from a private individual's collection, not a card retailer or wh
 
 ### fixed_collection
 
-The listing is one specific physical collection, not an abstract quantity assembled per sale ("Multiple of these available", "made up fresh for each order"). No signal passes.
+The listing is one specific physical collection, not an abstract quantity assembled per sale ("Multiple of these available", "made up fresh for each order"). Explicit repeatability language is not required: per-sale composition also shows in display-only photo disclaimers, "exact cards will vary", and curated "carefully assembled" product framing with guaranteed contents breakdowns. A listing anchored to one specific pile ("one box only", "contents as photographed") passes even alongside a stock-photo disclaimer. No signal passes.
 
 ## Labeling conventions
 

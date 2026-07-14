@@ -100,7 +100,7 @@ sequenceDiagram
 - MTG judge: `gpt-5.4-mini` with reasoning effort `none` via the shared `lib/llm` client; selected by the eval harness in `evals/mtg_bulk/` (perfect test-split TPR/TNR at the lowest cost and latency).
 - RAM judge: `gpt-5.4-nano` with reasoning effort `low`; selected by the eval harness in `evals/ram/` (perfect test-split TPR/TNR at roughly 3.6x lower cost than the mini candidate).
 - Broaden RAM coverage with three brand searches (`g.skill`, `gskill`, `trident z`) because Trade Me tokenizes `g.skill` and `gskill` differently and the previous narrow term returned almost nothing; spec-based terms stay out to keep results within the single scraped page.
-- Freeze each production system prompt (winning eval prompt plus train-split few-shot examples) as a checked-in resource loaded through `lib/prompts`: `src/main/resources/prompts/mtg-bulk-judge.md` (mtg_bulk v2) and `src/main/resources/prompts/ram-judge.md` (ram v3).
+- Freeze each production system prompt (winning eval prompt plus train-split few-shot examples) as a checked-in resource loaded through `lib/prompts`: `src/main/resources/prompts/mtg-bulk-judge.md` (mtg_bulk v3) and `src/main/resources/prompts/ram-judge.md` (ram v3).
 - Fail closed on judge errors: exceptions fail the invocation and the run retries on the next 15-minute tick; already-persisted items are not re-judged.
 - Memoize judgments per `(judge prompt, listing URL)` within an invocation so overlapping judged searches trigger one LLM call per listing.
 
