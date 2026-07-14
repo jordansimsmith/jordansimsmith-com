@@ -184,7 +184,8 @@ Representative item:
 - Notification publish happens before DynamoDB writes for the new snapshots.
 - If scraping throws after retry exhaustion, the invocation fails and no later writes in that run are executed.
 - Jsoup retries up to `3` attempts with exponential backoff (`1s`, `2s`, `4s`) plus jitter between retries.
-- HTTP error statuses (including `429`) are retried like other fetch failures until attempts are exhausted.
+- Non-`2xx` responses (including `429`) are retried like other fetch failures until attempts are exhausted.
+- Non-`2xx` responses are logged at warn level with status code, response headers, and response body (body truncated to `1000` characters).
 - When a `429` response includes a `Retry-After` header (delay-seconds or HTTP-date), the retry waits that long instead of the exponential backoff delay, capped at `60s`.
 - When a `429` response has no `Retry-After` header, the exponential backoff delay is multiplied by `10` (`10s`, `20s`) plus jitter, capped at `60s`.
 

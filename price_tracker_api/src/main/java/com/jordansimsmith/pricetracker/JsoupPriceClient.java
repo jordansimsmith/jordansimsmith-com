@@ -13,14 +13,19 @@ import javax.annotation.Nullable;
 import org.jsoup.Connection;
 import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class JsoupPriceClient implements PriceClient {
+  private static final Logger LOGGER = LoggerFactory.getLogger(JsoupPriceClient.class);
+
   private static final int MAX_RETRIES = 3;
   private static final long INITIAL_BACKOFF_MS = 1000;
   private static final double BACKOFF_MULTIPLIER = 2.0;
   private static final double JITTER_FACTOR = 0.5;
   private static final long MAX_RETRY_AFTER_MS = 60_000;
   private static final long RATE_LIMIT_BACKOFF_MULTIPLIER = 10;
+  private static final int MAX_LOGGED_BODY_CHARS = 1000;
 
   private final RandomGenerator random;
   private final Map<String, PriceExtractor> priceExtractors;
@@ -47,7 +52,8 @@ public class JsoupPriceClient implements PriceClient {
 
       try {
         var response = fetchResponse(url.toString());
-        if (response.statusCode() >= 400) {
+        if (response.statusCode() / 100 != 2) {
+          logErrorResponse(url, response);
           if (response.statusCode() == 429) {
             rateLimited = true;
             retryAfterMs = parseRetryAfterMs(response.header("Retry-After"));
@@ -90,6 +96,25 @@ public class JsoupPriceClient implements PriceClient {
     }
 
     return null;
+  }
+
+  private void logErrorResponse(URI url, Connection.Response response) {
+    String body;
+    try {
+      body = response.body();
+    } catch (Exception e) {
+      body = "<failed to read body: " + e.getMessage() + ">";
+    }
+    if (body.length() > MAX_LOGGED_BODY_CHARS) {
+      body = body.substring(0, MAX_LOGGED_BODY_CHARS) + "... (truncated)";
+    }
+
+    LOGGER.warn(
+        "http {} fetching url '{}', headers: {}, body: {}",
+        response.statusCode(),
+        url,
+        response.headers(),
+        body);
   }
 
   @VisibleForTesting
