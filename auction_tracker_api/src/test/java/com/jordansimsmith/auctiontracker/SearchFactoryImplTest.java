@@ -55,7 +55,7 @@ public class SearchFactoryImplTest {
                       "not_universes_beyond",
                       "civilian_seller",
                       "fixed_collection");
-              assertThat(search.maxPrice()).isEqualTo(100.0);
+              assertThat(search.maxPrice()).isEqualTo(200.0);
               assertThat(search.condition()).isEqualTo(SearchFactory.Condition.USED);
               assertThat(search.baseUrl().getPath())
                   .isEqualTo("/a/marketplace/gaming/trading-cards/magic/search");

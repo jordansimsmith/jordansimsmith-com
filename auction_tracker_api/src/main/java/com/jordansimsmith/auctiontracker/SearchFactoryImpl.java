@@ -58,21 +58,21 @@ public class SearchFactoryImpl implements SearchFactory {
                 baseUri.resolve("/a/marketplace/gaming/trading-cards/magic/search"),
                 "bulk",
                 null,
-                100.0,
+                200.0,
                 Condition.USED,
                 MTG_JUDGE),
             new Search(
                 baseUri.resolve("/a/marketplace/gaming/trading-cards/magic/search"),
                 "collection",
                 null,
-                100.0,
+                200.0,
                 Condition.USED,
                 MTG_JUDGE),
             new Search(
                 baseUri.resolve("/a/marketplace/gaming/trading-cards/magic/search"),
                 "assorted",
                 null,
-                100.0,
+                200.0,
                 Condition.USED,
                 MTG_JUDGE));
   }
