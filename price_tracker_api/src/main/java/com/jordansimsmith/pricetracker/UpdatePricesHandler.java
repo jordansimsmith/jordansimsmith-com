@@ -7,6 +7,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.notifications.NotificationPublisher;
 import com.jordansimsmith.time.Clock;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.StringJoiner;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,7 +55,10 @@ public class UpdatePricesHandler implements RequestHandler<ScheduledEvent, Void>
     var now = clock.now();
     var prices = new ArrayList<PriceTrackerItem>();
 
-    var allProducts = productsFactory.findProducts();
+    // shuffle so requests to the same host are less likely to run back-to-back,
+    // which trips per-host rate limits
+    var allProducts = new ArrayList<>(productsFactory.findProducts());
+    Collections.shuffle(allProducts);
     for (var product : allProducts) {
       var price = priceClient.getPrice(product.url());
       if (price == null) {

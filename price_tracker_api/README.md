@@ -177,6 +177,7 @@ Representative item:
 ## Behavioral invariants and time semantics
 
 - Each invocation captures `now` once and uses that same timestamp for all snapshots written in the run.
+- Products are scraped in a random order each run so consecutive requests are less likely to hit the same host's rate limits.
 - Snapshot timestamps are stored as epoch seconds (UTC) via `EpochSecondConverter`.
 - Price comparison detects decreases only (`currentPrice < previousPrice`); price increases are not notified.
 - No notification is sent for a product with no previous snapshot.
