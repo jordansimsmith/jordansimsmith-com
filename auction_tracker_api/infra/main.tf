@@ -249,7 +249,7 @@ resource "aws_lambda_permission" "allow_eventbridge_update_items" {
 resource "aws_cloudwatch_event_rule" "send_digest" {
   name                = "${local.application_id}_send_digest"
   description         = "Triggers the SendDigestHandler Lambda function"
-  schedule_expression = "cron(0 21 * * ? *)"
+  schedule_expression = "cron(0 6 * * ? *)"
 }
 
 resource "aws_cloudwatch_event_target" "send_digest_lambda" {

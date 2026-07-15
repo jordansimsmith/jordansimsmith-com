@@ -93,7 +93,7 @@ sequenceDiagram
 - Use DynamoDB `pk`/`sk` prefixes with `gsi1` so duplicate checks are direct key lookups, not scans.
 - Keep table and topic names code-defined (`auction_tracker`, `auction_tracker_api_digest`) to reduce configuration complexity.
 - Keep search definitions in code (`SearchFactoryImpl`) for deterministic behavior and easy testability.
-- Treat digest timing as a daily NZ-local intent while current infrastructure executes at `21:00 UTC` (`cron(0 21 * * ? *)`).
+- Treat digest timing as a daily NZ-local intent (6pm NZST) while current infrastructure executes at `06:00 UTC` (`cron(0 6 * * ? *)`).
 - Use browser-like headers and cookies in scrape requests to improve compatibility with Trade Me page delivery.
 - Judge listings at scrape time (the only moment descriptions exist in memory) and persist the verdict, so each listing is judged at most once per search and the digest filters purely from storage.
 - Carry judge configuration as a nullable nested `Judge` record (`prompt`, `model`, `reasoningEffort`, `criteria`) on each `SearchFactory.Search`, with one shared constant per judge in `SearchFactoryImpl`; criteria ride with the config because verdict validation is per-judge.
@@ -122,7 +122,7 @@ sequenceDiagram
 - **Trade Me website**: outbound `GET` requests to search and listing pages derived from configured searches. The base origin defaults to `https://www.trademe.co.nz` and can be overridden with `AUCTION_TRACKER_TRADEME_BASE_URL` (used in E2E tests). Requests include browser-like headers/cookies and a 30-second timeout. Item-page fetch failures are logged and skipped; unrecoverable search errors fail the invocation.
 - **Amazon DynamoDB**: outbound reads/writes against table `auction_tracker`. Update flow performs duplicate checks and inserts; digest flow queries per-search partitions for recent items.
 - **Amazon SNS**: outbound publish to topic `auction_tracker_api_digest` when at least one new item exists in the digest window. Topic ARN is resolved by listing topics and matching by topic-name suffix.
-- **Amazon EventBridge**: scheduled invocation source for both handlers (`rate(15 minutes)` and `cron(0 21 * * ? *)`).
+- **Amazon EventBridge**: scheduled invocation source for both handlers (`rate(15 minutes)` and `cron(0 6 * * ? *)`).
 - **OpenAI chat completions API**: outbound `POST /v1/chat/completions` for new listings on judged searches, with the search's configured model and reasoning effort (`gpt-5.4-mini`/`none` for MTG, `gpt-5.4-nano`/`low` for RAM) and JSON response format. The base origin defaults to `https://api.openai.com` and can be overridden with `AUCTION_TRACKER_OPENAI_BASE_URL` (used in E2E tests). The API key is read from the `auction_tracker_api` secret. Request failures and malformed verdicts fail the invocation.
 - **AWS Secrets Manager**: outbound read of secret `auction_tracker_api` for the OpenAI API key, resolved lazily on the first judged listing per Lambda instance.
 
@@ -230,7 +230,7 @@ Representative record:
 | Judge model and effort     | `Judge` constants in `SearchFactoryImpl`                                                  | MTG `gpt-5.4-mini`/`none`, RAM `gpt-5.4-nano`/`low`                                         |
 | Persisted discovered items | DynamoDB `auction_tracker` table                                                          | canonical history used for duplicate checks, verdicts, and digests                          |
 | Digest recipients          | SNS topic subscriptions in Terraform                                                      | email endpoints are infra-managed                                                           |
-| Schedule cadence           | EventBridge rules in Terraform                                                            | update `rate(15 minutes)`, digest `cron(0 21 * * ? *)`                                      |
+| Schedule cadence           | EventBridge rules in Terraform                                                            | update `rate(15 minutes)`, digest `cron(0 6 * * ? *)`                                       |
 
 ## Security and privacy
 
@@ -264,7 +264,7 @@ Secrets Manager secret `auction_tracker_api` (value set manually after Terraform
 
 ## Performance envelope
 
-- Update schedule runs every 15 minutes; digest schedule runs daily (`21:00 UTC`) and represents a daily NZ-local intent.
+- Update schedule runs every 15 minutes; digest schedule runs daily (`06:00 UTC`) and represents a daily NZ-local intent (6pm NZST).
 - Lambda runtime settings are `memory_size = 1024` MB for both handlers.
 - Lambda timeout is `300` seconds for `UpdateItemsHandler` (sized for sequential judging at roughly 2 seconds per new judged listing, including first-run backfill) and `30` seconds for `SendDigestHandler`.
 - Jsoup HTTP requests use a `30` second timeout per request.
@@ -312,7 +312,7 @@ Secrets Manager secret `auction_tracker_api` (value set manually after Terraform
 
 ### Scenario 3: daily digest publishes recent unique listings
 
-1. EventBridge triggers `SendDigestHandler` on the daily schedule (`21:00 UTC`).
+1. EventBridge triggers `SendDigestHandler` on the daily schedule (`06:00 UTC`).
 2. Handler queries each search partition for records newer than the rolling 24-hour threshold.
 3. Handler excludes records with `judgment` = `fail` and deduplicates merged results by listing URL across searches.
 4. Handler publishes one SNS digest when at least one item exists; otherwise it logs that no new items were found.
