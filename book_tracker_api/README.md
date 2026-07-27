@@ -343,6 +343,7 @@ Item attributes:
 - Per-user partitioning (`pk = USER#<user>`) prevents cross-user reads and writes.
 - Credentials live in the shared `auth_api` Secrets Manager secret owned by the `auth_api` service, not in source or Terraform state.
 - Transport is HTTPS only via the custom domain `api.book-tracker.jordansimsmith.com`.
+- API Gateway writes structured access logs and INFO-level execution logs to CloudWatch log groups retained for 30 days; request and response data tracing is disabled.
 - Handler logs must not include the `Authorization` header, raw password values, or secret payloads.
 
 ## Configuration and secrets reference

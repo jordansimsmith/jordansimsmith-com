@@ -42,6 +42,16 @@ resource "aws_api_gateway_rest_api" "this" {
   name = "${var.application_id}_gateway"
 }
 
+resource "aws_cloudwatch_log_group" "access" {
+  name              = "/aws/apigateway/${var.application_id}/access"
+  retention_in_days = 30
+}
+
+resource "aws_cloudwatch_log_group" "execution" {
+  name              = "API-Gateway-Execution-Logs_${aws_api_gateway_rest_api.this.id}/prod"
+  retention_in_days = 30
+}
+
 resource "aws_api_gateway_resource" "root_resource" {
   for_each = local.root_resources
 
@@ -233,4 +243,32 @@ resource "aws_api_gateway_stage" "prod" {
   rest_api_id          = aws_api_gateway_rest_api.this.id
   stage_name           = "prod"
   xray_tracing_enabled = true
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.access.arn
+    format = jsonencode({
+      extended_request_id = "$context.extendedRequestId"
+      http_method         = "$context.httpMethod"
+      protocol            = "$context.protocol"
+      request_id          = "$context.requestId"
+      request_time        = "$context.requestTime"
+      resource_path       = "$context.resourcePath"
+      response_length     = "$context.responseLength"
+      source_ip           = "$context.identity.sourceIp"
+      status              = "$context.status"
+    })
+  }
+
+  depends_on = [aws_cloudwatch_log_group.execution]
+}
+
+resource "aws_api_gateway_method_settings" "all" {
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  stage_name  = aws_api_gateway_stage.prod.stage_name
+  method_path = "*/*"
+
+  settings {
+    data_trace_enabled = false
+    logging_level      = "INFO"
+  }
 }

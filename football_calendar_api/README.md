@@ -228,6 +228,7 @@ Representative item:
 - `GET /calendar` is intentionally public (`authorization = NONE` in API Gateway).
 - Transport is HTTPS through API Gateway custom domain and ACM certificate.
 - Service runtime does not read credential secrets in current scope.
+- API Gateway writes structured access logs and INFO-level execution logs to CloudWatch log groups retained for 30 days; request and response data tracing is disabled.
 - IAM permissions for lambdas are scoped to DynamoDB operations for `football_calendar`, SNS publish and list for `fixture_updates`, plus basic execution logging.
 - Stored data is fixture metadata only; no user account data is modeled by this service.
 

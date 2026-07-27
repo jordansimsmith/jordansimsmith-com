@@ -201,6 +201,7 @@ Meetup event item:
 
 - `GET /calendar` is intentionally unauthenticated to support broad calendar subscription compatibility.
 - Transport to clients is HTTPS via API Gateway custom domain and ACM certificate.
+- API Gateway writes structured access logs and INFO-level execution logs to CloudWatch log groups retained for 30 days; request and response data tracing is disabled.
 - Lambda execution uses an IAM role scoped to DynamoDB table access plus basic execution logging permissions.
 - The service does not read runtime secrets in current scope.
 - Source data is public event metadata; logs should still avoid dumping large upstream payloads or noisy raw responses.

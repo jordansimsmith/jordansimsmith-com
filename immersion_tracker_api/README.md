@@ -338,6 +338,7 @@ Movie item:
 - Basic auth credentials live in the shared `auth_api` secret; provider keys are loaded from this service's own Secrets Manager secret, not hardcoded in source.
 - Transport is HTTPS through the custom API domain `api.immersion-tracker.jordansimsmith.com`.
 - CORS is restricted to `https://immersion-tracker.jordansimsmith.com`.
+- API Gateway writes structured access logs and INFO-level execution logs to CloudWatch log groups retained for 30 days; request and response data tracing is disabled.
 
 ## Configuration and secrets reference
 

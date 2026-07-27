@@ -262,6 +262,7 @@ Representative key failures for delete:
 - Credentials are stored in the shared `auth_api` Secrets Manager secret owned by the `auth_api` service.
 - Per-user data partitioning (`pk = USER#<user>`) prevents cross-user reads and writes.
 - Transport is HTTPS via API Gateway custom domain `api.packing-list.jordansimsmith.com`.
+- API Gateway writes structured access logs and INFO-level execution logs to CloudWatch log groups retained for 30 days; request and response data tracing is disabled.
 - Handler logs should not include raw credentials, authorization headers, or secret payloads.
 
 ## Configuration and secrets reference

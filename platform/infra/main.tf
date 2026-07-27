@@ -37,6 +37,34 @@ locals {
   subscriptions = ["jordansimsmith@gmail.com"]
 }
 
+data "aws_iam_policy_document" "api_gateway_cloudwatch_assume_role" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      identifiers = ["apigateway.amazonaws.com"]
+      type        = "Service"
+    }
+  }
+}
+
+resource "aws_iam_role" "api_gateway_cloudwatch" {
+  name               = "api_gateway_cloudwatch"
+  assume_role_policy = data.aws_iam_policy_document.api_gateway_cloudwatch_assume_role.json
+}
+
+resource "aws_iam_role_policy_attachment" "api_gateway_cloudwatch" {
+  role       = aws_iam_role.api_gateway_cloudwatch.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs"
+}
+
+resource "aws_api_gateway_account" "this" {
+  cloudwatch_role_arn = aws_iam_role.api_gateway_cloudwatch.arn
+
+  depends_on = [aws_iam_role_policy_attachment.api_gateway_cloudwatch]
+}
+
 resource "aws_sns_topic" "lambda_failure_notifications" {
   name = "lambda_failure_notifications"
 }

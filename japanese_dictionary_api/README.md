@@ -580,6 +580,7 @@ Required attributes on every `BOOKMARK` item: `pk`, `sk`, `user`, `sequence`, `c
 - No PII; the corpus is publicly available Japanese language data and the bookmark records carry only `(user, sequence, created_at)` triples.
 - Transport is HTTPS via API Gateway custom domain `api.japanese-dictionary.jordansimsmith.com`.
 - CORS allowed origin is `https://japanese-dictionary.jordansimsmith.com` only. Allowed methods include `GET`, `PUT`, and `OPTIONS`.
+- API Gateway writes structured access logs and INFO-level execution logs to CloudWatch log groups retained for 30 days; request and response data tracing is disabled.
 - CloudWatch logs include `q` query strings (the words the user looked up) and bookmarked sequences. Acceptable at personal scale; explicitly noted.
 
 ## Configuration and secrets reference

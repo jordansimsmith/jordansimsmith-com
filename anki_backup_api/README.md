@@ -284,6 +284,7 @@ Representative completed item:
 - Credentials live in the shared `auth_api` Secrets Manager secret owned by the `auth_api` service, not in code, logs, or Terraform state.
 - S3 public access is blocked; object access is via IAM for service internals and short-lived presigned URLs for clients.
 - Transport is HTTPS only.
+- API Gateway writes structured access logs and INFO-level execution logs to CloudWatch log groups retained for 30 days; request and response data tracing is disabled.
 - Logs must redact or omit raw auth headers, credentials, presigned URLs, and local file path details.
 - User data is partitioned by authenticated user key prefix in DynamoDB and S3 key paths.
 
