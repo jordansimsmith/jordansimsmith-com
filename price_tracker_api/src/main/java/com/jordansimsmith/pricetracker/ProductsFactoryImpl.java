@@ -111,25 +111,7 @@ public class ProductsFactoryImpl implements ProductsFactory {
       List.of(
           new CatalogProduct(
               "/products/clean-nutrition-whey-protein-1kg?variant=14788899504195",
-              "Sportsfuel - Clean Nutrition Whey Protein 1kg - Vanilla"),
-          new CatalogProduct(
-              "/products/clean-nutrition-whey-protein-1kg?variant=14788899536963",
-              "Sportsfuel - Clean Nutrition Whey Protein 1kg - Chocolate"),
-          new CatalogProduct(
-              "/products/clean-nutrition-whey-protein-1kg?variant=14788899569731",
-              "Sportsfuel - Clean Nutrition Whey Protein 1kg - Banana"),
-          new CatalogProduct(
-              "/products/clean-nutrition-whey-protein-1kg?variant=14788899602499",
-              "Sportsfuel - Clean Nutrition Whey Protein 1kg - Strawberry"),
-          new CatalogProduct(
-              "/products/clean-nutrition-whey-protein-1kg?variant=14788899635267",
-              "Sportsfuel - Clean Nutrition Whey Protein 1kg - Cookies and Cream"),
-          new CatalogProduct(
-              "/products/clean-nutrition-whey-protein-1kg?variant=14788899668035",
-              "Sportsfuel - Clean Nutrition Whey Protein 1kg - Unflavoured"),
-          new CatalogProduct(
-              "/products/clean-nutrition-whey-protein-1kg?variant=29421064126531",
-              "Sportsfuel - Clean Nutrition Whey Protein 1kg - Salted Caramel"));
+              "Sportsfuel - Clean Nutrition Whey Protein 1kg - Vanilla"));
 
   public ProductsFactoryImpl(
       URI chemistWarehouseBaseUri, URI nzProteinBaseUri, URI sportsfuelBaseUri) {

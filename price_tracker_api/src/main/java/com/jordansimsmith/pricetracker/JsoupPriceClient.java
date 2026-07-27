@@ -3,9 +3,6 @@ package com.jordansimsmith.pricetracker;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.net.URI;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeParseException;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.random.RandomGenerator;
@@ -19,12 +16,10 @@ import org.slf4j.LoggerFactory;
 public class JsoupPriceClient implements PriceClient {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsoupPriceClient.class);
 
-  private static final int MAX_RETRIES = 3;
+  private static final int MAX_ATTEMPTS = 3;
   private static final long INITIAL_BACKOFF_MS = 1000;
   private static final double BACKOFF_MULTIPLIER = 2.0;
   private static final double JITTER_FACTOR = 0.5;
-  private static final long MAX_RETRY_AFTER_MS = 60_000;
-  private static final long RATE_LIMIT_BACKOFF_MULTIPLIER = 10;
   private static final int MAX_LOGGED_BODY_CHARS = 1000;
 
   private final RandomGenerator random;
@@ -46,18 +41,11 @@ public class JsoupPriceClient implements PriceClient {
     var backoffMs = INITIAL_BACKOFF_MS;
     Exception lastException = null;
 
-    for (var attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      Long retryAfterMs = null;
-      var rateLimited = false;
-
+    for (var attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
         var response = fetchResponse(url.toString());
         if (response.statusCode() / 100 != 2) {
           logErrorResponse(url, response);
-          if (response.statusCode() == 429) {
-            rateLimited = true;
-            retryAfterMs = parseRetryAfterMs(response.header("Retry-After"));
-          }
           throw new HttpStatusException(
               "HTTP error fetching URL", response.statusCode(), url.toString());
         }
@@ -69,24 +57,14 @@ public class JsoupPriceClient implements PriceClient {
         lastException = e;
       }
 
-      if (attempt < MAX_RETRIES - 1) {
-        long sleepTimeMs;
-        if (retryAfterMs != null) {
-          sleepTimeMs = Math.min(retryAfterMs, MAX_RETRY_AFTER_MS);
-        } else {
-          // back off much harder when rate limited without guidance from the server
-          var baseMs = rateLimited ? backoffMs * RATE_LIMIT_BACKOFF_MULTIPLIER : backoffMs;
-          var jitterMs = (long) (random.nextDouble() * JITTER_FACTOR * baseMs);
-          sleepTimeMs = Math.min(baseMs + jitterMs, MAX_RETRY_AFTER_MS);
-        }
-
+      if (attempt < MAX_ATTEMPTS - 1) {
+        var jitterMs = (long) (random.nextDouble() * JITTER_FACTOR * backoffMs);
         try {
-          TimeUnit.MILLISECONDS.sleep(sleepTimeMs);
-        } catch (InterruptedException ie) {
+          TimeUnit.MILLISECONDS.sleep(backoffMs + jitterMs);
+        } catch (InterruptedException e) {
           Thread.currentThread().interrupt();
-          throw new RuntimeException("Thread interrupted during backoff", ie);
+          throw new RuntimeException("Thread interrupted during backoff", e);
         }
-
         backoffMs = (long) (backoffMs * BACKOFF_MULTIPLIER);
       }
     }
@@ -137,27 +115,6 @@ public class JsoupPriceClient implements PriceClient {
         .timeout(30000)
         .ignoreHttpErrors(true)
         .execute();
-  }
-
-  // retry-after is either delay-seconds or an http-date per rfc 9110
-  @Nullable
-  private Long parseRetryAfterMs(@Nullable String retryAfter) {
-    if (retryAfter == null || retryAfter.isBlank()) {
-      return null;
-    }
-
-    try {
-      return TimeUnit.SECONDS.toMillis(Long.parseLong(retryAfter.trim()));
-    } catch (NumberFormatException e) {
-      // fall through to http-date parsing
-    }
-
-    try {
-      var date = ZonedDateTime.parse(retryAfter.trim(), DateTimeFormatter.RFC_1123_DATE_TIME);
-      return Math.max(0, date.toInstant().toEpochMilli() - System.currentTimeMillis());
-    } catch (DateTimeParseException e) {
-      return null;
-    }
   }
 
   @Nullable

@@ -36,11 +36,11 @@ The price tracker service runs an hourly scheduled workflow that scrapes curated
 
 ### Current catalog summary
 
-| Retailer                                         | Product count | Representative examples                               |
-| ------------------------------------------------ | ------------- | ----------------------------------------------------- |
-| Chemist Warehouse (`www.chemistwarehouse.co.nz`) | `32`          | Dynamic Whey 2kg, Quest Protein Bars, INC Creatine    |
-| NZ Protein (`www.nzprotein.co.nz`)               | `1`           | NZ Whey 1kg                                           |
-| Sportsfuel (`www.sportsfuel.co.nz`)              | `7`           | Clean Nutrition Whey Protein 1kg (7 flavour variants) |
+| Retailer                                         | Product count | Representative examples                    |
+| ------------------------------------------------ | ------------- | ------------------------------------------ |
+| Chemist Warehouse (`www.chemistwarehouse.co.nz`) | `32`          | Dynamic Whey 2kg, Quest Protein Bars       |
+| NZ Protein (`www.nzprotein.co.nz`)               | `1`           | NZ Whey 1kg                                |
+| Sportsfuel (`www.sportsfuel.co.nz`)              | `1`           | Clean Nutrition Whey Protein 1kg - Vanilla |
 
 ## Architecture
 
@@ -86,7 +86,7 @@ sequenceDiagram
 - Keep the service as a scheduled Lambda worker (not an HTTP API) because workload is periodic polling, not request/response serving.
 - Store the tracked catalog directly in `ProductsFactoryImpl` so monitored products are explicit and versioned with code changes.
 - Route parsing by URL host to dedicated extractors (`Chemist Warehouse`, `NZ Protein`, `Sportsfuel`) for deterministic selector behavior per site.
-- Track Sportsfuel variants as separate catalog entries using `?variant=<id>` URLs so each flavour has its own price history.
+- Track only the Vanilla Sportsfuel variant using its `?variant=<id>` URL.
 - Persist snapshots as append-only DynamoDB items keyed by product URL + timestamp to preserve full historical price series.
 - Publish one aggregated SNS message per run to reduce notification noise when multiple products decrease together.
 
@@ -103,7 +103,7 @@ sequenceDiagram
 
 - **Chemist Warehouse website** (`www.chemistwarehouse.co.nz`): outbound HTTPS `GET` using Jsoup with browser-like headers and `30s` timeout. Required request field is the full product URL in the curated catalog. Auth method is none. Cadence is hourly per product. Failures return `null` when selector/price parsing fails and the product is skipped for that run.
 - **NZ Protein website** (`www.nzprotein.co.nz`): outbound HTTPS `GET` with the same client behavior. Required request field is the full product URL in the curated catalog. Auth method is none. Cadence is hourly. Failures follow the same skip-on-null behavior.
-- **Sportsfuel website** (`www.sportsfuel.co.nz`): outbound HTTPS `GET` with the same client behavior. Required request field is the full product URL including the `variant` query parameter. Auth method is none. Cadence is hourly. Failures follow the same skip-on-null behavior.
+- **Sportsfuel website** (`www.sportsfuel.co.nz`): one outbound HTTPS `GET` per run for the Vanilla variant, using the same client behavior. Required request field is the full product URL including the `variant` query parameter. Auth method is none. Cadence is hourly. Failures follow the same skip-on-null behavior.
 - **Amazon SNS** (`price_tracker_api_price_updates`): outbound publish integration for price decrease notifications. Required publish fields are topic name, subject, and message body lines containing product name, previous price, current price, and URL. Auth uses Lambda IAM role. When no matching topic ARN exists, publish fails and the invocation fails.
 
 ## API contracts
@@ -183,12 +183,10 @@ Representative item:
 - No notification is sent for a product with no previous snapshot.
 - Products with `null` extracted prices are skipped and not written for that run.
 - Notification publish happens before DynamoDB writes for the new snapshots.
-- If scraping throws after retry exhaustion, the invocation fails and no later writes in that run are executed.
-- Jsoup retries up to `3` attempts with exponential backoff (`1s`, `2s`, `4s`) plus jitter between retries.
-- Non-`2xx` responses (including `429`) are retried like other fetch failures until attempts are exhausted.
+- If scraping throws after all attempts, the invocation fails and no later writes in that run are executed.
+- Jsoup makes up to `3` attempts with exponential backoff starting at `1s`, doubling per retry, plus up to `50%` jitter.
+- Non-`2xx` responses, including `429`, use the same generic backoff without status-specific handling until attempts are exhausted.
 - Non-`2xx` responses are logged at warn level with status code, response headers, and response body (body truncated to `1000` characters).
-- When a `429` response includes a `Retry-After` header (delay-seconds or HTTP-date), the retry waits that long instead of the exponential backoff delay, capped at `60s`.
-- When a `429` response has no `Retry-After` header, the exponential backoff delay is multiplied by `10` (`10s`, `20s`) plus jitter, capped at `60s`.
 
 ## Source of truth
 
@@ -227,8 +225,8 @@ Representative item:
 ## Performance envelope
 
 - Execution cadence is fixed at one scheduled run per hour (`rate(1 hour)`).
-- Current catalog size is `40` product URLs processed sequentially in each run.
-- Each fetch uses up to `3` attempts, `30s` request timeout, and exponential backoff with jitter (on `429`, the `Retry-After` delay or a `10x` backoff multiplier is used instead, capped at `60s`).
+- Current catalog size is `34` product URLs processed sequentially in each run.
+- Each fetch uses up to `3` attempts with a `30s` request timeout and generic exponential backoff starting at `1s`.
 - Lambda timeout is `300s`; catalog size and scrape behavior are tuned for personal-scale workloads.
 - DynamoDB table uses `PAY_PER_REQUEST` billing mode for elastic low-volume operation.
 

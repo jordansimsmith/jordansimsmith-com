@@ -52,7 +52,7 @@ public class ProductsFactoryImplTest {
   }
 
   @Test
-  void findProductsShouldBuildUrlsFromConfiguredSportsfuelBaseUrl() {
+  void findProductsShouldBuildSingleUrlFromConfiguredSportsfuelBaseUrl() {
     // arrange
     var productsFactory =
         new ProductsFactoryImpl(
@@ -61,18 +61,16 @@ public class ProductsFactoryImplTest {
             URI.create("http://sportsfuel.example:8080"));
 
     // act
-    var remappedProduct =
+    var sportsfuelProducts =
         productsFactory.findProducts().stream()
-            .filter(
-                product ->
-                    product
-                        .name()
-                        .equals("Sportsfuel - Clean Nutrition Whey Protein 1kg - Vanilla"))
-            .findFirst()
-            .orElseThrow();
+            .filter(product -> product.url().getHost().equals("sportsfuel.example"))
+            .toList();
 
     // assert
-    assertThat(remappedProduct.url().toString())
+    assertThat(sportsfuelProducts).hasSize(1);
+    assertThat(sportsfuelProducts.get(0).name())
+        .isEqualTo("Sportsfuel - Clean Nutrition Whey Protein 1kg - Vanilla");
+    assertThat(sportsfuelProducts.get(0).url().toString())
         .isEqualTo(
             "http://sportsfuel.example:8080/products/clean-nutrition-whey-protein-1kg?variant=14788899504195");
   }
