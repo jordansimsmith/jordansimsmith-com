@@ -12,6 +12,7 @@ public final class PriceTrackerWebsiteStubServer {
   static final String CHEMIST_WAREHOUSE_STUB_HOST = "chemist-warehouse-stub";
   static final String NZ_PROTEIN_STUB_HOST = "nz-protein-stub";
   static final String SPORTSFUEL_STUB_HOST = "sportsfuel-stub";
+  static final String VIVOBAREFOOT_STUB_HOST = "vivobarefoot-stub";
   static final String CHEMIST_WAREHOUSE_TEMPLATE =
       """
       <html>
@@ -46,6 +47,18 @@ public final class PriceTrackerWebsiteStubServer {
         </body>
       </html>
       """;
+  static final String VIVOBAREFOOT_TEMPLATE =
+      """
+      <html>
+        <body>
+          <div class="price">
+            <div class="price__sale">
+              <span class="price__sale-value money">%s</span>
+            </div>
+          </div>
+        </body>
+      </html>
+      """;
   static final Map<String, HostFixtures> HOST_FIXTURES =
       Map.of(
           CHEMIST_WAREHOUSE_STUB_HOST,
@@ -54,7 +67,9 @@ public final class PriceTrackerWebsiteStubServer {
           NZ_PROTEIN_STUB_HOST,
           new HostFixtures(84.95, Map.of()),
           SPORTSFUEL_STUB_HOST,
-          new HostFixtures(61.11, Map.of()));
+          new HostFixtures(61.11, Map.of()),
+          VIVOBAREFOOT_STUB_HOST,
+          new HostFixtures(479.95, Map.of()));
 
   private PriceTrackerWebsiteStubServer() {}
 
@@ -94,6 +109,7 @@ public final class PriceTrackerWebsiteStubServer {
                     CHEMIST_WAREHOUSE_TEMPLATE.formatted(formattedPrice);
                 case NZ_PROTEIN_STUB_HOST -> NZ_PROTEIN_TEMPLATE.formatted(formattedPrice);
                 case SPORTSFUEL_STUB_HOST -> SPORTSFUEL_TEMPLATE.formatted(formattedPrice);
+                case VIVOBAREFOOT_STUB_HOST -> VIVOBAREFOOT_TEMPLATE.formatted(formattedPrice);
                 default -> "";
               };
 

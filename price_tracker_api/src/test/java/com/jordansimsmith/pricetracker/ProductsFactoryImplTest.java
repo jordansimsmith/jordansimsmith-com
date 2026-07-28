@@ -13,7 +13,8 @@ public class ProductsFactoryImplTest {
         new ProductsFactoryImpl(
             URI.create("http://chemist.example:8080"),
             URI.create("http://protein.example:8080"),
-            URI.create("http://sportsfuel.example:8080"));
+            URI.create("http://sportsfuel.example:8080"),
+            URI.create("http://vivobarefoot.example:8080"));
 
     // act
     var remappedProduct =
@@ -37,7 +38,8 @@ public class ProductsFactoryImplTest {
         new ProductsFactoryImpl(
             URI.create("http://chemist.example:8080"),
             URI.create("http://protein.example:8080"),
-            URI.create("http://sportsfuel.example:8080"));
+            URI.create("http://sportsfuel.example:8080"),
+            URI.create("http://vivobarefoot.example:8080"));
 
     // act
     var remappedProduct =
@@ -58,7 +60,8 @@ public class ProductsFactoryImplTest {
         new ProductsFactoryImpl(
             URI.create("http://chemist.example:8080"),
             URI.create("http://protein.example:8080"),
-            URI.create("http://sportsfuel.example:8080"));
+            URI.create("http://sportsfuel.example:8080"),
+            URI.create("http://vivobarefoot.example:8080"));
 
     // act
     var sportsfuelProducts =
@@ -73,5 +76,29 @@ public class ProductsFactoryImplTest {
     assertThat(sportsfuelProducts.get(0).url().toString())
         .isEqualTo(
             "http://sportsfuel.example:8080/products/clean-nutrition-whey-protein-1kg?variant=14788899504195");
+  }
+
+  @Test
+  void findProductsShouldBuildSingleUrlFromConfiguredVivobarefootBaseUrl() {
+    // arrange
+    var productsFactory =
+        new ProductsFactoryImpl(
+            URI.create("http://chemist.example:8080"),
+            URI.create("http://protein.example:8080"),
+            URI.create("http://sportsfuel.example:8080"),
+            URI.create("http://vivobarefoot.example:8080"));
+
+    // act
+    var vivobarefootProducts =
+        productsFactory.findProducts().stream()
+            .filter(product -> product.url().getHost().equals("vivobarefoot.example"))
+            .toList();
+
+    // assert
+    assertThat(vivobarefootProducts).hasSize(1);
+    assertThat(vivobarefootProducts.get(0).name())
+        .isEqualTo("Vivobarefoot - Tracker Forest ESC Men's - Bracken");
+    assertThat(vivobarefootProducts.get(0).url().toString())
+        .isEqualTo("http://vivobarefoot.example:8080/products/tracker-forest-esc-mens-bracken");
   }
 }

@@ -10,6 +10,7 @@ public class ProductsFactoryImpl implements ProductsFactory {
   private final URI chemistWarehouseBaseUri;
   private final URI nzProteinBaseUri;
   private final URI sportsfuelBaseUri;
+  private final URI vivobarefootBaseUri;
 
   private static final List<CatalogProduct> CHEMIST_WAREHOUSE_PRODUCTS =
       List.of(
@@ -113,11 +114,21 @@ public class ProductsFactoryImpl implements ProductsFactory {
               "/products/clean-nutrition-whey-protein-1kg?variant=14788899504195",
               "Sportsfuel - Clean Nutrition Whey Protein 1kg - Vanilla"));
 
+  private static final List<CatalogProduct> VIVOBAREFOOT_PRODUCTS =
+      List.of(
+          new CatalogProduct(
+              "/products/tracker-forest-esc-mens-bracken",
+              "Vivobarefoot - Tracker Forest ESC Men's - Bracken"));
+
   public ProductsFactoryImpl(
-      URI chemistWarehouseBaseUri, URI nzProteinBaseUri, URI sportsfuelBaseUri) {
+      URI chemistWarehouseBaseUri,
+      URI nzProteinBaseUri,
+      URI sportsfuelBaseUri,
+      URI vivobarefootBaseUri) {
     this.chemistWarehouseBaseUri = chemistWarehouseBaseUri;
     this.nzProteinBaseUri = nzProteinBaseUri;
     this.sportsfuelBaseUri = sportsfuelBaseUri;
+    this.vivobarefootBaseUri = vivobarefootBaseUri;
   }
 
   @Override
@@ -126,6 +137,7 @@ public class ProductsFactoryImpl implements ProductsFactory {
     allProducts.addAll(buildProducts(chemistWarehouseBaseUri, CHEMIST_WAREHOUSE_PRODUCTS));
     allProducts.addAll(buildProducts(nzProteinBaseUri, NZ_PROTEIN_PRODUCTS));
     allProducts.addAll(buildProducts(sportsfuelBaseUri, SPORTSFUEL_PRODUCTS));
+    allProducts.addAll(buildProducts(vivobarefootBaseUri, VIVOBAREFOOT_PRODUCTS));
     return allProducts;
   }
 

@@ -193,4 +193,68 @@ public class PriceExtractorTest {
     // assert
     assertThat(price).isNull();
   }
+
+  @Test
+  void vivobarefootExtractorShouldExtractPrice() {
+    // arrange
+    var html =
+        """
+        <html>
+          <body>
+            <div class="price">
+              <div class="price__sale">
+                <span class="price__sale-value money">$479.95</span>
+              </div>
+            </div>
+          </body>
+        </html>
+        """;
+    var document = Jsoup.parse(html);
+    var extractor = new VivobarefootPriceExtractor();
+
+    // act
+    var price = extractor.extractPrice(document);
+
+    // assert
+    assertThat(price).isEqualTo(479.95);
+  }
+
+  @Test
+  void vivobarefootExtractorShouldReturnNullWhenElementNotFound() {
+    // arrange
+    var html = "<html><body></body></html>";
+    var document = Jsoup.parse(html);
+    var extractor = new VivobarefootPriceExtractor();
+
+    // act
+    var price = extractor.extractPrice(document);
+
+    // assert
+    assertThat(price).isNull();
+  }
+
+  @Test
+  void vivobarefootExtractorShouldReturnNullWhenPriceIsInvalid() {
+    // arrange
+    var html =
+        """
+        <html>
+          <body>
+            <div class="price">
+              <div class="price__sale">
+                <span class="price__sale-value money">Unavailable</span>
+              </div>
+            </div>
+          </body>
+        </html>
+        """;
+    var document = Jsoup.parse(html);
+    var extractor = new VivobarefootPriceExtractor();
+
+    // act
+    var price = extractor.extractPrice(document);
+
+    // assert
+    assertThat(price).isNull();
+  }
 }

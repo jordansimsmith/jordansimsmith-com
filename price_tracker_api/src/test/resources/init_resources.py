@@ -105,6 +105,9 @@ lambda_env = {
     "PRICE_TRACKER_SPORTSFUEL_BASE_URL": os.getenv(
         "PRICE_TRACKER_SPORTSFUEL_BASE_URL", ""
     ),
+    "PRICE_TRACKER_VIVOBAREFOOT_BASE_URL": os.getenv(
+        "PRICE_TRACKER_VIVOBAREFOOT_BASE_URL", ""
+    ),
 }
 
 # create all lambda functions
