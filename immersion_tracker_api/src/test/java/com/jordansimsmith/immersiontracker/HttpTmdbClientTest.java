@@ -60,6 +60,7 @@ public class HttpTmdbClientTest {
             {
               "id": 372058,
               "title": "Your Name.",
+              "original_title": "君の名は。",
               "poster_path": "/q719jXXEzOoYaps6babgKnONONX.jpg",
               "runtime": 106
             }
@@ -72,7 +73,7 @@ public class HttpTmdbClientTest {
 
     // assert
     assertThat(movie.id()).isEqualTo(372058);
-    assertThat(movie.name()).isEqualTo("Your Name.");
+    assertThat(movie.name()).isEqualTo("君の名は。");
     assertThat(movie.image())
         .isEqualTo("https://image.tmdb.org/t/p/w500/q719jXXEzOoYaps6babgKnONONX.jpg");
     assertThat(movie.duration()).isEqualTo(Duration.ofMinutes(106));
@@ -95,6 +96,7 @@ public class HttpTmdbClientTest {
             {
               "id": 372058,
               "title": "Your Name.",
+              "original_title": "君の名は。",
               "poster_path": null,
               "runtime": 106
             }
@@ -119,6 +121,7 @@ public class HttpTmdbClientTest {
             {
               "id": 372058,
               "title": "Your Name.",
+              "original_title": "君の名は。",
               "poster_path": null,
               "runtime": 0
             }
@@ -133,7 +136,7 @@ public class HttpTmdbClientTest {
   }
 
   @Test
-  void getMovieShouldThrowWhenTitleIsBlank() throws IOException, InterruptedException {
+  void getMovieShouldThrowWhenOriginalTitleIsBlank() throws IOException, InterruptedException {
     // arrange
     var response =
         createMockResponse(
@@ -141,7 +144,8 @@ public class HttpTmdbClientTest {
             """
             {
               "id": 372058,
-              "title": " ",
+              "title": "Your Name.",
+              "original_title": " ",
               "poster_path": null,
               "runtime": 106
             }

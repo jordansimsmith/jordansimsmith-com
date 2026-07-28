@@ -33,7 +33,7 @@ public class HttpTmdbClient implements TmdbClient {
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record MovieResponse(
       @JsonProperty("id") int id,
-      @JsonProperty("title") String title,
+      @JsonProperty("original_title") String originalTitle,
       @JsonProperty("poster_path") String posterPath,
       @JsonProperty("runtime") Integer runtime) {}
 
@@ -73,8 +73,8 @@ public class HttpTmdbClient implements TmdbClient {
 
     var movie = objectMapper.readValue(response.body(), MovieResponse.class);
     Preconditions.checkState(movie.id() == id, "Expected movie ID %s, got %s", id, movie.id());
-    Preconditions.checkNotNull(movie.title(), "Movie title is null");
-    Preconditions.checkState(!movie.title().isBlank(), "Movie title is blank");
+    Preconditions.checkNotNull(movie.originalTitle(), "Movie original title is null");
+    Preconditions.checkState(!movie.originalTitle().isBlank(), "Movie original title is blank");
     Preconditions.checkNotNull(movie.runtime(), "Movie runtime is null");
     Preconditions.checkState(movie.runtime() > 0, "Movie runtime must be positive");
 
@@ -82,6 +82,6 @@ public class HttpTmdbClient implements TmdbClient {
         movie.posterPath() == null || movie.posterPath().isBlank()
             ? null
             : IMAGE_BASE_URL + movie.posterPath();
-    return new Movie(movie.id(), movie.title(), image, Duration.ofMinutes(movie.runtime()));
+    return new Movie(movie.id(), movie.originalTitle(), image, Duration.ofMinutes(movie.runtime()));
   }
 }

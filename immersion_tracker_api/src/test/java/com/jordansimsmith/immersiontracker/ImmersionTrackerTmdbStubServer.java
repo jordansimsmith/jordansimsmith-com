@@ -11,7 +11,8 @@ public final class ImmersionTrackerTmdbStubServer {
       """
       {
         "id": 916224,
-        "title": "すずめの戸締まり",
+        "title": "Suzume",
+        "original_title": "すずめの戸締まり",
         "poster_path": "/vIeu8WysZrTSFb2uhPViKjX9EcC.jpg",
         "runtime": 122
       }
@@ -21,7 +22,8 @@ public final class ImmersionTrackerTmdbStubServer {
       """
       {
         "id": 372058,
-        "title": "君の名は。",
+        "title": "Your Name.",
+        "original_title": "君の名は。",
         "poster_path": "/q719jXXEzOoYaps6babgKnONONX.jpg",
         "runtime": 106
       }

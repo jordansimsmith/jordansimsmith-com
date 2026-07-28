@@ -53,9 +53,9 @@ def get_tmdb_movie(access_token, movie_id):
     if movie.get("id") != movie_id:
         raise RuntimeError(f"Expected TMDB movie ID {movie_id}, got {movie.get('id')}")
 
-    title = movie.get("title")
+    title = movie.get("original_title")
     if not title or not title.strip():
-        raise RuntimeError("TMDB movie response missing title")
+        raise RuntimeError("TMDB movie response missing original_title")
 
     runtime_minutes = movie.get("runtime")
     if not isinstance(runtime_minutes, int) or runtime_minutes <= 0:

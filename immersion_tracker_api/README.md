@@ -99,7 +99,7 @@ sequenceDiagram
 ### External systems
 
 - **TVDB API (default origin `https://api4.thetvdb.com`)**: `HttpTvdbClient` logs in with secret key `tvdb_api_key` (`POST /v4/login`) then calls `GET /v4/series/{id}` during `PUT /show`. Base origin is configurable with `IMMERSION_TRACKER_TVDB_BASE_URL`; when unset it uses the default production origin. Required response data for writes is `name`, `image`, and `averageRuntime`. Non-200 or non-`success` responses fail the request.
-- **TMDB API (default origin `https://api.themoviedb.org`)**: `HttpTmdbClient` authenticates with secret key `tmdb_api_read_access_token` as a Bearer token and calls `GET /3/movie/{id}` during `POST /syncmovies`. Base origin is configurable with `IMMERSION_TRACKER_TMDB_BASE_URL`; when unset it uses the default production origin. Required response data is matching `id`, `title`, and a positive runtime in minutes. When `poster_path` is present, artwork uses `https://image.tmdb.org/t/p/w500<poster_path>`; missing artwork is persisted as null. Non-200 or invalid responses fail the request.
+- **TMDB API (default origin `https://api.themoviedb.org`)**: `HttpTmdbClient` authenticates with secret key `tmdb_api_read_access_token` as a Bearer token and calls `GET /3/movie/{id}` during `POST /syncmovies`. Base origin is configurable with `IMMERSION_TRACKER_TMDB_BASE_URL`; when unset it uses the default production origin. Required response data is matching `id`, non-blank `original_title`, and a positive runtime in minutes. `original_title` is persisted as `tmdb_name` so progress displays the title in the movie's original language and script. When `poster_path` is present, artwork uses `https://image.tmdb.org/t/p/w500<poster_path>`; missing artwork is persisted as null. Non-200 or invalid responses fail the request.
 - **YouTube Data API v3 (default origin `https://www.googleapis.com`)**: `HttpYoutubeClient` uses `youtube_api_key` as query parameter and calls `GET /youtube/v3/videos` and `GET /youtube/v3/channels` for each new video ID in `POST /syncyoutube`. Base origin is configurable with `IMMERSION_TRACKER_YOUTUBE_BASE_URL`; when unset it uses the default production origin. Required video data is `id`, `snippet.title`, `snippet.channelId`, and `contentDetails.duration`; channel metadata includes title and thumbnail URL preference (high, then medium, then default). Non-200 or invalid payload shape fails the request.
 - **Spotify Web API (default origins `https://accounts.spotify.com` and `https://api.spotify.com`)**: `HttpSpotifyClient` exchanges `spotify_client_id` and `spotify_client_secret` for an access token using client credentials (`POST /api/token` on accounts origin), then calls `GET /v1/episodes/{episode_id}` on API origin for each target episode ID in `POST /syncspotify`. When `backfill` is true, additionally calls `GET /v1/shows/{show_id}/episodes?limit=50` (following `next` for pagination) to enumerate every episode in the target's show. Origins are configurable with `IMMERSION_TRACKER_SPOTIFY_ACCOUNTS_BASE_URL` and `IMMERSION_TRACKER_SPOTIFY_API_BASE_URL`; when unset they use production defaults. Required episode data includes `id`, `name`, `duration_ms`, `release_date`, `release_date_precision`, `show.id`, and `show.name`; first show image URL is used when present. `release_date_precision` accepts any of `"day"`, `"month"`, `"year"`; less precise values are parsed to a lower-bound `LocalDate` (year → Jan 1, month → 1st of month, day → exact). Non-200 or invalid payload shape fails the request.
 
@@ -245,7 +245,7 @@ Item types and required attributes:
 
 - **Episode (`EPISODE#<folder_name>#<file_name>`)**: `pk`, `sk`, `user`, `folder_name`, `file_name`, `timestamp`
 - **Show (`SHOW#<folder_name>`)**: `pk`, `sk`, `user`, `folder_name`; optional `tvdb_id`, `tvdb_name`, `tvdb_image`, `tvdb_average_runtime`; includes optimistic-lock `version`
-- **Movie (`MOVIE#<file_name>`)**: `pk`, `sk`, `user`, `file_name`, `tmdb_id`, `tmdb_name`, optional `tmdb_image`, `movie_duration`, `timestamp`
+- **Movie (`MOVIE#<file_name>`)**: `pk`, `sk`, `user`, `file_name`, `tmdb_id`, `tmdb_name` (TMDB `original_title`), optional `tmdb_image`, `movie_duration`, `timestamp`
 - **YouTube video (`YOUTUBEVIDEO#<video_id>`)**: `pk`, `sk`, `user`, `youtube_video_id`, `youtube_video_title`, `youtube_channel_id`, `youtube_video_duration`, `timestamp`
 - **YouTube channel (`YOUTUBECHANNEL#<channel_id>`)**: `pk`, `sk`, `user`, `youtube_channel_id`, `youtube_channel_title`, optional `youtube_channel_artwork_url`
 - **Spotify episode (`SPOTIFYEPISODE#<episode_id>`)**: `pk`, `sk`, `user`, `spotify_episode_id`, `spotify_episode_title`, `spotify_show_id`, `spotify_episode_duration`, `timestamp`
@@ -297,7 +297,7 @@ Movie item:
   "user": "alice",
   "file_name": "movie_name",
   "tmdb_id": 372058,
-  "tmdb_name": "Your Name.",
+  "tmdb_name": "君の名は。",
   "tmdb_image": "https://image.tmdb.org/t/p/w500/q719jXXEzOoYaps6babgKnONONX.jpg",
   "movie_duration": 7200,
   "timestamp": 1730000000
@@ -416,7 +416,7 @@ Expected JSON for the `immersion_tracker_api` secret (third-party provider crede
 
 ### Movie migrations
 
-Both movie migrations require `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `TMDB_API_READ_ACCESS_TOKEN`.
+All movie migrations require `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `TMDB_API_READ_ACCESS_TOKEN`.
 
 #### Migrate metadata from TVDB
 
@@ -434,6 +434,14 @@ Both movie migrations require `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and 
 - Preview without writes: `python3 immersion_tracker_api/migrations/006-add-movies.py --user <user> --tmdb-id 1463232 --tmdb-id 1356890`.
 - Execute: add `--execute` to the preview command.
 - Manual items use the deterministic filename `manual_tmdb_<tmdb_id>` and are skipped when that user already has any movie with the same `tmdb_id`.
+
+#### Backfill original movie titles
+
+`migrations/007-backfill-original-movie-titles.py` is a one-time backfill for movie records created before `tmdb_name` changed from localized `title` to `original_title`.
+
+- Preview without writes: `python3 immersion_tracker_api/migrations/007-backfill-original-movie-titles.py`.
+- Execute: `python3 immersion_tracker_api/migrations/007-backfill-original-movie-titles.py --execute`.
+- The script skips records already using the original title and records without a TMDB ID.
 
 ## End-to-end scenarios
 
