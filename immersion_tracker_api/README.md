@@ -308,7 +308,7 @@ Movie item:
 
 - User identity for reads and writes is derived from the HTTP Basic username in `Authorization`.
 - A sync request only inserts new items; existing `pk`/`sk` records are skipped and not overwritten.
-- New movie records contain TMDB metadata only. Progress reads may fall back to legacy TVDB movie name and image fields until the interactive migration has converted every historical record.
+- Movie progress reads name and image exclusively from TMDB fields, so legacy movie records must be migrated before deploying this version.
 - `POST /sync` creates a `SHOW` item when missing before creating `EPISODE` items.
 - `POST /syncspotify` performs one DynamoDB query (`sk begins_with "SPOTIFY"`) per request to determine which episode and show items already exist for the user, then inserts only missing items.
 - `POST /syncspotify` backfilled siblings are stamped with the request-time `clock.now()` (not the Spotify `release_date`), so a backfill burst counts toward the request day's totals.

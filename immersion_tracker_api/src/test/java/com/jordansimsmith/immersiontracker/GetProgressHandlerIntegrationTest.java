@@ -1037,7 +1037,7 @@ public class GetProgressHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldReadLegacyTvdbMovieMetadata() throws Exception {
+  void handleRequestShouldIgnoreLegacyTvdbMovieMetadata() throws Exception {
     // arrange
     var user = "alice";
     fakeClock.setTime(Instant.ofEpochMilli(123_000));
@@ -1068,7 +1068,6 @@ public class GetProgressHandlerIntegrationTest {
     var progress =
         objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
     assertThat(progress.movies())
-        .containsExactly(
-            new GetProgressHandler.Movie("legacy_movie", "Legacy Movie", "legacy-image"));
+        .containsExactly(new GetProgressHandler.Movie("legacy_movie", null, null));
   }
 }

@@ -554,12 +554,7 @@ public class GetProgressHandler
 
   private List<Movie> movies(List<ImmersionTrackerItem> movies) {
     return movies.stream()
-        .map(
-            m ->
-                new Movie(
-                    m.getFileName(),
-                    m.getTmdbName() != null ? m.getTmdbName() : m.getTvdbName(),
-                    m.getTmdbImage() != null ? m.getTmdbImage() : m.getTvdbImage()))
+        .map(m -> new Movie(m.getFileName(), m.getTmdbName(), m.getTmdbImage()))
         .sorted(Comparator.comparing(m -> m.name, Comparator.nullsLast(Comparator.naturalOrder())))
         .toList();
   }
