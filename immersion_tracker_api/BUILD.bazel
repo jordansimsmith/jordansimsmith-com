@@ -221,6 +221,15 @@ java_binary(
 )
 
 java_binary(
+    name = "immersion-tracker-tmdb-stub-server",
+    testonly = True,
+    srcs = [
+        "src/test/java/com/jordansimsmith/immersiontracker/ImmersionTrackerTmdbStubServer.java",
+    ],
+    create_executable = False,
+)
+
+java_binary(
     name = "immersion-tracker-youtube-stub-server",
     testonly = True,
     srcs = [
@@ -257,6 +266,7 @@ java_library(
     data = [
         ":immersion-tracker-spotify-accounts-stub-load",
         ":immersion-tracker-spotify-api-stub-load",
+        ":immersion-tracker-tmdb-stub-load",
         ":immersion-tracker-tvdb-stub-load",
         ":immersion-tracker-youtube-stub-load",
         ":local-load",
@@ -357,6 +367,11 @@ localstack_image(
 stub_server_image(
     name = "immersion-tracker-tvdb-stub",
     deploy_jar = ":immersion-tracker-tvdb-stub-server_deploy.jar",
+)
+
+stub_server_image(
+    name = "immersion-tracker-tmdb-stub",
+    deploy_jar = ":immersion-tracker-tmdb-stub-server_deploy.jar",
 )
 
 stub_server_image(

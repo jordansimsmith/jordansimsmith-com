@@ -39,6 +39,8 @@ public interface ImmersionTrackerFactory {
 
   TvdbClient tvdbClient();
 
+  TmdbClient tmdbClient();
+
   YoutubeClient youtubeClient();
 
   SpotifyClient spotifyClient();

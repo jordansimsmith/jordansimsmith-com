@@ -33,6 +33,10 @@ public class ImmersionTrackerE2ETest {
       new ImmersionTrackerTvdbStubContainer().withNetwork(NETWORK);
 
   @Container
+  private static final ImmersionTrackerTmdbStubContainer immersionTrackerTmdbStubContainer =
+      new ImmersionTrackerTmdbStubContainer().withNetwork(NETWORK);
+
+  @Container
   private static final ImmersionTrackerYoutubeStubContainer immersionTrackerYoutubeStubContainer =
       new ImmersionTrackerYoutubeStubContainer().withNetwork(NETWORK);
 
@@ -54,6 +58,9 @@ public class ImmersionTrackerE2ETest {
           .withEnv(
               "IMMERSION_TRACKER_TVDB_BASE_URL",
               immersionTrackerTvdbStubContainer.getEndpoint().toString())
+          .withEnv(
+              "IMMERSION_TRACKER_TMDB_BASE_URL",
+              immersionTrackerTmdbStubContainer.getEndpoint().toString())
           .withEnv(
               "IMMERSION_TRACKER_YOUTUBE_BASE_URL",
               immersionTrackerYoutubeStubContainer.getEndpoint().toString())
@@ -253,8 +260,8 @@ public class ImmersionTrackerE2ETest {
     var process = processBuilder.start();
 
     var input = process.getOutputStream();
-    input.write("331904\n".getBytes());
-    input.write("197\n".getBytes());
+    input.write("916224\n".getBytes());
+    input.write("372058\n".getBytes());
     input.write("\n".getBytes());
     input.flush();
 
@@ -280,8 +287,8 @@ public class ImmersionTrackerE2ETest {
         Finding local movies watched...
         Finding watched URLs...
         Syncing 2 movies watched...
-        Enter the TVDB id for movie suzume:
-        Enter the TVDB id for movie your_name:
+        Enter the TMDB id for movie suzume:
+        Enter the TMDB id for movie your_name:
         Successfully added 2 new movies to the remote server.
         Retrieving progress summary...
 

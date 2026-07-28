@@ -24,6 +24,7 @@ secretsmanager_client.create_secret(
     SecretString=json.dumps(
         {
             "tvdb_api_key": "fake-tvdb-key",
+            "tmdb_api_read_access_token": "fake-tmdb-access-token",
             "youtube_api_key": "fake-youtube-key",
             "spotify_client_id": "fake-spotify-client-id",
             "spotify_client_secret": "fake-spotify-client-secret",
@@ -116,7 +117,7 @@ configs = [
         "http_method": "POST",
         "handler_name": "com.jordansimsmith.immersiontracker.SyncMoviesHandler",
         "zip_file": "sync-movies-handler_deploy.jar",
-        "provider_env_names": ["IMMERSION_TRACKER_TVDB_BASE_URL"],
+        "provider_env_names": ["IMMERSION_TRACKER_TMDB_BASE_URL"],
     },
     {
         "function_name": "sync_youtube_handler",
@@ -141,6 +142,7 @@ configs = [
 
 provider_env_values = {
     "IMMERSION_TRACKER_TVDB_BASE_URL": os.getenv("IMMERSION_TRACKER_TVDB_BASE_URL"),
+    "IMMERSION_TRACKER_TMDB_BASE_URL": os.getenv("IMMERSION_TRACKER_TMDB_BASE_URL"),
     "IMMERSION_TRACKER_YOUTUBE_BASE_URL": os.getenv(
         "IMMERSION_TRACKER_YOUTUBE_BASE_URL"
     ),

@@ -7,6 +7,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Preconditions;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.time.Clock;
@@ -27,10 +28,11 @@ public class SyncMoviesHandler
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable;
-  private final TvdbClient tvdbClient;
+  private final TmdbClient tmdbClient;
 
   @VisibleForTesting
-  record Movie(@JsonProperty("file_name") String fileName, @JsonProperty("tvdb_id") int tvdbId) {}
+  record Movie(
+      @JsonProperty("file_name") String fileName, @JsonProperty("tmdb_id") Integer tmdbId) {}
 
   @VisibleForTesting
   record SyncMoviesRequest(@JsonProperty("movies") List<Movie> movies) {}
@@ -49,7 +51,7 @@ public class SyncMoviesHandler
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.immersionTrackerTable = factory.immersionTrackerTable();
-    this.tvdbClient = factory.tvdbClient();
+    this.tmdbClient = factory.tmdbClient();
   }
 
   @Override
@@ -71,6 +73,8 @@ public class SyncMoviesHandler
     var moviesAdded = 0;
 
     for (var movie : body.movies) {
+      Preconditions.checkArgument(
+          movie.tmdbId() != null && movie.tmdbId() > 0, "tmdb_id must be positive");
       var existingMovie =
           immersionTrackerTable.getItem(
               Key.builder()
@@ -82,15 +86,15 @@ public class SyncMoviesHandler
         continue;
       }
 
-      var tvdbMovie = tvdbClient.getMovie(movie.tvdbId());
+      var tmdbMovie = tmdbClient.getMovie(movie.tmdbId());
       var movieItem =
           ImmersionTrackerItem.createMovie(
               user,
               movie.fileName(),
-              tvdbMovie.id(),
-              tvdbMovie.name(),
-              tvdbMovie.image(),
-              tvdbMovie.duration(),
+              tmdbMovie.id(),
+              tmdbMovie.name(),
+              tmdbMovie.image(),
+              tmdbMovie.duration(),
               now);
       immersionTrackerTable.putItem(movieItem);
       moviesAdded++;

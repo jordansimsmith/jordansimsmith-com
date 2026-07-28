@@ -133,8 +133,8 @@ def sync_movies_watched(movies):
     movies_with_ids = []
     for movie in movies:
         file_name = movie["file_name"]
-        tvdb_id = int(input(f"Enter the TVDB id for movie {file_name}:\n"))
-        movies_with_ids.append({"file_name": file_name, "tvdb_id": tvdb_id})
+        tmdb_id = int(input(f"Enter the TMDB id for movie {file_name}:\n"))
+        movies_with_ids.append({"file_name": file_name, "tmdb_id": tmdb_id})
 
     res = send_request("POST", "syncmovies", {"movies": movies_with_ids})
     movies_added = res["movies_added"]

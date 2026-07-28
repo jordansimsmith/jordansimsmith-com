@@ -41,30 +41,6 @@ public final class ImmersionTrackerTvdbStubServer {
       }
       """;
 
-  private static final String MOVIE_331904_RESPONSE =
-      """
-      {
-        "status": "success",
-        "data": {
-          "name": "すずめの戸締まり",
-          "image": "https://images.example.com/tvdb/suzume.jpg",
-          "runtime": 122
-        }
-      }
-      """;
-
-  private static final String MOVIE_197_RESPONSE =
-      """
-      {
-        "status": "success",
-        "data": {
-          "name": "君の名は。",
-          "image": "https://images.example.com/tvdb/your-name.jpg",
-          "runtime": 106
-        }
-      }
-      """;
-
   private ImmersionTrackerTvdbStubServer() {}
 
   public static void main(String[] args) throws Exception {
@@ -80,12 +56,6 @@ public final class ImmersionTrackerTvdbStubServer {
     server.createContext(
         "/v4/series/270065",
         exchange -> respond(exchange, "application/json; charset=utf-8", SERIES_270065_RESPONSE));
-    server.createContext(
-        "/v4/movies/331904",
-        exchange -> respond(exchange, "application/json; charset=utf-8", MOVIE_331904_RESPONSE));
-    server.createContext(
-        "/v4/movies/197",
-        exchange -> respond(exchange, "application/json; charset=utf-8", MOVIE_197_RESPONSE));
     server.start();
     Thread.currentThread().join();
   }

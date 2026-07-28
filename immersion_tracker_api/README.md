@@ -9,7 +9,7 @@ The immersion tracker API provides an authenticated backend for recording watche
 - **Runtime**: AWS Lambda (Java 21)
 - **Primary storage**: DynamoDB single-table design (`immersion_tracker`)
 - **Primary client**: local sync script (`immersion_tracker_api/script/sync_episodes.py`)
-- **External metadata providers**: TVDB, YouTube Data API v3, Spotify Web API
+- **External metadata providers**: TVDB, TMDB, YouTube Data API v3, Spotify Web API
 
 ## User stories
 
@@ -23,10 +23,10 @@ The immersion tracker API provides an authenticated backend for recording watche
 
 - Authenticate every API route with HTTP Basic credentials validated by the shared `auth_api` authorizer.
 - Sync watched local episodes, movies, YouTube videos, and Spotify episodes into per-user DynamoDB partitions.
-- Enrich content metadata from TVDB (shows and movies), YouTube (videos and channels), and Spotify (episodes and shows).
+- Enrich content metadata from TVDB (shows), TMDB (movies), YouTube (videos and channels), and Spotify (episodes and shows).
 - Return aggregate progress metrics, daily activity, weekly trend, and grouped progress summaries from persisted data.
 - Support idempotent sync semantics by skipping existing items keyed by deterministic `pk`/`sk` values.
-- Maintain a script-oriented workflow that can prompt for TVDB IDs, call API endpoints, and clean up local watched files.
+- Maintain a script-oriented workflow that can prompt for TVDB show IDs and TMDB movie IDs, call API endpoints, and clean up local watched files.
 
 ### Out of scope
 
@@ -44,6 +44,7 @@ flowchart TD
   handlers --> ddb[DynamoDB immersion_tracker]
   handlers --> secrets[Secrets Manager immersion_tracker_api]
   handlers --> tvdb[TVDB API]
+  handlers --> tmdb[TMDB API]
   handlers --> youtube[YouTube Data API]
   handlers --> spotify[Spotify Web API]
 ```
@@ -80,13 +81,14 @@ sequenceDiagram
 - Use one DynamoDB table with key prefixes (`EPISODE#`, `SHOW#`, `MOVIE#`, `YOUTUBEVIDEO#`, `YOUTUBECHANNEL#`, `SPOTIFYEPISODE#`, `SPOTIFYSHOW#`) to keep read and write paths simple for per-user workloads.
 - Use HTTP Basic authentication via the shared `auth_api` custom authorizer for straightforward script and CLI usage; the service keeps its own secret for third-party provider keys only.
 - Enrich and persist provider metadata during sync operations so progress queries avoid extra outbound calls.
+- Keep TVDB for show metadata and use TMDB for movie metadata so each media type can use the provider with the required catalogue coverage.
 - Compute progress and trend metrics at read time from canonical items; this keeps writes simple but makes read cost proportional to user data volume.
 
 ## Domain glossary
 
 - **Episode item**: one watched local show episode keyed by `EPISODE#<folder_name>#<file_name>`.
 - **Show item**: metadata record keyed by `SHOW#<folder_name>`, enriched from TVDB.
-- **Movie item**: watched movie keyed by `MOVIE#<file_name>`, enriched from TVDB.
+- **Movie item**: watched movie keyed by `MOVIE#<file_name>`, enriched from TMDB.
 - **YouTube video item**: one watched video keyed by `YOUTUBEVIDEO#<video_id>`.
 - **YouTube channel item**: channel metadata keyed by `YOUTUBECHANNEL#<channel_id>`.
 - **Spotify episode item**: one watched podcast episode keyed by `SPOTIFYEPISODE#<episode_id>`.
@@ -96,7 +98,8 @@ sequenceDiagram
 
 ### External systems
 
-- **TVDB API (default origin `https://api4.thetvdb.com`)**: `HttpTvdbClient` logs in with secret key `tvdb_api_key` (`POST /v4/login`) then calls `GET /v4/series/{id}` and `GET /v4/movies/{id}` during `PUT /show` and `POST /syncmovies`. Base origin is configurable with `IMMERSION_TRACKER_TVDB_BASE_URL`; when unset it uses the default production origin. Required response data for writes is `name`, `image`, and runtime (`averageRuntime` for series, `runtime` for movies). Non-200 or non-`success` responses fail the request.
+- **TVDB API (default origin `https://api4.thetvdb.com`)**: `HttpTvdbClient` logs in with secret key `tvdb_api_key` (`POST /v4/login`) then calls `GET /v4/series/{id}` during `PUT /show`. Base origin is configurable with `IMMERSION_TRACKER_TVDB_BASE_URL`; when unset it uses the default production origin. Required response data for writes is `name`, `image`, and `averageRuntime`. Non-200 or non-`success` responses fail the request.
+- **TMDB API (default origin `https://api.themoviedb.org`)**: `HttpTmdbClient` authenticates with secret key `tmdb_api_read_access_token` as a Bearer token and calls `GET /3/movie/{id}` during `POST /syncmovies`. Base origin is configurable with `IMMERSION_TRACKER_TMDB_BASE_URL`; when unset it uses the default production origin. Required response data is matching `id`, `title`, and a positive runtime in minutes. When `poster_path` is present, artwork uses `https://image.tmdb.org/t/p/w500<poster_path>`; missing artwork is persisted as null. Non-200 or invalid responses fail the request.
 - **YouTube Data API v3 (default origin `https://www.googleapis.com`)**: `HttpYoutubeClient` uses `youtube_api_key` as query parameter and calls `GET /youtube/v3/videos` and `GET /youtube/v3/channels` for each new video ID in `POST /syncyoutube`. Base origin is configurable with `IMMERSION_TRACKER_YOUTUBE_BASE_URL`; when unset it uses the default production origin. Required video data is `id`, `snippet.title`, `snippet.channelId`, and `contentDetails.duration`; channel metadata includes title and thumbnail URL preference (high, then medium, then default). Non-200 or invalid payload shape fails the request.
 - **Spotify Web API (default origins `https://accounts.spotify.com` and `https://api.spotify.com`)**: `HttpSpotifyClient` exchanges `spotify_client_id` and `spotify_client_secret` for an access token using client credentials (`POST /api/token` on accounts origin), then calls `GET /v1/episodes/{episode_id}` on API origin for each target episode ID in `POST /syncspotify`. When `backfill` is true, additionally calls `GET /v1/shows/{show_id}/episodes?limit=50` (following `next` for pagination) to enumerate every episode in the target's show. Origins are configurable with `IMMERSION_TRACKER_SPOTIFY_ACCOUNTS_BASE_URL` and `IMMERSION_TRACKER_SPOTIFY_API_BASE_URL`; when unset they use production defaults. Required episode data includes `id`, `name`, `duration_ms`, `release_date`, `release_date_precision`, `show.id`, and `show.name`; first show image URL is used when present. `release_date_precision` accepts any of `"day"`, `"month"`, `"year"`; less precise values are parsed to a lower-bound `LocalDate` (year → Jan 1, month → 1st of month, day → exact). Non-200 or invalid payload shape fails the request.
 
@@ -130,7 +133,7 @@ sequenceDiagram
 | `PUT`  | `/show`        | enrich an existing show with TVDB metadata                        |
 | `POST` | `/syncyoutube` | sync watched YouTube video IDs and channel metadata               |
 | `POST` | `/syncspotify` | sync watched Spotify episode IDs and show metadata                |
-| `POST` | `/syncmovies`  | sync watched local movies using provided TVDB IDs                 |
+| `POST` | `/syncmovies`  | sync watched local movies using provided TMDB IDs                 |
 
 ### Endpoint request and response contracts
 
@@ -156,7 +159,7 @@ sequenceDiagram
   - Response `200`: `{ "episodes_added": number }`
   - Behavior note: when `backfill` is true, each `episode_id` is treated as the most recent watched marker for its show; the handler additionally inserts every other episode in that show whose `release_date` is on or before the target's `release_date`, reusing the target's show metadata for those siblings.
 - `POST /syncmovies`
-  - Request body: `{ "movies": [{ "file_name": string, "tvdb_id": number }] }`
+  - Request body: `{ "movies": [{ "file_name": string, "tmdb_id": number }] }`
   - Response `200`: `{ "movies_added": number }`
 
 ### Example request and response
@@ -242,7 +245,7 @@ Item types and required attributes:
 
 - **Episode (`EPISODE#<folder_name>#<file_name>`)**: `pk`, `sk`, `user`, `folder_name`, `file_name`, `timestamp`
 - **Show (`SHOW#<folder_name>`)**: `pk`, `sk`, `user`, `folder_name`; optional `tvdb_id`, `tvdb_name`, `tvdb_image`, `tvdb_average_runtime`; includes optimistic-lock `version`
-- **Movie (`MOVIE#<file_name>`)**: `pk`, `sk`, `user`, `file_name`, `tvdb_id`, `tvdb_name`, `tvdb_image`, `movie_duration`, `timestamp`
+- **Movie (`MOVIE#<file_name>`)**: `pk`, `sk`, `user`, `file_name`, `tmdb_id`, `tmdb_name`, optional `tmdb_image`, `movie_duration`, `timestamp`
 - **YouTube video (`YOUTUBEVIDEO#<video_id>`)**: `pk`, `sk`, `user`, `youtube_video_id`, `youtube_video_title`, `youtube_channel_id`, `youtube_video_duration`, `timestamp`
 - **YouTube channel (`YOUTUBECHANNEL#<channel_id>`)**: `pk`, `sk`, `user`, `youtube_channel_id`, `youtube_channel_title`, optional `youtube_channel_artwork_url`
 - **Spotify episode (`SPOTIFYEPISODE#<episode_id>`)**: `pk`, `sk`, `user`, `spotify_episode_id`, `spotify_episode_title`, `spotify_show_id`, `spotify_episode_duration`, `timestamp`
@@ -251,7 +254,7 @@ Item types and required attributes:
 ### Data ownership expectations
 
 - User watch events and identifiers are authored by client sync payloads and persisted as canonical records in DynamoDB.
-- Provider metadata fields are owned by TVDB, YouTube, and Spotify and copied into service records at sync/update time.
+- Provider metadata fields are owned by TVDB, TMDB, YouTube, and Spotify and copied into service records at sync/update time.
 - Progress totals and trends are derived values computed from persisted records and are not separately authored.
 
 Representative records:
@@ -293,9 +296,9 @@ Movie item:
   "sk": "MOVIE#movie_name",
   "user": "alice",
   "file_name": "movie_name",
-  "tvdb_id": 67890,
-  "tvdb_name": "Example Movie",
-  "tvdb_image": "https://example.com/movie.jpg",
+  "tmdb_id": 372058,
+  "tmdb_name": "Your Name.",
+  "tmdb_image": "https://image.tmdb.org/t/p/w500/q719jXXEzOoYaps6babgKnONONX.jpg",
   "movie_duration": 7200,
   "timestamp": 1730000000
 }
@@ -305,6 +308,7 @@ Movie item:
 
 - User identity for reads and writes is derived from the HTTP Basic username in `Authorization`.
 - A sync request only inserts new items; existing `pk`/`sk` records are skipped and not overwritten.
+- New movie records contain TMDB metadata only. Progress reads may fall back to legacy TVDB movie name and image fields until the interactive migration has converted every historical record.
 - `POST /sync` creates a `SHOW` item when missing before creating `EPISODE` items.
 - `POST /syncspotify` performs one DynamoDB query (`sk begins_with "SPOTIFY"`) per request to determine which episode and show items already exist for the user, then inserts only missing items.
 - `POST /syncspotify` backfilled siblings are stamped with the request-time `clock.now()` (not the Spotify `release_date`), so a backfill burst counts toward the request day's totals.
@@ -325,17 +329,18 @@ Movie item:
 | Watched local episodes and movies | Client sync payloads accepted by `/sync` and `/syncmovies` | Persisted as canonical item records per user                         |
 | YouTube watch records             | Client-provided video IDs plus YouTube API metadata        | Video and channel metadata persisted at sync time                    |
 | Spotify watch records             | Client-provided episode IDs plus Spotify API metadata      | Episode and show metadata persisted at sync time                     |
-| TV show and movie metadata        | TVDB API lookups                                           | Persisted into `SHOW` and `MOVIE` records                            |
+| TV show metadata                  | TVDB API lookups                                           | Persisted into `SHOW` records                                        |
+| Movie metadata                    | TMDB API lookups                                           | Persisted into `MOVIE` records                                       |
 | Progress metrics                  | Derived at read time from DynamoDB user partition          | No separate aggregate cache table                                    |
 | Credential set                    | Secrets Manager secret `auth_api`                          | Owned by the shared `auth_api` authorizer service                    |
-| Provider API keys                 | Secrets Manager secret `immersion_tracker_api`             | Read by TVDB, YouTube, and Spotify clients                           |
+| Provider credentials              | Secrets Manager secret `immersion_tracker_api`             | Read by TVDB, TMDB, YouTube, and Spotify clients                     |
 
 ## Security and privacy
 
 - All non-OPTIONS API methods use custom API Gateway authorization (`CUSTOM`) routed to the shared `auth_api` authorizer Lambda.
 - Unauthorized requests return `401` and `WWW-Authenticate: Basic`.
 - Per-user partitioning (`pk = USER#<user>`) scopes records by authenticated identity.
-- Basic auth credentials live in the shared `auth_api` secret; provider keys are loaded from this service's own Secrets Manager secret, not hardcoded in source.
+- Basic auth credentials live in the shared `auth_api` secret; provider credentials are loaded from this service's own Secrets Manager secret, not hardcoded in source.
 - Transport is HTTPS through the custom API domain `api.immersion-tracker.jordansimsmith.com`.
 - CORS is restricted to `https://immersion-tracker.jordansimsmith.com`.
 - API Gateway writes structured access logs and INFO-level execution logs to CloudWatch log groups retained for 30 days; request and response data tracing is disabled.
@@ -349,6 +354,7 @@ Provider base URL overrides (optional, production defaults are preserved when un
 | Name                                          | Scope                            | Required | Purpose                                    | Default behavior                           |
 | --------------------------------------------- | -------------------------------- | -------- | ------------------------------------------ | ------------------------------------------ |
 | `IMMERSION_TRACKER_TVDB_BASE_URL`             | provider-calling Lambda handlers | no       | TVDB origin for `HttpTvdbClient`           | defaults to `https://api4.thetvdb.com`     |
+| `IMMERSION_TRACKER_TMDB_BASE_URL`             | `sync_movies_handler` Lambda     | no       | TMDB origin for `HttpTmdbClient`           | defaults to `https://api.themoviedb.org`   |
 | `IMMERSION_TRACKER_YOUTUBE_BASE_URL`          | provider-calling Lambda handlers | no       | YouTube origin for `HttpYoutubeClient`     | defaults to `https://www.googleapis.com`   |
 | `IMMERSION_TRACKER_SPOTIFY_API_BASE_URL`      | `sync_spotify_handler` Lambda    | no       | Spotify API origin for episode fetch calls | defaults to `https://api.spotify.com`      |
 | `IMMERSION_TRACKER_SPOTIFY_ACCOUNTS_BASE_URL` | `sync_spotify_handler` Lambda    | no       | Spotify accounts origin for token exchange | defaults to `https://accounts.spotify.com` |
@@ -363,11 +369,12 @@ Local script and test variables:
 
 ### Secret shape
 
-Expected JSON for the `immersion_tracker_api` secret (third-party provider keys only; Basic auth credentials live in the shared `auth_api` secret — see `auth_api/README.md`):
+Expected JSON for the `immersion_tracker_api` secret (third-party provider credentials only; Basic auth credentials live in the shared `auth_api` secret — see `auth_api/README.md`):
 
 ```json
 {
   "tvdb_api_key": "string",
+  "tmdb_api_read_access_token": "string",
   "youtube_api_key": "string",
   "spotify_client_id": "string",
   "spotify_client_secret": "string"
@@ -385,7 +392,7 @@ Expected JSON for the `immersion_tracker_api` secret (third-party provider keys 
 
 - Unit tests cover provider HTTP clients and response/validation behavior.
 - Integration tests cover each handler against DynamoDB test containers with fake provider clients.
-- E2E tests execute the sync script against a LocalStack-backed API with internal TVDB/YouTube/Spotify stub containers and verify user-facing flows.
+- E2E tests execute the sync script against a LocalStack-backed API with internal TVDB/TMDB/YouTube/Spotify stub containers and verify user-facing flows.
 - E2E tests are deterministic and do not require outbound internet or real provider credentials.
 - Required service checks:
   - `bazel build //immersion_tracker_api:all`
@@ -407,6 +414,16 @@ Expected JSON for the `immersion_tracker_api` secret (third-party provider keys 
   - request `/progress`
   - verify corresponding counts and grouped sections changed in response
 
+### Movie metadata migration
+
+`migrations/005-migrate-movies-to-tmdb.py` converts existing TVDB-backed movie records in place. The script scans all `MOVIE#` items, shows each stored title, asks for the equivalent TMDB ID, fetches the TMDB details for confirmation, and accepts a blank response to leave an item unchanged. Already migrated items are skipped, so interrupted runs can be resumed.
+
+- Add `tmdb_api_read_access_token` to the `immersion_tracker_api` AWS secret, then deploy the API before using the updated sync script or migration.
+- Set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `TMDB_API_READ_ACCESS_TOKEN`.
+- Preview without writes: `python3 immersion_tracker_api/migrations/005-migrate-movies-to-tmdb.py`.
+- Execute confirmed updates: `python3 immersion_tracker_api/migrations/005-migrate-movies-to-tmdb.py --execute`.
+- Each successful update preserves the item's keys, user, filename, timestamp, and version; replaces movie metadata and runtime with TMDB values; and removes the legacy movie `tvdb_id`, `tvdb_name`, and `tvdb_image` attributes.
+
 ## End-to-end scenarios
 
 ### Scenario 1: sync local episodes and enrich shows
@@ -425,3 +442,11 @@ Expected JSON for the `immersion_tracker_api` secret (third-party provider keys 
 3. API fetches metadata from YouTube and Spotify; for each Spotify episode it lists the show's full episode catalogue and inserts every episode released on or before the supplied marker, reusing the target's show metadata for siblings.
 4. User requests `GET /progress` and sees updated `youtube_channels` and `spotify_shows` including the backfilled sibling episodes.
 5. Script clears `watched.txt` after successful sync.
+
+### Scenario 3: sync local movies
+
+1. User places watched movie files under `movies/watched`.
+2. Script prompts for each movie's TMDB ID and sends `POST /syncmovies`.
+3. API fetches TMDB details and inserts only new `MOVIE#<file_name>` items with TMDB metadata.
+4. User requests `GET /progress` and sees updated movie counts, artwork, daily activity, and total hours.
+5. Script deletes successfully synced local movie files.

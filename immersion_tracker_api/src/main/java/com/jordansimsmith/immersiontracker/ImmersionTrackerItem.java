@@ -30,6 +30,9 @@ public class ImmersionTrackerItem {
   public static final String TVDB_NAME = "tvdb_name";
   public static final String TVDB_IMAGE = "tvdb_image";
   public static final String TVDB_AVERAGE_RUNTIME = "tvdb_average_runtime";
+  public static final String TMDB_ID = "tmdb_id";
+  public static final String TMDB_NAME = "tmdb_name";
+  public static final String TMDB_IMAGE = "tmdb_image";
   public static final String YOUTUBE_VIDEO_ID = "youtube_video_id";
   public static final String YOUTUBE_VIDEO_TITLE = "youtube_video_title";
   public static final String YOUTUBE_CHANNEL_ID = "youtube_channel_id";
@@ -55,6 +58,9 @@ public class ImmersionTrackerItem {
   private String tvdbName;
   private String tvdbImage;
   private Duration tvdbAverageRuntime;
+  private Integer tmdbId;
+  private String tmdbName;
+  private String tmdbImage;
   private String youtubeVideoId;
   private String youtubeVideoTitle;
   private String youtubeChannelId;
@@ -162,6 +168,33 @@ public class ImmersionTrackerItem {
 
   public void setTvdbAverageRuntime(Duration tvdbAverageRuntime) {
     this.tvdbAverageRuntime = tvdbAverageRuntime;
+  }
+
+  @DynamoDbAttribute(TMDB_ID)
+  public Integer getTmdbId() {
+    return tmdbId;
+  }
+
+  public void setTmdbId(Integer tmdbId) {
+    this.tmdbId = tmdbId;
+  }
+
+  @DynamoDbAttribute(TMDB_NAME)
+  public String getTmdbName() {
+    return tmdbName;
+  }
+
+  public void setTmdbName(String tmdbName) {
+    this.tmdbName = tmdbName;
+  }
+
+  @DynamoDbAttribute(TMDB_IMAGE)
+  public String getTmdbImage() {
+    return tmdbImage;
+  }
+
+  public void setTmdbImage(String tmdbImage) {
+    this.tmdbImage = tmdbImage;
   }
 
   @DynamoDbAttribute(YOUTUBE_VIDEO_ID)
@@ -321,6 +354,14 @@ public class ImmersionTrackerItem {
         + ", tvdbImage='"
         + tvdbImage
         + '\''
+        + ", tmdbId="
+        + tmdbId
+        + ", tmdbName='"
+        + tmdbName
+        + '\''
+        + ", tmdbImage='"
+        + tmdbImage
+        + '\''
         + ", youtubeVideoId='"
         + youtubeVideoId
         + '\''
@@ -374,6 +415,9 @@ public class ImmersionTrackerItem {
         && Objects.equals(tvdbId, that.tvdbId)
         && Objects.equals(tvdbName, that.tvdbName)
         && Objects.equals(tvdbImage, that.tvdbImage)
+        && Objects.equals(tmdbId, that.tmdbId)
+        && Objects.equals(tmdbName, that.tmdbName)
+        && Objects.equals(tmdbImage, that.tmdbImage)
         && Objects.equals(youtubeVideoId, that.youtubeVideoId)
         && Objects.equals(youtubeVideoTitle, that.youtubeVideoTitle)
         && Objects.equals(youtubeChannelId, that.youtubeChannelId)
@@ -401,6 +445,9 @@ public class ImmersionTrackerItem {
         tvdbId,
         tvdbName,
         tvdbImage,
+        tmdbId,
+        tmdbName,
+        tmdbImage,
         youtubeVideoId,
         youtubeVideoTitle,
         youtubeChannelId,
@@ -534,9 +581,9 @@ public class ImmersionTrackerItem {
   public static ImmersionTrackerItem createMovie(
       String user,
       String fileName,
-      int tvdbId,
-      String tvdbName,
-      String tvdbImage,
+      int tmdbId,
+      String tmdbName,
+      String tmdbImage,
       Duration duration,
       Instant timestamp) {
     var movie = new ImmersionTrackerItem();
@@ -544,9 +591,9 @@ public class ImmersionTrackerItem {
     movie.setSk(formatMovieSk(fileName));
     movie.setUser(user);
     movie.setFileName(fileName);
-    movie.setTvdbId(tvdbId);
-    movie.setTvdbName(tvdbName);
-    movie.setTvdbImage(tvdbImage);
+    movie.setTmdbId(tmdbId);
+    movie.setTmdbName(tmdbName);
+    movie.setTmdbImage(tmdbImage);
     movie.setMovieDuration(duration);
     movie.setTimestamp(timestamp);
     return movie;

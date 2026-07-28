@@ -41,6 +41,18 @@ public class ImmersionTrackerTestModule {
 
   @Provides
   @Singleton
+  FakeTmdbClient fakeTmdbClient() {
+    return new FakeTmdbClient();
+  }
+
+  @Provides
+  @Singleton
+  TmdbClient tmdbClient(FakeTmdbClient fakeTmdbClient) {
+    return fakeTmdbClient;
+  }
+
+  @Provides
+  @Singleton
   FakeYoutubeClient fakeYoutubeClient() {
     return new FakeYoutubeClient();
   }

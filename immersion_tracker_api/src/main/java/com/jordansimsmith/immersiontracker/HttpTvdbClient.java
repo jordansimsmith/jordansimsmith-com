@@ -48,32 +48,10 @@ public class HttpTvdbClient implements TvdbClient {
       @JsonProperty String image,
       @JsonProperty("averageRuntime") Integer averageRuntimeMinutes) {}
 
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  private record MovieResponse(
-      @JsonProperty("status") String status, @JsonProperty("data") MovieData data) {}
-
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  private record MovieData(
-      @JsonProperty("name") String name,
-      @JsonProperty String image,
-      @JsonProperty("runtime") Integer runtimeMinutes) {}
-
   @Override
   public Show getShow(int id) {
     try {
       return doGetShow(id);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new RuntimeException(e);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  @Override
-  public Movie getMovie(int id) {
-    try {
-      return doGetMovie(id);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
@@ -113,36 +91,6 @@ public class HttpTvdbClient implements TvdbClient {
         seriesResBody.data.name,
         seriesResBody.data.image,
         Duration.ofMinutes(seriesResBody.data.averageRuntimeMinutes));
-  }
-
-  private Movie doGetMovie(int id) throws IOException, InterruptedException {
-    var token = getToken();
-
-    var movieReq =
-        HttpRequest.newBuilder()
-            .uri(baseUri.resolve("/v4/movies/" + id))
-            .header("Accept", "application/json")
-            .header("Content-Type", "application/json")
-            .header("Authorization", "Bearer " + token)
-            .GET()
-            .build();
-    var movieRes = httpClient.send(movieReq, HttpResponse.BodyHandlers.ofString());
-
-    if (movieRes.statusCode() != 200) {
-      throw new IOException(
-          "tvdb.com movie request failed with status code " + movieRes.statusCode());
-    }
-
-    var movieResBody = objectMapper.readValue(movieRes.body(), MovieResponse.class);
-    if (!movieResBody.status.equals("success")) {
-      throw new IOException("tvdb.com movie request failed with status " + movieResBody.status);
-    }
-
-    Preconditions.checkNotNull(movieResBody.data.name);
-    Preconditions.checkNotNull(movieResBody.data.image);
-    Preconditions.checkNotNull(movieResBody.data.runtimeMinutes);
-    var duration = Duration.ofMinutes(movieResBody.data.runtimeMinutes);
-    return new Movie(id, movieResBody.data.name, movieResBody.data.image, duration);
   }
 
   private String getToken() throws IOException, InterruptedException {

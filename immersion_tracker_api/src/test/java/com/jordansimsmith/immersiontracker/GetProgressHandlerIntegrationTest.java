@@ -1035,4 +1035,40 @@ public class GetProgressHandlerIntegrationTest {
         .extracting(GetProgressHandler.Movie::name)
         .containsExactly("Another Movie", "My Movie");
   }
+
+  @Test
+  void handleRequestShouldReadLegacyTvdbMovieMetadata() throws Exception {
+    // arrange
+    var user = "alice";
+    fakeClock.setTime(Instant.ofEpochMilli(123_000));
+
+    var movie = new ImmersionTrackerItem();
+    movie.setPk(ImmersionTrackerItem.formatPk(user));
+    movie.setSk(ImmersionTrackerItem.formatMovieSk("legacy_movie"));
+    movie.setUser(user);
+    movie.setFileName("legacy_movie");
+    movie.setTvdbId(123);
+    movie.setTvdbName("Legacy Movie");
+    movie.setTvdbImage("legacy-image");
+    movie.setMovieDuration(Duration.ofMinutes(90));
+    movie.setTimestamp(fakeClock.now());
+    immersionTrackerTable.putItem(movie);
+
+    // act
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
+    var req =
+        APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
+    var res = getProgressHandler.handleRequest(req, null);
+
+    // assert
+    assertThat(res.getStatusCode()).isEqualTo(200);
+    var progress =
+        objectMapper.readValue(res.getBody(), GetProgressHandler.GetProgressResponse.class);
+    assertThat(progress.movies())
+        .containsExactly(
+            new GetProgressHandler.Movie("legacy_movie", "Legacy Movie", "legacy-image"));
+  }
 }

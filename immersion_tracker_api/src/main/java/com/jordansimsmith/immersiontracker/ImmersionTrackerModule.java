@@ -43,6 +43,17 @@ public class ImmersionTrackerModule {
 
   @Provides
   @Singleton
+  TmdbClient tmdbClient(ObjectMapper objectMapper, Secrets secrets) {
+    var tmdbBaseUrl = System.getenv("IMMERSION_TRACKER_TMDB_BASE_URL");
+    if (tmdbBaseUrl == null || tmdbBaseUrl.isBlank()) {
+      tmdbBaseUrl = "https://api.themoviedb.org";
+    }
+    var httpClient = HttpClient.newBuilder().build();
+    return new HttpTmdbClient(URI.create(tmdbBaseUrl), objectMapper, secrets, httpClient);
+  }
+
+  @Provides
+  @Singleton
   YoutubeClient youtubeClient(ObjectMapper objectMapper, Secrets secrets) {
     var youtubeBaseUrl = System.getenv("IMMERSION_TRACKER_YOUTUBE_BASE_URL");
     if (youtubeBaseUrl == null || youtubeBaseUrl.isBlank()) {

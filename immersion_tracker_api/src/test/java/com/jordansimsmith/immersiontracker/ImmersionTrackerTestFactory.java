@@ -31,6 +31,8 @@ public interface ImmersionTrackerTestFactory extends ImmersionTrackerFactory {
 
   FakeTvdbClient fakeTvdbClient();
 
+  FakeTmdbClient fakeTmdbClient();
+
   FakeYoutubeClient fakeYoutubeClient();
 
   FakeSpotifyClient fakeSpotifyClient();

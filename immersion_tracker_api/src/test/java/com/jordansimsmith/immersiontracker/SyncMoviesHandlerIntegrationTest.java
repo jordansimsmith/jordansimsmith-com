@@ -1,6 +1,7 @@
 package com.jordansimsmith.immersiontracker;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -28,7 +29,7 @@ public class SyncMoviesHandlerIntegrationTest {
   private FakeClock clock;
   private ObjectMapper objectMapper;
   private DynamoDbTable<ImmersionTrackerItem> immersionTrackerTable;
-  private FakeTvdbClient fakeTvdbClient;
+  private FakeTmdbClient fakeTmdbClient;
 
   private SyncMoviesHandler syncMoviesHandler;
 
@@ -48,7 +49,7 @@ public class SyncMoviesHandlerIntegrationTest {
     clock = factory.fakeClock();
     objectMapper = factory.objectMapper();
     immersionTrackerTable = factory.immersionTrackerTable();
-    fakeTvdbClient = factory.fakeTvdbClient();
+    fakeTmdbClient = factory.fakeTmdbClient();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
 
@@ -61,9 +62,9 @@ public class SyncMoviesHandlerIntegrationTest {
     clock.setTime(Instant.ofEpochMilli(123_000));
     var user = "alice";
 
-    fakeTvdbClient.addMovie(new TvdbClient.Movie(1, "My Movie", "image1", Duration.ofMinutes(120)));
-    fakeTvdbClient.addMovie(
-        new TvdbClient.Movie(2, "Another Movie", "image2", Duration.ofMinutes(90)));
+    fakeTmdbClient.addMovie(new TmdbClient.Movie(1, "My Movie", "image1", Duration.ofMinutes(120)));
+    fakeTmdbClient.addMovie(
+        new TmdbClient.Movie(2, "Another Movie", "image2", Duration.ofMinutes(90)));
 
     var movie1 = new SyncMoviesHandler.Movie("movie1", 1);
     var movie2 = new SyncMoviesHandler.Movie("movie2", 2);
@@ -123,7 +124,7 @@ public class SyncMoviesHandlerIntegrationTest {
     clock.setTime(Instant.ofEpochMilli(123_000));
     var user = "alice";
 
-    fakeTvdbClient.addMovie(new TvdbClient.Movie(1, "My Movie", "image1", Duration.ofMinutes(120)));
+    fakeTmdbClient.addMovie(new TmdbClient.Movie(1, "My Movie", "image1", Duration.ofMinutes(120)));
 
     var existingMovie =
         ImmersionTrackerItem.createMovie(
@@ -174,5 +175,35 @@ public class SyncMoviesHandlerIntegrationTest {
 
     assertThat(items).hasSize(1);
     assertThat(items.get(0)).isEqualTo(existingMovie);
+  }
+
+  @Test
+  void handleRequestShouldRejectMissingTmdbId() {
+    // arrange
+    var user = "alice";
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
+    var req =
+        APIGatewayV2HTTPEvent.builder()
+            .withHeaders(Map.of("Authorization", authHeader))
+            .withBody(
+                """
+                {
+                  "movies": [
+                    {
+                      "file_name": "movie1"
+                    }
+                  ]
+                }
+                """)
+            .build();
+
+    // act & assert
+    assertThatThrownBy(() -> syncMoviesHandler.handleRequest(req, null))
+        .isInstanceOf(RuntimeException.class)
+        .hasCauseInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("tmdb_id must be positive");
   }
 }

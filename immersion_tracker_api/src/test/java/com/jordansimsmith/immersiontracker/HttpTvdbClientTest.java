@@ -45,18 +45,6 @@ public class HttpTvdbClientTest {
       }
       """;
 
-  private static final String MOVIE_RESPONSE =
-      """
-      {
-        "status": "success",
-        "data": {
-          "name": "Test Movie",
-          "image": "https://example.com/movie.jpg",
-          "runtime": 123
-        }
-      }
-      """;
-
   @Mock HttpClient httpClient;
 
   private ObjectMapper objectMapper;
@@ -130,29 +118,6 @@ public class HttpTvdbClientTest {
     assertThatThrownBy(() -> client.getShow(123))
         .isInstanceOf(RuntimeException.class)
         .hasCauseInstanceOf(NullPointerException.class);
-  }
-
-  @Test
-  void getMovieShouldReturnMovie() throws IOException, InterruptedException {
-    // arrange
-    var secretJson = objectMapper.createObjectNode().put("tvdb_api_key", "test-api-key");
-    ((FakeSecrets) secrets).set(HttpTvdbClient.SECRET, objectMapper.writeValueAsString(secretJson));
-
-    var loginResponse = createMockResponse(200, LOGIN_RESPONSE);
-    var movieResponse = createMockResponse(200, MOVIE_RESPONSE);
-
-    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
-        .thenReturn(loginResponse)
-        .thenReturn(movieResponse);
-
-    // act
-    var movie = client.getMovie(456);
-
-    // assert
-    assertThat(movie.id()).isEqualTo(456);
-    assertThat(movie.name()).isEqualTo("Test Movie");
-    assertThat(movie.image()).isEqualTo("https://example.com/movie.jpg");
-    assertThat(movie.duration()).isEqualTo(Duration.ofMinutes(123));
   }
 
   @Test
