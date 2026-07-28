@@ -61,6 +61,8 @@ dynamodb_client.create_table(
         {"AttributeName": "sk", "AttributeType": "S"},
         {"AttributeName": "gsi1pk", "AttributeType": "S"},
         {"AttributeName": "gsi1sk", "AttributeType": "S"},
+        {"AttributeName": "gsi2pk", "AttributeType": "S"},
+        {"AttributeName": "gsi2sk", "AttributeType": "S"},
     ],
     KeySchema=[
         {"AttributeName": "pk", "KeyType": "HASH"},
@@ -74,7 +76,15 @@ dynamodb_client.create_table(
                 {"AttributeName": "gsi1sk", "KeyType": "RANGE"},
             ],
             "Projection": {"ProjectionType": "ALL"},
-        }
+        },
+        {
+            "IndexName": "gsi2",
+            "KeySchema": [
+                {"AttributeName": "gsi2pk", "KeyType": "HASH"},
+                {"AttributeName": "gsi2sk", "KeyType": "RANGE"},
+            ],
+            "Projection": {"ProjectionType": "KEYS_ONLY"},
+        },
     ],
     BillingMode="PAY_PER_REQUEST",
 )
@@ -82,8 +92,10 @@ dynamodb_client.get_waiter("table_exists").wait(TableName=table_name)
 
 while True:
     table_desc = dynamodb_client.describe_table(TableName=table_name)
-    gsi_status = table_desc["Table"]["GlobalSecondaryIndexes"][0]["IndexStatus"]
-    if gsi_status == "ACTIVE":
+    gsi_statuses = [
+        index["IndexStatus"] for index in table_desc["Table"]["GlobalSecondaryIndexes"]
+    ]
+    if all(status == "ACTIVE" for status in gsi_statuses):
         break
     time.sleep(1)
 

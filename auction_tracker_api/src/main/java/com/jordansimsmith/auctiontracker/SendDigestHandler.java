@@ -63,7 +63,9 @@ public class SendDigestHandler implements RequestHandler<ScheduledEvent, Void> {
                         tradeMeClient.getSearchUrl(search).toString(), yesterdayTime)
                         .stream())
             .filter(item -> item.getJudgment() != AuctionTrackerItem.Judgment.FAIL)
-            .collect(Collectors.groupingBy(AuctionTrackerItem::getUrl))
+            .collect(
+                Collectors.groupingBy(
+                    item -> item.getFingerprint() != null ? item.getFingerprint() : item.getUrl()))
             .values()
             .stream()
             .map(items -> items.get(0))

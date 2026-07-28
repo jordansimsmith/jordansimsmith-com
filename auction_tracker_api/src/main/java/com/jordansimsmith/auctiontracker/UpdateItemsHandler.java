@@ -6,7 +6,9 @@ import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.time.Clock;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbIndex;
@@ -24,6 +26,7 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
   private final ListingJudge listingJudge;
   private final DynamoDbTable<AuctionTrackerItem> auctionTrackerTable;
   private final DynamoDbIndex<AuctionTrackerItem> gsi1;
+  private final DynamoDbIndex<AuctionTrackerItem> gsi2;
 
   public UpdateItemsHandler() {
     this(AuctionTrackerFactory.create());
@@ -37,6 +40,7 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
     this.listingJudge = factory.listingJudge();
     this.auctionTrackerTable = factory.auctionTrackerTable();
     this.gsi1 = auctionTrackerTable.index("gsi1");
+    this.gsi2 = auctionTrackerTable.index("gsi2");
   }
 
   @Override
@@ -54,14 +58,18 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
 
     // memoize judgments so a listing found by multiple judged searches is judged once per run
     var judgments = new HashMap<String, Boolean>();
+    var contentFingerprints = new HashSet<String>();
     for (var search : searches) {
-      processSearch(search, judgments);
+      processSearch(search, judgments, contentFingerprints);
     }
 
     return null;
   }
 
-  private void processSearch(SearchFactory.Search search, Map<String, Boolean> judgments) {
+  private void processSearch(
+      SearchFactory.Search search,
+      Map<String, Boolean> judgments,
+      Set<String> contentFingerprints) {
     var tradeMeItems =
         tradeMeClient.searchItems(
             search.baseUrl(),
@@ -78,6 +86,13 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
         continue;
       }
 
+      var contentFingerprint =
+          AuctionTrackerItem.createFingerprint(tradeMeItem.title(), tradeMeItem.description());
+      if (contentFingerprints.contains(contentFingerprint)
+          || contentFingerprintExists(contentFingerprint)) {
+        continue;
+      }
+
       AuctionTrackerItem.Judgment judgment = null;
       if (search.judge() != null) {
         var pass =
@@ -91,8 +106,14 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
 
       var auctionTrackerItem =
           AuctionTrackerItem.create(
-              searchUrl, tradeMeItem.url(), tradeMeItem.title(), currentTime, judgment);
+              searchUrl,
+              tradeMeItem.url(),
+              tradeMeItem.title(),
+              tradeMeItem.description(),
+              currentTime,
+              judgment);
       auctionTrackerTable.putItem(auctionTrackerItem);
+      contentFingerprints.add(contentFingerprint);
     }
   }
 
@@ -105,6 +126,22 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
                         Key.builder()
                             .partitionValue(AuctionTrackerItem.formatGsi1pk(searchUrl))
                             .sortValue(AuctionTrackerItem.formatGsi1sk(itemUrl))
+                            .build()))
+                .build())
+        .stream()
+        .flatMap(page -> page.items().stream())
+        .findFirst()
+        .isPresent();
+  }
+
+  private boolean contentFingerprintExists(String contentFingerprint) {
+    return gsi2
+        .query(
+            QueryEnhancedRequest.builder()
+                .queryConditional(
+                    QueryConditional.keyEqualTo(
+                        Key.builder()
+                            .partitionValue(AuctionTrackerItem.formatGsi2pk(contentFingerprint))
                             .build()))
                 .build())
         .stream()

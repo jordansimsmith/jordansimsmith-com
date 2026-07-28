@@ -117,6 +117,14 @@ public class UpdateItemsHandlerIntegrationTest {
         .isEqualTo(
             AuctionTrackerItem.formatGsi1sk(
                 "https://www.trademe.co.nz/a/marketplace/sports/golf/listing/123"));
+    var fingerprint =
+        AuctionTrackerItem.createFingerprint("Titleist Wedge", "Great condition wedge");
+    assertThat(item1.getFingerprint()).isEqualTo(fingerprint);
+    assertThat(item1.getGsi2pk()).isEqualTo(AuctionTrackerItem.formatGsi2pk(fingerprint));
+    assertThat(item1.getGsi2sk())
+        .isEqualTo(
+            AuctionTrackerItem.formatGsi2sk(
+                "https://www.trademe.co.nz/a/marketplace/sports/golf/listing/123"));
 
     var item2 =
         items.stream()
@@ -161,6 +169,7 @@ public class UpdateItemsHandlerIntegrationTest {
             expectedSearchUrl,
             "https://www.trademe.co.nz/a/marketplace/sports/golf/listing/123",
             "Titleist Wedge",
+            "Great condition wedge",
             Instant.ofEpochSecond(2000),
             null);
     auctionTrackerTable.putItem(existingItem);
@@ -172,6 +181,86 @@ public class UpdateItemsHandlerIntegrationTest {
     var items = auctionTrackerTable.scan().items().stream().toList();
     assertThat(items).hasSize(1);
     assertThat(items.get(0).getTimestamp().getEpochSecond()).isEqualTo(2000);
+  }
+
+  @Test
+  void handleRequestShouldNotStoreOrJudgeRelistedItemWithMatchingContent() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
+    var existingSearchUrl =
+        "https://www.trademe.co.nz/search1?search_string=bulk&condition=used&sort_order=expirydesc";
+    var search =
+        new SearchFactory.Search(
+            URI.create("https://www.trademe.co.nz/search2"),
+            "collection",
+            null,
+            null,
+            SearchFactory.Condition.USED,
+            MTG_JUDGE);
+    fakeSearchFactory.addSearches(List.of(search));
+    fakeTradeMeClient.addSearchResponse(
+        URI.create("https://www.trademe.co.nz/search2"),
+        "collection",
+        null,
+        null,
+        SearchFactory.Condition.USED,
+        List.of(
+            new TradeMeClient.TradeMeItem(
+                "https://www.trademe.co.nz/listing/222", "mtg bulk lot", "500 assorted cards")));
+
+    var existingItem =
+        AuctionTrackerItem.create(
+            existingSearchUrl,
+            "https://www.trademe.co.nz/listing/111",
+            "mtg bulk lot",
+            "500 assorted cards",
+            Instant.ofEpochSecond(2000),
+            AuctionTrackerItem.Judgment.PASS);
+    auctionTrackerTable.putItem(existingItem);
+
+    // act
+    updateItemsHandler.handleRequest(new ScheduledEvent(), null);
+
+    // assert
+    var items = auctionTrackerTable.scan().items().stream().toList();
+    assertThat(items).hasSize(1);
+    assertThat(items.get(0).getUrl()).isEqualTo("https://www.trademe.co.nz/listing/111");
+    assertThat(items.get(0).getTimestamp()).isEqualTo(Instant.ofEpochSecond(2000));
+    assertThat(fakeLlmClient.findRequests()).isEmpty();
+  }
+
+  @Test
+  void handleRequestShouldStoreItemWhenDescriptionDiffersFromExistingItem() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
+    var baseUrl = "https://www.trademe.co.nz/search";
+    var expectedSearchUrl = baseUrl + "?search_string=ram&condition=used&sort_order=expirydesc";
+    var search =
+        new SearchFactory.Search(
+            URI.create(baseUrl), "ram", null, null, SearchFactory.Condition.USED, null);
+    fakeSearchFactory.addSearches(List.of(search));
+    fakeTradeMeClient.addSearchResponse(
+        URI.create(baseUrl),
+        "ram",
+        null,
+        null,
+        SearchFactory.Condition.USED,
+        List.of(new TradeMeClient.TradeMeItem("url2", "Trident Z RGB", "One stick is faulty")));
+
+    auctionTrackerTable.putItem(
+        AuctionTrackerItem.create(
+            expectedSearchUrl,
+            "url1",
+            "Trident Z RGB",
+            "Great condition",
+            Instant.ofEpochSecond(2000),
+            null));
+
+    // act
+    updateItemsHandler.handleRequest(new ScheduledEvent(), null);
+
+    // assert
+    assertThat(auctionTrackerTable.scan().items().stream().toList()).hasSize(2);
   }
 
   @Test
@@ -310,6 +399,7 @@ public class UpdateItemsHandlerIntegrationTest {
             expectedSearchUrl,
             "url1",
             "MTG bulk lot",
+            "500 assorted cards",
             Instant.ofEpochSecond(2000),
             AuctionTrackerItem.Judgment.FAIL);
     auctionTrackerTable.putItem(existingItem);
@@ -325,7 +415,7 @@ public class UpdateItemsHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldJudgeOnceWhenItemInMultipleJudgedSearches() {
+  void handleRequestShouldStoreAndJudgeOnceWhenMatchingContentIsInMultipleSearches() {
     // arrange
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var baseUrl = "https://www.trademe.co.nz/a/marketplace/gaming/trading-cards/magic/search";
@@ -342,22 +432,22 @@ public class UpdateItemsHandlerIntegrationTest {
             MTG_JUDGE);
     fakeSearchFactory.addSearches(List.of(search1, search2));
 
-    var tradeMeItem =
-        new TradeMeClient.TradeMeItem("url1", "MTG bulk collection", "500 assorted cards");
     fakeTradeMeClient.addSearchResponse(
         URI.create(baseUrl),
         "bulk",
         null,
         100.0,
         SearchFactory.Condition.USED,
-        List.of(tradeMeItem));
+        List.of(
+            new TradeMeClient.TradeMeItem("url1", "MTG bulk collection", "500 assorted cards")));
     fakeTradeMeClient.addSearchResponse(
         URI.create(baseUrl),
         "collection",
         null,
         100.0,
         SearchFactory.Condition.USED,
-        List.of(tradeMeItem));
+        List.of(
+            new TradeMeClient.TradeMeItem("url2", "MTG bulk collection", "500 assorted cards")));
     fakeLlmClient.addResponse(judgmentJson(false));
 
     // act
@@ -365,7 +455,7 @@ public class UpdateItemsHandlerIntegrationTest {
 
     // assert
     var items = auctionTrackerTable.scan().items().stream().toList();
-    assertThat(items).hasSize(2);
+    assertThat(items).hasSize(1);
     assertThat(items)
         .allSatisfy(
             item -> assertThat(item.getJudgment()).isEqualTo(AuctionTrackerItem.Judgment.FAIL));

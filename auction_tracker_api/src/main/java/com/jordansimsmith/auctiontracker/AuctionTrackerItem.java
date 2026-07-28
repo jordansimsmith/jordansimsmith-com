@@ -1,6 +1,8 @@
 package com.jordansimsmith.auctiontracker;
 
+import com.google.common.hash.Hashing;
 import com.jordansimsmith.dynamodb.EpochSecondConverter;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Locale;
@@ -46,28 +48,35 @@ public class AuctionTrackerItem {
   public static final String SEARCH_PREFIX = "SEARCH" + DELIMITER;
   public static final String TIMESTAMP_PREFIX = "TIMESTAMP" + DELIMITER;
   public static final String ITEM_PREFIX = "ITEM" + DELIMITER;
+  public static final String FINGERPRINT_PREFIX = "FINGERPRINT" + DELIMITER;
 
   public static final String PK = "pk";
   public static final String SK = "sk";
   public static final String TITLE = "title";
   public static final String TIMESTAMP = "timestamp";
   public static final String URL = "url";
+  public static final String FINGERPRINT = "fingerprint";
   public static final String JUDGMENT = "judgment";
   public static final String TTL = "ttl";
   public static final String VERSION = "version";
   public static final String GSI1PK = "gsi1pk";
   public static final String GSI1SK = "gsi1sk";
+  public static final String GSI2PK = "gsi2pk";
+  public static final String GSI2SK = "gsi2sk";
 
   private String pk;
   private String sk;
   private String title;
   private Instant timestamp;
   private String url;
+  private String fingerprint;
   private Judgment judgment;
   private Long ttl;
   private Long version;
   private String gsi1pk;
   private String gsi1sk;
+  private String gsi2pk;
+  private String gsi2sk;
 
   @DynamoDbPartitionKey
   @DynamoDbAttribute(PK)
@@ -115,6 +124,16 @@ public class AuctionTrackerItem {
 
   public void setUrl(String url) {
     this.url = url;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(FINGERPRINT)
+  public String getFingerprint() {
+    return fingerprint;
+  }
+
+  public void setFingerprint(@Nullable String fingerprint) {
+    this.fingerprint = fingerprint;
   }
 
   @Nullable
@@ -167,6 +186,28 @@ public class AuctionTrackerItem {
     this.gsi1sk = gsi1sk;
   }
 
+  @Nullable
+  @DynamoDbSecondaryPartitionKey(indexNames = "gsi2")
+  @DynamoDbAttribute(GSI2PK)
+  public String getGsi2pk() {
+    return gsi2pk;
+  }
+
+  public void setGsi2pk(@Nullable String gsi2pk) {
+    this.gsi2pk = gsi2pk;
+  }
+
+  @Nullable
+  @DynamoDbSecondarySortKey(indexNames = "gsi2")
+  @DynamoDbAttribute(GSI2SK)
+  public String getGsi2sk() {
+    return gsi2sk;
+  }
+
+  public void setGsi2sk(@Nullable String gsi2sk) {
+    this.gsi2sk = gsi2sk;
+  }
+
   @Override
   public String toString() {
     return "AuctionTrackerItem{"
@@ -185,6 +226,9 @@ public class AuctionTrackerItem {
         + ", url='"
         + url
         + '\''
+        + ", fingerprint='"
+        + fingerprint
+        + '\''
         + ", judgment='"
         + judgment
         + '\''
@@ -200,6 +244,12 @@ public class AuctionTrackerItem {
         + ", gsi1sk='"
         + gsi1sk
         + '\''
+        + ", gsi2pk='"
+        + gsi2pk
+        + '\''
+        + ", gsi2sk='"
+        + gsi2sk
+        + '\''
         + '}';
   }
 
@@ -212,16 +262,32 @@ public class AuctionTrackerItem {
         && Objects.equals(title, auctionTrackerItem.title)
         && Objects.equals(timestamp, auctionTrackerItem.timestamp)
         && Objects.equals(url, auctionTrackerItem.url)
+        && Objects.equals(fingerprint, auctionTrackerItem.fingerprint)
         && Objects.equals(judgment, auctionTrackerItem.judgment)
         && Objects.equals(ttl, auctionTrackerItem.ttl)
         && Objects.equals(version, auctionTrackerItem.version)
         && Objects.equals(gsi1pk, auctionTrackerItem.gsi1pk)
-        && Objects.equals(gsi1sk, auctionTrackerItem.gsi1sk);
+        && Objects.equals(gsi1sk, auctionTrackerItem.gsi1sk)
+        && Objects.equals(gsi2pk, auctionTrackerItem.gsi2pk)
+        && Objects.equals(gsi2sk, auctionTrackerItem.gsi2sk);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(pk, sk, title, timestamp, url, judgment, ttl, version, gsi1pk, gsi1sk);
+    return Objects.hash(
+        pk,
+        sk,
+        title,
+        timestamp,
+        url,
+        fingerprint,
+        judgment,
+        ttl,
+        version,
+        gsi1pk,
+        gsi1sk,
+        gsi2pk,
+        gsi2sk);
   }
 
   public static String formatPk(String searchUrl) {
@@ -244,10 +310,25 @@ public class AuctionTrackerItem {
     return ITEM_PREFIX + itemUrl;
   }
 
+  public static String formatGsi2pk(String fingerprint) {
+    return FINGERPRINT_PREFIX + fingerprint;
+  }
+
+  public static String formatGsi2sk(String itemUrl) {
+    return ITEM_PREFIX + itemUrl;
+  }
+
+  public static String createFingerprint(String title, String description) {
+    return Hashing.sha256()
+        .hashString(title + '\u0000' + description, StandardCharsets.UTF_8)
+        .toString();
+  }
+
   public static AuctionTrackerItem create(
       String searchUrl,
       String itemUrl,
       String title,
+      String description,
       Instant timestamp,
       @Nullable Judgment judgment) {
     var auctionTrackerItem = new AuctionTrackerItem();
@@ -256,10 +337,14 @@ public class AuctionTrackerItem {
     auctionTrackerItem.setTitle(title);
     auctionTrackerItem.setTimestamp(timestamp);
     auctionTrackerItem.setUrl(itemUrl);
+    var fingerprint = createFingerprint(title, description);
+    auctionTrackerItem.setFingerprint(fingerprint);
     auctionTrackerItem.setJudgment(judgment);
     auctionTrackerItem.setTtl(timestamp.plus(30, ChronoUnit.DAYS).getEpochSecond());
     auctionTrackerItem.setGsi1pk(formatGsi1pk(searchUrl));
     auctionTrackerItem.setGsi1sk(formatGsi1sk(itemUrl));
+    auctionTrackerItem.setGsi2pk(formatGsi2pk(fingerprint));
+    auctionTrackerItem.setGsi2sk(formatGsi2sk(itemUrl));
     return auctionTrackerItem;
   }
 }

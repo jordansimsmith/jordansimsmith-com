@@ -72,6 +72,7 @@ public class SendDigestHandlerIntegrationTest {
             expectedSearchUrl,
             "https://www.trademe.co.nz/listing/123",
             "Recent Wedge 1",
+            "Recent wedge description 1",
             yesterdayTime.plus(1, ChronoUnit.HOURS), // 23 hours ago
             null);
     var recentItem2 =
@@ -79,6 +80,7 @@ public class SendDigestHandlerIntegrationTest {
             expectedSearchUrl,
             "https://www.trademe.co.nz/listing/456",
             "Recent Wedge 2",
+            "Recent wedge description 2",
             yesterdayTime.plus(2, ChronoUnit.HOURS), // 22 hours ago
             null);
     var oldItem =
@@ -86,6 +88,7 @@ public class SendDigestHandlerIntegrationTest {
             expectedSearchUrl,
             "https://www.trademe.co.nz/listing/789",
             "Old Wedge",
+            "Old wedge description",
             twoDaysAgo,
             null);
 
@@ -111,7 +114,7 @@ public class SendDigestHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldDeduplicateListingsAcrossMultipleSearches() {
+  void handleRequestShouldDeduplicateLegacyListingsByUrlAcrossMultipleSearches() {
     // arrange
     var currentTime = Instant.ofEpochSecond(2_000_000);
     fakeClock.setTime(currentTime);
@@ -141,6 +144,7 @@ public class SendDigestHandlerIntegrationTest {
             expectedSearchUrl1,
             duplicateListingUrl,
             "Duplicate Item",
+            "Legacy duplicate description",
             yesterdayTime.plus(1, ChronoUnit.HOURS),
             null);
 
@@ -150,6 +154,7 @@ public class SendDigestHandlerIntegrationTest {
             expectedSearchUrl2,
             duplicateListingUrl,
             "Duplicate Item",
+            "Legacy duplicate description",
             yesterdayTime.plus(2, ChronoUnit.HOURS),
             null);
 
@@ -159,9 +164,16 @@ public class SendDigestHandlerIntegrationTest {
             expectedSearchUrl2,
             uniqueListingUrl,
             "Unique Item",
+            "Unique item description",
             yesterdayTime.plus(3, ChronoUnit.HOURS),
             null);
 
+    itemFromSearch1.setFingerprint(null);
+    itemFromSearch1.setGsi2pk(null);
+    itemFromSearch1.setGsi2sk(null);
+    itemFromSearch2.setFingerprint(null);
+    itemFromSearch2.setGsi2pk(null);
+    itemFromSearch2.setGsi2sk(null);
     auctionTrackerTable.putItem(itemFromSearch1);
     auctionTrackerTable.putItem(itemFromSearch2);
     auctionTrackerTable.putItem(uniqueItem);
@@ -181,6 +193,60 @@ public class SendDigestHandlerIntegrationTest {
         .contains("https://www.trademe.co.nz/listing/123")
         .contains("Unique Item")
         .contains("https://www.trademe.co.nz/listing/456");
+  }
+
+  @Test
+  void handleRequestShouldDeduplicateRelistedItemsByFingerprint() {
+    // arrange
+    var currentTime = Instant.ofEpochSecond(2_000_000);
+    fakeClock.setTime(currentTime);
+    var yesterdayTime = currentTime.minus(1, ChronoUnit.DAYS);
+
+    var baseUrl1 = "https://www.trademe.co.nz/category1/search";
+    var baseUrl2 = "https://www.trademe.co.nz/category2/search";
+    var expectedSearchUrl1 =
+        "https://www.trademe.co.nz/category1/search?search_string=item&sort_order=expirydesc";
+    var expectedSearchUrl2 =
+        "https://www.trademe.co.nz/category2/search?search_string=item&sort_order=expirydesc";
+    fakeSearchFactory.addSearches(
+        List.of(
+            new SearchFactory.Search(
+                URI.create(baseUrl1), "item", null, null, SearchFactory.Condition.ALL, null),
+            new SearchFactory.Search(
+                URI.create(baseUrl2), "item", null, null, SearchFactory.Condition.ALL, null)));
+
+    var itemFromSearch1 =
+        AuctionTrackerItem.create(
+            expectedSearchUrl1,
+            "https://www.trademe.co.nz/listing/123",
+            "Relisted Item",
+            "Same listing description",
+            yesterdayTime.plus(1, ChronoUnit.HOURS),
+            null);
+    var itemFromSearch2 =
+        AuctionTrackerItem.create(
+            expectedSearchUrl2,
+            "https://www.trademe.co.nz/listing/456",
+            "Relisted Item",
+            "Same listing description",
+            yesterdayTime.plus(2, ChronoUnit.HOURS),
+            null);
+    auctionTrackerTable.putItem(itemFromSearch1);
+    auctionTrackerTable.putItem(itemFromSearch2);
+
+    // act
+    sendDigestHandler.handleRequest(new ScheduledEvent(), null);
+
+    // assert
+    var notifications = fakeNotificationPublisher.findNotifications("auction_tracker_api_digest");
+    assertThat(notifications).hasSize(1);
+    assertThat(notifications.get(0).subject())
+        .isEqualTo("Auction Tracker Daily Digest - 1 new items");
+    var message = notifications.get(0).message();
+    assertThat(
+            message.contains("https://www.trademe.co.nz/listing/123")
+                ^ message.contains("https://www.trademe.co.nz/listing/456"))
+        .isTrue();
   }
 
   @Test
@@ -204,6 +270,7 @@ public class SendDigestHandlerIntegrationTest {
             expectedSearchUrl,
             "https://www.trademe.co.nz/listing/789",
             "Old Wedge",
+            "Old wedge description",
             twoDaysAgo,
             null);
     auctionTrackerTable.putItem(oldItem);
@@ -239,6 +306,7 @@ public class SendDigestHandlerIntegrationTest {
             expectedSearchUrl,
             "https://www.trademe.co.nz/listing/123",
             "MTG bulk lot",
+            "500 assorted cards",
             yesterdayTime.plus(1, ChronoUnit.HOURS),
             AuctionTrackerItem.Judgment.PASS);
     var failItem =
@@ -246,6 +314,7 @@ public class SendDigestHandlerIntegrationTest {
             expectedSearchUrl,
             "https://www.trademe.co.nz/listing/456",
             "Pokemon bulk lot",
+            "500 pokemon cards",
             yesterdayTime.plus(2, ChronoUnit.HOURS),
             AuctionTrackerItem.Judgment.FAIL);
 
