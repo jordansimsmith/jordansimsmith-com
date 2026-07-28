@@ -414,15 +414,26 @@ Expected JSON for the `immersion_tracker_api` secret (third-party provider crede
   - request `/progress`
   - verify corresponding counts and grouped sections changed in response
 
-### Movie metadata migration
+### Movie migrations
+
+Both movie migrations require `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `TMDB_API_READ_ACCESS_TOKEN`.
+
+#### Migrate metadata from TVDB
 
 `migrations/005-migrate-movies-to-tmdb.py` converts existing TVDB-backed movie records in place. The script scans all `MOVIE#` items, shows each stored title, asks for the equivalent TMDB ID, fetches the TMDB details for confirmation, and accepts a blank response to leave an item unchanged. Already migrated items are skipped, so interrupted runs can be resumed.
 
 - Add `tmdb_api_read_access_token` to the `immersion_tracker_api` AWS secret, then deploy the API before using the updated sync script or migration.
-- Set `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and `TMDB_API_READ_ACCESS_TOKEN`.
 - Preview without writes: `python3 immersion_tracker_api/migrations/005-migrate-movies-to-tmdb.py`.
 - Execute confirmed updates: `python3 immersion_tracker_api/migrations/005-migrate-movies-to-tmdb.py --execute`.
 - Each successful update preserves the item's keys, user, filename, timestamp, and version; replaces movie metadata and runtime with TMDB values; and removes the legacy movie `tvdb_id`, `tvdb_name`, and `tvdb_image` attributes.
+
+#### Add movies without local files
+
+`migrations/006-add-movies.py` adds manually watched movies directly from TMDB IDs. It accepts multiple `--tmdb-id` arguments, requires the target `--user`, and defaults `--watched-on` to the current date in `Pacific/Auckland`. Supplying `--watched-on YYYY-MM-DD` backdates all movies in that invocation to local noon on the selected date.
+
+- Preview without writes: `python3 immersion_tracker_api/migrations/006-add-movies.py --user <user> --tmdb-id 1463232 --tmdb-id 1356890`.
+- Execute: add `--execute` to the preview command.
+- Manual items use the deterministic filename `manual_tmdb_<tmdb_id>` and are skipped when that user already has any movie with the same `tmdb_id`.
 
 ## End-to-end scenarios
 
