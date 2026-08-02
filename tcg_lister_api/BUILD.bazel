@@ -1,0 +1,44 @@
+load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
+
+py_library(
+    name = "lib",
+    srcs = [
+        "scripts/list/analyze.py",
+        "scripts/list/fetch_set_mapping.py",
+        "scripts/list/fetchtcg_client.py",
+    ],
+    imports = ["scripts/list"],
+    deps = ["@pypi//requests"],
+)
+
+py_binary(
+    name = "fetchtcg-bulk-analyze",
+    srcs = ["scripts/list/main.py"],
+    main = "scripts/list/main.py",
+    deps = [":lib"],
+)
+
+py_binary(
+    name = "generate-fetch-set-mapping",
+    srcs = ["scripts/list/generate_fetch_set_mapping.py"],
+    main = "scripts/list/generate_fetch_set_mapping.py",
+)
+
+py_test(
+    name = "unit-tests",
+    size = "small",
+    srcs = [
+        "scripts/list/generate_fetch_set_mapping.py",
+        "scripts/list/test_analyze.py",
+        "scripts/list/test_fetchtcg_client.py",
+        "scripts/list/test_generate_fetch_set_mapping.py",
+        "scripts/list/test_runner.py",
+    ],
+    imports = ["scripts/list"],
+    main = "scripts/list/test_runner.py",
+    deps = [
+        ":lib",
+        "@pypi//pytest",
+        "@pypi//requests",
+    ],
+)
