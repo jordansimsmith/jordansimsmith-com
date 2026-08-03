@@ -28,6 +28,8 @@ public interface AuctionTrackerTestFactory extends AuctionTrackerFactory {
 
   FakeNotificationPublisher fakeNotificationPublisher();
 
+  FakeExcludedSellerUsernameFactory fakeExcludedSellerUsernameFactory();
+
   FakeSearchFactory fakeSearchFactory();
 
   FakeTradeMeClient fakeTradeMeClient();

@@ -26,6 +26,12 @@ public class AuctionTrackerModule {
 
   @Provides
   @Singleton
+  ExcludedSellerUsernameFactory excludedSellerUsernameFactory() {
+    return new ExcludedSellerUsernameFactoryImpl();
+  }
+
+  @Provides
+  @Singleton
   SearchFactory searchFactory() {
     var baseUrl = System.getenv("AUCTION_TRACKER_TRADEME_BASE_URL");
     if (baseUrl == null || baseUrl.isBlank()) {

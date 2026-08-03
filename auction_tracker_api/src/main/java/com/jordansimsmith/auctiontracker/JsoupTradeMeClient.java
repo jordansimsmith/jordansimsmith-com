@@ -158,6 +158,12 @@ public class JsoupTradeMeClient implements TradeMeClient {
             .path("entities")
             .path(listingId)
             .path("item");
+    var sellerUsernameNode = listing.path("member").path("nickname");
+    if (!sellerUsernameNode.isTextual() || sellerUsernameNode.textValue().isBlank()) {
+      throw new RuntimeException("Could not find valid seller username on page: " + url);
+    }
+    var sellerUsername = sellerUsernameNode.textValue().trim();
+
     var startPriceNode = listing.get("startPrice");
     var buyNowPriceNode = listing.get("buyNowPrice");
     if (startPriceNode == null
@@ -169,7 +175,8 @@ public class JsoupTradeMeClient implements TradeMeClient {
     var startPrice = startPriceNode.decimalValue();
     var buyNowPrice =
         buyNowPriceNode == null || buyNowPriceNode.isNull() ? null : buyNowPriceNode.decimalValue();
-    return new TradeMeItem(stripQueryParams(url), title, description, startPrice, buyNowPrice);
+    return new TradeMeItem(
+        stripQueryParams(url), title, description, sellerUsername, startPrice, buyNowPrice);
   }
 
   private String buildSearchUrl(

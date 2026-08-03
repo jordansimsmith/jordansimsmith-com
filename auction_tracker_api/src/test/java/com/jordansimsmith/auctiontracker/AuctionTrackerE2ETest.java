@@ -145,7 +145,8 @@ public class AuctionTrackerE2ETest {
             .anyMatch(
                 messageBody ->
                     messageBody.contains("Auction Tracker Daily Digest")
-                        && messageBody.contains("Titleist iron set"));
+                        && messageBody.contains("Titleist iron set")
+                        && !messageBody.contains("Callaway iron set"));
     assertThat(hasExpectedMessage).isTrue();
   }
 }

@@ -10,6 +10,7 @@ public interface TradeMeClient {
       String url,
       String title,
       String description,
+      String sellerUsername,
       BigDecimal startPrice,
       @Nullable BigDecimal buyNowPrice) {}
 

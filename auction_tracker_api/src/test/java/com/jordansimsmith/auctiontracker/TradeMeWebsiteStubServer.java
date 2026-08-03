@@ -30,7 +30,7 @@ public final class TradeMeWebsiteStubServer {
             <p>Steel shafts and standard grips.</p>
           </div>
           <script id="frend-state" type="application/json">
-            {"NGRX_STATE":{"listing":{"cachedDetails":{"entities":{"5337003621":{"item":{"startPrice":1,"buyNowPrice":150,"maxBidAmount":20}}}}}}}
+            {"NGRX_STATE":{"listing":{"cachedDetails":{"entities":{"5337003621":{"item":{"startPrice":1,"buyNowPrice":150,"maxBidAmount":20,"member":{"nickname":"allowed-seller"}}}}}}}}
           </script>
         </body>
       </html>
@@ -46,7 +46,7 @@ public final class TradeMeWebsiteStubServer {
             <p>Clean club faces and playable grooves.</p>
           </div>
           <script id="frend-state" type="application/json">
-            {"NGRX_STATE":{"listing":{"cachedDetails":{"entities":{"5337003622":{"item":{"startPrice":0,"buyNowPrice":200}}}}}}}
+            {"NGRX_STATE":{"listing":{"cachedDetails":{"entities":{"5337003622":{"item":{"startPrice":0,"buyNowPrice":200,"member":{"nickname":"roseshade"}}}}}}}}
           </script>
         </body>
       </html>

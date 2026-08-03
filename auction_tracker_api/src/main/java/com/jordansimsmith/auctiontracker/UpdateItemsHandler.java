@@ -7,6 +7,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.time.Clock;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.slf4j.Logger;
@@ -21,6 +22,7 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
   private static final Logger LOGGER = LoggerFactory.getLogger(UpdateItemsHandler.class);
 
   private final Clock clock;
+  private final ExcludedSellerUsernameFactory excludedSellerUsernameFactory;
   private final SearchFactory searchFactory;
   private final TradeMeClient tradeMeClient;
   private final ListingFingerprinter listingFingerprinter;
@@ -36,6 +38,7 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
   @VisibleForTesting
   UpdateItemsHandler(AuctionTrackerFactory factory) {
     this.clock = factory.clock();
+    this.excludedSellerUsernameFactory = factory.excludedSellerUsernameFactory();
     this.searchFactory = factory.searchFactory();
     this.tradeMeClient = factory.tradeMeClient();
     this.listingFingerprinter = factory.listingFingerprinter();
@@ -57,12 +60,13 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
 
   private Void doHandleRequest() {
     var searches = searchFactory.findSearches();
+    var excludedSellerUsernames = excludedSellerUsernameFactory.findExcludedSellerUsernames();
 
     // memoize judgments so a listing found by multiple judged searches is judged once per run
     var judgments = new HashMap<String, Boolean>();
     var contentFingerprints = new HashSet<String>();
     for (var search : searches) {
-      processSearch(search, judgments, contentFingerprints);
+      processSearch(search, excludedSellerUsernames, judgments, contentFingerprints);
     }
 
     return null;
@@ -70,6 +74,7 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
 
   private void processSearch(
       SearchFactory.Search search,
+      Set<String> excludedSellerUsernames,
       Map<String, Boolean> judgments,
       Set<String> contentFingerprints) {
     var tradeMeItems =
@@ -84,6 +89,15 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
     var currentTime = clock.now();
 
     for (var tradeMeItem : tradeMeItems) {
+      if (excludedSellerUsernames.contains(
+          tradeMeItem.sellerUsername().trim().toLowerCase(Locale.ROOT))) {
+        LOGGER.info(
+            "Skipping listing from excluded seller {}: {}",
+            tradeMeItem.sellerUsername(),
+            tradeMeItem.url());
+        continue;
+      }
+
       if (itemExists(searchUrl, tradeMeItem.url())) {
         continue;
       }

@@ -23,6 +23,19 @@ public class AuctionTrackerTestModule {
 
   @Provides
   @Singleton
+  FakeExcludedSellerUsernameFactory fakeExcludedSellerUsernameFactory() {
+    return new FakeExcludedSellerUsernameFactory();
+  }
+
+  @Provides
+  @Singleton
+  ExcludedSellerUsernameFactory excludedSellerUsernameFactory(
+      FakeExcludedSellerUsernameFactory fakeExcludedSellerUsernameFactory) {
+    return fakeExcludedSellerUsernameFactory;
+  }
+
+  @Provides
+  @Singleton
   FakeSearchFactory fakeSearchFactory() {
     return new FakeSearchFactory();
   }

@@ -16,6 +16,7 @@ public class Sha256ListingFingerprinterTest {
             "url",
             "Trident Z RGB",
             "Great condition",
+            "seller",
             new BigDecimal("100"),
             new BigDecimal("150"));
 
@@ -35,6 +36,7 @@ public class Sha256ListingFingerprinterTest {
             "url",
             "Trident Z RGB",
             "Great condition",
+            "seller",
             new BigDecimal("100"),
             new BigDecimal("150"));
     var item2 =
@@ -42,6 +44,7 @@ public class Sha256ListingFingerprinterTest {
             "url",
             "trident z rgb",
             "Great condition",
+            "seller",
             new BigDecimal("100"),
             new BigDecimal("150"));
 
@@ -61,6 +64,7 @@ public class Sha256ListingFingerprinterTest {
             "url",
             "Trident Z RGB",
             "Great condition",
+            "seller",
             new BigDecimal("100"),
             new BigDecimal("150"));
     var item2 =
@@ -68,6 +72,7 @@ public class Sha256ListingFingerprinterTest {
             "url",
             "Trident Z RGB",
             "One stick is faulty",
+            "seller",
             new BigDecimal("100"),
             new BigDecimal("150"));
 
@@ -87,11 +92,17 @@ public class Sha256ListingFingerprinterTest {
             "url",
             "Trident Z RGB",
             "Great condition",
+            "seller",
             new BigDecimal("100"),
             new BigDecimal("150"));
     var item2 =
         new TradeMeClient.TradeMeItem(
-            "url", "Trident Z RGB", "Great condition", new BigDecimal("90"), new BigDecimal("150"));
+            "url",
+            "Trident Z RGB",
+            "Great condition",
+            "seller",
+            new BigDecimal("90"),
+            new BigDecimal("150"));
 
     // act
     var fingerprint1 = fingerprinter.create(item1);
@@ -109,6 +120,7 @@ public class Sha256ListingFingerprinterTest {
             "url",
             "Trident Z RGB",
             "Great condition",
+            "seller",
             new BigDecimal("100"),
             new BigDecimal("150"));
     var item2 =
@@ -116,6 +128,7 @@ public class Sha256ListingFingerprinterTest {
             "url",
             "Trident Z RGB",
             "Great condition",
+            "seller",
             new BigDecimal("100"),
             new BigDecimal("140"));
 
@@ -135,6 +148,7 @@ public class Sha256ListingFingerprinterTest {
             "url",
             "Trident Z RGB",
             "Great condition",
+            "seller",
             new BigDecimal("100.0"),
             new BigDecimal("150.00"));
     var item2 =
@@ -142,6 +156,7 @@ public class Sha256ListingFingerprinterTest {
             "url",
             "Trident Z RGB",
             "Great condition",
+            "seller",
             new BigDecimal("100"),
             new BigDecimal("150"));
 

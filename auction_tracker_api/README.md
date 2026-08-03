@@ -16,6 +16,7 @@ The auction tracker API service runs scheduled backend workflows that scrape Tra
 - As a digest subscriber, I want one daily deduplicated summary, so that I can review new listings quickly.
 - As a digest subscriber, I want relists with unchanged content and seller-set prices suppressed across searches for 30 days, so that listings I have already reviewed do not reappear under a new listing ID.
 - As a digest subscriber, I want a relist with a changed seller-set price to be notified again, so that I see when a seller lowers the price.
+- As a digest subscriber, I want listings from known seller usernames excluded, so that my own listings do not appear in the digest.
 - As a maintainer, I want duplicate detection by listing URL, exact listing content, and seller-set price terms, so that persisted records, judge calls, and digests stay clean.
 - As an MTG bulk-lot hunter, I want junk listings (wrong game, single cards, basic lands, store repacks) filtered by an LLM judge, so that the digest only surfaces lots worth a look.
 - As a RAM kit hunter, I want mismatched listings (wrong family, DDR generation, configuration, speed, timings, or form factor) filtered by an LLM judge, so that the digest only surfaces kits matching my existing G.Skill Trident Z 2x16GB DDR4-3200 CL16 kit.
@@ -27,6 +28,7 @@ The auction tracker API service runs scheduled backend workflows that scrape Tra
 - Run `UpdateItemsHandler` every 15 minutes to scrape predefined Trade Me searches.
 - Build search URLs with term, optional price filters, condition filter, and `sort_order=expirydesc`.
 - Fetch listing pages, normalize listing URLs, extract original start and Buy Now prices from the embedded Trade Me page state, exclude current bids from relist identity, and skip listings marked as reserve not met.
+- Extract seller usernames from embedded Trade Me page state and skip listings from the injected code-defined exclusion set, initially `roseshade`, before duplicate checks, judging, or persistence.
 - Judge new listings on searches with a configured judge (all six searches: the three MTG searches `bulk`, `collection`, `assorted` and the three RAM searches `g.skill`, `gskill`, `trident z`) using an OpenAI LLM against the judge's six binary criteria, and persist the overall verdict.
 - Carry judge configuration (prompt resource, model, reasoning effort, criteria) per search: the MTG searches share one judge config, the RAM searches share another.
 - Store newly discovered items in DynamoDB with deterministic key prefixes and 30-day TTL.
@@ -39,6 +41,7 @@ The auction tracker API service runs scheduled backend workflows that scrape Tra
 
 - Exposing public HTTP endpoints or interactive UI contracts.
 - User-configurable search management at runtime (searches are code-defined in `SearchFactoryImpl`).
+- Runtime management of excluded seller usernames (the production set is code-defined in `ExcludedSellerUsernameFactoryImpl`).
 - Scraping paginated result pages beyond the first page of each search result.
 - Persisting listing descriptions or seller-set prices independently in DynamoDB (they are extracted during scraping and used for judging or fingerprinting, but only the fingerprint is stored).
 - Fuzzy relist detection when a seller changes the title or description.
@@ -52,6 +55,7 @@ The auction tracker API service runs scheduled backend workflows that scrape Tra
 flowchart TD
   updateSchedule[EventBridge rate 15 minutes] --> updateHandler[UpdateItemsHandler Lambda]
   updateHandler --> searchFactory[SearchFactoryImpl]
+  updateHandler --> excludedSellers[ExcludedSellerUsernameFactoryImpl]
   updateHandler --> tradeMe[Trade Me website]
   updateHandler --> listingJudge[LlmListingJudge]
   listingJudge --> openAi[OpenAI chat completions API]
@@ -76,6 +80,7 @@ sequenceDiagram
 
   EventBridge->>UpdateHandler: invoke every 15 minutes
   UpdateHandler->>TradeMe: fetch search page and listing pages
+  UpdateHandler->>UpdateHandler: skip configured seller usernames
   UpdateHandler->>DynamoDB: query gsi1 for URL duplicate check
   UpdateHandler->>UpdateHandler: hash title, description, start price, and Buy Now price
   UpdateHandler->>DynamoDB: query gsi2 for global relist fingerprint
@@ -101,11 +106,13 @@ sequenceDiagram
 - Use DynamoDB `pk`/`sk` prefixes with `gsi1` and `gsi2` so URL duplicate and relist checks are direct key lookups, not scans.
 - Keep table and topic names code-defined (`auction_tracker`, `auction_tracker_api_digest`) to reduce configuration complexity.
 - Keep search definitions in code (`SearchFactoryImpl`) for deterministic behavior and easy testability.
+- Inject excluded seller usernames through `ExcludedSellerUsernameFactory`; keep the production set in `ExcludedSellerUsernameFactoryImpl` and use a fake in integration tests.
 - Treat digest timing as a daily NZ-local intent (6pm NZST) while current infrastructure executes at `06:00 UTC` (`cron(0 6 * * ? *)`).
 - Use browser-like headers and cookies in scrape requests to improve compatibility with Trade Me page delivery.
 - Judge listings at scrape time (the only moment descriptions exist in memory) and persist the verdict, so matching fingerprinted relists are skipped before judging and the digest filters purely from storage.
 - Define relist identity through the injected `ListingFingerprinter`; `Sha256ListingFingerprinter` hashes the exact scraped title, description, normalized original start price, and normalized Buy Now price separated by null characters. Current bids are excluded because they are bidder-driven rather than seller-set; any content or seller-price change produces a new fingerprint.
 - Read seller-set prices from the server-rendered `#frend-state` JSON at `NGRX_STATE.listing.cachedDetails.entities.<listing_id>.item`, where `startPrice` remains distinct from `maxBidAmount` after bidding begins. Missing or malformed required page data fails the invocation rather than storing an unsafe fingerprint.
+- Read the required seller username from the same embedded listing item at `member.nickname`. A missing or blank username fails the invocation so upstream contract drift is detected instead of bypassing exclusions.
 - Existing title-and-description fingerprints are not backfilled. They do not match price-aware fingerprints, so the first relist after deployment can produce one notification even when its price is unchanged; subsequent relists use price-aware suppression.
 - Carry judge configuration as a nullable nested `Judge` record (`prompt`, `model`, `reasoningEffort`, `criteria`) on each `SearchFactory.Search`, with one shared constant per judge in `SearchFactoryImpl`; criteria ride with the config because verdict validation is per-judge.
 - MTG judge: `gpt-5.4-mini` with reasoning effort `none` via the shared `lib/llm` client; selected by the eval harness in `evals/mtg_bulk/` (perfect test-split TPR/TNR at the lowest cost and latency).
@@ -120,7 +127,8 @@ sequenceDiagram
 
 - **Search definition**: one configured Trade Me query with base URL, search term, optional price bounds, condition, and optional judge configuration.
 - **Judge configuration**: a prompt resource name, OpenAI model, reasoning effort, and ordered criteria list shared by the searches that use it (one config for MTG, one for RAM).
-- **Discovered item**: one listing found and parsed from Trade Me with normalized URL, title, transient description, and transient seller-set price terms.
+- **Discovered item**: one listing found and parsed from Trade Me with normalized URL, title, transient description, transient seller username, and transient seller-set price terms.
+- **Excluded seller username**: a normalized Trade Me member nickname in the injected global exclusion set; matching listings are discarded before any storage lookup, LLM call, or persistence.
 - **URL duplicate**: an item where the same search URL and listing URL already exists in `gsi1`.
 - **Content fingerprint**: a deterministic SHA-256 identity derived from the exact scraped listing title, description, normalized original start price, and normalized Buy Now price, persisted as `fingerprint`, and used to derive `gsi2pk`.
 - **Seller-set price terms**: the original auction start price and optional Buy Now price embedded in Trade Me's server-rendered page state; current bids are excluded.
@@ -134,7 +142,7 @@ sequenceDiagram
 
 ### External systems
 
-- **Trade Me website**: outbound `GET` requests to search and listing pages derived from configured searches. The base origin defaults to `https://www.trademe.co.nz` and can be overridden with `AUCTION_TRACKER_TRADEME_BASE_URL` (used in E2E tests). Requests include browser-like headers/cookies and a 30-second timeout. Individual item-page fetch failures are logged and skipped; missing or malformed required title, description, or seller-price data and unrecoverable search errors fail the invocation.
+- **Trade Me website**: outbound `GET` requests to search and listing pages derived from configured searches. The base origin defaults to `https://www.trademe.co.nz` and can be overridden with `AUCTION_TRACKER_TRADEME_BASE_URL` (used in E2E tests). Requests include browser-like headers/cookies and a 30-second timeout. Individual item-page fetch failures are logged and skipped; missing or malformed required title, description, seller username, or seller-price data and unrecoverable search errors fail the invocation. Seller usernames are read from `item.member.nickname`.
 - **Amazon DynamoDB**: outbound reads/writes against table `auction_tracker`. Update flow performs per-search URL checks, global content-fingerprint checks, and inserts; digest flow queries per-search partitions for recent items.
 - **Amazon SNS**: outbound publish to topic `auction_tracker_api_digest` when at least one new item exists in the digest window. Topic ARN is resolved by listing topics and matching by topic-name suffix.
 - **Amazon EventBridge**: scheduled invocation source for both handlers (`rate(15 minutes)` and `cron(0 6 * * ? *)`).
@@ -236,6 +244,9 @@ Representative record:
 ## Behavioral invariants and time semantics
 
 - Every update invocation iterates all configured searches and attempts to process each one.
+- Every update invocation loads the global excluded seller username set once from `ExcludedSellerUsernameFactory`.
+- Seller usernames are trimmed and compared case-insensitively with the normalized exclusion set. A match is skipped before `gsi1`, fingerprint, `gsi2`, judge, or persistence work and can never reach the digest.
+- A missing or blank seller username fails the invocation before the listing can enter duplicate, relist, judging, or persistence behavior.
 - A previously indexed exact `(search_url, item_url)` match in `gsi1` is skipped before fingerprinting or judging.
 - New records receive a standalone deterministic `fingerprint` attribute from the exact scraped title, description, normalized original start price, and normalized Buy Now price separated by null characters; `gsi2pk` is derived from it.
 - A new listing is skipped before judging when its fingerprint exists anywhere in `gsi2`, regardless of the search or prior judgment.
@@ -252,22 +263,23 @@ Representative record:
 - Digest output deduplicates fingerprinted records by the standalone `fingerprint` attribute across all configured searches and falls back to listing URL for legacy records.
 - Listing URLs are canonicalized by stripping query parameters before persistence and digesting.
 - Listings marked `Reserve not met` are filtered out and never persisted.
-- An individual item-page network fetch failure is logged and skipped. Missing or malformed title, description, embedded page state, original start price, or Buy Now price fails the invocation.
+- An individual item-page network fetch failure is logged and skipped. Missing or malformed title, description, seller username, embedded page state, original start price, or Buy Now price fails the invocation.
 - Search-result pagination beyond the first page is not processed; the handler logs a warning when pagination is detected.
 - `sk` includes zero-padded epoch seconds, preserving deterministic lexicographic time ordering.
 - TTL is always computed as `timestamp + 30 days`.
 
 ## Source of truth
 
-| Entity                     | Authoritative source                                                                      | Notes                                                                                       |
-| -------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| Search definitions         | `SearchFactoryImpl` in service code                                                       | current definitions are static and code-controlled                                          |
-| Listing content snapshot   | Trade Me listing pages at scrape time                                                     | title/url/fingerprint are persisted; description and seller-set prices are transient        |
-| Judge prompts              | `src/main/resources/prompts/mtg-bulk-judge.md`, `src/main/resources/prompts/ram-judge.md` | frozen system prompts validated by the eval harnesses in `evals/mtg_bulk/` and `evals/ram/` |
-| Judge model and effort     | `Judge` constants in `SearchFactoryImpl`                                                  | MTG `gpt-5.4-mini`/`none`, RAM `gpt-5.4-nano`/`low`                                         |
-| Persisted discovered items | DynamoDB `auction_tracker` table                                                          | canonical history used for duplicate checks, verdicts, and digests                          |
-| Digest recipients          | SNS topic subscriptions in Terraform                                                      | email endpoints are infra-managed                                                           |
-| Schedule cadence           | EventBridge rules in Terraform                                                            | update `rate(15 minutes)`, digest `cron(0 6 * * ? *)`                                       |
+| Entity                     | Authoritative source                                                                      | Notes                                                                                                  |
+| -------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Search definitions         | `SearchFactoryImpl` in service code                                                       | current definitions are static and code-controlled                                                     |
+| Excluded seller usernames  | `ExcludedSellerUsernameFactoryImpl` in service code                                       | global normalized set, initially `roseshade`; injected behind `ExcludedSellerUsernameFactory`          |
+| Listing content snapshot   | Trade Me listing pages at scrape time                                                     | title/url/fingerprint are persisted; description, seller username, and seller-set prices are transient |
+| Judge prompts              | `src/main/resources/prompts/mtg-bulk-judge.md`, `src/main/resources/prompts/ram-judge.md` | frozen system prompts validated by the eval harnesses in `evals/mtg_bulk/` and `evals/ram/`            |
+| Judge model and effort     | `Judge` constants in `SearchFactoryImpl`                                                  | MTG `gpt-5.4-mini`/`none`, RAM `gpt-5.4-nano`/`low`                                                    |
+| Persisted discovered items | DynamoDB `auction_tracker` table                                                          | canonical history used for duplicate checks, verdicts, and digests                                     |
+| Digest recipients          | SNS topic subscriptions in Terraform                                                      | email endpoints are infra-managed                                                                      |
+| Schedule cadence           | EventBridge rules in Terraform                                                            | update `rate(15 minutes)`, digest `cron(0 6 * * ? *)`                                                  |
 
 ## Security and privacy
 
@@ -276,8 +288,8 @@ Representative record:
 - The OpenAI API key lives only in Secrets Manager; it is never logged or persisted in DynamoDB.
 - AWS credentials and region resolve through the AWS SDK default provider chain in Lambda/runtime environments.
 - Integrations use HTTPS transport (Trade Me, OpenAI, and AWS APIs).
-- Listing titles and descriptions (public Trade Me content) are sent to the OpenAI API for judging; seller-set prices are not sent and no user data is involved.
-- Listing content-and-price fingerprints are persisted in DynamoDB; raw descriptions and seller-set prices are not persisted independently.
+- Listing titles and descriptions (public Trade Me content) are sent to the OpenAI API for judging; seller usernames and seller-set prices are not sent.
+- Listing content-and-price fingerprints are persisted in DynamoDB; raw descriptions, seller usernames, and seller-set prices are not persisted independently.
 - Logging uses standard INFO/WARN/ERROR levels; avoid introducing logs that include sensitive operational data such as subscription endpoints.
 - Scraping uses browser-like request headers/cookies; these are implementation details and should be reviewed when upstream page behavior changes.
 
@@ -307,16 +319,18 @@ Secrets Manager secret `auction_tracker_api` (value set manually after Terraform
 - Lambda timeout is `300` seconds for `UpdateItemsHandler` (sized for sequential judging at roughly 2 seconds per new judged listing, including first-run backfill) and `30` seconds for `SendDigestHandler`.
 - Jsoup HTTP requests use a `30` second timeout per request.
 - Each new URL performs one per-search `gsi1` query and, when not found, one global `gsi2` query before any optional LLM call.
+- Excluded sellers are rejected before DynamoDB reads or LLM calls.
 - Judging costs roughly $0.011 per judged MTG listing and $0.0014 per judged RAM listing at current model pricing; steady-state runs judge only newly discovered listings.
 - Per-item network fetch failures are non-fatal for a run (warn and continue), while required-field parsing failures, handler-level failures, and judge errors bubble as invocation errors.
 
 ## Testing and quality gates
 
-- Unit tests (`JsoupTradeMeClientTest`, `Sha256ListingFingerprinterTest`) cover URL generation, listing parsing, query-parameter stripping, reserve filtering, seller-price extraction, current-bid exclusion, fail-closed price parsing, decimal normalization, and exact content-and-price fingerprint semantics.
+- Unit tests (`JsoupTradeMeClientTest`, `Sha256ListingFingerprinterTest`) cover URL generation, listing parsing, query-parameter stripping, reserve filtering, required seller-username extraction, fail-closed seller and price parsing, current-bid exclusion, decimal normalization, and exact content-and-price fingerprint semantics.
+- Unit tests (`ExcludedSellerUsernameFactoryImplTest`) lock down the production exclusion set.
 - Unit tests (`LlmListingJudgeTest`) cover verdict parsing, criterion failure, malformed responses, and the exact LLM request shape (per-judge model, effort, and criteria) against both real checked-in prompt resources.
 - Unit tests (`SearchFactoryImplTest`) cover the six search definitions, their filters, and judge config wiring.
-- Integration tests cover update persistence, URL duplicate prevention, global relist suppression before judging, changed-description and changed-price handling, in-run cross-search suppression, judgment persistence, fail-closed judge errors, 24-hour digest filtering, fail-judged exclusion, price-aware fingerprint digest deduplication, and legacy URL fallback (LLM calls faked via `FakeLlmClient`).
-- E2E tests validate the LocalStack pipeline (Lambda invoke plus SNS/SQS notification path) against local Trade Me website and OpenAI stub containers and are CI-safe.
+- Integration tests cover update persistence, excluded-seller suppression before judging, URL duplicate prevention, global relist suppression before judging, changed-description and changed-price handling, in-run cross-search suppression, judgment persistence, fail-closed judge errors, 24-hour digest filtering, fail-judged exclusion, price-aware fingerprint digest deduplication, and legacy URL fallback (LLM calls faked via `FakeLlmClient`).
+- E2E tests validate the LocalStack pipeline (Lambda invoke plus SNS/SQS notification path), including an excluded `roseshade` listing, against local Trade Me website and OpenAI stub containers and are CI-safe.
 - Required checks before merge:
   - `bazel test //auction_tracker_api:unit-tests`
   - `bazel test //auction_tracker_api:integration-tests`
@@ -338,10 +352,11 @@ Secrets Manager secret `auction_tracker_api` (value set manually after Terraform
 ### Scenario 1: scheduled scrape ingests new listings
 
 1. EventBridge triggers `UpdateItemsHandler` on the 15-minute schedule.
-2. Handler loads static searches from `SearchFactoryImpl` and scrapes Trade Me search/listing pages.
-3. For each discovered listing, handler checks `gsi1` for an existing `(search_url, item_url)` record.
-4. For a new URL, handler reads the original start and Buy Now prices from the embedded page state, computes the price-aware content fingerprint, and checks global `gsi2`.
-5. Handler writes only new URLs and fingerprints to DynamoDB with timestamp, TTL, and prefixed primary/GSI keys.
+2. Handler loads static searches from `SearchFactoryImpl`, loads excluded seller usernames from `ExcludedSellerUsernameFactory`, and scrapes Trade Me search/listing pages.
+3. For each discovered listing, handler skips a case-insensitive seller username match before any downstream work.
+4. For an allowed listing, handler checks `gsi1` for an existing `(search_url, item_url)` record.
+5. For a new URL, handler reads the original start and Buy Now prices from the embedded page state, computes the price-aware content fingerprint, and checks global `gsi2`.
+6. Handler writes only new URLs and fingerprints to DynamoDB with timestamp, TTL, and prefixed primary/GSI keys.
 
 ### Scenario 2: new listing on a judged search is judged before persistence
 

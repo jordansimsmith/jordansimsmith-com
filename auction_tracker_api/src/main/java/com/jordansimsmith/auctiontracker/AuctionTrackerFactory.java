@@ -30,6 +30,8 @@ public interface AuctionTrackerFactory {
 
   NotificationPublisher notificationPublisher();
 
+  ExcludedSellerUsernameFactory excludedSellerUsernameFactory();
+
   SearchFactory searchFactory();
 
   TradeMeClient tradeMeClient();
