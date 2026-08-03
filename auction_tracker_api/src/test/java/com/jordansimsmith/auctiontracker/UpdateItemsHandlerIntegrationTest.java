@@ -7,6 +7,7 @@ import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.llm.FakeLlmClient;
 import com.jordansimsmith.time.FakeClock;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;
 import java.util.List;
@@ -19,6 +20,8 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 
 @Testcontainers
 public class UpdateItemsHandlerIntegrationTest {
+  private static final BigDecimal START_PRICE = new BigDecimal("100");
+  private static final BigDecimal BUY_NOW_PRICE = new BigDecimal("150");
   private static final SearchFactory.Judge MTG_JUDGE =
       new SearchFactory.Judge(
           "prompts/mtg-bulk-judge.md",
@@ -81,11 +84,15 @@ public class UpdateItemsHandlerIntegrationTest {
             new TradeMeClient.TradeMeItem(
                 "https://www.trademe.co.nz/a/marketplace/sports/golf/listing/123",
                 "Titleist Wedge",
-                "Great condition wedge"),
+                "Great condition wedge",
+                START_PRICE,
+                BUY_NOW_PRICE),
             new TradeMeClient.TradeMeItem(
                 "https://www.trademe.co.nz/a/marketplace/sports/golf/listing/456",
                 "Cleveland Wedge",
-                "Another wedge"));
+                "Another wedge",
+                START_PRICE,
+                BUY_NOW_PRICE));
     fakeTradeMeClient.addSearchResponse(
         URI.create(baseUrl), "wedge", null, null, SearchFactory.Condition.USED, tradeMeItems);
 
@@ -118,7 +125,8 @@ public class UpdateItemsHandlerIntegrationTest {
             AuctionTrackerItem.formatGsi1sk(
                 "https://www.trademe.co.nz/a/marketplace/sports/golf/listing/123"));
     var fingerprint =
-        AuctionTrackerItem.createFingerprint("Titleist Wedge", "Great condition wedge");
+        AuctionTrackerItem.createFingerprint(
+            "Titleist Wedge", "Great condition wedge", START_PRICE, BUY_NOW_PRICE);
     assertThat(item1.getFingerprint()).isEqualTo(fingerprint);
     assertThat(item1.getGsi2pk()).isEqualTo(AuctionTrackerItem.formatGsi2pk(fingerprint));
     assertThat(item1.getGsi2sk())
@@ -154,7 +162,9 @@ public class UpdateItemsHandlerIntegrationTest {
         new TradeMeClient.TradeMeItem(
             "https://www.trademe.co.nz/a/marketplace/sports/golf/listing/123",
             "Titleist Wedge",
-            "Great condition wedge");
+            "Great condition wedge",
+            START_PRICE,
+            BUY_NOW_PRICE);
     fakeTradeMeClient.addSearchResponse(
         URI.create(baseUrl),
         "wedge",
@@ -170,6 +180,8 @@ public class UpdateItemsHandlerIntegrationTest {
             "https://www.trademe.co.nz/a/marketplace/sports/golf/listing/123",
             "Titleist Wedge",
             "Great condition wedge",
+            START_PRICE,
+            BUY_NOW_PRICE,
             Instant.ofEpochSecond(2000),
             null);
     auctionTrackerTable.putItem(existingItem);
@@ -206,7 +218,11 @@ public class UpdateItemsHandlerIntegrationTest {
         SearchFactory.Condition.USED,
         List.of(
             new TradeMeClient.TradeMeItem(
-                "https://www.trademe.co.nz/listing/222", "mtg bulk lot", "500 assorted cards")));
+                "https://www.trademe.co.nz/listing/222",
+                "mtg bulk lot",
+                "500 assorted cards",
+                START_PRICE,
+                BUY_NOW_PRICE)));
 
     var existingItem =
         AuctionTrackerItem.create(
@@ -214,6 +230,8 @@ public class UpdateItemsHandlerIntegrationTest {
             "https://www.trademe.co.nz/listing/111",
             "mtg bulk lot",
             "500 assorted cards",
+            START_PRICE,
+            BUY_NOW_PRICE,
             Instant.ofEpochSecond(2000),
             AuctionTrackerItem.Judgment.PASS);
     auctionTrackerTable.putItem(existingItem);
@@ -245,7 +263,9 @@ public class UpdateItemsHandlerIntegrationTest {
         null,
         null,
         SearchFactory.Condition.USED,
-        List.of(new TradeMeClient.TradeMeItem("url2", "Trident Z RGB", "One stick is faulty")));
+        List.of(
+            new TradeMeClient.TradeMeItem(
+                "url2", "Trident Z RGB", "One stick is faulty", START_PRICE, BUY_NOW_PRICE)));
 
     auctionTrackerTable.putItem(
         AuctionTrackerItem.create(
@@ -253,6 +273,8 @@ public class UpdateItemsHandlerIntegrationTest {
             "url1",
             "Trident Z RGB",
             "Great condition",
+            START_PRICE,
+            BUY_NOW_PRICE,
             Instant.ofEpochSecond(2000),
             null));
 
@@ -261,6 +283,54 @@ public class UpdateItemsHandlerIntegrationTest {
 
     // assert
     assertThat(auctionTrackerTable.scan().items().stream().toList()).hasSize(2);
+  }
+
+  @Test
+  void handleRequestShouldStoreAndJudgeItemWhenSellerPriceDiffersFromExistingItem() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
+    var baseUrl = "https://www.trademe.co.nz/search";
+    var expectedSearchUrl = baseUrl + "?search_string=ram&condition=used&sort_order=expirydesc";
+    var search =
+        new SearchFactory.Search(
+            URI.create(baseUrl), "ram", null, null, SearchFactory.Condition.USED, MTG_JUDGE);
+    fakeSearchFactory.addSearches(List.of(search));
+    fakeTradeMeClient.addSearchResponse(
+        URI.create(baseUrl),
+        "ram",
+        null,
+        null,
+        SearchFactory.Condition.USED,
+        List.of(
+            new TradeMeClient.TradeMeItem(
+                "url2",
+                "Trident Z RGB",
+                "Great condition",
+                new BigDecimal("90"),
+                new BigDecimal("140"))));
+
+    auctionTrackerTable.putItem(
+        AuctionTrackerItem.create(
+            expectedSearchUrl,
+            "url1",
+            "Trident Z RGB",
+            "Great condition",
+            START_PRICE,
+            BUY_NOW_PRICE,
+            Instant.ofEpochSecond(2000),
+            AuctionTrackerItem.Judgment.PASS));
+    fakeLlmClient.addResponse(judgmentJson(false));
+
+    // act
+    updateItemsHandler.handleRequest(new ScheduledEvent(), null);
+
+    // assert
+    var items = auctionTrackerTable.scan().items().stream().toList();
+    assertThat(items).hasSize(2);
+    var relistedItem =
+        items.stream().filter(item -> item.getUrl().equals("url2")).findFirst().orElseThrow();
+    assertThat(relistedItem.getJudgment()).isEqualTo(AuctionTrackerItem.Judgment.FAIL);
+    assertThat(fakeLlmClient.findRequests()).hasSize(1);
   }
 
   @Test
@@ -291,14 +361,16 @@ public class UpdateItemsHandlerIntegrationTest {
         null,
         null,
         SearchFactory.Condition.USED,
-        List.of(new TradeMeClient.TradeMeItem("url1", "title1", "desc1")));
+        List.of(
+            new TradeMeClient.TradeMeItem("url1", "title1", "desc1", START_PRICE, BUY_NOW_PRICE)));
     fakeTradeMeClient.addSearchResponse(
         URI.create("https://www.trademe.co.nz/search2"),
         "term2",
         100.0,
         200.0,
         SearchFactory.Condition.USED,
-        List.of(new TradeMeClient.TradeMeItem("url2", "title2", "desc2")));
+        List.of(
+            new TradeMeClient.TradeMeItem("url2", "title2", "desc2", START_PRICE, BUY_NOW_PRICE)));
 
     // act
     updateItemsHandler.handleRequest(new ScheduledEvent(), null);
@@ -356,8 +428,10 @@ public class UpdateItemsHandlerIntegrationTest {
         100.0,
         SearchFactory.Condition.USED,
         List.of(
-            new TradeMeClient.TradeMeItem("url1", "MTG bulk lot", "500 assorted cards"),
-            new TradeMeClient.TradeMeItem("url2", "Pokemon bulk", "500 pokemon cards")));
+            new TradeMeClient.TradeMeItem(
+                "url1", "MTG bulk lot", "500 assorted cards", START_PRICE, BUY_NOW_PRICE),
+            new TradeMeClient.TradeMeItem(
+                "url2", "Pokemon bulk", "500 pokemon cards", START_PRICE, BUY_NOW_PRICE)));
     fakeLlmClient.addResponse(judgmentJson(true));
     fakeLlmClient.addResponse(judgmentJson(false));
 
@@ -392,7 +466,9 @@ public class UpdateItemsHandlerIntegrationTest {
         null,
         100.0,
         SearchFactory.Condition.USED,
-        List.of(new TradeMeClient.TradeMeItem("url1", "MTG bulk lot", "500 assorted cards")));
+        List.of(
+            new TradeMeClient.TradeMeItem(
+                "url1", "MTG bulk lot", "500 assorted cards", START_PRICE, BUY_NOW_PRICE)));
 
     var existingItem =
         AuctionTrackerItem.create(
@@ -400,6 +476,8 @@ public class UpdateItemsHandlerIntegrationTest {
             "url1",
             "MTG bulk lot",
             "500 assorted cards",
+            START_PRICE,
+            BUY_NOW_PRICE,
             Instant.ofEpochSecond(2000),
             AuctionTrackerItem.Judgment.FAIL);
     auctionTrackerTable.putItem(existingItem);
@@ -439,7 +517,8 @@ public class UpdateItemsHandlerIntegrationTest {
         100.0,
         SearchFactory.Condition.USED,
         List.of(
-            new TradeMeClient.TradeMeItem("url1", "MTG bulk collection", "500 assorted cards")));
+            new TradeMeClient.TradeMeItem(
+                "url1", "MTG bulk collection", "500 assorted cards", START_PRICE, BUY_NOW_PRICE)));
     fakeTradeMeClient.addSearchResponse(
         URI.create(baseUrl),
         "collection",
@@ -447,7 +526,8 @@ public class UpdateItemsHandlerIntegrationTest {
         100.0,
         SearchFactory.Condition.USED,
         List.of(
-            new TradeMeClient.TradeMeItem("url2", "MTG bulk collection", "500 assorted cards")));
+            new TradeMeClient.TradeMeItem(
+                "url2", "MTG bulk collection", "500 assorted cards", START_PRICE, BUY_NOW_PRICE)));
     fakeLlmClient.addResponse(judgmentJson(false));
 
     // act
@@ -493,14 +573,16 @@ public class UpdateItemsHandlerIntegrationTest {
         null,
         null,
         SearchFactory.Condition.USED,
-        List.of(new TradeMeClient.TradeMeItem("url1", "title1", "desc1")));
+        List.of(
+            new TradeMeClient.TradeMeItem("url1", "title1", "desc1", START_PRICE, BUY_NOW_PRICE)));
     fakeTradeMeClient.addSearchResponse(
         URI.create("https://www.trademe.co.nz/search2"),
         "term2",
         null,
         null,
         SearchFactory.Condition.USED,
-        List.of(new TradeMeClient.TradeMeItem("url2", "title2", "desc2")));
+        List.of(
+            new TradeMeClient.TradeMeItem("url2", "title2", "desc2", START_PRICE, BUY_NOW_PRICE)));
     fakeLlmClient.addResponse(judgmentJson(true));
     fakeLlmClient.addResponse(
         "{\"mtg_cards\": {\"reasoning\": \"because\", \"result\": \"pass\"}}");
@@ -539,7 +621,9 @@ public class UpdateItemsHandlerIntegrationTest {
         null,
         100.0,
         SearchFactory.Condition.USED,
-        List.of(new TradeMeClient.TradeMeItem("url1", "MTG bulk lot", "500 assorted cards")));
+        List.of(
+            new TradeMeClient.TradeMeItem(
+                "url1", "MTG bulk lot", "500 assorted cards", START_PRICE, BUY_NOW_PRICE)));
     // no llm response queued, so the judge call fails
 
     // act & assert

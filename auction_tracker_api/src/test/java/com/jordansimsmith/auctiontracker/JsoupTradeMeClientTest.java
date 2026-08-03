@@ -1,7 +1,10 @@
 package com.jordansimsmith.auctiontracker;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
 import java.net.URI;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -45,6 +48,9 @@ public class JsoupTradeMeClientTest {
             <p>There is a slight rattle in the head when shaken.</p>
             <p>Still plays great and has plenty of grooves left.</p>
           </div>
+          <script id="frend-state" type="application/json">
+            {"NGRX_STATE":{"listing":{"cachedDetails":{"entities":{"5337003621":{"item":{"startPrice":1,"buyNowPrice":70,"maxBidAmount":51}}}}}}}
+          </script>
         </body>
       </html>
       """;
@@ -59,6 +65,9 @@ public class JsoupTradeMeClientTest {
             <p>Steel shaft, standard grip.</p>
             <p>Excellent condition with sharp grooves.</p>
           </div>
+          <script id="frend-state" type="application/json">
+            {"NGRX_STATE":{"listing":{"cachedDetails":{"entities":{"5337003622":{"item":{"startPrice":0,"buyNowPrice":65}}}}}}}
+          </script>
         </body>
       </html>
       """;
@@ -72,6 +81,9 @@ public class JsoupTradeMeClientTest {
             <p>TaylorMade Hi-Toe wedge 56 degree.</p>
             <p>Great condition with minimal wear.</p>
           </div>
+          <script id="frend-state" type="application/json">
+            {"NGRX_STATE":{"listing":{"cachedDetails":{"entities":{"5337003623":{"item":{"startPrice":1,"buyNowPrice":80}}}}}}}
+          </script>
         </body>
       </html>
       """;
@@ -86,6 +98,9 @@ public class JsoupTradeMeClientTest {
             <p>Black dot specification for standard lie angle.</p>
             <p>Excellent grooves and performance.</p>
           </div>
+          <script id="frend-state" type="application/json">
+            {"NGRX_STATE":{"listing":{"cachedDetails":{"entities":{"5337003624":{"item":{"startPrice":0,"buyNowPrice":90}}}}}}}
+          </script>
         </body>
       </html>
       """;
@@ -131,6 +146,61 @@ public class JsoupTradeMeClientTest {
             <p>Regular golf wedge without reserve issues.</p>
             <p>Available for purchase now.</p>
           </div>
+          <script id="frend-state" type="application/json">
+            {"NGRX_STATE":{"listing":{"cachedDetails":{"entities":{"5337003626":{"item":{"startPrice":0,"buyNowPrice":75}}}}}}}
+          </script>
+        </body>
+      </html>
+      """;
+
+  private static final String SEARCH_HTML_WITH_MISSING_PRICE =
+      """
+      <html>
+        <body>
+          <div class="tm-search-results">
+            <a href="/a/marketplace/sports/golf/wedges-chippers/listing/5337003627">Missing price</a>
+          </div>
+        </body>
+      </html>
+      """;
+
+  private static final String ITEM_WITH_MISSING_PRICE_HTML =
+      """
+      <html>
+        <body>
+          <h1 class="tm-marketplace-koru-listing__title">Golf Wedge without Price</h1>
+          <div class="tm-marketplace-koru-listing__body">
+            <p>Listing included to verify required price handling.</p>
+          </div>
+          <script id="frend-state" type="application/json">
+            {"NGRX_STATE":{"listing":{"cachedDetails":{"entities":{"5337003627":{"item":{"maxBidAmount":50}}}}}}}
+          </script>
+        </body>
+      </html>
+      """;
+
+  private static final String SEARCH_HTML_WITH_MALFORMED_PRICE =
+      """
+      <html>
+        <body>
+          <div class="tm-search-results">
+            <a href="/a/marketplace/sports/golf/wedges-chippers/listing/5337003628">Malformed price</a>
+          </div>
+        </body>
+      </html>
+      """;
+
+  private static final String ITEM_WITH_MALFORMED_PRICE_HTML =
+      """
+      <html>
+        <body>
+          <h1 class="tm-marketplace-koru-listing__title">Golf Wedge with Malformed Price</h1>
+          <div class="tm-marketplace-koru-listing__body">
+            <p>Listing included to verify malformed price handling.</p>
+          </div>
+          <script id="frend-state" type="application/json">
+            {"NGRX_STATE":{"listing":{"cachedDetails":{"entities":{"5337003628":{"item":{"startPrice":"one dollar"}}}}}}}
+          </script>
         </body>
       </html>
       """;
@@ -140,7 +210,7 @@ public class JsoupTradeMeClientTest {
   @BeforeEach
   void setUp() {
     client =
-        new JsoupTradeMeClient() {
+        new JsoupTradeMeClient(new ObjectMapper()) {
           @Override
           protected Document fetchDocument(String url) {
             return switch (url) {
@@ -150,6 +220,10 @@ public class JsoupTradeMeClientTest {
                   Jsoup.parse(SEARCH_HTML_WITH_QUERY_PARAMS, BASE_URL);
               case BASE_URL + "?search_string=reserve+test&sort_order=expirydesc" ->
                   Jsoup.parse(SEARCH_HTML_WITH_RESERVE_NOT_MET, BASE_URL);
+              case BASE_URL + "?search_string=missing+price&sort_order=expirydesc" ->
+                  Jsoup.parse(SEARCH_HTML_WITH_MISSING_PRICE, BASE_URL);
+              case BASE_URL + "?search_string=malformed+price&sort_order=expirydesc" ->
+                  Jsoup.parse(SEARCH_HTML_WITH_MALFORMED_PRICE, BASE_URL);
               case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003621" ->
                   Jsoup.parse(ITEM1_HTML);
               case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003622" ->
@@ -162,6 +236,10 @@ public class JsoupTradeMeClientTest {
                   Jsoup.parse(ITEM_WITH_RESERVE_NOT_MET_HTML);
               case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003626" ->
                   Jsoup.parse(REGULAR_ITEM_HTML);
+              case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003627" ->
+                  Jsoup.parse(ITEM_WITH_MISSING_PRICE_HTML);
+              case "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003628" ->
+                  Jsoup.parse(ITEM_WITH_MALFORMED_PRICE_HTML);
               default -> throw new AssertionError("Unexpected URL in test: " + url);
             };
           }
@@ -193,6 +271,8 @@ public class JsoupTradeMeClientTest {
             "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003621");
     assertThat(item1.description()).contains("Titleist Vokey SM6 60* K Grind wedge");
     assertThat(item1.description()).contains("slight rattle in the head");
+    assertThat(item1.startPrice()).isEqualByComparingTo(BigDecimal.ONE);
+    assertThat(item1.buyNowPrice()).isEqualByComparingTo(new BigDecimal("70"));
 
     // verify second item
     var item2 =
@@ -203,6 +283,8 @@ public class JsoupTradeMeClientTest {
             "https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003622");
     assertThat(item2.description()).contains("Callaway Mack Daddy 4 wedge");
     assertThat(item2.description()).contains("52 degree loft");
+    assertThat(item2.startPrice()).isEqualByComparingTo(BigDecimal.ZERO);
+    assertThat(item2.buyNowPrice()).isEqualByComparingTo(new BigDecimal("65"));
   }
 
   @Test
@@ -300,5 +382,39 @@ public class JsoupTradeMeClientTest {
     // verify the item with unmet reserve was filtered out
     var hasUnmetReserveItem = items.stream().anyMatch(i -> i.url().contains("5337003625"));
     assertThat(hasUnmetReserveItem).as("Item with unmet reserve should be filtered out").isFalse();
+  }
+
+  @Test
+  void searchItemsShouldThrowWhenSellerPriceIsMissing() {
+    // arrange
+    var baseUrl = URI.create(BASE_URL);
+
+    // act & assert
+    assertThatThrownBy(
+            () ->
+                client.searchItems(
+                    baseUrl, "missing price", null, null, SearchFactory.Condition.ALL))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessage("Failed to search items")
+        .hasRootCauseMessage(
+            "Could not find valid seller price data on page:"
+                + " https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003627");
+  }
+
+  @Test
+  void searchItemsShouldThrowWhenSellerPriceIsMalformed() {
+    // arrange
+    var baseUrl = URI.create(BASE_URL);
+
+    // act & assert
+    assertThatThrownBy(
+            () ->
+                client.searchItems(
+                    baseUrl, "malformed price", null, null, SearchFactory.Condition.ALL))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessage("Failed to search items")
+        .hasRootCauseMessage(
+            "Could not find valid seller price data on page:"
+                + " https://www.trademe.co.nz/a/marketplace/sports/golf/wedges-chippers/listing/5337003628");
   }
 }

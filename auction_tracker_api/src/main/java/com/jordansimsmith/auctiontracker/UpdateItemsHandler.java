@@ -87,7 +87,11 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
       }
 
       var contentFingerprint =
-          AuctionTrackerItem.createFingerprint(tradeMeItem.title(), tradeMeItem.description());
+          AuctionTrackerItem.createFingerprint(
+              tradeMeItem.title(),
+              tradeMeItem.description(),
+              tradeMeItem.startPrice(),
+              tradeMeItem.buyNowPrice());
       if (contentFingerprints.contains(contentFingerprint)
           || contentFingerprintExists(contentFingerprint)) {
         continue;
@@ -110,6 +114,8 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
               tradeMeItem.url(),
               tradeMeItem.title(),
               tradeMeItem.description(),
+              tradeMeItem.startPrice(),
+              tradeMeItem.buyNowPrice(),
               currentTime,
               judgment);
       auctionTrackerTable.putItem(auctionTrackerItem);

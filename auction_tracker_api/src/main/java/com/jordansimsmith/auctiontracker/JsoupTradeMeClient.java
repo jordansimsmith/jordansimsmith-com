@@ -1,5 +1,6 @@
 package com.jordansimsmith.auctiontracker;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.net.URI;
@@ -19,6 +20,12 @@ import org.slf4j.LoggerFactory;
 
 public class JsoupTradeMeClient implements TradeMeClient {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsoupTradeMeClient.class);
+
+  private final ObjectMapper objectMapper;
+
+  public JsoupTradeMeClient(ObjectMapper objectMapper) {
+    this.objectMapper = objectMapper;
+  }
 
   @Override
   public List<TradeMeItem> searchItems(
@@ -58,14 +65,17 @@ public class JsoupTradeMeClient implements TradeMeClient {
     // fetch details for each item
     var items = new ArrayList<TradeMeItem>();
     for (var itemUrl : itemUrls) {
+      Document itemPage;
       try {
-        var itemPage = fetchDocument(itemUrl);
-        var item = parseItemPage(itemPage, itemUrl);
-        if (item != null) {
-          items.add(item);
-        }
+        itemPage = fetchDocument(itemUrl);
       } catch (Exception e) {
         LOGGER.warn("Failed to fetch item details for {}: {}", itemUrl, e.getMessage());
+        continue;
+      }
+
+      var item = parseItemPage(itemPage, itemUrl);
+      if (item != null) {
+        items.add(item);
       }
     }
 
@@ -92,7 +102,7 @@ public class JsoupTradeMeClient implements TradeMeClient {
   }
 
   @Nullable
-  private TradeMeItem parseItemPage(Document itemPage, String url) throws URISyntaxException {
+  private TradeMeItem parseItemPage(Document itemPage, String url) throws Exception {
     // extract title using specific CSS selectors
     var titleElements =
         itemPage.select(
@@ -131,7 +141,35 @@ public class JsoupTradeMeClient implements TradeMeClient {
       description = description.substring(0, 1000) + "...";
     }
 
-    return new TradeMeItem(stripQueryParams(url), title, description);
+    var path = new URI(url).getPath();
+    var listingId = path.substring(path.lastIndexOf('/') + 1);
+
+    var stateElement = itemPage.selectFirst("script#frend-state[type=application/json]");
+    if (stateElement == null) {
+      throw new RuntimeException("Could not find valid seller price data on page: " + url);
+    }
+
+    var state = objectMapper.readTree(stateElement.data());
+    var listing =
+        state
+            .path("NGRX_STATE")
+            .path("listing")
+            .path("cachedDetails")
+            .path("entities")
+            .path(listingId)
+            .path("item");
+    var startPriceNode = listing.get("startPrice");
+    var buyNowPriceNode = listing.get("buyNowPrice");
+    if (startPriceNode == null
+        || !startPriceNode.isNumber()
+        || (buyNowPriceNode != null && !buyNowPriceNode.isNull() && !buyNowPriceNode.isNumber())) {
+      throw new RuntimeException("Could not find valid seller price data on page: " + url);
+    }
+
+    var startPrice = startPriceNode.decimalValue();
+    var buyNowPrice =
+        buyNowPriceNode == null || buyNowPriceNode.isNull() ? null : buyNowPriceNode.decimalValue();
+    return new TradeMeItem(stripQueryParams(url), title, description, startPrice, buyNowPrice);
   }
 
   private String buildSearchUrl(

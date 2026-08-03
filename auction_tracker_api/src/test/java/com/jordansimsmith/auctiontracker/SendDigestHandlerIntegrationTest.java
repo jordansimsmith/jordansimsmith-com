@@ -7,6 +7,7 @@ import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.notifications.FakeNotificationPublisher;
 import com.jordansimsmith.time.FakeClock;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -20,6 +21,9 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 
 @Testcontainers
 public class SendDigestHandlerIntegrationTest {
+  private static final BigDecimal START_PRICE = new BigDecimal("100");
+  private static final BigDecimal BUY_NOW_PRICE = new BigDecimal("150");
+
   private FakeClock fakeClock;
   private FakeNotificationPublisher fakeNotificationPublisher;
   private FakeSearchFactory fakeSearchFactory;
@@ -73,6 +77,8 @@ public class SendDigestHandlerIntegrationTest {
             "https://www.trademe.co.nz/listing/123",
             "Recent Wedge 1",
             "Recent wedge description 1",
+            START_PRICE,
+            BUY_NOW_PRICE,
             yesterdayTime.plus(1, ChronoUnit.HOURS), // 23 hours ago
             null);
     var recentItem2 =
@@ -81,6 +87,8 @@ public class SendDigestHandlerIntegrationTest {
             "https://www.trademe.co.nz/listing/456",
             "Recent Wedge 2",
             "Recent wedge description 2",
+            START_PRICE,
+            BUY_NOW_PRICE,
             yesterdayTime.plus(2, ChronoUnit.HOURS), // 22 hours ago
             null);
     var oldItem =
@@ -89,6 +97,8 @@ public class SendDigestHandlerIntegrationTest {
             "https://www.trademe.co.nz/listing/789",
             "Old Wedge",
             "Old wedge description",
+            START_PRICE,
+            BUY_NOW_PRICE,
             twoDaysAgo,
             null);
 
@@ -145,6 +155,8 @@ public class SendDigestHandlerIntegrationTest {
             duplicateListingUrl,
             "Duplicate Item",
             "Legacy duplicate description",
+            START_PRICE,
+            BUY_NOW_PRICE,
             yesterdayTime.plus(1, ChronoUnit.HOURS),
             null);
 
@@ -155,6 +167,8 @@ public class SendDigestHandlerIntegrationTest {
             duplicateListingUrl,
             "Duplicate Item",
             "Legacy duplicate description",
+            START_PRICE,
+            BUY_NOW_PRICE,
             yesterdayTime.plus(2, ChronoUnit.HOURS),
             null);
 
@@ -165,6 +179,8 @@ public class SendDigestHandlerIntegrationTest {
             uniqueListingUrl,
             "Unique Item",
             "Unique item description",
+            START_PRICE,
+            BUY_NOW_PRICE,
             yesterdayTime.plus(3, ChronoUnit.HOURS),
             null);
 
@@ -221,6 +237,8 @@ public class SendDigestHandlerIntegrationTest {
             "https://www.trademe.co.nz/listing/123",
             "Relisted Item",
             "Same listing description",
+            START_PRICE,
+            BUY_NOW_PRICE,
             yesterdayTime.plus(1, ChronoUnit.HOURS),
             null);
     var itemFromSearch2 =
@@ -229,6 +247,8 @@ public class SendDigestHandlerIntegrationTest {
             "https://www.trademe.co.nz/listing/456",
             "Relisted Item",
             "Same listing description",
+            START_PRICE,
+            BUY_NOW_PRICE,
             yesterdayTime.plus(2, ChronoUnit.HOURS),
             null);
     auctionTrackerTable.putItem(itemFromSearch1);
@@ -271,6 +291,8 @@ public class SendDigestHandlerIntegrationTest {
             "https://www.trademe.co.nz/listing/789",
             "Old Wedge",
             "Old wedge description",
+            START_PRICE,
+            BUY_NOW_PRICE,
             twoDaysAgo,
             null);
     auctionTrackerTable.putItem(oldItem);
@@ -307,6 +329,8 @@ public class SendDigestHandlerIntegrationTest {
             "https://www.trademe.co.nz/listing/123",
             "MTG bulk lot",
             "500 assorted cards",
+            START_PRICE,
+            BUY_NOW_PRICE,
             yesterdayTime.plus(1, ChronoUnit.HOURS),
             AuctionTrackerItem.Judgment.PASS);
     var failItem =
@@ -315,6 +339,8 @@ public class SendDigestHandlerIntegrationTest {
             "https://www.trademe.co.nz/listing/456",
             "Pokemon bulk lot",
             "500 pokemon cards",
+            START_PRICE,
+            BUY_NOW_PRICE,
             yesterdayTime.plus(2, ChronoUnit.HOURS),
             AuctionTrackerItem.Judgment.FAIL);
 

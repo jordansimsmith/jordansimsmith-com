@@ -1,11 +1,17 @@
 package com.jordansimsmith.auctiontracker;
 
+import java.math.BigDecimal;
 import java.net.URI;
 import java.util.List;
 import javax.annotation.Nullable;
 
 public interface TradeMeClient {
-  record TradeMeItem(String url, String title, String description) {}
+  record TradeMeItem(
+      String url,
+      String title,
+      String description,
+      BigDecimal startPrice,
+      @Nullable BigDecimal buyNowPrice) {}
 
   List<TradeMeItem> searchItems(
       URI baseUrl,

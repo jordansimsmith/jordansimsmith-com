@@ -1,6 +1,6 @@
 # Auction tracker API
 
-The auction tracker API service runs scheduled backend workflows that scrape Trade Me listings, judge configured searches with per-search LLM listing filters, store discovered items, and send a daily digest email for newly found listings.
+The auction tracker API service runs scheduled backend workflows that scrape Trade Me listings and seller-set prices, judge configured searches with per-search LLM listing filters, store discovered items, and send a daily digest email for newly found listings.
 
 ## Overview
 
@@ -14,8 +14,9 @@ The auction tracker API service runs scheduled backend workflows that scrape Tra
 
 - As a bargain hunter, I want Trade Me listings scraped automatically, so that I do not miss relevant new items.
 - As a digest subscriber, I want one daily deduplicated summary, so that I can review new listings quickly.
-- As a digest subscriber, I want unchanged relists suppressed across searches for 30 days, so that listings I have already reviewed do not reappear under a new listing ID.
-- As a maintainer, I want duplicate detection by listing URL and exact listing content, so that persisted records, judge calls, and digests stay clean.
+- As a digest subscriber, I want relists with unchanged content and seller-set prices suppressed across searches for 30 days, so that listings I have already reviewed do not reappear under a new listing ID.
+- As a digest subscriber, I want a relist with a changed seller-set price to be notified again, so that I see when a seller lowers the price.
+- As a maintainer, I want duplicate detection by listing URL, exact listing content, and seller-set price terms, so that persisted records, judge calls, and digests stay clean.
 - As an MTG bulk-lot hunter, I want junk listings (wrong game, single cards, basic lands, store repacks) filtered by an LLM judge, so that the digest only surfaces lots worth a look.
 - As a RAM kit hunter, I want mismatched listings (wrong family, DDR generation, configuration, speed, timings, or form factor) filtered by an LLM judge, so that the digest only surfaces kits matching my existing G.Skill Trident Z 2x16GB DDR4-3200 CL16 kit.
 
@@ -25,21 +26,21 @@ The auction tracker API service runs scheduled backend workflows that scrape Tra
 
 - Run `UpdateItemsHandler` every 15 minutes to scrape predefined Trade Me searches.
 - Build search URLs with term, optional price filters, condition filter, and `sort_order=expirydesc`.
-- Fetch listing pages, normalize listing URLs, and skip listings marked as reserve not met.
+- Fetch listing pages, normalize listing URLs, extract original start and Buy Now prices from the embedded Trade Me page state, exclude current bids from relist identity, and skip listings marked as reserve not met.
 - Judge new listings on searches with a configured judge (all six searches: the three MTG searches `bulk`, `collection`, `assorted` and the three RAM searches `g.skill`, `gskill`, `trident z`) using an OpenAI LLM against the judge's six binary criteria, and persist the overall verdict.
 - Carry judge configuration (prompt resource, model, reasoning effort, criteria) per search: the MTG searches share one judge config, the RAM searches share another.
 - Store newly discovered items in DynamoDB with deterministic key prefixes and 30-day TTL.
 - Prevent duplicate inserts for the same `(search_url, item_url)` pair using GSI `gsi1`.
-- Suppress relists globally before judging when GSI `gsi2` contains the same exact title-and-description SHA-256 fingerprint.
+- Suppress relists globally before judging when GSI `gsi2` contains the same exact title, description, start price, and Buy Now price SHA-256 fingerprint.
 - Run `SendDigestHandler` daily and publish a digest for listings discovered in the last 24 hours, excluding listings judged `fail`.
-- Deduplicate digest entries by content fingerprint, falling back to listing URL for records created before content fingerprinting.
+- Deduplicate digest entries by price-aware content fingerprint, falling back to listing URL for records created before content fingerprinting.
 
 ### Out of scope
 
 - Exposing public HTTP endpoints or interactive UI contracts.
 - User-configurable search management at runtime (searches are code-defined in `SearchFactoryImpl`).
 - Scraping paginated result pages beyond the first page of each search result.
-- Persisting listing descriptions in DynamoDB (descriptions are extracted during scraping and used for judging and fingerprinting, but only the fingerprint is stored).
+- Persisting listing descriptions or seller-set prices independently in DynamoDB (they are extracted during scraping and used for judging or fingerprinting, but only the fingerprint is stored).
 - Fuzzy relist detection when a seller changes the title or description.
 - Custom retry orchestration beyond default AWS retry behavior and Lambda re-invocation semantics.
 - Re-judging listings after their first verdict (judgments are permanent for a record's lifetime), including records persisted by the removed narrow RAM search (`g.skill trident z 32gb ddr4`), which age out via TTL.
@@ -76,7 +77,7 @@ sequenceDiagram
   EventBridge->>UpdateHandler: invoke every 15 minutes
   UpdateHandler->>TradeMe: fetch search page and listing pages
   UpdateHandler->>DynamoDB: query gsi1 for URL duplicate check
-  UpdateHandler->>UpdateHandler: hash listing title and description
+  UpdateHandler->>UpdateHandler: hash title, description, start price, and Buy Now price
   UpdateHandler->>DynamoDB: query gsi2 for global relist fingerprint
   alt URL and fingerprint are new
     opt search has judge config
@@ -103,35 +104,37 @@ sequenceDiagram
 - Treat digest timing as a daily NZ-local intent (6pm NZST) while current infrastructure executes at `06:00 UTC` (`cron(0 6 * * ? *)`).
 - Use browser-like headers and cookies in scrape requests to improve compatibility with Trade Me page delivery.
 - Judge listings at scrape time (the only moment descriptions exist in memory) and persist the verdict, so matching fingerprinted relists are skipped before judging and the digest filters purely from storage.
-- Define relist identity as SHA-256 over the exact scraped title and description separated by a null character. Exact matches are suppressed globally; any content change produces a new fingerprint.
-- Store fingerprints only on records created after deployment. Legacy records retain URL-only deduplication and can produce one final notification if they relist under a new URL before aging out.
+- Define relist identity as SHA-256 over the exact scraped title, description, normalized original start price, and normalized Buy Now price separated by null characters. Current bids are excluded because they are bidder-driven rather than seller-set; any content or seller-price change produces a new fingerprint.
+- Read seller-set prices from the server-rendered `#frend-state` JSON at `NGRX_STATE.listing.cachedDetails.entities.<listing_id>.item`, where `startPrice` remains distinct from `maxBidAmount` after bidding begins. Missing or malformed required page data fails the invocation rather than storing an unsafe fingerprint.
+- Existing title-and-description fingerprints are not backfilled. They do not match price-aware fingerprints, so the first relist after deployment can produce one notification even when its price is unchanged; subsequent relists use price-aware suppression.
 - Carry judge configuration as a nullable nested `Judge` record (`prompt`, `model`, `reasoningEffort`, `criteria`) on each `SearchFactory.Search`, with one shared constant per judge in `SearchFactoryImpl`; criteria ride with the config because verdict validation is per-judge.
 - MTG judge: `gpt-5.4-mini` with reasoning effort `none` via the shared `lib/llm` client; selected by the eval harness in `evals/mtg_bulk/` (perfect test-split TPR/TNR at the lowest cost and latency).
 - RAM judge: `gpt-5.4-nano` with reasoning effort `low`; selected by the eval harness in `evals/ram/` (perfect test-split TPR/TNR at roughly 3.6x lower cost than the mini candidate).
 - Broaden RAM coverage with three brand searches (`g.skill`, `gskill`, `trident z`) because Trade Me tokenizes `g.skill` and `gskill` differently and the previous narrow term returned almost nothing; spec-based terms stay out to keep results within the single scraped page.
 - Freeze each production system prompt (winning eval prompt plus train-split few-shot examples) as a checked-in resource loaded through `lib/prompts`: `src/main/resources/prompts/mtg-bulk-judge.md` (mtg_bulk v3) and `src/main/resources/prompts/ram-judge.md` (ram v3).
 - Fail closed on judge errors: exceptions fail the invocation and the run retries on the next 15-minute tick; already-persisted items are not re-judged.
-- Track content fingerprints within an invocation so overlapping searches store and judge matching content once without depending on immediate GSI propagation.
+- Track price-aware content fingerprints within an invocation so overlapping searches store and judge matching content and seller-set price terms once without depending on immediate GSI propagation.
 - Memoize judgments per `(judge prompt, listing URL)` within an invocation as a fallback for overlapping judged searches.
 
 ## Domain glossary
 
 - **Search definition**: one configured Trade Me query with base URL, search term, optional price bounds, condition, and optional judge configuration.
 - **Judge configuration**: a prompt resource name, OpenAI model, reasoning effort, and ordered criteria list shared by the searches that use it (one config for MTG, one for RAM).
-- **Discovered item**: one listing found and parsed from Trade Me with normalized URL, title, and transient description.
+- **Discovered item**: one listing found and parsed from Trade Me with normalized URL, title, transient description, and transient seller-set price terms.
 - **URL duplicate**: an item where the same search URL and listing URL already exists in `gsi1`.
-- **Content fingerprint**: a deterministic SHA-256 identity derived from the exact scraped listing title and description, persisted as `fingerprint`, and used to derive `gsi2pk`.
-- **Relisted item**: a listing with a new URL whose content fingerprint matches a record retained in `gsi2`.
+- **Content fingerprint**: a deterministic SHA-256 identity derived from the exact scraped listing title, description, normalized original start price, and normalized Buy Now price, persisted as `fingerprint`, and used to derive `gsi2pk`.
+- **Seller-set price terms**: the original auction start price and optional Buy Now price embedded in Trade Me's server-rendered page state; current bids are excluded.
+- **Relisted item**: a listing with a new URL whose price-aware content fingerprint matches a record retained in `gsi2`.
 - **Judged search**: a search definition with a judge configuration (currently all six searches: three MTG sharing `prompts/mtg-bulk-judge.md`, three RAM sharing `prompts/ram-judge.md`).
 - **Judgment**: the LLM verdict for a listing, `pass` or `fail`; overall pass requires all of the judge's six criteria to pass (MTG: `mtg_cards`, `bulk_scale`, `not_basic_lands`, `not_universes_beyond`, `civilian_seller`, `fixed_collection`; RAM: `trident_z_family`, `ddr4`, `kit_2x16gb`, `speed_3200`, `timings_cl16`, `desktop_udimm`).
 - **Digest window**: rolling 24-hour interval from the digest handler execution timestamp.
-- **Cross-search duplicate**: the same listing URL or content fingerprint appearing in multiple search definitions.
+- **Cross-search duplicate**: the same listing URL or price-aware content fingerprint appearing in multiple search definitions.
 
 ## Integration contracts
 
 ### External systems
 
-- **Trade Me website**: outbound `GET` requests to search and listing pages derived from configured searches. The base origin defaults to `https://www.trademe.co.nz` and can be overridden with `AUCTION_TRACKER_TRADEME_BASE_URL` (used in E2E tests). Requests include browser-like headers/cookies and a 30-second timeout. Item-page fetch failures are logged and skipped; unrecoverable search errors fail the invocation.
+- **Trade Me website**: outbound `GET` requests to search and listing pages derived from configured searches. The base origin defaults to `https://www.trademe.co.nz` and can be overridden with `AUCTION_TRACKER_TRADEME_BASE_URL` (used in E2E tests). Requests include browser-like headers/cookies and a 30-second timeout. Individual item-page fetch failures are logged and skipped; missing or malformed required title, description, or seller-price data and unrecoverable search errors fail the invocation.
 - **Amazon DynamoDB**: outbound reads/writes against table `auction_tracker`. Update flow performs per-search URL checks, global content-fingerprint checks, and inserts; digest flow queries per-search partitions for recent items.
 - **Amazon SNS**: outbound publish to topic `auction_tracker_api_digest` when at least one new item exists in the digest window. Topic ARN is resolved by listing topics and matching by topic-name suffix.
 - **Amazon EventBridge**: scheduled invocation source for both handlers (`rate(15 minutes)` and `cron(0 6 * * ? *)`).
@@ -181,7 +184,7 @@ null
 - **Attributes**:
   - `title` (string): listing title
   - `url` (string): normalized listing URL with query parameters removed
-  - `fingerprint` (string, optional): 64-character SHA-256 of the exact scraped title and description; present on records created after content fingerprinting was deployed
+  - `fingerprint` (string, optional): 64-character SHA-256 of the exact scraped title, description, normalized original start price, and normalized Buy Now price; records created before price-aware fingerprinting retain the prior title-and-description hash
   - `timestamp` (number): epoch seconds (`Clock.now()`)
   - `judgment` (string, optional): LLM verdict `pass` or `fail`; absent for items from searches without a judge configuration and for records created before judging existed
   - `ttl` (number): epoch seconds at `timestamp + 30 days`
@@ -190,6 +193,9 @@ null
   - `gsi1sk` (string): `ITEM#<item_url>`
   - `gsi2pk` (string, optional): `FINGERPRINT#<fingerprint>`; derived from the standalone `fingerprint` attribute
   - `gsi2sk` (string, optional): `ITEM#<item_url>`; present when `gsi2pk` is present
+- **Transient fields**:
+  - `description`: used for judging and fingerprinting but not persisted
+  - `start_price` and `buy_now_price`: used for fingerprinting but not persisted independently
 - **Global secondary index `gsi1`**:
   - hash key: `gsi1pk`
   - range key: `gsi1sk`
@@ -231,11 +237,12 @@ Representative record:
 
 - Every update invocation iterates all configured searches and attempts to process each one.
 - A previously indexed exact `(search_url, item_url)` match in `gsi1` is skipped before fingerprinting or judging.
-- New records receive a standalone deterministic `fingerprint` attribute from the exact scraped title and description separated by a null character; `gsi2pk` is derived from it.
+- New records receive a standalone deterministic `fingerprint` attribute from the exact scraped title, description, normalized original start price, and normalized Buy Now price separated by null characters; `gsi2pk` is derived from it.
 - A new listing is skipped before judging when its fingerprint exists anywhere in `gsi2`, regardless of the search or prior judgment.
-- Any title or description change produces a different fingerprint and is treated as new.
+- Any title, description, original start price, or Buy Now price change produces a different fingerprint and is treated as new; changes to the current bid do not affect the fingerprint.
 - Records created before fingerprint deployment have no `gsi2` attributes and continue to use URL-only deduplication; no historical backfill occurs.
-- Within one invocation, matching content is stored and judged once across searches through an in-memory fingerprint set.
+- Records created with the prior title-and-description fingerprint remain unchanged until TTL expiry. Their first relist after price-aware deployment is treated as new even at the same price, after which the new fingerprint suppresses unchanged relists.
+- Within one invocation, matching content and seller-set price terms are stored and judged once across searches through an in-memory fingerprint set.
 - Concurrent invocations can race before GSI updates propagate; digest fingerprint deduplication prevents those duplicate records from producing repeated notifications.
 - A persisted `judgment` never changes.
 - Every judged search's verdict is validated against its own criteria list; a response missing any configured criterion is malformed and fails the invocation.
@@ -245,6 +252,7 @@ Representative record:
 - Digest output deduplicates fingerprinted records by the standalone `fingerprint` attribute across all configured searches and falls back to listing URL for legacy records.
 - Listing URLs are canonicalized by stripping query parameters before persistence and digesting.
 - Listings marked `Reserve not met` are filtered out and never persisted.
+- An individual item-page network fetch failure is logged and skipped. Missing or malformed title, description, embedded page state, original start price, or Buy Now price fails the invocation.
 - Search-result pagination beyond the first page is not processed; the handler logs a warning when pagination is detected.
 - `sk` includes zero-padded epoch seconds, preserving deterministic lexicographic time ordering.
 - TTL is always computed as `timestamp + 30 days`.
@@ -254,7 +262,7 @@ Representative record:
 | Entity                     | Authoritative source                                                                      | Notes                                                                                       |
 | -------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | Search definitions         | `SearchFactoryImpl` in service code                                                       | current definitions are static and code-controlled                                          |
-| Listing content snapshot   | Trade Me listing pages at scrape time                                                     | title/url/fingerprint are persisted; description is transient in scrape logic               |
+| Listing content snapshot   | Trade Me listing pages at scrape time                                                     | title/url/fingerprint are persisted; description and seller-set prices are transient        |
 | Judge prompts              | `src/main/resources/prompts/mtg-bulk-judge.md`, `src/main/resources/prompts/ram-judge.md` | frozen system prompts validated by the eval harnesses in `evals/mtg_bulk/` and `evals/ram/` |
 | Judge model and effort     | `Judge` constants in `SearchFactoryImpl`                                                  | MTG `gpt-5.4-mini`/`none`, RAM `gpt-5.4-nano`/`low`                                         |
 | Persisted discovered items | DynamoDB `auction_tracker` table                                                          | canonical history used for duplicate checks, verdicts, and digests                          |
@@ -268,8 +276,8 @@ Representative record:
 - The OpenAI API key lives only in Secrets Manager; it is never logged or persisted in DynamoDB.
 - AWS credentials and region resolve through the AWS SDK default provider chain in Lambda/runtime environments.
 - Integrations use HTTPS transport (Trade Me, OpenAI, and AWS APIs).
-- Listing titles and descriptions (public Trade Me content) are sent to the OpenAI API for judging; no user data is involved.
-- Listing content fingerprints are persisted in DynamoDB; raw descriptions are not persisted.
+- Listing titles and descriptions (public Trade Me content) are sent to the OpenAI API for judging; seller-set prices are not sent and no user data is involved.
+- Listing content-and-price fingerprints are persisted in DynamoDB; raw descriptions and seller-set prices are not persisted independently.
 - Logging uses standard INFO/WARN/ERROR levels; avoid introducing logs that include sensitive operational data such as subscription endpoints.
 - Scraping uses browser-like request headers/cookies; these are implementation details and should be reviewed when upstream page behavior changes.
 
@@ -300,14 +308,14 @@ Secrets Manager secret `auction_tracker_api` (value set manually after Terraform
 - Jsoup HTTP requests use a `30` second timeout per request.
 - Each new URL performs one per-search `gsi1` query and, when not found, one global `gsi2` query before any optional LLM call.
 - Judging costs roughly $0.011 per judged MTG listing and $0.0014 per judged RAM listing at current model pricing; steady-state runs judge only newly discovered listings.
-- Per-item scrape failures are non-fatal for a run (warn and continue), while handler-level failures (including judge errors) bubble as invocation errors.
+- Per-item network fetch failures are non-fatal for a run (warn and continue), while required-field parsing failures, handler-level failures, and judge errors bubble as invocation errors.
 
 ## Testing and quality gates
 
-- Unit tests (`JsoupTradeMeClientTest`, `AuctionTrackerItemTest`) cover URL generation, listing parsing, query-parameter stripping, reserve filtering, and exact content fingerprint semantics.
+- Unit tests (`JsoupTradeMeClientTest`, `AuctionTrackerItemTest`) cover URL generation, listing parsing, query-parameter stripping, reserve filtering, seller-price extraction, current-bid exclusion, fail-closed price parsing, decimal normalization, and exact content-and-price fingerprint semantics.
 - Unit tests (`LlmListingJudgeTest`) cover verdict parsing, criterion failure, malformed responses, and the exact LLM request shape (per-judge model, effort, and criteria) against both real checked-in prompt resources.
 - Unit tests (`SearchFactoryImplTest`) cover the six search definitions, their filters, and judge config wiring.
-- Integration tests cover update persistence, URL duplicate prevention, global relist suppression before judging, changed-description handling, in-run cross-search suppression, judgment persistence, fail-closed judge errors, 24-hour digest filtering, fail-judged exclusion, fingerprint digest deduplication, and legacy URL fallback (LLM calls faked via `FakeLlmClient`).
+- Integration tests cover update persistence, URL duplicate prevention, global relist suppression before judging, changed-description and changed-price handling, in-run cross-search suppression, judgment persistence, fail-closed judge errors, 24-hour digest filtering, fail-judged exclusion, price-aware fingerprint digest deduplication, and legacy URL fallback (LLM calls faked via `FakeLlmClient`).
 - E2E tests validate the LocalStack pipeline (Lambda invoke plus SNS/SQS notification path) against local Trade Me website and OpenAI stub containers and are CI-safe.
 - Required checks before merge:
   - `bazel test //auction_tracker_api:unit-tests`
@@ -332,7 +340,7 @@ Secrets Manager secret `auction_tracker_api` (value set manually after Terraform
 1. EventBridge triggers `UpdateItemsHandler` on the 15-minute schedule.
 2. Handler loads static searches from `SearchFactoryImpl` and scrapes Trade Me search/listing pages.
 3. For each discovered listing, handler checks `gsi1` for an existing `(search_url, item_url)` record.
-4. For a new URL, handler computes the content fingerprint and checks global `gsi2`.
+4. For a new URL, handler reads the original start and Buy Now prices from the embedded page state, computes the price-aware content fingerprint, and checks global `gsi2`.
 5. Handler writes only new URLs and fingerprints to DynamoDB with timestamp, TTL, and prefixed primary/GSI keys.
 
 ### Scenario 2: new listing on a judged search is judged before persistence
@@ -340,11 +348,11 @@ Secrets Manager secret `auction_tracker_api` (value set manually after Terraform
 1. `UpdateItemsHandler` discovers a new listing on a judged search (an MTG search or a RAM search).
 2. Handler confirms the URL and content fingerprint are new, then checks the per-run judgment memo and sends the listing title and description to the OpenAI API on a miss using the search's configured model, reasoning effort, and frozen system prompt.
 3. The judge parses the JSON verdict against the search's six criteria; overall pass requires all six to pass, and failed criteria are logged with their reasoning.
-4. Handler persists the record with `judgment` = `pass` or `fail`; other searches discovering matching content in the same run skip it through the in-memory fingerprint set.
+4. Handler persists the record with `judgment` = `pass` or `fail`; other searches discovering matching content and seller-set price terms in the same run skip it through the in-memory fingerprint set.
 
 ### Scenario 3: daily digest publishes recent unique listings
 
 1. EventBridge triggers `SendDigestHandler` on the daily schedule (`06:00 UTC`).
 2. Handler queries each search partition for records newer than the rolling 24-hour threshold.
-3. Handler excludes records with `judgment` = `fail` and deduplicates merged results by fingerprint, falling back to listing URL for legacy records.
+3. Handler excludes records with `judgment` = `fail` and deduplicates merged results by the price-aware fingerprint, falling back to listing URL for records created before fingerprinting.
 4. Handler publishes one SNS digest when at least one item exists; otherwise it logs that no new items were found.

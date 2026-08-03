@@ -36,8 +36,8 @@ public class AuctionTrackerModule {
 
   @Provides
   @Singleton
-  TradeMeClient tradeMeClient() {
-    return new JsoupTradeMeClient();
+  TradeMeClient tradeMeClient(ObjectMapper objectMapper) {
+    return new JsoupTradeMeClient(objectMapper);
   }
 
   @Provides

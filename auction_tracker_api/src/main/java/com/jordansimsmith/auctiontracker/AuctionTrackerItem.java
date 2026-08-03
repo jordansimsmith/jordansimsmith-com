@@ -2,6 +2,7 @@ package com.jordansimsmith.auctiontracker;
 
 import com.google.common.hash.Hashing;
 import com.jordansimsmith.dynamodb.EpochSecondConverter;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -318,9 +319,21 @@ public class AuctionTrackerItem {
     return ITEM_PREFIX + itemUrl;
   }
 
-  public static String createFingerprint(String title, String description) {
+  public static String createFingerprint(
+      String title, String description, BigDecimal startPrice, @Nullable BigDecimal buyNowPrice) {
+    var normalizedStartPrice = startPrice.stripTrailingZeros().toPlainString();
+    var normalizedBuyNowPrice =
+        buyNowPrice == null ? "" : buyNowPrice.stripTrailingZeros().toPlainString();
     return Hashing.sha256()
-        .hashString(title + '\u0000' + description, StandardCharsets.UTF_8)
+        .hashString(
+            title
+                + '\u0000'
+                + description
+                + '\u0000'
+                + normalizedStartPrice
+                + '\u0000'
+                + normalizedBuyNowPrice,
+            StandardCharsets.UTF_8)
         .toString();
   }
 
@@ -329,6 +342,8 @@ public class AuctionTrackerItem {
       String itemUrl,
       String title,
       String description,
+      BigDecimal startPrice,
+      @Nullable BigDecimal buyNowPrice,
       Instant timestamp,
       @Nullable Judgment judgment) {
     var auctionTrackerItem = new AuctionTrackerItem();
@@ -337,7 +352,7 @@ public class AuctionTrackerItem {
     auctionTrackerItem.setTitle(title);
     auctionTrackerItem.setTimestamp(timestamp);
     auctionTrackerItem.setUrl(itemUrl);
-    var fingerprint = createFingerprint(title, description);
+    var fingerprint = createFingerprint(title, description, startPrice, buyNowPrice);
     auctionTrackerItem.setFingerprint(fingerprint);
     auctionTrackerItem.setJudgment(judgment);
     auctionTrackerItem.setTtl(timestamp.plus(30, ChronoUnit.DAYS).getEpochSecond());
