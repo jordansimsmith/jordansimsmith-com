@@ -11,7 +11,9 @@ codebook) and prompts/ (versioned system prompts).
 Usage:
     OPENAI_API_KEY=... bazel run //auction_tracker_api:run-eval -- \
         --judge mtg_bulk --model MODEL [--split dev] [--prompt prompts/v1.md]
-        [--trials 1] [--limit N] [--price-input $/1M] [--price-output $/1M]
+        [--trials 1] [--limit N] [--price-input $/1M]
+        [--price-cached-input $/1M] [--price-cache-write $/1M]
+        [--price-output $/1M]
 
 Few-shot examples always come from the train split, regardless of the split
 being evaluated. Results are written to
@@ -102,11 +104,16 @@ def judge_once(client, model, system_prompt, criteria, fixture, reasoning_effort
             "reasoning": value.get("reasoning", ""),
         }
     usage = response.usage
+    prompt_details = usage.prompt_tokens_details
+    completion_details = usage.completion_tokens_details
     return {
         "criteria": results,
         "latency_s": latency,
         "input_tokens": usage.prompt_tokens,
+        "cached_input_tokens": getattr(prompt_details, "cached_tokens", 0) or 0,
+        "cache_write_tokens": getattr(prompt_details, "cache_write_tokens", 0) or 0,
         "output_tokens": usage.completion_tokens,
+        "reasoning_tokens": getattr(completion_details, "reasoning_tokens", 0) or 0,
     }
 
 
@@ -133,7 +140,10 @@ def judge_listing(
         "overall": overall,
         "latency_s": sum(a["latency_s"] for a in attempts),
         "input_tokens": sum(a["input_tokens"] for a in attempts),
+        "cached_input_tokens": sum(a["cached_input_tokens"] for a in attempts),
+        "cache_write_tokens": sum(a["cache_write_tokens"] for a in attempts),
         "output_tokens": sum(a["output_tokens"] for a in attempts),
+        "reasoning_tokens": sum(a["reasoning_tokens"] for a in attempts),
         "trials": trials,
     }
 
@@ -190,6 +200,12 @@ def main():
     parser.add_argument("--limit", type=int)
     parser.add_argument("--workers", type=int, default=8)
     parser.add_argument("--price-input", type=float, help="USD per 1M input tokens")
+    parser.add_argument(
+        "--price-cached-input", type=float, help="USD per 1M cached input tokens"
+    )
+    parser.add_argument(
+        "--price-cache-write", type=float, help="USD per 1M cache write tokens"
+    )
     parser.add_argument("--price-output", type=float, help="USD per 1M output tokens")
     args = parser.parse_args()
 
@@ -235,11 +251,28 @@ def main():
     metrics = compute_metrics(records, criteria, labels)
     latencies = [r["latency_s"] / r["trials"] for r in records.values()]
     input_tokens = sum(r["input_tokens"] for r in records.values())
+    cached_input_tokens = sum(r["cached_input_tokens"] for r in records.values())
+    cache_write_tokens = sum(r["cache_write_tokens"] for r in records.values())
+    uncached_input_tokens = input_tokens - cached_input_tokens - cache_write_tokens
     output_tokens = sum(r["output_tokens"] for r in records.values())
+    reasoning_tokens = sum(r["reasoning_tokens"] for r in records.values())
     cost = None
     if args.price_input is not None and args.price_output is not None:
+        cached_input_price = (
+            args.price_cached_input
+            if args.price_cached_input is not None
+            else args.price_input
+        )
+        cache_write_price = (
+            args.price_cache_write
+            if args.price_cache_write is not None
+            else args.price_input
+        )
         cost = (
-            input_tokens * args.price_input + output_tokens * args.price_output
+            uncached_input_tokens * args.price_input
+            + cached_input_tokens * cached_input_price
+            + cache_write_tokens * cache_write_price
+            + output_tokens * args.price_output
         ) / 1e6
 
     timestamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
@@ -257,6 +290,12 @@ def main():
         "judge": args.judge,
         "model": args.model,
         "reasoning_effort": args.reasoning_effort,
+        "prices_per_million_tokens": {
+            "input": args.price_input,
+            "cached_input": args.price_cached_input,
+            "cache_write": args.price_cache_write,
+            "output": args.price_output,
+        },
         "split": args.split,
         "trials": args.trials,
         "limit": args.limit,
@@ -286,7 +325,11 @@ def main():
             else None
         ),
         "input_tokens": input_tokens,
+        "uncached_input_tokens": uncached_input_tokens,
+        "cached_input_tokens": cached_input_tokens,
+        "cache_write_tokens": cache_write_tokens,
         "output_tokens": output_tokens,
+        "reasoning_tokens": reasoning_tokens,
         "cost_usd": cost,
         "cost_per_listing_usd": cost / len(records)
         if cost is not None and records
@@ -311,7 +354,12 @@ def main():
         print(
             f"\nmean latency {summary['mean_latency_s']:.2f}s | p95 {summary['p95_latency_s']:.2f}s"
         )
-    print(f"tokens: {input_tokens} in / {output_tokens} out", end="")
+    print(
+        f"tokens: {uncached_input_tokens} uncached in / {cached_input_tokens} cached in"
+        f" / {cache_write_tokens} cache write / {output_tokens} out"
+        f" ({reasoning_tokens} reasoning)",
+        end="",
+    )
     if cost is not None:
         print(f" | cost ${cost:.4f} (${summary['cost_per_listing_usd']:.5f}/listing)")
     else:
