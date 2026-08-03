@@ -10,12 +10,7 @@ public class SearchFactoryImpl implements SearchFactory {
           "gpt-5.4-mini",
           "none",
           List.of(
-              "mtg_cards",
-              "bulk_scale",
-              "not_basic_lands",
-              "not_universes_beyond",
-              "civilian_seller",
-              "fixed_collection"));
+              "mtg_cards", "bulk_scale", "not_basic_lands", "civilian_seller", "fixed_collection"));
 
   private static final Judge RAM_JUDGE =
       new Judge(

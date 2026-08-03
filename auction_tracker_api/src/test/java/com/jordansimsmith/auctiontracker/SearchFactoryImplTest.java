@@ -52,7 +52,6 @@ public class SearchFactoryImplTest {
                       "mtg_cards",
                       "bulk_scale",
                       "not_basic_lands",
-                      "not_universes_beyond",
                       "civilian_seller",
                       "fixed_collection");
               assertThat(search.maxPrice()).isEqualTo(200.0);

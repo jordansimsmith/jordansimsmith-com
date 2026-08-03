@@ -32,7 +32,6 @@ public class AuctionTrackerE2ETest {
         "mtg_cards": {"reasoning": "ok", "result": "pass"},
         "bulk_scale": {"reasoning": "ok", "result": "pass"},
         "not_basic_lands": {"reasoning": "ok", "result": "pass"},
-        "not_universes_beyond": {"reasoning": "ok", "result": "pass"},
         "civilian_seller": {"reasoning": "ok", "result": "pass"},
         "fixed_collection": {"reasoning": "ok", "result": "pass"},
         "trident_z_family": {"reasoning": "ok", "result": "pass"},

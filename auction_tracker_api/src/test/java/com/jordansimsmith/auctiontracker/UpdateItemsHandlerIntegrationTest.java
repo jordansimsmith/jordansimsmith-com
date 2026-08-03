@@ -29,12 +29,7 @@ public class UpdateItemsHandlerIntegrationTest {
           "gpt-5.4-mini",
           "none",
           List.of(
-              "mtg_cards",
-              "bulk_scale",
-              "not_basic_lands",
-              "not_universes_beyond",
-              "civilian_seller",
-              "fixed_collection"));
+              "mtg_cards", "bulk_scale", "not_basic_lands", "civilian_seller", "fixed_collection"));
 
   private FakeClock fakeClock;
   private FakeExcludedSellerUsernameFactory fakeExcludedSellerUsernameFactory;
@@ -727,12 +722,7 @@ public class UpdateItemsHandlerIntegrationTest {
     var result = pass ? "pass" : "fail";
     var criteria =
         List.of(
-            "mtg_cards",
-            "bulk_scale",
-            "not_basic_lands",
-            "not_universes_beyond",
-            "civilian_seller",
-            "fixed_collection");
+            "mtg_cards", "bulk_scale", "not_basic_lands", "civilian_seller", "fixed_collection");
     var builder = new StringBuilder("{");
     for (var i = 0; i < criteria.size(); i++) {
       builder.append(

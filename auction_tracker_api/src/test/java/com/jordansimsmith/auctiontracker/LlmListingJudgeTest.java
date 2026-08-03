@@ -18,12 +18,7 @@ public class LlmListingJudgeTest {
           "gpt-5.4-mini",
           "none",
           List.of(
-              "mtg_cards",
-              "bulk_scale",
-              "not_basic_lands",
-              "not_universes_beyond",
-              "civilian_seller",
-              "fixed_collection"));
+              "mtg_cards", "bulk_scale", "not_basic_lands", "civilian_seller", "fixed_collection"));
 
   private static final SearchFactory.Judge RAM_JUDGE =
       new SearchFactory.Judge(
@@ -69,7 +64,9 @@ public class LlmListingJudgeTest {
     assertThat(request.messages().get(0).role()).isEqualTo(LlmMessage.Role.SYSTEM);
     assertThat(request.messages().get(0).content())
         .startsWith("You judge Trade Me auction listings")
-        .contains("## Examples");
+        .contains("## Examples")
+        .contains("Treat Universes Within and Universes Beyond cards identically.")
+        .doesNotContain("not_universes_beyond");
     assertThat(request.messages().get(1).role()).isEqualTo(LlmMessage.Role.USER);
     assertThat(request.messages().get(1).content())
         .contains("Title: MTG bulk lot")

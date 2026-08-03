@@ -29,7 +29,7 @@ The auction tracker API service runs scheduled backend workflows that scrape Tra
 - Build search URLs with term, optional price filters, condition filter, and `sort_order=expirydesc`.
 - Fetch listing pages, normalize listing URLs, extract original start and Buy Now prices from the embedded Trade Me page state, exclude current bids from relist identity, and skip listings marked as reserve not met.
 - Extract seller usernames from embedded Trade Me page state and skip listings from the injected code-defined exclusion set, initially `roseshade`, before duplicate checks, judging, or persistence.
-- Judge new listings on searches with a configured judge (all eight searches: the five MTG searches `bulk`, `collection`, `assorted`, `clear out`, `clearout` and the three RAM searches `g.skill`, `gskill`, `trident z`) using an OpenAI LLM against the judge's six binary criteria, and persist the overall verdict.
+- Judge new listings on searches with a configured judge (all eight searches: the five MTG searches `bulk`, `collection`, `assorted`, `clear out`, `clearout` and the three RAM searches `g.skill`, `gskill`, `trident z`) using an OpenAI LLM against the judge's configured binary criteria, and persist the overall verdict.
 - Carry judge configuration (prompt resource, model, reasoning effort, criteria) per search: the MTG searches share one judge config, the RAM searches share another.
 - Store newly discovered items in DynamoDB with deterministic key prefixes and 30-day TTL.
 - Prevent duplicate inserts for the same `(search_url, item_url)` pair using GSI `gsi1`.
@@ -87,7 +87,7 @@ sequenceDiagram
   alt URL and fingerprint are new
     opt search has judge config
       UpdateHandler->>OpenAI: judge new listing title and description with the search's model and prompt
-      OpenAI-->>UpdateHandler: six-criteria JSON verdict
+      OpenAI-->>UpdateHandler: configured-criteria JSON verdict
     end
     UpdateHandler->>DynamoDB: put new SEARCH/TIMESTAMP item record with judgment and fingerprint
   end
@@ -115,10 +115,10 @@ sequenceDiagram
 - Read the required seller username from the same embedded listing item at `member.nickname`. A missing or blank username fails the invocation so upstream contract drift is detected instead of bypassing exclusions.
 - Existing title-and-description fingerprints are not backfilled. They do not match price-aware fingerprints, so the first relist after deployment can produce one notification even when its price is unchanged; subsequent relists use price-aware suppression.
 - Carry judge configuration as a nullable nested `Judge` record (`prompt`, `model`, `reasoningEffort`, `criteria`) on each `SearchFactory.Search`, with one shared constant per judge in `SearchFactoryImpl`; criteria ride with the config because verdict validation is per-judge.
-- MTG judge: `gpt-5.4-mini` with reasoning effort `none` via the shared `lib/llm` client; selected by the eval harness in `evals/mtg_bulk/` (perfect test-split TPR/TNR at the lowest cost and latency).
+- MTG judge: `gpt-5.4-mini` with reasoning effort `none` via the shared `lib/llm` client; retain the configuration selected by the eval harness in `evals/mtg_bulk/` while reducing the v4 prompt to the five current criteria.
 - RAM judge: `gpt-5.4-nano` with reasoning effort `low`; selected by the eval harness in `evals/ram/` (perfect test-split TPR/TNR at roughly 3.6x lower cost than the mini candidate).
 - Broaden RAM coverage with three brand searches (`g.skill`, `gskill`, `trident z`) because Trade Me tokenizes `g.skill` and `gskill` differently and the previous narrow term returned almost nothing; spec-based terms stay out to keep results within the single scraped page.
-- Freeze each production system prompt (winning eval prompt plus train-split few-shot examples) as a checked-in resource loaded through `lib/prompts`: `src/main/resources/prompts/mtg-bulk-judge.md` (mtg_bulk v3) and `src/main/resources/prompts/ram-judge.md` (ram v3).
+- Freeze each production system prompt (current eval prompt plus train-split few-shot examples) as a checked-in resource loaded through `lib/prompts`: `src/main/resources/prompts/mtg-bulk-judge.md` (mtg_bulk v4) and `src/main/resources/prompts/ram-judge.md` (ram v3).
 - Fail closed on judge errors: exceptions fail the invocation and the run retries on the next 15-minute tick; already-persisted items are not re-judged.
 - Track price-aware content fingerprints within an invocation so overlapping searches store and judge matching content and seller-set price terms once without depending on immediate GSI propagation.
 - Memoize judgments per `(judge prompt, listing URL)` within an invocation as a fallback for overlapping judged searches.
@@ -134,7 +134,7 @@ sequenceDiagram
 - **Seller-set price terms**: the original auction start price and optional Buy Now price embedded in Trade Me's server-rendered page state; current bids are excluded.
 - **Relisted item**: a listing with a new URL whose price-aware content fingerprint matches a record retained in `gsi2`.
 - **Judged search**: a search definition with a judge configuration (currently all eight searches: five MTG sharing `prompts/mtg-bulk-judge.md`, three RAM sharing `prompts/ram-judge.md`).
-- **Judgment**: the LLM verdict for a listing, `pass` or `fail`; overall pass requires all of the judge's six criteria to pass (MTG: `mtg_cards`, `bulk_scale`, `not_basic_lands`, `not_universes_beyond`, `civilian_seller`, `fixed_collection`; RAM: `trident_z_family`, `ddr4`, `kit_2x16gb`, `speed_3200`, `timings_cl16`, `desktop_udimm`).
+- **Judgment**: the LLM verdict for a listing, `pass` or `fail`; overall pass requires all configured criteria to pass (MTG: `mtg_cards`, `bulk_scale`, `not_basic_lands`, `civilian_seller`, `fixed_collection`; RAM: `trident_z_family`, `ddr4`, `kit_2x16gb`, `speed_3200`, `timings_cl16`, `desktop_udimm`). MTG set origin and crossover branding, including Universes Within and Universes Beyond, do not affect eligibility.
 - **Digest window**: rolling 24-hour interval from the digest handler execution timestamp.
 - **Cross-search duplicate**: the same listing URL or price-aware content fingerprint appearing in multiple search definitions.
 
@@ -362,7 +362,7 @@ Secrets Manager secret `auction_tracker_api` (value set manually after Terraform
 
 1. `UpdateItemsHandler` discovers a new listing on a judged search (an MTG search or a RAM search).
 2. Handler confirms the URL and content fingerprint are new, then checks the per-run judgment memo and sends the listing title and description to the OpenAI API on a miss using the search's configured model, reasoning effort, and frozen system prompt.
-3. The judge parses the JSON verdict against the search's six criteria; overall pass requires all six to pass, and failed criteria are logged with their reasoning.
+3. The judge parses the JSON verdict against the search's configured criteria; overall pass requires every configured criterion to pass, and failed criteria are logged with their reasoning.
 4. Handler persists the record with `judgment` = `pass` or `fail`; other searches discovering matching content and seller-set price terms in the same run skip it through the in-memory fingerprint set.
 
 ### Scenario 3: daily digest publishes recent unique listings
