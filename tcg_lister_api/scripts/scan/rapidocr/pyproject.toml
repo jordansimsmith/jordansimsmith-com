@@ -1,0 +1,14 @@
+[project]
+name = "tcg-scan-rapidocr-spike"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "onnxruntime",
+    "pillow",
+    "rapidocr",
+    "rapidfuzz",
+]
+
+[dependency-groups]
+dev = ["pytest"]

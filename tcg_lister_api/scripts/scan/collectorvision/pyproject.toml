@@ -1,0 +1,12 @@
+[project]
+name = "tcg-scan-collectorvision-spike"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "collectorvision[hf] @ git+https://github.com/HanClinto/CollectorVision.git@7e1be2463eac958e002d111865ae95b60c4a2759",
+    "onnxruntime",
+    "opencv-python-headless",
+]
+
+[dependency-groups]
+dev = ["pytest"]

@@ -1,0 +1,11 @@
+[project]
+name = "tcg-scan-fixed-phash-spike"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy",
+    "pillow",
+]
+
+[dependency-groups]
+dev = ["pytest"]

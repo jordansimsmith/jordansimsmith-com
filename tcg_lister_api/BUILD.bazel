@@ -11,6 +11,19 @@ py_library(
     deps = ["@pypi//requests"],
 )
 
+py_library(
+    name = "scan-eval-lib",
+    srcs = ["scripts/scan/evaluate.py"],
+    imports = ["scripts/scan"],
+)
+
+py_library(
+    name = "scryfall-sync-lib",
+    srcs = ["scripts/scan/scryfall_sync.py"],
+    imports = ["scripts/scan"],
+    deps = ["@pypi//requests"],
+)
+
 py_binary(
     name = "fetchtcg-bulk-analyze",
     srcs = ["scripts/list/main.py"],
@@ -22,6 +35,20 @@ py_binary(
     name = "generate-fetch-set-mapping",
     srcs = ["scripts/list/generate_fetch_set_mapping.py"],
     main = "scripts/list/generate_fetch_set_mapping.py",
+)
+
+py_binary(
+    name = "scan-evaluate",
+    srcs = ["scripts/scan/evaluate_main.py"],
+    main = "scripts/scan/evaluate_main.py",
+    deps = [":scan-eval-lib"],
+)
+
+py_binary(
+    name = "scan-sync-scryfall",
+    srcs = ["scripts/scan/scryfall_sync_main.py"],
+    main = "scripts/scan/scryfall_sync_main.py",
+    deps = [":scryfall-sync-lib"],
 )
 
 py_test(
@@ -38,6 +65,24 @@ py_test(
     main = "scripts/list/test_runner.py",
     deps = [
         ":lib",
+        "@pypi//pytest",
+        "@pypi//requests",
+    ],
+)
+
+py_test(
+    name = "scan-unit-tests",
+    size = "small",
+    srcs = [
+        "scripts/scan/test_evaluate.py",
+        "scripts/scan/test_runner.py",
+        "scripts/scan/test_scryfall_sync.py",
+    ],
+    imports = ["scripts/scan"],
+    main = "scripts/scan/test_runner.py",
+    deps = [
+        ":scan-eval-lib",
+        ":scryfall-sync-lib",
         "@pypi//pytest",
         "@pypi//requests",
     ],
