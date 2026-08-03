@@ -5,7 +5,7 @@ The auction tracker API service runs scheduled backend workflows that scrape Tra
 ## Overview
 
 - **Service type**: backend scheduled worker (`auction_tracker_api`)
-- **Interface**: EventBridge scheduled events to AWS Lambda handlers (`RequestHandler<ScheduledEvent, Void>`)
+- **Interface**: EventBridge rule and EventBridge Scheduler invocations to AWS Lambda handlers (`RequestHandler<ScheduledEvent, Void>`)
 - **Runtime**: AWS Lambda (Java 21)
 - **Primary storage**: DynamoDB table `auction_tracker` with `gsi1` for URL duplicate checks and `gsi2` for relist fingerprint checks
 - **Primary consumers**: email subscribers on SNS topic `auction_tracker_api_digest`
@@ -60,7 +60,7 @@ flowchart TD
   updateHandler --> listingJudge[LlmListingJudge]
   listingJudge --> openAi[OpenAI chat completions API]
   updateHandler --> auctionTable[DynamoDB auction_tracker]
-  digestSchedule[EventBridge daily schedule] --> digestHandler[SendDigestHandler Lambda]
+  digestSchedule[EventBridge Scheduler at 9pm Pacific/Auckland] --> digestHandler[SendDigestHandler Lambda]
   digestHandler --> auctionTable
   digestHandler --> digestTopic[SNS auction_tracker_api_digest]
   digestTopic --> subscribers[Email subscribers]
@@ -70,7 +70,8 @@ flowchart TD
 
 ```mermaid
 sequenceDiagram
-  participant EventBridge
+  participant UpdateSchedule as EventBridge rule
+  participant DigestSchedule as EventBridge Scheduler
   participant UpdateHandler
   participant TradeMe
   participant OpenAI
@@ -78,7 +79,7 @@ sequenceDiagram
   participant DigestHandler
   participant SNS
 
-  EventBridge->>UpdateHandler: invoke every 15 minutes
+  UpdateSchedule->>UpdateHandler: invoke every 15 minutes
   UpdateHandler->>TradeMe: fetch search page and listing pages
   UpdateHandler->>UpdateHandler: skip configured seller usernames
   UpdateHandler->>DynamoDB: query gsi1 for URL duplicate check
@@ -91,7 +92,7 @@ sequenceDiagram
     end
     UpdateHandler->>DynamoDB: put new SEARCH/TIMESTAMP item record with judgment and fingerprint
   end
-  EventBridge->>DigestHandler: invoke daily
+  DigestSchedule->>DigestHandler: invoke daily at 9pm Pacific/Auckland
   DigestHandler->>DynamoDB: query each search partition for last 24 hours
   DigestHandler->>DigestHandler: exclude judgment=fail, deduplicate by fingerprint or URL
   alt new items exist
@@ -101,13 +102,13 @@ sequenceDiagram
 
 ## Main technical decisions
 
-- Use EventBridge + Lambda for low operational overhead and fixed scraping/digest cadence.
+- Use an EventBridge rule for the 15-minute update cadence and EventBridge Scheduler for the daily digest cadence.
 - Use Jsoup scraping against Trade Me server-rendered pages instead of a browser automation stack.
 - Use DynamoDB `pk`/`sk` prefixes with `gsi1` and `gsi2` so URL duplicate and relist checks are direct key lookups, not scans.
 - Keep table and topic names code-defined (`auction_tracker`, `auction_tracker_api_digest`) to reduce configuration complexity.
 - Keep search definitions in code (`SearchFactoryImpl`) for deterministic behavior and easy testability.
 - Inject excluded seller usernames through `ExcludedSellerUsernameFactory`; keep the production set in `ExcludedSellerUsernameFactoryImpl` and use a fake in integration tests.
-- Treat digest timing as a daily NZ-local intent (6pm NZST) while current infrastructure executes at `06:00 UTC` (`cron(0 6 * * ? *)`).
+- Run the digest at 9pm New Zealand local time using `cron(0 21 * * ? *)` with the `Pacific/Auckland` schedule timezone so daylight-saving transitions do not shift the wall-clock delivery time.
 - Use browser-like headers and cookies in scrape requests to improve compatibility with Trade Me page delivery.
 - Judge listings at scrape time (the only moment descriptions exist in memory) and persist the verdict, so matching fingerprinted relists are skipped before judging and the digest filters purely from storage.
 - Define relist identity through the injected `ListingFingerprinter`; `Sha256ListingFingerprinter` hashes the exact scraped title, description, normalized original start price, and normalized Buy Now price separated by null characters. Current bids are excluded because they are bidder-driven rather than seller-set; any content or seller-price change produces a new fingerprint.
@@ -145,7 +146,8 @@ sequenceDiagram
 - **Trade Me website**: outbound `GET` requests to search and listing pages derived from configured searches. The base origin defaults to `https://www.trademe.co.nz` and can be overridden with `AUCTION_TRACKER_TRADEME_BASE_URL` (used in E2E tests). Requests include browser-like headers/cookies and a 30-second timeout. Individual item-page fetch failures are logged and skipped; missing or malformed required title, description, seller username, or seller-price data and unrecoverable search errors fail the invocation. Seller usernames are read from `item.member.nickname`.
 - **Amazon DynamoDB**: outbound reads/writes against table `auction_tracker`. Update flow performs per-search URL checks, global content-fingerprint checks, and inserts; digest flow queries per-search partitions for recent items.
 - **Amazon SNS**: outbound publish to topic `auction_tracker_api_digest` when at least one new item exists in the digest window. Topic ARN is resolved by listing topics and matching by topic-name suffix.
-- **Amazon EventBridge**: scheduled invocation source for both handlers (`rate(15 minutes)` and `cron(0 6 * * ? *)`).
+- **Amazon EventBridge**: scheduled invocation source for `UpdateItemsHandler` using `rate(15 minutes)`.
+- **Amazon EventBridge Scheduler**: invokes `SendDigestHandler` daily using `cron(0 21 * * ? *)` in the `Pacific/Auckland` timezone. A dedicated scheduler execution role can invoke only the qualified digest Lambda version.
 - **OpenAI chat completions API**: outbound `POST /v1/chat/completions` for new listings on judged searches, with the search's configured model and reasoning effort (`gpt-5.4-mini`/`none` for MTG, `gpt-5.4-nano`/`low` for RAM) and JSON response format. The base origin defaults to `https://api.openai.com` and can be overridden with `AUCTION_TRACKER_OPENAI_BASE_URL` (used in E2E tests). The API key is read from the `auction_tracker_api` secret. Request failures and malformed verdicts fail the invocation.
 - **AWS Secrets Manager**: outbound read of secret `auction_tracker_api` for the OpenAI API key, resolved lazily on the first judged listing per Lambda instance.
 
@@ -159,10 +161,10 @@ sequenceDiagram
 
 ### Endpoint summary
 
-| Interface             | Contract                                | Purpose                                 |
-| --------------------- | --------------------------------------- | --------------------------------------- |
-| EventBridge -> Lambda | scheduled event to `UpdateItemsHandler` | scrape listings and persist new records |
-| EventBridge -> Lambda | scheduled event to `SendDigestHandler`  | find recent items and publish digest    |
+| Interface                       | Contract                                | Purpose                                 |
+| ------------------------------- | --------------------------------------- | --------------------------------------- |
+| EventBridge rule -> Lambda      | scheduled event to `UpdateItemsHandler` | scrape listings and persist new records |
+| EventBridge Scheduler -> Lambda | daily invocation of `SendDigestHandler` | find recent items and publish digest    |
 
 ### Example request and response
 
@@ -279,12 +281,13 @@ Representative record:
 | Judge model and effort     | `Judge` constants in `SearchFactoryImpl`                                                  | MTG `gpt-5.4-mini`/`none`, RAM `gpt-5.4-nano`/`low`                                                    |
 | Persisted discovered items | DynamoDB `auction_tracker` table                                                          | canonical history used for duplicate checks, verdicts, and digests                                     |
 | Digest recipients          | SNS topic subscriptions in Terraform                                                      | email endpoints are infra-managed                                                                      |
-| Schedule cadence           | EventBridge rules in Terraform                                                            | update `rate(15 minutes)`, digest `cron(0 6 * * ? *)`                                                  |
+| Schedule cadence           | EventBridge resources in Terraform                                                        | update `rate(15 minutes)`; digest `cron(0 21 * * ? *)` in `Pacific/Auckland`                           |
 
 ## Security and privacy
 
 - Service is schedule-driven and does not expose public HTTP interfaces.
 - Lambda IAM role grants required access for DynamoDB operations, SNS publish/list-topics operations, and reading the `auction_tracker_api` secret.
+- The dedicated digest scheduler execution role can invoke only the qualified `SendDigestHandler` Lambda version.
 - The OpenAI API key lives only in Secrets Manager; it is never logged or persisted in DynamoDB.
 - AWS credentials and region resolve through the AWS SDK default provider chain in Lambda/runtime environments.
 - Integrations use HTTPS transport (Trade Me, OpenAI, and AWS APIs).
@@ -314,7 +317,7 @@ Secrets Manager secret `auction_tracker_api` (value set manually after Terraform
 
 ## Performance envelope
 
-- Update schedule runs every 15 minutes; digest schedule runs daily (`06:00 UTC`) and represents a daily NZ-local intent (6pm NZST).
+- Update schedule runs every 15 minutes; the digest schedule runs daily at 9pm in `Pacific/Auckland`, including across daylight-saving transitions.
 - Lambda runtime settings are `memory_size = 1024` MB for both handlers.
 - Lambda timeout is `300` seconds for `UpdateItemsHandler` (sized for sequential judging at roughly 2 seconds per new judged listing, including first-run backfill) and `30` seconds for `SendDigestHandler`.
 - Jsoup HTTP requests use a `30` second timeout per request.
@@ -367,7 +370,7 @@ Secrets Manager secret `auction_tracker_api` (value set manually after Terraform
 
 ### Scenario 3: daily digest publishes recent unique listings
 
-1. EventBridge triggers `SendDigestHandler` on the daily schedule (`06:00 UTC`).
+1. EventBridge Scheduler triggers `SendDigestHandler` daily at 9pm in `Pacific/Auckland`.
 2. Handler queries each search partition for records newer than the rolling 24-hour threshold.
 3. Handler excludes records with `judgment` = `fail` and deduplicates merged results by the price-aware fingerprint, falling back to listing URL for records created before fingerprinting.
 4. Handler publishes one SNS digest when at least one item exists; otherwise it logs that no new items were found.

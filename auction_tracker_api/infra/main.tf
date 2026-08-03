@@ -263,27 +263,58 @@ resource "aws_lambda_permission" "allow_eventbridge_update_items" {
   }
 }
 
-resource "aws_cloudwatch_event_rule" "send_digest" {
-  name                = "${local.application_id}_send_digest"
-  description         = "Triggers the SendDigestHandler Lambda function"
-  schedule_expression = "cron(0 6 * * ? *)"
+data "aws_iam_policy_document" "send_digest_scheduler_assume_role" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["scheduler.amazonaws.com"]
+    }
+  }
 }
 
-resource "aws_cloudwatch_event_target" "send_digest_lambda" {
-  rule      = aws_cloudwatch_event_rule.send_digest.name
-  target_id = "SendDigestHandler"
-  arn       = module.java_lambda.lambda_functions["send_digest_handler"].qualified_arn
+resource "aws_iam_role" "send_digest_scheduler" {
+  name               = "${local.application_id}_send_digest_scheduler"
+  assume_role_policy = data.aws_iam_policy_document.send_digest_scheduler_assume_role.json
 }
 
-resource "aws_lambda_permission" "allow_eventbridge_send_digest" {
-  statement_id  = "AllowEventBridgeInvokeSendDigest"
-  action        = "lambda:InvokeFunction"
-  function_name = module.java_lambda.lambda_functions["send_digest_handler"].function_name
-  qualifier     = module.java_lambda.lambda_functions["send_digest_handler"].version
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.send_digest.arn
+data "aws_iam_policy_document" "send_digest_scheduler_invoke_lambda" {
+  statement {
+    effect = "Allow"
 
-  lifecycle {
-    create_before_destroy = true
+    resources = [
+      module.java_lambda.lambda_functions["send_digest_handler"].qualified_arn
+    ]
+
+    actions = ["lambda:InvokeFunction"]
+  }
+}
+
+resource "aws_iam_policy" "send_digest_scheduler_invoke_lambda" {
+  name   = "${local.application_id}_send_digest_scheduler_invoke_lambda"
+  policy = data.aws_iam_policy_document.send_digest_scheduler_invoke_lambda.json
+}
+
+resource "aws_iam_role_policy_attachment" "send_digest_scheduler_invoke_lambda" {
+  role       = aws_iam_role.send_digest_scheduler.name
+  policy_arn = aws_iam_policy.send_digest_scheduler_invoke_lambda.arn
+}
+
+resource "aws_scheduler_schedule" "send_digest" {
+  name                         = "${local.application_id}_send_digest"
+  description                  = "Triggers the SendDigestHandler Lambda function"
+  schedule_expression          = "cron(0 21 * * ? *)"
+  schedule_expression_timezone = "Pacific/Auckland"
+  depends_on                   = [aws_iam_role_policy_attachment.send_digest_scheduler_invoke_lambda]
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = module.java_lambda.lambda_functions["send_digest_handler"].qualified_arn
+    role_arn = aws_iam_role.send_digest_scheduler.arn
   }
 }
