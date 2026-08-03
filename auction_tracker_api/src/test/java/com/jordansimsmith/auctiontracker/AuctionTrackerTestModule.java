@@ -47,6 +47,12 @@ public class AuctionTrackerTestModule {
 
   @Provides
   @Singleton
+  ListingFingerprinter listingFingerprinter() {
+    return new Sha256ListingFingerprinter();
+  }
+
+  @Provides
+  @Singleton
   FakeLlmClient fakeLlmClient() {
     return new FakeLlmClient();
   }

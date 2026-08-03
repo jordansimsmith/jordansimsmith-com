@@ -42,6 +42,12 @@ public class AuctionTrackerModule {
 
   @Provides
   @Singleton
+  ListingFingerprinter listingFingerprinter() {
+    return new Sha256ListingFingerprinter();
+  }
+
+  @Provides
+  @Singleton
   LlmClient llmClient(ObjectMapper objectMapper, Secrets secrets) {
     var openAiBaseUrl = System.getenv("AUCTION_TRACKER_OPENAI_BASE_URL");
     if (openAiBaseUrl == null || openAiBaseUrl.isBlank()) {

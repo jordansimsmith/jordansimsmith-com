@@ -34,6 +34,8 @@ public interface AuctionTrackerFactory {
 
   TradeMeClient tradeMeClient();
 
+  ListingFingerprinter listingFingerprinter();
+
   ListingJudge listingJudge();
 
   static AuctionTrackerFactory create() {

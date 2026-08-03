@@ -104,7 +104,7 @@ sequenceDiagram
 - Treat digest timing as a daily NZ-local intent (6pm NZST) while current infrastructure executes at `06:00 UTC` (`cron(0 6 * * ? *)`).
 - Use browser-like headers and cookies in scrape requests to improve compatibility with Trade Me page delivery.
 - Judge listings at scrape time (the only moment descriptions exist in memory) and persist the verdict, so matching fingerprinted relists are skipped before judging and the digest filters purely from storage.
-- Define relist identity as SHA-256 over the exact scraped title, description, normalized original start price, and normalized Buy Now price separated by null characters. Current bids are excluded because they are bidder-driven rather than seller-set; any content or seller-price change produces a new fingerprint.
+- Define relist identity through the injected `ListingFingerprinter`; `Sha256ListingFingerprinter` hashes the exact scraped title, description, normalized original start price, and normalized Buy Now price separated by null characters. Current bids are excluded because they are bidder-driven rather than seller-set; any content or seller-price change produces a new fingerprint.
 - Read seller-set prices from the server-rendered `#frend-state` JSON at `NGRX_STATE.listing.cachedDetails.entities.<listing_id>.item`, where `startPrice` remains distinct from `maxBidAmount` after bidding begins. Missing or malformed required page data fails the invocation rather than storing an unsafe fingerprint.
 - Existing title-and-description fingerprints are not backfilled. They do not match price-aware fingerprints, so the first relist after deployment can produce one notification even when its price is unchanged; subsequent relists use price-aware suppression.
 - Carry judge configuration as a nullable nested `Judge` record (`prompt`, `model`, `reasoningEffort`, `criteria`) on each `SearchFactory.Search`, with one shared constant per judge in `SearchFactoryImpl`; criteria ride with the config because verdict validation is per-judge.
@@ -312,7 +312,7 @@ Secrets Manager secret `auction_tracker_api` (value set manually after Terraform
 
 ## Testing and quality gates
 
-- Unit tests (`JsoupTradeMeClientTest`, `AuctionTrackerItemTest`) cover URL generation, listing parsing, query-parameter stripping, reserve filtering, seller-price extraction, current-bid exclusion, fail-closed price parsing, decimal normalization, and exact content-and-price fingerprint semantics.
+- Unit tests (`JsoupTradeMeClientTest`, `Sha256ListingFingerprinterTest`) cover URL generation, listing parsing, query-parameter stripping, reserve filtering, seller-price extraction, current-bid exclusion, fail-closed price parsing, decimal normalization, and exact content-and-price fingerprint semantics.
 - Unit tests (`LlmListingJudgeTest`) cover verdict parsing, criterion failure, malformed responses, and the exact LLM request shape (per-judge model, effort, and criteria) against both real checked-in prompt resources.
 - Unit tests (`SearchFactoryImplTest`) cover the six search definitions, their filters, and judge config wiring.
 - Integration tests cover update persistence, URL duplicate prevention, global relist suppression before judging, changed-description and changed-price handling, in-run cross-search suppression, judgment persistence, fail-closed judge errors, 24-hour digest filtering, fail-judged exclusion, price-aware fingerprint digest deduplication, and legacy URL fallback (LLM calls faked via `FakeLlmClient`).

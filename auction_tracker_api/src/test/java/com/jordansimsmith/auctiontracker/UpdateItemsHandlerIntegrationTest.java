@@ -125,8 +125,12 @@ public class UpdateItemsHandlerIntegrationTest {
             AuctionTrackerItem.formatGsi1sk(
                 "https://www.trademe.co.nz/a/marketplace/sports/golf/listing/123"));
     var fingerprint =
-        AuctionTrackerItem.createFingerprint(
-            "Titleist Wedge", "Great condition wedge", START_PRICE, BUY_NOW_PRICE);
+        fingerprint(
+            "https://www.trademe.co.nz/a/marketplace/sports/golf/listing/123",
+            "Titleist Wedge",
+            "Great condition wedge",
+            START_PRICE,
+            BUY_NOW_PRICE);
     assertThat(item1.getFingerprint()).isEqualTo(fingerprint);
     assertThat(item1.getGsi2pk()).isEqualTo(AuctionTrackerItem.formatGsi2pk(fingerprint));
     assertThat(item1.getGsi2sk())
@@ -179,9 +183,12 @@ public class UpdateItemsHandlerIntegrationTest {
             expectedSearchUrl,
             "https://www.trademe.co.nz/a/marketplace/sports/golf/listing/123",
             "Titleist Wedge",
-            "Great condition wedge",
-            START_PRICE,
-            BUY_NOW_PRICE,
+            fingerprint(
+                "https://www.trademe.co.nz/a/marketplace/sports/golf/listing/123",
+                "Titleist Wedge",
+                "Great condition wedge",
+                START_PRICE,
+                BUY_NOW_PRICE),
             Instant.ofEpochSecond(2000),
             null);
     auctionTrackerTable.putItem(existingItem);
@@ -229,9 +236,12 @@ public class UpdateItemsHandlerIntegrationTest {
             existingSearchUrl,
             "https://www.trademe.co.nz/listing/111",
             "mtg bulk lot",
-            "500 assorted cards",
-            START_PRICE,
-            BUY_NOW_PRICE,
+            fingerprint(
+                "https://www.trademe.co.nz/listing/111",
+                "mtg bulk lot",
+                "500 assorted cards",
+                START_PRICE,
+                BUY_NOW_PRICE),
             Instant.ofEpochSecond(2000),
             AuctionTrackerItem.Judgment.PASS);
     auctionTrackerTable.putItem(existingItem);
@@ -272,9 +282,7 @@ public class UpdateItemsHandlerIntegrationTest {
             expectedSearchUrl,
             "url1",
             "Trident Z RGB",
-            "Great condition",
-            START_PRICE,
-            BUY_NOW_PRICE,
+            fingerprint("url1", "Trident Z RGB", "Great condition", START_PRICE, BUY_NOW_PRICE),
             Instant.ofEpochSecond(2000),
             null));
 
@@ -314,9 +322,7 @@ public class UpdateItemsHandlerIntegrationTest {
             expectedSearchUrl,
             "url1",
             "Trident Z RGB",
-            "Great condition",
-            START_PRICE,
-            BUY_NOW_PRICE,
+            fingerprint("url1", "Trident Z RGB", "Great condition", START_PRICE, BUY_NOW_PRICE),
             Instant.ofEpochSecond(2000),
             AuctionTrackerItem.Judgment.PASS));
     fakeLlmClient.addResponse(judgmentJson(false));
@@ -475,9 +481,7 @@ public class UpdateItemsHandlerIntegrationTest {
             expectedSearchUrl,
             "url1",
             "MTG bulk lot",
-            "500 assorted cards",
-            START_PRICE,
-            BUY_NOW_PRICE,
+            fingerprint("url1", "MTG bulk lot", "500 assorted cards", START_PRICE, BUY_NOW_PRICE),
             Instant.ofEpochSecond(2000),
             AuctionTrackerItem.Judgment.FAIL);
     auctionTrackerTable.putItem(existingItem);
@@ -652,5 +656,11 @@ public class UpdateItemsHandlerIntegrationTest {
       }
     }
     return builder.append("}").toString();
+  }
+
+  private static String fingerprint(
+      String url, String title, String description, BigDecimal startPrice, BigDecimal buyNowPrice) {
+    return new Sha256ListingFingerprinter()
+        .create(new TradeMeClient.TradeMeItem(url, title, description, startPrice, buyNowPrice));
   }
 }

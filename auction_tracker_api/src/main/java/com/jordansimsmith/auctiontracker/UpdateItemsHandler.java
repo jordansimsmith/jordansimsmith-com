@@ -23,6 +23,7 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
   private final Clock clock;
   private final SearchFactory searchFactory;
   private final TradeMeClient tradeMeClient;
+  private final ListingFingerprinter listingFingerprinter;
   private final ListingJudge listingJudge;
   private final DynamoDbTable<AuctionTrackerItem> auctionTrackerTable;
   private final DynamoDbIndex<AuctionTrackerItem> gsi1;
@@ -37,6 +38,7 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
     this.clock = factory.clock();
     this.searchFactory = factory.searchFactory();
     this.tradeMeClient = factory.tradeMeClient();
+    this.listingFingerprinter = factory.listingFingerprinter();
     this.listingJudge = factory.listingJudge();
     this.auctionTrackerTable = factory.auctionTrackerTable();
     this.gsi1 = auctionTrackerTable.index("gsi1");
@@ -86,12 +88,7 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
         continue;
       }
 
-      var contentFingerprint =
-          AuctionTrackerItem.createFingerprint(
-              tradeMeItem.title(),
-              tradeMeItem.description(),
-              tradeMeItem.startPrice(),
-              tradeMeItem.buyNowPrice());
+      var contentFingerprint = listingFingerprinter.create(tradeMeItem);
       if (contentFingerprints.contains(contentFingerprint)
           || contentFingerprintExists(contentFingerprint)) {
         continue;
@@ -113,9 +110,7 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
               searchUrl,
               tradeMeItem.url(),
               tradeMeItem.title(),
-              tradeMeItem.description(),
-              tradeMeItem.startPrice(),
-              tradeMeItem.buyNowPrice(),
+              contentFingerprint,
               currentTime,
               judgment);
       auctionTrackerTable.putItem(auctionTrackerItem);
