@@ -29,7 +29,7 @@ The auction tracker API service runs scheduled backend workflows that scrape Tra
 - Build search URLs with term, optional price filters, condition filter, and `sort_order=expirydesc`.
 - Fetch listing pages, normalize listing URLs, extract original start and Buy Now prices from the embedded Trade Me page state, exclude current bids from relist identity, and skip listings marked as reserve not met.
 - Extract seller usernames from embedded Trade Me page state and skip listings from the injected code-defined exclusion set, initially `roseshade`, before duplicate checks, judging, or persistence.
-- Judge new listings on searches with a configured judge (all six searches: the three MTG searches `bulk`, `collection`, `assorted` and the three RAM searches `g.skill`, `gskill`, `trident z`) using an OpenAI LLM against the judge's six binary criteria, and persist the overall verdict.
+- Judge new listings on searches with a configured judge (all eight searches: the five MTG searches `bulk`, `collection`, `assorted`, `clear out`, `clearout` and the three RAM searches `g.skill`, `gskill`, `trident z`) using an OpenAI LLM against the judge's six binary criteria, and persist the overall verdict.
 - Carry judge configuration (prompt resource, model, reasoning effort, criteria) per search: the MTG searches share one judge config, the RAM searches share another.
 - Store newly discovered items in DynamoDB with deterministic key prefixes and 30-day TTL.
 - Prevent duplicate inserts for the same `(search_url, item_url)` pair using GSI `gsi1`.
@@ -133,7 +133,7 @@ sequenceDiagram
 - **Content fingerprint**: a deterministic SHA-256 identity derived from the exact scraped listing title, description, normalized original start price, and normalized Buy Now price, persisted as `fingerprint`, and used to derive `gsi2pk`.
 - **Seller-set price terms**: the original auction start price and optional Buy Now price embedded in Trade Me's server-rendered page state; current bids are excluded.
 - **Relisted item**: a listing with a new URL whose price-aware content fingerprint matches a record retained in `gsi2`.
-- **Judged search**: a search definition with a judge configuration (currently all six searches: three MTG sharing `prompts/mtg-bulk-judge.md`, three RAM sharing `prompts/ram-judge.md`).
+- **Judged search**: a search definition with a judge configuration (currently all eight searches: five MTG sharing `prompts/mtg-bulk-judge.md`, three RAM sharing `prompts/ram-judge.md`).
 - **Judgment**: the LLM verdict for a listing, `pass` or `fail`; overall pass requires all of the judge's six criteria to pass (MTG: `mtg_cards`, `bulk_scale`, `not_basic_lands`, `not_universes_beyond`, `civilian_seller`, `fixed_collection`; RAM: `trident_z_family`, `ddr4`, `kit_2x16gb`, `speed_3200`, `timings_cl16`, `desktop_udimm`).
 - **Digest window**: rolling 24-hour interval from the digest handler execution timestamp.
 - **Cross-search duplicate**: the same listing URL or price-aware content fingerprint appearing in multiple search definitions.
@@ -328,7 +328,7 @@ Secrets Manager secret `auction_tracker_api` (value set manually after Terraform
 - Unit tests (`JsoupTradeMeClientTest`, `Sha256ListingFingerprinterTest`) cover URL generation, listing parsing, query-parameter stripping, reserve filtering, required seller-username extraction, fail-closed seller and price parsing, current-bid exclusion, decimal normalization, and exact content-and-price fingerprint semantics.
 - Unit tests (`ExcludedSellerUsernameFactoryImplTest`) lock down the production exclusion set.
 - Unit tests (`LlmListingJudgeTest`) cover verdict parsing, criterion failure, malformed responses, and the exact LLM request shape (per-judge model, effort, and criteria) against both real checked-in prompt resources.
-- Unit tests (`SearchFactoryImplTest`) cover the six search definitions, their filters, and judge config wiring.
+- Unit tests (`SearchFactoryImplTest`) cover the eight search definitions, their filters, and judge config wiring.
 - Integration tests cover update persistence, excluded-seller suppression before judging, URL duplicate prevention, global relist suppression before judging, changed-description and changed-price handling, in-run cross-search suppression, judgment persistence, fail-closed judge errors, 24-hour digest filtering, fail-judged exclusion, price-aware fingerprint digest deduplication, and legacy URL fallback (LLM calls faked via `FakeLlmClient`).
 - E2E tests validate the LocalStack pipeline (Lambda invoke plus SNS/SQS notification path), including an excluded `roseshade` listing, against local Trade Me website and OpenAI stub containers and are CI-safe.
 - Required checks before merge:
