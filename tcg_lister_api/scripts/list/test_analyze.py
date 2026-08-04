@@ -92,11 +92,17 @@ def _snapshot(
     listing_count=0,
     *,
     copy_count=None,
+    all_condition_seller_count=None,
     all_condition_copy_count=None,
     fetch_card_id="mtg_244_c_dtk_normal",
     fetch_set_id=2648,
 ):
     copy_count = (3 if listing_count else 0) if copy_count is None else copy_count
+    all_condition_seller_count = (
+        listing_count
+        if all_condition_seller_count is None
+        else all_condition_seller_count
+    )
     all_condition_copy_count = (
         copy_count if all_condition_copy_count is None else all_condition_copy_count
     )
@@ -116,6 +122,7 @@ def _snapshot(
         market_price_nzd=Decimal(market_price),
         local_listing_count=listing_count,
         local_copy_count=copy_count,
+        all_condition_local_seller_count=all_condition_seller_count,
         all_condition_local_copy_count=all_condition_copy_count,
         lowest_local_price_nzd=Decimal("0.40") if listing_count else None,
         price_ladder=ladder,
@@ -238,26 +245,28 @@ def test_load_physical_cards_rejects_invalid_offset(tmp_path, offset, message):
         "market_price",
         "listing_count",
         "copy_count",
+        "all_condition_seller_count",
         "all_condition_copy_count",
         "expected",
     ),
     [
-        ("0.2499", 0, 0, 0, Decision.DISCARD),
-        ("0.25", 0, 0, 0, Decision.LIST),
-        ("0.25", 0, 0, 1, Decision.DISCARD),
-        ("0.33", 0, 0, 0, Decision.LIST),
-        ("0.33", 0, 0, 1, Decision.DISCARD),
-        ("0.3301", 9, 9, 9, Decision.LIST),
-        ("0.3301", 0, 0, 10, Decision.DISCARD),
-        ("0.4999", 2, 2, 9, Decision.LIST),
-        ("0.4999", 0, 0, 10, Decision.DISCARD),
-        ("0.50", 0, 0, 10, Decision.LIST),
+        ("0.2499", 0, 0, 0, 0, Decision.DISCARD),
+        ("0.25", 0, 0, 0, 0, Decision.LIST),
+        ("0.25", 0, 0, 1, 1, Decision.DISCARD),
+        ("0.33", 0, 0, 0, 0, Decision.LIST),
+        ("0.33", 0, 0, 1, 1, Decision.DISCARD),
+        ("0.3301", 9, 100, 5, 100, Decision.LIST),
+        ("0.3301", 0, 0, 6, 6, Decision.DISCARD),
+        ("0.4999", 2, 100, 5, 100, Decision.LIST),
+        ("0.4999", 0, 0, 6, 6, Decision.DISCARD),
+        ("0.50", 0, 0, 100, 100, Decision.LIST),
     ],
 )
 def test_decide_applies_price_and_stock_boundaries(
     market_price,
     listing_count,
     copy_count,
+    all_condition_seller_count,
     all_condition_copy_count,
     expected,
 ):
@@ -267,6 +276,7 @@ def test_decide_applies_price_and_stock_boundaries(
                 market_price,
                 listing_count,
                 copy_count=copy_count,
+                all_condition_seller_count=all_condition_seller_count,
                 all_condition_copy_count=all_condition_copy_count,
             )
         ).decision
@@ -1253,7 +1263,7 @@ def test_write_reports_preserves_one_record_per_physical_card(tmp_path):
     report = json.loads((output_dir / "report.json").read_text())
     assert [card["stack_position"] for card in report["cards"]] == [1, 2, 3]
     assert report["input_path"] == "scan.csv"
-    assert report["schema_version"] == 5
+    assert report["schema_version"] == 6
     assert report["execution_mode"] == "dry_run"
     assert report["execution_complete"] is True
     assert [card["listing_action"] for card in report["cards"]] == [
@@ -1264,6 +1274,7 @@ def test_write_reports_preserves_one_record_per_physical_card(tmp_path):
     assert all(card["mutation_status"] == "PLANNED" for card in report["cards"])
     assert [card["mutation_quantity"] for card in report["cards"]] == [1, 2, 3]
     assert report["cards"][0]["existing_listings"] == []
+    assert report["cards"][0]["all_condition_local_seller_count"] == 0
     assert report["cards"][0]["all_condition_local_copy_count"] == 0
     assert report["cards"][1]["existing_listings"][0]["simulated"] is True
 

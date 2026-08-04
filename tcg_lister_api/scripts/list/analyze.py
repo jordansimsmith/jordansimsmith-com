@@ -67,6 +67,7 @@ CSV_FIELDS = [
     "suggested_price_nzd",
     "local_listing_count",
     "local_copy_count",
+    "all_condition_local_seller_count",
     "all_condition_local_copy_count",
     "lowest_local_price_nzd",
     "price_ladder",
@@ -201,6 +202,7 @@ class CachedAnalysis:
     suggested_price_nzd: Decimal | None = None
     local_listing_count: int = 0
     local_copy_count: int = 0
+    all_condition_local_seller_count: int = 0
     all_condition_local_copy_count: int = 0
     lowest_local_price_nzd: Decimal | None = None
     price_ladder: dict[Decimal, PriceTier] | None = None
@@ -284,6 +286,7 @@ class AnalysisRecord:
     suggested_price_nzd: Decimal | None
     local_listing_count: int
     local_copy_count: int
+    all_condition_local_seller_count: int
     all_condition_local_copy_count: int
     lowest_local_price_nzd: Decimal | None
     price_ladder: dict[Decimal, PriceTier]
@@ -426,12 +429,16 @@ def decide(snapshot):
             ),
             suggested_price_nzd=None,
         )
-    if market_price < Decimal("0.50") and snapshot.all_condition_local_copy_count >= 10:
+    if (
+        market_price > Decimal("0.33")
+        and market_price < Decimal("0.50")
+        and snapshot.all_condition_local_seller_count > 5
+    ):
         return DecisionResult(
             decision=Decision.DISCARD,
             decision_reason=(
-                "market price is below NZ$0.50 and non-owned local listings "
-                "contain at least ten copies across all conditions"
+                "market price is above NZ$0.33 and below NZ$0.50 with more than "
+                "five distinct non-owned sellers across all conditions"
             ),
             suggested_price_nzd=None,
         )
@@ -446,7 +453,7 @@ def decide(snapshot):
         else:
             reason = (
                 "market price is above NZ$0.33 and below NZ$0.50 "
-                "with fewer than ten non-owned local copies across all conditions"
+                "with at most five distinct non-owned sellers across all conditions"
             )
     else:
         reason = "market price is at least NZ$0.50"
@@ -510,6 +517,9 @@ def analyze_cards(
                         suggested_price_nzd=result.suggested_price_nzd,
                         local_listing_count=snapshot.local_listing_count,
                         local_copy_count=snapshot.local_copy_count,
+                        all_condition_local_seller_count=(
+                            snapshot.all_condition_local_seller_count
+                        ),
                         all_condition_local_copy_count=(
                             snapshot.all_condition_local_copy_count
                         ),
@@ -788,7 +798,7 @@ def write_reports(
     output_dir.mkdir(parents=True, exist_ok=True)
     card_payloads = [_record_payload(record) for record in run.records]
     report = {
-        "schema_version": 5,
+        "schema_version": 6,
         "input_path": Path(input_path).name,
         "generated_at": generated_at.astimezone(timezone.utc).isoformat(),
         "complete": run.complete,
@@ -1042,6 +1052,7 @@ def _record(
         suggested_price_nzd=cached.suggested_price_nzd,
         local_listing_count=cached.local_listing_count,
         local_copy_count=cached.local_copy_count,
+        all_condition_local_seller_count=(cached.all_condition_local_seller_count),
         all_condition_local_copy_count=(cached.all_condition_local_copy_count),
         lowest_local_price_nzd=cached.lowest_local_price_nzd,
         price_ladder=cached.price_ladder or {},
@@ -1081,6 +1092,7 @@ def _record_payload(record):
         ),
         "local_listing_count": record.local_listing_count,
         "local_copy_count": record.local_copy_count,
+        "all_condition_local_seller_count": (record.all_condition_local_seller_count),
         "all_condition_local_copy_count": (record.all_condition_local_copy_count),
         "lowest_local_price_nzd": _decimal_string(record.lowest_local_price_nzd),
         "price_ladder": {
@@ -1126,6 +1138,7 @@ def _format_console_record(record, total, *, use_color=False):
         parts.append(
             f"local {record.local_listing_count} listings/"
             f"{record.local_copy_count} copies in condition, "
+            f"{record.all_condition_local_seller_count} sellers/"
             f"{record.all_condition_local_copy_count} copies across all conditions)"
         )
     parts.append(f"| {record.listing_action.value} — {record.listing_action_reason}")

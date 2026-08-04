@@ -136,12 +136,14 @@ def _listing(
     listing_id=1,
     condition="raw-nm",
     status="ACTIVE",
+    seller_profile_name="seller",
 ):
     return {
         "id": listing_id,
         "remainingQuantity": quantity,
         "status": status,
         "condition": condition,
+        "sellerProfileName": seller_profile_name,
         "listedPriceInRequestedCurrency": price,
         "requestedCurrency": "NZD",
         "listedCountry": "NZ",
@@ -249,6 +251,7 @@ def test_get_market_snapshot_uses_direct_id_and_builds_price_ladder():
     assert snapshot.market_price_nzd == Decimal("0.4657553244")
     assert snapshot.local_listing_count == 2
     assert snapshot.local_copy_count == 13
+    assert snapshot.all_condition_local_seller_count == 1
     assert snapshot.all_condition_local_copy_count == 15
     assert snapshot.lowest_local_price_nzd == Decimal("0.4")
     assert snapshot.price_ladder[Decimal("0.4")].copy_count == 3
@@ -285,6 +288,7 @@ def test_get_market_snapshot_excludes_owned_listings_from_competition():
 
     assert snapshot.local_listing_count == 1
     assert snapshot.local_copy_count == 2
+    assert snapshot.all_condition_local_seller_count == 1
     assert snapshot.all_condition_local_copy_count == 2
     assert snapshot.lowest_local_price_nzd == Decimal("0.4")
     assert snapshot.price_ladder == {
@@ -311,9 +315,78 @@ def test_get_market_snapshot_reports_no_competition_when_all_stock_is_owned():
 
     assert snapshot.local_listing_count == 0
     assert snapshot.local_copy_count == 0
+    assert snapshot.all_condition_local_seller_count == 0
     assert snapshot.all_condition_local_copy_count == 0
     assert snapshot.lowest_local_price_nzd is None
     assert snapshot.price_ladder == {}
+
+
+def test_get_market_snapshot_counts_distinct_non_owned_sellers_across_conditions():
+    client, _, _ = _client(
+        [
+            _FakeResponse(200, _card_payload(total_listings=5)),
+            _FakeResponse(
+                200,
+                _listings_payload(
+                    [
+                        _listing(
+                            0.40,
+                            2,
+                            listing_id=1,
+                            seller_profile_name="Alpha",
+                        ),
+                        _listing(
+                            0.35,
+                            3,
+                            listing_id=2,
+                            condition="raw-lp",
+                            seller_profile_name="alpha",
+                        ),
+                        _listing(
+                            0.30,
+                            4,
+                            listing_id=123,
+                            condition="raw-hp",
+                            seller_profile_name="CurrentUser",
+                        ),
+                    ],
+                    total_pages=2,
+                ),
+            ),
+            _FakeResponse(
+                200,
+                _listings_payload(
+                    [
+                        _listing(
+                            0.45,
+                            5,
+                            listing_id=3,
+                            condition="raw-mp",
+                            seller_profile_name="Beta",
+                        ),
+                        _listing(
+                            0.50,
+                            6,
+                            listing_id=4,
+                            condition="raw-d",
+                            seller_profile_name="ALPHA",
+                        ),
+                    ],
+                    total_pages=2,
+                    page_number=1,
+                ),
+            ),
+        ]
+    )
+
+    snapshot = client.get_market_snapshot(
+        _query(),
+        "raw-nm",
+        excluded_listing_ids={123},
+    )
+
+    assert snapshot.all_condition_local_seller_count == 2
+    assert snapshot.all_condition_local_copy_count == 16
 
 
 def test_get_market_snapshot_falls_back_to_filter_and_search():
@@ -1456,4 +1529,24 @@ def test_get_market_snapshot_rejects_fractional_remaining_quantity():
     )
 
     with pytest.raises(FetchTcgRequestError, match="remainingQuantity"):
+        client.get_market_snapshot(_query(), "raw-nm")
+
+
+@pytest.mark.parametrize("seller_profile_name", [None, "", "   ", 123])
+def test_get_market_snapshot_rejects_invalid_seller_profile_name(
+    seller_profile_name,
+):
+    client, _, _ = _client(
+        [
+            _FakeResponse(200, _card_payload(total_listings=1)),
+            _FakeResponse(
+                200,
+                _listings_payload(
+                    [_listing(0.4, 1, seller_profile_name=seller_profile_name)]
+                ),
+            ),
+        ]
+    )
+
+    with pytest.raises(FetchTcgRequestError, match="seller profile name"):
         client.get_market_snapshot(_query(), "raw-nm")

@@ -35,7 +35,7 @@ The current service is intentionally a script rather than an HTTP API. It is non
 - Expand each row's `Quantity` into one ordered record per physical card.
 - Skip an explicit number of expanded physical cards before applying an optional run limit.
 - Match each card to Fetch by Scryfall ID, Fetch set identity, collector number, and finish.
-- Read Fetch's NZD market price and active New Zealand listings across all conditions, while retaining translated-condition counts and prices.
+- Read Fetch's NZD market price and active New Zealand listings across all conditions, while retaining distinct seller counts, physical-copy counts, and translated-condition prices.
 - Read the authenticated user's active listings and match exact card, set, finish, and condition variants.
 - Exclude authenticated managed-listing IDs from local competition counts and price ladders.
 - Apply the fixed NZD decision policy.
@@ -127,7 +127,7 @@ sequenceDiagram
 - Keep a generated, checked-in one-to-many mapping from Scryfall/ManaBox set codes to Fetch numeric set identifiers. An unmapped set stops the run so the mapping must be updated explicitly. Manual aliases cover Fetch catalogs that split one Scryfall set across products, including `PLST` cards in Fetch's `The List` and `Mystery Booster` sets.
 - Translate ManaBox's seven Cardmarket-style conditions into Fetch condition codes: `mint` to `raw-m`, `near_mint` to `raw-nm`, `excellent` to `raw-lp`, `good` to `raw-mp`, `light_played` and `played` to `raw-hp`, and `poor` to `raw-d`.
 - Construct the normal Fetch card identifier as a fast path, but fall back to a search restricted to the statically mapped Fetch sets when that identifier does not resolve.
-- Always read the detailed listings endpoint for local stock. Count physical copies across every condition for decision thresholds, while deriving the price ladder only from the translated ManaBox condition. The indexed `listingsData` summary on a card may be stale and is not used for decisions or validation.
+- Always read the detailed listings endpoint for local stock. Count distinct non-owned seller profiles and physical copies across every condition, while deriving the price ladder only from the translated ManaBox condition. Use distinct sellers for the market-price range above `0.33` and below `0.50`; retain physical copies for the lower out-of-stock rule and reporting. The indexed `listingsData` summary on a card may be stale and is not used for decisions or validation.
 - Treat the authenticated managed-listing IDs as owned inventory, not competition. Exclude those IDs from local listing counts, copy counts, lowest prices, and price ladders before applying the decision policy.
 - Use `Decimal` for all threshold checks and price rounding.
 - Cache card resolution, market data, and pricing decisions only in memory for the duration of one run. Listing actions are never cached because owned state changes after each physical card.
@@ -147,6 +147,7 @@ sequenceDiagram
 - **Exact variant**: a card printing identified by Scryfall ID, Fetch set identity, collector number, and finish, with a specific condition for listing comparisons.
 - **Market price**: Fetch's NZD value at `pricingData.NZ.tcgMarketPrice`, which may be available without local stock.
 - **Local stock**: active New Zealand Fetch listings for the exact card and translated Fetch condition, excluding listings owned by the authenticated account.
+- **All-condition local sellers**: distinct seller profiles with at least one active New Zealand Fetch listing for the exact card in any condition, excluding listings owned by the authenticated account.
 - **All-condition local copies**: physical copies across active New Zealand Fetch listings for the exact card in every condition, excluding listings owned by the authenticated account.
 - **Price ladder**: non-owned local listing and remaining-copy counts grouped by NZD price.
 - **Managed listing**: one active listing owned by the authenticated Fetch account.
@@ -198,7 +199,7 @@ bazel run //tcg_lister_api:fetchtcg-bulk-analyze -- \
 
 - `GET /v3/cards/{card_id}` returns identity fields and `pricingData.NZ.tcgMarketPrice`. Its indexed `listingsData` summary is ignored.
 - `GET /v3/cards` finds card candidates for a card name, set, and finish.
-- `GET /v3/cards/{card_id}/listings` is the source of truth for paginated active listings sorted by price and is called for every newly analyzed exact variant. Active listing IDs found in the authenticated managed-listings response are excluded before deriving the all-condition physical-copy count and translated-condition local stock.
+- `GET /v3/cards/{card_id}/listings` is the source of truth for paginated active listings sorted by price and is called for every newly analyzed exact variant. Active listing IDs found in the authenticated managed-listings response are excluded before deriving the distinct all-condition seller count, all-condition physical-copy count, and translated-condition local stock.
 - Authenticated `GET /v1/manage-listings` returns the current account's listing pages. Requests filter to Magic, NZD, and all static Fetch set identifiers relevant to the input cards.
 - Authenticated `POST /v2/private/manage-listings` creates or updates one listing. Its JSON body contains `cardId`, exact `condition`, absolute `quantity`, `listedPrice`, `listedCurrency: "NZD"`, `matchPriceEnabled: false`, and `details: ""`. Fetch derives the upsert target from `cardId` and condition; no listing ID is sent.
 
@@ -237,6 +238,7 @@ Every card record contains:
 - `suggested_price_nzd`
 - `local_listing_count`
 - `local_copy_count`
+- `all_condition_local_seller_count`
 - `all_condition_local_copy_count`
 - `lowest_local_price_nzd`
 - `price_ladder`
@@ -253,7 +255,7 @@ Every card record contains:
 - `mutation_price_nzd`
 - `mutation_error`
 
-`local_listing_count`, `local_copy_count`, `lowest_local_price_nzd`, and `price_ladder` describe non-owned competition in the translated ManaBox condition. `all_condition_local_copy_count` is the non-owned physical-copy total across every condition and drives the stock thresholds. `price_ladder` is a JSON object keyed by two-decimal NZD price. Each value contains `listing_count` and `copy_count`.
+`local_listing_count`, `local_copy_count`, `lowest_local_price_nzd`, and `price_ladder` describe non-owned competition in the translated ManaBox condition. `all_condition_local_seller_count` is the number of distinct non-owned seller profiles across every condition and drives the above-`0.33`, below-`0.50` threshold. `all_condition_local_copy_count` is the non-owned physical-copy total across every condition and drives the `0.25` through `0.33` out-of-stock threshold. Seller names are not written to reports. `price_ladder` is a JSON object keyed by two-decimal NZD price. Each value contains `listing_count` and `copy_count`.
 
 `existing_listings` is a JSON array. Each item contains `listing_id`, `remaining_quantity`, `listed_price_nzd`, and `simulated`. A planned create produces `listing_id: null` and `simulated: true`; a planned update retains the real positive listing ID but uses `simulated: true` for its virtual quantity. Unmodified or executed Fetch state uses `simulated: false`. `stack.csv` stores this array as compact JSON.
 
@@ -268,7 +270,7 @@ Every card record contains:
 
 Execute-mode console output uses the intermediate `POSTED` status immediately after an accepted upsert; final reports replace it with `SUCCEEDED` or `FAILED` after the single verification refresh.
 
-`report.json` additionally contains `execution_mode` (`dry_run` or `execute`), `execution_complete`, and `execution_error`. Reports contain only cards reached before any fail-fast stop and use schema version `5`.
+`report.json` additionally contains `execution_mode` (`dry_run` or `execute`), `execution_complete`, and `execution_error`. Reports contain only cards reached before any fail-fast stop and use schema version `6`.
 
 ## Data and storage contracts
 
@@ -290,7 +292,7 @@ Execute-mode console output uses the intermediate `POSTED` status immediately af
 - Repeated exact variants may reuse one in-run market snapshot but derive listing actions again from current mutable owned inventory.
 - Every ManaBox set code must have at least one entry in the static Fetch set mapping before its first card is analyzed. All mapped Fetch sets are eligible for exact identity resolution and managed-listing reads.
 - Every condition must be one of ManaBox's seven exported values, and all Fetch comparisons and mutations use its fixed translated condition code.
-- All-condition physical-copy totals include every active New Zealand condition returned by the detailed listings endpoint, while local stock and price ladders include only the translated ManaBox condition. Both exclude positive listing IDs present in the authenticated managed-listings response.
+- All-condition seller totals deduplicate case-insensitive Fetch seller profile names across every active New Zealand condition. All-condition physical-copy totals include every active New Zealand condition, while local stock and price ladders include only the translated ManaBox condition. All counts exclude positive listing IDs present in the authenticated managed-listings response.
 - Managed listings are loaded before per-card analysis; authentication failure stops the run before card market requests or report generation.
 - A `LIST` decision with no exact managed listing previews `CREATE`.
 - A `LIST` decision with exactly one exact managed listing previews `UPDATE`.
@@ -308,7 +310,7 @@ Execute-mode console output uses the intermediate `POSTED` status immediately af
 - The final card count is the number of `PLANNED` dry-run records or `SUCCEEDED` execute records. The final value is the sum of one `mutation_price_nzd` per counted physical-card record.
 - Market prices below `0.25` NZD are `DISCARD`.
 - Market prices from `0.25` through `0.33` inclusive are `LIST` only when the non-owned all-condition physical-copy total is zero; otherwise they are `DISCARD`.
-- Market prices above `0.33` and below `0.50` are `LIST` when the non-owned all-condition physical-copy total is below ten; otherwise they are `DISCARD`.
+- Market prices above `0.33` and below `0.50` are `LIST` when at most five distinct non-owned sellers have active listings across all conditions; otherwise they are `DISCARD`.
 - Market prices of `0.50` NZD or more are `LIST`.
 - A `LIST` price is the market price rounded upward to the next whole NZ dollar, with an exact whole dollar left unchanged.
 - Missing market data, unsupported input, and ambiguous identity produce `REVIEW`.
@@ -321,7 +323,7 @@ Execute-mode console output uses the intermediate `POSTED` status immediately af
 - **Set translation**: generated `fetch_set_mapping.py`, including deterministic manual aliases for one-to-many catalog splits, reviewed and checked into the repository.
 - **Condition translation**: the fixed ManaBox-to-Fetch mapping in this README and the analyzer implementation.
 - **Market price**: Fetch `pricingData.NZ.tcgMarketPrice`.
-- **Local stock and all-condition copies**: active Fetch listing records for country `NZ`, minus listing IDs owned by the authenticated account.
+- **Local stock, all-condition sellers, and all-condition copies**: active Fetch listing records for country `NZ`, minus listing IDs owned by the authenticated account.
 - **Owned listings**: authenticated Fetch `/v1/manage-listings` records.
 - **Decision**: the fixed rules in this README and the analyzer implementation.
 - **Listing action**: the fixed preview rules in this README and the analyzer implementation.
@@ -377,7 +379,7 @@ The raw token is required at runtime but is never persisted by the service. It s
 
 ## Testing and quality gates
 
-- Unit tests cover CSV validation, reversed row order, quantity expansion, condition translation, one-to-many static set mapping, PLST collector normalization, exact matching, fallback search, card and listing pagination, condition-agnostic decision counts, condition-specific price ladders, owned-listing exclusion, bearer isolation, managed-listing validation and matching, inline dry-run simulation, per-card execution, mutable inventory, fail-fast partial results, final post-write verification, final count and value summaries, decision boundaries, whole-dollar rounding, retry behavior, rate limiting, request budgets, token redaction, and stop conditions.
+- Unit tests cover CSV validation, reversed row order, quantity expansion, condition translation, one-to-many static set mapping, PLST collector normalization, exact matching, fallback search, card and listing pagination, distinct all-condition seller counts, all-condition physical-copy counts, condition-specific price ladders, owned-listing exclusion, bearer isolation, managed-listing validation and matching, inline dry-run simulation, per-card execution, mutable inventory, fail-fast partial results, final post-write verification, final count and value summaries, decision boundaries, whole-dollar rounding, retry behavior, rate limiting, request budgets, token redaction, and stop conditions.
 - HTTP tests use mocked responses and injected time functions; tests never call Fetch.
 - Test fixtures contain no seller PII.
 - Required checks:
@@ -490,3 +492,9 @@ Run dry-run again to confirm `UPDATE`, execute once more to increase quantity fr
 2. The resolver searches each Fetch set mapped to `PLST`, including `The List` and `Mystery Booster`.
 3. Moonmist `ISD-195` resolves in Fetch's `The List` set, while Disenchant `M20-14` resolves in Fetch's `Mystery Booster` set.
 4. The candidate is accepted only after its exact Scryfall ID, normalized collector number, finish, and mapped Fetch set ID agree.
+
+### Scenario 8: mid-value cards use distinct sellers
+
+1. A card has a market price above `0.33` NZD and below `0.50` NZD.
+2. Five non-owned sellers collectively list any number of copies across one or more conditions.
+3. The card receives `LIST`; a sixth distinct non-owned seller would change the decision to `DISCARD`.

@@ -108,6 +108,7 @@ class MarketSnapshot:
     market_price_nzd: Decimal | None
     local_listing_count: int
     local_copy_count: int
+    all_condition_local_seller_count: int
     all_condition_local_copy_count: int
     lowest_local_price_nzd: Decimal | None
     price_ladder: dict[Decimal, PriceTier]
@@ -458,6 +459,7 @@ class FetchTcgClient:
         (
             listing_count,
             copy_count,
+            all_condition_seller_count,
             all_condition_copy_count,
             price_ladder,
         ) = self._get_listings(
@@ -473,6 +475,7 @@ class FetchTcgClient:
             market_price_nzd=market_price,
             local_listing_count=listing_count,
             local_copy_count=copy_count,
+            all_condition_local_seller_count=all_condition_seller_count,
             all_condition_local_copy_count=all_condition_copy_count,
             lowest_local_price_nzd=min(price_ladder) if price_ladder else None,
             price_ladder=price_ladder,
@@ -577,6 +580,7 @@ class FetchTcgClient:
     ):
         listing_count = 0
         copy_count = 0
+        all_condition_sellers = set()
         all_condition_copy_count = 0
         mutable_ladder = {}
         page_offset = 0
@@ -631,6 +635,14 @@ class FetchTcgClient:
                 if listing_id in excluded_listing_ids:
                     continue
 
+                seller_profile_name = listing.get("sellerProfileName")
+                if (
+                    not isinstance(seller_profile_name, str)
+                    or not seller_profile_name.strip()
+                ):
+                    raise FetchTcgRequestError(
+                        "active listing seller profile name was missing or invalid"
+                    )
                 price = self._required_nonnegative_decimal(
                     listing.get("listedPriceInRequestedCurrency"),
                     "listing listedPriceInRequestedCurrency",
@@ -644,6 +656,7 @@ class FetchTcgClient:
                         "active listing remainingQuantity must be positive"
                     )
 
+                all_condition_sellers.add(seller_profile_name.strip().casefold())
                 all_condition_copy_count += quantity
                 if condition != condition_code:
                     continue
@@ -668,6 +681,7 @@ class FetchTcgClient:
         return (
             listing_count,
             copy_count,
+            len(all_condition_sellers),
             all_condition_copy_count,
             price_ladder,
         )
