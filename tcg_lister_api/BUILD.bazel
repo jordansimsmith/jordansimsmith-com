@@ -12,6 +12,16 @@ py_library(
 )
 
 py_library(
+    name = "pricing-lib",
+    srcs = [
+        "scripts/pricing/analyze.py",
+        "scripts/pricing/fetchtcg_client.py",
+    ],
+    imports = ["scripts/pricing"],
+    deps = ["@pypi//requests"],
+)
+
+py_library(
     name = "scan-eval-lib",
     srcs = ["scripts/scan/evaluate.py"],
     imports = ["scripts/scan"],
@@ -29,6 +39,13 @@ py_binary(
     srcs = ["scripts/list/main.py"],
     main = "scripts/list/main.py",
     deps = [":lib"],
+)
+
+py_binary(
+    name = "fetchtcg-pricing-analyze",
+    srcs = ["scripts/pricing/main.py"],
+    main = "scripts/pricing/main.py",
+    deps = [":pricing-lib"],
 )
 
 py_binary(
@@ -65,6 +82,23 @@ py_test(
     main = "scripts/list/test_runner.py",
     deps = [
         ":lib",
+        "@pypi//pytest",
+        "@pypi//requests",
+    ],
+)
+
+py_test(
+    name = "pricing-unit-tests",
+    size = "small",
+    srcs = [
+        "scripts/pricing/test_analyze.py",
+        "scripts/pricing/test_fetchtcg_client.py",
+        "scripts/pricing/test_runner.py",
+    ],
+    imports = ["scripts/pricing"],
+    main = "scripts/pricing/test_runner.py",
+    deps = [
+        ":pricing-lib",
         "@pypi//pytest",
         "@pypi//requests",
     ],
