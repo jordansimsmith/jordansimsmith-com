@@ -63,7 +63,9 @@ The current service is intentionally a script rather than an HTTP API. It is non
 
 ```mermaid
 flowchart LR
-  AuthEnv[FETCHTCG_TOKEN] --> FetchClient[Rate-limited Fetch client]
+  RefreshEnv[FETCHTCG_REFRESH_TOKEN] --> TokenMinter[Firebase token minter]
+  TokenMinter --> AuthEnv[FETCHTCG_TOKEN]
+  AuthEnv --> FetchClient[Rate-limited Fetch client]
   ManaBoxCsv[ManaBox CSV] --> Parser[Ordered CSV parser]
   Parser --> Processor[Inline card processor]
   Processor --> FetchClient[Rate-limited Fetch client]
@@ -123,6 +125,7 @@ sequenceDiagram
 
 - Use a local Python CLI because the initial workflow is manual and does not need deployed infrastructure.
 - Keep dry-run as the default. Construct the bearer header from the explicit raw token and send it only to the managed-listings read and upsert endpoints.
+- Keep Firebase refresh-token exchange outside the listing client. The shared minter produces one short-lived `FETCHTCG_TOKEN` before a run, so the client's endpoint allowlist and fail-closed authorization behavior remain unchanged.
 - Treat spreadsheet order as reversed physical order, then expand quantities without aggregating output cards.
 - Apply offset after reversal and quantity expansion, then apply limit. Retain original full-stack positions so a resumed run after position 6 starts at `[7/<full stack size>]`.
 - Use Scryfall ID as the strongest printing identifier and verify set, collector number, and finish as independent safeguards.
@@ -168,7 +171,7 @@ sequenceDiagram
 
 ### External systems
 
-- **Fetch TCG website API**: The CLI sends sequential HTTPS JSON requests to `https://api.fetchtcg.com` using a browser-compatible macOS Chrome user agent. Public card and market requests are unauthenticated. Authenticated managed-listing reads and upserts construct `Authorization: Bearer <token>` from `FETCHTCG_TOKEN`; the credential is never attached to public endpoints. Transient errors retry with bounded exponential backoff. Authorization failures and repeated rate limits stop the run.
+- **Fetch TCG website API**: The CLI sends sequential HTTPS JSON requests to `https://api.fetchtcg.com` using a browser-compatible macOS Chrome user agent. Public card and market requests are unauthenticated. Authenticated managed-listing reads and upserts construct `Authorization: Bearer <token>` from `FETCHTCG_TOKEN`; the credential is never attached to public endpoints. The separate token minter can exchange `FETCHTCG_REFRESH_TOKEN` at Firebase's fixed HTTPS token endpoint before the CLI starts. Transient errors retry with bounded exponential backoff. Authorization failures and repeated rate limits stop the run.
 - **Scryfall API**: The mapping generator reads Scryfall's public set catalog and individual public card records to associate canonical set codes with Fetch set identifiers. Normal analysis runs do not call Scryfall.
 - **ManaBox CSV export**: The CLI consumes a local export and never sends the file to another service. Required fields are `Name`, `Set code`, `Set name`, `Collector number`, `Foil`, `Rarity`, `Quantity`, `Scryfall ID`, `Misprint`, `Altered`, `Condition`, and `Language`.
 
@@ -347,7 +350,9 @@ Execute-mode console output uses the intermediate `POSTED` status immediately af
 ## Security and privacy
 
 - `FETCHTCG_TOKEN` is required and must contain only the non-empty bearer token, without the `Bearer ` scheme prefix.
+- `FETCHTCG_REFRESH_TOKEN` is consumed only by the standalone token minter and is never passed to the listing client or Fetch API.
 - The bearer credential is kept in memory only, attached only to `GET /v1/manage-listings` and `POST /v2/private/manage-listings`, never logged, never written to reports, and never accepted from ambient session headers or cookies.
+- The token minter sends the refresh credential only to Firebase's fixed HTTPS token endpoint, disables redirects, ambient proxy/auth configuration, and cookies, and refuses to print a token directly to an interactive terminal.
 - Public card, market, and listing requests remain unauthenticated.
 - The complete HAR is never copied into the repository because it may contain unrelated request data.
 - Test fixtures contain only minimal card, price, and listing fields with no real credential or seller PII.
@@ -374,11 +379,12 @@ Execute-mode console output uses the intermediate `POSTED` status immediately af
 
 ### Environment variables
 
-- `FETCHTCG_TOKEN`: required raw bearer token, normally inherited from the user's shell environment.
+- `FETCHTCG_TOKEN`: required raw one-hour bearer token, supplied to the analyzer process.
+- `FETCHTCG_REFRESH_TOKEN`: long-lived Firebase refresh credential consumed only by `//tcg_lister_api:fetchtcg-mint-token`.
 
 ### Secrets handling
 
-The raw token is required at runtime but is never persisted by the service. It should be exported by the user's local shell configuration and must not be passed as a CLI argument, committed, printed, or copied into reports.
+Neither credential is persisted by the service. Set the refresh credential through a hidden prompt or local secret manager rather than a command, shell history, profile, or repository file. Capture the minted token through command substitution; do not run the minter directly or redirect its output to a file. Delete HAR files containing credentials when they are no longer needed. If a HAR has been shared, change the Fetch password to revoke existing Firebase refresh sessions.
 
 ## Performance envelope
 
@@ -416,11 +422,12 @@ Review the generated mapping before committing it. Unresolved Fetch sets are rep
 Analyze only the first three physical cards:
 
 ```shell
-source ~/.zshrc
-bazel run //tcg_lister_api:fetchtcg-bulk-analyze -- \
+token="$(bazel run //tcg_lister_api:fetchtcg-mint-token)" &&
+FETCHTCG_TOKEN="$token" bazel run //tcg_lister_api:fetchtcg-bulk-analyze -- \
   "/path/to/manabox-scan.csv" \
   --limit 3 \
   --verbose
+unset token
 ```
 
 Verify that console positions and `stack.csv` match the physical top-to-bottom stack before running the complete file.
@@ -428,12 +435,13 @@ Verify that console positions and `stack.csv` match the physical top-to-bottom s
 Resume after completing position 6 and analyze at most 20 more cards:
 
 ```shell
-source ~/.zshrc
-bazel run //tcg_lister_api:fetchtcg-bulk-analyze -- \
+token="$(bazel run //tcg_lister_api:fetchtcg-mint-token)" &&
+FETCHTCG_TOKEN="$token" bazel run //tcg_lister_api:fetchtcg-bulk-analyze -- \
   "/path/to/manabox-scan.csv" \
   --offset 6 \
   --limit 20 \
   --verbose
+unset token
 ```
 
 For a 70-card expanded stack, the first console record is `[7/70]`. Use the last successfully handled stack position as the next run's offset.
@@ -441,14 +449,15 @@ For a 70-card expanded stack, the first console record is `[7/70]`. Use the last
 For a controlled live mutation check, use only the disposable single-card `/Users/jordansimsmith/Downloads/pyramid.csv` input:
 
 ```shell
-source ~/.zshrc
-bazel run //tcg_lister_api:fetchtcg-bulk-analyze -- \
+token="$(bazel run //tcg_lister_api:fetchtcg-mint-token)" &&
+FETCHTCG_TOKEN="$token" bazel run //tcg_lister_api:fetchtcg-bulk-analyze -- \
   "/Users/jordansimsmith/Downloads/pyramid.csv" \
   --verbose
-bazel run //tcg_lister_api:fetchtcg-bulk-analyze -- \
+FETCHTCG_TOKEN="$token" bazel run //tcg_lister_api:fetchtcg-bulk-analyze -- \
   "/Users/jordansimsmith/Downloads/pyramid.csv" \
   --verbose \
   --execute
+unset token
 ```
 
 Run dry-run again to confirm `UPDATE`, execute once more to increase quantity from one to two, and verify the final report. Delete the disposable listing manually afterward. Never use another CSV for automated live smoke testing.

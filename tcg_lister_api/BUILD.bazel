@@ -52,6 +52,14 @@ py_binary(
 )
 
 py_binary(
+    name = "fetchtcg-mint-token",
+    srcs = ["scripts/auth/mint_token.py"],
+    imports = ["scripts/auth"],
+    main = "scripts/auth/mint_token.py",
+    deps = ["@pypi//requests"],
+)
+
+py_binary(
     name = "fetchtcg-pricing-analyze",
     srcs = ["scripts/pricing/main.py"],
     main = "scripts/pricing/main.py",
@@ -99,6 +107,22 @@ py_test(
     main = "scripts/list/test_runner.py",
     deps = [
         ":lib",
+        "@pypi//pytest",
+        "@pypi//requests",
+    ],
+)
+
+py_test(
+    name = "token-mint-unit-tests",
+    size = "small",
+    srcs = [
+        "scripts/auth/mint_token.py",
+        "scripts/auth/test_mint_token.py",
+        "scripts/auth/test_runner.py",
+    ],
+    imports = ["scripts/auth"],
+    main = "scripts/auth/test_runner.py",
+    deps = [
         "@pypi//pytest",
         "@pypi//requests",
     ],

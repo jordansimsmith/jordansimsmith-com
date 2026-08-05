@@ -74,7 +74,9 @@ non-binding analytical results.
 
 ```mermaid
 flowchart LR
-  AuthEnv[FETCHTCG_TOKEN] --> FetchClient[Read-only rate-limited Fetch client]
+  RefreshEnv[FETCHTCG_REFRESH_TOKEN] --> TokenMinter[Firebase token minter]
+  TokenMinter --> AuthEnv[FETCHTCG_TOKEN]
+  AuthEnv --> FetchClient[Read-only rate-limited Fetch client]
   FetchClient --> ManagedApi[Managed listings GET]
   FetchClient --> CardApi[Card detail GET]
   FetchClient --> CompetitionApi[Card listings GET]
@@ -120,6 +122,9 @@ sequenceDiagram
 - Keep this spike self-contained rather than importing from `scripts/list`.
   The safe read behavior is duplicated intentionally so future listing and
   pricing experiments can evolve independently.
+- Keep Firebase refresh-token exchange outside the pricing client. The shared
+  minter produces one short-lived `FETCHTCG_TOKEN` before a run without
+  changing the client's read-only endpoint guard.
 - Start from authenticated managed listings because they already contain the
   exact Fetch card and condition identities. No ManaBox input, set mapping, or
   card search is required.
@@ -182,6 +187,9 @@ sequenceDiagram
   Chrome user agent. The bearer credential is attached only to the managed
   listings read. Transient errors retry with bounded exponential backoff.
   Authorization failures and repeated rate limits stop the run.
+- **Firebase token service**: The separate token minter can exchange
+  `FETCHTCG_REFRESH_TOKEN` at Firebase's fixed HTTPS token endpoint before the
+  pricing CLI starts. The refresh credential is never passed to Fetch.
 
 Fetch TCG does not publish these endpoints as a supported third-party API, and
 its current terms prohibit automated access without permission. Conservative
@@ -201,6 +209,7 @@ bazel run //tcg_lister_api:fetchtcg-pricing-analyze -- \
 
 - `FETCHTCG_TOKEN` is required and contains the raw bearer token without the
   `Bearer ` scheme prefix.
+- `FETCHTCG_REFRESH_TOKEN` is consumed only by the standalone token minter.
 - `--limit N` analyzes only the first `N` active managed listings returned in
   newest-first order. The complete managed inventory is still loaded so every
   owned listing ID can be excluded from competition.
@@ -344,9 +353,13 @@ does not measure sales velocity or prove causation.
 
 - `FETCHTCG_TOKEN` is required, retained only in memory, and attached only to
   `GET /v1/manage-listings`.
+- `FETCHTCG_REFRESH_TOKEN` is sent only to Firebase's fixed HTTPS token
+  endpoint by the standalone minter. It is never passed to this client.
 - Ambient authorization headers, cookies, and proxy settings are removed from
   the HTTP session.
 - The token is never accepted as a CLI argument, logged, or written to reports.
+- The token minter disables redirects, ambient proxy/auth configuration, and
+  cookies, and refuses to print a token directly to an interactive terminal.
 - Seller profile names are used only as in-memory deduplication keys and are
   never written to reports.
 - Raw response bodies are not logged.
@@ -373,8 +386,10 @@ does not measure sales velocity or prove causation.
 
 ### Environment variables
 
-- `FETCHTCG_TOKEN`: required raw bearer token, normally inherited from the
-  user's shell environment.
+- `FETCHTCG_TOKEN`: required raw one-hour bearer token, supplied to the pricing
+  process.
+- `FETCHTCG_REFRESH_TOKEN`: long-lived Firebase refresh credential consumed
+  only by `//tcg_lister_api:fetchtcg-mint-token`.
 
 ## Performance envelope
 
@@ -411,15 +426,22 @@ bazel run //:format
 Analyze one listing before a full run:
 
 ```shell
-source ~/.zshrc
-bazel run //tcg_lister_api:fetchtcg-pricing-analyze -- \
+token="$(bazel run //tcg_lister_api:fetchtcg-mint-token)" &&
+FETCHTCG_TOKEN="$token" bazel run //tcg_lister_api:fetchtcg-pricing-analyze -- \
   --limit 1 \
   --verbose
+unset token
 ```
 
 Review the console evidence and generated files before removing `--limit`.
 The smoke check is read-only but still consumes the unsupported Fetch website
 API and requires permission.
+
+Set the refresh credential through a hidden prompt or local secret manager
+rather than a command, shell history, profile, or repository file. The minted
+token is not renewed during a run. Delete HAR files containing credentials when
+they are no longer needed; if one has been shared, change the Fetch password to
+revoke existing Firebase refresh sessions.
 
 ## End-to-end scenarios
 

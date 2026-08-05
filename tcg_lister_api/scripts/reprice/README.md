@@ -42,7 +42,7 @@ The script is self-contained under `scripts/reprice`. It intentionally duplicate
 - Creating or deleting listings.
 - Changing listing condition or quantity.
 - Automatically pricing `REVIEW` decisions.
-- Refreshing or obtaining Fetch credentials.
+- Refreshing or obtaining Fetch credentials inside the repricing process.
 - Resuming by report file or processed-ID set.
 - Supporting games other than Magic: The Gathering or markets other than New Zealand.
 - Sharing code at runtime with the sibling list or pricing spikes.
@@ -51,7 +51,10 @@ The script is self-contained under `scripts/reprice`. It intentionally duplicate
 
 ```mermaid
 flowchart TD
-  Cli[Reprice CLI] --> Inventory[Managed inventory reader]
+  RefreshEnv[FETCHTCG_REFRESH_TOKEN] --> TokenMinter[Firebase token minter]
+  TokenMinter --> AuthEnv[FETCHTCG_TOKEN]
+  AuthEnv --> Cli[Reprice CLI]
+  Cli --> Inventory[Managed inventory reader]
   Inventory --> StableOrder[Listing ID ascending order]
   StableOrder --> Slice[Offset and limit slice]
   Slice --> ListingLoop[One-listing processing loop]
@@ -94,6 +97,7 @@ sequenceDiagram
 ## Main technical decisions
 
 - Fetch the complete managed inventory before processing. Correct competitor analysis requires all owned listing IDs, even when offset and limit select a small batch.
+- Keep Firebase refresh-token exchange outside the repricing client. The shared minter produces one short-lived `FETCHTCG_TOKEN` before a run, preserving the client's existing endpoint allowlist and fail-closed authorization behavior.
 - Sort locally by listing ID ascending instead of relying on Fetch's `listed_at,DESC` response order. Price mutations cannot change listing IDs, and newly created listings normally append after existing IDs.
 - Apply offset and limit only after stable sorting. Offset is a zero-based count of listings skipped.
 - Keep the selected inventory slice immutable for the run. Mutations cannot reorder or change the active work list.
@@ -125,6 +129,7 @@ sequenceDiagram
 
 - **Fetch TCG website API**: sequential HTTPS JSON requests to `https://api.fetchtcg.com`.
 - **Managed inventory authentication**: `Authorization: Bearer <FETCHTCG_TOKEN>` is attached only to authenticated managed-listing reads and writes.
+- **Firebase token service**: the separate token minter can exchange `FETCHTCG_REFRESH_TOKEN` at Firebase's fixed HTTPS token endpoint before repricing starts. The refresh credential is never passed to Fetch.
 - **Public market reads**: card details and competitor listing requests never include the bearer token.
 - **Traffic policy**: request starts are spaced by a random one-to-two-second interval. Transient network errors and server errors retry with bounded backoff.
 
@@ -145,6 +150,7 @@ bazel run //tcg_lister_api:fetchtcg-reprice -- \
 - `--verbose`: print request and cache diagnostics without credentials.
 
 `FETCHTCG_TOKEN` must contain the raw token without a `Bearer ` prefix.
+`FETCHTCG_REFRESH_TOKEN` is consumed only by the standalone token minter.
 
 Each console listing line contains its current and target prices when available, a direction or terminal-outcome label, mutation status, and the full pricing decision reason. ANSI color is applied only to the label when stdout is interactive; redirected output and report files remain uncolored.
 
@@ -267,21 +273,24 @@ target = max(NZ$0.75, round_up(benchmark, NZ$0.25))
 ## Security and privacy
 
 - The bearer token is read only from `FETCHTCG_TOKEN`.
+- The long-lived refresh credential is read only by the standalone minter from `FETCHTCG_REFRESH_TOKEN` and sent only to Firebase's fixed HTTPS token endpoint.
 - The token is attached only to the two authenticated managed-listing endpoints.
 - Public card and competitor requests remain unauthenticated.
 - Exceptions and diagnostics redact authorization material.
+- The minter disables redirects, ambient proxy/auth configuration, and cookies, and refuses to print a token directly to an interactive terminal.
 - Reports include owned listing IDs and prices but exclude token values and seller names.
 - Output remains on the local machine under the repository workspace.
 
 ## Configuration and secrets
 
-| Setting         | Source           | Default       | Purpose                          |
-| --------------- | ---------------- | ------------- | -------------------------------- |
-| Fetch token     | `FETCHTCG_TOKEN` | none          | managed-listing reads and writes |
-| Offset          | `--offset`       | `0`           | stable listings skipped          |
-| Limit           | `--limit`        | all remaining | maximum selected listings        |
-| Execute mode    | `--execute`      | disabled      | enable price mutations           |
-| Verbose logging | `--verbose`      | disabled      | request diagnostics              |
+| Setting         | Source                   | Default       | Purpose                          |
+| --------------- | ------------------------ | ------------- | -------------------------------- |
+| Fetch token     | `FETCHTCG_TOKEN`         | none          | managed-listing reads and writes |
+| Refresh token   | `FETCHTCG_REFRESH_TOKEN` | none          | mint a one-hour Fetch token      |
+| Offset          | `--offset`               | `0`           | stable listings skipped          |
+| Limit           | `--limit`                | all remaining | maximum selected listings        |
+| Execute mode    | `--execute`              | disabled      | enable price mutations           |
+| Verbose logging | `--verbose`              | disabled      | request diagnostics              |
 
 Traffic pacing, retries, request budgets, country, currency, game, seller floor, increment, condition order, and decision thresholds are fixed implementation constants.
 
@@ -313,25 +322,27 @@ Traffic pacing, retries, request budgets, country, currency, game, seller floor,
 Dry-run a batch:
 
 ```bash
-FETCHTCG_TOKEN='<raw-token>' \
-  bazel run //tcg_lister_api:fetchtcg-reprice -- \
+token="$(bazel run //tcg_lister_api:fetchtcg-mint-token)" &&
+FETCHTCG_TOKEN="$token" bazel run //tcg_lister_api:fetchtcg-reprice -- \
   --offset 0 \
   --limit 25 \
   --verbose
+unset token
 ```
 
 Execute a batch:
 
 ```bash
-FETCHTCG_TOKEN='<raw-token>' \
-  bazel run //tcg_lister_api:fetchtcg-reprice -- \
+token="$(bazel run //tcg_lister_api:fetchtcg-mint-token)" &&
+FETCHTCG_TOKEN="$token" bazel run //tcg_lister_api:fetchtcg-reprice -- \
   --offset 0 \
   --limit 25 \
   --execute \
   --verbose
+unset token
 ```
 
-If the run reports `next offset: 17`, refresh `FETCHTCG_TOKEN` and rerun with `--offset 17`.
+If the run reports `next offset: 17`, mint a new `FETCHTCG_TOKEN` and rerun with `--offset 17`. Set the refresh credential through a hidden prompt or local secret manager rather than a command, shell history, profile, or repository file. Delete HAR files containing credentials when they are no longer needed; if one has been shared, change the Fetch password to revoke existing Firebase refresh sessions.
 
 ## End-to-end scenarios
 
