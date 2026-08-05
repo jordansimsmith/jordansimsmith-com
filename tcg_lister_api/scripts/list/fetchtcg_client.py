@@ -41,9 +41,15 @@ AUTHENTICATED_REQUESTS = frozenset(
         ("POST", MANAGED_LISTING_UPSERT_PATH),
     )
 )
-MANAGED_LISTING_CONDITIONS = frozenset(
-    ("raw-m", "raw-nm", "raw-lp", "raw-mp", "raw-hp", "raw-d")
-)
+CONDITION_QUALITY = {
+    "raw-d": 0,
+    "raw-hp": 1,
+    "raw-mp": 2,
+    "raw-lp": 3,
+    "raw-nm": 4,
+    "raw-m": 5,
+}
+MANAGED_LISTING_CONDITIONS = frozenset(CONDITION_QUALITY)
 
 RARITY_CODES = {
     "common": "c",
@@ -99,6 +105,11 @@ class CardQuery:
 class PriceTier:
     listing_count: int
     copy_count: int
+    seller_keys: frozenset[str] = frozenset()
+
+    @property
+    def seller_count(self):
+        return len(self.seller_keys)
 
 
 @dataclass(frozen=True)
@@ -112,6 +123,7 @@ class MarketSnapshot:
     all_condition_local_copy_count: int
     lowest_local_price_nzd: Decimal | None
     price_ladder: dict[Decimal, PriceTier]
+    better_condition_lowest_price_nzd: Decimal | None = None
 
 
 @dataclass(frozen=True)
@@ -436,6 +448,8 @@ class FetchTcgClient:
         *,
         excluded_listing_ids=(),
     ):
+        if condition_code not in CONDITION_QUALITY:
+            raise FetchTcgRequestError("condition code was missing or invalid")
         excluded_listing_ids = frozenset(excluded_listing_ids)
         if any(
             isinstance(listing_id, bool)
@@ -462,6 +476,7 @@ class FetchTcgClient:
             all_condition_seller_count,
             all_condition_copy_count,
             price_ladder,
+            better_condition_lowest_price,
         ) = self._get_listings(
             card_id,
             condition_code,
@@ -479,6 +494,7 @@ class FetchTcgClient:
             all_condition_local_copy_count=all_condition_copy_count,
             lowest_local_price_nzd=min(price_ladder) if price_ladder else None,
             price_ladder=price_ladder,
+            better_condition_lowest_price_nzd=better_condition_lowest_price,
         )
 
     def _resolve_card(self, query):
@@ -583,6 +599,8 @@ class FetchTcgClient:
         all_condition_sellers = set()
         all_condition_copy_count = 0
         mutable_ladder = {}
+        better_condition_lowest_price = None
+        requested_condition_quality = CONDITION_QUALITY[condition_code]
         page_offset = 0
         total_pages = 1
 
@@ -623,6 +641,10 @@ class FetchTcgClient:
                     raise FetchTcgRequestError(
                         "active listing condition was missing or invalid"
                     )
+                if condition not in CONDITION_QUALITY:
+                    raise FetchTcgRequestError(
+                        "active listing condition was missing or invalid"
+                    )
                 if listing.get("listedCountry") not in (None, "NZ"):
                     continue
                 if listing.get("requestedCurrency") not in (None, "NZD"):
@@ -656,18 +678,31 @@ class FetchTcgClient:
                         "active listing remainingQuantity must be positive"
                     )
 
-                all_condition_sellers.add(seller_profile_name.strip().casefold())
+                seller_key = seller_profile_name.strip().casefold()
+                all_condition_sellers.add(seller_key)
                 all_condition_copy_count += quantity
+                if CONDITION_QUALITY[condition] > requested_condition_quality:
+                    better_condition_lowest_price = (
+                        price
+                        if better_condition_lowest_price is None
+                        else min(better_condition_lowest_price, price)
+                    )
                 if condition != condition_code:
                     continue
 
                 listing_count += 1
                 copy_count += quantity
                 tier = mutable_ladder.setdefault(
-                    price, {"listing_count": 0, "copy_count": 0}
+                    price,
+                    {
+                        "listing_count": 0,
+                        "copy_count": 0,
+                        "seller_keys": set(),
+                    },
                 )
                 tier["listing_count"] += 1
                 tier["copy_count"] += quantity
+                tier["seller_keys"].add(seller_key)
 
             page_offset += 1
 
@@ -675,6 +710,7 @@ class FetchTcgClient:
             price: PriceTier(
                 listing_count=counts["listing_count"],
                 copy_count=counts["copy_count"],
+                seller_keys=frozenset(counts["seller_keys"]),
             )
             for price, counts in mutable_ladder.items()
         }
@@ -684,6 +720,7 @@ class FetchTcgClient:
             len(all_condition_sellers),
             all_condition_copy_count,
             price_ladder,
+            better_condition_lowest_price,
         )
 
     def _request_json(

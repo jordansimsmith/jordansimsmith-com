@@ -49,6 +49,11 @@ CONDITION_CODES = {
 }
 
 SUPPORTED_FINISHES = {"normal", "foil", "etched"}
+MINIMUM_LIST_PRICE_NZD = Decimal("0.75")
+PRICE_INCREMENT_NZD = Decimal("0.25")
+SUPPORTED_PRICE_SELLER_COUNT = 2
+MINIMUM_PRICE_REDUCTION_NZD = Decimal("0.25")
+MATERIAL_PRICE_REDUCTION_RATE = Decimal("0.05")
 
 CSV_FIELDS = [
     "stack_position",
@@ -64,6 +69,8 @@ CSV_FIELDS = [
     "decision",
     "decision_reason",
     "market_price_nzd",
+    "supported_local_price_nzd",
+    "better_condition_lowest_price_nzd",
     "suggested_price_nzd",
     "local_listing_count",
     "local_copy_count",
@@ -190,6 +197,7 @@ class DecisionResult:
     decision: Decision
     decision_reason: str
     suggested_price_nzd: Decimal | None
+    supported_local_price_nzd: Decimal | None = None
 
 
 @dataclass(frozen=True)
@@ -199,6 +207,8 @@ class CachedAnalysis:
     fetch_card_id: str | None = None
     fetch_set_id: int | None = None
     market_price_nzd: Decimal | None = None
+    supported_local_price_nzd: Decimal | None = None
+    better_condition_lowest_price_nzd: Decimal | None = None
     suggested_price_nzd: Decimal | None = None
     local_listing_count: int = 0
     local_copy_count: int = 0
@@ -283,6 +293,8 @@ class AnalysisRecord:
     decision: Decision
     decision_reason: str
     market_price_nzd: Decimal | None
+    supported_local_price_nzd: Decimal | None
+    better_condition_lowest_price_nzd: Decimal | None
     suggested_price_nzd: Decimal | None
     local_listing_count: int
     local_copy_count: int
@@ -443,7 +455,38 @@ def decide(snapshot):
             suggested_price_nzd=None,
         )
 
-    suggested_price = market_price.to_integral_value(rounding=ROUND_CEILING)
+    supported_local_price = _supported_local_price(snapshot.price_ladder)
+    pricing_benchmark = (
+        supported_local_price if supported_local_price is not None else market_price
+    )
+    suggested_price = max(
+        MINIMUM_LIST_PRICE_NZD,
+        (pricing_benchmark / PRICE_INCREMENT_NZD).to_integral_value(
+            rounding=ROUND_CEILING
+        )
+        * PRICE_INCREMENT_NZD,
+    )
+    better_condition_price = snapshot.better_condition_lowest_price_nzd
+    if better_condition_price is not None and (
+        not better_condition_price.is_finite() or better_condition_price < 0
+    ):
+        return DecisionResult(
+            decision=Decision.REVIEW,
+            decision_reason="Fetch provided an invalid better-condition price",
+            suggested_price_nzd=None,
+            supported_local_price_nzd=supported_local_price,
+        )
+    if better_condition_price is not None and better_condition_price < suggested_price:
+        return DecisionResult(
+            decision=Decision.REVIEW,
+            decision_reason=(
+                f"a better-condition copy at NZ${better_condition_price:.2f} "
+                f"is cheaper than the proposed NZ${suggested_price:.2f} price"
+            ),
+            suggested_price_nzd=None,
+            supported_local_price_nzd=supported_local_price,
+        )
+
     if market_price < Decimal("0.50"):
         if snapshot.all_condition_local_copy_count == 0:
             reason = (
@@ -457,11 +500,31 @@ def decide(snapshot):
             )
     else:
         reason = "market price is at least NZ$0.50"
+    if supported_local_price is None:
+        reason += (
+            f"; price uses the NZ${market_price:.2f} market benchmark, "
+            "NZ$0.25 increments, and the NZ$0.75 floor"
+        )
+    else:
+        reason += (
+            f"; price uses the NZ${supported_local_price:.2f} two-seller "
+            "supported exact-condition floor and NZ$0.25 increments"
+        )
     return DecisionResult(
         decision=Decision.LIST,
         decision_reason=reason,
         suggested_price_nzd=suggested_price,
+        supported_local_price_nzd=supported_local_price,
     )
+
+
+def _supported_local_price(price_ladder):
+    sellers = set()
+    for price in sorted(price_ladder):
+        sellers.update(price_ladder[price].seller_keys)
+        if len(sellers) >= SUPPORTED_PRICE_SELLER_COUNT:
+            return price
+    return None
 
 
 def analyze_cards(
@@ -514,6 +577,10 @@ def analyze_cards(
                         fetch_card_id=snapshot.fetch_card_id,
                         fetch_set_id=snapshot.fetch_set_id,
                         market_price_nzd=snapshot.market_price_nzd,
+                        supported_local_price_nzd=(result.supported_local_price_nzd),
+                        better_condition_lowest_price_nzd=(
+                            snapshot.better_condition_lowest_price_nzd
+                        ),
                         suggested_price_nzd=result.suggested_price_nzd,
                         local_listing_count=snapshot.local_listing_count,
                         local_copy_count=snapshot.local_copy_count,
@@ -591,7 +658,10 @@ def analyze_cards(
                     )
                 else:
                     quantity = existing_listing.remaining_quantity + 1
-                    listed_price = existing_listing.listed_price_nzd
+                    listed_price = _price_for_existing_listing(
+                        existing_listing.listed_price_nzd,
+                        cached.suggested_price_nzd,
+                    )
                     expected_listing_id = existing_listing.listing_id
                     if execute and expected_listing_id is None:
                         mutation_error = "execute update did not have a real listing id"
@@ -798,7 +868,7 @@ def write_reports(
     output_dir.mkdir(parents=True, exist_ok=True)
     card_payloads = [_record_payload(record) for record in run.records]
     report = {
-        "schema_version": 6,
+        "schema_version": 7,
         "input_path": Path(input_path).name,
         "generated_at": generated_at.astimezone(timezone.utc).isoformat(),
         "complete": run.complete,
@@ -822,6 +892,8 @@ def write_reports(
                 "fetch_card_id",
                 "fetch_set_id",
                 "market_price_nzd",
+                "supported_local_price_nzd",
+                "better_condition_lowest_price_nzd",
                 "suggested_price_nzd",
                 "lowest_local_price_nzd",
                 "mutation_key",
@@ -1010,11 +1082,23 @@ def _listing_preview(card, cached, inventory):
             exact_listings,
         )
     if exact_listings:
+        existing_listing = exact_listings[0]
+        update_price = _price_for_existing_listing(
+            existing_listing.listed_price_nzd,
+            cached.suggested_price_nzd,
+        )
         reason = (
             "one exact simulated managed listing exists"
-            if exact_listings[0].simulated
+            if existing_listing.simulated
             else "one exact active managed listing exists"
         )
+        if update_price < existing_listing.listed_price_nzd:
+            reason += (
+                f"; price will decrease from NZ${existing_listing.listed_price_nzd:.2f} "
+                f"to NZ${update_price:.2f}"
+            )
+        else:
+            reason += f"; existing NZ${existing_listing.listed_price_nzd:.2f} price is preserved"
         return (
             ListingAction.UPDATE,
             reason,
@@ -1025,6 +1109,19 @@ def _listing_preview(card, cached, inventory):
         "no exact active managed listing exists",
         exact_listings,
     )
+
+
+def _price_for_existing_listing(existing_price, suggested_price):
+    if suggested_price is None or suggested_price >= existing_price:
+        return existing_price
+    reduction = existing_price - suggested_price
+    material_reduction = max(
+        MINIMUM_PRICE_REDUCTION_NZD,
+        suggested_price * MATERIAL_PRICE_REDUCTION_RATE,
+    )
+    if reduction >= material_reduction:
+        return suggested_price
+    return existing_price
 
 
 def _record(
@@ -1049,6 +1146,8 @@ def _record(
         decision=cached.decision,
         decision_reason=cached.decision_reason,
         market_price_nzd=cached.market_price_nzd,
+        supported_local_price_nzd=cached.supported_local_price_nzd,
+        better_condition_lowest_price_nzd=(cached.better_condition_lowest_price_nzd),
         suggested_price_nzd=cached.suggested_price_nzd,
         local_listing_count=cached.local_listing_count,
         local_copy_count=cached.local_copy_count,
@@ -1087,6 +1186,10 @@ def _record_payload(record):
         "decision": record.decision.value,
         "decision_reason": record.decision_reason,
         "market_price_nzd": _decimal_string(record.market_price_nzd),
+        "supported_local_price_nzd": _decimal_string(record.supported_local_price_nzd),
+        "better_condition_lowest_price_nzd": _decimal_string(
+            record.better_condition_lowest_price_nzd
+        ),
         "suggested_price_nzd": _decimal_string(
             record.suggested_price_nzd, two_decimal_places=True
         ),
@@ -1098,6 +1201,7 @@ def _record_payload(record):
         "price_ladder": {
             f"{price:.2f}": {
                 "listing_count": tier.listing_count,
+                "seller_count": tier.seller_count,
                 "copy_count": tier.copy_count,
             }
             for price, tier in sorted(record.price_ladder.items())
@@ -1133,6 +1237,12 @@ def _format_console_record(record, total, *, use_color=False):
     ]
     if record.market_price_nzd is not None:
         parts.append(f"(market NZ${record.market_price_nzd:.2f}")
+        if record.supported_local_price_nzd is not None:
+            parts.append(f"supported floor NZ${record.supported_local_price_nzd:.2f}")
+        if record.better_condition_lowest_price_nzd is not None:
+            parts.append(
+                f"better condition NZ${record.better_condition_lowest_price_nzd:.2f}"
+            )
         if record.suggested_price_nzd is not None:
             parts.append(f"suggested NZ${record.suggested_price_nzd:.2f}")
         parts.append(

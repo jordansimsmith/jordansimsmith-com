@@ -96,6 +96,8 @@ def _snapshot(
     all_condition_copy_count=None,
     fetch_card_id="mtg_244_c_dtk_normal",
     fetch_set_id=2648,
+    price_ladder=None,
+    better_condition_lowest_price_nzd=None,
 ):
     copy_count = (3 if listing_count else 0) if copy_count is None else copy_count
     all_condition_seller_count = (
@@ -106,16 +108,21 @@ def _snapshot(
     all_condition_copy_count = (
         copy_count if all_condition_copy_count is None else all_condition_copy_count
     )
-    ladder = (
-        {
-            Decimal("0.40"): PriceTier(
-                listing_count=listing_count,
-                copy_count=copy_count,
-            )
-        }
-        if listing_count
-        else {}
-    )
+    ladder = price_ladder
+    if ladder is None:
+        ladder = (
+            {
+                Decimal("0.40"): PriceTier(
+                    listing_count=listing_count,
+                    copy_count=copy_count,
+                    seller_keys=frozenset(
+                        f"seller-{index}" for index in range(listing_count)
+                    ),
+                )
+            }
+            if listing_count
+            else {}
+        )
     return MarketSnapshot(
         fetch_card_id=fetch_card_id,
         fetch_set_id=fetch_set_id,
@@ -126,6 +133,7 @@ def _snapshot(
         all_condition_local_copy_count=all_condition_copy_count,
         lowest_local_price_nzd=Decimal("0.40") if listing_count else None,
         price_ladder=ladder,
+        better_condition_lowest_price_nzd=better_condition_lowest_price_nzd,
     )
 
 
@@ -287,16 +295,99 @@ def test_decide_applies_price_and_stock_boundaries(
 @pytest.mark.parametrize(
     ("market_price", "expected"),
     [
-        ("0.25", Decimal("1")),
+        ("0.25", Decimal("0.75")),
+        ("0.74", Decimal("0.75")),
+        ("0.76", Decimal("1.00")),
         ("1.00", Decimal("1")),
-        ("1.01", Decimal("2")),
+        ("1.01", Decimal("1.25")),
+        ("3.20", Decimal("3.25")),
     ],
 )
-def test_decide_rounds_list_prices_up_to_whole_dollars(market_price, expected):
+def test_decide_applies_seller_floor_and_quarter_dollar_increment(
+    market_price, expected
+):
     result = decide(_snapshot(market_price))
 
     assert result.decision == Decision.LIST
     assert result.suggested_price_nzd == expected
+
+
+def test_decide_uses_two_seller_supported_floor_before_market_price():
+    result = decide(
+        _snapshot(
+            "1.40",
+            listing_count=2,
+            copy_count=4,
+            price_ladder={
+                Decimal("0.40"): PriceTier(
+                    listing_count=1,
+                    copy_count=3,
+                    seller_keys=frozenset({"alpha"}),
+                ),
+                Decimal("0.76"): PriceTier(
+                    listing_count=1,
+                    copy_count=1,
+                    seller_keys=frozenset({"beta"}),
+                ),
+            },
+        )
+    )
+
+    assert result.decision == Decision.LIST
+    assert result.supported_local_price_nzd == Decimal("0.76")
+    assert result.suggested_price_nzd == Decimal("1.00")
+
+
+def test_decide_ignores_one_seller_across_copies_and_tiers_as_pricing_support():
+    result = decide(
+        _snapshot(
+            "1.01",
+            listing_count=2,
+            copy_count=4,
+            price_ladder={
+                Decimal("0.40"): PriceTier(
+                    listing_count=1,
+                    copy_count=3,
+                    seller_keys=frozenset({"alpha"}),
+                ),
+                Decimal("0.50"): PriceTier(
+                    listing_count=1,
+                    copy_count=1,
+                    seller_keys=frozenset({"alpha"}),
+                ),
+            },
+        )
+    )
+
+    assert result.decision == Decision.LIST
+    assert result.supported_local_price_nzd is None
+    assert result.suggested_price_nzd == Decimal("1.25")
+
+
+def test_decide_reviews_cheaper_better_condition_listing():
+    result = decide(
+        _snapshot(
+            "0.60",
+            better_condition_lowest_price_nzd=Decimal("0.74"),
+        )
+    )
+
+    assert result.decision == Decision.REVIEW
+    assert result.supported_local_price_nzd is None
+    assert result.suggested_price_nzd is None
+    assert "better-condition" in result.decision_reason
+
+
+def test_decide_accepts_better_condition_at_proposed_price():
+    result = decide(
+        _snapshot(
+            "0.60",
+            better_condition_lowest_price_nzd=Decimal("0.75"),
+        )
+    )
+
+    assert result.decision == Decision.LIST
+    assert result.suggested_price_nzd == Decimal("0.75")
 
 
 @pytest.mark.parametrize("market_price", ["NaN", "Infinity", "-0.01"])
@@ -600,7 +691,7 @@ def test_inline_dry_run_transitions_duplicates_in_stack_order(tmp_path):
         "mtg_55_c_ddu_normal|raw-nm"
     }
     assert [record.mutation_quantity for record in run.records] == [1, 2, 3]
-    assert {record.mutation_price_nzd for record in run.records} == {Decimal("1")}
+    assert {record.mutation_price_nzd for record in run.records} == {Decimal("0.75")}
     assert run.records[1].existing_listings[0].simulated is True
     assert run.records[1].existing_listings[0].listing_id is None
 
@@ -623,7 +714,7 @@ def test_format_run_summary_totals_physical_cards_and_per_card_values(tmp_path):
     )
 
     assert analyze_module._format_run_summary(run, use_color=True) == (
-        "\033[34m[summary] 3 cards planned for listing — total value NZ$3.00\033[0m"
+        "\033[34m[summary] 3 cards planned for listing — total value NZ$2.25\033[0m"
     )
 
     execute_run = replace(
@@ -833,7 +924,9 @@ def test_inline_processing_reviews_later_identity_collision(tmp_path):
     assert "identity" in run.records[-1].listing_action_reason
 
 
-def test_inline_execute_updates_quantity_and_preserves_existing_price(tmp_path):
+def test_inline_execute_updates_quantity_and_lowers_materially_overpriced_listing(
+    tmp_path,
+):
     scan = tmp_path / "scan.csv"
     _write_single_scan(scan)
     existing = _managed_listing(quantity=2, price="1.25")
@@ -844,10 +937,10 @@ def test_inline_execute_updates_quantity_and_preserves_existing_price(tmp_path):
                 listing_id=123,
                 remaining_quantity=3,
                 condition="raw-nm",
-                listed_price_nzd=Decimal("1.25"),
+                listed_price_nzd=Decimal("0.75"),
             )
         ],
-        managed_listings=[_managed_listing(quantity=3, price="1.25")],
+        managed_listings=[_managed_listing(quantity=3, price="0.75")],
     )
 
     result = analyze_cards(
@@ -863,12 +956,41 @@ def test_inline_execute_updates_quantity_and_preserves_existing_price(tmp_path):
     assert request.fetch_card_id == "mtg_244_c_dtk_normal"
     assert request.condition == "raw-nm"
     assert request.quantity == 3
-    assert request.listed_price_nzd == Decimal("1.25")
+    assert request.listed_price_nzd == Decimal("0.75")
     assert expected_listing_id == 123
     assert result.records[0].mutation_status == MutationStatus.SUCCEEDED
     assert result.records[0].mutation_listing_id == 123
+    assert "decrease" in result.records[0].listing_action_reason
     assert result.execution_complete is True
     assert client.managed_listing_calls == [{"dtk"}]
+
+
+@pytest.mark.parametrize(
+    ("existing_price", "market_price", "expected_price"),
+    [
+        ("0.90", "0.60", Decimal("0.90")),
+        ("0.50", "0.60", Decimal("0.50")),
+        ("1.00", "0.76", Decimal("1.00")),
+    ],
+)
+def test_inline_update_preserves_small_reductions_and_never_raises_prices(
+    tmp_path,
+    existing_price,
+    market_price,
+    expected_price,
+):
+    scan = tmp_path / "scan.csv"
+    _write_single_scan(scan)
+
+    result = analyze_cards(
+        load_physical_cards(scan),
+        _InlineClient([_snapshot(market_price)]),
+        managed_listings=[_managed_listing(quantity=2, price=existing_price)],
+        output=lambda _: None,
+    )
+
+    assert result.records[0].mutation_price_nzd == expected_price
+    assert "preserved" in result.records[0].listing_action_reason
 
 
 def test_inline_execute_creates_different_condition_without_updating_existing(
@@ -1248,7 +1370,7 @@ def test_write_reports_preserves_one_record_per_physical_card(tmp_path):
     cards = load_physical_cards(scan, limit=3)
     run = analyze_cards(
         cards,
-        _FakeClient([_snapshot("0.60")]),
+        _FakeClient([_snapshot("0.60", listing_count=2)]),
         output=lambda _: None,
     )
     output_dir = tmp_path / "output"
@@ -1263,9 +1385,16 @@ def test_write_reports_preserves_one_record_per_physical_card(tmp_path):
     report = json.loads((output_dir / "report.json").read_text())
     assert [card["stack_position"] for card in report["cards"]] == [1, 2, 3]
     assert report["input_path"] == "scan.csv"
-    assert report["schema_version"] == 6
+    assert report["schema_version"] == 7
     assert report["execution_mode"] == "dry_run"
     assert report["execution_complete"] is True
+    assert report["cards"][0]["supported_local_price_nzd"] == "0.40"
+    assert report["cards"][0]["better_condition_lowest_price_nzd"] is None
+    assert report["cards"][0]["price_ladder"]["0.40"] == {
+        "listing_count": 2,
+        "seller_count": 2,
+        "copy_count": 3,
+    }
     assert [card["listing_action"] for card in report["cards"]] == [
         "CREATE",
         "UPDATE",
@@ -1274,8 +1403,8 @@ def test_write_reports_preserves_one_record_per_physical_card(tmp_path):
     assert all(card["mutation_status"] == "PLANNED" for card in report["cards"])
     assert [card["mutation_quantity"] for card in report["cards"]] == [1, 2, 3]
     assert report["cards"][0]["existing_listings"] == []
-    assert report["cards"][0]["all_condition_local_seller_count"] == 0
-    assert report["cards"][0]["all_condition_local_copy_count"] == 0
+    assert report["cards"][0]["all_condition_local_seller_count"] == 2
+    assert report["cards"][0]["all_condition_local_copy_count"] == 3
     assert report["cards"][1]["existing_listings"][0]["simulated"] is True
 
     with (output_dir / "stack.csv").open(newline="") as file:
@@ -1316,7 +1445,7 @@ def test_write_reports_includes_existing_listing_details(tmp_path):
     assert card["mutation_status"] == "PLANNED"
     assert card["mutation_listing_id"] == 123
     assert card["mutation_quantity"] == 3
-    assert card["mutation_price_nzd"] == "1.25"
+    assert card["mutation_price_nzd"] == "0.75"
 
     with (output_dir / "stack.csv").open(newline="") as file:
         row = next(csv.DictReader(file))
@@ -1400,7 +1529,7 @@ def test_main_only_mutates_with_execute_flag(
                 _managed_listing(
                     listing_id=999,
                     quantity=1,
-                    price="1",
+                    price="0.75",
                 )
             ]
 
@@ -1413,7 +1542,7 @@ def test_main_only_mutates_with_execute_flag(
                 listing_id=999,
                 remaining_quantity=1,
                 condition="raw-nm",
-                listed_price_nzd=Decimal("1"),
+                listed_price_nzd=Decimal("0.75"),
             )
 
     monkeypatch.setattr(analyze_module, "FetchTcgClient", MainClient)
@@ -1427,9 +1556,9 @@ def test_main_only_mutates_with_execute_flag(
     )
     summary = capsys.readouterr().out.splitlines()[-1]
     if expected_upsert_count:
-        assert summary == "[summary] 1 card listed — total value NZ$1.00"
+        assert summary == "[summary] 1 card listed — total value NZ$0.75"
     else:
-        assert summary == ("[summary] 1 card planned for listing — total value NZ$1.00")
+        assert summary == ("[summary] 1 card planned for listing — total value NZ$0.75")
 
 
 @pytest.mark.parametrize("token", [None, "", "Bearer already-prefixed"])

@@ -255,8 +255,34 @@ def test_get_market_snapshot_uses_direct_id_and_builds_price_ladder():
     assert snapshot.all_condition_local_copy_count == 15
     assert snapshot.lowest_local_price_nzd == Decimal("0.4")
     assert snapshot.price_ladder[Decimal("0.4")].copy_count == 3
+    assert snapshot.price_ladder[Decimal("0.4")].seller_keys == frozenset({"seller"})
     assert snapshot.price_ladder[Decimal("0.49")].listing_count == 1
+    assert snapshot.better_condition_lowest_price_nzd is None
     assert session.calls[0]["url"].endswith("/v3/cards/mtg_244_c_dtk_normal")
+
+
+def test_get_market_snapshot_tracks_cheapest_strictly_better_condition():
+    client, _, _ = _client(
+        [
+            _FakeResponse(200, _card_payload(total_listings=4)),
+            _FakeResponse(
+                200,
+                _listings_payload(
+                    [
+                        _listing(0.80, 1, listing_id=1, condition="raw-lp"),
+                        _listing(0.70, 1, listing_id=2, condition="raw-nm"),
+                        _listing(0.60, 1, listing_id=3, condition="raw-m"),
+                        _listing(0.50, 1, listing_id=4, condition="raw-mp"),
+                    ]
+                ),
+            ),
+        ]
+    )
+
+    snapshot = client.get_market_snapshot(_query(), "raw-lp")
+
+    assert snapshot.local_listing_count == 1
+    assert snapshot.better_condition_lowest_price_nzd == Decimal("0.6")
 
 
 def test_get_market_snapshot_excludes_owned_listings_from_competition():
@@ -292,7 +318,11 @@ def test_get_market_snapshot_excludes_owned_listings_from_competition():
     assert snapshot.all_condition_local_copy_count == 2
     assert snapshot.lowest_local_price_nzd == Decimal("0.4")
     assert snapshot.price_ladder == {
-        Decimal("0.4"): PriceTier(listing_count=1, copy_count=2)
+        Decimal("0.4"): PriceTier(
+            listing_count=1,
+            copy_count=2,
+            seller_keys=frozenset({"seller"}),
+        )
     }
 
 
