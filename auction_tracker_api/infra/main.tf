@@ -316,5 +316,6 @@ resource "aws_scheduler_schedule" "send_digest" {
   target {
     arn      = module.java_lambda.lambda_functions["send_digest_handler"].qualified_arn
     role_arn = aws_iam_role.send_digest_scheduler.arn
+    input    = jsonencode({})
   }
 }
