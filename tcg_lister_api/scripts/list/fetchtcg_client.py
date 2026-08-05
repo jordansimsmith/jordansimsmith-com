@@ -687,7 +687,7 @@ class FetchTcgClient:
                         if better_condition_lowest_price is None
                         else min(better_condition_lowest_price, price)
                     )
-                if condition != condition_code:
+                if CONDITION_QUALITY[condition] < requested_condition_quality:
                     continue
 
                 listing_count += 1

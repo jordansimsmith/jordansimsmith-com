@@ -466,27 +466,6 @@ def decide(snapshot):
         )
         * PRICE_INCREMENT_NZD,
     )
-    better_condition_price = snapshot.better_condition_lowest_price_nzd
-    if better_condition_price is not None and (
-        not better_condition_price.is_finite() or better_condition_price < 0
-    ):
-        return DecisionResult(
-            decision=Decision.REVIEW,
-            decision_reason="Fetch provided an invalid better-condition price",
-            suggested_price_nzd=None,
-            supported_local_price_nzd=supported_local_price,
-        )
-    if better_condition_price is not None and better_condition_price < suggested_price:
-        return DecisionResult(
-            decision=Decision.REVIEW,
-            decision_reason=(
-                f"a better-condition copy at NZ${better_condition_price:.2f} "
-                f"is cheaper than the proposed NZ${suggested_price:.2f} price"
-            ),
-            suggested_price_nzd=None,
-            supported_local_price_nzd=supported_local_price,
-        )
-
     if market_price < Decimal("0.50"):
         if snapshot.all_condition_local_copy_count == 0:
             reason = (
@@ -508,7 +487,7 @@ def decide(snapshot):
     else:
         reason += (
             f"; price uses the NZ${supported_local_price:.2f} two-seller "
-            "supported exact-condition floor and NZ$0.25 increments"
+            "supported same-or-better-condition floor and NZ$0.25 increments"
         )
     return DecisionResult(
         decision=Decision.LIST,

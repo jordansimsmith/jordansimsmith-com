@@ -207,22 +207,44 @@ def test_calculatePricingShouldIgnoreOneSellerAcrossCopiesAndTiers():
     assert result.target_price_nzd == Decimal("1.25")
 
 
-def test_calculatePricingShouldReviewCheaperBetterCondition():
+def test_calculatePricingShouldIncludeBetterConditionsInSupportedFloor():
     # arrange
     listing = _managed(1, condition="raw-lp")
-    card = _card(listing, "0.60")
+    card = _card(listing, "1.40")
     competitors = [
-        _competitor(10, "0.74", condition="raw-nm"),
-        _competitor(11, "0.50", condition="raw-mp"),
+        _competitor(10, "0.40", condition="raw-nm", seller="alpha"),
+        _competitor(11, "0.76", condition="raw-m", seller="beta"),
+        _competitor(12, "0.20", condition="raw-mp", seller="gamma"),
     ]
 
     # act
     result = calculate_pricing(card, competitors, listing.condition)
 
     # assert
-    assert result.decision == Decision.REVIEW
+    assert result.decision == Decision.LIST
+    assert result.local_listing_count == 2
+    assert result.supported_local_price_nzd == Decimal("0.76")
+    assert result.better_condition_lowest_price_nzd == Decimal("0.40")
+    assert result.target_price_nzd == Decimal("1.00")
+
+
+def test_calculatePricingShouldIgnoreUnsupportedBetterConditionInsteadOfReview():
+    # arrange
+    listing = _managed(1, condition="raw-lp")
+    card = _card(listing, "0.60")
+    competitors = [
+        _competitor(10, "0.74", condition="raw-nm", seller="alpha"),
+        _competitor(11, "0.50", condition="raw-mp", seller="beta"),
+    ]
+
+    # act
+    result = calculate_pricing(card, competitors, listing.condition)
+
+    # assert
+    assert result.decision == Decision.LIST
+    assert result.supported_local_price_nzd is None
     assert result.better_condition_lowest_price_nzd == Decimal("0.74")
-    assert result.target_price_nzd is None
+    assert result.target_price_nzd == Decimal("0.75")
 
 
 @pytest.mark.parametrize(
@@ -401,11 +423,8 @@ def test_runRepricingShouldPrintDecisionReasonsAndColorDirections(tmp_path):
             decrease.fetch_card_id: "0.60",
             increase.fetch_card_id: "0.76",
             unchanged.fetch_card_id: "0.60",
-            reviewed.fetch_card_id: "0.60",
+            reviewed.fetch_card_id: "NaN",
             discarded.fetch_card_id: "0.20",
-        },
-        competitors={
-            reviewed.fetch_card_id: [_competitor(20, "0.74", condition="raw-nm")]
         },
     )
     messages = []
@@ -429,7 +448,7 @@ def test_runRepricingShouldPrintDecisionReasonsAndColorDirections(tmp_path):
     assert "\033[31mDISCARD\033[0m" in listing_lines[4]
     assert all(" — " in line for line in listing_lines)
     assert "price uses the NZ$0.60 market benchmark" in listing_lines[0]
-    assert "better-condition copy" in listing_lines[3]
+    assert "valid NZD market price" in listing_lines[3]
     assert "market price is below NZ$0.25" in listing_lines[4]
 
 
@@ -442,11 +461,8 @@ def test_runRepricingShouldCompleteUnchangedReviewAndDiscardSkips(tmp_path):
         [discarded, reviewed, unchanged],
         market_prices={
             unchanged.fetch_card_id: "0.60",
-            reviewed.fetch_card_id: "0.60",
+            reviewed.fetch_card_id: "NaN",
             discarded.fetch_card_id: "0.20",
-        },
-        competitors={
-            reviewed.fetch_card_id: [_competitor(20, "0.74", condition="raw-nm")]
         },
     )
 

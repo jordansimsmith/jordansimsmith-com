@@ -261,7 +261,7 @@ def test_get_market_snapshot_uses_direct_id_and_builds_price_ladder():
     assert session.calls[0]["url"].endswith("/v3/cards/mtg_244_c_dtk_normal")
 
 
-def test_get_market_snapshot_tracks_cheapest_strictly_better_condition():
+def test_get_market_snapshot_includes_same_and_better_conditions_in_ladder():
     client, _, _ = _client(
         [
             _FakeResponse(200, _card_payload(total_listings=4)),
@@ -281,7 +281,14 @@ def test_get_market_snapshot_tracks_cheapest_strictly_better_condition():
 
     snapshot = client.get_market_snapshot(_query(), "raw-lp")
 
-    assert snapshot.local_listing_count == 1
+    assert snapshot.local_listing_count == 3
+    assert snapshot.local_copy_count == 3
+    assert snapshot.lowest_local_price_nzd == Decimal("0.6")
+    assert set(snapshot.price_ladder) == {
+        Decimal("0.6"),
+        Decimal("0.7"),
+        Decimal("0.8"),
+    }
     assert snapshot.better_condition_lowest_price_nzd == Decimal("0.6")
 
 

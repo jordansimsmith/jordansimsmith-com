@@ -364,7 +364,7 @@ def test_decide_ignores_one_seller_across_copies_and_tiers_as_pricing_support():
     assert result.suggested_price_nzd == Decimal("1.25")
 
 
-def test_decide_reviews_cheaper_better_condition_listing():
+def test_decide_does_not_review_unsupported_better_condition_evidence():
     result = decide(
         _snapshot(
             "0.60",
@@ -372,21 +372,8 @@ def test_decide_reviews_cheaper_better_condition_listing():
         )
     )
 
-    assert result.decision == Decision.REVIEW
-    assert result.supported_local_price_nzd is None
-    assert result.suggested_price_nzd is None
-    assert "better-condition" in result.decision_reason
-
-
-def test_decide_accepts_better_condition_at_proposed_price():
-    result = decide(
-        _snapshot(
-            "0.60",
-            better_condition_lowest_price_nzd=Decimal("0.75"),
-        )
-    )
-
     assert result.decision == Decision.LIST
+    assert result.supported_local_price_nzd is None
     assert result.suggested_price_nzd == Decimal("0.75")
 
 

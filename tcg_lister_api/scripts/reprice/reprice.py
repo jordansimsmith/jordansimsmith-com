@@ -216,7 +216,7 @@ def calculate_pricing(card, competitors, condition):
                     competitor.listed_price_nzd,
                 )
             )
-        if competitor.condition != condition:
+        if competitor_quality < condition_quality:
             continue
         tier = mutable_ladder.setdefault(
             competitor.listed_price_nzd,
@@ -305,21 +305,6 @@ def calculate_pricing(card, competitors, condition):
         (benchmark / PRICE_INCREMENT_NZD).to_integral_value(rounding=ROUND_CEILING)
         * PRICE_INCREMENT_NZD,
     )
-    if (
-        better_condition_lowest_price is not None
-        and better_condition_lowest_price < target_price
-    ):
-        return PricingResult(
-            decision=Decision.REVIEW,
-            decision_reason=(
-                f"a better-condition copy at "
-                f"NZ${better_condition_lowest_price:.2f} is cheaper than "
-                f"the proposed NZ${target_price:.2f} price"
-            ),
-            target_price_nzd=None,
-            **common,
-        )
-
     if market_price < Decimal("0.50"):
         if all_condition_copy_count == 0:
             reason = (
@@ -341,7 +326,7 @@ def calculate_pricing(card, competitors, condition):
     else:
         reason += (
             f"; price uses the NZ${supported_local_price:.2f} two-seller "
-            "supported exact-condition floor and NZ$0.25 increments"
+            "supported same-or-better-condition floor and NZ$0.25 increments"
         )
     return PricingResult(
         decision=Decision.LIST,

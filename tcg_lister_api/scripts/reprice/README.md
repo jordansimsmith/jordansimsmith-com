@@ -28,10 +28,9 @@ The script is self-contained under `scripts/reprice`. It intentionally duplicate
 - Sort managed listings by numeric listing ID ascending before applying offset and limit.
 - Exclude every owned listing ID from competitor evidence.
 - Fetch current NZD market data and active New Zealand competitor listings.
-- Derive a two-independent-seller supported floor for the exact condition.
-- Fall back to Fetch's NZD market price when no supported exact-condition floor exists.
+- Derive a two-independent-seller supported floor from the managed condition and every strictly better condition.
+- Fall back to Fetch's NZD market price when no supported same-or-better-condition floor exists.
 - Round target prices upward to NZ$0.25 increments with an NZ$0.75 minimum.
-- Require review when a strictly better-condition competitor is cheaper than the target.
 - Reprice both upward and downward whenever an actionable target differs from the current price.
 - Preserve listing identity, condition, and quantity during every mutation.
 - Process and checkpoint one listing completely before moving to the next.
@@ -113,8 +112,8 @@ sequenceDiagram
 - **Offset**: zero-based number of stable managed listings skipped before processing.
 - **Next offset**: the offset of the first listing not yet completed; this is the restart value.
 - **Completed listing**: a listing whose analysis and optional mutation finished, including deliberate `UNCHANGED`, `DISCARD`, and `REVIEW` skips.
-- **Exact-condition ladder**: non-owned active NZ listings grouped by price for the managed listing's condition.
-- **Two-seller supported floor**: the first ascending exact-condition price at which at least two distinct sellers are available cumulatively.
+- **Same-or-better-condition ladder**: non-owned active NZ listings grouped by price for the managed listing's condition and every strictly better condition.
+- **Two-seller supported floor**: the first ascending same-or-better-condition price at which at least two distinct sellers are available cumulatively.
 - **Better condition**: a Fetch condition strictly above the managed listing in the fixed condition-quality order.
 - **Target price**: the supported floor or market fallback, rounded upward to NZ$0.25 and constrained to at least NZ$0.75.
 - **Controlled termination**: a normal failure path, HTTP authentication stop, request-budget stop, exception, `SIGINT`, or `SIGTERM` for which Python can execute cleanup.
@@ -187,7 +186,7 @@ Each listing record contains:
 - current price and quantity
 - decision and reason
 - market price, supported floor, better-condition price, and target price
-- exact-condition listing, seller, and copy evidence
+- same-or-better-condition listing, seller, and copy evidence
 - price ladder without seller identities
 - mutation status, requested price, and error
 
@@ -210,11 +209,9 @@ Files are checkpointed using a temporary file in the same directory followed by 
 For an eligible `LIST` decision:
 
 ```text
-benchmark = two-seller supported exact-condition floor, otherwise market price
+benchmark = two-seller supported same-or-better-condition floor, otherwise market price
 target = max(NZ$0.75, round_up(benchmark, NZ$0.25))
 ```
-
-If a strictly better-condition competitor is cheaper than `target`, the final decision is `REVIEW`.
 
 ### Mutation decision
 
@@ -298,7 +295,7 @@ Traffic pacing, retries, request budgets, country, currency, game, seller floor,
 ## Testing and quality gates
 
 - Unit tests use fake sessions and injected clocks; they never call Fetch.
-- Pricing tests cover market boundaries, two distinct seller support, one seller across copies and tiers, NZ$0.75 floor, NZ$0.25 rounding, and better-condition conflicts.
+- Pricing tests cover market boundaries, same-or-better-condition two-seller support, one seller across copies and tiers, NZ$0.75 floor, and NZ$0.25 rounding.
 - Runner tests cover stable sorting, offset and limit, both-direction mutations, unchanged and skipped records, duplicate identities, one-listing-at-a-time sequencing, quantity preservation, decision reasons, and interactive direction colors.
 - Failure tests cover 401 during reads and writes, request errors, partial records, exact next-offset behavior, `SIGINT`, and `SIGTERM`.
 - Report tests cover atomic checkpoints, JSON/CSV consistency, token and seller-name exclusion, and workspace-relative output outside Bazel runfiles.
@@ -357,11 +354,12 @@ If the run reports `next offset: 17`, refresh `FETCHTCG_TOKEN` and rerun with `-
 4. The partial report and console state `next offset: 10`.
 5. The refreshed run starts with `--offset 10`.
 
-### Scenario 4: better condition blocks mutation
+### Scenario 4: better conditions establish the floor
 
-1. A lightly played listing calculates to NZ$1.00.
-2. A near-mint competitor is available at NZ$0.75.
-3. The decision is `REVIEW`, the mutation is skipped, and the next offset advances.
+1. A lightly played listing has two independent near-mint competitors available cumulatively by NZ$0.75.
+2. The near-mint listings participate in the same-or-better-condition ladder.
+3. Their NZ$0.75 level becomes the supported floor and target.
+4. The listing is automatically repriced instead of requiring review.
 
 ### Scenario 5: limited batch completes
 
