@@ -41,7 +41,7 @@ The script is self-contained under `scripts/reprice`. It intentionally duplicate
 
 - Creating or deleting listings.
 - Changing listing condition or quantity.
-- Automatically pricing `DISCARD` or `REVIEW` decisions.
+- Automatically pricing `REVIEW` decisions.
 - Refreshing or obtaining Fetch credentials.
 - Resuming by report file or processed-ID set.
 - Supporting games other than Magic: The Gathering or markets other than New Zealand.
@@ -100,8 +100,9 @@ sequenceDiagram
 - Perform card reads, pricing, optional mutation, and checkpointing inline for one listing before beginning the next.
 - Use the mutation response as the per-listing write verification. The response must preserve listing ID, condition, quantity, currency, and requested price.
 - Apply targets in both directions. This tool does not use the list spike's material-decrease gate because exhaustive repricing is intended to converge every actionable listing to the current target.
+- Treat `DISCARD` as a sunk-inventory liquidation decision: lower an existing price above NZ$0.75 to the seller floor, but never raise a `DISCARD` listing already at or below the floor.
 - Print each listing's complete pricing reason after its direction and mutation status. Color only the direction or terminal-outcome label so the evidence remains easy to read.
-- Use green for `DECREASE`, blue for `UNCHANGED`, yellow for `INCREASE` and `REVIEW`, and red for `DISCARD` and `FAILED`. Disable ANSI color when stdout is not an interactive terminal.
+- Use green for `DECREASE`, blue for `UNCHANGED`, yellow for `INCREASE` and `REVIEW`, and red for `FAILED`. Disable ANSI color when stdout is not an interactive terminal.
 - Atomically replace report files after each completed listing. A prior valid checkpoint remains available if the process is killed while writing.
 - Print the safe offset after each completed listing as well as from the controlled-shutdown path.
 
@@ -111,7 +112,7 @@ sequenceDiagram
 - **Stable inventory position**: one-based display position after sorting managed listings by listing ID ascending.
 - **Offset**: zero-based number of stable managed listings skipped before processing.
 - **Next offset**: the offset of the first listing not yet completed; this is the restart value.
-- **Completed listing**: a listing whose analysis and optional mutation finished, including deliberate `UNCHANGED`, `DISCARD`, and `REVIEW` skips.
+- **Completed listing**: a listing whose analysis and optional mutation finished, including deliberate `UNCHANGED` and `REVIEW` skips.
 - **Same-or-better-condition ladder**: non-owned active NZ listings grouped by price for the managed listing's condition and every strictly better condition.
 - **Two-seller supported floor**: the first ascending same-or-better-condition price at which at least two distinct sellers are available cumulatively.
 - **Better condition**: a Fetch condition strictly above the managed listing in the fixed condition-quality order.
@@ -217,9 +218,11 @@ target = max(NZ$0.75, round_up(benchmark, NZ$0.25))
 
 - `LIST` and `target != current price`: `PLANNED` in dry-run or updated in execute mode.
 - `LIST` and `target == current price`: `UNCHANGED`.
-- `DISCARD` or `REVIEW`: `SKIPPED`; this tool never deletes the listing.
+- `DISCARD` receives an NZ$0.75 liquidation target because its listing effort is already sunk.
+- `DISCARD` above NZ$0.75 is reduced to NZ$0.75; at or below NZ$0.75 it is `UNCHANGED` and is never raised.
+- `REVIEW` is `SKIPPED`; this tool never deletes the listing.
 - A duplicate owned `(card_id, condition)` identity is `REVIEW` and `SKIPPED`.
-- Execute mode may raise or lower a price. Quantity, condition, and listing ID remain unchanged.
+- Execute mode may raise or lower a `LIST` price and may only lower a `DISCARD` price. Quantity, condition, and listing ID remain unchanged.
 
 ## Data and storage contracts
 
@@ -243,7 +246,7 @@ target = max(NZ$0.75, round_up(benchmark, NZ$0.25))
 - A failure during the current listing leaves `next_offset` unchanged so that listing is retried.
 - The safe next offset is printed after each completed listing and again on controlled termination.
 - Every completed or failed listing console line includes the same pricing reason persisted in `decision_reason`.
-- Interactive console labels use the fixed `DECREASE`, `UNCHANGED`, `INCREASE`, `REVIEW`, `DISCARD`, and `FAILED` color policy; reports never contain ANSI escapes.
+- Interactive console labels use the fixed `DECREASE`, `UNCHANGED`, `INCREASE`, `REVIEW`, and `FAILED` color policy; reports never contain ANSI escapes.
 - `SIGINT` and `SIGTERM` are converted into controlled termination and checkpoint the current state.
 - `SIGKILL`, interpreter failure, and power loss cannot execute cleanup. The last atomic checkpoint and previously printed offset remain the latest safe restart point.
 - A limited batch that completes successfully prints a continuation command when more stable inventory remains.

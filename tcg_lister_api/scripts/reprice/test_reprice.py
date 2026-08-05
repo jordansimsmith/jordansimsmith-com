@@ -248,10 +248,15 @@ def test_calculatePricingShouldIgnoreUnsupportedBetterConditionInsteadOfReview()
 
 
 @pytest.mark.parametrize(
-    ("market_price", "competitors", "expected"),
+    ("market_price", "competitors", "expected_decision", "expected_target"),
     [
-        ("0.2499", (), Decision.DISCARD),
-        ("0.25", (_competitor(10, "0.50", condition="raw-lp"),), Decision.DISCARD),
+        ("0.2499", (), Decision.DISCARD, Decimal("0.75")),
+        (
+            "0.25",
+            (_competitor(10, "0.50", condition="raw-lp"),),
+            Decision.DISCARD,
+            Decimal("0.75"),
+        ),
         (
             "0.40",
             tuple(
@@ -259,14 +264,16 @@ def test_calculatePricingShouldIgnoreUnsupportedBetterConditionInsteadOfReview()
                 for index in range(10, 16)
             ),
             Decision.DISCARD,
+            Decimal("0.75"),
         ),
-        ("0.50", (), Decision.LIST),
+        ("0.50", (), Decision.LIST, Decimal("0.75")),
     ],
 )
 def test_calculatePricingShouldApplySelectionBoundaries(
     market_price,
     competitors,
-    expected,
+    expected_decision,
+    expected_target,
 ):
     # arrange
     listing = _managed(1)
@@ -276,7 +283,8 @@ def test_calculatePricingShouldApplySelectionBoundaries(
     result = calculate_pricing(card, competitors, listing.condition)
 
     # assert
-    assert result.decision == expected
+    assert result.decision == expected_decision
+    assert result.target_price_nzd == expected_target
 
 
 def test_parseArgsShouldValidateOffsetAndLimit():
@@ -410,6 +418,51 @@ def test_runRepricingShouldPlanChangesWithoutPosting(tmp_path):
     assert client.upsert_calls == []
 
 
+def test_runRepricingShouldOnlyLowerDiscardedInventoryToSellerFloor(tmp_path):
+    # arrange
+    above_floor = _managed(1, price="1.00")
+    at_floor = _managed(2, price="0.75")
+    below_floor = _managed(3, price="0.50")
+    client = _FakeClient(
+        [below_floor, at_floor, above_floor],
+        market_prices={
+            above_floor.fetch_card_id: "0.20",
+            at_floor.fetch_card_id: "0.20",
+            below_floor.fetch_card_id: "0.20",
+        },
+    )
+
+    # act
+    run = run_repricing(
+        client,
+        output_dir=tmp_path / "output",
+        execute=True,
+        generated_at=GENERATED_AT,
+        output=lambda _: None,
+    )
+
+    # assert
+    assert [record.decision for record in run.records] == [
+        Decision.DISCARD,
+        Decision.DISCARD,
+        Decision.DISCARD,
+    ]
+    assert [record.mutation_status for record in run.records] == [
+        MutationStatus.SUCCEEDED,
+        MutationStatus.UNCHANGED,
+        MutationStatus.UNCHANGED,
+    ]
+    assert [record.target_price_nzd for record in run.records] == [
+        Decimal("0.75"),
+        Decimal("0.75"),
+        Decimal("0.75"),
+    ]
+    assert len(client.upsert_calls) == 1
+    request, expected_listing_id = client.upsert_calls[0]
+    assert request.listed_price_nzd == Decimal("0.75")
+    assert expected_listing_id == 1
+
+
 def test_runRepricingShouldPrintDecisionReasonsAndColorDirections(tmp_path):
     # arrange
     decrease = _managed(1, price="1.25")
@@ -445,14 +498,14 @@ def test_runRepricingShouldPrintDecisionReasonsAndColorDirections(tmp_path):
     assert "\033[33mINCREASE\033[0m" in listing_lines[1]
     assert "\033[34mUNCHANGED\033[0m" in listing_lines[2]
     assert "\033[33mREVIEW\033[0m" in listing_lines[3]
-    assert "\033[31mDISCARD\033[0m" in listing_lines[4]
+    assert "\033[32mDECREASE\033[0m" in listing_lines[4]
     assert all(" — " in line for line in listing_lines)
     assert "price uses the NZ$0.60 market benchmark" in listing_lines[0]
     assert "valid NZD market price" in listing_lines[3]
     assert "market price is below NZ$0.25" in listing_lines[4]
 
 
-def test_runRepricingShouldCompleteUnchangedReviewAndDiscardSkips(tmp_path):
+def test_runRepricingShouldCompleteUnchangedReviewAndDiscardActions(tmp_path):
     # arrange
     unchanged = _managed(1, price="0.75")
     reviewed = _managed(2, condition="raw-lp", price="1.00")
@@ -479,7 +532,7 @@ def test_runRepricingShouldCompleteUnchangedReviewAndDiscardSkips(tmp_path):
     assert [record.mutation_status for record in run.records] == [
         MutationStatus.UNCHANGED,
         MutationStatus.SKIPPED,
-        MutationStatus.SKIPPED,
+        MutationStatus.SUCCEEDED,
     ]
     assert [record.decision for record in run.records] == [
         Decision.LIST,
@@ -487,7 +540,8 @@ def test_runRepricingShouldCompleteUnchangedReviewAndDiscardSkips(tmp_path):
         Decision.DISCARD,
     ]
     assert run.next_offset == 3
-    assert client.upsert_calls == []
+    assert len(client.upsert_calls) == 1
+    assert client.upsert_calls[0][1] == discarded.listing_id
 
 
 def test_runRepricingShouldSkipDuplicateOwnedIdentityWithoutMarketReads(tmp_path):

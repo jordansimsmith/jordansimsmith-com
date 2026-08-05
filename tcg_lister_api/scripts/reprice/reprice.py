@@ -28,7 +28,6 @@ OUTCOME_COLORS = {
     "UNCHANGED": "\033[34m",
     "INCREASE": "\033[33m",
     "REVIEW": "\033[33m",
-    "DISCARD": "\033[31m",
     "FAILED": "\033[31m",
 }
 CSV_FIELDS = [
@@ -268,8 +267,11 @@ def calculate_pricing(card, competitors, condition):
     if market_price < Decimal("0.25"):
         return PricingResult(
             decision=Decision.DISCARD,
-            decision_reason="market price is below NZ$0.25",
-            target_price_nzd=None,
+            decision_reason=(
+                "market price is below NZ$0.25; existing DISCARD inventory "
+                "has an NZ$0.75 liquidation ceiling"
+            ),
+            target_price_nzd=MINIMUM_LIST_PRICE_NZD,
             **common,
         )
     if market_price <= Decimal("0.33") and all_condition_copy_count > 0:
@@ -277,9 +279,10 @@ def calculate_pricing(card, competitors, condition):
             decision=Decision.DISCARD,
             decision_reason=(
                 "market price is at most NZ$0.33 and non-owned local stock "
-                "exists in at least one condition"
+                "exists in at least one condition; existing DISCARD inventory "
+                "has an NZ$0.75 liquidation ceiling"
             ),
-            target_price_nzd=None,
+            target_price_nzd=MINIMUM_LIST_PRICE_NZD,
             **common,
         )
     if (
@@ -291,9 +294,10 @@ def calculate_pricing(card, competitors, condition):
             decision=Decision.DISCARD,
             decision_reason=(
                 "market price is above NZ$0.33 and below NZ$0.50 with more "
-                "than five distinct non-owned sellers across all conditions"
+                "than five distinct non-owned sellers across all conditions; "
+                "existing DISCARD inventory has an NZ$0.75 liquidation ceiling"
             ),
-            target_price_nzd=None,
+            target_price_nzd=MINIMUM_LIST_PRICE_NZD,
             **common,
         )
 
@@ -427,8 +431,14 @@ def run_repricing(
                             competitors,
                             listing.condition,
                         )
-                        if pricing.decision != Decision.LIST:
+                        if pricing.decision == Decision.REVIEW:
                             mutation_status = MutationStatus.SKIPPED
+                        elif (
+                            pricing.decision == Decision.DISCARD
+                            and pricing.target_price_nzd is not None
+                            and listing.listed_price_nzd <= pricing.target_price_nzd
+                        ):
+                            mutation_status = MutationStatus.UNCHANGED
                         elif pricing.target_price_nzd == listing.listed_price_nzd:
                             mutation_status = MutationStatus.UNCHANGED
                         elif execute:
@@ -754,9 +764,15 @@ def _safe_error(error):
 
 
 def _format_record(record, *, use_color=False):
+    suppress_nonmutation_target = (
+        record.decision == Decision.DISCARD
+        and record.mutation_status == MutationStatus.UNCHANGED
+        and record.target_price_nzd is not None
+        and record.current_price_nzd < record.target_price_nzd
+    )
     target = (
         f" -> NZ${record.target_price_nzd:.2f}"
-        if record.target_price_nzd is not None
+        if record.target_price_nzd is not None and not suppress_nonmutation_target
         else ""
     )
     name = record.name or record.fetch_card_id
@@ -784,10 +800,9 @@ def _outcome(record):
         return "FAILED"
     if record.decision == Decision.REVIEW:
         return "REVIEW"
-    if record.decision == Decision.DISCARD:
-        return "DISCARD"
     if (
-        record.target_price_nzd is None
+        record.mutation_status == MutationStatus.UNCHANGED
+        or record.target_price_nzd is None
         or record.target_price_nzd == record.current_price_nzd
     ):
         return "UNCHANGED"
