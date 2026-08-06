@@ -38,7 +38,7 @@ The current service is intentionally a script rather than an HTTP API. It is non
 - Read Fetch's NZD market price and active New Zealand listings across all conditions, while retaining distinct seller counts, physical-copy counts, and translated-condition prices.
 - Read the authenticated user's active listings and match exact card, set, finish, and condition variants.
 - Exclude authenticated managed-listing IDs from local competition counts and price ladders.
-- Price new listings from a two-independent-seller same-or-better-condition floor when available, otherwise use market price, then round upward to an NZ$0.25 increment with an NZ$0.75 minimum.
+- Price new listings from a two-independent-seller same-or-better-condition floor when available, otherwise use market price, then round to the nearest NZ$0.25 increment with midpoint ties upward and an NZ$0.75 minimum.
 - Apply the fixed NZD decision policy.
 - Preview `CREATE`, `UPDATE`, `NONE`, or `REVIEW` without mutating Fetch.
 - With `--execute`, create missing exact listings and add scanned quantities to existing exact listings, lowering an existing price only when the proposed reduction is material.
@@ -134,7 +134,7 @@ sequenceDiagram
 - Construct the normal Fetch card identifier as a fast path, but fall back to a search restricted to the statically mapped Fetch sets when that identifier does not resolve.
 - Always read the detailed listings endpoint for local stock. Count distinct non-owned seller profiles and physical copies across every condition, while deriving the price ladder from the translated ManaBox condition and every strictly better condition. Each price tier retains normalized seller keys in memory so a supported local floor requires two cumulative independent sellers; three copies from one seller do not establish a pricing floor. Use distinct all-condition sellers for the market-price range above `0.33` and below `0.50`; retain physical copies for the lower out-of-stock rule and reporting. The indexed `listingsData` summary on a card may be stale and is not used for decisions or validation.
 - Prefer the two-seller supported same-or-better-condition floor as the pricing benchmark. When no such floor exists, use Fetch's NZD market price and ignore one-seller local prices for automatic pricing.
-- Round the selected benchmark upward to the next NZ$0.25 increment and enforce an NZ$0.75 minimum. This is an explicit seller floor: a locally competitive benchmark below NZ$0.75 remains listed at NZ$0.75.
+- Round the selected benchmark to the nearest NZ$0.25 increment, with exact midpoint ties rounded upward, and enforce an NZ$0.75 minimum. Nearest rounding keeps the target within NZ$0.125 of the benchmark before applying the seller floor instead of systematically pricing above it.
 - Treat the authenticated managed-listing IDs as owned inventory, not competition. Exclude those IDs from local listing counts, copy counts, lowest prices, and price ladders before applying the decision policy.
 - Use `Decimal` for all threshold checks and price rounding.
 - Cache card resolution, market data, and pricing decisions only in memory for the duration of one run. Listing actions are never cached because owned state changes after each physical card.
@@ -159,7 +159,7 @@ sequenceDiagram
 - **Price ladder**: non-owned local listing, seller, and remaining-copy counts at the translated ManaBox condition or a strictly better condition, grouped by NZD price; seller identities remain in memory and are not reported.
 - **Two-seller supported floor**: the first ascending same-or-better-condition price at which at least two distinct non-owned sellers are available cumulatively.
 - **Seller price floor**: the fixed NZ$0.75 minimum suggested listing price.
-- **Price increment**: the fixed NZ$0.25 step to which pricing benchmarks are rounded upward.
+- **Price increment**: the fixed NZ$0.25 step to which pricing benchmarks are rounded to the nearest increment, with midpoint ties upward.
 - **Material reduction**: an existing-price reduction at least equal to the greater of NZ$0.25 and 5% of the suggested price.
 - **Managed listing**: one active listing owned by the authenticated Fetch account.
 - **Listing action**: a `CREATE`, `UPDATE`, `NONE`, or `REVIEW` intent derived from the pricing decision and exact managed-listing matches.
@@ -325,7 +325,7 @@ Execute-mode console output uses the intermediate `POSTED` status immediately af
 - Market prices from `0.25` through `0.33` inclusive are `LIST` only when the non-owned all-condition physical-copy total is zero; otherwise they are `DISCARD`.
 - Market prices above `0.33` and below `0.50` are `LIST` when at most five distinct non-owned sellers have active listings across all conditions; otherwise they are `DISCARD`.
 - Market prices of `0.50` NZD or more are `LIST`.
-- A `LIST` price uses the two-seller supported same-or-better-condition floor when available and otherwise uses market price. The benchmark is rounded upward to an NZ$0.25 increment and then raised to the NZ$0.75 seller floor when lower.
+- A `LIST` price uses the two-seller supported same-or-better-condition floor when available and otherwise uses market price. The benchmark is rounded to the nearest NZ$0.25 increment with midpoint ties upward and then raised to the NZ$0.75 seller floor when lower.
 - Missing market data, unsupported input, and ambiguous identity produce `REVIEW`.
 - Run directory timestamps and report generation timestamps use UTC.
 
@@ -338,7 +338,7 @@ Execute-mode console output uses the intermediate `POSTED` status immediately af
 - **Market price**: Fetch `pricingData.NZ.tcgMarketPrice`.
 - **Local stock, all-condition sellers, and all-condition copies**: active Fetch listing records for country `NZ`, minus listing IDs owned by the authenticated account.
 - **Suggested price benchmark**: the two-seller supported same-or-better-condition floor when present, otherwise Fetch market price.
-- **Seller floor and increment**: fixed NZ$0.75 minimum and NZ$0.25 upward rounding step in the analyzer.
+- **Seller floor and increment**: fixed NZ$0.75 minimum and nearest-NZ$0.25 rounding step with midpoint ties upward in the analyzer.
 - **Better-condition evidence**: strictly better-condition active Fetch listings participate in the supported ladder; the lowest remains an explicit report field.
 - **Owned listings**: authenticated Fetch `/v1/manage-listings` records.
 - **Decision**: the fixed rules in this README and the analyzer implementation.
@@ -398,7 +398,7 @@ Neither credential is persisted by the service. Set the refresh credential throu
 
 ## Testing and quality gates
 
-- Unit tests cover CSV validation, reversed row order, quantity expansion, condition translation, one-to-many static set mapping, PLST collector normalization, exact matching, fallback search, card and listing pagination, distinct all-condition seller counts, all-condition physical-copy counts, same-or-better-condition seller-aware price ladders, two-seller supported floors, owned-listing exclusion, bearer isolation, managed-listing validation and matching, inline dry-run simulation, per-card execution, material-only price reductions, mutable inventory, fail-fast partial results, final post-write verification, final count and value summaries, decision boundaries, NZ$0.75 floor and NZ$0.25 rounding, retry behavior, rate limiting, request budgets, token redaction, and stop conditions.
+- Unit tests cover CSV validation, reversed row order, quantity expansion, condition translation, one-to-many static set mapping, PLST collector normalization, exact matching, fallback search, card and listing pagination, distinct all-condition seller counts, all-condition physical-copy counts, same-or-better-condition seller-aware price ladders, two-seller supported floors, owned-listing exclusion, bearer isolation, managed-listing validation and matching, inline dry-run simulation, per-card execution, material-only price reductions, mutable inventory, fail-fast partial results, final post-write verification, final count and value summaries, decision boundaries, NZ$0.75 floor and nearest-NZ$0.25 rounding, retry behavior, rate limiting, request budgets, token redaction, and stop conditions.
 - HTTP tests use mocked responses and injected time functions; tests never call Fetch.
 - Test fixtures contain no seller PII.
 - Required checks:
@@ -526,7 +526,7 @@ Run dry-run again to confirm `UPDATE`, execute once more to increase quantity fr
 1. A card has a market price of `1.40` NZD.
 2. Two independent same-or-better-condition sellers are available cumulatively by `0.76` NZD.
 3. The two-seller supported floor replaces market price as the pricing benchmark.
-4. The benchmark rounds upward to a suggested price of `1.00` NZD.
+4. The benchmark rounds to the nearest increment for a suggested price of `0.75` NZD.
 
 ### Scenario 10: one deep seller does not establish the price
 

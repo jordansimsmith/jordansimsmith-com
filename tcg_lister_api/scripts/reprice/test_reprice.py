@@ -149,13 +149,16 @@ class _FakeClient:
     [
         ("0.25", Decimal("0.75")),
         ("0.74", Decimal("0.75")),
-        ("0.76", Decimal("1.00")),
+        ("0.76", Decimal("0.75")),
+        ("0.87", Decimal("0.75")),
+        ("0.875", Decimal("1.00")),
+        ("0.88", Decimal("1.00")),
         ("1.00", Decimal("1.00")),
-        ("1.01", Decimal("1.25")),
+        ("1.01", Decimal("1.00")),
         ("3.20", Decimal("3.25")),
     ],
 )
-def test_calculatePricingShouldApplyFloorAndQuarterIncrement(
+def test_calculatePricingShouldApplyFloorAndNearestQuarterIncrement(
     market_price,
     expected,
 ):
@@ -169,6 +172,7 @@ def test_calculatePricingShouldApplyFloorAndQuarterIncrement(
     # assert
     assert result.decision == Decision.LIST
     assert result.target_price_nzd == expected
+    assert "nearest NZ$0.25 increment" in result.decision_reason
 
 
 def test_calculatePricingShouldUseCumulativeTwoSellerFloor():
@@ -186,7 +190,7 @@ def test_calculatePricingShouldUseCumulativeTwoSellerFloor():
     # assert
     assert result.decision == Decision.LIST
     assert result.supported_local_price_nzd == Decimal("0.76")
-    assert result.target_price_nzd == Decimal("1.00")
+    assert result.target_price_nzd == Decimal("0.75")
 
 
 def test_calculatePricingShouldIgnoreOneSellerAcrossCopiesAndTiers():
@@ -204,7 +208,7 @@ def test_calculatePricingShouldIgnoreOneSellerAcrossCopiesAndTiers():
     # assert
     assert result.decision == Decision.LIST
     assert result.supported_local_price_nzd is None
-    assert result.target_price_nzd == Decimal("1.25")
+    assert result.target_price_nzd == Decimal("1.00")
 
 
 def test_calculatePricingShouldIncludeBetterConditionsInSupportedFloor():
@@ -225,7 +229,7 @@ def test_calculatePricingShouldIncludeBetterConditionsInSupportedFloor():
     assert result.local_listing_count == 2
     assert result.supported_local_price_nzd == Decimal("0.76")
     assert result.better_condition_lowest_price_nzd == Decimal("0.40")
-    assert result.target_price_nzd == Decimal("1.00")
+    assert result.target_price_nzd == Decimal("0.75")
 
 
 def test_calculatePricingShouldIgnoreUnsupportedBetterConditionInsteadOfReview():
@@ -361,7 +365,7 @@ def test_runRepricingShouldExecuteRaisesAndLowersInline(tmp_path):
     client = _FakeClient(
         [low_target, high_target],
         market_prices={
-            high_target.fetch_card_id: "0.76",
+            high_target.fetch_card_id: "0.88",
             low_target.fetch_card_id: "0.60",
         },
     )
@@ -474,7 +478,7 @@ def test_runRepricingShouldPrintDecisionReasonsAndColorDirections(tmp_path):
         [discarded, unchanged, reviewed, increase, decrease],
         market_prices={
             decrease.fetch_card_id: "0.60",
-            increase.fetch_card_id: "0.76",
+            increase.fetch_card_id: "0.88",
             unchanged.fetch_card_id: "0.60",
             reviewed.fetch_card_id: "NaN",
             discarded.fetch_card_id: "0.20",

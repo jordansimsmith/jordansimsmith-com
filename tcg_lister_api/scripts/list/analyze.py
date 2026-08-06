@@ -7,7 +7,7 @@ import sys
 import uuid
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
-from decimal import ROUND_CEILING, Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from enum import Enum
 from pathlib import Path
 from typing import Callable, Sequence
@@ -462,7 +462,7 @@ def decide(snapshot):
     suggested_price = max(
         MINIMUM_LIST_PRICE_NZD,
         (pricing_benchmark / PRICE_INCREMENT_NZD).to_integral_value(
-            rounding=ROUND_CEILING
+            rounding=ROUND_HALF_UP
         )
         * PRICE_INCREMENT_NZD,
     )
@@ -482,12 +482,13 @@ def decide(snapshot):
     if supported_local_price is None:
         reason += (
             f"; price uses the NZ${market_price:.2f} market benchmark, "
-            "NZ$0.25 increments, and the NZ$0.75 floor"
+            "the nearest NZ$0.25 increment, and the NZ$0.75 floor"
         )
     else:
         reason += (
             f"; price uses the NZ${supported_local_price:.2f} two-seller "
-            "supported same-or-better-condition floor and NZ$0.25 increments"
+            "supported same-or-better-condition floor, the nearest NZ$0.25 "
+            "increment, and the NZ$0.75 floor"
         )
     return DecisionResult(
         decision=Decision.LIST,

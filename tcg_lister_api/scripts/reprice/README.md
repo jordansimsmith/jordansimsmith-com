@@ -30,7 +30,7 @@ The script is self-contained under `scripts/reprice`. It intentionally duplicate
 - Fetch current NZD market data and active New Zealand competitor listings.
 - Derive a two-independent-seller supported floor from the managed condition and every strictly better condition.
 - Fall back to Fetch's NZD market price when no supported same-or-better-condition floor exists.
-- Round target prices upward to NZ$0.25 increments with an NZ$0.75 minimum.
+- Round target prices to the nearest NZ$0.25 increment with midpoint ties upward and an NZ$0.75 minimum.
 - Reprice both upward and downward whenever an actionable target differs from the current price.
 - Preserve listing identity, condition, and quantity during every mutation.
 - Process and checkpoint one listing completely before moving to the next.
@@ -103,6 +103,7 @@ sequenceDiagram
 - Keep the selected inventory slice immutable for the run. Mutations cannot reorder or change the active work list.
 - Perform card reads, pricing, optional mutation, and checkpointing inline for one listing before beginning the next.
 - Use the mutation response as the per-listing write verification. The response must preserve listing ID, condition, quantity, currency, and requested price.
+- Round the selected pricing benchmark to the nearest NZ$0.25 increment, with exact midpoint ties upward, before applying the NZ$0.75 minimum. This avoids systematically pricing above the benchmark.
 - Apply targets in both directions. This tool does not use the list spike's material-decrease gate because exhaustive repricing is intended to converge every actionable listing to the current target.
 - Treat `DISCARD` as a sunk-inventory liquidation decision: lower an existing price above NZ$0.75 to the seller floor, but never raise a `DISCARD` listing already at or below the floor.
 - Print each listing's complete pricing reason after its direction and mutation status. Color only the direction or terminal-outcome label so the evidence remains easy to read.
@@ -120,7 +121,7 @@ sequenceDiagram
 - **Same-or-better-condition ladder**: non-owned active NZ listings grouped by price for the managed listing's condition and every strictly better condition.
 - **Two-seller supported floor**: the first ascending same-or-better-condition price at which at least two distinct sellers are available cumulatively.
 - **Better condition**: a Fetch condition strictly above the managed listing in the fixed condition-quality order.
-- **Target price**: the supported floor or market fallback, rounded upward to NZ$0.25 and constrained to at least NZ$0.75.
+- **Target price**: the supported floor or market fallback, rounded to the nearest NZ$0.25 with midpoint ties upward and constrained to at least NZ$0.75.
 - **Controlled termination**: a normal failure path, HTTP authentication stop, request-budget stop, exception, `SIGINT`, or `SIGTERM` for which Python can execute cleanup.
 
 ## Integration contracts
@@ -217,7 +218,7 @@ For an eligible `LIST` decision:
 
 ```text
 benchmark = two-seller supported same-or-better-condition floor, otherwise market price
-target = max(NZ$0.75, round_up(benchmark, NZ$0.25))
+target = max(NZ$0.75, round_nearest_half_up(benchmark, NZ$0.25))
 ```
 
 ### Mutation decision
@@ -307,7 +308,7 @@ Traffic pacing, retries, request budgets, country, currency, game, seller floor,
 ## Testing and quality gates
 
 - Unit tests use fake sessions and injected clocks; they never call Fetch.
-- Pricing tests cover market boundaries, same-or-better-condition two-seller support, one seller across copies and tiers, NZ$0.75 floor, and NZ$0.25 rounding.
+- Pricing tests cover market boundaries, same-or-better-condition two-seller support, one seller across copies and tiers, NZ$0.75 floor, and nearest-NZ$0.25 rounding with midpoint ties upward.
 - Runner tests cover stable sorting, offset and limit, both-direction mutations, unchanged and skipped records, duplicate identities, one-listing-at-a-time sequencing, quantity preservation, decision reasons, and interactive direction colors.
 - Failure tests cover 401 during reads and writes, request errors, partial records, exact next-offset behavior, `SIGINT`, and `SIGTERM`.
 - Report tests cover atomic checkpoints, JSON/CSV consistency, token and seller-name exclusion, and workspace-relative output outside Bazel runfiles.

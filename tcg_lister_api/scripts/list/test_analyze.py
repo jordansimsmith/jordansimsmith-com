@@ -297,19 +297,23 @@ def test_decide_applies_price_and_stock_boundaries(
     [
         ("0.25", Decimal("0.75")),
         ("0.74", Decimal("0.75")),
-        ("0.76", Decimal("1.00")),
+        ("0.76", Decimal("0.75")),
+        ("0.87", Decimal("0.75")),
+        ("0.875", Decimal("1.00")),
+        ("0.88", Decimal("1.00")),
         ("1.00", Decimal("1")),
-        ("1.01", Decimal("1.25")),
+        ("1.01", Decimal("1.00")),
         ("3.20", Decimal("3.25")),
     ],
 )
-def test_decide_applies_seller_floor_and_quarter_dollar_increment(
+def test_decide_applies_seller_floor_and_nearest_quarter_dollar_increment(
     market_price, expected
 ):
     result = decide(_snapshot(market_price))
 
     assert result.decision == Decision.LIST
     assert result.suggested_price_nzd == expected
+    assert "nearest NZ$0.25 increment" in result.decision_reason
 
 
 def test_decide_uses_two_seller_supported_floor_before_market_price():
@@ -335,7 +339,7 @@ def test_decide_uses_two_seller_supported_floor_before_market_price():
 
     assert result.decision == Decision.LIST
     assert result.supported_local_price_nzd == Decimal("0.76")
-    assert result.suggested_price_nzd == Decimal("1.00")
+    assert result.suggested_price_nzd == Decimal("0.75")
 
 
 def test_decide_ignores_one_seller_across_copies_and_tiers_as_pricing_support():
@@ -361,7 +365,7 @@ def test_decide_ignores_one_seller_across_copies_and_tiers_as_pricing_support():
 
     assert result.decision == Decision.LIST
     assert result.supported_local_price_nzd is None
-    assert result.suggested_price_nzd == Decimal("1.25")
+    assert result.suggested_price_nzd == Decimal("1.00")
 
 
 def test_decide_does_not_review_unsupported_better_condition_evidence():
@@ -957,7 +961,7 @@ def test_inline_execute_updates_quantity_and_lowers_materially_overpriced_listin
     [
         ("0.90", "0.60", Decimal("0.90")),
         ("0.50", "0.60", Decimal("0.50")),
-        ("1.00", "0.76", Decimal("1.00")),
+        ("1.00", "0.88", Decimal("1.00")),
     ],
 )
 def test_inline_update_preserves_small_reductions_and_never_raises_prices(
