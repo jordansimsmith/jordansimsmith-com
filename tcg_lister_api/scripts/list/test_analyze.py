@@ -258,19 +258,19 @@ def test_load_physical_cards_rejects_invalid_offset(tmp_path, offset, message):
         "expected",
     ),
     [
-        ("0.2499", 0, 0, 0, 0, Decision.DISCARD),
+        ("0.2499", 10, 100, 10, 100, Decision.DISCARD),
         ("0.25", 0, 0, 0, 0, Decision.LIST),
-        ("0.25", 0, 0, 1, 1, Decision.DISCARD),
+        ("0.25", 0, 0, 1, 1, Decision.LIST),
         ("0.33", 0, 0, 0, 0, Decision.LIST),
-        ("0.33", 0, 0, 1, 1, Decision.DISCARD),
+        ("0.33", 0, 0, 1, 1, Decision.LIST),
         ("0.3301", 9, 100, 5, 100, Decision.LIST),
-        ("0.3301", 0, 0, 6, 6, Decision.DISCARD),
+        ("0.3301", 0, 0, 6, 6, Decision.LIST),
         ("0.4999", 2, 100, 5, 100, Decision.LIST),
-        ("0.4999", 0, 0, 6, 6, Decision.DISCARD),
+        ("0.4999", 0, 0, 100, 100, Decision.LIST),
         ("0.50", 0, 0, 100, 100, Decision.LIST),
     ],
 )
-def test_decide_applies_price_and_stock_boundaries(
+def test_decide_applies_minimum_market_price_regardless_of_competition(
     market_price,
     listing_count,
     copy_count,

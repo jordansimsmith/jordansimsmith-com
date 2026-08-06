@@ -28,6 +28,7 @@ The script is self-contained under `scripts/reprice`. It intentionally duplicate
 - Sort managed listings by numeric listing ID ascending before applying offset and limit.
 - Exclude every owned listing ID from competitor evidence.
 - Fetch current NZD market data and active New Zealand competitor listings.
+- Treat every valid market price of at least NZ$0.25 as eligible for `LIST` regardless of competitor count.
 - Derive a two-independent-seller supported floor from the managed condition and every strictly better condition.
 - Fall back to Fetch's NZD market price when no supported same-or-better-condition floor exists.
 - Round target prices to the nearest NZ$0.25 increment with midpoint ties upward and an NZ$0.75 minimum.
@@ -104,6 +105,7 @@ sequenceDiagram
 - Perform card reads, pricing, optional mutation, and checkpointing inline for one listing before beginning the next.
 - Use the mutation response as the per-listing write verification. The response must preserve listing ID, condition, quantity, currency, and requested price.
 - Round the selected pricing benchmark to the nearest NZ$0.25 increment, with exact midpoint ties upward, before applying the NZ$0.75 minimum. This avoids systematically pricing above the benchmark.
+- Use competitor evidence to choose the pricing benchmark and for reporting, never to reject an otherwise eligible card.
 - Apply targets in both directions. This tool does not use the list spike's material-decrease gate because exhaustive repricing is intended to converge every actionable listing to the current target.
 - Treat `DISCARD` as a sunk-inventory liquidation decision: lower an existing price above NZ$0.75 to the seller floor, but never raise a `DISCARD` listing already at or below the floor.
 - Print each listing's complete pricing reason after its direction and mutation status. Color only the direction or terminal-outcome label so the evidence remains easy to read.
@@ -208,9 +210,7 @@ Files are checkpointed using a temporary file in the same directory followed by 
 
 - Invalid or missing market price is `REVIEW`.
 - Market price below NZ$0.25 is `DISCARD`.
-- Market price from NZ$0.25 through NZ$0.33 is `DISCARD` when any non-owned local copy exists across conditions; otherwise it is eligible for `LIST`.
-- Market price above NZ$0.33 and below NZ$0.50 is `DISCARD` when more than five distinct non-owned sellers exist across conditions; otherwise it is eligible for `LIST`.
-- Market price of at least NZ$0.50 is eligible for `LIST`.
+- Market price of at least NZ$0.25 is eligible for `LIST` regardless of competitor listing, seller, or copy counts.
 
 ### Target decision
 

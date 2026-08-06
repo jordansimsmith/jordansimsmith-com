@@ -274,32 +274,6 @@ def calculate_pricing(card, competitors, condition):
             target_price_nzd=MINIMUM_LIST_PRICE_NZD,
             **common,
         )
-    if market_price <= Decimal("0.33") and all_condition_copy_count > 0:
-        return PricingResult(
-            decision=Decision.DISCARD,
-            decision_reason=(
-                "market price is at most NZ$0.33 and non-owned local stock "
-                "exists in at least one condition; existing DISCARD inventory "
-                "has an NZ$0.75 liquidation ceiling"
-            ),
-            target_price_nzd=MINIMUM_LIST_PRICE_NZD,
-            **common,
-        )
-    if (
-        market_price > Decimal("0.33")
-        and market_price < Decimal("0.50")
-        and len(all_condition_sellers) > 5
-    ):
-        return PricingResult(
-            decision=Decision.DISCARD,
-            decision_reason=(
-                "market price is above NZ$0.33 and below NZ$0.50 with more "
-                "than five distinct non-owned sellers across all conditions; "
-                "existing DISCARD inventory has an NZ$0.75 liquidation ceiling"
-            ),
-            target_price_nzd=MINIMUM_LIST_PRICE_NZD,
-            **common,
-        )
 
     benchmark = (
         supported_local_price if supported_local_price is not None else market_price
@@ -309,19 +283,7 @@ def calculate_pricing(card, competitors, condition):
         (benchmark / PRICE_INCREMENT_NZD).to_integral_value(rounding=ROUND_HALF_UP)
         * PRICE_INCREMENT_NZD,
     )
-    if market_price < Decimal("0.50"):
-        if all_condition_copy_count == 0:
-            reason = (
-                "market price is at least NZ$0.25 and below NZ$0.50 with "
-                "no non-owned local stock in any condition"
-            )
-        else:
-            reason = (
-                "market price is above NZ$0.33 and below NZ$0.50 with at "
-                "most five distinct non-owned sellers across all conditions"
-            )
-    else:
-        reason = "market price is at least NZ$0.50"
+    reason = "market price is at least NZ$0.25"
     if supported_local_price is None:
         reason += (
             f"; price uses the NZ${market_price:.2f} market benchmark, "

@@ -432,28 +432,6 @@ def decide(snapshot):
             decision_reason="market price is below NZ$0.25",
             suggested_price_nzd=None,
         )
-    if market_price <= Decimal("0.33") and snapshot.all_condition_local_copy_count > 0:
-        return DecisionResult(
-            decision=Decision.DISCARD,
-            decision_reason=(
-                "market price is at most NZ$0.33 and non-owned local stock "
-                "exists in at least one condition"
-            ),
-            suggested_price_nzd=None,
-        )
-    if (
-        market_price > Decimal("0.33")
-        and market_price < Decimal("0.50")
-        and snapshot.all_condition_local_seller_count > 5
-    ):
-        return DecisionResult(
-            decision=Decision.DISCARD,
-            decision_reason=(
-                "market price is above NZ$0.33 and below NZ$0.50 with more than "
-                "five distinct non-owned sellers across all conditions"
-            ),
-            suggested_price_nzd=None,
-        )
 
     supported_local_price = _supported_local_price(snapshot.price_ladder)
     pricing_benchmark = (
@@ -466,19 +444,7 @@ def decide(snapshot):
         )
         * PRICE_INCREMENT_NZD,
     )
-    if market_price < Decimal("0.50"):
-        if snapshot.all_condition_local_copy_count == 0:
-            reason = (
-                "market price is at least NZ$0.25 and below NZ$0.50 "
-                "with no non-owned local stock in any condition"
-            )
-        else:
-            reason = (
-                "market price is above NZ$0.33 and below NZ$0.50 "
-                "with at most five distinct non-owned sellers across all conditions"
-            )
-    else:
-        reason = "market price is at least NZ$0.50"
+    reason = "market price is at least NZ$0.25"
     if supported_local_price is None:
         reason += (
             f"; price uses the NZ${market_price:.2f} market benchmark, "

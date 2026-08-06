@@ -38,6 +38,7 @@ The current service is intentionally a script rather than an HTTP API. It is non
 - Read Fetch's NZD market price and active New Zealand listings across all conditions, while retaining distinct seller counts, physical-copy counts, and translated-condition prices.
 - Read the authenticated user's active listings and match exact card, set, finish, and condition variants.
 - Exclude authenticated managed-listing IDs from local competition counts and price ladders.
+- List every card with a valid Fetch NZD market price of at least NZ$0.25 regardless of competitor count; retain competitor evidence for pricing and reporting.
 - Price new listings from a two-independent-seller same-or-better-condition floor when available, otherwise use market price, then round to the nearest NZ$0.25 increment with midpoint ties upward and an NZ$0.75 minimum.
 - Apply the fixed NZD decision policy.
 - Preview `CREATE`, `UPDATE`, `NONE`, or `REVIEW` without mutating Fetch.
@@ -132,7 +133,7 @@ sequenceDiagram
 - Keep a generated, checked-in one-to-many mapping from Scryfall/ManaBox set codes to Fetch numeric set identifiers. An unmapped set stops the run so the mapping must be updated explicitly. Manual aliases cover Fetch catalogs that split one Scryfall set across products, including `PLST` cards in Fetch's `The List` and `Mystery Booster` sets.
 - Translate ManaBox's seven Cardmarket-style conditions into Fetch condition codes: `mint` to `raw-m`, `near_mint` to `raw-nm`, `excellent` to `raw-lp`, `good` to `raw-mp`, `light_played` and `played` to `raw-hp`, and `poor` to `raw-d`.
 - Construct the normal Fetch card identifier as a fast path, but fall back to a search restricted to the statically mapped Fetch sets when that identifier does not resolve.
-- Always read the detailed listings endpoint for local stock. Count distinct non-owned seller profiles and physical copies across every condition, while deriving the price ladder from the translated ManaBox condition and every strictly better condition. Each price tier retains normalized seller keys in memory so a supported local floor requires two cumulative independent sellers; three copies from one seller do not establish a pricing floor. Use distinct all-condition sellers for the market-price range above `0.33` and below `0.50`; retain physical copies for the lower out-of-stock rule and reporting. The indexed `listingsData` summary on a card may be stale and is not used for decisions or validation.
+- Always read the detailed listings endpoint for local stock. Count distinct non-owned seller profiles and physical copies across every condition for reporting, while deriving the price ladder from the translated ManaBox condition and every strictly better condition. Each price tier retains normalized seller keys in memory so a supported local floor requires two cumulative independent sellers; three copies from one seller do not establish a pricing floor. Competitor counts do not determine listing eligibility. The indexed `listingsData` summary on a card may be stale and is not used for decisions or validation.
 - Prefer the two-seller supported same-or-better-condition floor as the pricing benchmark. When no such floor exists, use Fetch's NZD market price and ignore one-seller local prices for automatic pricing.
 - Round the selected benchmark to the nearest NZ$0.25 increment, with exact midpoint ties rounded upward, and enforce an NZ$0.75 minimum. Nearest rounding keeps the target within NZ$0.125 of the benchmark before applying the seller floor instead of systematically pricing above it.
 - Treat the authenticated managed-listing IDs as owned inventory, not competition. Exclude those IDs from local listing counts, copy counts, lowest prices, and price ladders before applying the decision policy.
@@ -268,7 +269,7 @@ Every card record contains:
 - `mutation_price_nzd`
 - `mutation_error`
 
-`local_listing_count`, `local_copy_count`, `lowest_local_price_nzd`, and `price_ladder` describe non-owned competition in the translated ManaBox condition and every strictly better condition. `supported_local_price_nzd` is the two-seller supported floor or `null`; `better_condition_lowest_price_nzd` remains the cheapest strictly better-condition competitor for audit evidence or `null`. `all_condition_local_seller_count` is the number of distinct non-owned seller profiles across every condition and drives the above-`0.33`, below-`0.50` threshold. `all_condition_local_copy_count` is the non-owned physical-copy total across every condition and drives the `0.25` through `0.33` out-of-stock threshold. Seller names are not written to reports. `price_ladder` is a JSON object keyed by two-decimal NZD price. Each value contains `listing_count`, `seller_count`, and `copy_count`.
+`local_listing_count`, `local_copy_count`, `lowest_local_price_nzd`, and `price_ladder` describe non-owned competition in the translated ManaBox condition and every strictly better condition. `supported_local_price_nzd` is the two-seller supported floor or `null`; `better_condition_lowest_price_nzd` remains the cheapest strictly better-condition competitor for audit evidence or `null`. `all_condition_local_seller_count` and `all_condition_local_copy_count` report non-owned competition across every condition but do not determine listing eligibility. Seller names are not written to reports. `price_ladder` is a JSON object keyed by two-decimal NZD price. Each value contains `listing_count`, `seller_count`, and `copy_count`.
 
 `existing_listings` is a JSON array. Each item contains `listing_id`, `remaining_quantity`, `listed_price_nzd`, and `simulated`. A planned create produces `listing_id: null` and `simulated: true`; a planned update retains the real positive listing ID but uses `simulated: true` for its virtual quantity. Unmodified or executed Fetch state uses `simulated: false`. `stack.csv` stores this array as compact JSON.
 
@@ -322,9 +323,7 @@ Execute-mode console output uses the intermediate `POSTED` status immediately af
 - All posted records for one identity become `SUCCEEDED` only when its final expected state verifies; otherwise those records become `FAILED`.
 - The final card count is the number of `PLANNED` dry-run records or `SUCCEEDED` execute records. The final value is the sum of one `mutation_price_nzd` per counted physical-card record.
 - Market prices below `0.25` NZD are `DISCARD`.
-- Market prices from `0.25` through `0.33` inclusive are `LIST` only when the non-owned all-condition physical-copy total is zero; otherwise they are `DISCARD`.
-- Market prices above `0.33` and below `0.50` are `LIST` when at most five distinct non-owned sellers have active listings across all conditions; otherwise they are `DISCARD`.
-- Market prices of `0.50` NZD or more are `LIST`.
+- Market prices of `0.25` NZD or more are `LIST` regardless of competitor listing, seller, or copy counts.
 - A `LIST` price uses the two-seller supported same-or-better-condition floor when available and otherwise uses market price. The benchmark is rounded to the nearest NZ$0.25 increment with midpoint ties upward and then raised to the NZ$0.75 seller floor when lower.
 - Missing market data, unsupported input, and ambiguous identity produce `REVIEW`.
 - Run directory timestamps and report generation timestamps use UTC.
@@ -515,11 +514,12 @@ Run dry-run again to confirm `UPDATE`, execute once more to increase quantity fr
 3. Moonmist `ISD-195` resolves in Fetch's `The List` set, while Disenchant `M20-14` resolves in Fetch's `Mystery Booster` set.
 4. The candidate is accepted only after its exact Scryfall ID, normalized collector number, finish, and mapped Fetch set ID agree.
 
-### Scenario 8: mid-value cards use distinct sellers
+### Scenario 8: competition does not block listing eligibility
 
-1. A card has a market price above `0.33` NZD and below `0.50` NZD.
-2. Five non-owned sellers collectively list any number of copies across one or more conditions.
-3. The card receives `LIST`; a sixth distinct non-owned seller would change the decision to `DISCARD`.
+1. A card has a market price of `0.25` NZD or more.
+2. Any number of non-owned sellers list copies across one or more conditions.
+3. The card receives `LIST`.
+4. Same-or-better-condition competitor evidence still participates in selecting the pricing benchmark.
 
 ### Scenario 9: two sellers establish the listing price
 

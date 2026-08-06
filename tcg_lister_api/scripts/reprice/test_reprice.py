@@ -258,7 +258,7 @@ def test_calculatePricingShouldIgnoreUnsupportedBetterConditionInsteadOfReview()
         (
             "0.25",
             (_competitor(10, "0.50", condition="raw-lp"),),
-            Decision.DISCARD,
+            Decision.LIST,
             Decimal("0.75"),
         ),
         (
@@ -267,13 +267,13 @@ def test_calculatePricingShouldIgnoreUnsupportedBetterConditionInsteadOfReview()
                 _competitor(index, "0.50", seller=f"seller-{index}")
                 for index in range(10, 16)
             ),
-            Decision.DISCARD,
+            Decision.LIST,
             Decimal("0.75"),
         ),
         ("0.50", (), Decision.LIST, Decimal("0.75")),
     ],
 )
-def test_calculatePricingShouldApplySelectionBoundaries(
+def test_calculatePricingShouldApplyMinimumMarketPriceRegardlessOfCompetition(
     market_price,
     competitors,
     expected_decision,
