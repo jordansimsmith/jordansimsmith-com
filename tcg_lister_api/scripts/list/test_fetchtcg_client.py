@@ -1124,13 +1124,13 @@ def test_get_managed_listings_rejects_too_many_pages():
         [
             _FakeResponse(
                 200,
-                _listings_payload([], total_pages=26),
+                _listings_payload([], total_pages=101),
             )
         ],
         token="test-token",
     )
 
-    with pytest.raises(FetchTcgRequestError, match="exceeded 25 pages"):
+    with pytest.raises(FetchTcgRequestError, match="exceeded 100 pages"):
         client.get_managed_listings({"fic"})
 
 

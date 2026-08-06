@@ -373,7 +373,7 @@ Execute-mode console output uses the intermediate `POSTED` status immediately af
 - Maximum attempts per retryable request: `5`
 - Maximum requests per run: `1000`
 - Maximum card-search pages per mapped Fetch set: `5`
-- Maximum managed-listing pages: `25`
+- Maximum managed-listing pages: `100`
 - User agent: browser-compatible macOS Chrome shape captured in the reference HAR
 
 ### Environment variables
