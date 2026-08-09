@@ -8,6 +8,16 @@ py_library(
 )
 
 py_library(
+    name = "inventory-coverage-lib",
+    srcs = [
+        "scripts/inventory/coverage.py",
+        "scripts/inventory/fetchtcg_client.py",
+    ],
+    imports = ["scripts/inventory"],
+    deps = ["@pypi//requests"],
+)
+
+py_library(
     name = "lib",
     srcs = [
         "scripts/list/analyze.py",
@@ -56,6 +66,13 @@ py_binary(
     srcs = ["scripts/demand/main.py"],
     main = "scripts/demand/main.py",
     deps = [":demand-lib"],
+)
+
+py_binary(
+    name = "fetchtcg-inventory-coverage",
+    srcs = ["scripts/inventory/main.py"],
+    main = "scripts/inventory/main.py",
+    deps = [":inventory-coverage-lib"],
 )
 
 py_binary(
@@ -228,6 +245,23 @@ py_test(
     main = "scripts/demand/test_runner.py",
     deps = [
         ":demand-lib",
+        "@pypi//pytest",
+        "@pypi//requests",
+    ],
+)
+
+py_test(
+    name = "inventory-coverage-unit-tests",
+    size = "small",
+    srcs = [
+        "scripts/inventory/test_coverage.py",
+        "scripts/inventory/test_fetchtcg_client.py",
+        "scripts/inventory/test_runner.py",
+    ],
+    imports = ["scripts/inventory"],
+    main = "scripts/inventory/test_runner.py",
+    deps = [
+        ":inventory-coverage-lib",
         "@pypi//pytest",
         "@pypi//requests",
     ],
