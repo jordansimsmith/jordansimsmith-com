@@ -88,6 +88,13 @@ py_binary(
 )
 
 py_binary(
+    name = "fetchtcg-sales-telemetry",
+    srcs = ["scripts/sales/main.py"],
+    main = "scripts/sales/main.py",
+    deps = ["@pypi//requests"],
+)
+
+py_binary(
     name = "generate-fetch-set-mapping",
     srcs = ["scripts/list/generate_fetch_set_mapping.py"],
     main = "scripts/list/generate_fetch_set_mapping.py",
@@ -171,6 +178,22 @@ py_test(
     main = "scripts/reprice/test_runner.py",
     deps = [
         ":reprice-lib",
+        "@pypi//pytest",
+        "@pypi//requests",
+    ],
+)
+
+py_test(
+    name = "sales-unit-tests",
+    size = "small",
+    srcs = [
+        "scripts/sales/main.py",
+        "scripts/sales/test_main.py",
+        "scripts/sales/test_runner.py",
+    ],
+    imports = ["scripts/sales"],
+    main = "scripts/sales/test_runner.py",
+    deps = [
         "@pypi//pytest",
         "@pypi//requests",
     ],
