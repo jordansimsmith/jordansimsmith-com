@@ -1,6 +1,13 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 py_library(
+    name = "demand-lib",
+    srcs = ["scripts/demand/analyze.py"],
+    imports = ["scripts/demand"],
+    deps = ["@pypi//requests"],
+)
+
+py_library(
     name = "lib",
     srcs = [
         "scripts/list/analyze.py",
@@ -42,6 +49,13 @@ py_library(
     srcs = ["scripts/scan/scryfall_sync.py"],
     imports = ["scripts/scan"],
     deps = ["@pypi//requests"],
+)
+
+py_binary(
+    name = "demand-proxy-analyze",
+    srcs = ["scripts/demand/main.py"],
+    main = "scripts/demand/main.py",
+    deps = [":demand-lib"],
 )
 
 py_binary(
@@ -175,6 +189,22 @@ py_test(
     deps = [
         ":scan-eval-lib",
         ":scryfall-sync-lib",
+        "@pypi//pytest",
+        "@pypi//requests",
+    ],
+)
+
+py_test(
+    name = "demand-unit-tests",
+    size = "small",
+    srcs = [
+        "scripts/demand/test_analyze.py",
+        "scripts/demand/test_runner.py",
+    ],
+    imports = ["scripts/demand"],
+    main = "scripts/demand/test_runner.py",
+    deps = [
+        ":demand-lib",
         "@pypi//pytest",
         "@pypi//requests",
     ],
