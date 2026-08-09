@@ -147,18 +147,19 @@ class _FakeClient:
 @pytest.mark.parametrize(
     ("market_price", "expected"),
     [
-        ("0.25", Decimal("0.75")),
+        ("0.25", Decimal("0.25")),
         ("0.74", Decimal("0.75")),
         ("0.76", Decimal("0.75")),
-        ("0.87", Decimal("0.75")),
-        ("0.875", Decimal("1.00")),
-        ("0.88", Decimal("1.00")),
+        ("0.87", Decimal("0.85")),
+        ("0.875", Decimal("0.90")),
+        ("0.88", Decimal("0.90")),
         ("1.00", Decimal("1.00")),
-        ("1.01", Decimal("1.00")),
-        ("3.20", Decimal("3.25")),
+        ("1.99", Decimal("2.00")),
+        ("2.00", Decimal("2.30")),
+        ("3.20", Decimal("3.70")),
     ],
 )
-def test_calculatePricingShouldApplyFloorAndNearestQuarterIncrement(
+def test_calculatePricingShouldApplyFloorAndNearestFiveCentIncrement(
     market_price,
     expected,
 ):
@@ -172,7 +173,52 @@ def test_calculatePricingShouldApplyFloorAndNearestQuarterIncrement(
     # assert
     assert result.decision == Decision.LIST
     assert result.target_price_nzd == expected
-    assert "nearest NZ$0.25 increment" in result.decision_reason
+    assert "nearest NZ$0.05 increment" in result.decision_reason
+
+
+def test_calculatePricingShouldApplySoleSourcePremiumFromTwoDollarMarket():
+    # arrange
+    listing = _managed(1)
+    card = _card(listing, "2.00")
+
+    # act
+    result = calculate_pricing(card, (), listing.condition)
+
+    # assert
+    assert result.decision == Decision.LIST
+    assert result.target_price_nzd == Decimal("2.30")
+    assert "sole-source premium" in result.decision_reason
+
+
+def test_calculatePricingShouldTickUnderLowestSaneRival():
+    # arrange
+    listing = _managed(1)
+    card = _card(listing, "5.00")
+    competitors = [_competitor(10, "5.00", seller="alpha")]
+
+    # act
+    result = calculate_pricing(card, competitors, listing.condition)
+
+    # assert
+    assert result.decision == Decision.LIST
+    assert result.supported_local_price_nzd is None
+    assert result.target_price_nzd == Decimal("4.85")
+    assert "tick under" in result.decision_reason
+
+
+def test_calculatePricingShouldIgnoreDeepDiscountRivalWithoutSupport():
+    # arrange
+    listing = _managed(1)
+    card = _card(listing, "1.00")
+    competitors = [_competitor(10, "0.40", seller="alpha")]
+
+    # act
+    result = calculate_pricing(card, competitors, listing.condition)
+
+    # assert
+    assert result.decision == Decision.LIST
+    assert result.target_price_nzd == Decimal("1.00")
+    assert "below 80% of" in result.decision_reason
 
 
 def test_calculatePricingShouldUseCumulativeTwoSellerFloor():
@@ -248,18 +294,19 @@ def test_calculatePricingShouldIgnoreUnsupportedBetterConditionInsteadOfReview()
     assert result.decision == Decision.LIST
     assert result.supported_local_price_nzd is None
     assert result.better_condition_lowest_price_nzd == Decimal("0.74")
-    assert result.target_price_nzd == Decimal("0.75")
+    assert result.target_price_nzd == Decimal("0.70")
+    assert "tick under" in result.decision_reason
 
 
 @pytest.mark.parametrize(
     ("market_price", "competitors", "expected_decision", "expected_target"),
     [
-        ("0.2499", (), Decision.DISCARD, Decimal("0.75")),
+        ("0.2499", (), Decision.DISCARD, Decimal("0.25")),
         (
             "0.25",
             (_competitor(10, "0.50", condition="raw-lp"),),
             Decision.LIST,
-            Decimal("0.75"),
+            Decimal("0.25"),
         ),
         (
             "0.40",
@@ -268,9 +315,9 @@ def test_calculatePricingShouldIgnoreUnsupportedBetterConditionInsteadOfReview()
                 for index in range(10, 16)
             ),
             Decision.LIST,
-            Decimal("0.75"),
+            Decimal("0.45"),
         ),
-        ("0.50", (), Decision.LIST, Decimal("0.75")),
+        ("0.50", (), Decision.LIST, Decimal("0.50")),
     ],
 )
 def test_calculatePricingShouldApplyMinimumMarketPriceRegardlessOfCompetition(
@@ -386,8 +433,8 @@ def test_runRepricingShouldExecuteRaisesAndLowersInline(tmp_path):
         MutationStatus.SUCCEEDED,
     ]
     assert [record.mutation_price_nzd for record in run.records] == [
-        Decimal("1.00"),
-        Decimal("0.75"),
+        Decimal("0.90"),
+        Decimal("0.60"),
     ]
     assert client.events == [
         ("managed", None),
@@ -418,15 +465,15 @@ def test_runRepricingShouldPlanChangesWithoutPosting(tmp_path):
 
     # assert
     assert run.records[0].mutation_status == MutationStatus.PLANNED
-    assert run.records[0].mutation_price_nzd == Decimal("0.75")
+    assert run.records[0].mutation_price_nzd == Decimal("0.60")
     assert client.upsert_calls == []
 
 
 def test_runRepricingShouldOnlyLowerDiscardedInventoryToSellerFloor(tmp_path):
     # arrange
     above_floor = _managed(1, price="1.00")
-    at_floor = _managed(2, price="0.75")
-    below_floor = _managed(3, price="0.50")
+    at_floor = _managed(2, price="0.25")
+    below_floor = _managed(3, price="0.20")
     client = _FakeClient(
         [below_floor, at_floor, above_floor],
         market_prices={
@@ -457,13 +504,13 @@ def test_runRepricingShouldOnlyLowerDiscardedInventoryToSellerFloor(tmp_path):
         MutationStatus.UNCHANGED,
     ]
     assert [record.target_price_nzd for record in run.records] == [
-        Decimal("0.75"),
-        Decimal("0.75"),
-        Decimal("0.75"),
+        Decimal("0.25"),
+        Decimal("0.25"),
+        Decimal("0.25"),
     ]
     assert len(client.upsert_calls) == 1
     request, expected_listing_id = client.upsert_calls[0]
-    assert request.listed_price_nzd == Decimal("0.75")
+    assert request.listed_price_nzd == Decimal("0.25")
     assert expected_listing_id == 1
 
 
@@ -479,7 +526,7 @@ def test_runRepricingShouldPrintDecisionReasonsAndColorDirections(tmp_path):
         market_prices={
             decrease.fetch_card_id: "0.60",
             increase.fetch_card_id: "0.88",
-            unchanged.fetch_card_id: "0.60",
+            unchanged.fetch_card_id: "0.75",
             reviewed.fetch_card_id: "NaN",
             discarded.fetch_card_id: "0.20",
         },
@@ -517,7 +564,7 @@ def test_runRepricingShouldCompleteUnchangedReviewAndDiscardActions(tmp_path):
     client = _FakeClient(
         [discarded, reviewed, unchanged],
         market_prices={
-            unchanged.fetch_card_id: "0.60",
+            unchanged.fetch_card_id: "0.75",
             reviewed.fetch_card_id: "NaN",
             discarded.fetch_card_id: "0.20",
         },
@@ -636,7 +683,7 @@ def test_runRepricingShouldRetryCurrentOffsetWhenMutationFails(tmp_path):
     assert run.next_offset == 0
     assert run.completed_listing_count == 0
     assert run.records[0].mutation_status == MutationStatus.FAILED
-    assert run.records[0].mutation_price_nzd == Decimal("0.75")
+    assert run.records[0].mutation_price_nzd == Decimal("0.60")
     failed_line = next(message for message in messages if "#" in message)
     assert "\033[31mFAILED\033[0m" in failed_line
     assert "price uses the NZ$0.60 market benchmark" in failed_line

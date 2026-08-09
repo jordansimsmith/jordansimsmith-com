@@ -39,7 +39,7 @@ The current service is intentionally a script rather than an HTTP API. It is non
 - Read the authenticated user's active listings and match exact card, set, finish, and condition variants.
 - Exclude authenticated managed-listing IDs from local competition counts and price ladders.
 - List every card with a valid Fetch NZD market price of at least NZ$0.25 regardless of competitor count; retain competitor evidence for pricing and reporting.
-- Price new listings from a two-independent-seller same-or-better-condition floor when available, otherwise use market price, then round to the nearest NZ$0.25 increment with midpoint ties upward and an NZ$0.75 minimum.
+- Price new listings one undercut tick below the lowest same-or-better-condition rival when that rival is at least 80% of market price, otherwise from the two-independent-seller supported floor, otherwise from market price with a 15% sole-source premium at or above an NZ$2.00 market, then round to the nearest NZ$0.05 increment with midpoint ties upward and an NZ$0.25 minimum.
 - Apply the fixed NZD decision policy.
 - Preview `CREATE`, `UPDATE`, `NONE`, or `REVIEW` without mutating Fetch.
 - With `--execute`, create missing exact listings and add scanned quantities to existing exact listings, lowering an existing price only when the proposed reduction is material.
@@ -134,8 +134,10 @@ sequenceDiagram
 - Translate ManaBox's seven Cardmarket-style conditions into Fetch condition codes: `mint` to `raw-m`, `near_mint` to `raw-nm`, `excellent` to `raw-lp`, `good` to `raw-mp`, `light_played` and `played` to `raw-hp`, and `poor` to `raw-d`.
 - Construct the normal Fetch card identifier as a fast path, but fall back to a search restricted to the statically mapped Fetch sets when that identifier does not resolve.
 - Always read the detailed listings endpoint for local stock. Count distinct non-owned seller profiles and physical copies across every condition for reporting, while deriving the price ladder from the translated ManaBox condition and every strictly better condition. Each price tier retains normalized seller keys in memory so a supported local floor requires two cumulative independent sellers; three copies from one seller do not establish a pricing floor. Competitor counts do not determine listing eligibility. The indexed `listingsData` summary on a card may be stale and is not used for decisions or validation.
-- Prefer the two-seller supported same-or-better-condition floor as the pricing benchmark. When no such floor exists, use Fetch's NZD market price and ignore one-seller local prices for automatic pricing.
-- Round the selected benchmark to the nearest NZ$0.25 increment, with exact midpoint ties rounded upward, and enforce an NZ$0.75 minimum. Nearest rounding keeps the target within NZ$0.125 of the benchmark before applying the seller floor instead of systematically pricing above it.
+- Undercut the lowest same-or-better-condition rival by one tick when that rival is at least 80% of market price. A new seller without ratings loses price ties, so matching buys no position; one tick buys first place at minimal cost.
+- Treat a lowest rival below 80% of market as a deep discount to be left alone: the two-seller supported floor anchors the benchmark when it exists, otherwise market price does.
+- Apply a 15% sole-source premium when no same-or-better-condition rival exists and market price is at least NZ$2.00, because the import alternative carries GST, shipping, and delay.
+- Round the selected benchmark to the nearest NZ$0.05 increment, with exact midpoint ties rounded upward, and enforce an NZ$0.25 minimum. Rival prices rarely sit on NZ$0.25 boundaries, so a five-cent grid is required to express one-tick undercuts on low-value cards.
 - Treat the authenticated managed-listing IDs as owned inventory, not competition. Exclude those IDs from local listing counts, copy counts, lowest prices, and price ladders before applying the decision policy.
 - Use `Decimal` for all threshold checks and price rounding.
 - Cache card resolution, market data, and pricing decisions only in memory for the duration of one run. Listing actions are never cached because owned state changes after each physical card.
@@ -159,8 +161,11 @@ sequenceDiagram
 - **All-condition local copies**: physical copies across active New Zealand Fetch listings for the exact card in every condition, excluding listings owned by the authenticated account.
 - **Price ladder**: non-owned local listing, seller, and remaining-copy counts at the translated ManaBox condition or a strictly better condition, grouped by NZD price; seller identities remain in memory and are not reported.
 - **Two-seller supported floor**: the first ascending same-or-better-condition price at which at least two distinct non-owned sellers are available cumulatively.
-- **Seller price floor**: the fixed NZ$0.75 minimum suggested listing price.
-- **Price increment**: the fixed NZ$0.25 step to which pricing benchmarks are rounded to the nearest increment, with midpoint ties upward.
+- **Undercut tick**: `max(NZ$0.05, 2.5% of the lowest rival price rounded to the nearest NZ$0.05)`.
+- **Deep-discount guard**: a lowest rival below 80% of market price is not undercut; the supported floor or market price anchors the benchmark instead.
+- **Sole-source premium**: a 15% uplift on market price when no same-or-better-condition rival exists and market price is at least NZ$2.00.
+- **Seller price floor**: the fixed NZ$0.25 minimum suggested listing price.
+- **Price increment**: the fixed NZ$0.05 step to which pricing benchmarks are rounded to the nearest increment, with midpoint ties upward.
 - **Material reduction**: an existing-price reduction at least equal to the greater of NZ$0.25 and 5% of the suggested price.
 - **Managed listing**: one active listing owned by the authenticated Fetch account.
 - **Listing action**: a `CREATE`, `UPDATE`, `NONE`, or `REVIEW` intent derived from the pricing decision and exact managed-listing matches.
@@ -324,7 +329,7 @@ Execute-mode console output uses the intermediate `POSTED` status immediately af
 - The final card count is the number of `PLANNED` dry-run records or `SUCCEEDED` execute records. The final value is the sum of one `mutation_price_nzd` per counted physical-card record.
 - Market prices below `0.25` NZD are `DISCARD`.
 - Market prices of `0.25` NZD or more are `LIST` regardless of competitor listing, seller, or copy counts.
-- A `LIST` price uses the two-seller supported same-or-better-condition floor when available and otherwise uses market price. The benchmark is rounded to the nearest NZ$0.25 increment with midpoint ties upward and then raised to the NZ$0.75 seller floor when lower.
+- A `LIST` price undercuts the lowest same-or-better-condition rival by one tick when that rival is at least 80% of market price, otherwise uses the two-seller supported floor, otherwise uses market price with a 15% sole-source premium when no rival exists and market is at least NZ$2.00. The benchmark is rounded to the nearest NZ$0.05 increment with midpoint ties upward and then raised to the NZ$0.25 seller floor when lower.
 - Missing market data, unsupported input, and ambiguous identity produce `REVIEW`.
 - Run directory timestamps and report generation timestamps use UTC.
 
@@ -336,8 +341,8 @@ Execute-mode console output uses the intermediate `POSTED` status immediately af
 - **Condition translation**: the fixed ManaBox-to-Fetch mapping in this README and the analyzer implementation.
 - **Market price**: Fetch `pricingData.NZ.tcgMarketPrice`.
 - **Local stock, all-condition sellers, and all-condition copies**: active Fetch listing records for country `NZ`, minus listing IDs owned by the authenticated account.
-- **Suggested price benchmark**: the two-seller supported same-or-better-condition floor when present, otherwise Fetch market price.
-- **Seller floor and increment**: fixed NZ$0.75 minimum and nearest-NZ$0.25 rounding step with midpoint ties upward in the analyzer.
+- **Suggested price benchmark**: one undercut tick below a sane lowest same-or-better-condition rival, otherwise the two-seller supported floor, otherwise Fetch market price with the conditional sole-source premium.
+- **Seller floor and increment**: fixed NZ$0.25 minimum and nearest-NZ$0.05 rounding step with midpoint ties upward in the analyzer.
 - **Better-condition evidence**: strictly better-condition active Fetch listings participate in the supported ladder; the lowest remains an explicit report field.
 - **Owned listings**: authenticated Fetch `/v1/manage-listings` records.
 - **Decision**: the fixed rules in this README and the analyzer implementation.
@@ -397,7 +402,7 @@ Neither credential is persisted by the service. Set the refresh credential throu
 
 ## Testing and quality gates
 
-- Unit tests cover CSV validation, reversed row order, quantity expansion, condition translation, one-to-many static set mapping, PLST collector normalization, exact matching, fallback search, card and listing pagination, distinct all-condition seller counts, all-condition physical-copy counts, same-or-better-condition seller-aware price ladders, two-seller supported floors, owned-listing exclusion, bearer isolation, managed-listing validation and matching, inline dry-run simulation, per-card execution, material-only price reductions, mutable inventory, fail-fast partial results, final post-write verification, final count and value summaries, decision boundaries, NZ$0.75 floor and nearest-NZ$0.25 rounding, retry behavior, rate limiting, request budgets, token redaction, and stop conditions.
+- Unit tests cover CSV validation, reversed row order, quantity expansion, condition translation, one-to-many static set mapping, PLST collector normalization, exact matching, fallback search, card and listing pagination, distinct all-condition seller counts, all-condition physical-copy counts, same-or-better-condition seller-aware price ladders, two-seller supported floors, owned-listing exclusion, bearer isolation, managed-listing validation and matching, inline dry-run simulation, per-card execution, material-only price reductions, mutable inventory, fail-fast partial results, final post-write verification, final count and value summaries, decision boundaries, one-tick undercuts, the deep-discount guard, the sole-source premium threshold, NZ$0.25 floor and nearest-NZ$0.05 rounding, retry behavior, rate limiting, request budgets, token redaction, and stop conditions.
 - HTTP tests use mocked responses and injected time functions; tests never call Fetch.
 - Test fixtures contain no seller PII.
 - Required checks:
@@ -475,7 +480,7 @@ Run dry-run again to confirm `UPDATE`, execute once more to increase quantity fr
 
 1. A card resolves to the exact Fetch printing with a market price of `0.35` NZD.
 2. Fetch reports no non-owned active New Zealand copies in any condition.
-3. The card receives `LIST` with a suggested price of `0.75` NZD.
+3. The card receives `LIST` with a suggested price of `0.35` NZD; the sub-NZ$2.00 market carries no sole-source premium.
 4. The managed-listings index contains no exact owned listing, so the card previews `CREATE`.
 5. The decision and preview action appear at the card's physical stack position.
 
@@ -521,30 +526,30 @@ Run dry-run again to confirm `UPDATE`, execute once more to increase quantity fr
 3. The card receives `LIST`.
 4. Same-or-better-condition competitor evidence still participates in selecting the pricing benchmark.
 
-### Scenario 9: two sellers establish the listing price
+### Scenario 9: a deep-discount rival defers to the supported floor
 
 1. A card has a market price of `1.40` NZD.
-2. Two independent same-or-better-condition sellers are available cumulatively by `0.76` NZD.
-3. The two-seller supported floor replaces market price as the pricing benchmark.
-4. The benchmark rounds to the nearest increment for a suggested price of `0.75` NZD.
+2. Same-or-better-condition sellers list copies at `0.76` and `0.90` NZD.
+3. The `0.76` NZD lowest rival is below 80% of market, so it is not undercut.
+4. The `0.90` NZD two-seller supported floor becomes the benchmark and the suggested price is `0.90` NZD.
 
-### Scenario 10: one deep seller does not establish the price
+### Scenario 10: one deep-discount seller is left to sell out
 
-1. One same-or-better-condition seller has three copies at `0.45` NZD.
-2. No second same-or-better-condition seller exists.
-3. The seller's quantity contributes to stock reporting but does not establish a supported pricing floor.
-4. The suggestion uses market price, the NZ$0.25 increment, and the NZ$0.75 seller floor.
+1. One same-or-better-condition seller has three copies at `0.45` NZD against a `1.01` NZD market price.
+2. The `0.45` NZD rival is below 80% of market and no second seller provides a supported floor.
+3. The seller's quantity contributes to stock reporting but does not set the benchmark.
+4. The suggestion uses the market benchmark, the NZ$0.05 increment, and the NZ$0.25 seller floor for a suggested price of `1.00` NZD.
 
 ### Scenario 11: existing price decreases only when material
 
-1. An exact managed listing is `1.00` NZD and the current suggestion is `0.75` NZD.
-2. The `0.25` NZD reduction meets the material threshold.
-3. Adding a scanned copy previews or executes the new absolute quantity at `0.75` NZD.
-4. An existing price of `0.90` NZD would remain unchanged because its `0.15` NZD reduction is not material.
+1. An exact managed listing is `1.00` NZD and the current suggestion is `0.60` NZD.
+2. The `0.40` NZD reduction meets the material threshold.
+3. Adding a scanned copy previews or executes the new absolute quantity at `0.60` NZD.
+4. An existing price of `0.80` NZD would remain unchanged because its `0.20` NZD reduction is not material.
 
 ### Scenario 12: better conditions participate automatically
 
-1. A lightly played card would otherwise receive a suggested price of `1.00` NZD.
-2. Two independent near-mint sellers are available cumulatively by `0.75` NZD.
-3. Their listings participate in the same-or-better-condition ladder and establish the supported floor.
-4. The card remains `LIST` with an NZ$0.75 suggested price.
+1. A lightly played card has a market price of `1.00` NZD.
+2. Near-mint rivals list copies at `0.90` and `1.10` NZD.
+3. Their listings participate in the same-or-better-condition ladder, and the `0.90` NZD lowest rival is at least 80% of market.
+4. The card remains `LIST` with a suggested price one NZ$0.05 tick under at `0.85` NZD.

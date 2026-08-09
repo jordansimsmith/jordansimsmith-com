@@ -29,9 +29,10 @@ The script is self-contained under `scripts/reprice`. It intentionally duplicate
 - Exclude every owned listing ID from competitor evidence.
 - Fetch current NZD market data and active New Zealand competitor listings.
 - Treat every valid market price of at least NZ$0.25 as eligible for `LIST` regardless of competitor count.
-- Derive a two-independent-seller supported floor from the managed condition and every strictly better condition.
-- Fall back to Fetch's NZD market price when no supported same-or-better-condition floor exists.
-- Round target prices to the nearest NZ$0.25 increment with midpoint ties upward and an NZ$0.75 minimum.
+- Price one undercut tick below the lowest same-or-better-condition rival when that rival is at least 80% of market price.
+- Derive a two-independent-seller supported floor from the managed condition and every strictly better condition, and match it when the lowest rival is a deep discount.
+- Fall back to Fetch's NZD market price when no usable rival evidence exists, adding a 15% sole-source premium when no rival exists at all and market price is at least NZ$2.00.
+- Round target prices to the nearest NZ$0.05 increment with midpoint ties upward and an NZ$0.25 minimum.
 - Reprice both upward and downward whenever an actionable target differs from the current price.
 - Preserve listing identity, condition, and quantity during every mutation.
 - Process and checkpoint one listing completely before moving to the next.
@@ -104,10 +105,13 @@ sequenceDiagram
 - Keep the selected inventory slice immutable for the run. Mutations cannot reorder or change the active work list.
 - Perform card reads, pricing, optional mutation, and checkpointing inline for one listing before beginning the next.
 - Use the mutation response as the per-listing write verification. The response must preserve listing ID, condition, quantity, currency, and requested price.
-- Round the selected pricing benchmark to the nearest NZ$0.25 increment, with exact midpoint ties upward, before applying the NZ$0.75 minimum. This avoids systematically pricing above the benchmark.
+- Undercut the lowest same-or-better-condition rival by one tick instead of matching it. A new seller without ratings loses price ties, so matching buys no position; one tick buys first place at minimal cost.
+- Guard undercutting with an 80%-of-market dump check. A lone rival far below market is left to sell out rather than chased downward; the supported floor or market price then anchors the target.
+- Apply a 15% sole-source premium when no same-or-better-condition rival exists and market price is at least NZ$2.00. The import alternative carries GST, shipping, and delay, so scarce cards support a modest premium.
+- Round the selected pricing benchmark to the nearest NZ$0.05 increment, with exact midpoint ties upward, before applying the NZ$0.25 minimum. Rival prices rarely sit on NZ$0.25 boundaries, so a five-cent grid is required to express one-tick undercuts on low-value cards.
 - Use competitor evidence to choose the pricing benchmark and for reporting, never to reject an otherwise eligible card.
 - Apply targets in both directions. This tool does not use the list spike's material-decrease gate because exhaustive repricing is intended to converge every actionable listing to the current target.
-- Treat `DISCARD` as a sunk-inventory liquidation decision: lower an existing price above NZ$0.75 to the seller floor, but never raise a `DISCARD` listing already at or below the floor.
+- Treat `DISCARD` as a sunk-inventory liquidation decision: lower an existing price above NZ$0.25 to the seller floor, but never raise a `DISCARD` listing already at or below the floor.
 - Print each listing's complete pricing reason after its direction and mutation status. Color only the direction or terminal-outcome label so the evidence remains easy to read.
 - Use green for `DECREASE`, blue for `UNCHANGED`, yellow for `INCREASE` and `REVIEW`, and red for `FAILED`. Disable ANSI color when stdout is not an interactive terminal.
 - Atomically replace report files after each completed listing. A prior valid checkpoint remains available if the process is killed while writing.
@@ -123,7 +127,10 @@ sequenceDiagram
 - **Same-or-better-condition ladder**: non-owned active NZ listings grouped by price for the managed listing's condition and every strictly better condition.
 - **Two-seller supported floor**: the first ascending same-or-better-condition price at which at least two distinct sellers are available cumulatively.
 - **Better condition**: a Fetch condition strictly above the managed listing in the fixed condition-quality order.
-- **Target price**: the supported floor or market fallback, rounded to the nearest NZ$0.25 with midpoint ties upward and constrained to at least NZ$0.75.
+- **Undercut tick**: `max(NZ$0.05, 2.5% of the lowest rival price rounded to the nearest NZ$0.05)`.
+- **Deep-discount guard**: a lowest rival below 80% of market price is not undercut; the supported floor or market price anchors the target instead.
+- **Sole-source premium**: a 15% uplift on market price when no same-or-better-condition rival exists and market price is at least NZ$2.00.
+- **Target price**: the selected benchmark rounded to the nearest NZ$0.05 with midpoint ties upward and constrained to at least NZ$0.25.
 - **Controlled termination**: a normal failure path, HTTP authentication stop, request-budget stop, exception, `SIGINT`, or `SIGTERM` for which Python can execute cleanup.
 
 ## Integration contracts
@@ -217,16 +224,26 @@ Files are checkpointed using a temporary file in the same directory followed by 
 For an eligible `LIST` decision:
 
 ```text
-benchmark = two-seller supported same-or-better-condition floor, otherwise market price
-target = max(NZ$0.75, round_nearest_half_up(benchmark, NZ$0.25))
+tick = max(NZ$0.05, round_nearest_half_up(2.5% * lowest_rival, NZ$0.05))
+
+if lowest same-or-better-condition rival exists and lowest_rival >= 80% * market:
+    benchmark = lowest_rival - tick
+elif two-seller supported same-or-better-condition floor exists:
+    benchmark = supported_floor
+elif no same-or-better-condition rival exists and market >= NZ$2.00:
+    benchmark = market * 1.15
+else:
+    benchmark = market
+
+target = max(NZ$0.25, round_nearest_half_up(benchmark, NZ$0.05))
 ```
 
 ### Mutation decision
 
 - `LIST` and `target != current price`: `PLANNED` in dry-run or updated in execute mode.
 - `LIST` and `target == current price`: `UNCHANGED`.
-- `DISCARD` receives an NZ$0.75 liquidation target because its listing effort is already sunk.
-- `DISCARD` above NZ$0.75 is reduced to NZ$0.75; at or below NZ$0.75 it is `UNCHANGED` and is never raised.
+- `DISCARD` receives an NZ$0.25 liquidation target because its listing effort is already sunk.
+- `DISCARD` above NZ$0.25 is reduced to NZ$0.25; at or below NZ$0.25 it is `UNCHANGED` and is never raised.
 - `REVIEW` is `SKIPPED`; this tool never deletes the listing.
 - A duplicate owned `(card_id, condition)` identity is `REVIEW` and `SKIPPED`.
 - Execute mode may raise or lower a `LIST` price and may only lower a `DISCARD` price. Quantity, condition, and listing ID remain unchanged.
@@ -308,7 +325,7 @@ Traffic pacing, retries, request budgets, country, currency, game, seller floor,
 ## Testing and quality gates
 
 - Unit tests use fake sessions and injected clocks; they never call Fetch.
-- Pricing tests cover market boundaries, same-or-better-condition two-seller support, one seller across copies and tiers, NZ$0.75 floor, and nearest-NZ$0.25 rounding with midpoint ties upward.
+- Pricing tests cover market boundaries, one-tick undercuts of sane rivals, the 80%-of-market deep-discount guard, same-or-better-condition two-seller support, one seller across copies and tiers, the sole-source premium threshold, the NZ$0.25 floor, and nearest-NZ$0.05 rounding with midpoint ties upward.
 - Runner tests cover stable sorting, offset and limit, both-direction mutations, unchanged and skipped records, duplicate identities, one-listing-at-a-time sequencing, quantity preservation, decision reasons, and interactive direction colors.
 - Failure tests cover 401 during reads and writes, request errors, partial records, exact next-offset behavior, `SIGINT`, and `SIGTERM`.
 - Report tests cover atomic checkpoints, JSON/CSV consistency, token and seller-name exclusion, and workspace-relative output outside Bazel runfiles.
@@ -349,10 +366,10 @@ If the run reports `next offset: 17`, mint a new `FETCHTCG_TOKEN` and rerun with
 
 ### Scenario 1: dry-run proposes both directions
 
-1. Stable listing `#100` is NZ$1.25 and calculates to NZ$0.75.
-2. Stable listing `#101` is NZ$0.75 and calculates to NZ$1.00.
+1. Stable listing `#100` is NZ$1.25 with a NZ$0.60 market price and no rival, and calculates to NZ$0.60.
+2. Stable listing `#101` is NZ$0.75 with a NZ$0.88 market price and no rival, and calculates to NZ$0.90.
 3. Dry-run records both as `PLANNED` without POST requests.
-4. Checkpoints show requested prices of NZ$0.75 and NZ$1.00.
+4. Checkpoints show requested prices of NZ$0.60 and NZ$0.90.
 
 ### Scenario 2: execute updates inline
 
@@ -369,11 +386,11 @@ If the run reports `next offset: 17`, mint a new `FETCHTCG_TOKEN` and rerun with
 4. The partial report and console state `next offset: 10`.
 5. The refreshed run starts with `--offset 10`.
 
-### Scenario 4: better conditions establish the floor
+### Scenario 4: better conditions set the undercut reference
 
-1. A lightly played listing has two independent near-mint competitors available cumulatively by NZ$0.75.
+1. A lightly played listing with a NZ$1.00 market price has near-mint rivals at NZ$0.90 and NZ$1.10.
 2. The near-mint listings participate in the same-or-better-condition ladder.
-3. Their NZ$0.75 level becomes the supported floor and target.
+3. The NZ$0.90 lowest rival is at least 80% of market, so the target is one NZ$0.05 tick under it at NZ$0.85.
 4. The listing is automatically repriced instead of requiring review.
 
 ### Scenario 5: limited batch completes

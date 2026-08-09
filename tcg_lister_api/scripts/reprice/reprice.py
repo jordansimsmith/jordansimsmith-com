@@ -18,8 +18,12 @@ from fetchtcg_client import (
 )
 
 
-MINIMUM_LIST_PRICE_NZD = Decimal("0.75")
-PRICE_INCREMENT_NZD = Decimal("0.25")
+MINIMUM_LIST_PRICE_NZD = Decimal("0.25")
+PRICE_INCREMENT_NZD = Decimal("0.05")
+UNDERCUT_TICK_RATE = Decimal("0.025")
+DUMP_GUARD_RATE = Decimal("0.8")
+SOLE_SOURCE_PREMIUM_RATE = Decimal("1.15")
+SOLE_SOURCE_PREMIUM_MINIMUM_MARKET_NZD = Decimal("2.00")
 SUPPORTED_PRICE_SELLER_COUNT = 2
 REPORT_SCHEMA_VERSION = 1
 ANSI_RESET = "\033[0m"
@@ -269,32 +273,18 @@ def calculate_pricing(card, competitors, condition):
             decision=Decision.DISCARD,
             decision_reason=(
                 "market price is below NZ$0.25; existing DISCARD inventory "
-                "has an NZ$0.75 liquidation ceiling"
+                "has an NZ$0.25 liquidation ceiling"
             ),
             target_price_nzd=MINIMUM_LIST_PRICE_NZD,
             **common,
         )
 
-    benchmark = (
-        supported_local_price if supported_local_price is not None else market_price
+    lowest_local_price = common["lowest_local_price_nzd"]
+    benchmark, benchmark_reason = _select_benchmark(
+        market_price, lowest_local_price, supported_local_price
     )
-    target_price = max(
-        MINIMUM_LIST_PRICE_NZD,
-        (benchmark / PRICE_INCREMENT_NZD).to_integral_value(rounding=ROUND_HALF_UP)
-        * PRICE_INCREMENT_NZD,
-    )
-    reason = "market price is at least NZ$0.25"
-    if supported_local_price is None:
-        reason += (
-            f"; price uses the NZ${market_price:.2f} market benchmark, "
-            "the nearest NZ$0.25 increment, and the NZ$0.75 floor"
-        )
-    else:
-        reason += (
-            f"; price uses the NZ${supported_local_price:.2f} two-seller "
-            "supported same-or-better-condition floor, the nearest NZ$0.25 "
-            "increment, and the NZ$0.75 floor"
-        )
+    target_price = max(MINIMUM_LIST_PRICE_NZD, _round_to_increment(benchmark))
+    reason = "market price is at least NZ$0.25; " + benchmark_reason
     return PricingResult(
         decision=Decision.LIST,
         decision_reason=reason,
@@ -571,6 +561,56 @@ def _supported_local_price(price_ladder):
         if len(sellers) >= SUPPORTED_PRICE_SELLER_COUNT:
             return price
     return None
+
+
+def _round_to_increment(value):
+    return (value / PRICE_INCREMENT_NZD).to_integral_value(
+        rounding=ROUND_HALF_UP
+    ) * PRICE_INCREMENT_NZD
+
+
+def _undercut_tick(reference_price):
+    return max(
+        PRICE_INCREMENT_NZD, _round_to_increment(reference_price * UNDERCUT_TICK_RATE)
+    )
+
+
+def _select_benchmark(market_price, lowest_local_price, supported_local_price):
+    if lowest_local_price is not None and (
+        lowest_local_price >= DUMP_GUARD_RATE * market_price
+    ):
+        tick = _undercut_tick(lowest_local_price)
+        return lowest_local_price - tick, (
+            f"price sits one NZ${tick:.2f} tick under the "
+            f"NZ${lowest_local_price:.2f} lowest same-or-better-condition "
+            "rival, on the nearest NZ$0.05 increment with an NZ$0.25 floor"
+        )
+    if supported_local_price is not None:
+        return supported_local_price, (
+            f"the NZ${lowest_local_price:.2f} lowest rival is below 80% of "
+            f"the NZ${market_price:.2f} market price, so price matches the "
+            f"NZ${supported_local_price:.2f} two-seller supported floor, on "
+            "the nearest NZ$0.05 increment with an NZ$0.25 floor"
+        )
+    if lowest_local_price is None:
+        if market_price >= SOLE_SOURCE_PREMIUM_MINIMUM_MARKET_NZD:
+            return market_price * SOLE_SOURCE_PREMIUM_RATE, (
+                "no same-or-better-condition rival exists, so price carries "
+                f"a 15% sole-source premium on the NZ${market_price:.2f} "
+                "market price, on the nearest NZ$0.05 increment with an "
+                "NZ$0.25 floor"
+            )
+        return market_price, (
+            "no same-or-better-condition rival exists, so price uses the "
+            f"NZ${market_price:.2f} market benchmark, on the nearest NZ$0.05 "
+            "increment with an NZ$0.25 floor"
+        )
+    return market_price, (
+        f"the NZ${lowest_local_price:.2f} lowest rival is below 80% of the "
+        f"NZ${market_price:.2f} market price without two-seller support, so "
+        f"price uses the NZ${market_price:.2f} market benchmark, on the "
+        "nearest NZ$0.05 increment with an NZ$0.25 floor"
+    )
 
 
 def _empty_pricing_result(market_price, reason):
