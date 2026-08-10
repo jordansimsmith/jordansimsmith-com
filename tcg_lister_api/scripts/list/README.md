@@ -22,7 +22,7 @@ The current service is intentionally a script rather than an HTTP API. It is non
 - As a card seller, I want a deterministic list or discard decision, so that I can separate cards for collection indexing or bulk storage.
 - As a card seller, I want to know whether each exact card is already listed, so that I can preview whether a future listing operation would create or update.
 - As a card seller, I want each card actioned before the next card is analyzed, so that Fetch state follows my physical progress through the stack.
-- As a card seller, I want a final count and NZD value summary, so that I can quickly reconcile the processed stack.
+- As a card seller, I want a final physical-card count, unique new-card name count, and NZD value summary, so that I can quickly reconcile the processed stack.
 - As a card seller, I want execution to require an explicit flag, so that inspecting a scan cannot accidentally mutate my store.
 - As a cautious Fetch user, I want requests rate-limited and retried conservatively, so that a bulk scan does not create excessive traffic.
 
@@ -45,7 +45,7 @@ The current service is intentionally a script rather than an HTTP API. It is non
 - With `--execute`, create missing exact listings and add scanned quantities to existing exact listings, lowering an existing price only when the proposed reduction is material.
 - Process every physical card inline in stack order, with at most one absolute upsert for that card before advancing.
 - Print green `LIST`, red `DISCARD`, and yellow `REVIEW` decisions with the ManaBox condition when running in an interactive terminal, and write uncolored JSON and CSV reports.
-- Print a blue final summary containing the number of physical cards listed and their combined per-card listing value.
+- Print a blue final summary containing the number of physical cards listed, the number of unique card names among new listings, and the combined per-card listing value.
 - Reuse identical analysis results only within one process.
 - Rate-limit requests and retry transient failures with bounded backoff.
 
@@ -119,7 +119,7 @@ sequenceDiagram
     Cli->>Cli: verify final mutated states
   end
   Cli->>Reports: write report.json and stack.csv
-  Cli-->>User: print final card count and NZD value summary
+  Cli-->>User: print final card count, unique new-name count, and NZD value summary
 ```
 
 ## Main technical decisions
@@ -145,7 +145,7 @@ sequenceDiagram
 - Treat Fetch `cardId` plus condition as the upsert key. Fetch card identity encodes the printing and finish; Scryfall ID, numeric set ID, and finish are verified independently before any write.
 - Action cards inline. A create writes quantity `1` at the suggested price. An update writes the current in-memory quantity plus `1`; it lowers the existing price to the suggestion only when the reduction is at least the greater of NZ$0.25 and 5% of the suggestion. Smaller reductions and every increase preserve the existing price.
 - Dry-run applies virtual owned-inventory transitions, so repeated copies preview the same create-then-update sequence as execute mode.
-- Summarize `PLANNED` records in dry-run mode and verified `SUCCEEDED` records in execute mode. Each qualifying physical card contributes one unit at its mutation price, not the absolute quantity of its aggregated Fetch listing.
+- Summarize `PLANNED` records in dry-run mode and verified `SUCCEEDED` records in execute mode. Each qualifying physical card contributes one unit at its mutation price, not the absolute quantity of its aggregated Fetch listing. Count unique new cards from qualifying `CREATE` records by case-insensitive card name, regardless of set, finish, condition, or quantity.
 - Make requests sequentially with a randomly selected request-start interval from one to two seconds. Concurrency is not appropriate for this personal-volume integration.
 - Keep operational settings fixed so the normal CLI cannot accidentally weaken traffic controls.
 
@@ -210,7 +210,7 @@ bazel run //tcg_lister_api:fetchtcg-bulk-analyze -- \
 - A successful complete run exits `0`.
 - Missing or malformed `FETCHTCG_TOKEN`, invalid input, or a run-level safety stop exits non-zero.
 - Individual card resolution or transient API failures become `REVIEW` records when continuing is safe.
-- After reports are written, the CLI prints a blue interactive-terminal summary. Dry-run labels the total as planned; execute mode includes only successfully verified physical cards.
+- After reports are written, the CLI prints a blue interactive-terminal summary. Dry-run labels the physical-card and unique new-card totals as planned; execute mode includes only successfully verified physical cards and successful new-listing creations.
 
 ### Consumed backend endpoints
 
@@ -326,7 +326,7 @@ Execute-mode console output uses the intermediate `POSTED` status immediately af
 - Mutations execute sequentially and stop before the next card on the first request failure. The partial report includes only reached cards.
 - After all successful POST requests, or after a later POST fails, managed listings are reloaded once and each affected identity's final listing ID, quantity, condition, set, finish, Scryfall ID, and price is verified.
 - All posted records for one identity become `SUCCEEDED` only when its final expected state verifies; otherwise those records become `FAILED`.
-- The final card count is the number of `PLANNED` dry-run records or `SUCCEEDED` execute records. The final value is the sum of one `mutation_price_nzd` per counted physical-card record.
+- The final card count is the number of `PLANNED` dry-run records or `SUCCEEDED` execute records. The unique new-card count deduplicates the case-insensitive `name` values of counted `CREATE` records, ignoring set, finish, condition, and quantity. The final value is the sum of one `mutation_price_nzd` per counted physical-card record.
 - Market prices below `0.25` NZD are `DISCARD`.
 - Market prices of `0.25` NZD or more are `LIST` regardless of competitor listing, seller, or copy counts.
 - A `LIST` price undercuts the lowest same-or-better-condition rival by one tick when that rival is at least 80% of market price, otherwise uses the two-seller supported floor, otherwise uses market price with a 15% sole-source premium when no rival exists and market is at least NZ$2.00. The benchmark is rounded to the nearest NZ$0.05 increment with midpoint ties upward and then raised to the NZ$0.25 seller floor when lower.
@@ -402,7 +402,7 @@ Neither credential is persisted by the service. Set the refresh credential throu
 
 ## Testing and quality gates
 
-- Unit tests cover CSV validation, reversed row order, quantity expansion, condition translation, one-to-many static set mapping, PLST collector normalization, exact matching, fallback search, card and listing pagination, distinct all-condition seller counts, all-condition physical-copy counts, same-or-better-condition seller-aware price ladders, two-seller supported floors, owned-listing exclusion, bearer isolation, managed-listing validation and matching, inline dry-run simulation, per-card execution, material-only price reductions, mutable inventory, fail-fast partial results, final post-write verification, final count and value summaries, decision boundaries, one-tick undercuts, the deep-discount guard, the sole-source premium threshold, NZ$0.25 floor and nearest-NZ$0.05 rounding, retry behavior, rate limiting, request budgets, token redaction, and stop conditions.
+- Unit tests cover CSV validation, reversed row order, quantity expansion, condition translation, one-to-many static set mapping, PLST collector normalization, exact matching, fallback search, card and listing pagination, distinct all-condition seller counts, all-condition physical-copy counts, same-or-better-condition seller-aware price ladders, two-seller supported floors, owned-listing exclusion, bearer isolation, managed-listing validation and matching, inline dry-run simulation, per-card execution, material-only price reductions, mutable inventory, fail-fast partial results, final post-write verification, final physical-card, unique new-name, and value summaries, decision boundaries, one-tick undercuts, the deep-discount guard, the sole-source premium threshold, NZ$0.25 floor and nearest-NZ$0.05 rounding, retry behavior, rate limiting, request budgets, token redaction, and stop conditions.
 - HTTP tests use mocked responses and injected time functions; tests never call Fetch.
 - Test fixtures contain no seller PII.
 - Required checks:

@@ -749,7 +749,8 @@ def test_format_run_summary_totals_physical_cards_and_per_card_values(tmp_path):
     )
 
     assert analyze_module._format_run_summary(run, use_color=True) == (
-        "\033[34m[summary] 3 cards planned for listing — total value NZ$1.80\033[0m"
+        "\033[34m[summary] 3 cards planned for listing — "
+        "1 unique new card planned — total value NZ$1.80\033[0m"
     )
 
     execute_run = replace(
@@ -775,7 +776,59 @@ def test_format_run_summary_totals_physical_cards_and_per_card_values(tmp_path):
     )
 
     assert analyze_module._format_run_summary(execute_run) == (
-        "[summary] 2 cards listed — total value NZ$2.00"
+        "[summary] 2 cards listed — 1 unique new card created — total value NZ$2.00"
+    )
+
+
+def test_format_run_summary_deduplicates_new_card_names_across_variants(tmp_path):
+    scan = tmp_path / "scan.csv"
+    _write_scan(scan)
+    run = analyze_cards(
+        load_physical_cards(scan, limit=3),
+        _FakeClient(
+            [
+                _snapshot(
+                    "0.60",
+                    fetch_card_id="mtg_55_c_ddu_normal",
+                    fetch_set_id=2782,
+                )
+            ]
+        ),
+        output=lambda _: None,
+    )
+    run = replace(
+        run,
+        records=[
+            replace(
+                run.records[0],
+                name="Inventor's Goggles",
+                set_code="ddu",
+                finish="normal",
+                condition="near_mint",
+                listing_action=ListingAction.CREATE,
+            ),
+            replace(
+                run.records[1],
+                name="inventor's goggles",
+                set_code="other",
+                finish="foil",
+                condition="played",
+                listing_action=ListingAction.CREATE,
+            ),
+            replace(
+                run.records[2],
+                name="Inventor's Goggles",
+                set_code="another",
+                finish="etched",
+                condition="poor",
+                listing_action=ListingAction.CREATE,
+            ),
+        ],
+    )
+
+    assert analyze_module._format_run_summary(run) == (
+        "[summary] 3 cards planned for listing — "
+        "1 unique new card planned — total value NZ$1.80"
     )
 
 
@@ -1591,9 +1644,14 @@ def test_main_only_mutates_with_execute_flag(
     )
     summary = capsys.readouterr().out.splitlines()[-1]
     if expected_upsert_count:
-        assert summary == "[summary] 1 card listed — total value NZ$0.60"
+        assert summary == (
+            "[summary] 1 card listed — 1 unique new card created — total value NZ$0.60"
+        )
     else:
-        assert summary == ("[summary] 1 card planned for listing — total value NZ$0.60")
+        assert summary == (
+            "[summary] 1 card planned for listing — "
+            "1 unique new card planned — total value NZ$0.60"
+        )
 
 
 @pytest.mark.parametrize("token", [None, "", "Bearer already-prefixed"])

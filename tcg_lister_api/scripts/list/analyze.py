@@ -1271,19 +1271,30 @@ def _format_run_summary(run, *, use_color=False):
     if run.execution_mode == "execute":
         included_status = MutationStatus.SUCCEEDED
         action = "listed"
+        new_card_action = "created"
     else:
         included_status = MutationStatus.PLANNED
         action = "planned for listing"
+        new_card_action = "planned"
     included_records = [
         record for record in run.records if record.mutation_status == included_status
     ]
+    unique_new_card_count = len(
+        {
+            record.name.casefold()
+            for record in included_records
+            if record.listing_action == ListingAction.CREATE
+        }
+    )
     total_value = sum(
         (record.mutation_price_nzd or Decimal("0") for record in included_records),
         Decimal("0"),
     )
     card_label = "card" if len(included_records) == 1 else "cards"
+    new_card_label = "card" if unique_new_card_count == 1 else "cards"
     line = (
         f"[summary] {len(included_records)} {card_label} {action} — "
+        f"{unique_new_card_count} unique new {new_card_label} {new_card_action} — "
         f"total value NZ${total_value:.2f}"
     )
     if use_color:
