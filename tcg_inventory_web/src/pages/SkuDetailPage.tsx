@@ -21,6 +21,10 @@ import type { Condition, SkuDetail, SkuUnit } from '../api/client';
 const CARD_IMAGE_FALLBACK =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='488' height='680'%3E%3Crect width='100%25' height='100%25' fill='%23e9ecef' rx='24'/%3E%3C/svg%3E";
 
+// scryfall "normal" images are 488x680; reserving the box prevents layout shift while loading
+const CARD_IMAGE_WIDTH = 260;
+const CARD_IMAGE_ASPECT_RATIO = '488 / 680';
+
 export function SkuDetailPage() {
   const { skuId } = useParams<{ skuId: string }>();
   const navigate = useNavigate();
@@ -127,7 +131,11 @@ export function SkuDetailPage() {
       <Stack gap="md">
         {loading && (
           <Group align="flex-start" gap="xl">
-            <Skeleton height={360} width={260} radius="md" />
+            <Skeleton
+              width={CARD_IMAGE_WIDTH}
+              style={{ aspectRatio: CARD_IMAGE_ASPECT_RATIO }}
+              radius="md"
+            />
             <Stack gap="sm" flex={1}>
               <Skeleton height={32} width={280} />
               <Skeleton height={20} width={200} />
@@ -150,7 +158,8 @@ export function SkuDetailPage() {
                 src={`https://api.scryfall.com/cards/${sku.scryfall_id}?format=image&version=normal`}
                 fallbackSrc={CARD_IMAGE_FALLBACK}
                 alt={sku.name}
-                w={260}
+                w={CARD_IMAGE_WIDTH}
+                style={{ aspectRatio: CARD_IMAGE_ASPECT_RATIO }}
                 radius="md"
               />
               <Stack gap="xs" flex={1} miw={260}>
