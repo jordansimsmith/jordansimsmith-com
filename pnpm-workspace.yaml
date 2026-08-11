@@ -6,5 +6,10 @@ packages:
   - book_tracker_web
   - tcg_inventory_web
   - lib/ui
+onlyBuiltDependencies: []
 allowBuilds:
-  esbuild: set this to true or false
+  esbuild: false
+overrides:
+  '@babel/core': ^7.29.6
+  esbuild: ^0.28.1
+  undici: ^7.28.0
