@@ -1,13 +1,17 @@
 import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
+import { Notifications, notifications } from '@mantine/notifications';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { LoginPage } from './LoginPage';
+import * as sessionModule from '../auth/session';
+import * as clientModule from '../api/client';
 
 function renderLoginPage() {
   return render(
     <MantineProvider>
+      <Notifications />
       <MemoryRouter initialEntries={['/']}>
         <Routes>
           <Route path="/" element={<LoginPage />} />
@@ -20,11 +24,14 @@ function renderLoginPage() {
 
 describe('LoginPage', () => {
   beforeEach(() => {
+    vi.clearAllMocks();
     localStorage.clear();
+    notifications.clean();
   });
 
   afterEach(() => {
     cleanup();
+    notifications.clean();
   });
 
   it('renders login form', () => {
@@ -51,6 +58,11 @@ describe('LoginPage', () => {
   });
 
   it('navigates to inventory page on successful login', async () => {
+    vi.spyOn(clientModule.apiClient, 'getSettings').mockResolvedValue({
+      credential_set: false,
+      updated_at: null,
+    });
+
     const user = userEvent.setup();
     renderLoginPage();
 
@@ -61,24 +73,25 @@ describe('LoginPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Inventory page')).toBeDefined();
     });
+    expect(clientModule.apiClient.getSettings).toHaveBeenCalled();
   });
 
-  it('stores session in localStorage on login', async () => {
+  it('shows error notification and clears session on failed login', async () => {
+    vi.spyOn(clientModule.apiClient, 'getSettings').mockRejectedValue(
+      new Error('Unauthorized'),
+    );
+    const clearSessionSpy = vi.spyOn(sessionModule, 'clearSession');
+
     const user = userEvent.setup();
     renderLoginPage();
 
     await user.type(screen.getByLabelText(/username/i), 'testuser');
-    await user.type(screen.getByLabelText(/password/i), 'testpass');
+    await user.type(screen.getByLabelText(/password/i), 'wrongpass');
     await user.click(screen.getByRole('button', { name: /log in/i }));
 
     await waitFor(() => {
-      expect(screen.getByText('Inventory page')).toBeDefined();
+      expect(screen.getByText(/login failed/i)).toBeDefined();
     });
-
-    const stored = JSON.parse(
-      localStorage.getItem('tcg_inventory_auth') ?? '{}',
-    );
-    expect(stored.username).toBe('testuser');
-    expect(stored.token).toBe(btoa('testuser:testpass'));
+    expect(clearSessionSpy).toHaveBeenCalled();
   });
 });

@@ -133,7 +133,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 - Login is validated by an authenticated `GET /settings` call; success persists the session.
 - Async work is observed through the affected resource: the UI polls `GET /imports/{import_id}` during appraisal and `GET /publish` during a publish run, every ~2 seconds while running. `POST /publish` is idempotent while a run is active (returns the existing run), so the trigger button cannot double-fire.
 - The order detail response is also the pull sheet: its `units` list is location-ordered and renders as the pick list when the order is `to_pick`.
-- The credential endpoint is write-only: the UI never receives or renders a stored token value, only `{"set": true, "updated_at": …}`.
+- The credential endpoint is write-only: the UI never receives or renders a stored token value, only `{"credential_set": true, "updated_at": …}`.
 - Import review renders rows top-of-stack first exactly as returned; confirm is blocked client-side and server-side (`409`) while unresolved review rows remain.
 - Locations render from sequence numbers exactly as the backend provides them (`A42-42`); the client never re-derives them.
 
