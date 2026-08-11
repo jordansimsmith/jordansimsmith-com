@@ -1,5 +1,10 @@
 import { getSession } from '../auth/session';
-import type { ApiClient, SettingsResponse } from './client';
+import type {
+  ApiClient,
+  FindSkusParams,
+  FindSkusResponse,
+  SettingsResponse,
+} from './client';
 
 const BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
@@ -37,6 +42,21 @@ export function createHttpClient(): ApiClient {
   return {
     async getSettings(): Promise<SettingsResponse> {
       const response = await authenticatedFetch('/settings');
+      return response.json();
+    },
+
+    async findSkus(params?: FindSkusParams): Promise<FindSkusResponse> {
+      const query = new URLSearchParams();
+      if (params?.search) {
+        query.set('search', params.search);
+      }
+      if (params?.continuation) {
+        query.set('continuation', params.continuation);
+      }
+      const queryString = query.toString();
+      const response = await authenticatedFetch(
+        queryString ? `/skus?${queryString}` : '/skus',
+      );
       return response.json();
     },
   };

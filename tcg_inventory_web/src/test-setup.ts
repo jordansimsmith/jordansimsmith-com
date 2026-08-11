@@ -22,3 +22,5 @@ Object.defineProperty(window, 'ResizeObserver', {
     disconnect = vi.fn();
   },
 });
+
+Element.prototype.scrollIntoView = vi.fn();

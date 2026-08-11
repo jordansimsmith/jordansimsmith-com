@@ -75,7 +75,6 @@ When performing the code review step, check for:
 - Don't add private methods when the logic is simple and used only once - inline it
 - Let exceptions bubble up naturally when appropriate instead of unnecessarily catching them
 - Always use imports instead of fully qualified names (e.g., `import java.util.ArrayList;` instead of `java.util.ArrayList`)
-- Method naming: Use `get` prefix for methods that return a single item, use `find` prefix for methods that return multiple items (collections like List, Set, Collection)
 
 ## Testing guidelines
 
@@ -109,6 +108,8 @@ When performing the code review step, check for:
 - Don't invent new patterns when existing ones can be adapted
 - Use snake_case for DynamoDB attribute names (e.g., `home_team`, `date_time`)
 - Avoid truncated words in identifiers and attribute names (e.g., `sequence_number` not `seq`, `quantity` not `qty`); well-established abbreviations like `id`, `url`, and `api` are fine
+- Use standard method verbs in all languages: `get` returns a single item, `find` returns multiple items (collections like List, Set, Collection), and mutations use `create`, `update`, `delete`
+- Use `continuation` naming for pagination tokens in API contracts and method parameters (request parameter `continuation`, response field `next_continuation`); never `cursor` or `page_token`
 - Persist domain values independently from DynamoDB access-pattern keys: when `pk`, `sk`, or a `gsi*` key encodes a domain value, also store that value as a standalone attribute (for example, store `fingerprint` as well as `gsi2pk`)
 - Before starting implementation, identify similar features in existing services
 - During implementation, maintain consistent naming conventions across similar components

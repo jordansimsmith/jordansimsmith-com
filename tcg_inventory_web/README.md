@@ -24,9 +24,9 @@ The TCG inventory web service is a keyboard-first single-page app for running a 
 
 - Authenticate with username/password against the backend and persist a Basic auth session in `localStorage`; protect all routes and redirect unauthenticated users to `/`.
 - Import flow: upload a ManaBox CSV, watch appraisal progress, review rows in stack order with keyboard-first decisions, resolve review rows, confirm, and display placement instructions.
-- Inventory: dense SKU table with counts and dirty badges, prefix search, SKU detail with units and derived locations, and manual adjustments (remove unit, change condition).
+- Inventory: dense SKU table with counts, prefix search, SKU detail with units and derived locations, and manual adjustments (remove unit, change condition).
 - Orders: list and detail with state badges, location-ordered pull sheet optimized for one-handed phone use, confirm-pull action.
-- Publish widget (no dedicated jobs page): trigger a publish run, show the pending dirty-SKU count, and poll/render the current-or-latest run's progress and outcome. Appraisal progress and errors render on the import pages.
+- Publish widget (no dedicated jobs page): trigger a publish run, show the pending publish count (SKUs with unpublished inventory changes), and poll/render the current-or-latest run's progress and outcome. Appraisal progress and errors render on the import pages.
 - Settings: set or replace the FetchTCG refresh token; display presence and last-updated only.
 - Vim-style keyboard navigation across all data views.
 - Development fake mode: an in-memory `ApiClient` with seeded data so the whole UX runs without a backend.
@@ -84,11 +84,11 @@ sequenceDiagram
 
 ## Domain glossary
 
-Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it verbatim: SKU, unit, sequence number, block, location (`A42-42`), import (`appraising` → `review` → `confirming` → `confirmed`; deletable before confirm), appraise and publish jobs, order states (`awaiting_payment`, `to_pick`, `fulfilled`, `voided`), pull sheet, dirty.
+Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it verbatim: SKU, unit, sequence number, block, location (`A42-42`), import (`appraising` → `review` → `confirming` → `confirmed`; deletable before confirm), appraise and publish jobs, order states (`awaiting_payment`, `to_pick`, `fulfilled`, `voided`), pull sheet.
 
 - **Keep/discard/review row**: an import row's appraisal decision; review rows must be resolved before confirm.
 - **Placement instructions**: the post-confirm screen mapping the confirmed stack to block labels and location ranges.
-- **Pending publish badge**: count of dirty SKUs shown on the publish trigger.
+- **Pending publish badge**: count of SKUs with unpublished inventory changes shown on the publish trigger.
 
 ## Keyboard contract
 
@@ -192,7 +192,7 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 
 ## Performance envelope
 
-- Optimized for a single user with 5,000–10,000 SKUs: browse views paginate via cursors and keep interactions immediate on desktop hardware.
+- Optimized for a single user with 5,000–10,000 SKUs: browse views paginate via continuation tokens and keep interactions immediate on desktop hardware.
 - Import review handles a few hundred rows with keyboard navigation and optimistic updates; no virtualization until row counts demand it.
 - Polling intervals (~2 s) apply only while a job is running.
 - Mobile targets are the pull sheet and placement screens; they render fast on mid-range phones.
@@ -211,7 +211,7 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
   2. Open inventory, traverse with `j`/`k`, search with `/`, open a SKU with `Enter`.
   3. Upload a ManaBox CSV, watch appraisal progress, review with `y`/`d`/`r`, confirm, and check placement instructions.
   4. Open the seeded `to_pick` order, view the pull sheet at phone width, confirm the pull.
-  5. Trigger publish and watch the fake job drain the dirty count.
+  5. Trigger publish and watch the fake job drain the pending publish count.
   6. Set a credential in settings and verify only presence metadata renders.
 
 ## End-to-end scenarios

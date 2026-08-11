@@ -151,7 +151,7 @@ sequenceDiagram
 | `PATCH`  | `/imports/{import_id}/rows/{position}`   | override a row decision or fix its identity                                            |
 | `POST`   | `/imports/{import_id}/confirm`           | append keeper units; returns placement instructions                                    |
 | `DELETE` | `/imports/{import_id}`                   | delete an unconfirmed import and its rows                                              |
-| `GET`    | `/skus`                                  | browse/search SKUs (prefix search, cursor paging)                                      |
+| `GET`    | `/skus`                                  | browse/search SKUs (prefix search, continuation paging)                                |
 | `GET`    | `/skus/{sku_id}`                         | SKU detail including its units                                                         |
 | `DELETE` | `/skus/{sku_id}/units/{sequence_number}` | remove a unit (optional `reason` query param)                                          |
 | `PUT`    | `/skus/{sku_id}/units/{sequence_number}` | update a unit's condition (moves it to another SKU; response returns the new `sku_id`) |
