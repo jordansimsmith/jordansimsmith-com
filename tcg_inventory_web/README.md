@@ -26,7 +26,7 @@ The TCG inventory web service is a keyboard-first single-page app for running a 
 - Import flow: upload a ManaBox CSV, watch appraisal progress, review rows in stack order with keyboard-first decisions, resolve review rows, confirm, and display placement instructions.
 - Inventory: dense SKU table with counts and dirty badges, prefix search, SKU detail with units and derived locations, and manual adjustments (remove unit, change condition).
 - Orders: list and detail with state badges, location-ordered pull sheet optimized for one-handed phone use, confirm-pull action.
-- Publish and jobs: trigger the publish job, show pending dirty-SKU count, poll and render job progress and history for both job types.
+- Publish widget (no dedicated jobs page): trigger a publish run, show the pending dirty-SKU count, and poll/render the current-or-latest run's progress and outcome. Appraisal progress and errors render on the import pages.
 - Settings: set or replace the FetchTCG refresh token; display presence and last-updated only.
 - Vim-style keyboard navigation across all data views.
 - Development fake mode: an in-memory `ApiClient` with seeded data so the whole UX runs without a backend.
@@ -69,8 +69,8 @@ sequenceDiagram
   web-->>user: "place 87 cards into A42" screen
   user->>web: trigger publish
   web->>api: POST /publish
-  web->>api: GET /jobs (poll newest)
-  api-->>web: job progress to completion
+  web->>api: GET /publish (poll)
+  api-->>web: run progress to completion
 ```
 
 ## Main technical decisions
@@ -92,7 +92,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 
 ## Keyboard contract
 
-- List views (inventory, imports, import review, orders, jobs): `j`/`k` move selection down/up, `gg`/`G` jump to first/last row, `/` focuses search, `Enter` opens the selected row, `Escape` closes detail or clears search focus.
+- List views (inventory, imports, import review, orders): `j`/`k` move selection down/up, `gg`/`G` jump to first/last row, `/` focuses search, `Enter` opens the selected row, `Escape` closes detail or clears search focus.
 - Import review row actions: `y` mark keep, `d` mark discard, `r` open the resolve dialog for a review row, `u` revert the row to its appraised suggestion.
 - Destructive or committing actions (confirm import, confirm pull, remove unit, delete import) are explicit buttons with confirmation dialogs — never single keys.
 - Keyboard interactions are desktop affordances; all actions remain reachable by touch.
@@ -123,7 +123,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 | `GET`    | `/orders/{order_id}`                     | order detail                            |
 | `POST`   | `/orders/{order_id}/confirm`             | confirm pull                            |
 | `POST`   | `/publish`                               | publish trigger                         |
-| `GET`    | `/jobs`                                  | job history                             |
+| `GET`    | `/publish`                               | publish run polling + pending count     |
 | `GET`    | `/settings`                              | credential presence check + login probe |
 | `PUT`    | `/settings`                              | credential set/replace                  |
 
@@ -131,7 +131,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 
 - Requests and responses use snake_case fields; errors use `{"message":"..."}` and surface as user-visible feedback.
 - Login is validated by an authenticated `GET /settings` call; success persists the session.
-- Async triggers (`POST /imports`, `POST /publish`) return `202`-style payloads with a `job_id`; the UI polls `GET /jobs` (matching the `job_id`, or showing the newest job after a refresh) and `GET /imports/{import_id}` during appraisal, every ~2 seconds while running.
+- Async work is observed through the affected resource: the UI polls `GET /imports/{import_id}` during appraisal and `GET /publish` during a publish run, every ~2 seconds while running. `POST /publish` is idempotent while a run is active (returns the existing run), so the trigger button cannot double-fire.
 - The order detail response is also the pull sheet: its `units` list is location-ordered and renders as the pick list when the order is `to_pick`.
 - The credential endpoint is write-only: the UI never receives or renders a stored token value, only `{"set": true, "updated_at": …}`.
 - Import review renders rows top-of-stack first exactly as returned; confirm is blocked client-side and server-side (`409`) while unresolved review rows remain.
@@ -161,12 +161,12 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 
 ## Source of truth
 
-| Entity                                  | Authoritative source                   | Notes                                     |
-| --------------------------------------- | -------------------------------------- | ----------------------------------------- |
-| Credential validity                     | authenticated `GET /settings` response | login treated as valid on 2xx             |
-| Inventory, imports, orders, jobs, audit | `tcg_inventory_api`                    | client state is a render cache only       |
-| Review edits in flight                  | browser memory                         | authoritative only until `PATCH` succeeds |
-| Session persistence                     | browser `localStorage`                 | cleared on logout                         |
+| Entity                                   | Authoritative source                   | Notes                                     |
+| ---------------------------------------- | -------------------------------------- | ----------------------------------------- |
+| Credential validity                      | authenticated `GET /settings` response | login treated as valid on 2xx             |
+| Inventory, imports, orders, publish runs | `tcg_inventory_api`                    | client state is a render cache only       |
+| Review edits in flight                   | browser memory                         | authoritative only until `PATCH` succeeds |
+| Session persistence                      | browser `localStorage`                 | cleared on logout                         |
 
 ## Security and privacy
 
@@ -232,6 +232,6 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 
 ### Scenario 3: replacing an expired FetchTCG credential
 
-1. A publish job fails with an authentication error visible in job history.
+1. A publish run fails with an authentication error visible in the publish widget.
 2. The user opens settings, pastes a fresh refresh token into the write-only field, and saves.
 3. Settings shows updated presence metadata; re-triggering publish succeeds. The token value itself is never displayed.

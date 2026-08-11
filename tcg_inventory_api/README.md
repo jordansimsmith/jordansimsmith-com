@@ -138,7 +138,7 @@ sequenceDiagram
 - Auth: `Authorization: Basic <base64(user:password)>` on every endpoint
 - Request and response fields use `snake_case`; no path version segment
 - Non-2xx responses use `{"message": "error details"}`
-- Async work returns `202` with a `job_id`; job state is polled
+- Async work is observed through the affected resource, not a generic jobs API: appraisal progress and errors ride on the import (`GET /imports/{import_id}`), publish progress and errors on `GET /publish` (current-or-latest run). Job items exist in storage only as internal continuation state.
 - Verb convention: edits that record client-owned data use `PUT`/`PATCH` on the resource; domain actions that cause server-side cascades (confirm, publish) are `POST` sub-resource actions with transition-specific contracts
 
 ### Endpoint summary
@@ -158,8 +158,8 @@ sequenceDiagram
 | `GET`    | `/orders`                                | list orders newest-first                                                               |
 | `GET`    | `/orders/{order_id}`                     | order detail: lines, allocated units, pull locations                                   |
 | `POST`   | `/orders/{order_id}/confirm`             | confirm the pull; marks allocated units sold                                           |
-| `POST`   | `/publish`                               | enqueue the publish job                                                                |
-| `GET`    | `/jobs`                                  | list recent jobs newest-first (UI polls this)                                          |
+| `POST`   | `/publish`                               | start a publish run; idempotent while one is queued/running (returns the existing run) |
+| `GET`    | `/publish`                               | current-or-latest publish run: status, progress, error, pending dirty count            |
 | `GET`    | `/settings`                              | credential presence and last-updated (never a value)                                   |
 | `PUT`    | `/settings`                              | replace settings (stores the FetchTCG refresh token)                                   |
 
@@ -260,11 +260,11 @@ price = max(0.25, round_nearest_half_up(benchmark, 0.05))
 | ---------------- | ----------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | SKU              | `USER#<u>#SKU#<sku_id>`       | `SKU`                          | scryfall_id, finish, condition, name, set_code, set_name, collector_number, fetchtcg_card_id, fetchtcg_set_id, `in_stock_count`, `reserved_count`, `sold_count`, `dirty`, `fetchtcg_listing_id`, `last_published_quantity`, `last_published_price`, `last_published_at` |
 | Unit             | `USER#<u>#SKU#<sku_id>`       | `UNIT#<sequence_number>`       | sequence_number, status, import_id, order_id (when reserved/sold), timestamps                                                                                                                                                                                           |
-| Import           | `USER#<u>`                    | `IMPORT#<ulid>`                | filename, status, row counts, timestamps                                                                                                                                                                                                                                |
+| Import           | `USER#<u>`                    | `IMPORT#<ulid>`                | filename, status, row counts, appraisal_error (when the appraise job fails), timestamps                                                                                                                                                                                 |
 | Import row       | `USER#<u>#IMPORT#<import_id>` | `ROW#<stack position, padded>` | raw CSV fields, resolved identity, decision + reason, appraisal evidence (market price, rival evidence, suggested price), user overrides, assigned sequence_number                                                                                                      |
 | Order            | `USER#<u>`                    | `ORDER#<fetchtcg_offer_id>`    | state, FetchTCG status/currentAction snapshot, accepted_at, delivery_mode, financial totals (no buyer PII), embedded lines `[{sku_id, fetchtcg_listing_id, quantity, price, allocated sequence_numbers}]`                                                               |
 | Audit entry      | `USER#<u>#AUDIT`              | `<ulid>`                       | event_type (`import_confirm`, `adjustment`, `reserve`, `release`, `sell`, `publish`, `credential_update`), affected sku_ids / unit sequence_numbers / order_id / import_id, before/after summary                                                                        |
-| Job              | `USER#<u>`                    | `JOB#<ulid>`                   | type (`appraise` \| `publish`), status (`queued` \| `running` \| `succeeded` \| `failed`), continuation, progress counters, error                                                                                                                                       |
+| Job              | `USER#<u>`                    | `JOB#<ulid>`                   | internal continuation state, never an API resource: type (`appraise` \| `publish`), status (`queued` \| `running` \| `succeeded` \| `failed`), continuation, progress counters, error                                                                                   |
 | Sequence counter | `USER#<u>`                    | `COUNTER#SEQUENCE`             | `next_sequence_number`                                                                                                                                                                                                                                                  |
 | Settings         | `USER#<u>`                    | `SETTINGS`                     | credential metadata (set-at timestamp only)                                                                                                                                                                                                                             |
 
@@ -331,6 +331,8 @@ All mutations are `TransactWriteItems` including their audit entry; counters use
 - Confirming a pull writes nothing to FetchTCG. Voiding an order releases units and dirties SKUs; the restored quantity reaches FetchTCG on the next publish run unless the seller already relisted on FetchTCG, in which case the projection converges as a no-op.
 - SKU records are never deleted; a zero-count SKU keeps its record, is delisted on FetchTCG, and is reused on restock.
 - Duplicate SQS deliveries, replayed job slices, and re-processed offers converge: job slices read the job item's continuation fresh, order creation is conditional on the offer id, unit transitions are conditional on current status, publish writes are absolute.
+- At most one publish run is queued or running per user: `POST /publish` creates the job conditionally and returns the existing run when one is already active.
+- Job failures surface on the affected resource: an appraise failure sets `appraisal_error` on its import; a publish failure appears in `GET /publish`. Recovery is user-initiated (fix the cause — typically the credential — and re-trigger; for a failed appraise, delete the import and re-upload).
 - Market appraisal deduplicates FetchTCG reads per printing + finish within a job run; resolved `fetchtcg_card_id` values are cached on SKU records across runs.
 - NM is the default condition where none is provided. Timestamps are epoch seconds; ULIDs order imports, jobs, and audit entries by creation time.
 
