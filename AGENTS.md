@@ -108,6 +108,7 @@ When performing the code review step, check for:
 - Follow established style and structure precisely
 - Don't invent new patterns when existing ones can be adapted
 - Use snake_case for DynamoDB attribute names (e.g., `home_team`, `date_time`)
+- Avoid truncated words in identifiers and attribute names (e.g., `sequence_number` not `seq`, `quantity` not `qty`); well-established abbreviations like `id`, `url`, and `api` are fine
 - Persist domain values independently from DynamoDB access-pattern keys: when `pk`, `sk`, or a `gsi*` key encodes a domain value, also store that value as a standalone attribute (for example, store `fingerprint` as well as `gsi2pk`)
 - Before starting implementation, identify similar features in existing services
 - During implementation, maintain consistent naming conventions across similar components
