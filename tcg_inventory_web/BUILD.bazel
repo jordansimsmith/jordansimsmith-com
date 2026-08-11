@@ -102,6 +102,7 @@ js_library(
             "src/**/*.tsx",
         ],
         exclude = [
+            "src/**/*.test.ts",
             "src/**/*.test.tsx",
             "src/test-setup.ts",
         ],
@@ -123,6 +124,7 @@ js_library(
     name = "test-src",
     testonly = True,
     srcs = glob([
+        "src/**/*.test.ts",
         "src/**/*.test.tsx",
         "src/test-setup.ts",
     ]),

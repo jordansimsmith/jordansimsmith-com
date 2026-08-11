@@ -24,7 +24,7 @@ The TCG inventory web service is a keyboard-first single-page app for running a 
 
 - Authenticate with username/password against the backend and persist a Basic auth session in `localStorage`; protect all routes and redirect unauthenticated users to `/`.
 - Import flow: upload a ManaBox CSV, watch appraisal progress, review rows in stack order with keyboard-first decisions, resolve review rows, confirm, and display placement instructions.
-- Inventory: dense SKU table with counts, prefix search, SKU detail with units and derived locations, and manual adjustments (remove unit, change condition).
+- Inventory: dense SKU table with counts, prefix search, SKU detail with the Scryfall card image, units, and derived locations, and manual adjustments (remove unit, change condition).
 - Orders: list and detail with state badges, location-ordered pull sheet optimized for one-handed phone use, confirm-pull action.
 - Publish widget (no dedicated jobs page): trigger a publish run, show the pending publish count (SKUs with unpublished inventory changes), and poll/render the current-or-latest run's progress and outcome. Appraisal progress and errors render on the import pages.
 - Settings: set or replace the FetchTCG refresh token; display presence and last-updated only.
@@ -46,6 +46,7 @@ flowchart TD
   cloudfront --> s3[S3 bucket]
   s3 --> spa[React SPA]
   spa -->|HTTPS Basic auth| api[TCG inventory API]
+  spa -->|card images| scryfall[Scryfall image CDN]
 ```
 
 ### Primary workflow
@@ -101,7 +102,8 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 
 ### External systems
 
-- **None in current scope**: `tcg_inventory_web` calls only `tcg_inventory_api`. FetchTCG is integrated exclusively by the backend.
+- **Scryfall card imagery**: the SKU detail page loads the card image directly in the browser from `https://api.scryfall.com/cards/{scryfall_id}?format=image&version=normal` (an HTTP 302 redirect to Scryfall's image CDN). Requests are unauthenticated, carry only the public `scryfall_id`, and a neutral placeholder renders when the image fails to load.
+- FetchTCG is integrated exclusively by the backend; all other data comes from `tcg_inventory_api`.
 
 ## API contracts
 
@@ -134,6 +136,8 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 - Async work is observed through the affected resource: the UI polls `GET /imports/{import_id}` during appraisal and `GET /publish` during a publish run, every ~2 seconds while running. `POST /publish` is idempotent while a run is active (returns the existing run), so the trigger button cannot double-fire.
 - The order detail response is also the pull sheet: its `units` list is location-ordered and renders as the pick list when the order is `to_pick`.
 - The credential endpoint is write-only: the UI never receives or renders a stored token value, only `{"credential_set": true, "updated_at": …}`.
+- `DELETE /skus/{sku_id}/units/{sequence_number}` (optional `reason` query parameter) responds with the updated SKU detail; the page re-renders counters and units from that response.
+- `PUT /skus/{sku_id}/units/{sequence_number}` responds `{"sku_id": "<new sku_id>"}`; the UI navigates to the new SKU's detail page.
 - Import review renders rows top-of-stack first exactly as returned; confirm is blocked client-side and server-side (`409`) while unresolved review rows remain.
 - Locations render from sequence numbers exactly as the backend provides them (`A42-42`); the client never re-derives them.
 
@@ -171,6 +175,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 ## Security and privacy
 
 - All API calls use HTTPS with Basic auth from the persisted session; the session token lives in `localStorage`, never in URLs.
+- Card images load directly from Scryfall using the public `scryfall_id`; no session, credential, or inventory data accompanies those requests.
 - The FetchTCG refresh token is entered into a password-type field, sent once via `PUT /settings`, and never displayed, stored, or logged client-side.
 - Logout clears the session immediately.
 - The client embeds no backend secrets or infrastructure credentials.
@@ -200,7 +205,7 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 ## Testing and quality gates
 
 - Unit and component tests run with Vitest and React Testing Library in `jsdom`.
-- Key coverage: login and route protection, the vim navigation hook (movement, jumps, search focus), import review row actions and confirm gating, pull-sheet ordering and confirm flow, publish trigger + job polling, masked credential form.
+- Key coverage: login and route protection, the vim navigation hook (movement, jumps, search focus), SKU detail adjustments (remove unit, condition change), import review row actions and confirm gating, pull-sheet ordering and confirm flow, publish trigger + job polling, masked credential form.
 - Required checks: `bazel test //tcg_inventory_web:unit-tests`, `bazel build //tcg_inventory_web:typecheck`, `bazel build //tcg_inventory_web:build`.
 
 ## Local development and smoke checks
@@ -208,7 +213,7 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 - Recommended: `cd tcg_inventory_web && pnpm vite dev` (fake mode, no backend needed); Bazel option: `bazel run //tcg_inventory_web:vite -- dev`.
 - Smoke flow in dev mode:
   1. Log in with any credentials.
-  2. Open inventory, traverse with `j`/`k`, search with `/`, open a SKU with `Enter`.
+  2. Open inventory, traverse with `j`/`k`, search with `/`, open a SKU with `Enter`; verify the card image renders, remove a unit, and change a unit's condition.
   3. Upload a ManaBox CSV, watch appraisal progress, review with `y`/`d`/`r`, confirm, and check placement instructions.
   4. Open the seeded `to_pick` order, view the pull sheet at phone width, confirm the pull.
   5. Trigger publish and watch the fake job drain the pending publish count.

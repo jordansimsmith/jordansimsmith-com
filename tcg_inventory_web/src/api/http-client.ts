@@ -1,9 +1,12 @@
 import { getSession } from '../auth/session';
 import type {
   ApiClient,
+  Condition,
   FindSkusParams,
   FindSkusResponse,
   SettingsResponse,
+  SkuDetail,
+  UpdateUnitResponse,
 } from './client';
 
 const BASE_URL =
@@ -56,6 +59,42 @@ export function createHttpClient(): ApiClient {
       const queryString = query.toString();
       const response = await authenticatedFetch(
         queryString ? `/skus?${queryString}` : '/skus',
+      );
+      return response.json();
+    },
+
+    async getSku(skuId: string): Promise<SkuDetail> {
+      const response = await authenticatedFetch(
+        `/skus/${encodeURIComponent(skuId)}`,
+      );
+      return response.json();
+    },
+
+    async deleteUnit(
+      skuId: string,
+      sequenceNumber: number,
+      reason?: string,
+    ): Promise<SkuDetail> {
+      const query = reason ? `?${new URLSearchParams({ reason })}` : '';
+      const response = await authenticatedFetch(
+        `/skus/${encodeURIComponent(skuId)}/units/${sequenceNumber}${query}`,
+        { method: 'DELETE' },
+      );
+      return response.json();
+    },
+
+    async updateUnit(
+      skuId: string,
+      sequenceNumber: number,
+      condition: Condition,
+    ): Promise<UpdateUnitResponse> {
+      const response = await authenticatedFetch(
+        `/skus/${encodeURIComponent(skuId)}/units/${sequenceNumber}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ condition }),
+        },
       );
       return response.json();
     },

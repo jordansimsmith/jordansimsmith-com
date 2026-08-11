@@ -193,6 +193,33 @@ Representative failures:
 - `409`: `{"message":"import has unresolved review rows"}`
 - `404`: `{"message":"Not Found"}` (unknown import in user scope)
 
+`GET /skus/{sku_id}`
+
+Response `200` (units sorted ascending by sequence number; locations derived server-side):
+
+```json
+{
+  "sku_id": "f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
+  "scryfall_id": "f0a51425-d796-48b8-b68c-bc21fb465c81",
+  "name": "Elvish Aberration",
+  "set_code": "a25",
+  "set_name": "Masters 25",
+  "collector_number": "167",
+  "finish": "normal",
+  "condition": "NM",
+  "in_stock_count": 2,
+  "reserved_count": 1,
+  "sold_count": 0,
+  "units": [
+    { "sequence_number": 1204, "location": "A12-4", "status": "reserved" },
+    { "sequence_number": 4242, "location": "A42-42", "status": "in_stock" },
+    { "sequence_number": 4250, "location": "A42-50", "status": "in_stock" }
+  ]
+}
+```
+
+Adjustment responses: `DELETE /skus/{sku_id}/units/{sequence_number}` responds `200` with the updated SKU detail (same shape as `GET /skus/{sku_id}`); `PUT /skus/{sku_id}/units/{sequence_number}` with body `{"condition": "LP"}` responds `200` with `{"sku_id": "f0a51425-d796-48b8-b68c-bc21fb465c81#normal#LP"}`.
+
 `GET /orders/{order_id}`
 
 Response `200` (the `units` list, sorted by sequence number, is the pull sheet when the order is `to_pick`):
