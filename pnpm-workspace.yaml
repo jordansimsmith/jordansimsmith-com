@@ -4,4 +4,7 @@ packages:
   - personal_website_web
   - packing_list_web
   - book_tracker_web
+  - tcg_inventory_web
   - lib/ui
+allowBuilds:
+  esbuild: set this to true or false

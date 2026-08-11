@@ -188,6 +188,7 @@ npm.npm_translate_lock(
         "//lib/ui:package.json",
         "//packing_list_web:package.json",
         "//personal_website_web:package.json",
+        "//tcg_inventory_web:package.json",
     ],
     npmrc = "//:.npmrc",
     pnpm_lock = "//:pnpm-lock.yaml",
