@@ -2,8 +2,13 @@ import type {
   ApiClient,
   Condition,
   Finish,
+  FindImportsResponse,
   FindSkusParams,
   FindSkusResponse,
+  ImportDetail,
+  ImportStatus,
+  ImportSummary,
+  RowDecision,
   SettingsResponse,
   SkuDetail,
   SkuSummary,
@@ -11,6 +16,8 @@ import type {
   UnitStatus,
   UpdateUnitResponse,
 } from './client';
+import { parseManaBoxCsv } from '../domain/manabox';
+import type { ManaBoxRow } from '../domain/manabox';
 
 type SeedSku = [
   scryfallId: string,
@@ -175,8 +182,189 @@ function browseKey(sku: SkuSummary): string {
   return `${sku.name.toLowerCase()}#${sku.sku_id}`;
 }
 
+const APPRAISAL_ROWS_PER_SECOND = 2;
+
+const DISCARD_REASON = 'market price below NZ$0.25 keep threshold';
+
+const SEED_REVIEW_REASONS = [
+  'non-English card',
+  'unmapped set',
+  'unresolvable identity',
+];
+
+interface FakeImportRow {
+  position: number;
+  name: string;
+  set_code: string;
+  set_name: string;
+  collector_number: string;
+  finish: Finish;
+  condition: Condition;
+  scryfall_id: string;
+  decision: RowDecision;
+  decision_reason: string | null;
+}
+
+interface FakeImport {
+  import_id: string;
+  filename: string;
+  status: ImportStatus;
+  rows: FakeImportRow[];
+  created_at_ms: number;
+}
+
+function decideRow(
+  row: ManaBoxRow,
+  position: number,
+): Pick<FakeImportRow, 'decision' | 'decision_reason'> {
+  if (row.language !== 'en') {
+    return { decision: 'review', decision_reason: 'non-English card' };
+  }
+  if (row.misprint) {
+    return {
+      decision: 'review',
+      decision_reason: 'misprint flagged in ManaBox',
+    };
+  }
+  if (row.altered) {
+    return {
+      decision: 'review',
+      decision_reason: 'altered flagged in ManaBox',
+    };
+  }
+  if (position % 5 === 0) {
+    return { decision: 'discard', decision_reason: DISCARD_REASON };
+  }
+  return { decision: 'keep', decision_reason: null };
+}
+
+function createSeedImportRows(count: number): FakeImportRow[] {
+  const rows: FakeImportRow[] = [];
+  for (let position = 1; position <= count; position += 1) {
+    const [
+      scryfallId,
+      name,
+      setCode,
+      setName,
+      collectorNumber,
+      finish,
+      condition,
+    ] = seedSkus[(position - 1) % seedSkus.length];
+    let decision: RowDecision = 'keep';
+    let decisionReason: string | null = null;
+    if (position % 7 === 0) {
+      decision = 'discard';
+      decisionReason = DISCARD_REASON;
+    } else if (position % 11 === 0) {
+      decision = 'review';
+      decisionReason =
+        SEED_REVIEW_REASONS[(position / 11 - 1) % SEED_REVIEW_REASONS.length];
+    }
+    rows.push({
+      position,
+      name,
+      set_code: setCode,
+      set_name: setName,
+      collector_number: collectorNumber,
+      finish,
+      condition,
+      scryfall_id: scryfallId,
+      decision,
+      decision_reason: decisionReason,
+    });
+  }
+  return rows;
+}
+
+function createSeedImports(): FakeImport[] {
+  const now = Date.now();
+  return [
+    {
+      import_id: 'fake-import-1',
+      filename: 'manabox-2026-08-05.csv',
+      status: 'confirmed',
+      // review rows must be resolved before confirm, so none remain here
+      rows: createSeedImportRows(24).map((row) =>
+        row.decision === 'review'
+          ? { ...row, decision: 'keep' as RowDecision, decision_reason: null }
+          : row,
+      ),
+      created_at_ms: now - 7 * 24 * 60 * 60 * 1000,
+    },
+    {
+      // partway through appraisal at app load; finishes ~10s later
+      import_id: 'fake-import-2',
+      filename: 'manabox-2026-08-12.csv',
+      status: 'appraising',
+      rows: createSeedImportRows(40),
+      created_at_ms: now - 10_000,
+    },
+  ];
+}
+
+function appraisedCount(importRecord: FakeImport): number {
+  if (importRecord.status !== 'appraising') {
+    return importRecord.rows.length;
+  }
+  const elapsedMs = Math.max(0, Date.now() - importRecord.created_at_ms);
+  return Math.min(
+    importRecord.rows.length,
+    Math.floor((elapsedMs / 1000) * APPRAISAL_ROWS_PER_SECOND),
+  );
+}
+
+function progressAppraisal(importRecord: FakeImport): void {
+  if (
+    importRecord.status === 'appraising' &&
+    appraisedCount(importRecord) >= importRecord.rows.length
+  ) {
+    importRecord.status = 'review';
+  }
+}
+
+function toImportSummary(importRecord: FakeImport): ImportSummary {
+  const appraisedRows = importRecord.rows.slice(
+    0,
+    appraisedCount(importRecord),
+  );
+  const countByDecision = (decision: RowDecision) =>
+    appraisedRows.filter((row) => row.decision === decision).length;
+  return {
+    import_id: importRecord.import_id,
+    filename: importRecord.filename,
+    status: importRecord.status,
+    row_count: importRecord.rows.length,
+    keep_count: countByDecision('keep'),
+    discard_count: countByDecision('discard'),
+    review_count: countByDecision('review'),
+    appraisal_error: null,
+    created_at: Math.floor(importRecord.created_at_ms / 1000),
+  };
+}
+
+function toImportDetail(importRecord: FakeImport): ImportDetail {
+  const appraised = appraisedCount(importRecord);
+  return {
+    ...toImportSummary(importRecord),
+    rows: importRecord.rows.map((row, index) => ({
+      position: row.position,
+      name: row.name,
+      set_code: row.set_code,
+      set_name: row.set_name,
+      collector_number: row.collector_number,
+      finish: row.finish,
+      condition: row.condition,
+      scryfall_id: row.scryfall_id,
+      decision: index < appraised ? row.decision : null,
+      decision_reason: index < appraised ? row.decision_reason : null,
+    })),
+  };
+}
+
 export function createFakeClient(): ApiClient {
   const skus = createSeedState();
+  const importRecords = createSeedImports();
+  let importCounter = importRecords.length;
 
   const getSkuOrThrow = (skuId: string): FakeSku => {
     const sku = skus.find((candidate) => candidate.sku_id === skuId);
@@ -196,9 +384,67 @@ export function createFakeClient(): ApiClient {
     return unit;
   };
 
+  const getImportOrThrow = (importId: string): FakeImport => {
+    const importRecord = importRecords.find(
+      (candidate) => candidate.import_id === importId,
+    );
+    if (!importRecord) {
+      throw new Error('Not Found');
+    }
+    progressAppraisal(importRecord);
+    return importRecord;
+  };
+
   return {
     async getSettings(): Promise<SettingsResponse> {
       return { credential_set: false, updated_at: null };
+    },
+
+    async createImport(filename: string, csv: string): Promise<ImportSummary> {
+      const parsedRows = parseManaBoxCsv(csv);
+      // csv row order is physical bottom-up; position 1 is the top of the stack
+      const rows: FakeImportRow[] = [];
+      let position = 0;
+      for (const parsed of [...parsedRows].reverse()) {
+        for (let copy = 0; copy < parsed.quantity; copy += 1) {
+          position += 1;
+          rows.push({
+            position,
+            name: parsed.name,
+            set_code: parsed.set_code,
+            set_name: parsed.set_name,
+            collector_number: parsed.collector_number,
+            finish: parsed.finish,
+            condition: parsed.condition,
+            scryfall_id: parsed.scryfall_id,
+            ...decideRow(parsed, position),
+          });
+        }
+      }
+      importCounter += 1;
+      const importRecord: FakeImport = {
+        import_id: `fake-import-${importCounter}`,
+        filename,
+        status: 'appraising',
+        rows,
+        created_at_ms: Date.now(),
+      };
+      importRecords.push(importRecord);
+      return toImportSummary(importRecord);
+    },
+
+    async findImports(): Promise<FindImportsResponse> {
+      const summaries = [...importRecords]
+        .sort((a, b) => b.created_at_ms - a.created_at_ms)
+        .map((importRecord) => {
+          progressAppraisal(importRecord);
+          return toImportSummary(importRecord);
+        });
+      return { imports: summaries };
+    },
+
+    async getImport(importId: string): Promise<ImportDetail> {
+      return toImportDetail(getImportOrThrow(importId));
     },
 
     async findSkus(params?: FindSkusParams): Promise<FindSkusResponse> {

@@ -2,8 +2,11 @@ import { getSession } from '../auth/session';
 import type {
   ApiClient,
   Condition,
+  FindImportsResponse,
   FindSkusParams,
   FindSkusResponse,
+  ImportDetail,
+  ImportSummary,
   SettingsResponse,
   SkuDetail,
   UpdateUnitResponse,
@@ -45,6 +48,28 @@ export function createHttpClient(): ApiClient {
   return {
     async getSettings(): Promise<SettingsResponse> {
       const response = await authenticatedFetch('/settings');
+      return response.json();
+    },
+
+    async createImport(filename: string, csv: string): Promise<ImportSummary> {
+      const query = new URLSearchParams({ filename });
+      const response = await authenticatedFetch(`/imports?${query}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/csv' },
+        body: csv,
+      });
+      return response.json();
+    },
+
+    async findImports(): Promise<FindImportsResponse> {
+      const response = await authenticatedFetch('/imports');
+      return response.json();
+    },
+
+    async getImport(importId: string): Promise<ImportDetail> {
+      const response = await authenticatedFetch(
+        `/imports/${encodeURIComponent(importId)}`,
+      );
       return response.json();
     },
 

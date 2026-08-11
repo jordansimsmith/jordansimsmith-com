@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, describe, it, expect, vi } from 'vitest';
 import { createFakeClient } from './fake-client';
 
 async function findSkuId(
@@ -131,5 +131,123 @@ describe('createFakeClient', () => {
 
     const browse = await client.findSkus({ search: 'sylvan library' });
     expect(browse.skus).toHaveLength(2);
+  });
+});
+
+const MANABOX_HEADER =
+  'Name,Set code,Set name,Collector number,Foil,Rarity,Quantity,Scryfall ID,Misprint,Altered,Condition,Language';
+
+const SAMPLE_CSV = [
+  MANABOX_HEADER,
+  'Llanowar Elves,dom,Dominaria,168,normal,common,1,581b7327-3215-4a4f-b4ae-d9d4002ba882,false,false,near_mint,en',
+  'Opt,dom,Dominaria,60,normal,common,2,25f2e4d0-effd-4e83-b7aa-1a0d8f120951,false,false,excellent,en',
+  'Ponder,m12,Magic 2012,73,normal,common,1,81c908ee-e70a-4406-a32d-ab5ab17e67b1,false,false,good,ja',
+].join('\n');
+
+describe('createFakeClient imports', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('seeds imports newest-first with an in-flight appraisal', async () => {
+    const client = createFakeClient();
+
+    const response = await client.findImports();
+
+    expect(response.imports).toHaveLength(2);
+    const [inFlight, confirmed] = response.imports;
+    expect(inFlight.status).toBe('appraising');
+    expect(inFlight.created_at).toBeGreaterThan(confirmed.created_at);
+    const inFlightAppraised =
+      inFlight.keep_count + inFlight.discard_count + inFlight.review_count;
+    expect(inFlightAppraised).toBeGreaterThan(0);
+    expect(inFlightAppraised).toBeLessThan(inFlight.row_count);
+    expect(confirmed.status).toBe('confirmed');
+    expect(
+      confirmed.keep_count + confirmed.discard_count + confirmed.review_count,
+    ).toBe(confirmed.row_count);
+  });
+
+  it('creates an import with quantity-expanded rows top-of-stack first', async () => {
+    vi.useFakeTimers();
+    const client = createFakeClient();
+
+    const created = await client.createImport('bulk.csv', SAMPLE_CSV);
+
+    expect(created.status).toBe('appraising');
+    expect(created.filename).toBe('bulk.csv');
+    expect(created.row_count).toBe(4);
+    expect(created.keep_count).toBe(0);
+    expect(created.discard_count).toBe(0);
+    expect(created.review_count).toBe(0);
+
+    const detail = await client.getImport(created.import_id);
+    expect(detail.rows.map((row) => row.position)).toEqual([1, 2, 3, 4]);
+    expect(detail.rows.map((row) => row.name)).toEqual([
+      'Ponder',
+      'Opt',
+      'Opt',
+      'Llanowar Elves',
+    ]);
+    expect(detail.rows[0].condition).toBe('MP');
+    expect(detail.rows[1].condition).toBe('LP');
+    expect(detail.rows[0].decision).toBeNull();
+    expect(detail.rows[0].decision_reason).toBeNull();
+  });
+
+  it('progresses an uploaded import to review over time', async () => {
+    vi.useFakeTimers();
+    const client = createFakeClient();
+    const created = await client.createImport('bulk.csv', SAMPLE_CSV);
+
+    vi.advanceTimersByTime(1000);
+    let detail = await client.getImport(created.import_id);
+    expect(detail.status).toBe('appraising');
+    expect(detail.keep_count + detail.discard_count + detail.review_count).toBe(
+      2,
+    );
+
+    vi.advanceTimersByTime(60_000);
+    detail = await client.getImport(created.import_id);
+    expect(detail.status).toBe('review');
+    expect(detail.keep_count).toBe(3);
+    expect(detail.discard_count).toBe(0);
+    expect(detail.review_count).toBe(1);
+    expect(detail.rows[0].decision).toBe('review');
+    expect(detail.rows[0].decision_reason).toBe('non-English card');
+    expect(detail.rows[3].decision).toBe('keep');
+
+    const list = await client.findImports();
+    expect(list.imports[0].import_id).toBe(created.import_id);
+    expect(list.imports[0].status).toBe('review');
+  });
+
+  it('completes the seeded in-flight appraisal over time', async () => {
+    vi.useFakeTimers();
+    const client = createFakeClient();
+
+    vi.advanceTimersByTime(60_000);
+
+    const response = await client.findImports();
+    expect(response.imports[0].status).toBe('review');
+    expect(
+      response.imports[0].keep_count +
+        response.imports[0].discard_count +
+        response.imports[0].review_count,
+    ).toBe(response.imports[0].row_count);
+  });
+
+  it('rejects invalid csv content', async () => {
+    const client = createFakeClient();
+
+    await expect(
+      client.createImport('bad.csv', 'Name,Quantity\nOpt,1'),
+    ).rejects.toThrow('CSV is missing columns');
+  });
+
+  it('rejects unknown import ids', async () => {
+    const client = createFakeClient();
+
+    await expect(client.getImport('missing')).rejects.toThrow('Not Found');
   });
 });
