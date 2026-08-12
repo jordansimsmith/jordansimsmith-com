@@ -32,6 +32,11 @@ export function PlacementInstructionsView({
                   {instruction.unit_count === 1 ? 'card' : 'cards'}
                 </Text>
               </Group>
+              <Text>
+                {instruction.unit_count === 1
+                  ? instruction.from_name
+                  : `${instruction.from_name} through ${instruction.to_name}`}
+              </Text>
               <Text c="dimmed">
                 {instruction.from_location} through {instruction.to_location}
               </Text>

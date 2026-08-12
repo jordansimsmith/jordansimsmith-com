@@ -759,6 +759,9 @@ export function createFakeClient(): ApiClient {
             block: deriveBlock(from),
             from_location: deriveLocation(from),
             to_location: deriveLocation(to),
+            // keepRows[i] received sequence number first + i
+            from_name: keepRows[from - first].name,
+            to_name: keepRows[to - first].name,
             unit_count: to - from + 1,
           });
           from = to + 1;

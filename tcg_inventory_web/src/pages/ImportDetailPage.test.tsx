@@ -271,6 +271,8 @@ describe('ImportDetailPage', () => {
           block: 'A42',
           from_location: 'A42-0',
           to_location: 'A42-86',
+          from_name: 'Llanowar Elves',
+          to_name: 'Sol Ring',
           unit_count: 87,
         },
       ],
@@ -296,6 +298,7 @@ describe('ImportDetailPage', () => {
     expect(await screen.findByText('Placement instructions')).toBeDefined();
     expect(screen.getByText('A42')).toBeDefined();
     expect(screen.getByText('87 cards')).toBeDefined();
+    expect(screen.getByText('Llanowar Elves through Sol Ring')).toBeDefined();
     expect(screen.getByText('A42-0 through A42-86')).toBeDefined();
     expect(screen.getByText('confirmed')).toBeDefined();
     expect(screen.queryByText('Top Card')).toBeNull();

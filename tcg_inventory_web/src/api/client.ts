@@ -95,6 +95,8 @@ export interface PlacementInstruction {
   block: string;
   from_location: string;
   to_location: string;
+  from_name: string;
+  to_name: string;
   unit_count: number;
 }
 

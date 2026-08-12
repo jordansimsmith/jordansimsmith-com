@@ -88,7 +88,7 @@ sequenceDiagram
 Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it verbatim: SKU, unit, sequence number, block, location (`A42-42`), import (`appraising` → `review` → `confirming` → `confirmed`; deletable before confirm), appraise and publish jobs, order states (`awaiting_payment`, `to_pick`, `fulfilled`, `voided`), pull sheet.
 
 - **Keep/discard/review row**: an import row's appraisal decision; decisions are final for the import. Review cards are set aside physically, never ingested, and return through a later import once their cause is fixed.
-- **Placement instructions**: the post-confirm screen mapping the confirmed stack to block labels and location ranges.
+- **Placement instructions**: the post-confirm screen mapping the confirmed stack to block labels and location ranges, with the card names at each range boundary as physical checkpoints.
 - **Pending publish badge**: count of SKUs with unpublished inventory changes shown on the publish trigger.
 
 ## Keyboard contract

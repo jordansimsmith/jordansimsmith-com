@@ -310,6 +310,8 @@ describe('createFakeClient imports', () => {
         block: 'A6',
         from_location: 'A6-0',
         to_location: 'A6-2',
+        from_name: 'Llanowar Elves',
+        to_name: 'Opt',
         unit_count: 3,
       },
     ]);
@@ -358,12 +360,16 @@ describe('createFakeClient imports', () => {
         block: 'A6',
         from_location: 'A6-0',
         to_location: 'A6-99',
+        from_name: 'Relentless Rats',
+        to_name: 'Relentless Rats',
         unit_count: 100,
       },
       {
         block: 'A7',
         from_location: 'A7-0',
         to_location: 'A7-3',
+        from_name: 'Relentless Rats',
+        to_name: 'Relentless Rats',
         unit_count: 4,
       },
     ]);

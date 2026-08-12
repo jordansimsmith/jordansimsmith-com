@@ -166,7 +166,7 @@ sequenceDiagram
 
 `POST /imports/{import_id}/confirm`
 
-Response `200`:
+Response `200` (each placement instruction carries the card names at its boundary locations, taken from the keeper rows assigned to that range):
 
 ```json
 {
@@ -180,6 +180,8 @@ Response `200`:
       "block": "A42",
       "from_location": "A42-0",
       "to_location": "A42-86",
+      "from_name": "Llanowar Elves",
+      "to_name": "Sol Ring",
       "unit_count": 87
     }
   ]
