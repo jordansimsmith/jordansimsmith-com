@@ -107,6 +107,39 @@ export interface ConfirmImportResponse {
   placement_instructions: PlacementInstruction[];
 }
 
+export type OrderState =
+  | 'awaiting_payment'
+  | 'to_pick'
+  | 'fulfilled'
+  | 'voided';
+
+export interface OrderSummary {
+  order_id: string;
+  state: OrderState;
+  accepted_at: number;
+  delivery_mode: string;
+  total_price: string;
+  unit_count: number;
+}
+
+export interface FindOrdersResponse {
+  orders: OrderSummary[];
+}
+
+export interface OrderUnit {
+  sequence_number: number;
+  location: string;
+  name: string;
+  set_code: string;
+  collector_number: string;
+  finish: Finish;
+  condition: Condition;
+}
+
+export interface OrderDetail extends OrderSummary {
+  units: OrderUnit[];
+}
+
 export interface ApiClient {
   getSettings(): Promise<SettingsResponse>;
   createImport(filename: string, csv: string): Promise<ImportSummary>;
@@ -125,6 +158,9 @@ export interface ApiClient {
     sequenceNumber: number,
     condition: Condition,
   ): Promise<UpdateUnitResponse>;
+  findOrders(): Promise<FindOrdersResponse>;
+  getOrder(orderId: string): Promise<OrderDetail>;
+  confirmOrder(orderId: string): Promise<OrderDetail>;
 }
 
 export const apiClient: ApiClient = import.meta.env.PROD

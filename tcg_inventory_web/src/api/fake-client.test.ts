@@ -387,3 +387,96 @@ describe('createFakeClient imports', () => {
     expect(response.placement_instructions).toEqual([]);
   });
 });
+
+describe('createFakeClient orders', () => {
+  it('seeds orders newest-first covering every state', async () => {
+    const client = createFakeClient();
+
+    const response = await client.findOrders();
+
+    expect(response.orders.map((order) => order.state)).toEqual([
+      'awaiting_payment',
+      'to_pick',
+      'fulfilled',
+      'voided',
+    ]);
+    const acceptedAts = response.orders.map((order) => order.accepted_at);
+    expect(acceptedAts).toEqual([...acceptedAts].sort((a, b) => b - a));
+    const toPick = response.orders[1];
+    expect(toPick.order_id).toBe('83647');
+    expect(toPick.unit_count).toBe(3);
+    expect(toPick.total_price).toBe('10.90');
+    expect(toPick.delivery_mode).toBe('PICKUP');
+  });
+
+  it('returns order units ascending with derived locations', async () => {
+    const client = createFakeClient();
+
+    const detail = await client.getOrder('83647');
+
+    expect(detail.state).toBe('to_pick');
+    expect(detail.units).toHaveLength(3);
+    const sequenceNumbers = detail.units.map((unit) => unit.sequence_number);
+    expect(sequenceNumbers).toEqual([...sequenceNumbers].sort((a, b) => a - b));
+    for (const unit of detail.units) {
+      const block = Math.floor(unit.sequence_number / 100);
+      expect(unit.location).toBe(`A${block}-${unit.sequence_number % 100}`);
+    }
+    expect(
+      detail.units.filter((unit) => unit.name === 'Sol Ring'),
+    ).toHaveLength(2);
+    const aberration = detail.units.find(
+      (unit) => unit.name === 'Elvish Aberration',
+    );
+    expect(aberration?.set_code).toBe('a25');
+    expect(aberration?.collector_number).toBe('167');
+    expect(aberration?.finish).toBe('normal');
+    expect(aberration?.condition).toBe('NM');
+  });
+
+  it('rejects unknown order ids', async () => {
+    const client = createFakeClient();
+
+    await expect(client.getOrder('missing')).rejects.toThrow('Not Found');
+  });
+
+  it('marks units sold and fulfils the order on confirmOrder', async () => {
+    const client = createFakeClient();
+
+    const confirmed = await client.confirmOrder('83647');
+
+    expect(confirmed.state).toBe('fulfilled');
+    expect(confirmed.units).toHaveLength(3);
+
+    const solRing = await client.getSku(
+      '58b26011-e103-45c4-a253-900f4e6b2eeb#normal#NM',
+    );
+    expect(solRing.reserved_count).toBe(0);
+    expect(solRing.sold_count).toBe(2);
+    expect(solRing.in_stock_count).toBe(6);
+
+    const aberration = await client.getSku(
+      'f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM',
+    );
+    expect(aberration.reserved_count).toBe(0);
+    expect(aberration.sold_count).toBe(1);
+
+    const list = await client.findOrders();
+    expect(list.orders.find((order) => order.order_id === '83647')?.state).toBe(
+      'fulfilled',
+    );
+  });
+
+  it('rejects confirmOrder unless the order is to_pick', async () => {
+    const client = createFakeClient();
+
+    await expect(client.confirmOrder('83663')).rejects.toThrow(
+      'order is not ready to pick',
+    );
+
+    await client.confirmOrder('83647');
+    await expect(client.confirmOrder('83647')).rejects.toThrow(
+      'order is not ready to pick',
+    );
+  });
+});

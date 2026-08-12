@@ -4,11 +4,16 @@ import type {
   ConfirmImportResponse,
   Finish,
   FindImportsResponse,
+  FindOrdersResponse,
   FindSkusParams,
   FindSkusResponse,
   ImportDetail,
   ImportStatus,
   ImportSummary,
+  OrderDetail,
+  OrderState,
+  OrderSummary,
+  OrderUnit,
   PlacementInstruction,
   RowDecision,
   SettingsResponse,
@@ -31,6 +36,7 @@ type SeedSku = [
   condition: Condition,
   inStockCount: number,
   reservedCount: number,
+  soldCount?: number,
 ];
 
 // prettier-ignore
@@ -57,7 +63,7 @@ const seedSkus: SeedSku[] = [
   ['e9be371c-c688-44ad-ab71-bd4c9f242d58', 'Force of Negation', 'mh1', 'Modern Horizons', '52', 'foil', 'NM', 1, 0],
   ['82d7de2b-c909-48dc-9ab7-c4a8328e37bb', 'Ghostly Prison', 'chk', 'Champions of Kamigawa', '10', 'normal', 'HP', 0, 0],
   ['b2e2a777-0705-4a37-937d-c6e020ebc0f0', 'Goblin Guide', 'zen', 'Zendikar', '126', 'normal', 'DMG', 1, 0],
-  ['0bc3401f-935b-45ce-b1e6-300a5d9dfd4f', 'Hellkite Tyrant', 'gtc', 'Gatecrash', '94', 'normal', 'NM', 1, 0],
+  ['0bc3401f-935b-45ce-b1e6-300a5d9dfd4f', 'Hellkite Tyrant', 'gtc', 'Gatecrash', '94', 'normal', 'NM', 1, 0, 1],
   ['48caf4c4-745c-4072-bf3d-1a3fa7c3bc9c', 'Jeska, Thrice Reborn', 'cmr', 'Commander Legends', '186', 'etched', 'NM', 1, 0],
   ['85d207ac-0680-47ef-85d9-4323c1321d6f', "Kodama's Reach", 'chk', 'Champions of Kamigawa', '225', 'normal', 'MP', 5, 0],
   ['4eaac4fd-95f5-4f38-b593-0101e79a20f9', 'Lightning Bolt', 'sta', 'Strixhaven Mystical Archive', '42', 'normal', 'NM', 4, 0],
@@ -108,9 +114,10 @@ function createSeedState(): FakeSku[] {
       condition,
       inStockCount,
       reservedCount,
+      soldCount = 0,
     ]) => {
       const units: FakeUnit[] = [];
-      for (let i = 0; i < inStockCount + reservedCount; i += 1) {
+      for (let i = 0; i < inStockCount + reservedCount + soldCount; i += 1) {
         // stride 37 is coprime with 600, scattering units across blocks A0-A5
         units.push({
           sequence_number: (unitIndex * 37) % 600,
@@ -119,8 +126,11 @@ function createSeedState(): FakeSku[] {
         unitIndex += 1;
       }
       units.sort((a, b) => a.sequence_number - b.sequence_number);
-      // reservations take the forward-most units
-      for (let i = 0; i < reservedCount; i += 1) {
+      // pulls and reservations take the forward-most units, in that order
+      for (let i = 0; i < soldCount; i += 1) {
+        units[i].status = 'sold';
+      }
+      for (let i = soldCount; i < soldCount + reservedCount; i += 1) {
         units[i].status = 'reserved';
       }
       return {
@@ -397,9 +407,128 @@ function toImportDetail(importRecord: FakeImport): ImportDetail {
   };
 }
 
+interface FakeOrderUnitRef {
+  sku_id: string;
+  sequence_number: number;
+}
+
+interface FakeOrder {
+  order_id: string;
+  state: OrderState;
+  accepted_at: number;
+  delivery_mode: string;
+  total_price: string;
+  units: FakeOrderUnitRef[];
+}
+
+function createSeedOrders(skus: FakeSku[]): FakeOrder[] {
+  const now = Math.floor(Date.now() / 1000);
+  const unitsOf = (
+    name: string,
+    finish: Finish,
+    condition: Condition,
+    status: UnitStatus,
+  ): FakeOrderUnitRef[] => {
+    const sku = skus.find(
+      (candidate) =>
+        candidate.name === name &&
+        candidate.finish === finish &&
+        candidate.condition === condition,
+    );
+    if (!sku) {
+      throw new Error(`missing seed SKU: ${name}`);
+    }
+    return sku.units
+      .filter((unit) => unit.status === status)
+      .map((unit) => ({
+        sku_id: sku.sku_id,
+        sequence_number: unit.sequence_number,
+      }));
+  };
+
+  return [
+    {
+      order_id: '83663',
+      state: 'awaiting_payment',
+      accepted_at: now - 2 * 60 * 60,
+      delivery_mode: 'SHIPPING',
+      total_price: '479.90',
+      units: [
+        ...unitsOf('Arcane Signet', 'normal', 'NM', 'reserved'),
+        ...unitsOf('Cyclonic Rift', 'normal', 'LP', 'reserved'),
+        ...unitsOf('Dockside Extortionist', 'normal', 'LP', 'reserved'),
+        ...unitsOf('Lightning Greaves', 'normal', 'NM', 'reserved'),
+        ...unitsOf('Mana Crypt', 'normal', 'NM', 'reserved'),
+        ...unitsOf('Rhystic Study', 'normal', 'NM', 'reserved'),
+      ],
+    },
+    {
+      order_id: '83647',
+      state: 'to_pick',
+      accepted_at: now - 24 * 60 * 60,
+      delivery_mode: 'PICKUP',
+      total_price: '10.90',
+      units: [
+        ...unitsOf('Sol Ring', 'normal', 'NM', 'reserved'),
+        ...unitsOf('Elvish Aberration', 'normal', 'NM', 'reserved'),
+      ],
+    },
+    {
+      order_id: '83611',
+      state: 'fulfilled',
+      accepted_at: now - 3 * 24 * 60 * 60,
+      delivery_mode: 'SHIPPING',
+      total_price: '8.50',
+      units: unitsOf('Hellkite Tyrant', 'normal', 'NM', 'sold'),
+    },
+    {
+      order_id: '83598',
+      state: 'voided',
+      accepted_at: now - 5 * 24 * 60 * 60,
+      delivery_mode: 'PICKUP',
+      total_price: '4.20',
+      // the void released this unit back to stock
+      units: unitsOf('Counterspell', 'normal', 'NM', 'in_stock').slice(0, 1),
+    },
+  ];
+}
+
+function toOrderSummary(order: FakeOrder): OrderSummary {
+  return {
+    order_id: order.order_id,
+    state: order.state,
+    accepted_at: order.accepted_at,
+    delivery_mode: order.delivery_mode,
+    total_price: order.total_price,
+    unit_count: order.units.length,
+  };
+}
+
+function toOrderDetail(order: FakeOrder, skus: FakeSku[]): OrderDetail {
+  const units: OrderUnit[] = order.units
+    .map((ref) => {
+      const sku = skus.find((candidate) => candidate.sku_id === ref.sku_id);
+      if (!sku) {
+        throw new Error('Not Found');
+      }
+      return {
+        sequence_number: ref.sequence_number,
+        location: deriveLocation(ref.sequence_number),
+        name: sku.name,
+        set_code: sku.set_code,
+        collector_number: sku.collector_number,
+        finish: sku.finish,
+        condition: sku.condition,
+      };
+    })
+    .sort((a, b) => a.sequence_number - b.sequence_number);
+  return { ...toOrderSummary(order), units };
+}
+
 export function createFakeClient(): ApiClient {
   const skus = createSeedState();
   const importRecords = createSeedImports();
+  const orders = createSeedOrders(skus);
   let importCounter = importRecords.length;
   // seed units occupy sequence numbers 0-599 (blocks A0-A5)
   let nextSequenceNumber = 600;
@@ -431,6 +560,14 @@ export function createFakeClient(): ApiClient {
     }
     progressAppraisal(importRecord);
     return importRecord;
+  };
+
+  const getOrderOrThrow = (orderId: string): FakeOrder => {
+    const order = orders.find((candidate) => candidate.order_id === orderId);
+    if (!order) {
+      throw new Error('Not Found');
+    }
+    return order;
   };
 
   return {
@@ -602,6 +739,30 @@ export function createFakeClient(): ApiClient {
         status: 'in_stock',
       });
       return { sku_id: targetSkuId };
+    },
+
+    async findOrders(): Promise<FindOrdersResponse> {
+      const summaries = [...orders]
+        .sort((a, b) => b.accepted_at - a.accepted_at)
+        .map(toOrderSummary);
+      return { orders: summaries };
+    },
+
+    async getOrder(orderId: string): Promise<OrderDetail> {
+      return toOrderDetail(getOrderOrThrow(orderId), skus);
+    },
+
+    async confirmOrder(orderId: string): Promise<OrderDetail> {
+      const order = getOrderOrThrow(orderId);
+      if (order.state !== 'to_pick') {
+        throw new Error('order is not ready to pick');
+      }
+      for (const ref of order.units) {
+        const sku = getSkuOrThrow(ref.sku_id);
+        getUnitOrThrow(sku, ref.sequence_number).status = 'sold';
+      }
+      order.state = 'fulfilled';
+      return toOrderDetail(order, skus);
     },
   };
 }

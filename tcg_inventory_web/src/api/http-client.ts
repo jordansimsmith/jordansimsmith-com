@@ -4,10 +4,12 @@ import type {
   Condition,
   ConfirmImportResponse,
   FindImportsResponse,
+  FindOrdersResponse,
   FindSkusParams,
   FindSkusResponse,
   ImportDetail,
   ImportSummary,
+  OrderDetail,
   SettingsResponse,
   SkuDetail,
   UpdateUnitResponse,
@@ -129,6 +131,26 @@ export function createHttpClient(): ApiClient {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ condition }),
         },
+      );
+      return response.json();
+    },
+
+    async findOrders(): Promise<FindOrdersResponse> {
+      const response = await authenticatedFetch('/orders');
+      return response.json();
+    },
+
+    async getOrder(orderId: string): Promise<OrderDetail> {
+      const response = await authenticatedFetch(
+        `/orders/${encodeURIComponent(orderId)}`,
+      );
+      return response.json();
+    },
+
+    async confirmOrder(orderId: string): Promise<OrderDetail> {
+      const response = await authenticatedFetch(
+        `/orders/${encodeURIComponent(orderId)}/confirm`,
+        { method: 'POST' },
       );
       return response.json();
     },
