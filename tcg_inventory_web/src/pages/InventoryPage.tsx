@@ -1,8 +1,17 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Skeleton, Stack, Text, TextInput, Title } from '@mantine/core';
+import {
+  Button,
+  Group,
+  Skeleton,
+  Stack,
+  Text,
+  TextInput,
+  Title,
+} from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
 import { AppShellLayout } from '../layouts/AppShellLayout';
+import { PublishWidget } from '../components/PublishWidget';
 import { SkuTable } from '../components/SkuTable';
 import { apiClient } from '../api/client';
 import type { SkuSummary } from '../api/client';
@@ -89,7 +98,10 @@ export function InventoryPage() {
   return (
     <AppShellLayout>
       <Stack gap="md">
-        <Title order={2}>Inventory</Title>
+        <Group justify="space-between" align="flex-start">
+          <Title order={2}>Inventory</Title>
+          <PublishWidget />
+        </Group>
         <TextInput
           ref={searchInputRef}
           value={search}

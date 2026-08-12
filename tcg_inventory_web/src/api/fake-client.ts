@@ -15,6 +15,7 @@ import type {
   OrderSummary,
   OrderUnit,
   PlacementInstruction,
+  PublishResponse,
   RowDecision,
   SettingsResponse,
   SkuDetail,
@@ -504,6 +505,27 @@ function toOrderSummary(order: FakeOrder): OrderSummary {
   };
 }
 
+const PUBLISH_SKUS_PER_SECOND = 2;
+
+interface FakePublishRun {
+  worklist: string[];
+  status: 'running' | 'succeeded';
+  started_at_ms: number;
+  finished_at_ms: number | null;
+  cleared_count: number;
+}
+
+function publishedCount(run: FakePublishRun): number {
+  if (run.status !== 'running') {
+    return run.worklist.length;
+  }
+  const elapsedMs = Math.max(0, Date.now() - run.started_at_ms);
+  return Math.min(
+    run.worklist.length,
+    Math.floor((elapsedMs / 1000) * PUBLISH_SKUS_PER_SECOND),
+  );
+}
+
 function toOrderDetail(order: FakeOrder, skus: FakeSku[]): OrderDetail {
   const units: OrderUnit[] = order.units
     .map((ref) => {
@@ -532,6 +554,62 @@ export function createFakeClient(): ApiClient {
   let importCounter = importRecords.length;
   // seed units occupy sequence numbers 0-599 (blocks A0-A5)
   let nextSequenceNumber = 600;
+  // every 4th seed SKU starts dirty so the pending publish badge is non-zero
+  const dirtySkuIds = new Set<string>(
+    skus.filter((_, index) => index % 4 === 0).map((sku) => sku.sku_id),
+  );
+  let publishRun: FakePublishRun | null = null;
+  let settings: SettingsResponse = { credential_set: false, updated_at: null };
+
+  const progressPublish = (): void => {
+    if (!publishRun) {
+      return;
+    }
+    const published = publishedCount(publishRun);
+    // clear each drained SKU only once so later re-dirtied SKUs stay pending
+    for (const skuId of publishRun.worklist.slice(
+      publishRun.cleared_count,
+      published,
+    )) {
+      dirtySkuIds.delete(skuId);
+    }
+    publishRun.cleared_count = Math.max(publishRun.cleared_count, published);
+    if (
+      publishRun.status === 'running' &&
+      published >= publishRun.worklist.length
+    ) {
+      publishRun.status = 'succeeded';
+      publishRun.finished_at_ms =
+        publishRun.started_at_ms +
+        (publishRun.worklist.length / PUBLISH_SKUS_PER_SECOND) * 1000;
+    }
+  };
+
+  const toPublishResponse = (): PublishResponse => {
+    if (!publishRun) {
+      return {
+        status: null,
+        published_sku_count: 0,
+        total_sku_count: 0,
+        error: null,
+        started_at: null,
+        finished_at: null,
+        pending_sku_count: dirtySkuIds.size,
+      };
+    }
+    return {
+      status: publishRun.status,
+      published_sku_count: publishedCount(publishRun),
+      total_sku_count: publishRun.worklist.length,
+      error: null,
+      started_at: Math.floor(publishRun.started_at_ms / 1000),
+      finished_at:
+        publishRun.finished_at_ms === null
+          ? null
+          : Math.floor(publishRun.finished_at_ms / 1000),
+      pending_sku_count: dirtySkuIds.size,
+    };
+  };
 
   const getSkuOrThrow = (skuId: string): FakeSku => {
     const sku = skus.find((candidate) => candidate.sku_id === skuId);
@@ -572,7 +650,15 @@ export function createFakeClient(): ApiClient {
 
   return {
     async getSettings(): Promise<SettingsResponse> {
-      return { credential_set: false, updated_at: null };
+      return { ...settings };
+    },
+
+    async updateSettings(): Promise<SettingsResponse> {
+      settings = {
+        credential_set: true,
+        updated_at: Math.floor(Date.now() / 1000),
+      };
+      return { ...settings };
     },
 
     async createImport(filename: string, csv: string): Promise<ImportSummary> {
@@ -654,6 +740,7 @@ export function createFakeClient(): ApiClient {
           skus.push(sku);
         }
         sku.units.push({ sequence_number: sequenceNumber, status: 'in_stock' });
+        dirtySkuIds.add(sku.sku_id);
         sequenceNumbers.push(sequenceNumber);
       }
       importRecord.status = 'confirmed';
@@ -711,6 +798,7 @@ export function createFakeClient(): ApiClient {
         throw new Error('unit is not in stock');
       }
       unit.status = 'removed';
+      dirtySkuIds.add(sku.sku_id);
       return toDetail(sku);
     },
 
@@ -738,6 +826,8 @@ export function createFakeClient(): ApiClient {
         sequence_number: unit.sequence_number,
         status: 'in_stock',
       });
+      dirtySkuIds.add(sku.sku_id);
+      dirtySkuIds.add(target.sku_id);
       return { sku_id: targetSkuId };
     },
 
@@ -761,8 +851,30 @@ export function createFakeClient(): ApiClient {
         const sku = getSkuOrThrow(ref.sku_id);
         getUnitOrThrow(sku, ref.sequence_number).status = 'sold';
       }
+      // no dirty flag: sold units already left the projection at reservation
       order.state = 'fulfilled';
       return toOrderDetail(order, skus);
+    },
+
+    async createPublish(): Promise<PublishResponse> {
+      progressPublish();
+      if (!publishRun || publishRun.status === 'succeeded') {
+        publishRun = {
+          worklist: [...dirtySkuIds],
+          status: 'running',
+          started_at_ms: Date.now(),
+          finished_at_ms: null,
+          cleared_count: 0,
+        };
+        // an empty worklist completes immediately
+        progressPublish();
+      }
+      return toPublishResponse();
+    },
+
+    async getPublish(): Promise<PublishResponse> {
+      progressPublish();
+      return toPublishResponse();
     },
   };
 }

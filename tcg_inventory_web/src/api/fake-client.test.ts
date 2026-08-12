@@ -480,3 +480,146 @@ describe('createFakeClient orders', () => {
     );
   });
 });
+
+describe('createFakeClient publish', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  async function drainPublish(client: ReturnType<typeof createFakeClient>) {
+    await client.createPublish();
+    vi.advanceTimersByTime(60_000);
+    return client.getPublish();
+  }
+
+  it('reports no run and seeded pending SKUs before the first trigger', async () => {
+    const client = createFakeClient();
+
+    const response = await client.getPublish();
+
+    expect(response.status).toBeNull();
+    expect(response.started_at).toBeNull();
+    expect(response.finished_at).toBeNull();
+    expect(response.pending_sku_count).toBeGreaterThan(0);
+  });
+
+  it('drains dirty SKUs over time until the run succeeds', async () => {
+    vi.useFakeTimers();
+    const client = createFakeClient();
+    const before = await client.getPublish();
+
+    const started = await client.createPublish();
+    expect(started.status).toBe('running');
+    expect(started.total_sku_count).toBe(before.pending_sku_count);
+    expect(started.published_sku_count).toBe(0);
+
+    vi.advanceTimersByTime(1000);
+    const mid = await client.getPublish();
+    expect(mid.status).toBe('running');
+    expect(mid.published_sku_count).toBe(2);
+    expect(mid.pending_sku_count).toBe(before.pending_sku_count - 2);
+
+    vi.advanceTimersByTime(60_000);
+    const done = await client.getPublish();
+    expect(done.status).toBe('succeeded');
+    expect(done.published_sku_count).toBe(done.total_sku_count);
+    expect(done.pending_sku_count).toBe(0);
+    expect(done.finished_at).not.toBeNull();
+  });
+
+  it('returns the existing run when triggered while one is running', async () => {
+    vi.useFakeTimers();
+    const client = createFakeClient();
+
+    const first = await client.createPublish();
+    vi.advanceTimersByTime(1000);
+    const second = await client.createPublish();
+
+    expect(second.status).toBe('running');
+    expect(second.started_at).toBe(first.started_at);
+    expect(second.total_sku_count).toBe(first.total_sku_count);
+    expect(second.published_sku_count).toBe(2);
+  });
+
+  it('starts a fresh run after the previous run completed', async () => {
+    vi.useFakeTimers();
+    const client = createFakeClient();
+    await drainPublish(client);
+
+    const skuId = await findSkuId(client, 'brainstorm');
+    const detail = await client.getSku(skuId);
+    const unit = detail.units.find((entry) => entry.status === 'in_stock');
+    await client.deleteUnit(skuId, unit!.sequence_number);
+
+    const rerun = await client.createPublish();
+    expect(rerun.status).toBe('running');
+    expect(rerun.total_sku_count).toBe(1);
+    expect(rerun.published_sku_count).toBe(0);
+  });
+
+  it('completes immediately when nothing is pending', async () => {
+    vi.useFakeTimers();
+    const client = createFakeClient();
+    await drainPublish(client);
+
+    const response = await client.createPublish();
+
+    expect(response.status).toBe('succeeded');
+    expect(response.total_sku_count).toBe(0);
+    expect(response.pending_sku_count).toBe(0);
+    expect(response.finished_at).toBe(response.started_at);
+  });
+
+  it('marks SKUs dirty on adjustments but not on confirmed pulls', async () => {
+    vi.useFakeTimers();
+    const client = createFakeClient();
+    await drainPublish(client);
+    expect((await client.getPublish()).pending_sku_count).toBe(0);
+
+    await client.confirmOrder('83647');
+    expect((await client.getPublish()).pending_sku_count).toBe(0);
+
+    const skuId = await findSkuId(client, 'brainstorm');
+    const detail = await client.getSku(skuId);
+    const units = detail.units.filter((entry) => entry.status === 'in_stock');
+    await client.deleteUnit(skuId, units[0].sequence_number);
+    expect((await client.getPublish()).pending_sku_count).toBe(1);
+
+    await client.updateUnit(skuId, units[1].sequence_number, 'LP');
+    expect((await client.getPublish()).pending_sku_count).toBe(2);
+  });
+
+  it('marks keeper SKUs dirty when an import is confirmed', async () => {
+    vi.useFakeTimers();
+    const client = createFakeClient();
+    await drainPublish(client);
+
+    await client.confirmImport('fake-import-2');
+
+    const response = await client.getPublish();
+    expect(response.pending_sku_count).toBeGreaterThan(0);
+  });
+});
+
+describe('createFakeClient settings', () => {
+  it('stores credential presence without exposing the value', async () => {
+    const client = createFakeClient();
+
+    expect(await client.getSettings()).toEqual({
+      credential_set: false,
+      updated_at: null,
+    });
+
+    const response = await client.updateSettings('super-secret-refresh-token');
+
+    expect(response.credential_set).toBe(true);
+    expect(response.updated_at).not.toBeNull();
+    expect(JSON.stringify(response)).not.toContain(
+      'super-secret-refresh-token',
+    );
+
+    const fetched = await client.getSettings();
+    expect(fetched.credential_set).toBe(true);
+    expect(fetched.updated_at).toBe(response.updated_at);
+  });
+});

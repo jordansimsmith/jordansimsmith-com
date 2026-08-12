@@ -140,8 +140,21 @@ export interface OrderDetail extends OrderSummary {
   units: OrderUnit[];
 }
 
+export type PublishRunStatus = 'queued' | 'running' | 'succeeded' | 'failed';
+
+export interface PublishResponse {
+  status: PublishRunStatus | null;
+  published_sku_count: number;
+  total_sku_count: number;
+  error: string | null;
+  started_at: number | null;
+  finished_at: number | null;
+  pending_sku_count: number;
+}
+
 export interface ApiClient {
   getSettings(): Promise<SettingsResponse>;
+  updateSettings(refreshToken: string): Promise<SettingsResponse>;
   createImport(filename: string, csv: string): Promise<ImportSummary>;
   findImports(): Promise<FindImportsResponse>;
   getImport(importId: string): Promise<ImportDetail>;
@@ -161,6 +174,8 @@ export interface ApiClient {
   findOrders(): Promise<FindOrdersResponse>;
   getOrder(orderId: string): Promise<OrderDetail>;
   confirmOrder(orderId: string): Promise<OrderDetail>;
+  createPublish(): Promise<PublishResponse>;
+  getPublish(): Promise<PublishResponse>;
 }
 
 export const apiClient: ApiClient = import.meta.env.PROD

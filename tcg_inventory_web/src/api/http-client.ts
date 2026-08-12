@@ -10,6 +10,7 @@ import type {
   ImportDetail,
   ImportSummary,
   OrderDetail,
+  PublishResponse,
   SettingsResponse,
   SkuDetail,
   UpdateUnitResponse,
@@ -51,6 +52,15 @@ export function createHttpClient(): ApiClient {
   return {
     async getSettings(): Promise<SettingsResponse> {
       const response = await authenticatedFetch('/settings');
+      return response.json();
+    },
+
+    async updateSettings(refreshToken: string): Promise<SettingsResponse> {
+      const response = await authenticatedFetch('/settings', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ refresh_token: refreshToken }),
+      });
       return response.json();
     },
 
@@ -152,6 +162,18 @@ export function createHttpClient(): ApiClient {
         `/orders/${encodeURIComponent(orderId)}/confirm`,
         { method: 'POST' },
       );
+      return response.json();
+    },
+
+    async createPublish(): Promise<PublishResponse> {
+      const response = await authenticatedFetch('/publish', {
+        method: 'POST',
+      });
+      return response.json();
+    },
+
+    async getPublish(): Promise<PublishResponse> {
+      const response = await authenticatedFetch('/publish');
       return response.json();
     },
   };
