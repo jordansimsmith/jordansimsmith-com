@@ -6,6 +6,8 @@ import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.http.RequestContextModule;
 import com.jordansimsmith.json.ObjectMapperModule;
+import com.jordansimsmith.secrets.Secrets;
+import com.jordansimsmith.secrets.SecretsModule;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.time.ClockModule;
 import dagger.Component;
@@ -18,6 +20,7 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
       ObjectMapperModule.class,
       ClockModule.class,
       DynamoDbModule.class,
+      SecretsModule.class,
       RequestContextModule.class,
       TcgInventoryModule.class
     })
@@ -29,6 +32,8 @@ public interface TcgInventoryFactory {
   RequestContextFactory requestContextFactory();
 
   HttpResponseFactory httpResponseFactory();
+
+  Secrets secrets();
 
   DynamoDbTable<TcgInventoryItem> tcgInventoryTable();
 

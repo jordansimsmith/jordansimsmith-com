@@ -1,11 +1,8 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
-load("@rules_java//java:defs.bzl", "java_library")
+load("@rules_java//java:defs.bzl", "java_binary", "java_library")
 load("//lib/localstack:defs.bzl", "localstack_image")
 
-HANDLERS = glob(
-    ["src/main/java/**/*Handler.java"],
-    allow_empty = True,
-)
+HANDLERS = glob(["src/main/java/**/*Handler.java"])
 
 INTEGRATION_TESTS = glob(["src/test/java/**/*IntegrationTest.java"])
 
@@ -41,6 +38,53 @@ java_library(
     ],
 )
 
+java_binary(
+    name = "get-settings-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/GetSettingsHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "put-settings-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/PutSettingsHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "//lib/secrets:lib",
+        "//lib/time:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
 java_library(
     name = "test-lib",
     testonly = True,
@@ -61,6 +105,7 @@ java_library(
         "//lib/http:lib",
         "//lib/json:lib",
         "//lib/localstack:lib",
+        "//lib/secrets:test-lib",
         "//lib/testcontainers:test-lib",
         "//lib/time:test-lib",
         "//third_party/dagger",
@@ -107,13 +152,19 @@ java_test_suite(
     test_suffixes = ["IntegrationTest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":get-settings-handler",
         ":lib",
+        ":put-settings-handler",
         ":test-lib",
         "//lib/dynamodb:test-lib",
+        "//lib/secrets:test-lib",
         "//lib/testcontainers:test-lib",
         "//lib/time:test-lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
         "@maven//:org_slf4j_slf4j_api",
@@ -125,7 +176,10 @@ java_test_suite(
 
 localstack_image(
     name = "local",
-    handler_jars = [],
+    handler_jars = [
+        ":get-settings-handler_deploy.jar",
+        ":put-settings-handler_deploy.jar",
+    ],
     init_resources = "src/test/resources/init_resources.py",
     repo_tag = "bazel/tcg-inventory-local:latest",
 )

@@ -119,7 +119,7 @@ public class TcgInventoryItemIntegrationTest {
     var user = "jordan";
 
     var item = new TcgInventoryItem();
-    item.setPk(TcgInventoryItem.formatImportPk(user));
+    item.setPk(TcgInventoryItem.formatUserPk(user));
     item.setSk(TcgInventoryItem.formatImportSk("01JEXAMPLEULID0000000000"));
     item.setFilename("manabox_export.csv");
     item.setStatus("appraising");

@@ -536,7 +536,7 @@ public class TcgInventoryItem {
     return UNIT_PREFIX + String.format("%010d", sequenceNumber);
   }
 
-  public static String formatImportPk(String user) {
+  public static String formatUserPk(String user) {
     return USER_PREFIX + user;
   }
 
