@@ -18,6 +18,11 @@ public class FakeSecrets implements Secrets {
     return secret;
   }
 
+  @Override
+  public void put(String name, String value) {
+    secrets.put(name, value);
+  }
+
   public void set(String name, String secret) {
     secrets.put(name, secret);
   }

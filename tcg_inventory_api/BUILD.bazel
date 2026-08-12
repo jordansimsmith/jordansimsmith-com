@@ -27,6 +27,7 @@ java_library(
         "//lib/dynamodb:lib",
         "//lib/http:lib",
         "//lib/json:lib",
+        "//lib/secrets:lib",
         "//lib/time:lib",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_annotations",
@@ -79,8 +80,12 @@ java_test_suite(
     deps = [
         ":lib",
         ":test-lib",
+        "//lib/secrets:lib",
+        "//lib/secrets:test-lib",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_mockito_mockito_core",
     ],
 )
 
