@@ -53,7 +53,7 @@ export function SettingsPage() {
       setSettings(response);
       setRefreshToken('');
       notifications.show({
-        title: 'Credential saved',
+        title: 'Settings saved',
         message: 'FetchTCG refresh token updated',
         color: 'green',
       });
@@ -79,28 +79,21 @@ export function SettingsPage() {
         {!loading && error && <Text c="red">{error}</Text>}
         {!loading && !error && settings && (
           <>
-            {settings.credential_set ? (
-              <Text size="sm">
-                Credential set
-                {settings.updated_at !== null &&
-                  `, last updated ${new Date(
-                    settings.updated_at * 1000,
-                  ).toLocaleString()}`}
-              </Text>
-            ) : (
-              <Text size="sm" c="dimmed">
-                No credential set.
-              </Text>
-            )}
             <PasswordInput
               label="FetchTCG refresh token"
-              description="Write-only: the stored value is never displayed."
+              description={
+                settings.credential_set && settings.updated_at !== null
+                  ? `Last updated ${new Date(
+                      settings.updated_at * 1000,
+                    ).toLocaleString()}`
+                  : undefined
+              }
               value={refreshToken}
               onChange={(event) => setRefreshToken(event.currentTarget.value)}
               placeholder={
                 settings.credential_set
-                  ? 'Enter a new token to replace the stored one'
-                  : 'Enter a refresh token'
+                  ? '••••••••••••••••'
+                  : 'Enter refresh token'
               }
             />
             <Group>
@@ -109,7 +102,7 @@ export function SettingsPage() {
                 loading={saving}
                 disabled={refreshToken.trim() === ''}
               >
-                Save credential
+                Save
               </Button>
             </Group>
           </>

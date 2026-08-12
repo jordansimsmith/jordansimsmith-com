@@ -55,8 +55,10 @@ function renderPublishWidget() {
   );
 }
 
-function publishButton(): HTMLButtonElement {
-  return screen.getByRole('button', { name: /Publish/ }) as HTMLButtonElement;
+function publishButton(): HTMLButtonElement | null {
+  return screen.queryByRole('button', {
+    name: /Publish/,
+  }) as HTMLButtonElement | null;
 }
 
 describe('PublishWidget', () => {
@@ -79,7 +81,7 @@ describe('PublishWidget', () => {
     await act(async () => {});
 
     expect(screen.getByText('7')).toBeDefined();
-    expect(publishButton().disabled).toBe(false);
+    expect(publishButton()?.disabled).toBe(false);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(6000);
@@ -87,7 +89,20 @@ describe('PublishWidget', () => {
     expect(getPublishMock).toHaveBeenCalledTimes(1);
   });
 
-  it('triggers a run, polls progress, and shows the outcome', async () => {
+  it('keeps the trigger enabled without a badge when nothing is pending', async () => {
+    vi.spyOn(clientModule.apiClient, 'getPublish').mockResolvedValue(
+      publishResponse({ pending_sku_count: 0 }),
+    );
+
+    renderPublishWidget();
+    await act(async () => {});
+
+    // a zero-pending run still syncs orders, so the trigger stays available
+    expect(publishButton()?.disabled).toBe(false);
+    expect(screen.queryByText('0')).toBeNull();
+  });
+
+  it('triggers a run, polls progress in place of the button, and shows the outcome', async () => {
     vi.useFakeTimers();
     const getPublishMock = vi
       .spyOn(clientModule.apiClient, 'getPublish')
@@ -101,20 +116,20 @@ describe('PublishWidget', () => {
     renderPublishWidget();
     await act(async () => {});
 
-    fireEvent.click(publishButton());
+    fireEvent.click(publishButton()!);
     await act(async () => {});
 
     expect(createPublishMock).toHaveBeenCalledTimes(1);
     expect(screen.getByText('Publishing 1 of 3')).toBeDefined();
-    expect(publishButton().disabled).toBe(true);
+    expect(publishButton()).toBeNull();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
 
     expect(screen.getByText(/Last publish succeeded/)).toBeDefined();
-    expect(screen.getByText('0')).toBeDefined();
-    expect(publishButton().disabled).toBe(false);
+    expect(publishButton()?.disabled).toBe(false);
+    expect(screen.queryByText('0')).toBeNull();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(6000);
@@ -133,7 +148,7 @@ describe('PublishWidget', () => {
     await act(async () => {});
 
     expect(screen.getByText('Publishing 2 of 3')).toBeDefined();
-    expect(publishButton().disabled).toBe(true);
+    expect(publishButton()).toBeNull();
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000);
@@ -142,7 +157,7 @@ describe('PublishWidget', () => {
     expect(getPublishMock).toHaveBeenCalledTimes(2);
   });
 
-  it('shows the failed outcome without polling', async () => {
+  it('shows the failed outcome inline without polling', async () => {
     vi.useFakeTimers();
     const getPublishMock = vi
       .spyOn(clientModule.apiClient, 'getPublish')
@@ -160,9 +175,10 @@ describe('PublishWidget', () => {
     renderPublishWidget();
     await act(async () => {});
 
-    expect(screen.getByText('Publish failed')).toBeDefined();
-    expect(screen.getByText('FetchTCG authentication failed')).toBeDefined();
-    expect(publishButton().disabled).toBe(false);
+    expect(
+      screen.getByText('Publish failed: FetchTCG authentication failed'),
+    ).toBeDefined();
+    expect(publishButton()?.disabled).toBe(false);
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(6000);

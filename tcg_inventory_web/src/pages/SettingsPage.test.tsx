@@ -33,7 +33,7 @@ describe('SettingsPage', () => {
     cleanup();
   });
 
-  it('shows the no-credential state with an empty masked field', async () => {
+  it('shows an empty masked field when no credential is set', async () => {
     vi.spyOn(clientModule.apiClient, 'getSettings').mockResolvedValue({
       credential_set: false,
       updated_at: null,
@@ -41,19 +41,19 @@ describe('SettingsPage', () => {
 
     renderSettingsPage();
 
-    expect(await screen.findByText('No credential set.')).toBeDefined();
+    expect(
+      await screen.findByPlaceholderText('Enter refresh token'),
+    ).toBeDefined();
     expect(tokenInput().value).toBe('');
     expect(tokenInput().type).toBe('password');
+    expect(screen.queryByText(/Last updated/)).toBeNull();
     expect(
-      (
-        screen.getByRole('button', {
-          name: 'Save credential',
-        }) as HTMLButtonElement
-      ).disabled,
+      (screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement)
+        .disabled,
     ).toBe(true);
   });
 
-  it('shows presence metadata only when a credential is set', async () => {
+  it('shows a masked placeholder and last-updated when a credential is set', async () => {
     vi.spyOn(clientModule.apiClient, 'getSettings').mockResolvedValue({
       credential_set: true,
       updated_at: 1765420800,
@@ -62,10 +62,11 @@ describe('SettingsPage', () => {
     renderSettingsPage();
 
     expect(
-      await screen.findByText(
-        `Credential set, last updated ${new Date(
-          1765420800 * 1000,
-        ).toLocaleString()}`,
+      await screen.findByPlaceholderText('••••••••••••••••'),
+    ).toBeDefined();
+    expect(
+      screen.getByText(
+        `Last updated ${new Date(1765420800 * 1000).toLocaleString()}`,
       ),
     ).toBeDefined();
     expect(tokenInput().value).toBe('');
@@ -82,10 +83,10 @@ describe('SettingsPage', () => {
       .mockResolvedValue({ credential_set: true, updated_at: 1765507200 });
 
     renderSettingsPage();
-    await screen.findByText('No credential set.');
+    await screen.findByPlaceholderText('Enter refresh token');
 
     await user.type(tokenInput(), 'new-refresh-token');
-    await user.click(screen.getByRole('button', { name: 'Save credential' }));
+    await user.click(screen.getByRole('button', { name: 'Save' }));
 
     expect(updateSettingsMock).toHaveBeenCalledWith('new-refresh-token');
     await waitFor(() => {
@@ -93,11 +94,10 @@ describe('SettingsPage', () => {
     });
     expect(
       screen.getByText(
-        `Credential set, last updated ${new Date(
-          1765507200 * 1000,
-        ).toLocaleString()}`,
+        `Last updated ${new Date(1765507200 * 1000).toLocaleString()}`,
       ),
     ).toBeDefined();
+    expect(screen.getByPlaceholderText('••••••••••••••••')).toBeDefined();
     expect(screen.queryByDisplayValue('new-refresh-token')).toBeNull();
   });
 });

@@ -1,13 +1,5 @@
 import { useEffect, useState } from 'react';
-import {
-  Alert,
-  Badge,
-  Button,
-  Group,
-  Progress,
-  Stack,
-  Text,
-} from '@mantine/core';
+import { Badge, Button, Group, Progress, Stack, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { apiClient } from '../api/client';
 import type { PublishResponse } from '../api/client';
@@ -73,34 +65,26 @@ export function PublishWidget() {
   const pendingCount = publish?.pending_sku_count ?? 0;
 
   return (
-    <Stack gap="xs" align="flex-end">
-      <Group gap="sm" wrap="nowrap">
-        {!runActive &&
-          publish?.status === 'succeeded' &&
-          publish.finished_at !== null && (
-            <Text size="sm" c="dimmed">
-              Last publish succeeded{' '}
-              {new Date(publish.finished_at * 1000).toLocaleString()}
-            </Text>
-          )}
-        <Button
-          onClick={handleTrigger}
-          disabled={publish === null || runActive}
-          loading={triggering}
-          rightSection={
-            <Badge
-              size="sm"
-              variant="light"
-              color={pendingCount > 0 ? 'yellow' : 'gray'}
-            >
-              {pendingCount}
-            </Badge>
-          }
-        >
-          Publish
-        </Button>
-      </Group>
-      {runActive && publish && (
+    <Group gap="sm" wrap="nowrap" align="center">
+      {!runActive &&
+        publish?.status === 'succeeded' &&
+        publish.finished_at !== null && (
+          <Text size="sm" c="dimmed">
+            Last publish succeeded{' '}
+            {new Date(publish.finished_at * 1000).toLocaleString()}
+          </Text>
+        )}
+      {!runActive && publish?.status === 'failed' && (
+        <Text size="sm" c="red" maw={360}>
+          Publish failed: {publish.error}
+        </Text>
+      )}
+      {error && (
+        <Text size="sm" c="red">
+          {error}
+        </Text>
+      )}
+      {runActive && publish ? (
         <Stack gap={4} w={240}>
           <Text size="sm">
             Publishing {publish.published_sku_count} of{' '}
@@ -115,17 +99,22 @@ export function PublishWidget() {
             animated
           />
         </Stack>
+      ) : (
+        <Button
+          onClick={handleTrigger}
+          disabled={publish === null}
+          loading={triggering}
+          rightSection={
+            pendingCount > 0 ? (
+              <Badge size="sm" c="white" bg="rgba(255, 255, 255, 0.25)">
+                {pendingCount}
+              </Badge>
+            ) : undefined
+          }
+        >
+          Publish
+        </Button>
       )}
-      {publish?.status === 'failed' && (
-        <Alert color="red" title="Publish failed" maw={320}>
-          {publish.error}
-        </Alert>
-      )}
-      {error && (
-        <Text size="sm" c="red">
-          {error}
-        </Text>
-      )}
-    </Stack>
+    </Group>
   );
 }
