@@ -1,0 +1,5158 @@
+{
+  "10e": [
+    {
+      "set_id": 3254,
+      "set_name": "Tenth Edition"
+    }
+  ],
+  "2ed": [
+    {
+      "set_id": 3322,
+      "set_name": "Unlimited Edition"
+    }
+  ],
+  "2x2": [
+    {
+      "set_id": 2639,
+      "set_name": "Double Masters 2022"
+    }
+  ],
+  "2xm": [
+    {
+      "set_id": 2638,
+      "set_name": "Double Masters"
+    },
+    {
+      "set_id": 2641,
+      "set_name": "Double Masters Promos"
+    }
+  ],
+  "30a": [
+    {
+      "set_id": 2451,
+      "set_name": "30th Anniversary Edition"
+    }
+  ],
+  "3ed": [
+    {
+      "set_id": 3168,
+      "set_name": "Revised Edition"
+    }
+  ],
+  "40k": [
+    {
+      "set_id": 3337,
+      "set_name": "Warhammer 40,000"
+    }
+  ],
+  "4ed": [
+    {
+      "set_id": 2753,
+      "set_name": "Fourth Edition"
+    }
+  ],
+  "5dn": [
+    {
+      "set_id": 2742,
+      "set_name": "Fifth Dawn"
+    }
+  ],
+  "5ed": [
+    {
+      "set_id": 2744,
+      "set_name": "Fifth Edition"
+    }
+  ],
+  "6ed": [
+    {
+      "set_id": 2538,
+      "set_name": "Classic Sixth Edition"
+    }
+  ],
+  "7ed": [
+    {
+      "set_id": 3209,
+      "set_name": "Seventh Edition"
+    }
+  ],
+  "8ed": [
+    {
+      "set_id": 2715,
+      "set_name": "Eighth Edition"
+    },
+    {
+      "set_id": 2716,
+      "set_name": "Eighth Edition Box Topper"
+    }
+  ],
+  "9ed": [
+    {
+      "set_id": 3088,
+      "set_name": "Ninth Edition"
+    }
+  ],
+  "a25": [
+    {
+      "set_id": 3022,
+      "set_name": "Masters 25"
+    }
+  ],
+  "aacr": [
+    {
+      "set_id": 2495,
+      "set_name": "Assassin's Creed Art Series"
+    }
+  ],
+  "aafr": [
+    {
+      "set_id": 2699,
+      "set_name": "Dungeons & Dragons: Adventures in the Forgotten Realms Art Series"
+    },
+    {
+      "set_id": 3389,
+      "set_name": "Zendikar Rising Art Series"
+    }
+  ],
+  "ablb": [
+    {
+      "set_id": 2517,
+      "set_name": "Bloomburrow Art Series"
+    }
+  ],
+  "aclb": [
+    {
+      "set_id": 2579,
+      "set_name": "Commander Legends: Battle for Baldur's Gate Art Series"
+    }
+  ],
+  "acmm": [
+    {
+      "set_id": 2586,
+      "set_name": "Commander Masters Art Series"
+    }
+  ],
+  "acr": [
+    {
+      "set_id": 2494,
+      "set_name": "Assassin's Creed"
+    },
+    {
+      "set_id": 2497,
+      "set_name": "Assassin's Creed Promos"
+    }
+  ],
+  "adsk": [
+    {
+      "set_id": 2708,
+      "set_name": "Duskmourn: House of Horror Art Series"
+    }
+  ],
+  "aer": [
+    {
+      "set_id": 2460,
+      "set_name": "Aether Revolt"
+    }
+  ],
+  "afc": [
+    {
+      "set_id": 2700,
+      "set_name": "Dungeons & Dragons: Adventures in the Forgotten Realms Commander"
+    }
+  ],
+  "afdn": [
+    {
+      "set_id": 2746,
+      "set_name": "Foundations Art Series"
+    }
+  ],
+  "afr": [
+    {
+      "set_id": 2698,
+      "set_name": "Dungeons & Dragons: Adventures in the Forgotten Realms"
+    }
+  ],
+  "akh": [
+    {
+      "set_id": 2469,
+      "set_name": "Amonkhet"
+    }
+  ],
+  "ala": [
+    {
+      "set_id": 3217,
+      "set_name": "Shards of Alara"
+    }
+  ],
+  "alci": [
+    {
+      "set_id": 3278,
+      "set_name": "The Lost Caverns of Ixalan Art Series"
+    }
+  ],
+  "all": [
+    {
+      "set_id": 2467,
+      "set_name": "Alliances"
+    }
+  ],
+  "altr": [
+    {
+      "set_id": 3269,
+      "set_name": "The Lord of the Rings: Tales of Middle-earth Art Series"
+    }
+  ],
+  "amh1": [
+    {
+      "set_id": 3052,
+      "set_name": "Modern Horizons Art Series"
+    }
+  ],
+  "amh2": [
+    {
+      "set_id": 3039,
+      "set_name": "Modern Horizons 2 Art Series"
+    }
+  ],
+  "amid": [
+    {
+      "set_id": 2844,
+      "set_name": "Innistrad: Midnight Hunt Art Series"
+    }
+  ],
+  "amkm": [
+    {
+      "set_id": 3068,
+      "set_name": "Murders at Karlov Manor Art Series"
+    }
+  ],
+  "amom": [
+    {
+      "set_id": 3010,
+      "set_name": "March of the Machine Art Series"
+    }
+  ],
+  "aneo": [
+    {
+      "set_id": 2926,
+      "set_name": "Kamigawa: Neon Dynasty Art Series"
+    }
+  ],
+  "aone": [
+    {
+      "set_id": 3113,
+      "set_name": "Phyrexia: All Will Be One Art Series"
+    }
+  ],
+  "aotj": [
+    {
+      "set_id": 3100,
+      "set_name": "Outlaws of Thunder Junction Art Series"
+    }
+  ],
+  "apc": [
+    {
+      "set_id": 2476,
+      "set_name": "Apocalypse"
+    }
+  ],
+  "arb": [
+    {
+      "set_id": 2464,
+      "set_name": "Alara Reborn"
+    }
+  ],
+  "arc": [
+    {
+      "set_id": 2479,
+      "set_name": "Archenemy"
+    }
+  ],
+  "arn": [
+    {
+      "set_id": 2478,
+      "set_name": "Arabian Nights"
+    }
+  ],
+  "astx": [
+    {
+      "set_id": 2918,
+      "set_name": "Kaldheim Art Series"
+    },
+    {
+      "set_id": 3241,
+      "set_name": "Strixhaven: School of Mages Art Series"
+    }
+  ],
+  "ath": [
+    {
+      "set_id": 2474,
+      "set_name": "Anthologies"
+    }
+  ],
+  "atq": [
+    {
+      "set_id": 2475,
+      "set_name": "Antiquities"
+    }
+  ],
+  "avow": [
+    {
+      "set_id": 2834,
+      "set_name": "Innistrad: Crimson Vow Art Series"
+    }
+  ],
+  "avr": [
+    {
+      "set_id": 2499,
+      "set_name": "Avacyn Restored"
+    }
+  ],
+  "awoe": [
+    {
+      "set_id": 3347,
+      "set_name": "Wilds of Eldraine Art Series"
+    }
+  ],
+  "bbd": [
+    {
+      "set_id": 2503,
+      "set_name": "Battlebond"
+    }
+  ],
+  "bfz": [
+    {
+      "set_id": 2507,
+      "set_name": "Battle for Zendikar"
+    }
+  ],
+  "big": [
+    {
+      "set_id": 3108,
+      "set_name": "Outlaws of Thunder Junction: The Big Score"
+    }
+  ],
+  "blb": [
+    {
+      "set_id": 2516,
+      "set_name": "Bloomburrow"
+    }
+  ],
+  "blc": [
+    {
+      "set_id": 2518,
+      "set_name": "Bloomburrow Commander"
+    }
+  ],
+  "bng": [
+    {
+      "set_id": 2524,
+      "set_name": "Born of the Gods"
+    }
+  ],
+  "bok": [
+    {
+      "set_id": 2514,
+      "set_name": "Betrayers of Kamigawa"
+    }
+  ],
+  "bot": [
+    {
+      "set_id": 3307,
+      "set_name": "Transformers"
+    }
+  ],
+  "brb": [
+    {
+      "set_id": 2511,
+      "set_name": "Battle Royale"
+    }
+  ],
+  "brc": [
+    {
+      "set_id": 3259,
+      "set_name": "The Brothers' War Commander"
+    }
+  ],
+  "bro": [
+    {
+      "set_id": 3257,
+      "set_name": "The Brothers' War"
+    }
+  ],
+  "brr": [
+    {
+      "set_id": 3264,
+      "set_name": "The Brothers' War Retro Artifacts"
+    }
+  ],
+  "btd": [
+    {
+      "set_id": 2512,
+      "set_name": "Beatdown"
+    }
+  ],
+  "c13": [
+    {
+      "set_id": 2545,
+      "set_name": "Commander 2013"
+    }
+  ],
+  "c14": [
+    {
+      "set_id": 2547,
+      "set_name": "Commander 2014"
+    }
+  ],
+  "c15": [
+    {
+      "set_id": 2550,
+      "set_name": "Commander 2015"
+    }
+  ],
+  "c16": [
+    {
+      "set_id": 2553,
+      "set_name": "Commander 2016"
+    }
+  ],
+  "c17": [
+    {
+      "set_id": 2556,
+      "set_name": "Commander 2017"
+    }
+  ],
+  "c18": [
+    {
+      "set_id": 2559,
+      "set_name": "Commander 2018"
+    }
+  ],
+  "c19": [
+    {
+      "set_id": 2562,
+      "set_name": "Commander 2019"
+    }
+  ],
+  "c20": [
+    {
+      "set_id": 2565,
+      "set_name": "Commander 2020"
+    }
+  ],
+  "c21": [
+    {
+      "set_id": 2568,
+      "set_name": "Commander 2021"
+    }
+  ],
+  "cc1": [
+    {
+      "set_id": 2576,
+      "set_name": "Commander Collection: Green"
+    }
+  ],
+  "cc2": [
+    {
+      "set_id": 2574,
+      "set_name": "Commander Collection: Black"
+    }
+  ],
+  "ced": [
+    {
+      "set_id": 2542,
+      "set_name": "Collectors' Edition"
+    }
+  ],
+  "cei": [
+    {
+      "set_id": 2857,
+      "set_name": "International Collectors' Edition"
+    }
+  ],
+  "chk": [
+    {
+      "set_id": 2534,
+      "set_name": "Champions of Kamigawa"
+    }
+  ],
+  "chr": [
+    {
+      "set_id": 2537,
+      "set_name": "Chronicles"
+    }
+  ],
+  "clb": [
+    {
+      "set_id": 2578,
+      "set_name": "Commander Legends: Battle for Baldur's Gate"
+    }
+  ],
+  "clu": [
+    {
+      "set_id": 3157,
+      "set_name": "Ravnica: Clue Edition"
+    }
+  ],
+  "cm1": [
+    {
+      "set_id": 2588,
+      "set_name": "Commander's Arsenal"
+    }
+  ],
+  "cm2": [
+    {
+      "set_id": 2572,
+      "set_name": "Commander Anthology Volume II"
+    }
+  ],
+  "cma": [
+    {
+      "set_id": 2570,
+      "set_name": "Commander Anthology"
+    }
+  ],
+  "cmb2": [
+    {
+      "set_id": 3078,
+      "set_name": "Mystery Booster Playtest Cards"
+    }
+  ],
+  "cmd": [
+    {
+      "set_id": 2543,
+      "set_name": "Commander 2011"
+    }
+  ],
+  "cmm": [
+    {
+      "set_id": 2585,
+      "set_name": "Commander Masters"
+    }
+  ],
+  "cmr": [
+    {
+      "set_id": 2577,
+      "set_name": "Commander Legends"
+    },
+    {
+      "set_id": 2583,
+      "set_name": "Commander Legends Promos"
+    }
+  ],
+  "cn2": [
+    {
+      "set_id": 2595,
+      "set_name": "Conspiracy: Take the Crown"
+    }
+  ],
+  "cns": [
+    {
+      "set_id": 2593,
+      "set_name": "Conspiracy"
+    }
+  ],
+  "con": [
+    {
+      "set_id": 2590,
+      "set_name": "Conflux"
+    }
+  ],
+  "cp1": [
+    {
+      "set_id": 2976,
+      "set_name": "Magic 2015 Clash Pack"
+    }
+  ],
+  "cp2": [
+    {
+      "set_id": 2738,
+      "set_name": "Fate Reforged Clash Pack"
+    }
+  ],
+  "cp3": [
+    {
+      "set_id": 2987,
+      "set_name": "Magic Origins Clash Pack"
+    }
+  ],
+  "csp": [
+    {
+      "set_id": 2539,
+      "set_name": "Coldsnap"
+    }
+  ],
+  "cst": [
+    {
+      "set_id": 2541,
+      "set_name": "Coldsnap Theme Decks"
+    }
+  ],
+  "dbl": [
+    {
+      "set_id": 2841,
+      "set_name": "Innistrad: Double Feature"
+    }
+  ],
+  "dci": [
+    {
+      "set_id": 2795,
+      "set_name": "Gateway 2006"
+    },
+    {
+      "set_id": 2796,
+      "set_name": "Gateway 2007"
+    },
+    {
+      "set_id": 2797,
+      "set_name": "Gateway 2008"
+    },
+    {
+      "set_id": 2957,
+      "set_name": "Magic 2010 Promos"
+    },
+    {
+      "set_id": 2961,
+      "set_name": "Magic 2011 Promos"
+    },
+    {
+      "set_id": 3032,
+      "set_name": "Mirrodin Besieged Promos"
+    },
+    {
+      "set_id": 3143,
+      "set_name": "Promotional Schemes"
+    },
+    {
+      "set_id": 3171,
+      "set_name": "Rise of the Eldrazi Promos"
+    },
+    {
+      "set_id": 3189,
+      "set_name": "Scars of Mirrodin Promos"
+    },
+    {
+      "set_id": 3356,
+      "set_name": "Wizards Play Network 2008"
+    },
+    {
+      "set_id": 3357,
+      "set_name": "Wizards Play Network 2009"
+    },
+    {
+      "set_id": 3358,
+      "set_name": "Wizards Play Network 2010"
+    },
+    {
+      "set_id": 3359,
+      "set_name": "Wizards Play Network 2011"
+    },
+    {
+      "set_id": 3379,
+      "set_name": "Worldwake Promos"
+    },
+    {
+      "set_id": 3387,
+      "set_name": "Zendikar Promos"
+    }
+  ],
+  "dd1": [
+    {
+      "set_id": 2662,
+      "set_name": "Duel Decks: Elves vs. Goblins"
+    }
+  ],
+  "dd2": [
+    {
+      "set_id": 2672,
+      "set_name": "Duel Decks: Jace vs. Chandra"
+    }
+  ],
+  "ddc": [
+    {
+      "set_id": 2657,
+      "set_name": "Duel Decks: Divine vs. Demonic"
+    }
+  ],
+  "ddd": [
+    {
+      "set_id": 2666,
+      "set_name": "Duel Decks: Garruk vs. Liliana"
+    }
+  ],
+  "dde": [
+    {
+      "set_id": 2683,
+      "set_name": "Duel Decks: Phyrexia vs. the Coalition"
+    }
+  ],
+  "ddf": [
+    {
+      "set_id": 2660,
+      "set_name": "Duel Decks: Elspeth vs. Tezzeret"
+    }
+  ],
+  "ddg": [
+    {
+      "set_id": 2676,
+      "set_name": "Duel Decks: Knights vs. Dragons"
+    }
+  ],
+  "ddh": [
+    {
+      "set_id": 2652,
+      "set_name": "Duel Decks: Ajani vs. Nicol Bolas"
+    }
+  ],
+  "ddi": [
+    {
+      "set_id": 2688,
+      "set_name": "Duel Decks: Venser vs. Koth"
+    }
+  ],
+  "ddj": [
+    {
+      "set_id": 2670,
+      "set_name": "Duel Decks: Izzet vs. Golgari"
+    }
+  ],
+  "ddk": [
+    {
+      "set_id": 2685,
+      "set_name": "Duel Decks: Sorin vs. Tibalt"
+    }
+  ],
+  "ddl": [
+    {
+      "set_id": 2668,
+      "set_name": "Duel Decks: Heroes vs. Monsters"
+    }
+  ],
+  "ddm": [
+    {
+      "set_id": 2674,
+      "set_name": "Duel Decks: Jace vs. Vraska"
+    }
+  ],
+  "ddn": [
+    {
+      "set_id": 2687,
+      "set_name": "Duel Decks: Speed vs. Cunning"
+    }
+  ],
+  "ddo": [
+    {
+      "set_id": 2659,
+      "set_name": "Duel Decks: Elspeth vs. Kiora"
+    }
+  ],
+  "ddp": [
+    {
+      "set_id": 2690,
+      "set_name": "Duel Decks: Zendikar vs. Eldrazi"
+    }
+  ],
+  "ddq": [
+    {
+      "set_id": 2656,
+      "set_name": "Duel Decks: Blessed vs. Cursed"
+    }
+  ],
+  "ddr": [
+    {
+      "set_id": 2682,
+      "set_name": "Duel Decks: Nissa vs. Ob Nixilis"
+    }
+  ],
+  "dds": [
+    {
+      "set_id": 2680,
+      "set_name": "Duel Decks: Mind vs. Might"
+    }
+  ],
+  "ddt": [
+    {
+      "set_id": 2678,
+      "set_name": "Duel Decks: Merfolk vs. Goblins"
+    }
+  ],
+  "ddu": [
+    {
+      "set_id": 2664,
+      "set_name": "Duel Decks: Elves vs. Inventors"
+    }
+  ],
+  "dft": [
+    {
+      "set_id": 2455,
+      "set_name": "Aetherdrift"
+    },
+    {
+      "set_id": 2457,
+      "set_name": "Aetherdrift Promos"
+    }
+  ],
+  "dgm": [
+    {
+      "set_id": 2644,
+      "set_name": "Dragon's Maze"
+    }
+  ],
+  "dis": [
+    {
+      "set_id": 2619,
+      "set_name": "Dissension"
+    }
+  ],
+  "dka": [
+    {
+      "set_id": 2611,
+      "set_name": "Dark Ascension"
+    }
+  ],
+  "dkm": [
+    {
+      "set_id": 2618,
+      "set_name": "Deckmasters"
+    }
+  ],
+  "dmc": [
+    {
+      "set_id": 2632,
+      "set_name": "Dominaria United Commander"
+    }
+  ],
+  "dmr": [
+    {
+      "set_id": 2627,
+      "set_name": "Dominaria Remastered"
+    }
+  ],
+  "dmu": [
+    {
+      "set_id": 2630,
+      "set_name": "Dominaria United"
+    }
+  ],
+  "dom": [
+    {
+      "set_id": 2624,
+      "set_name": "Dominaria"
+    }
+  ],
+  "dpa": [
+    {
+      "set_id": 2691,
+      "set_name": "Duels of the Planeswalkers"
+    }
+  ],
+  "drb": [
+    {
+      "set_id": 2775,
+      "set_name": "From the Vault: Dragons"
+    }
+  ],
+  "drc": [
+    {
+      "set_id": 2456,
+      "set_name": "Aetherdrift Commander"
+    }
+  ],
+  "drk": [
+    {
+      "set_id": 3266,
+      "set_name": "The Dark"
+    }
+  ],
+  "dsc": [
+    {
+      "set_id": 2706,
+      "set_name": "Duskmourn: Archenemy"
+    },
+    {
+      "set_id": 2709,
+      "set_name": "Duskmourn: House of Horror Commander"
+    }
+  ],
+  "dsk": [
+    {
+      "set_id": 2707,
+      "set_name": "Duskmourn: House of Horror"
+    }
+  ],
+  "dst": [
+    {
+      "set_id": 2615,
+      "set_name": "Darksteel"
+    }
+  ],
+  "dtk": [
+    {
+      "set_id": 2648,
+      "set_name": "Dragons of Tarkir"
+    }
+  ],
+  "e01": [
+    {
+      "set_id": 2480,
+      "set_name": "Archenemy: Nicol Bolas"
+    }
+  ],
+  "e02": [
+    {
+      "set_id": 2731,
+      "set_name": "Explorers of Ixalan"
+    }
+  ],
+  "ecc": [
+    {
+      "set_id": 4425,
+      "set_name": "Commander: Lorwyn Eclipsed"
+    }
+  ],
+  "ecl": [
+    {
+      "set_id": 4424,
+      "set_name": "Lorwyn Eclipsed"
+    }
+  ],
+  "eld": [
+    {
+      "set_id": 3296,
+      "set_name": "Throne of Eldraine"
+    }
+  ],
+  "ema": [
+    {
+      "set_id": 2722,
+      "set_name": "Eternal Masters"
+    }
+  ],
+  "emn": [
+    {
+      "set_id": 2718,
+      "set_name": "Eldritch Moon"
+    }
+  ],
+  "eoc": [
+    {
+      "set_id": 4450,
+      "set_name": "Commander: Edge of Eternities"
+    }
+  ],
+  "eoe": [
+    {
+      "set_id": 4351,
+      "set_name": "Edge of Eternities"
+    }
+  ],
+  "eos": [
+    {
+      "set_id": 4451,
+      "set_name": "Edge of Eternities: Stellar Sights"
+    }
+  ],
+  "eve": [
+    {
+      "set_id": 2726,
+      "set_name": "Eventide"
+    }
+  ],
+  "exo": [
+    {
+      "set_id": 2729,
+      "set_name": "Exodus"
+    }
+  ],
+  "exp": [
+    {
+      "set_id": 3385,
+      "set_name": "Zendikar Expeditions"
+    }
+  ],
+  "f01": [
+    {
+      "set_id": 2755,
+      "set_name": "Friday Night Magic 2001"
+    }
+  ],
+  "f02": [
+    {
+      "set_id": 2756,
+      "set_name": "Friday Night Magic 2002"
+    }
+  ],
+  "f03": [
+    {
+      "set_id": 2757,
+      "set_name": "Friday Night Magic 2003"
+    }
+  ],
+  "f04": [
+    {
+      "set_id": 2758,
+      "set_name": "Friday Night Magic 2004"
+    }
+  ],
+  "f05": [
+    {
+      "set_id": 2759,
+      "set_name": "Friday Night Magic 2005"
+    }
+  ],
+  "f06": [
+    {
+      "set_id": 2760,
+      "set_name": "Friday Night Magic 2006"
+    }
+  ],
+  "f07": [
+    {
+      "set_id": 2761,
+      "set_name": "Friday Night Magic 2007"
+    }
+  ],
+  "f08": [
+    {
+      "set_id": 2762,
+      "set_name": "Friday Night Magic 2008"
+    }
+  ],
+  "f09": [
+    {
+      "set_id": 2763,
+      "set_name": "Friday Night Magic 2009"
+    }
+  ],
+  "f10": [
+    {
+      "set_id": 2764,
+      "set_name": "Friday Night Magic 2010"
+    }
+  ],
+  "f11": [
+    {
+      "set_id": 2765,
+      "set_name": "Friday Night Magic 2011"
+    }
+  ],
+  "f12": [
+    {
+      "set_id": 2766,
+      "set_name": "Friday Night Magic 2012"
+    }
+  ],
+  "f13": [
+    {
+      "set_id": 2767,
+      "set_name": "Friday Night Magic 2013"
+    }
+  ],
+  "f14": [
+    {
+      "set_id": 2768,
+      "set_name": "Friday Night Magic 2014"
+    }
+  ],
+  "f15": [
+    {
+      "set_id": 2769,
+      "set_name": "Friday Night Magic 2015"
+    }
+  ],
+  "f16": [
+    {
+      "set_id": 2770,
+      "set_name": "Friday Night Magic 2016"
+    }
+  ],
+  "f17": [
+    {
+      "set_id": 2771,
+      "set_name": "Friday Night Magic 2017"
+    }
+  ],
+  "f18": [
+    {
+      "set_id": 2772,
+      "set_name": "Friday Night Magic 2018"
+    }
+  ],
+  "fca": [
+    {
+      "set_id": 4228,
+      "set_name": "FINAL FANTASY: Through the Ages"
+    }
+  ],
+  "fclu": [
+    {
+      "set_id": 3158,
+      "set_name": "Ravnica: Clue Edition Tokens"
+    }
+  ],
+  "fdn": [
+    {
+      "set_id": 2745,
+      "set_name": "Foundations"
+    },
+    {
+      "set_id": 2750,
+      "set_name": "Foundations Promos"
+    }
+  ],
+  "fem": [
+    {
+      "set_id": 2733,
+      "set_name": "Fallen Empires"
+    }
+  ],
+  "fic": [
+    {
+      "set_id": 4232,
+      "set_name": "Commander: FINAL FANTASY"
+    }
+  ],
+  "fin": [
+    {
+      "set_id": 4226,
+      "set_name": "FINAL FANTASY"
+    }
+  ],
+  "fj22": [
+    {
+      "set_id": 2905,
+      "set_name": "Jumpstart 2022 Front Cards"
+    }
+  ],
+  "fj25": [
+    {
+      "set_id": 2748,
+      "set_name": "Foundations Jumpstart Front Cards"
+    }
+  ],
+  "fjmp": [
+    {
+      "set_id": 2906,
+      "set_name": "Jumpstart Front Cards"
+    }
+  ],
+  "fnm": [
+    {
+      "set_id": 2754,
+      "set_name": "Friday Night Magic 2000"
+    }
+  ],
+  "fone": [
+    {
+      "set_id": 3119,
+      "set_name": "Phyrexia: All Will Be One Tokens"
+    }
+  ],
+  "frf": [
+    {
+      "set_id": 2737,
+      "set_name": "Fate Reforged"
+    }
+  ],
+  "fut": [
+    {
+      "set_id": 2783,
+      "set_name": "Future Sight"
+    }
+  ],
+  "g00": [
+    {
+      "set_id": 2877,
+      "set_name": "Judge Gift Cards 2000"
+    }
+  ],
+  "g01": [
+    {
+      "set_id": 2878,
+      "set_name": "Judge Gift Cards 2001"
+    }
+  ],
+  "g02": [
+    {
+      "set_id": 2879,
+      "set_name": "Judge Gift Cards 2002"
+    }
+  ],
+  "g03": [
+    {
+      "set_id": 2880,
+      "set_name": "Judge Gift Cards 2003"
+    }
+  ],
+  "g04": [
+    {
+      "set_id": 2881,
+      "set_name": "Judge Gift Cards 2004"
+    }
+  ],
+  "g05": [
+    {
+      "set_id": 2882,
+      "set_name": "Judge Gift Cards 2005"
+    }
+  ],
+  "g06": [
+    {
+      "set_id": 2883,
+      "set_name": "Judge Gift Cards 2006"
+    }
+  ],
+  "g07": [
+    {
+      "set_id": 2884,
+      "set_name": "Judge Gift Cards 2007"
+    }
+  ],
+  "g08": [
+    {
+      "set_id": 2885,
+      "set_name": "Judge Gift Cards 2008"
+    }
+  ],
+  "g09": [
+    {
+      "set_id": 2886,
+      "set_name": "Judge Gift Cards 2009"
+    }
+  ],
+  "g10": [
+    {
+      "set_id": 2887,
+      "set_name": "Judge Gift Cards 2010"
+    }
+  ],
+  "g11": [
+    {
+      "set_id": 2888,
+      "set_name": "Judge Gift Cards 2011"
+    }
+  ],
+  "g17": [
+    {
+      "set_id": 2450,
+      "set_name": "2017 Gift Pack"
+    }
+  ],
+  "g18": [
+    {
+      "set_id": 2980,
+      "set_name": "Magic 2019 Gift Pack"
+    }
+  ],
+  "g99": [
+    {
+      "set_id": 2876,
+      "set_name": "Judge Gift Cards 1999"
+    }
+  ],
+  "gdy": [
+    {
+      "set_id": 2785,
+      "set_name": "Game Day 2022"
+    }
+  ],
+  "gk1": [
+    {
+      "set_id": 2803,
+      "set_name": "Guilds of Ravnica Guild Kit"
+    }
+  ],
+  "gn2": [
+    {
+      "set_id": 2787,
+      "set_name": "Game Night 2019"
+    }
+  ],
+  "gn3": [
+    {
+      "set_id": 2789,
+      "set_name": "Game Night: Free-for-All"
+    }
+  ],
+  "gnt": [
+    {
+      "set_id": 2786,
+      "set_name": "Game Night 2018"
+    }
+  ],
+  "gpt": [
+    {
+      "set_id": 2800,
+      "set_name": "Guildpact"
+    }
+  ],
+  "grn": [
+    {
+      "set_id": 2802,
+      "set_name": "Guilds of Ravnica"
+    }
+  ],
+  "gs1": [
+    {
+      "set_id": 2798,
+      "set_name": "Global Series Jiang Yanggu & Mu Yanling"
+    }
+  ],
+  "gtc": [
+    {
+      "set_id": 2791,
+      "set_name": "Gatecrash"
+    }
+  ],
+  "gvl": [
+    {
+      "set_id": 2654,
+      "set_name": "Duel Decks Anthology"
+    }
+  ],
+  "h09": [
+    {
+      "set_id": 3141,
+      "set_name": "Premium Deck Series: Slivers"
+    }
+  ],
+  "h17": [
+    {
+      "set_id": 2812,
+      "set_name": "HasCon 2017"
+    }
+  ],
+  "h2r": [
+    {
+      "set_id": 3037,
+      "set_name": "Modern Horizons"
+    },
+    {
+      "set_id": 3038,
+      "set_name": "Modern Horizons 2"
+    }
+  ],
+  "hho": [
+    {
+      "set_id": 2810,
+      "set_name": "Happy Holidays"
+    }
+  ],
+  "hml": [
+    {
+      "set_id": 2817,
+      "set_name": "Homelands"
+    }
+  ],
+  "hob": [
+    {
+      "set_id": 4702,
+      "set_name": "The Hobbit"
+    }
+  ],
+  "hoc": [
+    {
+      "set_id": 4703,
+      "set_name": "The Hobbit: Eternal-Legal"
+    }
+  ],
+  "hop": [
+    {
+      "set_id": 3124,
+      "set_name": "Planechase"
+    }
+  ],
+  "hou": [
+    {
+      "set_id": 2818,
+      "set_name": "Hour of Devastation"
+    }
+  ],
+  "ice": [
+    {
+      "set_id": 2822,
+      "set_name": "Ice Age"
+    }
+  ],
+  "iko": [
+    {
+      "set_id": 2828,
+      "set_name": "Ikoria: Lair of Behemoths"
+    }
+  ],
+  "ima": [
+    {
+      "set_id": 2823,
+      "set_name": "Iconic Masters"
+    }
+  ],
+  "inr": [
+    {
+      "set_id": 2853,
+      "set_name": "Innistrad Remastered"
+    }
+  ],
+  "inv": [
+    {
+      "set_id": 2859,
+      "set_name": "Invasion"
+    }
+  ],
+  "isd": [
+    {
+      "set_id": 2832,
+      "set_name": "Innistrad"
+    }
+  ],
+  "itp": [
+    {
+      "set_id": 2858,
+      "set_name": "Introductory Two-Player Set"
+    }
+  ],
+  "j12": [
+    {
+      "set_id": 2889,
+      "set_name": "Judge Gift Cards 2012"
+    }
+  ],
+  "j13": [
+    {
+      "set_id": 2890,
+      "set_name": "Judge Gift Cards 2013"
+    }
+  ],
+  "j14": [
+    {
+      "set_id": 2891,
+      "set_name": "Judge Gift Cards 2014"
+    }
+  ],
+  "j15": [
+    {
+      "set_id": 2892,
+      "set_name": "Judge Gift Cards 2015"
+    }
+  ],
+  "j16": [
+    {
+      "set_id": 2893,
+      "set_name": "Judge Gift Cards 2016"
+    }
+  ],
+  "j17": [
+    {
+      "set_id": 2894,
+      "set_name": "Judge Gift Cards 2017"
+    }
+  ],
+  "j18": [
+    {
+      "set_id": 2895,
+      "set_name": "Judge Gift Cards 2018"
+    }
+  ],
+  "j19": [
+    {
+      "set_id": 2896,
+      "set_name": "Judge Gift Cards 2019"
+    }
+  ],
+  "j20": [
+    {
+      "set_id": 2897,
+      "set_name": "Judge Gift Cards 2020"
+    }
+  ],
+  "j22": [
+    {
+      "set_id": 2904,
+      "set_name": "Jumpstart 2022"
+    }
+  ],
+  "j25": [
+    {
+      "set_id": 2747,
+      "set_name": "Foundations Jumpstart"
+    }
+  ],
+  "jgp": [
+    {
+      "set_id": 2875,
+      "set_name": "Judge Gift Cards 1998"
+    }
+  ],
+  "jmp": [
+    {
+      "set_id": 2903,
+      "set_name": "Jumpstart"
+    }
+  ],
+  "jou": [
+    {
+      "set_id": 2869,
+      "set_name": "Journey into Nyx"
+    }
+  ],
+  "jud": [
+    {
+      "set_id": 2901,
+      "set_name": "Judgment"
+    }
+  ],
+  "khc": [
+    {
+      "set_id": 2919,
+      "set_name": "Kaldheim Commander"
+    }
+  ],
+  "khm": [
+    {
+      "set_id": 2917,
+      "set_name": "Kaldheim"
+    }
+  ],
+  "kld": [
+    {
+      "set_id": 2912,
+      "set_name": "Kaladesh"
+    }
+  ],
+  "ktk": [
+    {
+      "set_id": 2933,
+      "set_name": "Khans of Tarkir"
+    }
+  ],
+  "l12": [
+    {
+      "set_id": 2937,
+      "set_name": "League Tokens 2012"
+    }
+  ],
+  "l13": [
+    {
+      "set_id": 2938,
+      "set_name": "League Tokens 2013"
+    }
+  ],
+  "l14": [
+    {
+      "set_id": 2939,
+      "set_name": "League Tokens 2014"
+    }
+  ],
+  "l15": [
+    {
+      "set_id": 2940,
+      "set_name": "League Tokens 2015"
+    }
+  ],
+  "l16": [
+    {
+      "set_id": 2941,
+      "set_name": "League Tokens 2016"
+    }
+  ],
+  "l17": [
+    {
+      "set_id": 2942,
+      "set_name": "League Tokens 2017"
+    }
+  ],
+  "lcc": [
+    {
+      "set_id": 3279,
+      "set_name": "The Lost Caverns of Ixalan Commander"
+    }
+  ],
+  "lci": [
+    {
+      "set_id": 3277,
+      "set_name": "The Lost Caverns of Ixalan"
+    },
+    {
+      "set_id": 3283,
+      "set_name": "The Lost Caverns of Ixalan Promos"
+    }
+  ],
+  "lea": [
+    {
+      "set_id": 2468,
+      "set_name": "Alpha Edition"
+    }
+  ],
+  "leb": [
+    {
+      "set_id": 2513,
+      "set_name": "Beta Edition"
+    }
+  ],
+  "leg": [
+    {
+      "set_id": 2943,
+      "set_name": "Legends"
+    }
+  ],
+  "lgn": [
+    {
+      "set_id": 2945,
+      "set_name": "Legions"
+    }
+  ],
+  "lrw": [
+    {
+      "set_id": 2947,
+      "set_name": "Lorwyn"
+    }
+  ],
+  "ltc": [
+    {
+      "set_id": 3270,
+      "set_name": "The Lord of the Rings: Tales of Middle-Earth Commander"
+    },
+    {
+      "set_id": 3271,
+      "set_name": "The Lord of the Rings: Tales of Middle-Earth Commander Showcase Scrolls"
+    }
+  ],
+  "ltr": [
+    {
+      "set_id": 3268,
+      "set_name": "The Lord of the Rings: Tales of Middle-Earth"
+    },
+    {
+      "set_id": 3275,
+      "set_name": "The Lord of the Rings: Tales of Middle-Earth Showcase Scrolls"
+    }
+  ],
+  "m10": [
+    {
+      "set_id": 2955,
+      "set_name": "Magic 2010"
+    }
+  ],
+  "m11": [
+    {
+      "set_id": 2959,
+      "set_name": "Magic 2011"
+    }
+  ],
+  "m12": [
+    {
+      "set_id": 2963,
+      "set_name": "Magic 2012"
+    }
+  ],
+  "m13": [
+    {
+      "set_id": 2967,
+      "set_name": "Magic 2013"
+    }
+  ],
+  "m14": [
+    {
+      "set_id": 2971,
+      "set_name": "Magic 2014"
+    }
+  ],
+  "m15": [
+    {
+      "set_id": 2975,
+      "set_name": "Magic 2015"
+    }
+  ],
+  "m19": [
+    {
+      "set_id": 2598,
+      "set_name": "Core Set 2019"
+    }
+  ],
+  "m20": [
+    {
+      "set_id": 2602,
+      "set_name": "Core Set 2020"
+    }
+  ],
+  "m21": [
+    {
+      "set_id": 2607,
+      "set_name": "Core Set 2021"
+    }
+  ],
+  "m3c": [
+    {
+      "set_id": 3046,
+      "set_name": "Modern Horizons 3 Commander"
+    }
+  ],
+  "macr": [
+    {
+      "set_id": 2496,
+      "set_name": "Assassin's Creed Minigame"
+    }
+  ],
+  "mafr": [
+    {
+      "set_id": 2702,
+      "set_name": "Dungeons & Dragons: Adventures in the Forgotten Realms Minigame"
+    }
+  ],
+  "mar": [
+    {
+      "set_id": 4377,
+      "set_name": "Marvel Universe Eternal Legal"
+    }
+  ],
+  "mat": [
+    {
+      "set_id": 3020,
+      "set_name": "March of the Machine: The Aftermath"
+    }
+  ],
+  "mb2": [
+    {
+      "set_id": 3076,
+      "set_name": "Mystery Booster 2"
+    }
+  ],
+  "mbro": [
+    {
+      "set_id": 3261,
+      "set_name": "The Brothers' War Minigame"
+    }
+  ],
+  "mbs": [
+    {
+      "set_id": 3030,
+      "set_name": "Mirrodin Besieged"
+    }
+  ],
+  "mclb": [
+    {
+      "set_id": 2580,
+      "set_name": "Commander Legends: Battle for Baldur's Gate Minigame"
+    }
+  ],
+  "md1": [
+    {
+      "set_id": 3035,
+      "set_name": "Modern Event Deck 2014"
+    }
+  ],
+  "mdmu": [
+    {
+      "set_id": 2634,
+      "set_name": "Dominaria United Minigame"
+    }
+  ],
+  "med": [
+    {
+      "set_id": 3079,
+      "set_name": "Mythic Edition"
+    }
+  ],
+  "mgb": [
+    {
+      "set_id": 3064,
+      "set_name": "Multiverse Gift Box"
+    }
+  ],
+  "mh3": [
+    {
+      "set_id": 3044,
+      "set_name": "Modern Horizons 3"
+    },
+    {
+      "set_id": 3049,
+      "set_name": "Modern Horizons 3 Promos"
+    }
+  ],
+  "mic": [
+    {
+      "set_id": 2845,
+      "set_name": "Innistrad: Midnight Hunt Commander"
+    }
+  ],
+  "mid": [
+    {
+      "set_id": 2843,
+      "set_name": "Innistrad: Midnight Hunt"
+    }
+  ],
+  "mir": [
+    {
+      "set_id": 3028,
+      "set_name": "Mirage"
+    }
+  ],
+  "mkc": [
+    {
+      "set_id": 3069,
+      "set_name": "Murders at Karlov Manor Commander"
+    }
+  ],
+  "mkhm": [
+    {
+      "set_id": 2921,
+      "set_name": "Kaldheim Minigame"
+    }
+  ],
+  "mkm": [
+    {
+      "set_id": 3067,
+      "set_name": "Murders at Karlov Manor"
+    }
+  ],
+  "mm2": [
+    {
+      "set_id": 3056,
+      "set_name": "Modern Masters 2015"
+    }
+  ],
+  "mm3": [
+    {
+      "set_id": 3058,
+      "set_name": "Modern Masters 2017"
+    }
+  ],
+  "mma": [
+    {
+      "set_id": 3055,
+      "set_name": "Modern Masters"
+    }
+  ],
+  "mmh2": [
+    {
+      "set_id": 3040,
+      "set_name": "Modern Horizons 2 Minigame"
+    }
+  ],
+  "mmid": [
+    {
+      "set_id": 2847,
+      "set_name": "Innistrad: Midnight Hunt Minigame"
+    }
+  ],
+  "mmq": [
+    {
+      "set_id": 3025,
+      "set_name": "Mercadian Masques"
+    }
+  ],
+  "mneo": [
+    {
+      "set_id": 2929,
+      "set_name": "Kamigawa: Neon Dynasty Minigame"
+    }
+  ],
+  "moc": [
+    {
+      "set_id": 3012,
+      "set_name": "March of the Machine Commander"
+    }
+  ],
+  "mom": [
+    {
+      "set_id": 3009,
+      "set_name": "March of the Machine"
+    }
+  ],
+  "mone": [
+    {
+      "set_id": 3116,
+      "set_name": "Phyrexia: All Will Be One Minigame"
+    }
+  ],
+  "mor": [
+    {
+      "set_id": 3061,
+      "set_name": "Morningtide"
+    }
+  ],
+  "mp2": [
+    {
+      "set_id": 2470,
+      "set_name": "Amonkhet Invocations"
+    }
+  ],
+  "mpr": [
+    {
+      "set_id": 2991,
+      "set_name": "Magic Player Rewards 2001"
+    }
+  ],
+  "mps": [
+    {
+      "set_id": 2913,
+      "set_name": "Kaladesh Inventions"
+    }
+  ],
+  "mrd": [
+    {
+      "set_id": 3029,
+      "set_name": "Mirrodin"
+    }
+  ],
+  "msc": [
+    {
+      "set_id": 4679,
+      "set_name": "Commander: Marvel Super Heroes"
+    }
+  ],
+  "msh": [
+    {
+      "set_id": 4678,
+      "set_name": "Marvel Super Heroes"
+    }
+  ],
+  "mstx": [
+    {
+      "set_id": 3242,
+      "set_name": "Strixhaven: School of Mages Minigame"
+    }
+  ],
+  "mul": [
+    {
+      "set_id": 3065,
+      "set_name": "Multiverse Legends"
+    }
+  ],
+  "mvow": [
+    {
+      "set_id": 2837,
+      "set_name": "Innistrad: Crimson Vow Minigame"
+    }
+  ],
+  "mznr": [
+    {
+      "set_id": 3393,
+      "set_name": "Zendikar Rising Minigame"
+    }
+  ],
+  "ncc": [
+    {
+      "set_id": 3233,
+      "set_name": "Streets of New Capenna Commander"
+    },
+    {
+      "set_id": 3234,
+      "set_name": "Streets of New Capenna Commander Promos"
+    }
+  ],
+  "nec": [
+    {
+      "set_id": 2927,
+      "set_name": "Kamigawa: Neon Dynasty Commander"
+    }
+  ],
+  "nem": [
+    {
+      "set_id": 3082,
+      "set_name": "Nemesis"
+    }
+  ],
+  "neo": [
+    {
+      "set_id": 2925,
+      "set_name": "Kamigawa: Neon Dynasty"
+    }
+  ],
+  "nph": [
+    {
+      "set_id": 3084,
+      "set_name": "New Phyrexia"
+    }
+  ],
+  "oarc": [
+    {
+      "set_id": 2483,
+      "set_name": "Archenemy Schemes"
+    }
+  ],
+  "oc13": [
+    {
+      "set_id": 2546,
+      "set_name": "Commander 2013 Oversized"
+    }
+  ],
+  "oc14": [
+    {
+      "set_id": 2548,
+      "set_name": "Commander 2014 Oversized"
+    }
+  ],
+  "oc15": [
+    {
+      "set_id": 2551,
+      "set_name": "Commander 2015 Oversized"
+    }
+  ],
+  "oc16": [
+    {
+      "set_id": 2554,
+      "set_name": "Commander 2016 Oversized"
+    }
+  ],
+  "oc17": [
+    {
+      "set_id": 2557,
+      "set_name": "Commander 2017 Oversized"
+    }
+  ],
+  "oc18": [
+    {
+      "set_id": 2560,
+      "set_name": "Commander 2018 Oversized"
+    }
+  ],
+  "oc19": [
+    {
+      "set_id": 2563,
+      "set_name": "Commander 2019 Oversized"
+    }
+  ],
+  "oc20": [
+    {
+      "set_id": 2566,
+      "set_name": "Commander 2020 Oversized"
+    }
+  ],
+  "ocm1": [
+    {
+      "set_id": 2589,
+      "set_name": "Commander's Arsenal Oversized"
+    }
+  ],
+  "ocmd": [
+    {
+      "set_id": 2544,
+      "set_name": "Commander 2011 Oversized"
+    }
+  ],
+  "ody": [
+    {
+      "set_id": 3094,
+      "set_name": "Odyssey"
+    }
+  ],
+  "oe01": [
+    {
+      "set_id": 2481,
+      "set_name": "Archenemy: Nicol Bolas Schemes"
+    }
+  ],
+  "ogw": [
+    {
+      "set_id": 3090,
+      "set_name": "Oath of the Gatewatch"
+    }
+  ],
+  "ohop": [
+    {
+      "set_id": 3130,
+      "set_name": "Planechase Planes"
+    }
+  ],
+  "onc": [
+    {
+      "set_id": 3114,
+      "set_name": "Phyrexia: All Will Be One Commander"
+    }
+  ],
+  "one": [
+    {
+      "set_id": 3112,
+      "set_name": "Phyrexia: All Will Be One"
+    },
+    {
+      "set_id": 3118,
+      "set_name": "Phyrexia: All Will Be One Promos"
+    }
+  ],
+  "ons": [
+    {
+      "set_id": 3096,
+      "set_name": "Onslaught"
+    }
+  ],
+  "opc2": [
+    {
+      "set_id": 3126,
+      "set_name": "Planechase 2012 Planes"
+    }
+  ],
+  "opca": [
+    {
+      "set_id": 3128,
+      "set_name": "Planechase Anthology Planes"
+    }
+  ],
+  "ori": [
+    {
+      "set_id": 2986,
+      "set_name": "Magic Origins"
+    }
+  ],
+  "otc": [
+    {
+      "set_id": 3103,
+      "set_name": "Outlaws of Thunder Junction Commander"
+    }
+  ],
+  "otj": [
+    {
+      "set_id": 3099,
+      "set_name": "Outlaws of Thunder Junction"
+    }
+  ],
+  "otp": [
+    {
+      "set_id": 3101,
+      "set_name": "Outlaws of Thunder Junction: Breaking News"
+    }
+  ],
+  "p02": [
+    {
+      "set_id": 3136,
+      "set_name": "Portal Second Age"
+    }
+  ],
+  "p03": [
+    {
+      "set_id": 2993,
+      "set_name": "Magic Player Rewards 2003"
+    }
+  ],
+  "p04": [
+    {
+      "set_id": 2994,
+      "set_name": "Magic Player Rewards 2004"
+    }
+  ],
+  "p05": [
+    {
+      "set_id": 2995,
+      "set_name": "Magic Player Rewards 2005"
+    }
+  ],
+  "p06": [
+    {
+      "set_id": 2996,
+      "set_name": "Magic Player Rewards 2006"
+    }
+  ],
+  "p07": [
+    {
+      "set_id": 2997,
+      "set_name": "Magic Player Rewards 2007"
+    }
+  ],
+  "p08": [
+    {
+      "set_id": 2998,
+      "set_name": "Magic Player Rewards 2008"
+    }
+  ],
+  "p09": [
+    {
+      "set_id": 2999,
+      "set_name": "Magic Player Rewards 2009"
+    }
+  ],
+  "p10": [
+    {
+      "set_id": 3000,
+      "set_name": "Magic Player Rewards 2010"
+    }
+  ],
+  "p10e": [
+    {
+      "set_id": 3250,
+      "set_name": "Summer of Magic"
+    }
+  ],
+  "p11": [
+    {
+      "set_id": 3001,
+      "set_name": "Magic Player Rewards 2011"
+    }
+  ],
+  "p15a": [
+    {
+      "set_id": 2449,
+      "set_name": "15th Anniversary"
+    }
+  ],
+  "p22": [
+    {
+      "set_id": 2899,
+      "set_name": "Judge Gift Cards 2022"
+    }
+  ],
+  "p23": [
+    {
+      "set_id": 2900,
+      "set_name": "Judge Gift Cards 2023"
+    }
+  ],
+  "p2hg": [
+    {
+      "set_id": 3309,
+      "set_name": "Two-Headed Giant Tournament"
+    }
+  ],
+  "p30a": [
+    {
+      "set_id": 2453,
+      "set_name": "30th Anniversary Promos"
+    }
+  ],
+  "p30h": [
+    {
+      "set_id": 2452,
+      "set_name": "30th Anniversary History Promos"
+    }
+  ],
+  "p5dn": [
+    {
+      "set_id": 2743,
+      "set_name": "Fifth Dawn Promos"
+    }
+  ],
+  "p8ed": [
+    {
+      "set_id": 2717,
+      "set_name": "Eighth Edition Promos"
+    }
+  ],
+  "p9ed": [
+    {
+      "set_id": 3089,
+      "set_name": "Ninth Edition Promos"
+    }
+  ],
+  "paer": [
+    {
+      "set_id": 2462,
+      "set_name": "Aether Revolt Promos"
+    }
+  ],
+  "pakh": [
+    {
+      "set_id": 2472,
+      "set_name": "Amonkhet Promos"
+    }
+  ],
+  "pal00": [
+    {
+      "set_id": 2486,
+      "set_name": "Arena League 2000"
+    }
+  ],
+  "pal01": [
+    {
+      "set_id": 2487,
+      "set_name": "Arena League 2001"
+    }
+  ],
+  "pal02": [
+    {
+      "set_id": 2488,
+      "set_name": "Arena League 2002"
+    }
+  ],
+  "pal03": [
+    {
+      "set_id": 2489,
+      "set_name": "Arena League 2003"
+    }
+  ],
+  "pal04": [
+    {
+      "set_id": 2490,
+      "set_name": "Arena League 2004"
+    }
+  ],
+  "pal05": [
+    {
+      "set_id": 2491,
+      "set_name": "Arena League 2005"
+    }
+  ],
+  "pal06": [
+    {
+      "set_id": 2492,
+      "set_name": "Arena League 2006"
+    }
+  ],
+  "pal99": [
+    {
+      "set_id": 2485,
+      "set_name": "Arena League 1999"
+    }
+  ],
+  "pala": [
+    {
+      "set_id": 3218,
+      "set_name": "Shards of Alara Promos"
+    }
+  ],
+  "palp": [
+    {
+      "set_id": 2493,
+      "set_name": "Asia Pacific Land Program"
+    }
+  ],
+  "papc": [
+    {
+      "set_id": 2477,
+      "set_name": "Apocalypse Promos"
+    }
+  ],
+  "parb": [
+    {
+      "set_id": 2465,
+      "set_name": "Alara Reborn Promos"
+    }
+  ],
+  "parl": [
+    {
+      "set_id": 2484,
+      "set_name": "Arena League 1996"
+    }
+  ],
+  "pavr": [
+    {
+      "set_id": 2501,
+      "set_name": "Avacyn Restored Promos"
+    }
+  ],
+  "pbbd": [
+    {
+      "set_id": 2505,
+      "set_name": "Battlebond Promos"
+    }
+  ],
+  "pbfz": [
+    {
+      "set_id": 2509,
+      "set_name": "Battle for Zendikar Promos"
+    }
+  ],
+  "pbng": [
+    {
+      "set_id": 2528,
+      "set_name": "Born of the Gods Promos"
+    }
+  ],
+  "pbok": [
+    {
+      "set_id": 2515,
+      "set_name": "Betrayers of Kamigawa Promos"
+    }
+  ],
+  "pc2": [
+    {
+      "set_id": 3125,
+      "set_name": "Planechase 2012"
+    }
+  ],
+  "pca": [
+    {
+      "set_id": 3127,
+      "set_name": "Planechase Anthology"
+    }
+  ],
+  "pcbb": [
+    {
+      "set_id": 3224,
+      "set_name": "Standard Showdown Promos"
+    }
+  ],
+  "pcel": [
+    {
+      "set_id": 2530,
+      "set_name": "Celebration Cards"
+    }
+  ],
+  "pchk": [
+    {
+      "set_id": 2535,
+      "set_name": "Champions of Kamigawa Promos"
+    }
+  ],
+  "pcmp": [
+    {
+      "set_id": 2536,
+      "set_name": "Champs and States"
+    }
+  ],
+  "pcmr": [
+    {
+      "set_id": 3072,
+      "set_name": "Murders at Karlov Manor Promos"
+    }
+  ],
+  "pcns": [
+    {
+      "set_id": 2594,
+      "set_name": "Conspiracy Promos"
+    }
+  ],
+  "pcon": [
+    {
+      "set_id": 2591,
+      "set_name": "Conflux Promos"
+    }
+  ],
+  "pcsp": [
+    {
+      "set_id": 2540,
+      "set_name": "Coldsnap Promos"
+    }
+  ],
+  "pcy": [
+    {
+      "set_id": 3144,
+      "set_name": "Prophecy"
+    }
+  ],
+  "pd2": [
+    {
+      "set_id": 3139,
+      "set_name": "Premium Deck Series: Fire and Lightning"
+    }
+  ],
+  "pd3": [
+    {
+      "set_id": 3140,
+      "set_name": "Premium Deck Series: Graveborn"
+    }
+  ],
+  "pdgm": [
+    {
+      "set_id": 2646,
+      "set_name": "Dragon's Maze Promos"
+    }
+  ],
+  "pdis": [
+    {
+      "set_id": 2620,
+      "set_name": "Dissension Promos"
+    }
+  ],
+  "pdka": [
+    {
+      "set_id": 2613,
+      "set_name": "Dark Ascension Promos"
+    }
+  ],
+  "pdom": [
+    {
+      "set_id": 2626,
+      "set_name": "Dominaria Promos"
+    }
+  ],
+  "pdp10": [
+    {
+      "set_id": 2693,
+      "set_name": "Duels of the Planeswalkers Promos 2010"
+    }
+  ],
+  "pdp12": [
+    {
+      "set_id": 2694,
+      "set_name": "Duels of the Planeswalkers Promos 2011"
+    }
+  ],
+  "pdp13": [
+    {
+      "set_id": 2695,
+      "set_name": "Duels of the Planeswalkers Promos 2012"
+    }
+  ],
+  "pdp14": [
+    {
+      "set_id": 2696,
+      "set_name": "Duels of the Planeswalkers Promos 2013"
+    }
+  ],
+  "pdp15": [
+    {
+      "set_id": 2697,
+      "set_name": "Duels of the Planeswalkers Promos 2014"
+    }
+  ],
+  "pdrc": [
+    {
+      "set_id": 2643,
+      "set_name": "Dragon Con"
+    }
+  ],
+  "pdsk": [
+    {
+      "set_id": 2712,
+      "set_name": "Duskmourn: House of Horror Promos"
+    }
+  ],
+  "pdst": [
+    {
+      "set_id": 2616,
+      "set_name": "Darksteel Promos"
+    }
+  ],
+  "pdtk": [
+    {
+      "set_id": 2650,
+      "set_name": "Dragons of Tarkir Promos"
+    }
+  ],
+  "pdtp": [
+    {
+      "set_id": 2692,
+      "set_name": "Duels of the Planeswalkers Promos 2009"
+    }
+  ],
+  "peld": [
+    {
+      "set_id": 3298,
+      "set_name": "Throne of Eldraine Promos"
+    }
+  ],
+  "pelp": [
+    {
+      "set_id": 2725,
+      "set_name": "European Land Program"
+    }
+  ],
+  "pemn": [
+    {
+      "set_id": 2720,
+      "set_name": "Eldritch Moon Promos"
+    }
+  ],
+  "peoe": [
+    {
+      "set_id": 4658,
+      "set_name": "Promo Pack: Edge of Eternities"
+    }
+  ],
+  "peve": [
+    {
+      "set_id": 2727,
+      "set_name": "Eventide Promos"
+    }
+  ],
+  "pewk": [
+    {
+      "set_id": 2724,
+      "set_name": "Eternal Weekend"
+    },
+    {
+      "set_id": 2984,
+      "set_name": "MagicFest 2023"
+    }
+  ],
+  "pexo": [
+    {
+      "set_id": 2730,
+      "set_name": "Exodus Promos"
+    }
+  ],
+  "pf19": [
+    {
+      "set_id": 2981,
+      "set_name": "MagicFest 2019"
+    }
+  ],
+  "pf20": [
+    {
+      "set_id": 2982,
+      "set_name": "MagicFest 2020"
+    }
+  ],
+  "pf24": [
+    {
+      "set_id": 2985,
+      "set_name": "MagicFest 2024"
+    },
+    {
+      "set_id": 3075,
+      "set_name": "Mystery Booster"
+    }
+  ],
+  "pfdn": [
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
+    }
+  ],
+  "pfrf": [
+    {
+      "set_id": 2740,
+      "set_name": "Fate Reforged Promos"
+    }
+  ],
+  "pfut": [
+    {
+      "set_id": 2784,
+      "set_name": "Future Sight Promos"
+    }
+  ],
+  "pgpt": [
+    {
+      "set_id": 2801,
+      "set_name": "Guildpact Promos"
+    }
+  ],
+  "pgpx": [
+    {
+      "set_id": 2799,
+      "set_name": "Grand Prix Promos"
+    }
+  ],
+  "pgrn": [
+    {
+      "set_id": 2806,
+      "set_name": "Guilds of Ravnica Promos"
+    }
+  ],
+  "pgru": [
+    {
+      "set_id": 2808,
+      "set_name": "Guru"
+    }
+  ],
+  "pgtc": [
+    {
+      "set_id": 2793,
+      "set_name": "Gatecrash Promos"
+    }
+  ],
+  "ph17": [
+    {
+      "set_id": 2813,
+      "set_name": "Heroes of the Realm"
+    }
+  ],
+  "ph18": [
+    {
+      "set_id": 2814,
+      "set_name": "Heroes of the Realm 2018"
+    }
+  ],
+  "ph19": [
+    {
+      "set_id": 2815,
+      "set_name": "Heroes of the Realm 2019"
+    }
+  ],
+  "ph20": [
+    {
+      "set_id": 2816,
+      "set_name": "Heroes of the Realm 2020"
+    }
+  ],
+  "phel": [
+    {
+      "set_id": 3098,
+      "set_name": "Open the Helvault"
+    }
+  ],
+  "phop": [
+    {
+      "set_id": 3142,
+      "set_name": "Promotional Planes"
+    }
+  ],
+  "phou": [
+    {
+      "set_id": 2704,
+      "set_name": "Dungeons & Dragons: Adventures in the Forgotten Realms Promos"
+    },
+    {
+      "set_id": 2820,
+      "set_name": "Hour of Devastation Promos"
+    }
+  ],
+  "phpr": [
+    {
+      "set_id": 2811,
+      "set_name": "HarperPrism Book Promos"
+    }
+  ],
+  "phuk": [
+    {
+      "set_id": 2809,
+      "set_name": "Hachette UK"
+    }
+  ],
+  "pidw": [
+    {
+      "set_id": 2825,
+      "set_name": "IDW Comics 2012"
+    },
+    {
+      "set_id": 2826,
+      "set_name": "IDW Comics 2013"
+    },
+    {
+      "set_id": 2827,
+      "set_name": "IDW Comics 2014"
+    }
+  ],
+  "piko": [
+    {
+      "set_id": 2830,
+      "set_name": "Ikoria: Lair of Behemoths Promos"
+    }
+  ],
+  "pinv": [
+    {
+      "set_id": 2860,
+      "set_name": "Invasion Promos"
+    }
+  ],
+  "pip": [
+    {
+      "set_id": 2734,
+      "set_name": "Fallout"
+    },
+    {
+      "set_id": 2735,
+      "set_name": "Fallout Promos"
+    }
+  ],
+  "pisd": [
+    {
+      "set_id": 2852,
+      "set_name": "Innistrad Promos"
+    }
+  ],
+  "pj21": [
+    {
+      "set_id": 2898,
+      "set_name": "Judge Gift Cards 2021"
+    }
+  ],
+  "pjas": [
+    {
+      "set_id": 2907,
+      "set_name": "Junior APAC Series"
+    }
+  ],
+  "pjjt": [
+    {
+      "set_id": 2866,
+      "set_name": "Japan Junior Series"
+    },
+    {
+      "set_id": 2867,
+      "set_name": "Japan Junior Tournament"
+    }
+  ],
+  "pjou": [
+    {
+      "set_id": 2873,
+      "set_name": "Journey into Nyx Promos"
+    }
+  ],
+  "pjse": [
+    {
+      "set_id": 2908,
+      "set_name": "Junior Series Europe"
+    }
+  ],
+  "pjud": [
+    {
+      "set_id": 2902,
+      "set_name": "Judgment Promos"
+    }
+  ],
+  "pkhm": [
+    {
+      "set_id": 2923,
+      "set_name": "Kaldheim Promos"
+    },
+    {
+      "set_id": 3163,
+      "set_name": "Resale Promos"
+    }
+  ],
+  "pkld": [
+    {
+      "set_id": 2915,
+      "set_name": "Kaladesh Promos"
+    }
+  ],
+  "pktk": [
+    {
+      "set_id": 2935,
+      "set_name": "Khans of Tarkir Promos"
+    }
+  ],
+  "pl21": [
+    {
+      "set_id": 3381,
+      "set_name": "Year of the Ox 2021"
+    }
+  ],
+  "pl22": [
+    {
+      "set_id": 3383,
+      "set_name": "Year of the Tiger 2022"
+    }
+  ],
+  "pl23": [
+    {
+      "set_id": 3382,
+      "set_name": "Year of the Rabbit 2023"
+    }
+  ],
+  "plc": [
+    {
+      "set_id": 3122,
+      "set_name": "Planar Chaos"
+    }
+  ],
+  "plg20": [
+    {
+      "set_id": 2950,
+      "set_name": "Love Your LGS 2020"
+    }
+  ],
+  "plg21": [
+    {
+      "set_id": 2951,
+      "set_name": "Love Your LGS 2021"
+    },
+    {
+      "set_id": 2983,
+      "set_name": "MagicFest 2021"
+    }
+  ],
+  "plg22": [
+    {
+      "set_id": 2952,
+      "set_name": "Love Your LGS 2022"
+    }
+  ],
+  "plg24": [
+    {
+      "set_id": 2953,
+      "set_name": "Love Your LGS 2024"
+    }
+  ],
+  "plgm": [
+    {
+      "set_id": 2617,
+      "set_name": "DCI Legend Membership"
+    }
+  ],
+  "plgn": [
+    {
+      "set_id": 2946,
+      "set_name": "Legions Promos"
+    }
+  ],
+  "plny": [
+    {
+      "set_id": 2954,
+      "set_name": "Lunar New Year 2018"
+    }
+  ],
+  "plrw": [
+    {
+      "set_id": 2948,
+      "set_name": "Lorwyn Promos"
+    }
+  ],
+  "pls": [
+    {
+      "set_id": 3131,
+      "set_name": "Planeshift"
+    }
+  ],
+  "plst": [
+    {
+      "set_id": 3075,
+      "set_name": "Mystery Booster"
+    },
+    {
+      "set_id": 3194,
+      "set_name": "Secret Lair: Angels"
+    },
+    {
+      "set_id": 3202,
+      "set_name": "Secret Lair: Heads I Win, Tails You Lose"
+    }
+  ],
+  "pm12": [
+    {
+      "set_id": 2965,
+      "set_name": "Magic 2012 Promos"
+    }
+  ],
+  "pm13": [
+    {
+      "set_id": 2969,
+      "set_name": "Magic 2013 Promos"
+    }
+  ],
+  "pm14": [
+    {
+      "set_id": 2973,
+      "set_name": "Magic 2014 Promos"
+    }
+  ],
+  "pm15": [
+    {
+      "set_id": 2978,
+      "set_name": "Magic 2015 Promos"
+    }
+  ],
+  "pm19": [
+    {
+      "set_id": 2600,
+      "set_name": "Core Set 2019 Promos"
+    }
+  ],
+  "pm20": [
+    {
+      "set_id": 2605,
+      "set_name": "Core Set 2020 Promos"
+    }
+  ],
+  "pm21": [
+    {
+      "set_id": 2609,
+      "set_name": "Core Set 2021 Promos"
+    }
+  ],
+  "pmei": [
+    {
+      "set_id": 3019,
+      "set_name": "March of the Machine Promos"
+    },
+    {
+      "set_id": 3024,
+      "set_name": "Media Promos"
+    }
+  ],
+  "pmh1": [
+    {
+      "set_id": 3053,
+      "set_name": "Modern Horizons Promos"
+    }
+  ],
+  "pmh2": [
+    {
+      "set_id": 3042,
+      "set_name": "Modern Horizons 2 Promos"
+    }
+  ],
+  "pmic": [
+    {
+      "set_id": 3027,
+      "set_name": "MicroProse Promos"
+    }
+  ],
+  "pmid": [
+    {
+      "set_id": 2849,
+      "set_name": "Innistrad: Midnight Hunt Promos"
+    }
+  ],
+  "pmmq": [
+    {
+      "set_id": 3026,
+      "set_name": "Mercadian Masques Promos"
+    }
+  ],
+  "pmor": [
+    {
+      "set_id": 3062,
+      "set_name": "Morningtide Promos"
+    }
+  ],
+  "pmps": [
+    {
+      "set_id": 3002,
+      "set_name": "Magic Premiere Shop 2005"
+    }
+  ],
+  "pmps06": [
+    {
+      "set_id": 3003,
+      "set_name": "Magic Premiere Shop 2006"
+    }
+  ],
+  "pmps07": [
+    {
+      "set_id": 3004,
+      "set_name": "Magic Premiere Shop 2007"
+    }
+  ],
+  "pmps08": [
+    {
+      "set_id": 3005,
+      "set_name": "Magic Premiere Shop 2008"
+    }
+  ],
+  "pmps09": [
+    {
+      "set_id": 3006,
+      "set_name": "Magic Premiere Shop 2009"
+    }
+  ],
+  "pmps10": [
+    {
+      "set_id": 3007,
+      "set_name": "Magic Premiere Shop 2010"
+    }
+  ],
+  "pmps11": [
+    {
+      "set_id": 3008,
+      "set_name": "Magic Premiere Shop 2011"
+    }
+  ],
+  "pmrd": [
+    {
+      "set_id": 3034,
+      "set_name": "Mirrodin Promos"
+    }
+  ],
+  "pnat": [
+    {
+      "set_id": 3081,
+      "set_name": "Nationals Promos"
+    }
+  ],
+  "pnem": [
+    {
+      "set_id": 3083,
+      "set_name": "Nemesis Promos"
+    }
+  ],
+  "pneo": [
+    {
+      "set_id": 2931,
+      "set_name": "Kamigawa: Neon Dynasty Promos"
+    },
+    {
+      "set_id": 3263,
+      "set_name": "The Brothers' War Promos"
+    }
+  ],
+  "pnph": [
+    {
+      "set_id": 3086,
+      "set_name": "New Phyrexia Promos"
+    }
+  ],
+  "pody": [
+    {
+      "set_id": 3095,
+      "set_name": "Odyssey Promos"
+    }
+  ],
+  "pogw": [
+    {
+      "set_id": 3092,
+      "set_name": "Oath of the Gatewatch Promos"
+    }
+  ],
+  "pons": [
+    {
+      "set_id": 3097,
+      "set_name": "Onslaught Promos"
+    }
+  ],
+  "por": [
+    {
+      "set_id": 3134,
+      "set_name": "Portal"
+    },
+    {
+      "set_id": 3135,
+      "set_name": "Portal Demo Game"
+    }
+  ],
+  "pori": [
+    {
+      "set_id": 2989,
+      "set_name": "Magic Origins Promos"
+    }
+  ],
+  "potj": [
+    {
+      "set_id": 3106,
+      "set_name": "Outlaws of Thunder Junction Promos"
+    }
+  ],
+  "ppcy": [
+    {
+      "set_id": 3145,
+      "set_name": "Prophecy Promos"
+    }
+  ],
+  "pplc": [
+    {
+      "set_id": 3123,
+      "set_name": "Planar Chaos Promos"
+    }
+  ],
+  "ppls": [
+    {
+      "set_id": 3132,
+      "set_name": "Planeshift Promos"
+    }
+  ],
+  "ppp1": [
+    {
+      "set_id": 2604,
+      "set_name": "Core Set 2020 Promo Pack"
+    }
+  ],
+  "pptk": [
+    {
+      "set_id": 3138,
+      "set_name": "Portal Three Kingdoms Promos"
+    }
+  ],
+  "pr2": [
+    {
+      "set_id": 2992,
+      "set_name": "Magic Player Rewards 2002"
+    }
+  ],
+  "pr23": [
+    {
+      "set_id": 3162,
+      "set_name": "Regional Championship Qualifiers 2023"
+    }
+  ],
+  "prav": [
+    {
+      "set_id": 3156,
+      "set_name": "Ravnica: City of Guilds Promos"
+    }
+  ],
+  "prcq": [
+    {
+      "set_id": 3161,
+      "set_name": "Regional Championship Qualifiers 2022"
+    }
+  ],
+  "prix": [
+    {
+      "set_id": 3175,
+      "set_name": "Rivals of Ixalan Promos"
+    }
+  ],
+  "prna": [
+    {
+      "set_id": 3152,
+      "set_name": "Ravnica Allegiance Promos"
+    }
+  ],
+  "prtr": [
+    {
+      "set_id": 3166,
+      "set_name": "Return to Ravnica Promos"
+    }
+  ],
+  "prw2": [
+    {
+      "set_id": 3149,
+      "set_name": "Ravnica Allegiance Guild Kit"
+    }
+  ],
+  "prwk": [
+    {
+      "set_id": 3153,
+      "set_name": "Ravnica Allegiance Ravnica Weekend"
+    }
+  ],
+  "ps14": [
+    {
+      "set_id": 3179,
+      "set_name": "San Diego Comic-Con 2014"
+    }
+  ],
+  "ps15": [
+    {
+      "set_id": 3180,
+      "set_name": "San Diego Comic-Con 2015"
+    }
+  ],
+  "ps16": [
+    {
+      "set_id": 3181,
+      "set_name": "San Diego Comic-Con 2016"
+    }
+  ],
+  "ps17": [
+    {
+      "set_id": 3182,
+      "set_name": "San Diego Comic-Con 2017"
+    }
+  ],
+  "ps18": [
+    {
+      "set_id": 3183,
+      "set_name": "San Diego Comic-Con 2018"
+    }
+  ],
+  "ps19": [
+    {
+      "set_id": 3184,
+      "set_name": "San Diego Comic-Con 2019"
+    }
+  ],
+  "pscg": [
+    {
+      "set_id": 3192,
+      "set_name": "Scourge Promos"
+    }
+  ],
+  "psdc": [
+    {
+      "set_id": 3178,
+      "set_name": "San Diego Comic-Con 2013"
+    }
+  ],
+  "pshm": [
+    {
+      "set_id": 3211,
+      "set_name": "Shadowmoor Promos"
+    }
+  ],
+  "psnc": [
+    {
+      "set_id": 3238,
+      "set_name": "Streets of New Capenna Promos"
+    }
+  ],
+  "psoi": [
+    {
+      "set_id": 3215,
+      "set_name": "Shadows over Innistrad Promos"
+    }
+  ],
+  "psok": [
+    {
+      "set_id": 3186,
+      "set_name": "Saviors of Kamigawa Promos"
+    }
+  ],
+  "psos": [
+    {
+      "set_id": 4644,
+      "set_name": "Promo Pack: Secrets of Strixhaven"
+    }
+  ],
+  "psth": [
+    {
+      "set_id": 3248,
+      "set_name": "Stronghold Promos"
+    }
+  ],
+  "pstx": [
+    {
+      "set_id": 3245,
+      "set_name": "Strixhaven: School of Mages Promos"
+    }
+  ],
+  "psus": [
+    {
+      "set_id": 2909,
+      "set_name": "Junior Super Series"
+    }
+  ],
+  "ptc": [
+    {
+      "set_id": 3146,
+      "set_name": "Pro Tour Collector Set"
+    }
+  ],
+  "ptdm": [
+    {
+      "set_id": 4398,
+      "set_name": "Promo Pack - Tarkir Dragonstorm"
+    }
+  ],
+  "ptg": [
+    {
+      "set_id": 3133,
+      "set_name": "Ponies: The Galloping"
+    }
+  ],
+  "pthb": [
+    {
+      "set_id": 3289,
+      "set_name": "Theros Beyond Death Promos"
+    }
+  ],
+  "pths": [
+    {
+      "set_id": 3294,
+      "set_name": "Theros Promos"
+    }
+  ],
+  "ptk": [
+    {
+      "set_id": 3137,
+      "set_name": "Portal Three Kingdoms"
+    }
+  ],
+  "ptkdf": [
+    {
+      "set_id": 3251,
+      "set_name": "Tarkir Dragonfury"
+    }
+  ],
+  "ptmp": [
+    {
+      "set_id": 3253,
+      "set_name": "Tempest Promos"
+    }
+  ],
+  "ptor": [
+    {
+      "set_id": 3306,
+      "set_name": "Torment Promos"
+    }
+  ],
+  "ptsp": [
+    {
+      "set_id": 3301,
+      "set_name": "Time Spiral Promos"
+    }
+  ],
+  "puds": [
+    {
+      "set_id": 3330,
+      "set_name": "Urza's Destiny Promos"
+    }
+  ],
+  "pulg": [
+    {
+      "set_id": 3332,
+      "set_name": "Urza's Legacy Promos"
+    }
+  ],
+  "puma": [
+    {
+      "set_id": 3312,
+      "set_name": "Ultimate Masters Box Topper"
+    }
+  ],
+  "punh": [
+    {
+      "set_id": 3320,
+      "set_name": "Unhinged Promos"
+    }
+  ],
+  "purl": [
+    {
+      "set_id": 3328,
+      "set_name": "URL/Convention Promos"
+    }
+  ],
+  "pusg": [
+    {
+      "set_id": 3334,
+      "set_name": "Urza's Saga Promos"
+    }
+  ],
+  "pust": [
+    {
+      "set_id": 3326,
+      "set_name": "Unstable Promos"
+    }
+  ],
+  "pvan": [
+    {
+      "set_id": 3335,
+      "set_name": "Vanguard Series"
+    }
+  ],
+  "pvow": [
+    {
+      "set_id": 2839,
+      "set_name": "Innistrad: Crimson Vow Promos"
+    }
+  ],
+  "pw12": [
+    {
+      "set_id": 3360,
+      "set_name": "Wizards Play Network 2012"
+    }
+  ],
+  "pw21": [
+    {
+      "set_id": 3361,
+      "set_name": "Wizards Play Network 2021"
+    }
+  ],
+  "pw22": [
+    {
+      "set_id": 3362,
+      "set_name": "Wizards Play Network 2022"
+    }
+  ],
+  "pw23": [
+    {
+      "set_id": 3363,
+      "set_name": "Wizards Play Network 2023"
+    }
+  ],
+  "pw24": [
+    {
+      "set_id": 3364,
+      "set_name": "Wizards Play Network 2024"
+    }
+  ],
+  "pwar": [
+    {
+      "set_id": 3341,
+      "set_name": "War of the Spark Promos"
+    }
+  ],
+  "pwoe": [
+    {
+      "set_id": 3353,
+      "set_name": "Wilds of Eldraine Promos"
+    }
+  ],
+  "pwos": [
+    {
+      "set_id": 3355,
+      "set_name": "Wizards of the Coast Online Store"
+    }
+  ],
+  "pxln": [
+    {
+      "set_id": 2863,
+      "set_name": "Ixalan Promos"
+    }
+  ],
+  "pxtc": [
+    {
+      "set_id": 2865,
+      "set_name": "Ixalan Treasure Chest"
+    }
+  ],
+  "pza": [
+    {
+      "set_id": 4467,
+      "set_name": "Teenage Mutant Ninja Turtles Eternal-Legal"
+    }
+  ],
+  "pznr": [
+    {
+      "set_id": 3395,
+      "set_name": "Zendikar Rising Promos"
+    }
+  ],
+  "q06": [
+    {
+      "set_id": 3120,
+      "set_name": "Pioneer Challenger Decks 2021"
+    }
+  ],
+  "rav": [
+    {
+      "set_id": 3155,
+      "set_name": "Ravnica: City of Guilds"
+    }
+  ],
+  "rex": [
+    {
+      "set_id": 2910,
+      "set_name": "Jurassic World Collection"
+    }
+  ],
+  "rix": [
+    {
+      "set_id": 3173,
+      "set_name": "Rivals of Ixalan"
+    }
+  ],
+  "rna": [
+    {
+      "set_id": 3148,
+      "set_name": "Ravnica Allegiance"
+    }
+  ],
+  "roe": [
+    {
+      "set_id": 3169,
+      "set_name": "Rise of the Eldrazi"
+    }
+  ],
+  "rqs": [
+    {
+      "set_id": 3177,
+      "set_name": "Rivals Quick Start Set"
+    }
+  ],
+  "rtr": [
+    {
+      "set_id": 3164,
+      "set_name": "Return to Ravnica"
+    }
+  ],
+  "rvr": [
+    {
+      "set_id": 3159,
+      "set_name": "Ravnica Remastered"
+    }
+  ],
+  "s00": [
+    {
+      "set_id": 3226,
+      "set_name": "Starter 2000"
+    }
+  ],
+  "s99": [
+    {
+      "set_id": 3225,
+      "set_name": "Starter 1999"
+    }
+  ],
+  "scd": [
+    {
+      "set_id": 3227,
+      "set_name": "Starter Commander Decks"
+    }
+  ],
+  "scg": [
+    {
+      "set_id": 3191,
+      "set_name": "Scourge"
+    }
+  ],
+  "sch": [
+    {
+      "set_id": 2521,
+      "set_name": "Bloomburrow Promos"
+    },
+    {
+      "set_id": 3228,
+      "set_name": "Store Championships 2022"
+    },
+    {
+      "set_id": 3229,
+      "set_name": "Store Championships 2023"
+    },
+    {
+      "set_id": 3230,
+      "set_name": "Store Championships 2024"
+    },
+    {
+      "set_id": 3365,
+      "set_name": "World Championship 2024"
+    },
+    {
+      "set_id": 3375,
+      "set_name": "World Championship Promos"
+    }
+  ],
+  "shm": [
+    {
+      "set_id": 3210,
+      "set_name": "Shadowmoor"
+    }
+  ],
+  "slc": [
+    {
+      "set_id": 3193,
+      "set_name": "Secret Lair 30th Anniversary Countdown Kit"
+    }
+  ],
+  "sld": [
+    {
+      "set_id": 3195,
+      "set_name": "Secret Lair: Angels Tokens"
+    },
+    {
+      "set_id": 3196,
+      "set_name": "Secret Lair Commander Deck: Raining Cats and Dogs"
+    },
+    {
+      "set_id": 3197,
+      "set_name": "Secret Lair Commander Deck: Raining Cats and Dogs Tokens"
+    },
+    {
+      "set_id": 3198,
+      "set_name": "Secret Lair Drop Promos"
+    },
+    {
+      "set_id": 3199,
+      "set_name": "Secret Lair Drop Series"
+    },
+    {
+      "set_id": 3200,
+      "set_name": "Secret Lair: From Cute to Brute"
+    },
+    {
+      "set_id": 3201,
+      "set_name": "Secret Lair: From Cute to Brute Tokens"
+    },
+    {
+      "set_id": 3204,
+      "set_name": "Secret Lair: Sheldon's Spellbook"
+    }
+  ],
+  "slp": [
+    {
+      "set_id": 3147,
+      "set_name": "Pro Tour Promos"
+    },
+    {
+      "set_id": 3205,
+      "set_name": "Secret Lair Showdown"
+    }
+  ],
+  "slu": [
+    {
+      "set_id": 3206,
+      "set_name": "Secret Lair: Ultimate Edition"
+    },
+    {
+      "set_id": 3207,
+      "set_name": "Secret Lair: Ultimate Edition 2"
+    }
+  ],
+  "slx": [
+    {
+      "set_id": 3208,
+      "set_name": "Secret Lair: Universes Within"
+    },
+    {
+      "set_id": 4670,
+      "set_name": "SLX Cards"
+    }
+  ],
+  "snc": [
+    {
+      "set_id": 3231,
+      "set_name": "Streets of New Capenna"
+    },
+    {
+      "set_id": 3236,
+      "set_name": "Streets of New Capenna Minigame"
+    }
+  ],
+  "soa": [
+    {
+      "set_id": 4643,
+      "set_name": "Secrets of Strixhaven: Mystical Archive"
+    }
+  ],
+  "soc": [
+    {
+      "set_id": 4642,
+      "set_name": "Commander: Secrets of Strixhaven"
+    }
+  ],
+  "soi": [
+    {
+      "set_id": 3213,
+      "set_name": "Shadows over Innistrad"
+    }
+  ],
+  "sok": [
+    {
+      "set_id": 3185,
+      "set_name": "Saviors of Kamigawa"
+    }
+  ],
+  "som": [
+    {
+      "set_id": 3187,
+      "set_name": "Scars of Mirrodin"
+    }
+  ],
+  "sos": [
+    {
+      "set_id": 4641,
+      "set_name": "Secrets of Strixhaven"
+    }
+  ],
+  "spe": [
+    {
+      "set_id": 4375,
+      "set_name": "Marvel's Spider-Man Eternal Legal"
+    }
+  ],
+  "spg": [
+    {
+      "set_id": 2458,
+      "set_name": "Art Series: Aetherdrift"
+    },
+    {
+      "set_id": 4499,
+      "set_name": "Special Guests"
+    }
+  ],
+  "spm": [
+    {
+      "set_id": 4374,
+      "set_name": "Marvel's Spider-Man"
+    }
+  ],
+  "ss1": [
+    {
+      "set_id": 3222,
+      "set_name": "Signature Spellbook: Jace"
+    }
+  ],
+  "ss2": [
+    {
+      "set_id": 3221,
+      "set_name": "Signature Spellbook: Gideon"
+    }
+  ],
+  "ss3": [
+    {
+      "set_id": 3220,
+      "set_name": "Signature Spellbook: Chandra"
+    }
+  ],
+  "sta": [
+    {
+      "set_id": 3243,
+      "set_name": "Strixhaven: School of Mages Mystical Archive"
+    }
+  ],
+  "sth": [
+    {
+      "set_id": 3247,
+      "set_name": "Stronghold"
+    }
+  ],
+  "stx": [
+    {
+      "set_id": 3240,
+      "set_name": "Strixhaven: School of Mages"
+    }
+  ],
+  "sum": [
+    {
+      "set_id": 3249,
+      "set_name": "Summer Magic / Edgar"
+    }
+  ],
+  "sunf": [
+    {
+      "set_id": 3315,
+      "set_name": "Unfinity Stickers"
+    }
+  ],
+  "t10e": [
+    {
+      "set_id": 3256,
+      "set_name": "Tenth Edition Tokens"
+    }
+  ],
+  "t2x2": [
+    {
+      "set_id": 2640,
+      "set_name": "Double Masters 2022 Tokens"
+    }
+  ],
+  "t2xm": [
+    {
+      "set_id": 2642,
+      "set_name": "Double Masters Tokens"
+    }
+  ],
+  "t30a": [
+    {
+      "set_id": 2454,
+      "set_name": "30th Anniversary Tokens"
+    }
+  ],
+  "t40k": [
+    {
+      "set_id": 3338,
+      "set_name": "Warhammer 40,000 Tokens"
+    }
+  ],
+  "ta25": [
+    {
+      "set_id": 3023,
+      "set_name": "Masters 25 Tokens"
+    }
+  ],
+  "taer": [
+    {
+      "set_id": 2463,
+      "set_name": "Aether Revolt Tokens"
+    }
+  ],
+  "tafc": [
+    {
+      "set_id": 2701,
+      "set_name": "Dungeons & Dragons: Adventures in the Forgotten Realms Commander Tokens"
+    }
+  ],
+  "tafr": [
+    {
+      "set_id": 2705,
+      "set_name": "Dungeons & Dragons: Adventures in the Forgotten Realms Tokens"
+    }
+  ],
+  "takh": [
+    {
+      "set_id": 2473,
+      "set_name": "Amonkhet Tokens"
+    }
+  ],
+  "tala": [
+    {
+      "set_id": 3219,
+      "set_name": "Shards of Alara Tokens"
+    }
+  ],
+  "tarb": [
+    {
+      "set_id": 2466,
+      "set_name": "Alara Reborn Tokens"
+    }
+  ],
+  "tavr": [
+    {
+      "set_id": 2502,
+      "set_name": "Avacyn Restored Tokens"
+    }
+  ],
+  "tbbd": [
+    {
+      "set_id": 2506,
+      "set_name": "Battlebond Tokens"
+    }
+  ],
+  "tbfz": [
+    {
+      "set_id": 2510,
+      "set_name": "Battle for Zendikar Tokens"
+    }
+  ],
+  "tbig": [
+    {
+      "set_id": 3109,
+      "set_name": "Outlaws of Thunder Junction: The Big Score Tokens"
+    }
+  ],
+  "tblb": [
+    {
+      "set_id": 2523,
+      "set_name": "Bloomburrow Tokens"
+    }
+  ],
+  "tblc": [
+    {
+      "set_id": 2519,
+      "set_name": "Bloomburrow Commander Tokens"
+    }
+  ],
+  "tbng": [
+    {
+      "set_id": 2529,
+      "set_name": "Born of the Gods Tokens"
+    }
+  ],
+  "tbot": [
+    {
+      "set_id": 3308,
+      "set_name": "Transformers Tokens"
+    }
+  ],
+  "tbrc": [
+    {
+      "set_id": 3260,
+      "set_name": "The Brothers' War Commander Tokens"
+    }
+  ],
+  "tbro": [
+    {
+      "set_id": 3265,
+      "set_name": "The Brothers' War Tokens"
+    }
+  ],
+  "tbth": [
+    {
+      "set_id": 2525,
+      "set_name": "Born of the Gods Battle the Horde"
+    }
+  ],
+  "tc14": [
+    {
+      "set_id": 2549,
+      "set_name": "Commander 2014 Tokens"
+    }
+  ],
+  "tc15": [
+    {
+      "set_id": 2552,
+      "set_name": "Commander 2015 Tokens"
+    }
+  ],
+  "tc16": [
+    {
+      "set_id": 2555,
+      "set_name": "Commander 2016 Tokens"
+    }
+  ],
+  "tc17": [
+    {
+      "set_id": 2558,
+      "set_name": "Commander 2017 Tokens"
+    }
+  ],
+  "tc18": [
+    {
+      "set_id": 2561,
+      "set_name": "Commander 2018 Tokens"
+    }
+  ],
+  "tc19": [
+    {
+      "set_id": 2564,
+      "set_name": "Commander 2019 Tokens"
+    }
+  ],
+  "tc20": [
+    {
+      "set_id": 2567,
+      "set_name": "Commander 2020 Tokens"
+    }
+  ],
+  "tc21": [
+    {
+      "set_id": 2569,
+      "set_name": "Commander 2021 Tokens"
+    }
+  ],
+  "tclb": [
+    {
+      "set_id": 2582,
+      "set_name": "Commander Legends: Battle for Baldur's Gate Tokens"
+    },
+    {
+      "set_id": 3111,
+      "set_name": "Oversize Cards"
+    }
+  ],
+  "tcm2": [
+    {
+      "set_id": 2573,
+      "set_name": "Commander Anthology Volume II Tokens"
+    }
+  ],
+  "tcma": [
+    {
+      "set_id": 2571,
+      "set_name": "Commander Anthology Tokens"
+    }
+  ],
+  "tcmm": [
+    {
+      "set_id": 2587,
+      "set_name": "Commander Masters Tokens"
+    }
+  ],
+  "tcmr": [
+    {
+      "set_id": 2584,
+      "set_name": "Commander Legends Tokens"
+    }
+  ],
+  "tcn2": [
+    {
+      "set_id": 2596,
+      "set_name": "Conspiracy: Take the Crown Tokens"
+    }
+  ],
+  "tcns": [
+    {
+      "set_id": 2597,
+      "set_name": "Conspiracy Tokens"
+    }
+  ],
+  "tcon": [
+    {
+      "set_id": 2592,
+      "set_name": "Conflux Tokens"
+    }
+  ],
+  "tdag": [
+    {
+      "set_id": 2870,
+      "set_name": "Journey into Nyx Defeat a God"
+    }
+  ],
+  "tdc": [
+    {
+      "set_id": 4397,
+      "set_name": "Commander - Tarkir Dragonstorm"
+    }
+  ],
+  "tdd1": [
+    {
+      "set_id": 2663,
+      "set_name": "Duel Decks: Elves vs. Goblins Tokens"
+    }
+  ],
+  "tdd2": [
+    {
+      "set_id": 2673,
+      "set_name": "Duel Decks: Jace vs. Chandra Tokens"
+    }
+  ],
+  "tddc": [
+    {
+      "set_id": 2658,
+      "set_name": "Duel Decks: Divine vs. Demonic Tokens"
+    }
+  ],
+  "tddd": [
+    {
+      "set_id": 2667,
+      "set_name": "Duel Decks: Garruk vs. Liliana Tokens"
+    }
+  ],
+  "tdde": [
+    {
+      "set_id": 2684,
+      "set_name": "Duel Decks: Phyrexia vs. the Coalition Tokens"
+    }
+  ],
+  "tddf": [
+    {
+      "set_id": 2661,
+      "set_name": "Duel Decks: Elspeth vs. Tezzeret Tokens"
+    }
+  ],
+  "tddg": [
+    {
+      "set_id": 2677,
+      "set_name": "Duel Decks: Knights vs. Dragons Tokens"
+    }
+  ],
+  "tddh": [
+    {
+      "set_id": 2653,
+      "set_name": "Duel Decks: Ajani vs. Nicol Bolas Tokens"
+    }
+  ],
+  "tddi": [
+    {
+      "set_id": 2689,
+      "set_name": "Duel Decks: Venser vs. Koth Tokens"
+    }
+  ],
+  "tddj": [
+    {
+      "set_id": 2671,
+      "set_name": "Duel Decks: Izzet vs. Golgari Tokens"
+    },
+    {
+      "set_id": 2732,
+      "set_name": "Explorers of Ixalan Tokens"
+    }
+  ],
+  "tddk": [
+    {
+      "set_id": 2686,
+      "set_name": "Duel Decks: Sorin vs. Tibalt Tokens"
+    }
+  ],
+  "tddl": [
+    {
+      "set_id": 2669,
+      "set_name": "Duel Decks: Heroes vs. Monsters Tokens"
+    }
+  ],
+  "tddm": [
+    {
+      "set_id": 2675,
+      "set_name": "Duel Decks: Jace vs. Vraska Tokens"
+    }
+  ],
+  "tdds": [
+    {
+      "set_id": 2681,
+      "set_name": "Duel Decks: Mind vs. Might Tokens"
+    }
+  ],
+  "tddt": [
+    {
+      "set_id": 2679,
+      "set_name": "Duel Decks: Merfolk vs. Goblins Tokens"
+    }
+  ],
+  "tddu": [
+    {
+      "set_id": 2665,
+      "set_name": "Duel Decks: Elves vs. Inventors Tokens"
+    }
+  ],
+  "tdgm": [
+    {
+      "set_id": 2647,
+      "set_name": "Dragon's Maze Tokens"
+    }
+  ],
+  "tdka": [
+    {
+      "set_id": 2614,
+      "set_name": "Dark Ascension Tokens"
+    }
+  ],
+  "tdm": [
+    {
+      "set_id": 3403,
+      "set_name": "Tarkir Dragonstorm"
+    }
+  ],
+  "tdmr": [
+    {
+      "set_id": 2628,
+      "set_name": "Dominaria Remastered Tokens"
+    }
+  ],
+  "tdmu": [
+    {
+      "set_id": 2633,
+      "set_name": "Dominaria United Commander Tokens"
+    },
+    {
+      "set_id": 2637,
+      "set_name": "Dominaria United Tokens"
+    }
+  ],
+  "tdom": [
+    {
+      "set_id": 2629,
+      "set_name": "Dominaria Tokens"
+    }
+  ],
+  "tdsc": [
+    {
+      "set_id": 2710,
+      "set_name": "Duskmourn: House of Horror Commander Tokens"
+    }
+  ],
+  "tdsk": [
+    {
+      "set_id": 2714,
+      "set_name": "Duskmourn: House of Horror Tokens"
+    }
+  ],
+  "tdtk": [
+    {
+      "set_id": 2651,
+      "set_name": "Dragons of Tarkir Tokens"
+    }
+  ],
+  "te01": [
+    {
+      "set_id": 2482,
+      "set_name": "Archenemy: Nicol Bolas Tokens"
+    }
+  ],
+  "teld": [
+    {
+      "set_id": 3121,
+      "set_name": "Pioneer Challenger Decks 2022"
+    },
+    {
+      "set_id": 3299,
+      "set_name": "Throne of Eldraine Tokens"
+    }
+  ],
+  "tema": [
+    {
+      "set_id": 2723,
+      "set_name": "Eternal Masters Tokens"
+    }
+  ],
+  "temn": [
+    {
+      "set_id": 2721,
+      "set_name": "Eldritch Moon Tokens"
+    }
+  ],
+  "teve": [
+    {
+      "set_id": 2728,
+      "set_name": "Eventide Tokens"
+    }
+  ],
+  "tevg": [
+    {
+      "set_id": 2655,
+      "set_name": "Duel Decks Anthology Tokens"
+    }
+  ],
+  "tfdn": [
+    {
+      "set_id": 2752,
+      "set_name": "Foundations Tokens"
+    }
+  ],
+  "tfrf": [
+    {
+      "set_id": 2741,
+      "set_name": "Fate Reforged Tokens"
+    }
+  ],
+  "tfth": [
+    {
+      "set_id": 3291,
+      "set_name": "Theros Face the Hydra"
+    }
+  ],
+  "tgk1": [
+    {
+      "set_id": 2804,
+      "set_name": "Guilds of Ravnica Guild Kit Tokens"
+    }
+  ],
+  "tgk2": [
+    {
+      "set_id": 3150,
+      "set_name": "Ravnica Allegiance Guild Kit Tokens"
+    }
+  ],
+  "tgn2": [
+    {
+      "set_id": 2788,
+      "set_name": "Game Night 2019 Tokens"
+    }
+  ],
+  "tgn3": [
+    {
+      "set_id": 2790,
+      "set_name": "Game Night: Free-for-All Tokens"
+    }
+  ],
+  "tgrn": [
+    {
+      "set_id": 2531,
+      "set_name": "Challenger Decks 2020 Tokens"
+    },
+    {
+      "set_id": 2807,
+      "set_name": "Guilds of Ravnica Tokens"
+    }
+  ],
+  "tgtc": [
+    {
+      "set_id": 2794,
+      "set_name": "Gatecrash Tokens"
+    }
+  ],
+  "thb": [
+    {
+      "set_id": 3287,
+      "set_name": "Theros Beyond Death"
+    }
+  ],
+  "thou": [
+    {
+      "set_id": 2821,
+      "set_name": "Hour of Devastation Tokens"
+    }
+  ],
+  "thp1": [
+    {
+      "set_id": 3292,
+      "set_name": "Theros Hero's Path"
+    }
+  ],
+  "thp2": [
+    {
+      "set_id": 2526,
+      "set_name": "Born of the Gods Hero's Path"
+    }
+  ],
+  "thp3": [
+    {
+      "set_id": 2871,
+      "set_name": "Journey into Nyx Hero's Path"
+    }
+  ],
+  "ths": [
+    {
+      "set_id": 3286,
+      "set_name": "Theros"
+    }
+  ],
+  "tiko": [
+    {
+      "set_id": 2831,
+      "set_name": "Ikoria: Lair of Behemoths Tokens"
+    }
+  ],
+  "tima": [
+    {
+      "set_id": 2824,
+      "set_name": "Iconic Masters Tokens"
+    }
+  ],
+  "tinr": [
+    {
+      "set_id": 2855,
+      "set_name": "Innistrad Remastered Tokens"
+    }
+  ],
+  "tisd": [
+    {
+      "set_id": 2856,
+      "set_name": "Innistrad Tokens"
+    }
+  ],
+  "tjou": [
+    {
+      "set_id": 2874,
+      "set_name": "Journey into Nyx Tokens"
+    }
+  ],
+  "tkhm": [
+    {
+      "set_id": 2920,
+      "set_name": "Kaldheim Commander Tokens"
+    },
+    {
+      "set_id": 2924,
+      "set_name": "Kaldheim Tokens"
+    }
+  ],
+  "tkld": [
+    {
+      "set_id": 2916,
+      "set_name": "Kaladesh Tokens"
+    }
+  ],
+  "tktk": [
+    {
+      "set_id": 2936,
+      "set_name": "Khans of Tarkir Tokens"
+    }
+  ],
+  "tla": [
+    {
+      "set_id": 4390,
+      "set_name": "Avatar The Last Airbender"
+    }
+  ],
+  "tlcc": [
+    {
+      "set_id": 3280,
+      "set_name": "The Lost Caverns of Ixalan Commander Tokens"
+    }
+  ],
+  "tlci": [
+    {
+      "set_id": 3285,
+      "set_name": "The Lost Caverns of Ixalan Tokens"
+    }
+  ],
+  "tle": [
+    {
+      "set_id": 4391,
+      "set_name": "Avatar The Last Airbender Eternal-Legal"
+    }
+  ],
+  "tlrw": [
+    {
+      "set_id": 2949,
+      "set_name": "Lorwyn Tokens"
+    }
+  ],
+  "tltc": [
+    {
+      "set_id": 3272,
+      "set_name": "The Lord of the Rings: Tales of Middle-Earth Commander Tokens"
+    }
+  ],
+  "tltr": [
+    {
+      "set_id": 3276,
+      "set_name": "The Lord of the Rings: Tales of Middle-Earth Tokens"
+    }
+  ],
+  "tm10": [
+    {
+      "set_id": 2958,
+      "set_name": "Magic 2010 Tokens"
+    }
+  ],
+  "tm11": [
+    {
+      "set_id": 2962,
+      "set_name": "Magic 2011 Tokens"
+    }
+  ],
+  "tm12": [
+    {
+      "set_id": 2966,
+      "set_name": "Magic 2012 Tokens"
+    }
+  ],
+  "tm13": [
+    {
+      "set_id": 2970,
+      "set_name": "Magic 2013 Tokens"
+    }
+  ],
+  "tm14": [
+    {
+      "set_id": 2974,
+      "set_name": "Magic 2014 Tokens"
+    }
+  ],
+  "tm15": [
+    {
+      "set_id": 2979,
+      "set_name": "Magic 2015 Tokens"
+    }
+  ],
+  "tm19": [
+    {
+      "set_id": 2601,
+      "set_name": "Core Set 2019 Tokens"
+    }
+  ],
+  "tm20": [
+    {
+      "set_id": 2606,
+      "set_name": "Core Set 2020 Tokens"
+    }
+  ],
+  "tm21": [
+    {
+      "set_id": 2610,
+      "set_name": "Core Set 2021 Tokens"
+    }
+  ],
+  "tmbs": [
+    {
+      "set_id": 3033,
+      "set_name": "Mirrodin Besieged Tokens"
+    }
+  ],
+  "tmc": [
+    {
+      "set_id": 4466,
+      "set_name": "Commander: Teenage Mutant Ninja Turtles"
+    }
+  ],
+  "tmd1": [
+    {
+      "set_id": 3036,
+      "set_name": "Modern Event Deck 2014 Tokens"
+    }
+  ],
+  "tmed": [
+    {
+      "set_id": 2868,
+      "set_name": "JingHe Age Tokens"
+    },
+    {
+      "set_id": 3080,
+      "set_name": "Mythic Edition Tokens"
+    }
+  ],
+  "tmh1": [
+    {
+      "set_id": 3054,
+      "set_name": "Modern Horizons Tokens"
+    }
+  ],
+  "tmh2": [
+    {
+      "set_id": 3043,
+      "set_name": "Modern Horizons 2 Tokens"
+    },
+    {
+      "set_id": 3203,
+      "set_name": "Secret Lair: Heads I Win, Tails You Lose Tokens"
+    }
+  ],
+  "tmh3": [
+    {
+      "set_id": 3047,
+      "set_name": "Modern Horizons 3 Commander Tokens"
+    },
+    {
+      "set_id": 3051,
+      "set_name": "Modern Horizons 3 Tokens"
+    }
+  ],
+  "tmic": [
+    {
+      "set_id": 2846,
+      "set_name": "Innistrad: Midnight Hunt Commander Tokens"
+    }
+  ],
+  "tmid": [
+    {
+      "set_id": 2850,
+      "set_name": "Innistrad: Midnight Hunt Tokens"
+    }
+  ],
+  "tmkc": [
+    {
+      "set_id": 3070,
+      "set_name": "Murders at Karlov Manor Commander Tokens"
+    }
+  ],
+  "tmkm": [
+    {
+      "set_id": 3074,
+      "set_name": "Murders at Karlov Manor Tokens"
+    }
+  ],
+  "tmm2": [
+    {
+      "set_id": 3057,
+      "set_name": "Modern Masters 2015 Tokens"
+    }
+  ],
+  "tmm3": [
+    {
+      "set_id": 3059,
+      "set_name": "Modern Masters 2017 Tokens"
+    }
+  ],
+  "tmma": [
+    {
+      "set_id": 3060,
+      "set_name": "Modern Masters Tokens"
+    }
+  ],
+  "tmoc": [
+    {
+      "set_id": 3016,
+      "set_name": "March of the Machine Commander Tokens"
+    }
+  ],
+  "tmom": [
+    {
+      "set_id": 3021,
+      "set_name": "March of the Machine Tokens"
+    }
+  ],
+  "tmor": [
+    {
+      "set_id": 3063,
+      "set_name": "Morningtide Tokens"
+    }
+  ],
+  "tmp": [
+    {
+      "set_id": 3252,
+      "set_name": "Tempest"
+    }
+  ],
+  "tmt": [
+    {
+      "set_id": 4465,
+      "set_name": "Teenage Mutant Ninja Turtles"
+    }
+  ],
+  "tmul": [
+    {
+      "set_id": 3066,
+      "set_name": "Multiverse Legends Tokens"
+    }
+  ],
+  "tnec": [
+    {
+      "set_id": 2928,
+      "set_name": "Kamigawa: Neon Dynasty Commander Tokens"
+    }
+  ],
+  "tneo": [
+    {
+      "set_id": 2932,
+      "set_name": "Kamigawa: Neon Dynasty Tokens"
+    }
+  ],
+  "tnph": [
+    {
+      "set_id": 3087,
+      "set_name": "New Phyrexia Tokens"
+    }
+  ],
+  "togw": [
+    {
+      "set_id": 3093,
+      "set_name": "Oath of the Gatewatch Tokens"
+    }
+  ],
+  "tonc": [
+    {
+      "set_id": 3045,
+      "set_name": "Modern Horizons 3 Art Series"
+    },
+    {
+      "set_id": 3115,
+      "set_name": "Phyrexia: All Will Be One Commander Tokens"
+    }
+  ],
+  "tone": [
+    {
+      "set_id": 3267,
+      "set_name": "The List"
+    }
+  ],
+  "tor": [
+    {
+      "set_id": 3305,
+      "set_name": "Torment"
+    }
+  ],
+  "tori": [
+    {
+      "set_id": 2990,
+      "set_name": "Magic Origins Tokens"
+    }
+  ],
+  "totc": [
+    {
+      "set_id": 3104,
+      "set_name": "Outlaws of Thunder Junction Commander Tokens"
+    }
+  ],
+  "totj": [
+    {
+      "set_id": 3110,
+      "set_name": "Outlaws of Thunder Junction Tokens"
+    }
+  ],
+  "totp": [
+    {
+      "set_id": 3102,
+      "set_name": "Outlaws of Thunder Junction: Breaking News Tokens"
+    }
+  ],
+  "tpca": [
+    {
+      "set_id": 3129,
+      "set_name": "Planechase Anthology Tokens"
+    }
+  ],
+  "tpip": [
+    {
+      "set_id": 2736,
+      "set_name": "Fallout Tokens"
+    }
+  ],
+  "trex": [
+    {
+      "set_id": 2911,
+      "set_name": "Jurassic World Collection Tokens"
+    }
+  ],
+  "trix": [
+    {
+      "set_id": 3176,
+      "set_name": "Rivals of Ixalan Tokens"
+    }
+  ],
+  "trna": [
+    {
+      "set_id": 3154,
+      "set_name": "Ravnica Allegiance Tokens"
+    }
+  ],
+  "troe": [
+    {
+      "set_id": 3172,
+      "set_name": "Rise of the Eldrazi Tokens"
+    }
+  ],
+  "trtr": [
+    {
+      "set_id": 3167,
+      "set_name": "Return to Ravnica Tokens"
+    }
+  ],
+  "trvr": [
+    {
+      "set_id": 3160,
+      "set_name": "Ravnica Remastered Tokens"
+    }
+  ],
+  "tsb": [
+    {
+      "set_id": 3304,
+      "set_name": "Time Spiral Timeshifted"
+    }
+  ],
+  "tshm": [
+    {
+      "set_id": 3212,
+      "set_name": "Shadowmoor Tokens"
+    }
+  ],
+  "tsnc": [
+    {
+      "set_id": 3239,
+      "set_name": "Streets of New Capenna Tokens"
+    }
+  ],
+  "tsoi": [
+    {
+      "set_id": 3216,
+      "set_name": "Shadows over Innistrad Tokens"
+    }
+  ],
+  "tsom": [
+    {
+      "set_id": 3190,
+      "set_name": "Scars of Mirrodin Tokens"
+    }
+  ],
+  "tsp": [
+    {
+      "set_id": 3300,
+      "set_name": "Time Spiral"
+    }
+  ],
+  "tsr": [
+    {
+      "set_id": 3302,
+      "set_name": "Time Spiral Remastered"
+    }
+  ],
+  "tstx": [
+    {
+      "set_id": 2533,
+      "set_name": "Challenger Decks 2022 Tokens"
+    },
+    {
+      "set_id": 3246,
+      "set_name": "Strixhaven: School of Mages Tokens"
+    }
+  ],
+  "tthb": [
+    {
+      "set_id": 3290,
+      "set_name": "Theros Beyond Death Tokens"
+    }
+  ],
+  "tths": [
+    {
+      "set_id": 3295,
+      "set_name": "Theros Tokens"
+    }
+  ],
+  "ttsr": [
+    {
+      "set_id": 3303,
+      "set_name": "Time Spiral Remastered Tokens"
+    }
+  ],
+  "tugl": [
+    {
+      "set_id": 3318,
+      "set_name": "Unglued Tokens"
+    }
+  ],
+  "tuma": [
+    {
+      "set_id": 3313,
+      "set_name": "Ultimate Masters Tokens"
+    }
+  ],
+  "tund": [
+    {
+      "set_id": 3324,
+      "set_name": "Unsanctioned Tokens"
+    }
+  ],
+  "tunf": [
+    {
+      "set_id": 3316,
+      "set_name": "Unfinity Tokens"
+    }
+  ],
+  "tust": [
+    {
+      "set_id": 3327,
+      "set_name": "Unstable Tokens"
+    }
+  ],
+  "tvoc": [
+    {
+      "set_id": 2836,
+      "set_name": "Innistrad: Crimson Vow Commander Tokens"
+    }
+  ],
+  "tvow": [
+    {
+      "set_id": 2840,
+      "set_name": "Innistrad: Crimson Vow Tokens"
+    }
+  ],
+  "twar": [
+    {
+      "set_id": 3342,
+      "set_name": "War of the Spark Tokens"
+    }
+  ],
+  "twho": [
+    {
+      "set_id": 2623,
+      "set_name": "Doctor Who Tokens"
+    }
+  ],
+  "twoc": [
+    {
+      "set_id": 3349,
+      "set_name": "Wilds of Eldraine Commander Tokens"
+    }
+  ],
+  "twoe": [
+    {
+      "set_id": 3354,
+      "set_name": "Wilds of Eldraine Tokens"
+    }
+  ],
+  "twwk": [
+    {
+      "set_id": 3380,
+      "set_name": "Worldwake Tokens"
+    }
+  ],
+  "txln": [
+    {
+      "set_id": 2864,
+      "set_name": "Ixalan Tokens"
+    }
+  ],
+  "tzen": [
+    {
+      "set_id": 3397,
+      "set_name": "Zendikar Tokens"
+    }
+  ],
+  "tznc": [
+    {
+      "set_id": 3391,
+      "set_name": "Zendikar Rising Commander Tokens"
+    }
+  ],
+  "tznr": [
+    {
+      "set_id": 3396,
+      "set_name": "Zendikar Rising Tokens"
+    }
+  ],
+  "uds": [
+    {
+      "set_id": 3329,
+      "set_name": "Urza's Destiny"
+    }
+  ],
+  "ugin": [
+    {
+      "set_id": 3310,
+      "set_name": "Ugin's Fate"
+    }
+  ],
+  "ugl": [
+    {
+      "set_id": 3317,
+      "set_name": "Unglued"
+    }
+  ],
+  "ulg": [
+    {
+      "set_id": 3331,
+      "set_name": "Urza's Legacy"
+    }
+  ],
+  "uma": [
+    {
+      "set_id": 3311,
+      "set_name": "Ultimate Masters"
+    }
+  ],
+  "und": [
+    {
+      "set_id": 3323,
+      "set_name": "Unsanctioned"
+    }
+  ],
+  "unf": [
+    {
+      "set_id": 3314,
+      "set_name": "Unfinity"
+    }
+  ],
+  "unh": [
+    {
+      "set_id": 3319,
+      "set_name": "Unhinged"
+    }
+  ],
+  "unk": [
+    {
+      "set_id": 3077,
+      "set_name": "Mystery Booster 2 Playtest Cards"
+    },
+    {
+      "set_id": 3321,
+      "set_name": "Unknown Event"
+    }
+  ],
+  "usg": [
+    {
+      "set_id": 3333,
+      "set_name": "Urza's Saga"
+    }
+  ],
+  "ust": [
+    {
+      "set_id": 3325,
+      "set_name": "Unstable"
+    }
+  ],
+  "v09": [
+    {
+      "set_id": 2776,
+      "set_name": "From the Vault: Exiled"
+    }
+  ],
+  "v10": [
+    {
+      "set_id": 2780,
+      "set_name": "From the Vault: Relics"
+    }
+  ],
+  "v11": [
+    {
+      "set_id": 2777,
+      "set_name": "From the Vault: Legends"
+    }
+  ],
+  "v12": [
+    {
+      "set_id": 2779,
+      "set_name": "From the Vault: Realms"
+    }
+  ],
+  "v13": [
+    {
+      "set_id": 2782,
+      "set_name": "From the Vault: Twenty"
+    }
+  ],
+  "v14": [
+    {
+      "set_id": 2774,
+      "set_name": "From the Vault: Annihilation"
+    }
+  ],
+  "v15": [
+    {
+      "set_id": 2773,
+      "set_name": "From the Vault: Angels"
+    }
+  ],
+  "v16": [
+    {
+      "set_id": 2778,
+      "set_name": "From the Vault: Lore"
+    }
+  ],
+  "v17": [
+    {
+      "set_id": 2781,
+      "set_name": "From the Vault: Transform"
+    }
+  ],
+  "vis": [
+    {
+      "set_id": 3336,
+      "set_name": "Visions"
+    }
+  ],
+  "voc": [
+    {
+      "set_id": 2835,
+      "set_name": "Innistrad: Crimson Vow Commander"
+    }
+  ],
+  "vow": [
+    {
+      "set_id": 2833,
+      "set_name": "Innistrad: Crimson Vow"
+    }
+  ],
+  "w16": [
+    {
+      "set_id": 3344,
+      "set_name": "Welcome Deck 2016"
+    }
+  ],
+  "w17": [
+    {
+      "set_id": 3345,
+      "set_name": "Welcome Deck 2017"
+    }
+  ],
+  "war": [
+    {
+      "set_id": 3339,
+      "set_name": "War of the Spark"
+    }
+  ],
+  "wc00": [
+    {
+      "set_id": 3370,
+      "set_name": "World Championship Decks 2000"
+    }
+  ],
+  "wc01": [
+    {
+      "set_id": 3371,
+      "set_name": "World Championship Decks 2001"
+    }
+  ],
+  "wc02": [
+    {
+      "set_id": 3372,
+      "set_name": "World Championship Decks 2002"
+    }
+  ],
+  "wc03": [
+    {
+      "set_id": 3373,
+      "set_name": "World Championship Decks 2003"
+    }
+  ],
+  "wc04": [
+    {
+      "set_id": 3374,
+      "set_name": "World Championship Decks 2004"
+    }
+  ],
+  "wc97": [
+    {
+      "set_id": 3367,
+      "set_name": "World Championship Decks 1997"
+    }
+  ],
+  "wc98": [
+    {
+      "set_id": 3368,
+      "set_name": "World Championship Decks 1998"
+    }
+  ],
+  "wc99": [
+    {
+      "set_id": 3369,
+      "set_name": "World Championship Decks 1999"
+    }
+  ],
+  "wdmu": [
+    {
+      "set_id": 2636,
+      "set_name": "Dominaria United Promos"
+    }
+  ],
+  "who": [
+    {
+      "set_id": 2621,
+      "set_name": "Doctor Who"
+    },
+    {
+      "set_id": 2622,
+      "set_name": "Doctor Who Promos"
+    }
+  ],
+  "wmc": [
+    {
+      "set_id": 3376,
+      "set_name": "World Magic Cup Qualifiers"
+    }
+  ],
+  "wmkm": [
+    {
+      "set_id": 2575,
+      "set_name": "Commander Collection: Black Tokens"
+    }
+  ],
+  "woc": [
+    {
+      "set_id": 3348,
+      "set_name": "Wilds of Eldraine Commander"
+    }
+  ],
+  "woe": [
+    {
+      "set_id": 3346,
+      "set_name": "Wilds of Eldraine"
+    }
+  ],
+  "wot": [
+    {
+      "set_id": 3350,
+      "set_name": "Wilds of Eldraine: Enchanting Tales"
+    }
+  ],
+  "wth": [
+    {
+      "set_id": 3343,
+      "set_name": "Weatherlight"
+    }
+  ],
+  "wwk": [
+    {
+      "set_id": 3377,
+      "set_name": "Worldwake"
+    }
+  ],
+  "xln": [
+    {
+      "set_id": 2861,
+      "set_name": "Ixalan"
+    }
+  ],
+  "zen": [
+    {
+      "set_id": 3384,
+      "set_name": "Zendikar"
+    }
+  ],
+  "znc": [
+    {
+      "set_id": 3390,
+      "set_name": "Zendikar Rising Commander"
+    }
+  ],
+  "zne": [
+    {
+      "set_id": 3392,
+      "set_name": "Zendikar Rising Expeditions"
+    }
+  ],
+  "znr": [
+    {
+      "set_id": 3388,
+      "set_name": "Zendikar Rising"
+    }
+  ]
+}

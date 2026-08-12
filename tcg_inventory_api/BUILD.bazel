@@ -23,6 +23,7 @@ java_library(
         ["src/main/java/**/*.java"],
         exclude = HANDLERS,
     ),
+    resources = glob(["src/main/resources/**"]),
     deps = [
         "//lib/dynamodb:lib",
         "//lib/http:lib",
@@ -31,6 +32,7 @@ java_library(
         "//lib/time:lib",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_core",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
