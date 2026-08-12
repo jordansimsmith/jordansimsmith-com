@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Badge,
@@ -10,11 +10,16 @@ import {
   Text,
   Title,
 } from '@mantine/core';
+import { notifications } from '@mantine/notifications';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { ImportStatusBadge } from '../components/ImportStatusBadge';
+import { ImportReviewTable } from '../components/ImportReviewTable';
+import { ConfirmImportModal } from '../components/ConfirmImportModal';
+import { PlacementInstructionsView } from '../components/PlacementInstructionsView';
 import { apiClient } from '../api/client';
-import type { ImportDetail } from '../api/client';
+import type { ConfirmImportResponse, ImportDetail } from '../api/client';
+import { useListNavigation } from '../hooks/use-list-navigation';
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -24,6 +29,25 @@ export function ImportDetailPage() {
   const [importDetail, setImportDetail] = useState<ImportDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmResult, setConfirmResult] =
+    useState<ConfirmImportResponse | null>(null);
+  // this page has no search input; the ref keeps the navigation hook inert on "/"
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  const rows = importDetail?.rows ?? [];
+  const showReview =
+    importDetail !== null &&
+    importDetail.status !== 'appraising' &&
+    !importDetail.appraisal_error &&
+    confirmResult === null;
+
+  const { selectedIndex, setSelectedIndex } = useListNavigation({
+    itemCount: showReview ? rows.length : 0,
+    onOpen: () => {},
+    searchInputRef,
+  });
 
   useEffect(() => {
     if (!importId) {
@@ -64,7 +88,7 @@ export function ImportDetailPage() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') {
+      if (event.key !== 'Escape' || confirmOpen) {
         return;
       }
       const target = event.target;
@@ -79,7 +103,28 @@ export function ImportDetailPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [navigate]);
+  }, [confirmOpen, navigate]);
+
+  const handleConfirm = async () => {
+    if (!importId) {
+      return;
+    }
+    setConfirming(true);
+    try {
+      const response = await apiClient.confirmImport(importId);
+      setConfirmResult(response);
+      setConfirmOpen(false);
+      setImportDetail((current) =>
+        current ? { ...current, status: response.status } : current,
+      );
+    } catch (e) {
+      const message =
+        e instanceof Error ? e.message : 'Failed to confirm import';
+      notifications.show({ title: 'Error', message, color: 'red' });
+    } finally {
+      setConfirming(false);
+    }
+  };
 
   const appraised = importDetail
     ? importDetail.keep_count +
@@ -134,21 +179,48 @@ export function ImportDetailPage() {
                   />
                 </Stack>
               )}
-            {!importDetail.appraisal_error &&
-              importDetail.status === 'review' && (
-                <Text size="sm">Appraisal complete.</Text>
-              )}
-            <Group gap="sm">
-              <Badge variant="light" color="green">
-                Keep {importDetail.keep_count}
-              </Badge>
-              <Badge variant="light" color="gray">
-                Discard {importDetail.discard_count}
-              </Badge>
-              <Badge variant="light" color="yellow">
-                Review {importDetail.review_count}
-              </Badge>
-            </Group>
+            {confirmResult === null && (
+              <Group justify="space-between" align="center">
+                <Group gap="sm">
+                  <Badge variant="light" color="green">
+                    Keep {importDetail.keep_count}
+                  </Badge>
+                  <Badge variant="light" color="gray">
+                    Discard {importDetail.discard_count}
+                  </Badge>
+                  <Badge variant="light" color="yellow">
+                    Review {importDetail.review_count}
+                  </Badge>
+                </Group>
+                {importDetail.status === 'review' && (
+                  <Button onClick={() => setConfirmOpen(true)}>
+                    Confirm import
+                  </Button>
+                )}
+              </Group>
+            )}
+            {showReview && rows.length > 0 && (
+              <ImportReviewTable
+                rows={rows}
+                selectedIndex={selectedIndex}
+                onSelect={setSelectedIndex}
+              />
+            )}
+            {confirmResult && (
+              <PlacementInstructionsView
+                result={confirmResult}
+                onDone={() => navigate('/imports')}
+              />
+            )}
+            <ConfirmImportModal
+              opened={confirmOpen}
+              keepCount={importDetail.keep_count}
+              discardCount={importDetail.discard_count}
+              reviewCount={importDetail.review_count}
+              loading={confirming}
+              onCancel={() => setConfirmOpen(false)}
+              onConfirm={handleConfirm}
+            />
           </>
         )}
       </Stack>

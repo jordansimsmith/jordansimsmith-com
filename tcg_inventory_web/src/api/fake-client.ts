@@ -1,6 +1,7 @@
 import type {
   ApiClient,
   Condition,
+  ConfirmImportResponse,
   Finish,
   FindImportsResponse,
   FindSkusParams,
@@ -8,6 +9,7 @@ import type {
   ImportDetail,
   ImportStatus,
   ImportSummary,
+  PlacementInstruction,
   RowDecision,
   SettingsResponse,
   SkuDetail,
@@ -136,12 +138,16 @@ function createSeedState(): FakeSku[] {
   );
 }
 
-function deriveLocation(sequenceNumber: number): string {
+function deriveBlock(sequenceNumber: number): string {
   const block = Math.floor(sequenceNumber / 100);
   const letter = String.fromCharCode(
     'A'.charCodeAt(0) + Math.floor(block / 100),
   );
-  return `${letter}${block % 100}-${sequenceNumber % 100}`;
+  return `${letter}${block % 100}`;
+}
+
+function deriveLocation(sequenceNumber: number): string {
+  return `${deriveBlock(sequenceNumber)}-${sequenceNumber % 100}`;
 }
 
 function countByStatus(sku: FakeSku, status: UnitStatus): number {
@@ -203,6 +209,33 @@ interface FakeImportRow {
   scryfall_id: string;
   decision: RowDecision;
   decision_reason: string | null;
+  market_price: string | null;
+  suggested_price: string | null;
+}
+
+function formatPrice(cents: number): string {
+  return (cents / 100).toFixed(2);
+}
+
+function appraisePrices(
+  decision: RowDecision,
+  position: number,
+): Pick<FakeImportRow, 'market_price' | 'suggested_price'> {
+  if (decision === 'review') {
+    return { market_price: null, suggested_price: null };
+  }
+  if (decision === 'discard') {
+    // below the NZ$0.25 keep threshold
+    return {
+      market_price: formatPrice(5 + ((position * 3) % 4) * 5),
+      suggested_price: null,
+    };
+  }
+  const marketCents = 30 + ((position * 37) % 20) * 25;
+  return {
+    market_price: formatPrice(marketCents),
+    suggested_price: formatPrice(Math.max(25, marketCents - 5)),
+  };
 }
 
 interface FakeImport {
@@ -271,6 +304,7 @@ function createSeedImportRows(count: number): FakeImportRow[] {
       scryfall_id: scryfallId,
       decision,
       decision_reason: decisionReason,
+      ...appraisePrices(decision, position),
     });
   }
   return rows;
@@ -357,6 +391,8 @@ function toImportDetail(importRecord: FakeImport): ImportDetail {
       scryfall_id: row.scryfall_id,
       decision: index < appraised ? row.decision : null,
       decision_reason: index < appraised ? row.decision_reason : null,
+      market_price: index < appraised ? row.market_price : null,
+      suggested_price: index < appraised ? row.suggested_price : null,
     })),
   };
 }
@@ -365,6 +401,8 @@ export function createFakeClient(): ApiClient {
   const skus = createSeedState();
   const importRecords = createSeedImports();
   let importCounter = importRecords.length;
+  // seed units occupy sequence numbers 0-599 (blocks A0-A5)
+  let nextSequenceNumber = 600;
 
   const getSkuOrThrow = (skuId: string): FakeSku => {
     const sku = skus.find((candidate) => candidate.sku_id === skuId);
@@ -408,6 +446,7 @@ export function createFakeClient(): ApiClient {
       for (const parsed of [...parsedRows].reverse()) {
         for (let copy = 0; copy < parsed.quantity; copy += 1) {
           position += 1;
+          const decided = decideRow(parsed, position);
           rows.push({
             position,
             name: parsed.name,
@@ -417,7 +456,8 @@ export function createFakeClient(): ApiClient {
             finish: parsed.finish,
             condition: parsed.condition,
             scryfall_id: parsed.scryfall_id,
-            ...decideRow(parsed, position),
+            ...decided,
+            ...appraisePrices(decided.decision, position),
           });
         }
       }
@@ -445,6 +485,70 @@ export function createFakeClient(): ApiClient {
 
     async getImport(importId: string): Promise<ImportDetail> {
       return toImportDetail(getImportOrThrow(importId));
+    },
+
+    async confirmImport(importId: string): Promise<ConfirmImportResponse> {
+      const importRecord = getImportOrThrow(importId);
+      if (importRecord.status !== 'review') {
+        throw new Error('import is not in review status');
+      }
+      // sequence numbers are assigned bottom-up (raw csv order), the reverse of review order
+      const keepRows = [...importRecord.rows]
+        .sort((a, b) => b.position - a.position)
+        .filter((row) => row.decision === 'keep');
+      const sequenceNumbers: number[] = [];
+      for (const row of keepRows) {
+        const sequenceNumber = nextSequenceNumber;
+        nextSequenceNumber += 1;
+        const skuId = `${row.scryfall_id}#${row.finish}#${row.condition}`;
+        let sku = skus.find((candidate) => candidate.sku_id === skuId);
+        if (!sku) {
+          sku = {
+            sku_id: skuId,
+            scryfall_id: row.scryfall_id,
+            name: row.name,
+            set_code: row.set_code,
+            set_name: row.set_name,
+            collector_number: row.collector_number,
+            finish: row.finish,
+            condition: row.condition,
+            units: [],
+          };
+          skus.push(sku);
+        }
+        sku.units.push({ sequence_number: sequenceNumber, status: 'in_stock' });
+        sequenceNumbers.push(sequenceNumber);
+      }
+      importRecord.status = 'confirmed';
+
+      const first = sequenceNumbers.length > 0 ? sequenceNumbers[0] : null;
+      const last =
+        sequenceNumbers.length > 0
+          ? sequenceNumbers[sequenceNumbers.length - 1]
+          : null;
+      const placementInstructions: PlacementInstruction[] = [];
+      if (first !== null && last !== null) {
+        let from = first;
+        while (from <= last) {
+          const to = Math.min(Math.floor(from / 100) * 100 + 99, last);
+          placementInstructions.push({
+            block: deriveBlock(from),
+            from_location: deriveLocation(from),
+            to_location: deriveLocation(to),
+            unit_count: to - from + 1,
+          });
+          from = to + 1;
+        }
+      }
+
+      return {
+        import_id: importRecord.import_id,
+        status: importRecord.status,
+        unit_count: sequenceNumbers.length,
+        first_sequence_number: first,
+        last_sequence_number: last,
+        placement_instructions: placementInstructions,
+      };
     },
 
     async findSkus(params?: FindSkusParams): Promise<FindSkusResponse> {

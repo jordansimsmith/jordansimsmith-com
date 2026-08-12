@@ -1,4 +1,11 @@
-import { render, screen, cleanup, act, waitFor } from '@testing-library/react';
+import {
+  render,
+  screen,
+  cleanup,
+  act,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
@@ -6,7 +13,7 @@ import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ImportDetailPage } from './ImportDetailPage';
 import * as clientModule from '../api/client';
-import type { ImportDetail } from '../api/client';
+import type { ImportDetail, ImportRow } from '../api/client';
 
 function importDetail(overrides: Partial<ImportDetail> = {}): ImportDetail {
   return {
@@ -22,6 +29,59 @@ function importDetail(overrides: Partial<ImportDetail> = {}): ImportDetail {
     rows: [],
     ...overrides,
   };
+}
+
+function importRow(
+  position: number,
+  overrides: Partial<ImportRow> = {},
+): ImportRow {
+  return {
+    position,
+    name: `Card ${position}`,
+    set_code: 'dom',
+    set_name: 'Dominaria',
+    collector_number: String(position),
+    finish: 'normal',
+    condition: 'NM',
+    scryfall_id: `00000000-0000-4000-8000-${String(position).padStart(12, '0')}`,
+    decision: 'keep',
+    decision_reason: null,
+    market_price: '1.00',
+    suggested_price: '0.95',
+    ...overrides,
+  };
+}
+
+function reviewImport(overrides: Partial<ImportDetail> = {}): ImportDetail {
+  return importDetail({
+    status: 'review',
+    row_count: 3,
+    keep_count: 1,
+    discard_count: 1,
+    review_count: 1,
+    rows: [
+      importRow(1, {
+        name: 'Top Card',
+        market_price: '4.55',
+        suggested_price: '4.50',
+      }),
+      importRow(2, {
+        name: 'Middle Card',
+        decision: 'discard',
+        decision_reason: 'market price below NZ$0.25 keep threshold',
+        market_price: '0.10',
+        suggested_price: null,
+      }),
+      importRow(3, {
+        name: 'Bottom Card',
+        decision: 'review',
+        decision_reason: 'non-English card',
+        market_price: null,
+        suggested_price: null,
+      }),
+    ],
+    ...overrides,
+  });
 }
 
 function renderImportDetailPage() {
@@ -86,7 +146,9 @@ describe('ImportDetailPage', () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
     expect(screen.getByText('review')).toBeDefined();
-    expect(screen.getByText('Appraisal complete.')).toBeDefined();
+    expect(
+      screen.getByRole('button', { name: 'Confirm import' }),
+    ).toBeDefined();
     expect(screen.getByText('Keep 33')).toBeDefined();
     expect(getImportMock).toHaveBeenCalledTimes(2);
 
@@ -145,5 +207,132 @@ describe('ImportDetailPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Imports list')).toBeDefined();
     });
+  });
+
+  it('renders review rows in stack order with decisions and prices', async () => {
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport(),
+    );
+
+    renderImportDetailPage();
+
+    expect(await screen.findByText('Top Card')).toBeDefined();
+    const dataRows = screen.getAllByRole('row').slice(1);
+    expect(dataRows).toHaveLength(3);
+    expect(dataRows[0].textContent).toContain('Top Card');
+    expect(dataRows[0].textContent).toContain('$4.55');
+    expect(dataRows[0].textContent).toContain('$4.50');
+    expect(dataRows[0].textContent).toContain('keep');
+    expect(dataRows[1].textContent).toContain('Middle Card');
+    expect(dataRows[1].textContent).toContain('discard');
+    expect(dataRows[1].textContent).toContain(
+      'market price below NZ$0.25 keep threshold',
+    );
+    expect(dataRows[2].textContent).toContain('Bottom Card');
+    expect(dataRows[2].textContent).toContain('review');
+    expect(dataRows[2].textContent).toContain('non-English card');
+    expect(
+      screen.getByRole('button', { name: 'Confirm import' }),
+    ).toBeDefined();
+  });
+
+  it('moves the selected row with j and k', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport(),
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+
+    const rowFor = (name: string) => screen.getByText(name).closest('tr');
+    expect(rowFor('Top Card')?.getAttribute('data-selected')).toBe('true');
+
+    await user.keyboard('j');
+    expect(rowFor('Middle Card')?.getAttribute('data-selected')).toBe('true');
+
+    await user.keyboard('k');
+    expect(rowFor('Top Card')?.getAttribute('data-selected')).toBe('true');
+  });
+
+  it('confirms the import and shows placement instructions', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport(),
+    );
+    vi.spyOn(clientModule.apiClient, 'confirmImport').mockResolvedValue({
+      import_id: 'import-2',
+      status: 'confirmed',
+      unit_count: 87,
+      first_sequence_number: 4200,
+      last_sequence_number: 4286,
+      placement_instructions: [
+        {
+          block: 'A42',
+          from_location: 'A42-0',
+          to_location: 'A42-86',
+          unit_count: 87,
+        },
+      ],
+    });
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+
+    await user.click(screen.getByRole('button', { name: 'Confirm import' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/Pull the 1 discard card/)).toBeDefined();
+    expect(
+      within(dialog).getByText(/Set aside the 1 review card/),
+    ).toBeDefined();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+
+    await waitFor(() => {
+      expect(clientModule.apiClient.confirmImport).toHaveBeenCalledWith(
+        'import-2',
+      );
+    });
+    expect(await screen.findByText('Placement instructions')).toBeDefined();
+    expect(screen.getByText('A42')).toBeDefined();
+    expect(screen.getByText('87 cards')).toBeDefined();
+    expect(screen.getByText('A42-0 through A42-86')).toBeDefined();
+    expect(screen.getByText('confirmed')).toBeDefined();
+    expect(screen.queryByText('Top Card')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Confirm import' })).toBeNull();
+  });
+
+  it('surfaces confirm failures and stays on the review table', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport(),
+    );
+    vi.spyOn(clientModule.apiClient, 'confirmImport').mockRejectedValue(
+      new Error('import is not in review status'),
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+
+    await user.click(screen.getByRole('button', { name: 'Confirm import' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+
+    expect(
+      await screen.findByText('import is not in review status'),
+    ).toBeDefined();
+    expect(screen.getByText('Top Card')).toBeDefined();
+    expect(screen.queryByText('Placement instructions')).toBeNull();
+  });
+
+  it('renders a confirmed import read-only without a confirm button', async () => {
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport({ status: 'confirmed' }),
+    );
+
+    renderImportDetailPage();
+
+    expect(await screen.findByText('Top Card')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Confirm import' })).toBeNull();
   });
 });

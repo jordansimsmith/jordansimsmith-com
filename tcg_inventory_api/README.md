@@ -24,7 +24,7 @@ The TCG inventory API service is the source of truth for a physical Magic: The G
 
 ### In scope
 
-- Authenticated CRUD for imports: upload a ManaBox CSV, appraise rows asynchronously, review and override rows, confirm keepers into inventory, delete unwanted imports before confirm.
+- Authenticated CRUD for imports: upload a ManaBox CSV, appraise rows asynchronously, review appraisal decisions, confirm keepers into inventory, delete unwanted imports before confirm.
 - Appraisal per row: FetchTCG identity resolution for the CSV-identified printing (cached on the SKU after first sight), keep filter, and suggested policy price.
 - Inventory browse: SKU search and detail with unit lists and derived locations.
 - Manual audited adjustments: remove a unit; change a unit's condition (moving it between SKUs).
@@ -77,7 +77,7 @@ sequenceDiagram
   A-->>W: import_id + job_id
   J->>F: resolve identity + market appraisal per row
   J-->>A: rows keep/discard/review (job item progress)
-  U->>W: review rows, remove discards from stack
+  U->>W: review rows, remove discards and review cards from stack
   W->>A: POST /imports/{import_id}/confirm
   A->>A: allocate sequence numbers, append units, mark SKUs dirty, audit
   A-->>W: placement instructions
@@ -139,7 +139,7 @@ sequenceDiagram
 - Request and response fields use `snake_case`; no path version segment
 - Non-2xx responses use `{"message": "error details"}`
 - Async work is observed through the affected resource, not a generic jobs API: appraisal progress and errors ride on the import (`GET /imports/{import_id}`), publish progress and errors on `GET /publish` (current-or-latest run). Job items exist in storage only as internal continuation state.
-- Verb convention: edits that record client-owned data use `PUT`/`PATCH` on the resource; domain actions that cause server-side cascades (confirm, publish) are `POST` sub-resource actions with transition-specific contracts
+- Verb convention: edits that record client-owned data use `PUT` on the resource; domain actions that cause server-side cascades (confirm, publish) are `POST` sub-resource actions with transition-specific contracts
 
 ### Endpoint summary
 
@@ -148,7 +148,6 @@ sequenceDiagram
 | `POST`   | `/imports`                               | upload a ManaBox CSV; starts the appraise job                                          |
 | `GET`    | `/imports`                               | list imports newest-first                                                              |
 | `GET`    | `/imports/{import_id}`                   | import status, progress, and rows                                                      |
-| `PATCH`  | `/imports/{import_id}/rows/{position}`   | override a row decision or fix its identity                                            |
 | `POST`   | `/imports/{import_id}/confirm`           | append keeper units; returns placement instructions                                    |
 | `DELETE` | `/imports/{import_id}`                   | delete an unconfirmed import and its rows                                              |
 | `GET`    | `/skus`                                  | browse/search SKUs (prefix search, continuation paging)                                |
@@ -190,7 +189,6 @@ Response `200`:
 Representative failures:
 
 - `409`: `{"message":"import is not in review status"}` (double confirm, or confirm during appraisal)
-- `409`: `{"message":"import has unresolved review rows"}`
 - `404`: `{"message":"Not Found"}` (unknown import in user scope)
 
 `GET /skus/{sku_id}`
@@ -288,7 +286,7 @@ price = max(0.25, round_nearest_half_up(benchmark, 0.05))
 | SKU              | `USER#<u>#SKU#<sku_id>`       | `SKU`                          | scryfall_id, finish, condition, name, set_code, set_name, collector_number, fetchtcg_card_id, fetchtcg_set_id, `in_stock_count`, `reserved_count`, `sold_count`, `dirty`, `fetchtcg_listing_id`, `last_published_quantity`, `last_published_price`, `last_published_at` |
 | Unit             | `USER#<u>#SKU#<sku_id>`       | `UNIT#<sequence_number>`       | sequence_number, status, import_id, order_id (when reserved/sold), timestamps                                                                                                                                                                                           |
 | Import           | `USER#<u>`                    | `IMPORT#<ulid>`                | filename, status, row counts, appraisal_error (when the appraise job fails), timestamps                                                                                                                                                                                 |
-| Import row       | `USER#<u>#IMPORT#<import_id>` | `ROW#<stack position, padded>` | raw CSV fields, resolved identity, decision + reason, appraisal evidence (market price, rival evidence, suggested price), user overrides, assigned sequence_number                                                                                                      |
+| Import row       | `USER#<u>#IMPORT#<import_id>` | `ROW#<stack position, padded>` | raw CSV fields, resolved identity, decision + reason, appraisal evidence (market price, rival evidence, suggested price), assigned sequence_number                                                                                                                      |
 | Order            | `USER#<u>`                    | `ORDER#<fetchtcg_offer_id>`    | state, FetchTCG status/currentAction snapshot, accepted_at, delivery_mode, financial totals (no buyer PII), embedded lines `[{sku_id, fetchtcg_listing_id, quantity, price, allocated sequence_numbers}]`                                                               |
 | Audit entry      | `USER#<u>#AUDIT`              | `<ulid>`                       | event_type (`import_confirm`, `adjustment`, `reserve`, `release`, `sell`, `publish`, `credential_update`), affected sku_ids / unit sequence_numbers / order_id / import_id, before/after summary                                                                        |
 | Job              | `USER#<u>`                    | `JOB#<ulid>`                   | internal continuation state, never an API resource: type (`appraise` \| `publish`), status (`queued` \| `running` \| `succeeded` \| `failed`), continuation, progress counters, error                                                                                   |
@@ -350,7 +348,7 @@ All mutations are `TransactWriteItems` including their audit entry; counters use
 
 - CSV rows are quantity-expanded; CSV row order is physical bottom-up (ManaBox stacks last-scanned-on-top). Review presents top-of-stack first (reverse CSV order); confirm assigns sequence numbers bottom-up (raw CSV order), so the reviewed stack slots into the box in one motion with placement order equal to location order.
 - Sequence numbers are unique per user: allocation is an atomic counter `ADD` (disjoint ranges by construction), the confirming-status gate prevents double allocation for one import, and unit keys embed the sequence number so within-SKU duplicates are unwritable.
-- Discarded and review rows never create units; only `keep` rows are confirmed. Unresolved review rows block confirm.
+- Discarded and review rows never create units; only `keep` rows are confirmed. Appraisal decisions are final for an import: review cards are set aside physically and return through a later import once their cause is fixed.
 - Import deletion is allowed only while `appraising` or `review` (409 otherwise) and removes the import and all its rows. An appraise job whose import has been deleted detects this at its next slice and completes cleanly without further writes.
 - English-only intake: non-English, misprint, and altered rows become `review`; unmapped sets and unresolvable identities become `review` rather than guesses.
 - The FetchTCG listing projection counts only `in_stock` units. Reserved and sold units are excluded. Upward and downward corrections, including delisting at zero, occur only for SKUs dirtied by an audited mutation.
@@ -419,7 +417,7 @@ Rotated refresh tokens returned by Firebase are written back to the same key.
 ## Testing and quality gates
 
 - Unit tests: pricing policy scenarios (keep filter, undercut tick, deep-discount guard, supported floor, sole-source premium, rounding, floor), condition translation, set mapping, sequence/block/location derivation, FetchTCG client pacing/retries/allowlist/fail-closed auth with fixture responses, offer state mapping.
-- Integration tests (DynamoDB Testcontainers, LocalStack SQS): import upload→rows, row overrides, confirm idempotency and double-confirm rejection, adjustments, reserve/release/sell transitions, publish create/update/delist and conditional clear, duplicate-delivery no-ops, masked credential handling.
+- Integration tests (DynamoDB Testcontainers, LocalStack SQS): import upload→rows, confirm idempotency and double-confirm rejection, adjustments, reserve/release/sell transitions, publish create/update/delist and conditional clear, duplicate-delivery no-ops, masked credential handling.
 - E2E (LocalStack): import → appraise → confirm → publish → order → pull → confirm loop.
 - Tests never call the live FetchTCG API.
 - Required checks: `bazel build //tcg_inventory_api:all`, `bazel test //tcg_inventory_api:all`, then repo-level `bazel mod tidy` and `bazel run //:format`.
@@ -435,7 +433,7 @@ Rotated refresh tokens returned by Firebase are written back to the same key.
 
 1. User uploads a 90-card ManaBox CSV; rows persist and the appraise job runs.
 2. Appraisal resolves identities (cache hits skip FetchTCG search), applies the keep filter, and prices keepers; three rows become `review` (one non-English, one unmapped set, one below threshold is `discard`).
-3. User reviews top-of-stack first, resolves the review rows, physically removes discards, and confirms.
+3. User reviews top-of-stack first, physically removes the discards, sets aside the review cards, and confirms.
 4. Confirm allocates sequence numbers 4200–4286, appends 87 units bottom-up, dirties 61 SKUs, and returns placement instructions ("A42-0 through A42-86").
 5. User boxes the stack in one motion and triggers publish; the order phase finds nothing new; the publish phase upserts 61 listings (creates priced by policy, updates as absolute quantities) and clears the markers.
 

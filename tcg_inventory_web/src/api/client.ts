@@ -83,10 +83,28 @@ export interface ImportRow {
   scryfall_id: string;
   decision: RowDecision | null;
   decision_reason: string | null;
+  market_price: string | null;
+  suggested_price: string | null;
 }
 
 export interface ImportDetail extends ImportSummary {
   rows: ImportRow[];
+}
+
+export interface PlacementInstruction {
+  block: string;
+  from_location: string;
+  to_location: string;
+  unit_count: number;
+}
+
+export interface ConfirmImportResponse {
+  import_id: string;
+  status: ImportStatus;
+  unit_count: number;
+  first_sequence_number: number | null;
+  last_sequence_number: number | null;
+  placement_instructions: PlacementInstruction[];
 }
 
 export interface ApiClient {
@@ -94,6 +112,7 @@ export interface ApiClient {
   createImport(filename: string, csv: string): Promise<ImportSummary>;
   findImports(): Promise<FindImportsResponse>;
   getImport(importId: string): Promise<ImportDetail>;
+  confirmImport(importId: string): Promise<ConfirmImportResponse>;
   findSkus(params?: FindSkusParams): Promise<FindSkusResponse>;
   getSku(skuId: string): Promise<SkuDetail>;
   deleteUnit(

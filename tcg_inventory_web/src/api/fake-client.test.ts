@@ -250,4 +250,140 @@ describe('createFakeClient imports', () => {
 
     await expect(client.getImport('missing')).rejects.toThrow('Not Found');
   });
+
+  it('appraises prices for keep and discard rows', async () => {
+    vi.useFakeTimers();
+    const client = createFakeClient();
+    const created = await client.createImport('bulk.csv', SAMPLE_CSV);
+
+    let detail = await client.getImport(created.import_id);
+    expect(detail.rows[3].market_price).toBeNull();
+
+    vi.advanceTimersByTime(60_000);
+    detail = await client.getImport(created.import_id);
+    expect(detail.rows[0].decision).toBe('review');
+    expect(detail.rows[0].market_price).toBeNull();
+    expect(detail.rows[0].suggested_price).toBeNull();
+    expect(detail.rows[3].decision).toBe('keep');
+    expect(detail.rows[3].market_price).toMatch(/^\d+\.\d{2}$/);
+    expect(detail.rows[3].suggested_price).toMatch(/^\d+\.\d{2}$/);
+
+    const confirmedSeed = await client.getImport('fake-import-1');
+    const discardRow = confirmedSeed.rows.find(
+      (row) => row.decision === 'discard',
+    );
+    expect(Number(discardRow?.market_price)).toBeLessThan(0.25);
+    expect(discardRow?.suggested_price).toBeNull();
+  });
+
+  it('rejects confirm unless the import is in review', async () => {
+    vi.useFakeTimers();
+    const client = createFakeClient();
+    const created = await client.createImport('bulk.csv', SAMPLE_CSV);
+
+    await expect(client.confirmImport(created.import_id)).rejects.toThrow(
+      'import is not in review status',
+    );
+
+    vi.advanceTimersByTime(60_000);
+    await client.confirmImport(created.import_id);
+    await expect(client.confirmImport(created.import_id)).rejects.toThrow(
+      'import is not in review status',
+    );
+  });
+
+  it('confirms keep rows bottom-up into inventory and skips review rows', async () => {
+    vi.useFakeTimers();
+    const client = createFakeClient();
+    const created = await client.createImport('bulk.csv', SAMPLE_CSV);
+    vi.advanceTimersByTime(60_000);
+
+    const response = await client.confirmImport(created.import_id);
+
+    expect(response.import_id).toBe(created.import_id);
+    expect(response.status).toBe('confirmed');
+    expect(response.unit_count).toBe(3);
+    expect(response.first_sequence_number).toBe(600);
+    expect(response.last_sequence_number).toBe(602);
+    expect(response.placement_instructions).toEqual([
+      {
+        block: 'A6',
+        from_location: 'A6-0',
+        to_location: 'A6-2',
+        unit_count: 3,
+      },
+    ]);
+
+    // the stack bottom (llanowar elves, csv row 1) gets the first sequence number
+    const elves = await client.getSku(
+      '581b7327-3215-4a4f-b4ae-d9d4002ba882#normal#NM',
+    );
+    expect(elves.in_stock_count).toBe(7);
+    expect(elves.units.map((unit) => unit.sequence_number)).toContain(600);
+
+    // the lp opt sku did not exist and is created by the confirm
+    const opt = await client.getSku(
+      '25f2e4d0-effd-4e83-b7aa-1a0d8f120951#normal#LP',
+    );
+    expect(opt.in_stock_count).toBe(2);
+    expect(opt.units.map((unit) => unit.sequence_number)).toEqual([601, 602]);
+
+    // the review row (non-english ponder) never becomes a unit
+    await expect(
+      client.getSku('81c908ee-e70a-4406-a32d-ab5ab17e67b1#normal#MP'),
+    ).rejects.toThrow('Not Found');
+
+    const detail = await client.getImport(created.import_id);
+    expect(detail.status).toBe('confirmed');
+  });
+
+  it('splits placement instructions at block boundaries', async () => {
+    vi.useFakeTimers();
+    const client = createFakeClient();
+    const csv = [
+      MANABOX_HEADER,
+      'Relentless Rats,8ed,Eighth Edition,151,normal,uncommon,130,aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa,false,false,near_mint,en',
+    ].join('\n');
+    const created = await client.createImport('rats.csv', csv);
+    vi.advanceTimersByTime(120_000);
+
+    const response = await client.confirmImport(created.import_id);
+
+    // 130 rows with every 5th discarded leaves 104 keeps spanning two blocks
+    expect(response.unit_count).toBe(104);
+    expect(response.first_sequence_number).toBe(600);
+    expect(response.last_sequence_number).toBe(703);
+    expect(response.placement_instructions).toEqual([
+      {
+        block: 'A6',
+        from_location: 'A6-0',
+        to_location: 'A6-99',
+        unit_count: 100,
+      },
+      {
+        block: 'A7',
+        from_location: 'A7-0',
+        to_location: 'A7-3',
+        unit_count: 4,
+      },
+    ]);
+  });
+
+  it('confirms an import with no keep rows without placements', async () => {
+    vi.useFakeTimers();
+    const client = createFakeClient();
+    const csv = [
+      MANABOX_HEADER,
+      'Ponder,m12,Magic 2012,73,normal,common,1,81c908ee-e70a-4406-a32d-ab5ab17e67b1,false,false,good,ja',
+    ].join('\n');
+    const created = await client.createImport('review-only.csv', csv);
+    vi.advanceTimersByTime(10_000);
+
+    const response = await client.confirmImport(created.import_id);
+
+    expect(response.unit_count).toBe(0);
+    expect(response.first_sequence_number).toBeNull();
+    expect(response.last_sequence_number).toBeNull();
+    expect(response.placement_instructions).toEqual([]);
+  });
 });

@@ -2,6 +2,7 @@ import { getSession } from '../auth/session';
 import type {
   ApiClient,
   Condition,
+  ConfirmImportResponse,
   FindImportsResponse,
   FindSkusParams,
   FindSkusResponse,
@@ -69,6 +70,14 @@ export function createHttpClient(): ApiClient {
     async getImport(importId: string): Promise<ImportDetail> {
       const response = await authenticatedFetch(
         `/imports/${encodeURIComponent(importId)}`,
+      );
+      return response.json();
+    },
+
+    async confirmImport(importId: string): Promise<ConfirmImportResponse> {
+      const response = await authenticatedFetch(
+        `/imports/${encodeURIComponent(importId)}/confirm`,
+        { method: 'POST' },
       );
       return response.json();
     },

@@ -12,7 +12,7 @@ The TCG inventory web service is a keyboard-first single-page app for running a 
 
 ## User stories
 
-- As a card seller working through a physical stack, I want to review an import top-of-stack first with single-key decisions, so that daily intake needs no mouse and tracks the cards in my hand.
+- As a card seller working through a physical stack, I want to review an import top-of-stack first while pulling out its discard and review cards, so that daily intake tracks the cards in my hand.
 - As a card seller, I want a dense full-width inventory view with instant prefix search, so that I can find any SKU and its storage location in seconds.
 - As a card seller standing at my boxes, I want a phone-friendly pull sheet in location order, so that I can pull an order one-handed in a single forward pass.
 - As a card seller, I want to trigger a publish run and watch its progress, so that FetchTCG listings converge with my inventory on demand.
@@ -23,7 +23,7 @@ The TCG inventory web service is a keyboard-first single-page app for running a 
 ### In scope
 
 - Authenticate with username/password against the backend and persist a Basic auth session in `localStorage`; protect all routes and redirect unauthenticated users to `/`.
-- Import flow: upload a ManaBox CSV, watch appraisal progress, review rows in stack order with keyboard-first decisions, resolve review rows, confirm, and display placement instructions.
+- Import flow: upload a ManaBox CSV, watch appraisal progress, review appraisal decisions in stack order while pulling discard and review cards from the stack, confirm keepers, and display placement instructions.
 - Inventory: dense SKU table with counts, prefix search, SKU detail with the Scryfall card image, units, and derived locations, and manual adjustments (remove unit, change condition).
 - Orders: list and detail with state badges, location-ordered pull sheet optimized for one-handed phone use, confirm-pull action.
 - Publish widget (no dedicated jobs page): trigger a publish run, show the pending publish count (SKUs with unpublished inventory changes), and poll/render the current-or-latest run's progress and outcome. Appraisal progress and errors render on the import pages.
@@ -64,7 +64,7 @@ sequenceDiagram
     web->>api: GET /imports/{import_id}
     api-->>web: progress + rows
   end
-  user->>web: review rows with y/d/r keys, confirm
+  user->>web: review rows, pull discards and review cards, confirm
   web->>api: POST /imports/{import_id}/confirm
   api-->>web: placement instructions
   web-->>user: "place 87 cards into A42" screen
@@ -87,14 +87,14 @@ sequenceDiagram
 
 Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it verbatim: SKU, unit, sequence number, block, location (`A42-42`), import (`appraising` → `review` → `confirming` → `confirmed`; deletable before confirm), appraise and publish jobs, order states (`awaiting_payment`, `to_pick`, `fulfilled`, `voided`), pull sheet.
 
-- **Keep/discard/review row**: an import row's appraisal decision; review rows must be resolved before confirm.
+- **Keep/discard/review row**: an import row's appraisal decision; decisions are final for the import. Review cards are set aside physically, never ingested, and return through a later import once their cause is fixed.
 - **Placement instructions**: the post-confirm screen mapping the confirmed stack to block labels and location ranges.
 - **Pending publish badge**: count of SKUs with unpublished inventory changes shown on the publish trigger.
 
 ## Keyboard contract
 
-- List views (inventory, imports, import review, orders): `j`/`k` move selection down/up, `gg`/`G` jump to first/last row, `/` focuses search, `Enter` opens the selected row, `Escape` closes detail or clears search focus.
-- Import review row actions: `y` mark keep, `d` mark discard, `r` open the resolve dialog for a review row, `u` revert the row to its appraised suggestion.
+- List views (inventory, imports, orders): `j`/`k` move selection down/up, `gg`/`G` jump to first/last row, `/` focuses search, `Enter` opens the selected row, `Escape` closes detail or clears search focus.
+- Import review is read-only: the same movement keys track the selected row while the user leafs through the physical stack; rows carry no actions.
 - Destructive or committing actions (confirm import, confirm pull, remove unit, delete import) are explicit buttons with confirmation dialogs — never single keys.
 - Keyboard interactions are desktop affordances; all actions remain reachable by touch.
 
@@ -114,7 +114,6 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 | `POST`   | `/imports`                               | import upload                           |
 | `GET`    | `/imports`                               | imports list                            |
 | `GET`    | `/imports/{import_id}`                   | appraisal progress + review rows        |
-| `PATCH`  | `/imports/{import_id}/rows/{position}`   | review row decisions and identity fixes |
 | `POST`   | `/imports/{import_id}/confirm`           | confirm flow + placement instructions   |
 | `DELETE` | `/imports/{import_id}`                   | delete-import action                    |
 | `GET`    | `/skus`                                  | inventory browse/search                 |
@@ -138,7 +137,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 - The credential endpoint is write-only: the UI never receives or renders a stored token value, only `{"credential_set": true, "updated_at": …}`.
 - `DELETE /skus/{sku_id}/units/{sequence_number}` (optional `reason` query parameter) responds with the updated SKU detail; the page re-renders counters and units from that response.
 - `PUT /skus/{sku_id}/units/{sequence_number}` responds `{"sku_id": "<new sku_id>"}`; the UI navigates to the new SKU's detail page.
-- Import review renders rows top-of-stack first exactly as returned; confirm is blocked client-side and server-side (`409`) while unresolved review rows remain.
+- Import review renders rows top-of-stack first exactly as returned; review rows are informational and never become units — confirm ingests keep rows only.
 - Locations render from sequence numbers exactly as the backend provides them (`A42-42`); the client never re-derives them.
 
 ## Data and storage contracts
@@ -159,18 +158,17 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 
 - Review order is always top-of-stack first; the client never re-sorts import rows.
 - Pull sheets and unit lists render in ascending sequence-number order (forward pass order).
-- Single-key review actions apply optimistically to the selected row and persist via `PATCH`; failures revert the row and surface the error.
+- Import review is read-only; appraisal decisions are final for the import.
 - Job and import polling stops when the job reaches a terminal status.
 - Dates and times display in the browser locale from epoch values; the API remains the source of truth for all timestamps.
 
 ## Source of truth
 
-| Entity                                   | Authoritative source                   | Notes                                     |
-| ---------------------------------------- | -------------------------------------- | ----------------------------------------- |
-| Credential validity                      | authenticated `GET /settings` response | login treated as valid on 2xx             |
-| Inventory, imports, orders, publish runs | `tcg_inventory_api`                    | client state is a render cache only       |
-| Review edits in flight                   | browser memory                         | authoritative only until `PATCH` succeeds |
-| Session persistence                      | browser `localStorage`                 | cleared on logout                         |
+| Entity                                   | Authoritative source                   | Notes                               |
+| ---------------------------------------- | -------------------------------------- | ----------------------------------- |
+| Credential validity                      | authenticated `GET /settings` response | login treated as valid on 2xx       |
+| Inventory, imports, orders, publish runs | `tcg_inventory_api`                    | client state is a render cache only |
+| Session persistence                      | browser `localStorage`                 | cleared on logout                   |
 
 ## Security and privacy
 
@@ -198,14 +196,14 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 ## Performance envelope
 
 - Optimized for a single user with 5,000–10,000 SKUs: browse views paginate via continuation tokens and keep interactions immediate on desktop hardware.
-- Import review handles a few hundred rows with keyboard navigation and optimistic updates; no virtualization until row counts demand it.
+- Import review handles a few hundred rows with keyboard navigation; no virtualization until row counts demand it.
 - Polling intervals (~2 s) apply only while a job is running.
 - Mobile targets are the pull sheet and placement screens; they render fast on mid-range phones.
 
 ## Testing and quality gates
 
 - Unit and component tests run with Vitest and React Testing Library in `jsdom`.
-- Key coverage: login and route protection, the vim navigation hook (movement, jumps, search focus), SKU detail adjustments (remove unit, condition change), import review row actions and confirm gating, pull-sheet ordering and confirm flow, publish trigger + job polling, masked credential form.
+- Key coverage: login and route protection, the vim navigation hook (movement, jumps, search focus), SKU detail adjustments (remove unit, condition change), import review rendering and the confirm transition, pull-sheet ordering and confirm flow, publish trigger + job polling, masked credential form.
 - Required checks: `bazel test //tcg_inventory_web:unit-tests`, `bazel build //tcg_inventory_web:typecheck`, `bazel build //tcg_inventory_web:build`.
 
 ## Local development and smoke checks
@@ -214,7 +212,7 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 - Smoke flow in dev mode:
   1. Log in with any credentials.
   2. Open inventory, traverse with `j`/`k`, search with `/`, open a SKU with `Enter`; verify the card image renders, remove a unit, and change a unit's condition.
-  3. Upload a ManaBox CSV, watch appraisal progress, review with `y`/`d`/`r`, confirm, and check placement instructions.
+  3. Upload a ManaBox CSV, watch appraisal progress, review the appraisal decisions, confirm, and check placement instructions.
   4. Open the seeded `to_pick` order, view the pull sheet at phone width, confirm the pull.
   5. Trigger publish and watch the fake job drain the pending publish count.
   6. Set a credential in settings and verify only presence metadata renders.
@@ -224,8 +222,8 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 ### Scenario 1: daily import without touching the mouse
 
 1. User uploads today's ManaBox export and watches appraisal progress.
-2. Review opens top-of-stack first; the user leafs through the physical stack while `j`/`k` tracks rows, pressing `y`/`d` to adjust decisions and `r` to resolve the flagged rows.
-3. Discards come out of the stack; the user confirms via the confirm dialog.
+2. Review opens top-of-stack first; the user leafs through the physical stack while `j`/`k` tracks rows, pulling out each discard and review card as it appears.
+3. The user confirms via the confirm dialog; only keep rows become units, and the set-aside review cards return through a later import once fixed.
 4. The placement screen says which block labels to file the stack into; the user boxes it in one motion.
 5. The user triggers publish and watches the job complete; the pending badge drops to zero.
 
