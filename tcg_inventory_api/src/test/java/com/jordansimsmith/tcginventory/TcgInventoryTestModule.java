@@ -72,21 +72,33 @@ public class TcgInventoryTestModule {
 
   @Provides
   @Singleton
-  PublishJobProcessor publishJobProcessor(
+  OrderPhaseProcessor orderPhaseProcessor(
       DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
       DynamoDbClient dynamoDbClient,
       Clock clock,
       UlidGenerator ulidGenerator,
       FetchTcgClient fetchTcgClient,
-      FetchTcgTokenMinter fetchTcgTokenMinter,
       ObjectMapper objectMapper) {
-    return new PublishJobProcessor(
-        tcgInventoryTable,
-        dynamoDbClient,
-        clock,
-        ulidGenerator,
-        fetchTcgClient,
-        fetchTcgTokenMinter,
-        objectMapper);
+    return new OrderPhaseProcessor(
+        tcgInventoryTable, dynamoDbClient, clock, ulidGenerator, fetchTcgClient, objectMapper);
+  }
+
+  @Provides
+  @Singleton
+  ListingPhaseProcessor listingPhaseProcessor(
+      DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
+      DynamoDbClient dynamoDbClient,
+      Clock clock,
+      FetchTcgClient fetchTcgClient) {
+    return new ListingPhaseProcessor(tcgInventoryTable, dynamoDbClient, clock, fetchTcgClient);
+  }
+
+  @Provides
+  @Singleton
+  PublishJobProcessor publishJobProcessor(
+      FetchTcgTokenMinter fetchTcgTokenMinter,
+      OrderPhaseProcessor orderPhaseProcessor,
+      ListingPhaseProcessor listingPhaseProcessor) {
+    return new PublishJobProcessor(fetchTcgTokenMinter, orderPhaseProcessor, listingPhaseProcessor);
   }
 }
