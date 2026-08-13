@@ -124,6 +124,10 @@ lambdas = {
         "handler": "com.jordansimsmith.tcginventory.DeleteImportHandler",
         "zip_file": "delete-import-handler_deploy.jar",
     },
+    "confirm_import": {
+        "handler": "com.jordansimsmith.tcginventory.ConfirmImportHandler",
+        "zip_file": "confirm-import-handler_deploy.jar",
+    },
     "create_publish": {
         "handler": "com.jordansimsmith.tcginventory.CreatePublishHandler",
         "zip_file": "create-publish-handler_deploy.jar",
@@ -179,6 +183,11 @@ endpoints = {
         "resource": "publish",
         "method": "GET",
         "lambda": "get_publish",
+    },
+    "confirm_import": {
+        "resource": "import_confirm",
+        "method": "POST",
+        "lambda": "confirm_import",
     },
 }
 

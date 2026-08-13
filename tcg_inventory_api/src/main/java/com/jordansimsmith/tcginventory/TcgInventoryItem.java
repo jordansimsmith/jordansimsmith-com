@@ -48,9 +48,7 @@ public class TcgInventoryItem {
   public static final String COLLECTOR_NUMBER = "collector_number";
   public static final String FETCHTCG_CARD_ID = "fetchtcg_card_id";
   public static final String FETCHTCG_SET_ID = "fetchtcg_set_id";
-  public static final String IN_STOCK_COUNT = "in_stock_count";
-  public static final String RESERVED_COUNT = "reserved_count";
-  public static final String SOLD_COUNT = "sold_count";
+  public static final String VERSION = "version";
   public static final String DIRTY = "dirty";
   public static final String SEQUENCE_NUMBER = "sequence_number";
   public static final String STATUS = "status";
@@ -73,6 +71,7 @@ public class TcgInventoryItem {
   public static final String JOB_ID = "job_id";
   public static final String CONTINUATION = "continuation";
   public static final String PROCESSED_COUNT = "processed_count";
+  public static final String EVENT_TYPE = "event_type";
   public static final String CREATED_AT = "created_at";
   public static final String UPDATED_AT = "updated_at";
 
@@ -92,9 +91,7 @@ public class TcgInventoryItem {
   private String collectorNumber;
   private Integer fetchtcgCardId;
   private Integer fetchtcgSetId;
-  private Integer inStockCount;
-  private Integer reservedCount;
-  private Integer soldCount;
+  private Integer version;
   private Boolean dirty;
   private Integer sequenceNumber;
   private String status;
@@ -117,6 +114,7 @@ public class TcgInventoryItem {
   private String jobId;
   private Integer continuation;
   private Integer processedCount;
+  private String eventType;
   private Instant createdAt;
   private Instant updatedAt;
 
@@ -285,33 +283,13 @@ public class TcgInventoryItem {
   }
 
   @Nullable
-  @DynamoDbAttribute(IN_STOCK_COUNT)
-  public Integer getInStockCount() {
-    return inStockCount;
+  @DynamoDbAttribute(VERSION)
+  public Integer getVersion() {
+    return version;
   }
 
-  public void setInStockCount(@Nullable Integer inStockCount) {
-    this.inStockCount = inStockCount;
-  }
-
-  @Nullable
-  @DynamoDbAttribute(RESERVED_COUNT)
-  public Integer getReservedCount() {
-    return reservedCount;
-  }
-
-  public void setReservedCount(@Nullable Integer reservedCount) {
-    this.reservedCount = reservedCount;
-  }
-
-  @Nullable
-  @DynamoDbAttribute(SOLD_COUNT)
-  public Integer getSoldCount() {
-    return soldCount;
-  }
-
-  public void setSoldCount(@Nullable Integer soldCount) {
-    this.soldCount = soldCount;
+  public void setVersion(@Nullable Integer version) {
+    this.version = version;
   }
 
   @Nullable
@@ -535,6 +513,16 @@ public class TcgInventoryItem {
   }
 
   @Nullable
+  @DynamoDbAttribute(EVENT_TYPE)
+  public String getEventType() {
+    return eventType;
+  }
+
+  public void setEventType(@Nullable String eventType) {
+    this.eventType = eventType;
+  }
+
+  @Nullable
   @DynamoDbAttribute(CREATED_AT)
   @DynamoDbConvertedBy(EpochSecondConverter.class)
   public Instant getCreatedAt() {
@@ -577,9 +565,7 @@ public class TcgInventoryItem {
         && Objects.equals(collectorNumber, that.collectorNumber)
         && Objects.equals(fetchtcgCardId, that.fetchtcgCardId)
         && Objects.equals(fetchtcgSetId, that.fetchtcgSetId)
-        && Objects.equals(inStockCount, that.inStockCount)
-        && Objects.equals(reservedCount, that.reservedCount)
-        && Objects.equals(soldCount, that.soldCount)
+        && Objects.equals(version, that.version)
         && Objects.equals(dirty, that.dirty)
         && Objects.equals(sequenceNumber, that.sequenceNumber)
         && Objects.equals(status, that.status)
@@ -602,6 +588,7 @@ public class TcgInventoryItem {
         && Objects.equals(jobId, that.jobId)
         && Objects.equals(continuation, that.continuation)
         && Objects.equals(processedCount, that.processedCount)
+        && Objects.equals(eventType, that.eventType)
         && Objects.equals(createdAt, that.createdAt)
         && Objects.equals(updatedAt, that.updatedAt);
   }
@@ -625,9 +612,7 @@ public class TcgInventoryItem {
         collectorNumber,
         fetchtcgCardId,
         fetchtcgSetId,
-        inStockCount,
-        reservedCount,
-        soldCount,
+        version,
         dirty,
         sequenceNumber,
         status,
@@ -650,6 +635,7 @@ public class TcgInventoryItem {
         jobId,
         continuation,
         processedCount,
+        eventType,
         createdAt,
         updatedAt);
   }
@@ -703,12 +689,8 @@ public class TcgInventoryItem {
         + fetchtcgCardId
         + ", fetchtcgSetId="
         + fetchtcgSetId
-        + ", inStockCount="
-        + inStockCount
-        + ", reservedCount="
-        + reservedCount
-        + ", soldCount="
-        + soldCount
+        + ", version="
+        + version
         + ", dirty="
         + dirty
         + ", sequenceNumber="
@@ -765,6 +747,9 @@ public class TcgInventoryItem {
         + continuation
         + ", processedCount="
         + processedCount
+        + ", eventType='"
+        + eventType
+        + '\''
         + ", createdAt="
         + createdAt
         + ", updatedAt="

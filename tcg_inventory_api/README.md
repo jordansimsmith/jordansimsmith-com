@@ -92,7 +92,7 @@ sequenceDiagram
 
 - Inventory is the source of truth; FetchTCG listings are an absolute projection: listing quantity = count of `in_stock` units per SKU. Re-importing already-listed cards converges to a no-op, and FetchTCG's own decrement at offer acceptance converges without a write.
 - Dirty-marker outbox for the projection: every mutation transaction sets a plain boolean `dirty` on affected SKU records. Only mutation transactions can set the flag, which makes every FetchTCG write traceable to an audited inventory event; blind reconciliation never changes quantities. Coalescing is inherent because the projection is absolute.
-- The publish phase recounts actual unit items rather than trusting counters, then clears `dirty` conditionally on `in_stock_count` equalling the published count. A mutation landing mid-publish fails the clear and the SKU stays dirty; counter drift fails it permanently, turning silent corruption into a visible tripwire.
+- Stock counts are never stored: SKU detail derives `in_stock`/`reserved`/`sold` counts from the unit items in its own partition query, and SKU browse fans out one parallel unit query per page row. With no denormalized aggregate there is nothing to drift or verify. Every mutation transaction bumps a plain `version` number on the affected SKU (`ADD version :1`); the publish phase recounts unit items for its absolute write and clears `dirty` conditionally on the version being unchanged since the recount, so a mutation landing mid-publish fails the clear and the SKU stays dirty for the next run.
 - SQS work queue with continuation messages: messages carry only `{user, job_id, job_type}`; the job item's `continuation` is authoritative. The consumer has maximum concurrency 1, serializing all FetchTCG traffic and all inventory-mutating jobs (no job lease needed). Each slice does bounded work, checkpoints, and re-enqueues.
 - Duplicate SQS delivery is expected and absorbed: slices read the job item fresh, DynamoDB effects are conditionally guarded, FetchTCG effects are absolute upserts keyed by `cardId` + condition. FIFO queues buy nothing here.
 - One publish job with two ordered phases (order phase before publish phase) structurally prevents relisting stock committed to a pending offer.
@@ -195,7 +195,7 @@ Representative failures:
 
 `GET /skus/{sku_id}`
 
-Response `200` (units sorted ascending by sequence number; locations derived server-side):
+Response `200` (units sorted ascending by sequence number; locations and the `*_count` fields are derived server-side from unit items, never stored):
 
 ```json
 {
@@ -283,17 +283,17 @@ price = max(0.25, round_nearest_half_up(benchmark, 0.05))
 - **`gsi2`**: SKU browse (`gsi2pk = USER#<user>#SKUS`, `gsi2sk = NAME#<normalized name>#<sku_id>`), supporting alphabetical listing and `begins_with` prefix search.
 - `sku_id` is `<scryfall_id>#<finish>#<condition>`. A SKU record and its unit items share a partition so one query serves detail, recount, and allocation.
 
-| Item             | pk                            | sk                             | Notable attributes                                                                                                                                                                                                                                                      |
-| ---------------- | ----------------------------- | ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SKU              | `USER#<u>#SKU#<sku_id>`       | `SKU`                          | scryfall_id, finish, condition, name, set_code, set_name, collector_number, fetchtcg_card_id, fetchtcg_set_id, `in_stock_count`, `reserved_count`, `sold_count`, `dirty`, `fetchtcg_listing_id`, `last_published_quantity`, `last_published_price`, `last_published_at` |
-| Unit             | `USER#<u>#SKU#<sku_id>`       | `UNIT#<sequence_number>`       | sequence_number, status, import_id, order_id (when reserved/sold), timestamps                                                                                                                                                                                           |
-| Import           | `USER#<u>`                    | `IMPORT#<ulid>`                | filename, status, row counts, error (when the appraise job fails), timestamps                                                                                                                                                                                           |
-| Import row       | `USER#<u>#IMPORT#<import_id>` | `ROW#<stack position, padded>` | raw CSV fields, resolved identity, decision + reason, appraisal evidence (market price, rival evidence, suggested price), assigned sequence_number                                                                                                                      |
-| Order            | `USER#<u>`                    | `ORDER#<fetchtcg_offer_id>`    | state, FetchTCG status/currentAction snapshot, accepted_at, delivery_mode, financial totals (no buyer PII), embedded lines `[{sku_id, fetchtcg_listing_id, quantity, price, allocated sequence_numbers}]`                                                               |
-| Audit entry      | `USER#<u>#AUDIT`              | `<ulid>`                       | event_type (`import_confirm`, `adjustment`, `reserve`, `release`, `sell`, `publish`), affected sku_ids / unit sequence_numbers / order_id / import_id, before/after summary                                                                                             |
-| Job              | `USER#<u>`                    | `JOB#<ulid>`                   | internal continuation state, never an API resource: type (`appraise` \| `publish`), status (`queued` \| `running` \| `succeeded` \| `failed`), continuation, progress counters, error                                                                                   |
-| Sequence counter | `USER#<u>`                    | `COUNTER#SEQUENCE`             | `next_sequence_number`                                                                                                                                                                                                                                                  |
-| Settings         | `USER#<u>`                    | `SETTINGS`                     | credential metadata (set-at timestamp only)                                                                                                                                                                                                                             |
+| Item             | pk                            | sk                             | Notable attributes                                                                                                                                                                                                               |
+| ---------------- | ----------------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SKU              | `USER#<u>#SKU#<sku_id>`       | `SKU`                          | scryfall_id, finish, condition, name, set_code, set_name, collector_number, fetchtcg_card_id, fetchtcg_set_id, `version`, `dirty`, `fetchtcg_listing_id`, `last_published_quantity`, `last_published_price`, `last_published_at` |
+| Unit             | `USER#<u>#SKU#<sku_id>`       | `UNIT#<sequence_number>`       | sequence_number, status, import_id, order_id (when reserved/sold), timestamps                                                                                                                                                    |
+| Import           | `USER#<u>`                    | `IMPORT#<ulid>`                | filename, status, row counts, error (when the appraise job fails), timestamps                                                                                                                                                    |
+| Import row       | `USER#<u>#IMPORT#<import_id>` | `ROW#<stack position, padded>` | raw CSV fields, resolved identity, decision + reason, appraisal evidence (market price, rival evidence, suggested price), assigned sequence_number                                                                               |
+| Order            | `USER#<u>`                    | `ORDER#<fetchtcg_offer_id>`    | state, FetchTCG status/currentAction snapshot, accepted_at, delivery_mode, financial totals (no buyer PII), embedded lines `[{sku_id, fetchtcg_listing_id, quantity, price, allocated sequence_numbers}]`                        |
+| Audit entry      | `USER#<u>#AUDIT`              | `<ulid>`                       | event_type (`import_confirm`, `adjustment`, `reserve`, `release`, `sell`, `publish`), affected sku_ids / unit sequence_numbers / order_id / import_id, before/after summary                                                      |
+| Job              | `USER#<u>`                    | `JOB#<ulid>`                   | internal continuation state, never an API resource: type (`appraise` \| `publish`), status (`queued` \| `running` \| `succeeded` \| `failed`), continuation, progress counters, error                                            |
+| Sequence counter | `USER#<u>`                    | `COUNTER#SEQUENCE`             | `next_sequence_number`                                                                                                                                                                                                           |
+| Settings         | `USER#<u>`                    | `SETTINGS`                     | credential metadata (set-at timestamp only)                                                                                                                                                                                      |
 
 ### Representative records
 
@@ -310,9 +310,7 @@ price = max(0.25, round_nearest_half_up(benchmark, 0.05))
   "collector_number": "167",
   "fetchtcg_card_id": 123456,
   "fetchtcg_set_id": 78,
-  "in_stock_count": 2,
-  "reserved_count": 1,
-  "sold_count": 0,
+  "version": 7,
   "dirty": true,
   "gsi1pk": "USER#jordan#DIRTY",
   "gsi1sk": "SKU#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
@@ -337,14 +335,14 @@ price = max(0.25, round_nearest_half_up(benchmark, 0.05))
 
 ### Transaction shapes
 
-All mutations are `TransactWriteItems` including their audit entry; counters use `ADD`; sparse-index attributes are set/removed alongside `dirty`.
+All mutations are `TransactWriteItems` including their audit entry; every mutation bumps the affected SKU's `version` with `ADD version :1`; sparse-index attributes are set/removed alongside `dirty`.
 
-- **Import confirm**: conditional status flip `review → confirming` (single confirmer), one `UpdateItem ADD next_sequence_number :n` allocating the range, sequence numbers recorded on rows (skipped on retry if present), then chunked per-SKU transactions — conditional unit puts + SKU counter/dirty updates — where a replayed chunk fails its unit-exists condition and no-ops atomically; final flip `confirming → confirmed`.
-- **Reserve**: conditional order put keyed by FetchTCG offer id + unit `in_stock → reserved` transitions + SKU counters + dirty + audit.
-- **Release (void)**: order `awaiting_payment → voided` + units `reserved → in_stock` + counters + dirty + audit.
-- **Sell (confirm pull)**: order `to_pick → fulfilled` + units `reserved → sold` + counters + audit. No dirty flag — reserved units already left the projection and FetchTCG decremented at acceptance.
-- **Remove / condition edit**: conditional unit transitions with counter and dirty updates; condition edit is one transaction across two SKU partitions (delete + re-put the unit item with the same sequence number, both SKUs dirtied).
-- **Publish clear**: set `dirty = false`, remove sparse index attributes, update the listing snapshot — conditional on `dirty = true AND in_stock_count = :published_count`. A delist clears the listing snapshot (`fetchtcg_listing_id` and published values removed); a later restock creates a fresh listing.
+- **Import confirm**: conditional status flip `review → confirming` (single confirmer), one `UpdateItem ADD next_sequence_number :n` allocating the range, sequence numbers recorded on rows (skipped on retry if present), then chunked per-SKU transactions — conditional unit puts + SKU dirty/version updates — where a replayed chunk fails its unit-exists condition and no-ops atomically; final flip `confirming → confirmed`.
+- **Reserve**: conditional order put keyed by FetchTCG offer id + unit `in_stock → reserved` transitions + SKU dirty + version + audit.
+- **Release (void)**: order `awaiting_payment → voided` + units `reserved → in_stock` + dirty + version + audit.
+- **Sell (confirm pull)**: order `to_pick → fulfilled` + units `reserved → sold` + version + audit. No dirty flag — reserved units already left the projection and FetchTCG decremented at acceptance.
+- **Remove / condition edit**: conditional unit transitions with dirty and version updates; condition edit is one transaction across two SKU partitions (delete + re-put the unit item with the same sequence number, both SKUs dirtied).
+- **Publish clear**: set `dirty = false`, remove sparse index attributes, update the listing snapshot — conditional on `dirty = true AND version = :captured` (the version read before the recount). A delist clears the listing snapshot (`fetchtcg_listing_id` and published values removed); a later restock creates a fresh listing.
 
 ## Behavioral invariants and time semantics
 
@@ -354,13 +352,14 @@ All mutations are `TransactWriteItems` including their audit entry; counters use
 - Import deletion is allowed only while `review` (409 otherwise) and removes the import and all its rows.
 - English-only intake: non-English rows become `review`; unmapped sets and unresolvable identities become `review` rather than guesses.
 - The FetchTCG listing projection counts only `in_stock` units. Reserved and sold units are excluded. Upward and downward corrections, including delisting at zero, occur only for SKUs dirtied by an audited mutation.
+- Stock counts are derived from unit items at read time and never stored. Every mutation transaction bumps the SKU `version`; the publish clear is conditional on the version being unchanged since the recount, so a mutation landing mid-publish leaves the SKU dirty.
 - The order phase always completes before the publish phase within a run.
 - Confirming a pull writes nothing to FetchTCG. Voiding an order releases units and dirties SKUs; the restored quantity reaches FetchTCG on the next publish run unless the seller already relisted on FetchTCG, in which case the projection converges as a no-op.
 - SKU records are never deleted; a zero-count SKU keeps its record, is delisted on FetchTCG, and is reused on restock.
 - Duplicate SQS deliveries, replayed job slices, and re-processed offers converge: job slices read the job item's continuation fresh, order creation is conditional on the offer id, unit transitions are conditional on current status, publish writes are absolute.
 - At most one publish run is queued or running per user: `POST /publish` creates the job conditionally and returns the existing run when one is already active.
 - Job failures surface on the affected resource: an appraise failure sets `error` on its import; a publish failure appears in `GET /publish`. Recovery is user-initiated (fix the cause — typically the credential — and re-trigger; for a failed appraise, delete the import and re-upload).
-- Market appraisal deduplicates FetchTCG reads per printing + finish within a job run; resolved `fetchtcg_card_id` values are cached on SKU records across runs.
+- Market appraisal deduplicates FetchTCG reads per printing + finish within a job run.
 - NM is the default condition where none is provided. Timestamps are epoch seconds; ULIDs order imports, jobs, and audit entries by creation time.
 
 ## Source of truth
@@ -371,7 +370,7 @@ All mutations are `TransactWriteItems` including their audit entry; counters use
 | Printing identity                    | ManaBox `Scryfall ID` (+ finish, condition columns)               | SKU computable offline from the row                                |
 | FetchTCG card identity               | Verified FetchTCG lookup, cached as `fetchtcg_card_id` on the SKU | set mapping is a generated, checked-in artifact                    |
 | Unit existence, status, and position | DynamoDB unit items                                               | append-only; gaps are permanent                                    |
-| Stock counts                         | DynamoDB SKU counters, verified against unit items at publish     | drift fails the conditional clear and stays visible                |
+| Stock counts                         | Derived from unit items at read time                              | never stored; publish recounts units for its absolute write        |
 | Listing quantity on FetchTCG         | Projection of in-stock unit count                                 | absolute upserts keyed by `cardId` + condition                     |
 | New-listing price                    | Pricing policy in this README                                     | applied at publish-create time                                     |
 | Order state                          | FetchTCG seller offers list (`status`, `currentAction`)           | mapped to `awaiting_payment` / `to_pick` / `voided`                |
@@ -411,6 +410,7 @@ Rotated refresh tokens returned by Firebase are written back to the same key.
 ## Performance envelope
 
 - Scale target: 10,000+ units, ~5,000–10,000 SKUs/listings per user; DynamoDB request volume at this scale is negligible.
+- SKU browse derives counts with one parallel unit query per page row (bounded by the page size); unit partitions are small, so the fan-out adds roughly one round-trip of latency per page.
 - Job Lambdas: 900 s timeout with the module's default 1769 MB memory (the 1-vCPU point — keeps Java cold starts fast; the GB-second cost of idle FetchTCG pacing still sits far inside the always-free compute allowance). HTTP handlers use module defaults (10 s).
 - FetchTCG pacing dominates: an appraise slice of ~100 rows runs minutes; a daily publish run (typical daily delta) runs single-digit minutes; jobs re-enqueue continuations well before timeout.
 - SQS consumer maximum concurrency 1; visibility timeout exceeds the function timeout.
@@ -434,7 +434,7 @@ Rotated refresh tokens returned by Firebase are written back to the same key.
 ### Scenario 1: daily import to listed stock
 
 1. User uploads a 90-card ManaBox CSV; rows persist and the appraise job runs.
-2. Appraisal resolves identities (cache hits skip FetchTCG search), applies the keep filter, and prices keepers; three rows become `review` (one non-English, one unmapped set, one below threshold is `discard`).
+2. Appraisal resolves identities (duplicate printings within the run skip FetchTCG search), applies the keep filter, and prices keepers; three rows become `review` (one non-English, one unmapped set, one below threshold is `discard`).
 3. User reviews top-of-stack first, physically removes the discards, sets aside the review cards, and confirms.
 4. Confirm allocates sequence numbers 4200–4286, appends 87 units bottom-up, dirties 61 SKUs, and returns placement instructions ("A42-0 through A42-86").
 5. User boxes the stack in one motion and triggers publish; the order phase finds nothing new; the publish phase upserts 61 listings (creates priced by policy, updates as absolute quantities) and clears the markers.
@@ -455,5 +455,5 @@ Rotated refresh tokens returned by Firebase are written back to the same key.
 ### Scenario 4: condition edit republishes both SKUs
 
 1. The user regrades a unit from NM to LP.
-2. One transaction moves the unit item to the LP SKU (same sequence number), decrements the NM SKU counter, increments the LP SKU counter, dirties both, and writes one audit entry.
+2. One transaction moves the unit item to the LP SKU (same sequence number), dirties both SKUs, bumps both versions, and writes one audit entry.
 3. The next publish updates the NM listing quantity (delisting it if the count reached zero) and creates or updates the LP listing at the policy price.

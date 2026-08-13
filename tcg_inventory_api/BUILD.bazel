@@ -183,6 +183,31 @@ java_binary(
 )
 
 java_binary(
+    name = "confirm-import-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/ConfirmImportHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "//lib/time:lib",
+        "//lib/ulid:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
     name = "jobs-handler",
     srcs = ["src/main/java/com/jordansimsmith/tcginventory/JobsHandler.java"],
     create_executable = False,
@@ -322,6 +347,7 @@ java_test_suite(
     test_suffixes = ["IntegrationTest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":confirm-import-handler",
         ":create-import-handler",
         ":create-publish-handler",
         ":delete-import-handler",
@@ -356,6 +382,7 @@ java_test_suite(
 localstack_image(
     name = "local",
     handler_jars = [
+        ":confirm-import-handler_deploy.jar",
         ":create-import-handler_deploy.jar",
         ":create-publish-handler_deploy.jar",
         ":delete-import-handler_deploy.jar",

@@ -56,9 +56,7 @@ public class TcgInventoryItemIntegrationTest {
     item.setCollectorNumber("167");
     item.setFetchtcgCardId(123456);
     item.setFetchtcgSetId(78);
-    item.setInStockCount(2);
-    item.setReservedCount(1);
-    item.setSoldCount(0);
+    item.setVersion(7);
     item.setDirty(true);
     item.setCreatedAt(Instant.ofEpochSecond(1700000000));
     item.setUpdatedAt(Instant.ofEpochSecond(1700000100));
@@ -80,7 +78,7 @@ public class TcgInventoryItemIntegrationTest {
         .isEqualTo("SKU#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM");
     assertThat(retrieved.getGsi2pk()).isEqualTo("USER#jordan#SKUS");
     assertThat(retrieved.getGsi2sk()).startsWith("NAME#elvish aberration#");
-    assertThat(retrieved.getInStockCount()).isEqualTo(2);
+    assertThat(retrieved.getVersion()).isEqualTo(7);
     assertThat(retrieved.getDirty()).isTrue();
   }
 

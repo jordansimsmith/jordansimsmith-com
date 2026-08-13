@@ -16,6 +16,7 @@ import com.jordansimsmith.ulid.UlidModule;
 import dagger.Component;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
 @Singleton
 @Component(
@@ -40,6 +41,8 @@ public interface TcgInventoryFactory {
   Secrets secrets();
 
   DynamoDbTable<TcgInventoryItem> tcgInventoryTable();
+
+  DynamoDbClient dynamoDbClient();
 
   QueueClient<JobMessage> jobsQueue();
 
