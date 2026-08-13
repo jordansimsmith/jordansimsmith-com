@@ -118,13 +118,9 @@ public class ConfirmImportHandlerIntegrationTest {
   void confirmShouldReturn409WhenNotInReview() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var importItem = new TcgInventoryItem();
-    importItem.setPk(TcgInventoryItem.formatUserPk("jordan"));
-    importItem.setSk(TcgInventoryItem.formatImportSk("import1"));
-    importItem.setImportId("import1");
-    importItem.setStatus("appraising");
-    importItem.setRowCount(1);
-    importItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
+    var importItem =
+        TcgInventoryItem.createImport(
+            "jordan", "import1", null, 1, null, Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(importItem);
 
     // act
@@ -140,13 +136,10 @@ public class ConfirmImportHandlerIntegrationTest {
   void confirmShouldReturn409OnDoubleConfirm() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var importItem = new TcgInventoryItem();
-    importItem.setPk(TcgInventoryItem.formatUserPk("jordan"));
-    importItem.setSk(TcgInventoryItem.formatImportSk("import1"));
-    importItem.setImportId("import1");
+    var importItem =
+        TcgInventoryItem.createImport(
+            "jordan", "import1", null, 1, null, Instant.ofEpochSecond(1700000000));
     importItem.setStatus("confirmed");
-    importItem.setRowCount(1);
-    importItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(importItem);
 
     // act
@@ -237,61 +230,69 @@ public class ConfirmImportHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
-    var importItem = new TcgInventoryItem();
-    importItem.setPk(TcgInventoryItem.formatUserPk("jordan"));
-    importItem.setSk(TcgInventoryItem.formatImportSk("import1"));
-    importItem.setImportId("import1");
+    var importItem =
+        TcgInventoryItem.createImport(
+            "jordan", "import1", null, 2, null, Instant.ofEpochSecond(1700000000));
     importItem.setStatus("confirming");
-    importItem.setRowCount(2);
-    importItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(importItem);
 
-    var row1 = new TcgInventoryItem();
-    row1.setPk(TcgInventoryItem.formatImportRowPk("jordan", "import1"));
-    row1.setSk(TcgInventoryItem.formatImportRowSk(1));
-    row1.setPosition(1);
-    row1.setName("Card A");
-    row1.setSetCode("dom");
-    row1.setSetName("Dominaria");
-    row1.setCollectorNumber("168");
-    row1.setFinish("normal");
-    row1.setCondition("NM");
-    row1.setScryfallId("scryfall-1");
-    row1.setLanguage("en");
+    var row1 =
+        TcgInventoryItem.createImportRow(
+            "jordan",
+            "import1",
+            1,
+            "Card A",
+            "dom",
+            "Dominaria",
+            "168",
+            "normal",
+            "NM",
+            "scryfall-1",
+            "en");
     row1.setDecision("keep");
     row1.setSequenceNumber(0);
     tcgInventoryTable.putItem(row1);
 
-    var row2 = new TcgInventoryItem();
-    row2.setPk(TcgInventoryItem.formatImportRowPk("jordan", "import1"));
-    row2.setSk(TcgInventoryItem.formatImportRowSk(2));
-    row2.setPosition(2);
-    row2.setName("Card B");
-    row2.setSetCode("dom");
-    row2.setSetName("Dominaria");
-    row2.setCollectorNumber("169");
-    row2.setFinish("normal");
-    row2.setCondition("NM");
-    row2.setScryfallId("scryfall-1");
-    row2.setLanguage("en");
+    var row2 =
+        TcgInventoryItem.createImportRow(
+            "jordan",
+            "import1",
+            2,
+            "Card B",
+            "dom",
+            "Dominaria",
+            "169",
+            "normal",
+            "NM",
+            "scryfall-1",
+            "en");
     row2.setDecision("keep");
     row2.setSequenceNumber(1);
     tcgInventoryTable.putItem(row2);
 
-    var existingUnit = new TcgInventoryItem();
-    existingUnit.setPk(TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#NM"));
-    existingUnit.setSk(TcgInventoryItem.formatUnitSk(0));
-    existingUnit.setSequenceNumber(0);
-    existingUnit.setStatus("in_stock");
-    existingUnit.setImportId("import1");
+    var existingUnit =
+        TcgInventoryItem.createUnit(
+            "jordan",
+            "scryfall-1#normal#NM",
+            0,
+            "in_stock",
+            "import1",
+            Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(existingUnit);
 
-    var existingSku = new TcgInventoryItem();
-    existingSku.setPk(TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#NM"));
-    existingSku.setSk(TcgInventoryItem.formatSkuSk());
-    existingSku.setSkuId("scryfall-1#normal#NM");
-    existingSku.setVersion(1);
-    existingSku.setDirty(true);
+    var existingSku =
+        TcgInventoryItem.createSku(
+            "jordan",
+            "scryfall-1#normal#NM",
+            "scryfall-1",
+            "normal",
+            "NM",
+            "Card A",
+            "dom",
+            "Dominaria",
+            "168",
+            null,
+            null);
     tcgInventoryTable.putItem(existingSku);
 
     // act
@@ -333,14 +334,10 @@ public class ConfirmImportHandlerIntegrationTest {
   }
 
   private void createImportInReview(String user, String importId, int rowCount) {
-    var importItem = new TcgInventoryItem();
-    importItem.setPk(TcgInventoryItem.formatUserPk(user));
-    importItem.setSk(TcgInventoryItem.formatImportSk(importId));
-    importItem.setImportId(importId);
-    importItem.setFilename("test.csv");
+    var importItem =
+        TcgInventoryItem.createImport(
+            user, importId, "test.csv", rowCount, null, Instant.ofEpochSecond(1700000000));
     importItem.setStatus("review");
-    importItem.setRowCount(rowCount);
-    importItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(importItem);
   }
 
@@ -352,36 +349,38 @@ public class ConfirmImportHandlerIntegrationTest {
       String finish,
       String condition,
       String name) {
-    var rowItem = new TcgInventoryItem();
-    rowItem.setPk(TcgInventoryItem.formatImportRowPk(user, importId));
-    rowItem.setSk(TcgInventoryItem.formatImportRowSk(position));
-    rowItem.setPosition(position);
-    rowItem.setName(name);
-    rowItem.setSetCode("dom");
-    rowItem.setSetName("Dominaria");
-    rowItem.setCollectorNumber(String.valueOf(position));
-    rowItem.setFinish(finish);
-    rowItem.setCondition(condition);
-    rowItem.setScryfallId(scryfallId);
-    rowItem.setLanguage("en");
+    var rowItem =
+        TcgInventoryItem.createImportRow(
+            user,
+            importId,
+            position,
+            name,
+            "dom",
+            "Dominaria",
+            String.valueOf(position),
+            finish,
+            condition,
+            scryfallId,
+            "en");
     rowItem.setDecision("keep");
     tcgInventoryTable.putItem(rowItem);
   }
 
   private void createRowWithDecision(
       String user, String importId, int position, String decision, String reason) {
-    var rowItem = new TcgInventoryItem();
-    rowItem.setPk(TcgInventoryItem.formatImportRowPk(user, importId));
-    rowItem.setSk(TcgInventoryItem.formatImportRowSk(position));
-    rowItem.setPosition(position);
-    rowItem.setName("Card " + position);
-    rowItem.setSetCode("dom");
-    rowItem.setSetName("Dominaria");
-    rowItem.setCollectorNumber(String.valueOf(position));
-    rowItem.setFinish("normal");
-    rowItem.setCondition("NM");
-    rowItem.setScryfallId("scryfall-" + position);
-    rowItem.setLanguage("en");
+    var rowItem =
+        TcgInventoryItem.createImportRow(
+            user,
+            importId,
+            position,
+            "Card " + position,
+            "dom",
+            "Dominaria",
+            String.valueOf(position),
+            "normal",
+            "NM",
+            "scryfall-" + position,
+            "en");
     rowItem.setDecision(decision);
     rowItem.setDecisionReason(reason);
     tcgInventoryTable.putItem(rowItem);

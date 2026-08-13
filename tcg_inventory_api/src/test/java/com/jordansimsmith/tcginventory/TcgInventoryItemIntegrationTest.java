@@ -39,25 +39,21 @@ public class TcgInventoryItemIntegrationTest {
     var user = "jordan";
     var skuId = "f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM";
 
-    var item = new TcgInventoryItem();
-    item.setPk(TcgInventoryItem.formatSkuPk(user, skuId));
-    item.setSk(TcgInventoryItem.formatSkuSk());
-    item.setGsi1pk(TcgInventoryItem.formatGsi1pk(user));
-    item.setGsi1sk(TcgInventoryItem.formatGsi1sk(skuId));
-    item.setGsi2pk(TcgInventoryItem.formatGsi2pk(user));
-    item.setGsi2sk(TcgInventoryItem.formatGsi2sk("elvish aberration", skuId));
-    item.setSkuId(skuId);
-    item.setScryfallId("f0a51425-d796-48b8-b68c-bc21fb465c81");
-    item.setFinish("normal");
-    item.setCondition("NM");
-    item.setName("Elvish Aberration");
-    item.setSetCode("a25");
-    item.setSetName("Masters 25");
-    item.setCollectorNumber("167");
-    item.setFetchtcgCardId("mtg_167_c_a25_normal");
+    var item =
+        TcgInventoryItem.createSku(
+            user,
+            skuId,
+            "f0a51425-d796-48b8-b68c-bc21fb465c81",
+            "normal",
+            "NM",
+            "Elvish Aberration",
+            "a25",
+            "Masters 25",
+            "167",
+            "mtg_167_c_a25_normal",
+            null);
     item.setFetchtcgSetId(78);
     item.setVersion(7);
-    item.setDirty(true);
     item.setCreatedAt(Instant.ofEpochSecond(1700000000));
     item.setUpdatedAt(Instant.ofEpochSecond(1700000100));
 
@@ -88,13 +84,14 @@ public class TcgInventoryItemIntegrationTest {
     var user = "jordan";
     var skuId = "f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM";
 
-    var item = new TcgInventoryItem();
-    item.setPk(TcgInventoryItem.formatSkuPk(user, skuId));
-    item.setSk(TcgInventoryItem.formatUnitSk(4242));
-    item.setSequenceNumber(4242);
-    item.setStatus("in_stock");
-    item.setImportId("01JEXAMPLEULID0000000000");
-    item.setCreatedAt(Instant.ofEpochSecond(1700000000));
+    var item =
+        TcgInventoryItem.createUnit(
+            user,
+            skuId,
+            4242,
+            "in_stock",
+            "01JEXAMPLEULID0000000000",
+            Instant.ofEpochSecond(1700000000));
 
     // act
     tcgInventoryTable.putItem(item);
@@ -116,12 +113,14 @@ public class TcgInventoryItemIntegrationTest {
     // arrange
     var user = "jordan";
 
-    var item = new TcgInventoryItem();
-    item.setPk(TcgInventoryItem.formatUserPk(user));
-    item.setSk(TcgInventoryItem.formatImportSk("01JEXAMPLEULID0000000000"));
-    item.setFilename("manabox_export.csv");
-    item.setStatus("appraising");
-    item.setCreatedAt(Instant.ofEpochSecond(1700000000));
+    var item =
+        TcgInventoryItem.createImport(
+            user,
+            "01JEXAMPLEULID0000000000",
+            "manabox_export.csv",
+            0,
+            null,
+            Instant.ofEpochSecond(1700000000));
 
     // act
     tcgInventoryTable.putItem(item);

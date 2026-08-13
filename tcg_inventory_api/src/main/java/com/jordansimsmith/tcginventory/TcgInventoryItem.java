@@ -923,4 +923,147 @@ public class TcgInventoryItem {
   public static String formatGsi2sk(String normalizedName, String skuId) {
     return NAME_PREFIX + normalizedName + DELIMITER + skuId;
   }
+
+  public static TcgInventoryItem createSku(
+      String user,
+      String skuId,
+      String scryfallId,
+      String finish,
+      String condition,
+      String name,
+      String setCode,
+      String setName,
+      String collectorNumber,
+      @Nullable String fetchtcgCardId,
+      @Nullable String suggestedPrice) {
+    var item = new TcgInventoryItem();
+    item.setPk(formatSkuPk(user, skuId));
+    item.setSk(formatSkuSk());
+    item.setSkuId(skuId);
+    item.setScryfallId(scryfallId);
+    item.setFinish(finish);
+    item.setCondition(condition);
+    item.setName(name);
+    item.setSetCode(setCode);
+    item.setSetName(setName);
+    item.setCollectorNumber(collectorNumber);
+    item.setFetchtcgCardId(fetchtcgCardId);
+    item.setSuggestedPrice(suggestedPrice);
+    item.setVersion(1);
+    item.setDirty(true);
+    item.setGsi1pk(formatGsi1pk(user));
+    item.setGsi1sk(formatGsi1sk(skuId));
+    item.setGsi2pk(formatGsi2pk(user));
+    item.setGsi2sk(formatGsi2sk(name.toLowerCase(), skuId));
+    return item;
+  }
+
+  public static TcgInventoryItem createUnit(
+      String user,
+      String skuId,
+      int sequenceNumber,
+      String status,
+      String importId,
+      Instant createdAt) {
+    var item = new TcgInventoryItem();
+    item.setPk(formatSkuPk(user, skuId));
+    item.setSk(formatUnitSk(sequenceNumber));
+    item.setSequenceNumber(sequenceNumber);
+    item.setStatus(status);
+    item.setImportId(importId);
+    item.setCreatedAt(createdAt);
+    return item;
+  }
+
+  public static TcgInventoryItem createImport(
+      String user,
+      String importId,
+      String filename,
+      int rowCount,
+      @Nullable String jobId,
+      Instant createdAt) {
+    var item = new TcgInventoryItem();
+    item.setPk(formatUserPk(user));
+    item.setSk(formatImportSk(importId));
+    item.setImportId(importId);
+    item.setFilename(filename);
+    item.setStatus("appraising");
+    item.setRowCount(rowCount);
+    item.setJobId(jobId);
+    item.setCreatedAt(createdAt);
+    return item;
+  }
+
+  public static TcgInventoryItem createImportRow(
+      String user,
+      String importId,
+      int position,
+      String name,
+      String setCode,
+      String setName,
+      String collectorNumber,
+      String finish,
+      String condition,
+      String scryfallId,
+      String language) {
+    var item = new TcgInventoryItem();
+    item.setPk(formatImportRowPk(user, importId));
+    item.setSk(formatImportRowSk(position));
+    item.setPosition(position);
+    item.setName(name);
+    item.setSetCode(setCode);
+    item.setSetName(setName);
+    item.setCollectorNumber(collectorNumber);
+    item.setFinish(finish);
+    item.setCondition(condition);
+    item.setScryfallId(scryfallId);
+    item.setLanguage(language);
+    return item;
+  }
+
+  public static TcgInventoryItem createOrder(
+      String user,
+      String orderId,
+      String status,
+      @Nullable String fetchtcgStatus,
+      @Nullable String fetchtcgCurrentAction,
+      @Nullable String deliveryMode,
+      @Nullable String totalPrice,
+      @Nullable String lines,
+      Instant createdAt) {
+    var item = new TcgInventoryItem();
+    item.setPk(formatUserPk(user));
+    item.setSk(formatOrderSk(orderId));
+    item.setOrderId(orderId);
+    item.setStatus(status);
+    item.setFetchtcgStatus(fetchtcgStatus);
+    item.setFetchtcgCurrentAction(fetchtcgCurrentAction);
+    item.setDeliveryMode(deliveryMode);
+    item.setTotalPrice(totalPrice);
+    item.setLines(lines);
+    item.setCreatedAt(createdAt);
+    item.setUpdatedAt(createdAt);
+    return item;
+  }
+
+  public static TcgInventoryItem createJob(
+      String user, String jobId, String jobType, @Nullable String importId, Instant createdAt) {
+    var item = new TcgInventoryItem();
+    item.setPk(formatUserPk(user));
+    item.setSk(formatJobSk(jobId));
+    item.setJobId(jobId);
+    item.setJobType(jobType);
+    item.setStatus("queued");
+    item.setImportId(importId);
+    item.setCreatedAt(createdAt);
+    return item;
+  }
+
+  public static TcgInventoryItem createSettings(String user, Instant updatedAt) {
+    var item = new TcgInventoryItem();
+    item.setPk(formatUserPk(user));
+    item.setSk(formatSettingsSk());
+    item.setUpdatedAt(updatedAt);
+    return item;
+  }
 }

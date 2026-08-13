@@ -254,16 +254,12 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
-    var jobItem = new TcgInventoryItem();
-    jobItem.setPk(TcgInventoryItem.formatUserPk("jordan"));
-    jobItem.setSk(TcgInventoryItem.formatJobSk("job1"));
-    jobItem.setJobId("job1");
-    jobItem.setJobType("appraise");
+    var jobItem =
+        TcgInventoryItem.createJob(
+            "jordan", "job1", "appraise", "import1", Instant.ofEpochSecond(1700000000));
     jobItem.setStatus("succeeded");
-    jobItem.setImportId("import1");
     jobItem.setProcessedCount(5);
     jobItem.setContinuation(5);
-    jobItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
     jobItem.setUpdatedAt(Instant.ofEpochSecond(1700000100));
     tcgInventoryTable.putItem(jobItem);
 
@@ -538,83 +534,60 @@ public class JobsHandlerIntegrationTest {
 
   private void createDirtySkuWithUnits(
       String user, String skuId, int unitCount, String suggestedPrice) {
-    var skuItem = new TcgInventoryItem();
-    skuItem.setPk(TcgInventoryItem.formatSkuPk(user, skuId));
-    skuItem.setSk(TcgInventoryItem.formatSkuSk());
-    skuItem.setSkuId(skuId);
     var parts = skuId.split("#");
-    skuItem.setScryfallId(parts[0]);
-    skuItem.setFinish(parts[1]);
-    skuItem.setCondition(parts[2]);
-    skuItem.setName("Test Card");
-    skuItem.setSetCode("dom");
-    skuItem.setSetName("Dominaria");
-    skuItem.setCollectorNumber("168");
-    skuItem.setFetchtcgCardId("mtg_168_c_dom_normal");
-    skuItem.setSuggestedPrice(suggestedPrice);
-    skuItem.setVersion(1);
-    skuItem.setDirty(true);
-    skuItem.setGsi1pk(TcgInventoryItem.formatGsi1pk(user));
-    skuItem.setGsi1sk(TcgInventoryItem.formatGsi1sk(skuId));
-    skuItem.setGsi2pk(TcgInventoryItem.formatGsi2pk(user));
-    skuItem.setGsi2sk(TcgInventoryItem.formatGsi2sk("test card", skuId));
+    var skuItem =
+        TcgInventoryItem.createSku(
+            user,
+            skuId,
+            parts[0],
+            parts[1],
+            parts[2],
+            "Test Card",
+            "dom",
+            "Dominaria",
+            "168",
+            "mtg_168_c_dom_normal",
+            suggestedPrice);
     tcgInventoryTable.putItem(skuItem);
 
     for (int i = 1; i <= unitCount; i++) {
-      var unit = new TcgInventoryItem();
-      unit.setPk(TcgInventoryItem.formatSkuPk(user, skuId));
-      unit.setSk(TcgInventoryItem.formatUnitSk(i));
-      unit.setSequenceNumber(i);
-      unit.setStatus("in_stock");
-      unit.setImportId("import1");
-      unit.setCreatedAt(Instant.ofEpochSecond(1700000000));
+      var unit =
+          TcgInventoryItem.createUnit(
+              user, skuId, i, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
       tcgInventoryTable.putItem(unit);
     }
   }
 
   private void createPublishJob(String user, String jobId) {
-    var jobItem = new TcgInventoryItem();
-    jobItem.setPk(TcgInventoryItem.formatUserPk(user));
-    jobItem.setSk(TcgInventoryItem.formatJobSk(jobId));
-    jobItem.setJobId(jobId);
-    jobItem.setJobType("publish");
-    jobItem.setStatus("queued");
-    jobItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
+    var jobItem =
+        TcgInventoryItem.createJob(user, jobId, "publish", null, Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(jobItem);
   }
 
   private void createSkuWithUnits(String user, String skuId, int fetchtcgListingId, int unitCount) {
-    var skuItem = new TcgInventoryItem();
-    skuItem.setPk(TcgInventoryItem.formatSkuPk(user, skuId));
-    skuItem.setSk(TcgInventoryItem.formatSkuSk());
-    skuItem.setSkuId(skuId);
     var parts = skuId.split("#");
-    skuItem.setScryfallId(parts[0]);
-    skuItem.setFinish(parts[1]);
-    skuItem.setCondition(parts[2]);
-    skuItem.setName("Test Card");
-    skuItem.setSetCode("dom");
-    skuItem.setSetName("Dominaria");
-    skuItem.setCollectorNumber("168");
-    skuItem.setFetchtcgCardId("mtg_168_c_dom_normal");
-    skuItem.setFetchtcgListingId(fetchtcgListingId);
-    skuItem.setSuggestedPrice("1.50");
-    skuItem.setVersion(1);
+    var skuItem =
+        TcgInventoryItem.createSku(
+            user,
+            skuId,
+            parts[0],
+            parts[1],
+            parts[2],
+            "Test Card",
+            "dom",
+            "Dominaria",
+            "168",
+            "mtg_168_c_dom_normal",
+            "1.50");
     skuItem.setDirty(false);
     skuItem.setGsi1pk(TcgInventoryItem.USER_PREFIX + user + "#CLEAN");
-    skuItem.setGsi1sk(TcgInventoryItem.formatGsi1sk(skuId));
-    skuItem.setGsi2pk(TcgInventoryItem.formatGsi2pk(user));
-    skuItem.setGsi2sk(TcgInventoryItem.formatGsi2sk("test card", skuId));
+    skuItem.setFetchtcgListingId(fetchtcgListingId);
     tcgInventoryTable.putItem(skuItem);
 
     for (int i = 1; i <= unitCount; i++) {
-      var unit = new TcgInventoryItem();
-      unit.setPk(TcgInventoryItem.formatSkuPk(user, skuId));
-      unit.setSk(TcgInventoryItem.formatUnitSk(i));
-      unit.setSequenceNumber(i);
-      unit.setStatus("in_stock");
-      unit.setImportId("import1");
-      unit.setCreatedAt(Instant.ofEpochSecond(1700000000));
+      var unit =
+          TcgInventoryItem.createUnit(
+              user, skuId, i, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
       tcgInventoryTable.putItem(unit);
     }
   }
@@ -634,40 +607,41 @@ public class JobsHandlerIntegrationTest {
   }
 
   private void createExistingOrder(String user, String offerId, String status) {
-    var order = new TcgInventoryItem();
-    order.setPk(TcgInventoryItem.formatUserPk(user));
-    order.setSk(TcgInventoryItem.formatOrderSk(offerId));
-    order.setOrderId(offerId);
-    order.setStatus(status);
-    order.setDeliveryMode("PICKUP");
-    order.setTotalPrice("3.33");
-    order.setFetchtcgStatus("ACCEPTED");
-    order.setLines("[]");
-    order.setCreatedAt(Instant.ofEpochSecond(1700000000));
-    order.setUpdatedAt(Instant.ofEpochSecond(1700000000));
+    var order =
+        TcgInventoryItem.createOrder(
+            user,
+            offerId,
+            status,
+            "ACCEPTED",
+            null,
+            "PICKUP",
+            "3.33",
+            "[]",
+            Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(order);
   }
 
   private void createExistingOrderWithLines(
       String user, String offerId, String status, String skuId, List<Integer> sequenceNumbers) {
-    var order = new TcgInventoryItem();
-    order.setPk(TcgInventoryItem.formatUserPk(user));
-    order.setSk(TcgInventoryItem.formatOrderSk(offerId));
-    order.setOrderId(offerId);
-    order.setStatus(status);
-    order.setDeliveryMode("PICKUP");
-    order.setTotalPrice("3.33");
-    order.setFetchtcgStatus("ACCEPTED");
-    order.setLines(
+    var lines =
         "[{\"sku_id\":\""
             + skuId
             + "\",\"fetchtcg_listing_id\":1001,\"quantity\":"
             + sequenceNumbers.size()
             + ",\"price\":\"1.50\",\"allocated_sequence_numbers\":"
             + sequenceNumbers
-            + "}]");
-    order.setCreatedAt(Instant.ofEpochSecond(1700000000));
-    order.setUpdatedAt(Instant.ofEpochSecond(1700000000));
+            + "}]";
+    var order =
+        TcgInventoryItem.createOrder(
+            user,
+            offerId,
+            status,
+            "ACCEPTED",
+            null,
+            "PICKUP",
+            "3.33",
+            lines,
+            Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(order);
   }
 
@@ -744,72 +718,62 @@ public class JobsHandlerIntegrationTest {
   }
 
   private void createImportWithRows(String user, String importId, List<RowSpec> rows) {
-    var importItem = new TcgInventoryItem();
-    importItem.setPk(TcgInventoryItem.formatUserPk(user));
-    importItem.setSk(TcgInventoryItem.formatImportSk(importId));
-    importItem.setImportId(importId);
-    importItem.setFilename("test.csv");
-    importItem.setStatus("appraising");
-    importItem.setRowCount(rows.size());
-    importItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
+    var importItem =
+        TcgInventoryItem.createImport(
+            user, importId, "test.csv", rows.size(), null, Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(importItem);
 
     for (int i = 0; i < rows.size(); i++) {
       var spec = rows.get(i);
-      var rowItem = new TcgInventoryItem();
-      rowItem.setPk(TcgInventoryItem.formatImportRowPk(user, importId));
-      rowItem.setSk(TcgInventoryItem.formatImportRowSk(i + 1));
-      rowItem.setPosition(i + 1);
-      rowItem.setName("Card " + (i + 1));
-      rowItem.setSetCode(spec.setCode());
-      rowItem.setSetName("Test Set");
-      rowItem.setCollectorNumber(spec.collectorNumber());
-      rowItem.setFinish(spec.finish());
-      rowItem.setCondition(spec.condition());
-      rowItem.setScryfallId(spec.scryfallId());
-      rowItem.setLanguage(spec.language());
+      var rowItem =
+          TcgInventoryItem.createImportRow(
+              user,
+              importId,
+              i + 1,
+              "Card " + (i + 1),
+              spec.setCode(),
+              "Test Set",
+              spec.collectorNumber(),
+              spec.finish(),
+              spec.condition(),
+              spec.scryfallId(),
+              spec.language());
       tcgInventoryTable.putItem(rowItem);
     }
   }
 
   private void createImportWithNRows(String user, String importId, int rowCount) {
-    var importItem = new TcgInventoryItem();
-    importItem.setPk(TcgInventoryItem.formatUserPk(user));
-    importItem.setSk(TcgInventoryItem.formatImportSk(importId));
-    importItem.setImportId(importId);
-    importItem.setFilename("test.csv");
-    importItem.setStatus("appraising");
-    importItem.setRowCount(rowCount);
-    importItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
+    var importItem =
+        TcgInventoryItem.createImport(
+            user, importId, "test.csv", rowCount, null, Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(importItem);
 
     for (int i = 1; i <= rowCount; i++) {
-      var rowItem = new TcgInventoryItem();
-      rowItem.setPk(TcgInventoryItem.formatImportRowPk(user, importId));
-      rowItem.setSk(TcgInventoryItem.formatImportRowSk(i));
-      rowItem.setPosition(i);
-      rowItem.setName("Card " + i);
-      rowItem.setSetCode("dom");
-      rowItem.setSetName("Dominaria");
-      rowItem.setCollectorNumber("168");
-      rowItem.setFinish("normal");
-      rowItem.setCondition("NM");
-      rowItem.setScryfallId("scryfall-" + i);
-      rowItem.setLanguage("en");
+      var rowItem =
+          TcgInventoryItem.createImportRow(
+              user,
+              importId,
+              i,
+              "Card " + i,
+              "dom",
+              "Dominaria",
+              "168",
+              "normal",
+              "NM",
+              "scryfall-" + i,
+              "en");
       tcgInventoryTable.putItem(rowItem);
     }
   }
 
   private TcgInventoryItem createJob(
       String user, String jobId, String jobType, String status, String importId) {
-    var jobItem = new TcgInventoryItem();
-    jobItem.setPk(TcgInventoryItem.formatUserPk(user));
-    jobItem.setSk(TcgInventoryItem.formatJobSk(jobId));
-    jobItem.setJobId(jobId);
-    jobItem.setJobType(jobType);
-    jobItem.setStatus(status);
-    jobItem.setImportId(importId);
-    jobItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
+    var jobItem =
+        TcgInventoryItem.createJob(
+            user, jobId, jobType, importId, Instant.ofEpochSecond(1700000000));
+    if (!"queued".equals(status)) {
+      jobItem.setStatus(status);
+    }
     tcgInventoryTable.putItem(jobItem);
     return jobItem;
   }

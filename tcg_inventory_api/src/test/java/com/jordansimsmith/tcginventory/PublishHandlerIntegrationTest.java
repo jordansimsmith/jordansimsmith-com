@@ -98,14 +98,11 @@ public class PublishHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
-    var jobItem = new TcgInventoryItem();
-    jobItem.setPk(TcgInventoryItem.formatUserPk("jordan"));
-    jobItem.setSk(TcgInventoryItem.formatJobSk("existing-job"));
-    jobItem.setJobId("existing-job");
-    jobItem.setJobType("publish");
+    var jobItem =
+        TcgInventoryItem.createJob(
+            "jordan", "existing-job", "publish", null, Instant.ofEpochSecond(1700000000));
     jobItem.setStatus("running");
     jobItem.setProcessedCount(5);
-    jobItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
     jobItem.setUpdatedAt(Instant.ofEpochSecond(1700000100));
     tcgInventoryTable.putItem(jobItem);
 
@@ -127,14 +124,11 @@ public class PublishHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
-    var completedJob = new TcgInventoryItem();
-    completedJob.setPk(TcgInventoryItem.formatUserPk("jordan"));
-    completedJob.setSk(TcgInventoryItem.formatJobSk("old-job"));
-    completedJob.setJobId("old-job");
-    completedJob.setJobType("publish");
+    var completedJob =
+        TcgInventoryItem.createJob(
+            "jordan", "old-job", "publish", null, Instant.ofEpochSecond(1699999000));
     completedJob.setStatus("succeeded");
     completedJob.setProcessedCount(10);
-    completedJob.setCreatedAt(Instant.ofEpochSecond(1699999000));
     tcgInventoryTable.putItem(completedJob);
 
     // act
@@ -154,24 +148,27 @@ public class PublishHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
-    var jobItem = new TcgInventoryItem();
-    jobItem.setPk(TcgInventoryItem.formatUserPk("jordan"));
-    jobItem.setSk(TcgInventoryItem.formatJobSk("pub-job"));
-    jobItem.setJobId("pub-job");
-    jobItem.setJobType("publish");
+    var jobItem =
+        TcgInventoryItem.createJob(
+            "jordan", "pub-job", "publish", null, Instant.ofEpochSecond(1700000000));
     jobItem.setStatus("succeeded");
     jobItem.setProcessedCount(3);
-    jobItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
     jobItem.setUpdatedAt(Instant.ofEpochSecond(1700000200));
     tcgInventoryTable.putItem(jobItem);
 
-    var dirtySku = new TcgInventoryItem();
-    dirtySku.setPk(TcgInventoryItem.formatSkuPk("jordan", "sku1#normal#NM"));
-    dirtySku.setSk(TcgInventoryItem.formatSkuSk());
-    dirtySku.setSkuId("sku1#normal#NM");
-    dirtySku.setDirty(true);
-    dirtySku.setGsi1pk(TcgInventoryItem.formatGsi1pk("jordan"));
-    dirtySku.setGsi1sk(TcgInventoryItem.formatGsi1sk("sku1#normal#NM"));
+    var dirtySku =
+        TcgInventoryItem.createSku(
+            "jordan",
+            "sku1#normal#NM",
+            "sku1",
+            "normal",
+            "NM",
+            "Test Card",
+            "dom",
+            "Dominaria",
+            "1",
+            null,
+            null);
     tcgInventoryTable.putItem(dirtySku);
 
     // act

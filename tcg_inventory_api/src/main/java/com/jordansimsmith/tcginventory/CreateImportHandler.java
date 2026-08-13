@@ -102,45 +102,31 @@ public class CreateImportHandler
 
     int totalRows = reversed.stream().mapToInt(ManaBoxCsvParser.ParsedRow::quantity).sum();
 
-    var importItem = new TcgInventoryItem();
-    importItem.setPk(TcgInventoryItem.formatUserPk(user));
-    importItem.setSk(TcgInventoryItem.formatImportSk(importId));
-    importItem.setImportId(importId);
-    importItem.setFilename(filename);
-    importItem.setStatus("appraising");
-    importItem.setRowCount(totalRows);
-    importItem.setJobId(jobId);
-    importItem.setCreatedAt(now);
+    var importItem = TcgInventoryItem.createImport(user, importId, filename, totalRows, jobId, now);
     tcgInventoryTable.putItem(importItem);
 
     int position = 0;
     for (var parsedRow : reversed) {
       for (int copy = 0; copy < parsedRow.quantity(); copy++) {
         position++;
-        var rowItem = new TcgInventoryItem();
-        rowItem.setPk(TcgInventoryItem.formatImportRowPk(user, importId));
-        rowItem.setSk(TcgInventoryItem.formatImportRowSk(position));
-        rowItem.setPosition(position);
-        rowItem.setName(parsedRow.name());
-        rowItem.setSetCode(parsedRow.setCode());
-        rowItem.setSetName(parsedRow.setName());
-        rowItem.setCollectorNumber(parsedRow.collectorNumber());
-        rowItem.setFinish(parsedRow.finish());
-        rowItem.setCondition(parsedRow.condition());
-        rowItem.setScryfallId(parsedRow.scryfallId());
-        rowItem.setLanguage(parsedRow.language());
+        var rowItem =
+            TcgInventoryItem.createImportRow(
+                user,
+                importId,
+                position,
+                parsedRow.name(),
+                parsedRow.setCode(),
+                parsedRow.setName(),
+                parsedRow.collectorNumber(),
+                parsedRow.finish(),
+                parsedRow.condition(),
+                parsedRow.scryfallId(),
+                parsedRow.language());
         tcgInventoryTable.putItem(rowItem);
       }
     }
 
-    var jobItem = new TcgInventoryItem();
-    jobItem.setPk(TcgInventoryItem.formatUserPk(user));
-    jobItem.setSk(TcgInventoryItem.formatJobSk(jobId));
-    jobItem.setJobId(jobId);
-    jobItem.setJobType("appraise");
-    jobItem.setStatus("queued");
-    jobItem.setImportId(importId);
-    jobItem.setCreatedAt(now);
+    var jobItem = TcgInventoryItem.createJob(user, jobId, "appraise", importId, now);
     tcgInventoryTable.putItem(jobItem);
 
     jobsQueue.send(new JobMessage(user, jobId, "appraise"));

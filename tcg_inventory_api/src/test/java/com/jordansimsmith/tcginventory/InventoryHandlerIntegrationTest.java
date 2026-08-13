@@ -444,34 +444,29 @@ public class InventoryHandlerIntegrationTest {
     var finish = parts[1];
     var condition = parts[2];
 
-    var item = new TcgInventoryItem();
-    item.setPk(TcgInventoryItem.formatSkuPk(user, skuId));
-    item.setSk(TcgInventoryItem.formatSkuSk());
-    item.setSkuId(skuId);
-    item.setScryfallId(scryfallId);
-    item.setFinish(finish);
-    item.setCondition(condition);
-    item.setName(name);
-    item.setSetCode(setCode);
-    item.setSetName(setName);
-    item.setCollectorNumber(collectorNumber);
-    item.setVersion(1);
+    var item =
+        TcgInventoryItem.createSku(
+            user,
+            skuId,
+            scryfallId,
+            finish,
+            condition,
+            name,
+            setCode,
+            setName,
+            collectorNumber,
+            null,
+            null);
     item.setDirty(false);
-    item.setGsi2pk(TcgInventoryItem.formatGsi2pk(user));
-    item.setGsi2sk(TcgInventoryItem.formatGsi2sk(name.toLowerCase(), skuId));
-    item.setCreatedAt(Instant.ofEpochSecond(1700000000));
+    item.setGsi1pk(TcgInventoryItem.USER_PREFIX + user + "#CLEAN");
     tcgInventoryTable.putItem(item);
   }
 
   private void createUnit(
       String user, String skuId, int sequenceNumber, String status, String importId) {
-    var item = new TcgInventoryItem();
-    item.setPk(TcgInventoryItem.formatSkuPk(user, skuId));
-    item.setSk(TcgInventoryItem.formatUnitSk(sequenceNumber));
-    item.setSequenceNumber(sequenceNumber);
-    item.setStatus(status);
-    item.setImportId(importId);
-    item.setCreatedAt(Instant.ofEpochSecond(1700000000));
+    var item =
+        TcgInventoryItem.createUnit(
+            user, skuId, sequenceNumber, status, importId, Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(item);
   }
 

@@ -72,10 +72,7 @@ public class PutSettingsHandler
     secretNode.put(user, request.refreshToken());
     secrets.put(SECRET_NAME, objectMapper.writeValueAsString(secretNode));
 
-    var settingsItem = new TcgInventoryItem();
-    settingsItem.setPk(TcgInventoryItem.formatUserPk(user));
-    settingsItem.setSk(TcgInventoryItem.formatSettingsSk());
-    settingsItem.setUpdatedAt(now);
+    var settingsItem = TcgInventoryItem.createSettings(user, now);
     tcgInventoryTable.putItem(settingsItem);
 
     return httpResponseFactory.ok(new PutSettingsResponse("settings updated"));

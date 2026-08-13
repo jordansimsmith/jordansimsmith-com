@@ -422,28 +422,25 @@ public class ImportsHandlerIntegrationTest {
 
   private String createReviewImportWithRow(String user) {
     var importId = "import1";
-    var importItem = new TcgInventoryItem();
-    importItem.setPk(TcgInventoryItem.formatUserPk(user));
-    importItem.setSk(TcgInventoryItem.formatImportSk(importId));
-    importItem.setImportId(importId);
-    importItem.setFilename("test.csv");
+    var importItem =
+        TcgInventoryItem.createImport(
+            user, importId, "test.csv", 1, null, Instant.ofEpochSecond(1700000000));
     importItem.setStatus("review");
-    importItem.setRowCount(1);
-    importItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(importItem);
 
-    var rowItem = new TcgInventoryItem();
-    rowItem.setPk(TcgInventoryItem.formatImportRowPk(user, importId));
-    rowItem.setSk(TcgInventoryItem.formatImportRowSk(1));
-    rowItem.setPosition(1);
-    rowItem.setName("Llanowar Elves");
-    rowItem.setSetCode("dom");
-    rowItem.setSetName("Dominaria");
-    rowItem.setCollectorNumber("168");
-    rowItem.setFinish("normal");
-    rowItem.setCondition("NM");
-    rowItem.setScryfallId("scryfall-1");
-    rowItem.setLanguage("en");
+    var rowItem =
+        TcgInventoryItem.createImportRow(
+            user,
+            importId,
+            1,
+            "Llanowar Elves",
+            "dom",
+            "Dominaria",
+            "168",
+            "normal",
+            "NM",
+            "scryfall-1",
+            "en");
     rowItem.setDecision("keep");
     rowItem.setMarketPrice("1.50");
     rowItem.setSuggestedPrice("1.40");

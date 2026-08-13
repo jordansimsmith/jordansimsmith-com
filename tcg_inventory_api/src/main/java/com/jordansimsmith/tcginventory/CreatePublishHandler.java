@@ -85,14 +85,7 @@ public class CreatePublishHandler
     var now = clock.now();
     var jobId = ulidGenerator.generate();
 
-    var jobItem = new TcgInventoryItem();
-    jobItem.setPk(TcgInventoryItem.formatUserPk(user));
-    jobItem.setSk(TcgInventoryItem.formatJobSk(jobId));
-    jobItem.setJobId(jobId);
-    jobItem.setJobType("publish");
-    jobItem.setStatus("queued");
-    jobItem.setProcessedCount(0);
-    jobItem.setCreatedAt(now);
+    var jobItem = TcgInventoryItem.createJob(user, jobId, "publish", null, now);
     tcgInventoryTable.putItem(jobItem);
 
     jobsQueue.send(new JobMessage(user, jobId, "publish"));

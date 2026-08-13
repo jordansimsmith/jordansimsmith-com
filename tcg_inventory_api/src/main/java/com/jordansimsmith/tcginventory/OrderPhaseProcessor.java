@@ -195,24 +195,24 @@ public class OrderPhaseProcessor {
       }
     }
 
-    var orderItem = new TcgInventoryItem();
-    orderItem.setPk(TcgInventoryItem.formatUserPk(user));
-    orderItem.setSk(TcgInventoryItem.formatOrderSk(offerId));
-    orderItem.setOrderId(offerId);
-    orderItem.setStatus(insufficientStock ? "flagged" : "awaiting_payment");
-    orderItem.setFetchtcgStatus(offer.status());
-    orderItem.setFetchtcgCurrentAction(offer.currentAction());
-    orderItem.setDeliveryMode(offer.deliveryMode());
-    orderItem.setTotalPrice(
-        offer.totalOfferPrice() != null ? offer.totalOfferPrice().toPlainString() : null);
-    orderItem.setCreatedAt(clock.now());
-    orderItem.setUpdatedAt(clock.now());
-
+    String linesJson;
     try {
-      orderItem.setLines(objectMapper.writeValueAsString(orderLines));
+      linesJson = objectMapper.writeValueAsString(orderLines);
     } catch (Exception e) {
       throw new RuntimeException("failed to serialize order lines", e);
     }
+
+    var orderItem =
+        TcgInventoryItem.createOrder(
+            user,
+            offerId,
+            insufficientStock ? "flagged" : "awaiting_payment",
+            offer.status(),
+            offer.currentAction(),
+            offer.deliveryMode(),
+            offer.totalOfferPrice() != null ? offer.totalOfferPrice().toPlainString() : null,
+            linesJson,
+            clock.now());
 
     var orderPut =
         TransactWriteItem.builder()
