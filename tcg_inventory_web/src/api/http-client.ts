@@ -8,6 +8,7 @@ import type {
   FindSkusParams,
   FindSkusResponse,
   ImportDetail,
+  ImportRow,
   ImportSummary,
   OrderDetail,
   PublishResponse,
@@ -82,6 +83,22 @@ export function createHttpClient(): ApiClient {
     async getImport(importId: string): Promise<ImportDetail> {
       const response = await authenticatedFetch(
         `/imports/${encodeURIComponent(importId)}`,
+      );
+      return response.json();
+    },
+
+    async updateImportRow(
+      importId: string,
+      position: number,
+      condition: Condition,
+    ): Promise<ImportRow> {
+      const response = await authenticatedFetch(
+        `/imports/${encodeURIComponent(importId)}/rows/${position}`,
+        {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ condition }),
+        },
       );
       return response.json();
     },

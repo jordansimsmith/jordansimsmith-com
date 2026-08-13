@@ -8,6 +8,7 @@ import type {
   FindSkusParams,
   FindSkusResponse,
   ImportDetail,
+  ImportRow,
   ImportStatus,
   ImportSummary,
   OrderDetail,
@@ -702,6 +703,36 @@ export function createFakeClient(): ApiClient {
 
     async getImport(importId: string): Promise<ImportDetail> {
       return toImportDetail(getImportOrThrow(importId));
+    },
+
+    async updateImportRow(
+      importId: string,
+      position: number,
+      condition: Condition,
+    ): Promise<ImportRow> {
+      const importRecord = getImportOrThrow(importId);
+      if (importRecord.status !== 'review') {
+        throw new Error('import is not in review status');
+      }
+      const row = importRecord.rows.find((r) => r.position === position);
+      if (!row) {
+        throw new Error('Not Found');
+      }
+      row.condition = condition;
+      return {
+        position: row.position,
+        name: row.name,
+        set_code: row.set_code,
+        set_name: row.set_name,
+        collector_number: row.collector_number,
+        finish: row.finish,
+        condition: row.condition,
+        scryfall_id: row.scryfall_id,
+        decision: row.decision,
+        decision_reason: row.decision_reason,
+        market_price: row.market_price,
+        suggested_price: row.suggested_price,
+      };
     },
 
     async confirmImport(importId: string): Promise<ConfirmImportResponse> {

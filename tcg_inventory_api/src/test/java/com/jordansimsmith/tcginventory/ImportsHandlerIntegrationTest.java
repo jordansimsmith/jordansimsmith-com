@@ -39,6 +39,7 @@ public class ImportsHandlerIntegrationTest {
   private FindImportsHandler findImportsHandler;
   private GetImportHandler getImportHandler;
   private DeleteImportHandler deleteImportHandler;
+  private UpdateImportRowHandler updateImportRowHandler;
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
@@ -67,6 +68,7 @@ public class ImportsHandlerIntegrationTest {
     findImportsHandler = new FindImportsHandler(factory);
     getImportHandler = new GetImportHandler(factory);
     deleteImportHandler = new DeleteImportHandler(factory);
+    updateImportRowHandler = new UpdateImportRowHandler(factory);
   }
 
   @Test
@@ -404,5 +406,142 @@ public class ImportsHandlerIntegrationTest {
         .withHeaders(Map.of("Authorization", authHeader))
         .withPathParameters(pathParams)
         .build();
+  }
+
+  private APIGatewayV2HTTPEvent buildEventWithBody(
+      String user, Map<String, String> pathParams, String body) {
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
+    return APIGatewayV2HTTPEvent.builder()
+        .withHeaders(Map.of("Authorization", authHeader))
+        .withPathParameters(pathParams)
+        .withBody(body)
+        .build();
+  }
+
+  private String createReviewImportWithRow(String user) {
+    var importId = "import1";
+    var importItem = new TcgInventoryItem();
+    importItem.setPk(TcgInventoryItem.formatUserPk(user));
+    importItem.setSk(TcgInventoryItem.formatImportSk(importId));
+    importItem.setImportId(importId);
+    importItem.setFilename("test.csv");
+    importItem.setStatus("review");
+    importItem.setRowCount(1);
+    importItem.setKeepCount(1);
+    importItem.setDiscardCount(0);
+    importItem.setReviewCount(0);
+    importItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
+    tcgInventoryTable.putItem(importItem);
+
+    var rowItem = new TcgInventoryItem();
+    rowItem.setPk(TcgInventoryItem.formatImportRowPk(user, importId));
+    rowItem.setSk(TcgInventoryItem.formatImportRowSk(1));
+    rowItem.setPosition(1);
+    rowItem.setName("Llanowar Elves");
+    rowItem.setSetCode("dom");
+    rowItem.setSetName("Dominaria");
+    rowItem.setCollectorNumber("168");
+    rowItem.setFinish("normal");
+    rowItem.setCondition("NM");
+    rowItem.setScryfallId("scryfall-1");
+    rowItem.setLanguage("en");
+    rowItem.setDecision("keep");
+    rowItem.setMarketPrice("1.50");
+    rowItem.setSuggestedPrice("1.40");
+    tcgInventoryTable.putItem(rowItem);
+
+    return importId;
+  }
+
+  @Test
+  void updateImportRowShouldUpdateCondition() throws Exception {
+    // arrange
+    var importId = createReviewImportWithRow("jordan");
+
+    // act
+    var response =
+        updateImportRowHandler.handleRequest(
+            buildEventWithBody(
+                "jordan", Map.of("import_id", importId, "position", "1"), "{\"condition\":\"LP\"}"),
+            null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = objectMapper.readTree(response.getBody());
+    assertThat(body.get("condition").asText()).isEqualTo("LP");
+    assertThat(body.get("name").asText()).isEqualTo("Llanowar Elves");
+    assertThat(body.get("decision").asText()).isEqualTo("keep");
+    assertThat(body.get("market_price").asText()).isEqualTo("1.50");
+
+    var rowItem =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue(TcgInventoryItem.formatImportRowPk("jordan", importId))
+                .sortValue(TcgInventoryItem.formatImportRowSk(1))
+                .build());
+    assertThat(rowItem.getCondition()).isEqualTo("LP");
+  }
+
+  @Test
+  void updateImportRowShouldReturn409WhenNotInReview() {
+    // arrange
+    var importId = createReviewImportWithRow("jordan");
+    var importItem =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
+                .sortValue(TcgInventoryItem.formatImportSk(importId))
+                .build());
+    importItem.setStatus("appraising");
+    tcgInventoryTable.putItem(importItem);
+
+    // act
+    var response =
+        updateImportRowHandler.handleRequest(
+            buildEventWithBody(
+                "jordan", Map.of("import_id", importId, "position", "1"), "{\"condition\":\"LP\"}"),
+            null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(409);
+  }
+
+  @Test
+  void updateImportRowShouldReturn404ForMissingRow() {
+    // arrange
+    createReviewImportWithRow("jordan");
+
+    // act
+    var response =
+        updateImportRowHandler.handleRequest(
+            buildEventWithBody(
+                "jordan",
+                Map.of("import_id", "import1", "position", "99"),
+                "{\"condition\":\"LP\"}"),
+            null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(404);
+  }
+
+  @Test
+  void updateImportRowShouldReturn400ForInvalidCondition() {
+    // arrange
+    createReviewImportWithRow("jordan");
+
+    // act
+    var response =
+        updateImportRowHandler.handleRequest(
+            buildEventWithBody(
+                "jordan",
+                Map.of("import_id", "import1", "position", "1"),
+                "{\"condition\":\"INVALID\"}"),
+            null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(400);
   }
 }

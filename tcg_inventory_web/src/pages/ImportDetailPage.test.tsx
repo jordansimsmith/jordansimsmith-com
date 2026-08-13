@@ -328,6 +328,43 @@ describe('ImportDetailPage', () => {
     expect(screen.queryByText('Placement instructions')).toBeNull();
   });
 
+  it('allows editing condition via inline select in review status', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport(),
+    );
+    vi.spyOn(clientModule.apiClient, 'updateImportRow').mockResolvedValue(
+      importRow(1, { name: 'Top Card', condition: 'LP' }),
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+
+    const selects = screen.getAllByLabelText(/Condition for row/);
+    expect(selects).toHaveLength(3);
+
+    await user.selectOptions(selects[0], 'LP');
+
+    await waitFor(() => {
+      expect(clientModule.apiClient.updateImportRow).toHaveBeenCalledWith(
+        'import-2',
+        1,
+        'LP',
+      );
+    });
+  });
+
+  it('does not show condition selects for a confirmed import', async () => {
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport({ status: 'confirmed' }),
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+
+    expect(screen.queryByLabelText(/Condition for row/)).toBeNull();
+  });
+
   it('renders a confirmed import read-only without a confirm button', async () => {
     vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
       reviewImport({ status: 'confirmed' }),

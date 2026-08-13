@@ -161,6 +161,11 @@ export interface ApiClient {
   createImport(filename: string, csv: string): Promise<ImportSummary>;
   findImports(): Promise<FindImportsResponse>;
   getImport(importId: string): Promise<ImportDetail>;
+  updateImportRow(
+    importId: string,
+    position: number,
+    condition: Condition,
+  ): Promise<ImportRow>;
   confirmImport(importId: string): Promise<ConfirmImportResponse>;
   findSkus(params?: FindSkusParams): Promise<FindSkusResponse>;
   getSku(skuId: string): Promise<SkuDetail>;

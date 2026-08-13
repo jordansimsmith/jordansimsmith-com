@@ -18,7 +18,11 @@ import { ImportReviewTable } from '../components/ImportReviewTable';
 import { ConfirmImportModal } from '../components/ConfirmImportModal';
 import { PlacementInstructionsView } from '../components/PlacementInstructionsView';
 import { apiClient } from '../api/client';
-import type { ConfirmImportResponse, ImportDetail } from '../api/client';
+import type {
+  Condition,
+  ConfirmImportResponse,
+  ImportDetail,
+} from '../api/client';
 import { useListNavigation } from '../hooks/use-list-navigation';
 
 const POLL_INTERVAL_MS = 2000;
@@ -104,6 +108,37 @@ export function ImportDetailPage() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [confirmOpen, navigate]);
+
+  const handleConditionChange = async (
+    position: number,
+    condition: Condition,
+  ) => {
+    if (!importId) {
+      return;
+    }
+    try {
+      const updated = await apiClient.updateImportRow(
+        importId,
+        position,
+        condition,
+      );
+      setImportDetail((current) => {
+        if (!current) {
+          return current;
+        }
+        return {
+          ...current,
+          rows: current.rows.map((row) =>
+            row.position === position ? { ...row, ...updated } : row,
+          ),
+        };
+      });
+    } catch (e) {
+      const message =
+        e instanceof Error ? e.message : 'Failed to update condition';
+      notifications.show({ title: 'Error', message, color: 'red' });
+    }
+  };
 
   const handleConfirm = async () => {
     if (!importId) {
@@ -204,6 +239,8 @@ export function ImportDetailPage() {
                 rows={rows}
                 selectedIndex={selectedIndex}
                 onSelect={setSelectedIndex}
+                editable={importDetail.status === 'review'}
+                onConditionChange={handleConditionChange}
               />
             )}
             {confirmResult && (

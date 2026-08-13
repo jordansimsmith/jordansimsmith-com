@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
-import { Badge, Table, Text } from '@mantine/core';
-import type { ImportRow, RowDecision } from '../api/client';
+import { Badge, NativeSelect, Table, Text } from '@mantine/core';
+import type { Condition, ImportRow, RowDecision } from '../api/client';
+import { CONDITIONS } from '../api/client';
 
 const DECISION_COLORS: Record<RowDecision, string> = {
   keep: 'green',
@@ -12,12 +13,16 @@ interface ImportReviewTableProps {
   rows: ImportRow[];
   selectedIndex: number;
   onSelect: (index: number) => void;
+  editable?: boolean;
+  onConditionChange?: (position: number, condition: Condition) => void;
 }
 
 export function ImportReviewTable({
   rows,
   selectedIndex,
   onSelect,
+  editable = false,
+  onConditionChange,
 }: ImportReviewTableProps) {
   const selectedRowRef = useRef<HTMLTableRowElement>(null);
 
@@ -67,7 +72,25 @@ export function ImportReviewTable({
               </Table.Td>
               <Table.Td>{row.collector_number}</Table.Td>
               <Table.Td>{row.finish}</Table.Td>
-              <Table.Td>{row.condition}</Table.Td>
+              <Table.Td>
+                {editable && onConditionChange ? (
+                  <NativeSelect
+                    size="xs"
+                    value={row.condition}
+                    data={CONDITIONS}
+                    onChange={(event) =>
+                      onConditionChange(
+                        row.position,
+                        event.currentTarget.value as Condition,
+                      )
+                    }
+                    onClick={(event) => event.stopPropagation()}
+                    aria-label={`Condition for row ${row.position}`}
+                  />
+                ) : (
+                  row.condition
+                )}
+              </Table.Td>
               <Table.Td ta="right">
                 {row.market_price !== null && `$${row.market_price}`}
               </Table.Td>
