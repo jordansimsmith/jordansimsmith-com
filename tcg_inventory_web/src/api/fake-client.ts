@@ -174,8 +174,6 @@ function toSummary(sku: FakeSku): SkuSummary {
     collector_number: sku.collector_number,
     finish: sku.finish,
     condition: sku.condition,
-    in_stock_count: countByStatus(sku, 'in_stock'),
-    reserved_count: countByStatus(sku, 'reserved'),
   };
 }
 
@@ -190,6 +188,8 @@ function toDetail(sku: FakeSku): SkuDetail {
   return {
     ...toSummary(sku),
     scryfall_id: sku.scryfall_id,
+    in_stock_count: countByStatus(sku, 'in_stock'),
+    reserved_count: countByStatus(sku, 'reserved'),
     sold_count: countByStatus(sku, 'sold'),
     units,
   };
@@ -779,10 +779,7 @@ export function createFakeClient(): ApiClient {
       return toDetail(getSkuOrThrow(skuId));
     },
 
-    async deleteUnit(
-      skuId: string,
-      sequenceNumber: number,
-    ): Promise<SkuDetail> {
+    async deleteUnit(skuId: string, sequenceNumber: number): Promise<void> {
       const sku = getSkuOrThrow(skuId);
       const unit = getUnitOrThrow(sku, sequenceNumber);
       if (unit.status !== 'in_stock') {
@@ -790,7 +787,6 @@ export function createFakeClient(): ApiClient {
       }
       unit.status = 'removed';
       dirtySkuIds.add(sku.sku_id);
-      return toDetail(sku);
     },
 
     async updateUnit(

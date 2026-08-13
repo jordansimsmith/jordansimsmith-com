@@ -142,17 +142,37 @@ lambdas = {
         "timeout": 900,
         "environment": {"JOBS_QUEUE_URL": queue_url},
     },
+    "find_skus": {
+        "handler": "com.jordansimsmith.tcginventory.FindSkusHandler",
+        "zip_file": "find-skus-handler_deploy.jar",
+    },
+    "get_sku": {
+        "handler": "com.jordansimsmith.tcginventory.GetSkuHandler",
+        "zip_file": "get-sku-handler_deploy.jar",
+    },
+    "remove_unit": {
+        "handler": "com.jordansimsmith.tcginventory.RemoveUnitHandler",
+        "zip_file": "remove-unit-handler_deploy.jar",
+    },
+    "update_unit": {
+        "handler": "com.jordansimsmith.tcginventory.UpdateUnitHandler",
+        "zip_file": "update-unit-handler_deploy.jar",
+    },
 }
 
 root_resources = {
     "settings": {"path": "settings"},
     "imports": {"path": "imports"},
     "publish": {"path": "publish"},
+    "skus": {"path": "skus"},
 }
 
 child_resources = {
     "import_detail": {"parent": "imports", "path": "{import_id}"},
     "import_confirm": {"parent": "import_detail", "path": "confirm"},
+    "sku_detail": {"parent": "skus", "path": "{sku_id}"},
+    "sku_units": {"parent": "sku_detail", "path": "units"},
+    "sku_unit_detail": {"parent": "sku_units", "path": "{sequence_number}"},
 }
 
 endpoints = {
@@ -188,6 +208,18 @@ endpoints = {
         "resource": "import_confirm",
         "method": "POST",
         "lambda": "confirm_import",
+    },
+    "find_skus": {"resource": "skus", "method": "GET", "lambda": "find_skus"},
+    "get_sku": {"resource": "sku_detail", "method": "GET", "lambda": "get_sku"},
+    "remove_unit": {
+        "resource": "sku_unit_detail",
+        "method": "DELETE",
+        "lambda": "remove_unit",
+    },
+    "update_unit": {
+        "resource": "sku_unit_detail",
+        "method": "PUT",
+        "lambda": "update_unit",
     },
 }
 

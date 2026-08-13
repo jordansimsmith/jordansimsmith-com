@@ -124,7 +124,10 @@ describe('SkuDetailPage', () => {
           : unit,
       ),
     };
-    vi.spyOn(clientModule.apiClient, 'deleteUnit').mockResolvedValue(updated);
+    vi.spyOn(clientModule.apiClient, 'deleteUnit').mockResolvedValue(undefined);
+    vi.spyOn(clientModule.apiClient, 'getSku')
+      .mockResolvedValueOnce(structuredClone(nmDetail))
+      .mockResolvedValue(updated);
 
     const user = userEvent.setup();
     renderSkuDetailPage();
@@ -152,9 +155,10 @@ describe('SkuDetailPage', () => {
   });
 
   it('removes a unit without a reason', async () => {
-    vi.spyOn(clientModule.apiClient, 'deleteUnit').mockResolvedValue(
-      structuredClone(nmDetail),
-    );
+    vi.spyOn(clientModule.apiClient, 'deleteUnit').mockResolvedValue(undefined);
+    vi.spyOn(clientModule.apiClient, 'getSku')
+      .mockResolvedValueOnce(structuredClone(nmDetail))
+      .mockResolvedValue(structuredClone(nmDetail));
 
     const user = userEvent.setup();
     renderSkuDetailPage();

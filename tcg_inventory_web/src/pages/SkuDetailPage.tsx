@@ -90,11 +90,12 @@ export function SkuDetailPage() {
     }
     setActionLoading(true);
     try {
-      const updated = await apiClient.deleteUnit(
+      await apiClient.deleteUnit(
         sku.sku_id,
         removingUnit.sequence_number,
         reason || undefined,
       );
+      const updated = await apiClient.getSku(sku.sku_id);
       setSku(updated);
       setRemovingUnit(null);
     } catch (e) {

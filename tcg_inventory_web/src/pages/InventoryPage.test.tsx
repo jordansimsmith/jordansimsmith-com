@@ -23,8 +23,6 @@ const skuFixtures: SkuSummary[] = [
     collector_number: '42',
     finish: 'normal',
     condition: 'NM',
-    in_stock_count: 4,
-    reserved_count: 1,
   },
   {
     sku_id: '22222222-2222-4222-8222-222222222222#foil#LP',
@@ -34,8 +32,6 @@ const skuFixtures: SkuSummary[] = [
     collector_number: '60',
     finish: 'foil',
     condition: 'LP',
-    in_stock_count: 5,
-    reserved_count: 0,
   },
   {
     sku_id: '33333333-3333-4333-8333-333333333333#normal#MP',
@@ -45,8 +41,6 @@ const skuFixtures: SkuSummary[] = [
     collector_number: '331',
     finish: 'normal',
     condition: 'MP',
-    in_stock_count: 6,
-    reserved_count: 2,
   },
 ];
 
@@ -103,8 +97,6 @@ describe('InventoryPage', () => {
     expect(within(row).getByText('42')).toBeDefined();
     expect(within(row).getByText('normal')).toBeDefined();
     expect(within(row).getByText('NM')).toBeDefined();
-    expect(within(row).getByText('4')).toBeDefined();
-    expect(within(row).getByText('1')).toBeDefined();
     expect(screen.getByText('Opt')).toBeDefined();
     expect(screen.getByText('Sol Ring')).toBeDefined();
   });

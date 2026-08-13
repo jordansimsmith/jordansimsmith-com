@@ -395,7 +395,7 @@ public class ConfirmImportHandler
 
   private PlacementInstruction buildInstruction(
       List<TcgInventoryItem> rows, int startIdx, int endIdx, int blockNum) {
-    var block = formatBlock(blockNum);
+    var block = InventoryLocation.formatBlock(blockNum);
     var firstRow = rows.get(startIdx);
     var lastRow = rows.get(endIdx);
     int firstSeq = firstRow.getSequenceNumber();
@@ -403,22 +403,10 @@ public class ConfirmImportHandler
 
     return new PlacementInstruction(
         block,
-        formatLocation(firstSeq),
-        formatLocation(lastSeq),
+        InventoryLocation.formatLocation(firstSeq),
+        InventoryLocation.formatLocation(lastSeq),
         firstRow.getName(),
         lastRow.getName(),
         endIdx - startIdx + 1);
-  }
-
-  static String formatBlock(int blockNum) {
-    char letter = (char) ('A' + blockNum / 100);
-    int number = blockNum % 100;
-    return "" + letter + number;
-  }
-
-  static String formatLocation(int sequenceNumber) {
-    int blockNum = sequenceNumber / 100;
-    int offset = sequenceNumber % 100;
-    return formatBlock(blockNum) + "-" + offset;
   }
 }

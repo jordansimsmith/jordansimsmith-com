@@ -1,4 +1,7 @@
+load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 load("@rules_java//java:defs.bzl", "java_library")
+
+UNIT_TESTS = glob(["src/test/java/**/*Test.java"])
 
 java_library(
     name = "lib",
@@ -8,6 +11,8 @@ java_library(
     ],
     deps = [
         "//third_party/dagger",
+        "@maven//:com_fasterxml_jackson_core_jackson_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:software_amazon_awssdk_aws_crt_client",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
@@ -18,7 +23,10 @@ java_library(
 java_library(
     name = "test-lib",
     testonly = True,
-    srcs = glob(["src/test/java/**/*.java"]),
+    srcs = glob(
+        ["src/test/java/**/*.java"],
+        exclude = UNIT_TESTS,
+    ),
     resources = glob(["src/test/resources/**/*.properties"]),
     visibility = [
         "//visibility:public",
@@ -31,5 +39,21 @@ java_library(
         "@maven//:org_testcontainers_testcontainers",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_test_suite(
+    name = "unit-tests",
+    size = "small",
+    srcs = UNIT_TESTS,
+    runner = "junit5",
+    test_suffixes = ["Test.java"],
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        ":lib",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:software_amazon_awssdk_dynamodb",
     ],
 )

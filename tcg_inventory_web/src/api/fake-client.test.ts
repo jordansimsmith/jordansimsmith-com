@@ -11,15 +11,15 @@ async function findSkuId(
 }
 
 describe('createFakeClient', () => {
-  it('derives browse counts from units', async () => {
+  it('derives detail counts from units', async () => {
     const client = createFakeClient();
-
     const response = await client.findSkus({ search: 'sol ring' });
+    const nmSku = response.skus.find((sku) => sku.condition === 'NM');
 
-    expect(response.skus).toHaveLength(2);
-    const nm = response.skus.find((sku) => sku.condition === 'NM');
-    expect(nm?.in_stock_count).toBe(6);
-    expect(nm?.reserved_count).toBe(2);
+    const detail = await client.getSku(nmSku!.sku_id);
+
+    expect(detail.in_stock_count).toBe(6);
+    expect(detail.reserved_count).toBe(2);
   });
 
   it('returns units ascending with derived locations', async () => {
@@ -54,21 +54,15 @@ describe('createFakeClient', () => {
     const detail = await client.getSku(skuId);
     const unit = detail.units.find((entry) => entry.status === 'in_stock');
 
-    const updated = await client.deleteUnit(
-      skuId,
-      unit!.sequence_number,
-      'damaged in storage',
-    );
+    await client.deleteUnit(skuId, unit!.sequence_number, 'damaged in storage');
 
+    const updated = await client.getSku(skuId);
     expect(updated.in_stock_count).toBe(detail.in_stock_count - 1);
     expect(
       updated.units.find(
         (entry) => entry.sequence_number === unit!.sequence_number,
       )?.status,
     ).toBe('removed');
-
-    const browse = await client.findSkus({ search: 'brainstorm' });
-    expect(browse.skus[0].in_stock_count).toBe(detail.in_stock_count - 1);
   });
 
   it('rejects deleteUnit for units that are not in stock', async () => {

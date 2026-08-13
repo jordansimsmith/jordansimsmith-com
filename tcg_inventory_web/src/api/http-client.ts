@@ -120,13 +120,12 @@ export function createHttpClient(): ApiClient {
       skuId: string,
       sequenceNumber: number,
       reason?: string,
-    ): Promise<SkuDetail> {
+    ): Promise<void> {
       const query = reason ? `?${new URLSearchParams({ reason })}` : '';
-      const response = await authenticatedFetch(
+      await authenticatedFetch(
         `/skus/${encodeURIComponent(skuId)}/units/${sequenceNumber}${query}`,
         { method: 'DELETE' },
       );
-      return response.json();
     },
 
     async updateUnit(

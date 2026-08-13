@@ -56,8 +56,6 @@ describe('parseManaBoxCsv', () => {
       scryfall_id: '4eaac4fd-95f5-4f38-b593-0101e79a20f9',
       quantity: 3,
       language: 'en',
-      misprint: false,
-      altered: false,
     });
   });
 
@@ -83,7 +81,6 @@ describe('parseManaBoxCsv', () => {
     ['light_played', 'HP'],
     ['played', 'HP'],
     ['poor', 'DMG'],
-    ['', 'NM'],
   ])('maps ManaBox condition %s to %s', (manaboxCondition, condition) => {
     const rows = parseManaBoxCsv(csv(csvRow({ condition: manaboxCondition })));
 
@@ -100,7 +97,7 @@ describe('parseManaBoxCsv', () => {
     const content = ['Name,Quantity', 'Lightning Bolt,1'].join('\n');
 
     expect(() => parseManaBoxCsv(content)).toThrow(
-      'CSV is missing columns: Set code, Set name, Collector number, Foil, Rarity, Scryfall ID, Misprint, Altered, Condition, Language',
+      'CSV is missing columns: Set code, Set name, Collector number, Foil, Scryfall ID, Condition, Language',
     );
   });
 
@@ -148,10 +145,13 @@ describe('parseManaBoxCsv', () => {
     );
   });
 
-  it('rejects malformed booleans', () => {
-    expect(() => parseManaBoxCsv(csv(csvRow({ misprint: 'yes' })))).toThrow(
-      'row 2: Misprint must be true or false',
+  it('ignores misprint and altered columns', () => {
+    const rows = parseManaBoxCsv(
+      csv(csvRow({ misprint: 'yes', altered: 'true' })),
     );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].name).toBe('Lightning Bolt');
   });
 
   it('reports the csv line number of the failing row', () => {

@@ -92,7 +92,7 @@ sequenceDiagram
 
 - Inventory is the source of truth; FetchTCG listings are an absolute projection: listing quantity = count of `in_stock` units per SKU. Re-importing already-listed cards converges to a no-op, and FetchTCG's own decrement at offer acceptance converges without a write.
 - Dirty-marker outbox for the projection: every mutation transaction sets a plain boolean `dirty` on affected SKU records. Only mutation transactions can set the flag, which makes every FetchTCG write traceable to an audited inventory event; blind reconciliation never changes quantities. Coalescing is inherent because the projection is absolute.
-- Stock counts are never stored: SKU detail derives `in_stock`/`reserved`/`sold` counts from the unit items in its own partition query, and SKU browse fans out one parallel unit query per page row. With no denormalized aggregate there is nothing to drift or verify. Every mutation transaction bumps a plain `version` number on the affected SKU (`ADD version :1`); the publish phase recounts unit items for its absolute write and clears `dirty` conditionally on the version being unchanged since the recount, so a mutation landing mid-publish fails the clear and the SKU stays dirty for the next run.
+- Stock counts are never stored: SKU detail derives `in_stock`/`reserved`/`sold` counts from the unit items in its own partition query. SKU browse returns only identity fields (no counts, no unit fan-out) — users click through to the detail page for counts. With no denormalized aggregate there is nothing to drift or verify. Every mutation transaction bumps a plain `version` number on the affected SKU (`ADD version :1`); the publish phase recounts unit items for its absolute write and clears `dirty` conditionally on the version being unchanged since the recount, so a mutation landing mid-publish fails the clear and the SKU stays dirty for the next run.
 - SQS work queue with continuation messages: messages carry only `{user, job_id, job_type}`; the job item's `continuation` is authoritative. The consumer has maximum concurrency 1, serializing all FetchTCG traffic and all inventory-mutating jobs (no job lease needed). Each slice does bounded work, checkpoints, and re-enqueues.
 - Duplicate SQS delivery is expected and absorbed: slices read the job item fresh, DynamoDB effects are conditionally guarded, FetchTCG effects are absolute upserts keyed by `cardId` + condition. FIFO queues buy nothing here.
 - One publish job with two ordered phases (order phase before publish phase) structurally prevents relisting stock committed to a pending offer.
@@ -279,7 +279,7 @@ price = max(0.25, round_nearest_half_up(benchmark, 0.05))
 ### DynamoDB model
 
 - **Table**: `tcg_inventory`, keys `pk`/`sk`, PAY_PER_REQUEST.
-- **`gsi1`** (sparse dirty index): `gsi1pk = USER#<user>#DIRTY`, `gsi1sk = SKU#<sku_id>`, attributes present on SKU records only while dirty — the publish worklist query returns exactly the dirty set. Unit items carry no GSI attributes; units are always addressed through their SKU partition (a global units-by-sequence index is deliberately absent until a flow needs one, for example block views or consolidation).
+- **`gsi1`** (dirty index): `gsi1pk` = `USER#<user>#DIRTY` (dirty) or `USER#<user>#CLEAN` (published), `gsi1sk = SKU#<sku_id>` (set once at SKU creation, never changed). Querying `gsi1pk = USER#<user>#DIRTY` returns exactly the dirty set. The publish phase flips `gsi1pk` to `CLEAN`; mutations flip it back to `DIRTY`. Unit items carry no GSI attributes; units are always addressed through their SKU partition (a global units-by-sequence index is deliberately absent until a flow needs one, for example block views or consolidation).
 - **`gsi2`**: SKU browse (`gsi2pk = USER#<user>#SKUS`, `gsi2sk = NAME#<normalized name>#<sku_id>`), supporting alphabetical listing and `begins_with` prefix search.
 - `sku_id` is `<scryfall_id>#<finish>#<condition>`. A SKU record and its unit items share a partition so one query serves detail, recount, and allocation.
 
@@ -335,14 +335,14 @@ price = max(0.25, round_nearest_half_up(benchmark, 0.05))
 
 ### Transaction shapes
 
-All mutations are `TransactWriteItems` including their audit entry; every mutation bumps the affected SKU's `version` with `ADD version :1`; sparse-index attributes are set/removed alongside `dirty`.
+All mutations are `TransactWriteItems` including their audit entry; every mutation bumps the affected SKU's `version` with `ADD version :1` and sets `gsi1pk` to the dirty value.
 
 - **Import confirm**: conditional status flip `review → confirming` (single confirmer), one `UpdateItem ADD next_sequence_number :n` allocating the range, sequence numbers recorded on rows (skipped on retry if present), then chunked per-SKU transactions — conditional unit puts + SKU dirty/version updates — where a replayed chunk fails its unit-exists condition and no-ops atomically; final flip `confirming → confirmed`.
 - **Reserve**: conditional order put keyed by FetchTCG offer id + unit `in_stock → reserved` transitions + SKU dirty + version + audit.
 - **Release (void)**: order `awaiting_payment → voided` + units `reserved → in_stock` + dirty + version + audit.
 - **Sell (confirm pull)**: order `to_pick → fulfilled` + units `reserved → sold` + version + audit. No dirty flag — reserved units already left the projection and FetchTCG decremented at acceptance.
 - **Remove / condition edit**: conditional unit transitions with dirty and version updates; condition edit is one transaction across two SKU partitions (delete + re-put the unit item with the same sequence number, both SKUs dirtied).
-- **Publish clear**: set `dirty = false`, remove sparse index attributes, update the listing snapshot — conditional on `dirty = true AND version = :captured` (the version read before the recount). A delist clears the listing snapshot (`fetchtcg_listing_id` and published values removed); a later restock creates a fresh listing.
+- **Publish clear**: set `dirty = false`, set `gsi1pk` to clean value, update the listing snapshot — conditional on `dirty = true AND version = :captured` (the version read before the recount). A delist clears the listing snapshot (`fetchtcg_listing_id` and published values removed); a later restock creates a fresh listing.
 
 ## Behavioral invariants and time semantics
 
@@ -410,7 +410,7 @@ Rotated refresh tokens returned by Firebase are written back to the same key.
 ## Performance envelope
 
 - Scale target: 10,000+ units, ~5,000–10,000 SKUs/listings per user; DynamoDB request volume at this scale is negligible.
-- SKU browse derives counts with one parallel unit query per page row (bounded by the page size); unit partitions are small, so the fan-out adds roughly one round-trip of latency per page.
+- SKU browse is a single GSI2 query returning identity fields only (no unit fan-out, no counts); detail derives counts from the partition query which returns the SKU and all its units in one shot.
 - Job Lambdas: 900 s timeout with the module's default 1769 MB memory (the 1-vCPU point — keeps Java cold starts fast; the GB-second cost of idle FetchTCG pacing still sits far inside the always-free compute allowance). HTTP handlers use module defaults (10 s).
 - FetchTCG pacing dominates: an appraise slice of ~100 rows runs minutes; a daily publish run (typical daily delta) runs single-digit minutes; jobs re-enqueue continuations well before timeout.
 - SQS consumer maximum concurrency 1; visibility timeout exceeds the function timeout.

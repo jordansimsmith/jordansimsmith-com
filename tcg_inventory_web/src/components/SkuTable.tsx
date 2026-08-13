@@ -30,8 +30,6 @@ export function SkuTable({ skus, selectedIndex, onOpen }: SkuTableProps) {
           <Table.Th>#</Table.Th>
           <Table.Th>Finish</Table.Th>
           <Table.Th>Condition</Table.Th>
-          <Table.Th ta="right">In stock</Table.Th>
-          <Table.Th ta="right">Reserved</Table.Th>
         </Table.Tr>
       </Table.Thead>
       <Table.Tbody>
@@ -53,8 +51,6 @@ export function SkuTable({ skus, selectedIndex, onOpen }: SkuTableProps) {
               <Table.Td>{sku.collector_number}</Table.Td>
               <Table.Td>{sku.finish}</Table.Td>
               <Table.Td>{sku.condition}</Table.Td>
-              <Table.Td ta="right">{sku.in_stock_count}</Table.Td>
-              <Table.Td ta="right">{sku.reserved_count}</Table.Td>
             </Table.Tr>
           );
         })}

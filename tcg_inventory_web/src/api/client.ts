@@ -22,8 +22,6 @@ export interface SkuSummary {
   collector_number: string;
   finish: Finish;
   condition: Condition;
-  in_stock_count: number;
-  reserved_count: number;
 }
 
 export interface FindSkusResponse {
@@ -44,6 +42,8 @@ export interface SkuUnit {
 
 export interface SkuDetail extends SkuSummary {
   scryfall_id: string;
+  in_stock_count: number;
+  reserved_count: number;
   sold_count: number;
   units: SkuUnit[];
 }
@@ -167,7 +167,7 @@ export interface ApiClient {
     skuId: string,
     sequenceNumber: number,
     reason?: string,
-  ): Promise<SkuDetail>;
+  ): Promise<void>;
   updateUnit(
     skuId: string,
     sequenceNumber: number,
