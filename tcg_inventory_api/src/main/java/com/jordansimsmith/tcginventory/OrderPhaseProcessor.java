@@ -1,7 +1,5 @@
 package com.jordansimsmith.tcginventory;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
@@ -156,7 +154,7 @@ public class OrderPhaseProcessor {
   private void reserveForNewOffer(
       String user, FetchTcgClient.SellerOffer offer, Map<Integer, String> listingToSkuId) {
     var offerId = String.valueOf(offer.id());
-    var orderLines = new ArrayList<OrderLine>();
+    var orderLines = new ArrayList<OrderLines.OrderLine>();
     var transactItems = new ArrayList<TransactWriteItem>();
     var affectedSkuIds = new HashSet<String>();
     boolean insufficientStock = false;
@@ -186,7 +184,7 @@ public class OrderPhaseProcessor {
         }
 
         orderLines.add(
-            new OrderLine(
+            new OrderLines.OrderLine(
                 skuId,
                 item.listing().id(),
                 item.quantity(),
@@ -214,16 +212,64 @@ public class OrderPhaseProcessor {
             linesJson,
             clock.now());
 
-    var orderPut =
+    var orderMap = new HashMap<String, AttributeValue>();
+    orderMap.put(TcgInventoryItem.PK, AttributeValue.builder().s(orderItem.getPk()).build());
+    orderMap.put(TcgInventoryItem.SK, AttributeValue.builder().s(orderItem.getSk()).build());
+    if (orderItem.getOrderId() != null) {
+      orderMap.put(
+          TcgInventoryItem.ORDER_ID, AttributeValue.builder().s(orderItem.getOrderId()).build());
+    }
+    if (orderItem.getStatus() != null) {
+      orderMap.put(
+          TcgInventoryItem.STATUS, AttributeValue.builder().s(orderItem.getStatus()).build());
+    }
+    if (orderItem.getFetchtcgStatus() != null) {
+      orderMap.put(
+          TcgInventoryItem.FETCHTCG_STATUS,
+          AttributeValue.builder().s(orderItem.getFetchtcgStatus()).build());
+    }
+    if (orderItem.getFetchtcgCurrentAction() != null) {
+      orderMap.put(
+          TcgInventoryItem.FETCHTCG_CURRENT_ACTION,
+          AttributeValue.builder().s(orderItem.getFetchtcgCurrentAction()).build());
+    }
+    if (orderItem.getDeliveryMode() != null) {
+      orderMap.put(
+          TcgInventoryItem.DELIVERY_MODE,
+          AttributeValue.builder().s(orderItem.getDeliveryMode()).build());
+    }
+    if (orderItem.getTotalPrice() != null) {
+      orderMap.put(
+          TcgInventoryItem.TOTAL_PRICE,
+          AttributeValue.builder().s(orderItem.getTotalPrice()).build());
+    }
+    if (orderItem.getLines() != null) {
+      orderMap.put(
+          TcgInventoryItem.LINES, AttributeValue.builder().s(orderItem.getLines()).build());
+    }
+    if (orderItem.getCreatedAt() != null) {
+      orderMap.put(
+          TcgInventoryItem.CREATED_AT,
+          AttributeValue.builder()
+              .n(String.valueOf(orderItem.getCreatedAt().getEpochSecond()))
+              .build());
+    }
+    if (orderItem.getUpdatedAt() != null) {
+      orderMap.put(
+          TcgInventoryItem.UPDATED_AT,
+          AttributeValue.builder()
+              .n(String.valueOf(orderItem.getUpdatedAt().getEpochSecond()))
+              .build());
+    }
+    transactItems.add(
         TransactWriteItem.builder()
             .put(
                 Put.builder()
                     .tableName(TcgInventoryItem.TABLE_NAME)
-                    .item(itemToAttributeMap(orderItem))
+                    .item(orderMap)
                     .conditionExpression("attribute_not_exists(pk)")
                     .build())
-            .build();
-    transactItems.add(orderPut);
+            .build());
 
     var auditItem = new HashMap<String, AttributeValue>();
     auditItem.put(
@@ -250,7 +296,7 @@ public class OrderPhaseProcessor {
     var affectedSkuIds = new HashSet<String>();
     var offerId = order.getOrderId();
 
-    List<OrderLine> orderLines = parseOrderLines(order.getLines());
+    var orderLines = OrderLines.parse(order.getLines(), objectMapper);
     for (var line : orderLines) {
       for (var seqNum : line.allocatedSequenceNumbers()) {
         transactItems.add(buildUnitReleaseUpdate(user, line.skuId(), seqNum));
@@ -261,17 +307,7 @@ public class OrderPhaseProcessor {
       }
     }
 
-    order.setStatus("voided");
-    order.setUpdatedAt(clock.now());
-    var orderPut =
-        TransactWriteItem.builder()
-            .put(
-                Put.builder()
-                    .tableName(TcgInventoryItem.TABLE_NAME)
-                    .item(itemToAttributeMap(order))
-                    .build())
-            .build();
-    transactItems.add(orderPut);
+    transactItems.add(buildOrderVoidUpdate(user, offerId));
 
     var auditItem = new HashMap<String, AttributeValue>();
     auditItem.put(
@@ -322,6 +358,34 @@ public class OrderPhaseProcessor {
       }
     }
     return results;
+  }
+
+  private TransactWriteItem buildOrderVoidUpdate(String user, String offerId) {
+    var userPk = TcgInventoryItem.formatUserPk(user);
+    var orderSk = TcgInventoryItem.formatOrderSk(offerId);
+
+    return TransactWriteItem.builder()
+        .update(
+            Update.builder()
+                .tableName(TcgInventoryItem.TABLE_NAME)
+                .key(
+                    Map.of(
+                        TcgInventoryItem.PK, AttributeValue.builder().s(userPk).build(),
+                        TcgInventoryItem.SK, AttributeValue.builder().s(orderSk).build()))
+                .updateExpression(
+                    "SET #status = :voided, " + TcgInventoryItem.UPDATED_AT + " = :now")
+                .conditionExpression("#status = :awaitingPayment")
+                .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+                .expressionAttributeValues(
+                    Map.of(
+                        ":voided", AttributeValue.builder().s("voided").build(),
+                        ":awaitingPayment", AttributeValue.builder().s("awaiting_payment").build(),
+                        ":now",
+                            AttributeValue.builder()
+                                .n(String.valueOf(clock.now().getEpochSecond()))
+                                .build()))
+                .build())
+        .build();
   }
 
   private TransactWriteItem buildUnitReserveUpdate(
@@ -420,67 +484,4 @@ public class OrderPhaseProcessor {
                 .build())
         .build();
   }
-
-  private Map<String, AttributeValue> itemToAttributeMap(TcgInventoryItem item) {
-    var map = new HashMap<String, AttributeValue>();
-    map.put(TcgInventoryItem.PK, AttributeValue.builder().s(item.getPk()).build());
-    map.put(TcgInventoryItem.SK, AttributeValue.builder().s(item.getSk()).build());
-    if (item.getOrderId() != null) {
-      map.put(TcgInventoryItem.ORDER_ID, AttributeValue.builder().s(item.getOrderId()).build());
-    }
-    if (item.getStatus() != null) {
-      map.put(TcgInventoryItem.STATUS, AttributeValue.builder().s(item.getStatus()).build());
-    }
-    if (item.getFetchtcgStatus() != null) {
-      map.put(
-          TcgInventoryItem.FETCHTCG_STATUS,
-          AttributeValue.builder().s(item.getFetchtcgStatus()).build());
-    }
-    if (item.getFetchtcgCurrentAction() != null) {
-      map.put(
-          TcgInventoryItem.FETCHTCG_CURRENT_ACTION,
-          AttributeValue.builder().s(item.getFetchtcgCurrentAction()).build());
-    }
-    if (item.getDeliveryMode() != null) {
-      map.put(
-          TcgInventoryItem.DELIVERY_MODE,
-          AttributeValue.builder().s(item.getDeliveryMode()).build());
-    }
-    if (item.getTotalPrice() != null) {
-      map.put(
-          TcgInventoryItem.TOTAL_PRICE, AttributeValue.builder().s(item.getTotalPrice()).build());
-    }
-    if (item.getLines() != null) {
-      map.put(TcgInventoryItem.LINES, AttributeValue.builder().s(item.getLines()).build());
-    }
-    if (item.getCreatedAt() != null) {
-      map.put(
-          TcgInventoryItem.CREATED_AT,
-          AttributeValue.builder().n(String.valueOf(item.getCreatedAt().getEpochSecond())).build());
-    }
-    if (item.getUpdatedAt() != null) {
-      map.put(
-          TcgInventoryItem.UPDATED_AT,
-          AttributeValue.builder().n(String.valueOf(item.getUpdatedAt().getEpochSecond())).build());
-    }
-    return map;
-  }
-
-  private List<OrderLine> parseOrderLines(String linesJson) {
-    if (linesJson == null || linesJson.isEmpty()) {
-      return List.of();
-    }
-    try {
-      return objectMapper.readValue(linesJson, new TypeReference<List<OrderLine>>() {});
-    } catch (Exception e) {
-      throw new RuntimeException("failed to parse order lines", e);
-    }
-  }
-
-  record OrderLine(
-      @JsonProperty("sku_id") String skuId,
-      @JsonProperty("fetchtcg_listing_id") int fetchtcgListingId,
-      @JsonProperty("quantity") int quantity,
-      @JsonProperty("price") String price,
-      @JsonProperty("allocated_sequence_numbers") List<Integer> allocatedSequenceNumbers) {}
 }

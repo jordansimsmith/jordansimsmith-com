@@ -396,6 +396,78 @@ java_binary(
 )
 
 java_binary(
+    name = "find-orders-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/FindOrdersHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "get-order-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/GetOrderHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "confirm-order-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/ConfirmOrderHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "//lib/time:lib",
+        "//lib/ulid:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
     name = "delete-import-row-handler",
     srcs = ["src/main/java/com/jordansimsmith/tcginventory/DeleteImportRowHandler.java"],
     create_executable = False,
@@ -489,13 +561,16 @@ java_test_suite(
     runtime_deps = JUNIT5_DEPS,
     deps = [
         ":confirm-import-handler",
+        ":confirm-order-handler",
         ":create-import-handler",
         ":create-publish-handler",
         ":delete-import-handler",
         ":delete-import-row-handler",
         ":find-imports-handler",
+        ":find-orders-handler",
         ":find-skus-handler",
         ":get-import-handler",
+        ":get-order-handler",
         ":get-publish-handler",
         ":get-settings-handler",
         ":get-sku-handler",
@@ -530,9 +605,12 @@ localstack_image(
     name = "local",
     handler_jars = [
         ":confirm-import-handler_deploy.jar",
+        ":confirm-order-handler_deploy.jar",
         ":create-import-handler_deploy.jar",
         ":create-publish-handler_deploy.jar",
+        ":find-orders-handler_deploy.jar",
         ":find-skus-handler_deploy.jar",
+        ":get-order-handler_deploy.jar",
         ":get-sku-handler_deploy.jar",
         ":remove-unit-handler_deploy.jar",
         ":delete-import-row-handler_deploy.jar",
