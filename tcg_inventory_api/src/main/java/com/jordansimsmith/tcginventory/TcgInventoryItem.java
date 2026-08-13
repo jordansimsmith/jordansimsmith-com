@@ -71,6 +71,8 @@ public class TcgInventoryItem {
   public static final String LANGUAGE = "language";
   public static final String JOB_TYPE = "job_type";
   public static final String JOB_ID = "job_id";
+  public static final String CONTINUATION = "continuation";
+  public static final String PROCESSED_COUNT = "processed_count";
   public static final String CREATED_AT = "created_at";
   public static final String UPDATED_AT = "updated_at";
 
@@ -113,6 +115,8 @@ public class TcgInventoryItem {
   private String language;
   private String jobType;
   private String jobId;
+  private Integer continuation;
+  private Integer processedCount;
   private Instant createdAt;
   private Instant updatedAt;
 
@@ -511,6 +515,26 @@ public class TcgInventoryItem {
   }
 
   @Nullable
+  @DynamoDbAttribute(CONTINUATION)
+  public Integer getContinuation() {
+    return continuation;
+  }
+
+  public void setContinuation(@Nullable Integer continuation) {
+    this.continuation = continuation;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(PROCESSED_COUNT)
+  public Integer getProcessedCount() {
+    return processedCount;
+  }
+
+  public void setProcessedCount(@Nullable Integer processedCount) {
+    this.processedCount = processedCount;
+  }
+
+  @Nullable
   @DynamoDbAttribute(CREATED_AT)
   @DynamoDbConvertedBy(EpochSecondConverter.class)
   public Instant getCreatedAt() {
@@ -576,6 +600,8 @@ public class TcgInventoryItem {
         && Objects.equals(language, that.language)
         && Objects.equals(jobType, that.jobType)
         && Objects.equals(jobId, that.jobId)
+        && Objects.equals(continuation, that.continuation)
+        && Objects.equals(processedCount, that.processedCount)
         && Objects.equals(createdAt, that.createdAt)
         && Objects.equals(updatedAt, that.updatedAt);
   }
@@ -622,6 +648,8 @@ public class TcgInventoryItem {
         language,
         jobType,
         jobId,
+        continuation,
+        processedCount,
         createdAt,
         updatedAt);
   }
@@ -733,6 +761,10 @@ public class TcgInventoryItem {
         + ", jobId='"
         + jobId
         + '\''
+        + ", continuation="
+        + continuation
+        + ", processedCount="
+        + processedCount
         + ", createdAt="
         + createdAt
         + ", updatedAt="

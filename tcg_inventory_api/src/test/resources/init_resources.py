@@ -15,6 +15,7 @@ apigateway_client = boto3.client(
 dynamodb_client = boto3.client(
     "dynamodb", endpoint_url=endpoint_url, region_name=region_name
 )
+sqs_client = boto3.client("sqs", endpoint_url=endpoint_url, region_name=region_name)
 
 table_name = "tcg_inventory"
 dynamodb_client.create_table(
@@ -59,6 +60,12 @@ while True:
     if all(gsi["IndexStatus"] == "ACTIVE" for gsi in gsis):
         break
     time.sleep(1)
+
+queue_name = "tcg_inventory_jobs"
+queue_url = sqs_client.create_queue(QueueName=queue_name)["QueueUrl"]
+queue_arn = sqs_client.get_queue_attributes(
+    QueueUrl=queue_url, AttributeNames=["QueueArn"]
+)["Attributes"]["QueueArn"]
 
 api_id = apigateway_client.create_rest_api(
     name="tcg_inventory", tags={"_custom_id_": "tcg_inventory"}
@@ -117,11 +124,26 @@ lambdas = {
         "handler": "com.jordansimsmith.tcginventory.DeleteImportHandler",
         "zip_file": "delete-import-handler_deploy.jar",
     },
+    "create_publish": {
+        "handler": "com.jordansimsmith.tcginventory.CreatePublishHandler",
+        "zip_file": "create-publish-handler_deploy.jar",
+    },
+    "get_publish": {
+        "handler": "com.jordansimsmith.tcginventory.GetPublishHandler",
+        "zip_file": "get-publish-handler_deploy.jar",
+    },
+    "jobs_handler": {
+        "handler": "com.jordansimsmith.tcginventory.JobsHandler",
+        "zip_file": "jobs-handler_deploy.jar",
+        "timeout": 900,
+        "environment": {"JOBS_QUEUE_URL": queue_url},
+    },
 }
 
 root_resources = {
     "settings": {"path": "settings"},
     "imports": {"path": "imports"},
+    "publish": {"path": "publish"},
 }
 
 child_resources = {
@@ -148,21 +170,40 @@ endpoints = {
         "method": "DELETE",
         "lambda": "delete_import",
     },
+    "create_publish": {
+        "resource": "publish",
+        "method": "POST",
+        "lambda": "create_publish",
+    },
+    "get_publish": {
+        "resource": "publish",
+        "method": "GET",
+        "lambda": "get_publish",
+    },
 }
 
 for function_name, config in lambdas.items():
     with open(f"/opt/code/localstack/{config['zip_file']}", "rb") as f:
         zip_file_bytes = f.read()
-    lambda_client.create_function(
-        FunctionName=function_name,
-        Runtime="java21",
-        Role=role_arn,
-        Handler=config["handler"],
-        Code={"ZipFile": zip_file_bytes},
-        Timeout=30,
-        MemorySize=1024,
-        Architectures=["x86_64"],
-    )
+    create_kwargs = {
+        "FunctionName": function_name,
+        "Runtime": "java21",
+        "Role": role_arn,
+        "Handler": config["handler"],
+        "Code": {"ZipFile": zip_file_bytes},
+        "Timeout": config.get("timeout", 30),
+        "MemorySize": 1024,
+        "Architectures": ["x86_64"],
+    }
+    if "environment" in config:
+        create_kwargs["Environment"] = {"Variables": config["environment"]}
+    lambda_client.create_function(**create_kwargs)
+
+lambda_client.create_event_source_mapping(
+    EventSourceArn=queue_arn,
+    FunctionName="jobs_handler",
+    BatchSize=1,
+)
 
 resource_ids = {}
 for name, config in root_resources.items():

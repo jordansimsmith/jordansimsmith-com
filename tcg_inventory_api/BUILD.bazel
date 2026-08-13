@@ -182,6 +182,75 @@ java_binary(
     ],
 )
 
+java_binary(
+    name = "jobs-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/JobsHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/queue:lib",
+        "//lib/time:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "create-publish-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/CreatePublishHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "//lib/queue:lib",
+        "//lib/time:lib",
+        "//lib/ulid:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "get-publish-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/GetPublishHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
 java_library(
     name = "test-lib",
     testonly = True,
@@ -254,10 +323,13 @@ java_test_suite(
     runtime_deps = JUNIT5_DEPS,
     deps = [
         ":create-import-handler",
+        ":create-publish-handler",
         ":delete-import-handler",
         ":find-imports-handler",
         ":get-import-handler",
+        ":get-publish-handler",
         ":get-settings-handler",
+        ":jobs-handler",
         ":lib",
         ":put-settings-handler",
         ":test-lib",
@@ -285,10 +357,13 @@ localstack_image(
     name = "local",
     handler_jars = [
         ":create-import-handler_deploy.jar",
+        ":create-publish-handler_deploy.jar",
         ":delete-import-handler_deploy.jar",
         ":find-imports-handler_deploy.jar",
         ":get-import-handler_deploy.jar",
+        ":get-publish-handler_deploy.jar",
         ":get-settings-handler_deploy.jar",
+        ":jobs-handler_deploy.jar",
         ":put-settings-handler_deploy.jar",
     ],
     init_resources = "src/test/resources/init_resources.py",
