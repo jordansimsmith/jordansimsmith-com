@@ -114,7 +114,7 @@ class AppraiseJobProcessor {
     var dedupeKey = rowItem.getScryfallId() + "#" + rowItem.getFinish();
     var cached = batchCache.get(dedupeKey);
     if (cached == null) {
-      cached = resolveCard(setCode, rowItem.getCollectorNumber());
+      cached = resolveCard(setCode, rowItem.getName(), rowItem.getFinish());
       if (cached == null) {
         return RowDecision.review("unresolvable");
       }
@@ -132,12 +132,13 @@ class AppraiseJobProcessor {
         cached.marketPrice().toPlainString(), result.suggestedPrice().toPlainString());
   }
 
-  private ResolvedCard resolveCard(String setCode, String collectorNumber) {
+  private ResolvedCard resolveCard(String setCode, String cardName, String finish) {
+    var searchName = cardName.contains("//") ? cardName.split("//")[0].trim() : cardName;
     var setEntries = FetchTcgSetMapping.get(setCode);
     for (var entry : setEntries) {
-      var searchResult = fetchTcgClient.searchCards(entry.setId(), collectorNumber);
-      if (!searchResult.data().isEmpty()) {
-        var card = searchResult.data().get(0);
+      var searchResult = fetchTcgClient.searchCards(entry.setId(), searchName, finish);
+      if (!searchResult.content().isEmpty()) {
+        var card = searchResult.content().get(0);
         var cardDetails = fetchTcgClient.getCard(card.id());
         var pricingData = cardDetails.pricingData();
         var nzPricing = pricingData != null ? pricingData.get("NZ") : null;
@@ -151,20 +152,20 @@ class AppraiseJobProcessor {
     return null;
   }
 
-  private List<PricingPolicy.RivalTier> buildRivalTiers(int cardId, String condition) {
+  private List<PricingPolicy.RivalTier> buildRivalTiers(String cardId, String condition) {
     var listingsResponse = fetchTcgClient.getCardListings(cardId);
     var fetchtcgCondition = CONDITION_TO_FETCHTCG.getOrDefault(condition, "raw-nm");
     var minQuality = CONDITION_QUALITY.getOrDefault(fetchtcgCondition, 0);
 
     TreeMap<BigDecimal, Set<String>> priceToSellers = new TreeMap<>();
-    for (var listing : listingsResponse.data()) {
+    for (var listing : listingsResponse.content()) {
       var listingQuality = CONDITION_QUALITY.getOrDefault(listing.condition(), -1);
       if (listingQuality < minQuality) {
         continue;
       }
       priceToSellers
-          .computeIfAbsent(listing.price(), k -> new HashSet<>())
-          .add(listing.sellerUsername());
+          .computeIfAbsent(listing.listedPrice(), k -> new HashSet<>())
+          .add(listing.sellerProfileName());
     }
 
     var tiers = new ArrayList<PricingPolicy.RivalTier>();
@@ -174,7 +175,7 @@ class AppraiseJobProcessor {
     return tiers;
   }
 
-  private record ResolvedCard(int cardId, BigDecimal marketPrice) {}
+  private record ResolvedCard(String cardId, BigDecimal marketPrice) {}
 
   private record RowDecision(
       String decision, String reason, String marketPrice, String suggestedPrice) {

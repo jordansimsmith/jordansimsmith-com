@@ -50,6 +50,8 @@ public interface TcgInventoryFactory {
 
   FetchTcgClient fetchTcgClient();
 
+  FetchTcgTokenMinter fetchTcgTokenMinter();
+
   AppraiseJobProcessor appraiseJobProcessor();
 
   PublishJobProcessor publishJobProcessor();

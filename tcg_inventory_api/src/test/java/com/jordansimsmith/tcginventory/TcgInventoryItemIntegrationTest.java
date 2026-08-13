@@ -54,7 +54,7 @@ public class TcgInventoryItemIntegrationTest {
     item.setSetCode("a25");
     item.setSetName("Masters 25");
     item.setCollectorNumber("167");
-    item.setFetchtcgCardId(123456);
+    item.setFetchtcgCardId("mtg_167_c_a25_normal");
     item.setFetchtcgSetId(78);
     item.setVersion(7);
     item.setDirty(true);

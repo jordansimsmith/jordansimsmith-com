@@ -1,11 +1,14 @@
 package com.jordansimsmith.tcginventory;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.List;
 
 public class HttpFetchTcgClient implements FetchTcgClient {
   static final String USER_AGENT =
@@ -27,7 +30,7 @@ public class HttpFetchTcgClient implements FetchTcgClient {
   }
 
   @Override
-  public GetCardResponse getCard(int cardId) {
+  public GetCardResponse getCard(String cardId) {
     try {
       return doGetCard(cardId);
     } catch (InterruptedException e) {
@@ -41,9 +44,9 @@ public class HttpFetchTcgClient implements FetchTcgClient {
   }
 
   @Override
-  public SearchCardsResponse searchCards(int setId, String collectorNumber) {
+  public SearchCardsResponse searchCards(int setId, String cardName, String finish) {
     try {
-      return doSearchCards(setId, collectorNumber);
+      return doSearchCards(setId, cardName, finish);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
@@ -55,7 +58,7 @@ public class HttpFetchTcgClient implements FetchTcgClient {
   }
 
   @Override
-  public GetCardListingsResponse getCardListings(int cardId) {
+  public GetCardListingsResponse getCardListings(String cardId) {
     try {
       return doGetCardListings(cardId);
     } catch (InterruptedException e) {
@@ -82,7 +85,7 @@ public class HttpFetchTcgClient implements FetchTcgClient {
     }
   }
 
-  private GetCardResponse doGetCard(int cardId) throws IOException, InterruptedException {
+  private GetCardResponse doGetCard(String cardId) throws IOException, InterruptedException {
     var request =
         HttpRequest.newBuilder()
             .uri(baseUri.resolve("/v3/cards/" + cardId))
@@ -95,40 +98,59 @@ public class HttpFetchTcgClient implements FetchTcgClient {
     return objectMapper.readValue(body, GetCardResponse.class);
   }
 
-  private SearchCardsResponse doSearchCards(int setId, String collectorNumber)
+  private SearchCardsResponse doSearchCards(int setId, String cardName, String finish)
+      throws IOException, InterruptedException {
+    var encodedName = cardName.replace(" ", "+");
+    var request =
+        HttpRequest.newBuilder()
+            .uri(
+                baseUri.resolve(
+                    "/v3/cards?gameIds=mtg&sets="
+                        + setId
+                        + "&cardName="
+                        + encodedName
+                        + "&finishes="
+                        + finish))
+            .header("User-Agent", USER_AGENT)
+            .header("Accept", "application/json")
+            .GET()
+            .build();
+
+    var body = doExecute(request);
+    var wrapper = objectMapper.readValue(body, SearchResultsWrapper.class);
+    var content =
+        wrapper.searchResults() != null ? wrapper.searchResults().content() : List.<SearchCard>of();
+    return new SearchCardsResponse(content);
+  }
+
+  private GetCardListingsResponse doGetCardListings(String cardId)
       throws IOException, InterruptedException {
     var request =
         HttpRequest.newBuilder()
             .uri(
-                baseUri.resolve("/v3/cards?setId=" + setId + "&collectorNumber=" + collectorNumber))
+                baseUri.resolve(
+                    "/v3/cards/" + cardId + "/listings?countryCode=NZ&currencyCode=NZD"))
             .header("User-Agent", USER_AGENT)
             .header("Accept", "application/json")
             .GET()
             .build();
 
     var body = doExecute(request);
-    return objectMapper.readValue(body, SearchCardsResponse.class);
-  }
-
-  private GetCardListingsResponse doGetCardListings(int cardId)
-      throws IOException, InterruptedException {
-    var request =
-        HttpRequest.newBuilder()
-            .uri(baseUri.resolve("/v3/cards/" + cardId + "/listings?country=NZ"))
-            .header("User-Agent", USER_AGENT)
-            .header("Accept", "application/json")
-            .GET()
-            .build();
-
-    var body = doExecute(request);
-    return objectMapper.readValue(body, GetCardListingsResponse.class);
+    var wrapper = objectMapper.readValue(body, ListingsResultsWrapper.class);
+    var content =
+        wrapper.searchResults() != null
+            ? wrapper.searchResults().content()
+            : List.<CardListing>of();
+    return new GetCardListingsResponse(content);
   }
 
   private GetSellerOffersResponse doGetSellerOffers(String bearerToken, int page)
       throws IOException, InterruptedException {
     var request =
         HttpRequest.newBuilder()
-            .uri(baseUri.resolve("/v2/private/market/offers/seller?page=" + page))
+            .uri(
+                baseUri.resolve(
+                    "/v2/private/market/offers/seller?sort=NEWEST&size=20&page=" + page))
             .header("User-Agent", USER_AGENT)
             .header("Accept", "application/json")
             .header("Authorization", "Bearer " + bearerToken)
@@ -170,4 +192,15 @@ public class HttpFetchTcgClient implements FetchTcgClient {
 
     throw new IOException("FetchTCG request failed after " + (MAX_RETRIES + 1) + " attempts");
   }
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  record SearchResultsWrapper(
+      @JsonProperty("searchResults") PagedContent<SearchCard> searchResults) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  record ListingsResultsWrapper(
+      @JsonProperty("searchResults") PagedContent<CardListing> searchResults) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  record PagedContent<T>(@JsonProperty("content") List<T> content) {}
 }

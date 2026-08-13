@@ -4,7 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.queue.SqsQueueClient;
+import com.jordansimsmith.secrets.Secrets;
 import com.jordansimsmith.time.Clock;
+import com.jordansimsmith.ulid.UlidGenerator;
 import dagger.Module;
 import dagger.Provides;
 import java.net.URI;
@@ -16,6 +18,7 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.http.crt.AwsCrtHttpClient;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Module
@@ -59,8 +62,33 @@ public class TcgInventoryModule {
 
   @Provides
   @Singleton
-  PublishJobProcessor publishJobProcessor() {
-    return new PublishJobProcessor();
+  FetchTcgTokenMinter fetchTcgTokenMinter(ObjectMapper objectMapper, Secrets secrets) {
+    return new HttpFetchTcgTokenMinter(
+        URI.create(
+            "https://securetoken.googleapis.com/v1/token?key=AIzaSyBOyrP5WfupPBgb2juJ5FX-OelxD-xRmGI"),
+        HttpClient.newHttpClient(),
+        objectMapper,
+        secrets);
+  }
+
+  @Provides
+  @Singleton
+  PublishJobProcessor publishJobProcessor(
+      DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
+      DynamoDbClient dynamoDbClient,
+      Clock clock,
+      UlidGenerator ulidGenerator,
+      FetchTcgClient fetchTcgClient,
+      FetchTcgTokenMinter fetchTcgTokenMinter,
+      ObjectMapper objectMapper) {
+    return new PublishJobProcessor(
+        tcgInventoryTable,
+        dynamoDbClient,
+        clock,
+        ulidGenerator,
+        fetchTcgClient,
+        fetchTcgTokenMinter,
+        objectMapper);
   }
 
   @Provides

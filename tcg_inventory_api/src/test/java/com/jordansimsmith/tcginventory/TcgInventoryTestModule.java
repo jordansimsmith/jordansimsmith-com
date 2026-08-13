@@ -5,12 +5,14 @@ import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.time.Clock;
+import com.jordansimsmith.ulid.UlidGenerator;
 import dagger.Module;
 import dagger.Provides;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
 @Module
 public class TcgInventoryTestModule {
@@ -64,7 +66,27 @@ public class TcgInventoryTestModule {
 
   @Provides
   @Singleton
-  PublishJobProcessor publishJobProcessor() {
-    return new PublishJobProcessor();
+  FetchTcgTokenMinter fetchTcgTokenMinter() {
+    return new FakeFetchTcgTokenMinter();
+  }
+
+  @Provides
+  @Singleton
+  PublishJobProcessor publishJobProcessor(
+      DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
+      DynamoDbClient dynamoDbClient,
+      Clock clock,
+      UlidGenerator ulidGenerator,
+      FetchTcgClient fetchTcgClient,
+      FetchTcgTokenMinter fetchTcgTokenMinter,
+      ObjectMapper objectMapper) {
+    return new PublishJobProcessor(
+        tcgInventoryTable,
+        dynamoDbClient,
+        clock,
+        ulidGenerator,
+        fetchTcgClient,
+        fetchTcgTokenMinter,
+        objectMapper);
   }
 }

@@ -57,7 +57,7 @@ public class HttpFetchTcgClientTest {
             200,
             """
             {
-              "id": 12345,
+              "id": "mtg_141_c_a25_normal",
               "name": "Lightning Bolt",
               "pricingData": {
                 "NZ": {
@@ -70,37 +70,37 @@ public class HttpFetchTcgClientTest {
         .thenReturn(response);
 
     // act
-    var result = client.getCard(12345);
+    var result = client.getCard("mtg_141_c_a25_normal");
 
     // assert
-    assertThat(result.id()).isEqualTo(12345);
+    assertThat(result.id()).isEqualTo("mtg_141_c_a25_normal");
     assertThat(result.name()).isEqualTo("Lightning Bolt");
     assertThat(result.pricingData()).containsKey("NZ");
     assertThat(result.pricingData().get("NZ").tcgMarketPrice()).isEqualByComparingTo("1.50");
   }
 
   @Test
-  void getCardShouldNotAttachBearerToken() throws IOException, InterruptedException {
+  void getCardShouldConstructCorrectUri() throws IOException, InterruptedException {
     // arrange
-    var response = createMockResponse(200, "{\"id\": 1, \"name\": \"x\"}");
+    var response = createMockResponse(200, "{\"id\": \"mtg_141_c_a25_normal\", \"name\": \"x\"}");
     when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
         .thenReturn(response);
 
     // act
-    client.getCard(1);
+    client.getCard("mtg_141_c_a25_normal");
 
     // assert
     var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
     verify(httpClient).send(requestCaptor.capture(), eq(HttpResponse.BodyHandlers.ofString()));
     assertThat(requestCaptor.getValue().headers().firstValue("Authorization")).isEmpty();
     assertThat(requestCaptor.getValue().uri())
-        .isEqualTo(URI.create("https://api.fetchtcg.com/v3/cards/1"));
+        .isEqualTo(URI.create("https://api.fetchtcg.com/v3/cards/mtg_141_c_a25_normal"));
   }
 
   @Test
   void getSellerOffersShouldAttachBearerToken() throws IOException, InterruptedException {
     // arrange
-    var response = createMockResponse(200, "{\"data\": [], \"totalPages\": 1}");
+    var response = createMockResponse(200, "{\"content\": [], \"totalPages\": 1}");
     when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
         .thenReturn(response);
 
@@ -113,7 +113,9 @@ public class HttpFetchTcgClientTest {
     assertThat(requestCaptor.getValue().headers().firstValue("Authorization"))
         .contains("Bearer my-bearer-token");
     assertThat(requestCaptor.getValue().uri())
-        .isEqualTo(URI.create("https://api.fetchtcg.com/v2/private/market/offers/seller?page=1"));
+        .isEqualTo(
+            URI.create(
+                "https://api.fetchtcg.com/v2/private/market/offers/seller?sort=NEWEST&size=20&page=1"));
   }
 
   @Test
@@ -124,7 +126,7 @@ public class HttpFetchTcgClientTest {
             200,
             """
             {
-              "data": [
+              "content": [
                 {"id": 100, "status": "ACCEPTED", "currentAction": "AWAITING_PAYMENT"},
                 {"id": 101, "status": "COMPLETED", "currentAction": null}
               ],
@@ -139,22 +141,22 @@ public class HttpFetchTcgClientTest {
 
     // assert
     assertThat(result.totalPages()).isEqualTo(3);
-    assertThat(result.data()).hasSize(2);
-    assertThat(result.data().get(0).id()).isEqualTo(100);
-    assertThat(result.data().get(0).status()).isEqualTo("ACCEPTED");
-    assertThat(result.data().get(0).currentAction()).isEqualTo("AWAITING_PAYMENT");
-    assertThat(result.data().get(1).currentAction()).isNull();
+    assertThat(result.content()).hasSize(2);
+    assertThat(result.content().get(0).id()).isEqualTo(100);
+    assertThat(result.content().get(0).status()).isEqualTo("ACCEPTED");
+    assertThat(result.content().get(0).currentAction()).isEqualTo("AWAITING_PAYMENT");
+    assertThat(result.content().get(1).currentAction()).isNull();
   }
 
   @Test
   void shouldCallPacerBeforeEachRequest() throws IOException, InterruptedException {
     // arrange
-    var response = createMockResponse(200, "{\"id\": 1, \"name\": \"x\"}");
+    var response = createMockResponse(200, "{\"id\": \"mtg_1_c_dom_normal\", \"name\": \"x\"}");
     when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
         .thenReturn(response);
 
     // act
-    client.getCard(1);
+    client.getCard("mtg_1_c_dom_normal");
 
     // assert
     assertThat(pacerCallCount.get()).isEqualTo(1);
@@ -164,17 +166,18 @@ public class HttpFetchTcgClientTest {
   void shouldCallPacerOnEachRetry() throws IOException, InterruptedException {
     // arrange
     var failResponse = createMockResponse(500, "Internal Server Error");
-    var successResponse = createMockResponse(200, "{\"id\": 1, \"name\": \"x\"}");
+    var successResponse =
+        createMockResponse(200, "{\"id\": \"mtg_1_c_dom_normal\", \"name\": \"x\"}");
     when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
         .thenReturn(failResponse)
         .thenReturn(failResponse)
         .thenReturn(successResponse);
 
     // act
-    var result = client.getCard(1);
+    var result = client.getCard("mtg_1_c_dom_normal");
 
     // assert
-    assertThat(result.id()).isEqualTo(1);
+    assertThat(result.id()).isEqualTo("mtg_1_c_dom_normal");
     assertThat(pacerCallCount.get()).isEqualTo(3);
     verify(httpClient, times(3))
         .send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString()));
@@ -188,7 +191,7 @@ public class HttpFetchTcgClientTest {
         .thenReturn(failResponse);
 
     // act & assert
-    assertThatThrownBy(() -> client.getCard(1))
+    assertThatThrownBy(() -> client.getCard("mtg_1_c_dom_normal"))
         .isInstanceOf(RuntimeException.class)
         .hasCauseInstanceOf(IOException.class)
         .hasMessageContaining("500");
@@ -220,7 +223,7 @@ public class HttpFetchTcgClientTest {
         .thenReturn(response);
 
     // act & assert
-    assertThatThrownBy(() -> client.getCard(1))
+    assertThatThrownBy(() -> client.getCard("mtg_1_c_dom_normal"))
         .isInstanceOf(FetchTcgAuthException.class)
         .hasMessageContaining("403");
 
@@ -245,12 +248,12 @@ public class HttpFetchTcgClientTest {
   @Test
   void shouldIncludeUserAgentHeader() throws IOException, InterruptedException {
     // arrange
-    var response = createMockResponse(200, "{\"id\": 1, \"name\": \"x\"}");
+    var response = createMockResponse(200, "{\"id\": \"mtg_1_c_dom_normal\", \"name\": \"x\"}");
     when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
         .thenReturn(response);
 
     // act
-    client.getCard(1);
+    client.getCard("mtg_1_c_dom_normal");
 
     // assert
     var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
@@ -267,39 +270,41 @@ public class HttpFetchTcgClientTest {
             200,
             """
             {
-              "data": [
-                {"id": 999, "name": "Lightning Bolt", "collectorNumber": "141"}
-              ]
+              "searchResults": {
+                "content": [
+                  {"id": "mtg_141_c_dom_normal"}
+                ]
+              }
             }
             """);
     when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
         .thenReturn(response);
 
     // act
-    var result = client.searchCards(42, "141");
+    var result = client.searchCards(42, "Lightning Bolt", "normal");
 
     // assert
-    assertThat(result.data()).hasSize(1);
-    assertThat(result.data().get(0).id()).isEqualTo(999);
-    assertThat(result.data().get(0).name()).isEqualTo("Lightning Bolt");
-    assertThat(result.data().get(0).collectorNumber()).isEqualTo("141");
+    assertThat(result.content()).hasSize(1);
+    assertThat(result.content().get(0).id()).isEqualTo("mtg_141_c_dom_normal");
   }
 
   @Test
   void searchCardsShouldConstructCorrectUri() throws IOException, InterruptedException {
     // arrange
-    var response = createMockResponse(200, "{\"data\": []}");
+    var response = createMockResponse(200, "{\"searchResults\": {\"content\": []}}");
     when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
         .thenReturn(response);
 
     // act
-    client.searchCards(78, "472");
+    client.searchCards(78, "Spidersilk Net", "normal");
 
     // assert
     var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
     verify(httpClient).send(requestCaptor.capture(), eq(HttpResponse.BodyHandlers.ofString()));
     assertThat(requestCaptor.getValue().uri())
-        .isEqualTo(URI.create("https://api.fetchtcg.com/v3/cards?setId=78&collectorNumber=472"));
+        .isEqualTo(
+            URI.create(
+                "https://api.fetchtcg.com/v3/cards?gameIds=mtg&sets=78&cardName=Spidersilk+Net&finishes=normal"));
     assertThat(requestCaptor.getValue().headers().firstValue("Authorization")).isEmpty();
   }
 
@@ -311,43 +316,46 @@ public class HttpFetchTcgClientTest {
             200,
             """
             {
-              "data": [
-                {"id": 1001, "condition": "raw-nm", "price": 2.50, "sellerUsername": "seller1", "sellerId": 10},
-                {"id": 1002, "condition": "raw-lp", "price": 1.80, "sellerUsername": "seller2", "sellerId": 20}
-              ]
+              "searchResults": {
+                "content": [
+                  {"id": 1001, "condition": "raw-nm", "listedPrice": 2.50, "sellerProfileName": "seller1"},
+                  {"id": 1002, "condition": "raw-lp", "listedPrice": 1.80, "sellerProfileName": "seller2"}
+                ]
+              }
             }
             """);
     when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
         .thenReturn(response);
 
     // act
-    var result = client.getCardListings(999);
+    var result = client.getCardListings("mtg_218_c_kld_normal");
 
     // assert
-    assertThat(result.data()).hasSize(2);
-    assertThat(result.data().get(0).id()).isEqualTo(1001);
-    assertThat(result.data().get(0).condition()).isEqualTo("raw-nm");
-    assertThat(result.data().get(0).price()).isEqualByComparingTo("2.50");
-    assertThat(result.data().get(0).sellerUsername()).isEqualTo("seller1");
-    assertThat(result.data().get(0).sellerId()).isEqualTo(10);
-    assertThat(result.data().get(1).condition()).isEqualTo("raw-lp");
+    assertThat(result.content()).hasSize(2);
+    assertThat(result.content().get(0).id()).isEqualTo(1001);
+    assertThat(result.content().get(0).condition()).isEqualTo("raw-nm");
+    assertThat(result.content().get(0).listedPrice()).isEqualByComparingTo("2.50");
+    assertThat(result.content().get(0).sellerProfileName()).isEqualTo("seller1");
+    assertThat(result.content().get(1).condition()).isEqualTo("raw-lp");
   }
 
   @Test
   void getCardListingsShouldConstructCorrectUri() throws IOException, InterruptedException {
     // arrange
-    var response = createMockResponse(200, "{\"data\": []}");
+    var response = createMockResponse(200, "{\"searchResults\": {\"content\": []}}");
     when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
         .thenReturn(response);
 
     // act
-    client.getCardListings(12345);
+    client.getCardListings("mtg_218_c_kld_normal");
 
     // assert
     var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
     verify(httpClient).send(requestCaptor.capture(), eq(HttpResponse.BodyHandlers.ofString()));
     assertThat(requestCaptor.getValue().uri())
-        .isEqualTo(URI.create("https://api.fetchtcg.com/v3/cards/12345/listings?country=NZ"));
+        .isEqualTo(
+            URI.create(
+                "https://api.fetchtcg.com/v3/cards/mtg_218_c_kld_normal/listings?countryCode=NZ&currencyCode=NZD"));
     assertThat(requestCaptor.getValue().headers().firstValue("Authorization")).isEmpty();
   }
 

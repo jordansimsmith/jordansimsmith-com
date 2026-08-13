@@ -7,50 +7,57 @@ import java.util.List;
 import java.util.Map;
 
 public interface FetchTcgClient {
-  GetCardResponse getCard(int cardId);
+  GetCardResponse getCard(String cardId);
 
-  SearchCardsResponse searchCards(int setId, String collectorNumber);
+  SearchCardsResponse searchCards(int setId, String cardName, String finish);
 
-  GetCardListingsResponse getCardListings(int cardId);
+  GetCardListingsResponse getCardListings(String cardId);
 
   GetSellerOffersResponse getSellerOffers(String bearerToken, int page);
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   record GetCardResponse(
-      @JsonProperty("id") int id,
+      @JsonProperty("id") String id,
       @JsonProperty("name") String name,
       @JsonProperty("pricingData") Map<String, PricingData> pricingData) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   record PricingData(@JsonProperty("tcgMarketPrice") BigDecimal tcgMarketPrice) {}
 
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  record SearchCardsResponse(@JsonProperty("data") List<SearchCard> data) {}
+  record SearchCardsResponse(List<SearchCard> content) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
-  record SearchCard(
-      @JsonProperty("id") int id,
-      @JsonProperty("name") String name,
-      @JsonProperty("collectorNumber") String collectorNumber) {}
+  record SearchCard(@JsonProperty("id") String id) {}
 
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  record GetCardListingsResponse(@JsonProperty("data") List<CardListing> data) {}
+  record GetCardListingsResponse(List<CardListing> content) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   record CardListing(
       @JsonProperty("id") int id,
       @JsonProperty("condition") String condition,
-      @JsonProperty("price") BigDecimal price,
-      @JsonProperty("sellerUsername") String sellerUsername,
-      @JsonProperty("sellerId") int sellerId) {}
+      @JsonProperty("listedPrice") BigDecimal listedPrice,
+      @JsonProperty("sellerProfileName") String sellerProfileName) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   record GetSellerOffersResponse(
-      @JsonProperty("data") List<SellerOffer> data, @JsonProperty("totalPages") int totalPages) {}
+      @JsonProperty("content") List<SellerOffer> content,
+      @JsonProperty("totalPages") int totalPages) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   record SellerOffer(
       @JsonProperty("id") int id,
       @JsonProperty("status") String status,
-      @JsonProperty("currentAction") String currentAction) {}
+      @JsonProperty("currentAction") String currentAction,
+      @JsonProperty("deliveryMode") String deliveryMode,
+      @JsonProperty("totalOfferPrice") BigDecimal totalOfferPrice,
+      @JsonProperty("items") List<OfferItem> items) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  record OfferItem(
+      @JsonProperty("listing") OfferListing listing,
+      @JsonProperty("quantity") int quantity,
+      @JsonProperty("price") BigDecimal price) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  record OfferListing(@JsonProperty("id") int id, @JsonProperty("condition") String condition) {}
 }

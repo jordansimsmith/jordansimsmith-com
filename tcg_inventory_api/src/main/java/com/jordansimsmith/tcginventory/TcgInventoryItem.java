@@ -71,6 +71,15 @@ public class TcgInventoryItem {
   public static final String JOB_ID = "job_id";
   public static final String CONTINUATION = "continuation";
   public static final String PROCESSED_COUNT = "processed_count";
+  public static final String FETCHTCG_LISTING_ID = "fetchtcg_listing_id";
+  public static final String LAST_PUBLISHED_QUANTITY = "last_published_quantity";
+  public static final String LAST_PUBLISHED_PRICE = "last_published_price";
+  public static final String LAST_PUBLISHED_AT = "last_published_at";
+  public static final String DELIVERY_MODE = "delivery_mode";
+  public static final String TOTAL_PRICE = "total_price";
+  public static final String LINES = "lines";
+  public static final String FETCHTCG_STATUS = "fetchtcg_status";
+  public static final String FETCHTCG_CURRENT_ACTION = "fetchtcg_current_action";
   public static final String EVENT_TYPE = "event_type";
   public static final String CREATED_AT = "created_at";
   public static final String UPDATED_AT = "updated_at";
@@ -89,7 +98,7 @@ public class TcgInventoryItem {
   private String setCode;
   private String setName;
   private String collectorNumber;
-  private Integer fetchtcgCardId;
+  private String fetchtcgCardId;
   private Integer fetchtcgSetId;
   private Integer version;
   private Boolean dirty;
@@ -114,6 +123,15 @@ public class TcgInventoryItem {
   private String jobId;
   private Integer continuation;
   private Integer processedCount;
+  private Integer fetchtcgListingId;
+  private Integer lastPublishedQuantity;
+  private String lastPublishedPrice;
+  private Instant lastPublishedAt;
+  private String deliveryMode;
+  private String totalPrice;
+  private String lines;
+  private String fetchtcgStatus;
+  private String fetchtcgCurrentAction;
   private String eventType;
   private Instant createdAt;
   private Instant updatedAt;
@@ -264,11 +282,11 @@ public class TcgInventoryItem {
 
   @Nullable
   @DynamoDbAttribute(FETCHTCG_CARD_ID)
-  public Integer getFetchtcgCardId() {
+  public String getFetchtcgCardId() {
     return fetchtcgCardId;
   }
 
-  public void setFetchtcgCardId(@Nullable Integer fetchtcgCardId) {
+  public void setFetchtcgCardId(@Nullable String fetchtcgCardId) {
     this.fetchtcgCardId = fetchtcgCardId;
   }
 
@@ -513,6 +531,97 @@ public class TcgInventoryItem {
   }
 
   @Nullable
+  @DynamoDbAttribute(FETCHTCG_LISTING_ID)
+  public Integer getFetchtcgListingId() {
+    return fetchtcgListingId;
+  }
+
+  public void setFetchtcgListingId(@Nullable Integer fetchtcgListingId) {
+    this.fetchtcgListingId = fetchtcgListingId;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(LAST_PUBLISHED_QUANTITY)
+  public Integer getLastPublishedQuantity() {
+    return lastPublishedQuantity;
+  }
+
+  public void setLastPublishedQuantity(@Nullable Integer lastPublishedQuantity) {
+    this.lastPublishedQuantity = lastPublishedQuantity;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(LAST_PUBLISHED_PRICE)
+  public String getLastPublishedPrice() {
+    return lastPublishedPrice;
+  }
+
+  public void setLastPublishedPrice(@Nullable String lastPublishedPrice) {
+    this.lastPublishedPrice = lastPublishedPrice;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(LAST_PUBLISHED_AT)
+  @DynamoDbConvertedBy(EpochSecondConverter.class)
+  public Instant getLastPublishedAt() {
+    return lastPublishedAt;
+  }
+
+  public void setLastPublishedAt(@Nullable Instant lastPublishedAt) {
+    this.lastPublishedAt = lastPublishedAt;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(DELIVERY_MODE)
+  public String getDeliveryMode() {
+    return deliveryMode;
+  }
+
+  public void setDeliveryMode(@Nullable String deliveryMode) {
+    this.deliveryMode = deliveryMode;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(TOTAL_PRICE)
+  public String getTotalPrice() {
+    return totalPrice;
+  }
+
+  public void setTotalPrice(@Nullable String totalPrice) {
+    this.totalPrice = totalPrice;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(LINES)
+  public String getLines() {
+    return lines;
+  }
+
+  public void setLines(@Nullable String lines) {
+    this.lines = lines;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(FETCHTCG_STATUS)
+  public String getFetchtcgStatus() {
+    return fetchtcgStatus;
+  }
+
+  public void setFetchtcgStatus(@Nullable String fetchtcgStatus) {
+    this.fetchtcgStatus = fetchtcgStatus;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(FETCHTCG_CURRENT_ACTION)
+  public String getFetchtcgCurrentAction() {
+    return fetchtcgCurrentAction;
+  }
+
+  public void setFetchtcgCurrentAction(@Nullable String fetchtcgCurrentAction) {
+    this.fetchtcgCurrentAction = fetchtcgCurrentAction;
+  }
+
+  @Nullable
   @DynamoDbAttribute(EVENT_TYPE)
   public String getEventType() {
     return eventType;
@@ -588,6 +697,15 @@ public class TcgInventoryItem {
         && Objects.equals(jobId, that.jobId)
         && Objects.equals(continuation, that.continuation)
         && Objects.equals(processedCount, that.processedCount)
+        && Objects.equals(fetchtcgListingId, that.fetchtcgListingId)
+        && Objects.equals(lastPublishedQuantity, that.lastPublishedQuantity)
+        && Objects.equals(lastPublishedPrice, that.lastPublishedPrice)
+        && Objects.equals(lastPublishedAt, that.lastPublishedAt)
+        && Objects.equals(deliveryMode, that.deliveryMode)
+        && Objects.equals(totalPrice, that.totalPrice)
+        && Objects.equals(lines, that.lines)
+        && Objects.equals(fetchtcgStatus, that.fetchtcgStatus)
+        && Objects.equals(fetchtcgCurrentAction, that.fetchtcgCurrentAction)
         && Objects.equals(eventType, that.eventType)
         && Objects.equals(createdAt, that.createdAt)
         && Objects.equals(updatedAt, that.updatedAt);
@@ -635,6 +753,15 @@ public class TcgInventoryItem {
         jobId,
         continuation,
         processedCount,
+        fetchtcgListingId,
+        lastPublishedQuantity,
+        lastPublishedPrice,
+        lastPublishedAt,
+        deliveryMode,
+        totalPrice,
+        lines,
+        fetchtcgStatus,
+        fetchtcgCurrentAction,
         eventType,
         createdAt,
         updatedAt);
@@ -747,6 +874,30 @@ public class TcgInventoryItem {
         + continuation
         + ", processedCount="
         + processedCount
+        + ", fetchtcgListingId="
+        + fetchtcgListingId
+        + ", lastPublishedQuantity="
+        + lastPublishedQuantity
+        + ", lastPublishedPrice='"
+        + lastPublishedPrice
+        + '\''
+        + ", lastPublishedAt="
+        + lastPublishedAt
+        + ", deliveryMode='"
+        + deliveryMode
+        + '\''
+        + ", totalPrice='"
+        + totalPrice
+        + '\''
+        + ", lines='"
+        + lines
+        + '\''
+        + ", fetchtcgStatus='"
+        + fetchtcgStatus
+        + '\''
+        + ", fetchtcgCurrentAction='"
+        + fetchtcgCurrentAction
+        + '\''
         + ", eventType='"
         + eventType
         + '\''

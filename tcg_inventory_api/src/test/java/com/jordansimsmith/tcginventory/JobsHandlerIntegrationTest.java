@@ -10,6 +10,7 @@ import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.time.FakeClock;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
@@ -19,6 +20,8 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 @Testcontainers
 public class JobsHandlerIntegrationTest {
@@ -66,21 +69,21 @@ public class JobsHandlerIntegrationTest {
 
     fakeFetchTcgClient.seedSearchResult(
         2624,
-        "168",
+        "Card 1",
+        "normal",
         new FetchTcgClient.SearchCardsResponse(
-            List.of(new FetchTcgClient.SearchCard(999, "Llanowar Elves", "168"))));
+            List.of(new FetchTcgClient.SearchCard("mtg_168_c_dom_normal"))));
     fakeFetchTcgClient.seedCard(
-        999,
+        "mtg_168_c_dom_normal",
         new FetchTcgClient.GetCardResponse(
-            999,
-            "Llanowar Elves",
+            "mtg_168_c_dom_normal",
+            "Card 1",
             Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50")))));
     fakeFetchTcgClient.seedListings(
-        999,
+        "mtg_168_c_dom_normal",
         new FetchTcgClient.GetCardListingsResponse(
             List.of(
-                new FetchTcgClient.CardListing(
-                    1, "raw-nm", new BigDecimal("1.20"), "rival1", 50))));
+                new FetchTcgClient.CardListing(1, "raw-nm", new BigDecimal("1.20"), "rival1"))));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
@@ -105,14 +108,15 @@ public class JobsHandlerIntegrationTest {
 
     fakeFetchTcgClient.seedSearchResult(
         2624,
-        "168",
+        "Card 1",
+        "normal",
         new FetchTcgClient.SearchCardsResponse(
-            List.of(new FetchTcgClient.SearchCard(999, "Llanowar Elves", "168"))));
+            List.of(new FetchTcgClient.SearchCard("mtg_168_c_dom_normal"))));
     fakeFetchTcgClient.seedCard(
-        999,
+        "mtg_168_c_dom_normal",
         new FetchTcgClient.GetCardResponse(
-            999,
-            "Llanowar Elves",
+            "mtg_168_c_dom_normal",
+            "Card 1",
             Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("0.10")))));
 
     // act
@@ -199,14 +203,15 @@ public class JobsHandlerIntegrationTest {
 
     fakeFetchTcgClient.seedSearchResult(
         2624,
-        "168",
+        "Card 1",
+        "normal",
         new FetchTcgClient.SearchCardsResponse(
-            List.of(new FetchTcgClient.SearchCard(999, "Llanowar Elves", "168"))));
+            List.of(new FetchTcgClient.SearchCard("mtg_168_c_dom_normal"))));
     fakeFetchTcgClient.seedCard(
-        999,
+        "mtg_168_c_dom_normal",
         new FetchTcgClient.GetCardResponse(
-            999,
-            "Llanowar Elves",
+            "mtg_168_c_dom_normal",
+            "Card 1",
             Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50")))));
 
     // act
@@ -283,18 +288,25 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishJobShouldCompleteImmediately() {
+  void publishOrderPhaseShouldReserveUnitsForNewOffer() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 3);
 
-    var jobItem = new TcgInventoryItem();
-    jobItem.setPk(TcgInventoryItem.formatUserPk("jordan"));
-    jobItem.setSk(TcgInventoryItem.formatJobSk("job1"));
-    jobItem.setJobId("job1");
-    jobItem.setJobType("publish");
-    jobItem.setStatus("queued");
-    jobItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(jobItem);
+    fakeFetchTcgClient.seedSellerOffers(
+        List.of(
+            new FetchTcgClient.SellerOffer(
+                83663,
+                "ACCEPTED",
+                null,
+                "PICKUP",
+                new BigDecimal("3.33"),
+                List.of(
+                    new FetchTcgClient.OfferItem(
+                        new FetchTcgClient.OfferListing(1001, "raw-nm"),
+                        2,
+                        new BigDecimal("1.50"))))));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -302,20 +314,285 @@ public class JobsHandlerIntegrationTest {
     // assert
     var updatedJob = getJob("jordan", "job1");
     assertThat(updatedJob.getStatus()).isEqualTo("succeeded");
-    assertThat(fakeJobsQueue.getMessages()).isEmpty();
+
+    var order = getOrder("jordan", "83663");
+    assertThat(order).isNotNull();
+    assertThat(order.getStatus()).isEqualTo("awaiting_payment");
+    assertThat(order.getDeliveryMode()).isEqualTo("PICKUP");
+    assertThat(order.getTotalPrice()).isEqualTo("3.33");
+    assertThat(order.getFetchtcgStatus()).isEqualTo("ACCEPTED");
+    assertThat(order.getLines()).contains("scryfall-1#normal#NM");
+
+    var sku = getSku("jordan", "scryfall-1#normal#NM");
+    assertThat(sku.getDirty()).isTrue();
+
+    var units = getUnits("jordan", "scryfall-1#normal#NM");
+    var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
+    assertThat(reserved).hasSize(2);
+    assertThat(reserved.get(0).getOrderId()).isEqualTo("83663");
+
+    var audit = getAuditEntries("jordan");
+    assertThat(audit.stream().anyMatch(a -> "reserve".equals(a.getEventType()))).isTrue();
+  }
+
+  @Test
+  void publishOrderPhaseShouldAdvanceToPickOnPayment() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createExistingOrder("jordan", "83663", "awaiting_payment");
+
+    fakeFetchTcgClient.seedSellerOffers(
+        List.of(
+            new FetchTcgClient.SellerOffer(
+                83663,
+                "ACCEPTED",
+                "SEND_PICKUP_ADDRESS",
+                "PICKUP",
+                new BigDecimal("3.33"),
+                List.of())));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "83663");
+    assertThat(order.getStatus()).isEqualTo("to_pick");
+    assertThat(order.getFetchtcgCurrentAction()).isEqualTo("SEND_PICKUP_ADDRESS");
+  }
+
+  @Test
+  void publishOrderPhaseShouldVoidWhenOfferDisappears() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    var skuId = "scryfall-1#normal#NM";
+    createSkuWithUnits("jordan", skuId, 1001, 2);
+    reserveUnits("jordan", skuId, "83663", 2);
+    createExistingOrderWithLines("jordan", "83663", "awaiting_payment", skuId, List.of(1, 2));
+
+    fakeFetchTcgClient.seedSellerOffers(List.of());
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "83663");
+    assertThat(order.getStatus()).isEqualTo("voided");
+
+    var units = getUnits("jordan", skuId);
+    assertThat(units.stream().allMatch(u -> "in_stock".equals(u.getStatus()))).isTrue();
+
+    var sku = getSku("jordan", skuId);
+    assertThat(sku.getDirty()).isTrue();
+
+    var audit = getAuditEntries("jordan");
+    assertThat(audit.stream().anyMatch(a -> "release".equals(a.getEventType()))).isTrue();
+  }
+
+  @Test
+  void publishOrderPhaseShouldBeIdempotentOnReprocessing() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createExistingOrder("jordan", "83663", "awaiting_payment");
+
+    fakeFetchTcgClient.seedSellerOffers(
+        List.of(
+            new FetchTcgClient.SellerOffer(
+                83663, "ACCEPTED", null, "PICKUP", new BigDecimal("3.33"), List.of())));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "83663");
+    assertThat(order.getStatus()).isEqualTo("awaiting_payment");
+  }
+
+  @Test
+  void publishOrderPhaseShouldFlagInsufficientStock() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 1);
+
+    fakeFetchTcgClient.seedSellerOffers(
+        List.of(
+            new FetchTcgClient.SellerOffer(
+                83663,
+                "ACCEPTED",
+                null,
+                "PICKUP",
+                new BigDecimal("3.33"),
+                List.of(
+                    new FetchTcgClient.OfferItem(
+                        new FetchTcgClient.OfferListing(1001, "raw-nm"),
+                        3,
+                        new BigDecimal("1.50"))))));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "83663");
+    assertThat(order).isNotNull();
+    assertThat(order.getStatus()).isEqualTo("flagged");
+  }
+
+  private void createPublishJob(String user, String jobId) {
+    var jobItem = new TcgInventoryItem();
+    jobItem.setPk(TcgInventoryItem.formatUserPk(user));
+    jobItem.setSk(TcgInventoryItem.formatJobSk(jobId));
+    jobItem.setJobId(jobId);
+    jobItem.setJobType("publish");
+    jobItem.setStatus("queued");
+    jobItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
+    tcgInventoryTable.putItem(jobItem);
+  }
+
+  private void createSkuWithUnits(String user, String skuId, int fetchtcgListingId, int unitCount) {
+    var skuItem = new TcgInventoryItem();
+    skuItem.setPk(TcgInventoryItem.formatSkuPk(user, skuId));
+    skuItem.setSk(TcgInventoryItem.formatSkuSk());
+    skuItem.setSkuId(skuId);
+    var parts = skuId.split("#");
+    skuItem.setScryfallId(parts[0]);
+    skuItem.setFinish(parts[1]);
+    skuItem.setCondition(parts[2]);
+    skuItem.setName("Test Card");
+    skuItem.setSetCode("dom");
+    skuItem.setSetName("Dominaria");
+    skuItem.setCollectorNumber("168");
+    skuItem.setFetchtcgCardId("mtg_168_c_dom_normal");
+    skuItem.setFetchtcgListingId(fetchtcgListingId);
+    skuItem.setVersion(1);
+    skuItem.setDirty(false);
+    skuItem.setGsi1pk(TcgInventoryItem.USER_PREFIX + user + "#CLEAN");
+    skuItem.setGsi1sk(TcgInventoryItem.formatGsi1sk(skuId));
+    skuItem.setGsi2pk(TcgInventoryItem.formatGsi2pk(user));
+    skuItem.setGsi2sk(TcgInventoryItem.formatGsi2sk("test card", skuId));
+    tcgInventoryTable.putItem(skuItem);
+
+    for (int i = 1; i <= unitCount; i++) {
+      var unit = new TcgInventoryItem();
+      unit.setPk(TcgInventoryItem.formatSkuPk(user, skuId));
+      unit.setSk(TcgInventoryItem.formatUnitSk(i));
+      unit.setSequenceNumber(i);
+      unit.setStatus("in_stock");
+      unit.setImportId("import1");
+      unit.setCreatedAt(Instant.ofEpochSecond(1700000000));
+      tcgInventoryTable.putItem(unit);
+    }
+  }
+
+  private void reserveUnits(String user, String skuId, String orderId, int count) {
+    for (int i = 1; i <= count; i++) {
+      var unit =
+          tcgInventoryTable.getItem(
+              Key.builder()
+                  .partitionValue(TcgInventoryItem.formatSkuPk(user, skuId))
+                  .sortValue(TcgInventoryItem.formatUnitSk(i))
+                  .build());
+      unit.setStatus("reserved");
+      unit.setOrderId(orderId);
+      tcgInventoryTable.putItem(unit);
+    }
+  }
+
+  private void createExistingOrder(String user, String offerId, String status) {
+    var order = new TcgInventoryItem();
+    order.setPk(TcgInventoryItem.formatUserPk(user));
+    order.setSk(TcgInventoryItem.formatOrderSk(offerId));
+    order.setOrderId(offerId);
+    order.setStatus(status);
+    order.setDeliveryMode("PICKUP");
+    order.setTotalPrice("3.33");
+    order.setFetchtcgStatus("ACCEPTED");
+    order.setLines("[]");
+    order.setCreatedAt(Instant.ofEpochSecond(1700000000));
+    order.setUpdatedAt(Instant.ofEpochSecond(1700000000));
+    tcgInventoryTable.putItem(order);
+  }
+
+  private void createExistingOrderWithLines(
+      String user, String offerId, String status, String skuId, List<Integer> sequenceNumbers) {
+    var order = new TcgInventoryItem();
+    order.setPk(TcgInventoryItem.formatUserPk(user));
+    order.setSk(TcgInventoryItem.formatOrderSk(offerId));
+    order.setOrderId(offerId);
+    order.setStatus(status);
+    order.setDeliveryMode("PICKUP");
+    order.setTotalPrice("3.33");
+    order.setFetchtcgStatus("ACCEPTED");
+    order.setLines(
+        "[{\"sku_id\":\""
+            + skuId
+            + "\",\"fetchtcg_listing_id\":1001,\"quantity\":"
+            + sequenceNumbers.size()
+            + ",\"price\":\"1.50\",\"allocated_sequence_numbers\":"
+            + sequenceNumbers
+            + "}]");
+    order.setCreatedAt(Instant.ofEpochSecond(1700000000));
+    order.setUpdatedAt(Instant.ofEpochSecond(1700000000));
+    tcgInventoryTable.putItem(order);
+  }
+
+  private TcgInventoryItem getOrder(String user, String offerId) {
+    return tcgInventoryTable.getItem(
+        Key.builder()
+            .partitionValue(TcgInventoryItem.formatUserPk(user))
+            .sortValue(TcgInventoryItem.formatOrderSk(offerId))
+            .build());
+  }
+
+  private TcgInventoryItem getSku(String user, String skuId) {
+    return tcgInventoryTable.getItem(
+        Key.builder()
+            .partitionValue(TcgInventoryItem.formatSkuPk(user, skuId))
+            .sortValue(TcgInventoryItem.formatSkuSk())
+            .build());
+  }
+
+  private List<TcgInventoryItem> getUnits(String user, String skuId) {
+    var results = new ArrayList<TcgInventoryItem>();
+    var request =
+        QueryEnhancedRequest.builder()
+            .queryConditional(
+                QueryConditional.sortBeginsWith(
+                    Key.builder()
+                        .partitionValue(TcgInventoryItem.formatSkuPk(user, skuId))
+                        .sortValue(TcgInventoryItem.UNIT_PREFIX)
+                        .build()))
+            .build();
+    tcgInventoryTable.query(request).items().forEach(results::add);
+    return results;
+  }
+
+  private List<TcgInventoryItem> getAuditEntries(String user) {
+    var results = new ArrayList<TcgInventoryItem>();
+    var request =
+        QueryEnhancedRequest.builder()
+            .queryConditional(
+                QueryConditional.keyEqualTo(
+                    Key.builder().partitionValue(TcgInventoryItem.formatAuditPk(user)).build()))
+            .build();
+    tcgInventoryTable.query(request).items().forEach(results::add);
+    return results;
   }
 
   private void seedDefaultCardForDom168() {
     fakeFetchTcgClient.seedSearchResult(
         2624,
-        "168",
+        "Card 1",
+        "normal",
         new FetchTcgClient.SearchCardsResponse(
-            List.of(new FetchTcgClient.SearchCard(999, "Llanowar Elves", "168"))));
+            List.of(new FetchTcgClient.SearchCard("mtg_168_c_dom_normal"))));
     fakeFetchTcgClient.seedCard(
-        999,
+        "mtg_168_c_dom_normal",
         new FetchTcgClient.GetCardResponse(
-            999,
-            "Llanowar Elves",
+            "mtg_168_c_dom_normal",
+            "Card 1",
             Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50")))));
   }
 

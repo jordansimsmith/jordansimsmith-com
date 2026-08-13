@@ -308,7 +308,7 @@ price = max(0.25, round_nearest_half_up(benchmark, 0.05))
   "name": "Elvish Aberration",
   "set_code": "a25",
   "collector_number": "167",
-  "fetchtcg_card_id": 123456,
+  "fetchtcg_card_id": "mtg_167_c_a25_normal",
   "fetchtcg_set_id": 78,
   "version": 7,
   "dirty": true,

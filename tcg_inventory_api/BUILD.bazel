@@ -397,6 +397,7 @@ java_library(
         "//lib/testcontainers:test-lib",
         "//lib/time:lib",
         "//lib/time:test-lib",
+        "//lib/ulid:lib",
         "//lib/ulid:test-lib",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",

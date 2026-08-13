@@ -27,7 +27,7 @@ public class FetchTcgTokenMinterTest {
 
   private ObjectMapper objectMapper;
   private FakeSecrets fakeSecrets;
-  private FetchTcgTokenMinter minter;
+  private HttpFetchTcgTokenMinter minter;
   private AutoCloseable openMocks;
 
   @BeforeEach
@@ -36,7 +36,7 @@ public class FetchTcgTokenMinterTest {
     objectMapper = new ObjectMapper();
     fakeSecrets = new FakeSecrets();
     minter =
-        new FetchTcgTokenMinter(
+        new HttpFetchTcgTokenMinter(
             URI.create("https://securetoken.googleapis.com/v1/token?key=FAKE_API_KEY"),
             httpClient,
             objectMapper,
