@@ -58,6 +58,19 @@ public class TcgInventoryItem {
   public static final String ORDER_ID = "order_id";
   public static final String FILENAME = "filename";
   public static final String NEXT_SEQUENCE_NUMBER = "next_sequence_number";
+  public static final String POSITION = "position";
+  public static final String DECISION = "decision";
+  public static final String DECISION_REASON = "decision_reason";
+  public static final String MARKET_PRICE = "market_price";
+  public static final String SUGGESTED_PRICE = "suggested_price";
+  public static final String ROW_COUNT = "row_count";
+  public static final String KEEP_COUNT = "keep_count";
+  public static final String DISCARD_COUNT = "discard_count";
+  public static final String REVIEW_COUNT = "review_count";
+  public static final String ERROR = "error";
+  public static final String LANGUAGE = "language";
+  public static final String JOB_TYPE = "job_type";
+  public static final String JOB_ID = "job_id";
   public static final String CREATED_AT = "created_at";
   public static final String UPDATED_AT = "updated_at";
 
@@ -87,6 +100,19 @@ public class TcgInventoryItem {
   private String orderId;
   private String filename;
   private Integer nextSequenceNumber;
+  private Integer position;
+  private String decision;
+  private String decisionReason;
+  private String marketPrice;
+  private String suggestedPrice;
+  private Integer rowCount;
+  private Integer keepCount;
+  private Integer discardCount;
+  private Integer reviewCount;
+  private String error;
+  private String language;
+  private String jobType;
+  private String jobId;
   private Instant createdAt;
   private Instant updatedAt;
 
@@ -355,6 +381,136 @@ public class TcgInventoryItem {
   }
 
   @Nullable
+  @DynamoDbAttribute(POSITION)
+  public Integer getPosition() {
+    return position;
+  }
+
+  public void setPosition(@Nullable Integer position) {
+    this.position = position;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(DECISION)
+  public String getDecision() {
+    return decision;
+  }
+
+  public void setDecision(@Nullable String decision) {
+    this.decision = decision;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(DECISION_REASON)
+  public String getDecisionReason() {
+    return decisionReason;
+  }
+
+  public void setDecisionReason(@Nullable String decisionReason) {
+    this.decisionReason = decisionReason;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(MARKET_PRICE)
+  public String getMarketPrice() {
+    return marketPrice;
+  }
+
+  public void setMarketPrice(@Nullable String marketPrice) {
+    this.marketPrice = marketPrice;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(SUGGESTED_PRICE)
+  public String getSuggestedPrice() {
+    return suggestedPrice;
+  }
+
+  public void setSuggestedPrice(@Nullable String suggestedPrice) {
+    this.suggestedPrice = suggestedPrice;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(ROW_COUNT)
+  public Integer getRowCount() {
+    return rowCount;
+  }
+
+  public void setRowCount(@Nullable Integer rowCount) {
+    this.rowCount = rowCount;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(KEEP_COUNT)
+  public Integer getKeepCount() {
+    return keepCount;
+  }
+
+  public void setKeepCount(@Nullable Integer keepCount) {
+    this.keepCount = keepCount;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(DISCARD_COUNT)
+  public Integer getDiscardCount() {
+    return discardCount;
+  }
+
+  public void setDiscardCount(@Nullable Integer discardCount) {
+    this.discardCount = discardCount;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(REVIEW_COUNT)
+  public Integer getReviewCount() {
+    return reviewCount;
+  }
+
+  public void setReviewCount(@Nullable Integer reviewCount) {
+    this.reviewCount = reviewCount;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(ERROR)
+  public String getError() {
+    return error;
+  }
+
+  public void setError(@Nullable String error) {
+    this.error = error;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(LANGUAGE)
+  public String getLanguage() {
+    return language;
+  }
+
+  public void setLanguage(@Nullable String language) {
+    this.language = language;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(JOB_TYPE)
+  public String getJobType() {
+    return jobType;
+  }
+
+  public void setJobType(@Nullable String jobType) {
+    this.jobType = jobType;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(JOB_ID)
+  public String getJobId() {
+    return jobId;
+  }
+
+  public void setJobId(@Nullable String jobId) {
+    this.jobId = jobId;
+  }
+
+  @Nullable
   @DynamoDbAttribute(CREATED_AT)
   @DynamoDbConvertedBy(EpochSecondConverter.class)
   public Instant getCreatedAt() {
@@ -407,6 +563,19 @@ public class TcgInventoryItem {
         && Objects.equals(orderId, that.orderId)
         && Objects.equals(filename, that.filename)
         && Objects.equals(nextSequenceNumber, that.nextSequenceNumber)
+        && Objects.equals(position, that.position)
+        && Objects.equals(decision, that.decision)
+        && Objects.equals(decisionReason, that.decisionReason)
+        && Objects.equals(marketPrice, that.marketPrice)
+        && Objects.equals(suggestedPrice, that.suggestedPrice)
+        && Objects.equals(rowCount, that.rowCount)
+        && Objects.equals(keepCount, that.keepCount)
+        && Objects.equals(discardCount, that.discardCount)
+        && Objects.equals(reviewCount, that.reviewCount)
+        && Objects.equals(error, that.error)
+        && Objects.equals(language, that.language)
+        && Objects.equals(jobType, that.jobType)
+        && Objects.equals(jobId, that.jobId)
         && Objects.equals(createdAt, that.createdAt)
         && Objects.equals(updatedAt, that.updatedAt);
   }
@@ -440,6 +609,19 @@ public class TcgInventoryItem {
         orderId,
         filename,
         nextSequenceNumber,
+        position,
+        decision,
+        decisionReason,
+        marketPrice,
+        suggestedPrice,
+        rowCount,
+        keepCount,
+        discardCount,
+        reviewCount,
+        error,
+        language,
+        jobType,
+        jobId,
         createdAt,
         updatedAt);
   }
@@ -517,6 +699,40 @@ public class TcgInventoryItem {
         + '\''
         + ", nextSequenceNumber="
         + nextSequenceNumber
+        + ", position="
+        + position
+        + ", decision='"
+        + decision
+        + '\''
+        + ", decisionReason='"
+        + decisionReason
+        + '\''
+        + ", marketPrice='"
+        + marketPrice
+        + '\''
+        + ", suggestedPrice='"
+        + suggestedPrice
+        + '\''
+        + ", rowCount="
+        + rowCount
+        + ", keepCount="
+        + keepCount
+        + ", discardCount="
+        + discardCount
+        + ", reviewCount="
+        + reviewCount
+        + ", error='"
+        + error
+        + '\''
+        + ", language='"
+        + language
+        + '\''
+        + ", jobType='"
+        + jobType
+        + '\''
+        + ", jobId='"
+        + jobId
+        + '\''
         + ", createdAt="
         + createdAt
         + ", updatedAt="

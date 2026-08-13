@@ -6,11 +6,8 @@ export const REQUIRED_COLUMNS = [
   'Set name',
   'Collector number',
   'Foil',
-  'Rarity',
   'Quantity',
   'Scryfall ID',
-  'Misprint',
-  'Altered',
   'Condition',
   'Language',
 ];
@@ -40,8 +37,6 @@ export interface ManaBoxRow {
   scryfall_id: string;
   quantity: number;
   language: string;
-  misprint: boolean;
-  altered: boolean;
 }
 
 function parseCsvTable(content: string): string[][] {
@@ -102,17 +97,6 @@ function parseCsvTable(content: string): string[][] {
   return rows.filter((cells) => cells.some((cell) => cell.trim() !== ''));
 }
 
-function parseBool(value: string, rowNumber: number, column: string): boolean {
-  const normalized = value.toLowerCase();
-  if (normalized === 'true') {
-    return true;
-  }
-  if (normalized === 'false') {
-    return false;
-  }
-  throw new Error(`row ${rowNumber}: ${column} must be true or false`);
-}
-
 function parseRow(
   header: string[],
   cells: string[],
@@ -145,9 +129,8 @@ function parseRow(
     throw new Error(`row ${rowNumber}: Scryfall ID must be a UUID`);
   }
 
-  const conditionValue = get('Condition').toLowerCase();
-  const condition =
-    conditionValue === '' ? 'NM' : MANABOX_CONDITIONS[conditionValue];
+  const conditionValue = required('Condition').toLowerCase();
+  const condition = MANABOX_CONDITIONS[conditionValue];
   if (!condition) {
     throw new Error(`row ${rowNumber}: unknown Condition ${conditionValue}`);
   }
@@ -162,8 +145,6 @@ function parseRow(
     scryfall_id: scryfallId,
     quantity,
     language: required('Language').toLowerCase(),
-    misprint: parseBool(required('Misprint'), rowNumber, 'Misprint'),
-    altered: parseBool(required('Altered'), rowNumber, 'Altered'),
   };
 }
 

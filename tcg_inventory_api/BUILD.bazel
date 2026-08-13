@@ -25,16 +25,22 @@ java_library(
         "//lib/dynamodb:lib",
         "//lib/http:lib",
         "//lib/json:lib",
+        "//lib/queue:lib",
         "//lib/secrets:lib",
         "//lib/time:lib",
+        "//lib/ulid:lib",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_annotations",
         "@maven//:com_fasterxml_jackson_core_jackson_core",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_fasterxml_jackson_dataformat_jackson_dataformat_csv",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
+        "@maven//:software_amazon_awssdk_aws_crt_client",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_regions",
+        "@maven//:software_amazon_awssdk_sqs",
     ],
 )
 
@@ -85,6 +91,97 @@ java_binary(
     ],
 )
 
+java_binary(
+    name = "create-import-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/CreateImportHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "//lib/queue:lib",
+        "//lib/time:lib",
+        "//lib/ulid:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "find-imports-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/FindImportsHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "get-import-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/GetImportHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "delete-import-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/DeleteImportHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
 java_library(
     name = "test-lib",
     testonly = True,
@@ -105,9 +202,13 @@ java_library(
         "//lib/http:lib",
         "//lib/json:lib",
         "//lib/localstack:lib",
+        "//lib/queue:lib",
+        "//lib/queue:test-lib",
         "//lib/secrets:test-lib",
         "//lib/testcontainers:test-lib",
+        "//lib/time:lib",
         "//lib/time:test-lib",
+        "//lib/ulid:test-lib",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_guava_guava",
@@ -152,14 +253,20 @@ java_test_suite(
     test_suffixes = ["IntegrationTest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":create-import-handler",
+        ":delete-import-handler",
+        ":find-imports-handler",
+        ":get-import-handler",
         ":get-settings-handler",
         ":lib",
         ":put-settings-handler",
         ":test-lib",
         "//lib/dynamodb:test-lib",
+        "//lib/queue:test-lib",
         "//lib/secrets:test-lib",
         "//lib/testcontainers:test-lib",
         "//lib/time:test-lib",
+        "//lib/ulid:test-lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -177,6 +284,10 @@ java_test_suite(
 localstack_image(
     name = "local",
     handler_jars = [
+        ":create-import-handler_deploy.jar",
+        ":delete-import-handler_deploy.jar",
+        ":find-imports-handler_deploy.jar",
+        ":get-import-handler_deploy.jar",
         ":get-settings-handler_deploy.jar",
         ":put-settings-handler_deploy.jar",
     ],

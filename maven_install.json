@@ -8,6 +8,7 @@
     "com.fasterxml.jackson.core:jackson-annotations": -797217172,
     "com.fasterxml.jackson.core:jackson-core": 1468189075,
     "com.fasterxml.jackson.core:jackson-databind": -1338141093,
+    "com.fasterxml.jackson.dataformat:jackson-dataformat-csv": 1244433164,
     "com.google.code.findbugs:jsr305": 495355163,
     "com.google.code.gson:gson": 597770368,
     "com.google.dagger:dagger": -481931483,
@@ -51,6 +52,7 @@
     "com.fasterxml.jackson.core:jackson-annotations": 1407322119,
     "com.fasterxml.jackson.core:jackson-core": 597846544,
     "com.fasterxml.jackson.core:jackson-databind": -1580019644,
+    "com.fasterxml.jackson.dataformat:jackson-dataformat-csv": -979353264,
     "com.github.docker-java:docker-java-api": -1061478,
     "com.github.docker-java:docker-java-transport": -2036426940,
     "com.github.docker-java:docker-java-transport-zerodep": 1522182707,
@@ -192,6 +194,12 @@
     "com.fasterxml.jackson.core:jackson-databind": {
       "shasums": {
         "jar": "0057817ee40bc71544072dc2a3ba575ef91dce53a2d87489bde91c05f3a22621"
+      },
+      "version": "2.21.0"
+    },
+    "com.fasterxml.jackson.dataformat:jackson-dataformat-csv": {
+      "shasums": {
+        "jar": "aee10df59c0482cd5a6f4be1588a99ae76718a133647ba8d6d270cc11607c276"
       },
       "version": "2.21.0"
     },
@@ -782,6 +790,11 @@
       "com.fasterxml.jackson.core:jackson-annotations",
       "com.fasterxml.jackson.core:jackson-core"
     ],
+    "com.fasterxml.jackson.dataformat:jackson-dataformat-csv": [
+      "com.fasterxml.jackson.core:jackson-annotations",
+      "com.fasterxml.jackson.core:jackson-core",
+      "com.fasterxml.jackson.core:jackson-databind"
+    ],
     "com.github.docker-java:docker-java-api": [
       "com.fasterxml.jackson.core:jackson-annotations",
       "org.slf4j:slf4j-api"
@@ -1369,6 +1382,10 @@
       "com.fasterxml.jackson.databind.type",
       "com.fasterxml.jackson.databind.util",
       "com.fasterxml.jackson.databind.util.internal"
+    ],
+    "com.fasterxml.jackson.dataformat:jackson-dataformat-csv": [
+      "com.fasterxml.jackson.dataformat.csv",
+      "com.fasterxml.jackson.dataformat.csv.impl"
     ],
     "com.github.docker-java:docker-java-api": [
       "com.github.dockerjava.api",
@@ -2955,6 +2972,7 @@
       "com.fasterxml.jackson.core:jackson-annotations",
       "com.fasterxml.jackson.core:jackson-core",
       "com.fasterxml.jackson.core:jackson-databind",
+      "com.fasterxml.jackson.dataformat:jackson-dataformat-csv",
       "com.github.docker-java:docker-java-api",
       "com.github.docker-java:docker-java-transport",
       "com.github.docker-java:docker-java-transport-zerodep",
@@ -3070,6 +3088,14 @@
     "com.fasterxml.jackson.core:jackson-databind": {
       "com.fasterxml.jackson.core.ObjectCodec": [
         "com.fasterxml.jackson.databind.ObjectMapper"
+      ]
+    },
+    "com.fasterxml.jackson.dataformat:jackson-dataformat-csv": {
+      "com.fasterxml.jackson.core.JsonFactory": [
+        "com.fasterxml.jackson.dataformat.csv.CsvFactory"
+      ],
+      "com.fasterxml.jackson.core.ObjectCodec": [
+        "com.fasterxml.jackson.dataformat.csv.CsvMapper"
       ]
     },
     "com.google.dagger:dagger-compiler": {

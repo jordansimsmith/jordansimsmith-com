@@ -2,6 +2,8 @@ package com.jordansimsmith.tcginventory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.http.HttpResponseFactory;
+import com.jordansimsmith.queue.FakeQueueClient;
+import com.jordansimsmith.queue.QueueClient;
 import dagger.Module;
 import dagger.Provides;
 import javax.inject.Singleton;
@@ -24,5 +26,17 @@ public class TcgInventoryTestModule {
   DynamoDbTable<TcgInventoryItem> tcgInventoryTable(DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(TcgInventoryItem.class);
     return dynamoDbEnhancedClient.table(TcgInventoryItem.TABLE_NAME, schema);
+  }
+
+  @Provides
+  @Singleton
+  FakeQueueClient<JobMessage> fakeJobsQueue() {
+    return new FakeQueueClient<>();
+  }
+
+  @Provides
+  @Singleton
+  QueueClient<JobMessage> jobsQueue(FakeQueueClient<JobMessage> fakeJobsQueue) {
+    return fakeJobsQueue;
   }
 }

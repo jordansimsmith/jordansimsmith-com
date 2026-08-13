@@ -264,18 +264,6 @@ function decideRow(
   if (row.language !== 'en') {
     return { decision: 'review', decision_reason: 'non-English card' };
   }
-  if (row.misprint) {
-    return {
-      decision: 'review',
-      decision_reason: 'misprint flagged in ManaBox',
-    };
-  }
-  if (row.altered) {
-    return {
-      decision: 'review',
-      decision_reason: 'altered flagged in ManaBox',
-    };
-  }
   if (position % 5 === 0) {
     return { decision: 'discard', decision_reason: DISCARD_REASON };
   }

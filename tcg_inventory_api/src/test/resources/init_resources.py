@@ -101,17 +101,53 @@ lambdas = {
         "handler": "com.jordansimsmith.tcginventory.PutSettingsHandler",
         "zip_file": "put-settings-handler_deploy.jar",
     },
+    "create_import": {
+        "handler": "com.jordansimsmith.tcginventory.CreateImportHandler",
+        "zip_file": "create-import-handler_deploy.jar",
+    },
+    "find_imports": {
+        "handler": "com.jordansimsmith.tcginventory.FindImportsHandler",
+        "zip_file": "find-imports-handler_deploy.jar",
+    },
+    "get_import": {
+        "handler": "com.jordansimsmith.tcginventory.GetImportHandler",
+        "zip_file": "get-import-handler_deploy.jar",
+    },
+    "delete_import": {
+        "handler": "com.jordansimsmith.tcginventory.DeleteImportHandler",
+        "zip_file": "delete-import-handler_deploy.jar",
+    },
 }
 
 root_resources = {
     "settings": {"path": "settings"},
+    "imports": {"path": "imports"},
 }
 
-child_resources = {}
+child_resources = {
+    "import_detail": {"parent": "imports", "path": "{import_id}"},
+    "import_confirm": {"parent": "import_detail", "path": "confirm"},
+}
 
 endpoints = {
     "get_settings": {"resource": "settings", "method": "GET", "lambda": "get_settings"},
     "put_settings": {"resource": "settings", "method": "PUT", "lambda": "put_settings"},
+    "create_import": {
+        "resource": "imports",
+        "method": "POST",
+        "lambda": "create_import",
+    },
+    "find_imports": {"resource": "imports", "method": "GET", "lambda": "find_imports"},
+    "get_import": {
+        "resource": "import_detail",
+        "method": "GET",
+        "lambda": "get_import",
+    },
+    "delete_import": {
+        "resource": "import_detail",
+        "method": "DELETE",
+        "lambda": "delete_import",
+    },
 }
 
 for function_name, config in lambdas.items():

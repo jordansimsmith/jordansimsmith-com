@@ -6,10 +6,13 @@ import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.http.RequestContextModule;
 import com.jordansimsmith.json.ObjectMapperModule;
+import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.secrets.Secrets;
 import com.jordansimsmith.secrets.SecretsModule;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.time.ClockModule;
+import com.jordansimsmith.ulid.UlidGenerator;
+import com.jordansimsmith.ulid.UlidModule;
 import dagger.Component;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -22,6 +25,7 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
       DynamoDbModule.class,
       SecretsModule.class,
       RequestContextModule.class,
+      UlidModule.class,
       TcgInventoryModule.class
     })
 public interface TcgInventoryFactory {
@@ -36,6 +40,10 @@ public interface TcgInventoryFactory {
   Secrets secrets();
 
   DynamoDbTable<TcgInventoryItem> tcgInventoryTable();
+
+  QueueClient<JobMessage> jobsQueue();
+
+  UlidGenerator ulidGenerator();
 
   static TcgInventoryFactory create() {
     return DaggerTcgInventoryFactory.create();
