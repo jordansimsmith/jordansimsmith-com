@@ -33,8 +33,8 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     this.clock = factory.clock();
     this.tcgInventoryTable = factory.tcgInventoryTable();
     this.jobsQueue = factory.jobsQueue();
-    this.appraiseJobProcessor = new AppraiseJobProcessor(tcgInventoryTable, clock);
-    this.publishJobProcessor = new PublishJobProcessor();
+    this.appraiseJobProcessor = factory.appraiseJobProcessor();
+    this.publishJobProcessor = factory.publishJobProcessor();
   }
 
   @Override

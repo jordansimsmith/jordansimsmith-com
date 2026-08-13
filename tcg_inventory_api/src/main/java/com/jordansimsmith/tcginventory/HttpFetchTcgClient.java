@@ -41,6 +41,34 @@ public class HttpFetchTcgClient implements FetchTcgClient {
   }
 
   @Override
+  public SearchCardsResponse searchCards(int setId, String collectorNumber) {
+    try {
+      return doSearchCards(setId, collectorNumber);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    } catch (FetchTcgAuthException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public GetCardListingsResponse getCardListings(int cardId) {
+    try {
+      return doGetCardListings(cardId);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    } catch (FetchTcgAuthException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
   public GetSellerOffersResponse getSellerOffers(String bearerToken, int page) {
     try {
       return doGetSellerOffers(bearerToken, page);
@@ -65,6 +93,35 @@ public class HttpFetchTcgClient implements FetchTcgClient {
 
     var body = doExecute(request);
     return objectMapper.readValue(body, GetCardResponse.class);
+  }
+
+  private SearchCardsResponse doSearchCards(int setId, String collectorNumber)
+      throws IOException, InterruptedException {
+    var request =
+        HttpRequest.newBuilder()
+            .uri(
+                baseUri.resolve("/v3/cards?setId=" + setId + "&collectorNumber=" + collectorNumber))
+            .header("User-Agent", USER_AGENT)
+            .header("Accept", "application/json")
+            .GET()
+            .build();
+
+    var body = doExecute(request);
+    return objectMapper.readValue(body, SearchCardsResponse.class);
+  }
+
+  private GetCardListingsResponse doGetCardListings(int cardId)
+      throws IOException, InterruptedException {
+    var request =
+        HttpRequest.newBuilder()
+            .uri(baseUri.resolve("/v3/cards/" + cardId + "/listings?country=NZ"))
+            .header("User-Agent", USER_AGENT)
+            .header("Accept", "application/json")
+            .GET()
+            .build();
+
+    var body = doExecute(request);
+    return objectMapper.readValue(body, GetCardListingsResponse.class);
   }
 
   private GetSellerOffersResponse doGetSellerOffers(String bearerToken, int page)

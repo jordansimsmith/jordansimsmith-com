@@ -37,6 +37,8 @@ public interface TcgInventoryTestFactory extends TcgInventoryFactory {
 
   FakeQueueClient<JobMessage> fakeJobsQueue();
 
+  FakeFetchTcgClient fakeFetchTcgClient();
+
   DynamoDbClient dynamoDbClient();
 
   @Component.Factory

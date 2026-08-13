@@ -259,6 +259,98 @@ public class HttpFetchTcgClientTest {
         .contains(HttpFetchTcgClient.USER_AGENT);
   }
 
+  @Test
+  void searchCardsShouldReturnParsedResponse() throws IOException, InterruptedException {
+    // arrange
+    var response =
+        createMockResponse(
+            200,
+            """
+            {
+              "data": [
+                {"id": 999, "name": "Lightning Bolt", "collectorNumber": "141"}
+              ]
+            }
+            """);
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response);
+
+    // act
+    var result = client.searchCards(42, "141");
+
+    // assert
+    assertThat(result.data()).hasSize(1);
+    assertThat(result.data().get(0).id()).isEqualTo(999);
+    assertThat(result.data().get(0).name()).isEqualTo("Lightning Bolt");
+    assertThat(result.data().get(0).collectorNumber()).isEqualTo("141");
+  }
+
+  @Test
+  void searchCardsShouldConstructCorrectUri() throws IOException, InterruptedException {
+    // arrange
+    var response = createMockResponse(200, "{\"data\": []}");
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response);
+
+    // act
+    client.searchCards(78, "472");
+
+    // assert
+    var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+    verify(httpClient).send(requestCaptor.capture(), eq(HttpResponse.BodyHandlers.ofString()));
+    assertThat(requestCaptor.getValue().uri())
+        .isEqualTo(URI.create("https://api.fetchtcg.com/v3/cards?setId=78&collectorNumber=472"));
+    assertThat(requestCaptor.getValue().headers().firstValue("Authorization")).isEmpty();
+  }
+
+  @Test
+  void getCardListingsShouldReturnParsedResponse() throws IOException, InterruptedException {
+    // arrange
+    var response =
+        createMockResponse(
+            200,
+            """
+            {
+              "data": [
+                {"id": 1001, "condition": "raw-nm", "price": 2.50, "sellerUsername": "seller1", "sellerId": 10},
+                {"id": 1002, "condition": "raw-lp", "price": 1.80, "sellerUsername": "seller2", "sellerId": 20}
+              ]
+            }
+            """);
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response);
+
+    // act
+    var result = client.getCardListings(999);
+
+    // assert
+    assertThat(result.data()).hasSize(2);
+    assertThat(result.data().get(0).id()).isEqualTo(1001);
+    assertThat(result.data().get(0).condition()).isEqualTo("raw-nm");
+    assertThat(result.data().get(0).price()).isEqualByComparingTo("2.50");
+    assertThat(result.data().get(0).sellerUsername()).isEqualTo("seller1");
+    assertThat(result.data().get(0).sellerId()).isEqualTo(10);
+    assertThat(result.data().get(1).condition()).isEqualTo("raw-lp");
+  }
+
+  @Test
+  void getCardListingsShouldConstructCorrectUri() throws IOException, InterruptedException {
+    // arrange
+    var response = createMockResponse(200, "{\"data\": []}");
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response);
+
+    // act
+    client.getCardListings(12345);
+
+    // assert
+    var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+    verify(httpClient).send(requestCaptor.capture(), eq(HttpResponse.BodyHandlers.ofString()));
+    assertThat(requestCaptor.getValue().uri())
+        .isEqualTo(URI.create("https://api.fetchtcg.com/v3/cards/12345/listings?country=NZ"));
+    assertThat(requestCaptor.getValue().headers().firstValue("Authorization")).isEmpty();
+  }
+
   @SuppressWarnings("unchecked")
   private HttpResponse<String> createMockResponse(int statusCode, String body) {
     HttpResponse<String> mockResponse = mock(HttpResponse.class);

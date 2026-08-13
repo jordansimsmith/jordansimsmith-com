@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.time.Clock;
 import dagger.Module;
 import dagger.Provides;
 import javax.inject.Singleton;
@@ -38,5 +39,32 @@ public class TcgInventoryTestModule {
   @Singleton
   QueueClient<JobMessage> jobsQueue(FakeQueueClient<JobMessage> fakeJobsQueue) {
     return fakeJobsQueue;
+  }
+
+  @Provides
+  @Singleton
+  FakeFetchTcgClient fakeFetchTcgClient() {
+    return new FakeFetchTcgClient();
+  }
+
+  @Provides
+  @Singleton
+  FetchTcgClient fetchTcgClient(FakeFetchTcgClient fakeFetchTcgClient) {
+    return fakeFetchTcgClient;
+  }
+
+  @Provides
+  @Singleton
+  AppraiseJobProcessor appraiseJobProcessor(
+      DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
+      Clock clock,
+      FetchTcgClient fetchTcgClient) {
+    return new AppraiseJobProcessor(tcgInventoryTable, clock, fetchTcgClient);
+  }
+
+  @Provides
+  @Singleton
+  PublishJobProcessor publishJobProcessor() {
+    return new PublishJobProcessor();
   }
 }

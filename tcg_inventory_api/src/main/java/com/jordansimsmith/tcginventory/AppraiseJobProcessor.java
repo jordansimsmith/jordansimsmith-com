@@ -1,18 +1,39 @@
 package com.jordansimsmith.tcginventory;
 
 import com.jordansimsmith.time.Clock;
+import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 
 class AppraiseJobProcessor {
   static final int BATCH_SIZE = 100;
 
+  private static final Map<String, Integer> CONDITION_QUALITY =
+      Map.of("raw-d", 0, "raw-hp", 1, "raw-mp", 2, "raw-lp", 3, "raw-nm", 4);
+
+  private static final Map<String, String> CONDITION_TO_FETCHTCG =
+      Map.of("NM", "raw-nm", "LP", "raw-lp", "MP", "raw-mp", "HP", "raw-hp", "DMG", "raw-d");
+
   private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
   private final Clock clock;
+  private final FetchTcgClient fetchTcgClient;
+  private final PricingPolicy pricingPolicy;
 
-  AppraiseJobProcessor(DynamoDbTable<TcgInventoryItem> tcgInventoryTable, Clock clock) {
+  AppraiseJobProcessor(
+      DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
+      Clock clock,
+      FetchTcgClient fetchTcgClient) {
     this.tcgInventoryTable = tcgInventoryTable;
     this.clock = clock;
+    this.fetchTcgClient = fetchTcgClient;
+    this.pricingPolicy = new PricingPolicy();
   }
 
   BatchResult processBatch(String user, TcgInventoryItem jobItem) {
@@ -30,6 +51,12 @@ class AppraiseJobProcessor {
     int batchEnd = Math.min(continuation + BATCH_SIZE, totalRows);
     int processed = continuation;
 
+    int keepCount = 0;
+    int discardCount = 0;
+    int reviewCount = 0;
+
+    Map<String, ResolvedCard> batchCache = new HashMap<>();
+
     for (int i = continuation + 1; i <= batchEnd; i++) {
       var rowKey =
           Key.builder()
@@ -37,23 +64,130 @@ class AppraiseJobProcessor {
               .sortValue(TcgInventoryItem.formatImportRowSk(i))
               .build();
       var rowItem = tcgInventoryTable.getItem(rowKey);
-      // TODO: replace with real FetchTCG identity resolution and market appraisal (Task 17)
-      if (rowItem != null && rowItem.getDecision() == null) {
-        rowItem.setDecision("keep");
-        rowItem.setDecisionReason("stub appraisal");
-        tcgInventoryTable.putItem(rowItem);
+      if (rowItem == null || rowItem.getDecision() != null) {
+        processed = i;
+        continue;
       }
+
+      var decision = appraiseRow(rowItem, batchCache);
+      rowItem.setDecision(decision.decision());
+      rowItem.setDecisionReason(decision.reason());
+      rowItem.setMarketPrice(decision.marketPrice());
+      rowItem.setSuggestedPrice(decision.suggestedPrice());
+      tcgInventoryTable.putItem(rowItem);
+
+      switch (decision.decision()) {
+        case "keep" -> keepCount++;
+        case "discard" -> discardCount++;
+        case "review" -> reviewCount++;
+      }
+
       processed = i;
     }
 
     boolean complete = processed >= totalRows;
+    importItem.setKeepCount(
+        (importItem.getKeepCount() != null ? importItem.getKeepCount() : 0) + keepCount);
+    importItem.setDiscardCount(
+        (importItem.getDiscardCount() != null ? importItem.getDiscardCount() : 0) + discardCount);
+    importItem.setReviewCount(
+        (importItem.getReviewCount() != null ? importItem.getReviewCount() : 0) + reviewCount);
     if (complete) {
       importItem.setStatus("review");
-      importItem.setKeepCount(totalRows);
-      importItem.setUpdatedAt(clock.now());
-      tcgInventoryTable.putItem(importItem);
     }
+    importItem.setUpdatedAt(clock.now());
+    tcgInventoryTable.putItem(importItem);
 
     return new BatchResult(processed, complete);
+  }
+
+  private RowDecision appraiseRow(TcgInventoryItem rowItem, Map<String, ResolvedCard> batchCache) {
+    if (!"en".equals(rowItem.getLanguage())) {
+      return RowDecision.review("non-english");
+    }
+
+    var setCode = rowItem.getSetCode();
+    if (!FetchTcgSetMapping.contains(setCode)) {
+      return RowDecision.review("unmapped set");
+    }
+
+    var dedupeKey = rowItem.getScryfallId() + "#" + rowItem.getFinish();
+    var cached = batchCache.get(dedupeKey);
+    if (cached == null) {
+      cached = resolveCard(setCode, rowItem.getCollectorNumber());
+      if (cached == null) {
+        return RowDecision.review("unresolvable");
+      }
+      batchCache.put(dedupeKey, cached);
+    }
+
+    var rivals = buildRivalTiers(cached.cardId(), rowItem.getCondition());
+    var result = pricingPolicy.appraise(cached.marketPrice(), rivals);
+
+    if (result.decision() == PricingPolicy.Decision.DISCARD) {
+      return RowDecision.discard("below threshold", cached.marketPrice().toPlainString());
+    }
+
+    return RowDecision.keep(
+        cached.marketPrice().toPlainString(), result.suggestedPrice().toPlainString());
+  }
+
+  private ResolvedCard resolveCard(String setCode, String collectorNumber) {
+    var setEntries = FetchTcgSetMapping.get(setCode);
+    for (var entry : setEntries) {
+      var searchResult = fetchTcgClient.searchCards(entry.setId(), collectorNumber);
+      if (!searchResult.data().isEmpty()) {
+        var card = searchResult.data().get(0);
+        var cardDetails = fetchTcgClient.getCard(card.id());
+        var pricingData = cardDetails.pricingData();
+        var nzPricing = pricingData != null ? pricingData.get("NZ") : null;
+        var marketPrice =
+            nzPricing != null && nzPricing.tcgMarketPrice() != null
+                ? nzPricing.tcgMarketPrice()
+                : BigDecimal.ZERO;
+        return new ResolvedCard(card.id(), marketPrice);
+      }
+    }
+    return null;
+  }
+
+  private List<PricingPolicy.RivalTier> buildRivalTiers(int cardId, String condition) {
+    var listingsResponse = fetchTcgClient.getCardListings(cardId);
+    var fetchtcgCondition = CONDITION_TO_FETCHTCG.getOrDefault(condition, "raw-nm");
+    var minQuality = CONDITION_QUALITY.getOrDefault(fetchtcgCondition, 0);
+
+    TreeMap<BigDecimal, Set<String>> priceToSellers = new TreeMap<>();
+    for (var listing : listingsResponse.data()) {
+      var listingQuality = CONDITION_QUALITY.getOrDefault(listing.condition(), -1);
+      if (listingQuality < minQuality) {
+        continue;
+      }
+      priceToSellers
+          .computeIfAbsent(listing.price(), k -> new HashSet<>())
+          .add(listing.sellerUsername());
+    }
+
+    var tiers = new ArrayList<PricingPolicy.RivalTier>();
+    for (var entry : priceToSellers.entrySet()) {
+      tiers.add(new PricingPolicy.RivalTier(entry.getKey(), entry.getValue()));
+    }
+    return tiers;
+  }
+
+  private record ResolvedCard(int cardId, BigDecimal marketPrice) {}
+
+  private record RowDecision(
+      String decision, String reason, String marketPrice, String suggestedPrice) {
+    static RowDecision keep(String marketPrice, String suggestedPrice) {
+      return new RowDecision("keep", null, marketPrice, suggestedPrice);
+    }
+
+    static RowDecision discard(String reason, String marketPrice) {
+      return new RowDecision("discard", reason, marketPrice, null);
+    }
+
+    static RowDecision review(String reason) {
+      return new RowDecision("review", reason, null, null);
+    }
   }
 }

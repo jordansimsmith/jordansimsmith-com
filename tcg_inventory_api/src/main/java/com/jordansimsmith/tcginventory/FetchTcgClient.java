@@ -9,6 +9,10 @@ import java.util.Map;
 public interface FetchTcgClient {
   GetCardResponse getCard(int cardId);
 
+  SearchCardsResponse searchCards(int setId, String collectorNumber);
+
+  GetCardListingsResponse getCardListings(int cardId);
+
   GetSellerOffersResponse getSellerOffers(String bearerToken, int page);
 
   @JsonIgnoreProperties(ignoreUnknown = true)
@@ -19,6 +23,26 @@ public interface FetchTcgClient {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   record PricingData(@JsonProperty("tcgMarketPrice") BigDecimal tcgMarketPrice) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  record SearchCardsResponse(@JsonProperty("data") List<SearchCard> data) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  record SearchCard(
+      @JsonProperty("id") int id,
+      @JsonProperty("name") String name,
+      @JsonProperty("collectorNumber") String collectorNumber) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  record GetCardListingsResponse(@JsonProperty("data") List<CardListing> data) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  record CardListing(
+      @JsonProperty("id") int id,
+      @JsonProperty("condition") String condition,
+      @JsonProperty("price") BigDecimal price,
+      @JsonProperty("sellerUsername") String sellerUsername,
+      @JsonProperty("sellerId") int sellerId) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   record GetSellerOffersResponse(

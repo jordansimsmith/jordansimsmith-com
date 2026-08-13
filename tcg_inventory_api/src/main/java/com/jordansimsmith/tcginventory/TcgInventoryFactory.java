@@ -45,6 +45,12 @@ public interface TcgInventoryFactory {
 
   UlidGenerator ulidGenerator();
 
+  FetchTcgClient fetchTcgClient();
+
+  AppraiseJobProcessor appraiseJobProcessor();
+
+  PublishJobProcessor publishJobProcessor();
+
   static TcgInventoryFactory create() {
     return DaggerTcgInventoryFactory.create();
   }
