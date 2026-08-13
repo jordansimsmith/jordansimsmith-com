@@ -9,6 +9,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.util.List;
+import java.util.Map;
 
 public class HttpFetchTcgClient implements FetchTcgClient {
   static final String USER_AGENT =
@@ -75,6 +76,34 @@ public class HttpFetchTcgClient implements FetchTcgClient {
   public GetSellerOffersResponse getSellerOffers(String bearerToken, int page) {
     try {
       return doGetSellerOffers(bearerToken, page);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    } catch (FetchTcgAuthException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public UpsertListingResponse upsertListing(String bearerToken, UpsertListingRequest request) {
+    try {
+      return doUpsertListing(bearerToken, request);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    } catch (FetchTcgAuthException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
+  public void deleteListing(String bearerToken, int listingId) {
+    try {
+      doDeleteListing(bearerToken, listingId);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
@@ -159,6 +188,46 @@ public class HttpFetchTcgClient implements FetchTcgClient {
 
     var body = doExecute(request);
     return objectMapper.readValue(body, GetSellerOffersResponse.class);
+  }
+
+  private UpsertListingResponse doUpsertListing(String bearerToken, UpsertListingRequest req)
+      throws IOException, InterruptedException {
+    var jsonBody =
+        objectMapper.writeValueAsString(
+            Map.of(
+                "cardId", req.cardId(),
+                "condition", req.condition(),
+                "listedPrice", req.price(),
+                "listedCurrency", "NZD",
+                "matchPriceEnabled", false,
+                "quantity", req.quantity(),
+                "details", ""));
+
+    var request =
+        HttpRequest.newBuilder()
+            .uri(baseUri.resolve("/v2/private/manage-listings"))
+            .header("User-Agent", USER_AGENT)
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer " + bearerToken)
+            .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
+            .build();
+
+    var body = doExecute(request);
+    return objectMapper.readValue(body, UpsertListingResponse.class);
+  }
+
+  private void doDeleteListing(String bearerToken, int listingId)
+      throws IOException, InterruptedException {
+    var request =
+        HttpRequest.newBuilder()
+            .uri(baseUri.resolve("/v1/manage-listings/" + listingId))
+            .header("User-Agent", USER_AGENT)
+            .header("Authorization", "Bearer " + bearerToken)
+            .DELETE()
+            .build();
+
+    doExecute(request);
   }
 
   private String doExecute(HttpRequest request) throws IOException, InterruptedException {

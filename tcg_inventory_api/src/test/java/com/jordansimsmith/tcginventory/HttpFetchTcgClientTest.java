@@ -12,6 +12,7 @@ import static org.mockito.MockitoAnnotations.openMocks;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -357,6 +358,53 @@ public class HttpFetchTcgClientTest {
             URI.create(
                 "https://api.fetchtcg.com/v3/cards/mtg_218_c_kld_normal/listings?countryCode=NZ&currencyCode=NZD"));
     assertThat(requestCaptor.getValue().headers().firstValue("Authorization")).isEmpty();
+  }
+
+  @Test
+  void upsertListingShouldPostWithCorrectBody() throws IOException, InterruptedException {
+    // arrange
+    var response = createMockResponse(200, "{\"listingId\": 992552, \"remainingQuantity\": 2}");
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response);
+
+    var request =
+        new FetchTcgClient.UpsertListingRequest(
+            "mtg_218_c_kld_normal", "raw-nm", 2, new BigDecimal("1.50"));
+
+    // act
+    var result = client.upsertListing("my-token", request);
+
+    // assert
+    assertThat(result.listingId()).isEqualTo(992552);
+    assertThat(result.remainingQuantity()).isEqualTo(2);
+
+    var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+    verify(httpClient).send(requestCaptor.capture(), eq(HttpResponse.BodyHandlers.ofString()));
+    assertThat(requestCaptor.getValue().uri())
+        .isEqualTo(URI.create("https://api.fetchtcg.com/v2/private/manage-listings"));
+    assertThat(requestCaptor.getValue().headers().firstValue("Authorization"))
+        .contains("Bearer my-token");
+    assertThat(requestCaptor.getValue().method()).isEqualTo("POST");
+  }
+
+  @Test
+  void deleteListingShouldSendDeleteRequest() throws IOException, InterruptedException {
+    // arrange
+    var response = createMockResponse(200, "");
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response);
+
+    // act
+    client.deleteListing("my-token", 975737);
+
+    // assert
+    var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+    verify(httpClient).send(requestCaptor.capture(), eq(HttpResponse.BodyHandlers.ofString()));
+    assertThat(requestCaptor.getValue().uri())
+        .isEqualTo(URI.create("https://api.fetchtcg.com/v1/manage-listings/975737"));
+    assertThat(requestCaptor.getValue().headers().firstValue("Authorization"))
+        .contains("Bearer my-token");
+    assertThat(requestCaptor.getValue().method()).isEqualTo("DELETE");
   }
 
   @SuppressWarnings("unchecked")

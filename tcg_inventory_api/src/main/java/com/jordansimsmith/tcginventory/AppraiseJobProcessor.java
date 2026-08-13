@@ -15,12 +15,6 @@ import software.amazon.awssdk.enhanced.dynamodb.Key;
 class AppraiseJobProcessor {
   static final int BATCH_SIZE = 100;
 
-  private static final Map<String, Integer> CONDITION_QUALITY =
-      Map.of("raw-d", 0, "raw-hp", 1, "raw-mp", 2, "raw-lp", 3, "raw-nm", 4);
-
-  private static final Map<String, String> CONDITION_TO_FETCHTCG =
-      Map.of("NM", "raw-nm", "LP", "raw-lp", "MP", "raw-mp", "HP", "raw-hp", "DMG", "raw-d");
-
   private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
   private final Clock clock;
   private final FetchTcgClient fetchTcgClient;
@@ -154,13 +148,12 @@ class AppraiseJobProcessor {
 
   private List<PricingPolicy.RivalTier> buildRivalTiers(String cardId, String condition) {
     var listingsResponse = fetchTcgClient.getCardListings(cardId);
-    var fetchtcgCondition = CONDITION_TO_FETCHTCG.getOrDefault(condition, "raw-nm");
-    var minQuality = CONDITION_QUALITY.getOrDefault(fetchtcgCondition, 0);
+    var skuCondition = Condition.valueOf(condition);
 
     TreeMap<BigDecimal, Set<String>> priceToSellers = new TreeMap<>();
     for (var listing : listingsResponse.content()) {
-      var listingQuality = CONDITION_QUALITY.getOrDefault(listing.condition(), -1);
-      if (listingQuality < minQuality) {
+      var listingCondition = Condition.fromFetchtcg(listing.condition());
+      if (listingCondition == null || !listingCondition.isSameOrBetterThan(skuCondition)) {
         continue;
       }
       priceToSellers

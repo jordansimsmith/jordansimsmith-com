@@ -14,7 +14,6 @@ import com.jordansimsmith.ulid.UlidGenerator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -31,7 +30,6 @@ public class UpdateUnitHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(UpdateUnitHandler.class);
-  private static final Set<String> VALID_CONDITIONS = Set.of("NM", "LP", "MP", "HP", "DMG");
 
   record UpdateUnitRequest(@JsonProperty("condition") String condition) {}
 
@@ -84,7 +82,12 @@ public class UpdateUnitHandler
       return httpResponseFactory.badRequest(new ErrorResponse("invalid request body"));
     }
 
-    if (body.condition() == null || !VALID_CONDITIONS.contains(body.condition())) {
+    try {
+      if (body.condition() == null) {
+        return httpResponseFactory.badRequest(new ErrorResponse("invalid condition"));
+      }
+      Condition.valueOf(body.condition());
+    } catch (IllegalArgumentException e) {
       return httpResponseFactory.badRequest(new ErrorResponse("invalid condition"));
     }
 

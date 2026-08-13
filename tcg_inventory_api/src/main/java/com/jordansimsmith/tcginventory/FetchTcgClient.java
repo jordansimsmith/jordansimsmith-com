@@ -15,6 +15,10 @@ public interface FetchTcgClient {
 
   GetSellerOffersResponse getSellerOffers(String bearerToken, int page);
 
+  UpsertListingResponse upsertListing(String bearerToken, UpsertListingRequest request);
+
+  void deleteListing(String bearerToken, int listingId);
+
   @JsonIgnoreProperties(ignoreUnknown = true)
   record GetCardResponse(
       @JsonProperty("id") String id,
@@ -60,4 +64,11 @@ public interface FetchTcgClient {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   record OfferListing(@JsonProperty("id") int id, @JsonProperty("condition") String condition) {}
+
+  record UpsertListingRequest(String cardId, String condition, int quantity, BigDecimal price) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  record UpsertListingResponse(
+      @JsonProperty("listingId") int listingId,
+      @JsonProperty("remainingQuantity") int remainingQuantity) {}
 }

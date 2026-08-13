@@ -1,5 +1,6 @@
 package com.jordansimsmith.tcginventory;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -9,7 +10,10 @@ public class FakeFetchTcgClient implements FetchTcgClient {
   private final Map<String, SearchCardsResponse> searchResults = new HashMap<>();
   private final Map<String, GetCardListingsResponse> listings = new HashMap<>();
   private final Map<Integer, GetSellerOffersResponse> sellerOffers = new HashMap<>();
+  private final List<UpsertListingRequest> upsertCalls = new ArrayList<>();
+  private final List<Integer> deleteCalls = new ArrayList<>();
   private int searchCallCount;
+  private int nextListingId = 900000;
 
   @Override
   public GetCardResponse getCard(String cardId) {
@@ -49,6 +53,17 @@ public class FakeFetchTcgClient implements FetchTcgClient {
     return response;
   }
 
+  @Override
+  public UpsertListingResponse upsertListing(String bearerToken, UpsertListingRequest request) {
+    upsertCalls.add(request);
+    return new UpsertListingResponse(nextListingId++, request.quantity());
+  }
+
+  @Override
+  public void deleteListing(String bearerToken, int listingId) {
+    deleteCalls.add(listingId);
+  }
+
   public void seedCard(String cardId, GetCardResponse response) {
     cards.put(cardId, response);
   }
@@ -70,6 +85,14 @@ public class FakeFetchTcgClient implements FetchTcgClient {
     sellerOffers.put(page, response);
   }
 
+  public List<UpsertListingRequest> getUpsertCalls() {
+    return upsertCalls;
+  }
+
+  public List<Integer> getDeleteCalls() {
+    return deleteCalls;
+  }
+
   public int getSearchCallCount() {
     return searchCallCount;
   }
@@ -79,6 +102,9 @@ public class FakeFetchTcgClient implements FetchTcgClient {
     searchResults.clear();
     listings.clear();
     sellerOffers.clear();
+    upsertCalls.clear();
+    deleteCalls.clear();
     searchCallCount = 0;
+    nextListingId = 900000;
   }
 }

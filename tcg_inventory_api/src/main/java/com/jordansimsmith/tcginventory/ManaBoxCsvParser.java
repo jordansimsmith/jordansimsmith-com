@@ -7,22 +7,11 @@ import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
 
 public class ManaBoxCsvParser {
   private static final Set<String> VALID_FINISHES = Set.of("normal", "foil", "etched");
-
-  private static final Map<String, String> CONDITION_MAP =
-      Map.of(
-          "mint", "NM",
-          "near_mint", "NM",
-          "excellent", "LP",
-          "good", "MP",
-          "light_played", "HP",
-          "played", "HP",
-          "poor", "DMG");
 
   private static final Pattern UUID_PATTERN =
       Pattern.compile("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
@@ -103,7 +92,7 @@ public class ManaBoxCsvParser {
 
     requireNonBlank(raw.condition(), "Condition", rowNumber);
     var conditionValue = raw.condition().toLowerCase();
-    var condition = CONDITION_MAP.get(conditionValue);
+    var condition = Condition.fromManaBox(conditionValue);
     if (condition == null) {
       throw new IllegalArgumentException(
           "row " + rowNumber + ": unknown Condition " + conditionValue);
@@ -115,7 +104,7 @@ public class ManaBoxCsvParser {
         raw.setName(),
         raw.collectorNumber(),
         finish,
-        condition,
+        condition.name(),
         scryfallId,
         raw.language().toLowerCase(),
         raw.quantity());

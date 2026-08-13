@@ -276,6 +276,8 @@ public class ConfirmImportHandler
                             + " = :setName, "
                             + TcgInventoryItem.COLLECTOR_NUMBER
                             + " = :collectorNumber, "
+                            + TcgInventoryItem.SUGGESTED_PRICE
+                            + " = :suggestedPrice, "
                             + TcgInventoryItem.DIRTY
                             + " = :dirty, "
                             + TcgInventoryItem.GSI1PK
@@ -316,6 +318,9 @@ public class ConfirmImportHandler
                             Map.entry(
                                 ":collectorNumber",
                                 AttributeValue.builder().s(firstRow.getCollectorNumber()).build()),
+                            Map.entry(
+                                ":suggestedPrice",
+                                AttributeValue.builder().s(firstRow.getSuggestedPrice()).build()),
                             Map.entry(":dirty", AttributeValue.builder().bool(true).build()),
                             Map.entry(
                                 ":gsi1pk",

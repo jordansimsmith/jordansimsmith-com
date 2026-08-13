@@ -324,7 +324,8 @@ public class JobsHandlerIntegrationTest {
     assertThat(order.getLines()).contains("scryfall-1#normal#NM");
 
     var sku = getSku("jordan", "scryfall-1#normal#NM");
-    assertThat(sku.getDirty()).isTrue();
+    assertThat(sku.getDirty()).isFalse();
+    assertThat(sku.getLastPublishedQuantity()).isEqualTo(1);
 
     var units = getUnits("jordan", "scryfall-1#normal#NM");
     var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
@@ -384,7 +385,8 @@ public class JobsHandlerIntegrationTest {
     assertThat(units.stream().allMatch(u -> "in_stock".equals(u.getStatus()))).isTrue();
 
     var sku = getSku("jordan", skuId);
-    assertThat(sku.getDirty()).isTrue();
+    assertThat(sku.getDirty()).isFalse();
+    assertThat(sku.getLastPublishedQuantity()).isEqualTo(2);
 
     var audit = getAuditEntries("jordan");
     assertThat(audit.stream().anyMatch(a -> "release".equals(a.getEventType()))).isTrue();
@@ -440,6 +442,146 @@ public class JobsHandlerIntegrationTest {
     assertThat(order.getStatus()).isEqualTo("flagged");
   }
 
+  @Test
+  void publishPhaseShouldCreateListingForDirtySku() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createDirtySkuWithUnits("jordan", "scryfall-1#normal#NM", 2, "1.50");
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var sku = getSku("jordan", "scryfall-1#normal#NM");
+    assertThat(sku.getDirty()).isFalse();
+    assertThat(sku.getFetchtcgListingId()).isNotNull();
+    assertThat(sku.getLastPublishedQuantity()).isEqualTo(2);
+    assertThat(sku.getLastPublishedPrice()).isEqualTo("1.50");
+    assertThat(sku.getLastPublishedAt()).isEqualTo(Instant.ofEpochSecond(1700000000));
+
+    assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(1);
+    var upsert = fakeFetchTcgClient.getUpsertCalls().get(0);
+    assertThat(upsert.cardId()).isEqualTo("mtg_168_c_dom_normal");
+    assertThat(upsert.condition()).isEqualTo("raw-nm");
+    assertThat(upsert.quantity()).isEqualTo(2);
+    assertThat(upsert.price()).isEqualByComparingTo("1.50");
+  }
+
+  @Test
+  void publishPhaseShouldUpdateListingForExistingSku() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createDirtySkuWithUnits("jordan", "scryfall-1#normal#NM", 3, "2.00");
+    var sku = getSku("jordan", "scryfall-1#normal#NM");
+    sku.setFetchtcgListingId(975737);
+    sku.setLastPublishedQuantity(1);
+    sku.setLastPublishedPrice("1.80");
+    tcgInventoryTable.putItem(sku);
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var updated = getSku("jordan", "scryfall-1#normal#NM");
+    assertThat(updated.getDirty()).isFalse();
+    assertThat(updated.getLastPublishedQuantity()).isEqualTo(3);
+    assertThat(updated.getLastPublishedPrice()).isEqualTo("2.00");
+
+    assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(1);
+    var upsert = fakeFetchTcgClient.getUpsertCalls().get(0);
+    assertThat(upsert.quantity()).isEqualTo(3);
+    assertThat(upsert.price()).isEqualByComparingTo("2.00");
+  }
+
+  @Test
+  void publishPhaseShouldDelistAtZero() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createDirtySkuWithUnits("jordan", "scryfall-1#normal#NM", 0, "1.50");
+    var sku = getSku("jordan", "scryfall-1#normal#NM");
+    sku.setFetchtcgListingId(975737);
+    sku.setLastPublishedQuantity(1);
+    sku.setLastPublishedPrice("1.50");
+    tcgInventoryTable.putItem(sku);
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var updated = getSku("jordan", "scryfall-1#normal#NM");
+    assertThat(updated.getDirty()).isFalse();
+    assertThat(updated.getFetchtcgListingId()).isNull();
+    assertThat(updated.getLastPublishedQuantity()).isNull();
+    assertThat(updated.getLastPublishedPrice()).isNull();
+
+    assertThat(fakeFetchTcgClient.getDeleteCalls()).containsExactly(975737);
+    assertThat(fakeFetchTcgClient.getUpsertCalls()).isEmpty();
+  }
+
+  @Test
+  void publishPhaseShouldNotClearDirtyWhenConditionFails() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createDirtySkuWithUnits("jordan", "scryfall-1#normal#NM", 2, "1.50");
+
+    // set dirty=false directly to simulate a race where the condition check
+    // (dirty = true AND version = :captured) fails at write time
+    var sku = getSku("jordan", "scryfall-1#normal#NM");
+    sku.setDirty(false);
+    tcgInventoryTable.putItem(sku);
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert - the upsert was called (FetchTCG got the update)
+    assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(1);
+
+    // but the listing snapshot was NOT written (condition failed)
+    var updated = getSku("jordan", "scryfall-1#normal#NM");
+    assertThat(updated.getFetchtcgListingId()).isNull();
+    assertThat(updated.getLastPublishedQuantity()).isNull();
+  }
+
+  private void createDirtySkuWithUnits(
+      String user, String skuId, int unitCount, String suggestedPrice) {
+    var skuItem = new TcgInventoryItem();
+    skuItem.setPk(TcgInventoryItem.formatSkuPk(user, skuId));
+    skuItem.setSk(TcgInventoryItem.formatSkuSk());
+    skuItem.setSkuId(skuId);
+    var parts = skuId.split("#");
+    skuItem.setScryfallId(parts[0]);
+    skuItem.setFinish(parts[1]);
+    skuItem.setCondition(parts[2]);
+    skuItem.setName("Test Card");
+    skuItem.setSetCode("dom");
+    skuItem.setSetName("Dominaria");
+    skuItem.setCollectorNumber("168");
+    skuItem.setFetchtcgCardId("mtg_168_c_dom_normal");
+    skuItem.setSuggestedPrice(suggestedPrice);
+    skuItem.setVersion(1);
+    skuItem.setDirty(true);
+    skuItem.setGsi1pk(TcgInventoryItem.formatGsi1pk(user));
+    skuItem.setGsi1sk(TcgInventoryItem.formatGsi1sk(skuId));
+    skuItem.setGsi2pk(TcgInventoryItem.formatGsi2pk(user));
+    skuItem.setGsi2sk(TcgInventoryItem.formatGsi2sk("test card", skuId));
+    tcgInventoryTable.putItem(skuItem);
+
+    for (int i = 1; i <= unitCount; i++) {
+      var unit = new TcgInventoryItem();
+      unit.setPk(TcgInventoryItem.formatSkuPk(user, skuId));
+      unit.setSk(TcgInventoryItem.formatUnitSk(i));
+      unit.setSequenceNumber(i);
+      unit.setStatus("in_stock");
+      unit.setImportId("import1");
+      unit.setCreatedAt(Instant.ofEpochSecond(1700000000));
+      tcgInventoryTable.putItem(unit);
+    }
+  }
+
   private void createPublishJob(String user, String jobId) {
     var jobItem = new TcgInventoryItem();
     jobItem.setPk(TcgInventoryItem.formatUserPk(user));
@@ -466,6 +608,7 @@ public class JobsHandlerIntegrationTest {
     skuItem.setCollectorNumber("168");
     skuItem.setFetchtcgCardId("mtg_168_c_dom_normal");
     skuItem.setFetchtcgListingId(fetchtcgListingId);
+    skuItem.setSuggestedPrice("1.50");
     skuItem.setVersion(1);
     skuItem.setDirty(false);
     skuItem.setGsi1pk(TcgInventoryItem.USER_PREFIX + user + "#CLEAN");
