@@ -99,6 +99,7 @@ interface FakeSku {
   collector_number: string;
   finish: Finish;
   condition: Condition;
+  last_published_price: string | null;
   units: FakeUnit[];
 }
 
@@ -134,6 +135,7 @@ function createSeedState(): FakeSku[] {
       for (let i = soldCount; i < soldCount + reservedCount; i += 1) {
         units[i].status = 'reserved';
       }
+      const hasStock = inStockCount > 0;
       return {
         sku_id: `${scryfallId}#${finish}#${condition}`,
         scryfall_id: scryfallId,
@@ -143,6 +145,9 @@ function createSeedState(): FakeSku[] {
         collector_number: collectorNumber,
         finish,
         condition,
+        last_published_price: hasStock
+          ? formatPrice(30 + ((unitIndex * 37) % 20) * 25)
+          : null,
         units,
       };
     },
@@ -174,6 +179,7 @@ function toSummary(sku: FakeSku): SkuSummary {
     collector_number: sku.collector_number,
     finish: sku.finish,
     condition: sku.condition,
+    last_published_price: sku.last_published_price,
   };
 }
 
@@ -723,6 +729,7 @@ export function createFakeClient(): ApiClient {
             collector_number: row.collector_number,
             finish: row.finish,
             condition: row.condition,
+            last_published_price: null,
             units: [],
           };
           skus.push(sku);
@@ -805,7 +812,13 @@ export function createFakeClient(): ApiClient {
       const targetSkuId = `${sku.scryfall_id}#${sku.finish}#${condition}`;
       let target = skus.find((candidate) => candidate.sku_id === targetSkuId);
       if (!target) {
-        target = { ...sku, sku_id: targetSkuId, condition, units: [] };
+        target = {
+          ...sku,
+          sku_id: targetSkuId,
+          condition,
+          last_published_price: null,
+          units: [],
+        };
         skus.push(target);
       }
       sku.units = sku.units.filter((candidate) => candidate !== unit);

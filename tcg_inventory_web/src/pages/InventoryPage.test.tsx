@@ -23,6 +23,7 @@ const skuFixtures: SkuSummary[] = [
     collector_number: '42',
     finish: 'normal',
     condition: 'NM',
+    last_published_price: '1.50',
   },
   {
     sku_id: '22222222-2222-4222-8222-222222222222#foil#LP',
@@ -32,6 +33,7 @@ const skuFixtures: SkuSummary[] = [
     collector_number: '60',
     finish: 'foil',
     condition: 'LP',
+    last_published_price: null,
   },
   {
     sku_id: '33333333-3333-4333-8333-333333333333#normal#MP',
@@ -41,6 +43,7 @@ const skuFixtures: SkuSummary[] = [
     collector_number: '331',
     finish: 'normal',
     condition: 'MP',
+    last_published_price: '0.30',
   },
 ];
 

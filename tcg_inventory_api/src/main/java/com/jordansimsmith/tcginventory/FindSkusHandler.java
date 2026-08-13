@@ -32,7 +32,8 @@ public class FindSkusHandler
       @JsonProperty("set_name") String setName,
       @JsonProperty("collector_number") String collectorNumber,
       @JsonProperty("finish") String finish,
-      @JsonProperty("condition") String condition) {}
+      @JsonProperty("condition") String condition,
+      @JsonProperty("last_published_price") @Nullable String lastPublishedPrice) {}
 
   record FindSkusResponse(
       @JsonProperty("skus") List<SkuSummaryResponse> skus,
@@ -115,7 +116,8 @@ public class FindSkusHandler
                         item.getSetName(),
                         item.getCollectorNumber(),
                         item.getFinish(),
-                        item.getCondition()))
+                        item.getCondition(),
+                        item.getLastPublishedPrice()))
             .toList();
 
     var lastEvaluatedKey = page.lastEvaluatedKey();

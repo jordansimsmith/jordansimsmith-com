@@ -9,6 +9,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import java.util.List;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -35,6 +36,7 @@ public class GetSkuHandler
       @JsonProperty("collector_number") String collectorNumber,
       @JsonProperty("finish") String finish,
       @JsonProperty("condition") String condition,
+      @JsonProperty("last_published_price") @Nullable String lastPublishedPrice,
       @JsonProperty("in_stock_count") int inStockCount,
       @JsonProperty("reserved_count") int reservedCount,
       @JsonProperty("sold_count") int soldCount,
@@ -132,6 +134,7 @@ public class GetSkuHandler
             skuItem.getCollectorNumber(),
             skuItem.getFinish(),
             skuItem.getCondition(),
+            skuItem.getLastPublishedPrice(),
             inStockCount,
             reservedCount,
             soldCount,

@@ -22,6 +22,7 @@ export interface SkuSummary {
   collector_number: string;
   finish: Finish;
   condition: Condition;
+  last_published_price: string | null;
 }
 
 export interface FindSkusResponse {

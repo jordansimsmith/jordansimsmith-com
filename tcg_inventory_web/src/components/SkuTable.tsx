@@ -30,6 +30,7 @@ export function SkuTable({ skus, selectedIndex, onOpen }: SkuTableProps) {
           <Table.Th>#</Table.Th>
           <Table.Th>Finish</Table.Th>
           <Table.Th>Condition</Table.Th>
+          <Table.Th>Price</Table.Th>
         </Table.Tr>
       </Table.Thead>
       <Table.Tbody>
@@ -51,6 +52,11 @@ export function SkuTable({ skus, selectedIndex, onOpen }: SkuTableProps) {
               <Table.Td>{sku.collector_number}</Table.Td>
               <Table.Td>{sku.finish}</Table.Td>
               <Table.Td>{sku.condition}</Table.Td>
+              <Table.Td>
+                {sku.last_published_price != null
+                  ? `$${sku.last_published_price}`
+                  : ''}
+              </Table.Td>
             </Table.Tr>
           );
         })}

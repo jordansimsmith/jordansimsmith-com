@@ -175,6 +175,11 @@ export function SkuDetailPage() {
                     {sku.condition}
                   </Badge>
                 </Group>
+                {sku.last_published_price != null && (
+                  <Text size="sm" mt="xs">
+                    Listed at ${sku.last_published_price}
+                  </Text>
+                )}
                 <Group gap="lg" mt="xs">
                   <Text size="sm">In stock: {sku.in_stock_count}</Text>
                   <Text size="sm">Reserved: {sku.reserved_count}</Text>
