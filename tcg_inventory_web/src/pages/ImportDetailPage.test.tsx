@@ -15,18 +15,40 @@ import { ImportDetailPage } from './ImportDetailPage';
 import * as clientModule from '../api/client';
 import type { ImportDetail, ImportRow } from '../api/client';
 
+function appraisingRows(): ImportRow[] {
+  const rows: ImportRow[] = [];
+  for (let i = 1; i <= 16; i++) {
+    rows.push(importRow(i));
+  }
+  for (let i = 17; i <= 19; i++) {
+    rows.push(
+      importRow(i, { decision: 'discard', decision_reason: 'below threshold' }),
+    );
+  }
+  rows.push(
+    importRow(20, { decision: 'review', decision_reason: 'non-English' }),
+  );
+  for (let i = 21; i <= 40; i++) {
+    rows.push(
+      importRow(i, {
+        decision: null,
+        market_price: null,
+        suggested_price: null,
+      }),
+    );
+  }
+  return rows;
+}
+
 function importDetail(overrides: Partial<ImportDetail> = {}): ImportDetail {
   return {
     import_id: 'import-2',
     filename: 'manabox-today.csv',
     status: 'appraising',
     row_count: 40,
-    keep_count: 16,
-    discard_count: 3,
-    review_count: 1,
     appraisal_error: null,
     created_at: 1765420932,
-    rows: [],
+    rows: appraisingRows(),
     ...overrides,
   };
 }
@@ -56,9 +78,6 @@ function reviewImport(overrides: Partial<ImportDetail> = {}): ImportDetail {
   return importDetail({
     status: 'review',
     row_count: 3,
-    keep_count: 1,
-    discard_count: 1,
-    review_count: 1,
     rows: [
       importRow(1, {
         name: 'Top Card',
@@ -131,9 +150,21 @@ describe('ImportDetailPage', () => {
       .mockResolvedValue(
         importDetail({
           status: 'review',
-          keep_count: 33,
-          discard_count: 4,
-          review_count: 3,
+          rows: [
+            ...Array.from({ length: 33 }, (_, i) => importRow(i + 1)),
+            ...Array.from({ length: 4 }, (_, i) =>
+              importRow(34 + i, {
+                decision: 'discard',
+                decision_reason: 'below threshold',
+              }),
+            ),
+            ...Array.from({ length: 3 }, (_, i) =>
+              importRow(38 + i, {
+                decision: 'review',
+                decision_reason: 'non-English',
+              }),
+            ),
+          ],
         }),
       );
 
@@ -145,7 +176,7 @@ describe('ImportDetailPage', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
-    expect(screen.getByText('review')).toBeDefined();
+    expect(screen.getAllByText('review').length).toBeGreaterThan(0);
     expect(
       screen.getByRole('button', { name: 'Confirm import' }),
     ).toBeDefined();
@@ -352,6 +383,44 @@ describe('ImportDetailPage', () => {
         'LP',
       );
     });
+  });
+
+  it('deletes a row and updates counts', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport(),
+    );
+    vi.spyOn(clientModule.apiClient, 'deleteImportRow').mockResolvedValue(
+      undefined,
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+
+    const deleteButtons = screen.getAllByLabelText(/Delete row/);
+    expect(deleteButtons).toHaveLength(3);
+
+    await user.click(deleteButtons[0]);
+
+    await waitFor(() => {
+      expect(clientModule.apiClient.deleteImportRow).toHaveBeenCalledWith(
+        'import-2',
+        1,
+      );
+    });
+    expect(screen.queryByText('Top Card')).toBeNull();
+    expect(screen.getByText('Keep 0')).toBeDefined();
+  });
+
+  it('does not show delete buttons for a confirmed import', async () => {
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport({ status: 'confirmed' }),
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+
+    expect(screen.queryByLabelText(/Delete row/)).toBeNull();
   });
 
   it('does not show condition selects for a confirmed import', async () => {

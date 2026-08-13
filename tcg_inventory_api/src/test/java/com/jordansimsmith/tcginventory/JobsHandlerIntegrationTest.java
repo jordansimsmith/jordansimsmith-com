@@ -96,7 +96,6 @@ public class JobsHandlerIntegrationTest {
 
     var importItem = getImport("jordan", "import1");
     assertThat(importItem.getStatus()).isEqualTo("review");
-    assertThat(importItem.getKeepCount()).isEqualTo(1);
   }
 
   @Test
@@ -129,7 +128,7 @@ public class JobsHandlerIntegrationTest {
     assertThat(row.getMarketPrice()).isEqualTo("0.10");
 
     var importItem = getImport("jordan", "import1");
-    assertThat(importItem.getDiscardCount()).isEqualTo(1);
+    assertThat(importItem.getStatus()).isEqualTo("review");
   }
 
   @Test
@@ -146,9 +145,6 @@ public class JobsHandlerIntegrationTest {
     var row = getRow("jordan", "import1", 1);
     assertThat(row.getDecision()).isEqualTo("review");
     assertThat(row.getDecisionReason()).isEqualTo("non-english");
-
-    var importItem = getImport("jordan", "import1");
-    assertThat(importItem.getReviewCount()).isEqualTo(1);
   }
 
   @Test
@@ -165,9 +161,6 @@ public class JobsHandlerIntegrationTest {
     var row = getRow("jordan", "import1", 1);
     assertThat(row.getDecision()).isEqualTo("review");
     assertThat(row.getDecisionReason()).isEqualTo("unmapped set");
-
-    var importItem = getImport("jordan", "import1");
-    assertThat(importItem.getReviewCount()).isEqualTo(1);
   }
 
   @Test
@@ -184,9 +177,6 @@ public class JobsHandlerIntegrationTest {
     var row = getRow("jordan", "import1", 1);
     assertThat(row.getDecision()).isEqualTo("review");
     assertThat(row.getDecisionReason()).isEqualTo("unresolvable");
-
-    var importItem = getImport("jordan", "import1");
-    assertThat(importItem.getReviewCount()).isEqualTo(1);
   }
 
   @Test
@@ -761,9 +751,6 @@ public class JobsHandlerIntegrationTest {
     importItem.setFilename("test.csv");
     importItem.setStatus("appraising");
     importItem.setRowCount(rows.size());
-    importItem.setKeepCount(0);
-    importItem.setDiscardCount(0);
-    importItem.setReviewCount(0);
     importItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(importItem);
 
@@ -793,9 +780,6 @@ public class JobsHandlerIntegrationTest {
     importItem.setFilename("test.csv");
     importItem.setStatus("appraising");
     importItem.setRowCount(rowCount);
-    importItem.setKeepCount(0);
-    importItem.setDiscardCount(0);
-    importItem.setReviewCount(0);
     importItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(importItem);
 

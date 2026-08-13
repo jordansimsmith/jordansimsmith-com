@@ -140,6 +140,27 @@ export function ImportDetailPage() {
     }
   };
 
+  const handleDeleteRow = async (position: number) => {
+    if (!importId) {
+      return;
+    }
+    try {
+      await apiClient.deleteImportRow(importId, position);
+      setImportDetail((current) => {
+        if (!current) {
+          return current;
+        }
+        return {
+          ...current,
+          rows: current.rows.filter((row) => row.position !== position),
+        };
+      });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to delete row';
+      notifications.show({ title: 'Error', message, color: 'red' });
+    }
+  };
+
   const handleConfirm = async () => {
     if (!importId) {
       return;
@@ -161,11 +182,10 @@ export function ImportDetailPage() {
     }
   };
 
-  const appraised = importDetail
-    ? importDetail.keep_count +
-      importDetail.discard_count +
-      importDetail.review_count
-    : 0;
+  const keepCount = rows.filter((r) => r.decision === 'keep').length;
+  const discardCount = rows.filter((r) => r.decision === 'discard').length;
+  const reviewCount = rows.filter((r) => r.decision === 'review').length;
+  const appraised = keepCount + discardCount + reviewCount;
 
   return (
     <AppShellLayout>
@@ -218,13 +238,13 @@ export function ImportDetailPage() {
               <Group justify="space-between" align="center">
                 <Group gap="sm">
                   <Badge variant="light" color="green">
-                    Keep {importDetail.keep_count}
+                    Keep {keepCount}
                   </Badge>
                   <Badge variant="light" color="gray">
-                    Discard {importDetail.discard_count}
+                    Discard {discardCount}
                   </Badge>
                   <Badge variant="light" color="yellow">
-                    Review {importDetail.review_count}
+                    Review {reviewCount}
                   </Badge>
                 </Group>
                 {importDetail.status === 'review' && (
@@ -241,6 +261,7 @@ export function ImportDetailPage() {
                 onSelect={setSelectedIndex}
                 editable={importDetail.status === 'review'}
                 onConditionChange={handleConditionChange}
+                onDeleteRow={handleDeleteRow}
               />
             )}
             {confirmResult && (
@@ -251,9 +272,9 @@ export function ImportDetailPage() {
             )}
             <ConfirmImportModal
               opened={confirmOpen}
-              keepCount={importDetail.keep_count}
-              discardCount={importDetail.discard_count}
-              reviewCount={importDetail.review_count}
+              keepCount={keepCount}
+              discardCount={discardCount}
+              reviewCount={reviewCount}
               loading={confirming}
               onCancel={() => setConfirmOpen(false)}
               onConfirm={handleConfirm}

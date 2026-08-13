@@ -20,9 +20,6 @@ const importFixtures: ImportSummary[] = [
     filename: 'manabox-today.csv',
     status: 'appraising',
     row_count: 40,
-    keep_count: 9,
-    discard_count: 2,
-    review_count: 1,
     appraisal_error: null,
     created_at: 1765420932,
   },
@@ -31,9 +28,6 @@ const importFixtures: ImportSummary[] = [
     filename: 'manabox-last-week.csv',
     status: 'confirmed',
     row_count: 24,
-    keep_count: 20,
-    discard_count: 3,
-    review_count: 1,
     appraisal_error: null,
     created_at: 1764816132,
   },
@@ -80,9 +74,6 @@ describe('ImportsPage', () => {
       import_id: 'import-3',
       filename: 'bulk.csv',
       row_count: 1,
-      keep_count: 0,
-      discard_count: 0,
-      review_count: 0,
     });
   });
 
@@ -90,7 +81,7 @@ describe('ImportsPage', () => {
     cleanup();
   });
 
-  it('renders import rows with progress and counts', async () => {
+  it('renders import rows with status and row count', async () => {
     renderImportsPage();
 
     const row = (await screen.findByText('manabox-today.csv')).closest(
@@ -98,15 +89,12 @@ describe('ImportsPage', () => {
     ) as HTMLTableRowElement;
 
     expect(within(row).getByText('appraising')).toBeDefined();
-    expect(within(row).getByText('12/40')).toBeDefined();
-    expect(within(row).getByText('9')).toBeDefined();
-    expect(within(row).getByText('2')).toBeDefined();
-    expect(within(row).getByText('1')).toBeDefined();
+    expect(within(row).getByText('40')).toBeDefined();
     const confirmedRow = screen
       .getByText('manabox-last-week.csv')
       .closest('tr') as HTMLTableRowElement;
     expect(within(confirmedRow).getByText('confirmed')).toBeDefined();
-    expect(within(confirmedRow).getByText('24/24')).toBeDefined();
+    expect(within(confirmedRow).getByText('24')).toBeDefined();
   });
 
   it('shows an empty state when there are no imports', async () => {

@@ -40,6 +40,7 @@ public class ImportsHandlerIntegrationTest {
   private GetImportHandler getImportHandler;
   private DeleteImportHandler deleteImportHandler;
   private UpdateImportRowHandler updateImportRowHandler;
+  private DeleteImportRowHandler deleteImportRowHandler;
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
@@ -69,6 +70,7 @@ public class ImportsHandlerIntegrationTest {
     getImportHandler = new GetImportHandler(factory);
     deleteImportHandler = new DeleteImportHandler(factory);
     updateImportRowHandler = new UpdateImportRowHandler(factory);
+    deleteImportRowHandler = new DeleteImportRowHandler(factory);
   }
 
   @Test
@@ -95,9 +97,6 @@ public class ImportsHandlerIntegrationTest {
     assertThat(body.get("filename").asText()).isEqualTo("manabox-export.csv");
     assertThat(body.get("status").asText()).isEqualTo("appraising");
     assertThat(body.get("row_count").asInt()).isEqualTo(2);
-    assertThat(body.get("keep_count").asInt()).isZero();
-    assertThat(body.get("discard_count").asInt()).isZero();
-    assertThat(body.get("review_count").asInt()).isZero();
     assertThat(body.get("appraisal_error").isNull()).isTrue();
     assertThat(body.get("created_at").asLong()).isEqualTo(1700000000);
 
@@ -430,9 +429,6 @@ public class ImportsHandlerIntegrationTest {
     importItem.setFilename("test.csv");
     importItem.setStatus("review");
     importItem.setRowCount(1);
-    importItem.setKeepCount(1);
-    importItem.setDiscardCount(0);
-    importItem.setReviewCount(0);
     importItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(importItem);
 
@@ -543,5 +539,66 @@ public class ImportsHandlerIntegrationTest {
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(400);
+  }
+
+  @Test
+  void deleteImportRowShouldDeleteRowAndDecrementCounts() {
+    // arrange
+    createReviewImportWithRow("jordan");
+
+    // act
+    var response =
+        deleteImportRowHandler.handleRequest(
+            buildEventWithPathParam("jordan", Map.of("import_id", "import1", "position", "1")),
+            null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(204);
+
+    var rowItem =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue(TcgInventoryItem.formatImportRowPk("jordan", "import1"))
+                .sortValue(TcgInventoryItem.formatImportRowSk(1))
+                .build());
+    assertThat(rowItem).isNull();
+  }
+
+  @Test
+  void deleteImportRowShouldReturn409WhenNotInReview() {
+    // arrange
+    createReviewImportWithRow("jordan");
+    var importItem =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
+                .sortValue(TcgInventoryItem.formatImportSk("import1"))
+                .build());
+    importItem.setStatus("appraising");
+    tcgInventoryTable.putItem(importItem);
+
+    // act
+    var response =
+        deleteImportRowHandler.handleRequest(
+            buildEventWithPathParam("jordan", Map.of("import_id", "import1", "position", "1")),
+            null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(409);
+  }
+
+  @Test
+  void deleteImportRowShouldReturn404ForMissingRow() {
+    // arrange
+    createReviewImportWithRow("jordan");
+
+    // act
+    var response =
+        deleteImportRowHandler.handleRequest(
+            buildEventWithPathParam("jordan", Map.of("import_id", "import1", "position", "99")),
+            null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(404);
   }
 }

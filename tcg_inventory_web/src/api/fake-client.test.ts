@@ -152,14 +152,8 @@ describe('createFakeClient imports', () => {
     const [inFlight, confirmed] = response.imports;
     expect(inFlight.status).toBe('appraising');
     expect(inFlight.created_at).toBeGreaterThan(confirmed.created_at);
-    const inFlightAppraised =
-      inFlight.keep_count + inFlight.discard_count + inFlight.review_count;
-    expect(inFlightAppraised).toBeGreaterThan(0);
-    expect(inFlightAppraised).toBeLessThan(inFlight.row_count);
+    expect(inFlight.row_count).toBeGreaterThan(0);
     expect(confirmed.status).toBe('confirmed');
-    expect(
-      confirmed.keep_count + confirmed.discard_count + confirmed.review_count,
-    ).toBe(confirmed.row_count);
   });
 
   it('creates an import with quantity-expanded rows top-of-stack first', async () => {
@@ -171,9 +165,6 @@ describe('createFakeClient imports', () => {
     expect(created.status).toBe('appraising');
     expect(created.filename).toBe('bulk.csv');
     expect(created.row_count).toBe(4);
-    expect(created.keep_count).toBe(0);
-    expect(created.discard_count).toBe(0);
-    expect(created.review_count).toBe(0);
 
     const detail = await client.getImport(created.import_id);
     expect(detail.rows.map((row) => row.position)).toEqual([1, 2, 3, 4]);
@@ -197,16 +188,13 @@ describe('createFakeClient imports', () => {
     vi.advanceTimersByTime(1000);
     let detail = await client.getImport(created.import_id);
     expect(detail.status).toBe('appraising');
-    expect(detail.keep_count + detail.discard_count + detail.review_count).toBe(
-      2,
-    );
+    expect(detail.rows.filter((r) => r.decision !== null)).toHaveLength(2);
 
     vi.advanceTimersByTime(60_000);
     detail = await client.getImport(created.import_id);
     expect(detail.status).toBe('review');
-    expect(detail.keep_count).toBe(3);
-    expect(detail.discard_count).toBe(0);
-    expect(detail.review_count).toBe(1);
+    expect(detail.rows.filter((r) => r.decision === 'keep')).toHaveLength(3);
+    expect(detail.rows.filter((r) => r.decision === 'review')).toHaveLength(1);
     expect(detail.rows[0].decision).toBe('review');
     expect(detail.rows[0].decision_reason).toBe('non-English card');
     expect(detail.rows[3].decision).toBe('keep');
@@ -224,11 +212,6 @@ describe('createFakeClient imports', () => {
 
     const response = await client.findImports();
     expect(response.imports[0].status).toBe('review');
-    expect(
-      response.imports[0].keep_count +
-        response.imports[0].discard_count +
-        response.imports[0].review_count,
-    ).toBe(response.imports[0].row_count);
   });
 
   it('rejects invalid csv content', async () => {

@@ -149,6 +149,7 @@ sequenceDiagram
 | `GET`    | `/imports`                               | list imports newest-first                                                              |
 | `GET`    | `/imports/{import_id}`                   | import status, progress, and rows                                                      |
 | `PUT`    | `/imports/{import_id}/rows/{position}`   | update a row's condition before confirm                                                |
+| `DELETE` | `/imports/{import_id}/rows/{position}`   | delete a misidentified row before confirm                                              |
 | `POST`   | `/imports/{import_id}/confirm`           | append keeper units; returns placement instructions                                    |
 | `DELETE` | `/imports/{import_id}`                   | delete an unconfirmed import and its rows                                              |
 | `GET`    | `/skus`                                  | browse/search SKUs (prefix search, continuation paging)                                |

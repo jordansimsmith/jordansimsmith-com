@@ -27,9 +27,6 @@ public class FindImportsHandler
       @JsonProperty("filename") String filename,
       @JsonProperty("status") String status,
       @JsonProperty("row_count") int rowCount,
-      @JsonProperty("keep_count") int keepCount,
-      @JsonProperty("discard_count") int discardCount,
-      @JsonProperty("review_count") int reviewCount,
       @JsonProperty("appraisal_error") @Nullable String appraisalError,
       @JsonProperty("created_at") long createdAt) {}
 
@@ -91,9 +88,6 @@ public class FindImportsHandler
         item.getFilename(),
         item.getStatus(),
         item.getRowCount() != null ? item.getRowCount() : 0,
-        item.getKeepCount() != null ? item.getKeepCount() : 0,
-        item.getDiscardCount() != null ? item.getDiscardCount() : 0,
-        item.getReviewCount() != null ? item.getReviewCount() : 0,
         item.getError(),
         item.getCreatedAt() != null ? item.getCreatedAt().getEpochSecond() : 0);
   }

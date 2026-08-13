@@ -41,9 +41,6 @@ public class GetImportHandler
       @JsonProperty("filename") String filename,
       @JsonProperty("status") String status,
       @JsonProperty("row_count") int rowCount,
-      @JsonProperty("keep_count") int keepCount,
-      @JsonProperty("discard_count") int discardCount,
-      @JsonProperty("review_count") int reviewCount,
       @JsonProperty("appraisal_error") @Nullable String appraisalError,
       @JsonProperty("created_at") long createdAt,
       @JsonProperty("rows") List<ImportRowResponse> rows) {}
@@ -129,9 +126,6 @@ public class GetImportHandler
             importItem.getFilename(),
             importItem.getStatus(),
             importItem.getRowCount() != null ? importItem.getRowCount() : 0,
-            importItem.getKeepCount() != null ? importItem.getKeepCount() : 0,
-            importItem.getDiscardCount() != null ? importItem.getDiscardCount() : 0,
-            importItem.getReviewCount() != null ? importItem.getReviewCount() : 0,
             importItem.getError(),
             importItem.getCreatedAt() != null ? importItem.getCreatedAt().getEpochSecond() : 0,
             rows));

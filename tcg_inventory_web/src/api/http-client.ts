@@ -103,6 +103,13 @@ export function createHttpClient(): ApiClient {
       return response.json();
     },
 
+    async deleteImportRow(importId: string, position: number): Promise<void> {
+      await authenticatedFetch(
+        `/imports/${encodeURIComponent(importId)}/rows/${position}`,
+        { method: 'DELETE' },
+      );
+    },
+
     async confirmImport(importId: string): Promise<ConfirmImportResponse> {
       const response = await authenticatedFetch(
         `/imports/${encodeURIComponent(importId)}/confirm`,

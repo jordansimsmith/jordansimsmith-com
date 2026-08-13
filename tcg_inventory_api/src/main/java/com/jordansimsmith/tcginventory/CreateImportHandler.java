@@ -29,9 +29,6 @@ public class CreateImportHandler
       @JsonProperty("filename") String filename,
       @JsonProperty("status") String status,
       @JsonProperty("row_count") int rowCount,
-      @JsonProperty("keep_count") int keepCount,
-      @JsonProperty("discard_count") int discardCount,
-      @JsonProperty("review_count") int reviewCount,
       @JsonProperty("appraisal_error") @Nullable String appraisalError,
       @JsonProperty("created_at") long createdAt) {}
 
@@ -112,9 +109,6 @@ public class CreateImportHandler
     importItem.setFilename(filename);
     importItem.setStatus("appraising");
     importItem.setRowCount(totalRows);
-    importItem.setKeepCount(0);
-    importItem.setDiscardCount(0);
-    importItem.setReviewCount(0);
     importItem.setJobId(jobId);
     importItem.setCreatedAt(now);
     tcgInventoryTable.putItem(importItem);
@@ -153,6 +147,6 @@ public class CreateImportHandler
 
     return httpResponseFactory.ok(
         new ImportSummaryResponse(
-            importId, filename, "appraising", totalRows, 0, 0, 0, null, now.getEpochSecond()));
+            importId, filename, "appraising", totalRows, null, now.getEpochSecond()));
   }
 }

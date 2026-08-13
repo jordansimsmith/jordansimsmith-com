@@ -62,9 +62,6 @@ public class TcgInventoryItem {
   public static final String MARKET_PRICE = "market_price";
   public static final String SUGGESTED_PRICE = "suggested_price";
   public static final String ROW_COUNT = "row_count";
-  public static final String KEEP_COUNT = "keep_count";
-  public static final String DISCARD_COUNT = "discard_count";
-  public static final String REVIEW_COUNT = "review_count";
   public static final String ERROR = "error";
   public static final String LANGUAGE = "language";
   public static final String JOB_TYPE = "job_type";
@@ -114,9 +111,6 @@ public class TcgInventoryItem {
   private String marketPrice;
   private String suggestedPrice;
   private Integer rowCount;
-  private Integer keepCount;
-  private Integer discardCount;
-  private Integer reviewCount;
   private String error;
   private String language;
   private String jobType;
@@ -441,36 +435,6 @@ public class TcgInventoryItem {
   }
 
   @Nullable
-  @DynamoDbAttribute(KEEP_COUNT)
-  public Integer getKeepCount() {
-    return keepCount;
-  }
-
-  public void setKeepCount(@Nullable Integer keepCount) {
-    this.keepCount = keepCount;
-  }
-
-  @Nullable
-  @DynamoDbAttribute(DISCARD_COUNT)
-  public Integer getDiscardCount() {
-    return discardCount;
-  }
-
-  public void setDiscardCount(@Nullable Integer discardCount) {
-    this.discardCount = discardCount;
-  }
-
-  @Nullable
-  @DynamoDbAttribute(REVIEW_COUNT)
-  public Integer getReviewCount() {
-    return reviewCount;
-  }
-
-  public void setReviewCount(@Nullable Integer reviewCount) {
-    this.reviewCount = reviewCount;
-  }
-
-  @Nullable
   @DynamoDbAttribute(ERROR)
   public String getError() {
     return error;
@@ -688,9 +652,6 @@ public class TcgInventoryItem {
         && Objects.equals(marketPrice, that.marketPrice)
         && Objects.equals(suggestedPrice, that.suggestedPrice)
         && Objects.equals(rowCount, that.rowCount)
-        && Objects.equals(keepCount, that.keepCount)
-        && Objects.equals(discardCount, that.discardCount)
-        && Objects.equals(reviewCount, that.reviewCount)
         && Objects.equals(error, that.error)
         && Objects.equals(language, that.language)
         && Objects.equals(jobType, that.jobType)
@@ -744,9 +705,6 @@ public class TcgInventoryItem {
         marketPrice,
         suggestedPrice,
         rowCount,
-        keepCount,
-        discardCount,
-        reviewCount,
         error,
         language,
         jobType,
@@ -852,12 +810,6 @@ public class TcgInventoryItem {
         + '\''
         + ", rowCount="
         + rowCount
-        + ", keepCount="
-        + keepCount
-        + ", discardCount="
-        + discardCount
-        + ", reviewCount="
-        + reviewCount
         + ", error='"
         + error
         + '\''

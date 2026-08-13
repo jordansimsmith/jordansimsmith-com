@@ -62,9 +62,6 @@ export interface ImportSummary {
   filename: string;
   status: ImportStatus;
   row_count: number;
-  keep_count: number;
-  discard_count: number;
-  review_count: number;
   appraisal_error: string | null;
   created_at: number;
 }
@@ -166,6 +163,7 @@ export interface ApiClient {
     position: number,
     condition: Condition,
   ): Promise<ImportRow>;
+  deleteImportRow(importId: string, position: number): Promise<void>;
   confirmImport(importId: string): Promise<ConfirmImportResponse>;
   findSkus(params?: FindSkusParams): Promise<FindSkusResponse>;
   getSku(skuId: string): Promise<SkuDetail>;

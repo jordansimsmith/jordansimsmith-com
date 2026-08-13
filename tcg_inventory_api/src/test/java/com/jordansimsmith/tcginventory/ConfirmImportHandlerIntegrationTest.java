@@ -243,9 +243,6 @@ public class ConfirmImportHandlerIntegrationTest {
     importItem.setImportId("import1");
     importItem.setStatus("confirming");
     importItem.setRowCount(2);
-    importItem.setKeepCount(0);
-    importItem.setDiscardCount(0);
-    importItem.setReviewCount(0);
     importItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(importItem);
 
@@ -343,9 +340,6 @@ public class ConfirmImportHandlerIntegrationTest {
     importItem.setFilename("test.csv");
     importItem.setStatus("review");
     importItem.setRowCount(rowCount);
-    importItem.setKeepCount(0);
-    importItem.setDiscardCount(0);
-    importItem.setReviewCount(0);
     importItem.setCreatedAt(Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(importItem);
   }

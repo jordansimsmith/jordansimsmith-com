@@ -363,20 +363,11 @@ function progressAppraisal(importRecord: FakeImport): void {
 }
 
 function toImportSummary(importRecord: FakeImport): ImportSummary {
-  const appraisedRows = importRecord.rows.slice(
-    0,
-    appraisedCount(importRecord),
-  );
-  const countByDecision = (decision: RowDecision) =>
-    appraisedRows.filter((row) => row.decision === decision).length;
   return {
     import_id: importRecord.import_id,
     filename: importRecord.filename,
     status: importRecord.status,
     row_count: importRecord.rows.length,
-    keep_count: countByDecision('keep'),
-    discard_count: countByDecision('discard'),
-    review_count: countByDecision('review'),
     appraisal_error: null,
     created_at: Math.floor(importRecord.created_at_ms / 1000),
   };
@@ -733,6 +724,18 @@ export function createFakeClient(): ApiClient {
         market_price: row.market_price,
         suggested_price: row.suggested_price,
       };
+    },
+
+    async deleteImportRow(importId: string, position: number): Promise<void> {
+      const importRecord = getImportOrThrow(importId);
+      if (importRecord.status !== 'review') {
+        throw new Error('import is not in review status');
+      }
+      const index = importRecord.rows.findIndex((r) => r.position === position);
+      if (index === -1) {
+        throw new Error('Not Found');
+      }
+      importRecord.rows.splice(index, 1);
     },
 
     async confirmImport(importId: string): Promise<ConfirmImportResponse> {

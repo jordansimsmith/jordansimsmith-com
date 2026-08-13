@@ -45,10 +45,6 @@ class AppraiseJobProcessor {
     int batchEnd = Math.min(continuation + BATCH_SIZE, totalRows);
     int processed = continuation;
 
-    int keepCount = 0;
-    int discardCount = 0;
-    int reviewCount = 0;
-
     Map<String, ResolvedCard> batchCache = new HashMap<>();
 
     for (int i = continuation + 1; i <= batchEnd; i++) {
@@ -70,22 +66,10 @@ class AppraiseJobProcessor {
       rowItem.setSuggestedPrice(decision.suggestedPrice());
       tcgInventoryTable.putItem(rowItem);
 
-      switch (decision.decision()) {
-        case "keep" -> keepCount++;
-        case "discard" -> discardCount++;
-        case "review" -> reviewCount++;
-      }
-
       processed = i;
     }
 
     boolean complete = processed >= totalRows;
-    importItem.setKeepCount(
-        (importItem.getKeepCount() != null ? importItem.getKeepCount() : 0) + keepCount);
-    importItem.setDiscardCount(
-        (importItem.getDiscardCount() != null ? importItem.getDiscardCount() : 0) + discardCount);
-    importItem.setReviewCount(
-        (importItem.getReviewCount() != null ? importItem.getReviewCount() : 0) + reviewCount);
     if (complete) {
       importItem.setStatus("review");
     }

@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { Badge, NativeSelect, Table, Text } from '@mantine/core';
+import { ActionIcon, Badge, NativeSelect, Table, Text } from '@mantine/core';
+import { IconTrash } from '@tabler/icons-react';
 import type { Condition, ImportRow, RowDecision } from '../api/client';
 import { CONDITIONS } from '../api/client';
 
@@ -15,6 +16,7 @@ interface ImportReviewTableProps {
   onSelect: (index: number) => void;
   editable?: boolean;
   onConditionChange?: (position: number, condition: Condition) => void;
+  onDeleteRow?: (position: number) => void;
 }
 
 export function ImportReviewTable({
@@ -23,6 +25,7 @@ export function ImportReviewTable({
   onSelect,
   editable = false,
   onConditionChange,
+  onDeleteRow,
 }: ImportReviewTableProps) {
   const selectedRowRef = useRef<HTMLTableRowElement>(null);
 
@@ -50,6 +53,7 @@ export function ImportReviewTable({
           <Table.Th ta="right">Suggested</Table.Th>
           <Table.Th>Decision</Table.Th>
           <Table.Th>Reason</Table.Th>
+          {editable && <Table.Th />}
         </Table.Tr>
       </Table.Thead>
       <Table.Tbody>
@@ -109,6 +113,22 @@ export function ImportReviewTable({
                 )}
               </Table.Td>
               <Table.Td c="dimmed">{row.decision_reason}</Table.Td>
+              {editable && onDeleteRow && (
+                <Table.Td>
+                  <ActionIcon
+                    variant="subtle"
+                    color="red"
+                    size="sm"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onDeleteRow(row.position);
+                    }}
+                    aria-label={`Delete row ${row.position}`}
+                  >
+                    <IconTrash size={14} />
+                  </ActionIcon>
+                </Table.Td>
+              )}
             </Table.Tr>
           );
         })}
