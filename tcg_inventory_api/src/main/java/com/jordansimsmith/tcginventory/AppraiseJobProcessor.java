@@ -64,6 +64,8 @@ class AppraiseJobProcessor {
       rowItem.setDecisionReason(decision.reason());
       rowItem.setMarketPrice(decision.marketPrice());
       rowItem.setSuggestedPrice(decision.suggestedPrice());
+      rowItem.setFetchtcgCardId(decision.fetchtcgCardId());
+      rowItem.setFetchtcgSetId(decision.fetchtcgSetId());
       tcgInventoryTable.putItem(rowItem);
 
       processed = i;
@@ -107,7 +109,10 @@ class AppraiseJobProcessor {
     }
 
     return RowDecision.keep(
-        cached.marketPrice().toPlainString(), result.suggestedPrice().toPlainString());
+        cached.marketPrice().toPlainString(),
+        result.suggestedPrice().toPlainString(),
+        cached.cardId(),
+        cached.setId());
   }
 
   private ResolvedCard resolveCard(String setCode, String cardName, String finish) {
@@ -124,7 +129,7 @@ class AppraiseJobProcessor {
             nzPricing != null && nzPricing.tcgMarketPrice() != null
                 ? nzPricing.tcgMarketPrice()
                 : BigDecimal.ZERO;
-        return new ResolvedCard(card.id(), marketPrice);
+        return new ResolvedCard(card.id(), entry.setId(), marketPrice);
       }
     }
     return null;
@@ -152,20 +157,27 @@ class AppraiseJobProcessor {
     return tiers;
   }
 
-  private record ResolvedCard(String cardId, BigDecimal marketPrice) {}
+  private record ResolvedCard(String cardId, int setId, BigDecimal marketPrice) {}
 
   private record RowDecision(
-      String decision, String reason, String marketPrice, String suggestedPrice) {
-    static RowDecision keep(String marketPrice, String suggestedPrice) {
-      return new RowDecision("keep", null, marketPrice, suggestedPrice);
+      String decision,
+      String reason,
+      String marketPrice,
+      String suggestedPrice,
+      String fetchtcgCardId,
+      Integer fetchtcgSetId) {
+    static RowDecision keep(
+        String marketPrice, String suggestedPrice, String fetchtcgCardId, int fetchtcgSetId) {
+      return new RowDecision(
+          "keep", null, marketPrice, suggestedPrice, fetchtcgCardId, fetchtcgSetId);
     }
 
     static RowDecision discard(String reason, String marketPrice) {
-      return new RowDecision("discard", reason, marketPrice, null);
+      return new RowDecision("discard", reason, marketPrice, null, null, null);
     }
 
     static RowDecision review(String reason) {
-      return new RowDecision("review", reason, null, null);
+      return new RowDecision("review", reason, null, null, null, null);
     }
   }
 }

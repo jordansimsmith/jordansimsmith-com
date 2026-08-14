@@ -204,7 +204,11 @@ public class OrderPhaseProcessor {
         TcgInventoryItem.createOrder(
             user,
             offerId,
-            insufficientStock ? "flagged" : "awaiting_payment",
+            insufficientStock
+                ? "flagged"
+                : (offer.currentAction() != null && PAYMENT_ACTIONS.contains(offer.currentAction()))
+                    ? "to_pick"
+                    : "awaiting_payment",
             offer.status(),
             offer.currentAction(),
             offer.deliveryMode(),

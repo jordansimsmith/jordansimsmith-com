@@ -1,5 +1,6 @@
 import boto3
 import json
+import os
 import time
 
 region_name = "ap-southeast-2"
@@ -16,6 +17,9 @@ dynamodb_client = boto3.client(
     "dynamodb", endpoint_url=endpoint_url, region_name=region_name
 )
 sqs_client = boto3.client("sqs", endpoint_url=endpoint_url, region_name=region_name)
+secretsmanager_client = boto3.client(
+    "secretsmanager", endpoint_url=endpoint_url, region_name=region_name
+)
 
 table_name = "tcg_inventory"
 dynamodb_client.create_table(
@@ -66,6 +70,11 @@ queue_url = sqs_client.create_queue(QueueName=queue_name)["QueueUrl"]
 queue_arn = sqs_client.get_queue_attributes(
     QueueUrl=queue_url, AttributeNames=["QueueArn"]
 )["Attributes"]["QueueArn"]
+
+secretsmanager_client.create_secret(
+    Name="tcg_inventory",
+    SecretString="{}",
+)
 
 api_id = apigateway_client.create_rest_api(
     name="tcg_inventory", tags={"_custom_id_": "tcg_inventory"}
@@ -140,7 +149,11 @@ lambdas = {
         "handler": "com.jordansimsmith.tcginventory.JobsHandler",
         "zip_file": "jobs-handler_deploy.jar",
         "timeout": 900,
-        "environment": {"JOBS_QUEUE_URL": queue_url},
+        "environment": {
+            "JOBS_QUEUE_URL": queue_url,
+            "FETCHTCG_BASE_URL": os.environ.get("FETCHTCG_BASE_URL", ""),
+            "FIREBASE_TOKEN_URL": os.environ.get("FIREBASE_TOKEN_URL", ""),
+        },
     },
     "find_skus": {
         "handler": "com.jordansimsmith.tcginventory.FindSkusHandler",
@@ -158,6 +171,26 @@ lambdas = {
         "handler": "com.jordansimsmith.tcginventory.UpdateUnitHandler",
         "zip_file": "update-unit-handler_deploy.jar",
     },
+    "find_orders": {
+        "handler": "com.jordansimsmith.tcginventory.FindOrdersHandler",
+        "zip_file": "find-orders-handler_deploy.jar",
+    },
+    "get_order": {
+        "handler": "com.jordansimsmith.tcginventory.GetOrderHandler",
+        "zip_file": "get-order-handler_deploy.jar",
+    },
+    "confirm_order": {
+        "handler": "com.jordansimsmith.tcginventory.ConfirmOrderHandler",
+        "zip_file": "confirm-order-handler_deploy.jar",
+    },
+    "update_import_row": {
+        "handler": "com.jordansimsmith.tcginventory.UpdateImportRowHandler",
+        "zip_file": "update-import-row-handler_deploy.jar",
+    },
+    "delete_import_row": {
+        "handler": "com.jordansimsmith.tcginventory.DeleteImportRowHandler",
+        "zip_file": "delete-import-row-handler_deploy.jar",
+    },
 }
 
 root_resources = {
@@ -165,14 +198,19 @@ root_resources = {
     "imports": {"path": "imports"},
     "publish": {"path": "publish"},
     "skus": {"path": "skus"},
+    "orders": {"path": "orders"},
 }
 
 child_resources = {
     "import_detail": {"parent": "imports", "path": "{import_id}"},
     "import_confirm": {"parent": "import_detail", "path": "confirm"},
+    "import_rows": {"parent": "import_detail", "path": "rows"},
+    "import_row_detail": {"parent": "import_rows", "path": "{position}"},
     "sku_detail": {"parent": "skus", "path": "{sku_id}"},
     "sku_units": {"parent": "sku_detail", "path": "units"},
     "sku_unit_detail": {"parent": "sku_units", "path": "{sequence_number}"},
+    "order_detail": {"parent": "orders", "path": "{order_id}"},
+    "order_confirm": {"parent": "order_detail", "path": "confirm"},
 }
 
 endpoints = {
@@ -220,6 +258,27 @@ endpoints = {
         "resource": "sku_unit_detail",
         "method": "PUT",
         "lambda": "update_unit",
+    },
+    "find_orders": {"resource": "orders", "method": "GET", "lambda": "find_orders"},
+    "get_order": {
+        "resource": "order_detail",
+        "method": "GET",
+        "lambda": "get_order",
+    },
+    "confirm_order": {
+        "resource": "order_confirm",
+        "method": "POST",
+        "lambda": "confirm_order",
+    },
+    "update_import_row": {
+        "resource": "import_row_detail",
+        "method": "PUT",
+        "lambda": "update_import_row",
+    },
+    "delete_import_row": {
+        "resource": "import_row_detail",
+        "method": "DELETE",
+        "lambda": "delete_import_row",
     },
 }
 

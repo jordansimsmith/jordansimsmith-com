@@ -63,12 +63,13 @@ public class TcgInventoryModule {
   @Provides
   @Singleton
   FetchTcgTokenMinter fetchTcgTokenMinter(ObjectMapper objectMapper, Secrets secrets) {
+    var firebaseTokenUrl = System.getenv("FIREBASE_TOKEN_URL");
+    if (firebaseTokenUrl == null || firebaseTokenUrl.isEmpty()) {
+      firebaseTokenUrl =
+          "https://securetoken.googleapis.com/v1/token?key=AIzaSyBOyrP5WfupPBgb2juJ5FX-OelxD-xRmGI";
+    }
     return new HttpFetchTcgTokenMinter(
-        URI.create(
-            "https://securetoken.googleapis.com/v1/token?key=AIzaSyBOyrP5WfupPBgb2juJ5FX-OelxD-xRmGI"),
-        HttpClient.newHttpClient(),
-        objectMapper,
-        secrets);
+        URI.create(firebaseTokenUrl), HttpClient.newHttpClient(), objectMapper, secrets);
   }
 
   @Provides
@@ -115,7 +116,11 @@ public class TcgInventoryModule {
             throw new RuntimeException(e);
           }
         };
+    var fetchTcgBaseUrl = System.getenv("FETCHTCG_BASE_URL");
+    if (fetchTcgBaseUrl == null || fetchTcgBaseUrl.isEmpty()) {
+      fetchTcgBaseUrl = "https://api.fetchtcg.com";
+    }
     return new HttpFetchTcgClient(
-        URI.create("https://api.fetchtcg.com"), HttpClient.newHttpClient(), objectMapper, pacer);
+        URI.create(fetchTcgBaseUrl), HttpClient.newHttpClient(), objectMapper, pacer);
   }
 }

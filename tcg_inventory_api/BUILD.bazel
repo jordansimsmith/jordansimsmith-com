@@ -1,5 +1,6 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 load("@rules_java//java:defs.bzl", "java_binary", "java_library")
+load("//lib/http:defs.bzl", "stub_server_image")
 load("//lib/localstack:defs.bzl", "localstack_image")
 
 HANDLERS = glob(["src/main/java/**/*Handler.java"])
@@ -488,6 +489,20 @@ java_binary(
     ],
 )
 
+java_binary(
+    name = "fetchtcg-stub-server",
+    testonly = True,
+    srcs = ["src/test/java/com/jordansimsmith/tcginventory/FetchTcgStubServer.java"],
+    create_executable = False,
+)
+
+java_binary(
+    name = "firebase-stub-server",
+    testonly = True,
+    srcs = ["src/test/java/com/jordansimsmith/tcginventory/FirebaseStubServer.java"],
+    create_executable = False,
+)
+
 java_library(
     name = "test-lib",
     testonly = True,
@@ -496,6 +511,8 @@ java_library(
         exclude = INTEGRATION_TESTS + E2E_TESTS + UNIT_TESTS,
     ),
     data = [
+        ":fetchtcg-stub-load",
+        ":firebase-stub-load",
         ":local-load",
     ],
     resources = [
@@ -506,6 +523,7 @@ java_library(
         ":lib",
         "//lib/dynamodb:test-lib",
         "//lib/http:lib",
+        "//lib/http:test-lib",
         "//lib/json:lib",
         "//lib/localstack:lib",
         "//lib/queue:lib",
@@ -628,6 +646,16 @@ localstack_image(
     repo_tag = "bazel/tcg-inventory-local:latest",
 )
 
+stub_server_image(
+    name = "fetchtcg-stub",
+    deploy_jar = ":fetchtcg-stub-server_deploy.jar",
+)
+
+stub_server_image(
+    name = "firebase-stub",
+    deploy_jar = ":firebase-stub-server_deploy.jar",
+)
+
 java_test_suite(
     name = "e2e-tests",
     size = "large",
@@ -647,12 +675,16 @@ java_test_suite(
         ":lib",
         ":test-lib",
         "//lib/dynamodb:test-lib",
+        "//lib/http:test-lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:org_assertj_assertj_core",
+        "@maven//:org_awaitility_awaitility",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
         "@maven//:org_slf4j_slf4j_api",
-        "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:org_testcontainers_testcontainers",
         "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
     ],
 )

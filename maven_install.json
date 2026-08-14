@@ -19,6 +19,7 @@
     "com.google.j2objc:j2objc-annotations": 2003271689,
     "net.sf.biweekly:biweekly": -637597406,
     "org.assertj:assertj-core": -1145412507,
+    "org.awaitility:awaitility": 2074909829,
     "org.jsoup:jsoup": 1981839900,
     "org.junit.jupiter:junit-jupiter-api": 378698123,
     "org.junit.jupiter:junit-jupiter-engine": -1948477529,
@@ -85,7 +86,9 @@
     "org.apache.commons:commons-lang3": 1110126408,
     "org.apiguardian:apiguardian-api": -1579303244,
     "org.assertj:assertj-core": -1692391089,
+    "org.awaitility:awaitility": 405038793,
     "org.checkerframework:checker-compat-qual": 205736368,
+    "org.hamcrest:hamcrest": 1473804130,
     "org.jetbrains.kotlin:kotlin-metadata-jvm": 2084183153,
     "org.jetbrains.kotlin:kotlin-reflect": 632291118,
     "org.jetbrains.kotlin:kotlin-stdlib": -300612860,
@@ -395,11 +398,23 @@
       },
       "version": "3.27.7"
     },
+    "org.awaitility:awaitility": {
+      "shasums": {
+        "jar": "ee58568ea5945dcf988551501655183dc184e23e45a8e013fdfd9036194e6f7b"
+      },
+      "version": "4.3.0"
+    },
     "org.checkerframework:checker-compat-qual": {
       "shasums": {
         "jar": "d76b9afea61c7c082908023f0cbc1427fab9abd2df915c8b8a3e7a509bccbc6d"
       },
       "version": "2.5.3"
+    },
+    "org.hamcrest:hamcrest": {
+      "shasums": {
+        "jar": "ba93b2e3a562322ba432f0a1b53addcc55cb188253319a020ed77f824e692050"
+      },
+      "version": "2.1"
     },
     "org.jetbrains.kotlin:kotlin-metadata-jvm": {
       "shasums": {
@@ -861,6 +876,7 @@
       "org.apache.commons:commons-lang3"
     ],
     "org.assertj:assertj-core": ["net.bytebuddy:byte-buddy"],
+    "org.awaitility:awaitility": ["org.hamcrest:hamcrest"],
     "org.jetbrains.kotlin:kotlin-metadata-jvm": [
       "org.jetbrains.kotlin:kotlin-stdlib"
     ],
@@ -1782,8 +1798,31 @@
       "org.assertj.core.util.introspection",
       "org.assertj.core.util.xml"
     ],
+    "org.awaitility:awaitility": [
+      "org.awaitility",
+      "org.awaitility.classpath",
+      "org.awaitility.constraint",
+      "org.awaitility.core",
+      "org.awaitility.pollinterval",
+      "org.awaitility.reflect",
+      "org.awaitility.reflect.exception",
+      "org.awaitility.spi"
+    ],
     "org.checkerframework:checker-compat-qual": [
       "org.checkerframework.checker.nullness.compatqual"
+    ],
+    "org.hamcrest:hamcrest": [
+      "org.hamcrest",
+      "org.hamcrest.beans",
+      "org.hamcrest.collection",
+      "org.hamcrest.comparator",
+      "org.hamcrest.core",
+      "org.hamcrest.internal",
+      "org.hamcrest.io",
+      "org.hamcrest.number",
+      "org.hamcrest.object",
+      "org.hamcrest.text",
+      "org.hamcrest.xml"
     ],
     "org.jetbrains.kotlin:kotlin-metadata-jvm": [
       "kotlin.metadata",
@@ -3005,7 +3044,9 @@
       "org.apache.commons:commons-lang3",
       "org.apiguardian:apiguardian-api",
       "org.assertj:assertj-core",
+      "org.awaitility:awaitility",
       "org.checkerframework:checker-compat-qual",
+      "org.hamcrest:hamcrest",
       "org.jetbrains.kotlin:kotlin-metadata-jvm",
       "org.jetbrains.kotlin:kotlin-reflect",
       "org.jetbrains.kotlin:kotlin-stdlib",
