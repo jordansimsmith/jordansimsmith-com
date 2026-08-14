@@ -147,6 +147,12 @@
         "confirm_order": "//tcg_inventory_api:confirm-order-handler_deploy.jar",
         "jobs_handler": "//tcg_inventory_api:jobs-handler_deploy.jar"
       }
+    },
+    {
+      "path": "tcg_inventory_web/infra",
+      "artifacts": {
+        "build": "//tcg_inventory_web:build"
+      }
     }
   ]
 }
