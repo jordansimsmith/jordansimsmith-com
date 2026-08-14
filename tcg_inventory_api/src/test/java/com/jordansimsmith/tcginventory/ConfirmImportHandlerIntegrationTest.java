@@ -250,6 +250,9 @@ public class ConfirmImportHandlerIntegrationTest {
             "scryfall-1",
             "en");
     row1.setDecision("keep");
+    row1.setSuggestedPrice("1.50");
+    row1.setFetchtcgCardId("mtg_168_c_dom_normal");
+    row1.setFetchtcgSetId(2624);
     row1.setSequenceNumber(0);
     tcgInventoryTable.putItem(row1);
 
@@ -267,6 +270,9 @@ public class ConfirmImportHandlerIntegrationTest {
             "scryfall-1",
             "en");
     row2.setDecision("keep");
+    row2.setSuggestedPrice("1.50");
+    row2.setFetchtcgCardId("mtg_168_c_dom_normal");
+    row2.setFetchtcgSetId(2624);
     row2.setSequenceNumber(1);
     tcgInventoryTable.putItem(row2);
 
@@ -363,6 +369,9 @@ public class ConfirmImportHandlerIntegrationTest {
             scryfallId,
             "en");
     rowItem.setDecision("keep");
+    rowItem.setSuggestedPrice("1.50");
+    rowItem.setFetchtcgCardId("mtg_" + position + "_c_dom_normal");
+    rowItem.setFetchtcgSetId(2624);
     tcgInventoryTable.putItem(rowItem);
   }
 

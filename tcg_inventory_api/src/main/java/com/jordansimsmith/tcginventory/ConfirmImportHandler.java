@@ -258,104 +258,13 @@ public class ConfirmImportHandler
                             TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build(),
                             TcgInventoryItem.SK,
                                 AttributeValue.builder().s(TcgInventoryItem.formatSkuSk()).build()))
-                    .updateExpression(
-                        "ADD "
-                            + TcgInventoryItem.VERSION
-                            + " :one"
-                            + " SET "
-                            + TcgInventoryItem.SKU_ID
-                            + " = :skuId, "
-                            + TcgInventoryItem.SCRYFALL_ID
-                            + " = :scryfallId, "
-                            + "#finish = :finish, "
-                            + "#condition = :condition, "
-                            + "#name = :cardName, "
-                            + TcgInventoryItem.SET_CODE
-                            + " = :setCode, "
-                            + TcgInventoryItem.SET_NAME
-                            + " = :setName, "
-                            + TcgInventoryItem.COLLECTOR_NUMBER
-                            + " = :collectorNumber, "
-                            + TcgInventoryItem.SUGGESTED_PRICE
-                            + " = :suggestedPrice, "
-                            + TcgInventoryItem.FETCHTCG_CARD_ID
-                            + " = :fetchtcgCardId, "
-                            + TcgInventoryItem.FETCHTCG_SET_ID
-                            + " = :fetchtcgSetId, "
-                            + TcgInventoryItem.DIRTY
-                            + " = :dirty, "
-                            + TcgInventoryItem.GSI1PK
-                            + " = :gsi1pk, "
-                            + TcgInventoryItem.GSI1SK
-                            + " = :gsi1sk, "
-                            + TcgInventoryItem.GSI2PK
-                            + " = :gsi2pk, "
-                            + TcgInventoryItem.GSI2SK
-                            + " = :gsi2sk")
+                    .updateExpression(buildSkuUpdateExpression(firstRow))
                     .expressionAttributeNames(
                         Map.of(
                             "#finish", TcgInventoryItem.FINISH,
                             "#condition", TcgInventoryItem.CONDITION,
                             "#name", TcgInventoryItem.NAME))
-                    .expressionAttributeValues(
-                        Map.ofEntries(
-                            Map.entry(":one", AttributeValue.builder().n("1").build()),
-                            Map.entry(":skuId", AttributeValue.builder().s(skuId).build()),
-                            Map.entry(
-                                ":scryfallId",
-                                AttributeValue.builder().s(firstRow.getScryfallId()).build()),
-                            Map.entry(
-                                ":finish",
-                                AttributeValue.builder().s(firstRow.getFinish()).build()),
-                            Map.entry(
-                                ":condition",
-                                AttributeValue.builder().s(firstRow.getCondition()).build()),
-                            Map.entry(
-                                ":cardName",
-                                AttributeValue.builder().s(firstRow.getName()).build()),
-                            Map.entry(
-                                ":setCode",
-                                AttributeValue.builder().s(firstRow.getSetCode()).build()),
-                            Map.entry(
-                                ":setName",
-                                AttributeValue.builder().s(firstRow.getSetName()).build()),
-                            Map.entry(
-                                ":collectorNumber",
-                                AttributeValue.builder().s(firstRow.getCollectorNumber()).build()),
-                            Map.entry(
-                                ":suggestedPrice",
-                                AttributeValue.builder().s(firstRow.getSuggestedPrice()).build()),
-                            Map.entry(
-                                ":fetchtcgCardId",
-                                AttributeValue.builder().s(firstRow.getFetchtcgCardId()).build()),
-                            Map.entry(
-                                ":fetchtcgSetId",
-                                AttributeValue.builder()
-                                    .n(String.valueOf(firstRow.getFetchtcgSetId()))
-                                    .build()),
-                            Map.entry(":dirty", AttributeValue.builder().bool(true).build()),
-                            Map.entry(
-                                ":gsi1pk",
-                                AttributeValue.builder()
-                                    .s(TcgInventoryItem.formatGsi1pk(user))
-                                    .build()),
-                            Map.entry(
-                                ":gsi1sk",
-                                AttributeValue.builder()
-                                    .s(TcgInventoryItem.formatGsi1sk(skuId))
-                                    .build()),
-                            Map.entry(
-                                ":gsi2pk",
-                                AttributeValue.builder()
-                                    .s(TcgInventoryItem.formatGsi2pk(user))
-                                    .build()),
-                            Map.entry(
-                                ":gsi2sk",
-                                AttributeValue.builder()
-                                    .s(
-                                        TcgInventoryItem.formatGsi2sk(
-                                            firstRow.getName().toLowerCase(), skuId))
-                                    .build())))
+                    .expressionAttributeValues(buildSkuUpdateValues(user, skuId, firstRow))
                     .build())
             .build();
     transactItems.add(skuUpdate);
@@ -385,6 +294,73 @@ public class ConfirmImportHandler
     } catch (TransactionCanceledException e) {
       LOGGER.info("transaction cancelled for SKU chunk {} (likely replay)", skuId);
     }
+  }
+
+  private String buildSkuUpdateExpression(TcgInventoryItem firstRow) {
+    var sb = new StringBuilder();
+    sb.append("ADD ").append(TcgInventoryItem.VERSION).append(" :one");
+    sb.append(" SET ");
+    sb.append(TcgInventoryItem.SKU_ID).append(" = :skuId, ");
+    sb.append(TcgInventoryItem.SCRYFALL_ID).append(" = :scryfallId, ");
+    sb.append("#finish = :finish, ");
+    sb.append("#condition = :condition, ");
+    sb.append("#name = :cardName, ");
+    sb.append(TcgInventoryItem.SET_CODE).append(" = :setCode, ");
+    sb.append(TcgInventoryItem.SET_NAME).append(" = :setName, ");
+    sb.append(TcgInventoryItem.COLLECTOR_NUMBER).append(" = :collectorNumber, ");
+    if (firstRow.getSuggestedPrice() != null) {
+      sb.append(TcgInventoryItem.SUGGESTED_PRICE).append(" = :suggestedPrice, ");
+    }
+    if (firstRow.getFetchtcgCardId() != null) {
+      sb.append(TcgInventoryItem.FETCHTCG_CARD_ID).append(" = :fetchtcgCardId, ");
+    }
+    if (firstRow.getFetchtcgSetId() != null) {
+      sb.append(TcgInventoryItem.FETCHTCG_SET_ID).append(" = :fetchtcgSetId, ");
+    }
+    sb.append(TcgInventoryItem.DIRTY).append(" = :dirty, ");
+    sb.append(TcgInventoryItem.GSI1PK).append(" = :gsi1pk, ");
+    sb.append(TcgInventoryItem.GSI1SK).append(" = :gsi1sk, ");
+    sb.append(TcgInventoryItem.GSI2PK).append(" = :gsi2pk, ");
+    sb.append(TcgInventoryItem.GSI2SK).append(" = :gsi2sk");
+    return sb.toString();
+  }
+
+  private Map<String, AttributeValue> buildSkuUpdateValues(
+      String user, String skuId, TcgInventoryItem firstRow) {
+    var values = new HashMap<String, AttributeValue>();
+    values.put(":one", AttributeValue.builder().n("1").build());
+    values.put(":skuId", AttributeValue.builder().s(skuId).build());
+    values.put(":scryfallId", AttributeValue.builder().s(firstRow.getScryfallId()).build());
+    values.put(":finish", AttributeValue.builder().s(firstRow.getFinish()).build());
+    values.put(":condition", AttributeValue.builder().s(firstRow.getCondition()).build());
+    values.put(":cardName", AttributeValue.builder().s(firstRow.getName()).build());
+    values.put(":setCode", AttributeValue.builder().s(firstRow.getSetCode()).build());
+    values.put(":setName", AttributeValue.builder().s(firstRow.getSetName()).build());
+    values.put(
+        ":collectorNumber", AttributeValue.builder().s(firstRow.getCollectorNumber()).build());
+    if (firstRow.getSuggestedPrice() != null) {
+      values.put(
+          ":suggestedPrice", AttributeValue.builder().s(firstRow.getSuggestedPrice()).build());
+    }
+    if (firstRow.getFetchtcgCardId() != null) {
+      values.put(
+          ":fetchtcgCardId", AttributeValue.builder().s(firstRow.getFetchtcgCardId()).build());
+    }
+    if (firstRow.getFetchtcgSetId() != null) {
+      values.put(
+          ":fetchtcgSetId",
+          AttributeValue.builder().n(String.valueOf(firstRow.getFetchtcgSetId())).build());
+    }
+    values.put(":dirty", AttributeValue.builder().bool(true).build());
+    values.put(":gsi1pk", AttributeValue.builder().s(TcgInventoryItem.formatGsi1pk(user)).build());
+    values.put(":gsi1sk", AttributeValue.builder().s(TcgInventoryItem.formatGsi1sk(skuId)).build());
+    values.put(":gsi2pk", AttributeValue.builder().s(TcgInventoryItem.formatGsi2pk(user)).build());
+    values.put(
+        ":gsi2sk",
+        AttributeValue.builder()
+            .s(TcgInventoryItem.formatGsi2sk(firstRow.getName().toLowerCase(), skuId))
+            .build());
+    return values;
   }
 
   private List<PlacementInstruction> buildPlacementInstructions(List<TcgInventoryItem> keepRows) {
