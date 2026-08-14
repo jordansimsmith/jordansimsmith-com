@@ -34,6 +34,10 @@ locals {
     "auction_tracker_api_send_digest_handler"
   ]
 
+  dead_letter_queues = [
+    "tcg_inventory_api_jobs_dlq.fifo",
+  ]
+
   subscriptions = ["jordansimsmith@gmail.com"]
 }
 
@@ -142,6 +146,36 @@ resource "aws_cloudwatch_metric_alarm" "lambda_failures" {
     id          = "error_rate"
     return_data = true
     expression  = "(errors / invocations) * 100"
+  }
+
+  alarm_actions = [aws_sns_topic.lambda_failure_notifications.arn]
+  ok_actions    = [aws_sns_topic.lambda_failure_notifications.arn]
+}
+
+resource "aws_cloudwatch_metric_alarm" "dead_letter_queue" {
+  for_each = toset(local.dead_letter_queues)
+
+  alarm_name          = "${each.value}_alarm"
+  comparison_operator = "GreaterThanThreshold"
+  evaluation_periods  = 1
+  threshold           = 0
+  alarm_description   = "This alarm fires when the ${each.value} DLQ has messages"
+  treat_missing_data  = "notBreaching"
+
+  metric_query {
+    id          = "messages"
+    return_data = true
+
+    metric {
+      metric_name = "ApproximateNumberOfMessagesVisible"
+      namespace   = "AWS/SQS"
+      period      = 60
+      stat        = "Maximum"
+
+      dimensions = {
+        QueueName = each.value
+      }
+    }
   }
 
   alarm_actions = [aws_sns_topic.lambda_failure_notifications.arn]

@@ -23,7 +23,7 @@ import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Module
 public class TcgInventoryModule {
-  static final String JOBS_QUEUE_NAME = "tcg_inventory_jobs";
+  static final String JOBS_QUEUE_NAME = "tcg_inventory_jobs.fifo";
 
   @Provides
   @Singleton

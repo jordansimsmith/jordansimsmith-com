@@ -88,7 +88,7 @@ public class CreatePublishHandler
     var jobItem = TcgInventoryItem.createJob(user, jobId, "publish", null, now);
     tcgInventoryTable.putItem(jobItem);
 
-    jobsQueue.send(new JobMessage(user, jobId, "publish"));
+    jobsQueue.send(new JobMessage(user, jobId, "publish"), user);
 
     return httpResponseFactory.ok(
         new PublishResponse(jobId, "queued", 0, null, dirtyCount, now.getEpochSecond(), null));

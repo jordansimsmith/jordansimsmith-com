@@ -11,6 +11,11 @@ public class FakeQueueClient<T> implements QueueClient<T> {
     messages.add(message);
   }
 
+  @Override
+  public void send(T message, String messageGroupId) {
+    messages.add(message);
+  }
+
   public List<T> getMessages() {
     return List.copyOf(messages);
   }

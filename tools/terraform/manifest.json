@@ -123,6 +123,30 @@
     {
       "path": "platform/infra",
       "artifacts": {}
+    },
+    {
+      "path": "tcg_inventory_api/infra",
+      "artifacts": {
+        "get_settings": "//tcg_inventory_api:get-settings-handler_deploy.jar",
+        "put_settings": "//tcg_inventory_api:put-settings-handler_deploy.jar",
+        "create_import": "//tcg_inventory_api:create-import-handler_deploy.jar",
+        "find_imports": "//tcg_inventory_api:find-imports-handler_deploy.jar",
+        "get_import": "//tcg_inventory_api:get-import-handler_deploy.jar",
+        "delete_import": "//tcg_inventory_api:delete-import-handler_deploy.jar",
+        "confirm_import": "//tcg_inventory_api:confirm-import-handler_deploy.jar",
+        "update_import_row": "//tcg_inventory_api:update-import-row-handler_deploy.jar",
+        "delete_import_row": "//tcg_inventory_api:delete-import-row-handler_deploy.jar",
+        "create_publish": "//tcg_inventory_api:create-publish-handler_deploy.jar",
+        "get_publish": "//tcg_inventory_api:get-publish-handler_deploy.jar",
+        "find_skus": "//tcg_inventory_api:find-skus-handler_deploy.jar",
+        "get_sku": "//tcg_inventory_api:get-sku-handler_deploy.jar",
+        "remove_unit": "//tcg_inventory_api:remove-unit-handler_deploy.jar",
+        "update_unit": "//tcg_inventory_api:update-unit-handler_deploy.jar",
+        "find_orders": "//tcg_inventory_api:find-orders-handler_deploy.jar",
+        "get_order": "//tcg_inventory_api:get-order-handler_deploy.jar",
+        "confirm_order": "//tcg_inventory_api:confirm-order-handler_deploy.jar",
+        "jobs_handler": "//tcg_inventory_api:jobs-handler_deploy.jar"
+      }
     }
   ]
 }

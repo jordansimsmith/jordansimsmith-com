@@ -8,10 +8,11 @@ variable "domain_name" {
 
 variable "lambdas" {
   type = map(object({
-    handler     = string
-    artifact    = string
-    memory_size = optional(number, 1769)
-    timeout     = optional(number, 10)
+    handler                        = string
+    artifact                       = string
+    memory_size                    = optional(number, 1769)
+    timeout                        = optional(number, 10)
+    reserved_concurrent_executions = optional(number, -1)
   }))
 }
 
@@ -29,8 +30,8 @@ variable "endpoints" {
   }
 
   validation {
-    condition     = alltrue([for endpoint in var.endpoints : length(split("/", endpoint.path)) <= 2])
-    error_message = "Endpoint paths support at most two segments (resource/{id})."
+    condition     = alltrue([for endpoint in var.endpoints : length(split("/", endpoint.path)) <= 4])
+    error_message = "Endpoint paths support at most four segments."
   }
 }
 

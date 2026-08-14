@@ -111,7 +111,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     tcgInventoryTable.putItem(jobItem);
 
     if (!result.complete()) {
-      jobsQueue.send(message);
+      jobsQueue.send(message, message.user());
     }
   }
 

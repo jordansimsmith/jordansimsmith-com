@@ -30,9 +30,25 @@ locals {
     } if length(split("/", path)) == 2
   }
 
+  depth_3_resources = {
+    for path in local.resource_paths : path => {
+      path_part = element(split("/", path), 2)
+      parent    = join("/", slice(split("/", path), 0, 2))
+    } if length(split("/", path)) == 3
+  }
+
+  depth_4_resources = {
+    for path in local.resource_paths : path => {
+      path_part = element(split("/", path), 3)
+      parent    = join("/", slice(split("/", path), 0, 3))
+    } if length(split("/", path)) == 4
+  }
+
   resource_ids = merge(
     { for path, resource in aws_api_gateway_resource.root_resource : path => resource.id },
     { for path, resource in aws_api_gateway_resource.child_resource : path => resource.id },
+    { for path, resource in aws_api_gateway_resource.depth_3_resource : path => resource.id },
+    { for path, resource in aws_api_gateway_resource.depth_4_resource : path => resource.id },
   )
 
   options_resources = local.cors_enabled ? local.resource_paths : toset([])
@@ -65,6 +81,22 @@ resource "aws_api_gateway_resource" "child_resource" {
 
   rest_api_id = aws_api_gateway_rest_api.this.id
   parent_id   = aws_api_gateway_resource.root_resource[each.value.parent].id
+  path_part   = each.value.path_part
+}
+
+resource "aws_api_gateway_resource" "depth_3_resource" {
+  for_each = local.depth_3_resources
+
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  parent_id   = aws_api_gateway_resource.child_resource[each.value.parent].id
+  path_part   = each.value.path_part
+}
+
+resource "aws_api_gateway_resource" "depth_4_resource" {
+  for_each = local.depth_4_resources
+
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  parent_id   = aws_api_gateway_resource.depth_3_resource[each.value.parent].id
   path_part   = each.value.path_part
 }
 
@@ -224,6 +256,8 @@ resource "aws_api_gateway_deployment" "this" {
       aws_api_gateway_gateway_response.default_5xx,
       aws_api_gateway_resource.root_resource,
       aws_api_gateway_resource.child_resource,
+      aws_api_gateway_resource.depth_3_resource,
+      aws_api_gateway_resource.depth_4_resource,
       aws_api_gateway_method.method,
       aws_api_gateway_integration.integration,
       aws_api_gateway_method.options,
