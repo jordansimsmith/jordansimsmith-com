@@ -31,9 +31,21 @@ export function PublishWidget() {
         if (cancelled) {
           return;
         }
-        setError(
-          e instanceof Error ? e.message : 'Failed to load publish status',
-        );
+        const message = e instanceof Error ? e.message : '';
+        if (message === 'Not Found') {
+          setPublish({
+            status: null,
+            published_sku_count: 0,
+            total_sku_count: 0,
+            error: null,
+            started_at: null,
+            finished_at: null,
+            pending_sku_count: 0,
+          });
+          setError(null);
+        } else {
+          setError(message || 'Failed to load publish status');
+        }
       }
     };
 

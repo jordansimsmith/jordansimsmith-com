@@ -22,6 +22,7 @@ export function InventoryPage() {
   const [skus, setSkus] = useState<SkuSummary[]>([]);
   const [nextContinuation, setNextContinuation] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -44,11 +45,16 @@ export function InventoryPage() {
   });
 
   useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
     const requestId = ++requestIdRef.current;
     const fetchSkus = async () => {
       try {
         const response = await apiClient.findSkus(
-          search ? { search } : undefined,
+          debouncedSearch ? { search: debouncedSearch } : undefined,
         );
         if (requestId !== requestIdRef.current) {
           return;
@@ -72,7 +78,7 @@ export function InventoryPage() {
     };
 
     fetchSkus();
-  }, [search, setSelectedIndex]);
+  }, [debouncedSearch, setSelectedIndex]);
 
   const handleLoadMore = async () => {
     if (!nextContinuation) {
@@ -81,7 +87,7 @@ export function InventoryPage() {
     setLoadingMore(true);
     try {
       const response = await apiClient.findSkus({
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         continuation: nextContinuation,
       });
       setSkus((previous) => [...previous, ...response.skus]);
