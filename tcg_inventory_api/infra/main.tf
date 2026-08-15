@@ -152,9 +152,22 @@ module "java_api" {
     confirm_order     = { path = "orders/{order_id}/confirm", method = "POST", lambda = "confirm_order" }
   }
 
+  role_policy_arns = {
+    dynamodb       = aws_iam_policy.lambda_dynamodb.arn
+    sqs            = aws_iam_policy.lambda_sqs.arn
+    secretsmanager = aws_iam_policy.lambda_secretsmanager.arn
+  }
+
   providers = {
     aws.us_east_1 = aws.us_east_1
   }
+
+  # snapstart snapshot init resolves the jobs queue and dynamodb table at
+  # startup, so they must exist before any lambda version is published
+  depends_on = [
+    aws_sqs_queue.jobs,
+    aws_dynamodb_table.tcg_inventory,
+  ]
 }
 
 resource "aws_dynamodb_table" "tcg_inventory" {
@@ -215,13 +228,13 @@ resource "aws_dynamodb_table" "tcg_inventory" {
 }
 
 resource "aws_sqs_queue" "jobs_dlq" {
-  name                        = "${local.application_id}_jobs_dlq.fifo"
+  name                        = "tcg_inventory_jobs_dlq.fifo"
   fifo_queue                  = true
   content_based_deduplication = true
 }
 
 resource "aws_sqs_queue" "jobs" {
-  name                        = "${local.application_id}_jobs.fifo"
+  name                        = "tcg_inventory_jobs.fifo"
   fifo_queue                  = true
   content_based_deduplication = true
   visibility_timeout_seconds  = 960
@@ -237,19 +250,6 @@ resource "aws_lambda_event_source_mapping" "jobs" {
   function_name                      = module.java_api.lambda_functions["jobs_handler"].qualified_arn
   batch_size                         = 1
   maximum_batching_window_in_seconds = 0
-}
-
-resource "aws_lambda_permission" "sqs_invoke_jobs_handler" {
-  statement_id  = "AllowSQSInvoke"
-  action        = "lambda:InvokeFunction"
-  function_name = module.java_api.lambda_functions["jobs_handler"].function_name
-  qualifier     = module.java_api.lambda_functions["jobs_handler"].version
-  principal     = "sqs.amazonaws.com"
-  source_arn    = aws_sqs_queue.jobs.arn
-
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
 resource "aws_secretsmanager_secret" "tcg_inventory" {
@@ -291,11 +291,6 @@ resource "aws_iam_policy" "lambda_dynamodb" {
   policy = data.aws_iam_policy_document.lambda_dynamodb.json
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
-  role       = module.java_api.lambda_role_name
-  policy_arn = aws_iam_policy.lambda_dynamodb.arn
-}
-
 data "aws_iam_policy_document" "lambda_sqs" {
   statement {
     effect = "Allow"
@@ -320,11 +315,6 @@ resource "aws_iam_policy" "lambda_sqs" {
   policy = data.aws_iam_policy_document.lambda_sqs.json
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_sqs" {
-  role       = module.java_api.lambda_role_name
-  policy_arn = aws_iam_policy.lambda_sqs.arn
-}
-
 data "aws_iam_policy_document" "lambda_secretsmanager" {
   statement {
     effect = "Allow"
@@ -339,14 +329,15 @@ data "aws_iam_policy_document" "lambda_secretsmanager" {
       "secretsmanager:DescribeSecret",
     ]
   }
+
+  statement {
+    effect    = "Allow"
+    resources = ["*"]
+    actions   = ["secretsmanager:ListSecrets"]
+  }
 }
 
 resource "aws_iam_policy" "lambda_secretsmanager" {
   name   = "${local.application_id}_lambda_secretsmanager"
   policy = data.aws_iam_policy_document.lambda_secretsmanager.json
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_secretsmanager" {
-  role       = module.java_api.lambda_role_name
-  policy_arn = aws_iam_policy.lambda_secretsmanager.arn
 }
