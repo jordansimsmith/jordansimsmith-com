@@ -2,6 +2,7 @@ package com.jordansimsmith.tcginventory;
 
 import com.jordansimsmith.time.Clock;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -129,7 +130,8 @@ class AppraiseJobProcessor {
             nzPricing != null && nzPricing.tcgMarketPrice() != null
                 ? nzPricing.tcgMarketPrice()
                 : BigDecimal.ZERO;
-        return new ResolvedCard(card.id(), entry.setId(), marketPrice);
+        return new ResolvedCard(
+            card.id(), entry.setId(), marketPrice.setScale(2, RoundingMode.HALF_UP));
       }
     }
     return null;
