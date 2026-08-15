@@ -206,8 +206,10 @@ def apply_changes(with_changes):
     for terraform_root in sorted(with_changes, key=lambda item: item["name"]):
         plan_file = PLAN_DIR / f"{terraform_root['name']}.tfplan"
         print(f"\nApplying: {terraform_root['name']}")
+        # low parallelism keeps concurrent snapstart snapshot creation under
+        # the account limit, which otherwise fails creates with 409 conflicts
         subprocess.run(
-            ["terraform", "apply", plan_file],
+            ["terraform", "apply", "-parallelism=5", plan_file],
             cwd=terraform_root["infra_dir"],
             check=True,
         )
