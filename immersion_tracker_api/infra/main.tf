@@ -92,6 +92,11 @@ module "java_api" {
     sync_movies   = { path = "syncmovies", method = "POST", lambda = "sync_movies" }
   }
 
+  role_policy_arns = {
+    dynamodb       = aws_iam_policy.lambda_dynamodb.arn
+    secretsmanager = aws_iam_policy.lambda_secretsmanager.arn
+  }
+
   providers = {
     aws.us_east_1 = aws.us_east_1
   }
@@ -157,11 +162,6 @@ resource "aws_iam_policy" "lambda_dynamodb" {
   policy = data.aws_iam_policy_document.lambda_dynamodb_allow_policy_document.json
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
-  role       = module.java_api.lambda_role_name
-  policy_arn = aws_iam_policy.lambda_dynamodb.arn
-}
-
 data "aws_iam_policy_document" "lambda_secretsmanager_allow_policy_document" {
   statement {
     effect = "Allow"
@@ -194,9 +194,4 @@ data "aws_iam_policy_document" "lambda_secretsmanager_allow_policy_document" {
 resource "aws_iam_policy" "lambda_secretsmanager" {
   name   = "${local.application_id}_lambda_secretsmanager"
   policy = data.aws_iam_policy_document.lambda_secretsmanager_allow_policy_document.json
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_secretsmanager" {
-  role       = module.java_api.lambda_role_name
-  policy_arn = aws_iam_policy.lambda_secretsmanager.arn
 }

@@ -69,6 +69,11 @@ module "java_api" {
     get_calendar_subscription = { path = "calendar", method = "GET", lambda = "get_calendar_subscription" }
   }
 
+  role_policy_arns = {
+    dynamodb = aws_iam_policy.lambda_dynamodb.arn
+    sns      = aws_iam_policy.lambda_sns.arn
+  }
+
   providers = {
     aws.us_east_1 = aws.us_east_1
   }
@@ -130,11 +135,6 @@ resource "aws_iam_policy" "lambda_dynamodb" {
   policy = data.aws_iam_policy_document.lambda_dynamodb_allow_policy_document.json
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
-  role       = module.java_api.lambda_role_name
-  policy_arn = aws_iam_policy.lambda_dynamodb.arn
-}
-
 resource "aws_sns_topic" "fixture_updates" {
   name = "${local.application_id}_fixture_updates"
 }
@@ -176,11 +176,6 @@ data "aws_iam_policy_document" "lambda_sns" {
 resource "aws_iam_policy" "lambda_sns" {
   name   = "${local.application_id}_lambda_sns"
   policy = data.aws_iam_policy_document.lambda_sns.json
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_sns" {
-  role       = module.java_api.lambda_role_name
-  policy_arn = aws_iam_policy.lambda_sns.arn
 }
 
 resource "aws_cloudwatch_event_rule" "update_fixtures" {

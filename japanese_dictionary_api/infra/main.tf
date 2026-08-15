@@ -78,6 +78,10 @@ module "java_api" {
     delete_bookmark = { path = "bookmarks/{sequence}", method = "DELETE", lambda = "delete_bookmark" }
   }
 
+  role_policy_arns = {
+    dynamodb = aws_iam_policy.lambda_dynamodb.arn
+  }
+
   providers = {
     aws.us_east_1 = aws.us_east_1
   }
@@ -190,9 +194,4 @@ data "aws_iam_policy_document" "lambda_dynamodb_allow_policy_document" {
 resource "aws_iam_policy" "lambda_dynamodb" {
   name   = "${local.application_id}_lambda_dynamodb"
   policy = data.aws_iam_policy_document.lambda_dynamodb_allow_policy_document.json
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
-  role       = module.java_api.lambda_role_name
-  policy_arn = aws_iam_policy.lambda_dynamodb.arn
 }

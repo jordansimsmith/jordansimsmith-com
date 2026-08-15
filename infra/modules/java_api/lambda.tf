@@ -1,8 +1,9 @@
 module "lambda" {
   source = "../java_lambda"
 
-  application_id = var.application_id
-  lambdas        = var.lambdas
+  application_id   = var.application_id
+  lambdas          = var.lambdas
+  role_policy_arns = var.role_policy_arns
 }
 
 resource "aws_lambda_permission" "api_gateway" {

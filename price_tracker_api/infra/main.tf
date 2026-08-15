@@ -46,6 +46,11 @@ module "java_lambda" {
       timeout  = 300
     }
   }
+
+  role_policy_arns = {
+    dynamodb = aws_iam_policy.lambda_dynamodb.arn
+    sns      = aws_iam_policy.lambda_sns.arn
+  }
 }
 
 resource "aws_dynamodb_table" "price_tracker" {
@@ -103,11 +108,6 @@ resource "aws_iam_policy" "lambda_dynamodb" {
   policy = data.aws_iam_policy_document.lambda_dynamodb.json
 }
 
-resource "aws_iam_role_policy_attachment" "lambda_dynamodb" {
-  role       = module.java_lambda.lambda_role_name
-  policy_arn = aws_iam_policy.lambda_dynamodb.arn
-}
-
 resource "aws_sns_topic" "price_updates" {
   name = "${local.application_id}_price_updates"
 }
@@ -149,11 +149,6 @@ data "aws_iam_policy_document" "lambda_sns" {
 resource "aws_iam_policy" "lambda_sns" {
   name   = "${local.application_id}_lambda_sns"
   policy = data.aws_iam_policy_document.lambda_sns.json
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_sns" {
-  role       = module.java_lambda.lambda_role_name
-  policy_arn = aws_iam_policy.lambda_sns.arn
 }
 
 resource "aws_cloudwatch_event_rule" "update_prices" {

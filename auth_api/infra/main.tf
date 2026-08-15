@@ -48,6 +48,10 @@ module "java_lambda" {
       artifact = var.artifacts["auth"]
     }
   }
+
+  role_policy_arns = {
+    secretsmanager = aws_iam_policy.lambda_secretsmanager.arn
+  }
 }
 
 # consumers reference the authorizer through this stable alias so their
@@ -108,9 +112,4 @@ data "aws_iam_policy_document" "lambda_secretsmanager_allow_policy_document" {
 resource "aws_iam_policy" "lambda_secretsmanager" {
   name   = "${local.application_id}_lambda_secretsmanager"
   policy = data.aws_iam_policy_document.lambda_secretsmanager_allow_policy_document.json
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_secretsmanager" {
-  role       = module.java_lambda.lambda_role_name
-  policy_arn = aws_iam_policy.lambda_secretsmanager.arn
 }
