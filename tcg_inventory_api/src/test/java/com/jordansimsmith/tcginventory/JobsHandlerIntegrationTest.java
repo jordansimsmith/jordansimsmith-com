@@ -286,6 +286,7 @@ public class JobsHandlerIntegrationTest {
                 83663,
                 "ACCEPTED",
                 null,
+                "2026-08-11T04:42:12.476+0000",
                 "PICKUP",
                 new BigDecimal("3.33"),
                 List.of(
@@ -335,6 +336,7 @@ public class JobsHandlerIntegrationTest {
                 83663,
                 "ACCEPTED",
                 "SEND_PICKUP_ADDRESS",
+                "2026-08-11T04:42:12.476+0000",
                 "PICKUP",
                 new BigDecimal("3.33"),
                 List.of())));
@@ -358,7 +360,13 @@ public class JobsHandlerIntegrationTest {
     fakeFetchTcgClient.seedSellerOffers(
         List.of(
             new FetchTcgClient.SellerOffer(
-                83663, "ACCEPTED", null, "PICKUP", new BigDecimal("3.33"), List.of())));
+                83663,
+                "ACCEPTED",
+                null,
+                "2026-08-11T04:42:12.476+0000",
+                "PICKUP",
+                new BigDecimal("3.33"),
+                List.of())));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -381,6 +389,7 @@ public class JobsHandlerIntegrationTest {
                 83663,
                 "ACCEPTED",
                 null,
+                "2026-08-11T04:42:12.476+0000",
                 "PICKUP",
                 new BigDecimal("3.33"),
                 List.of(
@@ -396,6 +405,134 @@ public class JobsHandlerIntegrationTest {
     var order = getOrder("jordan", "83663");
     assertThat(order).isNotNull();
     assertThat(order.getStatus()).isEqualTo("flagged");
+  }
+
+  @Test
+  void publishOrderPhaseShouldSkipOffersBeforeCutoff() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 3);
+    createTrackOrdersAfter("jordan", Instant.parse("2026-08-15T00:00:00Z"));
+
+    fakeFetchTcgClient.seedSellerOffers(
+        List.of(
+            new FetchTcgClient.SellerOffer(
+                83663,
+                "ACCEPTED",
+                null,
+                "2026-08-11T04:42:12.476+0000",
+                "PICKUP",
+                new BigDecimal("3.33"),
+                List.of(
+                    new FetchTcgClient.OfferItem(
+                        new FetchTcgClient.OfferListing(1001, "raw-nm"),
+                        2,
+                        new BigDecimal("1.50"))))));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "83663");
+    assertThat(order).isNull();
+
+    var units = getUnits("jordan", "scryfall-1#normal#NM");
+    assertThat(units.stream().allMatch(u -> "in_stock".equals(u.getStatus()))).isTrue();
+  }
+
+  @Test
+  void publishOrderPhaseShouldSkipOffersWithNullAcceptedAtWhenCutoffSet() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 3);
+    createTrackOrdersAfter("jordan", Instant.parse("2026-08-01T00:00:00Z"));
+
+    fakeFetchTcgClient.seedSellerOffers(
+        List.of(
+            new FetchTcgClient.SellerOffer(
+                83663,
+                "ACCEPTED",
+                null,
+                null,
+                "PICKUP",
+                new BigDecimal("3.33"),
+                List.of(
+                    new FetchTcgClient.OfferItem(
+                        new FetchTcgClient.OfferListing(1001, "raw-nm"),
+                        2,
+                        new BigDecimal("1.50"))))));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "83663");
+    assertThat(order).isNull();
+  }
+
+  @Test
+  void publishOrderPhaseShouldCreateOrderWhenCutoffNotSet() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 3);
+
+    fakeFetchTcgClient.seedSellerOffers(
+        List.of(
+            new FetchTcgClient.SellerOffer(
+                83663,
+                "ACCEPTED",
+                null,
+                "2026-08-11T04:42:12.476+0000",
+                "PICKUP",
+                new BigDecimal("3.33"),
+                List.of(
+                    new FetchTcgClient.OfferItem(
+                        new FetchTcgClient.OfferListing(1001, "raw-nm"),
+                        2,
+                        new BigDecimal("1.50"))))));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "83663");
+    assertThat(order).isNotNull();
+    assertThat(order.getStatus()).isEqualTo("awaiting_payment");
+  }
+
+  @Test
+  void publishOrderPhaseShouldCreateOrderAcceptedAfterCutoff() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 3);
+    createTrackOrdersAfter("jordan", Instant.parse("2026-08-10T00:00:00Z"));
+
+    fakeFetchTcgClient.seedSellerOffers(
+        List.of(
+            new FetchTcgClient.SellerOffer(
+                83663,
+                "ACCEPTED",
+                null,
+                "2026-08-11T04:42:12.476+0000",
+                "PICKUP",
+                new BigDecimal("3.33"),
+                List.of(
+                    new FetchTcgClient.OfferItem(
+                        new FetchTcgClient.OfferListing(1001, "raw-nm"),
+                        2,
+                        new BigDecimal("1.50"))))));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "83663");
+    assertThat(order).isNotNull();
+    assertThat(order.getStatus()).isEqualTo("awaiting_payment");
   }
 
   @Test
@@ -560,6 +697,14 @@ public class JobsHandlerIntegrationTest {
               user, skuId, i, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
       tcgInventoryTable.putItem(unit);
     }
+  }
+
+  private void createTrackOrdersAfter(String user, Instant trackOrdersAfter) {
+    var settingsItem = new TcgInventoryItem();
+    settingsItem.setPk(TcgInventoryItem.formatUserPk(user));
+    settingsItem.setSk(TcgInventoryItem.formatSettingsSk());
+    settingsItem.setTrackOrdersAfter(trackOrdersAfter);
+    tcgInventoryTable.putItem(settingsItem);
   }
 
   private void createExistingOrder(String user, String offerId, String status) {

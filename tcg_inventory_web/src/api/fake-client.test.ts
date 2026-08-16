@@ -596,9 +596,12 @@ describe('createFakeClient settings', () => {
     expect(await client.getSettings()).toEqual({
       credential_set: false,
       updated_at: null,
+      track_orders_after: null,
     });
 
-    const response = await client.updateSettings('super-secret-refresh-token');
+    const response = await client.updateSettings({
+      refresh_token: 'super-secret-refresh-token',
+    });
 
     expect(response.credential_set).toBe(true);
     expect(response.updated_at).not.toBeNull();
@@ -609,5 +612,31 @@ describe('createFakeClient settings', () => {
     const fetched = await client.getSettings();
     expect(fetched.credential_set).toBe(true);
     expect(fetched.updated_at).toBe(response.updated_at);
+  });
+
+  it('stores track_orders_after without affecting credential', async () => {
+    const client = createFakeClient();
+
+    const response = await client.updateSettings({
+      track_orders_after: 1723363200,
+    });
+
+    expect(response.credential_set).toBe(false);
+    expect(response.track_orders_after).toBe(1723363200);
+
+    const fetched = await client.getSettings();
+    expect(fetched.track_orders_after).toBe(1723363200);
+  });
+
+  it('preserves track_orders_after when updating credential', async () => {
+    const client = createFakeClient();
+
+    await client.updateSettings({ track_orders_after: 1723363200 });
+    const response = await client.updateSettings({
+      refresh_token: 'token',
+    });
+
+    expect(response.credential_set).toBe(true);
+    expect(response.track_orders_after).toBe(1723363200);
   });
 });

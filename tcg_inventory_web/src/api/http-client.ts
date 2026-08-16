@@ -14,6 +14,7 @@ import type {
   PublishResponse,
   SettingsResponse,
   SkuDetail,
+  UpdateSettingsRequest,
   UpdateUnitResponse,
 } from './client';
 
@@ -56,11 +57,13 @@ export function createHttpClient(): ApiClient {
       return response.json();
     },
 
-    async updateSettings(refreshToken: string): Promise<SettingsResponse> {
+    async updateSettings(
+      update: UpdateSettingsRequest,
+    ): Promise<SettingsResponse> {
       const response = await authenticatedFetch('/settings', {
-        method: 'PUT',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refresh_token: refreshToken }),
+        body: JSON.stringify(update),
       });
       return response.json();
     },

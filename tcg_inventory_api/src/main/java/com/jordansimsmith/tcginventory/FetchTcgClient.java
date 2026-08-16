@@ -52,6 +52,7 @@ public interface FetchTcgClient {
       @JsonProperty("id") int id,
       @JsonProperty("status") String status,
       @JsonProperty("currentAction") String currentAction,
+      @JsonProperty("acceptedAt") String acceptedAt,
       @JsonProperty("deliveryMode") String deliveryMode,
       @JsonProperty("totalOfferPrice") BigDecimal totalOfferPrice,
       @JsonProperty("items") List<OfferItem> items) {}

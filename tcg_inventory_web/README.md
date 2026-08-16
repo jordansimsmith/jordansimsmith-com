@@ -27,7 +27,7 @@ The TCG inventory web service is a keyboard-first single-page app for running a 
 - Inventory: dense SKU table with counts, prefix search, SKU detail with the Scryfall card image, units, and derived locations, and manual adjustments (remove unit, change condition).
 - Orders: list and detail with state badges, location-ordered pull sheet optimized for one-handed phone use, confirm-pull action.
 - Publish widget (no dedicated jobs page): trigger a publish run, show the pending publish count (SKUs with unpublished inventory changes), and poll/render the current-or-latest run's progress and outcome. Appraisal progress and errors render on the import pages.
-- Settings: set or replace the FetchTCG refresh token; display presence and last-updated only.
+- Settings: set or replace the FetchTCG refresh token (display presence and last-updated only); configure the "Track orders after" date to exclude pre-existing FetchTCG orders from tracking.
 - Vim-style keyboard navigation across all data views.
 - Development fake mode: an in-memory `ApiClient` with seeded data so the whole UX runs without a backend.
 
@@ -109,24 +109,24 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 
 ### Consumed backend endpoints
 
-| Method   | Path                                     | Used by                                 |
-| -------- | ---------------------------------------- | --------------------------------------- |
-| `POST`   | `/imports`                               | import upload                           |
-| `GET`    | `/imports`                               | imports list                            |
-| `GET`    | `/imports/{import_id}`                   | appraisal progress + review rows        |
-| `POST`   | `/imports/{import_id}/confirm`           | confirm flow + placement instructions   |
-| `DELETE` | `/imports/{import_id}`                   | delete-import action                    |
-| `GET`    | `/skus`                                  | inventory browse/search                 |
-| `GET`    | `/skus/{sku_id}`                         | SKU detail + units                      |
-| `DELETE` | `/skus/{sku_id}/units/{sequence_number}` | remove-unit adjustment                  |
-| `PUT`    | `/skus/{sku_id}/units/{sequence_number}` | condition-change adjustment             |
-| `GET`    | `/orders`                                | orders list                             |
-| `GET`    | `/orders/{order_id}`                     | order detail                            |
-| `POST`   | `/orders/{order_id}/confirm`             | confirm pull                            |
-| `POST`   | `/publish`                               | publish trigger                         |
-| `GET`    | `/publish`                               | publish run polling + pending count     |
-| `GET`    | `/settings`                              | credential presence check + login probe |
-| `PUT`    | `/settings`                              | credential set/replace                  |
+| Method   | Path                                     | Used by                                                      |
+| -------- | ---------------------------------------- | ------------------------------------------------------------ |
+| `POST`   | `/imports`                               | import upload                                                |
+| `GET`    | `/imports`                               | imports list                                                 |
+| `GET`    | `/imports/{import_id}`                   | appraisal progress + review rows                             |
+| `POST`   | `/imports/{import_id}/confirm`           | confirm flow + placement instructions                        |
+| `DELETE` | `/imports/{import_id}`                   | delete-import action                                         |
+| `GET`    | `/skus`                                  | inventory browse/search                                      |
+| `GET`    | `/skus/{sku_id}`                         | SKU detail + units                                           |
+| `DELETE` | `/skus/{sku_id}/units/{sequence_number}` | remove-unit adjustment                                       |
+| `PUT`    | `/skus/{sku_id}/units/{sequence_number}` | condition-change adjustment                                  |
+| `GET`    | `/orders`                                | orders list                                                  |
+| `GET`    | `/orders/{order_id}`                     | order detail                                                 |
+| `POST`   | `/orders/{order_id}/confirm`             | confirm pull                                                 |
+| `POST`   | `/publish`                               | publish trigger                                              |
+| `GET`    | `/publish`                               | publish run polling + pending count                          |
+| `GET`    | `/settings`                              | credential presence check + login probe + track orders after |
+| `PATCH`  | `/settings`                              | partial update: credential and/or track orders after         |
 
 ### UI contract expectations
 
@@ -134,7 +134,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 - Login is validated by an authenticated `GET /settings` call; success persists the session.
 - Async work is observed through the affected resource: the UI polls `GET /imports/{import_id}` during appraisal and `GET /publish` during a publish run, every ~2 seconds while running. `POST /publish` is idempotent while a run is active (returns the existing run), so the trigger button cannot double-fire.
 - The order detail response is also the pull sheet: its `units` list is location-ordered and renders as the pick list when the order is `to_pick`.
-- The credential endpoint is write-only: the UI never receives or renders a stored token value, only `{"credential_set": true, "updated_at": …}`.
+- The settings endpoint uses PATCH with merge semantics: each field present in the body is applied, absent fields are unchanged. The response returns the full view `{credential_set, updated_at, track_orders_after}`. The refresh token is write-only (never returned in the response).
 - `DELETE /skus/{sku_id}/units/{sequence_number}` (optional `reason` query parameter) responds with the updated SKU detail; the page re-renders counters and units from that response.
 - `PUT /skus/{sku_id}/units/{sequence_number}` responds `{"sku_id": "<new sku_id>"}`; the UI navigates to the new SKU's detail page.
 - Import review renders rows top-of-stack first exactly as returned; review rows are informational and never become units — confirm ingests keep rows only.
@@ -174,7 +174,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 
 - All API calls use HTTPS with Basic auth from the persisted session; the session token lives in `localStorage`, never in URLs.
 - Card images load directly from Scryfall using the public `scryfall_id`; no session, credential, or inventory data accompanies those requests.
-- The FetchTCG refresh token is entered into a password-type field, sent once via `PUT /settings`, and never displayed, stored, or logged client-side.
+- The FetchTCG refresh token is entered into a password-type field, sent once via `PATCH /settings`, and never displayed, stored, or logged client-side.
 - Logout clears the session immediately.
 - The client embeds no backend secrets or infrastructure credentials.
 

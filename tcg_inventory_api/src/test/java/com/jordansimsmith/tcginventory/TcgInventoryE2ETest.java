@@ -81,7 +81,7 @@ public class TcgInventoryE2ETest {
   @Test
   void fullLoopImportToOrderConfirm() throws IOException, InterruptedException {
     // arrange - store fake refresh token
-    var settingsResponse = put("/settings", "{\"refresh_token\":\"fake-token\"}");
+    var settingsResponse = patch("/settings", "{\"refresh_token\":\"fake-token\"}");
     assertThat(settingsResponse.statusCode()).isEqualTo(200);
 
     // act - upload csv
@@ -213,6 +213,18 @@ public class TcgInventoryE2ETest {
             .header("Authorization", AUTH_HEADER)
             .header("Content-Type", "application/json")
             .PUT(HttpRequest.BodyPublishers.ofString(body))
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> patch(String path, String body)
+      throws IOException, InterruptedException {
+    return httpClient.send(
+        HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl + path))
+            .header("Authorization", AUTH_HEADER)
+            .header("Content-Type", "application/json")
+            .method("PATCH", HttpRequest.BodyPublishers.ofString(body))
             .build(),
         HttpResponse.BodyHandlers.ofString());
   }

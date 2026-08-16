@@ -128,7 +128,7 @@
       "path": "tcg_inventory_api/infra",
       "artifacts": {
         "get_settings": "//tcg_inventory_api:get-settings-handler_deploy.jar",
-        "put_settings": "//tcg_inventory_api:put-settings-handler_deploy.jar",
+        "update_settings": "//tcg_inventory_api:update-settings-handler_deploy.jar",
         "create_import": "//tcg_inventory_api:create-import-handler_deploy.jar",
         "find_imports": "//tcg_inventory_api:find-imports-handler_deploy.jar",
         "get_import": "//tcg_inventory_api:get-import-handler_deploy.jar",

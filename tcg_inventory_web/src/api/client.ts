@@ -4,6 +4,12 @@ import { createHttpClient } from './http-client';
 export interface SettingsResponse {
   credential_set: boolean;
   updated_at: number | null;
+  track_orders_after: number | null;
+}
+
+export interface UpdateSettingsRequest {
+  refresh_token?: string;
+  track_orders_after?: number;
 }
 
 export type Finish = 'normal' | 'foil' | 'etched';
@@ -154,7 +160,7 @@ export interface PublishResponse {
 
 export interface ApiClient {
   getSettings(): Promise<SettingsResponse>;
-  updateSettings(refreshToken: string): Promise<SettingsResponse>;
+  updateSettings(update: UpdateSettingsRequest): Promise<SettingsResponse>;
   createImport(filename: string, csv: string): Promise<ImportSummary>;
   findImports(): Promise<FindImportsResponse>;
   getImport(importId: string): Promise<ImportDetail>;

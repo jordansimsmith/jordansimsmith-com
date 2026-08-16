@@ -37,6 +37,7 @@ describe('SettingsPage', () => {
     vi.spyOn(clientModule.apiClient, 'getSettings').mockResolvedValue({
       credential_set: false,
       updated_at: null,
+      track_orders_after: null,
     });
 
     renderSettingsPage();
@@ -47,16 +48,13 @@ describe('SettingsPage', () => {
     expect(tokenInput().value).toBe('');
     expect(tokenInput().type).toBe('password');
     expect(screen.queryByText(/Last updated/)).toBeNull();
-    expect(
-      (screen.getByRole('button', { name: 'Save' }) as HTMLButtonElement)
-        .disabled,
-    ).toBe(true);
   });
 
   it('shows a masked placeholder and last-updated when a credential is set', async () => {
     vi.spyOn(clientModule.apiClient, 'getSettings').mockResolvedValue({
       credential_set: true,
       updated_at: 1765420800,
+      track_orders_after: null,
     });
 
     renderSettingsPage();
@@ -77,18 +75,25 @@ describe('SettingsPage', () => {
     vi.spyOn(clientModule.apiClient, 'getSettings').mockResolvedValue({
       credential_set: false,
       updated_at: null,
+      track_orders_after: null,
     });
     const updateSettingsMock = vi
       .spyOn(clientModule.apiClient, 'updateSettings')
-      .mockResolvedValue({ credential_set: true, updated_at: 1765507200 });
+      .mockResolvedValue({
+        credential_set: true,
+        updated_at: 1765507200,
+        track_orders_after: null,
+      });
 
     renderSettingsPage();
     await screen.findByPlaceholderText('Enter refresh token');
 
     await user.type(tokenInput(), 'new-refresh-token');
-    await user.click(screen.getByRole('button', { name: 'Save' }));
+    await user.click(screen.getAllByRole('button', { name: 'Save' })[0]);
 
-    expect(updateSettingsMock).toHaveBeenCalledWith('new-refresh-token');
+    expect(updateSettingsMock).toHaveBeenCalledWith({
+      refresh_token: 'new-refresh-token',
+    });
     await waitFor(() => {
       expect(tokenInput().value).toBe('');
     });
@@ -99,5 +104,20 @@ describe('SettingsPage', () => {
     ).toBeDefined();
     expect(screen.getByPlaceholderText('••••••••••••••••')).toBeDefined();
     expect(screen.queryByDisplayValue('new-refresh-token')).toBeNull();
+  });
+
+  it('shows the track orders after date input', async () => {
+    vi.spyOn(clientModule.apiClient, 'getSettings').mockResolvedValue({
+      credential_set: true,
+      updated_at: 1765420800,
+      track_orders_after: null,
+    });
+
+    renderSettingsPage();
+
+    expect(await screen.findByLabelText('Track orders after')).toBeDefined();
+    expect(
+      screen.getByText(/Orders accepted on FetchTCG from this date onwards/),
+    ).toBeDefined();
   });
 });

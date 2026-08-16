@@ -117,7 +117,7 @@ sequenceDiagram
 - **Import row**: one candidate physical card within an import (CSV rows are quantity-expanded, so one row = one card at one stack position). A `keep` row becomes exactly one unit at confirm and records its assigned sequence number; `discard` and `review` rows never become units. Rows carry appraisal and review state and die with their import; units are permanent inventory.
 - **Appraise**: the job that adds what the CSV cannot contain — FetchTCG identity resolution and market appraisal (keep filter + suggested policy price).
 - **Publish**: the job that projects inventory to FetchTCG; order phase (ingest offers) then publish phase (drain dirty SKUs).
-- **Order**: an accepted FetchTCG offer. State: `awaiting_payment` → `to_pick` → `fulfilled`, or `awaiting_payment` → `voided`.
+- **Order**: an accepted FetchTCG offer. State: `awaiting_payment` → `to_pick` → `fulfilled`, or `awaiting_payment` → `voided`. An order created with an unmapped listing or insufficient stock enters `flagged` (requires manual review).
 - **Pull sheet**: pick list for a paid order, sorted by sequence number, forward-most duplicate first.
 - **Dirty**: boolean on a SKU meaning its FetchTCG listing may not reflect current in-stock count; set only inside mutation transactions.
 
@@ -127,7 +127,7 @@ sequenceDiagram
 
 - **FetchTCG website API**: sequential HTTPS JSON requests to `https://api.fetchtcg.com` with a browser-compatible user agent. Public reads (card details `GET /v3/cards/{card_id}`, card search `GET /v3/cards`, active listings `GET /v3/cards/{card_id}/listings`) are unauthenticated. Authenticated calls attach `Authorization: Bearer <token>` only to the seller offers list (`GET /v2/private/market/offers/seller`), managed-listings read (`GET /v1/manage-listings`), the listing upsert (`POST /v2/private/manage-listings`, absolute quantity and price keyed by `cardId` + condition), and the listing delete (`DELETE /v1/manage-listings/{listing_id}`, no body, 200 with empty body — used to delist a SKU whose in-stock count reaches zero). Transient failures retry with bounded backoff; 401/403 stops the job. FetchTCG does not publish these endpoints as a supported API and its terms prohibit unpermitted automation; conservative pacing reduces load but the policy risk stays with the user.
 - **Firebase token exchange**: each job run exchanges the stored refresh token at Firebase's fixed HTTPS token endpoint for a one-hour bearer. A replacement refresh token in the response is persisted back to the secret. The refresh token is never sent to FetchTCG.
-- **Offer state mapping** (from the seller offers list): an offer first seen with `status = ACCEPTED` creates an order and reserves units. `currentAction` past payment confirmation (for example `SEND_PICKUP_ADDRESS`, tracking actions, `SEND_REVIEW`, `AWAIT_REVIEW`) marks the order `to_pick`. A reserved order whose offer status leaves `ACCEPTED`/`COMPLETED`, or whose offer disappears, is voided defensively: units are released and the order is flagged for manual review. Buyer names, addresses, payment instructions, and tracking details are never persisted.
+- **Offer state mapping** (from the seller offers list): an offer first seen with `status = ACCEPTED` creates an order and reserves units, provided its `acceptedAt` is strictly after the user's `track_orders_after` setting (when set). Offers accepted at or before that instant are silently skipped on every run and never create order records. If `acceptedAt` is null or unparseable on an `ACCEPTED` offer, the offer is fail-closed skipped with a warning log. `currentAction` past payment confirmation (for example `SEND_PICKUP_ADDRESS`, tracking actions, `SEND_REVIEW`, `AWAIT_REVIEW`) marks the order `to_pick`. When an offer cannot resolve all its listing lines to known SKUs or has insufficient in-stock units, the order is created with status `flagged` (no units are reserved for unmapped lines). Buyer names, addresses, payment instructions, and tracking details are never persisted.
 - **Scryfall API**: consumed only by the set-mapping generator (public set catalog and card records); normal runs never call Scryfall.
 
 ## API contracts
@@ -138,6 +138,7 @@ sequenceDiagram
 - Auth: `Authorization: Basic <base64(user:password)>` on every endpoint
 - Request and response fields use `snake_case`; no path version segment
 - Non-2xx responses use `{"message": "error details"}`
+- `PATCH` is used for partial updates of resources with independent fields: each field present in the body is applied, absent fields are unchanged, and an empty body returns 400
 - Async work is observed through the affected resource, not a generic jobs API: appraisal progress and errors ride on the import (`GET /imports/{import_id}`), publish progress and errors on `GET /publish` (current-or-latest run). Job items exist in storage only as internal continuation state.
 - Verb convention: edits that record client-owned data use `PUT` on the resource; domain actions that cause server-side cascades (confirm, publish) are `POST` sub-resource actions with transition-specific contracts
 
@@ -161,8 +162,8 @@ sequenceDiagram
 | `POST`   | `/orders/{order_id}/confirm`             | confirm the pull; marks allocated units sold                                           |
 | `POST`   | `/publish`                               | start a publish run; responds 202 and is idempotent while one is queued/running        |
 | `GET`    | `/publish`                               | current-or-latest publish run: status, progress, error, pending dirty count            |
-| `GET`    | `/settings`                              | credential presence and last-updated (never a value)                                   |
-| `PUT`    | `/settings`                              | replace settings (stores the FetchTCG refresh token)                                   |
+| `GET`    | `/settings`                              | settings view: credential presence, last-updated, track orders after                   |
+| `PATCH`  | `/settings`                              | partial update: optional refresh token + optional track orders after                   |
 
 ### Example request and response
 
@@ -295,7 +296,7 @@ price = max(0.25, round_nearest_half_up(benchmark, 0.05))
 | Audit entry      | `USER#<u>#AUDIT`              | `<ulid>`                       | event_type (`import_confirm`, `adjustment`, `reserve`, `release`, `sell`, `publish`), affected sku_ids / unit sequence_numbers / order_id / import_id, before/after summary                                                      |
 | Job              | `USER#<u>`                    | `JOB#<ulid>`                   | internal continuation state, never an API resource: type (`appraise` \| `publish`), status (`queued` \| `running` \| `succeeded` \| `failed`), continuation, progress counters, error                                            |
 | Sequence counter | `USER#<u>`                    | `COUNTER#SEQUENCE`             | `next_sequence_number`                                                                                                                                                                                                           |
-| Settings         | `USER#<u>`                    | `SETTINGS`                     | credential metadata (set-at timestamp only)                                                                                                                                                                                      |
+| Settings         | `USER#<u>`                    | `SETTINGS`                     | credential metadata (set-at timestamp only), `track_orders_after` (epoch seconds)                                                                                                                                                |
 
 ### Representative records
 
@@ -356,6 +357,7 @@ All mutations are `TransactWriteItems` including their audit entry; every mutati
 - The FetchTCG listing projection counts only `in_stock` units. Reserved and sold units are excluded. Upward and downward corrections, including delisting at zero, occur only for SKUs dirtied by an audited mutation.
 - Stock counts are derived from unit items at read time and never stored. Every mutation transaction bumps the SKU `version`; the publish clear is conditional on the version being unchanged since the recount, so a mutation landing mid-publish leaves the SKU dirty.
 - The order phase always completes before the publish phase within a run.
+- Only FetchTCG offers with `acceptedAt` strictly after the user's `track_orders_after` setting create order records and reservations. The cutoff comparison uses epoch-seconds instants; the advance loop for existing orders is unfiltered (orders already tracked cannot be orphaned by a date change).
 - Confirming a pull writes nothing to FetchTCG. Voiding an order releases units and dirties SKUs; the restored quantity reaches FetchTCG on the next publish run unless the seller already relisted on FetchTCG, in which case the projection converges as a no-op.
 - SKU records are never deleted; a zero-count SKU keeps its record, is delisted on FetchTCG, and is reused on restock.
 - Duplicate SQS deliveries, replayed job slices, and re-processed offers converge: job slices read the job item's continuation fresh, order creation is conditional on the offer id, unit transitions are conditional on current status, publish writes are absolute.

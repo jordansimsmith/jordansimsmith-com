@@ -56,9 +56,9 @@ module "java_api" {
       handler  = "com.jordansimsmith.tcginventory.GetSettingsHandler"
       artifact = var.artifacts["get_settings"]
     }
-    put_settings = {
-      handler  = "com.jordansimsmith.tcginventory.PutSettingsHandler"
-      artifact = var.artifacts["put_settings"]
+    update_settings = {
+      handler  = "com.jordansimsmith.tcginventory.UpdateSettingsHandler"
+      artifact = var.artifacts["update_settings"]
     }
     create_import = {
       handler  = "com.jordansimsmith.tcginventory.CreateImportHandler"
@@ -133,7 +133,7 @@ module "java_api" {
 
   endpoints = {
     get_settings      = { path = "settings", method = "GET", lambda = "get_settings" }
-    put_settings      = { path = "settings", method = "PUT", lambda = "put_settings" }
+    update_settings   = { path = "settings", method = "PATCH", lambda = "update_settings" }
     create_import     = { path = "imports", method = "POST", lambda = "create_import" }
     find_imports      = { path = "imports", method = "GET", lambda = "find_imports" }
     get_import        = { path = "imports/{import_id}", method = "GET", lambda = "get_import" }

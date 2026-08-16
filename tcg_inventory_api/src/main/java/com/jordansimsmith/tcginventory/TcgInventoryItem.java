@@ -78,6 +78,7 @@ public class TcgInventoryItem {
   public static final String FETCHTCG_STATUS = "fetchtcg_status";
   public static final String FETCHTCG_CURRENT_ACTION = "fetchtcg_current_action";
   public static final String EVENT_TYPE = "event_type";
+  public static final String TRACK_ORDERS_AFTER = "track_orders_after";
   public static final String CREATED_AT = "created_at";
   public static final String UPDATED_AT = "updated_at";
 
@@ -127,6 +128,7 @@ public class TcgInventoryItem {
   private String fetchtcgStatus;
   private String fetchtcgCurrentAction;
   private String eventType;
+  private Instant trackOrdersAfter;
   private Instant createdAt;
   private Instant updatedAt;
 
@@ -596,6 +598,17 @@ public class TcgInventoryItem {
   }
 
   @Nullable
+  @DynamoDbAttribute(TRACK_ORDERS_AFTER)
+  @DynamoDbConvertedBy(EpochSecondConverter.class)
+  public Instant getTrackOrdersAfter() {
+    return trackOrdersAfter;
+  }
+
+  public void setTrackOrdersAfter(@Nullable Instant trackOrdersAfter) {
+    this.trackOrdersAfter = trackOrdersAfter;
+  }
+
+  @Nullable
   @DynamoDbAttribute(CREATED_AT)
   @DynamoDbConvertedBy(EpochSecondConverter.class)
   public Instant getCreatedAt() {
@@ -668,6 +681,7 @@ public class TcgInventoryItem {
         && Objects.equals(fetchtcgStatus, that.fetchtcgStatus)
         && Objects.equals(fetchtcgCurrentAction, that.fetchtcgCurrentAction)
         && Objects.equals(eventType, that.eventType)
+        && Objects.equals(trackOrdersAfter, that.trackOrdersAfter)
         && Objects.equals(createdAt, that.createdAt)
         && Objects.equals(updatedAt, that.updatedAt);
   }
@@ -721,6 +735,7 @@ public class TcgInventoryItem {
         fetchtcgStatus,
         fetchtcgCurrentAction,
         eventType,
+        trackOrdersAfter,
         createdAt,
         updatedAt);
   }
@@ -853,6 +868,8 @@ public class TcgInventoryItem {
         + ", eventType='"
         + eventType
         + '\''
+        + ", trackOrdersAfter="
+        + trackOrdersAfter
         + ", createdAt="
         + createdAt
         + ", updatedAt="

@@ -116,9 +116,9 @@ lambdas = {
         "handler": "com.jordansimsmith.tcginventory.GetSettingsHandler",
         "zip_file": "get-settings-handler_deploy.jar",
     },
-    "put_settings": {
-        "handler": "com.jordansimsmith.tcginventory.PutSettingsHandler",
-        "zip_file": "put-settings-handler_deploy.jar",
+    "update_settings": {
+        "handler": "com.jordansimsmith.tcginventory.UpdateSettingsHandler",
+        "zip_file": "update-settings-handler_deploy.jar",
     },
     "create_import": {
         "handler": "com.jordansimsmith.tcginventory.CreateImportHandler",
@@ -218,7 +218,11 @@ child_resources = {
 
 endpoints = {
     "get_settings": {"resource": "settings", "method": "GET", "lambda": "get_settings"},
-    "put_settings": {"resource": "settings", "method": "PUT", "lambda": "put_settings"},
+    "update_settings": {
+        "resource": "settings",
+        "method": "PATCH",
+        "lambda": "update_settings",
+    },
     "create_import": {
         "resource": "imports",
         "method": "POST",

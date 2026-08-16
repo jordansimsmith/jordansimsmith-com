@@ -90,8 +90,8 @@ java_binary(
 )
 
 java_binary(
-    name = "put-settings-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/PutSettingsHandler.java"],
+    name = "update-settings-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/UpdateSettingsHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
@@ -618,10 +618,10 @@ java_test_suite(
         ":jobs-handler",
         ":jobs-lib",
         ":lib",
-        ":put-settings-handler",
         ":remove-unit-handler",
         ":test-lib",
         ":update-import-row-handler",
+        ":update-settings-handler",
         ":update-unit-handler",
         "//lib/dynamodb:test-lib",
         "//lib/queue:test-lib",
@@ -664,7 +664,7 @@ localstack_image(
         ":get-publish-handler_deploy.jar",
         ":get-settings-handler_deploy.jar",
         ":jobs-handler_deploy.jar",
-        ":put-settings-handler_deploy.jar",
+        ":update-settings-handler_deploy.jar",
     ],
     init_resources = "src/test/resources/init_resources.py",
     repo_tag = "bazel/tcg-inventory-local:latest",

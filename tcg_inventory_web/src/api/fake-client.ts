@@ -23,6 +23,7 @@ import type {
   SkuSummary,
   SkuUnit,
   UnitStatus,
+  UpdateSettingsRequest,
   UpdateUnitResponse,
 } from './client';
 import { parseManaBoxCsv } from '../domain/manabox';
@@ -545,7 +546,11 @@ export function createFakeClient(): ApiClient {
     skus.filter((_, index) => index % 4 === 0).map((sku) => sku.sku_id),
   );
   let publishRun: FakePublishRun | null = null;
-  let settings: SettingsResponse = { credential_set: false, updated_at: null };
+  let settings: SettingsResponse = {
+    credential_set: false,
+    updated_at: null,
+    track_orders_after: null,
+  };
 
   const progressPublish = (): void => {
     if (!publishRun) {
@@ -639,11 +644,22 @@ export function createFakeClient(): ApiClient {
       return { ...settings };
     },
 
-    async updateSettings(): Promise<SettingsResponse> {
-      settings = {
-        credential_set: true,
-        updated_at: Math.floor(Date.now() / 1000),
-      };
+    async updateSettings(
+      update: UpdateSettingsRequest,
+    ): Promise<SettingsResponse> {
+      if (update.refresh_token) {
+        settings = {
+          ...settings,
+          credential_set: true,
+          updated_at: Math.floor(Date.now() / 1000),
+        };
+      }
+      if (update.track_orders_after !== undefined) {
+        settings = {
+          ...settings,
+          track_orders_after: update.track_orders_after,
+        };
+      }
       return { ...settings };
     },
 

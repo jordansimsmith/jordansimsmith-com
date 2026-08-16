@@ -61,6 +61,7 @@ describe('LoginPage', () => {
     vi.spyOn(clientModule.apiClient, 'getSettings').mockResolvedValue({
       credential_set: false,
       updated_at: null,
+      track_orders_after: null,
     });
 
     const user = userEvent.setup();

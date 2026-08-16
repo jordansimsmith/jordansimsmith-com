@@ -55,6 +55,7 @@ ts_project(
     deps = [
         ":node_modules/@jordansimsmith_com/ui",
         "//:node_modules/@mantine/core",
+        "//:node_modules/@mantine/dates",
         "//:node_modules/@mantine/notifications",
         "//:node_modules/@tabler/icons-react",
         "//:node_modules/@testing-library/react",
@@ -112,6 +113,7 @@ js_library(
     deps = [
         ":node_modules/@jordansimsmith_com/ui",
         "//:node_modules/@mantine/core",
+        "//:node_modules/@mantine/dates",
         "//:node_modules/@mantine/notifications",
         "//:node_modules/@tabler/icons-react",
         "//:node_modules/@types/react",
@@ -133,6 +135,7 @@ js_library(
     deps = [
         ":src",
         "//:node_modules/@mantine/core",
+        "//:node_modules/@mantine/dates",
         "//:node_modules/@testing-library/react",
         "//:node_modules/@testing-library/user-event",
         "//:node_modules/react-router-dom",

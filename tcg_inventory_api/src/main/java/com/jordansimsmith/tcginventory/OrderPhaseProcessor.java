@@ -3,6 +3,10 @@ package com.jordansimsmith.tcginventory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
+import java.time.Instant;
+import java.time.format.DateTimeFormatter;
+import java.time.format.DateTimeFormatterBuilder;
+import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,6 +38,15 @@ public class OrderPhaseProcessor {
           "AWAIT_REVIEW",
           "SEND_TRACKING_PICKUP");
 
+  private static final DateTimeFormatter ACCEPTED_AT_FORMATTER =
+      new DateTimeFormatterBuilder()
+          .append(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+          .optionalStart()
+          .appendFraction(ChronoField.MILLI_OF_SECOND, 0, 3, true)
+          .optionalEnd()
+          .appendOffset("+HHmm", "Z")
+          .toFormatter();
+
   private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
   private final DynamoDbClient dynamoDbClient;
   private final Clock clock;
@@ -64,6 +77,11 @@ public class OrderPhaseProcessor {
       var statusCounts =
           allOffers.stream().collect(Collectors.groupingBy(o -> o.status(), Collectors.counting()));
       LOGGER.info("offer statuses: {}", statusCounts);
+    }
+
+    var trackOrdersAfter = loadTrackOrdersAfter(user);
+    if (trackOrdersAfter != null) {
+      LOGGER.info("track_orders_after is set to {}", trackOrdersAfter);
     }
 
     var offerMap =
@@ -100,6 +118,7 @@ public class OrderPhaseProcessor {
 
     int createdCount = 0;
     int skippedCount = 0;
+    int cutoffSkippedCount = 0;
     for (var offer : allOffers) {
       var offerId = String.valueOf(offer.id());
       if (existingOrderIds.contains(offerId)) {
@@ -108,11 +127,19 @@ public class OrderPhaseProcessor {
       }
 
       if ("ACCEPTED".equals(offer.status())) {
+        if (trackOrdersAfter != null && !isAfterCutoff(offer, trackOrdersAfter)) {
+          cutoffSkippedCount++;
+          continue;
+        }
         reserveForNewOffer(user, offer, listingToSkuId);
         createdCount++;
       }
     }
-    LOGGER.info("created {} new orders, skipped {} existing", createdCount, skippedCount);
+    LOGGER.info(
+        "created {} new orders, skipped {} existing, skipped {} before cutoff",
+        createdCount,
+        skippedCount,
+        cutoffSkippedCount);
   }
 
   private List<FetchTcgClient.SellerOffer> paginateOffers(String bearerToken) {
@@ -127,6 +154,33 @@ public class OrderPhaseProcessor {
       }
     }
     return allOffers;
+  }
+
+  private Instant loadTrackOrdersAfter(String user) {
+    var key =
+        Key.builder()
+            .partitionValue(TcgInventoryItem.formatUserPk(user))
+            .sortValue(TcgInventoryItem.formatSettingsSk())
+            .build();
+    var settingsItem = tcgInventoryTable.getItem(key);
+    if (settingsItem == null) {
+      return null;
+    }
+    return settingsItem.getTrackOrdersAfter();
+  }
+
+  private boolean isAfterCutoff(FetchTcgClient.SellerOffer offer, Instant cutoff) {
+    if (offer.acceptedAt() == null) {
+      LOGGER.warn("offer {} has null acceptedAt, skipping (fail-closed)", offer.id());
+      return false;
+    }
+    try {
+      var acceptedInstant = ACCEPTED_AT_FORMATTER.parse(offer.acceptedAt(), Instant::from);
+      return acceptedInstant.isAfter(cutoff);
+    } catch (Exception e) {
+      throw new RuntimeException(
+          "offer " + offer.id() + " has unparseable acceptedAt '" + offer.acceptedAt() + "'", e);
+    }
   }
 
   private List<TcgInventoryItem> loadExistingOrders(String user) {
