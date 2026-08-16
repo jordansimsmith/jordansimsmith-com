@@ -24,7 +24,11 @@ public class PutSettingsHandler
 
   record PutSettingsRequest(@JsonProperty("refresh_token") String refreshToken) {}
 
-  record PutSettingsResponse(@JsonProperty("message") String message) {}
+  record PutSettingsErrorResponse(@JsonProperty("message") String message) {}
+
+  record PutSettingsResponse(
+      @JsonProperty("credential_set") boolean credentialSet,
+      @JsonProperty("updated_at") long updatedAt) {}
 
   private final ObjectMapper objectMapper;
   private final Clock clock;
@@ -62,7 +66,8 @@ public class PutSettingsHandler
     var request = objectMapper.readValue(event.getBody(), PutSettingsRequest.class);
 
     if (request.refreshToken() == null || request.refreshToken().isBlank()) {
-      return httpResponseFactory.badRequest(new PutSettingsResponse("refresh_token is required"));
+      return httpResponseFactory.badRequest(
+          new PutSettingsErrorResponse("refresh_token is required"));
     }
 
     var now = clock.now();
@@ -75,6 +80,6 @@ public class PutSettingsHandler
     var settingsItem = TcgInventoryItem.createSettings(user, now);
     tcgInventoryTable.putItem(settingsItem);
 
-    return httpResponseFactory.ok(new PutSettingsResponse("settings updated"));
+    return httpResponseFactory.ok(new PutSettingsResponse(true, now.getEpochSecond()));
   }
 }

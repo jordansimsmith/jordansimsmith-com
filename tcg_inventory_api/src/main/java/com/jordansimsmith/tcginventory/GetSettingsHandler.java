@@ -21,7 +21,7 @@ public class GetSettingsHandler
 
   record GetSettingsResponse(
       @JsonProperty("credential_set") boolean credentialSet,
-      @JsonProperty("credential_set_at") @Nullable Long credentialSetAt) {}
+      @JsonProperty("updated_at") @Nullable Long updatedAt) {}
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;

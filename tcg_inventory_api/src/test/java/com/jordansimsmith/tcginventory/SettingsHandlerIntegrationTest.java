@@ -62,6 +62,9 @@ public class SettingsHandlerIntegrationTest {
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = objectMapper.readTree(response.getBody());
+    assertThat(body.get("credential_set").asBoolean()).isTrue();
+    assertThat(body.get("updated_at").asLong()).isEqualTo(1700000000);
 
     var secretJson = fakeSecrets.get("tcg_inventory");
     var secretNode = objectMapper.readTree(secretJson);
@@ -81,7 +84,7 @@ public class SettingsHandlerIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
     assertThat(body.get("credential_set").asBoolean()).isTrue();
-    assertThat(body.get("credential_set_at").asLong()).isEqualTo(1700000000);
+    assertThat(body.get("updated_at").asLong()).isEqualTo(1700000000);
   }
 
   @Test
@@ -93,7 +96,7 @@ public class SettingsHandlerIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
     assertThat(body.get("credential_set").asBoolean()).isFalse();
-    assertThat(body.get("credential_set_at").isNull()).isTrue();
+    assertThat(body.get("updated_at").isNull()).isTrue();
   }
 
   @Test
@@ -110,7 +113,7 @@ public class SettingsHandlerIntegrationTest {
 
     // assert
     var body = objectMapper.readTree(response.getBody());
-    assertThat(body.get("credential_set_at").asLong()).isEqualTo(1700001000);
+    assertThat(body.get("updated_at").asLong()).isEqualTo(1700001000);
 
     var secretNode = objectMapper.readTree(fakeSecrets.get("tcg_inventory"));
     assertThat(secretNode.get("jordan").asText()).isEqualTo("token2");
