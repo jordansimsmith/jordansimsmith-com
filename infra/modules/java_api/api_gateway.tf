@@ -6,7 +6,7 @@ locals {
   cors_enabled = var.cors_origin != null
 
   cors_allow_headers = "Authorization,Content-Type"
-  cors_allow_methods = "GET,POST,PUT,DELETE,OPTIONS"
+  cors_allow_methods = "GET,POST,PUT,PATCH,DELETE,OPTIONS"
 
   api_lambdas = toset([for endpoint in var.endpoints : endpoint.lambda])
 
