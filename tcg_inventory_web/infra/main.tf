@@ -69,15 +69,34 @@ check "tcg_inventory_web_artifact_not_empty" {
   }
 }
 
-resource "aws_s3_object" "objects" {
-  for_each = module.tcg_inventory_web_dir.files
+resource "aws_s3_object" "index" {
+  bucket        = aws_s3_bucket.tcg_inventory_web.id
+  key           = "index.html"
+  source        = module.tcg_inventory_web_dir.files["index.html"].source_path
+  etag          = module.tcg_inventory_web_dir.files["index.html"].digests.md5
+  content_type  = "text/html"
+  cache_control = "no-cache"
+}
 
-  bucket       = aws_s3_bucket.tcg_inventory_web.id
-  key          = each.key
-  source       = each.value.source_path
-  etag         = each.value.digests.md5
-  content      = each.value.content
-  content_type = each.value.content_type
+resource "aws_s3_object" "favicon" {
+  bucket        = aws_s3_bucket.tcg_inventory_web.id
+  key           = "favicon.svg"
+  source        = module.tcg_inventory_web_dir.files["favicon.svg"].source_path
+  etag          = module.tcg_inventory_web_dir.files["favicon.svg"].digests.md5
+  content_type  = "image/svg+xml"
+  cache_control = "no-cache"
+}
+
+resource "aws_s3_object" "assets" {
+  for_each = { for k, v in module.tcg_inventory_web_dir.files : k => v if !contains(["index.html", "favicon.svg"], k) }
+
+  bucket        = aws_s3_bucket.tcg_inventory_web.id
+  key           = each.key
+  source        = each.value.source_path
+  etag          = each.value.digests.md5
+  content       = each.value.content
+  content_type  = each.value.content_type
+  cache_control = "public, max-age=31536000, immutable"
 }
 
 resource "aws_s3_bucket_website_configuration" "tcg_inventory_web" {
