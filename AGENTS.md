@@ -52,6 +52,12 @@ When performing the code review step, check for:
 - **Style consistency**: Check that the code follows all style guidelines and matches surrounding code
 - **Unnecessary complexity**: Simplify code where possible without losing functionality
 
+## Error handling philosophy
+
+- Always prefer failing loudly rather than adding fallbacks or silent handling
+- Do not add defensive null checks, default values, or silent skips to mask broken invariants
+- If data is in an unexpected state, let the error surface so the root cause can be fixed
+
 ## Bazel guidelines
 
 - Use kebab-case (skewer-case) for all Bazel target names (e.g., `update-fixtures-handler`)
