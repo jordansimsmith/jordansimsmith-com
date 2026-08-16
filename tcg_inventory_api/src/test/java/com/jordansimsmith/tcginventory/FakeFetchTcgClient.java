@@ -48,7 +48,7 @@ public class FakeFetchTcgClient implements FetchTcgClient {
   public GetSellerOffersResponse getSellerOffers(String bearerToken, int page) {
     var response = sellerOffers.get(page);
     if (response == null) {
-      return new GetSellerOffersResponse(List.of(), 1);
+      return new GetSellerOffersResponse(List.of(), 0);
     }
     return response;
   }
@@ -78,7 +78,7 @@ public class FakeFetchTcgClient implements FetchTcgClient {
   }
 
   public void seedSellerOffers(List<SellerOffer> offers) {
-    sellerOffers.put(1, new GetSellerOffersResponse(offers, 1));
+    sellerOffers.put(0, new GetSellerOffersResponse(offers, 1));
   }
 
   public void seedSellerOffers(int page, GetSellerOffersResponse response) {

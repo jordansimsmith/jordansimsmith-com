@@ -10,6 +10,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
@@ -22,6 +24,8 @@ import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
 import software.amazon.awssdk.services.dynamodb.model.Update;
 
 public class OrderPhaseProcessor {
+  private static final Logger LOGGER = LoggerFactory.getLogger(OrderPhaseProcessor.class);
+
   private static final Set<String> PAYMENT_ACTIONS =
       Set.of(
           "SEND_PICKUP_ADDRESS",
@@ -56,13 +60,25 @@ public class OrderPhaseProcessor {
 
   public void process(String user, String bearerToken) {
     var allOffers = paginateOffers(bearerToken);
+    LOGGER.info("fetched {} offers from FetchTCG for user {}", allOffers.size(), user);
+
+    if (!allOffers.isEmpty()) {
+      var statusCounts =
+          allOffers.stream().collect(Collectors.groupingBy(o -> o.status(), Collectors.counting()));
+      LOGGER.info("offer statuses: {}", statusCounts);
+    }
+
     var offerMap =
         allOffers.stream().collect(Collectors.toMap(o -> String.valueOf(o.id()), o -> o));
 
     var existingOrders = loadExistingOrders(user);
+    LOGGER.info("found {} existing orders in DynamoDB", existingOrders.size());
 
     var listingToSkuId = buildListingToSkuMap(user);
+    LOGGER.info("built listing-to-sku map with {} entries", listingToSkuId.size());
 
+    int voidedCount = 0;
+    int advancedCount = 0;
     for (var order : existingOrders) {
       if (!"awaiting_payment".equals(order.getStatus())) {
         continue;
@@ -78,36 +94,44 @@ public class OrderPhaseProcessor {
 
       if (!offerStillActive) {
         voidOrder(user, order);
+        voidedCount++;
       } else if (paymentReceived) {
         advanceToPickReady(order, offer);
+        advancedCount++;
       }
     }
+    LOGGER.info("voided {} orders, advanced {} to pick-ready", voidedCount, advancedCount);
 
     var existingOrderIds =
         existingOrders.stream().map(TcgInventoryItem::getOrderId).collect(Collectors.toSet());
 
+    int createdCount = 0;
+    int skippedCount = 0;
     for (var offer : allOffers) {
       var offerId = String.valueOf(offer.id());
       if (existingOrderIds.contains(offerId)) {
+        skippedCount++;
         continue;
       }
 
       if ("ACCEPTED".equals(offer.status())) {
         reserveForNewOffer(user, offer, listingToSkuId);
+        createdCount++;
       }
     }
+    LOGGER.info("created {} new orders, skipped {} existing", createdCount, skippedCount);
   }
 
   private List<FetchTcgClient.SellerOffer> paginateOffers(String bearerToken) {
     var allOffers = new ArrayList<FetchTcgClient.SellerOffer>();
-    int page = 1;
+    int page = 0;
     while (true) {
       var response = fetchTcgClient.getSellerOffers(bearerToken, page);
       allOffers.addAll(response.content());
+      page++;
       if (page >= response.totalPages()) {
         break;
       }
-      page++;
     }
     return allOffers;
   }

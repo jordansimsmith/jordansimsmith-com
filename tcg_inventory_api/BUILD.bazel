@@ -5,6 +5,14 @@ load("//lib/localstack:defs.bzl", "localstack_image")
 
 HANDLERS = glob(["src/main/java/**/*Handler.java"])
 
+JOBS_PROCESSORS = [
+    "src/main/java/com/jordansimsmith/tcginventory/AppraiseJobProcessor.java",
+    "src/main/java/com/jordansimsmith/tcginventory/BatchResult.java",
+    "src/main/java/com/jordansimsmith/tcginventory/ListingPhaseProcessor.java",
+    "src/main/java/com/jordansimsmith/tcginventory/OrderPhaseProcessor.java",
+    "src/main/java/com/jordansimsmith/tcginventory/PublishJobProcessor.java",
+]
+
 INTEGRATION_TESTS = glob(["src/test/java/**/*IntegrationTest.java"])
 
 E2E_TESTS = glob(["src/test/java/**/*E2ETest.java"])
@@ -19,7 +27,7 @@ java_library(
     name = "lib",
     srcs = glob(
         ["src/main/java/**/*.java"],
-        exclude = HANDLERS,
+        exclude = HANDLERS + JOBS_PROCESSORS,
     ),
     resources = glob(["src/main/resources/**"]),
     deps = [
@@ -42,6 +50,20 @@ java_library(
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
         "@maven//:software_amazon_awssdk_regions",
         "@maven//:software_amazon_awssdk_sqs",
+    ],
+)
+
+java_library(
+    name = "jobs-lib",
+    srcs = JOBS_PROCESSORS,
+    deps = [
+        ":lib",
+        "//lib/time:lib",
+        "//lib/ulid:lib",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
     ],
 )
 
@@ -216,6 +238,7 @@ java_binary(
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":jobs-lib",
         ":lib",
         "//lib/queue:lib",
         "//lib/time:lib",
@@ -593,6 +616,7 @@ java_test_suite(
         ":get-settings-handler",
         ":get-sku-handler",
         ":jobs-handler",
+        ":jobs-lib",
         ":lib",
         ":put-settings-handler",
         ":remove-unit-handler",

@@ -5,8 +5,6 @@ import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.queue.SqsQueueClient;
 import com.jordansimsmith.secrets.Secrets;
-import com.jordansimsmith.time.Clock;
-import com.jordansimsmith.ulid.UlidGenerator;
 import dagger.Module;
 import dagger.Provides;
 import java.net.URI;
@@ -18,7 +16,6 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.http.crt.AwsCrtHttpClient;
 import software.amazon.awssdk.regions.Region;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Module
@@ -53,15 +50,6 @@ public class TcgInventoryModule {
 
   @Provides
   @Singleton
-  AppraiseJobProcessor appraiseJobProcessor(
-      DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
-      Clock clock,
-      FetchTcgClient fetchTcgClient) {
-    return new AppraiseJobProcessor(tcgInventoryTable, clock, fetchTcgClient);
-  }
-
-  @Provides
-  @Singleton
   FetchTcgTokenMinter fetchTcgTokenMinter(ObjectMapper objectMapper, Secrets secrets) {
     var firebaseTokenUrl = System.getenv("FIREBASE_TOKEN_URL");
     if (firebaseTokenUrl == null || firebaseTokenUrl.isEmpty()) {
@@ -70,38 +58,6 @@ public class TcgInventoryModule {
     }
     return new HttpFetchTcgTokenMinter(
         URI.create(firebaseTokenUrl), HttpClient.newHttpClient(), objectMapper, secrets);
-  }
-
-  @Provides
-  @Singleton
-  OrderPhaseProcessor orderPhaseProcessor(
-      DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
-      DynamoDbClient dynamoDbClient,
-      Clock clock,
-      UlidGenerator ulidGenerator,
-      FetchTcgClient fetchTcgClient,
-      ObjectMapper objectMapper) {
-    return new OrderPhaseProcessor(
-        tcgInventoryTable, dynamoDbClient, clock, ulidGenerator, fetchTcgClient, objectMapper);
-  }
-
-  @Provides
-  @Singleton
-  ListingPhaseProcessor listingPhaseProcessor(
-      DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
-      DynamoDbClient dynamoDbClient,
-      Clock clock,
-      FetchTcgClient fetchTcgClient) {
-    return new ListingPhaseProcessor(tcgInventoryTable, dynamoDbClient, clock, fetchTcgClient);
-  }
-
-  @Provides
-  @Singleton
-  PublishJobProcessor publishJobProcessor(
-      FetchTcgTokenMinter fetchTcgTokenMinter,
-      OrderPhaseProcessor orderPhaseProcessor,
-      ListingPhaseProcessor listingPhaseProcessor) {
-    return new PublishJobProcessor(fetchTcgTokenMinter, orderPhaseProcessor, listingPhaseProcessor);
   }
 
   @Provides

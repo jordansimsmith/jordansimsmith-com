@@ -52,10 +52,6 @@ public interface TcgInventoryFactory {
 
   FetchTcgTokenMinter fetchTcgTokenMinter();
 
-  AppraiseJobProcessor appraiseJobProcessor();
-
-  PublishJobProcessor publishJobProcessor();
-
   static TcgInventoryFactory create() {
     return DaggerTcgInventoryFactory.create();
   }
