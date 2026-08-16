@@ -191,6 +191,71 @@ public class UpdateUnitHandler
                     .build())
             .build();
 
+    var targetSetExpr =
+        new StringBuilder(
+            "ADD "
+                + TcgInventoryItem.VERSION
+                + " :one"
+                + " SET "
+                + TcgInventoryItem.SKU_ID
+                + " = :skuId, "
+                + TcgInventoryItem.SCRYFALL_ID
+                + " = :scryfallId, "
+                + "#finish = :finish, "
+                + "#condition = :condition, "
+                + "#name = :cardName, "
+                + TcgInventoryItem.SET_CODE
+                + " = :setCode, "
+                + TcgInventoryItem.SET_NAME
+                + " = :setName, "
+                + TcgInventoryItem.COLLECTOR_NUMBER
+                + " = :collectorNumber, "
+                + TcgInventoryItem.DIRTY
+                + " = :dirty, "
+                + TcgInventoryItem.GSI1PK
+                + " = :gsi1pk, "
+                + TcgInventoryItem.GSI1SK
+                + " = :gsi1sk, "
+                + TcgInventoryItem.GSI2PK
+                + " = :gsi2pk, "
+                + TcgInventoryItem.GSI2SK
+                + " = :gsi2sk");
+
+    var targetValues = new HashMap<String, AttributeValue>();
+    targetValues.put(":one", AttributeValue.builder().n("1").build());
+    targetValues.put(":skuId", AttributeValue.builder().s(targetSkuId).build());
+    targetValues.put(":scryfallId", AttributeValue.builder().s(skuItem.getScryfallId()).build());
+    targetValues.put(":finish", AttributeValue.builder().s(skuItem.getFinish()).build());
+    targetValues.put(":condition", AttributeValue.builder().s(body.condition()).build());
+    targetValues.put(":cardName", AttributeValue.builder().s(skuItem.getName()).build());
+    targetValues.put(":setCode", AttributeValue.builder().s(skuItem.getSetCode()).build());
+    targetValues.put(":setName", AttributeValue.builder().s(skuItem.getSetName()).build());
+    targetValues.put(
+        ":collectorNumber", AttributeValue.builder().s(skuItem.getCollectorNumber()).build());
+    targetValues.put(":dirty", AttributeValue.builder().bool(true).build());
+    targetValues.put(
+        ":gsi1pk", AttributeValue.builder().s(TcgInventoryItem.formatGsi1pk(user)).build());
+    targetValues.put(
+        ":gsi1sk", AttributeValue.builder().s(TcgInventoryItem.formatGsi1sk(targetSkuId)).build());
+    targetValues.put(
+        ":gsi2pk", AttributeValue.builder().s(TcgInventoryItem.formatGsi2pk(user)).build());
+    targetValues.put(
+        ":gsi2sk",
+        AttributeValue.builder()
+            .s(TcgInventoryItem.formatGsi2sk(skuItem.getName().toLowerCase(), targetSkuId))
+            .build());
+
+    if (skuItem.getFetchtcgCardId() != null) {
+      targetSetExpr.append(", " + TcgInventoryItem.FETCHTCG_CARD_ID + " = :fetchtcgCardId");
+      targetValues.put(
+          ":fetchtcgCardId", AttributeValue.builder().s(skuItem.getFetchtcgCardId()).build());
+    }
+    if (skuItem.getSuggestedPrice() != null) {
+      targetSetExpr.append(", " + TcgInventoryItem.SUGGESTED_PRICE + " = :suggestedPrice");
+      targetValues.put(
+          ":suggestedPrice", AttributeValue.builder().s(skuItem.getSuggestedPrice()).build());
+    }
+
     var targetSkuUpdate =
         TransactWriteItem.builder()
             .update(
@@ -201,84 +266,13 @@ public class UpdateUnitHandler
                             TcgInventoryItem.PK, AttributeValue.builder().s(targetSkuPk).build(),
                             TcgInventoryItem.SK,
                                 AttributeValue.builder().s(TcgInventoryItem.formatSkuSk()).build()))
-                    .updateExpression(
-                        "ADD "
-                            + TcgInventoryItem.VERSION
-                            + " :one"
-                            + " SET "
-                            + TcgInventoryItem.SKU_ID
-                            + " = :skuId, "
-                            + TcgInventoryItem.SCRYFALL_ID
-                            + " = :scryfallId, "
-                            + "#finish = :finish, "
-                            + "#condition = :condition, "
-                            + "#name = :cardName, "
-                            + TcgInventoryItem.SET_CODE
-                            + " = :setCode, "
-                            + TcgInventoryItem.SET_NAME
-                            + " = :setName, "
-                            + TcgInventoryItem.COLLECTOR_NUMBER
-                            + " = :collectorNumber, "
-                            + TcgInventoryItem.DIRTY
-                            + " = :dirty, "
-                            + TcgInventoryItem.GSI1PK
-                            + " = :gsi1pk, "
-                            + TcgInventoryItem.GSI1SK
-                            + " = :gsi1sk, "
-                            + TcgInventoryItem.GSI2PK
-                            + " = :gsi2pk, "
-                            + TcgInventoryItem.GSI2SK
-                            + " = :gsi2sk")
+                    .updateExpression(targetSetExpr.toString())
                     .expressionAttributeNames(
                         Map.of(
                             "#finish", TcgInventoryItem.FINISH,
                             "#condition", TcgInventoryItem.CONDITION,
                             "#name", TcgInventoryItem.NAME))
-                    .expressionAttributeValues(
-                        Map.ofEntries(
-                            Map.entry(":one", AttributeValue.builder().n("1").build()),
-                            Map.entry(":skuId", AttributeValue.builder().s(targetSkuId).build()),
-                            Map.entry(
-                                ":scryfallId",
-                                AttributeValue.builder().s(skuItem.getScryfallId()).build()),
-                            Map.entry(
-                                ":finish", AttributeValue.builder().s(skuItem.getFinish()).build()),
-                            Map.entry(
-                                ":condition", AttributeValue.builder().s(body.condition()).build()),
-                            Map.entry(
-                                ":cardName", AttributeValue.builder().s(skuItem.getName()).build()),
-                            Map.entry(
-                                ":setCode",
-                                AttributeValue.builder().s(skuItem.getSetCode()).build()),
-                            Map.entry(
-                                ":setName",
-                                AttributeValue.builder().s(skuItem.getSetName()).build()),
-                            Map.entry(
-                                ":collectorNumber",
-                                AttributeValue.builder().s(skuItem.getCollectorNumber()).build()),
-                            Map.entry(":dirty", AttributeValue.builder().bool(true).build()),
-                            Map.entry(
-                                ":gsi1pk",
-                                AttributeValue.builder()
-                                    .s(TcgInventoryItem.formatGsi1pk(user))
-                                    .build()),
-                            Map.entry(
-                                ":gsi1sk",
-                                AttributeValue.builder()
-                                    .s(TcgInventoryItem.formatGsi1sk(targetSkuId))
-                                    .build()),
-                            Map.entry(
-                                ":gsi2pk",
-                                AttributeValue.builder()
-                                    .s(TcgInventoryItem.formatGsi2pk(user))
-                                    .build()),
-                            Map.entry(
-                                ":gsi2sk",
-                                AttributeValue.builder()
-                                    .s(
-                                        TcgInventoryItem.formatGsi2sk(
-                                            skuItem.getName().toLowerCase(), targetSkuId))
-                                    .build())))
+                    .expressionAttributeValues(targetValues)
                     .build())
             .build();
 
