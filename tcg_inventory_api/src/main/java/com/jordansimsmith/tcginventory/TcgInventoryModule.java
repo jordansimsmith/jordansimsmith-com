@@ -66,7 +66,7 @@ public class TcgInventoryModule {
     var firebaseTokenUrl = System.getenv("FIREBASE_TOKEN_URL");
     if (firebaseTokenUrl == null || firebaseTokenUrl.isEmpty()) {
       firebaseTokenUrl =
-          "https://securetoken.googleapis.com/v1/token?key=AIzaSyBOyrP5WfupPBgb2juJ5FX-OelxD-xRmGI";
+          "https://securetoken.googleapis.com/v1/token?key=AIzaSyD7SVUprLrgU-bc0Oh756v17y5NKZNQBB8";
     }
     return new HttpFetchTcgTokenMinter(
         URI.create(firebaseTokenUrl), HttpClient.newHttpClient(), objectMapper, secrets);
