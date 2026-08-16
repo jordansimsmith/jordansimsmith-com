@@ -34,8 +34,6 @@ public class OrderPhaseProcessor {
           "AWAIT_REVIEW",
           "SEND_TRACKING_PICKUP");
 
-  private static final Set<String> ACTIVE_OFFER_STATUSES = Set.of("ACCEPTED", "COMPLETED");
-
   private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
   private final DynamoDbClient dynamoDbClient;
   private final Clock clock;
@@ -77,7 +75,6 @@ public class OrderPhaseProcessor {
     var listingToSkuId = buildListingToSkuMap(user);
     LOGGER.info("built listing-to-sku map with {} entries", listingToSkuId.size());
 
-    int voidedCount = 0;
     int advancedCount = 0;
     for (var order : existingOrders) {
       if (!"awaiting_payment".equals(order.getStatus())) {
@@ -86,21 +83,17 @@ public class OrderPhaseProcessor {
 
       var offerId = order.getOrderId();
       var offer = offerMap.get(offerId);
-      var offerStillActive = offer != null && ACTIVE_OFFER_STATUSES.contains(offer.status());
       var paymentReceived =
           offer != null
               && offer.currentAction() != null
               && PAYMENT_ACTIONS.contains(offer.currentAction());
 
-      if (!offerStillActive) {
-        voidOrder(user, order);
-        voidedCount++;
-      } else if (paymentReceived) {
+      if (paymentReceived) {
         advanceToPickReady(order, offer);
         advancedCount++;
       }
     }
-    LOGGER.info("voided {} orders, advanced {} to pick-ready", voidedCount, advancedCount);
+    LOGGER.info("advanced {} orders to pick-ready", advancedCount);
 
     var existingOrderIds =
         existingOrders.stream().map(TcgInventoryItem::getOrderId).collect(Collectors.toSet());
@@ -319,44 +312,6 @@ public class OrderPhaseProcessor {
         TransactWriteItemsRequest.builder().transactItems(transactItems).build());
   }
 
-  private void voidOrder(String user, TcgInventoryItem order) {
-    var transactItems = new ArrayList<TransactWriteItem>();
-    var affectedSkuIds = new HashSet<String>();
-    var offerId = order.getOrderId();
-
-    var orderLines = OrderLines.parse(order.getLines(), objectMapper);
-    for (var line : orderLines) {
-      for (var seqNum : line.allocatedSequenceNumbers()) {
-        transactItems.add(buildUnitReleaseUpdate(user, line.skuId(), seqNum));
-      }
-      if (!affectedSkuIds.contains(line.skuId())) {
-        transactItems.add(buildSkuDirtyUpdate(user, line.skuId()));
-        affectedSkuIds.add(line.skuId());
-      }
-    }
-
-    transactItems.add(buildOrderVoidUpdate(user, offerId));
-
-    var auditItem = new HashMap<String, AttributeValue>();
-    auditItem.put(
-        TcgInventoryItem.PK,
-        AttributeValue.builder().s(TcgInventoryItem.formatAuditPk(user)).build());
-    auditItem.put(
-        TcgInventoryItem.SK, AttributeValue.builder().s(ulidGenerator.generate()).build());
-    auditItem.put(TcgInventoryItem.EVENT_TYPE, AttributeValue.builder().s("release").build());
-    auditItem.put(TcgInventoryItem.ORDER_ID, AttributeValue.builder().s(offerId).build());
-    auditItem.put(
-        TcgInventoryItem.CREATED_AT,
-        AttributeValue.builder().n(String.valueOf(clock.now().getEpochSecond())).build());
-    transactItems.add(
-        TransactWriteItem.builder()
-            .put(Put.builder().tableName(TcgInventoryItem.TABLE_NAME).item(auditItem).build())
-            .build());
-
-    dynamoDbClient.transactWriteItems(
-        TransactWriteItemsRequest.builder().transactItems(transactItems).build());
-  }
-
   private void advanceToPickReady(TcgInventoryItem order, FetchTcgClient.SellerOffer offer) {
     order.setStatus("to_pick");
     order.setFetchtcgStatus(offer.status());
@@ -388,34 +343,6 @@ public class OrderPhaseProcessor {
     return results;
   }
 
-  private TransactWriteItem buildOrderVoidUpdate(String user, String offerId) {
-    var userPk = TcgInventoryItem.formatUserPk(user);
-    var orderSk = TcgInventoryItem.formatOrderSk(offerId);
-
-    return TransactWriteItem.builder()
-        .update(
-            Update.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
-                .key(
-                    Map.of(
-                        TcgInventoryItem.PK, AttributeValue.builder().s(userPk).build(),
-                        TcgInventoryItem.SK, AttributeValue.builder().s(orderSk).build()))
-                .updateExpression(
-                    "SET #status = :voided, " + TcgInventoryItem.UPDATED_AT + " = :now")
-                .conditionExpression("#status = :awaitingPayment")
-                .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
-                .expressionAttributeValues(
-                    Map.of(
-                        ":voided", AttributeValue.builder().s("voided").build(),
-                        ":awaitingPayment", AttributeValue.builder().s("awaiting_payment").build(),
-                        ":now",
-                            AttributeValue.builder()
-                                .n(String.valueOf(clock.now().getEpochSecond()))
-                                .build()))
-                .build())
-        .build();
-  }
-
   private TransactWriteItem buildUnitReserveUpdate(
       String user, String skuId, int sequenceNumber, String orderId) {
     var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
@@ -442,37 +369,6 @@ public class OrderPhaseProcessor {
                         ":reserved", AttributeValue.builder().s("reserved").build(),
                         ":inStock", AttributeValue.builder().s("in_stock").build(),
                         ":orderId", AttributeValue.builder().s(orderId).build(),
-                        ":now",
-                            AttributeValue.builder()
-                                .n(String.valueOf(clock.now().getEpochSecond()))
-                                .build()))
-                .build())
-        .build();
-  }
-
-  private TransactWriteItem buildUnitReleaseUpdate(String user, String skuId, int sequenceNumber) {
-    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
-    var unitSk = TcgInventoryItem.formatUnitSk(sequenceNumber);
-
-    return TransactWriteItem.builder()
-        .update(
-            Update.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
-                .key(
-                    Map.of(
-                        TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build(),
-                        TcgInventoryItem.SK, AttributeValue.builder().s(unitSk).build()))
-                .updateExpression(
-                    "SET #status = :inStock, "
-                        + TcgInventoryItem.UPDATED_AT
-                        + " = :now REMOVE "
-                        + TcgInventoryItem.ORDER_ID)
-                .conditionExpression("#status = :reserved")
-                .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
-                .expressionAttributeValues(
-                    Map.of(
-                        ":inStock", AttributeValue.builder().s("in_stock").build(),
-                        ":reserved", AttributeValue.builder().s("reserved").build(),
                         ":now",
                             AttributeValue.builder()
                                 .n(String.valueOf(clock.now().getEpochSecond()))

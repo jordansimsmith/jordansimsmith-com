@@ -349,36 +349,6 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldVoidWhenOfferDisappears() {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
-    var skuId = "scryfall-1#normal#NM";
-    createSkuWithUnits("jordan", skuId, 1001, 2);
-    reserveUnits("jordan", skuId, "83663", 2);
-    createExistingOrderWithLines("jordan", "83663", "awaiting_payment", skuId, List.of(1, 2));
-
-    fakeFetchTcgClient.seedSellerOffers(List.of());
-
-    // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
-
-    // assert
-    var order = getOrder("jordan", "83663");
-    assertThat(order.getStatus()).isEqualTo("voided");
-
-    var units = getUnits("jordan", skuId);
-    assertThat(units.stream().allMatch(u -> "in_stock".equals(u.getStatus()))).isTrue();
-
-    var sku = getSku("jordan", skuId);
-    assertThat(sku.getDirty()).isFalse();
-    assertThat(sku.getLastPublishedQuantity()).isEqualTo(2);
-
-    var audit = getAuditEntries("jordan");
-    assertThat(audit.stream().anyMatch(a -> "release".equals(a.getEventType()))).isTrue();
-  }
-
-  @Test
   void publishOrderPhaseShouldBeIdempotentOnReprocessing() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
@@ -592,20 +562,6 @@ public class JobsHandlerIntegrationTest {
     }
   }
 
-  private void reserveUnits(String user, String skuId, String orderId, int count) {
-    for (int i = 1; i <= count; i++) {
-      var unit =
-          tcgInventoryTable.getItem(
-              Key.builder()
-                  .partitionValue(TcgInventoryItem.formatSkuPk(user, skuId))
-                  .sortValue(TcgInventoryItem.formatUnitSk(i))
-                  .build());
-      unit.setStatus("reserved");
-      unit.setOrderId(orderId);
-      tcgInventoryTable.putItem(unit);
-    }
-  }
-
   private void createExistingOrder(String user, String offerId, String status) {
     var order =
         TcgInventoryItem.createOrder(
@@ -617,30 +573,6 @@ public class JobsHandlerIntegrationTest {
             "PICKUP",
             "3.33",
             "[]",
-            Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(order);
-  }
-
-  private void createExistingOrderWithLines(
-      String user, String offerId, String status, String skuId, List<Integer> sequenceNumbers) {
-    var lines =
-        "[{\"sku_id\":\""
-            + skuId
-            + "\",\"fetchtcg_listing_id\":1001,\"quantity\":"
-            + sequenceNumbers.size()
-            + ",\"price\":\"1.50\",\"allocated_sequence_numbers\":"
-            + sequenceNumbers
-            + "}]";
-    var order =
-        TcgInventoryItem.createOrder(
-            user,
-            offerId,
-            status,
-            "ACCEPTED",
-            null,
-            "PICKUP",
-            "3.33",
-            lines,
             Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(order);
   }
