@@ -8,6 +8,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
@@ -71,7 +73,8 @@ public class GetSkuHandler
 
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
     var user = requestContextFactory.createCtx(event).user();
-    var skuId = event.getPathParameters().get("sku_id");
+    // api gateway rest proxy integrations pass path parameters still url-encoded
+    var skuId = URLDecoder.decode(event.getPathParameters().get("sku_id"), StandardCharsets.UTF_8);
 
     var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
 

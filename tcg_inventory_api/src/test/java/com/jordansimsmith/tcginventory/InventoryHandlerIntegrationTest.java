@@ -179,6 +179,23 @@ public class InventoryHandlerIntegrationTest {
   }
 
   @Test
+  void getSkuShouldDecodeUrlEncodedSkuId() throws Exception {
+    // arrange
+    createSku("jordan", "scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
+    createUnit("jordan", "scryfall-1#normal#NM", 4242, "in_stock", "import1");
+
+    // act
+    var response =
+        getSkuHandler.handleRequest(
+            buildEvent("jordan", Map.of("sku_id", "scryfall-1%23normal%23NM")), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = objectMapper.readTree(response.getBody());
+    assertThat(body.get("sku_id").asText()).isEqualTo("scryfall-1#normal#NM");
+  }
+
+  @Test
   void getSkuShouldReturn404ForUnknownSku() {
     // act
     var response =

@@ -10,6 +10,8 @@ import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -64,7 +66,8 @@ public class RemoveUnitHandler
 
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
     var user = requestContextFactory.createCtx(event).user();
-    var skuId = event.getPathParameters().get("sku_id");
+    // api gateway rest proxy integrations pass path parameters still url-encoded
+    var skuId = URLDecoder.decode(event.getPathParameters().get("sku_id"), StandardCharsets.UTF_8);
     var sequenceNumber = Integer.parseInt(event.getPathParameters().get("sequence_number"));
     var queryParams = event.getQueryStringParameters();
     var reason = queryParams != null ? queryParams.get("reason") : null;
