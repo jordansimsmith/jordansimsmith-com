@@ -159,7 +159,7 @@ sequenceDiagram
 | `GET`    | `/orders`                                | list orders newest-first                                                               |
 | `GET`    | `/orders/{order_id}`                     | order detail: lines, allocated units, pull locations                                   |
 | `POST`   | `/orders/{order_id}/confirm`             | confirm the pull; marks allocated units sold                                           |
-| `POST`   | `/publish`                               | start a publish run; idempotent while one is queued/running (returns the existing run) |
+| `POST`   | `/publish`                               | start a publish run; responds 202 and is idempotent while one is queued/running        |
 | `GET`    | `/publish`                               | current-or-latest publish run: status, progress, error, pending dirty count            |
 | `GET`    | `/settings`                              | credential presence and last-updated (never a value)                                   |
 | `PUT`    | `/settings`                              | replace settings (stores the FetchTCG refresh token)                                   |
@@ -359,7 +359,7 @@ All mutations are `TransactWriteItems` including their audit entry; every mutati
 - Confirming a pull writes nothing to FetchTCG. Voiding an order releases units and dirties SKUs; the restored quantity reaches FetchTCG on the next publish run unless the seller already relisted on FetchTCG, in which case the projection converges as a no-op.
 - SKU records are never deleted; a zero-count SKU keeps its record, is delisted on FetchTCG, and is reused on restock.
 - Duplicate SQS deliveries, replayed job slices, and re-processed offers converge: job slices read the job item's continuation fresh, order creation is conditional on the offer id, unit transitions are conditional on current status, publish writes are absolute.
-- At most one publish run is queued or running per user: `POST /publish` creates the job conditionally and returns the existing run when one is already active.
+- At most one publish run is queued or running per user: `POST /publish` creates the job conditionally, responds 202 either way, and starts nothing new while one is already active; progress is observed via `GET /publish`.
 - Job failures surface on the affected resource: an appraise failure sets `error` on its import; a publish failure appears in `GET /publish`. Recovery is user-initiated (fix the cause — typically the credential — and re-trigger; for a failed appraise, delete the import and re-upload).
 - Market appraisal deduplicates FetchTCG reads per printing + finish within a job run.
 - NM is the default condition where none is provided. Timestamps are epoch seconds; ULIDs order imports, jobs, and audit entries by creation time.

@@ -180,7 +180,7 @@ export interface ApiClient {
   findOrders(): Promise<FindOrdersResponse>;
   getOrder(orderId: string): Promise<OrderDetail>;
   confirmOrder(orderId: string): Promise<OrderDetail>;
-  createPublish(): Promise<PublishResponse>;
+  createPublish(): Promise<void>;
   getPublish(): Promise<PublishResponse>;
 }
 

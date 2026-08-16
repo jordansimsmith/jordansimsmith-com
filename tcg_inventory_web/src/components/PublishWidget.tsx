@@ -59,9 +59,7 @@ export function PublishWidget() {
   const handleTrigger = async () => {
     setTriggering(true);
     try {
-      const response = await apiClient.createPublish();
-      setPublish(response);
-      setError(null);
+      await apiClient.createPublish();
       setPollEpoch((epoch) => epoch + 1);
     } catch (e) {
       const message =

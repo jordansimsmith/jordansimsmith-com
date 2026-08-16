@@ -111,7 +111,7 @@ describe('PublishWidget', () => {
       .mockResolvedValue(succeededResponse);
     const createPublishMock = vi
       .spyOn(clientModule.apiClient, 'createPublish')
-      .mockResolvedValue(runningResponse(0));
+      .mockResolvedValue(undefined);
 
     renderPublishWidget();
     await act(async () => {});

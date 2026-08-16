@@ -491,7 +491,8 @@ describe('createFakeClient publish', () => {
     const client = createFakeClient();
     const before = await client.getPublish();
 
-    const started = await client.createPublish();
+    await client.createPublish();
+    const started = await client.getPublish();
     expect(started.status).toBe('running');
     expect(started.total_sku_count).toBe(before.pending_sku_count);
     expect(started.published_sku_count).toBe(0);
@@ -510,13 +511,15 @@ describe('createFakeClient publish', () => {
     expect(done.finished_at).not.toBeNull();
   });
 
-  it('returns the existing run when triggered while one is running', async () => {
+  it('keeps the existing run when triggered while one is running', async () => {
     vi.useFakeTimers();
     const client = createFakeClient();
 
-    const first = await client.createPublish();
+    await client.createPublish();
+    const first = await client.getPublish();
     vi.advanceTimersByTime(1000);
-    const second = await client.createPublish();
+    await client.createPublish();
+    const second = await client.getPublish();
 
     expect(second.status).toBe('running');
     expect(second.started_at).toBe(first.started_at);
@@ -534,7 +537,8 @@ describe('createFakeClient publish', () => {
     const unit = detail.units.find((entry) => entry.status === 'in_stock');
     await client.deleteUnit(skuId, unit!.sequence_number);
 
-    const rerun = await client.createPublish();
+    await client.createPublish();
+    const rerun = await client.getPublish();
     expect(rerun.status).toBe('running');
     expect(rerun.total_sku_count).toBe(1);
     expect(rerun.published_sku_count).toBe(0);
@@ -545,7 +549,8 @@ describe('createFakeClient publish', () => {
     const client = createFakeClient();
     await drainPublish(client);
 
-    const response = await client.createPublish();
+    await client.createPublish();
+    const response = await client.getPublish();
 
     expect(response.status).toBe('succeeded');
     expect(response.total_sku_count).toBe(0);

@@ -890,7 +890,7 @@ export function createFakeClient(): ApiClient {
       return toOrderDetail(order, skus);
     },
 
-    async createPublish(): Promise<PublishResponse> {
+    async createPublish(): Promise<void> {
       progressPublish();
       if (!publishRun || publishRun.status === 'succeeded') {
         publishRun = {
@@ -903,7 +903,6 @@ export function createFakeClient(): ApiClient {
         // an empty worklist completes immediately
         progressPublish();
       }
-      return toPublishResponse();
     },
 
     async getPublish(): Promise<PublishResponse> {

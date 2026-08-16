@@ -188,11 +188,8 @@ export function createHttpClient(): ApiClient {
       return response.json();
     },
 
-    async createPublish(): Promise<PublishResponse> {
-      const response = await authenticatedFetch('/publish', {
-        method: 'POST',
-      });
-      return response.json();
+    async createPublish(): Promise<void> {
+      await authenticatedFetch('/publish', { method: 'POST' });
     },
 
     async getPublish(): Promise<PublishResponse> {

@@ -4,14 +4,12 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
-import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -23,15 +21,6 @@ public class CreatePublishHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CreatePublishHandler.class);
-
-  record PublishResponse(
-      @JsonProperty("job_id") String jobId,
-      @JsonProperty("status") String status,
-      @JsonProperty("processed_count") int processedCount,
-      @JsonProperty("error") @Nullable String error,
-      @JsonProperty("pending_dirty_count") int pendingDirtyCount,
-      @JsonProperty("created_at") long createdAt,
-      @JsonProperty("updated_at") @Nullable Long updatedAt) {}
 
   private final Clock clock;
   private final RequestContextFactory requestContextFactory;
@@ -68,18 +57,8 @@ public class CreatePublishHandler
     var user = requestContextFactory.createCtx(event).user();
 
     var activeJob = findActivePublishJob(user);
-    var dirtyCount = countDirtySkus(user);
-
     if (activeJob != null) {
-      return httpResponseFactory.ok(
-          new PublishResponse(
-              activeJob.getJobId(),
-              activeJob.getStatus(),
-              activeJob.getProcessedCount() != null ? activeJob.getProcessedCount() : 0,
-              activeJob.getError(),
-              dirtyCount,
-              activeJob.getCreatedAt() != null ? activeJob.getCreatedAt().getEpochSecond() : 0,
-              activeJob.getUpdatedAt() != null ? activeJob.getUpdatedAt().getEpochSecond() : null));
+      return httpResponseFactory.accepted();
     }
 
     var now = clock.now();
@@ -90,8 +69,7 @@ public class CreatePublishHandler
 
     jobsQueue.send(new JobMessage(user, jobId, "publish"), user);
 
-    return httpResponseFactory.ok(
-        new PublishResponse(jobId, "queued", 0, null, dirtyCount, now.getEpochSecond(), null));
+    return httpResponseFactory.accepted();
   }
 
   private TcgInventoryItem findActivePublishJob(String user) {
@@ -114,21 +92,5 @@ public class CreatePublishHandler
         .filter(item -> "queued".equals(item.getStatus()) || "running".equals(item.getStatus()))
         .findFirst()
         .orElse(null);
-  }
-
-  private int countDirtySkus(String user) {
-    var queryConditional =
-        QueryConditional.sortBeginsWith(
-            Key.builder()
-                .partitionValue(TcgInventoryItem.formatGsi1pk(user))
-                .sortValue(TcgInventoryItem.SKU_PREFIX)
-                .build());
-
-    var request = QueryEnhancedRequest.builder().queryConditional(queryConditional).build();
-
-    return (int)
-        tcgInventoryTable.index(TcgInventoryItem.GSI1_NAME).query(request).stream()
-            .flatMap(page -> page.items().stream())
-            .count();
   }
 }

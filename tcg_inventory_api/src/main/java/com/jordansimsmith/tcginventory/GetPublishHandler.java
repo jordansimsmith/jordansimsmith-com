@@ -22,13 +22,13 @@ public class GetPublishHandler
   private static final Logger LOGGER = LoggerFactory.getLogger(GetPublishHandler.class);
 
   record PublishResponse(
-      @JsonProperty("job_id") String jobId,
       @JsonProperty("status") String status,
-      @JsonProperty("processed_count") int processedCount,
+      @JsonProperty("published_sku_count") int publishedSkuCount,
+      @JsonProperty("total_sku_count") int totalSkuCount,
       @JsonProperty("error") @Nullable String error,
-      @JsonProperty("pending_dirty_count") int pendingDirtyCount,
-      @JsonProperty("created_at") long createdAt,
-      @JsonProperty("updated_at") @Nullable Long updatedAt) {}
+      @JsonProperty("started_at") long startedAt,
+      @JsonProperty("finished_at") @Nullable Long finishedAt,
+      @JsonProperty("pending_sku_count") int pendingSkuCount) {}
 
   record ErrorResponse(@JsonProperty("message") String message) {}
 
@@ -66,20 +66,26 @@ public class GetPublishHandler
     }
 
     var dirtyCount = countDirtySkus(user);
+    var status = latestPublishJob.getStatus();
+    var publishedCount =
+        latestPublishJob.getProcessedCount() != null ? latestPublishJob.getProcessedCount() : 0;
+    var terminal = "succeeded".equals(status) || "failed".equals(status);
+    var finishedAt =
+        terminal && latestPublishJob.getUpdatedAt() != null
+            ? latestPublishJob.getUpdatedAt().getEpochSecond()
+            : null;
 
     return httpResponseFactory.ok(
         new PublishResponse(
-            latestPublishJob.getJobId(),
-            latestPublishJob.getStatus(),
-            latestPublishJob.getProcessedCount() != null ? latestPublishJob.getProcessedCount() : 0,
+            status,
+            publishedCount,
+            publishedCount + dirtyCount,
             latestPublishJob.getError(),
-            dirtyCount,
             latestPublishJob.getCreatedAt() != null
                 ? latestPublishJob.getCreatedAt().getEpochSecond()
                 : 0,
-            latestPublishJob.getUpdatedAt() != null
-                ? latestPublishJob.getUpdatedAt().getEpochSecond()
-                : null));
+            finishedAt,
+            dirtyCount));
   }
 
   private TcgInventoryItem findLatestPublishJob(String user) {

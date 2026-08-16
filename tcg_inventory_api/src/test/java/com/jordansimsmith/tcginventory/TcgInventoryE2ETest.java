@@ -219,7 +219,7 @@ public class TcgInventoryE2ETest {
 
   private void triggerPublishAndWait() throws IOException, InterruptedException {
     var response = post("/publish");
-    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.statusCode()).isEqualTo(202);
 
     await()
         .atMost(Duration.ofSeconds(120))

@@ -69,19 +69,12 @@ public class PublishHandlerIntegrationTest {
     var response = createPublishHandler.handleRequest(buildEvent("jordan"), null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
-    assertThat(body.get("job_id").asText()).isNotEmpty();
-    assertThat(body.get("status").asText()).isEqualTo("queued");
-    assertThat(body.get("processed_count").asInt()).isZero();
-    assertThat(body.get("error").isNull()).isTrue();
-    assertThat(body.get("pending_dirty_count").asInt()).isZero();
-    assertThat(body.get("created_at").asLong()).isEqualTo(1700000000);
+    assertThat(response.getStatusCode()).isEqualTo(202);
 
     assertThat(fakeJobsQueue.getMessages()).hasSize(1);
     assertThat(fakeJobsQueue.getMessages().get(0).jobType()).isEqualTo("publish");
 
-    var jobId = body.get("job_id").asText();
+    var jobId = fakeJobsQueue.getMessages().get(0).jobId();
     var jobItem =
         tcgInventoryTable.getItem(
             Key.builder()
@@ -110,11 +103,7 @@ public class PublishHandlerIntegrationTest {
     var response = createPublishHandler.handleRequest(buildEvent("jordan"), null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
-    assertThat(body.get("job_id").asText()).isEqualTo("existing-job");
-    assertThat(body.get("status").asText()).isEqualTo("running");
-    assertThat(body.get("processed_count").asInt()).isEqualTo(5);
+    assertThat(response.getStatusCode()).isEqualTo(202);
 
     assertThat(fakeJobsQueue.getMessages()).isEmpty();
   }
@@ -135,12 +124,10 @@ public class PublishHandlerIntegrationTest {
     var response = createPublishHandler.handleRequest(buildEvent("jordan"), null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
-    assertThat(body.get("job_id").asText()).isNotEqualTo("old-job");
-    assertThat(body.get("status").asText()).isEqualTo("queued");
+    assertThat(response.getStatusCode()).isEqualTo(202);
 
     assertThat(fakeJobsQueue.getMessages()).hasSize(1);
+    assertThat(fakeJobsQueue.getMessages().get(0).jobId()).isNotEqualTo("old-job");
   }
 
   @Test
@@ -177,13 +164,13 @@ public class PublishHandlerIntegrationTest {
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
-    assertThat(body.get("job_id").asText()).isEqualTo("pub-job");
     assertThat(body.get("status").asText()).isEqualTo("succeeded");
-    assertThat(body.get("processed_count").asInt()).isEqualTo(3);
+    assertThat(body.get("published_sku_count").asInt()).isEqualTo(3);
+    assertThat(body.get("total_sku_count").asInt()).isEqualTo(4);
     assertThat(body.get("error").isNull()).isTrue();
-    assertThat(body.get("pending_dirty_count").asInt()).isEqualTo(1);
-    assertThat(body.get("created_at").asLong()).isEqualTo(1700000000);
-    assertThat(body.get("updated_at").asLong()).isEqualTo(1700000200);
+    assertThat(body.get("pending_sku_count").asInt()).isEqualTo(1);
+    assertThat(body.get("started_at").asLong()).isEqualTo(1700000000);
+    assertThat(body.get("finished_at").asLong()).isEqualTo(1700000200);
   }
 
   @Test
