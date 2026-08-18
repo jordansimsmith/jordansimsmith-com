@@ -182,6 +182,138 @@ public class TcgInventoryE2ETest {
     assertThat(finalOrdersResponse.statusCode()).isEqualTo(200);
     var finalOrdersBody = objectMapper.readTree(finalOrdersResponse.body());
     assertThat(finalOrdersBody.get("orders").get(0).get("state").asText()).isEqualTo("fulfilled");
+
+    // act - trigger report generation and wait for completion
+    triggerReportAndWait();
+
+    // assert - verify the complete report shape
+    var reportResponse = get("/reports");
+    assertThat(reportResponse.statusCode()).isEqualTo(200);
+    var reportBody = objectMapper.readTree(reportResponse.body());
+
+    // assert - freshness (just generated, no mutations since)
+    assertThat(reportBody.get("generated_at").asLong()).isGreaterThan(0);
+    assertThat(reportBody.get("stale").asBoolean()).isFalse();
+
+    // assert - generation status
+    var generation = reportBody.get("generation");
+    assertThat(generation.get("status").asText()).isEqualTo("succeeded");
+    assertThat(generation.get("started_at").asLong()).isGreaterThan(0);
+    assertThat(generation.get("finished_at").asLong()).isGreaterThan(0);
+
+    // assert - report totals
+    var report = reportBody.get("report");
+    assertThat(report).isNotNull();
+    var totals = report.get("totals");
+    assertThat(totals).isNotNull();
+    assertThat(totals.get("inventory_value")).isNotNull();
+    assertThat(totals.get("in_stock_units").asInt()).isGreaterThanOrEqualTo(0);
+    assertThat(totals.get("sku_count").asInt()).isGreaterThan(0);
+    assertThat(totals.get("reserved_units").asInt()).isGreaterThanOrEqualTo(0);
+    assertThat(totals.get("sold_units").asInt()).isGreaterThanOrEqualTo(0);
+    assertThat(totals.get("revenue_to_date")).isNotNull();
+    assertThat(totals.get("unpriced_units").asInt()).isGreaterThanOrEqualTo(0);
+
+    // assert - top sets
+    var topSets = report.get("top_sets");
+    assertThat(topSets).isNotNull();
+    assertThat(topSets.isArray()).isTrue();
+    assertThat(topSets).isNotEmpty();
+    for (var entry : topSets) {
+      assertThat(entry.get("set_code").asText()).isNotEmpty();
+      assertThat(entry.get("set_name").asText()).isNotEmpty();
+      assertThat(entry.get("in_stock_units").asInt()).isGreaterThanOrEqualTo(0);
+    }
+
+    // assert - price buckets (always exactly 6 entries)
+    var priceBuckets = report.get("price_buckets");
+    assertThat(priceBuckets).isNotNull();
+    assertThat(priceBuckets).hasSize(6);
+    for (var bucket : priceBuckets) {
+      assertThat(bucket.get("label").asText()).isNotEmpty();
+      assertThat(bucket.get("in_stock_units").asInt()).isGreaterThanOrEqualTo(0);
+    }
+
+    // assert - top hits
+    var topHits = report.get("top_hits");
+    assertThat(topHits).isNotNull();
+    assertThat(topHits.isArray()).isTrue();
+    assertThat(topHits).isNotEmpty();
+    for (var entry : topHits) {
+      assertThat(entry.get("sku_id").asText()).isNotEmpty();
+      assertThat(entry.get("name").asText()).isNotEmpty();
+      assertThat(entry.get("set_code").asText()).isNotEmpty();
+      assertThat(entry.get("collector_number").asText()).isNotEmpty();
+      assertThat(entry.get("finish").asText()).isNotEmpty();
+      assertThat(entry.get("condition").asText()).isNotEmpty();
+      assertThat(entry.get("price").asText()).isNotEmpty();
+      assertThat(entry.get("in_stock_units").asInt()).isGreaterThan(0);
+    }
+
+    // assert - aging bands (always exactly 4 entries)
+    var agingBands = report.get("aging_bands");
+    assertThat(agingBands).isNotNull();
+    assertThat(agingBands).hasSize(4);
+    for (var band : agingBands) {
+      assertThat(band.get("label").asText()).isNotEmpty();
+      assertThat(band.get("in_stock_units").asInt()).isGreaterThanOrEqualTo(0);
+    }
+
+    // assert - revenue by month (paid order exists from the flow)
+    var revenueByMonth = report.get("revenue_by_month");
+    assertThat(revenueByMonth).isNotNull();
+    assertThat(revenueByMonth.isArray()).isTrue();
+    assertThat(revenueByMonth).isNotEmpty();
+    for (var entry : revenueByMonth) {
+      assertThat(entry.get("month").asText()).matches("\\d{4}-\\d{2}");
+      assertThat(entry.get("revenue").asText()).isNotEmpty();
+      assertThat(entry.get("order_count").asInt()).isGreaterThan(0);
+    }
+
+    // assert - intake vs sales by week (intake happened during imports)
+    var intakeVsSales = report.get("intake_vs_sales_by_week");
+    assertThat(intakeVsSales).isNotNull();
+    assertThat(intakeVsSales.isArray()).isTrue();
+    assertThat(intakeVsSales).isNotEmpty();
+    for (var entry : intakeVsSales) {
+      assertThat(entry.get("week_start").asText()).matches("\\d{4}-\\d{2}-\\d{2}");
+      assertThat(entry.get("added_units").asInt()).isGreaterThanOrEqualTo(0);
+      assertThat(entry.get("sold_units").asInt()).isGreaterThanOrEqualTo(0);
+    }
+
+    // act - upload another csv to create a new audit entry via confirm
+    var importResponse2 =
+        httpClient.send(
+            HttpRequest.newBuilder()
+                .uri(URI.create(apiUrl + "/imports?filename=test2.csv"))
+                .header("Authorization", AUTH_HEADER)
+                .header("content-type", "text/csv")
+                .POST(HttpRequest.BodyPublishers.ofString(CSV_BODY))
+                .build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertThat(importResponse2.statusCode()).isEqualTo(200);
+    var importBody2 = objectMapper.readTree(importResponse2.body());
+    var importId2 = importBody2.get("import_id").asText();
+
+    await()
+        .atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(
+            () -> {
+              var pollResponse = get("/imports/" + importId2);
+              assertThat(pollResponse.statusCode()).isEqualTo(200);
+              var body = objectMapper.readTree(pollResponse.body());
+              assertThat(body.get("status").asText()).isEqualTo("review");
+            });
+
+    var confirmResponse2 = post("/imports/" + importId2 + "/confirm");
+    assertThat(confirmResponse2.statusCode()).isEqualTo(200);
+
+    // assert - report is now stale after mutation
+    var staleReportResponse = get("/reports");
+    assertThat(staleReportResponse.statusCode()).isEqualTo(200);
+    var staleReportBody = objectMapper.readTree(staleReportResponse.body());
+    assertThat(staleReportBody.get("stale").asBoolean()).isTrue();
   }
 
   private HttpResponse<String> get(String path) throws IOException, InterruptedException {
@@ -247,6 +379,26 @@ public class TcgInventoryE2ETest {
     var result = get("/publish");
     var resultBody = objectMapper.readTree(result.body());
     assertThat(resultBody.get("status").asText()).isEqualTo("succeeded");
+  }
+
+  private void triggerReportAndWait() throws IOException, InterruptedException {
+    var response = post("/reports");
+    assertThat(response.statusCode()).isEqualTo(202);
+
+    await()
+        .atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(
+            () -> {
+              var pollResponse = get("/reports");
+              assertThat(pollResponse.statusCode()).isEqualTo(200);
+              var body = objectMapper.readTree(pollResponse.body());
+              assertThat(body.get("generation").get("status").asText()).isIn("succeeded", "failed");
+            });
+
+    var result = get("/reports");
+    var resultBody = objectMapper.readTree(result.body());
+    assertThat(resultBody.get("generation").get("status").asText()).isEqualTo("succeeded");
   }
 
   private HttpResponse<String> delete(String path) throws IOException, InterruptedException {

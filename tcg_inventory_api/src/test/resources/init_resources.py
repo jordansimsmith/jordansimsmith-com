@@ -194,12 +194,24 @@ lambdas = {
         "handler": "com.jordansimsmith.tcginventory.DeleteImportRowHandler",
         "zip_file": "delete-import-row-handler_deploy.jar",
     },
+    "create_report": {
+        "handler": "com.jordansimsmith.tcginventory.CreateReportHandler",
+        "zip_file": "create-report-handler_deploy.jar",
+        "environment": {
+            "JOBS_QUEUE_URL": queue_url,
+        },
+    },
+    "get_reports": {
+        "handler": "com.jordansimsmith.tcginventory.GetReportsHandler",
+        "zip_file": "get-reports-handler_deploy.jar",
+    },
 }
 
 root_resources = {
     "settings": {"path": "settings"},
     "imports": {"path": "imports"},
     "publish": {"path": "publish"},
+    "reports": {"path": "reports"},
     "skus": {"path": "skus"},
     "orders": {"path": "orders"},
 }
@@ -248,6 +260,16 @@ endpoints = {
         "resource": "publish",
         "method": "GET",
         "lambda": "get_publish",
+    },
+    "create_report": {
+        "resource": "reports",
+        "method": "POST",
+        "lambda": "create_report",
+    },
+    "get_reports": {
+        "resource": "reports",
+        "method": "GET",
+        "lambda": "get_reports",
     },
     "confirm_import": {
         "resource": "import_confirm",
