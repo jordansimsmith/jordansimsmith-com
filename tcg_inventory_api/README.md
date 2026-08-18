@@ -18,6 +18,7 @@ The TCG inventory API service is the source of truth for a physical Magic: The G
 - As a card seller, I want FetchTCG listing quantities to always equal my in-stock unit counts, so that I never oversell or list phantom stock.
 - As a card seller, I want accepted offers to reserve the exact physical units and paid orders to produce a location-ordered pull sheet, so that fulfilment is one forward pass through my boxes.
 - As a card seller, I want every inventory mutation audited with before/after state, so that digital counts never silently drift from the physical boxes.
+- As a card seller, I want a regenerated overview report of value, movement, and composition, so that I can appreciate the overall state of the inventory without browsing SKU by SKU.
 - As a cautious FetchTCG user, I want conservative sequential API traffic and fail-closed credential handling, so that automation risk stays minimal.
 
 ## Features and scope boundaries
@@ -30,6 +31,7 @@ The TCG inventory API service is the source of truth for a physical Magic: The G
 - Manual audited adjustments: remove a unit; change a unit's condition (moving it between SKUs).
 - Publish job (single two-phase job): order phase ingests FetchTCG seller offers (reserve, pick-ready, defensive void release), then publish phase drains dirty SKUs to FetchTCG — create and update as absolute listing quantities, delete the listing when the in-stock count reaches zero.
 - Pull sheets for paid orders, sorted by unit sequence number; order confirm marks pulled units sold.
+- Reports: an async report job aggregates the entire inventory into a stored dashboard snapshot (headline totals, monthly revenue, weekly intake vs sales, top sets, price buckets, top hits, aging bands); `GET /reports` serves the latest snapshot with staleness metadata and generation status.
 - Per-user FetchTCG refresh-token storage with masked reads; fresh one-hour bearer minted per job run.
 - Append-only audit log written transactionally with every mutation.
 
@@ -38,7 +40,7 @@ The TCG inventory API service is the source of truth for a physical Magic: The G
 - Repricing existing listings (a separate repricing process owns price maintenance; this service prices new listings only).
 - Marketplaces other than FetchTCG; games other than Magic: The Gathering; non-English cards (they become review rows).
 - Camera or scanner-based intake, image recognition, and scan verification UIs.
-- Cost/purchase-price tracking, profit reporting, analytics dashboards, bulk lots, master sets, POS, buylist.
+- Cost/purchase-price tracking and profit reporting (reports cover revenue and valuation only), bulk lots, master sets, POS, buylist.
 - Background/scheduled polling of FetchTCG (all jobs are manually triggered).
 - Deleting SKU records (they are permanent once created) or offer negotiation (accept/counter/reject happens on FetchTCG).
 
@@ -51,7 +53,7 @@ flowchart TD
   apigw --> http[HTTP handlers]
   http -->|read/write| ddb[(DynamoDB: tcg_inventory)]
   http -->|send job + continuation messages| sqs[SQS: tcg_inventory_jobs]
-  sqs -->|batch size 1, max concurrency 1| jobs[Job consumer Lambda: appraise / publish]
+  sqs -->|batch size 1, max concurrency 1| jobs[Job consumer Lambda: appraise / publish / report]
   jobs --> ddb
   jobs -->|continuation| sqs
   jobs -->|mint bearer| firebase[Firebase token endpoint]
@@ -101,6 +103,7 @@ sequenceDiagram
 - SKU identity is the deterministic composite `scryfall_id#finish#condition` — computable offline from a ManaBox row with no lookup. SKU records cache the resolved `fetchtcg_card_id` and are never deleted.
 - Conditions use the 5-level TCGplayer-style scale; ManaBox's 7 values collapse at import and FetchTCG codes are a boundary translation. NM is the default when no condition is provided.
 - FetchTCG traffic is sequential with 1–2 s random request spacing, bounded retries, an endpoint allowlist, and fail-closed bearer handling. Every job run mints a fresh one-hour bearer from the stored refresh token and persists a rotated refresh token when Firebase returns one.
+- Reports are a stored snapshot, not live aggregation: a `report` job pages all SKU records via `gsi2` (projection ALL), derives every figure from unit and order items, and overwrites a singleton report item stamped with the latest audit ULID captured at generation start. `GET /reports` computes staleness (comparing the latest audit ULID against the snapshot's as-of audit ULID, plus a 24-hour backstop) without touching inventory partitions. Stock counts stay unstored; the report is a disposable projection regenerated on demand.
 - The static Scryfall→FetchTCG set mapping is a generated, checked-in artifact; unmapped sets stop appraisal into `review` rather than guessing. The generator maps each FetchTCG set to every distinct Scryfall code found by sampling unique card names from both the newest and oldest ends of that set, so reprint printings filed under an older FetchTCG set (for example MH1 and MH2 Timeshifts under Modern Horizons) still resolve.
 
 ## Domain glossary
@@ -120,6 +123,7 @@ sequenceDiagram
 - **Order**: an accepted FetchTCG offer. State: `awaiting_payment` → `to_pick` → `fulfilled`, or `awaiting_payment` → `voided`. An order created with an unmapped listing or insufficient stock enters `flagged` (requires manual review).
 - **Pull sheet**: pick list for a paid order, sorted by sequence number, forward-most duplicate first.
 - **Dirty**: boolean on a SKU meaning its FetchTCG listing may not reflect current in-stock count; set only inside mutation transactions.
+- **Report**: the singleton stored dashboard snapshot (totals, trends, composition figures) produced by the report job; overwritten in place, no history. Stale when any audited mutation postdates its as-of audit ULID or it is older than 24 hours.
 
 ## Integration contracts
 
@@ -139,7 +143,7 @@ sequenceDiagram
 - Request and response fields use `snake_case`; no path version segment
 - Non-2xx responses use `{"message": "error details"}`
 - `PATCH` is used for partial updates of resources with independent fields: each field present in the body is applied, absent fields are unchanged, and an empty body returns 400
-- Async work is observed through the affected resource, not a generic jobs API: appraisal progress and errors ride on the import (`GET /imports/{import_id}`), publish progress and errors on `GET /publish` (current-or-latest run). Job items exist in storage only as internal continuation state.
+- Async work is observed through the affected resource, not a generic jobs API: appraisal progress and errors ride on the import (`GET /imports/{import_id}`), publish progress and errors on `GET /publish` (current-or-latest run), and report generation progress and errors on `GET /reports` (latest snapshot plus current-or-latest generation). Job items exist in storage only as internal continuation state.
 - Verb convention: edits that record client-owned data use `PUT` on the resource; domain actions that cause server-side cascades (confirm, publish) are `POST` sub-resource actions with transition-specific contracts
 
 ### Endpoint summary
@@ -162,6 +166,8 @@ sequenceDiagram
 | `POST`   | `/orders/{order_id}/confirm`             | confirm the pull; marks allocated units sold                                           |
 | `POST`   | `/publish`                               | start a publish run; responds 202 and is idempotent while one is queued/running        |
 | `GET`    | `/publish`                               | current-or-latest publish run: status, progress, error, pending dirty count            |
+| `POST`   | `/reports`                               | start a report generation; responds 202 and is idempotent while one is queued/running  |
+| `GET`    | `/reports`                               | latest report snapshot with staleness and generation status; 404 before first run      |
 | `GET`    | `/settings`                              | settings view: credential presence, last-updated, track orders after                   |
 | `PATCH`  | `/settings`                              | partial update: optional refresh token + optional track orders after                   |
 
@@ -250,6 +256,60 @@ Response `200` (the `units` list, sorted by sequence number, is the pull sheet w
 
 - `409` on `POST /orders/{order_id}/confirm`: `{"message":"order is not ready to pick"}` when the order is not `to_pick`.
 
+`GET /reports`
+
+Response `200` (arrays shown with one representative entry; empty buckets and bands are still emitted so charts render stable axes; money values are NZD decimal strings):
+
+```json
+{
+  "generated_at": 1765420800,
+  "stale": false,
+  "generation": {
+    "status": "succeeded",
+    "error": null,
+    "started_at": 1765420700,
+    "finished_at": 1765420800
+  },
+  "report": {
+    "totals": {
+      "inventory_value": "2894.35",
+      "in_stock_units": 9412,
+      "sku_count": 6120,
+      "reserved_units": 14,
+      "sold_units": 862,
+      "revenue_to_date": "1204.50",
+      "unpriced_units": 3
+    },
+    "revenue_by_month": [
+      { "month": "2026-07", "revenue": "180.20", "order_count": 12 }
+    ],
+    "intake_vs_sales_by_week": [
+      { "week_start": "2026-07-06", "added_units": 240, "sold_units": 31 }
+    ],
+    "top_sets": [
+      { "set_code": "a25", "set_name": "Masters 25", "in_stock_units": 812 }
+    ],
+    "price_buckets": [{ "label": "0.25-0.50", "in_stock_units": 5120 }],
+    "top_hits": [
+      {
+        "sku_id": "f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
+        "name": "Ragavan, Nimble Pilferer",
+        "set_code": "mh2",
+        "collector_number": "138",
+        "finish": "normal",
+        "condition": "NM",
+        "price": "95.00",
+        "in_stock_units": 1
+      }
+    ],
+    "aging_bands": [{ "label": "0-30", "in_stock_units": 1200 }]
+  }
+}
+```
+
+- `generation` reflects the current-or-latest `report` job (`queued` | `running` | `succeeded` | `failed`, with `error` populated on failure); a run in flight rides alongside the previous snapshot.
+- `404` with `{"message":"Not Found"}` before the first generation ever.
+
 ### Pricing policy (new listings)
 
 Applied when the publish phase creates a listing for a SKU with no existing FetchTCG listing. All values NZD.
@@ -294,9 +354,10 @@ price = max(0.25, round_nearest_half_up(benchmark, 0.05))
 | Import row       | `USER#<u>#IMPORT#<import_id>` | `ROW#<stack position, padded>` | raw CSV fields, resolved identity, decision + reason, appraisal evidence (market price, rival evidence, suggested price), assigned sequence_number                                                                               |
 | Order            | `USER#<u>`                    | `ORDER#<fetchtcg_offer_id>`    | state, FetchTCG status/currentAction snapshot, accepted_at, delivery_mode, financial totals (no buyer PII), embedded lines `[{sku_id, fetchtcg_listing_id, quantity, price, allocated sequence_numbers}]`                        |
 | Audit entry      | `USER#<u>#AUDIT`              | `<ulid>`                       | event_type (`import_confirm`, `adjustment`, `reserve`, `release`, `sell`, `publish`), affected sku_ids / unit sequence_numbers / order_id / import_id, before/after summary                                                      |
-| Job              | `USER#<u>`                    | `JOB#<ulid>`                   | internal continuation state, never an API resource: type (`appraise` \| `publish`), status (`queued` \| `running` \| `succeeded` \| `failed`), continuation, progress counters, error                                            |
+| Job              | `USER#<u>`                    | `JOB#<ulid>`                   | internal continuation state, never an API resource: type (`appraise` \| `publish` \| `report`), status (`queued` \| `running` \| `succeeded` \| `failed`), continuation, progress counters, error                                |
 | Sequence counter | `USER#<u>`                    | `COUNTER#SEQUENCE`             | `next_sequence_number`                                                                                                                                                                                                           |
 | Settings         | `USER#<u>`                    | `SETTINGS`                     | credential metadata (set-at timestamp only), `track_orders_after` (epoch seconds)                                                                                                                                                |
+| Report           | `USER#<u>`                    | `REPORT`                       | singleton snapshot: `report` (JSON string in the API's `report` shape), `as_of_audit_ulid` (the latest audit ULID at generation start), `updated_at` (generation instant)                                                        |
 
 ### Representative records
 
@@ -364,6 +425,10 @@ All mutations are `TransactWriteItems` including their audit entry; every mutati
 - At most one publish run is queued or running per user: `POST /publish` creates the job conditionally, responds 202 either way, and starts nothing new while one is already active; progress is observed via `GET /publish`.
 - Job failures surface on the affected resource: an appraise failure sets `error` on its import; a publish failure appears in `GET /publish`. Recovery is user-initiated (fix the cause — typically the credential — and re-trigger; for a failed appraise, delete the import and re-upload).
 - Market appraisal deduplicates FetchTCG reads per printing + finish within a job run.
+- Report generation is a single-slice job of pure reads plus one snapshot overwrite; re-runs and duplicate deliveries converge on the same result. At most one report job is queued or running per user (`POST /reports` responds 202 either way, mirroring publish).
+- Report staleness: the job captures the latest audit ULID before reading any data; `GET /reports` reports stale when a later audit entry exists or the snapshot is older than 24 hours, so mutations landing mid-generation surface as stale on the next read.
+- Report figures count `in_stock` units only for value, price buckets, top sets, top hits, and aging; reserved units appear only in the headline reserved count; `removed` units are excluded everywhere. Intake trends count every unit by `created_at` (preserved across condition edits); sold trends use the sell-time `updated_at`; revenue counts paid orders (`to_pick`, `fulfilled`) bucketed by first-seen month. A unit's price is its SKU's `last_published_price` falling back to appraisal `suggested_price`; SKUs with neither surface as an unpriced count and are excluded from value figures.
+- Report week and month bucketing and aging bands use the fixed `Pacific/Auckland` timezone; weeks start Monday. Top hits rank by per-unit price (quantity is display detail), tie-broken by name ascending.
 - NM is the default condition where none is provided. Timestamps are epoch seconds; ULIDs order imports, jobs, and audit entries by creation time.
 
 ## Source of truth
@@ -380,6 +445,8 @@ All mutations are `TransactWriteItems` including their audit entry; every mutati
 | Order state                          | FetchTCG seller offers list (`status`, `currentAction`)           | mapped to `awaiting_payment` / `to_pick` / `voided`                |
 | Market price                         | FetchTCG `pricingData.NZ.tcgMarketPrice`                          | keep filter and pricing benchmark                                  |
 | Audit history                        | Append-only audit items                                           | written in the same transaction as each mutation                   |
+| Report figures                       | Stored report snapshot item                                       | derived from SKU/unit/order items at generation time               |
+| Report staleness                     | Latest audit ULID vs snapshot `as_of_audit_ulid`                  | plus a fixed 24-hour wall-clock backstop                           |
 
 ## Security and privacy
 
@@ -397,7 +464,7 @@ All mutations are `TransactWriteItems` including their audit entry; every mutati
 | ---------------- | -------------------------------- | ------------------------------------------- | ---------------------- |
 | `JOBS_QUEUE_URL` | yes (trigger + consumer Lambdas) | SQS queue for job and continuation messages | none; set by Terraform |
 
-Fixed configuration lives in code: request spacing 1–2 s, bounded retries, request budgets, page sizes, slice size (~100 rows or bounded FetchTCG calls per slice), country `NZ`, currency `NZD`, keep threshold NZ$0.25, price increment NZ$0.05, seller floor NZ$0.25.
+Fixed configuration lives in code: request spacing 1–2 s, bounded retries, request budgets, page sizes, slice size (~100 rows or bounded FetchTCG calls per slice), country `NZ`, currency `NZD`, keep threshold NZ$0.25, price increment NZ$0.05, seller floor NZ$0.25. Report constants: staleness backstop 24 h, bucketing timezone `Pacific/Auckland`, price buckets 0.25–0.50 / 0.50–1 / 1–2 / 2–5 / 5–10 / 10+ NZD, aging bands 0–30 / 31–90 / 91–180 / 180+ days, top sets 10, top hits 10.
 
 ### Secret shape
 
@@ -417,14 +484,15 @@ Rotated refresh tokens returned by Firebase are written back to the same key.
 - SKU browse is a single GSI2 query returning identity fields only (no unit fan-out, no counts); detail derives counts from the partition query which returns the SKU and all its units in one shot.
 - Job Lambdas: 900 s timeout with the module's default 1769 MB memory (the 1-vCPU point — keeps Java cold starts fast; the GB-second cost of idle FetchTCG pacing still sits far inside the always-free compute allowance). HTTP handlers use module defaults (10 s).
 - FetchTCG pacing dominates: an appraise slice of ~100 rows runs minutes; a daily publish run (typical daily delta) runs single-digit minutes; jobs re-enqueue continuations well before timeout.
+- Report generation makes no FetchTCG calls: it pages all SKU records via gsi2 (~5–10 pages) and queries each SKU partition once (~25–100 s sequential at target scale), completing in a single slice. `GET /reports` is one item read plus two small queries.
 - SQS consumer maximum concurrency 1; visibility timeout exceeds the function timeout.
 - Everything fits the repo's serverless cost posture (Lambda/SQS free tiers; Secrets Manager ~US$0.40/month).
 
 ## Testing and quality gates
 
-- Unit tests: pricing policy scenarios (keep filter, undercut tick, deep-discount guard, supported floor, sole-source premium, rounding, floor), condition translation, set mapping, sequence/block/location derivation, FetchTCG client pacing/retries/allowlist/fail-closed auth with fixture responses, offer state mapping.
-- Integration tests (DynamoDB Testcontainers, LocalStack SQS): import upload→rows, confirm idempotency and double-confirm rejection, adjustments, reserve/release/sell transitions, publish create/update/delist and conditional clear, duplicate-delivery no-ops, masked credential handling.
-- E2E (LocalStack): import → appraise → confirm → publish → order → pull → confirm loop.
+- Unit tests: pricing policy scenarios (keep filter, undercut tick, deep-discount guard, supported floor, sole-source premium, rounding, floor), condition translation, set mapping, sequence/block/location derivation, FetchTCG client pacing/retries/allowlist/fail-closed auth with fixture responses, offer state mapping, report aggregation (price fallback chain, bucket and band edges, NZ-timezone bucketing, top-hits ordering and tie-break, paid-order filter, removed-unit exclusion), and report staleness comparison (as-of audit ULID and 24 h backstop).
+- Integration tests (DynamoDB Testcontainers, LocalStack SQS): import upload→rows, confirm idempotency and double-confirm rejection, adjustments, reserve/release/sell transitions, publish create/update/delist and conditional clear, duplicate-delivery no-ops, masked credential handling, report job snapshot writes, `GET /reports` staleness transitions, and `POST /reports` idempotency while active.
+- E2E (LocalStack): import → appraise → confirm → publish → order → pull → confirm loop, then report generation and retrieval.
 - Tests never call the live FetchTCG API.
 - Required checks: `bazel build //tcg_inventory_api:all`, `bazel test //tcg_inventory_api:all`, then repo-level `bazel mod tidy` and `bazel run //:format`.
 
@@ -461,3 +529,9 @@ Rotated refresh tokens returned by Firebase are written back to the same key.
 1. The user regrades a unit from NM to LP.
 2. One transaction moves the unit item to the LP SKU (same sequence number), dirties both SKUs, bumps both versions, and writes one audit entry.
 3. The next publish updates the NM listing quantity (delisting it if the count reached zero) and creates or updates the LP listing at the policy price.
+
+### Scenario 5: report snapshot after a day's activity
+
+1. After confirming an import and running publish, the user opens the reports tab; `GET /reports` returns the previous snapshot marked stale because new audit entries postdate its as-of audit ULID.
+2. The client posts `/reports`; the job captures the latest audit ULID, pages every SKU and its units, pages orders, and overwrites the snapshot.
+3. `GET /reports` now returns fresh figures: updated totals, today's intake in the weekly trend, and any newly listed hits.

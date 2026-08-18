@@ -1,6 +1,6 @@
 # TCG inventory web
 
-The TCG inventory web service is a keyboard-first single-page app for running a chaos-sorted Magic: The Gathering card operation against `tcg_inventory_api`: importing ManaBox scans, reviewing appraisals, browsing stock, publishing to FetchTCG, and pulling orders.
+The TCG inventory web service is a keyboard-first single-page app for running a chaos-sorted Magic: The Gathering card operation against `tcg_inventory_api`: importing ManaBox scans, reviewing appraisals, browsing stock, publishing to FetchTCG, pulling orders, and reviewing inventory reports.
 
 ## Overview
 
@@ -16,6 +16,7 @@ The TCG inventory web service is a keyboard-first single-page app for running a 
 - As a card seller, I want a dense full-width inventory view with instant prefix search, so that I can find any SKU and its storage location in seconds.
 - As a card seller standing at my boxes, I want a phone-friendly pull sheet in location order, so that I can pull an order one-handed in a single forward pass.
 - As a card seller, I want to trigger a publish run and watch its progress, so that FetchTCG listings converge with my inventory on demand.
+- As a card seller, I want a reports dashboard of value, movement, and composition figures, so that I can appreciate the overall state of my inventory at a glance.
 - As a returning user, I want a persisted session and a write-only credential form, so that setup is one-time and my FetchTCG token is never displayed.
 
 ## Features and scope boundaries
@@ -27,13 +28,14 @@ The TCG inventory web service is a keyboard-first single-page app for running a 
 - Inventory: dense SKU table with counts, prefix search, SKU detail with the Scryfall card image, units, and derived locations, and manual adjustments (remove unit, change condition).
 - Orders: list and detail with state badges, location-ordered pull sheet optimized for one-handed phone use, confirm-pull action.
 - Publish widget (no dedicated jobs page): trigger a publish run, show the pending publish count (SKUs with unpublished inventory changes), and poll/render the current-or-latest run's progress and outcome. Appraisal progress and errors render on the import pages.
+- Reports tab: renders the latest generated report — headline totals strip, monthly revenue, weekly intake vs sales, top sets, price buckets, top hits table, and aging bands — under a "data as of" stamp. Regeneration is automatic and background-only: when the response says stale (checked on navigation and window refocus), the page triggers a new generation and polls until fresh figures swap in place; the first-ever visit shows skeletons while the first generation runs.
 - Settings: set or replace the FetchTCG refresh token (display presence and last-updated only); configure the "Track orders after" date to exclude pre-existing FetchTCG orders from tracking.
 - Vim-style keyboard navigation across all data views.
 - Development fake mode: an in-memory `ApiClient` with seeded data so the whole UX runs without a backend.
 
 ### Out of scope
 
-- Analytics dashboards, reporting, and charts.
+- Manual report refresh controls (regeneration is automatic on visit and refocus) and real-time or streaming report updates.
 - Scan or camera-based intake and image verification UIs.
 - Offline support, background sync, or push notifications.
 - Multi-marketplace views, repricing controls, and offer negotiation (accept/counter happens on FetchTCG).
@@ -76,7 +78,9 @@ sequenceDiagram
 
 ## Main technical decisions
 
-- Use a typed `ApiClient` interface with swappable implementations: production uses the HTTP client, development uses an in-memory fake with seeded data (SKUs across blocks, an in-flight import, orders in every state) for fast iteration and tests.
+- Use a typed `ApiClient` interface with swappable implementations: production uses the HTTP client, development uses an in-memory fake with seeded data (SKUs across blocks, an in-flight import, orders in every state, a generated report) for fast iteration and tests.
+- Charts come from `@mantine/charts` (Recharts-backed, same version line as the Mantine kit); every report figure renders the API's prepared payload verbatim with no client-side aggregation.
+- Report freshness is stale-while-revalidate: the page always renders the stored snapshot immediately, auto-triggers regeneration when stale, and never unmounts content during a refresh; there is no manual refresh control (a browser reload or re-navigation is the escape hatch).
 - Implement vim-style navigation as one small custom hook (keydown handling scoped to the focused data view) rather than adopting a hotkey framework.
 - Desktop-first dense layouts: full-width compact Mantine tables, minimal chrome, no narrow content column. Mobile remains functional everywhere, with the pull sheet and placement screens explicitly designed for one-handed phone use.
 - Store the session in `localStorage` so it survives browser restarts; logout clears it.
@@ -90,6 +94,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 - **Keep/discard/review row**: an import row's appraisal decision; decisions are final for the import. Review cards are set aside physically, never ingested, and return through a later import once their cause is fixed.
 - **Placement instructions**: the post-confirm screen mapping the confirmed stack to block labels and location ranges, with the card names at each range boundary as physical checkpoints.
 - **Pending publish badge**: count of SKUs with unpublished inventory changes shown on the publish trigger.
+- **Report**: the latest generated dashboard snapshot served by `GET /reports`; stale when inventory changed since generation or the snapshot is older than 24 hours. The "data as of" stamp renders its generation time (relative under 24 h, absolute beyond).
 
 ## Keyboard contract
 
@@ -125,6 +130,8 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 | `POST`   | `/orders/{order_id}/confirm`             | confirm pull                                                 |
 | `POST`   | `/publish`                               | publish trigger                                              |
 | `GET`    | `/publish`                               | publish run polling + pending count                          |
+| `GET`    | `/reports`                               | reports tab snapshot + staleness + generation polling        |
+| `POST`   | `/reports`                               | automatic regeneration trigger when stale                    |
 | `GET`    | `/settings`                              | credential presence check + login probe + track orders after |
 | `PATCH`  | `/settings`                              | partial update: credential and/or track orders after         |
 
@@ -139,6 +146,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 - `PUT /skus/{sku_id}/units/{sequence_number}` responds `{"sku_id": "<new sku_id>"}`; the UI navigates to the new SKU's detail page.
 - Import review renders rows top-of-stack first exactly as returned; review rows are informational and never become units — confirm ingests keep rows only.
 - Locations render from sequence numbers exactly as the backend provides them (`A42-42`); the client never re-derives them.
+- The reports tab renders `GET /reports` figures exactly as provided — buckets, bands, labels, and money strings are pre-shaped server-side. A 404 means no report exists yet: the page triggers `POST /reports` and shows skeletons until the first snapshot lands. When `stale` is true and no generation is queued or running, the page triggers `POST /reports` and polls `GET /reports` every ~2 seconds, keeping the old figures visible with a subtle refreshing indicator until fresh figures swap in place. Generation failures render inline (like the publish widget) while the stale figures remain visible.
 
 ## Data and storage contracts
 
@@ -160,6 +168,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 - Pull sheets and unit lists render in ascending sequence-number order (forward pass order).
 - Import review is read-only; appraisal decisions are final for the import.
 - Job and import polling stops when the job reaches a terminal status.
+- The reports tab revalidates staleness on navigation and window refocus; regeneration is automatic only, and rendered figures never unmount during a refresh.
 - Dates and times display in the browser locale from epoch values; the API remains the source of truth for all timestamps.
 
 ## Source of truth
@@ -198,12 +207,13 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 - Optimized for a single user with 5,000–10,000 SKUs: browse views paginate via continuation tokens and keep interactions immediate on desktop hardware.
 - Import review handles a few hundred rows with keyboard navigation; no virtualization until row counts demand it.
 - Polling intervals (~2 s) apply only while a job is running.
+- The report payload is a few KB of pre-aggregated figures; charts render prepared data with no client-side computation. The reports tab is desktop-first and functional on mobile without special optimization.
 - Mobile targets are the pull sheet and placement screens; they render fast on mid-range phones.
 
 ## Testing and quality gates
 
 - Unit and component tests run with Vitest and React Testing Library in `jsdom`.
-- Key coverage: login and route protection, the vim navigation hook (movement, jumps, search focus), SKU detail adjustments (remove unit, condition change), import review rendering and the confirm transition, pull-sheet ordering and confirm flow, publish trigger + job polling, masked credential form.
+- Key coverage: login and route protection, the vim navigation hook (movement, jumps, search focus), SKU detail adjustments (remove unit, condition change), import review rendering and the confirm transition, pull-sheet ordering and confirm flow, publish trigger + job polling, masked credential form, reports tab rendering of every section from the fake client, the stale→regenerate→poll flow with figures kept visible, and first-visit skeleton generation.
 - Required checks: `bazel test //tcg_inventory_web:unit-tests`, `bazel build //tcg_inventory_web:typecheck`, `bazel build //tcg_inventory_web:build`.
 
 ## Local development and smoke checks
@@ -216,6 +226,7 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
   4. Open the seeded `to_pick` order, view the pull sheet at phone width, confirm the pull.
   5. Trigger publish and watch the fake job drain the pending publish count.
   6. Set a credential in settings and verify only presence metadata renders.
+  7. Open reports; verify every figure renders under the "data as of" stamp, then make an inventory change, revisit reports, and watch it regenerate automatically with figures swapping in place.
 
 ## End-to-end scenarios
 
@@ -238,3 +249,10 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 1. A publish run fails with an authentication error visible in the publish widget.
 2. The user opens settings, pastes a fresh refresh token into the write-only field, and saves.
 3. Settings shows updated presence metadata; re-triggering publish succeeds. The token value itself is never displayed.
+
+### Scenario 4: appreciating the inventory after a big import
+
+1. The user confirms a 300-card import and triggers publish.
+2. Opening the reports tab shows the previous snapshot instantly, marked stale, with the refreshing indicator while regeneration runs in the background.
+3. Fresh figures swap in place: total value and in-stock units jump, the intake trend shows this week's spike, and a new card appears in the top hits table.
+4. Glancing away and refocusing the window later re-checks staleness silently; nothing regenerates when nothing changed.
