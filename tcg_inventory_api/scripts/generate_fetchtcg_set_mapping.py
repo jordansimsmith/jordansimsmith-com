@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Generate the Scryfall-to-FetchTCG set mapping JSON.
 
-Probes every FetchTCG set by sampling a card, looking up its Scryfall ID,
-and resolving the Scryfall set code. Produces fetchtcg_set_mapping.json.
+Probes every FetchTCG set by sampling unique card names from the newest and
+oldest ends, looking up each card's Scryfall ID, and collecting the distinct
+Scryfall set codes. Produces fetchtcg_set_mapping.json.
 
 Usage:
     python generate_fetchtcg_set_mapping.py [--output PATH]
@@ -43,9 +44,11 @@ SCRYFALL_HEADERS = {
 MAX_ATTEMPTS = 5
 MIN_INTERVAL_SECONDS = 1.0
 MAX_INTERVAL_SECONDS = 2.0
+PAGE_SIZE = 10
+SAMPLE_PER_END = 5
 
-# manual overrides: FetchTCG sets that should also map to a Scryfall code
-# even though the probe would resolve them to a different code
+# extra Scryfall codes that should also include a FetchTCG set
+# (probe-discovered codes are kept)
 ADDITIONAL_MAPPINGS = {
     "plst": [3075],  # Mystery Booster contains plst-coded cards
 }
@@ -74,18 +77,17 @@ def main():
 
     mapping = defaultdict(dict)
     unresolved = []
-    has_fetchtcg_request = False
 
     for index, fetchtcg_set in enumerate(fetchtcg_sets, start=1):
         set_id = int(fetchtcg_set["value"])
         label = str(fetchtcg_set["label"])
 
-        code = _probe_set(set_id, scryfall_codes, has_fetchtcg_request)
-        has_fetchtcg_request = True
+        codes = _probe_set(set_id, scryfall_codes)
 
-        if code:
-            mapping[code][set_id] = label
-            status = code.upper()
+        if codes:
+            for code in codes:
+                mapping[code][set_id] = label
+            status = ",".join(code.upper() for code in sorted(codes))
         else:
             unresolved.append((set_id, label))
             status = "unresolved"
@@ -116,49 +118,60 @@ def main():
         print(f"  unresolved: {set_id} {label}")
 
 
-def _probe_set(fetchtcg_set_id, scryfall_codes, pace_first):
-    """Sample a card from the FetchTCG set and resolve its Scryfall set code."""
-    query = urllib.parse.urlencode(
-        {
-            "pageSize": 5,
-            "pageOffset": 0,
-            "sort": "DATE_DESC",
-            "gameIds": "mtg",
-            "sets": fetchtcg_set_id,
-        }
-    )
-
-    if pace_first:
+def _probe_set(fetchtcg_set_id, scryfall_codes):
+    """Return distinct Scryfall codes from newest and oldest cards in the set."""
+    codes = set()
+    seen_names = set()
+    for sort in ("DATE_DESC", "DATE_ASC"):
+        query = urllib.parse.urlencode(
+            {
+                "pageSize": PAGE_SIZE,
+                "pageOffset": 0,
+                "sort": sort,
+                "gameIds": "mtg",
+                "sets": fetchtcg_set_id,
+            }
+        )
         _pace()
-    search = _get_json(f"{FETCHTCG_CARDS_URL}?{query}", FETCHTCG_HEADERS)
-    results = search.get("searchResults", {})
-    candidates = results.get("content", [])
+        search = _get_json(f"{FETCHTCG_CARDS_URL}?{query}", FETCHTCG_HEADERS)
+        results = search.get("searchResults", {})
+        candidates = results.get("content", [])
 
-    for candidate in candidates:
-        if not isinstance(candidate, dict) or not candidate.get("id"):
-            continue
+        names_this_end = 0
+        for candidate in candidates:
+            if not isinstance(candidate, dict) or not candidate.get("id"):
+                continue
 
-        card_id = urllib.parse.quote(str(candidate["id"]), safe="_-.")
-        _pace()
-        card = _get_json(f"{FETCHTCG_CARDS_URL}/{card_id}", FETCHTCG_HEADERS)
-        references = card.get("externalReferences", {})
-        scryfall_id = references.get("scryfallId")
-        if not scryfall_id:
-            continue
+            name = candidate.get("cardName")
+            if not name or name in seen_names:
+                continue
+            seen_names.add(name)
 
-        scryfall_id = urllib.parse.quote(str(scryfall_id), safe="-")
-        try:
-            scryfall_card = _get_json(
-                f"{SCRYFALL_CARDS_URL}/{scryfall_id}", SCRYFALL_HEADERS
-            )
-        except RuntimeError:
-            continue
+            card_id = urllib.parse.quote(str(candidate["id"]), safe="_-.")
+            _pace()
+            card = _get_json(f"{FETCHTCG_CARDS_URL}/{card_id}", FETCHTCG_HEADERS)
+            references = card.get("externalReferences", {})
+            scryfall_id = references.get("scryfallId")
+            if not scryfall_id:
+                continue
 
-        code = str(scryfall_card.get("set", "")).casefold()
-        if code in scryfall_codes:
-            return code
+            scryfall_id = urllib.parse.quote(str(scryfall_id), safe="-")
+            try:
+                scryfall_card = _get_json(
+                    f"{SCRYFALL_CARDS_URL}/{scryfall_id}", SCRYFALL_HEADERS
+                )
+            except RuntimeError:
+                continue
 
-    return None
+            code = str(scryfall_card.get("set", "")).casefold()
+            if code in scryfall_codes:
+                codes.add(code)
+
+            names_this_end += 1
+            if names_this_end >= SAMPLE_PER_END:
+                break
+
+    return codes
 
 
 def _get_json(url, headers):
