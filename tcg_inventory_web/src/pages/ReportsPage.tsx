@@ -6,6 +6,7 @@ import {
   SimpleGrid,
   Skeleton,
   Stack,
+  Table,
   Text,
   Title,
 } from '@mantine/core';
@@ -17,6 +18,7 @@ import { apiClient } from '../api/client';
 import type {
   ReportPriceBucket,
   ReportResponse,
+  ReportTopHit,
   ReportTopSet,
   ReportTotals,
 } from '../api/client';
@@ -145,6 +147,42 @@ function PriceBucketsChart({
   );
 }
 
+function TopHitsTable({ topHits }: { topHits: ReportTopHit[] }) {
+  return (
+    <Paper p="md" radius="sm" withBorder>
+      <Text size="sm" fw={700} mb="md">
+        Top hits
+      </Text>
+      <Table
+        striped
+        highlightOnHover
+        verticalSpacing={4}
+        horizontalSpacing="sm"
+        fz="sm"
+      >
+        <Table.Thead>
+          <Table.Tr>
+            <Table.Th>Name</Table.Th>
+            <Table.Th>Set</Table.Th>
+            <Table.Th>Finish</Table.Th>
+            <Table.Th>Price</Table.Th>
+          </Table.Tr>
+        </Table.Thead>
+        <Table.Tbody>
+          {topHits.map((hit) => (
+            <Table.Tr key={hit.sku_id}>
+              <Table.Td>{hit.name}</Table.Td>
+              <Table.Td>{hit.set_code.toUpperCase()}</Table.Td>
+              <Table.Td>{hit.finish}</Table.Td>
+              <Table.Td>{formatCurrency(hit.price)}</Table.Td>
+            </Table.Tr>
+          ))}
+        </Table.Tbody>
+      </Table>
+    </Paper>
+  );
+}
+
 export function ReportsPage() {
   const [report, setReport] = useState<ReportResponse | null>(null);
   const [firstVisit, setFirstVisit] = useState(false);
@@ -258,6 +296,12 @@ export function ReportsPage() {
           report?.report?.price_buckets &&
           report.report.price_buckets.length > 0 && (
             <PriceBucketsChart priceBuckets={report.report.price_buckets} />
+          )}
+
+        {!firstVisit &&
+          report?.report?.top_hits &&
+          report.report.top_hits.length > 0 && (
+            <TopHitsTable topHits={report.report.top_hits} />
           )}
 
         {!firstVisit && report && !report.report?.totals && (

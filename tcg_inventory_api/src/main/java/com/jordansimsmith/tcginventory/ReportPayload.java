@@ -9,7 +9,8 @@ import javax.annotation.Nullable;
 public record ReportPayload(
     @JsonProperty("totals") @Nullable Totals totals,
     @JsonProperty("top_sets") @Nullable List<TopSet> topSets,
-    @JsonProperty("price_buckets") @Nullable List<PriceBucket> priceBuckets) {
+    @JsonProperty("price_buckets") @Nullable List<PriceBucket> priceBuckets,
+    @JsonProperty("top_hits") @Nullable List<TopHit> topHits) {
 
   public record Totals(
       @JsonProperty("inventory_value") String inventoryValue,
@@ -27,4 +28,14 @@ public record ReportPayload(
 
   public record PriceBucket(
       @JsonProperty("label") String label, @JsonProperty("in_stock_units") int inStockUnits) {}
+
+  public record TopHit(
+      @JsonProperty("sku_id") String skuId,
+      @JsonProperty("name") String name,
+      @JsonProperty("set_code") String setCode,
+      @JsonProperty("collector_number") String collectorNumber,
+      @JsonProperty("finish") String finish,
+      @JsonProperty("condition") String condition,
+      @JsonProperty("price") String price,
+      @JsonProperty("in_stock_units") int inStockUnits) {}
 }

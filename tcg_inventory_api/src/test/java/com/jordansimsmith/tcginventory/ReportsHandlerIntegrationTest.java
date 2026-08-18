@@ -360,6 +360,18 @@ public class ReportsHandlerIntegrationTest {
     // sku1: 2 in_stock at $1.50 -> bucket "1-2", sku2: 1 in_stock at $3.00 -> bucket "2-5"
     assertThat(priceBuckets.get(2).get("in_stock_units").asInt()).isEqualTo(2);
     assertThat(priceBuckets.get(3).get("in_stock_units").asInt()).isEqualTo(1);
+
+    var topHits = reportJson.get("top_hits");
+    assertThat(topHits).isNotNull();
+    assertThat(topHits.isArray()).isTrue();
+    // sku2 (Sol Ring, $3.00) first, sku1 (Lightning Bolt, $1.50) second; sku3 unpriced excluded
+    assertThat(topHits.size()).isEqualTo(2);
+    assertThat(topHits.get(0).get("name").asText()).isEqualTo("Sol Ring");
+    assertThat(topHits.get(0).get("price").asText()).isEqualTo("3.00");
+    assertThat(topHits.get(0).get("in_stock_units").asInt()).isEqualTo(1);
+    assertThat(topHits.get(1).get("name").asText()).isEqualTo("Lightning Bolt");
+    assertThat(topHits.get(1).get("price").asText()).isEqualTo("1.50");
+    assertThat(topHits.get(1).get("in_stock_units").asInt()).isEqualTo(2);
   }
 
   @Test

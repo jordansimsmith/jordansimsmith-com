@@ -186,10 +186,22 @@ export interface ReportPriceBucket {
   in_stock_units: number;
 }
 
+export interface ReportTopHit {
+  sku_id: string;
+  name: string;
+  set_code: string;
+  collector_number: string;
+  finish: string;
+  condition: string;
+  price: string;
+  in_stock_units: number;
+}
+
 export interface Report {
   totals?: ReportTotals;
   top_sets?: ReportTopSet[];
   price_buckets?: ReportPriceBucket[];
+  top_hits?: ReportTopHit[];
 }
 
 export interface ReportResponse {

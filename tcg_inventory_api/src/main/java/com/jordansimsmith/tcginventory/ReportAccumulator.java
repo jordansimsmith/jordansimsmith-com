@@ -9,6 +9,7 @@ import java.util.Map;
 
 public class ReportAccumulator {
   private static final int TOP_SETS_LIMIT = 10;
+  private static final int TOP_HITS_LIMIT = 10;
 
   private static final BigDecimal BUCKET_0_50 = new BigDecimal("0.50");
   private static final BigDecimal BUCKET_1 = new BigDecimal("1");
@@ -30,6 +31,7 @@ public class ReportAccumulator {
 
   private final int[] priceBucketCounts = new int[6];
   private final Map<String, SetAccumulator> setMap = new HashMap<>();
+  private final List<HitCandidate> hitCandidates = new ArrayList<>();
 
   public void addSku(TcgInventoryItem sku, List<TcgInventoryItem> units) {
     skuCount++;
@@ -63,6 +65,19 @@ public class ReportAccumulator {
       setMap
           .computeIfAbsent(sku.getSetCode(), k -> new SetAccumulator(sku.getSetName()))
           .addUnits(skuInStockCount);
+
+      if (price != null) {
+        hitCandidates.add(
+            new HitCandidate(
+                sku.getSkuId(),
+                sku.getName(),
+                sku.getSetCode(),
+                sku.getCollectorNumber(),
+                sku.getFinish(),
+                sku.getCondition(),
+                price,
+                skuInStockCount));
+      }
     }
   }
 
@@ -110,6 +125,27 @@ public class ReportAccumulator {
     return buckets;
   }
 
+  public List<ReportPayload.TopHit> toTopHits() {
+    return hitCandidates.stream()
+        .sorted(
+            Comparator.<HitCandidate, BigDecimal>comparing(HitCandidate::price)
+                .reversed()
+                .thenComparing(HitCandidate::name))
+        .limit(TOP_HITS_LIMIT)
+        .map(
+            h ->
+                new ReportPayload.TopHit(
+                    h.skuId(),
+                    h.name(),
+                    h.setCode(),
+                    h.collectorNumber(),
+                    h.finish(),
+                    h.condition(),
+                    h.price().toPlainString(),
+                    h.inStockUnits()))
+        .toList();
+  }
+
   static int bucketIndex(BigDecimal price) {
     if (price.compareTo(BUCKET_0_50) < 0) {
       return 0;
@@ -148,4 +184,14 @@ public class ReportAccumulator {
       inStockUnits += count;
     }
   }
+
+  private record HitCandidate(
+      String skuId,
+      String name,
+      String setCode,
+      String collectorNumber,
+      String finish,
+      String condition,
+      BigDecimal price,
+      int inStockUnits) {}
 }

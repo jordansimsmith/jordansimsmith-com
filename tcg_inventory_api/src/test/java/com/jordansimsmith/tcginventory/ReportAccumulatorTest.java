@@ -155,12 +155,26 @@ public class ReportAccumulatorTest {
       String suggestedPrice,
       String setCode,
       String setName) {
+    return createSku(skuId, lastPublishedPrice, suggestedPrice, setCode, setName, "Card " + skuId);
+  }
+
+  private static TcgInventoryItem createSku(
+      String skuId,
+      String lastPublishedPrice,
+      String suggestedPrice,
+      String setCode,
+      String setName,
+      String name) {
     var item = new TcgInventoryItem();
     item.setSkuId(skuId);
     item.setLastPublishedPrice(lastPublishedPrice);
     item.setSuggestedPrice(suggestedPrice);
     item.setSetCode(setCode);
     item.setSetName(setName);
+    item.setName(name);
+    item.setCollectorNumber("1");
+    item.setFinish("normal");
+    item.setCondition("NM");
     return item;
   }
 
@@ -400,6 +414,140 @@ public class ReportAccumulatorTest {
     assertThat(buckets.get(3).inStockUnits()).isEqualTo(1);
     assertThat(buckets.get(4).inStockUnits()).isEqualTo(1);
     assertThat(buckets.get(5).inStockUnits()).isEqualTo(1);
+  }
+
+  @Test
+  void toTopHitsShouldOrderByPriceDescending() {
+    // arrange
+    var accumulator = new ReportAccumulator();
+    accumulator.addSku(
+        createSku("sku1", "1.00", null, "a25", "Masters 25", "Cheap Card"),
+        List.of(createUnit("in_stock")));
+    accumulator.addSku(
+        createSku("sku2", "10.00", null, "a25", "Masters 25", "Expensive Card"),
+        List.of(createUnit("in_stock")));
+    accumulator.addSku(
+        createSku("sku3", "5.00", null, "a25", "Masters 25", "Mid Card"),
+        List.of(createUnit("in_stock")));
+
+    // act
+    var topHits = accumulator.toTopHits();
+
+    // assert
+    assertThat(topHits).hasSize(3);
+    assertThat(topHits.get(0).name()).isEqualTo("Expensive Card");
+    assertThat(topHits.get(0).price()).isEqualTo("10.00");
+    assertThat(topHits.get(1).name()).isEqualTo("Mid Card");
+    assertThat(topHits.get(1).price()).isEqualTo("5.00");
+    assertThat(topHits.get(2).name()).isEqualTo("Cheap Card");
+    assertThat(topHits.get(2).price()).isEqualTo("1.00");
+  }
+
+  @Test
+  void toTopHitsShouldTieBreakByNameAscending() {
+    // arrange
+    var accumulator = new ReportAccumulator();
+    accumulator.addSku(
+        createSku("sku1", "5.00", null, "a25", "Masters 25", "Zebra Card"),
+        List.of(createUnit("in_stock")));
+    accumulator.addSku(
+        createSku("sku2", "5.00", null, "a25", "Masters 25", "Alpha Card"),
+        List.of(createUnit("in_stock")));
+    accumulator.addSku(
+        createSku("sku3", "5.00", null, "a25", "Masters 25", "Middle Card"),
+        List.of(createUnit("in_stock")));
+
+    // act
+    var topHits = accumulator.toTopHits();
+
+    // assert
+    assertThat(topHits).hasSize(3);
+    assertThat(topHits.get(0).name()).isEqualTo("Alpha Card");
+    assertThat(topHits.get(1).name()).isEqualTo("Middle Card");
+    assertThat(topHits.get(2).name()).isEqualTo("Zebra Card");
+  }
+
+  @Test
+  void toTopHitsShouldLimitToTen() {
+    // arrange
+    var accumulator = new ReportAccumulator();
+    for (int i = 0; i < 12; i++) {
+      accumulator.addSku(
+          createSku("sku" + i, String.valueOf(i + 1) + ".00", null, "a25", "Masters 25"),
+          List.of(createUnit("in_stock")));
+    }
+
+    // act
+    var topHits = accumulator.toTopHits();
+
+    // assert
+    assertThat(topHits).hasSize(10);
+    assertThat(topHits.get(0).price()).isEqualTo("12.00");
+    assertThat(topHits.get(9).price()).isEqualTo("3.00");
+  }
+
+  @Test
+  void toTopHitsShouldExcludeUnpricedSkus() {
+    // arrange
+    var accumulator = new ReportAccumulator();
+    accumulator.addSku(
+        createSku("sku1", "5.00", null, "a25", "Masters 25", "Priced Card"),
+        List.of(createUnit("in_stock")));
+    accumulator.addSku(
+        createSku("sku2", null, null, "a25", "Masters 25", "Unpriced Card"),
+        List.of(createUnit("in_stock")));
+
+    // act
+    var topHits = accumulator.toTopHits();
+
+    // assert
+    assertThat(topHits).hasSize(1);
+    assertThat(topHits.get(0).name()).isEqualTo("Priced Card");
+  }
+
+  @Test
+  void toTopHitsShouldExcludeSkusWithZeroInStockUnits() {
+    // arrange
+    var accumulator = new ReportAccumulator();
+    accumulator.addSku(
+        createSku("sku1", "5.00", null, "a25", "Masters 25", "In Stock Card"),
+        List.of(createUnit("in_stock")));
+    accumulator.addSku(
+        createSku("sku2", "10.00", null, "a25", "Masters 25", "All Reserved Card"),
+        List.of(createUnit("reserved"), createUnit("sold")));
+
+    // act
+    var topHits = accumulator.toTopHits();
+
+    // assert
+    assertThat(topHits).hasSize(1);
+    assertThat(topHits.get(0).name()).isEqualTo("In Stock Card");
+  }
+
+  @Test
+  void toTopHitsShouldIncludeIdentityFieldsAndInStockCount() {
+    // arrange
+    var accumulator = new ReportAccumulator();
+    var sku = createSku("my-sku-id", "7.50", null, "mh2", "Modern Horizons 2", "Ragavan");
+    sku.setCollectorNumber("138");
+    sku.setFinish("foil");
+    sku.setCondition("LP");
+    accumulator.addSku(sku, List.of(createUnit("in_stock"), createUnit("in_stock")));
+
+    // act
+    var topHits = accumulator.toTopHits();
+
+    // assert
+    assertThat(topHits).hasSize(1);
+    var hit = topHits.get(0);
+    assertThat(hit.skuId()).isEqualTo("my-sku-id");
+    assertThat(hit.name()).isEqualTo("Ragavan");
+    assertThat(hit.setCode()).isEqualTo("mh2");
+    assertThat(hit.collectorNumber()).isEqualTo("138");
+    assertThat(hit.finish()).isEqualTo("foil");
+    assertThat(hit.condition()).isEqualTo("LP");
+    assertThat(hit.price()).isEqualTo("7.50");
+    assertThat(hit.inStockUnits()).isEqualTo(2);
   }
 
   private static TcgInventoryItem createOrder(String status, String totalPrice) {

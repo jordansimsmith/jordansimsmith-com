@@ -218,6 +218,65 @@ describe('ReportsPage', () => {
     expect(screen.queryByText('Price distribution')).toBeNull();
   });
 
+  it('shouldRenderTopHitsTable', async () => {
+    vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
+      ...baseReport,
+      report: {
+        ...baseReport.report,
+        top_hits: [
+          {
+            sku_id: 'sku1#normal#NM',
+            name: 'Ragavan, Nimble Pilferer',
+            set_code: 'mh2',
+            collector_number: '138',
+            finish: 'normal',
+            condition: 'NM',
+            price: '95.00',
+            in_stock_units: 1,
+          },
+          {
+            sku_id: 'sku2#foil#LP',
+            name: 'Doubling Season',
+            set_code: 'bbd',
+            collector_number: '195',
+            finish: 'foil',
+            condition: 'LP',
+            price: '48.50',
+            in_stock_units: 2,
+          },
+        ],
+      },
+    });
+
+    renderReportsPage();
+    await act(async () => {});
+
+    expect(screen.getByText('Top hits')).toBeDefined();
+    expect(screen.getByText('Ragavan, Nimble Pilferer')).toBeDefined();
+    expect(screen.getByText('$95.00')).toBeDefined();
+    expect(screen.getByText('Doubling Season')).toBeDefined();
+    expect(screen.getByText('$48.50')).toBeDefined();
+    expect(screen.getByText('Name')).toBeDefined();
+    expect(screen.getByText('Set')).toBeDefined();
+    expect(screen.getByText('Finish')).toBeDefined();
+    expect(screen.getByText('Price')).toBeDefined();
+  });
+
+  it('shouldNotRenderTopHitsTableWhenEmpty', async () => {
+    vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
+      ...baseReport,
+      report: {
+        ...baseReport.report,
+        top_hits: [],
+      },
+    });
+
+    renderReportsPage();
+    await act(async () => {});
+
+    expect(screen.queryByText('Top hits')).toBeNull();
+  });
+
   it('shouldShowGenerationError', async () => {
     vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
       ...baseReport,
