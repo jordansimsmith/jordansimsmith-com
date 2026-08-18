@@ -165,11 +165,25 @@ export interface GenerationStatus {
   finished_at: number | null;
 }
 
+export interface ReportTotals {
+  inventory_value: string;
+  in_stock_units: number;
+  sku_count: number;
+  reserved_units: number;
+  sold_units: number;
+  revenue_to_date: string;
+  unpriced_units: number;
+}
+
+export interface Report {
+  totals?: ReportTotals;
+}
+
 export interface ReportResponse {
   generated_at: number;
   stale: boolean;
   generation: GenerationStatus | null;
-  report: Record<string, unknown>;
+  report: Report;
 }
 
 export interface ApiClient {

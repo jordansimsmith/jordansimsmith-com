@@ -15,7 +15,17 @@ const baseReport: ReportResponse = {
     started_at: Math.floor(Date.now() / 1000) - 3700,
     finished_at: Math.floor(Date.now() / 1000) - 3600,
   },
-  report: {},
+  report: {
+    totals: {
+      inventory_value: '2894.35',
+      in_stock_units: 9412,
+      sku_count: 6120,
+      reserved_units: 14,
+      sold_units: 862,
+      revenue_to_date: '1204.50',
+      unpriced_units: 3,
+    },
+  },
 };
 
 function renderReportsPage() {
@@ -52,6 +62,41 @@ describe('ReportsPage', () => {
     expect(screen.getByText(/Data as of/)).toBeDefined();
   });
 
+  it('shouldRenderStatCards', async () => {
+    vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
+      ...baseReport,
+    });
+
+    renderReportsPage();
+    await act(async () => {});
+
+    expect(screen.getByText('$2894.35')).toBeDefined();
+    expect(screen.getByText('9,412')).toBeDefined();
+    expect(screen.getByText('6,120')).toBeDefined();
+    expect(screen.getByText('14')).toBeDefined();
+    expect(screen.getByText('862')).toBeDefined();
+    expect(screen.getByText('$1204.50')).toBeDefined();
+    expect(screen.getByText('3')).toBeDefined();
+    expect(screen.getByText('Unpriced')).toBeDefined();
+  });
+
+  it('shouldHideUnpricedCardWhenZero', async () => {
+    vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
+      ...baseReport,
+      report: {
+        totals: {
+          ...baseReport.report.totals!,
+          unpriced_units: 0,
+        },
+      },
+    });
+
+    renderReportsPage();
+    await act(async () => {});
+
+    expect(screen.queryByText('Unpriced')).toBeNull();
+  });
+
   it('shouldShowSkeletonsOnFirstVisit', async () => {
     const getReportMock = vi
       .spyOn(clientModule.apiClient, 'getReport')
@@ -74,6 +119,7 @@ describe('ReportsPage', () => {
     });
 
     expect(screen.getByText(/Data as of/)).toBeDefined();
+    expect(screen.getByText('$2894.35')).toBeDefined();
   });
 
   it('shouldTriggerRegenerationWhenStale', async () => {

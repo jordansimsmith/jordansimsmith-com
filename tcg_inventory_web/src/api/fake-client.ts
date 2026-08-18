@@ -18,6 +18,7 @@ import type {
   OrderUnit,
   PlacementInstruction,
   PublishResponse,
+  Report,
   ReportResponse,
   RowDecision,
   SettingsResponse,
@@ -940,11 +941,22 @@ export function createFakeClient(): ApiClient {
     },
 
     async getReport(): Promise<ReportResponse> {
+      const report: Report = {
+        totals: {
+          inventory_value: '2894.35',
+          in_stock_units: 94,
+          sku_count: 41,
+          reserved_units: 8,
+          sold_units: 1,
+          revenue_to_date: '8.50',
+          unpriced_units: 0,
+        },
+      };
       return {
         generated_at: reportGeneratedAt,
         stale: reportStale,
         generation: reportGeneration,
-        report: {},
+        report,
       };
     },
 

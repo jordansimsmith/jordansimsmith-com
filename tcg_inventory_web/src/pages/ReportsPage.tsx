@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Group, Loader, Skeleton, Stack, Text, Title } from '@mantine/core';
+import {
+  Group,
+  Loader,
+  Paper,
+  SimpleGrid,
+  Skeleton,
+  Stack,
+  Text,
+  Title,
+} from '@mantine/core';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { apiClient } from '../api/client';
-import type { ReportResponse } from '../api/client';
+import type { ReportResponse, ReportTotals } from '../api/client';
 
 dayjs.extend(relativeTime);
 
@@ -23,6 +32,54 @@ function isGenerationActive(report: ReportResponse): boolean {
   return (
     report.generation?.status === 'queued' ||
     report.generation?.status === 'running'
+  );
+}
+
+function formatCurrency(value: string): string {
+  return `$${value}`;
+}
+
+function StatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <Paper p="md" radius="sm" withBorder>
+      <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
+        {label}
+      </Text>
+      <Text size="xl" fw={700} mt={4}>
+        {value}
+      </Text>
+    </Paper>
+  );
+}
+
+function TotalsStrip({ totals }: { totals: ReportTotals }) {
+  return (
+    <SimpleGrid cols={{ base: 2, sm: 3, md: 6 }} spacing="md">
+      <StatCard
+        label="Inventory Value"
+        value={formatCurrency(totals.inventory_value)}
+      />
+      <StatCard
+        label="In Stock"
+        value={totals.in_stock_units.toLocaleString()}
+      />
+      <StatCard label="SKUs" value={totals.sku_count.toLocaleString()} />
+      <StatCard
+        label="Reserved"
+        value={totals.reserved_units.toLocaleString()}
+      />
+      <StatCard label="Sold" value={totals.sold_units.toLocaleString()} />
+      <StatCard
+        label="Revenue"
+        value={formatCurrency(totals.revenue_to_date)}
+      />
+      {totals.unpriced_units > 0 && (
+        <StatCard
+          label="Unpriced"
+          value={totals.unpriced_units.toLocaleString()}
+        />
+      )}
+    </SimpleGrid>
   );
 }
 
@@ -125,7 +182,11 @@ export function ReportsPage() {
           </Stack>
         )}
 
-        {!firstVisit && report && Object.keys(report.report).length === 0 && (
+        {!firstVisit && report?.report?.totals && (
+          <TotalsStrip totals={report.report.totals} />
+        )}
+
+        {!firstVisit && report && !report.report?.totals && (
           <Text c="dimmed">No report data yet.</Text>
         )}
       </Stack>

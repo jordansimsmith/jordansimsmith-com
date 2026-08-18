@@ -162,6 +162,181 @@ public class ReportsHandlerIntegrationTest {
   }
 
   @Test
+  void jobShouldComputeCorrectTotals() throws Exception {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+
+    var sku1 =
+        TcgInventoryItem.createSku(
+            "jordan",
+            "scryfall1#normal#NM",
+            "scryfall1",
+            "normal",
+            "NM",
+            "Lightning Bolt",
+            "sta",
+            "Strixhaven Mystical Archive",
+            "42",
+            null,
+            "1.00");
+    sku1.setLastPublishedPrice("1.50");
+    tcgInventoryTable.putItem(sku1);
+
+    var sku2 =
+        TcgInventoryItem.createSku(
+            "jordan",
+            "scryfall2#normal#NM",
+            "scryfall2",
+            "normal",
+            "NM",
+            "Sol Ring",
+            "cmr",
+            "Commander Legends",
+            "472",
+            null,
+            "3.00");
+    tcgInventoryTable.putItem(sku2);
+
+    var sku3 =
+        TcgInventoryItem.createSku(
+            "jordan",
+            "scryfall3#normal#NM",
+            "scryfall3",
+            "normal",
+            "NM",
+            "Opt",
+            "dom",
+            "Dominaria",
+            "60",
+            null,
+            null);
+    tcgInventoryTable.putItem(sku3);
+
+    tcgInventoryTable.putItem(
+        TcgInventoryItem.createUnit(
+            "jordan",
+            "scryfall1#normal#NM",
+            1,
+            "in_stock",
+            "import1",
+            Instant.ofEpochSecond(1699000000)));
+    tcgInventoryTable.putItem(
+        TcgInventoryItem.createUnit(
+            "jordan",
+            "scryfall1#normal#NM",
+            2,
+            "in_stock",
+            "import1",
+            Instant.ofEpochSecond(1699000000)));
+    tcgInventoryTable.putItem(
+        TcgInventoryItem.createUnit(
+            "jordan",
+            "scryfall1#normal#NM",
+            3,
+            "reserved",
+            "import1",
+            Instant.ofEpochSecond(1699000000)));
+    tcgInventoryTable.putItem(
+        TcgInventoryItem.createUnit(
+            "jordan",
+            "scryfall2#normal#NM",
+            4,
+            "in_stock",
+            "import1",
+            Instant.ofEpochSecond(1699000000)));
+    tcgInventoryTable.putItem(
+        TcgInventoryItem.createUnit(
+            "jordan",
+            "scryfall2#normal#NM",
+            5,
+            "sold",
+            "import1",
+            Instant.ofEpochSecond(1699000000)));
+    tcgInventoryTable.putItem(
+        TcgInventoryItem.createUnit(
+            "jordan",
+            "scryfall2#normal#NM",
+            6,
+            "removed",
+            "import1",
+            Instant.ofEpochSecond(1699000000)));
+    tcgInventoryTable.putItem(
+        TcgInventoryItem.createUnit(
+            "jordan",
+            "scryfall3#normal#NM",
+            7,
+            "in_stock",
+            "import1",
+            Instant.ofEpochSecond(1699000000)));
+
+    tcgInventoryTable.putItem(
+        TcgInventoryItem.createOrder(
+            "jordan",
+            "order1",
+            "fulfilled",
+            null,
+            null,
+            "SHIPPING",
+            "10.50",
+            null,
+            Instant.ofEpochSecond(1699500000)));
+    tcgInventoryTable.putItem(
+        TcgInventoryItem.createOrder(
+            "jordan",
+            "order2",
+            "to_pick",
+            null,
+            null,
+            "PICKUP",
+            "5.25",
+            null,
+            Instant.ofEpochSecond(1699600000)));
+    tcgInventoryTable.putItem(
+        TcgInventoryItem.createOrder(
+            "jordan",
+            "order3",
+            "voided",
+            null,
+            null,
+            "PICKUP",
+            "100.00",
+            null,
+            Instant.ofEpochSecond(1699700000)));
+
+    var jobItem =
+        TcgInventoryItem.createJob(
+            "jordan", "report-job", "report", null, Instant.ofEpochSecond(1700000000));
+    tcgInventoryTable.putItem(jobItem);
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "report-job", "report"), null);
+
+    // assert
+    var reportItem =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
+                .sortValue(TcgInventoryItem.formatReportSk())
+                .build());
+    assertThat(reportItem).isNotNull();
+
+    var reportJson = objectMapper.readTree(reportItem.getReport());
+    var totals = reportJson.get("totals");
+    assertThat(totals).isNotNull();
+    // sku1: 2 in_stock * 1.50 = 3.00, sku2: 1 in_stock * 3.00 = 3.00, sku3: unpriced
+    assertThat(totals.get("inventory_value").asText()).isEqualTo("6.00");
+    // sku1: 2, sku2: 1, sku3: 1
+    assertThat(totals.get("in_stock_units").asInt()).isEqualTo(4);
+    assertThat(totals.get("sku_count").asInt()).isEqualTo(3);
+    assertThat(totals.get("reserved_units").asInt()).isEqualTo(1);
+    assertThat(totals.get("sold_units").asInt()).isEqualTo(1);
+    // fulfilled: 10.50, to_pick: 5.25
+    assertThat(totals.get("revenue_to_date").asText()).isEqualTo("15.75");
+    // sku3 has 1 in_stock unit with no price
+    assertThat(totals.get("unpriced_units").asInt()).isEqualTo(1);
+  }
+
+  @Test
   void getReportsShouldReturnFreshWhenNoChanges() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));

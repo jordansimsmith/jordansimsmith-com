@@ -52,7 +52,9 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
                 factory.dynamoDbClient(),
                 factory.clock(),
                 factory.fetchTcgClient()));
-    this.reportJobProcessor = new ReportJobProcessor(factory.tcgInventoryTable(), factory.clock());
+    this.reportJobProcessor =
+        new ReportJobProcessor(
+            factory.tcgInventoryTable(), factory.objectMapper(), factory.clock());
   }
 
   @Override
