@@ -146,10 +146,21 @@ public class ReportAccumulatorTest {
 
   private static TcgInventoryItem createSku(
       String skuId, String lastPublishedPrice, String suggestedPrice) {
+    return createSku(skuId, lastPublishedPrice, suggestedPrice, "set1", "Set One");
+  }
+
+  private static TcgInventoryItem createSku(
+      String skuId,
+      String lastPublishedPrice,
+      String suggestedPrice,
+      String setCode,
+      String setName) {
     var item = new TcgInventoryItem();
     item.setSkuId(skuId);
     item.setLastPublishedPrice(lastPublishedPrice);
     item.setSuggestedPrice(suggestedPrice);
+    item.setSetCode(setCode);
+    item.setSetName(setName);
     return item;
   }
 
@@ -158,6 +169,130 @@ public class ReportAccumulatorTest {
     item.setStatus(status);
     item.setCreatedAt(Instant.ofEpochSecond(1700000000));
     return item;
+  }
+
+  @Test
+  void toTopSetsShouldReturnSetsOrderedByInStockUnitsDescending() {
+    // arrange
+    var accumulator = new ReportAccumulator();
+    accumulator.addSku(
+        createSku("sku1", "1.00", null, "a25", "Masters 25"),
+        List.of(createUnit("in_stock"), createUnit("in_stock"), createUnit("in_stock")));
+    accumulator.addSku(
+        createSku("sku2", "1.00", null, "cmr", "Commander Legends"),
+        List.of(createUnit("in_stock")));
+    accumulator.addSku(
+        createSku("sku3", "1.00", null, "dom", "Dominaria"),
+        List.of(createUnit("in_stock"), createUnit("in_stock")));
+
+    // act
+    var topSets = accumulator.toTopSets();
+
+    // assert
+    assertThat(topSets).hasSize(3);
+    assertThat(topSets.get(0).setCode()).isEqualTo("a25");
+    assertThat(topSets.get(0).setName()).isEqualTo("Masters 25");
+    assertThat(topSets.get(0).inStockUnits()).isEqualTo(3);
+    assertThat(topSets.get(1).setCode()).isEqualTo("dom");
+    assertThat(topSets.get(1).inStockUnits()).isEqualTo(2);
+    assertThat(topSets.get(2).setCode()).isEqualTo("cmr");
+    assertThat(topSets.get(2).inStockUnits()).isEqualTo(1);
+  }
+
+  @Test
+  void toTopSetsShouldLimitToTenSets() {
+    // arrange
+    var accumulator = new ReportAccumulator();
+    for (int i = 0; i < 12; i++) {
+      accumulator.addSku(
+          createSku("sku" + i, "1.00", null, "set" + i, "Set " + i),
+          List.of(createUnit("in_stock")));
+    }
+
+    // act
+    var topSets = accumulator.toTopSets();
+
+    // assert
+    assertThat(topSets).hasSize(10);
+  }
+
+  @Test
+  void toTopSetsShouldTieBreakBySetNameAscending() {
+    // arrange
+    var accumulator = new ReportAccumulator();
+    accumulator.addSku(
+        createSku("sku1", "1.00", null, "dom", "Dominaria"),
+        List.of(createUnit("in_stock"), createUnit("in_stock")));
+    accumulator.addSku(
+        createSku("sku2", "1.00", null, "a25", "Masters 25"),
+        List.of(createUnit("in_stock"), createUnit("in_stock")));
+    accumulator.addSku(
+        createSku("sku3", "1.00", null, "cmr", "Commander Legends"),
+        List.of(createUnit("in_stock"), createUnit("in_stock")));
+
+    // act
+    var topSets = accumulator.toTopSets();
+
+    // assert
+    assertThat(topSets).hasSize(3);
+    assertThat(topSets.get(0).setName()).isEqualTo("Commander Legends");
+    assertThat(topSets.get(1).setName()).isEqualTo("Dominaria");
+    assertThat(topSets.get(2).setName()).isEqualTo("Masters 25");
+  }
+
+  @Test
+  void toTopSetsShouldAggregateAcrossMultipleSkusInSameSet() {
+    // arrange
+    var accumulator = new ReportAccumulator();
+    accumulator.addSku(
+        createSku("sku1", "1.00", null, "a25", "Masters 25"),
+        List.of(createUnit("in_stock"), createUnit("in_stock")));
+    accumulator.addSku(
+        createSku("sku2", "2.00", null, "a25", "Masters 25"),
+        List.of(createUnit("in_stock"), createUnit("in_stock"), createUnit("in_stock")));
+
+    // act
+    var topSets = accumulator.toTopSets();
+
+    // assert
+    assertThat(topSets).hasSize(1);
+    assertThat(topSets.get(0).setCode()).isEqualTo("a25");
+    assertThat(topSets.get(0).inStockUnits()).isEqualTo(5);
+  }
+
+  @Test
+  void toTopSetsShouldExcludeNonInStockUnits() {
+    // arrange
+    var accumulator = new ReportAccumulator();
+    accumulator.addSku(
+        createSku("sku1", "1.00", null, "a25", "Masters 25"),
+        List.of(
+            createUnit("in_stock"),
+            createUnit("reserved"),
+            createUnit("sold"),
+            createUnit("removed")));
+
+    // act
+    var topSets = accumulator.toTopSets();
+
+    // assert
+    assertThat(topSets).hasSize(1);
+    assertThat(topSets.get(0).inStockUnits()).isEqualTo(1);
+  }
+
+  @Test
+  void toTopSetsShouldReturnEmptyWhenNoInStockUnits() {
+    // arrange
+    var accumulator = new ReportAccumulator();
+    accumulator.addSku(
+        createSku("sku1", "1.00", null, "a25", "Masters 25"),
+        List.of(createUnit("sold"), createUnit("removed")));
+
+    // act
+    var topSets = accumulator.toTopSets();
+
+    // assert
+    assertThat(topSets).isEmpty();
   }
 
   private static TcgInventoryItem createOrder(String status, String totalPrice) {

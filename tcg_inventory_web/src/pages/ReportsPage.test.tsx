@@ -25,6 +25,15 @@ const baseReport: ReportResponse = {
       revenue_to_date: '1204.50',
       unpriced_units: 3,
     },
+    top_sets: [
+      { set_code: 'cmr', set_name: 'Commander Legends', in_stock_units: 11 },
+      {
+        set_code: 'sta',
+        set_name: 'Strixhaven Mystical Archive',
+        in_stock_units: 8,
+      },
+      { set_code: 'a25', set_name: 'Masters 25', in_stock_units: 5 },
+    ],
   },
 };
 
@@ -144,6 +153,32 @@ describe('ReportsPage', () => {
     });
 
     expect(screen.queryByLabelText('Refreshing')).toBeNull();
+  });
+
+  it('shouldRenderTopSetsChart', async () => {
+    vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
+      ...baseReport,
+    });
+
+    renderReportsPage();
+    await act(async () => {});
+
+    expect(screen.getByText('Top sets by in-stock units')).toBeDefined();
+  });
+
+  it('shouldNotRenderTopSetsChartWhenEmpty', async () => {
+    vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
+      ...baseReport,
+      report: {
+        ...baseReport.report,
+        top_sets: [],
+      },
+    });
+
+    renderReportsPage();
+    await act(async () => {});
+
+    expect(screen.queryByText('Top sets by in-stock units')).toBeNull();
   });
 
   it('shouldShowGenerationError', async () => {

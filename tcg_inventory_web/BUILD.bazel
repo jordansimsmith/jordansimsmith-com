@@ -54,6 +54,7 @@ ts_project(
     tsconfig = "tsconfig.json",
     deps = [
         ":node_modules/@jordansimsmith_com/ui",
+        "//:node_modules/@mantine/charts",
         "//:node_modules/@mantine/core",
         "//:node_modules/@mantine/dates",
         "//:node_modules/@mantine/notifications",
@@ -66,6 +67,7 @@ ts_project(
         "//:node_modules/react",
         "//:node_modules/react-dom",
         "//:node_modules/react-router-dom",
+        "//:node_modules/recharts",
         "//:node_modules/vite",
         "//:node_modules/vitest",
     ],
@@ -113,6 +115,7 @@ js_library(
     data = [":assets"],
     deps = [
         ":node_modules/@jordansimsmith_com/ui",
+        "//:node_modules/@mantine/charts",
         "//:node_modules/@mantine/core",
         "//:node_modules/@mantine/dates",
         "//:node_modules/@mantine/notifications",
@@ -123,6 +126,7 @@ js_library(
         "//:node_modules/react",
         "//:node_modules/react-dom",
         "//:node_modules/react-router-dom",
+        "//:node_modules/recharts",
     ],
 )
 
@@ -136,11 +140,13 @@ js_library(
     ]),
     deps = [
         ":src",
+        "//:node_modules/@mantine/charts",
         "//:node_modules/@mantine/core",
         "//:node_modules/@mantine/dates",
         "//:node_modules/@testing-library/react",
         "//:node_modules/@testing-library/user-event",
         "//:node_modules/react-router-dom",
+        "//:node_modules/recharts",
         "//:node_modules/vitest",
     ],
 )

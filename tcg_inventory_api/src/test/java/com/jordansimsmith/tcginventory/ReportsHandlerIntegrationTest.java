@@ -334,6 +334,22 @@ public class ReportsHandlerIntegrationTest {
     assertThat(totals.get("revenue_to_date").asText()).isEqualTo("15.75");
     // sku3 has 1 in_stock unit with no price
     assertThat(totals.get("unpriced_units").asInt()).isEqualTo(1);
+
+    var topSets = reportJson.get("top_sets");
+    assertThat(topSets).isNotNull();
+    assertThat(topSets.isArray()).isTrue();
+    assertThat(topSets.size()).isEqualTo(3);
+    // sku1 (sta): 2 in_stock, sku2 (cmr): 1 in_stock, sku3 (dom): 1 in_stock
+    // ordered by count desc, tie-break by name asc: sta=2, cmr=1, dom=1
+    assertThat(topSets.get(0).get("set_code").asText()).isEqualTo("sta");
+    assertThat(topSets.get(0).get("set_name").asText()).isEqualTo("Strixhaven Mystical Archive");
+    assertThat(topSets.get(0).get("in_stock_units").asInt()).isEqualTo(2);
+    assertThat(topSets.get(1).get("set_code").asText()).isEqualTo("cmr");
+    assertThat(topSets.get(1).get("set_name").asText()).isEqualTo("Commander Legends");
+    assertThat(topSets.get(1).get("in_stock_units").asInt()).isEqualTo(1);
+    assertThat(topSets.get(2).get("set_code").asText()).isEqualTo("dom");
+    assertThat(topSets.get(2).get("set_name").asText()).isEqualTo("Dominaria");
+    assertThat(topSets.get(2).get("in_stock_units").asInt()).isEqualTo(1);
   }
 
   @Test

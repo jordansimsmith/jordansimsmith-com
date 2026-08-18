@@ -175,8 +175,15 @@ export interface ReportTotals {
   unpriced_units: number;
 }
 
+export interface ReportTopSet {
+  set_code: string;
+  set_name: string;
+  in_stock_units: number;
+}
+
 export interface Report {
   totals?: ReportTotals;
+  top_sets?: ReportTopSet[];
 }
 
 export interface ReportResponse {

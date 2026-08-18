@@ -9,11 +9,12 @@ import {
   Text,
   Title,
 } from '@mantine/core';
+import { BarChart } from '@mantine/charts';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { apiClient } from '../api/client';
-import type { ReportResponse, ReportTotals } from '../api/client';
+import type { ReportResponse, ReportTopSet, ReportTotals } from '../api/client';
 
 dayjs.extend(relativeTime);
 
@@ -80,6 +81,30 @@ function TotalsStrip({ totals }: { totals: ReportTotals }) {
         />
       )}
     </SimpleGrid>
+  );
+}
+
+function TopSetsChart({ topSets }: { topSets: ReportTopSet[] }) {
+  const data = [...topSets].reverse().map((s) => ({
+    set_name: s.set_name,
+    in_stock_units: s.in_stock_units,
+  }));
+
+  return (
+    <Paper p="md" radius="sm" withBorder>
+      <Text size="sm" fw={700} mb="md">
+        Top sets by in-stock units
+      </Text>
+      <BarChart
+        h={300}
+        data={data}
+        dataKey="set_name"
+        series={[{ name: 'in_stock_units', color: 'blue.6' }]}
+        orientation="vertical"
+        gridAxis="x"
+        tickLine="x"
+      />
+    </Paper>
   );
 }
 
@@ -185,6 +210,12 @@ export function ReportsPage() {
         {!firstVisit && report?.report?.totals && (
           <TotalsStrip totals={report.report.totals} />
         )}
+
+        {!firstVisit &&
+          report?.report?.top_sets &&
+          report.report.top_sets.length > 0 && (
+            <TopSetsChart topSets={report.report.top_sets} />
+          )}
 
         {!firstVisit && report && !report.report?.totals && (
           <Text c="dimmed">No report data yet.</Text>

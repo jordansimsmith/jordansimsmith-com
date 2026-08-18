@@ -951,6 +951,34 @@ export function createFakeClient(): ApiClient {
           revenue_to_date: '8.50',
           unpriced_units: 0,
         },
+        top_sets: [
+          {
+            set_code: 'cmr',
+            set_name: 'Commander Legends',
+            in_stock_units: 11,
+          },
+          {
+            set_code: 'sta',
+            set_name: 'Strixhaven Mystical Archive',
+            in_stock_units: 8,
+          },
+          { set_code: 'a25', set_name: 'Masters 25', in_stock_units: 5 },
+          {
+            set_code: 'chk',
+            set_name: 'Champions of Kamigawa',
+            in_stock_units: 5,
+          },
+          {
+            set_code: 'msc',
+            set_name: 'Marvel Super Heroes Commander',
+            in_stock_units: 4,
+          },
+          { set_code: 'dom', set_name: 'Dominaria', in_stock_units: 3 },
+          { set_code: 'mh2', set_name: 'Modern Horizons 2', in_stock_units: 3 },
+          { set_code: 'ema', set_name: 'Eternal Masters', in_stock_units: 2 },
+          { set_code: 'm12', set_name: 'Magic 2012', in_stock_units: 2 },
+          { set_code: 'cmm', set_name: 'Commander Masters', in_stock_units: 1 },
+        ],
       };
       return {
         generated_at: reportGeneratedAt,

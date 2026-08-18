@@ -46,7 +46,7 @@ public class ReportJobProcessor {
 
     var now = clock.now();
     try {
-      var payload = new ReportPayload(accumulator.toTotals());
+      var payload = new ReportPayload(accumulator.toTotals(), accumulator.toTopSets());
       var reportJson = objectMapper.writeValueAsString(payload);
       var reportItem = TcgInventoryItem.createReport(user, reportJson, asOfAuditUlid, now);
       tcgInventoryTable.putItem(reportItem);
