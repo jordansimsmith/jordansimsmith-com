@@ -33,7 +33,8 @@ public class ReportJobProcessor {
     var asOfAuditUlid = findLatestAuditUlid(user);
     LOGGER.info("captured as-of audit ULID: {}", asOfAuditUlid);
 
-    var accumulator = new ReportAccumulator();
+    var now = clock.now();
+    var accumulator = new ReportAccumulator(now);
 
     for (var sku : pageGsi2Skus(user)) {
       var units = queryUnits(user, sku.getSkuId());
@@ -44,14 +45,14 @@ public class ReportJobProcessor {
       accumulator.addOrder(order);
     }
 
-    var now = clock.now();
     try {
       var payload =
           new ReportPayload(
               accumulator.toTotals(),
               accumulator.toTopSets(),
               accumulator.toPriceBuckets(),
-              accumulator.toTopHits());
+              accumulator.toTopHits(),
+              accumulator.toAgingBands());
       var reportJson = objectMapper.writeValueAsString(payload);
       var reportItem = TcgInventoryItem.createReport(user, reportJson, asOfAuditUlid, now);
       tcgInventoryTable.putItem(reportItem);

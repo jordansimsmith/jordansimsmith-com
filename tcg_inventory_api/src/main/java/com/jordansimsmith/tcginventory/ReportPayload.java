@@ -10,7 +10,8 @@ public record ReportPayload(
     @JsonProperty("totals") @Nullable Totals totals,
     @JsonProperty("top_sets") @Nullable List<TopSet> topSets,
     @JsonProperty("price_buckets") @Nullable List<PriceBucket> priceBuckets,
-    @JsonProperty("top_hits") @Nullable List<TopHit> topHits) {
+    @JsonProperty("top_hits") @Nullable List<TopHit> topHits,
+    @JsonProperty("aging_bands") @Nullable List<AgingBand> agingBands) {
 
   public record Totals(
       @JsonProperty("inventory_value") String inventoryValue,
@@ -38,4 +39,7 @@ public record ReportPayload(
       @JsonProperty("condition") String condition,
       @JsonProperty("price") String price,
       @JsonProperty("in_stock_units") int inStockUnits) {}
+
+  public record AgingBand(
+      @JsonProperty("label") String label, @JsonProperty("in_stock_units") int inStockUnits) {}
 }

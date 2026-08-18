@@ -372,6 +372,20 @@ public class ReportsHandlerIntegrationTest {
     assertThat(topHits.get(1).get("name").asText()).isEqualTo("Lightning Bolt");
     assertThat(topHits.get(1).get("price").asText()).isEqualTo("1.50");
     assertThat(topHits.get(1).get("in_stock_units").asInt()).isEqualTo(2);
+
+    var agingBands = reportJson.get("aging_bands");
+    assertThat(agingBands).isNotNull();
+    assertThat(agingBands.isArray()).isTrue();
+    assertThat(agingBands.size()).isEqualTo(4);
+    assertThat(agingBands.get(0).get("label").asText()).isEqualTo("0-30 days");
+    assertThat(agingBands.get(1).get("label").asText()).isEqualTo("31-90 days");
+    assertThat(agingBands.get(2).get("label").asText()).isEqualTo("91-180 days");
+    assertThat(agingBands.get(3).get("label").asText()).isEqualTo("180+ days");
+    // all units created at 1699000000, generation at 1700000000 -> ~11.5 days -> band 0-30
+    assertThat(agingBands.get(0).get("in_stock_units").asInt()).isEqualTo(4);
+    assertThat(agingBands.get(1).get("in_stock_units").asInt()).isEqualTo(0);
+    assertThat(agingBands.get(2).get("in_stock_units").asInt()).isEqualTo(0);
+    assertThat(agingBands.get(3).get("in_stock_units").asInt()).isEqualTo(0);
   }
 
   @Test

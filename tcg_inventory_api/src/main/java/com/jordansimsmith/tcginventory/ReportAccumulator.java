@@ -1,6 +1,10 @@
 package com.jordansimsmith.tcginventory;
 
 import java.math.BigDecimal;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -10,6 +14,8 @@ import java.util.Map;
 public class ReportAccumulator {
   private static final int TOP_SETS_LIMIT = 10;
   private static final int TOP_HITS_LIMIT = 10;
+
+  private static final ZoneId AUCKLAND = ZoneId.of("Pacific/Auckland");
 
   private static final BigDecimal BUCKET_0_50 = new BigDecimal("0.50");
   private static final BigDecimal BUCKET_1 = new BigDecimal("1");
@@ -21,6 +27,10 @@ public class ReportAccumulator {
     "$0.25-$0.50", "$0.50-$1", "$1-$2", "$2-$5", "$5-$10", "$10+"
   };
 
+  private static final String[] AGING_LABELS = {"0-30 days", "31-90 days", "91-180 days", "180+ days"};
+
+  private final LocalDate generationDate;
+
   private BigDecimal inventoryValue = BigDecimal.ZERO;
   private int inStockUnits = 0;
   private int skuCount = 0;
@@ -30,8 +40,13 @@ public class ReportAccumulator {
   private int unpricedUnits = 0;
 
   private final int[] priceBucketCounts = new int[6];
+  private final int[] agingBandCounts = new int[4];
   private final Map<String, SetAccumulator> setMap = new HashMap<>();
   private final List<HitCandidate> hitCandidates = new ArrayList<>();
+
+  public ReportAccumulator(Instant generationTime) {
+    this.generationDate = generationTime.atZone(AUCKLAND).toLocalDate();
+  }
 
   public void addSku(TcgInventoryItem sku, List<TcgInventoryItem> units) {
     skuCount++;
@@ -48,6 +63,7 @@ public class ReportAccumulator {
         case "in_stock" -> {
           inStockUnits++;
           skuInStockCount++;
+          agingBandCounts[agingBandIndex(unit.getCreatedAt())]++;
           if (price != null) {
             inventoryValue = inventoryValue.add(price);
             priceBucketCounts[bucketIndex(price)]++;
@@ -125,6 +141,14 @@ public class ReportAccumulator {
     return buckets;
   }
 
+  public List<ReportPayload.AgingBand> toAgingBands() {
+    var bands = new ArrayList<ReportPayload.AgingBand>(AGING_LABELS.length);
+    for (int i = 0; i < AGING_LABELS.length; i++) {
+      bands.add(new ReportPayload.AgingBand(AGING_LABELS[i], agingBandCounts[i]));
+    }
+    return bands;
+  }
+
   public List<ReportPayload.TopHit> toTopHits() {
     return hitCandidates.stream()
         .sorted(
@@ -146,7 +170,7 @@ public class ReportAccumulator {
         .toList();
   }
 
-  static int bucketIndex(BigDecimal price) {
+  private static int bucketIndex(BigDecimal price) {
     if (price.compareTo(BUCKET_0_50) < 0) {
       return 0;
     } else if (price.compareTo(BUCKET_1) < 0) {
@@ -162,7 +186,21 @@ public class ReportAccumulator {
     }
   }
 
-  static BigDecimal resolvePrice(TcgInventoryItem sku) {
+  private int agingBandIndex(Instant createdAt) {
+    var unitDate = createdAt.atZone(AUCKLAND).toLocalDate();
+    var days = ChronoUnit.DAYS.between(unitDate, generationDate);
+    if (days <= 30) {
+      return 0;
+    } else if (days <= 90) {
+      return 1;
+    } else if (days <= 180) {
+      return 2;
+    } else {
+      return 3;
+    }
+  }
+
+  private static BigDecimal resolvePrice(TcgInventoryItem sku) {
     if (sku.getLastPublishedPrice() != null) {
       return new BigDecimal(sku.getLastPublishedPrice());
     }

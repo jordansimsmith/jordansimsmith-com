@@ -16,6 +16,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { apiClient } from '../api/client';
 import type {
+  ReportAgingBand,
   ReportPriceBucket,
   ReportResponse,
   ReportTopHit,
@@ -132,6 +133,31 @@ function PriceBucketsChart({
     <Paper p="md" radius="sm" withBorder>
       <Text size="sm" fw={700} mb="md">
         Price distribution
+      </Text>
+      <BarChart
+        h={300}
+        data={data}
+        dataKey="label"
+        series={[
+          { name: 'in_stock_units', label: 'In stock', color: 'blue.6' },
+        ]}
+        gridAxis="y"
+        tickLine="y"
+      />
+    </Paper>
+  );
+}
+
+function StockAgingChart({ agingBands }: { agingBands: ReportAgingBand[] }) {
+  const data = agingBands.map((b) => ({
+    label: b.label,
+    in_stock_units: b.in_stock_units,
+  }));
+
+  return (
+    <Paper p="md" radius="sm" withBorder>
+      <Text size="sm" fw={700} mb="md">
+        Stock aging
       </Text>
       <BarChart
         h={300}
@@ -296,6 +322,12 @@ export function ReportsPage() {
           report?.report?.price_buckets &&
           report.report.price_buckets.length > 0 && (
             <PriceBucketsChart priceBuckets={report.report.price_buckets} />
+          )}
+
+        {!firstVisit &&
+          report?.report?.aging_bands &&
+          report.report.aging_bands.length > 0 && (
+            <StockAgingChart agingBands={report.report.aging_bands} />
           )}
 
         {!firstVisit &&

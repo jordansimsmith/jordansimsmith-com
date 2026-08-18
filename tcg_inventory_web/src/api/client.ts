@@ -186,6 +186,11 @@ export interface ReportPriceBucket {
   in_stock_units: number;
 }
 
+export interface ReportAgingBand {
+  label: string;
+  in_stock_units: number;
+}
+
 export interface ReportTopHit {
   sku_id: string;
   name: string;
@@ -202,6 +207,7 @@ export interface Report {
   top_sets?: ReportTopSet[];
   price_buckets?: ReportPriceBucket[];
   top_hits?: ReportTopHit[];
+  aging_bands?: ReportAgingBand[];
 }
 
 export interface ReportResponse {

@@ -302,7 +302,7 @@ Response `200` (arrays shown with one representative entry; empty buckets and ba
         "in_stock_units": 1
       }
     ],
-    "aging_bands": [{ "label": "0-30", "in_stock_units": 1200 }]
+    "aging_bands": [{ "label": "0-30 days", "in_stock_units": 1200 }]
   }
 }
 ```

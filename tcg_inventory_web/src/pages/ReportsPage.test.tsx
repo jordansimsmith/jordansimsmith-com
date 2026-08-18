@@ -277,6 +277,41 @@ describe('ReportsPage', () => {
     expect(screen.queryByText('Top hits')).toBeNull();
   });
 
+  it('shouldRenderStockAgingChart', async () => {
+    vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
+      ...baseReport,
+      report: {
+        ...baseReport.report,
+        aging_bands: [
+          { label: '0-30 days', in_stock_units: 22 },
+          { label: '31-90 days', in_stock_units: 35 },
+          { label: '91-180', in_stock_units: 25 },
+          { label: '180+', in_stock_units: 12 },
+        ],
+      },
+    });
+
+    renderReportsPage();
+    await act(async () => {});
+
+    expect(screen.getByText('Stock aging')).toBeDefined();
+  });
+
+  it('shouldNotRenderStockAgingChartWhenEmpty', async () => {
+    vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
+      ...baseReport,
+      report: {
+        ...baseReport.report,
+        aging_bands: [],
+      },
+    });
+
+    renderReportsPage();
+    await act(async () => {});
+
+    expect(screen.queryByText('Stock aging')).toBeNull();
+  });
+
   it('shouldShowGenerationError', async () => {
     vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
       ...baseReport,

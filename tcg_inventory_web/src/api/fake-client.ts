@@ -1039,6 +1039,12 @@ export function createFakeClient(): ApiClient {
             in_stock_units: 2,
           },
         ],
+        aging_bands: [
+          { label: '0-30 days', in_stock_units: 22 },
+          { label: '31-90 days', in_stock_units: 35 },
+          { label: '91-180 days', in_stock_units: 25 },
+          { label: '180+ days', in_stock_units: 12 },
+        ],
       };
       return {
         generated_at: reportGeneratedAt,
