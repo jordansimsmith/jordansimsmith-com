@@ -79,6 +79,8 @@ public class TcgInventoryItem {
   public static final String FETCHTCG_CURRENT_ACTION = "fetchtcg_current_action";
   public static final String EVENT_TYPE = "event_type";
   public static final String TRACK_ORDERS_AFTER = "track_orders_after";
+  public static final String REPORT = "report";
+  public static final String AS_OF_AUDIT_ULID = "as_of_audit_ulid";
   public static final String CREATED_AT = "created_at";
   public static final String UPDATED_AT = "updated_at";
 
@@ -129,6 +131,8 @@ public class TcgInventoryItem {
   private String fetchtcgCurrentAction;
   private String eventType;
   private Instant trackOrdersAfter;
+  private String report;
+  private String asOfAuditUlid;
   private Instant createdAt;
   private Instant updatedAt;
 
@@ -609,6 +613,26 @@ public class TcgInventoryItem {
   }
 
   @Nullable
+  @DynamoDbAttribute(REPORT)
+  public String getReport() {
+    return report;
+  }
+
+  public void setReport(@Nullable String report) {
+    this.report = report;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(AS_OF_AUDIT_ULID)
+  public String getAsOfAuditUlid() {
+    return asOfAuditUlid;
+  }
+
+  public void setAsOfAuditUlid(@Nullable String asOfAuditUlid) {
+    this.asOfAuditUlid = asOfAuditUlid;
+  }
+
+  @Nullable
   @DynamoDbAttribute(CREATED_AT)
   @DynamoDbConvertedBy(EpochSecondConverter.class)
   public Instant getCreatedAt() {
@@ -682,6 +706,8 @@ public class TcgInventoryItem {
         && Objects.equals(fetchtcgCurrentAction, that.fetchtcgCurrentAction)
         && Objects.equals(eventType, that.eventType)
         && Objects.equals(trackOrdersAfter, that.trackOrdersAfter)
+        && Objects.equals(report, that.report)
+        && Objects.equals(asOfAuditUlid, that.asOfAuditUlid)
         && Objects.equals(createdAt, that.createdAt)
         && Objects.equals(updatedAt, that.updatedAt);
   }
@@ -736,6 +762,8 @@ public class TcgInventoryItem {
         fetchtcgCurrentAction,
         eventType,
         trackOrdersAfter,
+        report,
+        asOfAuditUlid,
         createdAt,
         updatedAt);
   }
@@ -870,6 +898,12 @@ public class TcgInventoryItem {
         + '\''
         + ", trackOrdersAfter="
         + trackOrdersAfter
+        + ", report='"
+        + report
+        + '\''
+        + ", asOfAuditUlid='"
+        + asOfAuditUlid
+        + '\''
         + ", createdAt="
         + createdAt
         + ", updatedAt="
@@ -919,6 +953,10 @@ public class TcgInventoryItem {
 
   public static String formatSettingsSk() {
     return "SETTINGS";
+  }
+
+  public static String formatReportSk() {
+    return "REPORT";
   }
 
   public static String formatAuditPk(String user) {
@@ -1080,6 +1118,17 @@ public class TcgInventoryItem {
     var item = new TcgInventoryItem();
     item.setPk(formatUserPk(user));
     item.setSk(formatSettingsSk());
+    item.setUpdatedAt(updatedAt);
+    return item;
+  }
+
+  public static TcgInventoryItem createReport(
+      String user, String report, @Nullable String asOfAuditUlid, Instant updatedAt) {
+    var item = new TcgInventoryItem();
+    item.setPk(formatUserPk(user));
+    item.setSk(formatReportSk());
+    item.setReport(report);
+    item.setAsOfAuditUlid(asOfAuditUlid);
     item.setUpdatedAt(updatedAt);
     return item;
   }

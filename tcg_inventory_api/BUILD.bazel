@@ -11,6 +11,7 @@ JOBS_PROCESSORS = [
     "src/main/java/com/jordansimsmith/tcginventory/ListingPhaseProcessor.java",
     "src/main/java/com/jordansimsmith/tcginventory/OrderPhaseProcessor.java",
     "src/main/java/com/jordansimsmith/tcginventory/PublishJobProcessor.java",
+    "src/main/java/com/jordansimsmith/tcginventory/ReportJobProcessor.java",
 ]
 
 INTEGRATION_TESTS = glob(["src/test/java/**/*IntegrationTest.java"])
@@ -288,6 +289,54 @@ java_binary(
     deps = [
         ":lib",
         "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "create-report-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/CreateReportHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "//lib/queue:lib",
+        "//lib/time:lib",
+        "//lib/ulid:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "get-reports-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/GetReportsHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "//lib/time:lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -605,6 +654,7 @@ java_test_suite(
         ":confirm-order-handler",
         ":create-import-handler",
         ":create-publish-handler",
+        ":create-report-handler",
         ":delete-import-handler",
         ":delete-import-row-handler",
         ":find-imports-handler",
@@ -613,6 +663,7 @@ java_test_suite(
         ":get-import-handler",
         ":get-order-handler",
         ":get-publish-handler",
+        ":get-reports-handler",
         ":get-settings-handler",
         ":get-sku-handler",
         ":jobs-handler",
@@ -650,6 +701,7 @@ localstack_image(
         ":confirm-order-handler_deploy.jar",
         ":create-import-handler_deploy.jar",
         ":create-publish-handler_deploy.jar",
+        ":create-report-handler_deploy.jar",
         ":find-orders-handler_deploy.jar",
         ":find-skus-handler_deploy.jar",
         ":get-order-handler_deploy.jar",
@@ -662,6 +714,7 @@ localstack_image(
         ":find-imports-handler_deploy.jar",
         ":get-import-handler_deploy.jar",
         ":get-publish-handler_deploy.jar",
+        ":get-reports-handler_deploy.jar",
         ":get-settings-handler_deploy.jar",
         ":jobs-handler_deploy.jar",
         ":update-settings-handler_deploy.jar",

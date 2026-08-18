@@ -22,6 +22,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
   private final QueueClient<JobMessage> jobsQueue;
   private final AppraiseJobProcessor appraiseJobProcessor;
   private final PublishJobProcessor publishJobProcessor;
+  private final ReportJobProcessor reportJobProcessor;
 
   public JobsHandler() {
     this(TcgInventoryFactory.create());
@@ -51,6 +52,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
                 factory.dynamoDbClient(),
                 factory.clock(),
                 factory.fetchTcgClient()));
+    this.reportJobProcessor = new ReportJobProcessor(factory.tcgInventoryTable(), factory.clock());
   }
 
   @Override
@@ -114,6 +116,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
         switch (message.jobType()) {
           case "appraise" -> appraiseJobProcessor.processBatch(message.user(), jobItem);
           case "publish" -> publishJobProcessor.processBatch(message.user(), jobItem);
+          case "report" -> reportJobProcessor.processBatch(message.user(), jobItem);
           default -> throw new IllegalArgumentException("unknown job type: " + message.jobType());
         };
 
