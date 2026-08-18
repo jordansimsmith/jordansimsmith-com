@@ -79,14 +79,19 @@ describe('ReportsPage', () => {
     renderReportsPage();
     await act(async () => {});
 
-    expect(screen.getByText('$2894.35')).toBeDefined();
+    expect(screen.getByText('$2,894')).toBeDefined();
+    expect(screen.getByText('at your listed prices')).toBeDefined();
     expect(screen.getByText('9,412')).toBeDefined();
     expect(screen.getByText('6,120')).toBeDefined();
     expect(screen.getByText('14')).toBeDefined();
+    expect(screen.getByText('Sold · all-time')).toBeDefined();
     expect(screen.getByText('862')).toBeDefined();
-    expect(screen.getByText('$1204.50')).toBeDefined();
+    expect(screen.getByText('Revenue · all-time')).toBeDefined();
+    expect(screen.getByText('$1,204.50')).toBeDefined();
+    expect(screen.getByText('from paid orders')).toBeDefined();
     expect(screen.getByText('3')).toBeDefined();
     expect(screen.getByText('Unpriced')).toBeDefined();
+    expect(screen.getByText('excluded from value')).toBeDefined();
   });
 
   it('shouldHideUnpricedCardWhenZero', async () => {
@@ -128,7 +133,7 @@ describe('ReportsPage', () => {
     });
 
     expect(screen.getByText(/Data as of/)).toBeDefined();
-    expect(screen.getByText('$2894.35')).toBeDefined();
+    expect(screen.getByText('$2,894')).toBeDefined();
   });
 
   it('shouldTriggerRegenerationWhenStale', async () => {
@@ -163,10 +168,11 @@ describe('ReportsPage', () => {
     renderReportsPage();
     await act(async () => {});
 
-    expect(screen.getByText('Top sets by in-stock units')).toBeDefined();
+    expect(screen.getByText('Top sets')).toBeDefined();
+    expect(screen.queryByText('No sets in stock.')).toBeNull();
   });
 
-  it('shouldNotRenderTopSetsChartWhenEmpty', async () => {
+  it('shouldShowTopSetsEmptyMessageWhenEmpty', async () => {
     vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
       ...baseReport,
       report: {
@@ -178,7 +184,8 @@ describe('ReportsPage', () => {
     renderReportsPage();
     await act(async () => {});
 
-    expect(screen.queryByText('Top sets by in-stock units')).toBeNull();
+    expect(screen.getByText('Top sets')).toBeDefined();
+    expect(screen.getByText('No sets in stock.')).toBeDefined();
   });
 
   it('shouldRenderPriceBucketsChart', async () => {
@@ -201,9 +208,10 @@ describe('ReportsPage', () => {
     await act(async () => {});
 
     expect(screen.getByText('Price distribution')).toBeDefined();
+    expect(screen.queryByText('No priced units in stock.')).toBeNull();
   });
 
-  it('shouldNotRenderPriceBucketsChartWhenEmpty', async () => {
+  it('shouldShowPriceBucketsEmptyMessageWhenEmpty', async () => {
     vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
       ...baseReport,
       report: {
@@ -215,7 +223,8 @@ describe('ReportsPage', () => {
     renderReportsPage();
     await act(async () => {});
 
-    expect(screen.queryByText('Price distribution')).toBeNull();
+    expect(screen.getByText('Price distribution')).toBeDefined();
+    expect(screen.getByText('No priced units in stock.')).toBeDefined();
   });
 
   it('shouldRenderTopHitsTable', async () => {
@@ -256,13 +265,20 @@ describe('ReportsPage', () => {
     expect(screen.getByText('$95.00')).toBeDefined();
     expect(screen.getByText('Doubling Season')).toBeDefined();
     expect(screen.getByText('$48.50')).toBeDefined();
+    expect(screen.getByText('#')).toBeDefined();
     expect(screen.getByText('Name')).toBeDefined();
     expect(screen.getByText('Set')).toBeDefined();
     expect(screen.getByText('Finish')).toBeDefined();
     expect(screen.getByText('Price')).toBeDefined();
+    // rank column: two hits ranked 1 and 2
+    expect(screen.getByText('1')).toBeDefined();
+    expect(screen.getByText('2')).toBeDefined();
+    // normal finish is muted to a dash, foil is spelled out
+    expect(screen.getByText('—')).toBeDefined();
+    expect(screen.getByText('foil')).toBeDefined();
   });
 
-  it('shouldNotRenderTopHitsTableWhenEmpty', async () => {
+  it('shouldShowTopHitsEmptyMessageWhenEmpty', async () => {
     vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
       ...baseReport,
       report: {
@@ -274,7 +290,8 @@ describe('ReportsPage', () => {
     renderReportsPage();
     await act(async () => {});
 
-    expect(screen.queryByText('Top hits')).toBeNull();
+    expect(screen.getByText('Top hits')).toBeDefined();
+    expect(screen.getByText('No in-stock hits yet.')).toBeDefined();
   });
 
   it('shouldRenderStockAgingChart', async () => {
@@ -295,9 +312,12 @@ describe('ReportsPage', () => {
     await act(async () => {});
 
     expect(screen.getByText('Stock aging')).toBeDefined();
+    expect(screen.getByText('94 units')).toBeDefined();
+    expect(screen.getByText('180+: 13% of stock')).toBeDefined();
+    expect(screen.getByText('0-30 days · 22 (23%)')).toBeDefined();
   });
 
-  it('shouldNotRenderStockAgingChartWhenEmpty', async () => {
+  it('shouldShowStockAgingEmptyMessageWhenEmpty', async () => {
     vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
       ...baseReport,
       report: {
@@ -309,7 +329,8 @@ describe('ReportsPage', () => {
     renderReportsPage();
     await act(async () => {});
 
-    expect(screen.queryByText('Stock aging')).toBeNull();
+    expect(screen.getByText('Stock aging')).toBeDefined();
+    expect(screen.getByText('No in-stock units.')).toBeDefined();
   });
 
   it('shouldRenderRevenueByMonthChart', async () => {
@@ -328,9 +349,10 @@ describe('ReportsPage', () => {
     await act(async () => {});
 
     expect(screen.getByText('Revenue by month')).toBeDefined();
+    expect(screen.queryByText('No paid orders yet.')).toBeNull();
   });
 
-  it('shouldNotRenderRevenueByMonthChartWhenEmpty', async () => {
+  it('shouldShowRevenueEmptyMessageWhenEmpty', async () => {
     vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
       ...baseReport,
       report: {
@@ -342,7 +364,8 @@ describe('ReportsPage', () => {
     renderReportsPage();
     await act(async () => {});
 
-    expect(screen.queryByText('Revenue by month')).toBeNull();
+    expect(screen.getByText('Revenue by month')).toBeDefined();
+    expect(screen.getByText('No paid orders yet.')).toBeDefined();
   });
 
   it('shouldRenderIntakeVsSalesChart', async () => {
@@ -361,9 +384,10 @@ describe('ReportsPage', () => {
     await act(async () => {});
 
     expect(screen.getByText('Intake vs sales')).toBeDefined();
+    expect(screen.queryByText('No weekly activity yet.')).toBeNull();
   });
 
-  it('shouldNotRenderIntakeVsSalesChartWhenEmpty', async () => {
+  it('shouldShowIntakeVsSalesEmptyMessageWhenEmpty', async () => {
     vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
       ...baseReport,
       report: {
@@ -375,7 +399,8 @@ describe('ReportsPage', () => {
     renderReportsPage();
     await act(async () => {});
 
-    expect(screen.queryByText('Intake vs sales')).toBeNull();
+    expect(screen.getByText('Intake vs sales')).toBeDefined();
+    expect(screen.getByText('No weekly activity yet.')).toBeDefined();
   });
 
   it('shouldShowGenerationError', async () => {

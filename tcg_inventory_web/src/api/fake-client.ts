@@ -947,8 +947,10 @@ export function createFakeClient(): ApiClient {
           in_stock_units: 94,
           sku_count: 41,
           reserved_units: 8,
-          sold_units: 1,
-          revenue_to_date: '8.50',
+          // consistent with the chart series below: 40 units sold across the
+          // visible 12 weeks plus earlier months, revenue equal to the monthly sum
+          sold_units: 76,
+          revenue_to_date: '1114.75',
           unpriced_units: 0,
         },
         top_sets: [
