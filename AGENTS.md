@@ -65,6 +65,10 @@ When performing the code review step, check for:
 - When build or test errors occur, fix the underlying code issues rather than modifying tests to accept buggy code
 - Address build errors first, then test failures
 
+## Infrastructure guidelines
+
+- When adding new Lambda handlers to a service's `infra/main.tf` (new entries in `lambdas` and `endpoints`), always add the corresponding artifact mapping to `tools/terraform/manifest.json` — the deploy pipeline reads this manifest to build and upload the correct jars
+
 ## Java style guidelines
 
 - Use Google Java Format (enforced by formatter)
