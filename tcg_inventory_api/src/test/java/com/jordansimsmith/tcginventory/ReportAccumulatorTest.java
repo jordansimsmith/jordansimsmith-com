@@ -195,6 +195,14 @@ public class ReportAccumulatorTest {
     return item;
   }
 
+  private static TcgInventoryItem createUnit(String status, Instant createdAt, Instant updatedAt) {
+    var item = new TcgInventoryItem();
+    item.setStatus(status);
+    item.setCreatedAt(createdAt);
+    item.setUpdatedAt(updatedAt);
+    return item;
+  }
+
   @Test
   void toTopSetsShouldReturnSetsOrderedByInStockUnitsDescending() {
     // arrange
@@ -841,5 +849,144 @@ public class ReportAccumulatorTest {
     var result = accumulator.toRevenueByMonth();
     assertThat(result).hasSize(1);
     assertThat(result.get(0).revenue()).isEqualTo("0.30");
+  }
+
+  @Test
+  void toIntakeVsSalesByWeekShouldCountAllNonRemovedStatusesAsAdded() {
+    // arrange
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
+    // Wednesday 2023-11-15 NZ time -> week start Monday 2023-11-13
+    var createdAt = Instant.ofEpochSecond(1700000000);
+    var soldAt = Instant.ofEpochSecond(1700100000);
+    accumulator.addSku(
+        createSku("sku1", "1.00", null),
+        List.of(
+            createUnit("in_stock", createdAt),
+            createUnit("reserved", createdAt),
+            createUnit("sold", createdAt, soldAt)));
+
+    // act
+    var result = accumulator.toIntakeVsSalesByWeek();
+
+    // assert
+    assertThat(result).hasSize(1);
+    assertThat(result.get(0).weekStart()).isEqualTo("2023-11-13");
+    assertThat(result.get(0).addedUnits()).isEqualTo(3);
+  }
+
+  @Test
+  void toIntakeVsSalesByWeekShouldExcludeRemovedFromAddedCount() {
+    // arrange
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
+    var createdAt = Instant.ofEpochSecond(1700000000);
+    accumulator.addSku(
+        createSku("sku1", "1.00", null),
+        List.of(createUnit("in_stock", createdAt), createUnit("removed", createdAt)));
+
+    // act
+    var result = accumulator.toIntakeVsSalesByWeek();
+
+    // assert
+    assertThat(result).hasSize(1);
+    assertThat(result.get(0).addedUnits()).isEqualTo(1);
+  }
+
+  @Test
+  void toIntakeVsSalesByWeekShouldBucketSoldUnitsByUpdatedAtNotCreatedAt() {
+    // arrange
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
+    // created Monday 2023-11-06 NZ time
+    var createdAt = Instant.parse("2023-11-05T22:00:00Z");
+    // sold Wednesday 2023-11-15 NZ time -> week start Monday 2023-11-13
+    var soldAt = Instant.ofEpochSecond(1700000000);
+    accumulator.addSku(
+        createSku("sku1", "1.00", null), List.of(createUnit("sold", createdAt, soldAt)));
+
+    // act
+    var result = accumulator.toIntakeVsSalesByWeek();
+
+    // assert
+    assertThat(result).hasSize(2);
+    // added in the creation week (2023-11-06)
+    assertThat(result.get(0).weekStart()).isEqualTo("2023-11-06");
+    assertThat(result.get(0).addedUnits()).isEqualTo(1);
+    assertThat(result.get(0).soldUnits()).isEqualTo(0);
+    // sold in the sell week (2023-11-13)
+    assertThat(result.get(1).weekStart()).isEqualTo("2023-11-13");
+    assertThat(result.get(1).addedUnits()).isEqualTo(0);
+    assertThat(result.get(1).soldUnits()).isEqualTo(1);
+  }
+
+  @Test
+  void toIntakeVsSalesByWeekShouldAlignWednesdayToPrecedingMonday() {
+    // arrange
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
+    // 1700000000 is 2023-11-15 in NZ (Wednesday) -> week start 2023-11-13 (Monday)
+    var wednesday = Instant.ofEpochSecond(1700000000);
+    accumulator.addSku(createSku("sku1", "1.00", null), List.of(createUnit("in_stock", wednesday)));
+
+    // act
+    var result = accumulator.toIntakeVsSalesByWeek();
+
+    // assert
+    assertThat(result).hasSize(1);
+    assertThat(result.get(0).weekStart()).isEqualTo("2023-11-13");
+  }
+
+  @Test
+  void toIntakeVsSalesByWeekShouldMergeWeeksFromBothMaps() {
+    // arrange
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
+    // week 1: only adds
+    var week1Created = Instant.parse("2023-11-06T00:00:00Z");
+    // week 2: only sales (unit was created in week 1 but sold in week 2)
+    var week2Sold = Instant.parse("2023-11-13T12:00:00Z");
+    accumulator.addSku(
+        createSku("sku1", "1.00", null),
+        List.of(createUnit("in_stock", week1Created), createUnit("sold", week1Created, week2Sold)));
+
+    // act
+    var result = accumulator.toIntakeVsSalesByWeek();
+
+    // assert
+    assertThat(result).hasSize(2);
+    assertThat(result.get(0).weekStart()).isEqualTo("2023-11-06");
+    assertThat(result.get(0).addedUnits()).isEqualTo(2);
+    assertThat(result.get(0).soldUnits()).isEqualTo(0);
+    assertThat(result.get(1).weekStart()).isEqualTo("2023-11-13");
+    assertThat(result.get(1).addedUnits()).isEqualTo(0);
+    assertThat(result.get(1).soldUnits()).isEqualTo(1);
+  }
+
+  @Test
+  void toIntakeVsSalesByWeekShouldSortChronologically() {
+    // arrange
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
+    // add units in reverse chronological order
+    var laterWeek = Instant.parse("2023-11-13T12:00:00Z");
+    var earlierWeek = Instant.parse("2023-11-06T12:00:00Z");
+    accumulator.addSku(
+        createSku("sku1", "1.00", null),
+        List.of(createUnit("in_stock", laterWeek), createUnit("in_stock", earlierWeek)));
+
+    // act
+    var result = accumulator.toIntakeVsSalesByWeek();
+
+    // assert
+    assertThat(result).hasSize(2);
+    assertThat(result.get(0).weekStart()).isEqualTo("2023-11-06");
+    assertThat(result.get(1).weekStart()).isEqualTo("2023-11-13");
+  }
+
+  @Test
+  void toIntakeVsSalesByWeekShouldReturnEmptyWhenNoUnits() {
+    // arrange
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
+
+    // act
+    var result = accumulator.toIntakeVsSalesByWeek();
+
+    // assert
+    assertThat(result).isEmpty();
   }
 }

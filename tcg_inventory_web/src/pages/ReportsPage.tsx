@@ -17,6 +17,7 @@ import { AppShellLayout } from '../layouts/AppShellLayout';
 import { apiClient } from '../api/client';
 import type {
   ReportAgingBand,
+  ReportIntakeVsSales,
   ReportPriceBucket,
   ReportResponse,
   ReportRevenueByMonth,
@@ -202,6 +203,37 @@ function RevenueByMonthChart({
   );
 }
 
+function IntakeVsSalesChart({
+  intakeVsSales,
+}: {
+  intakeVsSales: ReportIntakeVsSales[];
+}) {
+  const data = intakeVsSales.map((entry) => ({
+    week_start: entry.week_start,
+    added_units: entry.added_units,
+    sold_units: entry.sold_units,
+  }));
+
+  return (
+    <Paper p="md" radius="sm" withBorder>
+      <Text size="sm" fw={700} mb="md">
+        Intake vs sales
+      </Text>
+      <BarChart
+        h={300}
+        data={data}
+        dataKey="week_start"
+        series={[
+          { name: 'added_units', label: 'Added', color: 'blue.6' },
+          { name: 'sold_units', label: 'Sold', color: 'teal.6' },
+        ]}
+        gridAxis="y"
+        tickLine="y"
+      />
+    </Paper>
+  );
+}
+
 function TopHitsTable({ topHits }: { topHits: ReportTopHit[] }) {
   return (
     <Paper p="md" radius="sm" withBorder>
@@ -348,15 +380,22 @@ export function ReportsPage() {
           )}
 
         {!firstVisit &&
-          report?.report?.price_buckets &&
-          report.report.price_buckets.length > 0 && (
-            <PriceBucketsChart priceBuckets={report.report.price_buckets} />
-          )}
-
-        {!firstVisit &&
-          report?.report?.aging_bands &&
-          report.report.aging_bands.length > 0 && (
-            <StockAgingChart agingBands={report.report.aging_bands} />
+          ((report?.report?.price_buckets &&
+            report.report.price_buckets.length > 0) ||
+            (report?.report?.aging_bands &&
+              report.report.aging_bands.length > 0)) && (
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+              {report?.report?.price_buckets &&
+                report.report.price_buckets.length > 0 && (
+                  <PriceBucketsChart
+                    priceBuckets={report.report.price_buckets}
+                  />
+                )}
+              {report?.report?.aging_bands &&
+                report.report.aging_bands.length > 0 && (
+                  <StockAgingChart agingBands={report.report.aging_bands} />
+                )}
+            </SimpleGrid>
           )}
 
         {!firstVisit &&
@@ -364,6 +403,14 @@ export function ReportsPage() {
           report.report.revenue_by_month.length > 0 && (
             <RevenueByMonthChart
               revenueByMonth={report.report.revenue_by_month}
+            />
+          )}
+
+        {!firstVisit &&
+          report?.report?.intake_vs_sales_by_week &&
+          report.report.intake_vs_sales_by_week.length > 0 && (
+            <IntakeVsSalesChart
+              intakeVsSales={report.report.intake_vs_sales_by_week}
             />
           )}
 

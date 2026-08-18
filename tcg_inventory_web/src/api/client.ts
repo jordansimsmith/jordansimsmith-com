@@ -197,6 +197,12 @@ export interface ReportRevenueByMonth {
   order_count: number;
 }
 
+export interface ReportIntakeVsSales {
+  week_start: string;
+  added_units: number;
+  sold_units: number;
+}
+
 export interface ReportTopHit {
   sku_id: string;
   name: string;
@@ -215,6 +221,7 @@ export interface Report {
   top_hits?: ReportTopHit[];
   aging_bands?: ReportAgingBand[];
   revenue_by_month?: ReportRevenueByMonth[];
+  intake_vs_sales_by_week?: ReportIntakeVsSales[];
 }
 
 export interface ReportResponse {

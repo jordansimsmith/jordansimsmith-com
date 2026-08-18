@@ -244,14 +244,16 @@ public class ReportsHandlerIntegrationTest {
             "in_stock",
             "import1",
             Instant.ofEpochSecond(1699000000)));
-    tcgInventoryTable.putItem(
+    var soldUnit =
         TcgInventoryItem.createUnit(
             "jordan",
             "scryfall2#normal#NM",
             5,
             "sold",
             "import1",
-            Instant.ofEpochSecond(1699000000)));
+            Instant.ofEpochSecond(1699000000));
+    soldUnit.setUpdatedAt(Instant.ofEpochSecond(1699500000));
+    tcgInventoryTable.putItem(soldUnit);
     tcgInventoryTable.putItem(
         TcgInventoryItem.createUnit(
             "jordan",
@@ -395,6 +397,19 @@ public class ReportsHandlerIntegrationTest {
     assertThat(revenueByMonth.get(0).get("month").asText()).isEqualTo("2023-11");
     assertThat(revenueByMonth.get(0).get("revenue").asText()).isEqualTo("15.75");
     assertThat(revenueByMonth.get(0).get("order_count").asInt()).isEqualTo(2);
+
+    var intakeVsSales = reportJson.get("intake_vs_sales_by_week");
+    assertThat(intakeVsSales).isNotNull();
+    assertThat(intakeVsSales.isArray()).isTrue();
+    // all non-removed units created at 1699000000 (2023-11-03 NZ, Friday) -> week 2023-10-30
+    // sold unit updatedAt 1699500000 (2023-11-09 NZ, Thursday) -> week 2023-11-06
+    assertThat(intakeVsSales.size()).isEqualTo(2);
+    assertThat(intakeVsSales.get(0).get("week_start").asText()).isEqualTo("2023-10-30");
+    assertThat(intakeVsSales.get(0).get("added_units").asInt()).isEqualTo(6);
+    assertThat(intakeVsSales.get(0).get("sold_units").asInt()).isEqualTo(0);
+    assertThat(intakeVsSales.get(1).get("week_start").asText()).isEqualTo("2023-11-06");
+    assertThat(intakeVsSales.get(1).get("added_units").asInt()).isEqualTo(0);
+    assertThat(intakeVsSales.get(1).get("sold_units").asInt()).isEqualTo(1);
   }
 
   @Test

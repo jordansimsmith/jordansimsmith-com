@@ -1,17 +1,20 @@
 package com.jordansimsmith.tcginventory;
 
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
 public class ReportAccumulator {
   private static final int TOP_SETS_LIMIT = 10;
@@ -48,6 +51,8 @@ public class ReportAccumulator {
   private final Map<String, SetAccumulator> setMap = new HashMap<>();
   private final List<HitCandidate> hitCandidates = new ArrayList<>();
   private final TreeMap<YearMonth, MonthAccumulator> monthMap = new TreeMap<>();
+  private final TreeMap<LocalDate, Integer> addedByWeek = new TreeMap<>();
+  private final TreeMap<LocalDate, Integer> soldByWeek = new TreeMap<>();
 
   public ReportAccumulator(Instant generationTime) {
     this.generationDate = generationTime.atZone(AUCKLAND).toLocalDate();
@@ -64,6 +69,12 @@ public class ReportAccumulator {
       if ("removed".equals(status)) {
         continue;
       }
+
+      if (unit.getCreatedAt() != null) {
+        var weekStart = weekStartOf(unit.getCreatedAt());
+        addedByWeek.merge(weekStart, 1, Integer::sum);
+      }
+
       switch (status) {
         case "in_stock" -> {
           inStockUnits++;
@@ -77,7 +88,13 @@ public class ReportAccumulator {
           }
         }
         case "reserved" -> reservedUnits++;
-        case "sold" -> soldUnits++;
+        case "sold" -> {
+          soldUnits++;
+          if (unit.getUpdatedAt() != null) {
+            var weekStart = weekStartOf(unit.getUpdatedAt());
+            soldByWeek.merge(weekStart, 1, Integer::sum);
+          }
+        }
         default -> {}
       }
     }
@@ -188,6 +205,26 @@ public class ReportAccumulator {
                     e.getValue().revenue.toPlainString(),
                     e.getValue().orderCount))
         .toList();
+  }
+
+  public List<ReportPayload.IntakeVsSalesByWeek> toIntakeVsSalesByWeek() {
+    var allWeeks = new TreeSet<LocalDate>();
+    allWeeks.addAll(addedByWeek.keySet());
+    allWeeks.addAll(soldByWeek.keySet());
+
+    return allWeeks.stream()
+        .map(
+            week ->
+                new ReportPayload.IntakeVsSalesByWeek(
+                    week.toString(),
+                    addedByWeek.getOrDefault(week, 0),
+                    soldByWeek.getOrDefault(week, 0)))
+        .toList();
+  }
+
+  private LocalDate weekStartOf(Instant instant) {
+    var date = instant.atZone(AUCKLAND).toLocalDate();
+    return date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY));
   }
 
   private static int bucketIndex(BigDecimal price) {

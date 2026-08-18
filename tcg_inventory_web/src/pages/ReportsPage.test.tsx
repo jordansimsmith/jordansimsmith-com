@@ -345,6 +345,39 @@ describe('ReportsPage', () => {
     expect(screen.queryByText('Revenue by month')).toBeNull();
   });
 
+  it('shouldRenderIntakeVsSalesChart', async () => {
+    vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
+      ...baseReport,
+      report: {
+        ...baseReport.report,
+        intake_vs_sales_by_week: [
+          { week_start: '2026-07-06', added_units: 14, sold_units: 6 },
+          { week_start: '2026-07-13', added_units: 9, sold_units: 3 },
+        ],
+      },
+    });
+
+    renderReportsPage();
+    await act(async () => {});
+
+    expect(screen.getByText('Intake vs sales')).toBeDefined();
+  });
+
+  it('shouldNotRenderIntakeVsSalesChartWhenEmpty', async () => {
+    vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
+      ...baseReport,
+      report: {
+        ...baseReport.report,
+        intake_vs_sales_by_week: [],
+      },
+    });
+
+    renderReportsPage();
+    await act(async () => {});
+
+    expect(screen.queryByText('Intake vs sales')).toBeNull();
+  });
+
   it('shouldShowGenerationError', async () => {
     vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
       ...baseReport,

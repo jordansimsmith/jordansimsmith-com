@@ -1053,6 +1053,20 @@ export function createFakeClient(): ApiClient {
           { month: '2026-07', revenue: '156.80', order_count: 9 },
           { month: '2026-08', revenue: '8.50', order_count: 1 },
         ],
+        intake_vs_sales_by_week: [
+          { week_start: '2026-06-01', added_units: 12, sold_units: 3 },
+          { week_start: '2026-06-08', added_units: 8, sold_units: 5 },
+          { week_start: '2026-06-15', added_units: 15, sold_units: 4 },
+          { week_start: '2026-06-22', added_units: 6, sold_units: 7 },
+          { week_start: '2026-06-29', added_units: 10, sold_units: 2 },
+          { week_start: '2026-07-06', added_units: 14, sold_units: 6 },
+          { week_start: '2026-07-13', added_units: 9, sold_units: 3 },
+          { week_start: '2026-07-20', added_units: 11, sold_units: 4 },
+          { week_start: '2026-07-27', added_units: 7, sold_units: 5 },
+          { week_start: '2026-08-03', added_units: 18, sold_units: 1 },
+          { week_start: '2026-08-10', added_units: 5, sold_units: 0 },
+          { week_start: '2026-08-17', added_units: 3, sold_units: 0 },
+        ],
       };
       return {
         generated_at: reportGeneratedAt,

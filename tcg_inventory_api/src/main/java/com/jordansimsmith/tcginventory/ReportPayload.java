@@ -12,7 +12,9 @@ public record ReportPayload(
     @JsonProperty("price_buckets") @Nullable List<PriceBucket> priceBuckets,
     @JsonProperty("top_hits") @Nullable List<TopHit> topHits,
     @JsonProperty("aging_bands") @Nullable List<AgingBand> agingBands,
-    @JsonProperty("revenue_by_month") @Nullable List<RevenueByMonth> revenueByMonth) {
+    @JsonProperty("revenue_by_month") @Nullable List<RevenueByMonth> revenueByMonth,
+    @JsonProperty("intake_vs_sales_by_week") @Nullable
+        List<IntakeVsSalesByWeek> intakeVsSalesByWeek) {
 
   public record Totals(
       @JsonProperty("inventory_value") String inventoryValue,
@@ -48,4 +50,9 @@ public record ReportPayload(
       @JsonProperty("month") String month,
       @JsonProperty("revenue") String revenue,
       @JsonProperty("order_count") int orderCount) {}
+
+  public record IntakeVsSalesByWeek(
+      @JsonProperty("week_start") String weekStart,
+      @JsonProperty("added_units") int addedUnits,
+      @JsonProperty("sold_units") int soldUnits) {}
 }
