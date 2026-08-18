@@ -138,6 +138,8 @@
         "delete_import_row": "//tcg_inventory_api:delete-import-row-handler_deploy.jar",
         "create_publish": "//tcg_inventory_api:create-publish-handler_deploy.jar",
         "get_publish": "//tcg_inventory_api:get-publish-handler_deploy.jar",
+        "create_report": "//tcg_inventory_api:create-report-handler_deploy.jar",
+        "get_reports": "//tcg_inventory_api:get-reports-handler_deploy.jar",
         "find_skus": "//tcg_inventory_api:find-skus-handler_deploy.jar",
         "get_sku": "//tcg_inventory_api:get-sku-handler_deploy.jar",
         "remove_unit": "//tcg_inventory_api:remove-unit-handler_deploy.jar",
