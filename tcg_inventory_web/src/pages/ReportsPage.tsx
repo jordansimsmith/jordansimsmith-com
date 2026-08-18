@@ -85,7 +85,7 @@ function TotalsStrip({ totals }: { totals: ReportTotals }) {
 }
 
 function TopSetsChart({ topSets }: { topSets: ReportTopSet[] }) {
-  const data = [...topSets].reverse().map((s) => ({
+  const data = topSets.map((s) => ({
     set_name: s.set_name,
     in_stock_units: s.in_stock_units,
   }));
@@ -99,10 +99,13 @@ function TopSetsChart({ topSets }: { topSets: ReportTopSet[] }) {
         h={300}
         data={data}
         dataKey="set_name"
-        series={[{ name: 'in_stock_units', color: 'blue.6' }]}
+        series={[
+          { name: 'in_stock_units', label: 'In stock', color: 'blue.6' },
+        ]}
         orientation="vertical"
         gridAxis="x"
         tickLine="x"
+        yAxisProps={{ width: 160 }}
       />
     </Paper>
   );
