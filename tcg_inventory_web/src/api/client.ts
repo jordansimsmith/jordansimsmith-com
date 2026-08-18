@@ -181,9 +181,15 @@ export interface ReportTopSet {
   in_stock_units: number;
 }
 
+export interface ReportPriceBucket {
+  label: string;
+  in_stock_units: number;
+}
+
 export interface Report {
   totals?: ReportTotals;
   top_sets?: ReportTopSet[];
+  price_buckets?: ReportPriceBucket[];
 }
 
 export interface ReportResponse {

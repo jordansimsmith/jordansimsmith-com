@@ -14,7 +14,12 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { apiClient } from '../api/client';
-import type { ReportResponse, ReportTopSet, ReportTotals } from '../api/client';
+import type {
+  ReportPriceBucket,
+  ReportResponse,
+  ReportTopSet,
+  ReportTotals,
+} from '../api/client';
 
 dayjs.extend(relativeTime);
 
@@ -106,6 +111,35 @@ function TopSetsChart({ topSets }: { topSets: ReportTopSet[] }) {
         gridAxis="x"
         tickLine="x"
         yAxisProps={{ width: 160 }}
+      />
+    </Paper>
+  );
+}
+
+function PriceBucketsChart({
+  priceBuckets,
+}: {
+  priceBuckets: ReportPriceBucket[];
+}) {
+  const data = priceBuckets.map((b) => ({
+    label: b.label,
+    in_stock_units: b.in_stock_units,
+  }));
+
+  return (
+    <Paper p="md" radius="sm" withBorder>
+      <Text size="sm" fw={700} mb="md">
+        Price distribution
+      </Text>
+      <BarChart
+        h={300}
+        data={data}
+        dataKey="label"
+        series={[
+          { name: 'in_stock_units', label: 'In stock', color: 'blue.6' },
+        ]}
+        gridAxis="y"
+        tickLine="y"
       />
     </Paper>
   );
@@ -218,6 +252,12 @@ export function ReportsPage() {
           report?.report?.top_sets &&
           report.report.top_sets.length > 0 && (
             <TopSetsChart topSets={report.report.top_sets} />
+          )}
+
+        {!firstVisit &&
+          report?.report?.price_buckets &&
+          report.report.price_buckets.length > 0 && (
+            <PriceBucketsChart priceBuckets={report.report.price_buckets} />
           )}
 
         {!firstVisit && report && !report.report?.totals && (

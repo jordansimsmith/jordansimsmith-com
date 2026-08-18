@@ -181,6 +181,43 @@ describe('ReportsPage', () => {
     expect(screen.queryByText('Top sets by in-stock units')).toBeNull();
   });
 
+  it('shouldRenderPriceBucketsChart', async () => {
+    vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
+      ...baseReport,
+      report: {
+        ...baseReport.report,
+        price_buckets: [
+          { label: '$0.25-$0.50', in_stock_units: 38 },
+          { label: '$0.50-$1', in_stock_units: 24 },
+          { label: '$1-$2', in_stock_units: 15 },
+          { label: '$2-$5', in_stock_units: 9 },
+          { label: '$5-$10', in_stock_units: 5 },
+          { label: '$10+', in_stock_units: 3 },
+        ],
+      },
+    });
+
+    renderReportsPage();
+    await act(async () => {});
+
+    expect(screen.getByText('Price distribution')).toBeDefined();
+  });
+
+  it('shouldNotRenderPriceBucketsChartWhenEmpty', async () => {
+    vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
+      ...baseReport,
+      report: {
+        ...baseReport.report,
+        price_buckets: [],
+      },
+    });
+
+    renderReportsPage();
+    await act(async () => {});
+
+    expect(screen.queryByText('Price distribution')).toBeNull();
+  });
+
   it('shouldShowGenerationError', async () => {
     vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
       ...baseReport,

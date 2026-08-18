@@ -289,7 +289,7 @@ Response `200` (arrays shown with one representative entry; empty buckets and ba
     "top_sets": [
       { "set_code": "a25", "set_name": "Masters 25", "in_stock_units": 812 }
     ],
-    "price_buckets": [{ "label": "0.25-0.50", "in_stock_units": 5120 }],
+    "price_buckets": [{ "label": "$0.25-$0.50", "in_stock_units": 5120 }],
     "top_hits": [
       {
         "sku_id": "f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
@@ -464,7 +464,7 @@ All mutations are `TransactWriteItems` including their audit entry; every mutati
 | ---------------- | -------------------------------- | ------------------------------------------- | ---------------------- |
 | `JOBS_QUEUE_URL` | yes (trigger + consumer Lambdas) | SQS queue for job and continuation messages | none; set by Terraform |
 
-Fixed configuration lives in code: request spacing 1–2 s, bounded retries, request budgets, page sizes, slice size (~100 rows or bounded FetchTCG calls per slice), country `NZ`, currency `NZD`, keep threshold NZ$0.25, price increment NZ$0.05, seller floor NZ$0.25. Report constants: staleness backstop 24 h, bucketing timezone `Pacific/Auckland`, price buckets 0.25–0.50 / 0.50–1 / 1–2 / 2–5 / 5–10 / 10+ NZD, aging bands 0–30 / 31–90 / 91–180 / 180+ days, top sets 10, top hits 10.
+Fixed configuration lives in code: request spacing 1–2 s, bounded retries, request budgets, page sizes, slice size (~100 rows or bounded FetchTCG calls per slice), country `NZ`, currency `NZD`, keep threshold NZ$0.25, price increment NZ$0.05, seller floor NZ$0.25. Report constants: staleness backstop 24 h, bucketing timezone `Pacific/Auckland`, price buckets $0.25–$0.50 / $0.50–$1 / $1–$2 / $2–$5 / $5–$10 / $10+ NZD, aging bands 0–30 / 31–90 / 91–180 / 180+ days, top sets 10, top hits 10.
 
 ### Secret shape
 

@@ -350,6 +350,16 @@ public class ReportsHandlerIntegrationTest {
     assertThat(topSets.get(2).get("set_code").asText()).isEqualTo("dom");
     assertThat(topSets.get(2).get("set_name").asText()).isEqualTo("Dominaria");
     assertThat(topSets.get(2).get("in_stock_units").asInt()).isEqualTo(1);
+
+    var priceBuckets = reportJson.get("price_buckets");
+    assertThat(priceBuckets).isNotNull();
+    assertThat(priceBuckets.isArray()).isTrue();
+    assertThat(priceBuckets.size()).isEqualTo(6);
+    assertThat(priceBuckets.get(0).get("label").asText()).isEqualTo("$0.25-$0.50");
+    assertThat(priceBuckets.get(5).get("label").asText()).isEqualTo("$10+");
+    // sku1: 2 in_stock at $1.50 -> bucket "1-2", sku2: 1 in_stock at $3.00 -> bucket "2-5"
+    assertThat(priceBuckets.get(2).get("in_stock_units").asInt()).isEqualTo(2);
+    assertThat(priceBuckets.get(3).get("in_stock_units").asInt()).isEqualTo(1);
   }
 
   @Test

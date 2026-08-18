@@ -295,6 +295,113 @@ public class ReportAccumulatorTest {
     assertThat(topSets).isEmpty();
   }
 
+  @Test
+  void toPriceBucketsShouldPlacePrice025InFirstBucket() {
+    // arrange
+    var accumulator = new ReportAccumulator();
+    accumulator.addSku(createSku("sku1", "0.25", null), List.of(createUnit("in_stock")));
+
+    // act
+    var buckets = accumulator.toPriceBuckets();
+
+    // assert
+    assertThat(buckets).hasSize(6);
+    assertThat(buckets.get(0).label()).isEqualTo("$0.25-$0.50");
+    assertThat(buckets.get(0).inStockUnits()).isEqualTo(1);
+    assertThat(buckets.get(1).inStockUnits()).isEqualTo(0);
+  }
+
+  @Test
+  void toPriceBucketsShouldPlacePrice050InSecondBucket() {
+    // arrange
+    var accumulator = new ReportAccumulator();
+    accumulator.addSku(createSku("sku1", "0.50", null), List.of(createUnit("in_stock")));
+
+    // act
+    var buckets = accumulator.toPriceBuckets();
+
+    // assert
+    assertThat(buckets.get(0).inStockUnits()).isEqualTo(0);
+    assertThat(buckets.get(1).label()).isEqualTo("$0.50-$1");
+    assertThat(buckets.get(1).inStockUnits()).isEqualTo(1);
+  }
+
+  @Test
+  void toPriceBucketsShouldPlacePrice1000InLastBucket() {
+    // arrange
+    var accumulator = new ReportAccumulator();
+    accumulator.addSku(createSku("sku1", "10.00", null), List.of(createUnit("in_stock")));
+
+    // act
+    var buckets = accumulator.toPriceBuckets();
+
+    // assert
+    assertThat(buckets.get(4).inStockUnits()).isEqualTo(0);
+    assertThat(buckets.get(5).label()).isEqualTo("$10+");
+    assertThat(buckets.get(5).inStockUnits()).isEqualTo(1);
+  }
+
+  @Test
+  void toPriceBucketsShouldEmitAllBucketsEvenWhenEmpty() {
+    // arrange
+    var accumulator = new ReportAccumulator();
+
+    // act
+    var buckets = accumulator.toPriceBuckets();
+
+    // assert
+    assertThat(buckets).hasSize(6);
+    assertThat(buckets.get(0).label()).isEqualTo("$0.25-$0.50");
+    assertThat(buckets.get(1).label()).isEqualTo("$0.50-$1");
+    assertThat(buckets.get(2).label()).isEqualTo("$1-$2");
+    assertThat(buckets.get(3).label()).isEqualTo("$2-$5");
+    assertThat(buckets.get(4).label()).isEqualTo("$5-$10");
+    assertThat(buckets.get(5).label()).isEqualTo("$10+");
+    for (var bucket : buckets) {
+      assertThat(bucket.inStockUnits()).isEqualTo(0);
+    }
+  }
+
+  @Test
+  void toPriceBucketsShouldExcludeUnpricedUnits() {
+    // arrange
+    var accumulator = new ReportAccumulator();
+    accumulator.addSku(
+        createSku("sku1", null, null), List.of(createUnit("in_stock"), createUnit("in_stock")));
+
+    // act
+    var buckets = accumulator.toPriceBuckets();
+
+    // assert
+    for (var bucket : buckets) {
+      assertThat(bucket.inStockUnits()).isEqualTo(0);
+    }
+  }
+
+  @Test
+  void toPriceBucketsShouldDistributeAcrossMultipleBuckets() {
+    // arrange
+    var accumulator = new ReportAccumulator();
+    accumulator.addSku(createSku("sku1", "0.30", null), List.of(createUnit("in_stock")));
+    accumulator.addSku(createSku("sku2", "0.75", null), List.of(createUnit("in_stock")));
+    accumulator.addSku(
+        createSku("sku3", "1.50", null), List.of(createUnit("in_stock"), createUnit("in_stock")));
+    accumulator.addSku(createSku("sku4", "3.00", null), List.of(createUnit("in_stock")));
+    accumulator.addSku(createSku("sku5", "7.50", null), List.of(createUnit("in_stock")));
+    accumulator.addSku(createSku("sku6", "15.00", null), List.of(createUnit("in_stock")));
+
+    // act
+    var buckets = accumulator.toPriceBuckets();
+
+    // assert
+    assertThat(buckets.get(0).inStockUnits()).isEqualTo(1);
+    assertThat(buckets.get(1).inStockUnits()).isEqualTo(1);
+    assertThat(buckets.get(2).inStockUnits()).isEqualTo(2);
+    assertThat(buckets.get(3).inStockUnits()).isEqualTo(1);
+    assertThat(buckets.get(4).inStockUnits()).isEqualTo(1);
+    assertThat(buckets.get(5).inStockUnits()).isEqualTo(1);
+  }
+
   private static TcgInventoryItem createOrder(String status, String totalPrice) {
     var item = new TcgInventoryItem();
     item.setStatus(status);

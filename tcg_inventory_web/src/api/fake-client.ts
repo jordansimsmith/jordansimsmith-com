@@ -979,6 +979,14 @@ export function createFakeClient(): ApiClient {
           { set_code: 'm12', set_name: 'Magic 2012', in_stock_units: 2 },
           { set_code: 'cmm', set_name: 'Commander Masters', in_stock_units: 1 },
         ],
+        price_buckets: [
+          { label: '$0.25-$0.50', in_stock_units: 38 },
+          { label: '$0.50-$1', in_stock_units: 24 },
+          { label: '$1-$2', in_stock_units: 15 },
+          { label: '$2-$5', in_stock_units: 9 },
+          { label: '$5-$10', in_stock_units: 5 },
+          { label: '$10+', in_stock_units: 3 },
+        ],
       };
       return {
         generated_at: reportGeneratedAt,
