@@ -96,6 +96,14 @@ module "java_api" {
       handler  = "com.jordansimsmith.tcginventory.GetPublishHandler"
       artifact = var.artifacts["get_publish"]
     }
+    create_report = {
+      handler  = "com.jordansimsmith.tcginventory.CreateReportHandler"
+      artifact = var.artifacts["create_report"]
+    }
+    get_reports = {
+      handler  = "com.jordansimsmith.tcginventory.GetReportsHandler"
+      artifact = var.artifacts["get_reports"]
+    }
     find_skus = {
       handler  = "com.jordansimsmith.tcginventory.FindSkusHandler"
       artifact = var.artifacts["find_skus"]
@@ -143,6 +151,8 @@ module "java_api" {
     delete_import_row = { path = "imports/{import_id}/rows/{position}", method = "DELETE", lambda = "delete_import_row" }
     create_publish    = { path = "publish", method = "POST", lambda = "create_publish" }
     get_publish       = { path = "publish", method = "GET", lambda = "get_publish" }
+    create_report     = { path = "reports", method = "POST", lambda = "create_report" }
+    get_reports       = { path = "reports", method = "GET", lambda = "get_reports" }
     find_skus         = { path = "skus", method = "GET", lambda = "find_skus" }
     get_sku           = { path = "skus/{sku_id}", method = "GET", lambda = "get_sku" }
     remove_unit       = { path = "skus/{sku_id}/units/{sequence_number}", method = "DELETE", lambda = "remove_unit" }
