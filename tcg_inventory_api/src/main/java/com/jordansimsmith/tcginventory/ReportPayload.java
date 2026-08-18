@@ -11,7 +11,8 @@ public record ReportPayload(
     @JsonProperty("top_sets") @Nullable List<TopSet> topSets,
     @JsonProperty("price_buckets") @Nullable List<PriceBucket> priceBuckets,
     @JsonProperty("top_hits") @Nullable List<TopHit> topHits,
-    @JsonProperty("aging_bands") @Nullable List<AgingBand> agingBands) {
+    @JsonProperty("aging_bands") @Nullable List<AgingBand> agingBands,
+    @JsonProperty("revenue_by_month") @Nullable List<RevenueByMonth> revenueByMonth) {
 
   public record Totals(
       @JsonProperty("inventory_value") String inventoryValue,
@@ -42,4 +43,9 @@ public record ReportPayload(
 
   public record AgingBand(
       @JsonProperty("label") String label, @JsonProperty("in_stock_units") int inStockUnits) {}
+
+  public record RevenueByMonth(
+      @JsonProperty("month") String month,
+      @JsonProperty("revenue") String revenue,
+      @JsonProperty("order_count") int orderCount) {}
 }

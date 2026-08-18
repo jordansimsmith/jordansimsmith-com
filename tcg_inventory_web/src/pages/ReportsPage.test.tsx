@@ -312,6 +312,39 @@ describe('ReportsPage', () => {
     expect(screen.queryByText('Stock aging')).toBeNull();
   });
 
+  it('shouldRenderRevenueByMonthChart', async () => {
+    vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
+      ...baseReport,
+      report: {
+        ...baseReport.report,
+        revenue_by_month: [
+          { month: '2026-06', revenue: '342.20', order_count: 18 },
+          { month: '2026-07', revenue: '156.80', order_count: 9 },
+        ],
+      },
+    });
+
+    renderReportsPage();
+    await act(async () => {});
+
+    expect(screen.getByText('Revenue by month')).toBeDefined();
+  });
+
+  it('shouldNotRenderRevenueByMonthChartWhenEmpty', async () => {
+    vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
+      ...baseReport,
+      report: {
+        ...baseReport.report,
+        revenue_by_month: [],
+      },
+    });
+
+    renderReportsPage();
+    await act(async () => {});
+
+    expect(screen.queryByText('Revenue by month')).toBeNull();
+  });
+
   it('shouldShowGenerationError', async () => {
     vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
       ...baseReport,

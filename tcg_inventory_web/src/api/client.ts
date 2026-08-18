@@ -191,6 +191,12 @@ export interface ReportAgingBand {
   in_stock_units: number;
 }
 
+export interface ReportRevenueByMonth {
+  month: string;
+  revenue: string;
+  order_count: number;
+}
+
 export interface ReportTopHit {
   sku_id: string;
   name: string;
@@ -208,6 +214,7 @@ export interface Report {
   price_buckets?: ReportPriceBucket[];
   top_hits?: ReportTopHit[];
   aging_bands?: ReportAgingBand[];
+  revenue_by_month?: ReportRevenueByMonth[];
 }
 
 export interface ReportResponse {

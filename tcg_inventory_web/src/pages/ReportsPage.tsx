@@ -19,6 +19,7 @@ import type {
   ReportAgingBand,
   ReportPriceBucket,
   ReportResponse,
+  ReportRevenueByMonth,
   ReportTopHit,
   ReportTopSet,
   ReportTotals,
@@ -45,7 +46,7 @@ function isGenerationActive(report: ReportResponse): boolean {
 }
 
 function formatCurrency(value: string): string {
-  return `$${value}`;
+  return `$${parseFloat(value).toFixed(2)}`;
 }
 
 function StatCard({ label, value }: { label: string; value: string }) {
@@ -168,6 +169,34 @@ function StockAgingChart({ agingBands }: { agingBands: ReportAgingBand[] }) {
         ]}
         gridAxis="y"
         tickLine="y"
+      />
+    </Paper>
+  );
+}
+
+function RevenueByMonthChart({
+  revenueByMonth,
+}: {
+  revenueByMonth: ReportRevenueByMonth[];
+}) {
+  const data = revenueByMonth.map((entry) => ({
+    month: entry.month,
+    revenue: parseFloat(entry.revenue),
+  }));
+
+  return (
+    <Paper p="md" radius="sm" withBorder>
+      <Text size="sm" fw={700} mb="md">
+        Revenue by month
+      </Text>
+      <BarChart
+        h={300}
+        data={data}
+        dataKey="month"
+        series={[{ name: 'revenue', label: 'Revenue', color: 'blue.6' }]}
+        gridAxis="y"
+        tickLine="y"
+        valueFormatter={(v) => `$${v.toFixed(2)}`}
       />
     </Paper>
   );
@@ -328,6 +357,14 @@ export function ReportsPage() {
           report?.report?.aging_bands &&
           report.report.aging_bands.length > 0 && (
             <StockAgingChart agingBands={report.report.aging_bands} />
+          )}
+
+        {!firstVisit &&
+          report?.report?.revenue_by_month &&
+          report.report.revenue_by_month.length > 0 && (
+            <RevenueByMonthChart
+              revenueByMonth={report.report.revenue_by_month}
+            />
           )}
 
         {!firstVisit &&

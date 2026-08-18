@@ -733,6 +733,113 @@ public class ReportAccumulatorTest {
     var item = new TcgInventoryItem();
     item.setStatus(status);
     item.setTotalPrice(totalPrice);
+    item.setCreatedAt(Instant.ofEpochSecond(1700000000));
     return item;
+  }
+
+  private static TcgInventoryItem createOrder(String status, String totalPrice, Instant createdAt) {
+    var item = new TcgInventoryItem();
+    item.setStatus(status);
+    item.setTotalPrice(totalPrice);
+    item.setCreatedAt(createdAt);
+    return item;
+  }
+
+  @Test
+  void toRevenueByMonthShouldIncludePaidOrdersOnly() {
+    // arrange
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
+    // 2023-11-14 in Pacific/Auckland
+    var nov2023 = Instant.ofEpochSecond(1700000000);
+
+    // act
+    accumulator.addOrder(createOrder("to_pick", "10.50", nov2023));
+    accumulator.addOrder(createOrder("fulfilled", "5.25", nov2023));
+    accumulator.addOrder(createOrder("awaiting_payment", "100.00", nov2023));
+    accumulator.addOrder(createOrder("voided", "20.00", nov2023));
+    accumulator.addOrder(createOrder("flagged", "30.00", nov2023));
+
+    // assert
+    var result = accumulator.toRevenueByMonth();
+    assertThat(result).hasSize(1);
+    assertThat(result.get(0).month()).isEqualTo("2023-11");
+    assertThat(result.get(0).revenue()).isEqualTo("15.75");
+    assertThat(result.get(0).orderCount()).isEqualTo(2);
+  }
+
+  @Test
+  void toRevenueByMonthShouldAggregateOrdersInSameMonth() {
+    // arrange
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
+    // both in November 2023 NZ time
+    var earlyNov = Instant.ofEpochSecond(1698800000);
+    var lateNov = Instant.ofEpochSecond(1700000000);
+
+    // act
+    accumulator.addOrder(createOrder("fulfilled", "10.00", earlyNov));
+    accumulator.addOrder(createOrder("fulfilled", "5.50", lateNov));
+    accumulator.addOrder(createOrder("to_pick", "3.25", lateNov));
+
+    // assert
+    var result = accumulator.toRevenueByMonth();
+    assertThat(result).hasSize(1);
+    assertThat(result.get(0).month()).isEqualTo("2023-11");
+    assertThat(result.get(0).revenue()).isEqualTo("18.75");
+    assertThat(result.get(0).orderCount()).isEqualTo(3);
+  }
+
+  @Test
+  void toRevenueByMonthShouldSortChronologically() {
+    // arrange
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
+    // March 2023
+    var march = Instant.parse("2023-03-15T00:00:00Z");
+    // January 2023
+    var january = Instant.parse("2023-01-10T00:00:00Z");
+    // November 2023
+    var november = Instant.ofEpochSecond(1700000000);
+
+    // act (add in non-chronological order)
+    accumulator.addOrder(createOrder("fulfilled", "5.00", march));
+    accumulator.addOrder(createOrder("fulfilled", "3.00", january));
+    accumulator.addOrder(createOrder("fulfilled", "7.00", november));
+
+    // assert
+    var result = accumulator.toRevenueByMonth();
+    assertThat(result).hasSize(3);
+    assertThat(result.get(0).month()).isEqualTo("2023-01");
+    assertThat(result.get(0).revenue()).isEqualTo("3.00");
+    assertThat(result.get(1).month()).isEqualTo("2023-03");
+    assertThat(result.get(1).revenue()).isEqualTo("5.00");
+    assertThat(result.get(2).month()).isEqualTo("2023-11");
+    assertThat(result.get(2).revenue()).isEqualTo("7.00");
+  }
+
+  @Test
+  void toRevenueByMonthShouldReturnEmptyWhenNoOrders() {
+    // arrange
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
+
+    // act
+    var result = accumulator.toRevenueByMonth();
+
+    // assert
+    assertThat(result).isEmpty();
+  }
+
+  @Test
+  void toRevenueByMonthShouldSumRevenueCorrectlyAsBigDecimal() {
+    // arrange
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
+    var instant = Instant.ofEpochSecond(1700000000);
+
+    // act
+    accumulator.addOrder(createOrder("fulfilled", "0.10", instant));
+    accumulator.addOrder(createOrder("fulfilled", "0.20", instant));
+
+    // assert
+    var result = accumulator.toRevenueByMonth();
+    assertThat(result).hasSize(1);
+    assertThat(result.get(0).revenue()).isEqualTo("0.30");
   }
 }

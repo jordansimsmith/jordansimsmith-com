@@ -386,6 +386,15 @@ public class ReportsHandlerIntegrationTest {
     assertThat(agingBands.get(1).get("in_stock_units").asInt()).isEqualTo(0);
     assertThat(agingBands.get(2).get("in_stock_units").asInt()).isEqualTo(0);
     assertThat(agingBands.get(3).get("in_stock_units").asInt()).isEqualTo(0);
+
+    var revenueByMonth = reportJson.get("revenue_by_month");
+    assertThat(revenueByMonth).isNotNull();
+    assertThat(revenueByMonth.isArray()).isTrue();
+    // order1 created at 1699500000, order2 at 1699600000 -> both November 2023 NZ time
+    assertThat(revenueByMonth.size()).isEqualTo(1);
+    assertThat(revenueByMonth.get(0).get("month").asText()).isEqualTo("2023-11");
+    assertThat(revenueByMonth.get(0).get("revenue").asText()).isEqualTo("15.75");
+    assertThat(revenueByMonth.get(0).get("order_count").asInt()).isEqualTo(2);
   }
 
   @Test

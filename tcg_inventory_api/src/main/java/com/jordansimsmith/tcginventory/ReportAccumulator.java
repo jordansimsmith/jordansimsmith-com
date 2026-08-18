@@ -3,6 +3,7 @@ package com.jordansimsmith.tcginventory;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -10,6 +11,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
 
 public class ReportAccumulator {
   private static final int TOP_SETS_LIMIT = 10;
@@ -27,7 +29,9 @@ public class ReportAccumulator {
     "$0.25-$0.50", "$0.50-$1", "$1-$2", "$2-$5", "$5-$10", "$10+"
   };
 
-  private static final String[] AGING_LABELS = {"0-30 days", "31-90 days", "91-180 days", "180+ days"};
+  private static final String[] AGING_LABELS = {
+    "0-30 days", "31-90 days", "91-180 days", "180+ days"
+  };
 
   private final LocalDate generationDate;
 
@@ -43,6 +47,7 @@ public class ReportAccumulator {
   private final int[] agingBandCounts = new int[4];
   private final Map<String, SetAccumulator> setMap = new HashMap<>();
   private final List<HitCandidate> hitCandidates = new ArrayList<>();
+  private final TreeMap<YearMonth, MonthAccumulator> monthMap = new TreeMap<>();
 
   public ReportAccumulator(Instant generationTime) {
     this.generationDate = generationTime.atZone(AUCKLAND).toLocalDate();
@@ -103,7 +108,11 @@ public class ReportAccumulator {
       return;
     }
     if (order.getTotalPrice() != null) {
-      revenueToDate = revenueToDate.add(new BigDecimal(order.getTotalPrice()));
+      var price = new BigDecimal(order.getTotalPrice());
+      revenueToDate = revenueToDate.add(price);
+
+      var month = YearMonth.from(order.getCreatedAt().atZone(AUCKLAND));
+      monthMap.computeIfAbsent(month, k -> new MonthAccumulator()).add(price);
     }
   }
 
@@ -170,6 +179,17 @@ public class ReportAccumulator {
         .toList();
   }
 
+  public List<ReportPayload.RevenueByMonth> toRevenueByMonth() {
+    return monthMap.entrySet().stream()
+        .map(
+            e ->
+                new ReportPayload.RevenueByMonth(
+                    e.getKey().toString(),
+                    e.getValue().revenue.toPlainString(),
+                    e.getValue().orderCount))
+        .toList();
+  }
+
   private static int bucketIndex(BigDecimal price) {
     if (price.compareTo(BUCKET_0_50) < 0) {
       return 0;
@@ -232,4 +252,14 @@ public class ReportAccumulator {
       String condition,
       BigDecimal price,
       int inStockUnits) {}
+
+  private static class MonthAccumulator {
+    BigDecimal revenue = BigDecimal.ZERO;
+    int orderCount = 0;
+
+    void add(BigDecimal price) {
+      revenue = revenue.add(price);
+      orderCount++;
+    }
+  }
 }

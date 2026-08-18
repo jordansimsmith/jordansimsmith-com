@@ -52,7 +52,8 @@ public class ReportJobProcessor {
               accumulator.toTopSets(),
               accumulator.toPriceBuckets(),
               accumulator.toTopHits(),
-              accumulator.toAgingBands());
+              accumulator.toAgingBands(),
+              accumulator.toRevenueByMonth());
       var reportJson = objectMapper.writeValueAsString(payload);
       var reportItem = TcgInventoryItem.createReport(user, reportJson, asOfAuditUlid, now);
       tcgInventoryTable.putItem(reportItem);

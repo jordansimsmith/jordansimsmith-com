@@ -1045,6 +1045,14 @@ export function createFakeClient(): ApiClient {
           { label: '91-180 days', in_stock_units: 25 },
           { label: '180+ days', in_stock_units: 12 },
         ],
+        revenue_by_month: [
+          { month: '2026-03', revenue: '124.50', order_count: 8 },
+          { month: '2026-04', revenue: '287.00', order_count: 15 },
+          { month: '2026-05', revenue: '195.75', order_count: 12 },
+          { month: '2026-06', revenue: '342.20', order_count: 18 },
+          { month: '2026-07', revenue: '156.80', order_count: 9 },
+          { month: '2026-08', revenue: '8.50', order_count: 1 },
+        ],
       };
       return {
         generated_at: reportGeneratedAt,
