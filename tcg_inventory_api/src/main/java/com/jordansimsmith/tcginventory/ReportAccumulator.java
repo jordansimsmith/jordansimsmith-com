@@ -63,8 +63,8 @@ public class ReportAccumulator {
     }
   }
 
-  public ReportTotals toTotals() {
-    return new ReportTotals(
+  public ReportPayload.Totals toTotals() {
+    return new ReportPayload.Totals(
         inventoryValue.toPlainString(),
         inStockUnits,
         skuCount,
@@ -74,7 +74,7 @@ public class ReportAccumulator {
         unpricedUnits);
   }
 
-  public List<ReportTopSet> toTopSets() {
+  public List<ReportPayload.TopSet> toTopSets() {
     return setMap.entrySet().stream()
         .sorted(
             Comparator.<Map.Entry<String, SetAccumulator>>comparingInt(
@@ -82,7 +82,10 @@ public class ReportAccumulator {
                 .reversed()
                 .thenComparing(e -> e.getValue().setName))
         .limit(TOP_SETS_LIMIT)
-        .map(e -> new ReportTopSet(e.getKey(), e.getValue().setName, e.getValue().inStockUnits))
+        .map(
+            e ->
+                new ReportPayload.TopSet(
+                    e.getKey(), e.getValue().setName, e.getValue().inStockUnits))
         .toList();
   }
 

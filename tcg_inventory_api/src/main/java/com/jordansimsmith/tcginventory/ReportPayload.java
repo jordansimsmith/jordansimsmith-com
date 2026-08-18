@@ -7,5 +7,20 @@ import javax.annotation.Nullable;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public record ReportPayload(
-    @JsonProperty("totals") @Nullable ReportTotals totals,
-    @JsonProperty("top_sets") @Nullable List<ReportTopSet> topSets) {}
+    @JsonProperty("totals") @Nullable Totals totals,
+    @JsonProperty("top_sets") @Nullable List<TopSet> topSets) {
+
+  public record Totals(
+      @JsonProperty("inventory_value") String inventoryValue,
+      @JsonProperty("in_stock_units") int inStockUnits,
+      @JsonProperty("sku_count") int skuCount,
+      @JsonProperty("reserved_units") int reservedUnits,
+      @JsonProperty("sold_units") int soldUnits,
+      @JsonProperty("revenue_to_date") String revenueToDate,
+      @JsonProperty("unpriced_units") int unpricedUnits) {}
+
+  public record TopSet(
+      @JsonProperty("set_code") String setCode,
+      @JsonProperty("set_name") String setName,
+      @JsonProperty("in_stock_units") int inStockUnits) {}
+}
