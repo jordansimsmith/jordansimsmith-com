@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink } from '@mantine/core';
 import {
   IconCards,
+  IconChartBar,
   IconFileImport,
   IconPackage,
   IconSettings,
@@ -14,6 +15,7 @@ const NAV_LINKS = [
   { label: 'Inventory', to: '/inventory', icon: IconCards },
   { label: 'Imports', to: '/imports', icon: IconFileImport },
   { label: 'Orders', to: '/orders', icon: IconPackage },
+  { label: 'Reports', to: '/reports', icon: IconChartBar },
   { label: 'Settings', to: '/settings', icon: IconSettings },
 ];
 

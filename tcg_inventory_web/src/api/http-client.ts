@@ -12,6 +12,7 @@ import type {
   ImportSummary,
   OrderDetail,
   PublishResponse,
+  ReportResponse,
   SettingsResponse,
   SkuDetail,
   UpdateSettingsRequest,
@@ -198,6 +199,15 @@ export function createHttpClient(): ApiClient {
     async getPublish(): Promise<PublishResponse> {
       const response = await authenticatedFetch('/publish');
       return response.json();
+    },
+
+    async getReport(): Promise<ReportResponse> {
+      const response = await authenticatedFetch('/reports');
+      return response.json();
+    },
+
+    async createReport(): Promise<void> {
+      await authenticatedFetch('/reports', { method: 'POST' });
     },
   };
 }

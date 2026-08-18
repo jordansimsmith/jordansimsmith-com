@@ -158,6 +158,20 @@ export interface PublishResponse {
   pending_sku_count: number;
 }
 
+export interface GenerationStatus {
+  status: 'queued' | 'running' | 'succeeded' | 'failed';
+  error: string | null;
+  started_at: number;
+  finished_at: number | null;
+}
+
+export interface ReportResponse {
+  generated_at: number;
+  stale: boolean;
+  generation: GenerationStatus | null;
+  report: Record<string, unknown>;
+}
+
 export interface ApiClient {
   getSettings(): Promise<SettingsResponse>;
   updateSettings(update: UpdateSettingsRequest): Promise<SettingsResponse>;
@@ -188,6 +202,8 @@ export interface ApiClient {
   confirmOrder(orderId: string): Promise<OrderDetail>;
   createPublish(): Promise<void>;
   getPublish(): Promise<PublishResponse>;
+  getReport(): Promise<ReportResponse>;
+  createReport(): Promise<void>;
 }
 
 export const apiClient: ApiClient = import.meta.env.PROD

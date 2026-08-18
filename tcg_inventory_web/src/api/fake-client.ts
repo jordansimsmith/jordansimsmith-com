@@ -7,6 +7,7 @@ import type {
   FindOrdersResponse,
   FindSkusParams,
   FindSkusResponse,
+  GenerationStatus,
   ImportDetail,
   ImportRow,
   ImportStatus,
@@ -17,6 +18,7 @@ import type {
   OrderUnit,
   PlacementInstruction,
   PublishResponse,
+  ReportResponse,
   RowDecision,
   SettingsResponse,
   SkuDetail,
@@ -551,6 +553,14 @@ export function createFakeClient(): ApiClient {
     updated_at: null,
     track_orders_after: null,
   };
+  let reportGeneratedAt = Math.floor(Date.now() / 1000) - 3600;
+  let reportStale = false;
+  let reportGeneration: GenerationStatus | null = {
+    status: 'succeeded',
+    error: null,
+    started_at: reportGeneratedAt - 100,
+    finished_at: reportGeneratedAt,
+  };
 
   const progressPublish = (): void => {
     if (!publishRun) {
@@ -789,6 +799,7 @@ export function createFakeClient(): ApiClient {
         sequenceNumbers.push(sequenceNumber);
       }
       importRecord.status = 'confirmed';
+      reportStale = true;
 
       const first = sequenceNumbers.length > 0 ? sequenceNumbers[0] : null;
       const last =
@@ -844,6 +855,7 @@ export function createFakeClient(): ApiClient {
       }
       unit.status = 'removed';
       dirtySkuIds.add(sku.sku_id);
+      reportStale = true;
     },
 
     async updateUnit(
@@ -878,6 +890,7 @@ export function createFakeClient(): ApiClient {
       });
       dirtySkuIds.add(sku.sku_id);
       dirtySkuIds.add(target.sku_id);
+      reportStale = true;
       return { sku_id: targetSkuId };
     },
 
@@ -901,8 +914,8 @@ export function createFakeClient(): ApiClient {
         const sku = getSkuOrThrow(ref.sku_id);
         getUnitOrThrow(sku, ref.sequence_number).status = 'sold';
       }
-      // no dirty flag: sold units already left the projection at reservation
       order.state = 'fulfilled';
+      reportStale = true;
       return toOrderDetail(order, skus);
     },
 
@@ -924,6 +937,34 @@ export function createFakeClient(): ApiClient {
     async getPublish(): Promise<PublishResponse> {
       progressPublish();
       return toPublishResponse();
+    },
+
+    async getReport(): Promise<ReportResponse> {
+      return {
+        generated_at: reportGeneratedAt,
+        stale: reportStale,
+        generation: reportGeneration,
+        report: {},
+      };
+    },
+
+    async createReport(): Promise<void> {
+      reportGeneration = {
+        status: 'queued',
+        error: null,
+        started_at: Math.floor(Date.now() / 1000),
+        finished_at: null,
+      };
+      setTimeout(() => {
+        reportGeneratedAt = Math.floor(Date.now() / 1000);
+        reportStale = false;
+        reportGeneration = {
+          status: 'succeeded',
+          error: null,
+          started_at: reportGeneration!.started_at,
+          finished_at: reportGeneratedAt,
+        };
+      }, 3000);
     },
   };
 }

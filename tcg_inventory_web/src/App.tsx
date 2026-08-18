@@ -6,6 +6,7 @@ import { ImportsPage } from './pages/ImportsPage';
 import { ImportDetailPage } from './pages/ImportDetailPage';
 import { OrdersPage } from './pages/OrdersPage';
 import { OrderDetailPage } from './pages/OrderDetailPage';
+import { ReportsPage } from './pages/ReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { getSession } from './auth/session';
 
@@ -75,6 +76,14 @@ export function App() {
           element={
             <RequireAuth>
               <OrderDetailPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/reports"
+          element={
+            <RequireAuth>
+              <ReportsPage />
             </RequireAuth>
           }
         />
