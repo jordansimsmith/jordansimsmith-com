@@ -67,7 +67,8 @@ public class CreateReportHandler
     var jobItem = TcgInventoryItem.createJob(user, jobId, "report", null, now);
     tcgInventoryTable.putItem(jobItem);
 
-    jobsQueue.send(new JobMessage(user, jobId, "report"), user);
+    var jobMessage = new JobMessage(user, jobId, "report");
+    jobsQueue.send(jobMessage, user, jobMessage.deduplicationId(0));
 
     return httpResponseFactory.accepted();
   }

@@ -68,7 +68,7 @@ while True:
 queue_name = "tcg_inventory_jobs.fifo"
 queue_url = sqs_client.create_queue(
     QueueName=queue_name,
-    Attributes={"FifoQueue": "true", "ContentBasedDeduplication": "true"},
+    Attributes={"FifoQueue": "true", "ContentBasedDeduplication": "false"},
 )["QueueUrl"]
 queue_arn = sqs_client.get_queue_attributes(
     QueueUrl=queue_url, AttributeNames=["QueueArn"]

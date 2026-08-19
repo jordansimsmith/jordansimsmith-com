@@ -129,7 +129,8 @@ public class CreateImportHandler
     var jobItem = TcgInventoryItem.createJob(user, jobId, "appraise", importId, now);
     tcgInventoryTable.putItem(jobItem);
 
-    jobsQueue.send(new JobMessage(user, jobId, "appraise"), user);
+    var jobMessage = new JobMessage(user, jobId, "appraise");
+    jobsQueue.send(jobMessage, user, jobMessage.deduplicationId(0));
 
     return httpResponseFactory.ok(
         new ImportSummaryResponse(

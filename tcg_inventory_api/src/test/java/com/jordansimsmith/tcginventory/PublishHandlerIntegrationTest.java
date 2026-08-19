@@ -71,10 +71,13 @@ public class PublishHandlerIntegrationTest {
     // assert
     assertThat(response.getStatusCode()).isEqualTo(202);
 
-    assertThat(fakeJobsQueue.getMessages()).hasSize(1);
-    assertThat(fakeJobsQueue.getMessages().get(0).jobType()).isEqualTo("publish");
+    assertThat(fakeJobsQueue.getSends()).hasSize(1);
+    var send = fakeJobsQueue.getSends().get(0);
+    assertThat(send.message().jobType()).isEqualTo("publish");
+    assertThat(send.messageGroupId()).isEqualTo("jordan");
 
-    var jobId = fakeJobsQueue.getMessages().get(0).jobId();
+    var jobId = send.message().jobId();
+    assertThat(send.messageDeduplicationId()).isEqualTo(jobId + "#0");
     var jobItem =
         tcgInventoryTable.getItem(
             Key.builder()

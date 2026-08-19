@@ -114,6 +114,8 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
   }
 
   private void processBatch(JobMessage message, TcgInventoryItem jobItem) {
+    var previousContinuation = jobItem.getContinuation() != null ? jobItem.getContinuation() : 0;
+
     var result =
         switch (message.jobType()) {
           case "appraise" -> appraiseJobProcessor.processBatch(message.user(), jobItem);
@@ -121,6 +123,17 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
           case "report" -> reportJobProcessor.processBatch(message.user(), jobItem);
           default -> throw new IllegalArgumentException("unknown job type: " + message.jobType());
         };
+
+    // the continuation deduplication id only distinguishes slices when every
+    // re-enqueueing slice advances; a non-advancing slice would be silently
+    // deduplicated into a stalled job, so fail loudly instead
+    if (!result.complete() && result.processedUpTo() <= previousContinuation) {
+      throw new IllegalStateException(
+          "job continuation did not advance: "
+              + previousContinuation
+              + " -> "
+              + result.processedUpTo());
+    }
 
     jobItem.setContinuation(result.processedUpTo());
     jobItem.setProcessedCount(result.processedUpTo());
@@ -132,7 +145,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     tcgInventoryTable.putItem(jobItem);
 
     if (!result.complete()) {
-      jobsQueue.send(message, message.user());
+      jobsQueue.send(message, message.user(), message.deduplicationId(result.processedUpTo()));
     }
   }
 

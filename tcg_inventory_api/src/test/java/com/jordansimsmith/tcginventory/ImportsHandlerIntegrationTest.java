@@ -142,8 +142,11 @@ public class ImportsHandlerIntegrationTest {
     assertThat(jobItem.getImportId()).isEqualTo(importId);
 
     // verify SQS enqueue
-    assertThat(fakeJobsQueue.getMessages()).hasSize(1);
-    assertThat(fakeJobsQueue.getMessages().get(0).jobType()).isEqualTo("appraise");
+    assertThat(fakeJobsQueue.getSends()).hasSize(1);
+    var send = fakeJobsQueue.getSends().get(0);
+    assertThat(send.message().jobType()).isEqualTo("appraise");
+    assertThat(send.messageGroupId()).isEqualTo("jordan");
+    assertThat(send.messageDeduplicationId()).isEqualTo(importItem.getJobId() + "#0");
   }
 
   @Test

@@ -46,4 +46,20 @@ public class SqsQueueClient<T> implements QueueClient<T> {
       throw new RuntimeException("failed to send message to queue", e);
     }
   }
+
+  @Override
+  public void send(T message, String messageGroupId, String messageDeduplicationId) {
+    try {
+      var body = objectMapper.writeValueAsString(message);
+      sqsClient.sendMessage(
+          SendMessageRequest.builder()
+              .queueUrl(queueUrl)
+              .messageBody(body)
+              .messageGroupId(messageGroupId)
+              .messageDeduplicationId(messageDeduplicationId)
+              .build());
+    } catch (Exception e) {
+      throw new RuntimeException("failed to send message to queue", e);
+    }
+  }
 }

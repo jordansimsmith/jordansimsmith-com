@@ -237,16 +237,19 @@ resource "aws_dynamodb_table" "tcg_inventory" {
   deletion_protection_enabled = true
 }
 
+# content-based deduplication is disabled because job slice messages are
+# byte-identical; senders set an explicit deduplication id of
+# <job_id>#<continuation> and a send missing one fails loudly
 resource "aws_sqs_queue" "jobs_dlq" {
   name                        = "tcg_inventory_jobs_dlq.fifo"
   fifo_queue                  = true
-  content_based_deduplication = true
+  content_based_deduplication = false
 }
 
 resource "aws_sqs_queue" "jobs" {
   name                        = "tcg_inventory_jobs.fifo"
   fifo_queue                  = true
-  content_based_deduplication = true
+  content_based_deduplication = false
   visibility_timeout_seconds  = 960
 
   redrive_policy = jsonencode({

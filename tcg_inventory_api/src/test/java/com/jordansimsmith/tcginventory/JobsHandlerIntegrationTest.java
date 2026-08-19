@@ -233,7 +233,11 @@ public class JobsHandlerIntegrationTest {
     var jobItem = getJob("jordan", "job1");
     assertThat(jobItem.getStatus()).isEqualTo("running");
     assertThat(jobItem.getContinuation()).isEqualTo(AppraiseJobProcessor.BATCH_SIZE);
-    assertThat(fakeJobsQueue.getMessages()).hasSize(1);
+    assertThat(fakeJobsQueue.getSends()).hasSize(1);
+    var continuationSend = fakeJobsQueue.getSends().get(0);
+    assertThat(continuationSend.messageGroupId()).isEqualTo("jordan");
+    assertThat(continuationSend.messageDeduplicationId())
+        .isEqualTo("job1#" + AppraiseJobProcessor.BATCH_SIZE);
 
     // act - second batch
     fakeJobsQueue.reset();
