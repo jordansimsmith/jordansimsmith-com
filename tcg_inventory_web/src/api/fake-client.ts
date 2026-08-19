@@ -765,6 +765,15 @@ export function createFakeClient(): ApiClient {
       importRecord.rows.splice(index, 1);
     },
 
+    async deleteImport(importId: string): Promise<void> {
+      const importRecord = getImportOrThrow(importId);
+      if (importRecord.status !== 'review') {
+        throw new Error('import is not in a deletable status');
+      }
+      const index = importRecords.indexOf(importRecord);
+      importRecords.splice(index, 1);
+    },
+
     async confirmImport(importId: string): Promise<ConfirmImportResponse> {
       const importRecord = getImportOrThrow(importId);
       if (importRecord.status !== 'review') {

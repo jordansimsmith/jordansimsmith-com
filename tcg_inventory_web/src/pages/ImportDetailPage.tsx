@@ -16,6 +16,7 @@ import { AppShellLayout } from '../layouts/AppShellLayout';
 import { ImportStatusBadge } from '../components/ImportStatusBadge';
 import { ImportReviewTable } from '../components/ImportReviewTable';
 import { ConfirmImportModal } from '../components/ConfirmImportModal';
+import { DeleteImportModal } from '../components/DeleteImportModal';
 import { PlacementInstructionsView } from '../components/PlacementInstructionsView';
 import { apiClient } from '../api/client';
 import type {
@@ -37,6 +38,8 @@ export function ImportDetailPage() {
   const [confirming, setConfirming] = useState(false);
   const [confirmResult, setConfirmResult] =
     useState<ConfirmImportResponse | null>(null);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   // this page has no search input; the ref keeps the navigation hook inert on "/"
   const searchInputRef = useRef<HTMLInputElement>(null);
 
@@ -92,7 +95,7 @@ export function ImportDetailPage() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || confirmOpen) {
+      if (event.key !== 'Escape' || confirmOpen || deleteOpen) {
         return;
       }
       const target = event.target;
@@ -107,7 +110,7 @@ export function ImportDetailPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [confirmOpen, navigate]);
+  }, [confirmOpen, deleteOpen, navigate]);
 
   const handleConditionChange = async (
     position: number,
@@ -182,6 +185,23 @@ export function ImportDetailPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!importId) {
+      return;
+    }
+    setDeleting(true);
+    try {
+      await apiClient.deleteImport(importId);
+      navigate('/imports');
+    } catch (e) {
+      const message =
+        e instanceof Error ? e.message : 'Failed to delete import';
+      notifications.show({ title: 'Error', message, color: 'red' });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const keepCount = rows.filter((r) => r.decision === 'keep').length;
   const discardCount = rows.filter((r) => r.decision === 'discard').length;
   const reviewCount = rows.filter((r) => r.decision === 'review').length;
@@ -248,9 +268,18 @@ export function ImportDetailPage() {
                   </Badge>
                 </Group>
                 {importDetail.status === 'review' && (
-                  <Button onClick={() => setConfirmOpen(true)}>
-                    Confirm import
-                  </Button>
+                  <Group gap="sm">
+                    <Button
+                      variant="outline"
+                      color="red"
+                      onClick={() => setDeleteOpen(true)}
+                    >
+                      Delete import
+                    </Button>
+                    <Button onClick={() => setConfirmOpen(true)}>
+                      Confirm import
+                    </Button>
+                  </Group>
                 )}
               </Group>
             )}
@@ -278,6 +307,14 @@ export function ImportDetailPage() {
               loading={confirming}
               onCancel={() => setConfirmOpen(false)}
               onConfirm={handleConfirm}
+            />
+            <DeleteImportModal
+              opened={deleteOpen}
+              filename={importDetail.filename}
+              rowCount={importDetail.row_count}
+              loading={deleting}
+              onCancel={() => setDeleteOpen(false)}
+              onConfirm={handleDelete}
             />
           </>
         )}

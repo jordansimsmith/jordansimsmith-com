@@ -114,6 +114,12 @@ export function createHttpClient(): ApiClient {
       );
     },
 
+    async deleteImport(importId: string): Promise<void> {
+      await authenticatedFetch(`/imports/${encodeURIComponent(importId)}`, {
+        method: 'DELETE',
+      });
+    },
+
     async confirmImport(importId: string): Promise<ConfirmImportResponse> {
       const response = await authenticatedFetch(
         `/imports/${encodeURIComponent(importId)}/confirm`,

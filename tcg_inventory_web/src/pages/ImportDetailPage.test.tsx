@@ -444,4 +444,77 @@ describe('ImportDetailPage', () => {
     expect(await screen.findByText('Top Card')).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Confirm import' })).toBeNull();
   });
+
+  it('deletes an import via the confirmation dialog and navigates away', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport(),
+    );
+    vi.spyOn(clientModule.apiClient, 'deleteImport').mockResolvedValue(
+      undefined,
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+
+    await user.click(screen.getByRole('button', { name: 'Delete import' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByText(/manabox-today.csv/)).toBeDefined();
+    expect(within(dialog).getByText(/3 rows/)).toBeDefined();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => {
+      expect(clientModule.apiClient.deleteImport).toHaveBeenCalledWith(
+        'import-2',
+      );
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Imports list')).toBeDefined();
+    });
+  });
+
+  it('surfaces delete failures and stays on the detail page', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport(),
+    );
+    vi.spyOn(clientModule.apiClient, 'deleteImport').mockRejectedValue(
+      new Error('import is not in a deletable status'),
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+
+    await user.click(screen.getByRole('button', { name: 'Delete import' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Delete' }));
+
+    expect(
+      await screen.findByText('import is not in a deletable status'),
+    ).toBeDefined();
+    expect(screen.getByText('Top Card')).toBeDefined();
+  });
+
+  it('does not show delete button for a confirmed import', async () => {
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport({ status: 'confirmed' }),
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+
+    expect(screen.queryByRole('button', { name: 'Delete import' })).toBeNull();
+  });
+
+  it('does not show delete button while appraising', async () => {
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      importDetail(),
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('manabox-today.csv');
+
+    expect(screen.queryByRole('button', { name: 'Delete import' })).toBeNull();
+  });
 });

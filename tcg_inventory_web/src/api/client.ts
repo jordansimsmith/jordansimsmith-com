@@ -243,6 +243,7 @@ export interface ApiClient {
     condition: Condition,
   ): Promise<ImportRow>;
   deleteImportRow(importId: string, position: number): Promise<void>;
+  deleteImport(importId: string): Promise<void>;
   confirmImport(importId: string): Promise<ConfirmImportResponse>;
   findSkus(params?: FindSkusParams): Promise<FindSkusResponse>;
   getSku(skuId: string): Promise<SkuDetail>;
