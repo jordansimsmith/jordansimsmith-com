@@ -14,7 +14,9 @@ import { AppShellLayout } from '../layouts/AppShellLayout';
 import { OrderStateBadge } from '../components/OrderStateBadge';
 import { ConfirmPullModal } from '../components/ConfirmPullModal';
 import { apiClient } from '../api/client';
-import type { OrderDetail, OrderUnit } from '../api/client';
+import type { OrderDetail, OrderLine, OrderUnit } from '../api/client';
+import { ListPriceBadge } from '../components/ListPriceBadge';
+import { listedLineTotal } from '../domain/listPrice';
 
 function unitDescription(unit: OrderUnit): string {
   const parts = [
@@ -24,6 +26,18 @@ function unitDescription(unit: OrderUnit): string {
   if (unit.finish !== 'normal') {
     parts.push(unit.finish);
   }
+  return parts.join(' · ');
+}
+
+function lineDescription(line: OrderLine): string {
+  const parts = [
+    `${line.set_code.toUpperCase()} #${line.collector_number}`,
+    line.condition,
+  ];
+  if (line.finish !== 'normal') {
+    parts.push(line.finish);
+  }
+  parts.push(`×${line.quantity}`);
   return parts.join(' · ');
 }
 
@@ -133,10 +147,68 @@ export function OrderDetailPage() {
                   Accepted {new Date(order.accepted_at * 1000).toLocaleString()}
                 </Text>
               </Group>
-              <Text size="sm" c="dimmed">
-                {order.delivery_mode} · ${order.total_price}
-              </Text>
+              <Group gap="sm" align="center">
+                <Text size="sm" c="dimmed">
+                  {order.delivery_mode} · ${order.total_price}
+                </Text>
+                {order.items_total_price != null &&
+                  order.listed_total_price != null && (
+                    <ListPriceBadge
+                      offered={order.items_total_price}
+                      listed={order.listed_total_price}
+                    />
+                  )}
+              </Group>
             </Stack>
+            {order.lines.length > 0 && (
+              <Stack gap="sm" maw={480}>
+                <Title order={3}>Offer</Title>
+                {order.lines.map((line, index) => {
+                  const listedTotal =
+                    line.listed_price != null
+                      ? listedLineTotal(line.listed_price, line.quantity)
+                      : null;
+                  return (
+                    <Paper
+                      key={`${line.name}-${line.set_code}-${index}`}
+                      withBorder
+                      p="md"
+                      radius="md"
+                    >
+                      <Group
+                        justify="space-between"
+                        align="flex-start"
+                        wrap="nowrap"
+                        gap="md"
+                      >
+                        <Stack gap={2} style={{ minWidth: 0 }}>
+                          <Text fw={500}>{line.name}</Text>
+                          <Text size="sm" c="dimmed">
+                            {lineDescription(line)}
+                          </Text>
+                        </Stack>
+                        <Stack gap={4} align="flex-end">
+                          {line.price != null && (
+                            <Text fw={500}>${line.price}</Text>
+                          )}
+                          {listedTotal != null && (
+                            <Text size="sm" c="dimmed">
+                              listed ${listedTotal}
+                            </Text>
+                          )}
+                          {line.price != null && listedTotal != null && (
+                            <ListPriceBadge
+                              offered={line.price}
+                              listed={listedTotal}
+                            />
+                          )}
+                        </Stack>
+                      </Group>
+                    </Paper>
+                  );
+                })}
+              </Stack>
+            )}
             <Stack gap="sm" maw={480}>
               <Title order={3}>
                 {order.state === 'to_pick' ? 'Pull sheet' : 'Cards'}

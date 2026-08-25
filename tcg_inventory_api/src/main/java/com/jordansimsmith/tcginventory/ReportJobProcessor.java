@@ -34,7 +34,7 @@ public class ReportJobProcessor {
     LOGGER.info("captured as-of audit ULID: {}", asOfAuditUlid);
 
     var now = clock.now();
-    var accumulator = new ReportAccumulator(now);
+    var accumulator = new ReportAccumulator(now, objectMapper);
 
     for (var sku : pageGsi2Skus(user)) {
       var units = queryUnits(user, sku.getSkuId());

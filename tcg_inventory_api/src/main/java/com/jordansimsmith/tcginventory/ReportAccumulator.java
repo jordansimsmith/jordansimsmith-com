@@ -1,5 +1,6 @@
 package com.jordansimsmith.tcginventory;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -37,6 +38,7 @@ public class ReportAccumulator {
   };
 
   private final LocalDate generationDate;
+  private final ObjectMapper objectMapper;
 
   private BigDecimal inventoryValue = BigDecimal.ZERO;
   private int inStockUnits = 0;
@@ -54,8 +56,9 @@ public class ReportAccumulator {
   private final TreeMap<LocalDate, Integer> addedByWeek = new TreeMap<>();
   private final TreeMap<LocalDate, Integer> soldByWeek = new TreeMap<>();
 
-  public ReportAccumulator(Instant generationTime) {
+  public ReportAccumulator(Instant generationTime, ObjectMapper objectMapper) {
     this.generationDate = generationTime.atZone(AUCKLAND).toLocalDate();
+    this.objectMapper = objectMapper;
   }
 
   public void addSku(TcgInventoryItem sku, List<TcgInventoryItem> units) {
@@ -124,13 +127,11 @@ public class ReportAccumulator {
     if (!"to_pick".equals(status) && !"fulfilled".equals(status)) {
       return;
     }
-    if (order.getTotalPrice() != null) {
-      var price = new BigDecimal(order.getTotalPrice());
-      revenueToDate = revenueToDate.add(price);
+    var price = OrderLines.itemsTotal(OrderLines.parse(order.getLines(), objectMapper));
+    revenueToDate = revenueToDate.add(price);
 
-      var month = YearMonth.from(order.getCreatedAt().atZone(AUCKLAND));
-      monthMap.computeIfAbsent(month, k -> new MonthAccumulator()).add(price);
-    }
+    var month = YearMonth.from(order.getCreatedAt().atZone(AUCKLAND));
+    monthMap.computeIfAbsent(month, k -> new MonthAccumulator()).add(price);
   }
 
   public ReportPayload.Totals toTotals() {

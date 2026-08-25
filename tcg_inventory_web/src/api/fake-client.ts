@@ -13,6 +13,7 @@ import type {
   ImportStatus,
   ImportSummary,
   OrderDetail,
+  OrderLine,
   OrderState,
   OrderSummary,
   OrderUnit,
@@ -493,6 +494,13 @@ interface FakeOrderUnitRef {
   sequence_number: number;
 }
 
+interface FakeOrderLine {
+  sku_id: string;
+  quantity: number;
+  price: string;
+  listed_price: string | null;
+}
+
 interface FakeOrder {
   order_id: string;
   state: OrderState;
@@ -500,6 +508,7 @@ interface FakeOrder {
   delivery_mode: string;
   total_price: string;
   units: FakeOrderUnitRef[];
+  lines: FakeOrderLine[];
 }
 
 function createSeedOrders(skus: FakeSku[]): FakeOrder[] {
@@ -527,6 +536,35 @@ function createSeedOrders(skus: FakeSku[]): FakeOrder[] {
       }));
   };
 
+  const lineOf = (
+    units: FakeOrderUnitRef[],
+    price: string,
+    listedPrice: string | null,
+  ): FakeOrderLine => ({
+    sku_id: units[0].sku_id,
+    quantity: units.length,
+    price,
+    listed_price: listedPrice,
+  });
+
+  const aboveListUnits = {
+    signet: unitsOf('Arcane Signet', 'normal', 'NM', 'reserved'),
+    rift: unitsOf('Cyclonic Rift', 'normal', 'LP', 'reserved'),
+    dockside: unitsOf('Dockside Extortionist', 'normal', 'LP', 'reserved'),
+    greaves: unitsOf('Lightning Greaves', 'normal', 'NM', 'reserved'),
+    crypt: unitsOf('Mana Crypt', 'normal', 'NM', 'reserved'),
+    study: unitsOf('Rhystic Study', 'normal', 'NM', 'reserved'),
+  };
+  const discountedUnits = {
+    solRing: unitsOf('Sol Ring', 'normal', 'NM', 'reserved'),
+    aberration: unitsOf('Elvish Aberration', 'normal', 'NM', 'reserved'),
+  };
+  const atListUnits = unitsOf('Hellkite Tyrant', 'normal', 'NM', 'sold');
+  const legacyUnits = unitsOf('Counterspell', 'normal', 'NM', 'in_stock').slice(
+    0,
+    1,
+  );
+
   return [
     {
       order_id: '83663',
@@ -535,12 +573,20 @@ function createSeedOrders(skus: FakeSku[]): FakeOrder[] {
       delivery_mode: 'SHIPPING',
       total_price: '479.90',
       units: [
-        ...unitsOf('Arcane Signet', 'normal', 'NM', 'reserved'),
-        ...unitsOf('Cyclonic Rift', 'normal', 'LP', 'reserved'),
-        ...unitsOf('Dockside Extortionist', 'normal', 'LP', 'reserved'),
-        ...unitsOf('Lightning Greaves', 'normal', 'NM', 'reserved'),
-        ...unitsOf('Mana Crypt', 'normal', 'NM', 'reserved'),
-        ...unitsOf('Rhystic Study', 'normal', 'NM', 'reserved'),
+        ...aboveListUnits.signet,
+        ...aboveListUnits.rift,
+        ...aboveListUnits.dockside,
+        ...aboveListUnits.greaves,
+        ...aboveListUnits.crypt,
+        ...aboveListUnits.study,
+      ],
+      lines: [
+        lineOf(aboveListUnits.signet, '2.00', '1.50'),
+        lineOf(aboveListUnits.rift, '90.00', '80.00'),
+        lineOf(aboveListUnits.dockside, '90.00', '80.00'),
+        lineOf(aboveListUnits.greaves, '12.00', '10.00'),
+        lineOf(aboveListUnits.crypt, '220.00', '200.00'),
+        lineOf(aboveListUnits.study, '65.90', '60.00'),
       ],
     },
     {
@@ -549,9 +595,10 @@ function createSeedOrders(skus: FakeSku[]): FakeOrder[] {
       accepted_at: now - 24 * 60 * 60,
       delivery_mode: 'PICKUP',
       total_price: '10.90',
-      units: [
-        ...unitsOf('Sol Ring', 'normal', 'NM', 'reserved'),
-        ...unitsOf('Elvish Aberration', 'normal', 'NM', 'reserved'),
+      units: [...discountedUnits.solRing, ...discountedUnits.aberration],
+      lines: [
+        lineOf(discountedUnits.solRing, '8.00', '5.00'),
+        lineOf(discountedUnits.aberration, '2.90', '3.00'),
       ],
     },
     {
@@ -560,7 +607,8 @@ function createSeedOrders(skus: FakeSku[]): FakeOrder[] {
       accepted_at: now - 3 * 24 * 60 * 60,
       delivery_mode: 'SHIPPING',
       total_price: '8.50',
-      units: unitsOf('Hellkite Tyrant', 'normal', 'NM', 'sold'),
+      units: atListUnits,
+      lines: [lineOf(atListUnits, '8.50', '8.50')],
     },
     {
       order_id: '83598',
@@ -568,10 +616,34 @@ function createSeedOrders(skus: FakeSku[]): FakeOrder[] {
       accepted_at: now - 5 * 24 * 60 * 60,
       delivery_mode: 'PICKUP',
       total_price: '4.20',
-      // the void released this unit back to stock
-      units: unitsOf('Counterspell', 'normal', 'NM', 'in_stock').slice(0, 1),
+      // the void released this unit back to stock; ingested before listed_price
+      units: legacyUnits,
+      lines: [lineOf(legacyUnits, '4.20', null)],
     },
   ];
+}
+
+function itemsTotalPrice(lines: FakeOrderLine[]): string | null {
+  if (lines.length === 0) {
+    return null;
+  }
+  const cents = lines.reduce(
+    (sum, line) => sum + Math.round(Number(line.price) * 100),
+    0,
+  );
+  return (cents / 100).toFixed(2);
+}
+
+function listedTotalPrice(lines: FakeOrderLine[]): string | null {
+  if (lines.length === 0 || lines.some((line) => line.listed_price == null)) {
+    return null;
+  }
+  const cents = lines.reduce(
+    (sum, line) =>
+      sum + Math.round(Number(line.listed_price) * 100) * line.quantity,
+    0,
+  );
+  return (cents / 100).toFixed(2);
 }
 
 function toOrderSummary(order: FakeOrder): OrderSummary {
@@ -581,6 +653,8 @@ function toOrderSummary(order: FakeOrder): OrderSummary {
     accepted_at: order.accepted_at,
     delivery_mode: order.delivery_mode,
     total_price: order.total_price,
+    items_total_price: itemsTotalPrice(order.lines),
+    listed_total_price: listedTotalPrice(order.lines),
     unit_count: order.units.length,
   };
 }
@@ -624,7 +698,23 @@ function toOrderDetail(order: FakeOrder, skus: FakeSku[]): OrderDetail {
       };
     })
     .sort((a, b) => a.sequence_number - b.sequence_number);
-  return { ...toOrderSummary(order), units };
+  const lines: OrderLine[] = order.lines.map((line) => {
+    const sku = skus.find((candidate) => candidate.sku_id === line.sku_id);
+    if (!sku) {
+      throw new Error('Not Found');
+    }
+    return {
+      name: sku.name,
+      set_code: sku.set_code,
+      collector_number: sku.collector_number,
+      finish: sku.finish,
+      condition: sku.condition,
+      quantity: line.quantity,
+      price: line.price,
+      listed_price: line.listed_price,
+    };
+  });
+  return { ...toOrderSummary(order), lines, units };
 }
 
 export function createFakeClient(): ApiClient {

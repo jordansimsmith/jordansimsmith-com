@@ -98,8 +98,50 @@ public class OrdersHandlerIntegrationTest {
     assertThat(orders.get(0).get("delivery_mode").asText()).isEqualTo("SHIPPING");
     assertThat(orders.get(0).get("total_price").asText()).isEqualTo("5.50");
     assertThat(orders.get(0).get("accepted_at").asLong()).isEqualTo(1700000000);
+    assertThat(orders.get(0).get("items_total_price").isNull()).isTrue();
+    assertThat(orders.get(0).get("listed_total_price").isNull()).isTrue();
     assertThat(orders.get(1).get("order_id").asText()).isEqualTo("10001");
     assertThat(orders.get(1).get("state").asText()).isEqualTo("awaiting_payment");
+  }
+
+  @Test
+  void findOrdersShouldReturnItemAndListedTotals() throws Exception {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    var skuId = "scryfall-1#normal#NM";
+    createSkuWithUnits("jordan", skuId, 2);
+    createOrderWithLines(
+        "jordan", "83663", "to_pick", skuId, List.of(1, 2), "PICKUP", "3.00", "2.00");
+
+    // act
+    var response = findOrdersHandler.handleRequest(buildEvent("jordan"), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = objectMapper.readTree(response.getBody());
+    var order = body.get("orders").get(0);
+    assertThat(order.get("total_price").asText()).isEqualTo("3.00");
+    assertThat(order.get("items_total_price").asText()).isEqualTo("1.50");
+    assertThat(order.get("listed_total_price").asText()).isEqualTo("4.00");
+  }
+
+  @Test
+  void findOrdersShouldOmitListedTotalWhenBaselineMissing() throws Exception {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    var skuId = "scryfall-1#normal#NM";
+    createSkuWithUnits("jordan", skuId, 1);
+    createOrderWithLines("jordan", "83663", "to_pick", skuId, List.of(1), "PICKUP", "1.50", null);
+
+    // act
+    var response = findOrdersHandler.handleRequest(buildEvent("jordan"), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = objectMapper.readTree(response.getBody());
+    var order = body.get("orders").get(0);
+    assertThat(order.get("items_total_price").asText()).isEqualTo("1.50");
+    assertThat(order.get("listed_total_price").isNull()).isTrue();
   }
 
   @Test
@@ -109,7 +151,8 @@ public class OrdersHandlerIntegrationTest {
     var skuId = "scryfall-1#normal#NM";
     createSkuWithUnits("jordan", skuId, 3);
     reserveUnits("jordan", skuId, "83663", List.of(1, 3));
-    createOrderWithLines("jordan", "83663", "to_pick", skuId, List.of(1, 3), "PICKUP", "3.33");
+    createOrderWithLines(
+        "jordan", "83663", "to_pick", skuId, List.of(1, 3), "PICKUP", "3.33", "3.50");
 
     // act
     var response =
@@ -124,6 +167,17 @@ public class OrdersHandlerIntegrationTest {
     assertThat(body.get("accepted_at").asLong()).isEqualTo(1700000000);
     assertThat(body.get("delivery_mode").asText()).isEqualTo("PICKUP");
     assertThat(body.get("total_price").asText()).isEqualTo("3.33");
+
+    var lines = body.get("lines");
+    assertThat(lines).hasSize(1);
+    assertThat(lines.get(0).get("name").asText()).isEqualTo("Test Card");
+    assertThat(lines.get(0).get("set_code").asText()).isEqualTo("dom");
+    assertThat(lines.get(0).get("collector_number").asText()).isEqualTo("168");
+    assertThat(lines.get(0).get("finish").asText()).isEqualTo("normal");
+    assertThat(lines.get(0).get("condition").asText()).isEqualTo("NM");
+    assertThat(lines.get(0).get("quantity").asInt()).isEqualTo(2);
+    assertThat(lines.get(0).get("price").asText()).isEqualTo("1.50");
+    assertThat(lines.get(0).get("listed_price").asText()).isEqualTo("3.50");
 
     var units = body.get("units");
     assertThat(units).hasSize(2);
@@ -153,11 +207,11 @@ public class OrdersHandlerIntegrationTest {
         "[{\"sku_id\":\""
             + skuId1
             + "\",\"fetchtcg_listing_id\":1001,\"quantity\":1,\"price\":\"1.50\""
-            + ",\"allocated_sequence_numbers\":[1]},"
+            + ",\"listed_price\":\"2.00\",\"allocated_sequence_numbers\":[1]},"
             + "{\"sku_id\":\""
             + skuId2
             + "\",\"fetchtcg_listing_id\":1002,\"quantity\":1,\"price\":\"2.00\""
-            + ",\"allocated_sequence_numbers\":[1]}]";
+            + ",\"listed_price\":\"1.80\",\"allocated_sequence_numbers\":[1]}]";
     var order =
         TcgInventoryItem.createOrder(
             "jordan",
@@ -183,6 +237,37 @@ public class OrdersHandlerIntegrationTest {
     assertThat(units).hasSize(2);
     assertThat(units.get(0).get("name").asText()).isIn("Lightning Bolt", "Sol Ring");
     assertThat(units.get(1).get("name").asText()).isIn("Lightning Bolt", "Sol Ring");
+
+    var responseLines = body.get("lines");
+    assertThat(responseLines).hasSize(2);
+    assertThat(responseLines.get(0).get("name").asText()).isEqualTo("Lightning Bolt");
+    assertThat(responseLines.get(0).get("price").asText()).isEqualTo("1.50");
+    assertThat(responseLines.get(0).get("listed_price").asText()).isEqualTo("2.00");
+    assertThat(responseLines.get(1).get("name").asText()).isEqualTo("Sol Ring");
+    assertThat(responseLines.get(1).get("listed_price").asText()).isEqualTo("1.80");
+  }
+
+  @Test
+  void getOrderShouldReturnNullListedPriceForLegacyOrders() throws Exception {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    var skuId = "scryfall-1#normal#NM";
+    createSkuWithUnits("jordan", skuId, 1);
+    reserveUnits("jordan", skuId, "83663", List.of(1));
+    createOrderWithLines("jordan", "83663", "to_pick", skuId, List.of(1), "PICKUP", "1.50", null);
+
+    // act
+    var response =
+        getOrderHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("order_id", "83663")), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = objectMapper.readTree(response.getBody());
+    var lines = body.get("lines");
+    assertThat(lines).hasSize(1);
+    assertThat(lines.get(0).get("price").asText()).isEqualTo("1.50");
+    assertThat(lines.get(0).get("listed_price").isNull()).isTrue();
   }
 
   @Test
@@ -203,7 +288,8 @@ public class OrdersHandlerIntegrationTest {
     var skuId = "scryfall-1#normal#NM";
     createSkuWithUnits("jordan", skuId, 3);
     reserveUnits("jordan", skuId, "83663", List.of(1, 2));
-    createOrderWithLines("jordan", "83663", "to_pick", skuId, List.of(1, 2), "PICKUP", "3.00");
+    createOrderWithLines(
+        "jordan", "83663", "to_pick", skuId, List.of(1, 2), "PICKUP", "3.00", null);
 
     // act
     var response =
@@ -250,7 +336,7 @@ public class OrdersHandlerIntegrationTest {
     tcgInventoryTable.putItem(sku);
 
     reserveUnits("jordan", skuId, "83663", List.of(1));
-    createOrderWithLines("jordan", "83663", "to_pick", skuId, List.of(1), "PICKUP", "1.50");
+    createOrderWithLines("jordan", "83663", "to_pick", skuId, List.of(1), "PICKUP", "1.50", null);
 
     // act
     confirmOrderHandler.handleRequest(
@@ -364,13 +450,17 @@ public class OrdersHandlerIntegrationTest {
       String skuId,
       List<Integer> sequenceNumbers,
       String deliveryMode,
-      String totalPrice) {
+      String totalPrice,
+      String listedPrice) {
+    var listedPriceJson = listedPrice != null ? ",\"listed_price\":\"" + listedPrice + "\"" : "";
     var lines =
         "[{\"sku_id\":\""
             + skuId
             + "\",\"fetchtcg_listing_id\":1001,\"quantity\":"
             + sequenceNumbers.size()
-            + ",\"price\":\"1.50\",\"allocated_sequence_numbers\":"
+            + ",\"price\":\"1.50\""
+            + listedPriceJson
+            + ",\"allocated_sequence_numbers\":"
             + sequenceNumbers
             + "}]";
     var order =

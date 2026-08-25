@@ -260,6 +260,9 @@ public class OrderPhaseProcessor {
                 item.listing().id(),
                 item.quantity(),
                 item.price() != null ? item.price().toPlainString() : null,
+                item.listing().listedPrice() != null
+                    ? item.listing().listedPrice().toPlainString()
+                    : null,
                 allocatedSequenceNumbers));
       }
     }

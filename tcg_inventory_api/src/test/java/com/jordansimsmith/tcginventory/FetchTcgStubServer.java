@@ -50,7 +50,7 @@ public final class FetchTcgStubServer {
       """
       {"content":[{"id":99001,"status":"ACCEPTED","currentAction":"SEND_PICKUP_ADDRESS",\
       "deliveryMode":"PICKUP","totalOfferPrice":1.50,\
-      "items":[{"listing":{"id":900001,"condition":"raw-lp"},"quantity":1,"price":1.50}]}],\
+      "items":[{"listing":{"id":900001,"condition":"raw-lp","listedPrice":2.00},"quantity":1,"price":1.50}]}],\
       "totalPages":1}\
       """;
 

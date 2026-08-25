@@ -34,12 +34,23 @@ public class GetOrderHandler
       @JsonProperty("finish") String finish,
       @JsonProperty("condition") String condition) {}
 
+  record OrderLineResponse(
+      @JsonProperty("name") String name,
+      @JsonProperty("set_code") String setCode,
+      @JsonProperty("collector_number") String collectorNumber,
+      @JsonProperty("finish") String finish,
+      @JsonProperty("condition") String condition,
+      @JsonProperty("quantity") int quantity,
+      @JsonProperty("price") @Nullable String price,
+      @JsonProperty("listed_price") @Nullable String listedPrice) {}
+
   record OrderDetailResponse(
       @JsonProperty("order_id") String orderId,
       @JsonProperty("state") String state,
       @JsonProperty("accepted_at") long acceptedAt,
       @JsonProperty("delivery_mode") @Nullable String deliveryMode,
       @JsonProperty("total_price") @Nullable String totalPrice,
+      @JsonProperty("lines") List<OrderLineResponse> lines,
       @JsonProperty("units") List<OrderUnitResponse> units) {}
 
   record ErrorResponse(@JsonProperty("message") String message) {}
@@ -90,6 +101,7 @@ public class GetOrderHandler
 
     Map<String, TcgInventoryItem> skuCache = new HashMap<>();
     var units = new ArrayList<OrderUnitResponse>();
+    var lines = new ArrayList<OrderLineResponse>();
 
     for (var line : orderLines) {
       var skuItem =
@@ -105,6 +117,17 @@ public class GetOrderHandler
       if (skuItem == null) {
         continue;
       }
+
+      lines.add(
+          new OrderLineResponse(
+              skuItem.getName(),
+              skuItem.getSetCode(),
+              skuItem.getCollectorNumber(),
+              skuItem.getFinish(),
+              skuItem.getCondition(),
+              line.quantity(),
+              line.price(),
+              line.listedPrice()));
 
       for (var seqNum : line.allocatedSequenceNumbers()) {
         units.add(
@@ -128,6 +151,7 @@ public class GetOrderHandler
             orderItem.getCreatedAt() != null ? orderItem.getCreatedAt().getEpochSecond() : 0,
             orderItem.getDeliveryMode(),
             orderItem.getTotalPrice(),
+            lines,
             units));
   }
 }

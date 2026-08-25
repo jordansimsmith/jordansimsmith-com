@@ -3,7 +3,9 @@ package com.jordansimsmith.tcginventory;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
 import java.util.List;
+import javax.annotation.Nullable;
 
 public class OrderLines {
   public record OrderLine(
@@ -11,6 +13,7 @@ public class OrderLines {
       @JsonProperty("fetchtcg_listing_id") int fetchtcgListingId,
       @JsonProperty("quantity") int quantity,
       @JsonProperty("price") String price,
+      @JsonProperty("listed_price") @Nullable String listedPrice,
       @JsonProperty("allocated_sequence_numbers") List<Integer> allocatedSequenceNumbers) {}
 
   public static List<OrderLine> parse(String linesJson, ObjectMapper objectMapper) {
@@ -22,5 +25,15 @@ public class OrderLines {
     } catch (Exception e) {
       throw new RuntimeException("failed to parse order lines", e);
     }
+  }
+
+  public static BigDecimal itemsTotal(List<OrderLine> lines) {
+    var total = BigDecimal.ZERO;
+    for (var line : lines) {
+      if (line.price() != null) {
+        total = total.add(new BigDecimal(line.price()));
+      }
+    }
+    return total;
   }
 }

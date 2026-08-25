@@ -300,7 +300,7 @@ public class JobsHandlerIntegrationTest {
                 new BigDecimal("3.33"),
                 List.of(
                     new FetchTcgClient.OfferItem(
-                        new FetchTcgClient.OfferListing(1001, "raw-nm"),
+                        new FetchTcgClient.OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
                         2,
                         new BigDecimal("1.50"))))));
 
@@ -318,6 +318,11 @@ public class JobsHandlerIntegrationTest {
     assertThat(order.getTotalPrice()).isEqualTo("3.33");
     assertThat(order.getFetchtcgStatus()).isEqualTo("ACCEPTED");
     assertThat(order.getLines()).contains("scryfall-1#normal#NM");
+    var orderLines = OrderLines.parse(order.getLines(), objectMapper);
+    assertThat(orderLines).hasSize(1);
+    assertThat(orderLines.get(0).price()).isEqualTo("1.50");
+    assertThat(orderLines.get(0).listedPrice()).isEqualTo("2.00");
+    assertThat(orderLines.get(0).quantity()).isEqualTo(2);
 
     var sku = getSku("jordan", "scryfall-1#normal#NM");
     assertThat(sku.getDirty()).isFalse();
@@ -403,7 +408,7 @@ public class JobsHandlerIntegrationTest {
                 new BigDecimal("3.33"),
                 List.of(
                     new FetchTcgClient.OfferItem(
-                        new FetchTcgClient.OfferListing(1001, "raw-nm"),
+                        new FetchTcgClient.OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
                         3,
                         new BigDecimal("1.50"))))));
 
@@ -435,7 +440,7 @@ public class JobsHandlerIntegrationTest {
                 new BigDecimal("3.33"),
                 List.of(
                     new FetchTcgClient.OfferItem(
-                        new FetchTcgClient.OfferListing(1001, "raw-nm"),
+                        new FetchTcgClient.OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
                         2,
                         new BigDecimal("1.50"))))));
 
@@ -469,7 +474,7 @@ public class JobsHandlerIntegrationTest {
                 new BigDecimal("3.33"),
                 List.of(
                     new FetchTcgClient.OfferItem(
-                        new FetchTcgClient.OfferListing(1001, "raw-nm"),
+                        new FetchTcgClient.OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
                         2,
                         new BigDecimal("1.50"))))));
 
@@ -499,7 +504,7 @@ public class JobsHandlerIntegrationTest {
                 new BigDecimal("3.33"),
                 List.of(
                     new FetchTcgClient.OfferItem(
-                        new FetchTcgClient.OfferListing(1001, "raw-nm"),
+                        new FetchTcgClient.OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
                         2,
                         new BigDecimal("1.50"))))));
 
@@ -531,7 +536,7 @@ public class JobsHandlerIntegrationTest {
                 new BigDecimal("3.33"),
                 List.of(
                     new FetchTcgClient.OfferItem(
-                        new FetchTcgClient.OfferListing(1001, "raw-nm"),
+                        new FetchTcgClient.OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
                         2,
                         new BigDecimal("1.50"))))));
 

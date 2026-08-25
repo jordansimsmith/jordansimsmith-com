@@ -133,7 +133,19 @@ public class HttpFetchTcgClientTest {
             """
             {
               "content": [
-                {"id": 100, "status": "ACCEPTED", "currentAction": "AWAITING_PAYMENT"},
+                {
+                  "id": 100,
+                  "status": "ACCEPTED",
+                  "currentAction": "AWAITING_PAYMENT",
+                  "totalOfferPrice": 3.33,
+                  "items": [
+                    {
+                      "quantity": 1,
+                      "price": 3.33,
+                      "listing": {"id": 975737, "condition": "raw-nm", "listedPrice": 3.50}
+                    }
+                  ]
+                },
                 {"id": 101, "status": "COMPLETED", "currentAction": null}
               ],
               "totalPages": 3
@@ -151,6 +163,9 @@ public class HttpFetchTcgClientTest {
     assertThat(result.content().get(0).id()).isEqualTo(100);
     assertThat(result.content().get(0).status()).isEqualTo("ACCEPTED");
     assertThat(result.content().get(0).currentAction()).isEqualTo("AWAITING_PAYMENT");
+    assertThat(result.content().get(0).items()).hasSize(1);
+    assertThat(result.content().get(0).items().get(0).listing().listedPrice())
+        .isEqualByComparingTo("3.50");
     assertThat(result.content().get(1).currentAction()).isNull();
   }
 

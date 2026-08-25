@@ -227,6 +227,9 @@ public class TcgInventoryE2ETest {
     assertThat(ordersBody.get("orders")).hasSize(1);
     assertThat(ordersBody.get("orders").get(0).get("order_id").asText()).isEqualTo("99001");
     assertThat(ordersBody.get("orders").get(0).get("state").asText()).isEqualTo("to_pick");
+    assertThat(ordersBody.get("orders").get(0).get("items_total_price").asText()).isEqualTo("1.50");
+    assertThat(ordersBody.get("orders").get(0).get("listed_total_price").asText())
+        .isEqualTo("2.00");
 
     // act - get order detail (pull sheet)
     var orderDetailResponse = get("/orders/99001");
@@ -235,6 +238,11 @@ public class TcgInventoryE2ETest {
     assertThat(orderDetailBody.get("order_id").asText()).isEqualTo("99001");
     assertThat(orderDetailBody.get("state").asText()).isEqualTo("to_pick");
     assertThat(orderDetailBody.get("delivery_mode").asText()).isEqualTo("PICKUP");
+    var orderLines = orderDetailBody.get("lines");
+    assertThat(orderLines).hasSize(1);
+    assertThat(orderLines.get(0).get("quantity").asInt()).isEqualTo(1);
+    assertThat(orderLines.get(0).get("price").asText()).isEqualTo("1.50");
+    assertThat(orderLines.get(0).get("listed_price").asText()).isEqualTo("2.00");
     var orderUnits = orderDetailBody.get("units");
     assertThat(orderUnits).hasSize(1);
     assertThat(orderUnits.get(0).get("sequence_number").asInt()).isZero();

@@ -520,7 +520,15 @@ describe('createFakeClient orders', () => {
     expect(toPick.order_id).toBe('83647');
     expect(toPick.unit_count).toBe(3);
     expect(toPick.total_price).toBe('10.90');
+    expect(toPick.items_total_price).toBe('10.90');
+    expect(toPick.listed_total_price).toBe('13.00');
     expect(toPick.delivery_mode).toBe('PICKUP');
+    expect(response.orders[0].items_total_price).toBe('479.90');
+    expect(response.orders[0].listed_total_price).toBe('431.50');
+    expect(response.orders[2].items_total_price).toBe('8.50');
+    expect(response.orders[2].listed_total_price).toBe('8.50');
+    expect(response.orders[3].items_total_price).toBe('4.20');
+    expect(response.orders[3].listed_total_price).toBeNull();
   });
 
   it('returns order units ascending with derived locations', async () => {
@@ -546,6 +554,28 @@ describe('createFakeClient orders', () => {
     expect(aberration?.collector_number).toBe('167');
     expect(aberration?.finish).toBe('normal');
     expect(aberration?.condition).toBe('NM');
+    expect(detail.lines).toEqual([
+      {
+        name: 'Sol Ring',
+        set_code: 'cmr',
+        collector_number: '472',
+        finish: 'normal',
+        condition: 'NM',
+        quantity: 2,
+        price: '8.00',
+        listed_price: '5.00',
+      },
+      {
+        name: 'Elvish Aberration',
+        set_code: 'a25',
+        collector_number: '167',
+        finish: 'normal',
+        condition: 'NM',
+        quantity: 1,
+        price: '2.90',
+        listed_price: '3.00',
+      },
+    ]);
   });
 
   it('rejects unknown order ids', async () => {

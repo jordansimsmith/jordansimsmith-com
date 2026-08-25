@@ -288,7 +288,7 @@ public class ReportsHandlerIntegrationTest {
             null,
             "SHIPPING",
             "10.50",
-            null,
+            "[{\"sku_id\":\"s\",\"fetchtcg_listing_id\":1,\"quantity\":1,\"price\":\"10.50\",\"allocated_sequence_numbers\":[]}]",
             Instant.ofEpochSecond(1699500000)));
     tcgInventoryTable.putItem(
         TcgInventoryItem.createOrder(
@@ -299,7 +299,7 @@ public class ReportsHandlerIntegrationTest {
             null,
             "PICKUP",
             "5.25",
-            null,
+            "[{\"sku_id\":\"s\",\"fetchtcg_listing_id\":1,\"quantity\":1,\"price\":\"5.25\",\"allocated_sequence_numbers\":[]}]",
             Instant.ofEpochSecond(1699600000)));
     tcgInventoryTable.putItem(
         TcgInventoryItem.createOrder(
@@ -310,7 +310,7 @@ public class ReportsHandlerIntegrationTest {
             null,
             "PICKUP",
             "100.00",
-            null,
+            "[{\"sku_id\":\"s\",\"fetchtcg_listing_id\":1,\"quantity\":1,\"price\":\"100.00\",\"allocated_sequence_numbers\":[]}]",
             Instant.ofEpochSecond(1699700000)));
 
     var jobItem =

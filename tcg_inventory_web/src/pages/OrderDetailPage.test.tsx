@@ -21,7 +21,31 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
     accepted_at: 1765420932,
     delivery_mode: 'PICKUP',
     total_price: '10.90',
+    items_total_price: '10.90',
+    listed_total_price: '13.00',
     unit_count: 3,
+    lines: [
+      {
+        name: 'Sol Ring',
+        set_code: 'cmr',
+        collector_number: '472',
+        finish: 'normal',
+        condition: 'NM',
+        quantity: 2,
+        price: '8.00',
+        listed_price: '5.00',
+      },
+      {
+        name: 'Elvish Aberration',
+        set_code: 'a25',
+        collector_number: '167',
+        finish: 'foil',
+        condition: 'NM',
+        quantity: 1,
+        price: '2.90',
+        listed_price: '3.00',
+      },
+    ],
     units: [
       {
         sequence_number: 37,
@@ -88,13 +112,23 @@ describe('OrderDetailPage', () => {
     expect(await screen.findByText('Order 83647')).toBeDefined();
     expect(screen.getByText('to pick')).toBeDefined();
     expect(screen.getByText('PICKUP · $10.90')).toBeDefined();
+    expect(screen.getAllByText('−16% vs list').length).toBeGreaterThan(0);
+    expect(screen.getByText('Offer')).toBeDefined();
+    expect(screen.getByText('CMR #472 · NM · ×2')).toBeDefined();
+    expect(screen.getByText('$8.00')).toBeDefined();
+    expect(screen.getByText('listed $10.00')).toBeDefined();
+    expect(screen.getByText('−20% vs list')).toBeDefined();
+    expect(screen.getByText('A25 #167 · NM · foil · ×1')).toBeDefined();
+    expect(screen.getByText('$2.90')).toBeDefined();
+    expect(screen.getByText('listed $3.00')).toBeDefined();
+    expect(screen.getByText('−3% vs list')).toBeDefined();
     expect(screen.getByText('Pull sheet')).toBeDefined();
 
     const locations = screen
       .getAllByText(/^A\d+-\d+$/)
       .map((element) => element.textContent);
     expect(locations).toEqual(['A0-37', 'A0-74', 'A2-59']);
-    expect(screen.getAllByText('Sol Ring')).toHaveLength(2);
+    expect(screen.getAllByText('Sol Ring')).toHaveLength(3);
     expect(screen.getByText('A25 #167 · NM · foil')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Confirm pull' })).toBeDefined();
   });
@@ -148,6 +182,44 @@ describe('OrderDetailPage', () => {
     expect(await screen.findByText('order is not ready to pick')).toBeDefined();
     expect(screen.getByText('Pull sheet')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Confirm pull' })).toBeDefined();
+  });
+
+  it('omits the vs-list badge when the offer matches list', async () => {
+    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(
+      orderDetail({
+        items_total_price: '8.50',
+        listed_total_price: '8.50',
+        lines: [
+          {
+            name: 'Hellkite Tyrant',
+            set_code: 'gtc',
+            collector_number: '94',
+            finish: 'normal',
+            condition: 'NM',
+            quantity: 1,
+            price: '8.50',
+            listed_price: '8.50',
+          },
+        ],
+        units: [
+          {
+            sequence_number: 1,
+            location: 'A0-1',
+            name: 'Hellkite Tyrant',
+            set_code: 'gtc',
+            collector_number: '94',
+            finish: 'normal',
+            condition: 'NM',
+          },
+        ],
+      }),
+    );
+
+    renderOrderDetailPage();
+
+    expect(await screen.findByText('Order 83647')).toBeDefined();
+    expect(screen.getByText('listed $8.50')).toBeDefined();
+    expect(screen.queryByText(/vs list/)).toBeNull();
   });
 
   it('renders a non-pickable order without a confirm button', async () => {

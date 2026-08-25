@@ -67,7 +67,10 @@ public interface FetchTcgClient {
       @JsonProperty("price") BigDecimal price) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
-  record OfferListing(@JsonProperty("id") int id, @JsonProperty("condition") String condition) {}
+  record OfferListing(
+      @JsonProperty("id") int id,
+      @JsonProperty("condition") String condition,
+      @JsonProperty("listedPrice") @Nullable BigDecimal listedPrice) {}
 
   record UpsertListingRequest(
       String cardId,

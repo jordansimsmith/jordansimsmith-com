@@ -133,6 +133,8 @@ export interface OrderSummary {
   accepted_at: number;
   delivery_mode: string;
   total_price: string;
+  items_total_price: string | null;
+  listed_total_price: string | null;
   unit_count: number;
 }
 
@@ -150,7 +152,19 @@ export interface OrderUnit {
   condition: Condition;
 }
 
+export interface OrderLine {
+  name: string;
+  set_code: string;
+  collector_number: string;
+  finish: Finish;
+  condition: Condition;
+  quantity: number;
+  price: string | null;
+  listed_price: string | null;
+}
+
 export interface OrderDetail extends OrderSummary {
+  lines: OrderLine[];
   units: OrderUnit[];
 }
 

@@ -5,9 +5,11 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
+import java.math.BigDecimal;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
@@ -27,13 +29,16 @@ public class FindOrdersHandler
       @JsonProperty("state") String state,
       @JsonProperty("accepted_at") long acceptedAt,
       @JsonProperty("delivery_mode") @Nullable String deliveryMode,
-      @JsonProperty("total_price") @Nullable String totalPrice) {}
+      @JsonProperty("total_price") @Nullable String totalPrice,
+      @JsonProperty("items_total_price") @Nullable String itemsTotalPrice,
+      @JsonProperty("listed_total_price") @Nullable String listedTotalPrice) {}
 
   record FindOrdersResponse(@JsonProperty("orders") List<OrderSummary> orders) {}
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final ObjectMapper objectMapper;
 
   public FindOrdersHandler() {
     this(TcgInventoryFactory.create());
@@ -44,6 +49,7 @@ public class FindOrdersHandler
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.objectMapper = factory.objectMapper();
   }
 
   @Override
@@ -76,15 +82,42 @@ public class FindOrdersHandler
         tcgInventoryTable.query(request).stream()
             .flatMap(page -> page.items().stream())
             .map(
-                item ->
-                    new OrderSummary(
-                        item.getOrderId(),
-                        item.getStatus(),
-                        item.getCreatedAt() != null ? item.getCreatedAt().getEpochSecond() : 0,
-                        item.getDeliveryMode(),
-                        item.getTotalPrice()))
+                item -> {
+                  var orderLines = OrderLines.parse(item.getLines(), objectMapper);
+                  return new OrderSummary(
+                      item.getOrderId(),
+                      item.getStatus(),
+                      item.getCreatedAt() != null ? item.getCreatedAt().getEpochSecond() : 0,
+                      item.getDeliveryMode(),
+                      item.getTotalPrice(),
+                      itemsTotalPrice(orderLines),
+                      listedTotalPrice(orderLines));
+                })
             .toList();
 
     return httpResponseFactory.ok(new FindOrdersResponse(orders));
+  }
+
+  private static @Nullable String itemsTotalPrice(List<OrderLines.OrderLine> orderLines) {
+    if (orderLines.isEmpty()) {
+      return null;
+    }
+    return OrderLines.itemsTotal(orderLines).toPlainString();
+  }
+
+  private static @Nullable String listedTotalPrice(List<OrderLines.OrderLine> orderLines) {
+    if (orderLines.isEmpty()) {
+      return null;
+    }
+    var total = BigDecimal.ZERO;
+    for (var line : orderLines) {
+      if (line.listedPrice() == null) {
+        return null;
+      }
+      total =
+          total.add(
+              new BigDecimal(line.listedPrice()).multiply(BigDecimal.valueOf(line.quantity())));
+    }
+    return total.toPlainString();
   }
 }

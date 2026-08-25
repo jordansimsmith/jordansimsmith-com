@@ -21,6 +21,8 @@ const orderFixtures: OrderSummary[] = [
     accepted_at: 1765420932,
     delivery_mode: 'SHIPPING',
     total_price: '479.90',
+    items_total_price: '479.90',
+    listed_total_price: '431.50',
     unit_count: 6,
   },
   {
@@ -29,6 +31,8 @@ const orderFixtures: OrderSummary[] = [
     accepted_at: 1765334532,
     delivery_mode: 'PICKUP',
     total_price: '10.90',
+    items_total_price: '10.90',
+    listed_total_price: '13.00',
     unit_count: 3,
   },
   {
@@ -37,6 +41,8 @@ const orderFixtures: OrderSummary[] = [
     accepted_at: 1765161732,
     delivery_mode: 'SHIPPING',
     total_price: '8.50',
+    items_total_price: '8.50',
+    listed_total_price: '8.50',
     unit_count: 1,
   },
   {
@@ -45,6 +51,8 @@ const orderFixtures: OrderSummary[] = [
     accepted_at: 1764988932,
     delivery_mode: 'PICKUP',
     total_price: '4.20',
+    items_total_price: '4.20',
+    listed_total_price: null,
     unit_count: 1,
   },
 ];
@@ -90,6 +98,7 @@ describe('OrdersPage', () => {
     expect(within(row).getByText('3')).toBeDefined();
     expect(within(row).getByText('$10.90')).toBeDefined();
     expect(within(row).getByText('PICKUP')).toBeDefined();
+    expect(within(row).queryByText(/vs list/)).toBeNull();
 
     const awaitingRow = screen
       .getByText('83663')
