@@ -34,8 +34,8 @@ variable "endpoints" {
   }
 
   validation {
-    condition     = alltrue([for endpoint in var.endpoints : length(split("/", endpoint.path)) <= 4])
-    error_message = "Endpoint paths support at most four segments."
+    condition     = alltrue([for endpoint in var.endpoints : length(split("/", endpoint.path)) <= 6])
+    error_message = "Endpoint paths support at most six segments."
   }
 }
 

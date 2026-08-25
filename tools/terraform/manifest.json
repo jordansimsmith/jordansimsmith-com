@@ -136,6 +136,8 @@
         "confirm_import": "//tcg_inventory_api:confirm-import-handler_deploy.jar",
         "update_import_row": "//tcg_inventory_api:update-import-row-handler_deploy.jar",
         "delete_import_row": "//tcg_inventory_api:delete-import-row-handler_deploy.jar",
+        "create_import_row_photo": "//tcg_inventory_api:create-import-row-photo-handler_deploy.jar",
+        "delete_import_row_photo": "//tcg_inventory_api:delete-import-row-photo-handler_deploy.jar",
         "create_publish": "//tcg_inventory_api:create-publish-handler_deploy.jar",
         "get_publish": "//tcg_inventory_api:get-publish-handler_deploy.jar",
         "create_report": "//tcg_inventory_api:create-report-handler_deploy.jar",

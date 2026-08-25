@@ -44,11 +44,27 @@ locals {
     } if length(split("/", path)) == 4
   }
 
+  depth_5_resources = {
+    for path in local.resource_paths : path => {
+      path_part = element(split("/", path), 4)
+      parent    = join("/", slice(split("/", path), 0, 4))
+    } if length(split("/", path)) == 5
+  }
+
+  depth_6_resources = {
+    for path in local.resource_paths : path => {
+      path_part = element(split("/", path), 5)
+      parent    = join("/", slice(split("/", path), 0, 5))
+    } if length(split("/", path)) == 6
+  }
+
   resource_ids = merge(
     { for path, resource in aws_api_gateway_resource.root_resource : path => resource.id },
     { for path, resource in aws_api_gateway_resource.child_resource : path => resource.id },
     { for path, resource in aws_api_gateway_resource.depth_3_resource : path => resource.id },
     { for path, resource in aws_api_gateway_resource.depth_4_resource : path => resource.id },
+    { for path, resource in aws_api_gateway_resource.depth_5_resource : path => resource.id },
+    { for path, resource in aws_api_gateway_resource.depth_6_resource : path => resource.id },
   )
 
   options_resources = local.cors_enabled ? local.resource_paths : toset([])
@@ -98,6 +114,22 @@ resource "aws_api_gateway_resource" "depth_4_resource" {
 
   rest_api_id = aws_api_gateway_rest_api.this.id
   parent_id   = aws_api_gateway_resource.depth_3_resource[each.value.parent].id
+  path_part   = each.value.path_part
+}
+
+resource "aws_api_gateway_resource" "depth_5_resource" {
+  for_each = local.depth_5_resources
+
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  parent_id   = aws_api_gateway_resource.depth_4_resource[each.value.parent].id
+  path_part   = each.value.path_part
+}
+
+resource "aws_api_gateway_resource" "depth_6_resource" {
+  for_each = local.depth_6_resources
+
+  rest_api_id = aws_api_gateway_rest_api.this.id
+  parent_id   = aws_api_gateway_resource.depth_5_resource[each.value.parent].id
   path_part   = each.value.path_part
 }
 
@@ -259,6 +291,8 @@ resource "aws_api_gateway_deployment" "this" {
       aws_api_gateway_resource.child_resource,
       aws_api_gateway_resource.depth_3_resource,
       aws_api_gateway_resource.depth_4_resource,
+      aws_api_gateway_resource.depth_5_resource,
+      aws_api_gateway_resource.depth_6_resource,
       aws_api_gateway_method.method,
       aws_api_gateway_integration.integration,
       aws_api_gateway_method.options,

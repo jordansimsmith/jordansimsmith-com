@@ -89,6 +89,14 @@ module "java_api" {
       handler  = "com.jordansimsmith.tcginventory.DeleteImportRowHandler"
       artifact = var.artifacts["delete_import_row"]
     }
+    create_import_row_photo = {
+      handler  = "com.jordansimsmith.tcginventory.CreateImportRowPhotoHandler"
+      artifact = var.artifacts["create_import_row_photo"]
+    }
+    delete_import_row_photo = {
+      handler  = "com.jordansimsmith.tcginventory.DeleteImportRowPhotoHandler"
+      artifact = var.artifacts["delete_import_row_photo"]
+    }
     create_publish = {
       handler  = "com.jordansimsmith.tcginventory.CreatePublishHandler"
       artifact = var.artifacts["create_publish"]
@@ -141,26 +149,28 @@ module "java_api" {
   }
 
   endpoints = {
-    get_settings      = { path = "settings", method = "GET", lambda = "get_settings" }
-    update_settings   = { path = "settings", method = "PATCH", lambda = "update_settings" }
-    create_import     = { path = "imports", method = "POST", lambda = "create_import" }
-    find_imports      = { path = "imports", method = "GET", lambda = "find_imports" }
-    get_import        = { path = "imports/{import_id}", method = "GET", lambda = "get_import" }
-    delete_import     = { path = "imports/{import_id}", method = "DELETE", lambda = "delete_import" }
-    confirm_import    = { path = "imports/{import_id}/confirm", method = "POST", lambda = "confirm_import" }
-    update_import_row = { path = "imports/{import_id}/rows/{position}", method = "PUT", lambda = "update_import_row" }
-    delete_import_row = { path = "imports/{import_id}/rows/{position}", method = "DELETE", lambda = "delete_import_row" }
-    create_publish    = { path = "publish", method = "POST", lambda = "create_publish" }
-    get_publish       = { path = "publish", method = "GET", lambda = "get_publish" }
-    create_report     = { path = "reports", method = "POST", lambda = "create_report" }
-    get_reports       = { path = "reports", method = "GET", lambda = "get_reports" }
-    find_skus         = { path = "skus", method = "GET", lambda = "find_skus" }
-    get_sku           = { path = "skus/{sku_id}", method = "GET", lambda = "get_sku" }
-    remove_unit       = { path = "skus/{sku_id}/units/{sequence_number}", method = "DELETE", lambda = "remove_unit" }
-    update_unit       = { path = "skus/{sku_id}/units/{sequence_number}", method = "PUT", lambda = "update_unit" }
-    find_orders       = { path = "orders", method = "GET", lambda = "find_orders" }
-    get_order         = { path = "orders/{order_id}", method = "GET", lambda = "get_order" }
-    confirm_order     = { path = "orders/{order_id}/confirm", method = "POST", lambda = "confirm_order" }
+    get_settings            = { path = "settings", method = "GET", lambda = "get_settings" }
+    update_settings         = { path = "settings", method = "PATCH", lambda = "update_settings" }
+    create_import           = { path = "imports", method = "POST", lambda = "create_import" }
+    find_imports            = { path = "imports", method = "GET", lambda = "find_imports" }
+    get_import              = { path = "imports/{import_id}", method = "GET", lambda = "get_import" }
+    delete_import           = { path = "imports/{import_id}", method = "DELETE", lambda = "delete_import" }
+    confirm_import          = { path = "imports/{import_id}/confirm", method = "POST", lambda = "confirm_import" }
+    update_import_row       = { path = "imports/{import_id}/rows/{position}", method = "PUT", lambda = "update_import_row" }
+    delete_import_row       = { path = "imports/{import_id}/rows/{position}", method = "DELETE", lambda = "delete_import_row" }
+    create_import_row_photo = { path = "imports/{import_id}/rows/{position}/photos", method = "POST", lambda = "create_import_row_photo" }
+    delete_import_row_photo = { path = "imports/{import_id}/rows/{position}/photos/{photo_id}", method = "DELETE", lambda = "delete_import_row_photo" }
+    create_publish          = { path = "publish", method = "POST", lambda = "create_publish" }
+    get_publish             = { path = "publish", method = "GET", lambda = "get_publish" }
+    create_report           = { path = "reports", method = "POST", lambda = "create_report" }
+    get_reports             = { path = "reports", method = "GET", lambda = "get_reports" }
+    find_skus               = { path = "skus", method = "GET", lambda = "find_skus" }
+    get_sku                 = { path = "skus/{sku_id}", method = "GET", lambda = "get_sku" }
+    remove_unit             = { path = "skus/{sku_id}/units/{sequence_number}", method = "DELETE", lambda = "remove_unit" }
+    update_unit             = { path = "skus/{sku_id}/units/{sequence_number}", method = "PUT", lambda = "update_unit" }
+    find_orders             = { path = "orders", method = "GET", lambda = "find_orders" }
+    get_order               = { path = "orders/{order_id}", method = "GET", lambda = "get_order" }
+    confirm_order           = { path = "orders/{order_id}/confirm", method = "POST", lambda = "confirm_order" }
   }
 
   role_policy_arns = {
