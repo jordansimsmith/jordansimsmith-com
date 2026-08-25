@@ -15,6 +15,7 @@ public class Photos {
   public static final int MAX_PHOTOS = 5;
   public static final int MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
   public static final BigDecimal IMPORT_GATE = new BigDecimal("20");
+  public static final BigDecimal PUBLISH_WARNING = new BigDecimal("50");
   public static final Duration PRESIGN_TTL = Duration.ofMinutes(15);
 
   public static String key(String user, String photoId) {
@@ -29,6 +30,11 @@ public class Photos {
         && suggestedPrice != null
         && (photos == null || photos.isEmpty())
         && new BigDecimal(suggestedPrice).compareTo(IMPORT_GATE) >= 0;
+  }
+
+  public static boolean needsPublishWarning(
+      BigDecimal price, @Nullable List<TcgInventoryItem.Photo> photos) {
+    return price.compareTo(PUBLISH_WARNING) >= 0 && (photos == null || photos.isEmpty());
   }
 
   public static AttributeValue toAttributeValue(List<TcgInventoryItem.Photo> photos) {

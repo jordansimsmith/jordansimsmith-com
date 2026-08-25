@@ -2,6 +2,7 @@ package com.jordansimsmith.tcginventory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 
@@ -32,5 +33,23 @@ public class PhotosTest {
     assertThat(Photos.needsPhotos("review", "20.00", null)).isFalse();
     assertThat(Photos.needsPhotos("keep", null, null)).isFalse();
     assertThat(Photos.needsPhotos("keep", "20.00", photos)).isFalse();
+  }
+
+  @Test
+  void needsPublishWarningShouldBeTrueAtOrAboveFiftyWhenPhotoLess() {
+    // act / assert
+    assertThat(Photos.needsPublishWarning(new BigDecimal("50"), null)).isTrue();
+    assertThat(Photos.needsPublishWarning(new BigDecimal("50.00"), List.of())).isTrue();
+    assertThat(Photos.needsPublishWarning(new BigDecimal("50.01"), null)).isTrue();
+  }
+
+  @Test
+  void needsPublishWarningShouldBeFalseBelowFiftyOrWhenPhotosPresent() {
+    // arrange
+    var photos = List.of(TcgInventoryItem.Photo.create("01JEXAMPLEPHOTOULID00000", null));
+
+    // act / assert
+    assertThat(Photos.needsPublishWarning(new BigDecimal("49.99"), null)).isFalse();
+    assertThat(Photos.needsPublishWarning(new BigDecimal("60.00"), photos)).isFalse();
   }
 }

@@ -568,6 +568,8 @@ public class JobsHandlerIntegrationTest {
     assertThat(upsert.condition()).isEqualTo("raw-nm");
     assertThat(upsert.quantity()).isEqualTo(2);
     assertThat(upsert.price()).isEqualByComparingTo("1.50");
+    assertThat(upsert.frontImage()).isNull();
+    assertThat(upsert.additionalImages()).isEmpty();
   }
 
   @Test
@@ -595,6 +597,8 @@ public class JobsHandlerIntegrationTest {
     var upsert = fakeFetchTcgClient.getUpsertCalls().get(0);
     assertThat(upsert.quantity()).isEqualTo(3);
     assertThat(upsert.price()).isEqualByComparingTo("2.00");
+    assertThat(upsert.frontImage()).isNull();
+    assertThat(upsert.additionalImages()).isEmpty();
   }
 
   @Test

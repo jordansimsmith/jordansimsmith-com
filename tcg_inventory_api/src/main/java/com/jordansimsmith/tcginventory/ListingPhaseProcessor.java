@@ -5,6 +5,8 @@ import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
@@ -13,22 +15,29 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 
 public class ListingPhaseProcessor {
+  private static final Logger LOGGER = LoggerFactory.getLogger(ListingPhaseProcessor.class);
+
   private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
   private final DynamoDbClient dynamoDbClient;
   private final Clock clock;
   private final FetchTcgClient fetchTcgClient;
+  private final S3Client s3Client;
 
   public ListingPhaseProcessor(
       DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
       DynamoDbClient dynamoDbClient,
       Clock clock,
-      FetchTcgClient fetchTcgClient) {
+      FetchTcgClient fetchTcgClient,
+      S3Client s3Client) {
     this.tcgInventoryTable = tcgInventoryTable;
     this.dynamoDbClient = dynamoDbClient;
     this.clock = clock;
     this.fetchTcgClient = fetchTcgClient;
+    this.s3Client = s3Client;
   }
 
   public BatchResult process(String user, String bearerToken) {
@@ -38,10 +47,10 @@ public class ListingPhaseProcessor {
     for (var sku : dirtySkus) {
       var skuId = sku.getSkuId();
       var capturedVersion = sku.getVersion();
-      var inStockCount = countInStockUnits(user, skuId);
+      var inStock = loadInStock(user, skuId);
 
-      if (inStockCount > 0) {
-        publishSku(user, bearerToken, sku, inStockCount, capturedVersion);
+      if (inStock.count() > 0) {
+        publishSku(user, bearerToken, sku, inStock, capturedVersion);
       } else if (sku.getFetchtcgListingId() != null) {
         delistSku(user, bearerToken, sku, capturedVersion);
       } else {
@@ -71,8 +80,9 @@ public class ListingPhaseProcessor {
     return results;
   }
 
-  private int countInStockUnits(String user, String skuId) {
+  private InStock loadInStock(String user, String skuId) {
     int count = 0;
+    TcgInventoryItem first = null;
     var request =
         QueryEnhancedRequest.builder()
             .queryConditional(
@@ -85,24 +95,73 @@ public class ListingPhaseProcessor {
 
     for (var item : tcgInventoryTable.query(request).items()) {
       if ("in_stock".equals(item.getStatus())) {
+        if (first == null) {
+          first = item;
+        }
         count++;
       }
     }
-    return count;
+    return new InStock(count, first);
   }
 
   private void publishSku(
-      String user,
-      String bearerToken,
-      TcgInventoryItem sku,
-      int inStockCount,
-      int capturedVersion) {
+      String user, String bearerToken, TcgInventoryItem sku, InStock inStock, int capturedVersion) {
+    var photos =
+        inStock.first().getPhotos() == null
+            ? new ArrayList<TcgInventoryItem.Photo>()
+            : new ArrayList<>(inStock.first().getPhotos());
+    var imageUrls = new ArrayList<String>();
+    for (var photo : photos) {
+      if (photo.getFetchtcgUrl() == null) {
+        var bytes =
+            s3Client
+                .getObjectAsBytes(
+                    GetObjectRequest.builder()
+                        .bucket(Photos.BUCKET)
+                        .key(Photos.key(user, photo.getPhotoId()))
+                        .build())
+                .asByteArray();
+        photo.setFetchtcgUrl(
+            fetchTcgClient.uploadListingImage(bearerToken, bytes, photo.getPhotoId() + ".jpg"));
+        dynamoDbClient.updateItem(
+            UpdateItemRequest.builder()
+                .tableName(TcgInventoryItem.TABLE_NAME)
+                .key(
+                    Map.of(
+                        TcgInventoryItem.PK,
+                            AttributeValue.builder()
+                                .s(TcgInventoryItem.formatSkuPk(user, sku.getSkuId()))
+                                .build(),
+                        TcgInventoryItem.SK,
+                            AttributeValue.builder()
+                                .s(
+                                    TcgInventoryItem.formatUnitSk(
+                                        inStock.first().getSequenceNumber()))
+                                .build()))
+                .updateExpression("SET " + TcgInventoryItem.PHOTOS + " = :photos")
+                .expressionAttributeValues(Map.of(":photos", Photos.toAttributeValue(photos)))
+                .build());
+      }
+      imageUrls.add(photo.getFetchtcgUrl());
+    }
+
     var condition = Condition.valueOf(sku.getCondition()).toFetchtcg();
     var price = new BigDecimal(sku.getSuggestedPrice());
+    if (Photos.needsPublishWarning(price, photos)) {
+      LOGGER.warn("upserting photo-less sku {} at price {} (>= NZ$50)", sku.getSkuId(), price);
+    }
 
+    var frontImage = imageUrls.isEmpty() ? null : imageUrls.get(0);
+    List<String> additionalImages =
+        imageUrls.size() <= 1 ? List.of() : imageUrls.subList(1, imageUrls.size());
     var upsertRequest =
         new FetchTcgClient.UpsertListingRequest(
-            sku.getFetchtcgCardId(), condition, inStockCount, price, null, null);
+            sku.getFetchtcgCardId(),
+            condition,
+            inStock.count(),
+            price,
+            frontImage,
+            additionalImages);
 
     var response = fetchTcgClient.upsertListing(bearerToken, upsertRequest);
 
@@ -111,9 +170,11 @@ public class ListingPhaseProcessor {
         sku.getSkuId(),
         capturedVersion,
         response.listingId(),
-        inStockCount,
+        inStock.count(),
         price.toPlainString());
   }
+
+  private record InStock(int count, TcgInventoryItem first) {}
 
   private void delistSku(
       String user, String bearerToken, TcgInventoryItem sku, int capturedVersion) {

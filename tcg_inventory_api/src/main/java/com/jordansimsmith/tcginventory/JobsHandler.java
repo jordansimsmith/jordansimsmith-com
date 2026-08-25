@@ -51,7 +51,8 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
                 factory.tcgInventoryTable(),
                 factory.dynamoDbClient(),
                 factory.clock(),
-                factory.fetchTcgClient()));
+                factory.fetchTcgClient(),
+                factory.s3Client()));
     this.reportJobProcessor =
         new ReportJobProcessor(
             factory.tcgInventoryTable(), factory.objectMapper(), factory.clock());
