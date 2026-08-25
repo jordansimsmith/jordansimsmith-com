@@ -159,30 +159,30 @@ sequenceDiagram
 
 ### Endpoint summary
 
-| Method   | Path                                                             | Purpose                                                                                |
-| -------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `POST`   | `/imports`                                                       | upload a ManaBox CSV; starts the appraise job                                          |
-| `GET`    | `/imports`                                                       | list imports newest-first                                                              |
-| `GET`    | `/imports/{import_id}`                                           | import status, progress, and rows                                                      |
-| `PUT`    | `/imports/{import_id}/rows/{position}`                           | update a row's condition before confirm                                                |
-| `DELETE` | `/imports/{import_id}/rows/{position}`                           | delete a misidentified row before confirm                                              |
-| `POST`   | `/imports/{import_id}/rows/{position}/photos`                    | add a photo to a keep row (raw JPEG body)                                              |
-| `DELETE` | `/imports/{import_id}/rows/{position}/photos/{photo_id}`         | remove a row photo before confirm                                                      |
-| `POST`   | `/imports/{import_id}/confirm`                                   | append keeper units; returns placement instructions                                    |
-| `DELETE` | `/imports/{import_id}`                                           | delete an unconfirmed import and its rows                                              |
-| `GET`    | `/skus`                                                          | browse/search SKUs (prefix search, continuation paging)                                |
-| `GET`    | `/skus/{sku_id}`                                                 | SKU detail including its units                                                         |
-| `DELETE` | `/skus/{sku_id}/units/{sequence_number}`                         | remove a unit (optional `reason` query param)                                          |
-| `PUT`    | `/skus/{sku_id}/units/{sequence_number}`                         | update a unit's condition (moves it to another SKU; response returns the new `sku_id`) |
-| `GET`    | `/orders`                                                        | list orders newest-first                                                               |
-| `GET`    | `/orders/{order_id}`                                             | order detail: lines, allocated units, pull locations                                   |
-| `POST`   | `/orders/{order_id}/confirm`                                     | confirm the pull; marks allocated units sold                                           |
-| `POST`   | `/publish`                                                       | start a publish run; responds 202 and is idempotent while one is queued/running        |
-| `GET`    | `/publish`                                                       | current-or-latest publish run: status, progress, error, pending dirty count            |
-| `POST`   | `/reports`                                                       | start a report generation; responds 202 and is idempotent while one is queued/running  |
-| `GET`    | `/reports`                                                       | latest report snapshot with staleness and generation status; 404 before first run      |
-| `GET`    | `/settings`                                                      | settings view: credential presence, last-updated, track orders after                   |
-| `PATCH`  | `/settings`                                                      | partial update: optional refresh token + optional track orders after                   |
+| Method   | Path                                                     | Purpose                                                                                |
+| -------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `POST`   | `/imports`                                               | upload a ManaBox CSV; starts the appraise job                                          |
+| `GET`    | `/imports`                                               | list imports newest-first                                                              |
+| `GET`    | `/imports/{import_id}`                                   | import status, progress, and rows                                                      |
+| `PUT`    | `/imports/{import_id}/rows/{position}`                   | update a row's condition before confirm                                                |
+| `DELETE` | `/imports/{import_id}/rows/{position}`                   | delete a misidentified row before confirm                                              |
+| `POST`   | `/imports/{import_id}/rows/{position}/photos`            | add a photo to a keep row (raw JPEG body)                                              |
+| `DELETE` | `/imports/{import_id}/rows/{position}/photos/{photo_id}` | remove a row photo before confirm                                                      |
+| `POST`   | `/imports/{import_id}/confirm`                           | append keeper units; returns placement instructions                                    |
+| `DELETE` | `/imports/{import_id}`                                   | delete an unconfirmed import and its rows                                              |
+| `GET`    | `/skus`                                                  | browse/search SKUs (prefix search, continuation paging)                                |
+| `GET`    | `/skus/{sku_id}`                                         | SKU detail including its units                                                         |
+| `DELETE` | `/skus/{sku_id}/units/{sequence_number}`                 | remove a unit (optional `reason` query param)                                          |
+| `PUT`    | `/skus/{sku_id}/units/{sequence_number}`                 | update a unit's condition (moves it to another SKU; response returns the new `sku_id`) |
+| `GET`    | `/orders`                                                | list orders newest-first                                                               |
+| `GET`    | `/orders/{order_id}`                                     | order detail: lines, allocated units, pull locations                                   |
+| `POST`   | `/orders/{order_id}/confirm`                             | confirm the pull; marks allocated units sold                                           |
+| `POST`   | `/publish`                                               | start a publish run; responds 202 and is idempotent while one is queued/running        |
+| `GET`    | `/publish`                                               | current-or-latest publish run: status, progress, error, pending dirty count            |
+| `POST`   | `/reports`                                               | start a report generation; responds 202 and is idempotent while one is queued/running  |
+| `GET`    | `/reports`                                               | latest report snapshot with staleness and generation status; 404 before first run      |
+| `GET`    | `/settings`                                              | settings view: credential presence, last-updated, track orders after                   |
+| `PATCH`  | `/settings`                                              | partial update: optional refresh token + optional track orders after                   |
 
 ### Example request and response
 
@@ -524,10 +524,9 @@ All mutations are `TransactWriteItems` including their audit entry; every mutati
 
 ### Environment variables
 
-| Name                 | Required                            | Purpose                                     | Default behavior       |
-| -------------------- | ----------------------------------- | ------------------------------------------- | ---------------------- |
-| `JOBS_QUEUE_URL`     | yes (trigger + consumer Lambdas)    | SQS queue for job and continuation messages | none; set by Terraform |
-| `BUCKET_NAME`        | yes (photo handlers + job consumer) | service S3 object store                     | none; set by Terraform |
+| Name             | Required                         | Purpose                                     | Default behavior       |
+| ---------------- | -------------------------------- | ------------------------------------------- | ---------------------- |
+| `JOBS_QUEUE_URL` | yes (trigger + consumer Lambdas) | SQS queue for job and continuation messages | none; set by Terraform |
 
 Fixed configuration lives in code: request spacing 1–2 s, bounded retries, request budgets, page sizes, slice size (~100 rows or bounded FetchTCG calls per slice), country `NZ`, currency `NZD`, keep threshold NZ$0.25, price increment NZ$0.05, seller floor NZ$0.25. Photo constants: import gate NZ$20, publish warning NZ$50, 5 photos per row/unit, 4 MB max upload, 15-minute presign TTL. Report constants: staleness backstop 24 h, bucketing timezone `Pacific/Auckland`, price buckets $0.25–$0.50 / $0.50–$1 / $1–$2 / $2–$5 / $5–$10 / $10+ NZD, aging bands 0–30 / 31–90 / 91–180 / 180+ days, top sets 10, top hits 10.
 

@@ -85,6 +85,7 @@ When performing the code review step, check for:
 - Don't add private methods when the logic is simple and used only once - inline it
 - Let exceptions bubble up naturally when appropriate instead of unnecessarily catching them
 - Always use imports instead of fully qualified names (e.g., `import java.util.ArrayList;` instead of `java.util.ArrayList`)
+- When a signature gains a required parameter, update every call site; do not add an overload, default, or dummy wrapper to avoid touching existing callers
 
 ## Testing guidelines
 
@@ -97,6 +98,7 @@ When performing the code review step, check for:
 - Integration tests: Use local dependencies (Testcontainers), test component interactions
 - E2E tests: Build local stack of complete system, test real user workflows
 - With DynamoDB test containers, no need to clean up data after tests - containers are reset between tests
+- When a test factory gains a dependency, pass it at every call site even if the test does not use it (for example `UNUSED_S3_ENDPOINT`)
 - Maintain a testing pyramid: many unit tests, fewer integration tests, fewest E2E tests
 
 ## TDD approach

@@ -122,28 +122,28 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 
 ### Consumed backend endpoints
 
-| Method   | Path                                                             | Used by                                                      |
-| -------- | ---------------------------------------------------------------- | ------------------------------------------------------------ |
-| `POST`   | `/imports`                                                       | import upload                                                |
-| `GET`    | `/imports`                                                       | imports list                                                 |
-| `GET`    | `/imports/{import_id}`                                           | appraisal progress + review rows                             |
-| `POST`   | `/imports/{import_id}/confirm`                                   | confirm flow + placement instructions                        |
-| `DELETE` | `/imports/{import_id}`                                           | delete-import action                                         |
-| `POST`   | `/imports/{import_id}/rows/{position}/photos`                    | photo add from the review strip                              |
-| `DELETE` | `/imports/{import_id}/rows/{position}/photos/{photo_id}`         | photo remove                                                 |
-| `GET`    | `/skus`                                                          | inventory browse/search                                      |
-| `GET`    | `/skus/{sku_id}`                                                 | SKU detail + units                                           |
-| `DELETE` | `/skus/{sku_id}/units/{sequence_number}`                         | remove-unit adjustment                                       |
-| `PUT`    | `/skus/{sku_id}/units/{sequence_number}`                         | condition-change adjustment                                  |
-| `GET`    | `/orders`                                                        | orders list                                                  |
-| `GET`    | `/orders/{order_id}`                                             | order detail                                                 |
-| `POST`   | `/orders/{order_id}/confirm`                                     | confirm pull                                                 |
-| `POST`   | `/publish`                                                       | publish trigger                                              |
-| `GET`    | `/publish`                                                       | publish run polling + pending count                          |
-| `GET`    | `/reports`                                                       | reports tab snapshot + staleness + generation polling        |
-| `POST`   | `/reports`                                                       | automatic regeneration trigger when stale                    |
-| `GET`    | `/settings`                                                      | credential presence check + login probe + track orders after |
-| `PATCH`  | `/settings`                                                      | partial update: credential and/or track orders after         |
+| Method   | Path                                                     | Used by                                                      |
+| -------- | -------------------------------------------------------- | ------------------------------------------------------------ |
+| `POST`   | `/imports`                                               | import upload                                                |
+| `GET`    | `/imports`                                               | imports list                                                 |
+| `GET`    | `/imports/{import_id}`                                   | appraisal progress + review rows                             |
+| `POST`   | `/imports/{import_id}/confirm`                           | confirm flow + placement instructions                        |
+| `DELETE` | `/imports/{import_id}`                                   | delete-import action                                         |
+| `POST`   | `/imports/{import_id}/rows/{position}/photos`            | photo add from the review strip                              |
+| `DELETE` | `/imports/{import_id}/rows/{position}/photos/{photo_id}` | photo remove                                                 |
+| `GET`    | `/skus`                                                  | inventory browse/search                                      |
+| `GET`    | `/skus/{sku_id}`                                         | SKU detail + units                                           |
+| `DELETE` | `/skus/{sku_id}/units/{sequence_number}`                 | remove-unit adjustment                                       |
+| `PUT`    | `/skus/{sku_id}/units/{sequence_number}`                 | condition-change adjustment                                  |
+| `GET`    | `/orders`                                                | orders list                                                  |
+| `GET`    | `/orders/{order_id}`                                     | order detail                                                 |
+| `POST`   | `/orders/{order_id}/confirm`                             | confirm pull                                                 |
+| `POST`   | `/publish`                                               | publish trigger                                              |
+| `GET`    | `/publish`                                               | publish run polling + pending count                          |
+| `GET`    | `/reports`                                               | reports tab snapshot + staleness + generation polling        |
+| `POST`   | `/reports`                                               | automatic regeneration trigger when stale                    |
+| `GET`    | `/settings`                                              | credential presence check + login probe + track orders after |
+| `PATCH`  | `/settings`                                              | partial update: credential and/or track orders after         |
 
 ### UI contract expectations
 

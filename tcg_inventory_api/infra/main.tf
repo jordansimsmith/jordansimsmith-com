@@ -47,9 +47,10 @@ locals {
 module "java_api" {
   source = "../../infra/modules/java_api"
 
-  application_id = local.application_id
-  domain_name    = "api.tcg-inventory.jordansimsmith.com"
-  cors_origin    = "https://tcg-inventory.jordansimsmith.com"
+  application_id     = local.application_id
+  domain_name        = "api.tcg-inventory.jordansimsmith.com"
+  cors_origin        = "https://tcg-inventory.jordansimsmith.com"
+  binary_media_types = ["image/jpeg"]
 
   lambdas = {
     get_settings = {
@@ -166,18 +167,43 @@ module "java_api" {
     dynamodb       = aws_iam_policy.lambda_dynamodb.arn
     sqs            = aws_iam_policy.lambda_sqs.arn
     secretsmanager = aws_iam_policy.lambda_secretsmanager.arn
+    s3             = aws_iam_policy.lambda_s3.arn
   }
 
   providers = {
     aws.us_east_1 = aws.us_east_1
   }
 
-  # snapstart snapshot init resolves the jobs queue and dynamodb table at
-  # startup, so they must exist before any lambda version is published
+  # snapstart snapshot init resolves the jobs queue, dynamodb table, and s3
+  # bucket at startup, so they must exist before any lambda version is published
   depends_on = [
     aws_sqs_queue.jobs,
     aws_dynamodb_table.tcg_inventory,
+    aws_s3_bucket.tcg_inventory,
   ]
+}
+
+resource "aws_s3_bucket" "tcg_inventory" {
+  bucket = "api.tcg-inventory.jordansimsmith.com"
+}
+
+resource "aws_s3_bucket_server_side_encryption_configuration" "tcg_inventory" {
+  bucket = aws_s3_bucket.tcg_inventory.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "tcg_inventory" {
+  bucket = aws_s3_bucket.tcg_inventory.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
 }
 
 resource "aws_dynamodb_table" "tcg_inventory" {
@@ -353,4 +379,30 @@ data "aws_iam_policy_document" "lambda_secretsmanager" {
 resource "aws_iam_policy" "lambda_secretsmanager" {
   name   = "${local.application_id}_lambda_secretsmanager"
   policy = data.aws_iam_policy_document.lambda_secretsmanager.json
+}
+
+data "aws_iam_policy_document" "lambda_s3" {
+  statement {
+    effect = "Allow"
+
+    resources = [
+      "${aws_s3_bucket.tcg_inventory.arn}/*"
+    ]
+
+    actions = [
+      "s3:PutObject",
+      "s3:GetObject",
+    ]
+  }
+
+  statement {
+    effect    = "Allow"
+    resources = ["*"]
+    actions   = ["s3:ListAllMyBuckets"]
+  }
+}
+
+resource "aws_iam_policy" "lambda_s3" {
+  name   = "${local.application_id}_lambda_s3"
+  policy = data.aws_iam_policy_document.lambda_s3.json
 }

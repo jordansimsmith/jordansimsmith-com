@@ -53,3 +53,8 @@ variable "cors_origin" {
   type    = string
   default = null
 }
+
+variable "binary_media_types" {
+  type    = list(string)
+  default = []
+}

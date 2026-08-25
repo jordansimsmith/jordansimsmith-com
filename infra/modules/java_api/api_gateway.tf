@@ -55,7 +55,8 @@ locals {
 }
 
 resource "aws_api_gateway_rest_api" "this" {
-  name = "${var.application_id}_gateway"
+  name               = "${var.application_id}_gateway"
+  binary_media_types = var.binary_media_types
 }
 
 resource "aws_cloudwatch_log_group" "access" {
@@ -264,6 +265,7 @@ resource "aws_api_gateway_deployment" "this" {
       aws_api_gateway_integration.options,
       aws_api_gateway_method_response.options,
       aws_api_gateway_integration_response.options,
+      var.binary_media_types,
     ]))
   }
 

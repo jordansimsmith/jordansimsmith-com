@@ -20,6 +20,12 @@ sqs_client = boto3.client("sqs", endpoint_url=endpoint_url, region_name=region_n
 secretsmanager_client = boto3.client(
     "secretsmanager", endpoint_url=endpoint_url, region_name=region_name
 )
+s3_client = boto3.client("s3", endpoint_url=endpoint_url, region_name=region_name)
+
+s3_client.create_bucket(
+    Bucket="api.tcg-inventory.jordansimsmith.com",
+    CreateBucketConfiguration={"LocationConstraint": region_name},
+)
 
 table_name = "tcg_inventory"
 dynamodb_client.create_table(

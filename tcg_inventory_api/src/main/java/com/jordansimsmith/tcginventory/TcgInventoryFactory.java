@@ -7,6 +7,7 @@ import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.http.RequestContextModule;
 import com.jordansimsmith.json.ObjectMapperModule;
 import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.s3.S3Module;
 import com.jordansimsmith.secrets.Secrets;
 import com.jordansimsmith.secrets.SecretsModule;
 import com.jordansimsmith.time.Clock;
@@ -17,6 +18,8 @@ import dagger.Component;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 @Singleton
 @Component(
@@ -27,6 +30,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
       SecretsModule.class,
       RequestContextModule.class,
       UlidModule.class,
+      S3Module.class,
       TcgInventoryModule.class
     })
 public interface TcgInventoryFactory {
@@ -51,6 +55,10 @@ public interface TcgInventoryFactory {
   FetchTcgClient fetchTcgClient();
 
   FetchTcgTokenMinter fetchTcgTokenMinter();
+
+  S3Client s3Client();
+
+  S3Presigner s3Presigner();
 
   static TcgInventoryFactory create() {
     return DaggerTcgInventoryFactory.create();

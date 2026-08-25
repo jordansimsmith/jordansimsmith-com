@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import java.net.URI;
 import java.time.Instant;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -19,16 +20,20 @@ public class TcgInventoryItemIntegrationTest {
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
+  private static final URI UNUSED_S3_ENDPOINT = URI.create("http://localhost:1");
+
   @BeforeAll
   static void setUpBeforeClass() {
-    var factory = TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint());
+    var factory =
+        TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
     var table = factory.tcgInventoryTable();
     DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
   }
 
   @BeforeEach
   void setUp() {
-    var factory = TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint());
+    var factory =
+        TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
     tcgInventoryTable = factory.tcgInventoryTable();
     DynamoDbUtils.reset(factory.dynamoDbClient());
   }
