@@ -24,6 +24,7 @@ import type {
   ConfirmImportResponse,
   ImportDetail,
 } from '../api/client';
+import { encodeListingPhoto } from '../domain/encode-listing-photo';
 import { useListNavigation } from '../hooks/use-list-navigation';
 
 const POLL_INTERVAL_MS = 2000;
@@ -42,6 +43,8 @@ export function ImportDetailPage() {
   const [deleting, setDeleting] = useState(false);
   // this page has no search input; the ref keeps the navigation hook inert on "/"
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const importDetailRef = useRef(importDetail);
+  importDetailRef.current = importDetail;
 
   const rows = importDetail?.rows ?? [];
   const showReview =
@@ -112,6 +115,29 @@ export function ImportDetailPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [confirmOpen, deleteOpen, navigate]);
 
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState !== 'visible' || !importId) {
+        return;
+      }
+      if (importDetailRef.current?.status !== 'review') {
+        return;
+      }
+      try {
+        const response = await apiClient.getImport(importId);
+        setImportDetail(response);
+      } catch (e) {
+        const message =
+          e instanceof Error ? e.message : 'Failed to load import';
+        notifications.show({ title: 'Error', message, color: 'red' });
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [importId]);
+
   const handleConditionChange = async (
     position: number,
     condition: Condition,
@@ -164,6 +190,35 @@ export function ImportDetailPage() {
     }
   };
 
+  const handleAddPhoto = async (position: number, file: File) => {
+    if (!importId) {
+      return;
+    }
+    try {
+      const jpeg = await encodeListingPhoto(file);
+      await apiClient.addRowPhoto(importId, position, jpeg);
+      const updated = await apiClient.getImport(importId);
+      setImportDetail(updated);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to add photo';
+      notifications.show({ title: 'Error', message, color: 'red' });
+    }
+  };
+
+  const handleRemovePhoto = async (position: number, photoId: string) => {
+    if (!importId) {
+      return;
+    }
+    try {
+      await apiClient.deleteRowPhoto(importId, position, photoId);
+      const updated = await apiClient.getImport(importId);
+      setImportDetail(updated);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Failed to remove photo';
+      notifications.show({ title: 'Error', message, color: 'red' });
+    }
+  };
+
   const handleConfirm = async () => {
     if (!importId) {
       return;
@@ -205,6 +260,7 @@ export function ImportDetailPage() {
   const keepCount = rows.filter((r) => r.decision === 'keep').length;
   const discardCount = rows.filter((r) => r.decision === 'discard').length;
   const reviewCount = rows.filter((r) => r.decision === 'review').length;
+  const needsPhotosCount = rows.filter((r) => r.needs_photos).length;
   const appraised = keepCount + discardCount + reviewCount;
 
   return (
@@ -266,6 +322,13 @@ export function ImportDetailPage() {
                   <Badge variant="light" color="yellow">
                     Review {reviewCount}
                   </Badge>
+                  {importDetail.status === 'review' && needsPhotosCount > 0 && (
+                    <Text size="sm" c="dimmed">
+                      {needsPhotosCount === 1
+                        ? '1 row needs photos before confirm'
+                        : `${needsPhotosCount} rows need photos before confirm`}
+                    </Text>
+                  )}
                 </Group>
                 {importDetail.status === 'review' && (
                   <Group gap="sm">
@@ -276,7 +339,10 @@ export function ImportDetailPage() {
                     >
                       Delete import
                     </Button>
-                    <Button onClick={() => setConfirmOpen(true)}>
+                    <Button
+                      onClick={() => setConfirmOpen(true)}
+                      disabled={needsPhotosCount > 0}
+                    >
                       Confirm import
                     </Button>
                   </Group>
@@ -291,6 +357,8 @@ export function ImportDetailPage() {
                 editable={importDetail.status === 'review'}
                 onConditionChange={handleConditionChange}
                 onDeleteRow={handleDeleteRow}
+                onAddPhoto={handleAddPhoto}
+                onRemovePhoto={handleRemovePhoto}
               />
             )}
             {confirmResult && (

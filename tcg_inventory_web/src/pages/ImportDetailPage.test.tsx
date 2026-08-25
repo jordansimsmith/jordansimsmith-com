@@ -14,6 +14,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ImportDetailPage } from './ImportDetailPage';
 import * as clientModule from '../api/client';
 import type { ImportDetail, ImportRow } from '../api/client';
+import { encodeListingPhoto } from '../domain/encode-listing-photo';
+
+vi.mock('../domain/encode-listing-photo', () => ({
+  encodeListingPhoto: vi.fn(),
+}));
 
 function appraisingRows(): ImportRow[] {
   const rows: ImportRow[] = [];
@@ -127,6 +132,10 @@ describe('ImportDetailPage', () => {
   afterEach(() => {
     cleanup();
     vi.useRealTimers();
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    });
   });
 
   it('renders appraisal progress with running counts', async () => {
@@ -518,5 +527,324 @@ describe('ImportDetailPage', () => {
     await screen.findByText('manabox-today.csv');
 
     expect(screen.queryByRole('button', { name: 'Delete import' })).toBeNull();
+  });
+
+  it('shows a needs photos badge only when the server flags the row', async () => {
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport({
+        rows: [
+          importRow(1, {
+            name: 'Flagged Card',
+            suggested_price: '60.00',
+            needs_photos: true,
+          }),
+          importRow(2, {
+            name: 'High Value Unflagged',
+            suggested_price: '60.00',
+            needs_photos: false,
+          }),
+          importRow(3, {
+            name: 'Middle Card',
+            decision: 'discard',
+            decision_reason: 'market price below NZ$0.25 keep threshold',
+            market_price: '0.10',
+            suggested_price: null,
+          }),
+        ],
+      }),
+    );
+
+    renderImportDetailPage();
+
+    expect(await screen.findByText('Flagged Card')).toBeDefined();
+    const flaggedRow = screen.getByText('Flagged Card').closest('tr');
+    expect(flaggedRow).not.toBeNull();
+    expect(
+      within(flaggedRow as HTMLElement).getByText('Needs photos'),
+    ).toBeDefined();
+    expect(
+      within(flaggedRow as HTMLElement).getByLabelText('Add photo to row 1'),
+    ).toBeDefined();
+    const unflaggedRow = screen.getByText('High Value Unflagged').closest('tr');
+    expect(unflaggedRow).not.toBeNull();
+    expect(
+      within(unflaggedRow as HTMLElement).queryByText('Needs photos'),
+    ).toBeNull();
+    expect(
+      within(unflaggedRow as HTMLElement).getByLabelText('Add photo to row 2'),
+    ).toBeDefined();
+  });
+
+  it('shows a photo strip on keep rows only', async () => {
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport(),
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+
+    expect(screen.getByLabelText('Add photo to row 1')).toBeDefined();
+    expect(screen.queryByLabelText('Add photo to row 2')).toBeNull();
+    expect(screen.queryByLabelText('Add photo to row 3')).toBeNull();
+    expect(screen.queryByRole('button', { name: /primary/i })).toBeNull();
+  });
+
+  it('adds a photo through the canvas util and refetches the import', async () => {
+    const user = userEvent.setup();
+    const encodedJpeg = new Blob(['encoded'], { type: 'image/jpeg' });
+    vi.mocked(encodeListingPhoto).mockResolvedValue(encodedJpeg);
+    const flagged = reviewImport({
+      rows: [
+        importRow(1, {
+          name: 'Top Card',
+          suggested_price: '60.00',
+          needs_photos: true,
+        }),
+        importRow(2, {
+          name: 'Middle Card',
+          decision: 'discard',
+          decision_reason: 'market price below NZ$0.25 keep threshold',
+          market_price: '0.10',
+          suggested_price: null,
+        }),
+      ],
+    });
+    const withPhoto = reviewImport({
+      rows: [
+        importRow(1, {
+          name: 'Top Card',
+          suggested_price: '60.00',
+          needs_photos: false,
+          photos: [{ photo_id: 'photo-1', url: 'https://example.com/p1.jpg' }],
+        }),
+        importRow(2, {
+          name: 'Middle Card',
+          decision: 'discard',
+          decision_reason: 'market price below NZ$0.25 keep threshold',
+          market_price: '0.10',
+          suggested_price: null,
+        }),
+      ],
+    });
+    const getImportMock = vi
+      .spyOn(clientModule.apiClient, 'getImport')
+      .mockResolvedValueOnce(flagged)
+      .mockResolvedValue(withPhoto);
+    vi.spyOn(clientModule.apiClient, 'addRowPhoto').mockResolvedValue(
+      undefined,
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+    expect(screen.getByText('Needs photos')).toBeDefined();
+
+    const file = new File(['src'], 'card.jpg', { type: 'image/jpeg' });
+    await user.upload(screen.getByLabelText('Add photo to row 1'), file);
+
+    await waitFor(() => {
+      expect(encodeListingPhoto).toHaveBeenCalledWith(file);
+      expect(clientModule.apiClient.addRowPhoto).toHaveBeenCalledWith(
+        'import-2',
+        1,
+        encodedJpeg,
+      );
+    });
+    await waitFor(() => {
+      expect(getImportMock).toHaveBeenCalledTimes(2);
+    });
+    expect(screen.getByAltText('Listing photo photo-1')).toBeDefined();
+    expect(screen.queryByText('Needs photos')).toBeNull();
+  });
+
+  it('removes a photo and refetches the import', async () => {
+    const user = userEvent.setup();
+    const withPhoto = reviewImport({
+      rows: [
+        importRow(1, {
+          name: 'Top Card',
+          suggested_price: '60.00',
+          needs_photos: false,
+          photos: [{ photo_id: 'photo-1', url: 'https://example.com/p1.jpg' }],
+        }),
+      ],
+    });
+    const withoutPhoto = reviewImport({
+      rows: [
+        importRow(1, {
+          name: 'Top Card',
+          suggested_price: '60.00',
+          needs_photos: true,
+        }),
+      ],
+    });
+    vi.spyOn(clientModule.apiClient, 'getImport')
+      .mockResolvedValueOnce(withPhoto)
+      .mockResolvedValue(withoutPhoto);
+    vi.spyOn(clientModule.apiClient, 'deleteRowPhoto').mockResolvedValue(
+      undefined,
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+
+    await user.click(
+      screen.getByRole('button', { name: 'Remove photo photo-1' }),
+    );
+
+    await waitFor(() => {
+      expect(clientModule.apiClient.deleteRowPhoto).toHaveBeenCalledWith(
+        'import-2',
+        1,
+        'photo-1',
+      );
+    });
+    await waitFor(() => {
+      expect(screen.getByText('Needs photos')).toBeDefined();
+    });
+    expect(screen.queryByAltText('Listing photo photo-1')).toBeNull();
+  });
+
+  it('pluralises the confirm gate reason', async () => {
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport({
+        rows: [
+          importRow(1, { name: 'Top Card', needs_photos: true }),
+          importRow(2, { name: 'Second Card', needs_photos: true }),
+        ],
+      }),
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+
+    expect(
+      screen.getByText('2 rows need photos before confirm'),
+    ).toBeDefined();
+  });
+
+  it('disables confirm while any row needs photos and enables after they are photographed', async () => {
+    const user = userEvent.setup();
+    const encodedJpeg = new Blob(['encoded'], { type: 'image/jpeg' });
+    vi.mocked(encodeListingPhoto).mockResolvedValue(encodedJpeg);
+    const flagged = reviewImport({
+      rows: [
+        importRow(1, {
+          name: 'Top Card',
+          suggested_price: '60.00',
+          needs_photos: true,
+        }),
+      ],
+    });
+    const photographed = reviewImport({
+      rows: [
+        importRow(1, {
+          name: 'Top Card',
+          suggested_price: '60.00',
+          needs_photos: false,
+          photos: [{ photo_id: 'photo-1', url: 'https://example.com/p1.jpg' }],
+        }),
+      ],
+    });
+    vi.spyOn(clientModule.apiClient, 'getImport')
+      .mockResolvedValueOnce(flagged)
+      .mockResolvedValueOnce(photographed)
+      .mockResolvedValue(flagged);
+    vi.spyOn(clientModule.apiClient, 'addRowPhoto').mockResolvedValue(
+      undefined,
+    );
+    vi.spyOn(clientModule.apiClient, 'deleteRowPhoto').mockResolvedValue(
+      undefined,
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+
+    expect(
+      screen.getByRole('button', { name: 'Confirm import' }),
+    ).toHaveProperty('disabled', true);
+    expect(screen.getByText('1 row needs photos before confirm')).toBeDefined();
+
+    const file = new File(['src'], 'card.jpg', { type: 'image/jpeg' });
+    await user.upload(screen.getByLabelText('Add photo to row 1'), file);
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Confirm import' }),
+      ).toHaveProperty('disabled', false);
+    });
+    expect(screen.queryByText('1 row needs photos before confirm')).toBeNull();
+
+    await user.click(
+      screen.getByRole('button', { name: 'Remove photo photo-1' }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole('button', { name: 'Confirm import' }),
+      ).toHaveProperty('disabled', true);
+    });
+    expect(screen.getByText('1 row needs photos before confirm')).toBeDefined();
+  });
+
+  it('refetches the import on window refocus while in review', async () => {
+    const getImportMock = vi
+      .spyOn(clientModule.apiClient, 'getImport')
+      .mockResolvedValue(reviewImport());
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+    expect(getImportMock).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    });
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    await waitFor(() => {
+      expect(getImportMock).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  it('does not refetch on refocus while appraising', async () => {
+    const getImportMock = vi
+      .spyOn(clientModule.apiClient, 'getImport')
+      .mockResolvedValue(importDetail());
+
+    renderImportDetailPage();
+    await screen.findByText('manabox-today.csv');
+    expect(getImportMock).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    });
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    expect(getImportMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not refetch on refocus when the import is confirmed', async () => {
+    const getImportMock = vi
+      .spyOn(clientModule.apiClient, 'getImport')
+      .mockResolvedValue(reviewImport({ status: 'confirmed' }));
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+    expect(getImportMock).toHaveBeenCalledTimes(1);
+
+    Object.defineProperty(document, 'visibilityState', {
+      configurable: true,
+      get: () => 'visible',
+    });
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    expect(getImportMock).toHaveBeenCalledTimes(1);
   });
 });
