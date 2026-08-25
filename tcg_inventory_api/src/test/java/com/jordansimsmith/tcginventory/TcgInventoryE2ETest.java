@@ -3,10 +3,12 @@ package com.jordansimsmith.tcginventory;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -25,14 +27,32 @@ public class TcgInventoryE2ETest {
       "Basic "
           + Base64.getEncoder().encodeToString("jordan:password".getBytes(StandardCharsets.UTF_8));
 
+  private static final String HIT_SCRYFALL_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
+  private static final String HIT_SKU_ID = HIT_SCRYFALL_ID + "#normal#NM";
+
   private static final String CSV_BODY =
       "Name,Set code,Set name,Collector number,Foil,Quantity,Scryfall ID,Condition,Language\n"
-          + "Test Card A,DOM,Dominaria,168,normal,1,f0a51425-d796-48b8-b68c-bc21fb465c81,"
-          + "near_mint,en\n"
+          + "Test Hit,DOM,Dominaria,1,normal,2,"
+          + HIT_SCRYFALL_ID
+          + ",near_mint,en\n"
           + "Test Card B,DOM,Dominaria,169,normal,1,a1b2c3d4-e5f6-7890-abcd-ef1234567890,"
-          + "near_mint,en\n"
-          + "Test Card C,DOM,Dominaria,170,normal,1,11111111-2222-3333-4444-555555555555,"
           + "near_mint,en\n";
+
+  private static final String CHEAP_CSV_BODY =
+      "Name,Set code,Set name,Collector number,Foil,Quantity,Scryfall ID,Condition,Language\n"
+          + "Test Card B,DOM,Dominaria,169,normal,1,a1b2c3d4-e5f6-7890-abcd-ef1234567890,"
+          + "near_mint,en\n";
+
+  private static final byte[] FRONT_JPEG =
+      new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xD9};
+  private static final byte[] BACK_JPEG =
+      new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE0, (byte) 0x00};
+  private static final byte[] UNIT_TWO_JPEG =
+      new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xE1, (byte) 0x00};
+
+  private static final String STUB_IMAGE_1 = "https://listing-img.fetchtcg.com/stub/listing/1.jpg";
+  private static final String STUB_IMAGE_2 = "https://listing-img.fetchtcg.com/stub/listing/2.jpg";
+  private static final String STUB_IMAGE_3 = "https://listing-img.fetchtcg.com/stub/listing/3.jpg";
 
   private static final Network NETWORK = Network.newNetwork();
 
@@ -84,7 +104,7 @@ public class TcgInventoryE2ETest {
     var settingsResponse = patch("/settings", "{\"refresh_token\":\"fake-token\"}");
     assertThat(settingsResponse.statusCode()).isEqualTo(200);
 
-    // act - upload csv
+    // act - upload csv (two hit copies + one cheap card)
     var importResponse =
         httpClient.send(
             HttpRequest.newBuilder()
@@ -112,17 +132,16 @@ public class TcgInventoryE2ETest {
               assertThat(body.get("status").asText()).isEqualTo("review");
             });
 
-    // act - update row 1 condition from NM to LP
+    // act - update cheap row 1 condition from NM to LP, then delete it
     var updateRowResponse = put("/imports/" + importId + "/rows/1", "{\"condition\":\"LP\"}");
     assertThat(updateRowResponse.statusCode()).isEqualTo(200);
     var updatedRow = objectMapper.readTree(updateRowResponse.body());
     assertThat(updatedRow.get("condition").asText()).isEqualTo("LP");
 
-    // act - delete row 3
-    var deleteRowResponse = delete("/imports/" + importId + "/rows/3");
+    var deleteRowResponse = delete("/imports/" + importId + "/rows/1");
     assertThat(deleteRowResponse.statusCode()).isEqualTo(204);
 
-    // assert - verify import still in review with modified rows
+    // assert - two hit rows remain, both flagged for photos
     var importDetail = get("/imports/" + importId);
     assertThat(importDetail.statusCode()).isEqualTo(200);
     var importDetailBody = objectMapper.readTree(importDetail.body());
@@ -130,6 +149,43 @@ public class TcgInventoryE2ETest {
     var rows = importDetailBody.get("rows");
     assertThat(rows).hasSize(2);
     assertThat(rows.get(0).get("decision").asText()).isEqualTo("keep");
+    assertThat(rows.get(0).get("needs_photos").asBoolean()).isTrue();
+    assertThat(rows.get(1).get("decision").asText()).isEqualTo("keep");
+    assertThat(rows.get(1).get("needs_photos").asBoolean()).isTrue();
+    var firstHitPosition = rows.get(0).get("position").asInt();
+    var secondHitPosition = rows.get(1).get("position").asInt();
+
+    // act - confirm is blocked while flagged rows are photo-less
+    var gatedConfirm = post("/imports/" + importId + "/confirm");
+    assertThat(gatedConfirm.statusCode()).isEqualTo(409);
+    assertThat(objectMapper.readTree(gatedConfirm.body()).get("message").asText())
+        .isEqualTo("2 rows need photos before confirm");
+
+    // act - photograph each remaining hit row separately
+    assertThat(
+            postJpeg("/imports/" + importId + "/rows/" + firstHitPosition + "/photos", FRONT_JPEG)
+                .statusCode())
+        .isEqualTo(204);
+    assertThat(
+            postJpeg("/imports/" + importId + "/rows/" + firstHitPosition + "/photos", BACK_JPEG)
+                .statusCode())
+        .isEqualTo(204);
+    assertThat(
+            postJpeg(
+                    "/imports/" + importId + "/rows/" + secondHitPosition + "/photos",
+                    UNIT_TWO_JPEG)
+                .statusCode())
+        .isEqualTo(204);
+
+    var photographedImport = get("/imports/" + importId);
+    assertThat(photographedImport.statusCode()).isEqualTo(200);
+    var photographedRows = objectMapper.readTree(photographedImport.body()).get("rows");
+    assertThat(photographedRows.get(0).get("needs_photos").asBoolean()).isFalse();
+    assertThat(photographedRows.get(0).get("photos")).hasSize(2);
+    assertThat(photographedRows.get(0).get("photos").get(0).get("url").asText()).isNotBlank();
+    assertThat(photographedRows.get(1).get("needs_photos").asBoolean()).isFalse();
+    assertThat(photographedRows.get(1).get("photos")).hasSize(1);
+    assertThat(photographedRows.get(1).get("photos").get(0).get("url").asText()).isNotBlank();
 
     // act - confirm import
     var confirmResponse = post("/imports/" + importId + "/confirm");
@@ -138,17 +194,30 @@ public class TcgInventoryE2ETest {
     assertThat(confirmBody.get("status").asText()).isEqualTo("confirmed");
     assertThat(confirmBody.get("unit_count").asInt()).isEqualTo(2);
 
-    // assert - verify skus exist
+    // assert - one sku with both units carrying photos
     var skusResponse = get("/skus");
     assertThat(skusResponse.statusCode()).isEqualTo(200);
     var skusBody = objectMapper.readTree(skusResponse.body());
-    assertThat(skusBody.get("skus").size()).isGreaterThanOrEqualTo(2);
+    assertThat(skusBody.get("skus")).hasSize(1);
+
+    var skuResponse = get("/skus/" + URLEncoder.encode(HIT_SKU_ID, StandardCharsets.UTF_8));
+    assertThat(skuResponse.statusCode()).isEqualTo(200);
+    var skuBody = objectMapper.readTree(skuResponse.body());
+    assertThat(skuBody.get("units")).hasSize(2);
+    assertThat(skuBody.get("units").get(0).get("photos")).hasSize(2);
+    assertThat(skuBody.get("units").get(1).get("photos")).hasSize(1);
 
     // act - publish run 1: stub returns empty offers, listing phase creates listings
     triggerPublishAndWait();
 
+    var firstListing = getStubListing();
+    assertThat(firstListing.get("frontImage").asText()).isEqualTo(STUB_IMAGE_1);
+    assertThat(firstListing.get("additionalImages")).hasSize(1);
+    assertThat(firstListing.get("additionalImages").get(0).get("url").asText())
+        .isEqualTo(STUB_IMAGE_2);
+
     // act - publish run 2: stub returns offer with listing 900001, order created directly as
-    // to_pick
+    // to_pick; reserved first unit so listing swaps to the next unit's photos
     triggerPublishAndWait();
 
     // act - list orders
@@ -170,6 +239,10 @@ public class TcgInventoryE2ETest {
     assertThat(orderUnits).hasSize(1);
     assertThat(orderUnits.get(0).get("sequence_number").asInt()).isZero();
     assertThat(orderUnits.get(0).get("location").asText()).isEqualTo("A0-0");
+
+    var swappedListing = getStubListing();
+    assertThat(swappedListing.get("frontImage").asText()).isEqualTo(STUB_IMAGE_3);
+    assertThat(swappedListing.get("additionalImages")).isEmpty();
 
     // act - confirm pull
     var confirmOrderResponse = post("/orders/99001/confirm");
@@ -281,14 +354,14 @@ public class TcgInventoryE2ETest {
       assertThat(entry.get("sold_units").asInt()).isGreaterThanOrEqualTo(0);
     }
 
-    // act - upload another csv to create a new audit entry via confirm
+    // act - upload a cheap csv to create a new audit entry via confirm
     var importResponse2 =
         httpClient.send(
             HttpRequest.newBuilder()
                 .uri(URI.create(apiUrl + "/imports?filename=test2.csv"))
                 .header("Authorization", AUTH_HEADER)
                 .header("content-type", "text/csv")
-                .POST(HttpRequest.BodyPublishers.ofString(CSV_BODY))
+                .POST(HttpRequest.BodyPublishers.ofString(CHEAP_CSV_BODY))
                 .build(),
             HttpResponse.BodyHandlers.ofString());
     assertThat(importResponse2.statusCode()).isEqualTo(200);
@@ -333,6 +406,18 @@ public class TcgInventoryE2ETest {
             .header("Authorization", AUTH_HEADER)
             .header("Content-Type", "application/json")
             .POST(HttpRequest.BodyPublishers.ofString(""))
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> postJpeg(String path, byte[] jpeg)
+      throws IOException, InterruptedException {
+    return httpClient.send(
+        HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl + path))
+            .header("Authorization", AUTH_HEADER)
+            .header("content-type", "image/jpeg")
+            .POST(HttpRequest.BodyPublishers.ofByteArray(jpeg))
             .build(),
         HttpResponse.BodyHandlers.ofString());
   }
@@ -409,5 +494,24 @@ public class TcgInventoryE2ETest {
             .DELETE()
             .build(),
         HttpResponse.BodyHandlers.ofString());
+  }
+
+  @SuppressWarnings("HttpUrlsUsage")
+  private JsonNode getStubListing() throws IOException, InterruptedException {
+    var stubUrl =
+        URI.create(
+            "http://"
+                + fetchTcgStubContainer.getHost()
+                + ":"
+                + fetchTcgStubContainer.getMappedPort(8080)
+                + "/v1/manage-listings");
+    var response =
+        httpClient.send(
+            HttpRequest.newBuilder().uri(stubUrl).GET().build(),
+            HttpResponse.BodyHandlers.ofString());
+    assertThat(response.statusCode()).isEqualTo(200);
+    var content = objectMapper.readTree(response.body()).get("content");
+    assertThat(content).hasSize(1);
+    return content.get(0);
   }
 }

@@ -86,7 +86,9 @@ secretsmanager_client.create_secret(
 )
 
 api_id = apigateway_client.create_rest_api(
-    name="tcg_inventory", tags={"_custom_id_": "tcg_inventory"}
+    name="tcg_inventory",
+    binaryMediaTypes=["image/jpeg"],
+    tags={"_custom_id_": "tcg_inventory"},
 )["id"]
 root_id = apigateway_client.get_resources(restApiId=api_id)["items"][0]["id"]
 
@@ -200,6 +202,14 @@ lambdas = {
         "handler": "com.jordansimsmith.tcginventory.DeleteImportRowHandler",
         "zip_file": "delete-import-row-handler_deploy.jar",
     },
+    "create_import_row_photo": {
+        "handler": "com.jordansimsmith.tcginventory.CreateImportRowPhotoHandler",
+        "zip_file": "create-import-row-photo-handler_deploy.jar",
+    },
+    "delete_import_row_photo": {
+        "handler": "com.jordansimsmith.tcginventory.DeleteImportRowPhotoHandler",
+        "zip_file": "delete-import-row-photo-handler_deploy.jar",
+    },
     "create_report": {
         "handler": "com.jordansimsmith.tcginventory.CreateReportHandler",
         "zip_file": "create-report-handler_deploy.jar",
@@ -227,6 +237,8 @@ child_resources = {
     "import_confirm": {"parent": "import_detail", "path": "confirm"},
     "import_rows": {"parent": "import_detail", "path": "rows"},
     "import_row_detail": {"parent": "import_rows", "path": "{position}"},
+    "import_row_photos": {"parent": "import_row_detail", "path": "photos"},
+    "import_row_photo_detail": {"parent": "import_row_photos", "path": "{photo_id}"},
     "sku_detail": {"parent": "skus", "path": "{sku_id}"},
     "sku_units": {"parent": "sku_detail", "path": "units"},
     "sku_unit_detail": {"parent": "sku_units", "path": "{sequence_number}"},
@@ -315,6 +327,16 @@ endpoints = {
         "method": "DELETE",
         "lambda": "delete_import_row",
     },
+    "create_import_row_photo": {
+        "resource": "import_row_photos",
+        "method": "POST",
+        "lambda": "create_import_row_photo",
+    },
+    "delete_import_row_photo": {
+        "resource": "import_row_photo_detail",
+        "method": "DELETE",
+        "lambda": "delete_import_row_photo",
+    },
 }
 
 for function_name, config in lambdas.items():
@@ -359,14 +381,20 @@ for endpoint in endpoints.values():
         httpMethod=endpoint["method"],
         authorizationType="NONE",
     )
-    apigateway_client.put_integration(
-        restApiId=api_id,
-        resourceId=resource_ids[endpoint["resource"]],
-        httpMethod=endpoint["method"],
-        type="AWS_PROXY",
-        integrationHttpMethod="POST",
-        uri=f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/arn:aws:lambda:{region_name}:000000000000:function:{endpoint['lambda']}/invocations",
-    )
+    integration_kwargs = {
+        "restApiId": api_id,
+        "resourceId": resource_ids[endpoint["resource"]],
+        "httpMethod": endpoint["method"],
+        "type": "AWS_PROXY",
+        "integrationHttpMethod": "POST",
+        "uri": (
+            f"arn:aws:apigateway:{region_name}:lambda:path/2015-03-31/functions/"
+            f"arn:aws:lambda:{region_name}:000000000000:function:{endpoint['lambda']}/invocations"
+        ),
+    }
+    if endpoint["lambda"] == "create_import_row_photo":
+        integration_kwargs["contentHandling"] = "CONVERT_TO_TEXT"
+    apigateway_client.put_integration(**integration_kwargs)
 
 for function_name in lambdas:
     lambda_client.get_waiter("function_active_v2").wait(FunctionName=function_name)

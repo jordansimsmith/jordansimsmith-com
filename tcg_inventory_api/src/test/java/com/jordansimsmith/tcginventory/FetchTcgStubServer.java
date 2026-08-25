@@ -21,9 +21,19 @@ public final class FetchTcgStubServer {
       {"searchResults":{"content":[{"id":"mtg_168_c_dom_normal"}]}}\
       """;
 
+  private static final String HIT_SEARCH_RESPONSE =
+      """
+      {"searchResults":{"content":[{"id":"mtg_hit_c_dom_normal"}]}}\
+      """;
+
   private static final String CARD_RESPONSE =
       """
       {"id":"mtg_168_c_dom_normal","name":"Test Card","pricingData":{"NZ":{"tcgMarketPrice":1.50}}}\
+      """;
+
+  private static final String HIT_CARD_RESPONSE =
+      """
+      {"id":"mtg_hit_c_dom_normal","name":"Test Hit","pricingData":{"NZ":{"tcgMarketPrice":60.00}}}\
       """;
 
   private static final String LISTINGS_RESPONSE =
@@ -73,11 +83,18 @@ public final class FetchTcgStubServer {
 
   private static void handleCards(HttpExchange exchange) throws IOException {
     var query = exchange.getRequestURI().getQuery();
+    var path = exchange.getRequestURI().getPath();
 
     if (query != null && query.contains("countryCode=")) {
       respond(exchange, 200, "application/json", LISTINGS_RESPONSE);
     } else if (query != null && query.contains("cardName=")) {
-      respond(exchange, 200, "application/json", SEARCH_RESPONSE);
+      var searchResponse =
+          query.contains("cardName=Test+Hit") || query.contains("cardName=Test%20Hit")
+              ? HIT_SEARCH_RESPONSE
+              : SEARCH_RESPONSE;
+      respond(exchange, 200, "application/json", searchResponse);
+    } else if (path.endsWith("/mtg_hit_c_dom_normal")) {
+      respond(exchange, 200, "application/json", HIT_CARD_RESPONSE);
     } else {
       respond(exchange, 200, "application/json", CARD_RESPONSE);
     }
