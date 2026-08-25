@@ -10,6 +10,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.math.BigDecimal;
@@ -17,6 +18,10 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.ByteBuffer;
+import java.nio.charset.StandardCharsets;
+import java.util.List;
+import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -369,7 +374,7 @@ public class HttpFetchTcgClientTest {
 
     var request =
         new FetchTcgClient.UpsertListingRequest(
-            "mtg_218_c_kld_normal", "raw-nm", 2, new BigDecimal("1.50"));
+            "mtg_218_c_kld_normal", "raw-nm", 2, new BigDecimal("1.50"), null, null);
 
     // act
     var result = client.upsertListing("my-token", request);
@@ -385,6 +390,126 @@ public class HttpFetchTcgClientTest {
     assertThat(requestCaptor.getValue().headers().firstValue("Authorization"))
         .contains("Bearer my-token");
     assertThat(requestCaptor.getValue().method()).isEqualTo("POST");
+
+    var body = objectMapper.readTree(requestBodyString(requestCaptor.getValue()));
+    assertThat(body.get("cardId").asText()).isEqualTo("mtg_218_c_kld_normal");
+    assertThat(body.get("condition").asText()).isEqualTo("raw-nm");
+    assertThat(body.get("listedPrice").decimalValue()).isEqualByComparingTo("1.50");
+    assertThat(body.get("listedCurrency").asText()).isEqualTo("NZD");
+    assertThat(body.get("matchPriceEnabled").asBoolean()).isFalse();
+    assertThat(body.get("quantity").asInt()).isEqualTo(2);
+    assertThat(body.get("details").asText()).isEmpty();
+    assertThat(body.has("frontImage")).isFalse();
+    assertThat(body.has("additionalImages")).isFalse();
+  }
+
+  @Test
+  void upsertListingShouldOmitImageFieldsWhenNull() throws IOException, InterruptedException {
+    // arrange
+    var response = createMockResponse(200, "{\"listingId\": 1, \"remainingQuantity\": 1}");
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response);
+    var request =
+        new FetchTcgClient.UpsertListingRequest(
+            "mtg_218_c_kld_normal", "raw-nm", 1, new BigDecimal("1.50"), null, null);
+
+    // act
+    client.upsertListing("my-token", request);
+
+    // assert
+    var body = capturedJsonBody();
+    assertThat(body.has("frontImage")).isFalse();
+    assertThat(body.has("additionalImages")).isFalse();
+  }
+
+  @Test
+  void upsertListingShouldSendEmptyAdditionalImagesAsEmptyArray()
+      throws IOException, InterruptedException {
+    // arrange
+    var response = createMockResponse(200, "{\"listingId\": 1, \"remainingQuantity\": 1}");
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response);
+    var request =
+        new FetchTcgClient.UpsertListingRequest(
+            "mtg_218_c_kld_normal", "raw-nm", 1, new BigDecimal("1.50"), null, List.of());
+
+    // act
+    client.upsertListing("my-token", request);
+
+    // assert
+    var body = capturedJsonBody();
+    assertThat(body.has("frontImage")).isFalse();
+    assertThat(body.has("additionalImages")).isTrue();
+    assertThat(body.get("additionalImages").isArray()).isTrue();
+    assertThat(body.get("additionalImages")).isEmpty();
+  }
+
+  @Test
+  void upsertListingShouldSerializeAdditionalImagesAsLabeledObjects()
+      throws IOException, InterruptedException {
+    // arrange
+    var response = createMockResponse(200, "{\"listingId\": 1, \"remainingQuantity\": 1}");
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response);
+    var front = "https://listing-img.fetchtcg.com/acct/listing/front.jpg";
+    var extra = "https://listing-img.fetchtcg.com/acct/listing/extra.jpg";
+    var request =
+        new FetchTcgClient.UpsertListingRequest(
+            "mtg_218_c_kld_normal", "raw-nm", 1, new BigDecimal("1.50"), front, List.of(extra));
+
+    // act
+    client.upsertListing("my-token", request);
+
+    // assert
+    var body = capturedJsonBody();
+    assertThat(body.get("frontImage").asText()).isEqualTo(front);
+    assertThat(body.get("additionalImages")).hasSize(1);
+    var image = body.get("additionalImages").get(0);
+    assertThat(image.isObject()).isTrue();
+    assertThat(image.get("label").isNull()).isTrue();
+    assertThat(image.get("url").asText()).isEqualTo(extra);
+    assertThat(image.get("url").isTextual()).isTrue();
+  }
+
+  @Test
+  void uploadListingImageShouldPostMultipartFileAndReturnImageUrl()
+      throws IOException, InterruptedException {
+    // arrange
+    var imageUrl = "https://listing-img.fetchtcg.com/acct/listing/5314d615.jpg";
+    var response = createMockResponse(200, "{\"imageUrl\": \"" + imageUrl + "\"}");
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response);
+    var bytes = new byte[] {(byte) 0xff, (byte) 0xd8, 0x00, 0x01, 0x02};
+
+    // act
+    var result = client.uploadListingImage("my-token", bytes, "photo.jpg");
+
+    // assert
+    assertThat(result).isEqualTo(imageUrl);
+
+    var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+    verify(httpClient).send(requestCaptor.capture(), eq(HttpResponse.BodyHandlers.ofString()));
+    var request = requestCaptor.getValue();
+    assertThat(request.uri())
+        .isEqualTo(
+            URI.create("https://api.fetchtcg.com/v2/private/manage-listings/uploadListingImage"));
+    assertThat(request.method()).isEqualTo("POST");
+    assertThat(request.headers().firstValue("Authorization")).contains("Bearer my-token");
+    assertThat(request.headers().firstValue("User-Agent")).contains(HttpFetchTcgClient.USER_AGENT);
+
+    var contentType = request.headers().firstValue("Content-Type").orElseThrow();
+    assertThat(contentType).startsWith("multipart/form-data; boundary=");
+    var boundary = contentType.substring("multipart/form-data; boundary=".length());
+    assertThat(boundary).isNotBlank();
+
+    var body = requestBodyBytes(request);
+    var bodyText = new String(body, StandardCharsets.ISO_8859_1);
+    assertThat(bodyText).contains("--" + boundary);
+    assertThat(bodyText)
+        .contains("Content-Disposition: form-data; name=\"file\"; filename=\"photo.jpg\"");
+    assertThat(bodyText).contains("Content-Type: image/jpeg");
+    assertThat(body).contains(bytes);
+    assertThat(bodyText).endsWith("--" + boundary + "--\r\n");
   }
 
   @Test
@@ -413,5 +538,43 @@ public class HttpFetchTcgClientTest {
     when(mockResponse.statusCode()).thenReturn(statusCode);
     when(mockResponse.body()).thenReturn(body);
     return mockResponse;
+  }
+
+  private JsonNode capturedJsonBody() throws IOException, InterruptedException {
+    var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+    verify(httpClient).send(requestCaptor.capture(), eq(HttpResponse.BodyHandlers.ofString()));
+    return objectMapper.readTree(requestBodyString(requestCaptor.getValue()));
+  }
+
+  private String requestBodyString(HttpRequest request) {
+    return new String(requestBodyBytes(request), StandardCharsets.UTF_8);
+  }
+
+  private byte[] requestBodyBytes(HttpRequest request) {
+    var publisher = request.bodyPublisher().orElseThrow();
+    var subscriber = HttpResponse.BodySubscribers.ofByteArray();
+    publisher.subscribe(
+        new Flow.Subscriber<>() {
+          @Override
+          public void onSubscribe(Flow.Subscription subscription) {
+            subscriber.onSubscribe(subscription);
+          }
+
+          @Override
+          public void onNext(ByteBuffer item) {
+            subscriber.onNext(List.of(item));
+          }
+
+          @Override
+          public void onError(Throwable throwable) {
+            subscriber.onError(throwable);
+          }
+
+          @Override
+          public void onComplete() {
+            subscriber.onComplete();
+          }
+        });
+    return subscriber.getBody().toCompletableFuture().join();
   }
 }

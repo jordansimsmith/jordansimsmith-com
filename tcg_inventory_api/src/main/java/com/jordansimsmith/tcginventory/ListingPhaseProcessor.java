@@ -102,7 +102,7 @@ public class ListingPhaseProcessor {
 
     var upsertRequest =
         new FetchTcgClient.UpsertListingRequest(
-            sku.getFetchtcgCardId(), condition, inStockCount, price);
+            sku.getFetchtcgCardId(), condition, inStockCount, price, null, null);
 
     var response = fetchTcgClient.upsertListing(bearerToken, upsertRequest);
 

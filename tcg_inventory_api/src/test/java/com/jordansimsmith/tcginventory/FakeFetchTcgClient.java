@@ -12,8 +12,10 @@ public class FakeFetchTcgClient implements FetchTcgClient {
   private final Map<Integer, GetSellerOffersResponse> sellerOffers = new HashMap<>();
   private final List<UpsertListingRequest> upsertCalls = new ArrayList<>();
   private final List<Integer> deleteCalls = new ArrayList<>();
+  private final List<UploadCall> uploadCalls = new ArrayList<>();
   private int searchCallCount;
   private int nextListingId = 900000;
+  private int nextImageId = 1;
 
   @Override
   public GetCardResponse getCard(String cardId) {
@@ -64,6 +66,12 @@ public class FakeFetchTcgClient implements FetchTcgClient {
     deleteCalls.add(listingId);
   }
 
+  @Override
+  public String uploadListingImage(String bearerToken, byte[] bytes, String filename) {
+    uploadCalls.add(new UploadCall(bytes, filename));
+    return "https://listing-img.fetchtcg.com/fake/listing/" + nextImageId++ + ".jpg";
+  }
+
   public void seedCard(String cardId, GetCardResponse response) {
     cards.put(cardId, response);
   }
@@ -93,6 +101,10 @@ public class FakeFetchTcgClient implements FetchTcgClient {
     return deleteCalls;
   }
 
+  public List<UploadCall> getUploadCalls() {
+    return uploadCalls;
+  }
+
   public int getSearchCallCount() {
     return searchCallCount;
   }
@@ -104,7 +116,11 @@ public class FakeFetchTcgClient implements FetchTcgClient {
     sellerOffers.clear();
     upsertCalls.clear();
     deleteCalls.clear();
+    uploadCalls.clear();
     searchCallCount = 0;
     nextListingId = 900000;
+    nextImageId = 1;
   }
+
+  public record UploadCall(byte[] bytes, String filename) {}
 }

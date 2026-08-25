@@ -6,9 +6,15 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Pattern;
 
 public final class FetchTcgStubServer {
   private static final AtomicInteger sellerOfferCallCount = new AtomicInteger(0);
+  private static final AtomicInteger imageUploadCount = new AtomicInteger(0);
+
+  private static volatile boolean listingStored;
+  private static volatile String lastFrontImageJson;
+  private static volatile String lastAdditionalImagesJson;
 
   private static final String SEARCH_RESPONSE =
       """
@@ -38,11 +44,6 @@ public final class FetchTcgStubServer {
       "totalPages":1}\
       """;
 
-  private static final String UPSERT_LISTING_RESPONSE =
-      """
-      {"listingId":900001,"remainingQuantity":1}\
-      """;
-
   private FetchTcgStubServer() {}
 
   public static void main(String[] args) throws Exception {
@@ -61,10 +62,10 @@ public final class FetchTcgStubServer {
           respond(exchange, 200, "application/json", response);
         });
     server.createContext(
-        "/v2/private/manage-listings",
-        exchange -> respond(exchange, 200, "application/json", UPSERT_LISTING_RESPONSE));
-    server.createContext(
-        "/v1/manage-listings", exchange -> respond(exchange, 200, "application/json", ""));
+        "/v2/private/manage-listings/uploadListingImage",
+        exchange -> handleUploadListingImage(exchange));
+    server.createContext("/v2/private/manage-listings", exchange -> handleUpsertListing(exchange));
+    server.createContext("/v1/manage-listings", exchange -> handleManageListings(exchange));
 
     server.start();
     Thread.currentThread().join();
@@ -80,6 +81,53 @@ public final class FetchTcgStubServer {
     } else {
       respond(exchange, 200, "application/json", CARD_RESPONSE);
     }
+  }
+
+  private static void handleUploadListingImage(HttpExchange exchange) throws IOException {
+    exchange.getRequestBody().readAllBytes();
+    var imageUrl =
+        "https://listing-img.fetchtcg.com/stub/listing/"
+            + imageUploadCount.incrementAndGet()
+            + ".jpg";
+    respond(exchange, 200, "application/json", "{\"imageUrl\":\"" + imageUrl + "\"}");
+  }
+
+  private static void handleUpsertListing(HttpExchange exchange) throws IOException {
+    var requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+    lastFrontImageJson = extractJsonField(requestBody, "frontImage");
+    lastAdditionalImagesJson = extractJsonField(requestBody, "additionalImages");
+    listingStored = true;
+    respond(exchange, 200, "application/json", listingJson());
+  }
+
+  private static void handleManageListings(HttpExchange exchange) throws IOException {
+    if ("DELETE".equalsIgnoreCase(exchange.getRequestMethod())) {
+      respond(exchange, 200, "application/json", "");
+      return;
+    }
+    if (!listingStored) {
+      respond(exchange, 200, "application/json", "{\"content\":[]}");
+      return;
+    }
+    respond(exchange, 200, "application/json", "{\"content\":[" + listingJson() + "]}");
+  }
+
+  private static String listingJson() {
+    var listing = new StringBuilder("{\"listingId\":900001,\"remainingQuantity\":1");
+    if (lastFrontImageJson != null) {
+      listing.append(",\"frontImage\":").append(lastFrontImageJson);
+    }
+    if (lastAdditionalImagesJson != null) {
+      listing.append(",\"additionalImages\":").append(lastAdditionalImagesJson);
+    }
+    return listing.append("}").toString();
+  }
+
+  private static String extractJsonField(String json, String field) {
+    var matcher =
+        Pattern.compile("\"" + field + "\"\\s*:\\s*(\"(?:\\\\.|[^\"\\\\])*\"|\\[[^\\]]*\\]|null)")
+            .matcher(json);
+    return matcher.find() ? matcher.group(1) : null;
   }
 
   private static void respond(

@@ -8,8 +8,10 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
+import java.util.UUID;
 
 public class HttpFetchTcgClient implements FetchTcgClient {
   static final String USER_AGENT =
@@ -114,6 +116,20 @@ public class HttpFetchTcgClient implements FetchTcgClient {
     }
   }
 
+  @Override
+  public String uploadListingImage(String bearerToken, byte[] bytes, String filename) {
+    try {
+      return doUploadListingImage(bearerToken, bytes, filename);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    } catch (FetchTcgAuthException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
   private GetCardResponse doGetCard(String cardId) throws IOException, InterruptedException {
     var request =
         HttpRequest.newBuilder()
@@ -192,16 +208,24 @@ public class HttpFetchTcgClient implements FetchTcgClient {
 
   private UpsertListingResponse doUpsertListing(String bearerToken, UpsertListingRequest req)
       throws IOException, InterruptedException {
-    var jsonBody =
-        objectMapper.writeValueAsString(
-            Map.of(
-                "cardId", req.cardId(),
-                "condition", req.condition(),
-                "listedPrice", req.price(),
-                "listedCurrency", "NZD",
-                "matchPriceEnabled", false,
-                "quantity", req.quantity(),
-                "details", ""));
+    var payload = new LinkedHashMap<String, Object>();
+    payload.put("cardId", req.cardId());
+    payload.put("condition", req.condition());
+    payload.put("listedPrice", req.price());
+    payload.put("listedCurrency", "NZD");
+    payload.put("matchPriceEnabled", false);
+    payload.put("quantity", req.quantity());
+    payload.put("details", "");
+    if (req.frontImage() != null) {
+      payload.put("frontImage", req.frontImage());
+    }
+    if (req.additionalImages() != null) {
+      payload.put(
+          "additionalImages",
+          req.additionalImages().stream().map(url -> new AdditionalImage(null, url)).toList());
+    }
+
+    var jsonBody = objectMapper.writeValueAsString(payload);
 
     var request =
         HttpRequest.newBuilder()
@@ -217,6 +241,24 @@ public class HttpFetchTcgClient implements FetchTcgClient {
     return objectMapper.readValue(body, UpsertListingResponse.class);
   }
 
+  private String doUploadListingImage(String bearerToken, byte[] bytes, String filename)
+      throws IOException, InterruptedException {
+    var boundary = UUID.randomUUID().toString();
+    var request =
+        HttpRequest.newBuilder()
+            .uri(baseUri.resolve("/v2/private/manage-listings/uploadListingImage"))
+            .header("User-Agent", USER_AGENT)
+            .header("Accept", "application/json")
+            .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+            .header("Authorization", "Bearer " + bearerToken)
+            .POST(
+                HttpRequest.BodyPublishers.ofByteArray(encodeMultipart(bytes, filename, boundary)))
+            .build();
+
+    var body = doExecute(request);
+    return objectMapper.readValue(body, UploadListingImageResponse.class).imageUrl();
+  }
+
   private void doDeleteListing(String bearerToken, int listingId)
       throws IOException, InterruptedException {
     var request =
@@ -228,6 +270,27 @@ public class HttpFetchTcgClient implements FetchTcgClient {
             .build();
 
     doExecute(request);
+  }
+
+  private static byte[] encodeMultipart(byte[] fileBytes, String filename, String boundary) {
+    var header =
+        "--"
+            + boundary
+            + "\r\n"
+            + "Content-Disposition: form-data; name=\"file\"; filename=\""
+            + filename
+            + "\"\r\n"
+            + "Content-Type: image/jpeg\r\n"
+            + "\r\n";
+    var footer = "\r\n--" + boundary + "--\r\n";
+    var headerBytes = header.getBytes(StandardCharsets.UTF_8);
+    var footerBytes = footer.getBytes(StandardCharsets.UTF_8);
+    var body = new byte[headerBytes.length + fileBytes.length + footerBytes.length];
+    System.arraycopy(headerBytes, 0, body, 0, headerBytes.length);
+    System.arraycopy(fileBytes, 0, body, headerBytes.length, fileBytes.length);
+    System.arraycopy(
+        footerBytes, 0, body, headerBytes.length + fileBytes.length, footerBytes.length);
+    return body;
   }
 
   private String doExecute(HttpRequest request) throws IOException, InterruptedException {
@@ -272,4 +335,9 @@ public class HttpFetchTcgClient implements FetchTcgClient {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   record PagedContent<T>(@JsonProperty("content") List<T> content) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  record UploadListingImageResponse(@JsonProperty("imageUrl") String imageUrl) {}
+
+  record AdditionalImage(String label, String url) {}
 }
