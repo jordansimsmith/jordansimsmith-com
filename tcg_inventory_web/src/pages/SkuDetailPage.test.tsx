@@ -30,10 +30,25 @@ const nmDetail: SkuDetail = {
   reserved_count: 1,
   sold_count: 1,
   units: [
-    { sequence_number: 3, location: 'A0-3', status: 'reserved' },
-    { sequence_number: 40, location: 'A0-40', status: 'in_stock' },
-    { sequence_number: 152, location: 'A1-52', status: 'in_stock' },
-    { sequence_number: 480, location: 'A4-80', status: 'sold' },
+    {
+      sequence_number: 3,
+      location: 'A0-3',
+      status: 'reserved',
+      photos: [
+        { photo_id: 'photo-reserved', url: 'https://example.com/reserved.jpg' },
+      ],
+    },
+    {
+      sequence_number: 40,
+      location: 'A0-40',
+      status: 'in_stock',
+      photos: [
+        { photo_id: 'photo-front', url: 'https://example.com/front.jpg' },
+        { photo_id: 'photo-back', url: 'https://example.com/back.jpg' },
+      ],
+    },
+    { sequence_number: 152, location: 'A1-52', status: 'in_stock', photos: [] },
+    { sequence_number: 480, location: 'A4-80', status: 'sold', photos: [] },
   ],
 };
 
@@ -50,7 +65,9 @@ const lpDetail: SkuDetail = {
   in_stock_count: 5,
   reserved_count: 0,
   sold_count: 0,
-  units: [{ sequence_number: 40, location: 'A0-40', status: 'in_stock' }],
+  units: [
+    { sequence_number: 40, location: 'A0-40', status: 'in_stock', photos: [] },
+  ],
 };
 
 function renderSkuDetailPage(skuId = nmDetail.sku_id) {
@@ -221,6 +238,45 @@ describe('SkuDetailPage', () => {
     await user.keyboard('{Escape}');
 
     expect(await screen.findByText('Inventory page')).toBeDefined();
+  });
+
+  it('renders view-only photo thumbnails on photographed units of any status', async () => {
+    renderSkuDetailPage();
+    await screen.findByRole('heading', { name: 'Sol Ring' });
+
+    const inStockRow = screen.getByText('A0-40').closest('tr') as HTMLElement;
+    const reservedRow = screen.getByText('A0-3').closest('tr') as HTMLElement;
+    const photoLessRow = screen.getByText('A1-52').closest('tr') as HTMLElement;
+    const soldRow = screen.getByText('A4-80').closest('tr') as HTMLElement;
+
+    const front = within(inStockRow).getByAltText('Listing photo photo-front');
+    const back = within(inStockRow).getByAltText('Listing photo photo-back');
+    expect(front.getAttribute('src')).toBe('https://example.com/front.jpg');
+    expect(back.getAttribute('src')).toBe('https://example.com/back.jpg');
+
+    const reserved = within(reservedRow).getByAltText(
+      'Listing photo photo-reserved',
+    );
+    expect(reserved.getAttribute('src')).toBe(
+      'https://example.com/reserved.jpg',
+    );
+
+    expect(within(photoLessRow).queryByAltText(/Listing photo/)).toBeNull();
+    expect(within(soldRow).queryByAltText(/Listing photo/)).toBeNull();
+  });
+
+  it('does not render photo management controls on any unit', async () => {
+    renderSkuDetailPage();
+    await screen.findByRole('heading', { name: 'Sol Ring' });
+
+    expect(screen.queryByText('Needs photos')).toBeNull();
+    expect(screen.queryByLabelText(/add photo/i)).toBeNull();
+    expect(screen.queryByRole('button', { name: /remove photo/i })).toBeNull();
+    expect(document.querySelector('input[type="file"]')).toBeNull();
+    expect(screen.getAllByRole('button', { name: 'Remove' })).toHaveLength(2);
+    expect(
+      screen.getAllByRole('button', { name: 'Edit condition' }),
+    ).toHaveLength(2);
   });
 
   it('shows an error state for an unknown SKU', async () => {

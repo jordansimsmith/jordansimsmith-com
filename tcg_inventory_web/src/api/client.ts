@@ -45,6 +45,7 @@ export interface SkuUnit {
   sequence_number: number;
   location: string;
   status: UnitStatus;
+  photos: RowPhoto[];
 }
 
 export interface SkuDetail extends SkuSummary {

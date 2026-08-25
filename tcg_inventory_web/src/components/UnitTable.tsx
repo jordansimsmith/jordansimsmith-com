@@ -1,4 +1,4 @@
-import { Badge, Button, Group, Table } from '@mantine/core';
+import { Badge, Button, Group, Image, Table } from '@mantine/core';
 import type { SkuUnit, UnitStatus } from '../api/client';
 
 const STATUS_COLORS: Record<UnitStatus, string> = {
@@ -7,6 +7,8 @@ const STATUS_COLORS: Record<UnitStatus, string> = {
   sold: 'gray',
   removed: 'red',
 };
+
+const THUMB_SIZE = 40;
 
 interface UnitTableProps {
   units: SkuUnit[];
@@ -32,6 +34,7 @@ export function UnitTable({
           <Table.Th>Sequence number</Table.Th>
           <Table.Th>Location</Table.Th>
           <Table.Th>Status</Table.Th>
+          <Table.Th>Photos</Table.Th>
           <Table.Th />
         </Table.Tr>
       </Table.Thead>
@@ -48,6 +51,21 @@ export function UnitTable({
               >
                 {unit.status.replace('_', ' ')}
               </Badge>
+            </Table.Td>
+            <Table.Td>
+              <Group gap={6} wrap="nowrap">
+                {unit.photos.map((photo) => (
+                  <Image
+                    key={photo.photo_id}
+                    src={photo.url}
+                    alt={`Listing photo ${photo.photo_id}`}
+                    w={THUMB_SIZE}
+                    h={THUMB_SIZE}
+                    radius="sm"
+                    fit="cover"
+                  />
+                ))}
+              </Group>
             </Table.Td>
             <Table.Td>
               {unit.status === 'in_stock' && (

@@ -94,7 +94,11 @@ const seedSkus: SeedSku[] = [
 interface FakeUnit {
   sequence_number: number;
   status: UnitStatus;
+  photos: RowPhoto[];
 }
+
+const SEEDED_UNIT_PHOTO_URL =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Crect width='100%25' height='100%25' fill='%23868e96'/%3E%3C/svg%3E";
 
 interface FakeSku {
   sku_id: string;
@@ -111,7 +115,7 @@ interface FakeSku {
 
 function createSeedState(): FakeSku[] {
   let unitIndex = 0;
-  return seedSkus.map(
+  const skus = seedSkus.map(
     ([
       scryfallId,
       name,
@@ -130,6 +134,7 @@ function createSeedState(): FakeSku[] {
         units.push({
           sequence_number: (unitIndex * 37) % 600,
           status: 'in_stock',
+          photos: [],
         });
         unitIndex += 1;
       }
@@ -158,6 +163,17 @@ function createSeedState(): FakeSku[] {
       };
     },
   );
+  const doublingSeason = skus.find((sku) => sku.name === 'Doubling Season');
+  const photographed = doublingSeason?.units.find(
+    (unit) => unit.status === 'in_stock',
+  );
+  if (!photographed) {
+    throw new Error('expected a seeded in-stock Doubling Season unit');
+  }
+  photographed.photos = [
+    { photo_id: 'fake-unit-photo-1', url: SEEDED_UNIT_PHOTO_URL },
+  ];
+  return skus;
 }
 
 function deriveBlock(sequenceNumber: number): string {
@@ -196,6 +212,7 @@ function toDetail(sku: FakeSku): SkuDetail {
       sequence_number: unit.sequence_number,
       location: deriveLocation(unit.sequence_number),
       status: unit.status,
+      photos: unit.photos.map((photo) => ({ ...photo })),
     }));
   return {
     ...toSummary(sku),
@@ -915,7 +932,11 @@ export function createFakeClient(): ApiClient {
           };
           skus.push(sku);
         }
-        sku.units.push({ sequence_number: sequenceNumber, status: 'in_stock' });
+        sku.units.push({
+          sequence_number: sequenceNumber,
+          status: 'in_stock',
+          photos: row.photos.map((photo) => ({ ...photo })),
+        });
         dirtySkuIds.add(sku.sku_id);
         sequenceNumbers.push(sequenceNumber);
       }
@@ -1008,6 +1029,7 @@ export function createFakeClient(): ApiClient {
       target.units.push({
         sequence_number: unit.sequence_number,
         status: 'in_stock',
+        photos: unit.photos.map((photo) => ({ ...photo })),
       });
       dirtySkuIds.add(sku.sku_id);
       dirtySkuIds.add(target.sku_id);

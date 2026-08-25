@@ -35,6 +35,13 @@ export function ImportRowPhotoStrip({
 
   return (
     <Group gap={6} wrap="nowrap" onClick={(event) => event.stopPropagation()}>
+      {canAdd && (
+        <AddPhotoControl position={position} onAdd={onAdd}>
+          <ActionIcon component="span" variant="subtle" size="sm" color="gray">
+            <IconCamera size={16} />
+          </ActionIcon>
+        </AddPhotoControl>
+      )}
       {photos.map((photo) => (
         <div
           key={photo.photo_id}
@@ -68,13 +75,6 @@ export function ImportRowPhotoStrip({
           )}
         </div>
       ))}
-      {canAdd && (
-        <AddPhotoControl position={position} onAdd={onAdd}>
-          <ActionIcon component="span" variant="subtle" size="sm" color="gray">
-            <IconCamera size={16} />
-          </ActionIcon>
-        </AddPhotoControl>
-      )}
       {needsPhotos && photos.length === 0 && (
         <Badge variant="light" color="orange">
           Needs photos

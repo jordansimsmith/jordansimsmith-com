@@ -40,6 +40,24 @@ describe('createFakeClient', () => {
     expect(detail.units[1].status).toBe('reserved');
   });
 
+  it('seeds a photographed Doubling Season unit', async () => {
+    const client = createFakeClient();
+    const skuId = await findSkuId(client, 'doubling season');
+    const detail = await client.getSku(skuId);
+
+    expect(detail.units).toHaveLength(1);
+    expect(detail.units[0].photos).toEqual([
+      {
+        photo_id: 'fake-unit-photo-1',
+        url: expect.stringMatching(/^data:image\/svg\+xml,/),
+      },
+    ]);
+
+    const solRingId = await findSkuId(client, 'sol ring', 1);
+    const solRing = await client.getSku(solRingId);
+    expect(solRing.units.every((unit) => unit.photos.length === 0)).toBe(true);
+  });
+
   it('rejects unknown SKUs', async () => {
     const client = createFakeClient();
 

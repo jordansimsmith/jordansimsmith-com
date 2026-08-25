@@ -589,6 +589,33 @@ describe('ImportDetailPage', () => {
     expect(screen.queryByRole('button', { name: /primary/i })).toBeNull();
   });
 
+  it('keeps the add photo control leftmost when photos already exist', async () => {
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport({
+        rows: [
+          importRow(1, {
+            name: 'Top Card',
+            photos: [
+              { photo_id: 'photo-1', url: 'https://example.com/p1.jpg' },
+              { photo_id: 'photo-2', url: 'https://example.com/p2.jpg' },
+            ],
+          }),
+        ],
+      }),
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+
+    const row = screen.getByText('Top Card').closest('tr') as HTMLElement;
+    const add = within(row).getByLabelText('Add photo to row 1');
+    const firstThumb = within(row).getByAltText('Listing photo photo-1');
+    expect(
+      add.compareDocumentPosition(firstThumb) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  });
+
   it('adds a photo through the canvas util and refetches the import', async () => {
     const user = userEvent.setup();
     const encodedJpeg = new Blob(['encoded'], { type: 'image/jpeg' });
@@ -717,9 +744,7 @@ describe('ImportDetailPage', () => {
     renderImportDetailPage();
     await screen.findByText('Top Card');
 
-    expect(
-      screen.getByText('2 rows need photos before confirm'),
-    ).toBeDefined();
+    expect(screen.getByText('2 rows need photos before confirm')).toBeDefined();
   });
 
   it('disables confirm while any row needs photos and enables after they are photographed', async () => {
