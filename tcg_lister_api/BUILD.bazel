@@ -1,6 +1,16 @@
 load("@rules_python//python:defs.bzl", "py_binary", "py_library", "py_test")
 
 py_library(
+    name = "delete-listings-lib",
+    srcs = [
+        "scripts/delete/delete_listings.py",
+        "scripts/delete/fetchtcg_client.py",
+    ],
+    imports = ["scripts/delete"],
+    deps = ["@pypi//requests"],
+)
+
+py_library(
     name = "demand-lib",
     srcs = ["scripts/demand/analyze.py"],
     imports = ["scripts/demand"],
@@ -66,6 +76,13 @@ py_binary(
     srcs = ["scripts/demand/main.py"],
     main = "scripts/demand/main.py",
     deps = [":demand-lib"],
+)
+
+py_binary(
+    name = "fetchtcg-delete-listings",
+    srcs = ["scripts/delete/main.py"],
+    main = "scripts/delete/main.py",
+    deps = [":delete-listings-lib"],
 )
 
 py_binary(
@@ -229,6 +246,23 @@ py_test(
     deps = [
         ":scan-eval-lib",
         ":scryfall-sync-lib",
+        "@pypi//pytest",
+        "@pypi//requests",
+    ],
+)
+
+py_test(
+    name = "delete-listings-unit-tests",
+    size = "small",
+    srcs = [
+        "scripts/delete/test_delete_listings.py",
+        "scripts/delete/test_fetchtcg_client.py",
+        "scripts/delete/test_runner.py",
+    ],
+    imports = ["scripts/delete"],
+    main = "scripts/delete/test_runner.py",
+    deps = [
+        ":delete-listings-lib",
         "@pypi//pytest",
         "@pypi//requests",
     ],

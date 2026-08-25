@@ -5,6 +5,7 @@ This directory groups self-contained local scripts for managing TCG workflows.
 ## Scripts
 
 - [List cards](scripts/list/README.md): analyze ManaBox scans and create or update FetchTCG listings.
+- [Delete listings](scripts/delete/README.md): delete active Fetch TCG listings with dry-run by default.
 - [Analyze pricing](scripts/pricing/README.md): compare active owned listings with exact New Zealand competition and report portfolio pricing signals.
 - [Analyze EDH demand proxy](scripts/demand/README.md): gauge how well the US$0.25 TCGplayer keep filter tracks Commander demand across the card universe.
 - [Analyze EDH inventory coverage](scripts/inventory/README.md): compare unique active inventory cards with cumulative EDHREC rank brackets.
