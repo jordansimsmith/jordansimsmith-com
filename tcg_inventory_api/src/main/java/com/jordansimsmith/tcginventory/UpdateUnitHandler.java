@@ -155,6 +155,9 @@ public class UpdateUnitHandler
         AttributeValue.builder()
             .n(String.valueOf(unitItem.getCreatedAt().getEpochSecond()))
             .build());
+    if (unitItem.getPhotos() != null && !unitItem.getPhotos().isEmpty()) {
+      newUnitItem.put(TcgInventoryItem.PHOTOS, Photos.toAttributeValue(unitItem.getPhotos()));
+    }
 
     var putUnit =
         TransactWriteItem.builder()

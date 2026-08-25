@@ -351,6 +351,100 @@ public class InventoryHandlerIntegrationTest {
   }
 
   @Test
+  void updateUnitShouldCarryPhotosAcrossSkuPartitions() throws Exception {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createSku("jordan", "scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
+    var photos =
+        List.of(
+            TcgInventoryItem.Photo.create("photo-front", null),
+            TcgInventoryItem.Photo.create(
+                "photo-back", "https://listing-img.fetchtcg.com/example/listing/photo.jpg"));
+    createUnit("jordan", "scryfall-1#normal#NM", 42, "in_stock", "import1", photos);
+
+    // act
+    var response =
+        updateUnitHandler.handleRequest(
+            buildEventWithBody(
+                "jordan",
+                Map.of("sku_id", "scryfall-1#normal#NM", "sequence_number", "42"),
+                "{\"condition\":\"LP\"}"),
+            null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+
+    var sourceSkuPk = TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#NM");
+    var oldUnit =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue(sourceSkuPk)
+                .sortValue(TcgInventoryItem.formatUnitSk(42))
+                .build());
+    assertThat(oldUnit).isNull();
+
+    var targetSkuPk = TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#LP");
+    var newUnit =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue(targetSkuPk)
+                .sortValue(TcgInventoryItem.formatUnitSk(42))
+                .build());
+    assertThat(newUnit).isNotNull();
+    assertThat(newUnit.getPhotos()).isEqualTo(photos);
+  }
+
+  @Test
+  void getSkuShouldReturnUnitPhotosWithPresignedUrls() throws Exception {
+    // arrange
+    createSku("jordan", "scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
+    createUnit(
+        "jordan",
+        "scryfall-1#normal#NM",
+        4242,
+        "in_stock",
+        "import1",
+        List.of(TcgInventoryItem.Photo.create("photo-in-stock", null)));
+    createUnit(
+        "jordan",
+        "scryfall-1#normal#NM",
+        1204,
+        "reserved",
+        "import1",
+        List.of(TcgInventoryItem.Photo.create("photo-reserved", null)));
+    createUnit("jordan", "scryfall-1#normal#NM", 4250, "in_stock", "import1");
+    createUnit("jordan", "scryfall-1#normal#NM", 300, "removed", "import1");
+
+    // act
+    var response =
+        getSkuHandler.handleRequest(
+            buildEvent("jordan", Map.of("sku_id", "scryfall-1#normal#NM")), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var units = objectMapper.readTree(response.getBody()).get("units");
+    assertThat(units).hasSize(3);
+
+    assertThat(units.get(0).get("sequence_number").asInt()).isEqualTo(1204);
+    assertThat(units.get(0).get("status").asText()).isEqualTo("reserved");
+    assertThat(units.get(0).get("photos")).hasSize(1);
+    assertThat(units.get(0).get("photos").get(0).get("photo_id").asText())
+        .isEqualTo("photo-reserved");
+    assertThat(units.get(0).get("photos").get(0).get("url").asText())
+        .contains(Photos.key("jordan", "photo-reserved"));
+
+    assertThat(units.get(1).get("sequence_number").asInt()).isEqualTo(4242);
+    assertThat(units.get(1).get("photos")).hasSize(1);
+    assertThat(units.get(1).get("photos").get(0).get("photo_id").asText())
+        .isEqualTo("photo-in-stock");
+    assertThat(units.get(1).get("photos").get(0).get("url").asText())
+        .contains(Photos.key("jordan", "photo-in-stock"));
+
+    assertThat(units.get(2).get("sequence_number").asInt()).isEqualTo(4250);
+    assertThat(units.get(2).get("photos")).isEmpty();
+  }
+
+  @Test
   void updateUnitShouldCreateTargetSkuWhenNotExists() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
@@ -486,9 +580,22 @@ public class InventoryHandlerIntegrationTest {
 
   private void createUnit(
       String user, String skuId, int sequenceNumber, String status, String importId) {
+    createUnit(user, skuId, sequenceNumber, status, importId, null);
+  }
+
+  private void createUnit(
+      String user,
+      String skuId,
+      int sequenceNumber,
+      String status,
+      String importId,
+      List<TcgInventoryItem.Photo> photos) {
     var item =
         TcgInventoryItem.createUnit(
             user, skuId, sequenceNumber, status, importId, Instant.ofEpochSecond(1700000000));
+    if (photos != null) {
+      item.setPhotos(photos);
+    }
     tcgInventoryTable.putItem(item);
   }
 

@@ -102,13 +102,24 @@ public class ConfirmImportHandler
       return httpResponseFactory.conflict(new ErrorResponse("import is not in review status"));
     }
 
+    var keepRows = queryKeepRows(user, importId);
+    long rowsNeedingPhotos =
+        keepRows.stream()
+            .filter(
+                row ->
+                    Photos.needsPhotos(row.getDecision(), row.getSuggestedPrice(), row.getPhotos()))
+            .count();
+    if (rowsNeedingPhotos > 0) {
+      return httpResponseFactory.conflict(
+          new ErrorResponse(rowsNeedingPhotos + " rows need photos before confirm"));
+    }
+
     if ("review".equals(importItem.getStatus())) {
       importItem.setStatus("confirming");
       importItem.setUpdatedAt(clock.now());
       tcgInventoryTable.putItem(importItem);
     }
 
-    var keepRows = queryKeepRows(user, importId);
     if (keepRows.isEmpty()) {
       importItem.setStatus("confirmed");
       importItem.setUpdatedAt(clock.now());
@@ -235,6 +246,9 @@ public class ConfirmImportHandler
       unitItem.put(
           TcgInventoryItem.CREATED_AT,
           AttributeValue.builder().n(String.valueOf(clock.now().getEpochSecond())).build());
+      if (row.getPhotos() != null && !row.getPhotos().isEmpty()) {
+        unitItem.put(TcgInventoryItem.PHOTOS, Photos.toAttributeValue(row.getPhotos()));
+      }
 
       transactItems.add(
           TransactWriteItem.builder()

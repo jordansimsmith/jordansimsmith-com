@@ -12,6 +12,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -344,6 +345,115 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(404);
   }
 
+  @Test
+  void confirmShouldReturn409WhenKeepRowsNeedPhotos() throws Exception {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createImportInReview("jordan", "import1", 2);
+    createKeepRow("jordan", "import1", 1, "scryfall-1", "normal", "NM", "Hit A", "20.00", null);
+    createKeepRow("jordan", "import1", 2, "scryfall-2", "normal", "NM", "Hit B", "25.00", null);
+
+    // act
+    var response =
+        confirmImportHandler.handleRequest(
+            buildEvent("jordan", Map.of("import_id", "import1")), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(409);
+    var body = objectMapper.readTree(response.getBody());
+    assertThat(body.get("message").asText()).isEqualTo("2 rows need photos before confirm");
+
+    var importResult =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
+                .sortValue(TcgInventoryItem.formatImportSk("import1"))
+                .build());
+    assertThat(importResult.getStatus()).isEqualTo("review");
+    assertThat(countUnits(TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#NM")))
+        .isEqualTo(0);
+    assertThat(countUnits(TcgInventoryItem.formatSkuPk("jordan", "scryfall-2#normal#NM")))
+        .isEqualTo(0);
+  }
+
+  @Test
+  void confirmShouldCopyRowPhotosOntoUnitsWhenGatedRowsHavePhotos() throws Exception {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createImportInReview("jordan", "import1", 3);
+    createKeepRow(
+        "jordan",
+        "import1",
+        1,
+        "scryfall-1",
+        "normal",
+        "NM",
+        "Hit A",
+        "20.00",
+        List.of(
+            TcgInventoryItem.Photo.create("photo-a1", null),
+            TcgInventoryItem.Photo.create("photo-a2", null)));
+    createKeepRow(
+        "jordan",
+        "import1",
+        2,
+        "scryfall-2",
+        "normal",
+        "NM",
+        "Hit B",
+        "25.00",
+        List.of(TcgInventoryItem.Photo.create("photo-b1", null)));
+    createKeepRow(
+        "jordan",
+        "import1",
+        3,
+        "scryfall-3",
+        "normal",
+        "NM",
+        "Bulk",
+        "1.50",
+        List.of(TcgInventoryItem.Photo.create("photo-c1", null)));
+
+    // act
+    var response =
+        confirmImportHandler.handleRequest(
+            buildEvent("jordan", Map.of("import_id", "import1")), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = objectMapper.readTree(response.getBody());
+    assertThat(body.get("status").asText()).isEqualTo("confirmed");
+    assertThat(body.get("unit_count").asInt()).isEqualTo(3);
+
+    var unitA =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue(TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#NM"))
+                .sortValue(TcgInventoryItem.formatUnitSk(0))
+                .build());
+    assertThat(unitA.getPhotos()).hasSize(2);
+    assertThat(unitA.getPhotos().get(0).getPhotoId()).isEqualTo("photo-a1");
+    assertThat(unitA.getPhotos().get(1).getPhotoId()).isEqualTo("photo-a2");
+
+    var unitB =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue(TcgInventoryItem.formatSkuPk("jordan", "scryfall-2#normal#NM"))
+                .sortValue(TcgInventoryItem.formatUnitSk(1))
+                .build());
+    assertThat(unitB.getPhotos()).hasSize(1);
+    assertThat(unitB.getPhotos().get(0).getPhotoId()).isEqualTo("photo-b1");
+
+    var unitC =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue(TcgInventoryItem.formatSkuPk("jordan", "scryfall-3#normal#NM"))
+                .sortValue(TcgInventoryItem.formatUnitSk(2))
+                .build());
+    assertThat(unitC.getPhotos()).hasSize(1);
+    assertThat(unitC.getPhotos().get(0).getPhotoId()).isEqualTo("photo-c1");
+  }
+
   private void createImportInReview(String user, String importId, int rowCount) {
     var importItem =
         TcgInventoryItem.createImport(
@@ -360,6 +470,19 @@ public class ConfirmImportHandlerIntegrationTest {
       String finish,
       String condition,
       String name) {
+    createKeepRow(user, importId, position, scryfallId, finish, condition, name, "1.50", null);
+  }
+
+  private void createKeepRow(
+      String user,
+      String importId,
+      int position,
+      String scryfallId,
+      String finish,
+      String condition,
+      String name,
+      String suggestedPrice,
+      List<TcgInventoryItem.Photo> photos) {
     var rowItem =
         TcgInventoryItem.createImportRow(
             user,
@@ -374,9 +497,12 @@ public class ConfirmImportHandlerIntegrationTest {
             scryfallId,
             "en");
     rowItem.setDecision("keep");
-    rowItem.setSuggestedPrice("1.50");
+    rowItem.setSuggestedPrice(suggestedPrice);
     rowItem.setFetchtcgCardId("mtg_" + position + "_c_dom_normal");
     rowItem.setFetchtcgSetId(2624);
+    if (photos != null) {
+      rowItem.setPhotos(photos);
+    }
     tcgInventoryTable.putItem(rowItem);
   }
 

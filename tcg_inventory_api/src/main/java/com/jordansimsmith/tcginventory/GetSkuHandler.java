@@ -18,16 +18,20 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 public class GetSkuHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GetSkuHandler.class);
 
+  record PhotoResponse(@JsonProperty("photo_id") String photoId, @JsonProperty("url") String url) {}
+
   record UnitResponse(
       @JsonProperty("sequence_number") int sequenceNumber,
       @JsonProperty("location") String location,
-      @JsonProperty("status") String status) {}
+      @JsonProperty("status") String status,
+      @JsonProperty("photos") List<PhotoResponse> photos) {}
 
   record SkuDetailResponse(
       @JsonProperty("sku_id") String skuId,
@@ -49,6 +53,7 @@ public class GetSkuHandler
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final S3Presigner s3Presigner;
 
   public GetSkuHandler() {
     this(TcgInventoryFactory.create());
@@ -59,6 +64,7 @@ public class GetSkuHandler
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.s3Presigner = factory.s3Presigner();
   }
 
   @Override
@@ -124,7 +130,8 @@ public class GetSkuHandler
                     new UnitResponse(
                         unit.getSequenceNumber(),
                         InventoryLocation.formatLocation(unit.getSequenceNumber()),
-                        unit.getStatus()))
+                        unit.getStatus(),
+                        toPhotoResponses(user, unit.getPhotos())))
             .toList();
 
     return httpResponseFactory.ok(
@@ -142,5 +149,18 @@ public class GetSkuHandler
             reservedCount,
             soldCount,
             units));
+  }
+
+  private List<PhotoResponse> toPhotoResponses(String user, List<TcgInventoryItem.Photo> photos) {
+    if (photos == null) {
+      return List.of();
+    }
+    return photos.stream()
+        .map(
+            photo ->
+                new PhotoResponse(
+                    photo.getPhotoId(),
+                    Photos.presignedGetUrl(s3Presigner, user, photo.getPhotoId())))
+        .toList();
   }
 }

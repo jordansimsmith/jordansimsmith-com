@@ -8,8 +8,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import java.math.BigDecimal;
-import java.time.Duration;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
@@ -18,9 +16,7 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
-import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 public class GetImportHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
@@ -130,12 +126,8 @@ public class GetImportHandler
                         item.getMarketPrice(),
                         item.getSuggestedPrice(),
                         toPhotoResponses(user, item.getPhotos()),
-                        "keep".equals(item.getDecision())
-                            && item.getSuggestedPrice() != null
-                            && (item.getPhotos() == null || item.getPhotos().isEmpty())
-                            && new BigDecimal(item.getSuggestedPrice())
-                                    .compareTo(new BigDecimal("20"))
-                                >= 0))
+                        Photos.needsPhotos(
+                            item.getDecision(), item.getSuggestedPrice(), item.getPhotos())))
             .toList();
 
     return httpResponseFactory.ok(
@@ -158,18 +150,7 @@ public class GetImportHandler
             photo ->
                 new PhotoResponse(
                     photo.getPhotoId(),
-                    s3Presigner
-                        .presignGetObject(
-                            GetObjectPresignRequest.builder()
-                                .signatureDuration(Duration.ofMinutes(15))
-                                .getObjectRequest(
-                                    GetObjectRequest.builder()
-                                        .bucket(Photos.BUCKET)
-                                        .key(Photos.key(user, photo.getPhotoId()))
-                                        .build())
-                                .build())
-                        .url()
-                        .toString()))
+                    Photos.presignedGetUrl(s3Presigner, user, photo.getPhotoId())))
         .toList();
   }
 }
