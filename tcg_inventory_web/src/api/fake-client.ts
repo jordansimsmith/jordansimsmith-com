@@ -1056,10 +1056,16 @@ export function createFakeClient(): ApiClient {
         }
       }
 
+      const totalSuggestedCents = keepRows.reduce(
+        (sum, row) => sum + Math.round(Number(row.suggested_price) * 100),
+        0,
+      );
+
       return {
         import_id: importRecord.import_id,
         status: importRecord.status,
         unit_count: sequenceNumbers.length,
+        total_suggested_price: (totalSuggestedCents / 100).toFixed(2),
         first_sequence_number: first,
         last_sequence_number: last,
         placement_instructions: placementInstructions,

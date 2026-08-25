@@ -170,7 +170,7 @@ sequenceDiagram
 | `DELETE` | `/imports/{import_id}/rows/{position}`                   | delete a misidentified row before confirm                                              |
 | `POST`   | `/imports/{import_id}/rows/{position}/photos`            | add a photo to a keep row (raw JPEG body)                                              |
 | `DELETE` | `/imports/{import_id}/rows/{position}/photos/{photo_id}` | remove a row photo before confirm                                                      |
-| `POST`   | `/imports/{import_id}/confirm`                           | append keeper units; returns placement instructions                                    |
+| `POST`   | `/imports/{import_id}/confirm`                           | append keeper units; returns placement instructions and total suggested price          |
 | `DELETE` | `/imports/{import_id}`                                   | delete an unconfirmed import and its rows                                              |
 | `GET`    | `/skus`                                                  | browse/search SKUs (prefix search, continuation paging)                                |
 | `GET`    | `/skus/{sku_id}`                                         | SKU detail including its units                                                         |
@@ -190,13 +190,14 @@ sequenceDiagram
 
 `POST /imports/{import_id}/confirm`
 
-Response `200` (each placement instruction carries the card names at its boundary locations, taken from the keeper rows assigned to that range):
+Response `200` (each placement instruction carries the card names at its boundary locations, taken from the keeper rows assigned to that range; `total_suggested_price` is the sum of those keepers' suggested listing prices):
 
 ```json
 {
   "import_id": "01JEXAMPLEULID0000000000",
   "status": "confirmed",
   "unit_count": 87,
+  "total_suggested_price": "342.50",
   "first_sequence_number": 4200,
   "last_sequence_number": 4286,
   "placement_instructions": [

@@ -306,6 +306,7 @@ describe('ImportDetailPage', () => {
       import_id: 'import-2',
       status: 'confirmed',
       unit_count: 87,
+      total_suggested_price: '342.50',
       first_sequence_number: 4200,
       last_sequence_number: 4286,
       placement_instructions: [
@@ -338,6 +339,7 @@ describe('ImportDetailPage', () => {
       );
     });
     expect(await screen.findByText('Placement instructions')).toBeDefined();
+    expect(screen.getByText('Total suggested value $342.50')).toBeDefined();
     expect(screen.getByText('A42')).toBeDefined();
     expect(screen.getByText('87 cards')).toBeDefined();
     expect(screen.getByText('Llanowar Elves through Sol Ring')).toBeDefined();

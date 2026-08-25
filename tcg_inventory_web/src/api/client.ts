@@ -116,6 +116,7 @@ export interface ConfirmImportResponse {
   import_id: string;
   status: ImportStatus;
   unit_count: number;
+  total_suggested_price: string;
   first_sequence_number: number | null;
   last_sequence_number: number | null;
   placement_instructions: PlacementInstruction[];

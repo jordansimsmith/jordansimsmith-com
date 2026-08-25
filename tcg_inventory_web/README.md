@@ -26,7 +26,7 @@ The TCG inventory web service is a keyboard-first single-page app for running a 
 ### In scope
 
 - Authenticate with username/password against the backend and persist a Basic auth session in `localStorage`; protect all routes and redirect unauthenticated users to `/`.
-- Import flow: upload a ManaBox CSV, watch appraisal progress, review appraisal decisions in stack order while pulling discard and review cards from the stack, confirm keepers, and display placement instructions.
+- Import flow: upload a ManaBox CSV, watch appraisal progress, review appraisal decisions in stack order while pulling discard and review cards from the stack, confirm keepers, and display placement instructions with the card count and total suggested value.
 - Listing photos during review: keep rows appraised at NZ$20+ carry a "needs photos" badge; a touch-friendly photo strip on keep rows supports add (camera or library) and remove — the first uploaded photo is the listing front image; confirm stays disabled while flagged rows lack photos; desktop picks up phone uploads on window refocus.
 - Inventory: dense SKU table with counts, prefix search, SKU detail with the Scryfall card image, units, derived locations, and per-unit photo thumbnails (view-only), and manual adjustments (remove unit, change condition).
 - Orders: list and detail with state badges, offer lines on detail with an above/below-list badge when the offered price differs from list, location-ordered pull sheet optimized for one-handed phone use, confirm-pull action.
@@ -99,7 +99,7 @@ sequenceDiagram
 Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it verbatim: SKU, unit, sequence number, block, location (`A42-42`), import (`appraising` → `review` → `confirming` → `confirmed`; deletable before confirm), appraise and publish jobs, order states (`awaiting_payment`, `to_pick`, `fulfilled`, `voided`), pull sheet.
 
 - **Keep/discard/review row**: an import row's appraisal decision; decisions are final for the import. Review cards are set aside physically, never ingested, and return through a later import once their cause is fixed.
-- **Placement instructions**: the post-confirm screen mapping the confirmed stack to block labels and location ranges, with the card names at each range boundary as physical checkpoints.
+- **Placement instructions**: the post-confirm screen mapping the confirmed stack to block labels and location ranges, with the card names at each range boundary as physical checkpoints and a total suggested value for the confirmed stack.
 - **Pending publish badge**: count of SKUs with unpublished inventory changes shown on the publish trigger.
 - **Needs photos badge**: flag on a keep row appraised at NZ$20+ with no photos yet; confirm is blocked while any such row remains.
 - **Report**: the latest generated dashboard snapshot served by `GET /reports`; stale when inventory changed since generation or the snapshot is older than 24 hours. The "data as of" stamp renders its generation time (relative under 24 h, absolute beyond).
@@ -123,28 +123,28 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 
 ### Consumed backend endpoints
 
-| Method   | Path                                                     | Used by                                                      |
-| -------- | -------------------------------------------------------- | ------------------------------------------------------------ |
-| `POST`   | `/imports`                                               | import upload                                                |
-| `GET`    | `/imports`                                               | imports list                                                 |
-| `GET`    | `/imports/{import_id}`                                   | appraisal progress + review rows                             |
-| `POST`   | `/imports/{import_id}/confirm`                           | confirm flow + placement instructions                        |
-| `DELETE` | `/imports/{import_id}`                                   | delete-import action                                         |
-| `POST`   | `/imports/{import_id}/rows/{position}/photos`            | photo add from the review strip                              |
-| `DELETE` | `/imports/{import_id}/rows/{position}/photos/{photo_id}` | photo remove                                                 |
-| `GET`    | `/skus`                                                  | inventory browse/search                                      |
-| `GET`    | `/skus/{sku_id}`                                         | SKU detail + units                                           |
-| `DELETE` | `/skus/{sku_id}/units/{sequence_number}`                 | remove-unit adjustment                                       |
-| `PUT`    | `/skus/{sku_id}/units/{sequence_number}`                 | condition-change adjustment                                  |
-| `GET`    | `/orders`                                                | orders list                                                  |
-| `GET`    | `/orders/{order_id}`                                     | order detail                                                 |
-| `POST`   | `/orders/{order_id}/confirm`                             | confirm pull                                                 |
-| `POST`   | `/publish`                                               | publish trigger                                              |
-| `GET`    | `/publish`                                               | publish run polling + pending count                          |
-| `GET`    | `/reports`                                               | reports tab snapshot + staleness + generation polling        |
-| `POST`   | `/reports`                                               | automatic regeneration trigger when stale                    |
-| `GET`    | `/settings`                                              | credential presence check + login probe + track orders after |
-| `PATCH`  | `/settings`                                              | partial update: credential and/or track orders after         |
+| Method   | Path                                                     | Used by                                                         |
+| -------- | -------------------------------------------------------- | --------------------------------------------------------------- |
+| `POST`   | `/imports`                                               | import upload                                                   |
+| `GET`    | `/imports`                                               | imports list                                                    |
+| `GET`    | `/imports/{import_id}`                                   | appraisal progress + review rows                                |
+| `POST`   | `/imports/{import_id}/confirm`                           | confirm flow + placement instructions and total suggested value |
+| `DELETE` | `/imports/{import_id}`                                   | delete-import action                                            |
+| `POST`   | `/imports/{import_id}/rows/{position}/photos`            | photo add from the review strip                                 |
+| `DELETE` | `/imports/{import_id}/rows/{position}/photos/{photo_id}` | photo remove                                                    |
+| `GET`    | `/skus`                                                  | inventory browse/search                                         |
+| `GET`    | `/skus/{sku_id}`                                         | SKU detail + units                                              |
+| `DELETE` | `/skus/{sku_id}/units/{sequence_number}`                 | remove-unit adjustment                                          |
+| `PUT`    | `/skus/{sku_id}/units/{sequence_number}`                 | condition-change adjustment                                     |
+| `GET`    | `/orders`                                                | orders list                                                     |
+| `GET`    | `/orders/{order_id}`                                     | order detail                                                    |
+| `POST`   | `/orders/{order_id}/confirm`                             | confirm pull                                                    |
+| `POST`   | `/publish`                                               | publish trigger                                                 |
+| `GET`    | `/publish`                                               | publish run polling + pending count                             |
+| `GET`    | `/reports`                                               | reports tab snapshot + staleness + generation polling           |
+| `POST`   | `/reports`                                               | automatic regeneration trigger when stale                       |
+| `GET`    | `/settings`                                              | credential presence check + login probe + track orders after    |
+| `PATCH`  | `/settings`                                              | partial update: credential and/or track orders after            |
 
 ### UI contract expectations
 

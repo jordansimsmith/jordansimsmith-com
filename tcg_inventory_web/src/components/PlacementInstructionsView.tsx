@@ -21,6 +21,9 @@ export function PlacementInstructionsView({
             Place {result.unit_count}{' '}
             {result.unit_count === 1 ? 'card' : 'cards'}:
           </Text>
+          <Text c="dimmed">
+            Total suggested value ${result.total_suggested_price}
+          </Text>
           {result.placement_instructions.map((instruction) => (
             <Paper key={instruction.block} withBorder p="lg" radius="md">
               <Group justify="space-between" align="baseline">

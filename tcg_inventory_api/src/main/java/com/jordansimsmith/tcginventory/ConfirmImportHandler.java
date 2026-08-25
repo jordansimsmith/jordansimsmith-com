@@ -10,6 +10,7 @@ import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -39,6 +40,7 @@ public class ConfirmImportHandler
       @JsonProperty("import_id") String importId,
       @JsonProperty("status") String status,
       @JsonProperty("unit_count") int unitCount,
+      @JsonProperty("total_suggested_price") String totalSuggestedPrice,
       @JsonProperty("first_sequence_number") int firstSequenceNumber,
       @JsonProperty("last_sequence_number") int lastSequenceNumber,
       @JsonProperty("placement_instructions") List<PlacementInstruction> placementInstructions) {}
@@ -120,11 +122,18 @@ public class ConfirmImportHandler
       tcgInventoryTable.putItem(importItem);
     }
 
+    var totalSuggestedPrice =
+        keepRows.stream()
+            .map(row -> new BigDecimal(row.getSuggestedPrice()))
+            .reduce(new BigDecimal("0.00"), BigDecimal::add)
+            .toPlainString();
+
     if (keepRows.isEmpty()) {
       importItem.setStatus("confirmed");
       importItem.setUpdatedAt(clock.now());
       tcgInventoryTable.putItem(importItem);
-      return httpResponseFactory.ok(new ConfirmResponse(importId, "confirmed", 0, 0, 0, List.of()));
+      return httpResponseFactory.ok(
+          new ConfirmResponse(importId, "confirmed", 0, totalSuggestedPrice, 0, 0, List.of()));
     }
 
     int keepCount = keepRows.size();
@@ -146,7 +155,13 @@ public class ConfirmImportHandler
 
     return httpResponseFactory.ok(
         new ConfirmResponse(
-            importId, "confirmed", keepCount, firstSeq, lastSeq, placementInstructions));
+            importId,
+            "confirmed",
+            keepCount,
+            totalSuggestedPrice,
+            firstSeq,
+            lastSeq,
+            placementInstructions));
   }
 
   private List<TcgInventoryItem> queryKeepRows(String user, String importId) {

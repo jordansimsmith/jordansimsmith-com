@@ -81,6 +81,7 @@ public class ConfirmImportHandlerIntegrationTest {
     var body = objectMapper.readTree(response.getBody());
     assertThat(body.get("status").asText()).isEqualTo("confirmed");
     assertThat(body.get("unit_count").asInt()).isEqualTo(3);
+    assertThat(body.get("total_suggested_price").asText()).isEqualTo("4.50");
     assertThat(body.get("first_sequence_number").asInt()).isEqualTo(0);
     assertThat(body.get("last_sequence_number").asInt()).isEqualTo(2);
 
@@ -173,6 +174,7 @@ public class ConfirmImportHandlerIntegrationTest {
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
+    assertThat(body.get("total_suggested_price").asText()).isEqualTo("3.00");
     var instructions = body.get("placement_instructions");
     assertThat(instructions).hasSize(1);
     assertThat(instructions.get(0).get("block").asText()).isEqualTo("A0");
@@ -201,6 +203,7 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
     assertThat(body.get("unit_count").asInt()).isEqualTo(1);
+    assertThat(body.get("total_suggested_price").asText()).isEqualTo("1.50");
   }
 
   @Test
@@ -222,6 +225,7 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
     assertThat(body.get("unit_count").asInt()).isEqualTo(4);
+    assertThat(body.get("total_suggested_price").asText()).isEqualTo("6.00");
 
     assertThat(countUnits(TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#NM")))
         .isEqualTo(2);
@@ -316,6 +320,7 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
     assertThat(body.get("status").asText()).isEqualTo("confirmed");
+    assertThat(body.get("total_suggested_price").asText()).isEqualTo("3.00");
 
     var sku =
         tcgInventoryTable.getItem(
@@ -332,6 +337,28 @@ public class ConfirmImportHandlerIntegrationTest {
                 .sortValue(TcgInventoryItem.formatImportSk("import1"))
                 .build());
     assertThat(importResult.getStatus()).isEqualTo("confirmed");
+  }
+
+  @Test
+  void confirmShouldReturnZeroTotalsWhenImportHasNoKeepRows() throws Exception {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createImportInReview("jordan", "import1", 2);
+    createRowWithDecision("jordan", "import1", 1, "discard", "below threshold");
+    createRowWithDecision("jordan", "import1", 2, "review", "unmapped set");
+
+    // act
+    var response =
+        confirmImportHandler.handleRequest(
+            buildEvent("jordan", Map.of("import_id", "import1")), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = objectMapper.readTree(response.getBody());
+    assertThat(body.get("status").asText()).isEqualTo("confirmed");
+    assertThat(body.get("unit_count").asInt()).isEqualTo(0);
+    assertThat(body.get("total_suggested_price").asText()).isEqualTo("0.00");
+    assertThat(body.get("placement_instructions")).isEmpty();
   }
 
   @Test
@@ -424,6 +451,7 @@ public class ConfirmImportHandlerIntegrationTest {
     var body = objectMapper.readTree(response.getBody());
     assertThat(body.get("status").asText()).isEqualTo("confirmed");
     assertThat(body.get("unit_count").asInt()).isEqualTo(3);
+    assertThat(body.get("total_suggested_price").asText()).isEqualTo("46.50");
 
     var unitA =
         tcgInventoryTable.getItem(

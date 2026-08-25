@@ -300,6 +300,7 @@ describe('createFakeClient imports', () => {
     expect(response.import_id).toBe(created.import_id);
     expect(response.status).toBe('confirmed');
     expect(response.unit_count).toBe(3);
+    expect(response.total_suggested_price).toBe('9.00');
     expect(response.first_sequence_number).toBe(600);
     expect(response.last_sequence_number).toBe(602);
     expect(response.placement_instructions).toEqual([
@@ -350,6 +351,7 @@ describe('createFakeClient imports', () => {
 
     // 130 rows with every 5th discarded leaves 104 keeps spanning two blocks
     expect(response.unit_count).toBe(104);
+    expect(response.total_suggested_price).toBe('291.00');
     expect(response.first_sequence_number).toBe(600);
     expect(response.last_sequence_number).toBe(703);
     expect(response.placement_instructions).toEqual([
@@ -385,6 +387,7 @@ describe('createFakeClient imports', () => {
     const response = await client.confirmImport(created.import_id);
 
     expect(response.unit_count).toBe(0);
+    expect(response.total_suggested_price).toBe('0.00');
     expect(response.first_sequence_number).toBeNull();
     expect(response.last_sequence_number).toBeNull();
     expect(response.placement_instructions).toEqual([]);
