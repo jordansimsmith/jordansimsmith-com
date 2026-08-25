@@ -70,6 +70,8 @@ function importRow(
     decision_reason: null,
     market_price: '1.00',
     suggested_price: '0.95',
+    photos: [],
+    needs_photos: false,
     ...overrides,
   };
 }

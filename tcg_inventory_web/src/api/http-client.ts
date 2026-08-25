@@ -114,6 +114,32 @@ export function createHttpClient(): ApiClient {
       );
     },
 
+    async addRowPhoto(
+      importId: string,
+      position: number,
+      jpeg: Blob,
+    ): Promise<void> {
+      await authenticatedFetch(
+        `/imports/${encodeURIComponent(importId)}/rows/${position}/photos`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'image/jpeg' },
+          body: jpeg,
+        },
+      );
+    },
+
+    async deleteRowPhoto(
+      importId: string,
+      position: number,
+      photoId: string,
+    ): Promise<void> {
+      await authenticatedFetch(
+        `/imports/${encodeURIComponent(importId)}/rows/${position}/photos/${encodeURIComponent(photoId)}`,
+        { method: 'DELETE' },
+      );
+    },
+
     async deleteImport(importId: string): Promise<void> {
       await authenticatedFetch(`/imports/${encodeURIComponent(importId)}`, {
         method: 'DELETE',

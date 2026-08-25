@@ -148,10 +148,12 @@ describe('createFakeClient imports', () => {
 
     const response = await client.findImports();
 
-    expect(response.imports).toHaveLength(2);
-    const [inFlight, confirmed] = response.imports;
+    expect(response.imports).toHaveLength(3);
+    const [inFlight, review, confirmed] = response.imports;
     expect(inFlight.status).toBe('appraising');
-    expect(inFlight.created_at).toBeGreaterThan(confirmed.created_at);
+    expect(inFlight.created_at).toBeGreaterThan(review.created_at);
+    expect(review.status).toBe('review');
+    expect(review.created_at).toBeGreaterThan(confirmed.created_at);
     expect(inFlight.row_count).toBeGreaterThan(0);
     expect(confirmed.status).toBe('confirmed');
   });
@@ -368,6 +370,117 @@ describe('createFakeClient imports', () => {
     expect(response.first_sequence_number).toBeNull();
     expect(response.last_sequence_number).toBeNull();
     expect(response.placement_instructions).toEqual([]);
+  });
+});
+
+describe('createFakeClient row photos', () => {
+  const jpeg = () =>
+    new Blob([new Uint8Array([0xff, 0xd8, 0xff])], { type: 'image/jpeg' });
+
+  it('seeds a keep row at NZ$20+ with needs_photos', async () => {
+    const client = createFakeClient();
+
+    const detail = await client.getImport('fake-import-3');
+
+    expect(detail.status).toBe('review');
+    const flagged = detail.rows.find((row) => row.needs_photos);
+    expect(flagged).toMatchObject({
+      position: 1,
+      name: 'Doubling Season',
+      decision: 'keep',
+      suggested_price: '60.00',
+      photos: [],
+      needs_photos: true,
+    });
+    expect(detail.rows.find((row) => row.position === 2)?.needs_photos).toBe(
+      false,
+    );
+    expect(detail.rows.find((row) => row.position === 3)?.needs_photos).toBe(
+      false,
+    );
+  });
+
+  it('appends object-url photos in upload order and clears needs_photos', async () => {
+    const client = createFakeClient();
+
+    await client.addRowPhoto('fake-import-3', 1, jpeg());
+    await client.addRowPhoto('fake-import-3', 1, jpeg());
+    const detail = await client.getImport('fake-import-3');
+    const row = detail.rows[0];
+
+    expect(row.photos).toHaveLength(2);
+    expect(row.photos[0].photo_id).toBe('fake-photo-1');
+    expect(row.photos[1].photo_id).toBe('fake-photo-2');
+    expect(row.photos[0].url).toMatch(/^blob:/);
+    expect(row.photos[1].url).toMatch(/^blob:/);
+    expect(row.photos[0].url).not.toBe(row.photos[1].url);
+    expect(row.needs_photos).toBe(false);
+  });
+
+  it('promotes the next photo when the first is deleted', async () => {
+    const client = createFakeClient();
+    await client.addRowPhoto('fake-import-3', 1, jpeg());
+    await client.addRowPhoto('fake-import-3', 1, jpeg());
+    const before = (await client.getImport('fake-import-3')).rows[0];
+
+    await client.deleteRowPhoto('fake-import-3', 1, before.photos[0].photo_id);
+    const after = (await client.getImport('fake-import-3')).rows[0];
+
+    expect(after.photos.map((photo) => photo.photo_id)).toEqual([
+      before.photos[1].photo_id,
+    ]);
+    expect(after.needs_photos).toBe(false);
+  });
+
+  it('sets needs_photos again when the last photo is removed', async () => {
+    const client = createFakeClient();
+    await client.addRowPhoto('fake-import-3', 1, jpeg());
+    const photoId = (await client.getImport('fake-import-3')).rows[0].photos[0]
+      .photo_id;
+
+    await client.deleteRowPhoto('fake-import-3', 1, photoId);
+
+    expect((await client.getImport('fake-import-3')).rows[0].needs_photos).toBe(
+      true,
+    );
+  });
+
+  it('rejects a sixth photo', async () => {
+    const client = createFakeClient();
+    for (let i = 0; i < 5; i += 1) {
+      await client.addRowPhoto('fake-import-3', 1, jpeg());
+    }
+
+    await expect(
+      client.addRowPhoto('fake-import-3', 1, jpeg()),
+    ).rejects.toThrow('a row may have at most 5 photos');
+  });
+
+  it('rejects photos on non-keep rows', async () => {
+    const client = createFakeClient();
+
+    await expect(
+      client.addRowPhoto('fake-import-3', 3, jpeg()),
+    ).rejects.toThrow('photos can only be created on keep rows');
+  });
+
+  it('rejects photo mutations unless the import is in review', async () => {
+    const client = createFakeClient();
+
+    await expect(
+      client.addRowPhoto('fake-import-1', 1, jpeg()),
+    ).rejects.toThrow('import is not in review status');
+    await expect(
+      client.deleteRowPhoto('fake-import-1', 1, 'fake-photo-1'),
+    ).rejects.toThrow('import is not in review status');
+  });
+
+  it('rejects unknown photo ids', async () => {
+    const client = createFakeClient();
+
+    await expect(
+      client.deleteRowPhoto('fake-import-3', 1, 'missing'),
+    ).rejects.toThrow('Not Found');
   });
 });
 

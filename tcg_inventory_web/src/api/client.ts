@@ -76,6 +76,11 @@ export interface FindImportsResponse {
   imports: ImportSummary[];
 }
 
+export interface RowPhoto {
+  photo_id: string;
+  url: string;
+}
+
 export interface ImportRow {
   position: number;
   name: string;
@@ -89,6 +94,8 @@ export interface ImportRow {
   decision_reason: string | null;
   market_price: string | null;
   suggested_price: string | null;
+  photos: RowPhoto[];
+  needs_photos: boolean;
 }
 
 export interface ImportDetail extends ImportSummary {
@@ -243,6 +250,12 @@ export interface ApiClient {
     condition: Condition,
   ): Promise<ImportRow>;
   deleteImportRow(importId: string, position: number): Promise<void>;
+  addRowPhoto(importId: string, position: number, jpeg: Blob): Promise<void>;
+  deleteRowPhoto(
+    importId: string,
+    position: number,
+    photoId: string,
+  ): Promise<void>;
   deleteImport(importId: string): Promise<void>;
   confirmImport(importId: string): Promise<ConfirmImportResponse>;
   findSkus(params?: FindSkusParams): Promise<FindSkusResponse>;

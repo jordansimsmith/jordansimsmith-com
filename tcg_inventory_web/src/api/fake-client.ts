@@ -21,6 +21,7 @@ import type {
   Report,
   ReportResponse,
   RowDecision,
+  RowPhoto,
   SettingsResponse,
   SkuDetail,
   SkuSummary,
@@ -233,6 +234,7 @@ interface FakeImportRow {
   decision_reason: string | null;
   market_price: string | null;
   suggested_price: string | null;
+  photos: RowPhoto[];
 }
 
 function formatPrice(cents: number): string {
@@ -315,6 +317,7 @@ function createSeedImportRows(count: number): FakeImportRow[] {
       decision,
       decision_reason: decisionReason,
       ...appraisePrices(decision, position),
+      photos: [],
     });
   }
   return rows;
@@ -342,6 +345,59 @@ function createSeedImports(): FakeImport[] {
       status: 'appraising',
       rows: createSeedImportRows(40),
       created_at_ms: now - 10_000,
+    },
+    {
+      import_id: 'fake-import-3',
+      filename: 'manabox-2026-08-19.csv',
+      status: 'review',
+      rows: [
+        {
+          position: 1,
+          name: 'Doubling Season',
+          set_code: 'bbd',
+          set_name: 'Battlebond',
+          collector_number: '195',
+          finish: 'normal',
+          condition: 'NM',
+          scryfall_id: '29ba5a2d-d787-4214-8cd7-7f2bcea938f8',
+          decision: 'keep',
+          decision_reason: null,
+          market_price: '62.00',
+          suggested_price: '60.00',
+          photos: [],
+        },
+        {
+          position: 2,
+          name: 'Llanowar Elves',
+          set_code: 'dom',
+          set_name: 'Dominaria',
+          collector_number: '168',
+          finish: 'normal',
+          condition: 'NM',
+          scryfall_id: '581b7327-3215-4a4f-b4ae-d9d4002ba882',
+          decision: 'keep',
+          decision_reason: null,
+          market_price: '0.30',
+          suggested_price: '0.25',
+          photos: [],
+        },
+        {
+          position: 3,
+          name: 'Opt',
+          set_code: 'dom',
+          set_name: 'Dominaria',
+          collector_number: '60',
+          finish: 'normal',
+          condition: 'NM',
+          scryfall_id: '25f2e4d0-effd-4e83-b7aa-1a0d8f120951',
+          decision: 'discard',
+          decision_reason: DISCARD_REASON,
+          market_price: '0.10',
+          suggested_price: null,
+          photos: [],
+        },
+      ],
+      created_at_ms: now - 24 * 60 * 60 * 1000,
     },
   ];
 }
@@ -377,24 +433,41 @@ function toImportSummary(importRecord: FakeImport): ImportSummary {
   };
 }
 
+function needsPhotos(row: FakeImportRow): boolean {
+  return (
+    row.decision === 'keep' &&
+    row.suggested_price != null &&
+    Number(row.suggested_price) >= 20 &&
+    row.photos.length === 0
+  );
+}
+
+function toImportRow(row: FakeImportRow, revealed: boolean): ImportRow {
+  return {
+    position: row.position,
+    name: row.name,
+    set_code: row.set_code,
+    set_name: row.set_name,
+    collector_number: row.collector_number,
+    finish: row.finish,
+    condition: row.condition,
+    scryfall_id: row.scryfall_id,
+    decision: revealed ? row.decision : null,
+    decision_reason: revealed ? row.decision_reason : null,
+    market_price: revealed ? row.market_price : null,
+    suggested_price: revealed ? row.suggested_price : null,
+    photos: row.photos.map((photo) => ({ ...photo })),
+    needs_photos: revealed && needsPhotos(row),
+  };
+}
+
 function toImportDetail(importRecord: FakeImport): ImportDetail {
   const appraised = appraisedCount(importRecord);
   return {
     ...toImportSummary(importRecord),
-    rows: importRecord.rows.map((row, index) => ({
-      position: row.position,
-      name: row.name,
-      set_code: row.set_code,
-      set_name: row.set_name,
-      collector_number: row.collector_number,
-      finish: row.finish,
-      condition: row.condition,
-      scryfall_id: row.scryfall_id,
-      decision: index < appraised ? row.decision : null,
-      decision_reason: index < appraised ? row.decision_reason : null,
-      market_price: index < appraised ? row.market_price : null,
-      suggested_price: index < appraised ? row.suggested_price : null,
-    })),
+    rows: importRecord.rows.map((row, index) =>
+      toImportRow(row, index < appraised),
+    ),
   };
 }
 
@@ -542,6 +615,7 @@ export function createFakeClient(): ApiClient {
   const importRecords = createSeedImports();
   const orders = createSeedOrders(skus);
   let importCounter = importRecords.length;
+  let photoCounter = 0;
   // seed units occupy sequence numbers 0-599 (blocks A0-A5)
   let nextSequenceNumber = 600;
   // every 4th seed SKU starts dirty so the pending publish badge is non-zero
@@ -694,6 +768,7 @@ export function createFakeClient(): ApiClient {
             scryfall_id: parsed.scryfall_id,
             ...decided,
             ...appraisePrices(decided.decision, position),
+            photos: [],
           });
         }
       }
@@ -737,20 +812,7 @@ export function createFakeClient(): ApiClient {
         throw new Error('Not Found');
       }
       row.condition = condition;
-      return {
-        position: row.position,
-        name: row.name,
-        set_code: row.set_code,
-        set_name: row.set_name,
-        collector_number: row.collector_number,
-        finish: row.finish,
-        condition: row.condition,
-        scryfall_id: row.scryfall_id,
-        decision: row.decision,
-        decision_reason: row.decision_reason,
-        market_price: row.market_price,
-        suggested_price: row.suggested_price,
-      };
+      return toImportRow(row, true);
     },
 
     async deleteImportRow(importId: string, position: number): Promise<void> {
@@ -763,6 +825,55 @@ export function createFakeClient(): ApiClient {
         throw new Error('Not Found');
       }
       importRecord.rows.splice(index, 1);
+    },
+
+    async addRowPhoto(
+      importId: string,
+      position: number,
+      jpeg: Blob,
+    ): Promise<void> {
+      const importRecord = getImportOrThrow(importId);
+      if (importRecord.status !== 'review') {
+        throw new Error('import is not in review status');
+      }
+      const row = importRecord.rows.find((r) => r.position === position);
+      if (!row) {
+        throw new Error('Not Found');
+      }
+      if (row.decision !== 'keep') {
+        throw new Error('photos can only be created on keep rows');
+      }
+      if (row.photos.length >= 5) {
+        throw new Error('a row may have at most 5 photos');
+      }
+      photoCounter += 1;
+      row.photos.push({
+        photo_id: `fake-photo-${photoCounter}`,
+        url: URL.createObjectURL(jpeg),
+      });
+    },
+
+    async deleteRowPhoto(
+      importId: string,
+      position: number,
+      photoId: string,
+    ): Promise<void> {
+      const importRecord = getImportOrThrow(importId);
+      if (importRecord.status !== 'review') {
+        throw new Error('import is not in review status');
+      }
+      const row = importRecord.rows.find((r) => r.position === position);
+      if (!row) {
+        throw new Error('Not Found');
+      }
+      const photoIndex = row.photos.findIndex(
+        (photo) => photo.photo_id === photoId,
+      );
+      if (photoIndex === -1) {
+        throw new Error('Not Found');
+      }
+      const [removed] = row.photos.splice(photoIndex, 1);
+      URL.revokeObjectURL(removed.url);
     },
 
     async deleteImport(importId: string): Promise<void> {
