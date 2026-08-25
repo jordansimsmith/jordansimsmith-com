@@ -7,7 +7,7 @@ The TCG inventory API service is the source of truth for a physical Magic: The G
 - **Service type**: backend API (`tcg_inventory_api`)
 - **Interface**: REST over HTTPS plus an SQS-driven job consumer
 - **Runtime**: AWS Lambda (Java 21) behind API Gateway REST; one job Lambda consuming SQS
-- **Primary storage**: DynamoDB table `tcg_inventory` with `gsi1` and `gsi2`
+- **Primary storage**: DynamoDB table `tcg_inventory` with `gsi1` and `gsi2`; S3 bucket `api.tcg-inventory.jordansimsmith.com` (service object store; listing photos under `users/<user>/photos/`)
 - **Auth model**: API Gateway custom REQUEST authorizer provided by the shared `auth_api` service (see `auth_api/README.md`)
 - **External integration**: FetchTCG website API (unofficial), Firebase token exchange
 - **Primary consumer**: `tcg_inventory_web`
@@ -16,6 +16,7 @@ The TCG inventory API service is the source of truth for a physical Magic: The G
 
 - As a card seller, I want to import a ManaBox scan, review each card's keep/discard appraisal in stack order, and confirm keepers into inventory with assigned storage locations, so that intake requires no physical sorting.
 - As a card seller, I want FetchTCG listing quantities to always equal my in-stock unit counts, so that I never oversell or list phantom stock.
+- As a card seller, I want cards appraised at NZ$20 or more to require photos captured during import review and projected onto their FetchTCG listings, so that high-value listings show the actual card the buyer receives.
 - As a card seller, I want accepted offers to reserve the exact physical units and paid orders to produce a location-ordered pull sheet, so that fulfilment is one forward pass through my boxes.
 - As a card seller, I want every inventory mutation audited with before/after state, so that digital counts never silently drift from the physical boxes.
 - As a card seller, I want a regenerated overview report of value, movement, and composition, so that I can appreciate the overall state of the inventory without browsing SKU by SKU.
@@ -28,8 +29,9 @@ The TCG inventory API service is the source of truth for a physical Magic: The G
 - Authenticated CRUD for imports: upload a ManaBox CSV, appraise rows asynchronously, review appraisal decisions, confirm keepers into inventory, delete unwanted imports before confirm.
 - Appraisal per row: FetchTCG identity resolution for the CSV-identified printing (cached on the SKU after first sight), keep filter, and suggested policy price.
 - Inventory browse: SKU search and detail with unit lists and derived locations.
+- Listing photos: up to 5 JPEG photos per keep row, captured during import review (raw-body upload, stored durably in S3, served via short-lived presigned URLs); confirm is blocked while any keep row appraised at NZ$20+ has no photos; photos freeze onto units at confirm and are immutable afterwards.
 - Manual audited adjustments: remove a unit; change a unit's condition (moving it between SKUs).
-- Publish job (single two-phase job): order phase ingests FetchTCG seller offers (reserve, pick-ready, defensive void release), then publish phase drains dirty SKUs to FetchTCG — create and update as absolute listing quantities, delete the listing when the in-stock count reaches zero.
+- Publish job (single two-phase job): order phase ingests FetchTCG seller offers (reserve, pick-ready, defensive void release), then publish phase drains dirty SKUs to FetchTCG — create and update as absolute listing quantities projecting the first in-stock unit's photos as the listing images, delete the listing when the in-stock count reaches zero.
 - Pull sheets for paid orders, sorted by unit sequence number; order confirm marks pulled units sold.
 - Reports: an async report job aggregates the entire inventory into a stored dashboard snapshot (headline totals, monthly revenue, weekly intake vs sales, top sets, price buckets, top hits, aging bands); `GET /reports` serves the latest snapshot with staleness metadata and generation status.
 - Per-user FetchTCG refresh-token storage with masked reads; fresh one-hour bearer minted per job run.
@@ -40,6 +42,7 @@ The TCG inventory API service is the source of truth for a physical Magic: The G
 - Repricing existing listings (a separate repricing process owns price maintenance; this service prices new listings only).
 - Marketplaces other than FetchTCG; games other than Magic: The Gathering; non-English cards (they become review rows).
 - Camera or scanner-based intake, image recognition, and scan verification UIs.
+- Post-confirm photo editing (photos freeze at confirm; remove and re-import is the retake path) and FetchTCG buyer photo requests.
 - Cost/purchase-price tracking and profit reporting (reports cover revenue and valuation only), bulk lots, master sets, POS, buylist.
 - Background/scheduled polling of FetchTCG (all jobs are manually triggered).
 - Deleting SKU records (they are permanent once created) or offer negotiation (accept/counter/reject happens on FetchTCG).
@@ -60,6 +63,8 @@ flowchart TD
   jobs -->|sequential 1-2s| fetchtcg[FetchTCG API]
   http -->|put/get secret| secrets[Secrets Manager: tcg_inventory]
   jobs --> secrets
+  http -->|put/get/presign photos| s3[(S3: api.tcg-inventory)]
+  jobs -->|get photo bytes| s3
 ```
 
 ### Primary workflow
@@ -106,6 +111,9 @@ sequenceDiagram
 - FetchTCG traffic is sequential with 1–2 s random request spacing, bounded retries, an endpoint allowlist, and fail-closed bearer handling. Every job run mints a fresh one-hour bearer from the stored refresh token and persists a rotated refresh token when Firebase returns one.
 - Reports are a stored snapshot, not live aggregation: a `report` job pages all SKU records via `gsi2` (projection ALL), derives every figure from unit and order items, and overwrites a singleton report item stamped with the latest audit ULID captured at generation start. `GET /reports` computes staleness (comparing the latest audit ULID against the snapshot's as-of audit ULID, plus a 24-hour backstop) without touching inventory partitions. Stock counts stay unstored; the report is a disposable projection regenerated on demand.
 - The static Scryfall→FetchTCG set mapping is a generated, checked-in artifact; unmapped sets stop appraisal into `review` rather than guessing. The generator maps each FetchTCG set to every distinct Scryfall code found by sampling unique card names from both the newest and oldest ends of that set, so reprint printings filed under an older FetchTCG set (for example MH1 and MH2 Timeshifts under Modern Horizons) still resolve.
+- Photos are per-unit, captured on keep rows during import review (the only moment cards are in hand) and immutable after confirm — no unit-level photo mutations exist, so no photo-driven dirty flags or audit events. The import gate is NZ$20 against FetchTCG's NZ$50 client-side rule: the margin makes a sub-gate card later drifting past $50 negligible, and FetchTCG's API never rejects photo-less listings anyway (verified live — it defaults the front image to the stock card image), so a photo-less NZ$50+ upsert logs a warning and proceeds rather than blocking publish.
+- Listing images are an absolute projection of the first (lowest sequence) in-stock unit's photos — the exact card the next buyer receives, since reservation allocates forward-most first. Every upsert sends full image state (verified live: an omitted `frontImage` resets to the stock image; a present `additionalImages` replaces the set). Each photo uploads to FetchTCG once ever; the returned URL is cached on the unit's photo entry and remains valid across listing deletion and recreation.
+- Photo upload uses a raw `image/jpeg` request body through the API (the CSV import precedent) rather than presigned S3 uploads: client-side re-encoding keeps bodies far below Lambda's payload ceiling, so presign choreography buys nothing at photo sizes.
 
 ## Domain glossary
 
@@ -114,6 +122,7 @@ sequenceDiagram
 - **Condition**: `NM` | `LP` | `MP` | `HP` | `DMG`. ManaBox import mapping: mint→NM, near_mint→NM, excellent→LP, good→MP, light_played→HP, played→HP, poor→DMG. FetchTCG listing mapping: NM→`raw-nm`, LP→`raw-lp`, MP→`raw-mp`, HP→`raw-hp`, DMG→`raw-d` (`raw-m` is never listed).
 - **SKU**: printing + finish + condition; the sellable identity. One FetchTCG listing per SKU. Permanent once created.
 - **Unit**: one physical card. Status lifecycle: `in_stock` → `reserved` → `sold`; `reserved` → `in_stock` on void; `in_stock` → `removed` by adjustment.
+- **Photo**: a JPEG of a specific physical card (max 5 per row/unit, in upload order; the first uploaded is the listing front image), captured on a keep row during review, stored durably in S3, frozen onto the unit at confirm.
 - **Sequence number**: globally monotonic integer per unit, assigned at import confirm; the canonical physical position.
 - **Block**: `floor(sequence_number / 100)`, labeled `A0` … `A99`, `B0` … (letter advances every 100 blocks). Labels are logical and append-only; a block physically lives wherever its labeled divider sits.
 - **Location**: display form `<block>-<offset>` with zero-based offset = `sequence_number % 100` (4242 → `A42-42`). Derived, never stored. Offsets are placement order; pulls leave gaps but preserve relative order, guaranteeing single-forward-pass pulls.
@@ -130,7 +139,7 @@ sequenceDiagram
 
 ### External systems
 
-- **FetchTCG website API**: sequential HTTPS JSON requests to `https://api.fetchtcg.com` with a browser-compatible user agent. Public reads (card details `GET /v3/cards/{card_id}`, card search `GET /v3/cards`, active listings `GET /v3/cards/{card_id}/listings`) are unauthenticated. Authenticated calls attach `Authorization: Bearer <token>` only to the seller offers list (`GET /v2/private/market/offers/seller`), managed-listings read (`GET /v1/manage-listings`), the listing upsert (`POST /v2/private/manage-listings`, absolute quantity and price keyed by `cardId` + condition), and the listing delete (`DELETE /v1/manage-listings/{listing_id}`, no body, 200 with empty body — used to delist a SKU whose in-stock count reaches zero). Transient failures retry with bounded backoff; 401/403 stops the job. FetchTCG does not publish these endpoints as a supported API and its terms prohibit unpermitted automation; conservative pacing reduces load but the policy risk stays with the user.
+- **FetchTCG website API**: sequential HTTPS JSON requests to `https://api.fetchtcg.com` with a browser-compatible user agent. Public reads (card details `GET /v3/cards/{card_id}`, card search `GET /v3/cards`, active listings `GET /v3/cards/{card_id}/listings`) are unauthenticated. Authenticated calls attach `Authorization: Bearer <token>` only to the seller offers list (`GET /v2/private/market/offers/seller`), managed-listings read (`GET /v1/manage-listings`), the listing image upload (`POST /v2/private/manage-listings/uploadListingImage`, multipart `file`, JPEG/PNG only, server re-encodes; returns a durable account-scoped `imageUrl` reusable across listing lifecycles), the listing upsert (`POST /v2/private/manage-listings`, absolute quantity, price, and image state keyed by `cardId` + condition — `frontImage` is a string that resets to the stock card image when omitted; `additionalImages` is `[{"label": null, "url": "..."}]` and replaces the set when present, `[]` clearing it), and the listing delete (`DELETE /v1/manage-listings/{listing_id}`, no body, 200 with empty body — used to delist a SKU whose in-stock count reaches zero). Transient failures retry with bounded backoff; 401/403 stops the job. FetchTCG does not publish these endpoints as a supported API and its terms prohibit unpermitted automation; conservative pacing reduces load but the policy risk stays with the user.
 - **Firebase token exchange**: each job run exchanges the stored refresh token at Firebase's fixed HTTPS token endpoint for a one-hour bearer. A replacement refresh token in the response is persisted back to the secret. The refresh token is never sent to FetchTCG.
 - **Offer state mapping** (from the seller offers list): an offer first seen with `status = ACCEPTED` creates an order and reserves units, provided its `acceptedAt` is strictly after the user's `track_orders_after` setting (when set). Offers accepted at or before that instant are silently skipped on every run and never create order records. If `acceptedAt` is null or unparseable on an `ACCEPTED` offer, the offer is fail-closed skipped with a warning log. `currentAction` past payment confirmation (for example `SEND_PICKUP_ADDRESS`, tracking actions, `SEND_REVIEW`, `AWAIT_REVIEW`) marks the order `to_pick`. When an offer cannot resolve all its listing lines to known SKUs or has insufficient in-stock units, the order is created with status `flagged` (no units are reserved for unmapped lines). Buyer names, addresses, payment instructions, and tracking details are never persisted.
 - **Scryfall API**: consumed only by the set-mapping generator (public set catalog and card records); normal runs never call Scryfall.
@@ -144,33 +153,36 @@ sequenceDiagram
 - Request and response fields use `snake_case`; no path version segment
 - Non-2xx responses use `{"message": "error details"}`
 - `PATCH` is used for partial updates of resources with independent fields: each field present in the body is applied, absent fields are unchanged, and an empty body returns 400
+- The photo upload endpoint accepts a raw binary body (`Content-Type: image/jpeg`, 4 MB max) instead of JSON; photo mutation responses return the row's updated ordered `photos` list with short-lived presigned URLs
 - Async work is observed through the affected resource, not a generic jobs API: appraisal progress and errors ride on the import (`GET /imports/{import_id}`), publish progress and errors on `GET /publish` (current-or-latest run), and report generation progress and errors on `GET /reports` (latest snapshot plus current-or-latest generation). Job items exist in storage only as internal continuation state.
 - Verb convention: edits that record client-owned data use `PUT` on the resource; domain actions that cause server-side cascades (confirm, publish) are `POST` sub-resource actions with transition-specific contracts
 
 ### Endpoint summary
 
-| Method   | Path                                     | Purpose                                                                                |
-| -------- | ---------------------------------------- | -------------------------------------------------------------------------------------- |
-| `POST`   | `/imports`                               | upload a ManaBox CSV; starts the appraise job                                          |
-| `GET`    | `/imports`                               | list imports newest-first                                                              |
-| `GET`    | `/imports/{import_id}`                   | import status, progress, and rows                                                      |
-| `PUT`    | `/imports/{import_id}/rows/{position}`   | update a row's condition before confirm                                                |
-| `DELETE` | `/imports/{import_id}/rows/{position}`   | delete a misidentified row before confirm                                              |
-| `POST`   | `/imports/{import_id}/confirm`           | append keeper units; returns placement instructions                                    |
-| `DELETE` | `/imports/{import_id}`                   | delete an unconfirmed import and its rows                                              |
-| `GET`    | `/skus`                                  | browse/search SKUs (prefix search, continuation paging)                                |
-| `GET`    | `/skus/{sku_id}`                         | SKU detail including its units                                                         |
-| `DELETE` | `/skus/{sku_id}/units/{sequence_number}` | remove a unit (optional `reason` query param)                                          |
-| `PUT`    | `/skus/{sku_id}/units/{sequence_number}` | update a unit's condition (moves it to another SKU; response returns the new `sku_id`) |
-| `GET`    | `/orders`                                | list orders newest-first                                                               |
-| `GET`    | `/orders/{order_id}`                     | order detail: lines, allocated units, pull locations                                   |
-| `POST`   | `/orders/{order_id}/confirm`             | confirm the pull; marks allocated units sold                                           |
-| `POST`   | `/publish`                               | start a publish run; responds 202 and is idempotent while one is queued/running        |
-| `GET`    | `/publish`                               | current-or-latest publish run: status, progress, error, pending dirty count            |
-| `POST`   | `/reports`                               | start a report generation; responds 202 and is idempotent while one is queued/running  |
-| `GET`    | `/reports`                               | latest report snapshot with staleness and generation status; 404 before first run      |
-| `GET`    | `/settings`                              | settings view: credential presence, last-updated, track orders after                   |
-| `PATCH`  | `/settings`                              | partial update: optional refresh token + optional track orders after                   |
+| Method   | Path                                                             | Purpose                                                                                |
+| -------- | ---------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `POST`   | `/imports`                                                       | upload a ManaBox CSV; starts the appraise job                                          |
+| `GET`    | `/imports`                                                       | list imports newest-first                                                              |
+| `GET`    | `/imports/{import_id}`                                           | import status, progress, and rows                                                      |
+| `PUT`    | `/imports/{import_id}/rows/{position}`                           | update a row's condition before confirm                                                |
+| `DELETE` | `/imports/{import_id}/rows/{position}`                           | delete a misidentified row before confirm                                              |
+| `POST`   | `/imports/{import_id}/rows/{position}/photos`                    | add a photo to a keep row (raw JPEG body)                                              |
+| `DELETE` | `/imports/{import_id}/rows/{position}/photos/{photo_id}`         | remove a row photo before confirm                                                      |
+| `POST`   | `/imports/{import_id}/confirm`                                   | append keeper units; returns placement instructions                                    |
+| `DELETE` | `/imports/{import_id}`                                           | delete an unconfirmed import and its rows                                              |
+| `GET`    | `/skus`                                                          | browse/search SKUs (prefix search, continuation paging)                                |
+| `GET`    | `/skus/{sku_id}`                                                 | SKU detail including its units                                                         |
+| `DELETE` | `/skus/{sku_id}/units/{sequence_number}`                         | remove a unit (optional `reason` query param)                                          |
+| `PUT`    | `/skus/{sku_id}/units/{sequence_number}`                         | update a unit's condition (moves it to another SKU; response returns the new `sku_id`) |
+| `GET`    | `/orders`                                                        | list orders newest-first                                                               |
+| `GET`    | `/orders/{order_id}`                                             | order detail: lines, allocated units, pull locations                                   |
+| `POST`   | `/orders/{order_id}/confirm`                                     | confirm the pull; marks allocated units sold                                           |
+| `POST`   | `/publish`                                                       | start a publish run; responds 202 and is idempotent while one is queued/running        |
+| `GET`    | `/publish`                                                       | current-or-latest publish run: status, progress, error, pending dirty count            |
+| `POST`   | `/reports`                                                       | start a report generation; responds 202 and is idempotent while one is queued/running  |
+| `GET`    | `/reports`                                                       | latest report snapshot with staleness and generation status; 404 before first run      |
+| `GET`    | `/settings`                                                      | settings view: credential presence, last-updated, track orders after                   |
+| `PATCH`  | `/settings`                                                      | partial update: optional refresh token + optional track orders after                   |
 
 ### Example request and response
 
@@ -201,11 +213,29 @@ Response `200` (each placement instruction carries the card names at its boundar
 Representative failures:
 
 - `409`: `{"message":"import is not in review status"}` (double confirm, or confirm during appraisal)
+- `409`: `{"message":"2 rows need photos before confirm"}` (keep rows appraised at NZ$20+ still photo-less)
 - `404`: `{"message":"Not Found"}` (unknown import in user scope)
+
+`POST /imports/{import_id}/rows/{position}/photos` (body: raw JPEG bytes)
+
+Response `200` (both photo mutations return the row's updated ordered list; `url` is a 15-minute presigned S3 GET; photos order by upload and the first is the listing front image — removing one promotes the next, so reordering is delete + re-upload):
+
+```json
+{
+  "photos": [
+    {
+      "photo_id": "01JEXAMPLEPHOTOULID00000",
+      "url": "https://s3.ap-southeast-2.amazonaws.com/api.tcg-inventory.jordansimsmith.com/users/jordan/photos/01JEXAMPLEPHOTOULID00000.jpg?X-Amz-Expires=900&..."
+    }
+  ]
+}
+```
+
+Representative failures: `409` unless the import is in review; `400` for a non-keep row, a non-JPEG body, a body over 4 MB, or a sixth photo. Rows in `GET /imports/{import_id}` carry `photos` (same shape) and `needs_photos` (keep, appraised at NZ$20+, no photos yet).
 
 `GET /skus/{sku_id}`
 
-Response `200` (units sorted ascending by sequence number; locations and the `*_count` fields are derived server-side from unit items, never stored):
+Response `200` (units sorted ascending by sequence number; locations and the `*_count` fields are derived server-side from unit items, never stored; unit `photos` are read-only — photo management exists only on review rows):
 
 ```json
 {
@@ -221,9 +251,29 @@ Response `200` (units sorted ascending by sequence number; locations and the `*_
   "reserved_count": 1,
   "sold_count": 0,
   "units": [
-    { "sequence_number": 1204, "location": "A12-4", "status": "reserved" },
-    { "sequence_number": 4242, "location": "A42-42", "status": "in_stock" },
-    { "sequence_number": 4250, "location": "A42-50", "status": "in_stock" }
+    {
+      "sequence_number": 1204,
+      "location": "A12-4",
+      "status": "reserved",
+      "photos": []
+    },
+    {
+      "sequence_number": 4242,
+      "location": "A42-42",
+      "status": "in_stock",
+      "photos": [
+        {
+          "photo_id": "01JEXAMPLEPHOTOULID00000",
+          "url": "https://s3.ap-southeast-2.amazonaws.com/api.tcg-inventory.jordansimsmith.com/users/jordan/photos/01JEXAMPLEPHOTOULID00000.jpg?X-Amz-Expires=900&..."
+        }
+      ]
+    },
+    {
+      "sequence_number": 4250,
+      "location": "A42-50",
+      "status": "in_stock",
+      "photos": []
+    }
   ]
 }
 ```
@@ -350,9 +400,9 @@ price = max(0.25, round_nearest_half_up(benchmark, 0.05))
 | Item             | pk                            | sk                             | Notable attributes                                                                                                                                                                                                               |
 | ---------------- | ----------------------------- | ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | SKU              | `USER#<u>#SKU#<sku_id>`       | `SKU`                          | scryfall_id, finish, condition, name, set_code, set_name, collector_number, fetchtcg_card_id, fetchtcg_set_id, `version`, `dirty`, `fetchtcg_listing_id`, `last_published_quantity`, `last_published_price`, `last_published_at` |
-| Unit             | `USER#<u>#SKU#<sku_id>`       | `UNIT#<sequence_number>`       | sequence_number, status, import_id, order_id (when reserved/sold), timestamps                                                                                                                                                    |
+| Unit             | `USER#<u>#SKU#<sku_id>`       | `UNIT#<sequence_number>`       | sequence_number, status, import_id, order_id (when reserved/sold), timestamps, `photos` (ordered `{photo_id, fetchtcg_url once uploaded}` list)                                                                                  |
 | Import           | `USER#<u>`                    | `IMPORT#<ulid>`                | filename, status, row counts, error (when the appraise job fails), timestamps                                                                                                                                                    |
-| Import row       | `USER#<u>#IMPORT#<import_id>` | `ROW#<stack position, padded>` | raw CSV fields, resolved identity, decision + reason, appraisal evidence (market price, rival evidence, suggested price), assigned sequence_number                                                                               |
+| Import row       | `USER#<u>#IMPORT#<import_id>` | `ROW#<stack position, padded>` | raw CSV fields, resolved identity, decision + reason, appraisal evidence (market price, rival evidence, suggested price), assigned sequence_number, `photos` (ordered `{photo_id}` list)                                         |
 | Order            | `USER#<u>`                    | `ORDER#<fetchtcg_offer_id>`    | state, FetchTCG status/currentAction snapshot, accepted_at, delivery_mode, financial totals (no buyer PII), embedded lines `[{sku_id, fetchtcg_listing_id, quantity, price, allocated sequence_numbers}]`                        |
 | Audit entry      | `USER#<u>#AUDIT`              | `<ulid>`                       | event_type (`import_confirm`, `adjustment`, `reserve`, `release`, `sell`, `publish`), affected sku_ids / unit sequence_numbers / order_id / import_id, before/after summary                                                      |
 | Job              | `USER#<u>`                    | `JOB#<ulid>`                   | internal continuation state, never an API resource: type (`appraise` \| `publish` \| `report`), status (`queued` \| `running` \| `succeeded` \| `failed`), continuation, progress counters, error                                |
@@ -394,7 +444,13 @@ price = max(0.25, round_nearest_half_up(benchmark, 0.05))
   "sk": "UNIT#0000004242",
   "sequence_number": 4242,
   "status": "in_stock",
-  "import_id": "01JEXAMPLEULID0000000000"
+  "import_id": "01JEXAMPLEULID0000000000",
+  "photos": [
+    {
+      "photo_id": "01JEXAMPLEPHOTOULID00000",
+      "fetchtcg_url": "https://listing-img.fetchtcg.com/aBcDeFgH0123456789/listing/5314d615-8f24-4eb9-8613-de544566c2c2.jpg"
+    }
+  ]
 }
 ```
 
@@ -402,11 +458,11 @@ price = max(0.25, round_nearest_half_up(benchmark, 0.05))
 
 All mutations are `TransactWriteItems` including their audit entry; every mutation bumps the affected SKU's `version` with `ADD version :1` and sets `gsi1pk` to the dirty value.
 
-- **Import confirm**: conditional status flip `review → confirming` (single confirmer), one `UpdateItem ADD next_sequence_number :n` allocating the range, sequence numbers recorded on rows (skipped on retry if present), then chunked per-SKU transactions — conditional unit puts + SKU dirty/version updates — where a replayed chunk fails its unit-exists condition and no-ops atomically; final flip `confirming → confirmed`.
+- **Import confirm**: conditional status flip `review → confirming` (single confirmer), one `UpdateItem ADD next_sequence_number :n` allocating the range, sequence numbers recorded on rows (skipped on retry if present), then chunked per-SKU transactions — conditional unit puts (carrying each row's `photos` list verbatim) + SKU dirty/version updates — where a replayed chunk fails its unit-exists condition and no-ops atomically; final flip `confirming → confirmed`. Confirm rejects with 409 while any keep row appraised at NZ$20+ has zero photos.
 - **Reserve**: conditional order put keyed by FetchTCG offer id + unit `in_stock → reserved` transitions + SKU dirty + version + audit.
 - **Release (void)**: order `awaiting_payment → voided` + units `reserved → in_stock` + dirty + version + audit.
 - **Sell (confirm pull)**: order `to_pick → fulfilled` + units `reserved → sold` + version + audit. No dirty flag — reserved units already left the projection and FetchTCG decremented at acceptance.
-- **Remove / condition edit**: conditional unit transitions with dirty and version updates; condition edit is one transaction across two SKU partitions (delete + re-put the unit item with the same sequence number, both SKUs dirtied).
+- **Remove / condition edit**: conditional unit transitions with dirty and version updates; condition edit is one transaction across two SKU partitions (delete + re-put the unit item with the same sequence number and `photos` list, both SKUs dirtied).
 - **Publish clear**: set `dirty = false`, set `gsi1pk` to clean value, update the listing snapshot — conditional on `dirty = true AND version = :captured` (the version read before the recount). A delist clears the listing snapshot (`fetchtcg_listing_id` and published values removed); a later restock creates a fresh listing.
 
 ## Behavioral invariants and time semantics
@@ -431,24 +487,29 @@ All mutations are `TransactWriteItems` including their audit entry; every mutati
 - Report staleness: the job captures the latest audit ULID before reading any data; `GET /reports` reports stale when a later audit entry exists or the snapshot is older than 24 hours, so mutations landing mid-generation surface as stale on the next read.
 - Report figures count `in_stock` units only for value, price buckets, top sets, top hits, and aging; reserved units appear only in the headline reserved count; `removed` units are excluded everywhere. Intake trends count every unit by `created_at` (preserved across condition edits); sold trends use the sell-time `updated_at`; revenue counts paid orders (`to_pick`, `fulfilled`) bucketed by first-seen month. A unit's price is its SKU's `last_published_price` falling back to appraisal `suggested_price`; SKUs with neither surface as an unpriced count and are excluded from value figures.
 - Report week and month bucketing and aging bands use the fixed `Pacific/Auckland` timezone; weeks start Monday. Top hits rank by per-unit price (quantity is display detail), tie-broken by name ascending.
+- Photos are immutable after confirm: management exists only on keep rows while the import is in review (max 5, JPEG, 4 MB), and the confirm gate (409 while any keep row appraised at NZ$20+ is photo-less) is the only photo enforcement anywhere — publish never blocks on photos.
+- Listing upserts always project full image state: a photographed SKU sends its first (lowest sequence) in-stock unit's photos (`frontImage` first, the rest as `additionalImages`); a photo-less SKU omits `frontImage` (FetchTCG defaults to the stock card image) and sends `additionalImages: []`. An upsert at NZ$50+ with a photo-less first unit logs a warning and proceeds.
+- Each photo is uploaded to FetchTCG at most once: the returned `imageUrl` persists on the unit's photo entry as `fetchtcg_url` and is reused thereafter; replayed slices converge on the same URL.
 - NM is the default condition where none is provided. Timestamps are epoch seconds; ULIDs order imports, jobs, and audit entries by creation time.
 
 ## Source of truth
 
-| Entity                               | Authoritative source                                              | Notes                                                              |
-| ------------------------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------ |
-| Physical stack order and quantity    | ManaBox CSV row order and `Quantity`                              | reversed for review display; raw order = sequence assignment order |
-| Printing identity                    | ManaBox `Scryfall ID` (+ finish, condition columns)               | SKU computable offline from the row                                |
-| FetchTCG card identity               | Verified FetchTCG lookup, cached as `fetchtcg_card_id` on the SKU | set mapping is a generated, checked-in artifact                    |
-| Unit existence, status, and position | DynamoDB unit items                                               | append-only; gaps are permanent                                    |
-| Stock counts                         | Derived from unit items at read time                              | never stored; publish recounts units for its absolute write        |
-| Listing quantity on FetchTCG         | Projection of in-stock unit count                                 | absolute upserts keyed by `cardId` + condition                     |
-| New-listing price                    | Pricing policy in this README                                     | applied at publish-create time                                     |
-| Order state                          | FetchTCG seller offers list (`status`, `currentAction`)           | mapped to `awaiting_payment` / `to_pick` / `voided`                |
-| Market price                         | FetchTCG `pricingData.NZ.tcgMarketPrice`                          | keep filter and pricing benchmark                                  |
-| Audit history                        | Append-only audit items                                           | written in the same transaction as each mutation                   |
-| Report figures                       | Stored report snapshot item                                       | derived from SKU/unit/order items at generation time               |
-| Report staleness                     | Latest audit ULID vs snapshot `as_of_audit_ulid`                  | plus a fixed 24-hour wall-clock backstop                           |
+| Entity                               | Authoritative source                                              | Notes                                                                 |
+| ------------------------------------ | ----------------------------------------------------------------- | --------------------------------------------------------------------- |
+| Physical stack order and quantity    | ManaBox CSV row order and `Quantity`                              | reversed for review display; raw order = sequence assignment order    |
+| Printing identity                    | ManaBox `Scryfall ID` (+ finish, condition columns)               | SKU computable offline from the row                                   |
+| FetchTCG card identity               | Verified FetchTCG lookup, cached as `fetchtcg_card_id` on the SKU | set mapping is a generated, checked-in artifact                       |
+| Unit existence, status, and position | DynamoDB unit items                                               | append-only; gaps are permanent                                       |
+| Stock counts                         | Derived from unit items at read time                              | never stored; publish recounts units for its absolute write           |
+| Listing quantity on FetchTCG         | Projection of in-stock unit count                                 | absolute upserts keyed by `cardId` + condition                        |
+| Photo bytes                          | S3 object at `users/<user>/photos/<photo_id>.jpg`                 | immutable; never lifecycle-deleted                                    |
+| Listing images on FetchTCG           | Projection of the first in-stock unit's photos                    | full image state on every upsert; stock-image default when photo-less |
+| New-listing price                    | Pricing policy in this README                                     | applied at publish-create time                                        |
+| Order state                          | FetchTCG seller offers list (`status`, `currentAction`)           | mapped to `awaiting_payment` / `to_pick` / `voided`                   |
+| Market price                         | FetchTCG `pricingData.NZ.tcgMarketPrice`                          | keep filter and pricing benchmark                                     |
+| Audit history                        | Append-only audit items                                           | written in the same transaction as each mutation                      |
+| Report figures                       | Stored report snapshot item                                       | derived from SKU/unit/order items at generation time                  |
+| Report staleness                     | Latest audit ULID vs snapshot `as_of_audit_ulid`                  | plus a fixed 24-hour wall-clock backstop                              |
 
 ## Security and privacy
 
@@ -456,17 +517,19 @@ All mutations are `TransactWriteItems` including their audit entry; every mutati
 - The FetchTCG refresh token lives only in the Secrets Manager secret; the settings endpoint writes it and never returns it (reads expose presence and last-updated only). Bearer tokens are minted per job run, held in memory, attached only to the four authenticated FetchTCG endpoints, and never logged.
 - Buyer PII from offers (names, addresses, payment instructions, bank details, tracking) is never persisted; orders store card identity, quantities, and financial totals only.
 - Audit entries and logs exclude credentials and raw FetchTCG response bodies.
+- Listing photos live in a private SSE-S3 bucket; clients access them only through short-lived presigned GET URLs, which are never logged. Copies uploaded to FetchTCG are public marketplace images by nature.
 - All external requests use HTTPS. FetchTCG automation is unsupported by its terms; the user owns that policy risk.
 
 ## Configuration and secrets reference
 
 ### Environment variables
 
-| Name             | Required                         | Purpose                                     | Default behavior       |
-| ---------------- | -------------------------------- | ------------------------------------------- | ---------------------- |
-| `JOBS_QUEUE_URL` | yes (trigger + consumer Lambdas) | SQS queue for job and continuation messages | none; set by Terraform |
+| Name                 | Required                            | Purpose                                     | Default behavior       |
+| -------------------- | ----------------------------------- | ------------------------------------------- | ---------------------- |
+| `JOBS_QUEUE_URL`     | yes (trigger + consumer Lambdas)    | SQS queue for job and continuation messages | none; set by Terraform |
+| `BUCKET_NAME`        | yes (photo handlers + job consumer) | service S3 object store                     | none; set by Terraform |
 
-Fixed configuration lives in code: request spacing 1–2 s, bounded retries, request budgets, page sizes, slice size (~100 rows or bounded FetchTCG calls per slice), country `NZ`, currency `NZD`, keep threshold NZ$0.25, price increment NZ$0.05, seller floor NZ$0.25. Report constants: staleness backstop 24 h, bucketing timezone `Pacific/Auckland`, price buckets $0.25–$0.50 / $0.50–$1 / $1–$2 / $2–$5 / $5–$10 / $10+ NZD, aging bands 0–30 / 31–90 / 91–180 / 180+ days, top sets 10, top hits 10.
+Fixed configuration lives in code: request spacing 1–2 s, bounded retries, request budgets, page sizes, slice size (~100 rows or bounded FetchTCG calls per slice), country `NZ`, currency `NZD`, keep threshold NZ$0.25, price increment NZ$0.05, seller floor NZ$0.25. Photo constants: import gate NZ$20, publish warning NZ$50, 5 photos per row/unit, 4 MB max upload, 15-minute presign TTL. Report constants: staleness backstop 24 h, bucketing timezone `Pacific/Auckland`, price buckets $0.25–$0.50 / $0.50–$1 / $1–$2 / $2–$5 / $5–$10 / $10+ NZD, aging bands 0–30 / 31–90 / 91–180 / 180+ days, top sets 10, top hits 10.
 
 ### Secret shape
 
@@ -486,22 +549,23 @@ Rotated refresh tokens returned by Firebase are written back to the same key.
 - SKU browse is a single GSI2 query returning identity fields only (no unit fan-out, no counts); detail derives counts from the partition query which returns the SKU and all its units in one shot.
 - Job Lambdas: 900 s timeout with the module's default 1769 MB memory (the 1-vCPU point — keeps Java cold starts fast; the GB-second cost of idle FetchTCG pacing still sits far inside the always-free compute allowance). HTTP handlers use module defaults (10 s).
 - FetchTCG pacing dominates: an appraise slice of ~100 rows runs minutes; a daily publish run (typical daily delta) runs single-digit minutes; jobs re-enqueue continuations well before timeout.
+- Photo volume is negligible (<10 photographed SKUs expected at target scale, ≤5 photos each); each photo uploads to FetchTCG once ever, inside the existing pacing.
 - Report generation makes no FetchTCG calls: it pages all SKU records via gsi2 (~5–10 pages) and queries each SKU partition once (~25–100 s sequential at target scale), completing in a single slice. `GET /reports` is one item read plus two small queries.
 - SQS consumer maximum concurrency 1; visibility timeout exceeds the function timeout.
 - Everything fits the repo's serverless cost posture (Lambda/SQS free tiers; Secrets Manager ~US$0.40/month).
 
 ## Testing and quality gates
 
-- Unit tests: pricing policy scenarios (keep filter, undercut tick, deep-discount guard, supported floor, sole-source premium, rounding, floor), condition translation, set mapping, sequence/block/location derivation, FetchTCG client pacing/retries/allowlist/fail-closed auth with fixture responses, offer state mapping, report aggregation (price fallback chain, bucket and band edges, NZ-timezone bucketing, top-hits ordering and tie-break, paid-order filter, removed-unit exclusion), and report staleness comparison (as-of audit ULID and 24 h backstop).
-- Integration tests (DynamoDB Testcontainers, LocalStack SQS): import upload→rows, confirm idempotency and double-confirm rejection, adjustments, reserve/release/sell transitions, publish create/update/delist and conditional clear, duplicate-delivery no-ops, masked credential handling, report job snapshot writes, `GET /reports` staleness transitions, and `POST /reports` idempotency while active.
-- E2E (LocalStack): import → appraise → confirm → publish → order → pull → confirm loop, then report generation and retrieval.
+- Unit tests: pricing policy scenarios (keep filter, undercut tick, deep-discount guard, supported floor, sole-source premium, rounding, floor), condition translation, set mapping, sequence/block/location derivation, FetchTCG client pacing/retries/allowlist/fail-closed auth with fixture responses, offer state mapping, report aggregation (price fallback chain, bucket and band edges, NZ-timezone bucketing, top-hits ordering and tie-break, paid-order filter, removed-unit exclusion), report staleness comparison (as-of audit ULID and 24 h backstop), the photo gate predicate, image-state projection (object shape, omission and replace rules, NZ$50 warning), and FetchTCG multipart upload encoding.
+- Integration tests (DynamoDB Testcontainers, LocalStack SQS): import upload→rows, confirm idempotency and double-confirm rejection, adjustments, reserve/release/sell transitions, publish create/update/delist and conditional clear, duplicate-delivery no-ops, masked credential handling, report job snapshot writes, `GET /reports` staleness transitions, `POST /reports` idempotency while active, row photo CRUD against LocalStack S3 (caps, status gates, presigned reads), confirm photo freeze and gate 409, condition-edit photo carry, and publish image projection with one-time `fetchtcg_url` persistence.
+- E2E (LocalStack): import → appraise → confirm → publish → order → pull → confirm loop, then report generation and retrieval, plus the photo lifecycle (flagged row → photo → gated confirm → published images → sale swaps the listing to the next unit's photos).
 - Tests never call the live FetchTCG API.
 - Required checks: `bazel build //tcg_inventory_api:all`, `bazel test //tcg_inventory_api:all`, then repo-level `bazel mod tidy` and `bazel run //:format`.
 
 ## Local development and smoke checks
 
 - Focused suites: `bazel test //tcg_inventory_api:unit-tests`, `:integration-tests`, `:e2e-tests`.
-- Minimal smoke flow (against deployed stack): set the credential via `PUT /settings`; `POST /imports` with a single-card CSV; poll the import to `review`; confirm; `POST /publish`; verify the listing appears on FetchTCG at the policy price; then remove the unit via `DELETE` and run publish again to verify the delist. Use only a throwaway low-value card for live smoke checks.
+- Minimal smoke flow (against deployed stack): set the credential via `PUT /settings`; `POST /imports` with a single-card CSV; poll the import to `review`; add a photo to the row from a phone (raw JPEG POST) and verify it renders via the presigned URL; confirm; `POST /publish`; verify the listing appears on FetchTCG at the policy price; then remove the unit via `DELETE` and run publish again to verify the delist. Use only a throwaway low-value card for live smoke checks.
 
 ## End-to-end scenarios
 
@@ -537,3 +601,11 @@ Rotated refresh tokens returned by Firebase are written back to the same key.
 1. After confirming an import and running publish, the user opens the reports tab; `GET /reports` returns the previous snapshot marked stale because new audit entries postdate its as-of audit ULID.
 2. The client posts `/reports`; the job captures the latest audit ULID, pages every SKU and its units, pages orders, and overwrites the snapshot.
 3. `GET /reports` now returns fresh figures: updated totals, today's intake in the weekly trend, and any newly listed hits.
+
+### Scenario 6: listing a hit with photos
+
+1. An import contains a card appraised at NZ$60; its row is flagged `needs_photos` and confirm returns 409 while it stays photo-less.
+2. The user opens the same import on their phone and photographs the card front and back; confirm then freezes the photos onto the created unit.
+3. Publish uploads each photo to FetchTCG once, then creates the listing carrying the unit's photos as its images.
+4. The unit sells while a second copy (photographed at its own import) remains; the next publish swaps the listing images to that unit's photos.
+5. A card that entered below the NZ$20 gate and later reprices past NZ$50 publishes with FetchTCG's stock-image default plus a warning log; remove + re-import captures photos if the user cares to fix it.

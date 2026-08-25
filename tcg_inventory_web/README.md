@@ -13,6 +13,7 @@ The TCG inventory web service is a keyboard-first single-page app for running a 
 ## User stories
 
 - As a card seller working through a physical stack, I want to review an import top-of-stack first while pulling out its discard and review cards, so that daily intake tracks the cards in my hand.
+- As a card seller reviewing an import on my desktop, I want rows needing photos flagged so I can add photos from my phone mid-review, so that high-value cards are photographed while still in hand.
 - As a card seller, I want a dense full-width inventory view with instant prefix search, so that I can find any SKU and its storage location in seconds.
 - As a card seller standing at my boxes, I want a phone-friendly pull sheet in location order, so that I can pull an order one-handed in a single forward pass.
 - As a card seller, I want to trigger a publish run and watch its progress, so that FetchTCG listings converge with my inventory on demand.
@@ -25,7 +26,8 @@ The TCG inventory web service is a keyboard-first single-page app for running a 
 
 - Authenticate with username/password against the backend and persist a Basic auth session in `localStorage`; protect all routes and redirect unauthenticated users to `/`.
 - Import flow: upload a ManaBox CSV, watch appraisal progress, review appraisal decisions in stack order while pulling discard and review cards from the stack, confirm keepers, and display placement instructions.
-- Inventory: dense SKU table with counts, prefix search, SKU detail with the Scryfall card image, units, and derived locations, and manual adjustments (remove unit, change condition).
+- Listing photos during review: keep rows appraised at NZ$20+ carry a "needs photos" badge; a touch-friendly photo strip on keep rows supports add (camera or library) and remove — the first uploaded photo is the listing front image; confirm stays disabled while flagged rows lack photos; desktop picks up phone uploads on window refocus.
+- Inventory: dense SKU table with counts, prefix search, SKU detail with the Scryfall card image, units, derived locations, and per-unit photo thumbnails (view-only), and manual adjustments (remove unit, change condition).
 - Orders: list and detail with state badges, location-ordered pull sheet optimized for one-handed phone use, confirm-pull action.
 - Publish widget (no dedicated jobs page): trigger a publish run, show the pending publish count (SKUs with unpublished inventory changes), and poll/render the current-or-latest run's progress and outcome. Appraisal progress and errors render on the import pages.
 - Reports tab: renders the latest generated report — headline totals strip, monthly revenue, weekly intake vs sales, top sets, price buckets, top hits table, and aging bands — under a "data as of" stamp. Regeneration is automatic and background-only: when the response says stale (checked on navigation and window refocus), the page triggers a new generation and polls until fresh figures swap in place; the first-ever visit shows skeletons while the first generation runs.
@@ -37,6 +39,7 @@ The TCG inventory web service is a keyboard-first single-page app for running a 
 
 - Manual report refresh controls (regeneration is automatic on visit and refocus) and real-time or streaming report updates.
 - Scan or camera-based intake and image verification UIs.
+- Post-confirm photo management (unit photos render view-only; retakes go through remove + re-import).
 - Offline support, background sync, or push notifications.
 - Multi-marketplace views, repricing controls, and offer negotiation (accept/counter happens on FetchTCG).
 
@@ -49,6 +52,7 @@ flowchart TD
   s3 --> spa[React SPA]
   spa -->|HTTPS Basic auth| api[TCG inventory API]
   spa -->|card images| scryfall[Scryfall image CDN]
+  spa -->|presigned GET listing photos| s3data[S3: api.tcg-inventory]
 ```
 
 ### Primary workflow
@@ -86,6 +90,8 @@ sequenceDiagram
 - Store the session in `localStorage` so it survives browser restarts; logout clears it.
 - Poll job and import progress with a short interval while a job is running instead of adding streaming infrastructure.
 - Keep server state in page-level React state fed by the `ApiClient`; no global cache library.
+- Photo uploads are processed client-side before the API: a canvas re-encode to JPEG (max edge 2000 px, quality 0.85) normalizes iPhone HEIC and library picks, strips EXIF (including GPS), and keeps raw `image/jpeg` bodies far under Lambda's payload ceiling — no multipart, no presigned upload choreography.
+- Cross-device capture needs no live sync: the desktop review page refetches the import on window refocus (the reports pattern), so photos added from the phone appear when the user glances back.
 
 ## Domain glossary
 
@@ -94,6 +100,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 - **Keep/discard/review row**: an import row's appraisal decision; decisions are final for the import. Review cards are set aside physically, never ingested, and return through a later import once their cause is fixed.
 - **Placement instructions**: the post-confirm screen mapping the confirmed stack to block labels and location ranges, with the card names at each range boundary as physical checkpoints.
 - **Pending publish badge**: count of SKUs with unpublished inventory changes shown on the publish trigger.
+- **Needs photos badge**: flag on a keep row appraised at NZ$20+ with no photos yet; confirm is blocked while any such row remains.
 - **Report**: the latest generated dashboard snapshot served by `GET /reports`; stale when inventory changed since generation or the snapshot is older than 24 hours. The "data as of" stamp renders its generation time (relative under 24 h, absolute beyond).
 
 ## Keyboard contract
@@ -108,32 +115,35 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 ### External systems
 
 - **Scryfall card imagery**: the SKU detail page loads the card image directly in the browser from `https://api.scryfall.com/cards/{scryfall_id}?format=image&version=normal` (an HTTP 302 redirect to Scryfall's image CDN). Requests are unauthenticated, carry only the public `scryfall_id`, and a neutral placeholder renders when the image fails to load.
+- **Listing photo thumbnails**: row and unit photos render from short-lived presigned S3 URLs provided by the API; the client never constructs S3 URLs itself.
 - FetchTCG is integrated exclusively by the backend; all other data comes from `tcg_inventory_api`.
 
 ## API contracts
 
 ### Consumed backend endpoints
 
-| Method   | Path                                     | Used by                                                      |
-| -------- | ---------------------------------------- | ------------------------------------------------------------ |
-| `POST`   | `/imports`                               | import upload                                                |
-| `GET`    | `/imports`                               | imports list                                                 |
-| `GET`    | `/imports/{import_id}`                   | appraisal progress + review rows                             |
-| `POST`   | `/imports/{import_id}/confirm`           | confirm flow + placement instructions                        |
-| `DELETE` | `/imports/{import_id}`                   | delete-import action                                         |
-| `GET`    | `/skus`                                  | inventory browse/search                                      |
-| `GET`    | `/skus/{sku_id}`                         | SKU detail + units                                           |
-| `DELETE` | `/skus/{sku_id}/units/{sequence_number}` | remove-unit adjustment                                       |
-| `PUT`    | `/skus/{sku_id}/units/{sequence_number}` | condition-change adjustment                                  |
-| `GET`    | `/orders`                                | orders list                                                  |
-| `GET`    | `/orders/{order_id}`                     | order detail                                                 |
-| `POST`   | `/orders/{order_id}/confirm`             | confirm pull                                                 |
-| `POST`   | `/publish`                               | publish trigger                                              |
-| `GET`    | `/publish`                               | publish run polling + pending count                          |
-| `GET`    | `/reports`                               | reports tab snapshot + staleness + generation polling        |
-| `POST`   | `/reports`                               | automatic regeneration trigger when stale                    |
-| `GET`    | `/settings`                              | credential presence check + login probe + track orders after |
-| `PATCH`  | `/settings`                              | partial update: credential and/or track orders after         |
+| Method   | Path                                                             | Used by                                                      |
+| -------- | ---------------------------------------------------------------- | ------------------------------------------------------------ |
+| `POST`   | `/imports`                                                       | import upload                                                |
+| `GET`    | `/imports`                                                       | imports list                                                 |
+| `GET`    | `/imports/{import_id}`                                           | appraisal progress + review rows                             |
+| `POST`   | `/imports/{import_id}/confirm`                                   | confirm flow + placement instructions                        |
+| `DELETE` | `/imports/{import_id}`                                           | delete-import action                                         |
+| `POST`   | `/imports/{import_id}/rows/{position}/photos`                    | photo add from the review strip                              |
+| `DELETE` | `/imports/{import_id}/rows/{position}/photos/{photo_id}`         | photo remove                                                 |
+| `GET`    | `/skus`                                                          | inventory browse/search                                      |
+| `GET`    | `/skus/{sku_id}`                                                 | SKU detail + units                                           |
+| `DELETE` | `/skus/{sku_id}/units/{sequence_number}`                         | remove-unit adjustment                                       |
+| `PUT`    | `/skus/{sku_id}/units/{sequence_number}`                         | condition-change adjustment                                  |
+| `GET`    | `/orders`                                                        | orders list                                                  |
+| `GET`    | `/orders/{order_id}`                                             | order detail                                                 |
+| `POST`   | `/orders/{order_id}/confirm`                                     | confirm pull                                                 |
+| `POST`   | `/publish`                                                       | publish trigger                                              |
+| `GET`    | `/publish`                                                       | publish run polling + pending count                          |
+| `GET`    | `/reports`                                                       | reports tab snapshot + staleness + generation polling        |
+| `POST`   | `/reports`                                                       | automatic regeneration trigger when stale                    |
+| `GET`    | `/settings`                                                      | credential presence check + login probe + track orders after |
+| `PATCH`  | `/settings`                                                      | partial update: credential and/or track orders after         |
 
 ### UI contract expectations
 
@@ -145,6 +155,9 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 - `DELETE /skus/{sku_id}/units/{sequence_number}` (optional `reason` query parameter) responds with the updated SKU detail; the page re-renders counters and units from that response.
 - `PUT /skus/{sku_id}/units/{sequence_number}` responds `{"sku_id": "<new sku_id>"}`; the UI navigates to the new SKU's detail page.
 - Import review renders rows top-of-stack first exactly as returned; review rows are informational and never become units — confirm ingests keep rows only.
+- Photo mutations respond with the row's updated ordered `photos` list; the strip re-renders from the response. Photos order by upload — the first is the listing front image, removing one promotes the next, and reordering is delete + re-upload. Uploads send canvas-processed raw `image/jpeg` bodies; the 5-photo cap and the NZ$20 gate are server-derived (`needs_photos`), never re-derived client-side.
+- The confirm 409 while rows still need photos surfaces the API message; the confirm button is disabled client-side with the same reason.
+- Unit `photos` on SKU detail are read-only; no management affordances render at any status.
 - Locations render from sequence numbers exactly as the backend provides them (`A42-42`); the client never re-derives them.
 - The reports tab renders `GET /reports` figures exactly as provided — buckets, bands, labels, and money strings are pre-shaped server-side. A 404 means no report exists yet: the page triggers `POST /reports` and shows skeletons until the first snapshot lands. When `stale` is true and no generation is queued or running, the page triggers `POST /reports` and polls `GET /reports` every ~2 seconds, keeping the old figures visible with a subtle refreshing indicator until fresh figures swap in place. Generation failures render inline (like the publish widget) while the stale figures remain visible.
 
@@ -169,6 +182,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 - Import review is read-only; appraisal decisions are final for the import.
 - Job and import polling stops when the job reaches a terminal status.
 - The reports tab revalidates staleness on navigation and window refocus; regeneration is automatic only, and rendered figures never unmount during a refresh.
+- The import review page refetches on window refocus while the import is in review, picking up cross-device photo uploads; photos are immutable after confirm and the UI offers no unit-level photo management.
 - Dates and times display in the browser locale from epoch values; the API remains the source of truth for all timestamps.
 
 ## Source of truth
@@ -213,7 +227,7 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 ## Testing and quality gates
 
 - Unit and component tests run with Vitest and React Testing Library in `jsdom`.
-- Key coverage: login and route protection, the vim navigation hook (movement, jumps, search focus), SKU detail adjustments (remove unit, condition change), import review rendering and the confirm transition, pull-sheet ordering and confirm flow, publish trigger + job polling, masked credential form, reports tab rendering of every section from the fake client, the stale→regenerate→poll flow with figures kept visible, and first-visit skeleton generation.
+- Key coverage: login and route protection, the vim navigation hook (movement, jumps, search focus), SKU detail adjustments (remove unit, condition change), import review rendering and the confirm transition, pull-sheet ordering and confirm flow, publish trigger + job polling, masked credential form, reports tab rendering of every section from the fake client, the stale→regenerate→poll flow with figures kept visible, first-visit skeleton generation, the needs-photos badge and gated confirm, photo strip interactions (add via the canvas util, remove), refocus refetch of in-review imports, and read-only unit photo thumbnails.
 - Required checks: `bazel test //tcg_inventory_web:unit-tests`, `bazel build //tcg_inventory_web:typecheck`, `bazel build //tcg_inventory_web:build`.
 
 ## Local development and smoke checks
@@ -222,7 +236,7 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 - Smoke flow in dev mode:
   1. Log in with any credentials.
   2. Open inventory, traverse with `j`/`k`, search with `/`, open a SKU with `Enter`; verify the card image renders, remove a unit, and change a unit's condition.
-  3. Upload a ManaBox CSV, watch appraisal progress, review the appraisal decisions, confirm, and check placement instructions.
+  3. Upload a ManaBox CSV, watch appraisal progress, review the appraisal decisions, add photos to the seeded flagged row and watch confirm enable, confirm, and check placement instructions.
   4. Open the seeded `to_pick` order, view the pull sheet at phone width, confirm the pull.
   5. Trigger publish and watch the fake job drain the pending publish count.
   6. Set a credential in settings and verify only presence metadata renders.
@@ -234,9 +248,10 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 
 1. User uploads today's ManaBox export and watches appraisal progress.
 2. Review opens top-of-stack first; the user leafs through the physical stack while `j`/`k` tracks rows, pulling out each discard and review card as it appears.
-3. The user confirms via the confirm dialog; only keep rows become units, and the set-aside review cards return through a later import once fixed.
-4. The placement screen says which block labels to file the stack into; the user boxes it in one motion.
-5. The user triggers publish and watches the job complete; the pending badge drops to zero.
+3. A NZ$60 rare carries the needs-photos badge: the user opens the same import on their phone, photographs the card, and the desktop picks the photos up on refocus, enabling confirm.
+4. The user confirms via the confirm dialog; only keep rows become units (photos frozen onto them), and the set-aside review cards return through a later import once fixed.
+5. The placement screen says which block labels to file the stack into; the user boxes it in one motion.
+6. The user triggers publish and watches the job complete; the pending badge drops to zero.
 
 ### Scenario 2: pulling an order on a phone
 
