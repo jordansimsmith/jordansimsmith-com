@@ -86,6 +86,8 @@ When performing the code review step, check for:
 - Let exceptions bubble up naturally when appropriate instead of unnecessarily catching them
 - Always use imports instead of fully qualified names (e.g., `import java.util.ArrayList;` instead of `java.util.ArrayList`)
 - When a signature gains a required parameter, update every call site; do not add an overload, default, or dummy wrapper to avoid touching existing callers
+- Members are public or private. Package-private is allowed only when annotated `@VisibleForTesting`
+- Classes with only static methods are ordinary public classes: do not mark them `final` or add a private constructor to prevent instantiation
 
 ## Testing guidelines
 

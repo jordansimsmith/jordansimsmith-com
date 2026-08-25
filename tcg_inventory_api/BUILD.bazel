@@ -183,6 +183,7 @@ java_binary(
         "@maven//:com_google_guava_guava",
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_s3",
     ],
 )
 
@@ -564,6 +565,52 @@ java_binary(
 )
 
 java_binary(
+    name = "create-import-row-photo-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/CreateImportRowPhotoHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "//lib/ulid:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_s3",
+        "@maven//:software_amazon_awssdk_sdk_core",
+    ],
+)
+
+java_binary(
+    name = "delete-import-row-photo-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/DeleteImportRowPhotoHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_s3",
+    ],
+)
+
+java_binary(
     name = "fetchtcg-stub-server",
     testonly = True,
     srcs = ["src/test/java/com/jordansimsmith/tcginventory/FetchTcgStubServer.java"],
@@ -657,10 +704,12 @@ java_test_suite(
         ":confirm-import-handler",
         ":confirm-order-handler",
         ":create-import-handler",
+        ":create-import-row-photo-handler",
         ":create-publish-handler",
         ":create-report-handler",
         ":delete-import-handler",
         ":delete-import-row-handler",
+        ":delete-import-row-photo-handler",
         ":find-imports-handler",
         ":find-orders-handler",
         ":find-skus-handler",
@@ -680,6 +729,7 @@ java_test_suite(
         ":update-unit-handler",
         "//lib/dynamodb:test-lib",
         "//lib/queue:test-lib",
+        "//lib/s3:test-lib",
         "//lib/secrets:test-lib",
         "//lib/testcontainers:test-lib",
         "//lib/time:test-lib",
@@ -695,6 +745,7 @@ java_test_suite(
         "@maven//:org_testcontainers_junit_jupiter",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_s3",
     ],
 )
 

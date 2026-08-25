@@ -6,6 +6,7 @@ import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import java.net.URI;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -97,6 +98,12 @@ public class TcgInventoryItemIntegrationTest {
             "in_stock",
             "01JEXAMPLEULID0000000000",
             Instant.ofEpochSecond(1700000000));
+    item.setPhotos(
+        List.of(
+            TcgInventoryItem.Photo.create("01JEXAMPLEPHOTOULID00000", null),
+            TcgInventoryItem.Photo.create(
+                "01JEXAMPLEPHOTOULID00001",
+                "https://listing-img.fetchtcg.com/example/listing/photo.jpg")));
 
     // act
     tcgInventoryTable.putItem(item);
@@ -111,6 +118,44 @@ public class TcgInventoryItemIntegrationTest {
     assertThat(retrieved.getSequenceNumber()).isEqualTo(4242);
     assertThat(retrieved.getStatus()).isEqualTo("in_stock");
     assertThat(retrieved.getImportId()).isEqualTo("01JEXAMPLEULID0000000000");
+    assertThat(retrieved.getPhotos()).hasSize(2);
+    assertThat(retrieved.getPhotos().get(0).getPhotoId()).isEqualTo("01JEXAMPLEPHOTOULID00000");
+    assertThat(retrieved.getPhotos().get(0).getFetchtcgUrl()).isNull();
+    assertThat(retrieved.getPhotos().get(1).getFetchtcgUrl())
+        .isEqualTo("https://listing-img.fetchtcg.com/example/listing/photo.jpg");
+  }
+
+  @Test
+  void shouldRoundTripImportRowWithPhotos() {
+    // arrange
+    var item =
+        TcgInventoryItem.createImportRow(
+            "jordan",
+            "01JEXAMPLEULID0000000000",
+            1,
+            "Llanowar Elves",
+            "dom",
+            "Dominaria",
+            "168",
+            "normal",
+            "NM",
+            "581b7327-3215-4a4f-b4ae-d9d4002ba882",
+            "en");
+    item.setDecision("keep");
+    item.setSuggestedPrice("20.00");
+    item.setPhotos(List.of(TcgInventoryItem.Photo.create("01JEXAMPLEPHOTOULID00000", null)));
+
+    // act
+    tcgInventoryTable.putItem(item);
+
+    var retrieved =
+        tcgInventoryTable.getItem(
+            Key.builder().partitionValue(item.getPk()).sortValue(item.getSk()).build());
+
+    // assert
+    assertThat(retrieved).isEqualTo(item);
+    assertThat(retrieved.getPhotos()).hasSize(1);
+    assertThat(retrieved.getPhotos().get(0).getPhotoId()).isEqualTo("01JEXAMPLEPHOTOULID00000");
   }
 
   @Test

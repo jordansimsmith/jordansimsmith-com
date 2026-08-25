@@ -8,6 +8,7 @@ import javax.inject.Singleton;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 @Module
@@ -32,6 +33,7 @@ public class S3TestModule {
     return S3Presigner.builder()
         .endpointOverride(s3Endpoint)
         .credentialsProvider(CREDENTIALS)
+        .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
         .build();
   }
 }

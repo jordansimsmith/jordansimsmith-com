@@ -29,13 +29,14 @@ public class S3Module {
   @Provides
   @Singleton
   S3Presigner s3Presigner() {
-    var builder = S3Presigner.builder().region(Region.of(System.getenv("AWS_REGION")));
+    var builder =
+        S3Presigner.builder()
+            .region(Region.of(System.getenv("AWS_REGION")))
+            .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build());
     // S3Presigner does not auto-detect AWS_ENDPOINT_URL unlike S3Client
     var endpointUrl = System.getenv("AWS_ENDPOINT_URL");
     if (endpointUrl != null && !endpointUrl.isBlank()) {
-      builder
-          .endpointOverride(URI.create(endpointUrl))
-          .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build());
+      builder.endpointOverride(URI.create(endpointUrl));
     }
     return builder.build();
   }

@@ -2,6 +2,7 @@ package com.jordansimsmith.tcginventory;
 
 import com.jordansimsmith.dynamodb.EpochSecondConverter;
 import java.time.Instant;
+import java.util.List;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
@@ -83,6 +84,9 @@ public class TcgInventoryItem {
   public static final String AS_OF_AUDIT_ULID = "as_of_audit_ulid";
   public static final String CREATED_AT = "created_at";
   public static final String UPDATED_AT = "updated_at";
+  public static final String PHOTOS = "photos";
+  public static final String PHOTO_ID = "photo_id";
+  public static final String FETCHTCG_URL = "fetchtcg_url";
 
   private String pk;
   private String sk;
@@ -135,6 +139,7 @@ public class TcgInventoryItem {
   private String asOfAuditUlid;
   private Instant createdAt;
   private Instant updatedAt;
+  private List<Photo> photos;
 
   @DynamoDbPartitionKey
   @DynamoDbAttribute(PK)
@@ -654,6 +659,16 @@ public class TcgInventoryItem {
     this.updatedAt = updatedAt;
   }
 
+  @Nullable
+  @DynamoDbAttribute(PHOTOS)
+  public List<Photo> getPhotos() {
+    return photos;
+  }
+
+  public void setPhotos(@Nullable List<Photo> photos) {
+    this.photos = photos;
+  }
+
   @Override
   public boolean equals(Object o) {
     if (this == o) return true;
@@ -709,7 +724,8 @@ public class TcgInventoryItem {
         && Objects.equals(report, that.report)
         && Objects.equals(asOfAuditUlid, that.asOfAuditUlid)
         && Objects.equals(createdAt, that.createdAt)
-        && Objects.equals(updatedAt, that.updatedAt);
+        && Objects.equals(updatedAt, that.updatedAt)
+        && Objects.equals(photos, that.photos);
   }
 
   @Override
@@ -765,7 +781,8 @@ public class TcgInventoryItem {
         report,
         asOfAuditUlid,
         createdAt,
-        updatedAt);
+        updatedAt,
+        photos);
   }
 
   @Override
@@ -908,6 +925,8 @@ public class TcgInventoryItem {
         + createdAt
         + ", updatedAt="
         + updatedAt
+        + ", photos="
+        + photos
         + '}';
   }
 
@@ -1131,5 +1150,56 @@ public class TcgInventoryItem {
     item.setAsOfAuditUlid(asOfAuditUlid);
     item.setUpdatedAt(updatedAt);
     return item;
+  }
+
+  @DynamoDbBean
+  public static class Photo {
+    private String photoId;
+    private String fetchtcgUrl;
+
+    @DynamoDbAttribute(PHOTO_ID)
+    public String getPhotoId() {
+      return photoId;
+    }
+
+    public void setPhotoId(String photoId) {
+      this.photoId = photoId;
+    }
+
+    @Nullable
+    @DynamoDbAttribute(FETCHTCG_URL)
+    public String getFetchtcgUrl() {
+      return fetchtcgUrl;
+    }
+
+    public void setFetchtcgUrl(@Nullable String fetchtcgUrl) {
+      this.fetchtcgUrl = fetchtcgUrl;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      Photo photo = (Photo) o;
+      return Objects.equals(photoId, photo.photoId)
+          && Objects.equals(fetchtcgUrl, photo.fetchtcgUrl);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(photoId, fetchtcgUrl);
+    }
+
+    @Override
+    public String toString() {
+      return "Photo{" + "photoId='" + photoId + '\'' + ", fetchtcgUrl='" + fetchtcgUrl + '\'' + '}';
+    }
+
+    public static Photo create(String photoId, @Nullable String fetchtcgUrl) {
+      var photo = new Photo();
+      photo.setPhotoId(photoId);
+      photo.setFetchtcgUrl(fetchtcgUrl);
+      return photo;
+    }
   }
 }
