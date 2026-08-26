@@ -50,9 +50,9 @@ export function ImportReviewTable({
         <Table.Tr>
           <Table.Th ta="right">Position</Table.Th>
           <Table.Th>Name</Table.Th>
+          <Table.Th>Finish</Table.Th>
           <Table.Th>Set</Table.Th>
           <Table.Th>#</Table.Th>
-          <Table.Th>Finish</Table.Th>
           <Table.Th>Condition</Table.Th>
           <Table.Th ta="right">Market</Table.Th>
           <Table.Th ta="right">Suggested</Table.Th>
@@ -79,11 +79,16 @@ export function ImportReviewTable({
                 {row.position}
               </Table.Td>
               <Table.Td fw={500}>{row.name}</Table.Td>
+              <Table.Td
+                fw={row.finish === 'normal' ? undefined : 700}
+                tt="capitalize"
+              >
+                {row.finish}
+              </Table.Td>
               <Table.Td title={row.set_name}>
                 {row.set_code.toUpperCase()}
               </Table.Td>
               <Table.Td>{row.collector_number}</Table.Td>
-              <Table.Td>{row.finish}</Table.Td>
               <Table.Td>
                 {editable && onConditionChange ? (
                   <NativeSelect

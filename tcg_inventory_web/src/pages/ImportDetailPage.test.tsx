@@ -251,6 +251,53 @@ describe('ImportDetailPage', () => {
     });
   });
 
+  it('places finish after name and bolds non-normal finishes', async () => {
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport({
+        rows: [
+          importRow(1, { name: 'Normal Card', finish: 'normal' }),
+          importRow(2, {
+            name: 'Foil Card',
+            finish: 'foil',
+            decision: 'keep',
+          }),
+          importRow(3, {
+            name: 'Etched Card',
+            finish: 'etched',
+            decision: 'keep',
+          }),
+        ],
+      }),
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Normal Card');
+
+    const headers = screen
+      .getAllByRole('columnheader')
+      .map((header) => header.textContent);
+    expect(headers.indexOf('Finish')).toBe(headers.indexOf('Name') + 1);
+
+    const cellAfterName = (name: string) => {
+      const row = screen.getByText(name).closest('tr') as HTMLElement;
+      return within(row).getAllByRole('cell')[2];
+    };
+
+    const normalCell = cellAfterName('Normal Card');
+    expect(normalCell.textContent).toBe('normal');
+    expect(normalCell.style.fontWeight).toBe('');
+
+    const foilCell = cellAfterName('Foil Card');
+    expect(foilCell.textContent).toBe('foil');
+    expect(foilCell.style.fontWeight).toBe('700');
+    expect(foilCell.style.textTransform).toBe('capitalize');
+
+    const etchedCell = cellAfterName('Etched Card');
+    expect(etchedCell.textContent).toBe('etched');
+    expect(etchedCell.style.fontWeight).toBe('700');
+    expect(etchedCell.style.textTransform).toBe('capitalize');
+  });
+
   it('renders review rows in stack order with decisions and prices', async () => {
     vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
       reviewImport(),
