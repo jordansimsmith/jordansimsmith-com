@@ -96,10 +96,7 @@ export function PublishWidget() {
       )}
       {runActive && publish ? (
         <Stack gap={4} w={240}>
-          <Text size="sm">
-            Publishing {publish.published_sku_count} of{' '}
-            {publish.total_sku_count}
-          </Text>
+          <Text size="sm">Publishing, {pendingCount} remaining</Text>
           <Progress
             value={
               publish.total_sku_count > 0

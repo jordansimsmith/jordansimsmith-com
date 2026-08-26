@@ -19,6 +19,8 @@ import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 
 public class ListingPhaseProcessor {
+  static final int BATCH_SIZE = 100;
+
   private static final Logger LOGGER = LoggerFactory.getLogger(ListingPhaseProcessor.class);
 
   private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
@@ -40,7 +42,7 @@ public class ListingPhaseProcessor {
     this.s3Client = s3Client;
   }
 
-  public BatchResult process(String user, String bearerToken) {
+  public BatchResult process(String user, String bearerToken, int continuation) {
     var dirtySkus = loadDirtySkus(user);
     int processed = 0;
 
@@ -59,7 +61,7 @@ public class ListingPhaseProcessor {
       processed++;
     }
 
-    return new BatchResult(processed, true);
+    return new BatchResult(continuation + processed, dirtySkus.size() < BATCH_SIZE);
   }
 
   private List<TcgInventoryItem> loadDirtySkus(String user) {
@@ -76,6 +78,7 @@ public class ListingPhaseProcessor {
 
     tcgInventoryTable.index(TcgInventoryItem.GSI1_NAME).query(request).stream()
         .flatMap(page -> page.items().stream())
+        .limit(BATCH_SIZE)
         .forEach(results::add);
     return results;
   }

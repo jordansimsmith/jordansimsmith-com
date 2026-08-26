@@ -35,7 +35,7 @@ public class PublishJobProcessor {
     }
 
     LOGGER.info("running listing phase");
-    var result = listingPhaseProcessor.process(user, bearerToken);
+    var result = listingPhaseProcessor.process(user, bearerToken, continuation);
     LOGGER.info(
         "listing phase complete: processedUpTo={}, complete={}",
         result.processedUpTo(),

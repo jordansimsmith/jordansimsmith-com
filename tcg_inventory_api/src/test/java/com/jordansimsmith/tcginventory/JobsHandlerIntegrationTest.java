@@ -356,6 +356,42 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
+  void publishShouldCheckpointAndContinue() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    int totalSkus = ListingPhaseProcessor.BATCH_SIZE + 2;
+    createPublishJob("jordan", "job1");
+    for (int i = 1; i <= totalSkus; i++) {
+      createDirtySkuWithUnit("jordan", "scryfall-" + i + "#normal#NM", i);
+    }
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var jobItem = getJob("jordan", "job1");
+    assertThat(jobItem.getStatus()).isEqualTo("running");
+    assertThat(jobItem.getContinuation()).isEqualTo(ListingPhaseProcessor.BATCH_SIZE);
+    assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(ListingPhaseProcessor.BATCH_SIZE);
+    assertThat(fakeJobsQueue.getSends()).hasSize(1);
+    var continuationSend = fakeJobsQueue.getSends().get(0);
+    assertThat(continuationSend.messageGroupId()).isEqualTo("jordan");
+    assertThat(continuationSend.messageDeduplicationId())
+        .isEqualTo("job1#" + ListingPhaseProcessor.BATCH_SIZE);
+
+    // act - second slice
+    fakeJobsQueue.reset();
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var completedJob = getJob("jordan", "job1");
+    assertThat(completedJob.getStatus()).isEqualTo("succeeded");
+    assertThat(completedJob.getProcessedCount()).isEqualTo(totalSkus);
+    assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(totalSkus);
+    assertThat(fakeJobsQueue.getMessages()).isEmpty();
+  }
+
+  @Test
   void publishOrderPhaseShouldReserveUnitsForNewOffer() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
@@ -760,6 +796,29 @@ public class JobsHandlerIntegrationTest {
     var jobItem =
         TcgInventoryItem.createJob(user, jobId, "publish", null, Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(jobItem);
+  }
+
+  private void createDirtySkuWithUnit(String user, String skuId, int sequenceNumber) {
+    var parts = skuId.split("#");
+    var skuItem =
+        TcgInventoryItem.createSku(
+            user,
+            skuId,
+            parts[0],
+            parts[1],
+            parts[2],
+            "Test Card",
+            "dom",
+            "Dominaria",
+            "168",
+            "mtg_168_c_dom_normal",
+            "1.50");
+    tcgInventoryTable.putItem(skuItem);
+
+    var unit =
+        TcgInventoryItem.createUnit(
+            user, skuId, sequenceNumber, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
+    tcgInventoryTable.putItem(unit);
   }
 
   private void createSkuWithUnits(String user, String skuId, int fetchtcgListingId, int unitCount) {

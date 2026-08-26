@@ -120,7 +120,7 @@ describe('PublishWidget', () => {
     await act(async () => {});
 
     expect(createPublishMock).toHaveBeenCalledTimes(1);
-    expect(screen.getByText('Publishing 1 of 3')).toBeDefined();
+    expect(screen.getByText('Publishing, 2 remaining')).toBeDefined();
     expect(publishButton()).toBeNull();
 
     await act(async () => {
@@ -147,7 +147,7 @@ describe('PublishWidget', () => {
     renderPublishWidget();
     await act(async () => {});
 
-    expect(screen.getByText('Publishing 2 of 3')).toBeDefined();
+    expect(screen.getByText('Publishing, 1 remaining')).toBeDefined();
     expect(publishButton()).toBeNull();
 
     await act(async () => {
