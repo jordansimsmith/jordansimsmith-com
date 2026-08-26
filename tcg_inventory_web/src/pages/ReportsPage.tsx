@@ -295,6 +295,7 @@ function TopHitsTable({ topHits }: { topHits: ReportTopHit[] }) {
               <Table.Th>Name</Table.Th>
               <Table.Th>Set</Table.Th>
               <Table.Th>Finish</Table.Th>
+              <Table.Th>Condition</Table.Th>
               <Table.Th ta="right">Price</Table.Th>
             </Table.Tr>
           </Table.Thead>
@@ -310,6 +311,12 @@ function TopHitsTable({ topHits }: { topHits: ReportTopHit[] }) {
                   tt="capitalize"
                 >
                   {hit.finish === 'normal' ? '—' : hit.finish}
+                </Table.Td>
+                <Table.Td
+                  c={hit.condition === 'NM' ? 'dimmed' : undefined}
+                  fw={hit.condition === 'NM' ? undefined : 600}
+                >
+                  {hit.condition}
                 </Table.Td>
                 <Table.Td
                   ta="right"

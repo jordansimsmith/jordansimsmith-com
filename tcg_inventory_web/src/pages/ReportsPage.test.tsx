@@ -269,7 +269,10 @@ describe('ReportsPage', () => {
     expect(screen.getByText('Name')).toBeDefined();
     expect(screen.getByText('Set')).toBeDefined();
     expect(screen.getByText('Finish')).toBeDefined();
+    expect(screen.getByText('Condition')).toBeDefined();
     expect(screen.getByText('Price')).toBeDefined();
+    expect(screen.getByText('NM')).toBeDefined();
+    expect(screen.getByText('LP')).toBeDefined();
     // rank column: two hits ranked 1 and 2
     expect(screen.getByText('1')).toBeDefined();
     expect(screen.getByText('2')).toBeDefined();
