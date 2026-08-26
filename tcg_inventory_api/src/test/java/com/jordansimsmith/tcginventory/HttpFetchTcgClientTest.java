@@ -69,6 +69,10 @@ public class HttpFetchTcgClientTest {
                 "NZ": {
                   "tcgMarketPrice": 1.50
                 }
+              },
+              "externalReferences": {
+                "tcgId": "161863",
+                "scryfallId": "f0a51425-d796-48b8-b68c-bc21fb465c81"
               }
             }
             """);
@@ -83,6 +87,8 @@ public class HttpFetchTcgClientTest {
     assertThat(result.name()).isEqualTo("Lightning Bolt");
     assertThat(result.pricingData()).containsKey("NZ");
     assertThat(result.pricingData().get("NZ").tcgMarketPrice()).isEqualByComparingTo("1.50");
+    assertThat(result.externalReferences().scryfallId())
+        .isEqualTo("f0a51425-d796-48b8-b68c-bc21fb465c81");
   }
 
   @Test

@@ -83,7 +83,8 @@ public class JobsHandlerIntegrationTest {
         new FetchTcgClient.GetCardResponse(
             "mtg_168_c_dom_normal",
             "Card 1",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50")))));
+            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
+            new FetchTcgClient.ExternalReferences("scryfall-1")));
     fakeFetchTcgClient.seedListings(
         "mtg_168_c_dom_normal",
         new FetchTcgClient.GetCardListingsResponse(
@@ -121,7 +122,8 @@ public class JobsHandlerIntegrationTest {
         new FetchTcgClient.GetCardResponse(
             "mtg_168_c_dom_normal",
             "Card 1",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("0.10")))));
+            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("0.10"))),
+            new FetchTcgClient.ExternalReferences("scryfall-1")));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
@@ -185,6 +187,76 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
+  void appraiseShouldResolveVariantPrintingByScryfallId() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createImportWithRow("jordan", "import1", "dom", "410", "normal", "NM", "en");
+    createJob("jordan", "job1", "appraise", "queued", "import1");
+
+    fakeFetchTcgClient.seedSearchResult(
+        2624,
+        "Card 1",
+        "normal",
+        new FetchTcgClient.SearchCardsResponse(
+            List.of(
+                new FetchTcgClient.SearchCard("mtg_168_c_dom_normal"),
+                new FetchTcgClient.SearchCard("mtg_410_c_dom_B_normal"))));
+    fakeFetchTcgClient.seedCard(
+        "mtg_168_c_dom_normal",
+        new FetchTcgClient.GetCardResponse(
+            "mtg_168_c_dom_normal",
+            "Card 1",
+            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
+            new FetchTcgClient.ExternalReferences("scryfall-other")));
+    fakeFetchTcgClient.seedCard(
+        "mtg_410_c_dom_B_normal",
+        new FetchTcgClient.GetCardResponse(
+            "mtg_410_c_dom_B_normal",
+            "Card 1 (Borderless)",
+            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("27.43"))),
+            new FetchTcgClient.ExternalReferences("scryfall-1")));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
+
+    // assert
+    var row = getRow("jordan", "import1", 1);
+    assertThat(row.getDecision()).isEqualTo("keep");
+    assertThat(row.getFetchtcgCardId()).isEqualTo("mtg_410_c_dom_B_normal");
+    assertThat(row.getMarketPrice()).isEqualTo("27.43");
+  }
+
+  @Test
+  void appraiseShouldReviewWhenNoCandidateMatchesScryfallId() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createImportWithRow("jordan", "import1", "dom", "168", "normal", "NM", "en");
+    createJob("jordan", "job1", "appraise", "queued", "import1");
+
+    fakeFetchTcgClient.seedSearchResult(
+        2624,
+        "Card 1",
+        "normal",
+        new FetchTcgClient.SearchCardsResponse(
+            List.of(new FetchTcgClient.SearchCard("mtg_168_c_dom_normal"))));
+    fakeFetchTcgClient.seedCard(
+        "mtg_168_c_dom_normal",
+        new FetchTcgClient.GetCardResponse(
+            "mtg_168_c_dom_normal",
+            "Card 1",
+            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
+            new FetchTcgClient.ExternalReferences("scryfall-other")));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
+
+    // assert
+    var row = getRow("jordan", "import1", 1);
+    assertThat(row.getDecision()).isEqualTo("review");
+    assertThat(row.getDecisionReason()).isEqualTo("unresolvable");
+  }
+
+  @Test
   void appraiseShouldDedupeWithinBatch() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
@@ -207,7 +279,8 @@ public class JobsHandlerIntegrationTest {
         new FetchTcgClient.GetCardResponse(
             "mtg_168_c_dom_normal",
             "Card 1",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50")))));
+            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
+            new FetchTcgClient.ExternalReferences("scryfall-1")));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
@@ -795,7 +868,8 @@ public class JobsHandlerIntegrationTest {
         new FetchTcgClient.GetCardResponse(
             "mtg_168_c_dom_normal",
             "Card 1",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50")))));
+            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
+            new FetchTcgClient.ExternalReferences("scryfall-1")));
   }
 
   private void createImportWithRow(

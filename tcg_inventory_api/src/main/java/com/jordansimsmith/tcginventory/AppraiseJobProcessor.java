@@ -47,6 +47,7 @@ class AppraiseJobProcessor {
     int processed = continuation;
 
     Map<String, ResolvedCard> batchCache = new HashMap<>();
+    Map<String, FetchTcgClient.GetCardResponse> cardCache = new HashMap<>();
 
     for (int i = continuation + 1; i <= batchEnd; i++) {
       var rowKey =
@@ -60,7 +61,7 @@ class AppraiseJobProcessor {
         continue;
       }
 
-      var decision = appraiseRow(rowItem, batchCache);
+      var decision = appraiseRow(rowItem, batchCache, cardCache);
       rowItem.setDecision(decision.decision());
       rowItem.setDecisionReason(decision.reason());
       rowItem.setMarketPrice(decision.marketPrice());
@@ -82,7 +83,10 @@ class AppraiseJobProcessor {
     return new BatchResult(processed, complete);
   }
 
-  private RowDecision appraiseRow(TcgInventoryItem rowItem, Map<String, ResolvedCard> batchCache) {
+  private RowDecision appraiseRow(
+      TcgInventoryItem rowItem,
+      Map<String, ResolvedCard> batchCache,
+      Map<String, FetchTcgClient.GetCardResponse> cardCache) {
     if (!"en".equals(rowItem.getLanguage())) {
       return RowDecision.review("non-english");
     }
@@ -95,7 +99,9 @@ class AppraiseJobProcessor {
     var dedupeKey = rowItem.getScryfallId() + "#" + rowItem.getFinish();
     var cached = batchCache.get(dedupeKey);
     if (cached == null) {
-      cached = resolveCard(setCode, rowItem.getName(), rowItem.getFinish());
+      cached =
+          resolveCard(
+              setCode, rowItem.getName(), rowItem.getFinish(), rowItem.getScryfallId(), cardCache);
       if (cached == null) {
         return RowDecision.review("unresolvable");
       }
@@ -116,14 +122,23 @@ class AppraiseJobProcessor {
         cached.setId());
   }
 
-  private ResolvedCard resolveCard(String setCode, String cardName, String finish) {
+  private ResolvedCard resolveCard(
+      String setCode,
+      String cardName,
+      String finish,
+      String scryfallId,
+      Map<String, FetchTcgClient.GetCardResponse> cardCache) {
     var searchName = cardName.contains("//") ? cardName.split("//")[0].trim() : cardName;
     var setEntries = FetchTcgSetMapping.get(setCode);
     for (var entry : setEntries) {
       var searchResult = fetchTcgClient.searchCards(entry.setId(), searchName, finish);
-      if (!searchResult.content().isEmpty()) {
-        var card = searchResult.content().get(0);
-        var cardDetails = fetchTcgClient.getCard(card.id());
+      for (var card : searchResult.content()) {
+        var cardDetails = cardCache.computeIfAbsent(card.id(), fetchTcgClient::getCard);
+        var externalReferences = cardDetails.externalReferences();
+        if (externalReferences == null
+            || !scryfallId.equalsIgnoreCase(externalReferences.scryfallId())) {
+          continue;
+        }
         var pricingData = cardDetails.pricingData();
         var nzPricing = pricingData != null ? pricingData.get("NZ") : null;
         var marketPrice =

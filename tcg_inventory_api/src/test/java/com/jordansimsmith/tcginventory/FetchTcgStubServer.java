@@ -28,12 +28,14 @@ public final class FetchTcgStubServer {
 
   private static final String CARD_RESPONSE =
       """
-      {"id":"mtg_168_c_dom_normal","name":"Test Card","pricingData":{"NZ":{"tcgMarketPrice":1.50}}}\
+      {"id":"mtg_168_c_dom_normal","name":"Test Card","pricingData":{"NZ":{"tcgMarketPrice":1.50}},\
+      "externalReferences":{"scryfallId":"a1b2c3d4-e5f6-7890-abcd-ef1234567890"}}\
       """;
 
   private static final String HIT_CARD_RESPONSE =
       """
-      {"id":"mtg_hit_c_dom_normal","name":"Test Hit","pricingData":{"NZ":{"tcgMarketPrice":60.00}}}\
+      {"id":"mtg_hit_c_dom_normal","name":"Test Hit","pricingData":{"NZ":{"tcgMarketPrice":60.00}},\
+      "externalReferences":{"scryfallId":"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"}}\
       """;
 
   private static final String LISTINGS_RESPONSE =

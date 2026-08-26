@@ -21,7 +21,7 @@ public class FakeFetchTcgClient implements FetchTcgClient {
   public GetCardResponse getCard(String cardId) {
     var response = cards.get(cardId);
     if (response == null) {
-      return new GetCardResponse(cardId, "Unknown", Map.of());
+      return new GetCardResponse(cardId, "Unknown", Map.of(), null);
     }
     return response;
   }
