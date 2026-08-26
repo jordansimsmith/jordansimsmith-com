@@ -53,6 +53,9 @@ ADDITIONAL_MAPPINGS = {
     "plst": [3075],  # Mystery Booster contains plst-coded cards
 }
 
+PROMOS_LABEL_SUFFIX = " Promos"
+PRE_RELEASE_SET_LABEL = "Pre-Release Cards"
+
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
@@ -102,6 +105,8 @@ def main():
             if label:
                 mapping[code][set_id] = label
 
+    _augment_with_promo_rules(mapping, fetchtcg_sets, scryfall_sets)
+
     output = {}
     for code in sorted(mapping):
         output[code] = [
@@ -116,6 +121,37 @@ def main():
     )
     for set_id, label in unresolved:
         print(f"  unresolved: {set_id} {label}")
+
+
+def _augment_with_promo_rules(mapping, fetchtcg_sets, scryfall_sets):
+    """Add FetchTCG sets that sampling cannot discover.
+
+    Promos-twin rule: promo-pack cards are numbered inside the main set on
+    Scryfall but filed under the set's "<label> Promos" set on FetchTCG.
+
+    Pre-release rule: prerelease-stamped cards carry Scryfall promo set codes
+    but live in FetchTCG's catch-all "Pre-Release Cards" set, whose sampled
+    ends only ever reveal the newest and oldest promo codes.
+
+    Both rules only add candidate search entries; appraisal verifies every
+    candidate against the row's Scryfall ID, so extra entries cannot cause a
+    wrong match.
+    """
+    labels_by_id = {int(s["value"]): str(s["label"]) for s in fetchtcg_sets}
+    ids_by_label = {label: set_id for set_id, label in labels_by_id.items()}
+    promo_codes = {
+        s["code"].casefold() for s in scryfall_sets if s.get("set_type") == "promo"
+    }
+    pre_release_set_id = ids_by_label.get(PRE_RELEASE_SET_LABEL)
+
+    for code, set_entries in mapping.items():
+        for label in list(set_entries.values()):
+            twin_id = ids_by_label.get(label + PROMOS_LABEL_SUFFIX)
+            if twin_id is not None:
+                set_entries[twin_id] = labels_by_id[twin_id]
+
+        if code in promo_codes and pre_release_set_id is not None:
+            set_entries[pre_release_set_id] = labels_by_id[pre_release_set_id]
 
 
 def _probe_set(fetchtcg_set_id, scryfall_codes):
