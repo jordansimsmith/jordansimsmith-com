@@ -55,6 +55,10 @@
     {
       "set_id": 2742,
       "set_name": "Fifth Dawn"
+    },
+    {
+      "set_id": 2743,
+      "set_name": "Fifth Dawn Promos"
     }
   ],
   "5ed": [
@@ -83,12 +87,20 @@
     {
       "set_id": 2716,
       "set_name": "Eighth Edition Box Topper"
+    },
+    {
+      "set_id": 2717,
+      "set_name": "Eighth Edition Promos"
     }
   ],
   "9ed": [
     {
       "set_id": 3088,
       "set_name": "Ninth Edition"
+    },
+    {
+      "set_id": 3089,
+      "set_name": "Ninth Edition Promos"
     },
     {
       "set_id": 3111,
@@ -181,12 +193,20 @@
     {
       "set_id": 2698,
       "set_name": "Dungeons & Dragons: Adventures in the Forgotten Realms"
+    },
+    {
+      "set_id": 2704,
+      "set_name": "Dungeons & Dragons: Adventures in the Forgotten Realms Promos"
     }
   ],
   "akh": [
     {
       "set_id": 2469,
       "set_name": "Amonkhet"
+    },
+    {
+      "set_id": 2472,
+      "set_name": "Amonkhet Promos"
     }
   ],
   "akhm": [
@@ -199,6 +219,10 @@
     {
       "set_id": 3217,
       "set_name": "Shards of Alara"
+    },
+    {
+      "set_id": 3218,
+      "set_name": "Shards of Alara Promos"
     }
   ],
   "alci": [
@@ -271,12 +295,20 @@
     {
       "set_id": 2476,
       "set_name": "Apocalypse"
+    },
+    {
+      "set_id": 2477,
+      "set_name": "Apocalypse Promos"
     }
   ],
   "arb": [
     {
       "set_id": 2464,
       "set_name": "Alara Reborn"
+    },
+    {
+      "set_id": 2465,
+      "set_name": "Alara Reborn Promos"
     }
   ],
   "arc": [
@@ -327,6 +359,10 @@
     {
       "set_id": 2499,
       "set_name": "Avacyn Restored"
+    },
+    {
+      "set_id": 2501,
+      "set_name": "Avacyn Restored Promos"
     }
   ],
   "awoe": [
@@ -345,12 +381,20 @@
     {
       "set_id": 2503,
       "set_name": "Battlebond"
+    },
+    {
+      "set_id": 2505,
+      "set_name": "Battlebond Promos"
     }
   ],
   "bfz": [
     {
       "set_id": 2507,
       "set_name": "Battle for Zendikar"
+    },
+    {
+      "set_id": 2509,
+      "set_name": "Battle for Zendikar Promos"
     }
   ],
   "big": [
@@ -383,12 +427,20 @@
     {
       "set_id": 2524,
       "set_name": "Born of the Gods"
+    },
+    {
+      "set_id": 2528,
+      "set_name": "Born of the Gods Promos"
     }
   ],
   "bok": [
     {
       "set_id": 2514,
       "set_name": "Betrayers of Kamigawa"
+    },
+    {
+      "set_id": 2515,
+      "set_name": "Betrayers of Kamigawa Promos"
     }
   ],
   "bot": [
@@ -513,6 +565,10 @@
     {
       "set_id": 2534,
       "set_name": "Champions of Kamigawa"
+    },
+    {
+      "set_id": 2535,
+      "set_name": "Champions of Kamigawa Promos"
     }
   ],
   "chr": [
@@ -595,12 +651,20 @@
     {
       "set_id": 2593,
       "set_name": "Conspiracy"
+    },
+    {
+      "set_id": 2594,
+      "set_name": "Conspiracy Promos"
     }
   ],
   "con": [
     {
       "set_id": 2590,
       "set_name": "Conflux"
+    },
+    {
+      "set_id": 2591,
+      "set_name": "Conflux Promos"
     }
   ],
   "cp1": [
@@ -625,6 +689,10 @@
     {
       "set_id": 2539,
       "set_name": "Coldsnap"
+    },
+    {
+      "set_id": 2540,
+      "set_name": "Coldsnap Promos"
     }
   ],
   "cst": [
@@ -711,6 +779,10 @@
     {
       "set_id": 3387,
       "set_name": "Zendikar Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "dd1": [
@@ -857,18 +929,30 @@
     {
       "set_id": 2644,
       "set_name": "Dragon's Maze"
+    },
+    {
+      "set_id": 2646,
+      "set_name": "Dragon's Maze Promos"
     }
   ],
   "dis": [
     {
       "set_id": 2619,
       "set_name": "Dissension"
+    },
+    {
+      "set_id": 2620,
+      "set_name": "Dissension Promos"
     }
   ],
   "dka": [
     {
       "set_id": 2611,
       "set_name": "Dark Ascension"
+    },
+    {
+      "set_id": 2613,
+      "set_name": "Dark Ascension Promos"
     }
   ],
   "dkm": [
@@ -903,6 +987,10 @@
     {
       "set_id": 2624,
       "set_name": "Dominaria"
+    },
+    {
+      "set_id": 2626,
+      "set_name": "Dominaria Promos"
     }
   ],
   "dpa": [
@@ -943,18 +1031,30 @@
     {
       "set_id": 2707,
       "set_name": "Duskmourn: House of Horror"
+    },
+    {
+      "set_id": 2712,
+      "set_name": "Duskmourn: House of Horror Promos"
     }
   ],
   "dst": [
     {
       "set_id": 2615,
       "set_name": "Darksteel"
+    },
+    {
+      "set_id": 2616,
+      "set_name": "Darksteel Promos"
     }
   ],
   "dtk": [
     {
       "set_id": 2648,
       "set_name": "Dragons of Tarkir"
+    },
+    {
+      "set_id": 2650,
+      "set_name": "Dragons of Tarkir Promos"
     }
   ],
   "dvd": [
@@ -991,6 +1091,10 @@
     {
       "set_id": 3296,
       "set_name": "Throne of Eldraine"
+    },
+    {
+      "set_id": 3298,
+      "set_name": "Throne of Eldraine Promos"
     }
   ],
   "ema": [
@@ -1003,6 +1107,10 @@
     {
       "set_id": 2718,
       "set_name": "Eldritch Moon"
+    },
+    {
+      "set_id": 2720,
+      "set_name": "Eldritch Moon Promos"
     }
   ],
   "eoc": [
@@ -1027,6 +1135,10 @@
     {
       "set_id": 2726,
       "set_name": "Eventide"
+    },
+    {
+      "set_id": 2727,
+      "set_name": "Eventide Promos"
     }
   ],
   "evg": [
@@ -1039,6 +1151,10 @@
     {
       "set_id": 2729,
       "set_name": "Exodus"
+    },
+    {
+      "set_id": 2730,
+      "set_name": "Exodus Promos"
     }
   ],
   "exp": [
@@ -1051,108 +1167,180 @@
     {
       "set_id": 2755,
       "set_name": "Friday Night Magic 2001"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "f02": [
     {
       "set_id": 2756,
       "set_name": "Friday Night Magic 2002"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "f03": [
     {
       "set_id": 2757,
       "set_name": "Friday Night Magic 2003"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "f04": [
     {
       "set_id": 2758,
       "set_name": "Friday Night Magic 2004"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "f05": [
     {
       "set_id": 2759,
       "set_name": "Friday Night Magic 2005"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "f06": [
     {
       "set_id": 2760,
       "set_name": "Friday Night Magic 2006"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "f07": [
     {
       "set_id": 2761,
       "set_name": "Friday Night Magic 2007"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "f08": [
     {
       "set_id": 2762,
       "set_name": "Friday Night Magic 2008"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "f09": [
     {
       "set_id": 2763,
       "set_name": "Friday Night Magic 2009"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "f10": [
     {
       "set_id": 2764,
       "set_name": "Friday Night Magic 2010"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "f11": [
     {
       "set_id": 2765,
       "set_name": "Friday Night Magic 2011"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "f12": [
     {
       "set_id": 2766,
       "set_name": "Friday Night Magic 2012"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "f13": [
     {
       "set_id": 2767,
       "set_name": "Friday Night Magic 2013"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "f14": [
     {
       "set_id": 2768,
       "set_name": "Friday Night Magic 2014"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "f15": [
     {
       "set_id": 2769,
       "set_name": "Friday Night Magic 2015"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "f16": [
     {
       "set_id": 2770,
       "set_name": "Friday Night Magic 2016"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "f17": [
     {
       "set_id": 2771,
       "set_name": "Friday Night Magic 2017"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "f18": [
     {
       "set_id": 2772,
       "set_name": "Friday Night Magic 2018"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "fbro": [
@@ -1171,6 +1359,16 @@
     {
       "set_id": 3158,
       "set_name": "Ravnica: Clue Edition Tokens"
+    }
+  ],
+  "fdc": [
+    {
+      "set_id": 2745,
+      "set_name": "Foundations"
+    },
+    {
+      "set_id": 2750,
+      "set_name": "Foundations Promos"
     }
   ],
   "fdn": [
@@ -1231,10 +1429,6 @@
     {
       "set_id": 3268,
       "set_name": "The Lord of the Rings: Tales of Middle-Earth"
-    },
-    {
-      "set_id": 3276,
-      "set_name": "The Lord of the Rings: Tales of Middle-Earth Tokens"
     }
   ],
   "fmom": [
@@ -1247,6 +1441,10 @@
     {
       "set_id": 2754,
       "set_name": "Friday Night Magic 2000"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "fone": [
@@ -1259,84 +1457,140 @@
     {
       "set_id": 2737,
       "set_name": "Fate Reforged"
+    },
+    {
+      "set_id": 2740,
+      "set_name": "Fate Reforged Promos"
     }
   ],
   "fut": [
     {
       "set_id": 2783,
       "set_name": "Future Sight"
+    },
+    {
+      "set_id": 2784,
+      "set_name": "Future Sight Promos"
     }
   ],
   "g00": [
     {
       "set_id": 2877,
       "set_name": "Judge Gift Cards 2000"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "g01": [
     {
       "set_id": 2878,
       "set_name": "Judge Gift Cards 2001"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "g02": [
     {
       "set_id": 2879,
       "set_name": "Judge Gift Cards 2002"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "g03": [
     {
       "set_id": 2880,
       "set_name": "Judge Gift Cards 2003"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "g04": [
     {
       "set_id": 2881,
       "set_name": "Judge Gift Cards 2004"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "g05": [
     {
       "set_id": 2882,
       "set_name": "Judge Gift Cards 2005"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "g06": [
     {
       "set_id": 2883,
       "set_name": "Judge Gift Cards 2006"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "g07": [
     {
       "set_id": 2884,
       "set_name": "Judge Gift Cards 2007"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "g08": [
     {
       "set_id": 2885,
       "set_name": "Judge Gift Cards 2008"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "g09": [
     {
       "set_id": 2886,
       "set_name": "Judge Gift Cards 2009"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "g10": [
     {
       "set_id": 2887,
       "set_name": "Judge Gift Cards 2010"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "g11": [
     {
       "set_id": 2888,
       "set_name": "Judge Gift Cards 2011"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "g17": [
@@ -1355,12 +1609,20 @@
     {
       "set_id": 2876,
       "set_name": "Judge Gift Cards 1999"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "gdy": [
     {
       "set_id": 2785,
       "set_name": "Game Day 2022"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "gk1": [
@@ -1397,12 +1659,20 @@
     {
       "set_id": 2800,
       "set_name": "Guildpact"
+    },
+    {
+      "set_id": 2801,
+      "set_name": "Guildpact Promos"
     }
   ],
   "grn": [
     {
       "set_id": 2802,
       "set_name": "Guilds of Ravnica"
+    },
+    {
+      "set_id": 2806,
+      "set_name": "Guilds of Ravnica Promos"
     }
   ],
   "gs1": [
@@ -1415,6 +1685,10 @@
     {
       "set_id": 2791,
       "set_name": "Gatecrash"
+    },
+    {
+      "set_id": 2793,
+      "set_name": "Gatecrash Promos"
     }
   ],
   "gvl": [
@@ -1439,6 +1713,10 @@
     {
       "set_id": 3037,
       "set_name": "Modern Horizons"
+    },
+    {
+      "set_id": 3053,
+      "set_name": "Modern Horizons Promos"
     }
   ],
   "h2r": [
@@ -1449,6 +1727,14 @@
     {
       "set_id": 3038,
       "set_name": "Modern Horizons 2"
+    },
+    {
+      "set_id": 3042,
+      "set_name": "Modern Horizons 2 Promos"
+    },
+    {
+      "set_id": 3053,
+      "set_name": "Modern Horizons Promos"
     }
   ],
   "hho": [
@@ -1485,6 +1771,10 @@
     {
       "set_id": 2818,
       "set_name": "Hour of Devastation"
+    },
+    {
+      "set_id": 2820,
+      "set_name": "Hour of Devastation Promos"
     }
   ],
   "ice": [
@@ -1497,6 +1787,10 @@
     {
       "set_id": 2828,
       "set_name": "Ikoria: Lair of Behemoths"
+    },
+    {
+      "set_id": 2830,
+      "set_name": "Ikoria: Lair of Behemoths Promos"
     }
   ],
   "ima": [
@@ -1515,12 +1809,20 @@
     {
       "set_id": 2859,
       "set_name": "Invasion"
+    },
+    {
+      "set_id": 2860,
+      "set_name": "Invasion Promos"
     }
   ],
   "isd": [
     {
       "set_id": 2832,
       "set_name": "Innistrad"
+    },
+    {
+      "set_id": 2852,
+      "set_name": "Innistrad Promos"
     }
   ],
   "itp": [
@@ -1533,54 +1835,90 @@
     {
       "set_id": 2889,
       "set_name": "Judge Gift Cards 2012"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "j13": [
     {
       "set_id": 2890,
       "set_name": "Judge Gift Cards 2013"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "j14": [
     {
       "set_id": 2891,
       "set_name": "Judge Gift Cards 2014"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "j15": [
     {
       "set_id": 2892,
       "set_name": "Judge Gift Cards 2015"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "j16": [
     {
       "set_id": 2893,
       "set_name": "Judge Gift Cards 2016"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "j17": [
     {
       "set_id": 2894,
       "set_name": "Judge Gift Cards 2017"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "j18": [
     {
       "set_id": 2895,
       "set_name": "Judge Gift Cards 2018"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "j19": [
     {
       "set_id": 2896,
       "set_name": "Judge Gift Cards 2019"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "j20": [
     {
       "set_id": 2897,
       "set_name": "Judge Gift Cards 2020"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "j22": [
@@ -1599,6 +1937,10 @@
     {
       "set_id": 2875,
       "set_name": "Judge Gift Cards 1998"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "jmp": [
@@ -1611,12 +1953,20 @@
     {
       "set_id": 2869,
       "set_name": "Journey into Nyx"
+    },
+    {
+      "set_id": 2873,
+      "set_name": "Journey into Nyx Promos"
     }
   ],
   "jud": [
     {
       "set_id": 2901,
       "set_name": "Judgment"
+    },
+    {
+      "set_id": 2902,
+      "set_name": "Judgment Promos"
     }
   ],
   "jvc": [
@@ -1655,6 +2005,10 @@
     {
       "set_id": 2933,
       "set_name": "Khans of Tarkir"
+    },
+    {
+      "set_id": 2935,
+      "set_name": "Khans of Tarkir Promos"
     }
   ],
   "l12": [
@@ -1731,12 +2085,20 @@
     {
       "set_id": 2945,
       "set_name": "Legions"
+    },
+    {
+      "set_id": 2946,
+      "set_name": "Legions Promos"
     }
   ],
   "lrw": [
     {
       "set_id": 2947,
       "set_name": "Lorwyn"
+    },
+    {
+      "set_id": 2948,
+      "set_name": "Lorwyn Promos"
     }
   ],
   "ltc": [
@@ -1767,54 +2129,90 @@
     {
       "set_id": 2955,
       "set_name": "Magic 2010"
+    },
+    {
+      "set_id": 2957,
+      "set_name": "Magic 2010 Promos"
     }
   ],
   "m11": [
     {
       "set_id": 2959,
       "set_name": "Magic 2011"
+    },
+    {
+      "set_id": 2961,
+      "set_name": "Magic 2011 Promos"
     }
   ],
   "m12": [
     {
       "set_id": 2963,
       "set_name": "Magic 2012"
+    },
+    {
+      "set_id": 2965,
+      "set_name": "Magic 2012 Promos"
     }
   ],
   "m13": [
     {
       "set_id": 2967,
       "set_name": "Magic 2013"
+    },
+    {
+      "set_id": 2969,
+      "set_name": "Magic 2013 Promos"
     }
   ],
   "m14": [
     {
       "set_id": 2971,
       "set_name": "Magic 2014"
+    },
+    {
+      "set_id": 2973,
+      "set_name": "Magic 2014 Promos"
     }
   ],
   "m15": [
     {
       "set_id": 2975,
       "set_name": "Magic 2015"
+    },
+    {
+      "set_id": 2978,
+      "set_name": "Magic 2015 Promos"
     }
   ],
   "m19": [
     {
       "set_id": 2598,
       "set_name": "Core Set 2019"
+    },
+    {
+      "set_id": 2600,
+      "set_name": "Core Set 2019 Promos"
     }
   ],
   "m20": [
     {
       "set_id": 2602,
       "set_name": "Core Set 2020"
+    },
+    {
+      "set_id": 2605,
+      "set_name": "Core Set 2020 Promos"
     }
   ],
   "m21": [
     {
       "set_id": 2607,
       "set_name": "Core Set 2021"
+    },
+    {
+      "set_id": 2609,
+      "set_name": "Core Set 2021 Promos"
     }
   ],
   "m3c": [
@@ -1875,6 +2273,10 @@
     {
       "set_id": 3030,
       "set_name": "Mirrodin Besieged"
+    },
+    {
+      "set_id": 3032,
+      "set_name": "Mirrodin Besieged Promos"
     }
   ],
   "mclb": [
@@ -1911,12 +2313,20 @@
     {
       "set_id": 3037,
       "set_name": "Modern Horizons"
+    },
+    {
+      "set_id": 3053,
+      "set_name": "Modern Horizons Promos"
     }
   ],
   "mh2": [
     {
       "set_id": 3038,
       "set_name": "Modern Horizons 2"
+    },
+    {
+      "set_id": 3042,
+      "set_name": "Modern Horizons 2 Promos"
     }
   ],
   "mh3": [
@@ -1939,6 +2349,10 @@
     {
       "set_id": 2843,
       "set_name": "Innistrad: Midnight Hunt"
+    },
+    {
+      "set_id": 2849,
+      "set_name": "Innistrad: Midnight Hunt Promos"
     }
   ],
   "mir": [
@@ -1963,6 +2377,10 @@
     {
       "set_id": 3067,
       "set_name": "Murders at Karlov Manor"
+    },
+    {
+      "set_id": 3072,
+      "set_name": "Murders at Karlov Manor Promos"
     }
   ],
   "mm2": [
@@ -1999,6 +2417,10 @@
     {
       "set_id": 3025,
       "set_name": "Mercadian Masques"
+    },
+    {
+      "set_id": 3026,
+      "set_name": "Mercadian Masques Promos"
     }
   ],
   "mneo": [
@@ -2033,6 +2455,10 @@
     {
       "set_id": 3061,
       "set_name": "Morningtide"
+    },
+    {
+      "set_id": 3062,
+      "set_name": "Morningtide Promos"
     }
   ],
   "mp2": [
@@ -2045,6 +2471,10 @@
     {
       "set_id": 2991,
       "set_name": "Magic Player Rewards 2001"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "mps": [
@@ -2057,6 +2487,10 @@
     {
       "set_id": 3029,
       "set_name": "Mirrodin"
+    },
+    {
+      "set_id": 3034,
+      "set_name": "Mirrodin Promos"
     }
   ],
   "msc": [
@@ -2121,18 +2555,30 @@
     {
       "set_id": 3082,
       "set_name": "Nemesis"
+    },
+    {
+      "set_id": 3083,
+      "set_name": "Nemesis Promos"
     }
   ],
   "neo": [
     {
       "set_id": 2925,
       "set_name": "Kamigawa: Neon Dynasty"
+    },
+    {
+      "set_id": 2931,
+      "set_name": "Kamigawa: Neon Dynasty Promos"
     }
   ],
   "nph": [
     {
       "set_id": 3084,
       "set_name": "New Phyrexia"
+    },
+    {
+      "set_id": 3086,
+      "set_name": "New Phyrexia Promos"
     }
   ],
   "oarc": [
@@ -2205,6 +2651,10 @@
     {
       "set_id": 3094,
       "set_name": "Odyssey"
+    },
+    {
+      "set_id": 3095,
+      "set_name": "Odyssey Promos"
     }
   ],
   "oe01": [
@@ -2249,6 +2699,10 @@
     {
       "set_id": 3096,
       "set_name": "Onslaught"
+    },
+    {
+      "set_id": 3097,
+      "set_name": "Onslaught Promos"
     }
   ],
   "opc2": [
@@ -2267,6 +2721,10 @@
     {
       "set_id": 2986,
       "set_name": "Magic Origins"
+    },
+    {
+      "set_id": 2989,
+      "set_name": "Magic Origins Promos"
     }
   ],
   "otc": [
@@ -2279,6 +2737,10 @@
     {
       "set_id": 3099,
       "set_name": "Outlaws of Thunder Junction"
+    },
+    {
+      "set_id": 3106,
+      "set_name": "Outlaws of Thunder Junction Promos"
     }
   ],
   "otp": [
@@ -2297,42 +2759,70 @@
     {
       "set_id": 2993,
       "set_name": "Magic Player Rewards 2003"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p04": [
     {
       "set_id": 2994,
       "set_name": "Magic Player Rewards 2004"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p05": [
     {
       "set_id": 2995,
       "set_name": "Magic Player Rewards 2005"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p06": [
     {
       "set_id": 2996,
       "set_name": "Magic Player Rewards 2006"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p07": [
     {
       "set_id": 2997,
       "set_name": "Magic Player Rewards 2007"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p08": [
     {
       "set_id": 2998,
       "set_name": "Magic Player Rewards 2008"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p09": [
     {
       "set_id": 2999,
       "set_name": "Magic Player Rewards 2009"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p10": [
@@ -2343,12 +2833,20 @@
     {
       "set_id": 3111,
       "set_name": "Oversize Cards"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p10e": [
     {
       "set_id": 3250,
       "set_name": "Summer of Magic"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p11": [
@@ -2359,204 +2857,340 @@
     {
       "set_id": 3111,
       "set_name": "Oversize Cards"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p15a": [
     {
       "set_id": 2449,
       "set_name": "15th Anniversary"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p22": [
     {
       "set_id": 2899,
       "set_name": "Judge Gift Cards 2022"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p23": [
     {
       "set_id": 2900,
       "set_name": "Judge Gift Cards 2023"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p2hg": [
     {
       "set_id": 3309,
       "set_name": "Two-Headed Giant Tournament"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p30a": [
     {
       "set_id": 2453,
       "set_name": "30th Anniversary Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p30h": [
     {
       "set_id": 2452,
       "set_name": "30th Anniversary History Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p30m": [
     {
       "set_id": 2453,
       "set_name": "30th Anniversary Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p5dn": [
     {
       "set_id": 2743,
       "set_name": "Fifth Dawn Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p8ed": [
     {
       "set_id": 2717,
       "set_name": "Eighth Edition Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "p9ed": [
     {
       "set_id": 3089,
       "set_name": "Ninth Edition Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "paer": [
     {
       "set_id": 2462,
       "set_name": "Aether Revolt Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pafr": [
     {
       "set_id": 2704,
       "set_name": "Dungeons & Dragons: Adventures in the Forgotten Realms Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pakh": [
     {
       "set_id": 2472,
       "set_name": "Amonkhet Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pal00": [
     {
       "set_id": 2486,
       "set_name": "Arena League 2000"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pal01": [
     {
       "set_id": 2487,
       "set_name": "Arena League 2001"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pal02": [
     {
       "set_id": 2488,
       "set_name": "Arena League 2002"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pal03": [
     {
       "set_id": 2489,
       "set_name": "Arena League 2003"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pal04": [
     {
       "set_id": 2490,
       "set_name": "Arena League 2004"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pal05": [
     {
       "set_id": 2491,
       "set_name": "Arena League 2005"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pal06": [
     {
       "set_id": 2492,
       "set_name": "Arena League 2006"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pal99": [
     {
       "set_id": 2485,
       "set_name": "Arena League 1999"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pala": [
     {
       "set_id": 3218,
       "set_name": "Shards of Alara Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "palp": [
     {
       "set_id": 2493,
       "set_name": "Asia Pacific Land Program"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "papc": [
     {
       "set_id": 2477,
       "set_name": "Apocalypse Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "parb": [
     {
       "set_id": 2465,
       "set_name": "Alara Reborn Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "parl": [
     {
       "set_id": 2484,
       "set_name": "Arena League 1996"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pavr": [
     {
       "set_id": 2501,
       "set_name": "Avacyn Restored Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pbbd": [
     {
       "set_id": 2505,
       "set_name": "Battlebond Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pbfz": [
     {
       "set_id": 2509,
       "set_name": "Battle for Zendikar Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pblb": [
     {
       "set_id": 2521,
       "set_name": "Bloomburrow Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pbng": [
     {
       "set_id": 2528,
       "set_name": "Born of the Gods Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pbok": [
     {
       "set_id": 2515,
       "set_name": "Betrayers of Kamigawa Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pbro": [
     {
       "set_id": 3263,
       "set_name": "The Brothers' War Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pc2": [
@@ -2575,6 +3209,10 @@
     {
       "set_id": 3224,
       "set_name": "Standard Showdown Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pcel": [
@@ -2587,12 +3225,20 @@
     {
       "set_id": 2535,
       "set_name": "Champions of Kamigawa Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pclb": [
     {
       "set_id": 3283,
       "set_name": "The Lost Caverns of Ixalan Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pcmd": [
@@ -2605,36 +3251,60 @@
     {
       "set_id": 2536,
       "set_name": "Champs and States"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pcmr": [
     {
       "set_id": 3072,
       "set_name": "Murders at Karlov Manor Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pcns": [
     {
       "set_id": 2594,
       "set_name": "Conspiracy Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pcon": [
     {
       "set_id": 2591,
       "set_name": "Conflux Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pcsp": [
     {
       "set_id": 2540,
       "set_name": "Coldsnap Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pcy": [
     {
       "set_id": 3144,
       "set_name": "Prophecy"
+    },
+    {
+      "set_id": 3145,
+      "set_name": "Prophecy Promos"
     }
   ],
   "pd2": [
@@ -2659,42 +3329,70 @@
     {
       "set_id": 2646,
       "set_name": "Dragon's Maze Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pdis": [
     {
       "set_id": 2620,
       "set_name": "Dissension Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pdka": [
     {
       "set_id": 2613,
       "set_name": "Dark Ascension Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pdmu": [
     {
       "set_id": 2636,
       "set_name": "Dominaria United Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pdom": [
     {
       "set_id": 2626,
       "set_name": "Dominaria Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pdp10": [
     {
       "set_id": 2693,
       "set_name": "Duels of the Planeswalkers Promos 2010"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pdp12": [
     {
       "set_id": 2694,
       "set_name": "Duels of the Planeswalkers Promos 2011"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pdp13": [
@@ -2705,69 +3403,117 @@
     {
       "set_id": 2696,
       "set_name": "Duels of the Planeswalkers Promos 2013"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pdp14": [
     {
       "set_id": 2696,
       "set_name": "Duels of the Planeswalkers Promos 2013"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pdp15": [
     {
       "set_id": 2697,
       "set_name": "Duels of the Planeswalkers Promos 2014"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pdrc": [
     {
       "set_id": 2643,
       "set_name": "Dragon Con"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pdsk": [
     {
       "set_id": 2712,
       "set_name": "Duskmourn: House of Horror Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pdst": [
     {
       "set_id": 2616,
       "set_name": "Darksteel Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pdtk": [
     {
       "set_id": 2650,
       "set_name": "Dragons of Tarkir Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pdtp": [
     {
       "set_id": 2692,
       "set_name": "Duels of the Planeswalkers Promos 2009"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "peld": [
     {
       "set_id": 3298,
       "set_name": "Throne of Eldraine Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pelp": [
     {
       "set_id": 2725,
       "set_name": "European Land Program"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pemn": [
     {
       "set_id": 2720,
       "set_name": "Eldritch Moon Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "peoe": [
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
+    },
     {
       "set_id": 4658,
       "set_name": "Promo Pack: Edge of Eternities"
@@ -2777,6 +3523,10 @@
     {
       "set_id": 2727,
       "set_name": "Eventide Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pewk": [
@@ -2787,30 +3537,50 @@
     {
       "set_id": 2984,
       "set_name": "MagicFest 2023"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pexo": [
     {
       "set_id": 2730,
       "set_name": "Exodus Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pf19": [
     {
       "set_id": 2981,
       "set_name": "MagicFest 2019"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pf20": [
     {
       "set_id": 2982,
       "set_name": "MagicFest 2020"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pf23": [
     {
       "set_id": 2984,
       "set_name": "MagicFest 2023"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pf24": [
@@ -2821,6 +3591,10 @@
     {
       "set_id": 3075,
       "set_name": "Mystery Booster"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pfdn": [
@@ -2843,42 +3617,70 @@
     {
       "set_id": 2740,
       "set_name": "Fate Reforged Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pfut": [
     {
       "set_id": 2784,
       "set_name": "Future Sight Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pgpt": [
     {
       "set_id": 2801,
       "set_name": "Guildpact Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pgpx": [
     {
       "set_id": 2799,
       "set_name": "Grand Prix Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pgrn": [
     {
       "set_id": 2806,
       "set_name": "Guilds of Ravnica Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pgru": [
     {
       "set_id": 2808,
       "set_name": "Guru"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pgtc": [
     {
       "set_id": 2793,
       "set_name": "Gatecrash Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "ph17": [
@@ -2919,6 +3721,10 @@
     {
       "set_id": 3142,
       "set_name": "Promotional Planes"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "phou": [
@@ -2929,12 +3735,20 @@
     {
       "set_id": 2820,
       "set_name": "Hour of Devastation Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "phpr": [
     {
       "set_id": 2811,
       "set_name": "HarperPrism Book Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "phtr": [
@@ -2961,18 +3775,30 @@
     {
       "set_id": 2827,
       "set_name": "IDW Comics 2014"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "piko": [
     {
       "set_id": 2830,
       "set_name": "Ikoria: Lair of Behemoths Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pinv": [
     {
       "set_id": 2860,
       "set_name": "Invasion Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pip": [
@@ -2989,18 +3815,30 @@
     {
       "set_id": 2852,
       "set_name": "Innistrad Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pj21": [
     {
       "set_id": 2898,
       "set_name": "Judge Gift Cards 2021"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pjas": [
     {
       "set_id": 2907,
       "set_name": "Junior APAC Series"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pjjt": [
@@ -3011,6 +3849,10 @@
     {
       "set_id": 2867,
       "set_name": "Japan Junior Tournament"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pjou": [
@@ -3021,18 +3863,30 @@
     {
       "set_id": 2873,
       "set_name": "Journey into Nyx Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pjse": [
     {
       "set_id": 2908,
       "set_name": "Junior Series Europe"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pjud": [
     {
       "set_id": 2902,
       "set_name": "Judgment Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pkhm": [
@@ -3043,60 +3897,100 @@
     {
       "set_id": 3163,
       "set_name": "Resale Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pkld": [
     {
       "set_id": 2915,
       "set_name": "Kaladesh Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pktk": [
     {
       "set_id": 2935,
       "set_name": "Khans of Tarkir Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pl21": [
     {
       "set_id": 3381,
       "set_name": "Year of the Ox 2021"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pl22": [
     {
       "set_id": 3383,
       "set_name": "Year of the Tiger 2022"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pl23": [
     {
       "set_id": 3382,
       "set_name": "Year of the Rabbit 2023"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pl24": [
     {
       "set_id": 3224,
       "set_name": "Standard Showdown Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "plc": [
     {
       "set_id": 3122,
       "set_name": "Planar Chaos"
+    },
+    {
+      "set_id": 3123,
+      "set_name": "Planar Chaos Promos"
     }
   ],
   "plci": [
     {
       "set_id": 3283,
       "set_name": "The Lost Caverns of Ixalan Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "plg20": [
     {
       "set_id": 2950,
       "set_name": "Love Your LGS 2020"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "plg21": [
@@ -3107,48 +4001,84 @@
     {
       "set_id": 2983,
       "set_name": "MagicFest 2021"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "plg22": [
     {
       "set_id": 2952,
       "set_name": "Love Your LGS 2022"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "plg24": [
     {
       "set_id": 2953,
       "set_name": "Love Your LGS 2024"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "plgm": [
     {
       "set_id": 2617,
       "set_name": "DCI Legend Membership"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "plgn": [
     {
       "set_id": 2946,
       "set_name": "Legions Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "plny": [
     {
       "set_id": 2954,
       "set_name": "Lunar New Year 2018"
+    },
+    {
+      "set_id": 3239,
+      "set_name": "Streets of New Capenna Tokens"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "plrw": [
     {
       "set_id": 2948,
       "set_name": "Lorwyn Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pls": [
     {
       "set_id": 3131,
       "set_name": "Planeshift"
+    },
+    {
+      "set_id": 3132,
+      "set_name": "Planeshift Promos"
     }
   ],
   "plst": [
@@ -3177,60 +4107,100 @@
     {
       "set_id": 3163,
       "set_name": "Resale Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pm10": [
     {
       "set_id": 2957,
       "set_name": "Magic 2010 Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pm11": [
     {
       "set_id": 2961,
       "set_name": "Magic 2011 Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pm12": [
     {
       "set_id": 2965,
       "set_name": "Magic 2012 Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pm13": [
     {
       "set_id": 2969,
       "set_name": "Magic 2013 Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pm14": [
     {
       "set_id": 2973,
       "set_name": "Magic 2014 Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pm15": [
     {
       "set_id": 2978,
       "set_name": "Magic 2015 Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pm19": [
     {
       "set_id": 2600,
       "set_name": "Core Set 2019 Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pm20": [
     {
       "set_id": 2605,
       "set_name": "Core Set 2020 Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pm21": [
     {
       "set_id": 2609,
       "set_name": "Core Set 2021 Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pmat": [
@@ -3241,12 +4211,20 @@
     {
       "set_id": 3072,
       "set_name": "Murders at Karlov Manor Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pmbs": [
     {
       "set_id": 3032,
       "set_name": "Mirrodin Besieged Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pmei": [
@@ -3257,18 +4235,30 @@
     {
       "set_id": 3024,
       "set_name": "Media Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pmh1": [
     {
       "set_id": 3053,
       "set_name": "Modern Horizons Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pmh2": [
     {
       "set_id": 3042,
       "set_name": "Modern Horizons 2 Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pmic": [
@@ -3285,90 +4275,150 @@
     {
       "set_id": 3024,
       "set_name": "Media Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pmkm": [
     {
       "set_id": 3072,
       "set_name": "Murders at Karlov Manor Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pmmq": [
     {
       "set_id": 3026,
       "set_name": "Mercadian Masques Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pmor": [
     {
       "set_id": 3062,
       "set_name": "Morningtide Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pmps": [
     {
       "set_id": 3002,
       "set_name": "Magic Premiere Shop 2005"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pmps06": [
     {
       "set_id": 3003,
       "set_name": "Magic Premiere Shop 2006"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pmps07": [
     {
       "set_id": 3004,
       "set_name": "Magic Premiere Shop 2007"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pmps08": [
     {
       "set_id": 3005,
       "set_name": "Magic Premiere Shop 2008"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pmps09": [
     {
       "set_id": 3006,
       "set_name": "Magic Premiere Shop 2009"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pmps10": [
     {
       "set_id": 3007,
       "set_name": "Magic Premiere Shop 2010"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pmps11": [
     {
       "set_id": 3008,
       "set_name": "Magic Premiere Shop 2011"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pmrd": [
     {
       "set_id": 3034,
       "set_name": "Mirrodin Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pnat": [
     {
       "set_id": 3081,
       "set_name": "Nationals Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pncc": [
     {
       "set_id": 3234,
       "set_name": "Streets of New Capenna Commander Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pnem": [
     {
       "set_id": 3083,
       "set_name": "Nemesis Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pneo": [
@@ -3379,36 +4429,60 @@
     {
       "set_id": 3263,
       "set_name": "The Brothers' War Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pnph": [
     {
       "set_id": 3086,
       "set_name": "New Phyrexia Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pody": [
     {
       "set_id": 3095,
       "set_name": "Odyssey Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pogw": [
     {
       "set_id": 3092,
       "set_name": "Oath of the Gatewatch Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pone": [
     {
       "set_id": 3118,
       "set_name": "Phyrexia: All Will Be One Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pons": [
     {
       "set_id": 3097,
       "set_name": "Onslaught Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "por": [
@@ -3425,162 +4499,270 @@
     {
       "set_id": 2989,
       "set_name": "Magic Origins Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "potj": [
     {
       "set_id": 3106,
       "set_name": "Outlaws of Thunder Junction Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "ppcy": [
     {
       "set_id": 3145,
       "set_name": "Prophecy Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pplc": [
     {
       "set_id": 3123,
       "set_name": "Planar Chaos Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "ppls": [
     {
       "set_id": 3132,
       "set_name": "Planeshift Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "ppp1": [
     {
       "set_id": 2604,
       "set_name": "Core Set 2020 Promo Pack"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "ppro": [
     {
       "set_id": 3147,
       "set_name": "Pro Tour Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pptk": [
     {
       "set_id": 3138,
       "set_name": "Portal Three Kingdoms Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pr2": [
     {
       "set_id": 2992,
       "set_name": "Magic Player Rewards 2002"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pr23": [
     {
       "set_id": 3162,
       "set_name": "Regional Championship Qualifiers 2023"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "prav": [
     {
       "set_id": 3156,
       "set_name": "Ravnica: City of Guilds Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "prcq": [
     {
       "set_id": 3161,
       "set_name": "Regional Championship Qualifiers 2022"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "prix": [
     {
       "set_id": 3175,
       "set_name": "Rivals of Ixalan Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "prna": [
     {
       "set_id": 3152,
       "set_name": "Ravnica Allegiance Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "proe": [
     {
       "set_id": 3171,
       "set_name": "Rise of the Eldrazi Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "prtr": [
     {
       "set_id": 3166,
       "set_name": "Return to Ravnica Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "prw2": [
     {
       "set_id": 3149,
       "set_name": "Ravnica Allegiance Guild Kit"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "prwk": [
     {
       "set_id": 3153,
       "set_name": "Ravnica Allegiance Ravnica Weekend"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "ps14": [
     {
       "set_id": 3179,
       "set_name": "San Diego Comic-Con 2014"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "ps15": [
     {
       "set_id": 3180,
       "set_name": "San Diego Comic-Con 2015"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "ps16": [
     {
       "set_id": 3181,
       "set_name": "San Diego Comic-Con 2016"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "ps17": [
     {
       "set_id": 3182,
       "set_name": "San Diego Comic-Con 2017"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "ps18": [
     {
       "set_id": 3183,
       "set_name": "San Diego Comic-Con 2018"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "ps19": [
     {
       "set_id": 3184,
       "set_name": "San Diego Comic-Con 2019"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pscg": [
     {
       "set_id": 3192,
       "set_name": "Scourge Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "psdc": [
     {
       "set_id": 3178,
       "set_name": "San Diego Comic-Con 2013"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pshm": [
     {
       "set_id": 3211,
       "set_name": "Shadowmoor Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "psnc": [
@@ -3591,27 +4773,47 @@
     {
       "set_id": 3238,
       "set_name": "Streets of New Capenna Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "psoi": [
     {
       "set_id": 3215,
       "set_name": "Shadows over Innistrad Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "psok": [
     {
       "set_id": 3186,
       "set_name": "Saviors of Kamigawa Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "psom": [
     {
       "set_id": 3189,
       "set_name": "Scars of Mirrodin Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "psos": [
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
+    },
     {
       "set_id": 4644,
       "set_name": "Promo Pack: Secrets of Strixhaven"
@@ -3621,24 +4823,40 @@
     {
       "set_id": 3224,
       "set_name": "Standard Showdown Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "psth": [
     {
       "set_id": 3248,
       "set_name": "Stronghold Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pstx": [
     {
       "set_id": 3245,
       "set_name": "Strixhaven: School of Mages Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "psus": [
     {
       "set_id": 2909,
       "set_name": "Junior Super Series"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "ptbro": [
@@ -3673,24 +4891,40 @@
     {
       "set_id": 3289,
       "set_name": "Theros Beyond Death Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pths": [
     {
       "set_id": 3294,
       "set_name": "Theros Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "ptk": [
     {
       "set_id": 3137,
       "set_name": "Portal Three Kingdoms"
+    },
+    {
+      "set_id": 3138,
+      "set_name": "Portal Three Kingdoms Promos"
     }
   ],
   "ptkdf": [
     {
       "set_id": 3251,
       "set_name": "Tarkir Dragonfury"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "ptla": [
@@ -3703,18 +4937,30 @@
     {
       "set_id": 3253,
       "set_name": "Tempest Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "ptor": [
     {
       "set_id": 3306,
       "set_name": "Torment Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "ptsnc": [
     {
       "set_id": 3239,
       "set_name": "Streets of New Capenna Tokens"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "ptsp": [
@@ -3725,18 +4971,30 @@
     {
       "set_id": 3301,
       "set_name": "Time Spiral Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "puds": [
     {
       "set_id": 3330,
       "set_name": "Urza's Destiny Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pulg": [
     {
       "set_id": 3332,
       "set_name": "Urza's Legacy Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "puma": [
@@ -3749,24 +5007,40 @@
     {
       "set_id": 3320,
       "set_name": "Unhinged Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "purl": [
     {
       "set_id": 3328,
       "set_name": "URL/Convention Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pusg": [
     {
       "set_id": 3334,
       "set_name": "Urza's Saga Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pust": [
     {
       "set_id": 3326,
       "set_name": "Unstable Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pvan": [
@@ -3783,18 +5057,30 @@
     {
       "set_id": 2839,
       "set_name": "Innistrad: Crimson Vow Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pw12": [
     {
       "set_id": 3360,
       "set_name": "Wizards Play Network 2012"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pw21": [
     {
       "set_id": 3361,
       "set_name": "Wizards Play Network 2021"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pw22": [
@@ -3805,6 +5091,10 @@
     {
       "set_id": 3362,
       "set_name": "Wizards Play Network 2022"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pw23": [
@@ -3815,54 +5105,90 @@
     {
       "set_id": 3363,
       "set_name": "Wizards Play Network 2023"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pw24": [
     {
       "set_id": 3364,
       "set_name": "Wizards Play Network 2024"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pwar": [
     {
       "set_id": 3341,
       "set_name": "War of the Spark Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pwoe": [
     {
       "set_id": 3353,
       "set_name": "Wilds of Eldraine Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pwor": [
     {
       "set_id": 3375,
       "set_name": "World Championship Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pwos": [
     {
       "set_id": 3355,
       "set_name": "Wizards of the Coast Online Store"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pwwk": [
     {
       "set_id": 3379,
       "set_name": "Worldwake Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pxln": [
     {
       "set_id": 2863,
       "set_name": "Ixalan Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pxtc": [
     {
       "set_id": 2865,
       "set_name": "Ixalan Treasure Chest"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pza": [
@@ -3875,6 +5201,10 @@
     {
       "set_id": 3387,
       "set_name": "Zendikar Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "pznr": [
@@ -3885,6 +5215,10 @@
     {
       "set_id": 3395,
       "set_name": "Zendikar Rising Promos"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "q06": [
@@ -3897,6 +5231,10 @@
     {
       "set_id": 3155,
       "set_name": "Ravnica: City of Guilds"
+    },
+    {
+      "set_id": 3156,
+      "set_name": "Ravnica: City of Guilds Promos"
     }
   ],
   "rex": [
@@ -3913,18 +5251,30 @@
     {
       "set_id": 3173,
       "set_name": "Rivals of Ixalan"
+    },
+    {
+      "set_id": 3175,
+      "set_name": "Rivals of Ixalan Promos"
     }
   ],
   "rna": [
     {
       "set_id": 3148,
       "set_name": "Ravnica Allegiance"
+    },
+    {
+      "set_id": 3152,
+      "set_name": "Ravnica Allegiance Promos"
     }
   ],
   "roe": [
     {
       "set_id": 3169,
       "set_name": "Rise of the Eldrazi"
+    },
+    {
+      "set_id": 3171,
+      "set_name": "Rise of the Eldrazi Promos"
     }
   ],
   "rqs": [
@@ -3937,6 +5287,10 @@
     {
       "set_id": 3164,
       "set_name": "Return to Ravnica"
+    },
+    {
+      "set_id": 3166,
+      "set_name": "Return to Ravnica Promos"
     }
   ],
   "rvr": [
@@ -3967,6 +5321,10 @@
     {
       "set_id": 3191,
       "set_name": "Scourge"
+    },
+    {
+      "set_id": 3192,
+      "set_name": "Scourge Promos"
     }
   ],
   "sch": [
@@ -3995,6 +5353,10 @@
       "set_name": "World Championship Promos"
     },
     {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
+    },
+    {
       "set_id": 4639,
       "set_name": "Game Day and Store Championship Promos"
     }
@@ -4003,12 +5365,22 @@
     {
       "set_id": 3210,
       "set_name": "Shadowmoor"
+    },
+    {
+      "set_id": 3211,
+      "set_name": "Shadowmoor Promos"
     }
   ],
   "slc": [
     {
       "set_id": 3193,
       "set_name": "Secret Lair Countdown Kit"
+    }
+  ],
+  "slci": [
+    {
+      "set_id": 3285,
+      "set_name": "The Lost Caverns of Ixalan Tokens"
     }
   ],
   "sld": [
@@ -4053,6 +5425,10 @@
     {
       "set_id": 3205,
       "set_name": "Secret Lair Showdown"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "slu": [
@@ -4083,6 +5459,10 @@
     {
       "set_id": 3236,
       "set_name": "Streets of New Capenna Minigame"
+    },
+    {
+      "set_id": 3238,
+      "set_name": "Streets of New Capenna Promos"
     }
   ],
   "soa": [
@@ -4101,18 +5481,30 @@
     {
       "set_id": 3213,
       "set_name": "Shadows over Innistrad"
+    },
+    {
+      "set_id": 3215,
+      "set_name": "Shadows over Innistrad Promos"
     }
   ],
   "sok": [
     {
       "set_id": 3185,
       "set_name": "Saviors of Kamigawa"
+    },
+    {
+      "set_id": 3186,
+      "set_name": "Saviors of Kamigawa Promos"
     }
   ],
   "som": [
     {
       "set_id": 3187,
       "set_name": "Scars of Mirrodin"
+    },
+    {
+      "set_id": 3189,
+      "set_name": "Scars of Mirrodin Promos"
     }
   ],
   "sos": [
@@ -4171,12 +5563,20 @@
     {
       "set_id": 3247,
       "set_name": "Stronghold"
+    },
+    {
+      "set_id": 3248,
+      "set_name": "Stronghold Promos"
     }
   ],
   "stx": [
     {
       "set_id": 3240,
       "set_name": "Strixhaven: School of Mages"
+    },
+    {
+      "set_id": 3245,
+      "set_name": "Strixhaven: School of Mages Promos"
     }
   ],
   "sum": [
@@ -4755,6 +6155,10 @@
     {
       "set_id": 3287,
       "set_name": "Theros Beyond Death"
+    },
+    {
+      "set_id": 3289,
+      "set_name": "Theros Beyond Death Promos"
     }
   ],
   "thou": [
@@ -4785,6 +6189,10 @@
     {
       "set_id": 3286,
       "set_name": "Theros"
+    },
+    {
+      "set_id": 3294,
+      "set_name": "Theros Promos"
     }
   ],
   "tiko": [
@@ -5109,6 +6517,10 @@
   ],
   "tmom": [
     {
+      "set_id": 3016,
+      "set_name": "March of the Machine Commander Tokens"
+    },
+    {
       "set_id": 3021,
       "set_name": "March of the Machine Tokens"
     }
@@ -5127,6 +6539,10 @@
     {
       "set_id": 3252,
       "set_name": "Tempest"
+    },
+    {
+      "set_id": 3253,
+      "set_name": "Tempest Promos"
     }
   ],
   "tmt": [
@@ -5207,6 +6623,10 @@
     {
       "set_id": 3305,
       "set_name": "Torment"
+    },
+    {
+      "set_id": 3306,
+      "set_name": "Torment Promos"
     }
   ],
   "tori": [
@@ -5333,6 +6753,10 @@
     {
       "set_id": 3300,
       "set_name": "Time Spiral"
+    },
+    {
+      "set_id": 3301,
+      "set_name": "Time Spiral Promos"
     }
   ],
   "tsr": [
@@ -5501,12 +6925,20 @@
     {
       "set_id": 3329,
       "set_name": "Urza's Destiny"
+    },
+    {
+      "set_id": 3330,
+      "set_name": "Urza's Destiny Promos"
     }
   ],
   "ugin": [
     {
       "set_id": 3310,
       "set_name": "Ugin's Fate"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "ugl": [
@@ -5519,6 +6951,10 @@
     {
       "set_id": 3331,
       "set_name": "Urza's Legacy"
+    },
+    {
+      "set_id": 3332,
+      "set_name": "Urza's Legacy Promos"
     }
   ],
   "uma": [
@@ -5543,6 +6979,10 @@
     {
       "set_id": 3319,
       "set_name": "Unhinged"
+    },
+    {
+      "set_id": 3320,
+      "set_name": "Unhinged Promos"
     }
   ],
   "unk": [
@@ -5559,12 +6999,20 @@
     {
       "set_id": 3333,
       "set_name": "Urza's Saga"
+    },
+    {
+      "set_id": 3334,
+      "set_name": "Urza's Saga Promos"
     }
   ],
   "ust": [
     {
       "set_id": 3325,
       "set_name": "Unstable"
+    },
+    {
+      "set_id": 3326,
+      "set_name": "Unstable Promos"
     }
   ],
   "v09": [
@@ -5637,6 +7085,10 @@
     {
       "set_id": 2833,
       "set_name": "Innistrad: Crimson Vow"
+    },
+    {
+      "set_id": 2839,
+      "set_name": "Innistrad: Crimson Vow Promos"
     }
   ],
   "w16": [
@@ -5655,6 +7107,10 @@
     {
       "set_id": 3339,
       "set_name": "War of the Spark"
+    },
+    {
+      "set_id": 3341,
+      "set_name": "War of the Spark Promos"
     }
   ],
   "wc00": [
@@ -5725,6 +7181,10 @@
     {
       "set_id": 3376,
       "set_name": "World Magic Cup Qualifiers"
+    },
+    {
+      "set_id": 4382,
+      "set_name": "Pre-Release Cards"
     }
   ],
   "wmkm": [
@@ -5743,6 +7203,10 @@
     {
       "set_id": 3346,
       "set_name": "Wilds of Eldraine"
+    },
+    {
+      "set_id": 3353,
+      "set_name": "Wilds of Eldraine Promos"
     }
   ],
   "wot": [
@@ -5761,18 +7225,30 @@
     {
       "set_id": 3377,
       "set_name": "Worldwake"
+    },
+    {
+      "set_id": 3379,
+      "set_name": "Worldwake Promos"
     }
   ],
   "xln": [
     {
       "set_id": 2861,
       "set_name": "Ixalan"
+    },
+    {
+      "set_id": 2863,
+      "set_name": "Ixalan Promos"
     }
   ],
   "zen": [
     {
       "set_id": 3384,
       "set_name": "Zendikar"
+    },
+    {
+      "set_id": 3387,
+      "set_name": "Zendikar Promos"
     }
   ],
   "znc": [
