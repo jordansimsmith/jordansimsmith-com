@@ -76,7 +76,7 @@ export function ImportRowPhotoStrip({
         </div>
       ))}
       {needsPhotos && photos.length === 0 && (
-        <Badge variant="light" color="orange">
+        <Badge variant="light" color="orange" style={{ flexShrink: 0 }}>
           Needs photos
         </Badge>
       )}
