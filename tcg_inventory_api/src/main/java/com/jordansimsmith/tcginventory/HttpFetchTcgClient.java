@@ -12,8 +12,12 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class HttpFetchTcgClient implements FetchTcgClient {
+  private static final Logger LOGGER = LoggerFactory.getLogger(HttpFetchTcgClient.class);
+
   static final String USER_AGENT =
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
           + " (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -106,6 +110,10 @@ public class HttpFetchTcgClient implements FetchTcgClient {
   public void deleteListing(String bearerToken, int listingId) {
     try {
       doDeleteListing(bearerToken, listingId);
+    } catch (FetchTcgNotFoundException e) {
+      // the listing is already gone on fetchtcg (for example its last copy
+      // sold through an untracked offer), so the delete converged
+      LOGGER.info("listing {} not found on FetchTCG, treating as already deleted", listingId);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
@@ -307,6 +315,11 @@ public class HttpFetchTcgClient implements FetchTcgClient {
       if (statusCode == 401 || statusCode == 403) {
         throw new FetchTcgAuthException(
             statusCode, "FetchTCG authentication failed with status " + statusCode);
+      }
+
+      if (statusCode == 404) {
+        throw new FetchTcgNotFoundException(
+            "FetchTCG request failed with status 404: " + response.body());
       }
 
       if (statusCode >= 500 && attempt < MAX_RETRIES) {

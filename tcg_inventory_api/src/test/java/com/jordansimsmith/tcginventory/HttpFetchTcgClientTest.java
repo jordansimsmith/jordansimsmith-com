@@ -273,6 +273,22 @@ public class HttpFetchTcgClientTest {
   }
 
   @Test
+  void shouldThrowWrappedFetchTcgNotFoundExceptionOn404() throws IOException, InterruptedException {
+    // arrange
+    var response = createMockResponse(404, "");
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response);
+
+    // act & assert
+    assertThatThrownBy(() -> client.getCard("mtg_1_c_dom_normal"))
+        .isInstanceOf(RuntimeException.class)
+        .hasCauseInstanceOf(FetchTcgNotFoundException.class)
+        .hasMessageContaining("404");
+
+    assertThat(pacerCallCount.get()).isEqualTo(1);
+  }
+
+  @Test
   void shouldIncludeUserAgentHeader() throws IOException, InterruptedException {
     // arrange
     var response = createMockResponse(200, "{\"id\": \"mtg_1_c_dom_normal\", \"name\": \"x\"}");
@@ -551,6 +567,22 @@ public class HttpFetchTcgClientTest {
     assertThat(requestCaptor.getValue().headers().firstValue("Authorization"))
         .contains("Bearer my-token");
     assertThat(requestCaptor.getValue().method()).isEqualTo("DELETE");
+  }
+
+  @Test
+  void deleteListingShouldSucceedWhenListingNotFound() throws IOException, InterruptedException {
+    // arrange
+    var response = createMockResponse(404, "");
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response);
+
+    // act
+    client.deleteListing("my-token", 975737);
+
+    // assert
+    verify(httpClient, times(1))
+        .send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString()));
+    assertThat(pacerCallCount.get()).isEqualTo(1);
   }
 
   @SuppressWarnings("unchecked")
