@@ -24,6 +24,7 @@ public class ListingPhaseProcessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ListingPhaseProcessor.class);
 
   private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final TcgInventoryItemRepository tcgInventoryItemRepository;
   private final DynamoDbClient dynamoDbClient;
   private final Clock clock;
   private final FetchTcgClient fetchTcgClient;
@@ -31,11 +32,13 @@ public class ListingPhaseProcessor {
 
   public ListingPhaseProcessor(
       DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
+      TcgInventoryItemRepository tcgInventoryItemRepository,
       DynamoDbClient dynamoDbClient,
       Clock clock,
       FetchTcgClient fetchTcgClient,
       S3Client s3Client) {
     this.tcgInventoryTable = tcgInventoryTable;
+    this.tcgInventoryItemRepository = tcgInventoryItemRepository;
     this.dynamoDbClient = dynamoDbClient;
     this.clock = clock;
     this.fetchTcgClient = fetchTcgClient;
@@ -86,17 +89,7 @@ public class ListingPhaseProcessor {
   private InStock loadInStock(String user, String skuId) {
     int count = 0;
     TcgInventoryItem first = null;
-    var request =
-        QueryEnhancedRequest.builder()
-            .queryConditional(
-                QueryConditional.sortBeginsWith(
-                    Key.builder()
-                        .partitionValue(TcgInventoryItem.formatSkuPk(user, skuId))
-                        .sortValue(TcgInventoryItem.UNIT_PREFIX)
-                        .build()))
-            .build();
-
-    for (var item : tcgInventoryTable.query(request).items()) {
+    for (var item : tcgInventoryItemRepository.findUnits(user, skuId)) {
       if ("in_stock".equals(item.getStatus())) {
         if (first == null) {
           first = item;

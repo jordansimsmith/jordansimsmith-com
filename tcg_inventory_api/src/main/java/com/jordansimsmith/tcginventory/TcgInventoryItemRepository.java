@@ -6,12 +6,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import javax.annotation.Nullable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.Delete;
 import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
@@ -38,9 +40,7 @@ public class TcgInventoryItemRepository {
     this.ulidGenerator = ulidGenerator;
   }
 
-  public List<TcgInventoryItem> findUnitsToAllocate(
-      String user, String skuId, String orderId, int quantity) {
-    var results = new ArrayList<TcgInventoryItem>();
+  public List<TcgInventoryItem> findUnits(String user, String skuId) {
     var request =
         QueryEnhancedRequest.builder()
             .queryConditional(
@@ -51,7 +51,15 @@ public class TcgInventoryItemRepository {
                         .build()))
             .build();
 
-    for (var item : tcgInventoryTable.query(request).items()) {
+    return tcgInventoryTable.query(request).stream()
+        .flatMap(page -> page.items().stream())
+        .toList();
+  }
+
+  public List<TcgInventoryItem> findUnitsToAllocate(
+      String user, String skuId, String orderId, int quantity) {
+    var results = new ArrayList<TcgInventoryItem>();
+    for (var item : findUnits(user, skuId)) {
       // units already reserved for this order were allocated by a run that died before
       // writing the order item; reclaiming them keeps retries convergent
       var reclaimed = "reserved".equals(item.getStatus()) && orderId.equals(item.getOrderId());
@@ -89,7 +97,13 @@ public class TcgInventoryItemRepository {
                     .conditionExpression("attribute_not_exists(pk)")
                     .build())
             .build());
-    transactItems.add(buildAuditPut(user, "reserve", orderItem.getOrderId()));
+    transactItems.add(
+        buildAuditPut(
+            user,
+            "reserve",
+            Map.of(
+                TcgInventoryItem.ORDER_ID,
+                AttributeValue.builder().s(orderItem.getOrderId()).build())));
 
     executeChunked(transactItems);
   }
@@ -107,9 +121,82 @@ public class TcgInventoryItemRepository {
     }
 
     transactItems.add(buildOrderFulfilledUpdate(user, orderId));
-    transactItems.add(buildAuditPut(user, "sell", orderId));
+    transactItems.add(
+        buildAuditPut(
+            user,
+            "sell",
+            Map.of(TcgInventoryItem.ORDER_ID, AttributeValue.builder().s(orderId).build())));
 
     executeChunked(transactItems);
+  }
+
+  public void removeUnit(String user, String skuId, int sequenceNumber, @Nullable String reason) {
+    var auditAttributes = new HashMap<String, AttributeValue>();
+    auditAttributes.put(TcgInventoryItem.SKU_ID, AttributeValue.builder().s(skuId).build());
+    auditAttributes.put(
+        TcgInventoryItem.SEQUENCE_NUMBER,
+        AttributeValue.builder().n(String.valueOf(sequenceNumber)).build());
+    if (reason != null && !reason.isEmpty()) {
+      auditAttributes.put(
+          TcgInventoryItem.DECISION_REASON, AttributeValue.builder().s(reason).build());
+    }
+
+    executeChunked(
+        List.of(
+            buildSkuDirtyUpdate(user, skuId),
+            buildUnitRemoveUpdate(user, skuId, sequenceNumber),
+            buildAuditPut(user, "adjustment", auditAttributes)));
+  }
+
+  // one transaction across both SKU partitions: the unit moves keeping its sequence number and
+  // photos, the source SKU is dirtied, and the target SKU record is created or refreshed
+  public String updateUnitCondition(
+      String user, TcgInventoryItem skuItem, TcgInventoryItem unitItem, String condition) {
+    var targetSkuId = skuItem.getScryfallId() + "#" + skuItem.getFinish() + "#" + condition;
+    var targetSku =
+        TcgInventoryItem.createSku(
+            user,
+            targetSkuId,
+            skuItem.getScryfallId(),
+            skuItem.getFinish(),
+            condition,
+            skuItem.getName(),
+            skuItem.getSetCode(),
+            skuItem.getSetName(),
+            skuItem.getCollectorNumber(),
+            skuItem.getFetchtcgCardId(),
+            skuItem.getSuggestedPrice());
+
+    var movedUnit =
+        TcgInventoryItem.createUnit(
+            user,
+            targetSkuId,
+            unitItem.getSequenceNumber(),
+            "in_stock",
+            unitItem.getImportId(),
+            unitItem.getCreatedAt());
+    if (unitItem.getPhotos() != null && !unitItem.getPhotos().isEmpty()) {
+      movedUnit.setPhotos(unitItem.getPhotos());
+    }
+
+    executeChunked(
+        List.of(
+            buildUnitDelete(user, skuItem.getSkuId(), unitItem.getSequenceNumber()),
+            buildUnitPut(movedUnit),
+            buildSkuDirtyUpdate(user, skuItem.getSkuId()),
+            buildSkuUpsert(targetSku),
+            buildAuditPut(
+                user,
+                "adjustment",
+                Map.of(
+                    TcgInventoryItem.SKU_ID,
+                    AttributeValue.builder().s(skuItem.getSkuId()).build(),
+                    TcgInventoryItem.SEQUENCE_NUMBER,
+                    AttributeValue.builder()
+                        .n(String.valueOf(unitItem.getSequenceNumber()))
+                        .build()))));
+
+    return targetSkuId;
   }
 
   private void executeChunked(List<TransactWriteItem> transactItems) {
@@ -178,6 +265,147 @@ public class TcgInventoryItemRepository {
                             AttributeValue.builder()
                                 .n(String.valueOf(clock.now().getEpochSecond()))
                                 .build()))
+                .build())
+        .build();
+  }
+
+  private TransactWriteItem buildUnitRemoveUpdate(String user, String skuId, int sequenceNumber) {
+    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
+    var unitSk = TcgInventoryItem.formatUnitSk(sequenceNumber);
+
+    return TransactWriteItem.builder()
+        .update(
+            Update.builder()
+                .tableName(TcgInventoryItem.TABLE_NAME)
+                .key(
+                    Map.of(
+                        TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build(),
+                        TcgInventoryItem.SK, AttributeValue.builder().s(unitSk).build()))
+                .updateExpression(
+                    "SET #status = :removed, " + TcgInventoryItem.UPDATED_AT + " = :now")
+                .conditionExpression("#status = :inStock")
+                .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+                .expressionAttributeValues(
+                    Map.of(
+                        ":removed", AttributeValue.builder().s("removed").build(),
+                        ":inStock", AttributeValue.builder().s("in_stock").build(),
+                        ":now",
+                            AttributeValue.builder()
+                                .n(String.valueOf(clock.now().getEpochSecond()))
+                                .build()))
+                .build())
+        .build();
+  }
+
+  private TransactWriteItem buildUnitDelete(String user, String skuId, int sequenceNumber) {
+    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
+    var unitSk = TcgInventoryItem.formatUnitSk(sequenceNumber);
+
+    return TransactWriteItem.builder()
+        .delete(
+            Delete.builder()
+                .tableName(TcgInventoryItem.TABLE_NAME)
+                .key(
+                    Map.of(
+                        TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build(),
+                        TcgInventoryItem.SK, AttributeValue.builder().s(unitSk).build()))
+                .conditionExpression("#status = :inStock")
+                .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+                .expressionAttributeValues(
+                    Map.of(":inStock", AttributeValue.builder().s("in_stock").build()))
+                .build())
+        .build();
+  }
+
+  private TransactWriteItem buildUnitPut(TcgInventoryItem unitItem) {
+    return TransactWriteItem.builder()
+        .put(
+            Put.builder()
+                .tableName(TcgInventoryItem.TABLE_NAME)
+                .item(tcgInventoryTable.tableSchema().itemToMap(unitItem, true))
+                .build())
+        .build();
+  }
+
+  private TransactWriteItem buildSkuUpsert(TcgInventoryItem skuSeed) {
+    var expression =
+        new StringBuilder(
+            "ADD "
+                + TcgInventoryItem.VERSION
+                + " :one SET "
+                + TcgInventoryItem.SKU_ID
+                + " = :skuId, "
+                + TcgInventoryItem.SCRYFALL_ID
+                + " = :scryfallId, "
+                + "#finish = :finish, "
+                + "#condition = :condition, "
+                + "#name = :cardName, "
+                + TcgInventoryItem.SET_CODE
+                + " = :setCode, "
+                + TcgInventoryItem.SET_NAME
+                + " = :setName, "
+                + TcgInventoryItem.COLLECTOR_NUMBER
+                + " = :collectorNumber, "
+                + TcgInventoryItem.DIRTY
+                + " = :dirty, "
+                + TcgInventoryItem.GSI1PK
+                + " = :gsi1pk, "
+                + TcgInventoryItem.GSI1SK
+                + " = :gsi1sk, "
+                + TcgInventoryItem.GSI2PK
+                + " = :gsi2pk, "
+                + TcgInventoryItem.GSI2SK
+                + " = :gsi2sk");
+
+    var values = new HashMap<String, AttributeValue>();
+    values.put(":one", AttributeValue.builder().n("1").build());
+    values.put(":skuId", AttributeValue.builder().s(skuSeed.getSkuId()).build());
+    values.put(":scryfallId", AttributeValue.builder().s(skuSeed.getScryfallId()).build());
+    values.put(":finish", AttributeValue.builder().s(skuSeed.getFinish()).build());
+    values.put(":condition", AttributeValue.builder().s(skuSeed.getCondition()).build());
+    values.put(":cardName", AttributeValue.builder().s(skuSeed.getName()).build());
+    values.put(":setCode", AttributeValue.builder().s(skuSeed.getSetCode()).build());
+    values.put(":setName", AttributeValue.builder().s(skuSeed.getSetName()).build());
+    values.put(
+        ":collectorNumber", AttributeValue.builder().s(skuSeed.getCollectorNumber()).build());
+    values.put(":dirty", AttributeValue.builder().bool(true).build());
+    values.put(":gsi1pk", AttributeValue.builder().s(skuSeed.getGsi1pk()).build());
+    values.put(":gsi1sk", AttributeValue.builder().s(skuSeed.getGsi1sk()).build());
+    values.put(":gsi2pk", AttributeValue.builder().s(skuSeed.getGsi2pk()).build());
+    values.put(":gsi2sk", AttributeValue.builder().s(skuSeed.getGsi2sk()).build());
+
+    if (skuSeed.getSuggestedPrice() != null) {
+      expression.append(", " + TcgInventoryItem.SUGGESTED_PRICE + " = :suggestedPrice");
+      values.put(
+          ":suggestedPrice", AttributeValue.builder().s(skuSeed.getSuggestedPrice()).build());
+    }
+    if (skuSeed.getFetchtcgCardId() != null) {
+      expression.append(", " + TcgInventoryItem.FETCHTCG_CARD_ID + " = :fetchtcgCardId");
+      values.put(
+          ":fetchtcgCardId", AttributeValue.builder().s(skuSeed.getFetchtcgCardId()).build());
+    }
+    if (skuSeed.getFetchtcgSetId() != null) {
+      expression.append(", " + TcgInventoryItem.FETCHTCG_SET_ID + " = :fetchtcgSetId");
+      values.put(
+          ":fetchtcgSetId",
+          AttributeValue.builder().n(String.valueOf(skuSeed.getFetchtcgSetId())).build());
+    }
+
+    return TransactWriteItem.builder()
+        .update(
+            Update.builder()
+                .tableName(TcgInventoryItem.TABLE_NAME)
+                .key(
+                    Map.of(
+                        TcgInventoryItem.PK, AttributeValue.builder().s(skuSeed.getPk()).build(),
+                        TcgInventoryItem.SK, AttributeValue.builder().s(skuSeed.getSk()).build()))
+                .updateExpression(expression.toString())
+                .expressionAttributeNames(
+                    Map.of(
+                        "#finish", TcgInventoryItem.FINISH,
+                        "#condition", TcgInventoryItem.CONDITION,
+                        "#name", TcgInventoryItem.NAME))
+                .expressionAttributeValues(values)
                 .build())
         .build();
   }
@@ -260,15 +488,15 @@ public class TcgInventoryItemRepository {
         .build();
   }
 
-  private TransactWriteItem buildAuditPut(String user, String eventType, String orderId) {
-    var auditItem = new HashMap<String, AttributeValue>();
+  private TransactWriteItem buildAuditPut(
+      String user, String eventType, Map<String, AttributeValue> attributes) {
+    var auditItem = new HashMap<>(attributes);
     auditItem.put(
         TcgInventoryItem.PK,
         AttributeValue.builder().s(TcgInventoryItem.formatAuditPk(user)).build());
     auditItem.put(
         TcgInventoryItem.SK, AttributeValue.builder().s(ulidGenerator.generate()).build());
     auditItem.put(TcgInventoryItem.EVENT_TYPE, AttributeValue.builder().s(eventType).build());
-    auditItem.put(TcgInventoryItem.ORDER_ID, AttributeValue.builder().s(orderId).build());
     auditItem.put(
         TcgInventoryItem.CREATED_AT,
         AttributeValue.builder().n(String.valueOf(clock.now().getEpochSecond())).build());

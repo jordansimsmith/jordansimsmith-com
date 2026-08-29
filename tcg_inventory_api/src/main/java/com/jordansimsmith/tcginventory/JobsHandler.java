@@ -48,13 +48,17 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
                 factory.objectMapper()),
             new ListingPhaseProcessor(
                 factory.tcgInventoryTable(),
+                factory.tcgInventoryItemRepository(),
                 factory.dynamoDbClient(),
                 factory.clock(),
                 factory.fetchTcgClient(),
                 factory.s3Client()));
     this.reportJobProcessor =
         new ReportJobProcessor(
-            factory.tcgInventoryTable(), factory.objectMapper(), factory.clock());
+            factory.tcgInventoryTable(),
+            factory.tcgInventoryItemRepository(),
+            factory.objectMapper(),
+            factory.clock());
   }
 
   @Override

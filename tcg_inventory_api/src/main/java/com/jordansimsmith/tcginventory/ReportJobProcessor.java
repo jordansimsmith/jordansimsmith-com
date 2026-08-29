@@ -15,13 +15,18 @@ public class ReportJobProcessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReportJobProcessor.class);
 
   private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final TcgInventoryItemRepository tcgInventoryItemRepository;
   private final DynamoDbIndex<TcgInventoryItem> gsi2Index;
   private final ObjectMapper objectMapper;
   private final Clock clock;
 
   public ReportJobProcessor(
-      DynamoDbTable<TcgInventoryItem> tcgInventoryTable, ObjectMapper objectMapper, Clock clock) {
+      DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
+      TcgInventoryItemRepository tcgInventoryItemRepository,
+      ObjectMapper objectMapper,
+      Clock clock) {
     this.tcgInventoryTable = tcgInventoryTable;
+    this.tcgInventoryItemRepository = tcgInventoryItemRepository;
     this.gsi2Index = tcgInventoryTable.index(TcgInventoryItem.GSI2_NAME);
     this.objectMapper = objectMapper;
     this.clock = clock;
@@ -37,7 +42,7 @@ public class ReportJobProcessor {
     var accumulator = new ReportAccumulator(now, objectMapper);
 
     for (var sku : pageGsi2Skus(user)) {
-      var units = queryUnits(user, sku.getSkuId());
+      var units = tcgInventoryItemRepository.findUnits(user, sku.getSkuId());
       accumulator.addSku(sku, units);
     }
 
@@ -93,24 +98,6 @@ public class ReportJobProcessor {
             .build();
 
     return gsi2Index.query(request).stream().flatMap(page -> page.items().stream()).toList();
-  }
-
-  private List<TcgInventoryItem> queryUnits(String user, String skuId) {
-    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
-    var request =
-        QueryEnhancedRequest.builder()
-            .queryConditional(
-                QueryConditional.sortBeginsWith(
-                    Key.builder()
-                        .partitionValue(skuPk)
-                        .sortValue(TcgInventoryItem.UNIT_PREFIX)
-                        .build()))
-            .scanIndexForward(true)
-            .build();
-
-    return tcgInventoryTable.query(request).stream()
-        .flatMap(page -> page.items().stream())
-        .toList();
   }
 
   private List<TcgInventoryItem> pageOrders(String user) {

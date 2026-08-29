@@ -9,24 +9,12 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import com.jordansimsmith.time.Clock;
-import com.jordansimsmith.ulid.UlidGenerator;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import software.amazon.awssdk.services.dynamodb.model.Delete;
-import software.amazon.awssdk.services.dynamodb.model.Put;
-import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
-import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
-import software.amazon.awssdk.services.dynamodb.model.Update;
 
 public class UpdateUnitHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
@@ -39,13 +27,11 @@ public class UpdateUnitHandler
 
   record ErrorResponse(@JsonProperty("message") String message) {}
 
-  private final Clock clock;
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
-  private final DynamoDbClient dynamoDbClient;
+  private final TcgInventoryItemRepository tcgInventoryItemRepository;
   private final ObjectMapper objectMapper;
-  private final UlidGenerator ulidGenerator;
 
   public UpdateUnitHandler() {
     this(TcgInventoryFactory.create());
@@ -53,13 +39,11 @@ public class UpdateUnitHandler
 
   @VisibleForTesting
   UpdateUnitHandler(TcgInventoryFactory factory) {
-    this.clock = factory.clock();
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.tcgInventoryTable = factory.tcgInventoryTable();
-    this.dynamoDbClient = factory.dynamoDbClient();
+    this.tcgInventoryItemRepository = factory.tcgInventoryItemRepository();
     this.objectMapper = factory.objectMapper();
-    this.ulidGenerator = factory.ulidGenerator();
   }
 
   @Override
@@ -122,187 +106,8 @@ public class UpdateUnitHandler
       return httpResponseFactory.conflict(new ErrorResponse("condition is unchanged"));
     }
 
-    var targetSkuId = skuItem.getScryfallId() + "#" + skuItem.getFinish() + "#" + body.condition();
-    var targetSkuPk = TcgInventoryItem.formatSkuPk(user, targetSkuId);
-
-    var deleteUnit =
-        TransactWriteItem.builder()
-            .delete(
-                Delete.builder()
-                    .tableName(TcgInventoryItem.TABLE_NAME)
-                    .key(
-                        Map.of(
-                            TcgInventoryItem.PK, AttributeValue.builder().s(sourceSkuPk).build(),
-                            TcgInventoryItem.SK, AttributeValue.builder().s(unitSk).build()))
-                    .conditionExpression("#status = :inStock")
-                    .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
-                    .expressionAttributeValues(
-                        Map.of(":inStock", AttributeValue.builder().s("in_stock").build()))
-                    .build())
-            .build();
-
-    var newUnitItem = new HashMap<String, AttributeValue>();
-    newUnitItem.put(TcgInventoryItem.PK, AttributeValue.builder().s(targetSkuPk).build());
-    newUnitItem.put(TcgInventoryItem.SK, AttributeValue.builder().s(unitSk).build());
-    newUnitItem.put(
-        TcgInventoryItem.SEQUENCE_NUMBER,
-        AttributeValue.builder().n(String.valueOf(sequenceNumber)).build());
-    newUnitItem.put(TcgInventoryItem.STATUS, AttributeValue.builder().s("in_stock").build());
-    newUnitItem.put(
-        TcgInventoryItem.IMPORT_ID, AttributeValue.builder().s(unitItem.getImportId()).build());
-    newUnitItem.put(
-        TcgInventoryItem.CREATED_AT,
-        AttributeValue.builder()
-            .n(String.valueOf(unitItem.getCreatedAt().getEpochSecond()))
-            .build());
-    if (unitItem.getPhotos() != null && !unitItem.getPhotos().isEmpty()) {
-      newUnitItem.put(TcgInventoryItem.PHOTOS, Photos.toAttributeValue(unitItem.getPhotos()));
-    }
-
-    var putUnit =
-        TransactWriteItem.builder()
-            .put(Put.builder().tableName(TcgInventoryItem.TABLE_NAME).item(newUnitItem).build())
-            .build();
-
-    var sourceSkuUpdate =
-        TransactWriteItem.builder()
-            .update(
-                Update.builder()
-                    .tableName(TcgInventoryItem.TABLE_NAME)
-                    .key(
-                        Map.of(
-                            TcgInventoryItem.PK, AttributeValue.builder().s(sourceSkuPk).build(),
-                            TcgInventoryItem.SK,
-                                AttributeValue.builder().s(TcgInventoryItem.formatSkuSk()).build()))
-                    .updateExpression(
-                        "ADD "
-                            + TcgInventoryItem.VERSION
-                            + " :one"
-                            + " SET "
-                            + TcgInventoryItem.DIRTY
-                            + " = :dirty, "
-                            + TcgInventoryItem.GSI1PK
-                            + " = :gsi1pk")
-                    .expressionAttributeValues(
-                        Map.of(
-                            ":one", AttributeValue.builder().n("1").build(),
-                            ":dirty", AttributeValue.builder().bool(true).build(),
-                            ":gsi1pk",
-                                AttributeValue.builder()
-                                    .s(TcgInventoryItem.formatGsi1pk(user))
-                                    .build()))
-                    .build())
-            .build();
-
-    var targetSetExpr =
-        new StringBuilder(
-            "ADD "
-                + TcgInventoryItem.VERSION
-                + " :one"
-                + " SET "
-                + TcgInventoryItem.SKU_ID
-                + " = :skuId, "
-                + TcgInventoryItem.SCRYFALL_ID
-                + " = :scryfallId, "
-                + "#finish = :finish, "
-                + "#condition = :condition, "
-                + "#name = :cardName, "
-                + TcgInventoryItem.SET_CODE
-                + " = :setCode, "
-                + TcgInventoryItem.SET_NAME
-                + " = :setName, "
-                + TcgInventoryItem.COLLECTOR_NUMBER
-                + " = :collectorNumber, "
-                + TcgInventoryItem.DIRTY
-                + " = :dirty, "
-                + TcgInventoryItem.GSI1PK
-                + " = :gsi1pk, "
-                + TcgInventoryItem.GSI1SK
-                + " = :gsi1sk, "
-                + TcgInventoryItem.GSI2PK
-                + " = :gsi2pk, "
-                + TcgInventoryItem.GSI2SK
-                + " = :gsi2sk");
-
-    var targetValues = new HashMap<String, AttributeValue>();
-    targetValues.put(":one", AttributeValue.builder().n("1").build());
-    targetValues.put(":skuId", AttributeValue.builder().s(targetSkuId).build());
-    targetValues.put(":scryfallId", AttributeValue.builder().s(skuItem.getScryfallId()).build());
-    targetValues.put(":finish", AttributeValue.builder().s(skuItem.getFinish()).build());
-    targetValues.put(":condition", AttributeValue.builder().s(body.condition()).build());
-    targetValues.put(":cardName", AttributeValue.builder().s(skuItem.getName()).build());
-    targetValues.put(":setCode", AttributeValue.builder().s(skuItem.getSetCode()).build());
-    targetValues.put(":setName", AttributeValue.builder().s(skuItem.getSetName()).build());
-    targetValues.put(
-        ":collectorNumber", AttributeValue.builder().s(skuItem.getCollectorNumber()).build());
-    targetValues.put(":dirty", AttributeValue.builder().bool(true).build());
-    targetValues.put(
-        ":gsi1pk", AttributeValue.builder().s(TcgInventoryItem.formatGsi1pk(user)).build());
-    targetValues.put(
-        ":gsi1sk", AttributeValue.builder().s(TcgInventoryItem.formatGsi1sk(targetSkuId)).build());
-    targetValues.put(
-        ":gsi2pk", AttributeValue.builder().s(TcgInventoryItem.formatGsi2pk(user)).build());
-    targetValues.put(
-        ":gsi2sk",
-        AttributeValue.builder()
-            .s(TcgInventoryItem.formatGsi2sk(skuItem.getName().toLowerCase(), targetSkuId))
-            .build());
-
-    if (skuItem.getFetchtcgCardId() != null) {
-      targetSetExpr.append(", " + TcgInventoryItem.FETCHTCG_CARD_ID + " = :fetchtcgCardId");
-      targetValues.put(
-          ":fetchtcgCardId", AttributeValue.builder().s(skuItem.getFetchtcgCardId()).build());
-    }
-    if (skuItem.getSuggestedPrice() != null) {
-      targetSetExpr.append(", " + TcgInventoryItem.SUGGESTED_PRICE + " = :suggestedPrice");
-      targetValues.put(
-          ":suggestedPrice", AttributeValue.builder().s(skuItem.getSuggestedPrice()).build());
-    }
-
-    var targetSkuUpdate =
-        TransactWriteItem.builder()
-            .update(
-                Update.builder()
-                    .tableName(TcgInventoryItem.TABLE_NAME)
-                    .key(
-                        Map.of(
-                            TcgInventoryItem.PK, AttributeValue.builder().s(targetSkuPk).build(),
-                            TcgInventoryItem.SK,
-                                AttributeValue.builder().s(TcgInventoryItem.formatSkuSk()).build()))
-                    .updateExpression(targetSetExpr.toString())
-                    .expressionAttributeNames(
-                        Map.of(
-                            "#finish", TcgInventoryItem.FINISH,
-                            "#condition", TcgInventoryItem.CONDITION,
-                            "#name", TcgInventoryItem.NAME))
-                    .expressionAttributeValues(targetValues)
-                    .build())
-            .build();
-
-    var auditItem = new HashMap<String, AttributeValue>();
-    auditItem.put(
-        TcgInventoryItem.PK,
-        AttributeValue.builder().s(TcgInventoryItem.formatAuditPk(user)).build());
-    auditItem.put(
-        TcgInventoryItem.SK, AttributeValue.builder().s(ulidGenerator.generate()).build());
-    auditItem.put(TcgInventoryItem.EVENT_TYPE, AttributeValue.builder().s("adjustment").build());
-    auditItem.put(TcgInventoryItem.SKU_ID, AttributeValue.builder().s(skuId).build());
-    auditItem.put(
-        TcgInventoryItem.SEQUENCE_NUMBER,
-        AttributeValue.builder().n(String.valueOf(sequenceNumber)).build());
-    auditItem.put(
-        TcgInventoryItem.CREATED_AT,
-        AttributeValue.builder().n(String.valueOf(clock.now().getEpochSecond())).build());
-
-    var auditPut =
-        TransactWriteItem.builder()
-            .put(Put.builder().tableName(TcgInventoryItem.TABLE_NAME).item(auditItem).build())
-            .build();
-
-    dynamoDbClient.transactWriteItems(
-        TransactWriteItemsRequest.builder()
-            .transactItems(List.of(deleteUnit, putUnit, sourceSkuUpdate, targetSkuUpdate, auditPut))
-            .build());
+    var targetSkuId =
+        tcgInventoryItemRepository.updateUnitCondition(user, skuItem, unitItem, body.condition());
 
     return httpResponseFactory.ok(new UpdateUnitResponse(targetSkuId));
   }
