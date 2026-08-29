@@ -9,7 +9,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.time.Clock;
-import com.jordansimsmith.ulid.UlidGenerator;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -21,15 +20,6 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import software.amazon.awssdk.services.dynamodb.model.Put;
-import software.amazon.awssdk.services.dynamodb.model.ReturnValuesOnConditionCheckFailure;
-import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
-import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
-import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
-import software.amazon.awssdk.services.dynamodb.model.Update;
-import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 public class ConfirmImportHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
@@ -59,8 +49,7 @@ public class ConfirmImportHandler
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
-  private final DynamoDbClient dynamoDbClient;
-  private final UlidGenerator ulidGenerator;
+  private final TcgInventoryItemRepository tcgInventoryItemRepository;
 
   public ConfirmImportHandler() {
     this(TcgInventoryFactory.create());
@@ -72,8 +61,7 @@ public class ConfirmImportHandler
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.tcgInventoryTable = factory.tcgInventoryTable();
-    this.dynamoDbClient = factory.dynamoDbClient();
-    this.ulidGenerator = factory.ulidGenerator();
+    this.tcgInventoryItemRepository = factory.tcgInventoryItemRepository();
   }
 
   @Override
@@ -195,25 +183,7 @@ public class ConfirmImportHandler
           .orElse(0);
     }
 
-    var response =
-        dynamoDbClient.updateItem(
-            UpdateItemRequest.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
-                .key(
-                    Map.of(
-                        TcgInventoryItem.PK,
-                        AttributeValue.builder().s(TcgInventoryItem.formatUserPk(user)).build(),
-                        TcgInventoryItem.SK,
-                        AttributeValue.builder().s(TcgInventoryItem.formatCounterSk()).build()))
-                .updateExpression("ADD " + TcgInventoryItem.NEXT_SEQUENCE_NUMBER + " :n")
-                .expressionAttributeValues(
-                    Map.of(":n", AttributeValue.builder().n(String.valueOf(keepCount)).build()))
-                .returnValues("ALL_NEW")
-                .build());
-
-    int newValue =
-        Integer.parseInt(response.attributes().get(TcgInventoryItem.NEXT_SEQUENCE_NUMBER).n());
-    return newValue - keepCount;
+    return tcgInventoryItemRepository.allocateSequenceRange(user, keepCount);
   }
 
   private void assignSequenceNumbers(List<TcgInventoryItem> keepRows, int firstSeq) {
@@ -240,156 +210,34 @@ public class ConfirmImportHandler
 
   private void confirmSkuChunk(
       String user, String importId, String skuId, List<TcgInventoryItem> rows) {
-    var transactItems = new ArrayList<TransactWriteItem>();
-
-    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
     var firstRow = rows.get(0);
+    var skuSeed =
+        TcgInventoryItem.createSku(
+            user,
+            skuId,
+            firstRow.getScryfallId(),
+            firstRow.getFinish(),
+            firstRow.getCondition(),
+            firstRow.getName(),
+            firstRow.getSetCode(),
+            firstRow.getSetName(),
+            firstRow.getCollectorNumber(),
+            firstRow.getFetchtcgCardId(),
+            firstRow.getSuggestedPrice());
+    skuSeed.setFetchtcgSetId(firstRow.getFetchtcgSetId());
 
+    var units = new ArrayList<TcgInventoryItem>();
     for (var row : rows) {
-      var unitItem = new HashMap<String, AttributeValue>();
-      unitItem.put(TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build());
-      unitItem.put(
-          TcgInventoryItem.SK,
-          AttributeValue.builder()
-              .s(TcgInventoryItem.formatUnitSk(row.getSequenceNumber()))
-              .build());
-      unitItem.put(
-          TcgInventoryItem.SEQUENCE_NUMBER,
-          AttributeValue.builder().n(String.valueOf(row.getSequenceNumber())).build());
-      unitItem.put(TcgInventoryItem.STATUS, AttributeValue.builder().s("in_stock").build());
-      unitItem.put(TcgInventoryItem.IMPORT_ID, AttributeValue.builder().s(importId).build());
-      unitItem.put(
-          TcgInventoryItem.CREATED_AT,
-          AttributeValue.builder().n(String.valueOf(clock.now().getEpochSecond())).build());
+      var unit =
+          TcgInventoryItem.createUnit(
+              user, skuId, row.getSequenceNumber(), "in_stock", importId, clock.now());
       if (row.getPhotos() != null && !row.getPhotos().isEmpty()) {
-        unitItem.put(TcgInventoryItem.PHOTOS, Photos.toAttributeValue(row.getPhotos()));
+        unit.setPhotos(row.getPhotos());
       }
-
-      transactItems.add(
-          TransactWriteItem.builder()
-              .put(
-                  Put.builder()
-                      .tableName(TcgInventoryItem.TABLE_NAME)
-                      .item(unitItem)
-                      .conditionExpression("attribute_not_exists(pk)")
-                      .returnValuesOnConditionCheckFailure(ReturnValuesOnConditionCheckFailure.NONE)
-                      .build())
-              .build());
+      units.add(unit);
     }
 
-    var skuUpdate =
-        TransactWriteItem.builder()
-            .update(
-                Update.builder()
-                    .tableName(TcgInventoryItem.TABLE_NAME)
-                    .key(
-                        Map.of(
-                            TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build(),
-                            TcgInventoryItem.SK,
-                                AttributeValue.builder().s(TcgInventoryItem.formatSkuSk()).build()))
-                    .updateExpression(buildSkuUpdateExpression(firstRow))
-                    .expressionAttributeNames(
-                        Map.of(
-                            "#finish", TcgInventoryItem.FINISH,
-                            "#condition", TcgInventoryItem.CONDITION,
-                            "#name", TcgInventoryItem.NAME))
-                    .expressionAttributeValues(buildSkuUpdateValues(user, skuId, firstRow))
-                    .build())
-            .build();
-    transactItems.add(skuUpdate);
-
-    var auditItem = new HashMap<String, AttributeValue>();
-    auditItem.put(
-        TcgInventoryItem.PK,
-        AttributeValue.builder().s(TcgInventoryItem.formatAuditPk(user)).build());
-    auditItem.put(
-        TcgInventoryItem.SK, AttributeValue.builder().s(ulidGenerator.generate()).build());
-    auditItem.put(
-        TcgInventoryItem.EVENT_TYPE, AttributeValue.builder().s("import_confirm").build());
-    auditItem.put(TcgInventoryItem.IMPORT_ID, AttributeValue.builder().s(importId).build());
-    auditItem.put(TcgInventoryItem.SKU_ID, AttributeValue.builder().s(skuId).build());
-    auditItem.put(
-        TcgInventoryItem.CREATED_AT,
-        AttributeValue.builder().n(String.valueOf(clock.now().getEpochSecond())).build());
-
-    transactItems.add(
-        TransactWriteItem.builder()
-            .put(Put.builder().tableName(TcgInventoryItem.TABLE_NAME).item(auditItem).build())
-            .build());
-
-    try {
-      dynamoDbClient.transactWriteItems(
-          TransactWriteItemsRequest.builder().transactItems(transactItems).build());
-    } catch (TransactionCanceledException e) {
-      LOGGER.info("transaction cancelled for SKU chunk {} (likely replay)", skuId);
-    }
-  }
-
-  private String buildSkuUpdateExpression(TcgInventoryItem firstRow) {
-    var sb = new StringBuilder();
-    sb.append("ADD ").append(TcgInventoryItem.VERSION).append(" :one");
-    sb.append(" SET ");
-    sb.append(TcgInventoryItem.SKU_ID).append(" = :skuId, ");
-    sb.append(TcgInventoryItem.SCRYFALL_ID).append(" = :scryfallId, ");
-    sb.append("#finish = :finish, ");
-    sb.append("#condition = :condition, ");
-    sb.append("#name = :cardName, ");
-    sb.append(TcgInventoryItem.SET_CODE).append(" = :setCode, ");
-    sb.append(TcgInventoryItem.SET_NAME).append(" = :setName, ");
-    sb.append(TcgInventoryItem.COLLECTOR_NUMBER).append(" = :collectorNumber, ");
-    if (firstRow.getSuggestedPrice() != null) {
-      sb.append(TcgInventoryItem.SUGGESTED_PRICE).append(" = :suggestedPrice, ");
-    }
-    if (firstRow.getFetchtcgCardId() != null) {
-      sb.append(TcgInventoryItem.FETCHTCG_CARD_ID).append(" = :fetchtcgCardId, ");
-    }
-    if (firstRow.getFetchtcgSetId() != null) {
-      sb.append(TcgInventoryItem.FETCHTCG_SET_ID).append(" = :fetchtcgSetId, ");
-    }
-    sb.append(TcgInventoryItem.DIRTY).append(" = :dirty, ");
-    sb.append(TcgInventoryItem.GSI1PK).append(" = :gsi1pk, ");
-    sb.append(TcgInventoryItem.GSI1SK).append(" = :gsi1sk, ");
-    sb.append(TcgInventoryItem.GSI2PK).append(" = :gsi2pk, ");
-    sb.append(TcgInventoryItem.GSI2SK).append(" = :gsi2sk");
-    return sb.toString();
-  }
-
-  private Map<String, AttributeValue> buildSkuUpdateValues(
-      String user, String skuId, TcgInventoryItem firstRow) {
-    var values = new HashMap<String, AttributeValue>();
-    values.put(":one", AttributeValue.builder().n("1").build());
-    values.put(":skuId", AttributeValue.builder().s(skuId).build());
-    values.put(":scryfallId", AttributeValue.builder().s(firstRow.getScryfallId()).build());
-    values.put(":finish", AttributeValue.builder().s(firstRow.getFinish()).build());
-    values.put(":condition", AttributeValue.builder().s(firstRow.getCondition()).build());
-    values.put(":cardName", AttributeValue.builder().s(firstRow.getName()).build());
-    values.put(":setCode", AttributeValue.builder().s(firstRow.getSetCode()).build());
-    values.put(":setName", AttributeValue.builder().s(firstRow.getSetName()).build());
-    values.put(
-        ":collectorNumber", AttributeValue.builder().s(firstRow.getCollectorNumber()).build());
-    if (firstRow.getSuggestedPrice() != null) {
-      values.put(
-          ":suggestedPrice", AttributeValue.builder().s(firstRow.getSuggestedPrice()).build());
-    }
-    if (firstRow.getFetchtcgCardId() != null) {
-      values.put(
-          ":fetchtcgCardId", AttributeValue.builder().s(firstRow.getFetchtcgCardId()).build());
-    }
-    if (firstRow.getFetchtcgSetId() != null) {
-      values.put(
-          ":fetchtcgSetId",
-          AttributeValue.builder().n(String.valueOf(firstRow.getFetchtcgSetId())).build());
-    }
-    values.put(":dirty", AttributeValue.builder().bool(true).build());
-    values.put(":gsi1pk", AttributeValue.builder().s(TcgInventoryItem.formatGsi1pk(user)).build());
-    values.put(":gsi1sk", AttributeValue.builder().s(TcgInventoryItem.formatGsi1sk(skuId)).build());
-    values.put(":gsi2pk", AttributeValue.builder().s(TcgInventoryItem.formatGsi2pk(user)).build());
-    values.put(
-        ":gsi2sk",
-        AttributeValue.builder()
-            .s(TcgInventoryItem.formatGsi2sk(firstRow.getName().toLowerCase(), skuId))
-            .build());
-    return values;
+    tcgInventoryItemRepository.confirmImportSku(user, importId, skuSeed, units);
   }
 
   private List<PlacementInstruction> buildPlacementInstructions(List<TcgInventoryItem> keepRows) {

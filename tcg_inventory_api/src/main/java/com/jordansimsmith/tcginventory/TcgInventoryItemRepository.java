@@ -7,6 +7,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
@@ -15,11 +17,16 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.Delete;
 import software.amazon.awssdk.services.dynamodb.model.Put;
+import software.amazon.awssdk.services.dynamodb.model.ReturnValuesOnConditionCheckFailure;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
+import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 import software.amazon.awssdk.services.dynamodb.model.Update;
+import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 public class TcgInventoryItemRepository {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TcgInventoryItemRepository.class);
+
   private static final int MAX_TRANSACT_ITEMS = 100;
 
   public record SkuUnits(String skuId, List<Integer> sequenceNumbers) {}
@@ -197,6 +204,64 @@ public class TcgInventoryItemRepository {
                         .build()))));
 
     return targetSkuId;
+  }
+
+  public int allocateSequenceRange(String user, int count) {
+    var response =
+        dynamoDbClient.updateItem(
+            UpdateItemRequest.builder()
+                .tableName(TcgInventoryItem.TABLE_NAME)
+                .key(
+                    Map.of(
+                        TcgInventoryItem.PK,
+                        AttributeValue.builder().s(TcgInventoryItem.formatUserPk(user)).build(),
+                        TcgInventoryItem.SK,
+                        AttributeValue.builder().s(TcgInventoryItem.formatCounterSk()).build()))
+                .updateExpression("ADD " + TcgInventoryItem.NEXT_SEQUENCE_NUMBER + " :n")
+                .expressionAttributeValues(
+                    Map.of(":n", AttributeValue.builder().n(String.valueOf(count)).build()))
+                .returnValues("ALL_NEW")
+                .build());
+
+    int newValue =
+        Integer.parseInt(response.attributes().get(TcgInventoryItem.NEXT_SEQUENCE_NUMBER).n());
+    return newValue - count;
+  }
+
+  // deliberately a single transaction rather than a chunked sequence: a replayed chunk fails its
+  // unit-exists condition and the whole transaction cancels atomically into a no-op
+  public void confirmImportSku(
+      String user, String importId, TcgInventoryItem skuSeed, List<TcgInventoryItem> units) {
+    var transactItems = new ArrayList<TransactWriteItem>();
+    for (var unit : units) {
+      transactItems.add(
+          TransactWriteItem.builder()
+              .put(
+                  Put.builder()
+                      .tableName(TcgInventoryItem.TABLE_NAME)
+                      .item(tcgInventoryTable.tableSchema().itemToMap(unit, true))
+                      .conditionExpression("attribute_not_exists(pk)")
+                      .returnValuesOnConditionCheckFailure(ReturnValuesOnConditionCheckFailure.NONE)
+                      .build())
+              .build());
+    }
+    transactItems.add(buildSkuUpsert(skuSeed));
+    transactItems.add(
+        buildAuditPut(
+            user,
+            "import_confirm",
+            Map.of(
+                TcgInventoryItem.IMPORT_ID,
+                AttributeValue.builder().s(importId).build(),
+                TcgInventoryItem.SKU_ID,
+                AttributeValue.builder().s(skuSeed.getSkuId()).build())));
+
+    try {
+      dynamoDbClient.transactWriteItems(
+          TransactWriteItemsRequest.builder().transactItems(transactItems).build());
+    } catch (TransactionCanceledException e) {
+      LOGGER.info("transaction cancelled for SKU chunk {} (likely replay)", skuSeed.getSkuId());
+    }
   }
 
   private void executeChunked(List<TransactWriteItem> transactItems) {
