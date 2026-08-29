@@ -95,7 +95,8 @@ public class OrderPhaseProcessor {
               && PAYMENT_ACTIONS.contains(offer.currentAction());
 
       if (paymentReceived) {
-        advanceToPickReady(order, offer);
+        tcgInventoryItemRepository.advanceOrderToPickReady(
+            user, order.getOrderId(), offer.status(), offer.currentAction());
         advancedCount++;
       }
     }
@@ -283,13 +284,5 @@ public class OrderPhaseProcessor {
             .map(entry -> new TcgInventoryItemRepository.SkuUnits(entry.getKey(), entry.getValue()))
             .toList();
     tcgInventoryItemRepository.reserveOrder(user, orderItem, skuUnits);
-  }
-
-  private void advanceToPickReady(TcgInventoryItem order, FetchTcgClient.SellerOffer offer) {
-    order.setStatus("to_pick");
-    order.setFetchtcgStatus(offer.status());
-    order.setFetchtcgCurrentAction(offer.currentAction());
-    order.setUpdatedAt(clock.now());
-    tcgInventoryTable.putItem(order);
   }
 }

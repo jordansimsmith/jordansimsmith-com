@@ -10,6 +10,7 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
@@ -31,6 +32,7 @@ public class ReportsHandlerIntegrationTest {
   private FakeClock fakeClock;
   private FakeUlidGenerator fakeUlidGenerator;
   private FakeQueueClient<JobMessage> fakeJobsQueue;
+  private FakeFetchTcgClient fakeFetchTcgClient;
   private ObjectMapper objectMapper;
   private DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
 
@@ -58,12 +60,14 @@ public class ReportsHandlerIntegrationTest {
     fakeClock = factory.fakeClock();
     fakeUlidGenerator = factory.fakeUlidGenerator();
     fakeJobsQueue = factory.fakeJobsQueue();
+    fakeFetchTcgClient = factory.fakeFetchTcgClient();
     objectMapper = factory.objectMapper();
     tcgInventoryTable = factory.tcgInventoryTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
     fakeJobsQueue.reset();
+    fakeFetchTcgClient.reset();
 
     createReportHandler = new CreateReportHandler(factory);
     getReportsHandler = new GetReportsHandler(factory);
@@ -485,6 +489,68 @@ public class ReportsHandlerIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
     assertThat(body.get("stale").asBoolean()).isTrue();
+  }
+
+  @Test
+  void getReportsShouldReturnStaleAfterOrderAdvance() throws Exception {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+
+    var auditEntry = new TcgInventoryItem();
+    auditEntry.setPk(TcgInventoryItem.formatAuditPk("jordan"));
+    auditEntry.setSk("01JEXAMPLEULID0000000000");
+    auditEntry.setEventType("reserve");
+    tcgInventoryTable.putItem(auditEntry);
+
+    var reportItem =
+        TcgInventoryItem.createReport(
+            "jordan", "{}", "01JEXAMPLEULID0000000000", Instant.ofEpochSecond(1700000000));
+    tcgInventoryTable.putItem(reportItem);
+
+    var order =
+        TcgInventoryItem.createOrder(
+            "jordan",
+            "83663",
+            "awaiting_payment",
+            "ACCEPTED",
+            null,
+            "PICKUP",
+            "3.33",
+            "[]",
+            Instant.ofEpochSecond(1699000000));
+    tcgInventoryTable.putItem(order);
+
+    fakeFetchTcgClient.seedSellerOffers(
+        List.of(
+            new FetchTcgClient.SellerOffer(
+                83663,
+                "ACCEPTED",
+                "SEND_PICKUP_ADDRESS",
+                "2026-08-11T04:42:12.476+0000",
+                "PICKUP",
+                new BigDecimal("3.33"),
+                List.of())));
+
+    tcgInventoryTable.putItem(
+        TcgInventoryItem.createJob(
+            "jordan", "publish-job", "publish", null, Instant.ofEpochSecond(1700000000)));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "publish-job", "publish"), null);
+    var response = getReportsHandler.handleRequest(buildHttpEvent("jordan"), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = objectMapper.readTree(response.getBody());
+    assertThat(body.get("stale").asBoolean()).isTrue();
+
+    var updatedOrder =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
+                .sortValue(TcgInventoryItem.formatOrderSk("83663"))
+                .build());
+    assertThat(updatedOrder.getStatus()).isEqualTo("to_pick");
   }
 
   @Test

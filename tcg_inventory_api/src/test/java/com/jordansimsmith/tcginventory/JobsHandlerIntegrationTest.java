@@ -473,6 +473,11 @@ public class JobsHandlerIntegrationTest {
     var order = getOrder("jordan", "83663");
     assertThat(order.getStatus()).isEqualTo("to_pick");
     assertThat(order.getFetchtcgCurrentAction()).isEqualTo("SEND_PICKUP_ADDRESS");
+
+    var paymentAudits =
+        getAuditEntries("jordan").stream().filter(a -> "payment".equals(a.getEventType())).toList();
+    assertThat(paymentAudits).hasSize(1);
+    assertThat(paymentAudits.get(0).getOrderId()).isEqualTo("83663");
   }
 
   @Test
@@ -500,6 +505,11 @@ public class JobsHandlerIntegrationTest {
     var order = getOrder("jordan", "91329");
     assertThat(order.getStatus()).isEqualTo("to_pick");
     assertThat(order.getFetchtcgCurrentAction()).isEqualTo("SEND_TRACKING_CODE");
+
+    var paymentAudits =
+        getAuditEntries("jordan").stream().filter(a -> "payment".equals(a.getEventType())).toList();
+    assertThat(paymentAudits).hasSize(1);
+    assertThat(paymentAudits.get(0).getOrderId()).isEqualTo("91329");
   }
 
   @Test

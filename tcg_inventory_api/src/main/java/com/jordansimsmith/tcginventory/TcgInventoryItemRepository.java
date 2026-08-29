@@ -115,6 +115,20 @@ public class TcgInventoryItemRepository {
     executeChunked(transactItems);
   }
 
+  // the status flip and its payment audit land atomically so report staleness never misses a
+  // revenue-affecting advance; replayed slices re-read orders and skip those already advanced,
+  // so a condition failure is a real conflict and fails loudly
+  public void advanceOrderToPickReady(
+      String user, String orderId, String fetchtcgStatus, String fetchtcgCurrentAction) {
+    executeChunked(
+        List.of(
+            buildOrderPickReadyUpdate(user, orderId, fetchtcgStatus, fetchtcgCurrentAction),
+            buildAuditPut(
+                user,
+                "payment",
+                Map.of(TcgInventoryItem.ORDER_ID, AttributeValue.builder().s(orderId).build()))));
+  }
+
   // the conditional order flip and the audit entry ride in the final chunk; a partially applied
   // confirm leaves the order to_pick so the client can retry, and the unit condition tolerates
   // units the failed attempt already sold
@@ -521,6 +535,44 @@ public class TcgInventoryItemRepository {
                             AttributeValue.builder().s(TcgInventoryItem.formatSkuSk()).build()))
                 .updateExpression("ADD " + TcgInventoryItem.VERSION + " :one")
                 .expressionAttributeValues(Map.of(":one", AttributeValue.builder().n("1").build()))
+                .build())
+        .build();
+  }
+
+  private TransactWriteItem buildOrderPickReadyUpdate(
+      String user, String orderId, String fetchtcgStatus, String fetchtcgCurrentAction) {
+    var userPk = TcgInventoryItem.formatUserPk(user);
+    var orderSk = TcgInventoryItem.formatOrderSk(orderId);
+
+    return TransactWriteItem.builder()
+        .update(
+            Update.builder()
+                .tableName(TcgInventoryItem.TABLE_NAME)
+                .key(
+                    Map.of(
+                        TcgInventoryItem.PK, AttributeValue.builder().s(userPk).build(),
+                        TcgInventoryItem.SK, AttributeValue.builder().s(orderSk).build()))
+                .updateExpression(
+                    "SET #status = :toPick, "
+                        + TcgInventoryItem.FETCHTCG_STATUS
+                        + " = :fetchtcgStatus, "
+                        + TcgInventoryItem.FETCHTCG_CURRENT_ACTION
+                        + " = :fetchtcgCurrentAction, "
+                        + TcgInventoryItem.UPDATED_AT
+                        + " = :now")
+                .conditionExpression("#status = :awaitingPayment")
+                .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+                .expressionAttributeValues(
+                    Map.of(
+                        ":toPick", AttributeValue.builder().s("to_pick").build(),
+                        ":awaitingPayment", AttributeValue.builder().s("awaiting_payment").build(),
+                        ":fetchtcgStatus", AttributeValue.builder().s(fetchtcgStatus).build(),
+                        ":fetchtcgCurrentAction",
+                            AttributeValue.builder().s(fetchtcgCurrentAction).build(),
+                        ":now",
+                            AttributeValue.builder()
+                                .n(String.valueOf(clock.now().getEpochSecond()))
+                                .build()))
                 .build())
         .build();
   }
