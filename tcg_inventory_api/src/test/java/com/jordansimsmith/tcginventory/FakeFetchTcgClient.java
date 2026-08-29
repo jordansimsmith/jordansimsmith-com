@@ -13,6 +13,7 @@ public class FakeFetchTcgClient implements FetchTcgClient {
   private final List<UpsertListingRequest> upsertCalls = new ArrayList<>();
   private final List<Integer> deleteCalls = new ArrayList<>();
   private final List<UploadCall> uploadCalls = new ArrayList<>();
+  private RuntimeException sellerOffersFailure;
   private int searchCallCount;
   private int nextListingId = 900000;
   private int nextImageId = 1;
@@ -48,6 +49,9 @@ public class FakeFetchTcgClient implements FetchTcgClient {
 
   @Override
   public GetSellerOffersResponse getSellerOffers(String bearerToken, int page) {
+    if (sellerOffersFailure != null) {
+      throw sellerOffersFailure;
+    }
     var response = sellerOffers.get(page);
     if (response == null) {
       return new GetSellerOffersResponse(List.of(), 0);
@@ -93,6 +97,10 @@ public class FakeFetchTcgClient implements FetchTcgClient {
     sellerOffers.put(page, response);
   }
 
+  public void seedSellerOffersFailure(RuntimeException exception) {
+    this.sellerOffersFailure = exception;
+  }
+
   public List<UpsertListingRequest> getUpsertCalls() {
     return upsertCalls;
   }
@@ -117,6 +125,7 @@ public class FakeFetchTcgClient implements FetchTcgClient {
     upsertCalls.clear();
     deleteCalls.clear();
     uploadCalls.clear();
+    sellerOffersFailure = null;
     searchCallCount = 0;
     nextListingId = 900000;
     nextImageId = 1;

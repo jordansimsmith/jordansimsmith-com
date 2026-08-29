@@ -175,9 +175,8 @@ describe('PublishWidget', () => {
     renderPublishWidget();
     await act(async () => {});
 
-    expect(
-      screen.getByText('Publish failed: FetchTCG authentication failed'),
-    ).toBeDefined();
+    expect(screen.getByText('Publish failed')).toBeDefined();
+    expect(screen.getByText('FetchTCG authentication failed')).toBeDefined();
     expect(publishButton()?.disabled).toBe(false);
 
     await act(async () => {

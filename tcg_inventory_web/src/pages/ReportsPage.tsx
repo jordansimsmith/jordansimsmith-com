@@ -16,6 +16,7 @@ import { BarChart, LineChart } from '@mantine/charts';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { AppShellLayout } from '../layouts/AppShellLayout';
+import { JobFailureAlert } from '../components/JobFailureAlert';
 import { apiClient } from '../api/client';
 import type {
   ReportAgingBand,
@@ -566,9 +567,11 @@ export function ReportsPage() {
         </Group>
 
         {report?.generation?.status === 'failed' && (
-          <Text c="red">
-            Report generation failed: {report.generation.error}
-          </Text>
+          <JobFailureAlert
+            title="Report generation failed"
+            error={report.generation.error}
+            maw={480}
+          />
         )}
 
         {firstVisit && (

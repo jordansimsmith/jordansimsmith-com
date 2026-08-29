@@ -15,6 +15,7 @@ import software.amazon.awssdk.enhanced.dynamodb.Key;
 public class JobsHandler implements RequestHandler<SQSEvent, Void> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(JobsHandler.class);
+  private static final int MAX_ERROR_LENGTH = 300;
 
   private final ObjectMapper objectMapper;
   private final Clock clock;
@@ -105,16 +106,39 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
       processBatch(message, jobItem);
     } catch (Exception e) {
       LOGGER.error("job processing failed: {}", message.jobId(), e);
+      var error = summarizeError(e);
       jobItem.setStatus("failed");
-      jobItem.setError(e.getMessage());
+      jobItem.setError(error);
       jobItem.setUpdatedAt(clock.now());
       tcgInventoryTable.putItem(jobItem);
 
       if ("appraise".equals(message.jobType()) && jobItem.getImportId() != null) {
-        setImportError(message.user(), jobItem.getImportId(), e.getMessage());
+        setImportError(message.user(), jobItem.getImportId(), error);
       }
       return;
     }
+  }
+
+  // the full exception is already in the logs; store a short actionable summary for the ui
+  private String summarizeError(Exception e) {
+    for (Throwable t = e; t != null; t = t.getCause()) {
+      if (t instanceof FetchTcgAuthException) {
+        return "FetchTCG authentication failed. Replace the refresh token in settings.";
+      }
+    }
+
+    Throwable rootCause = e;
+    while (rootCause.getCause() != null) {
+      rootCause = rootCause.getCause();
+    }
+    var errorMessage =
+        rootCause.getMessage() != null
+            ? rootCause.getMessage()
+            : rootCause.getClass().getSimpleName();
+    if (errorMessage.length() > MAX_ERROR_LENGTH) {
+      return errorMessage.substring(0, MAX_ERROR_LENGTH) + "…";
+    }
+    return errorMessage;
   }
 
   private void processBatch(JobMessage message, TcgInventoryItem jobItem) {

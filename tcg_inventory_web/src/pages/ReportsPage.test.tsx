@@ -420,8 +420,7 @@ describe('ReportsPage', () => {
     renderReportsPage();
     await act(async () => {});
 
-    expect(
-      screen.getByText(/Report generation failed: DynamoDB timeout/),
-    ).toBeDefined();
+    expect(screen.getByText('Report generation failed')).toBeDefined();
+    expect(screen.getByText('DynamoDB timeout')).toBeDefined();
   });
 });

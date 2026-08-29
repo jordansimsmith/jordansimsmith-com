@@ -31,6 +31,7 @@ The TCG inventory web service is a keyboard-first single-page app for running a 
 - Inventory: dense SKU table with counts, prefix search, SKU detail with the Scryfall card image, units, derived locations, and per-unit photo thumbnails (view-only), and manual adjustments (remove unit, change condition).
 - Orders: list and detail with state badges, offer lines on detail with an above/below-list badge when the offered price differs from list, location-ordered pull sheet optimized for one-handed phone use, confirm-pull action.
 - Publish widget (no dedicated jobs page): trigger a publish run, show the pending publish count (SKUs with unpublished inventory changes), and poll/render the current-or-latest run's progress and outcome. Appraisal progress and errors render on the import pages.
+- Job failure reporting: failed publish runs, appraisals, and report generations render a compact alert with the failure title and the backend's short actionable error message; full diagnostics stay in backend logs, never in the UI.
 - Reports tab: renders the latest generated report — headline totals strip, monthly revenue, weekly intake vs sales, top sets, price buckets, top hits table, and aging bands — under a "data as of" stamp. Regeneration is automatic and background-only: when the response says stale (checked on navigation and window refocus), the page triggers a new generation and polls until fresh figures swap in place; the first-ever visit shows skeletons while the first generation runs.
 - Settings: set or replace the FetchTCG refresh token (display presence and last-updated only); configure the "Track orders after" date to exclude pre-existing FetchTCG orders from tracking.
 - Vim-style keyboard navigation across all data views.
@@ -93,6 +94,7 @@ sequenceDiagram
 - Keep server state in page-level React state fed by the `ApiClient`; no global cache library.
 - Photo uploads are processed client-side before the API: a canvas re-encode to JPEG (max edge 2000 px, quality 0.85) normalizes iPhone HEIC and library picks, strips EXIF (including GPS), and keeps raw `image/jpeg` bodies far under Lambda's payload ceiling — no multipart, no presigned upload choreography.
 - Cross-device capture needs no live sync: the desktop review page refetches the import on window refocus (the reports pattern), so photos added from the phone appear when the user glances back.
+- Error surfaces split into two classes: transient request errors (short API `{"message"}` strings) surface as toasts or inline text, while persistent job failures use one shared failure alert component that renders the API's short error summary with defensive single-line truncation; deep diagnostics belong to backend logs rather than shipping to the browser.
 
 ## Domain glossary
 
@@ -160,7 +162,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 - The confirm 409 while rows still need photos surfaces the API message; the confirm button is disabled client-side with the same reason.
 - Unit `photos` on SKU detail are read-only; no management affordances render at any status.
 - Locations render from sequence numbers exactly as the backend provides them (`A42-42`); the client never re-derives them.
-- The reports tab renders `GET /reports` figures exactly as provided — buckets, bands, labels, and money strings are pre-shaped server-side. A 404 means no report exists yet: the page triggers `POST /reports` and shows skeletons until the first snapshot lands. When `stale` is true and no generation is queued or running, the page triggers `POST /reports` and polls `GET /reports` every ~2 seconds, keeping the old figures visible with a subtle refreshing indicator until fresh figures swap in place. Generation failures render inline (like the publish widget) while the stale figures remain visible.
+- The reports tab renders `GET /reports` figures exactly as provided — buckets, bands, labels, and money strings are pre-shaped server-side. A 404 means no report exists yet: the page triggers `POST /reports` and shows skeletons until the first snapshot lands. When `stale` is true and no generation is queued or running, the page triggers `POST /reports` and polls `GET /reports` every ~2 seconds, keeping the old figures visible with a subtle refreshing indicator until fresh figures swap in place. Generation failures render the shared job-failure alert while the stale figures remain visible.
 
 ## Data and storage contracts
 
@@ -228,7 +230,7 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 ## Testing and quality gates
 
 - Unit and component tests run with Vitest and React Testing Library in `jsdom`.
-- Key coverage: login and route protection, the vim navigation hook (movement, jumps, search focus), SKU detail adjustments (remove unit, condition change), import review rendering and the confirm transition, pull-sheet ordering and confirm flow, offered-vs-listed badges on order detail (above/below only; omitted at list and when the listed baseline is missing), publish trigger + job polling, masked credential form, reports tab rendering of every section from the fake client, the stale→regenerate→poll flow with figures kept visible, first-visit skeleton generation, the needs-photos badge and gated confirm, photo strip interactions (add via the canvas util, remove), refocus refetch of in-review imports, and read-only unit photo thumbnails.
+- Key coverage: login and route protection, the vim navigation hook (movement, jumps, search focus), SKU detail adjustments (remove unit, condition change), import review rendering and the confirm transition, pull-sheet ordering and confirm flow, offered-vs-listed badges on order detail (above/below only; omitted at list and when the listed baseline is missing), publish trigger + job polling, the job-failure alert, masked credential form, reports tab rendering of every section from the fake client, the stale→regenerate→poll flow with figures kept visible, first-visit skeleton generation, the needs-photos badge and gated confirm, photo strip interactions (add via the canvas util, remove), refocus refetch of in-review imports, and read-only unit photo thumbnails.
 - Required checks: `bazel test //tcg_inventory_web:unit-tests`, `bazel build //tcg_inventory_web:typecheck`, `bazel build //tcg_inventory_web:build`.
 
 ## Local development and smoke checks

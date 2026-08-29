@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Alert,
   Badge,
   Button,
   Group,
@@ -14,6 +13,7 @@ import { notifications } from '@mantine/notifications';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { ImportStatusBadge } from '../components/ImportStatusBadge';
+import { JobFailureAlert } from '../components/JobFailureAlert';
 import { ImportReviewTable } from '../components/ImportReviewTable';
 import { ConfirmImportModal } from '../components/ConfirmImportModal';
 import { DeleteImportModal } from '../components/DeleteImportModal';
@@ -294,9 +294,11 @@ export function ImportDetailPage() {
               </Group>
             </Stack>
             {importDetail.appraisal_error && (
-              <Alert color="red" title="Appraisal failed" maw={480}>
-                {importDetail.appraisal_error}
-              </Alert>
+              <JobFailureAlert
+                title="Appraisal failed"
+                error={importDetail.appraisal_error}
+                maw={480}
+              />
             )}
             {!importDetail.appraisal_error &&
               importDetail.status === 'appraising' && (

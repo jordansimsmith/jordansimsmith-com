@@ -3,6 +3,7 @@ import { Badge, Button, Group, Progress, Stack, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { apiClient } from '../api/client';
 import type { PublishResponse } from '../api/client';
+import { JobFailureAlert } from './JobFailureAlert';
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -85,9 +86,11 @@ export function PublishWidget() {
           </Text>
         )}
       {!runActive && publish?.status === 'failed' && (
-        <Text size="sm" c="red" maw={360}>
-          Publish failed: {publish.error}
-        </Text>
+        <JobFailureAlert
+          title="Publish failed"
+          error={publish.error}
+          maw={420}
+        />
       )}
       {error && (
         <Text size="sm" c="red">
