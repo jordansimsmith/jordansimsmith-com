@@ -68,6 +68,7 @@ describe('ImportsPage', () => {
     vi.clearAllMocks();
     vi.spyOn(clientModule.apiClient, 'findImports').mockResolvedValue({
       imports: importFixtures,
+      next_continuation: null,
     });
     vi.spyOn(clientModule.apiClient, 'createImport').mockResolvedValue({
       ...importFixtures[0],
@@ -100,6 +101,7 @@ describe('ImportsPage', () => {
   it('shows an empty state when there are no imports', async () => {
     vi.spyOn(clientModule.apiClient, 'findImports').mockResolvedValue({
       imports: [],
+      next_continuation: null,
     });
 
     renderImportsPage();
@@ -166,5 +168,36 @@ describe('ImportsPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Import detail import-2')).toBeDefined();
     });
+  });
+
+  it('appends the next page when load more is clicked', async () => {
+    const nextPage: ImportSummary = {
+      import_id: 'import-0',
+      filename: 'manabox-older.csv',
+      status: 'confirmed',
+      row_count: 12,
+      appraisal_error: null,
+      created_at: 1764211332,
+    };
+    vi.spyOn(clientModule.apiClient, 'findImports').mockImplementation(
+      async (params) => {
+        if (params?.continuation === 'page-2') {
+          return { imports: [nextPage], next_continuation: null };
+        }
+        return { imports: importFixtures, next_continuation: 'page-2' };
+      },
+    );
+    const user = userEvent.setup();
+    renderImportsPage();
+    await screen.findByText('manabox-today.csv');
+    expect(screen.queryByText('manabox-older.csv')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Load more' }));
+
+    expect(await screen.findByText('manabox-older.csv')).toBeDefined();
+    expect(clientModule.apiClient.findImports).toHaveBeenLastCalledWith({
+      continuation: 'page-2',
+    });
+    expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
   });
 });

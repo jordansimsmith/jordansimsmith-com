@@ -221,6 +221,50 @@ public class ImportsHandlerIntegrationTest {
     assertThat(imports).hasSize(2);
     assertThat(imports.get(0).get("filename").asText()).isEqualTo("second.csv");
     assertThat(imports.get(1).get("filename").asText()).isEqualTo("first.csv");
+    assertThat(body.get("next_continuation").isNull()).isTrue();
+  }
+
+  @Test
+  void findImportsShouldSupportContinuationPaging() throws Exception {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createImportHandler.handleRequest(
+        buildCreateEvent("jordan", buildSingleCardCsv(), "first.csv"), null);
+
+    fakeClock.setTime(Instant.ofEpochSecond(1700001000));
+    createImportHandler.handleRequest(
+        buildCreateEvent("jordan", buildSingleCardCsv(), "second.csv"), null);
+
+    fakeClock.setTime(Instant.ofEpochSecond(1700002000));
+    createImportHandler.handleRequest(
+        buildCreateEvent("jordan", buildSingleCardCsv(), "third.csv"), null);
+
+    // act - first page
+    var response1 =
+        findImportsHandler.handleRequest(
+            buildEventWithQuery("jordan", Map.of(), Map.of("limit", "2")), null);
+
+    // assert - first page
+    assertThat(response1.getStatusCode()).isEqualTo(200);
+    var body1 = objectMapper.readTree(response1.getBody());
+    assertThat(body1.get("imports")).hasSize(2);
+    assertThat(body1.get("imports").get(0).get("filename").asText()).isEqualTo("third.csv");
+    assertThat(body1.get("imports").get(1).get("filename").asText()).isEqualTo("second.csv");
+    var continuation = body1.get("next_continuation").asText();
+    assertThat(continuation).isNotNull();
+    assertThat(continuation).isNotEmpty();
+
+    // act - second page
+    var response2 =
+        findImportsHandler.handleRequest(
+            buildEventWithQuery("jordan", Map.of(), Map.of("continuation", continuation)), null);
+
+    // assert - second page
+    assertThat(response2.getStatusCode()).isEqualTo(200);
+    var body2 = objectMapper.readTree(response2.getBody());
+    assertThat(body2.get("imports")).hasSize(1);
+    assertThat(body2.get("imports").get(0).get("filename").asText()).isEqualTo("first.csv");
+    assertThat(body2.get("next_continuation").isNull()).isTrue();
   }
 
   @Test
@@ -401,6 +445,19 @@ public class ImportsHandlerIntegrationTest {
             + Base64.getEncoder()
                 .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     return APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
+  }
+
+  private APIGatewayV2HTTPEvent buildEventWithQuery(
+      String user, Map<String, String> pathParams, Map<String, String> queryParams) {
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
+    return APIGatewayV2HTTPEvent.builder()
+        .withHeaders(Map.of("Authorization", authHeader))
+        .withPathParameters(pathParams)
+        .withQueryStringParameters(queryParams)
+        .build();
   }
 
   private APIGatewayV2HTTPEvent buildEventWithPathParam(

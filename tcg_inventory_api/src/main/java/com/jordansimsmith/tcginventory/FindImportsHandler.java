@@ -5,7 +5,9 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.jordansimsmith.dynamodb.Continuations;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import java.util.List;
@@ -21,6 +23,7 @@ public class FindImportsHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FindImportsHandler.class);
+  private static final int DEFAULT_LIMIT = 20;
 
   record ImportSummary(
       @JsonProperty("import_id") String importId,
@@ -30,11 +33,14 @@ public class FindImportsHandler
       @JsonProperty("appraisal_error") @Nullable String appraisalError,
       @JsonProperty("created_at") long createdAt) {}
 
-  record FindImportsResponse(@JsonProperty("imports") List<ImportSummary> imports) {}
+  record FindImportsResponse(
+      @JsonProperty("imports") List<ImportSummary> imports,
+      @JsonProperty("next_continuation") @Nullable String nextContinuation) {}
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final ObjectMapper objectMapper;
 
   public FindImportsHandler() {
     this(TcgInventoryFactory.create());
@@ -45,6 +51,7 @@ public class FindImportsHandler
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.objectMapper = factory.objectMapper();
   }
 
   @Override
@@ -60,6 +67,11 @@ public class FindImportsHandler
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
     var user = requestContextFactory.createCtx(event).user();
 
+    var queryParams = event.getQueryStringParameters();
+    var continuation = queryParams != null ? queryParams.get("continuation") : null;
+    var limitParam = queryParams != null ? queryParams.get("limit") : null;
+    int limit = limitParam != null ? Integer.parseInt(limitParam) : DEFAULT_LIMIT;
+
     var queryConditional =
         QueryConditional.sortBeginsWith(
             Key.builder()
@@ -67,19 +79,34 @@ public class FindImportsHandler
                 .sortValue(TcgInventoryItem.IMPORT_PREFIX)
                 .build());
 
-    var request =
+    var requestBuilder =
         QueryEnhancedRequest.builder()
             .queryConditional(queryConditional)
             .scanIndexForward(false)
-            .build();
+            .limit(limit);
 
-    var imports =
-        tcgInventoryTable.query(request).stream()
-            .flatMap(page -> page.items().stream())
-            .map(FindImportsHandler::toSummary)
-            .toList();
+    if (continuation != null && !continuation.isEmpty()) {
+      var exclusiveStartKey = Continuations.decode(continuation, objectMapper);
+      if (exclusiveStartKey != null) {
+        requestBuilder.exclusiveStartKey(exclusiveStartKey);
+      }
+    }
 
-    return httpResponseFactory.ok(new FindImportsResponse(imports));
+    var page = tcgInventoryTable.query(requestBuilder.build()).stream().findFirst().orElse(null);
+
+    if (page == null) {
+      return httpResponseFactory.ok(new FindImportsResponse(List.of(), null));
+    }
+
+    var imports = page.items().stream().map(FindImportsHandler::toSummary).toList();
+
+    var lastEvaluatedKey = page.lastEvaluatedKey();
+    String nextContinuation = null;
+    if (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty()) {
+      nextContinuation = Continuations.encode(lastEvaluatedKey, objectMapper);
+    }
+
+    return httpResponseFactory.ok(new FindImportsResponse(imports, nextContinuation));
   }
 
   static ImportSummary toSummary(TcgInventoryItem item) {

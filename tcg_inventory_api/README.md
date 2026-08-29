@@ -166,7 +166,7 @@ sequenceDiagram
 | Method   | Path                                                     | Purpose                                                                                |
 | -------- | -------------------------------------------------------- | -------------------------------------------------------------------------------------- |
 | `POST`   | `/imports`                                               | upload a ManaBox CSV; starts the appraise job                                          |
-| `GET`    | `/imports`                                               | list imports newest-first                                                              |
+| `GET`    | `/imports`                                               | list imports newest-first (continuation paging)                                        |
 | `GET`    | `/imports/{import_id}`                                   | import status, progress, and rows                                                      |
 | `PUT`    | `/imports/{import_id}/rows/{position}`                   | update a row's condition before confirm                                                |
 | `DELETE` | `/imports/{import_id}/rows/{position}`                   | delete a misidentified row before confirm                                              |
@@ -189,6 +189,10 @@ sequenceDiagram
 | `PATCH`  | `/settings`                                              | partial update: optional refresh token + optional track orders after                   |
 
 ### Example request and response
+
+`GET /imports`
+
+Query parameters: optional `continuation` (opaque token from a previous page) and `limit` (default 20). Response is `{ "imports": [...], "next_continuation": "<token>" | null }` newest-first; `next_continuation` is null on the last page.
 
 `POST /imports/{import_id}/confirm`
 
@@ -540,7 +544,7 @@ All mutations are `TransactWriteItems` including their audit entry; every mutati
 | ---------------- | -------------------------------- | ------------------------------------------- | ---------------------- |
 | `JOBS_QUEUE_URL` | yes (trigger + consumer Lambdas) | SQS queue for job and continuation messages | none; set by Terraform |
 
-Fixed configuration lives in code: request spacing 1–2 s, bounded retries, request budgets, page sizes, slice sizes (~100 rows per appraise slice, ~100 dirty SKUs per publish listing slice), country `NZ`, currency `NZD`, keep threshold NZ$0.25, price increment NZ$0.05, seller floor NZ$0.25. Photo constants: import gate NZ$20, publish warning NZ$50, 5 photos per row/unit, 4 MB max upload, 15-minute presign TTL. Report constants: staleness backstop 24 h, bucketing timezone `Pacific/Auckland`, price buckets $0.25–$0.50 / $0.50–$1 / $1–$2 / $2–$5 / $5–$10 / $10+ NZD, aging bands 0–30 / 31–90 / 91–180 / 180+ days, top sets 10, top hits 10.
+Fixed configuration lives in code: request spacing 1–2 s, bounded retries, request budgets, list page size 20, slice sizes (~100 rows per appraise slice, ~100 dirty SKUs per publish listing slice), country `NZ`, currency `NZD`, keep threshold NZ$0.25, price increment NZ$0.05, seller floor NZ$0.25. Photo constants: import gate NZ$20, publish warning NZ$50, 5 photos per row/unit, 4 MB max upload, 15-minute presign TTL. Report constants: staleness backstop 24 h, bucketing timezone `Pacific/Auckland`, price buckets $0.25–$0.50 / $0.50–$1 / $1–$2 / $2–$5 / $5–$10 / $10+ NZD, aging bands 0–30 / 31–90 / 91–180 / 180+ days, top sets 10, top hits 10.
 
 ### Secret shape
 
@@ -568,7 +572,7 @@ Rotated refresh tokens returned by Firebase are written back to the same key.
 ## Testing and quality gates
 
 - Unit tests: pricing policy scenarios (keep filter, undercut tick, deep-discount guard, supported floor, sole-source premium, rounding, floor), condition translation, set mapping, sequence/block/location derivation, FetchTCG client pacing/retries/allowlist/fail-closed auth/delete-of-missing-listing tolerance with fixture responses (including seller-offer `listedPrice` and card `externalReferences.scryfallId` parsing), offer state mapping, report aggregation (price fallback chain, bucket and band edges, NZ-timezone bucketing, top-hits ordering and tie-break, paid-order filter, shipping excluded from revenue, removed-unit exclusion), report staleness comparison (as-of audit ULID and 24 h backstop), image-state projection (object shape, omission and replace rules, NZ$50 warning), and FetchTCG multipart upload encoding.
-- Integration tests (DynamoDB Testcontainers, LocalStack SQS): import upload→rows, appraisal identity verification (variant printings resolve by Scryfall ID, unverified candidates fall through to review), confirm idempotency and double-confirm rejection, adjustments, reserve/release/sell transitions, chunked reserve and sell for orders past the 100-item transaction cap, crashed-reserve reclaim convergence, publish create/update/delist and conditional clear, publish checkpointing and continuation across listing slices, duplicate-delivery no-ops, masked credential handling, report job snapshot writes, `GET /reports` staleness transitions, `POST /reports` idempotency while active, row photo CRUD against LocalStack S3 (caps, status gates, 204 mutations, `GET` import `photos`/`needs_photos` and presigned reads), confirm photo freeze and gate 409, condition-edit photo carry, publish image projection with one-time `fetchtcg_url` persistence, order-phase `listed_price` capture, and order list/detail offered-vs-listed fields (including null baseline on legacy lines).
+- Integration tests (DynamoDB Testcontainers, LocalStack SQS): import upload→rows, import list continuation paging, appraisal identity verification (variant printings resolve by Scryfall ID, unverified candidates fall through to review), confirm idempotency and double-confirm rejection, adjustments, reserve/release/sell transitions, chunked reserve and sell for orders past the 100-item transaction cap, crashed-reserve reclaim convergence, publish create/update/delist and conditional clear, publish checkpointing and continuation across listing slices, duplicate-delivery no-ops, masked credential handling, report job snapshot writes, `GET /reports` staleness transitions, `POST /reports` idempotency while active, row photo CRUD against LocalStack S3 (caps, status gates, 204 mutations, `GET` import `photos`/`needs_photos` and presigned reads), confirm photo freeze and gate 409, condition-edit photo carry, publish image projection with one-time `fetchtcg_url` persistence, order-phase `listed_price` capture, and order list/detail offered-vs-listed fields (including null baseline on legacy lines).
 - E2E (LocalStack): import → appraise → confirm → publish → order → pull → confirm loop, then report generation and retrieval, plus the photo lifecycle (flagged row → photo → gated confirm → published images → sale swaps the listing to the next unit's photos). The ingested order asserts offered 1.50 against listed 2.00.
 - Tests never call the live FetchTCG API.
 - Required checks: `bazel build //tcg_inventory_api:all`, `bazel test //tcg_inventory_api:all`, then repo-level `bazel mod tidy` and `bazel run //:format`.

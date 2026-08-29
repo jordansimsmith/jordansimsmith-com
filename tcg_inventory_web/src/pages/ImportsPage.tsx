@@ -20,7 +20,9 @@ import { useListNavigation } from '../hooks/use-list-navigation';
 export function ImportsPage() {
   const navigate = useNavigate();
   const [imports, setImports] = useState<ImportSummary[]>([]);
+  const [nextContinuation, setNextContinuation] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -49,6 +51,7 @@ export function ImportsPage() {
         const response = await apiClient.findImports();
         if (!cancelled) {
           setImports(response.imports);
+          setNextContinuation(response.next_continuation);
         }
       } catch (e) {
         if (!cancelled) {
@@ -69,6 +72,26 @@ export function ImportsPage() {
       cancelled = true;
     };
   }, []);
+
+  const handleLoadMore = async () => {
+    if (!nextContinuation) {
+      return;
+    }
+    setLoadingMore(true);
+    try {
+      const response = await apiClient.findImports({
+        continuation: nextContinuation,
+      });
+      setImports((previous) => [...previous, ...response.imports]);
+      setNextContinuation(response.next_continuation);
+    } catch (e) {
+      const message =
+        e instanceof Error ? e.message : 'Failed to load more imports';
+      notifications.show({ title: 'Error', message, color: 'red' });
+    } finally {
+      setLoadingMore(false);
+    }
+  };
 
   const handleUpload = async () => {
     if (!file) {
@@ -122,11 +145,23 @@ export function ImportsPage() {
           <Text c="dimmed">No imports yet.</Text>
         )}
         {!loading && !error && imports.length > 0 && (
-          <ImportTable
-            imports={imports}
-            selectedIndex={selectedIndex}
-            onOpen={openImport}
-          />
+          <>
+            <ImportTable
+              imports={imports}
+              selectedIndex={selectedIndex}
+              onOpen={openImport}
+            />
+            {nextContinuation && (
+              <Button
+                variant="default"
+                onClick={handleLoadMore}
+                loading={loadingMore}
+                w="fit-content"
+              >
+                Load more
+              </Button>
+            )}
+          </>
         )}
       </Stack>
     </AppShellLayout>

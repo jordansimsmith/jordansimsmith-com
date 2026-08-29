@@ -898,7 +898,7 @@ export function createFakeClient(): ApiClient {
           progressAppraisal(importRecord);
           return toImportSummary(importRecord);
         });
-      return { imports: summaries };
+      return { imports: summaries, next_continuation: null };
     },
 
     async getImport(importId: string): Promise<ImportDetail> {

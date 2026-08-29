@@ -75,6 +75,11 @@ export interface ImportSummary {
 
 export interface FindImportsResponse {
   imports: ImportSummary[];
+  next_continuation: string | null;
+}
+
+export interface FindImportsParams {
+  continuation?: string;
 }
 
 export interface RowPhoto {
@@ -258,7 +263,7 @@ export interface ApiClient {
   getSettings(): Promise<SettingsResponse>;
   updateSettings(update: UpdateSettingsRequest): Promise<SettingsResponse>;
   createImport(filename: string, csv: string): Promise<ImportSummary>;
-  findImports(): Promise<FindImportsResponse>;
+  findImports(params?: FindImportsParams): Promise<FindImportsResponse>;
   getImport(importId: string): Promise<ImportDetail>;
   updateImportRow(
     importId: string,

@@ -128,7 +128,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 | Method   | Path                                                     | Used by                                                         |
 | -------- | -------------------------------------------------------- | --------------------------------------------------------------- |
 | `POST`   | `/imports`                                               | import upload                                                   |
-| `GET`    | `/imports`                                               | imports list                                                    |
+| `GET`    | `/imports`                                               | imports list (continuation paging)                              |
 | `GET`    | `/imports/{import_id}`                                   | appraisal progress + review rows                                |
 | `POST`   | `/imports/{import_id}/confirm`                           | confirm flow + placement instructions and total suggested value |
 | `DELETE` | `/imports/{import_id}`                                   | delete-import action                                            |
@@ -158,6 +158,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 - `DELETE /skus/{sku_id}/units/{sequence_number}` (optional `reason` query parameter) responds with the updated SKU detail; the page re-renders counters and units from that response.
 - `PUT /skus/{sku_id}/units/{sequence_number}` responds `{"sku_id": "<new sku_id>"}`; the UI navigates to the new SKU's detail page.
 - Import review renders rows top-of-stack first exactly as returned; review rows are informational and never become units — confirm ingests keep rows only.
+- The imports list loads the first `GET /imports` page on mount and appends further pages via Load more while `next_continuation` is present.
 - Photo mutations respond `204`; the strip and needs-photos badge re-render from a follow-up `GET /imports/{import_id}`. Photos order by upload — the first is the listing front image, removing one promotes the next, and reordering is delete + re-upload. Uploads send canvas-processed raw `image/jpeg` bodies; the 5-photo cap and the NZ$20 gate are server-derived (`needs_photos`), never re-derived client-side.
 - The confirm 409 while rows still need photos surfaces the API message; the confirm button is disabled client-side with the same reason.
 - Unit `photos` on SKU detail are read-only; no management affordances render at any status.
@@ -230,7 +231,7 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 ## Testing and quality gates
 
 - Unit and component tests run with Vitest and React Testing Library in `jsdom`.
-- Key coverage: login and route protection, the vim navigation hook (movement, jumps, search focus), SKU detail adjustments (remove unit, condition change), import review rendering and the confirm transition, pull-sheet ordering and confirm flow, offered-vs-listed badges on order detail (above/below only; omitted at list and when the listed baseline is missing), publish trigger + job polling, the job-failure alert, masked credential form, reports tab rendering of every section from the fake client, the stale→regenerate→poll flow with figures kept visible, first-visit skeleton generation, the needs-photos badge and gated confirm, photo strip interactions (add via the canvas util, remove), refocus refetch of in-review imports, and read-only unit photo thumbnails.
+- Key coverage: login and route protection, the vim navigation hook (movement, jumps, search focus), SKU detail adjustments (remove unit, condition change), imports list load more, import review rendering and the confirm transition, pull-sheet ordering and confirm flow, offered-vs-listed badges on order detail (above/below only; omitted at list and when the listed baseline is missing), publish trigger + job polling, the job-failure alert, masked credential form, reports tab rendering of every section from the fake client, the stale→regenerate→poll flow with figures kept visible, first-visit skeleton generation, the needs-photos badge and gated confirm, photo strip interactions (add via the canvas util, remove), refocus refetch of in-review imports, and read-only unit photo thumbnails.
 - Required checks: `bazel test //tcg_inventory_web:unit-tests`, `bazel build //tcg_inventory_web:typecheck`, `bazel build //tcg_inventory_web:build`.
 
 ## Local development and smoke checks

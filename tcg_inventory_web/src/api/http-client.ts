@@ -3,6 +3,7 @@ import type {
   ApiClient,
   Condition,
   ConfirmImportResponse,
+  FindImportsParams,
   FindImportsResponse,
   FindOrdersResponse,
   FindSkusParams,
@@ -79,8 +80,17 @@ export function createHttpClient(): ApiClient {
       return response.json();
     },
 
-    async findImports(): Promise<FindImportsResponse> {
-      const response = await authenticatedFetch('/imports');
+    async findImports(
+      params?: FindImportsParams,
+    ): Promise<FindImportsResponse> {
+      const query = new URLSearchParams();
+      if (params?.continuation) {
+        query.set('continuation', params.continuation);
+      }
+      const queryString = query.toString();
+      const response = await authenticatedFetch(
+        queryString ? `/imports?${queryString}` : '/imports',
+      );
       return response.json();
     },
 
