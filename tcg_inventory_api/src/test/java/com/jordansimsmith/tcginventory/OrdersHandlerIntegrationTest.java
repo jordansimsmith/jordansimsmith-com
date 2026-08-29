@@ -324,6 +324,51 @@ public class OrdersHandlerIntegrationTest {
   }
 
   @Test
+  void confirmOrderShouldSellLargeOrderAcrossTransactions() throws Exception {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    var lines = new ArrayList<OrderLines.OrderLine>();
+    for (int i = 1; i <= 60; i++) {
+      var skuId = "scryfall-" + i + "#normal#NM";
+      createSkuWithUnits("jordan", skuId, 1);
+      reserveUnits("jordan", skuId, "83663", List.of(1));
+      lines.add(new OrderLines.OrderLine(skuId, 1000 + i, 1, "0.50", "0.50", List.of(1)));
+    }
+    var order =
+        TcgInventoryItem.createOrder(
+            "jordan",
+            "83663",
+            "to_pick",
+            "ACCEPTED",
+            "SEND_PICKUP_ADDRESS",
+            "PICKUP",
+            "30.00",
+            objectMapper.writeValueAsString(lines),
+            Instant.ofEpochSecond(1700000000));
+    tcgInventoryTable.putItem(order);
+
+    // act
+    var response =
+        confirmOrderHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("order_id", "83663")), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var updatedOrder = getOrderItem("jordan", "83663");
+    assertThat(updatedOrder.getStatus()).isEqualTo("fulfilled");
+
+    for (int i = 1; i <= 60; i++) {
+      var units = getUnits("jordan", "scryfall-" + i + "#normal#NM");
+      assertThat(units).hasSize(1);
+      assertThat(units.get(0).getStatus()).isEqualTo("sold");
+    }
+
+    var sellAudits =
+        getAuditEntries("jordan").stream().filter(a -> "sell".equals(a.getEventType())).toList();
+    assertThat(sellAudits).hasSize(1);
+  }
+
+  @Test
   void confirmOrderShouldNotSetDirtyFlag() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));

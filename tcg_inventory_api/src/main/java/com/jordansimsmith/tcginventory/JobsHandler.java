@@ -42,9 +42,8 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             factory.fetchTcgTokenMinter(),
             new OrderPhaseProcessor(
                 factory.tcgInventoryTable(),
-                factory.dynamoDbClient(),
+                factory.tcgInventoryItemRepository(),
                 factory.clock(),
-                factory.ulidGenerator(),
                 factory.fetchTcgClient(),
                 factory.objectMapper()),
             new ListingPhaseProcessor(

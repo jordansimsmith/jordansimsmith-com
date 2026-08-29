@@ -46,6 +46,8 @@ public interface TcgInventoryFactory {
 
   DynamoDbTable<TcgInventoryItem> tcgInventoryTable();
 
+  TcgInventoryItemRepository tcgInventoryItemRepository();
+
   DynamoDbClient dynamoDbClient();
 
   QueueClient<JobMessage> jobsQueue();

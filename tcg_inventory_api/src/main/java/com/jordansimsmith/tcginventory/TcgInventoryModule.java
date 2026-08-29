@@ -5,6 +5,8 @@ import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.queue.SqsQueueClient;
 import com.jordansimsmith.secrets.Secrets;
+import com.jordansimsmith.time.Clock;
+import com.jordansimsmith.ulid.UlidGenerator;
 import dagger.Module;
 import dagger.Provides;
 import java.net.URI;
@@ -16,6 +18,7 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.http.crt.AwsCrtHttpClient;
 import software.amazon.awssdk.regions.Region;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Module
@@ -35,6 +38,16 @@ public class TcgInventoryModule {
   DynamoDbTable<TcgInventoryItem> tcgInventoryTable(DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(TcgInventoryItem.class);
     return dynamoDbEnhancedClient.table(TcgInventoryItem.TABLE_NAME, schema);
+  }
+
+  @Provides
+  @Singleton
+  TcgInventoryItemRepository tcgInventoryItemRepository(
+      DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
+      DynamoDbClient dynamoDbClient,
+      Clock clock,
+      UlidGenerator ulidGenerator) {
+    return new TcgInventoryItemRepository(tcgInventoryTable, dynamoDbClient, clock, ulidGenerator);
   }
 
   @Provides

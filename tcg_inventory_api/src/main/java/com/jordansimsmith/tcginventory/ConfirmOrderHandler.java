@@ -9,22 +9,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import com.jordansimsmith.time.Clock;
-import com.jordansimsmith.ulid.UlidGenerator;
 import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
+import java.util.LinkedHashMap;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import software.amazon.awssdk.services.dynamodb.model.Put;
-import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
-import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
-import software.amazon.awssdk.services.dynamodb.model.Update;
 
 public class ConfirmOrderHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
@@ -36,12 +27,10 @@ public class ConfirmOrderHandler
 
   record ErrorResponse(@JsonProperty("message") String message) {}
 
-  private final Clock clock;
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
-  private final DynamoDbClient dynamoDbClient;
-  private final UlidGenerator ulidGenerator;
+  private final TcgInventoryItemRepository tcgInventoryItemRepository;
   private final ObjectMapper objectMapper;
 
   public ConfirmOrderHandler() {
@@ -50,12 +39,10 @@ public class ConfirmOrderHandler
 
   @VisibleForTesting
   ConfirmOrderHandler(TcgInventoryFactory factory) {
-    this.clock = factory.clock();
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.tcgInventoryTable = factory.tcgInventoryTable();
-    this.dynamoDbClient = factory.dynamoDbClient();
-    this.ulidGenerator = factory.ulidGenerator();
+    this.tcgInventoryItemRepository = factory.tcgInventoryItemRepository();
     this.objectMapper = factory.objectMapper();
   }
 
@@ -89,112 +76,19 @@ public class ConfirmOrderHandler
     }
 
     var orderLines = OrderLines.parse(orderItem.getLines(), objectMapper);
-    var transactItems = new ArrayList<TransactWriteItem>();
-    var affectedSkuIds = new HashSet<String>();
-
+    var soldUnits = new LinkedHashMap<String, List<Integer>>();
     for (var line : orderLines) {
-      for (var seqNum : line.allocatedSequenceNumbers()) {
-        transactItems.add(buildUnitSellUpdate(user, line.skuId(), seqNum));
-      }
-      if (affectedSkuIds.add(line.skuId())) {
-        transactItems.add(buildSkuVersionBump(user, line.skuId()));
-      }
+      soldUnits
+          .computeIfAbsent(line.skuId(), k -> new ArrayList<>())
+          .addAll(line.allocatedSequenceNumbers());
     }
 
-    transactItems.add(buildOrderFulfilledUpdate(user, orderId));
-
-    var auditItem = new HashMap<String, AttributeValue>();
-    auditItem.put(
-        TcgInventoryItem.PK,
-        AttributeValue.builder().s(TcgInventoryItem.formatAuditPk(user)).build());
-    auditItem.put(
-        TcgInventoryItem.SK, AttributeValue.builder().s(ulidGenerator.generate()).build());
-    auditItem.put(TcgInventoryItem.EVENT_TYPE, AttributeValue.builder().s("sell").build());
-    auditItem.put(TcgInventoryItem.ORDER_ID, AttributeValue.builder().s(orderId).build());
-    auditItem.put(
-        TcgInventoryItem.CREATED_AT,
-        AttributeValue.builder().n(String.valueOf(clock.now().getEpochSecond())).build());
-    transactItems.add(
-        TransactWriteItem.builder()
-            .put(Put.builder().tableName(TcgInventoryItem.TABLE_NAME).item(auditItem).build())
-            .build());
-
-    dynamoDbClient.transactWriteItems(
-        TransactWriteItemsRequest.builder().transactItems(transactItems).build());
+    var skuUnits =
+        soldUnits.entrySet().stream()
+            .map(entry -> new TcgInventoryItemRepository.SkuUnits(entry.getKey(), entry.getValue()))
+            .toList();
+    tcgInventoryItemRepository.sellOrder(user, orderId, skuUnits);
 
     return httpResponseFactory.ok(new ConfirmOrderResponse(orderId, "fulfilled"));
-  }
-
-  private TransactWriteItem buildUnitSellUpdate(String user, String skuId, int sequenceNumber) {
-    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
-    var unitSk = TcgInventoryItem.formatUnitSk(sequenceNumber);
-
-    return TransactWriteItem.builder()
-        .update(
-            Update.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
-                .key(
-                    Map.of(
-                        TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build(),
-                        TcgInventoryItem.SK, AttributeValue.builder().s(unitSk).build()))
-                .updateExpression("SET #status = :sold, " + TcgInventoryItem.UPDATED_AT + " = :now")
-                .conditionExpression("#status = :reserved")
-                .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
-                .expressionAttributeValues(
-                    Map.of(
-                        ":sold", AttributeValue.builder().s("sold").build(),
-                        ":reserved", AttributeValue.builder().s("reserved").build(),
-                        ":now",
-                            AttributeValue.builder()
-                                .n(String.valueOf(clock.now().getEpochSecond()))
-                                .build()))
-                .build())
-        .build();
-  }
-
-  private TransactWriteItem buildOrderFulfilledUpdate(String user, String orderId) {
-    var userPk = TcgInventoryItem.formatUserPk(user);
-    var orderSk = TcgInventoryItem.formatOrderSk(orderId);
-
-    return TransactWriteItem.builder()
-        .update(
-            Update.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
-                .key(
-                    Map.of(
-                        TcgInventoryItem.PK, AttributeValue.builder().s(userPk).build(),
-                        TcgInventoryItem.SK, AttributeValue.builder().s(orderSk).build()))
-                .updateExpression(
-                    "SET #status = :fulfilled, " + TcgInventoryItem.UPDATED_AT + " = :now")
-                .conditionExpression("#status = :toPick")
-                .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
-                .expressionAttributeValues(
-                    Map.of(
-                        ":fulfilled", AttributeValue.builder().s("fulfilled").build(),
-                        ":toPick", AttributeValue.builder().s("to_pick").build(),
-                        ":now",
-                            AttributeValue.builder()
-                                .n(String.valueOf(clock.now().getEpochSecond()))
-                                .build()))
-                .build())
-        .build();
-  }
-
-  private TransactWriteItem buildSkuVersionBump(String user, String skuId) {
-    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
-
-    return TransactWriteItem.builder()
-        .update(
-            Update.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
-                .key(
-                    Map.of(
-                        TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build(),
-                        TcgInventoryItem.SK,
-                            AttributeValue.builder().s(TcgInventoryItem.formatSkuSk()).build()))
-                .updateExpression("ADD " + TcgInventoryItem.VERSION + " :one")
-                .expressionAttributeValues(Map.of(":one", AttributeValue.builder().n("1").build()))
-                .build())
-        .build();
   }
 }

@@ -14,6 +14,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -659,6 +660,122 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
+  void publishOrderPhaseShouldReserveLargeOfferAcrossTransactions() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+
+    var offerItems = new ArrayList<FetchTcgClient.OfferItem>();
+    for (int i = 1; i <= 60; i++) {
+      createSkuWithUnitAtSequence("jordan", "scryfall-" + i + "#normal#NM", 2000 + i, i);
+      offerItems.add(
+          new FetchTcgClient.OfferItem(
+              new FetchTcgClient.OfferListing(2000 + i, "raw-nm", new BigDecimal("0.50")),
+              1,
+              new BigDecimal("0.50")));
+    }
+
+    fakeFetchTcgClient.seedSellerOffers(
+        List.of(
+            new FetchTcgClient.SellerOffer(
+                91329,
+                "ACCEPTED",
+                null,
+                "2026-08-11T04:42:12.476+0000",
+                "DELIVERY",
+                new BigDecimal("30.00"),
+                offerItems)));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var jobItem = getJob("jordan", "job1");
+    assertThat(jobItem.getStatus()).isEqualTo("succeeded");
+
+    var order = getOrder("jordan", "91329");
+    assertThat(order).isNotNull();
+    assertThat(order.getStatus()).isEqualTo("awaiting_payment");
+    var orderLines = OrderLines.parse(order.getLines(), objectMapper);
+    assertThat(orderLines).hasSize(60);
+    var allocated =
+        orderLines.stream().flatMap(l -> l.allocatedSequenceNumbers().stream()).toList();
+    assertThat(allocated)
+        .containsExactlyInAnyOrderElementsOf(IntStream.rangeClosed(1, 60).boxed().toList());
+
+    for (int i = 1; i <= 60; i++) {
+      var units = getUnits("jordan", "scryfall-" + i + "#normal#NM");
+      assertThat(units).hasSize(1);
+      assertThat(units.get(0).getStatus()).isEqualTo("reserved");
+      assertThat(units.get(0).getOrderId()).isEqualTo("91329");
+    }
+
+    var reserveAudits =
+        getAuditEntries("jordan").stream().filter(a -> "reserve".equals(a.getEventType())).toList();
+    assertThat(reserveAudits).hasSize(1);
+  }
+
+  @Test
+  void publishOrderPhaseShouldReclaimUnitsReservedByCrashedRun() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 3);
+
+    // simulate a run that crashed after reserving units but before writing the order
+    var sku = getSku("jordan", "scryfall-1#normal#NM");
+    sku.setDirty(true);
+    sku.setGsi1pk(TcgInventoryItem.formatGsi1pk("jordan"));
+    tcgInventoryTable.putItem(sku);
+    for (int sequenceNumber : new int[] {1, 2}) {
+      var unit =
+          tcgInventoryTable.getItem(
+              Key.builder()
+                  .partitionValue(TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#NM"))
+                  .sortValue(TcgInventoryItem.formatUnitSk(sequenceNumber))
+                  .build());
+      unit.setStatus("reserved");
+      unit.setOrderId("83663");
+      tcgInventoryTable.putItem(unit);
+    }
+
+    fakeFetchTcgClient.seedSellerOffers(
+        List.of(
+            new FetchTcgClient.SellerOffer(
+                83663,
+                "ACCEPTED",
+                null,
+                "2026-08-11T04:42:12.476+0000",
+                "PICKUP",
+                new BigDecimal("3.33"),
+                List.of(
+                    new FetchTcgClient.OfferItem(
+                        new FetchTcgClient.OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
+                        2,
+                        new BigDecimal("1.50"))))));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "83663");
+    assertThat(order).isNotNull();
+    assertThat(order.getStatus()).isEqualTo("awaiting_payment");
+    var orderLines = OrderLines.parse(order.getLines(), objectMapper);
+    assertThat(orderLines).hasSize(1);
+    assertThat(orderLines.get(0).quantity()).isEqualTo(2);
+    assertThat(orderLines.get(0).allocatedSequenceNumbers()).containsExactly(1, 2);
+
+    var units = getUnits("jordan", "scryfall-1#normal#NM");
+    var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
+    assertThat(reserved).hasSize(2);
+    assertThat(reserved).allSatisfy(u -> assertThat(u.getOrderId()).isEqualTo("83663"));
+    var inStock = units.stream().filter(u -> "in_stock".equals(u.getStatus())).toList();
+    assertThat(inStock).hasSize(1);
+    assertThat(inStock.get(0).getSequenceNumber()).isEqualTo(3);
+  }
+
+  @Test
   void publishPhaseShouldCreateListingForDirtySku() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
@@ -847,6 +964,33 @@ public class JobsHandlerIntegrationTest {
               user, skuId, i, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
       tcgInventoryTable.putItem(unit);
     }
+  }
+
+  private void createSkuWithUnitAtSequence(
+      String user, String skuId, int fetchtcgListingId, int sequenceNumber) {
+    var parts = skuId.split("#");
+    var skuItem =
+        TcgInventoryItem.createSku(
+            user,
+            skuId,
+            parts[0],
+            parts[1],
+            parts[2],
+            "Test Card",
+            "dom",
+            "Dominaria",
+            "168",
+            "mtg_168_c_dom_normal",
+            "1.50");
+    skuItem.setDirty(false);
+    skuItem.setGsi1pk(TcgInventoryItem.USER_PREFIX + user + "#CLEAN");
+    skuItem.setFetchtcgListingId(fetchtcgListingId);
+    tcgInventoryTable.putItem(skuItem);
+
+    var unit =
+        TcgInventoryItem.createUnit(
+            user, skuId, sequenceNumber, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
+    tcgInventoryTable.putItem(unit);
   }
 
   private void createTrackOrdersAfter(String user, Instant trackOrdersAfter) {
