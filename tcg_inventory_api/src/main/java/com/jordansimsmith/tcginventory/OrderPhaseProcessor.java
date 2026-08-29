@@ -23,13 +23,11 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 public class OrderPhaseProcessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(OrderPhaseProcessor.class);
 
+  // observed currentAction values after CONFIRM_PAYMENT_RECEIVED, per delivery mode:
+  // pickup:   SEND_PICKUP_ADDRESS -> SEND_REVIEW -> AWAIT_REVIEW
+  // delivery: SEND_TRACKING_CODE -> SEND_REVIEW -> AWAIT_REVIEW
   private static final Set<String> PAYMENT_ACTIONS =
-      Set.of(
-          "SEND_PICKUP_ADDRESS",
-          "SEND_TRACKING",
-          "SEND_REVIEW",
-          "AWAIT_REVIEW",
-          "SEND_TRACKING_PICKUP");
+      Set.of("SEND_PICKUP_ADDRESS", "SEND_TRACKING_CODE", "SEND_REVIEW", "AWAIT_REVIEW");
 
   private static final DateTimeFormatter ACCEPTED_AT_FORMATTER =
       new DateTimeFormatterBuilder()

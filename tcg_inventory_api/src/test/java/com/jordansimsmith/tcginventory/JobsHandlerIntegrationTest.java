@@ -475,6 +475,59 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
+  void publishOrderPhaseShouldAdvanceToPickOnTrackingCode() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createExistingOrder("jordan", "91329", "awaiting_payment");
+
+    fakeFetchTcgClient.seedSellerOffers(
+        List.of(
+            new FetchTcgClient.SellerOffer(
+                91329,
+                "ACCEPTED",
+                "SEND_TRACKING_CODE",
+                "2026-08-29T03:03:55.019+0000",
+                "DELIVERY",
+                new BigDecimal("61.50"),
+                List.of())));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "91329");
+    assertThat(order.getStatus()).isEqualTo("to_pick");
+    assertThat(order.getFetchtcgCurrentAction()).isEqualTo("SEND_TRACKING_CODE");
+  }
+
+  @Test
+  void publishOrderPhaseShouldNotAdvanceWhenAwaitingPayment() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createExistingOrder("jordan", "91101", "awaiting_payment");
+
+    fakeFetchTcgClient.seedSellerOffers(
+        List.of(
+            new FetchTcgClient.SellerOffer(
+                91101,
+                "ACCEPTED",
+                "AWAITING_PAYMENT",
+                "2026-08-28T10:50:05.986+0000",
+                "DELIVERY",
+                new BigDecimal("5.00"),
+                List.of())));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "91101");
+    assertThat(order.getStatus()).isEqualTo("awaiting_payment");
+  }
+
+  @Test
   void publishOrderPhaseShouldBeIdempotentOnReprocessing() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
