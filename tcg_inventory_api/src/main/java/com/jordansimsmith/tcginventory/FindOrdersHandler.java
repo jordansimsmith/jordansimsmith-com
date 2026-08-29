@@ -7,6 +7,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.jordansimsmith.dynamodb.Continuations;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import java.math.BigDecimal;
@@ -23,6 +24,7 @@ public class FindOrdersHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(FindOrdersHandler.class);
+  private static final int DEFAULT_LIMIT = 20;
 
   record OrderSummary(
       @JsonProperty("order_id") String orderId,
@@ -31,9 +33,12 @@ public class FindOrdersHandler
       @JsonProperty("delivery_mode") @Nullable String deliveryMode,
       @JsonProperty("total_price") @Nullable String totalPrice,
       @JsonProperty("items_total_price") @Nullable String itemsTotalPrice,
-      @JsonProperty("listed_total_price") @Nullable String listedTotalPrice) {}
+      @JsonProperty("listed_total_price") @Nullable String listedTotalPrice,
+      @JsonProperty("unit_count") int unitCount) {}
 
-  record FindOrdersResponse(@JsonProperty("orders") List<OrderSummary> orders) {}
+  record FindOrdersResponse(
+      @JsonProperty("orders") List<OrderSummary> orders,
+      @JsonProperty("next_continuation") @Nullable String nextContinuation) {}
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
@@ -65,6 +70,11 @@ public class FindOrdersHandler
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
     var user = requestContextFactory.createCtx(event).user();
 
+    var queryParams = event.getQueryStringParameters();
+    var continuation = queryParams != null ? queryParams.get("continuation") : null;
+    var limitParam = queryParams != null ? queryParams.get("limit") : null;
+    int limit = limitParam != null ? Integer.parseInt(limitParam) : DEFAULT_LIMIT;
+
     var queryConditional =
         QueryConditional.sortBeginsWith(
             Key.builder()
@@ -72,18 +82,34 @@ public class FindOrdersHandler
                 .sortValue(TcgInventoryItem.ORDER_PREFIX)
                 .build());
 
-    var request =
+    var requestBuilder =
         QueryEnhancedRequest.builder()
             .queryConditional(queryConditional)
             .scanIndexForward(false)
-            .build();
+            .limit(limit);
+
+    if (continuation != null && !continuation.isEmpty()) {
+      var exclusiveStartKey = Continuations.decode(continuation, objectMapper);
+      if (exclusiveStartKey != null) {
+        requestBuilder.exclusiveStartKey(exclusiveStartKey);
+      }
+    }
+
+    var page = tcgInventoryTable.query(requestBuilder.build()).stream().findFirst().orElse(null);
+
+    if (page == null) {
+      return httpResponseFactory.ok(new FindOrdersResponse(List.of(), null));
+    }
 
     var orders =
-        tcgInventoryTable.query(request).stream()
-            .flatMap(page -> page.items().stream())
+        page.items().stream()
             .map(
                 item -> {
                   var orderLines = OrderLines.parse(item.getLines(), objectMapper);
+                  var unitCount = 0;
+                  for (var line : orderLines) {
+                    unitCount += line.quantity();
+                  }
                   return new OrderSummary(
                       item.getOrderId(),
                       item.getStatus(),
@@ -91,11 +117,18 @@ public class FindOrdersHandler
                       item.getDeliveryMode(),
                       item.getTotalPrice(),
                       itemsTotalPrice(orderLines),
-                      listedTotalPrice(orderLines));
+                      listedTotalPrice(orderLines),
+                      unitCount);
                 })
             .toList();
 
-    return httpResponseFactory.ok(new FindOrdersResponse(orders));
+    var lastEvaluatedKey = page.lastEvaluatedKey();
+    String nextContinuation = null;
+    if (lastEvaluatedKey != null && !lastEvaluatedKey.isEmpty()) {
+      nextContinuation = Continuations.encode(lastEvaluatedKey, objectMapper);
+    }
+
+    return httpResponseFactory.ok(new FindOrdersResponse(orders, nextContinuation));
   }
 
   private static @Nullable String itemsTotalPrice(List<OrderLines.OrderLine> orderLines) {

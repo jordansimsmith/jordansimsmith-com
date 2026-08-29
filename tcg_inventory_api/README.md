@@ -178,7 +178,7 @@ sequenceDiagram
 | `GET`    | `/skus/{sku_id}`                                         | SKU detail including its units                                                         |
 | `DELETE` | `/skus/{sku_id}/units/{sequence_number}`                 | remove a unit (optional `reason` query param)                                          |
 | `PUT`    | `/skus/{sku_id}/units/{sequence_number}`                 | update a unit's condition (moves it to another SKU; response returns the new `sku_id`) |
-| `GET`    | `/orders`                                                | list orders newest-first with item and listed subtotals                                |
+| `GET`    | `/orders`                                                | list orders newest-first with item and listed subtotals (continuation paging)          |
 | `GET`    | `/orders/{order_id}`                                     | order detail: offer lines (offered vs listed), allocated units, pull locations         |
 | `POST`   | `/orders/{order_id}/confirm`                             | confirm the pull; marks allocated units sold                                           |
 | `POST`   | `/publish`                                               | start a publish run; responds 202 and is idempotent while one is queued/running        |
@@ -289,6 +289,7 @@ Response `200` (the `units` list, sorted by sequence number, is the pull sheet w
   "accepted_at": 1765420932,
   "delivery_mode": "PICKUP",
   "total_price": "3.33",
+  "unit_count": 1,
   "lines": [
     {
       "name": "Hellkite Tyrant",
@@ -315,7 +316,9 @@ Response `200` (the `units` list, sorted by sequence number, is the pull sheet w
 }
 ```
 
-`GET /orders` summaries add `items_total_price` (sum of line offered totals; excludes shipping) and `listed_total_price` (sum of `listed_price × quantity`). `listed_total_price` is `null` when any line lacks a listed baseline. `total_price` remains the FetchTCG offer total and may include shipping.
+`GET /orders`
+
+Query parameters: optional `continuation` (opaque token from a previous page) and `limit` (default 20). Response is `{ "orders": [...], "next_continuation": "<token>" | null }` newest-first; `next_continuation` is null on the last page. Summaries add `unit_count` (sum of line quantities), `items_total_price` (sum of line offered totals; excludes shipping), and `listed_total_price` (sum of `listed_price × quantity`). `listed_total_price` is `null` when any line lacks a listed baseline. `total_price` remains the FetchTCG offer total and may include shipping. `GET /orders/{order_id}` also returns `unit_count` (allocated unit count).
 
 - `409` on `POST /orders/{order_id}/confirm`: `{"message":"order is not ready to pick"}` when the order is not `to_pick`.
 
@@ -572,7 +575,7 @@ Rotated refresh tokens returned by Firebase are written back to the same key.
 ## Testing and quality gates
 
 - Unit tests: pricing policy scenarios (keep filter, undercut tick, deep-discount guard, supported floor, sole-source premium, rounding, floor), condition translation, set mapping, sequence/block/location derivation, FetchTCG client pacing/retries/allowlist/fail-closed auth/delete-of-missing-listing tolerance with fixture responses (including seller-offer `listedPrice` and card `externalReferences.scryfallId` parsing), offer state mapping, report aggregation (price fallback chain, bucket and band edges, NZ-timezone bucketing, top-hits ordering and tie-break, paid-order filter, shipping excluded from revenue, removed-unit exclusion), report staleness comparison (as-of audit ULID and 24 h backstop), image-state projection (object shape, omission and replace rules, NZ$50 warning), and FetchTCG multipart upload encoding.
-- Integration tests (DynamoDB Testcontainers, LocalStack SQS): import upload→rows, import list continuation paging, appraisal identity verification (variant printings resolve by Scryfall ID, unverified candidates fall through to review), confirm idempotency and double-confirm rejection, adjustments, reserve/release/sell transitions, chunked reserve and sell for orders past the 100-item transaction cap, crashed-reserve reclaim convergence, publish create/update/delist and conditional clear, publish checkpointing and continuation across listing slices, duplicate-delivery no-ops, masked credential handling, report job snapshot writes, `GET /reports` staleness transitions, `POST /reports` idempotency while active, row photo CRUD against LocalStack S3 (caps, status gates, 204 mutations, `GET` import `photos`/`needs_photos` and presigned reads), confirm photo freeze and gate 409, condition-edit photo carry, publish image projection with one-time `fetchtcg_url` persistence, order-phase `listed_price` capture, and order list/detail offered-vs-listed fields (including null baseline on legacy lines).
+- Integration tests (DynamoDB Testcontainers, LocalStack SQS): import upload→rows, import list continuation paging, order list continuation paging and unit_count, appraisal identity verification (variant printings resolve by Scryfall ID, unverified candidates fall through to review), confirm idempotency and double-confirm rejection, adjustments, reserve/release/sell transitions, chunked reserve and sell for orders past the 100-item transaction cap, crashed-reserve reclaim convergence, publish create/update/delist and conditional clear, publish checkpointing and continuation across listing slices, duplicate-delivery no-ops, masked credential handling, report job snapshot writes, `GET /reports` staleness transitions, `POST /reports` idempotency while active, row photo CRUD against LocalStack S3 (caps, status gates, 204 mutations, `GET` import `photos`/`needs_photos` and presigned reads), confirm photo freeze and gate 409, condition-edit photo carry, publish image projection with one-time `fetchtcg_url` persistence, order-phase `listed_price` capture, and order list/detail offered-vs-listed fields (including null baseline on legacy lines).
 - E2E (LocalStack): import → appraise → confirm → publish → order → pull → confirm loop, then report generation and retrieval, plus the photo lifecycle (flagged row → photo → gated confirm → published images → sale swaps the listing to the next unit's photos). The ingested order asserts offered 1.50 against listed 2.00.
 - Tests never call the live FetchTCG API.
 - Required checks: `bazel build //tcg_inventory_api:all`, `bazel test //tcg_inventory_api:all`, then repo-level `bazel mod tidy` and `bazel run //:format`.

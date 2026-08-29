@@ -146,6 +146,11 @@ export interface OrderSummary {
 
 export interface FindOrdersResponse {
   orders: OrderSummary[];
+  next_continuation: string | null;
+}
+
+export interface FindOrdersParams {
+  continuation?: string;
 }
 
 export interface OrderUnit {
@@ -291,7 +296,7 @@ export interface ApiClient {
     sequenceNumber: number,
     condition: Condition,
   ): Promise<UpdateUnitResponse>;
-  findOrders(): Promise<FindOrdersResponse>;
+  findOrders(params?: FindOrdersParams): Promise<FindOrdersResponse>;
   getOrder(orderId: string): Promise<OrderDetail>;
   confirmOrder(orderId: string): Promise<OrderDetail>;
   createPublish(): Promise<void>;

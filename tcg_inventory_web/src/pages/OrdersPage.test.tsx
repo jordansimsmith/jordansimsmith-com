@@ -81,6 +81,7 @@ describe('OrdersPage', () => {
     vi.clearAllMocks();
     vi.spyOn(clientModule.apiClient, 'findOrders').mockResolvedValue({
       orders: orderFixtures,
+      next_continuation: null,
     });
   });
 
@@ -117,6 +118,7 @@ describe('OrdersPage', () => {
   it('shows an empty state when there are no orders', async () => {
     vi.spyOn(clientModule.apiClient, 'findOrders').mockResolvedValue({
       orders: [],
+      next_continuation: null,
     });
 
     renderOrdersPage();
@@ -173,5 +175,38 @@ describe('OrdersPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Order detail 83611')).toBeDefined();
     });
+  });
+
+  it('appends the next page when load more is clicked', async () => {
+    const nextPage: OrderSummary = {
+      order_id: '83500',
+      state: 'fulfilled',
+      accepted_at: 1764802532,
+      delivery_mode: 'SHIPPING',
+      total_price: '2.00',
+      items_total_price: '2.00',
+      listed_total_price: '2.00',
+      unit_count: 2,
+    };
+    vi.spyOn(clientModule.apiClient, 'findOrders').mockImplementation(
+      async (params) => {
+        if (params?.continuation === 'page-2') {
+          return { orders: [nextPage], next_continuation: null };
+        }
+        return { orders: orderFixtures, next_continuation: 'page-2' };
+      },
+    );
+    const user = userEvent.setup();
+    renderOrdersPage();
+    await screen.findByText('83663');
+    expect(screen.queryByText('83500')).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Load more' }));
+
+    expect(await screen.findByText('83500')).toBeDefined();
+    expect(clientModule.apiClient.findOrders).toHaveBeenLastCalledWith({
+      continuation: 'page-2',
+    });
+    expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
   });
 });

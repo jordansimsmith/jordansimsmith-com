@@ -28,7 +28,7 @@ export function OrderTable({ orders, selectedIndex, onOpen }: OrderTableProps) {
         <Table.Tr>
           <Table.Th>Order</Table.Th>
           <Table.Th>State</Table.Th>
-          <Table.Th ta="right">Cards</Table.Th>
+          <Table.Th ta="right">Units</Table.Th>
           <Table.Th ta="right">Total</Table.Th>
           <Table.Th>Delivery</Table.Th>
           <Table.Th>Accepted</Table.Th>

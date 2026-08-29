@@ -102,6 +102,42 @@ public class OrdersHandlerIntegrationTest {
     assertThat(orders.get(0).get("listed_total_price").isNull()).isTrue();
     assertThat(orders.get(1).get("order_id").asText()).isEqualTo("10001");
     assertThat(orders.get(1).get("state").asText()).isEqualTo("awaiting_payment");
+    assertThat(body.get("next_continuation").isNull()).isTrue();
+  }
+
+  @Test
+  void findOrdersShouldSupportContinuationPaging() throws Exception {
+    // arrange
+    createOrder("jordan", "10001", "awaiting_payment", "PICKUP", "2.00");
+    createOrder("jordan", "10002", "to_pick", "SHIPPING", "5.50");
+    createOrder("jordan", "10003", "fulfilled", "PICKUP", "1.00");
+
+    // act - first page
+    var response1 =
+        findOrdersHandler.handleRequest(
+            buildEventWithQuery("jordan", Map.of(), Map.of("limit", "2")), null);
+
+    // assert - first page
+    assertThat(response1.getStatusCode()).isEqualTo(200);
+    var body1 = objectMapper.readTree(response1.getBody());
+    assertThat(body1.get("orders")).hasSize(2);
+    assertThat(body1.get("orders").get(0).get("order_id").asText()).isEqualTo("10003");
+    assertThat(body1.get("orders").get(1).get("order_id").asText()).isEqualTo("10002");
+    var continuation = body1.get("next_continuation").asText();
+    assertThat(continuation).isNotNull();
+    assertThat(continuation).isNotEmpty();
+
+    // act - second page
+    var response2 =
+        findOrdersHandler.handleRequest(
+            buildEventWithQuery("jordan", Map.of(), Map.of("continuation", continuation)), null);
+
+    // assert - second page
+    assertThat(response2.getStatusCode()).isEqualTo(200);
+    var body2 = objectMapper.readTree(response2.getBody());
+    assertThat(body2.get("orders")).hasSize(1);
+    assertThat(body2.get("orders").get(0).get("order_id").asText()).isEqualTo("10001");
+    assertThat(body2.get("next_continuation").isNull()).isTrue();
   }
 
   @Test
@@ -123,6 +159,7 @@ public class OrdersHandlerIntegrationTest {
     assertThat(order.get("total_price").asText()).isEqualTo("3.00");
     assertThat(order.get("items_total_price").asText()).isEqualTo("1.50");
     assertThat(order.get("listed_total_price").asText()).isEqualTo("4.00");
+    assertThat(order.get("unit_count").asInt()).isEqualTo(2);
   }
 
   @Test
@@ -167,6 +204,7 @@ public class OrdersHandlerIntegrationTest {
     assertThat(body.get("accepted_at").asLong()).isEqualTo(1700000000);
     assertThat(body.get("delivery_mode").asText()).isEqualTo("PICKUP");
     assertThat(body.get("total_price").asText()).isEqualTo("3.33");
+    assertThat(body.get("unit_count").asInt()).isEqualTo(2);
 
     var lines = body.get("lines");
     assertThat(lines).hasSize(1);
@@ -571,6 +609,19 @@ public class OrdersHandlerIntegrationTest {
             + Base64.getEncoder()
                 .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     return APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", authHeader)).build();
+  }
+
+  private APIGatewayV2HTTPEvent buildEventWithQuery(
+      String user, Map<String, String> pathParams, Map<String, String> queryParams) {
+    var authHeader =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
+    return APIGatewayV2HTTPEvent.builder()
+        .withHeaders(Map.of("Authorization", authHeader))
+        .withPathParameters(pathParams)
+        .withQueryStringParameters(queryParams)
+        .build();
   }
 
   private APIGatewayV2HTTPEvent buildEventWithPath(String user, Map<String, String> pathParams) {

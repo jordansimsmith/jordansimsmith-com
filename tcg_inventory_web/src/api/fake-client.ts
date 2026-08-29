@@ -1137,7 +1137,7 @@ export function createFakeClient(): ApiClient {
       const summaries = [...orders]
         .sort((a, b) => b.accepted_at - a.accepted_at)
         .map(toOrderSummary);
-      return { orders: summaries };
+      return { orders: summaries, next_continuation: null };
     },
 
     async getOrder(orderId: string): Promise<OrderDetail> {

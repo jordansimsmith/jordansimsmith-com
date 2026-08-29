@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Skeleton, Stack, Text, Title } from '@mantine/core';
+import { Button, Skeleton, Stack, Text, Title } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
 import { AppShellLayout } from '../layouts/AppShellLayout';
@@ -11,7 +11,9 @@ import { useListNavigation } from '../hooks/use-list-navigation';
 export function OrdersPage() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<OrderSummary[]>([]);
+  const [nextContinuation, setNextContinuation] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // this page has no search input; the ref keeps the navigation hook inert on "/"
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -38,6 +40,7 @@ export function OrdersPage() {
         const response = await apiClient.findOrders();
         if (!cancelled) {
           setOrders(response.orders);
+          setNextContinuation(response.next_continuation);
         }
       } catch (e) {
         if (!cancelled) {
@@ -59,6 +62,26 @@ export function OrdersPage() {
     };
   }, []);
 
+  const handleLoadMore = async () => {
+    if (!nextContinuation) {
+      return;
+    }
+    setLoadingMore(true);
+    try {
+      const response = await apiClient.findOrders({
+        continuation: nextContinuation,
+      });
+      setOrders((previous) => [...previous, ...response.orders]);
+      setNextContinuation(response.next_continuation);
+    } catch (e) {
+      const message =
+        e instanceof Error ? e.message : 'Failed to load more orders';
+      notifications.show({ title: 'Error', message, color: 'red' });
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
   return (
     <AppShellLayout>
       <Stack gap="md">
@@ -79,11 +102,23 @@ export function OrdersPage() {
           <Text c="dimmed">No orders yet.</Text>
         )}
         {!loading && !error && orders.length > 0 && (
-          <OrderTable
-            orders={orders}
-            selectedIndex={selectedIndex}
-            onOpen={openOrder}
-          />
+          <>
+            <OrderTable
+              orders={orders}
+              selectedIndex={selectedIndex}
+              onOpen={openOrder}
+            />
+            {nextContinuation && (
+              <Button
+                variant="default"
+                onClick={handleLoadMore}
+                loading={loadingMore}
+                w="fit-content"
+              >
+                Load more
+              </Button>
+            )}
+          </>
         )}
       </Stack>
     </AppShellLayout>

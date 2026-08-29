@@ -50,6 +50,7 @@ public class GetOrderHandler
       @JsonProperty("accepted_at") long acceptedAt,
       @JsonProperty("delivery_mode") @Nullable String deliveryMode,
       @JsonProperty("total_price") @Nullable String totalPrice,
+      @JsonProperty("unit_count") int unitCount,
       @JsonProperty("lines") List<OrderLineResponse> lines,
       @JsonProperty("units") List<OrderUnitResponse> units) {}
 
@@ -151,6 +152,7 @@ public class GetOrderHandler
             orderItem.getCreatedAt() != null ? orderItem.getCreatedAt().getEpochSecond() : 0,
             orderItem.getDeliveryMode(),
             orderItem.getTotalPrice(),
+            units.size(),
             lines,
             units));
   }
