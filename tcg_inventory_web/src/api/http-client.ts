@@ -3,6 +3,7 @@ import type {
   ApiClient,
   Condition,
   ConfirmImportResponse,
+  ConfirmOrderResponse,
   FindImportsParams,
   FindImportsResponse,
   FindOrdersParams,
@@ -234,7 +235,7 @@ export function createHttpClient(): ApiClient {
       return response.json();
     },
 
-    async confirmOrder(orderId: string): Promise<OrderDetail> {
+    async confirmOrder(orderId: string): Promise<ConfirmOrderResponse> {
       const response = await authenticatedFetch(
         `/orders/${encodeURIComponent(orderId)}/confirm`,
         { method: 'POST' },

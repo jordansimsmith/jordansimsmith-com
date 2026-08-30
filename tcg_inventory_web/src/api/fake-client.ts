@@ -2,6 +2,7 @@ import type {
   ApiClient,
   Condition,
   ConfirmImportResponse,
+  ConfirmOrderResponse,
   Finish,
   FindImportsResponse,
   FindOrdersResponse,
@@ -1144,7 +1145,7 @@ export function createFakeClient(): ApiClient {
       return toOrderDetail(getOrderOrThrow(orderId), skus);
     },
 
-    async confirmOrder(orderId: string): Promise<OrderDetail> {
+    async confirmOrder(orderId: string): Promise<ConfirmOrderResponse> {
       const order = getOrderOrThrow(orderId);
       if (order.state !== 'to_pick') {
         throw new Error('order is not ready to pick');
@@ -1155,7 +1156,8 @@ export function createFakeClient(): ApiClient {
       }
       order.state = 'fulfilled';
       reportStale = true;
-      return toOrderDetail(order, skus);
+      // mirror the real API: a transition receipt, not the order detail
+      return { order_id: orderId, state: order.state };
     },
 
     async createPublish(): Promise<void> {

@@ -103,8 +103,8 @@ export function OrderDetailPage() {
     }
     setConfirming(true);
     try {
-      const response = await apiClient.confirmOrder(orderId);
-      setOrder(response);
+      await apiClient.confirmOrder(orderId);
+      setOrder(await apiClient.getOrder(orderId));
       setConfirmOpen(false);
       notifications.show({
         title: 'Order fulfilled',

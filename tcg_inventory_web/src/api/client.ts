@@ -179,6 +179,11 @@ export interface OrderDetail extends OrderSummary {
   units: OrderUnit[];
 }
 
+export interface ConfirmOrderResponse {
+  order_id: string;
+  state: OrderState;
+}
+
 export type PublishRunStatus = 'queued' | 'running' | 'succeeded' | 'failed';
 
 export interface PublishResponse {
@@ -298,7 +303,7 @@ export interface ApiClient {
   ): Promise<UpdateUnitResponse>;
   findOrders(params?: FindOrdersParams): Promise<FindOrdersResponse>;
   getOrder(orderId: string): Promise<OrderDetail>;
-  confirmOrder(orderId: string): Promise<OrderDetail>;
+  confirmOrder(orderId: string): Promise<ConfirmOrderResponse>;
   createPublish(): Promise<void>;
   getPublish(): Promise<PublishResponse>;
   getReport(): Promise<ReportResponse>;

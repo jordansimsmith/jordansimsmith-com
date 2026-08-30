@@ -320,6 +320,8 @@ Response `200` (the `units` list, sorted by sequence number, is the pull sheet w
 
 Query parameters: optional `continuation` (opaque token from a previous page) and `limit` (default 20). Response is `{ "orders": [...], "next_continuation": "<token>" | null }` newest-first; `next_continuation` is null on the last page. Summaries add `unit_count` (sum of line quantities), `items_total_price` (sum of line offered totals; excludes shipping), and `listed_total_price` (sum of `listed_price × quantity`). `listed_total_price` is `null` when any line lacks a listed baseline. `total_price` remains the FetchTCG offer total and may include shipping. `GET /orders/{order_id}` also returns `unit_count` (allocated unit count).
 
+`POST /orders/{order_id}/confirm` responds `200` with a transition receipt `{"order_id": "83663", "state": "fulfilled"}` — not the order detail; clients re-read `GET /orders/{order_id}` for the updated order.
+
 - `409` on `POST /orders/{order_id}/confirm`: `{"message":"order is not ready to pick"}` when the order is not `to_pick`.
 
 `GET /reports`

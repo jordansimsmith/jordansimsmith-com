@@ -592,8 +592,11 @@ describe('createFakeClient orders', () => {
 
     const confirmed = await client.confirmOrder('83647');
 
-    expect(confirmed.state).toBe('fulfilled');
-    expect(confirmed.units).toHaveLength(3);
+    expect(confirmed).toEqual({ order_id: '83647', state: 'fulfilled' });
+
+    const detail = await client.getOrder('83647');
+    expect(detail.state).toBe('fulfilled');
+    expect(detail.units).toHaveLength(3);
 
     const solRing = await client.getSku(
       '58b26011-e103-45c4-a253-900f4e6b2eeb#normal#NM',

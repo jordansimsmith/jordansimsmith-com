@@ -135,12 +135,13 @@ describe('OrderDetailPage', () => {
 
   it('confirms the pull and renders the fulfilled order', async () => {
     const user = userEvent.setup();
-    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(
-      orderDetail(),
-    );
-    vi.spyOn(clientModule.apiClient, 'confirmOrder').mockResolvedValue(
-      orderDetail({ state: 'fulfilled' }),
-    );
+    vi.spyOn(clientModule.apiClient, 'getOrder')
+      .mockResolvedValueOnce(orderDetail())
+      .mockResolvedValue(orderDetail({ state: 'fulfilled' }));
+    vi.spyOn(clientModule.apiClient, 'confirmOrder').mockResolvedValue({
+      order_id: '83647',
+      state: 'fulfilled',
+    });
 
     renderOrderDetailPage();
     await screen.findByText('Order 83647');
@@ -157,6 +158,7 @@ describe('OrderDetailPage', () => {
       expect(clientModule.apiClient.confirmOrder).toHaveBeenCalledWith('83647');
     });
     expect(await screen.findByText('fulfilled')).toBeDefined();
+    expect(clientModule.apiClient.getOrder).toHaveBeenCalledTimes(2);
     expect(screen.getByText('Order fulfilled')).toBeDefined();
     expect(screen.getByText('Cards')).toBeDefined();
     expect(screen.queryByText('Pull sheet')).toBeNull();
