@@ -50,29 +50,65 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
       {
         sequence_number: 37,
         location: 'A0-37',
+        current_location: 'A0-35',
         name: 'Sol Ring',
         set_code: 'cmr',
         collector_number: '472',
         finish: 'normal',
         condition: 'NM',
+        price: '4.00',
+        previous_card: {
+          name: 'Llanowar Elves',
+          set_code: 'dom',
+          collector_number: '168',
+          finish: 'normal',
+          condition: 'NM',
+        },
+        next_card: {
+          name: 'Sol Ring',
+          set_code: 'cmr',
+          collector_number: '472',
+          finish: 'normal',
+          condition: 'NM',
+        },
       },
       {
         sequence_number: 74,
         location: 'A0-74',
+        current_location: 'A0-70',
         name: 'Sol Ring',
         set_code: 'cmr',
         collector_number: '472',
         finish: 'normal',
         condition: 'NM',
+        price: '4.00',
+        previous_card: {
+          name: 'Brainstorm',
+          set_code: 'ema',
+          collector_number: '40',
+          finish: 'normal',
+          condition: 'NM',
+        },
+        next_card: null,
       },
       {
         sequence_number: 259,
         location: 'A2-59',
+        current_location: 'A2-59',
         name: 'Elvish Aberration',
         set_code: 'a25',
         collector_number: '167',
         finish: 'foil',
         condition: 'NM',
+        price: '2.90',
+        previous_card: null,
+        next_card: {
+          name: 'Counterspell',
+          set_code: 'mh2',
+          collector_number: '267',
+          finish: 'normal',
+          condition: 'NM',
+        },
       },
     ],
     ...overrides,
@@ -112,24 +148,29 @@ describe('OrderDetailPage', () => {
     expect(await screen.findByText('Order 83647')).toBeDefined();
     expect(screen.getByText('to pick')).toBeDefined();
     expect(screen.getByText('PICKUP · $10.90')).toBeDefined();
-    expect(screen.getAllByText('−16% vs list').length).toBeGreaterThan(0);
-    expect(screen.getByText('Offer')).toBeDefined();
-    expect(screen.getByText('CMR #472 · NM · ×2')).toBeDefined();
-    expect(screen.getByText('$8.00')).toBeDefined();
-    expect(screen.getByText('listed $10.00')).toBeDefined();
-    expect(screen.getByText('−20% vs list')).toBeDefined();
-    expect(screen.getByText('A25 #167 · NM · foil · ×1')).toBeDefined();
-    expect(screen.getByText('$2.90')).toBeDefined();
-    expect(screen.getByText('listed $3.00')).toBeDefined();
-    expect(screen.getByText('−3% vs list')).toBeDefined();
+    expect(screen.getByText('Offered $10.90 · Listed $13.00')).toBeDefined();
+    expect(screen.getByText('−16% vs list')).toBeDefined();
+    expect(screen.queryByText('Offer')).toBeNull();
     expect(screen.getByText('Pull sheet')).toBeDefined();
 
+    // current locations render big with the insertion location struck through
+    // beside them when they differ
     const locations = screen
       .getAllByText(/^A\d+-\d+$/)
       .map((element) => element.textContent);
-    expect(locations).toEqual(['A0-37', 'A0-74', 'A2-59']);
-    expect(screen.getAllByText('Sol Ring')).toHaveLength(3);
+    expect(locations).toEqual(['A0-35', 'A0-37', 'A0-70', 'A0-74', 'A2-59']);
+    expect(screen.getAllByText('$4.00')).toHaveLength(2);
+    expect(screen.getByText('$2.90')).toBeDefined();
+    expect(screen.getAllByText('Sol Ring')).toHaveLength(2);
     expect(screen.getByText('A25 #167 · NM · foil')).toBeDefined();
+    expect(
+      screen.getByText('Prev · Llanowar Elves · DOM #168 · NM'),
+    ).toBeDefined();
+    expect(screen.getByText('Next · Sol Ring · CMR #472 · NM')).toBeDefined();
+    expect(screen.getByText('Prev · Brainstorm · EMA #40 · NM')).toBeDefined();
+    expect(
+      screen.getByText('Next · Counterspell · MH2 #267 · NM'),
+    ).toBeDefined();
     expect(screen.getByRole('button', { name: 'Confirm pull' })).toBeDefined();
   });
 
@@ -163,6 +204,14 @@ describe('OrderDetailPage', () => {
     expect(screen.getByText('Cards')).toBeDefined();
     expect(screen.queryByText('Pull sheet')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Confirm pull' })).toBeNull();
+
+    // fulfilled orders show insertion locations only, without pull context
+    const locations = screen
+      .getAllByText(/^A\d+-\d+$/)
+      .map((element) => element.textContent);
+    expect(locations).toEqual(['A0-37', 'A0-74', 'A2-59']);
+    expect(screen.queryByText(/^Prev ·/)).toBeNull();
+    expect(screen.queryByText(/^Next ·/)).toBeNull();
   });
 
   it('surfaces confirm failures and stays on the pull sheet', async () => {
@@ -207,11 +256,15 @@ describe('OrderDetailPage', () => {
           {
             sequence_number: 1,
             location: 'A0-1',
+            current_location: 'A0-1',
             name: 'Hellkite Tyrant',
             set_code: 'gtc',
             collector_number: '94',
             finish: 'normal',
             condition: 'NM',
+            price: '8.50',
+            previous_card: null,
+            next_card: null,
           },
         ],
       }),
@@ -220,7 +273,7 @@ describe('OrderDetailPage', () => {
     renderOrderDetailPage();
 
     expect(await screen.findByText('Order 83647')).toBeDefined();
-    expect(screen.getByText('listed $8.50')).toBeDefined();
+    expect(screen.getByText('Offered $8.50 · Listed $8.50')).toBeDefined();
     expect(screen.queryByText(/vs list/)).toBeNull();
   });
 
@@ -236,6 +289,8 @@ describe('OrderDetailPage', () => {
     expect(screen.getByText('Cards')).toBeDefined();
     expect(screen.queryByText('Pull sheet')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Confirm pull' })).toBeNull();
+    // reserved cards are still boxed, so pull context renders before payment
+    expect(screen.getByText('A0-35')).toBeDefined();
   });
 
   it('returns to the orders list on Escape', async () => {

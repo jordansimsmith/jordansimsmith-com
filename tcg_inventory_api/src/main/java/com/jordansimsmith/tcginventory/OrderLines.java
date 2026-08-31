@@ -36,4 +36,29 @@ public class OrderLines {
     }
     return total;
   }
+
+  @Nullable
+  public static String itemsTotalPrice(List<OrderLine> lines) {
+    if (lines.isEmpty()) {
+      return null;
+    }
+    return itemsTotal(lines).toPlainString();
+  }
+
+  @Nullable
+  public static String listedTotalPrice(List<OrderLine> lines) {
+    if (lines.isEmpty()) {
+      return null;
+    }
+    var total = BigDecimal.ZERO;
+    for (var line : lines) {
+      if (line.listedPrice() == null) {
+        return null;
+      }
+      total =
+          total.add(
+              new BigDecimal(line.listedPrice()).multiply(BigDecimal.valueOf(line.quantity())));
+    }
+    return total.toPlainString();
+  }
 }

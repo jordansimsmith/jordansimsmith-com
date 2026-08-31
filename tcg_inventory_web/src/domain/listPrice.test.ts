@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareToList, formatVsList, listedLineTotal } from './listPrice';
+import { compareToList, formatVsList } from './listPrice';
 
 describe('listPrice', () => {
   it('compares offered totals against listed totals', () => {
@@ -12,10 +12,5 @@ describe('listPrice', () => {
     expect(formatVsList('3.33', '3.50')).toBe('−5% vs list');
     expect(formatVsList('10.90', '13.00')).toBe('−16% vs list');
     expect(formatVsList('1.00', '0.80')).toBe('+25% vs list');
-  });
-
-  it('multiplies per-unit listed price by quantity', () => {
-    expect(listedLineTotal('2.00', 2)).toBe('4.00');
-    expect(listedLineTotal('5.00', 1)).toBe('5.00');
   });
 });

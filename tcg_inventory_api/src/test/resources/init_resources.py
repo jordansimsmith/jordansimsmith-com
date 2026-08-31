@@ -37,6 +37,8 @@ dynamodb_client.create_table(
         {"AttributeName": "gsi1sk", "AttributeType": "S"},
         {"AttributeName": "gsi2pk", "AttributeType": "S"},
         {"AttributeName": "gsi2sk", "AttributeType": "S"},
+        {"AttributeName": "gsi3pk", "AttributeType": "S"},
+        {"AttributeName": "sequence_number", "AttributeType": "N"},
     ],
     KeySchema=[
         {"AttributeName": "pk", "KeyType": "HASH"},
@@ -56,6 +58,14 @@ dynamodb_client.create_table(
             "KeySchema": [
                 {"AttributeName": "gsi2pk", "KeyType": "HASH"},
                 {"AttributeName": "gsi2sk", "KeyType": "RANGE"},
+            ],
+            "Projection": {"ProjectionType": "ALL"},
+        },
+        {
+            "IndexName": "gsi3",
+            "KeySchema": [
+                {"AttributeName": "gsi3pk", "KeyType": "HASH"},
+                {"AttributeName": "sequence_number", "KeyType": "RANGE"},
             ],
             "Projection": {"ProjectionType": "ALL"},
         },

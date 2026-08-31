@@ -252,6 +252,16 @@ resource "aws_dynamodb_table" "tcg_inventory" {
     type = "S"
   }
 
+  attribute {
+    name = "gsi3pk"
+    type = "S"
+  }
+
+  attribute {
+    name = "sequence_number"
+    type = "N"
+  }
+
   global_secondary_index {
     name            = "gsi1"
     hash_key        = "gsi1pk"
@@ -263,6 +273,13 @@ resource "aws_dynamodb_table" "tcg_inventory" {
     name            = "gsi2"
     hash_key        = "gsi2pk"
     range_key       = "gsi2sk"
+    projection_type = "ALL"
+  }
+
+  global_secondary_index {
+    name            = "gsi3"
+    hash_key        = "gsi3pk"
+    range_key       = "sequence_number"
     projection_type = "ALL"
   }
 

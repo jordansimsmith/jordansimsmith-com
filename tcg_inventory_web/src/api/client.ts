@@ -153,14 +153,26 @@ export interface FindOrdersParams {
   continuation?: string;
 }
 
-export interface OrderUnit {
-  sequence_number: number;
-  location: string;
+export interface OrderNeighborCard {
   name: string;
   set_code: string;
   collector_number: string;
   finish: Finish;
   condition: Condition;
+}
+
+export interface OrderUnit {
+  sequence_number: number;
+  location: string;
+  current_location: string;
+  name: string;
+  set_code: string;
+  collector_number: string;
+  finish: Finish;
+  condition: Condition;
+  price: string | null;
+  previous_card: OrderNeighborCard | null;
+  next_card: OrderNeighborCard | null;
 }
 
 export interface OrderLine {

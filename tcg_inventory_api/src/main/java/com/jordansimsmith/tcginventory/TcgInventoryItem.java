@@ -26,12 +26,14 @@ public class TcgInventoryItem {
   public static final String COUNTER_PREFIX = "COUNTER" + DELIMITER;
   public static final String DIRTY_SUFFIX = "DIRTY";
   public static final String SKUS_SUFFIX = "SKUS";
+  public static final String UNITS_SUFFIX = "UNITS";
   public static final String NAME_PREFIX = "NAME" + DELIMITER;
   public static final String AUDIT_SUFFIX = "AUDIT";
 
   public static final String TABLE_NAME = "tcg_inventory";
   public static final String GSI1_NAME = "gsi1";
   public static final String GSI2_NAME = "gsi2";
+  public static final String GSI3_NAME = "gsi3";
 
   public static final String PK = "pk";
   public static final String SK = "sk";
@@ -39,6 +41,7 @@ public class TcgInventoryItem {
   public static final String GSI1SK = "gsi1sk";
   public static final String GSI2PK = "gsi2pk";
   public static final String GSI2SK = "gsi2sk";
+  public static final String GSI3PK = "gsi3pk";
   public static final String SKU_ID = "sku_id";
   public static final String SCRYFALL_ID = "scryfall_id";
   public static final String FINISH = "finish";
@@ -94,6 +97,7 @@ public class TcgInventoryItem {
   private String gsi1sk;
   private String gsi2pk;
   private String gsi2sk;
+  private String gsi3pk;
   private String skuId;
   private String scryfallId;
   private String finish;
@@ -203,6 +207,17 @@ public class TcgInventoryItem {
 
   public void setGsi2sk(@Nullable String gsi2sk) {
     this.gsi2sk = gsi2sk;
+  }
+
+  @Nullable
+  @DynamoDbSecondaryPartitionKey(indexNames = GSI3_NAME)
+  @DynamoDbAttribute(GSI3PK)
+  public String getGsi3pk() {
+    return gsi3pk;
+  }
+
+  public void setGsi3pk(@Nullable String gsi3pk) {
+    this.gsi3pk = gsi3pk;
   }
 
   @Nullable
@@ -326,6 +341,7 @@ public class TcgInventoryItem {
   }
 
   @Nullable
+  @DynamoDbSecondarySortKey(indexNames = GSI3_NAME)
   @DynamoDbAttribute(SEQUENCE_NUMBER)
   public Integer getSequenceNumber() {
     return sequenceNumber;
@@ -680,6 +696,7 @@ public class TcgInventoryItem {
         && Objects.equals(gsi1sk, that.gsi1sk)
         && Objects.equals(gsi2pk, that.gsi2pk)
         && Objects.equals(gsi2sk, that.gsi2sk)
+        && Objects.equals(gsi3pk, that.gsi3pk)
         && Objects.equals(skuId, that.skuId)
         && Objects.equals(scryfallId, that.scryfallId)
         && Objects.equals(finish, that.finish)
@@ -737,6 +754,7 @@ public class TcgInventoryItem {
         gsi1sk,
         gsi2pk,
         gsi2sk,
+        gsi3pk,
         skuId,
         scryfallId,
         finish,
@@ -805,6 +823,9 @@ public class TcgInventoryItem {
         + '\''
         + ", gsi2sk='"
         + gsi2sk
+        + '\''
+        + ", gsi3pk='"
+        + gsi3pk
         + '\''
         + ", skuId='"
         + skuId
@@ -994,6 +1015,10 @@ public class TcgInventoryItem {
     return USER_PREFIX + user + DELIMITER + SKUS_SUFFIX;
   }
 
+  public static String formatGsi3pk(String user) {
+    return USER_PREFIX + user + DELIMITER + UNITS_SUFFIX;
+  }
+
   public static String formatGsi2sk(String normalizedName, String skuId) {
     return NAME_PREFIX + normalizedName + DELIMITER + skuId;
   }
@@ -1042,6 +1067,7 @@ public class TcgInventoryItem {
     var item = new TcgInventoryItem();
     item.setPk(formatSkuPk(user, skuId));
     item.setSk(formatUnitSk(sequenceNumber));
+    item.setGsi3pk(formatGsi3pk(user));
     item.setSequenceNumber(sequenceNumber);
     item.setStatus(status);
     item.setImportId(importId);

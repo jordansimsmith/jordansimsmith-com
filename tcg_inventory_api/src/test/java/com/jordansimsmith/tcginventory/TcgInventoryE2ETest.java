@@ -238,6 +238,8 @@ public class TcgInventoryE2ETest {
     assertThat(orderDetailBody.get("order_id").asText()).isEqualTo("99001");
     assertThat(orderDetailBody.get("state").asText()).isEqualTo("to_pick");
     assertThat(orderDetailBody.get("delivery_mode").asText()).isEqualTo("PICKUP");
+    assertThat(orderDetailBody.get("items_total_price").asText()).isEqualTo("1.50");
+    assertThat(orderDetailBody.get("listed_total_price").asText()).isEqualTo("2.00");
     var orderLines = orderDetailBody.get("lines");
     assertThat(orderLines).hasSize(1);
     assertThat(orderLines.get(0).get("quantity").asInt()).isEqualTo(1);
@@ -247,6 +249,10 @@ public class TcgInventoryE2ETest {
     assertThat(orderUnits).hasSize(1);
     assertThat(orderUnits.get(0).get("sequence_number").asInt()).isZero();
     assertThat(orderUnits.get(0).get("location").asText()).isEqualTo("A0-0");
+    assertThat(orderUnits.get(0).get("current_location").asText()).isEqualTo("A0-0");
+    assertThat(orderUnits.get(0).get("price").asText()).isEqualTo("1.50");
+    assertThat(orderUnits.get(0).get("previous_card").isNull()).isTrue();
+    assertThat(orderUnits.get(0).get("next_card").get("name").asText()).isEqualTo("Test Hit");
 
     var swappedListing = getStubListing();
     assertThat(swappedListing.get("frontImage").asText()).isEqualTo(STUB_IMAGE_3);

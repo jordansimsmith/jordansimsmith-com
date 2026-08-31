@@ -8,8 +8,10 @@ public class InventoryLocation {
   }
 
   public static String formatLocation(int sequenceNumber) {
-    int blockNum = sequenceNumber / 100;
-    int offset = sequenceNumber % 100;
-    return formatBlock(blockNum) + "-" + offset;
+    return formatLocation(sequenceNumber / 100, sequenceNumber % 100);
+  }
+
+  public static String formatLocation(int blockNumber, int offset) {
+    return formatBlock(blockNumber) + "-" + offset;
   }
 }

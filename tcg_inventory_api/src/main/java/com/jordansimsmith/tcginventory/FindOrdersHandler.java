@@ -10,7 +10,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.dynamodb.Continuations;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import java.math.BigDecimal;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
@@ -116,8 +115,8 @@ public class FindOrdersHandler
                       item.getCreatedAt() != null ? item.getCreatedAt().getEpochSecond() : 0,
                       item.getDeliveryMode(),
                       item.getTotalPrice(),
-                      itemsTotalPrice(orderLines),
-                      listedTotalPrice(orderLines),
+                      OrderLines.itemsTotalPrice(orderLines),
+                      OrderLines.listedTotalPrice(orderLines),
                       unitCount);
                 })
             .toList();
@@ -129,28 +128,5 @@ public class FindOrdersHandler
     }
 
     return httpResponseFactory.ok(new FindOrdersResponse(orders, nextContinuation));
-  }
-
-  private static @Nullable String itemsTotalPrice(List<OrderLines.OrderLine> orderLines) {
-    if (orderLines.isEmpty()) {
-      return null;
-    }
-    return OrderLines.itemsTotal(orderLines).toPlainString();
-  }
-
-  private static @Nullable String listedTotalPrice(List<OrderLines.OrderLine> orderLines) {
-    if (orderLines.isEmpty()) {
-      return null;
-    }
-    var total = BigDecimal.ZERO;
-    for (var line : orderLines) {
-      if (line.listedPrice() == null) {
-        return null;
-      }
-      total =
-          total.add(
-              new BigDecimal(line.listedPrice()).multiply(BigDecimal.valueOf(line.quantity())));
-    }
-    return total.toPlainString();
   }
 }

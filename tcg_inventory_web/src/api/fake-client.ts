@@ -15,6 +15,7 @@ import type {
   ImportSummary,
   OrderDetail,
   OrderLine,
+  OrderNeighborCard,
   OrderState,
   OrderSummary,
   OrderUnit,
@@ -681,7 +682,76 @@ function publishedCount(run: FakePublishRun): number {
   );
 }
 
+interface BlockUnit {
+  sequence_number: number;
+  status: UnitStatus;
+  sku: FakeSku;
+}
+
+function toNeighborCard(unit: BlockUnit | null): OrderNeighborCard | null {
+  if (!unit) {
+    return null;
+  }
+  return {
+    name: unit.sku.name,
+    set_code: unit.sku.set_code,
+    collector_number: unit.sku.collector_number,
+    finish: unit.sku.finish,
+    condition: unit.sku.condition,
+  };
+}
+
+// mirrors the backend: a snapshot of the box at read time where sold and
+// removed units are gone and in-stock and reserved units still occupy slots
+function computeBlockPosition(
+  allUnits: BlockUnit[],
+  sequenceNumber: number,
+): Pick<OrderUnit, 'current_location' | 'previous_card' | 'next_card'> {
+  const block = Math.floor(sequenceNumber / 100);
+  let offset = 0;
+  let previous: BlockUnit | null = null;
+  let next: BlockUnit | null = null;
+  for (const unit of allUnits) {
+    if (
+      unit.sequence_number === sequenceNumber ||
+      Math.floor(unit.sequence_number / 100) !== block ||
+      unit.status === 'sold' ||
+      unit.status === 'removed'
+    ) {
+      continue;
+    }
+    if (unit.sequence_number < sequenceNumber) {
+      offset += 1;
+      if (!previous || previous.sequence_number < unit.sequence_number) {
+        previous = unit;
+      }
+    } else if (!next || next.sequence_number > unit.sequence_number) {
+      next = unit;
+    }
+  }
+  return {
+    current_location: `${deriveBlock(sequenceNumber)}-${offset}`,
+    previous_card: toNeighborCard(previous),
+    next_card: toNeighborCard(next),
+  };
+}
+
+function perUnitPrice(line: FakeOrderLine): string {
+  const cents = Math.round(Number(line.price) * 100);
+  return (Math.round(cents / line.quantity) / 100).toFixed(2);
+}
+
 function toOrderDetail(order: FakeOrder, skus: FakeSku[]): OrderDetail {
+  const allUnits: BlockUnit[] = skus.flatMap((sku) =>
+    sku.units.map((unit) => ({
+      sequence_number: unit.sequence_number,
+      status: unit.status,
+      sku,
+    })),
+  );
+  const unitPriceBySkuId = new Map(
+    order.lines.map((line) => [line.sku_id, perUnitPrice(line)]),
+  );
   const units: OrderUnit[] = order.units
     .map((ref) => {
       const sku = skus.find((candidate) => candidate.sku_id === ref.sku_id);
@@ -696,6 +766,8 @@ function toOrderDetail(order: FakeOrder, skus: FakeSku[]): OrderDetail {
         collector_number: sku.collector_number,
         finish: sku.finish,
         condition: sku.condition,
+        price: unitPriceBySkuId.get(ref.sku_id) ?? null,
+        ...computeBlockPosition(allUnits, ref.sequence_number),
       };
     })
     .sort((a, b) => a.sequence_number - b.sequence_number);

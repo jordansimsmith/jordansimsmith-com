@@ -547,9 +547,27 @@ describe('createFakeClient orders', () => {
       const block = Math.floor(unit.sequence_number / 100);
       expect(unit.location).toBe(`A${block}-${unit.sequence_number % 100}`);
     }
-    expect(
-      detail.units.filter((unit) => unit.name === 'Sol Ring'),
-    ).toHaveLength(2);
+    for (const unit of detail.units) {
+      expect(unit.current_location).toMatch(/^A\d+-\d+$/);
+      // gaps only ever pull a card forward from its insertion offset
+      const currentOffset = Number(unit.current_location.split('-')[1]);
+      expect(currentOffset).toBeLessThanOrEqual(unit.sequence_number % 100);
+    }
+    const neighbors = detail.units.flatMap((unit) =>
+      [unit.previous_card, unit.next_card].filter((card) => card != null),
+    );
+    expect(neighbors.length).toBeGreaterThan(0);
+    for (const card of neighbors) {
+      expect(card.name).toBeTruthy();
+      expect(card.set_code).toBeTruthy();
+      expect(card.collector_number).toBeTruthy();
+    }
+    const solRingUnits = detail.units.filter(
+      (unit) => unit.name === 'Sol Ring',
+    );
+    expect(solRingUnits).toHaveLength(2);
+    // the 8.00 line total splits evenly across its two units
+    expect(solRingUnits.every((unit) => unit.price === '4.00')).toBe(true);
     const aberration = detail.units.find(
       (unit) => unit.name === 'Elvish Aberration',
     );
@@ -557,6 +575,7 @@ describe('createFakeClient orders', () => {
     expect(aberration?.collector_number).toBe('167');
     expect(aberration?.finish).toBe('normal');
     expect(aberration?.condition).toBe('NM');
+    expect(aberration?.price).toBe('2.90');
     expect(detail.lines).toEqual([
       {
         name: 'Sol Ring',

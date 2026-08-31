@@ -9,30 +9,46 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 public class GetOrderHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GetOrderHandler.class);
 
-  record OrderUnitResponse(
-      @JsonProperty("sequence_number") int sequenceNumber,
-      @JsonProperty("location") String location,
+  record NeighborCardResponse(
       @JsonProperty("name") String name,
       @JsonProperty("set_code") String setCode,
       @JsonProperty("collector_number") String collectorNumber,
       @JsonProperty("finish") String finish,
       @JsonProperty("condition") String condition) {}
+
+  record OrderUnitResponse(
+      @JsonProperty("sequence_number") int sequenceNumber,
+      @JsonProperty("location") String location,
+      @JsonProperty("current_location") String currentLocation,
+      @JsonProperty("name") String name,
+      @JsonProperty("set_code") String setCode,
+      @JsonProperty("collector_number") String collectorNumber,
+      @JsonProperty("finish") String finish,
+      @JsonProperty("condition") String condition,
+      @JsonProperty("price") @Nullable String price,
+      @JsonProperty("previous_card") @Nullable NeighborCardResponse previousCard,
+      @JsonProperty("next_card") @Nullable NeighborCardResponse nextCard) {}
 
   record OrderLineResponse(
       @JsonProperty("name") String name,
@@ -50,11 +66,18 @@ public class GetOrderHandler
       @JsonProperty("accepted_at") long acceptedAt,
       @JsonProperty("delivery_mode") @Nullable String deliveryMode,
       @JsonProperty("total_price") @Nullable String totalPrice,
+      @JsonProperty("items_total_price") @Nullable String itemsTotalPrice,
+      @JsonProperty("listed_total_price") @Nullable String listedTotalPrice,
       @JsonProperty("unit_count") int unitCount,
       @JsonProperty("lines") List<OrderLineResponse> lines,
       @JsonProperty("units") List<OrderUnitResponse> units) {}
 
   record ErrorResponse(@JsonProperty("message") String message) {}
+
+  private record BlockPosition(
+      String currentLocation,
+      @Nullable TcgInventoryItem previousUnit,
+      @Nullable TcgInventoryItem nextUnit) {}
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
@@ -99,21 +122,14 @@ public class GetOrderHandler
     }
 
     var orderLines = OrderLines.parse(orderItem.getLines(), objectMapper);
+    var blockUnits = findBlockUnits(user, orderLines);
 
     Map<String, TcgInventoryItem> skuCache = new HashMap<>();
     var units = new ArrayList<OrderUnitResponse>();
     var lines = new ArrayList<OrderLineResponse>();
 
     for (var line : orderLines) {
-      var skuItem =
-          skuCache.computeIfAbsent(
-              line.skuId(),
-              skuId ->
-                  tcgInventoryTable.getItem(
-                      Key.builder()
-                          .partitionValue(TcgInventoryItem.formatSkuPk(user, skuId))
-                          .sortValue(TcgInventoryItem.formatSkuSk())
-                          .build()));
+      var skuItem = getSku(TcgInventoryItem.formatSkuPk(user, line.skuId()), skuCache);
 
       if (skuItem == null) {
         continue;
@@ -130,16 +146,22 @@ public class GetOrderHandler
               line.price(),
               line.listedPrice()));
 
+      var unitPrice = perUnitPrice(line);
       for (var seqNum : line.allocatedSequenceNumbers()) {
+        var position = computeBlockPosition(blockUnits, seqNum);
         units.add(
             new OrderUnitResponse(
                 seqNum,
                 InventoryLocation.formatLocation(seqNum),
+                position.currentLocation(),
                 skuItem.getName(),
                 skuItem.getSetCode(),
                 skuItem.getCollectorNumber(),
                 skuItem.getFinish(),
-                skuItem.getCondition()));
+                skuItem.getCondition(),
+                unitPrice,
+                toNeighborCard(position.previousUnit(), skuCache),
+                toNeighborCard(position.nextUnit(), skuCache)));
       }
     }
 
@@ -152,8 +174,109 @@ public class GetOrderHandler
             orderItem.getCreatedAt() != null ? orderItem.getCreatedAt().getEpochSecond() : 0,
             orderItem.getDeliveryMode(),
             orderItem.getTotalPrice(),
+            OrderLines.itemsTotalPrice(orderLines),
+            OrderLines.listedTotalPrice(orderLines),
             units.size(),
             lines,
             units));
+  }
+
+  private Map<Integer, List<TcgInventoryItem>> findBlockUnits(
+      String user, List<OrderLines.OrderLine> orderLines) {
+    var blocks = new TreeSet<Integer>();
+    for (var line : orderLines) {
+      for (var seqNum : line.allocatedSequenceNumbers()) {
+        blocks.add(seqNum / 100);
+      }
+    }
+
+    var gsi3 = tcgInventoryTable.index(TcgInventoryItem.GSI3_NAME);
+    var blockUnits = new HashMap<Integer, List<TcgInventoryItem>>();
+    for (var block : blocks) {
+      var request =
+          QueryEnhancedRequest.builder()
+              .queryConditional(
+                  QueryConditional.sortBetween(
+                      Key.builder()
+                          .partitionValue(TcgInventoryItem.formatGsi3pk(user))
+                          .sortValue(block * 100)
+                          .build(),
+                      Key.builder()
+                          .partitionValue(TcgInventoryItem.formatGsi3pk(user))
+                          .sortValue(block * 100 + 99)
+                          .build()))
+              .build();
+      blockUnits.put(
+          block, gsi3.query(request).stream().flatMap(page -> page.items().stream()).toList());
+    }
+    return blockUnits;
+  }
+
+  // current position and neighbors are a snapshot of the box at read time: sold and removed
+  // units are gone, in-stock and reserved units still occupy their slots
+  private BlockPosition computeBlockPosition(
+      Map<Integer, List<TcgInventoryItem>> blockUnits, int sequenceNumber) {
+    var offset = 0;
+    TcgInventoryItem previous = null;
+    TcgInventoryItem next = null;
+
+    for (var unit : blockUnits.get(sequenceNumber / 100)) {
+      int unitSeq = unit.getSequenceNumber();
+      var status = unit.getStatus();
+      if (unitSeq == sequenceNumber || "sold".equals(status) || "removed".equals(status)) {
+        continue;
+      }
+      if (unitSeq < sequenceNumber) {
+        offset++;
+        if (previous == null || previous.getSequenceNumber() < unitSeq) {
+          previous = unit;
+        }
+      } else if (next == null || next.getSequenceNumber() > unitSeq) {
+        next = unit;
+      }
+    }
+
+    return new BlockPosition(
+        InventoryLocation.formatLocation(sequenceNumber / 100, offset), previous, next);
+  }
+
+  @Nullable
+  private NeighborCardResponse toNeighborCard(
+      @Nullable TcgInventoryItem unit, Map<String, TcgInventoryItem> skuCache) {
+    if (unit == null) {
+      return null;
+    }
+    var skuItem = getSku(unit.getPk(), skuCache);
+    if (skuItem == null) {
+      throw new IllegalStateException("sku record missing for unit " + unit.getSequenceNumber());
+    }
+    return new NeighborCardResponse(
+        skuItem.getName(),
+        skuItem.getSetCode(),
+        skuItem.getCollectorNumber(),
+        skuItem.getFinish(),
+        skuItem.getCondition());
+  }
+
+  @Nullable
+  private TcgInventoryItem getSku(String skuPk, Map<String, TcgInventoryItem> skuCache) {
+    return skuCache.computeIfAbsent(
+        skuPk,
+        pk ->
+            tcgInventoryTable.getItem(
+                Key.builder()
+                    .partitionValue(pk)
+                    .sortValue(TcgInventoryItem.formatSkuSk())
+                    .build()));
+  }
+
+  @Nullable
+  private static String perUnitPrice(OrderLines.OrderLine line) {
+    if (line.price() == null) {
+      return null;
+    }
+    return new BigDecimal(line.price())
+        .divide(BigDecimal.valueOf(line.quantity()), 2, RoundingMode.HALF_UP)
+        .toPlainString();
   }
 }

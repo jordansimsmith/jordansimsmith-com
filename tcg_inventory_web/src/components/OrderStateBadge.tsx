@@ -14,7 +14,11 @@ interface OrderStateBadgeProps {
 
 export function OrderStateBadge({ state }: OrderStateBadgeProps) {
   return (
-    <Badge variant="light" color={STATE_COLORS[state]}>
+    <Badge
+      variant="light"
+      color={STATE_COLORS[state]}
+      style={{ flexShrink: 0, minWidth: 'max-content' }}
+    >
       {state.replace('_', ' ')}
     </Badge>
   );
