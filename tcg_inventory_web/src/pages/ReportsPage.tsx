@@ -18,6 +18,7 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { JobFailureAlert } from '../components/JobFailureAlert';
 import { apiClient } from '../api/client';
+import { formatSetNumber } from '../domain/card-label';
 import type {
   ReportAgingBand,
   ReportIntakeVsSales,
@@ -304,21 +305,22 @@ function TopHitsTable({ topHits }: { topHits: ReportTopHit[] }) {
             {topHits.map((hit, index) => (
               <Table.Tr key={hit.sku_id}>
                 <Table.Td c="dimmed">{index + 1}</Table.Td>
-                <Table.Td fw={500}>{hit.name}</Table.Td>
-                <Table.Td>{hit.set_code.toUpperCase()}</Table.Td>
                 <Table.Td
-                  c={hit.finish === 'normal' ? 'dimmed' : undefined}
-                  fw={hit.finish === 'normal' ? undefined : 600}
+                  className={hit.finish === 'foil' ? 'foil-finish' : undefined}
+                  fw={hit.finish === 'foil' ? 700 : 500}
+                >
+                  {hit.name}
+                </Table.Td>
+                <Table.Td>
+                  {formatSetNumber(hit.set_code, hit.collector_number)}
+                </Table.Td>
+                <Table.Td
+                  fw={hit.finish === 'normal' ? undefined : 700}
                   tt="capitalize"
                 >
-                  {hit.finish === 'normal' ? '—' : hit.finish}
+                  {hit.finish}
                 </Table.Td>
-                <Table.Td
-                  c={hit.condition === 'NM' ? 'dimmed' : undefined}
-                  fw={hit.condition === 'NM' ? undefined : 600}
-                >
-                  {hit.condition}
-                </Table.Td>
+                <Table.Td>{hit.condition}</Table.Td>
                 <Table.Td
                   ta="right"
                   style={{ fontVariantNumeric: 'tabular-nums' }}

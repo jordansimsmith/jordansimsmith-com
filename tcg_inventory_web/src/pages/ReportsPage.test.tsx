@@ -273,12 +273,36 @@ describe('ReportsPage', () => {
     expect(screen.getByText('Price')).toBeDefined();
     expect(screen.getByText('NM')).toBeDefined();
     expect(screen.getByText('LP')).toBeDefined();
+    expect(screen.getByText('NM').style.fontWeight).toBe('');
+    expect(screen.getByText('LP').style.fontWeight).toBe('');
+    expect(screen.getByText('NM').style.color).toBe('');
+    expect(screen.getByText('LP').style.color).toBe('');
     // rank column: two hits ranked 1 and 2
     expect(screen.getByText('1')).toBeDefined();
     expect(screen.getByText('2')).toBeDefined();
-    // normal finish is muted to a dash, foil is spelled out
-    expect(screen.getByText('—')).toBeDefined();
+    expect(screen.getByText('MH2#138')).toBeDefined();
+    expect(screen.getByText('BBD#195')).toBeDefined();
+    expect(screen.getByText('normal')).toBeDefined();
     expect(screen.getByText('foil')).toBeDefined();
+    expect(screen.getByText('normal').style.fontWeight).toBe('');
+    expect(screen.getByText('foil').style.fontWeight).toBe('700');
+    const headers = screen
+      .getAllByRole('columnheader')
+      .map((header) => header.textContent);
+    expect(headers.indexOf('Finish')).toBe(headers.indexOf('Set') + 1);
+    expect(headers.indexOf('Condition')).toBe(headers.indexOf('Finish') + 1);
+    expect(
+      screen.getByText('Doubling Season').classList.contains('foil-finish'),
+    ).toBe(true);
+    expect(screen.getByText('Doubling Season').style.fontWeight).toBe('700');
+    expect(
+      screen
+        .getByText('Ragavan, Nimble Pilferer')
+        .classList.contains('foil-finish'),
+    ).toBe(false);
+    expect(screen.getByText('Ragavan, Nimble Pilferer').style.fontWeight).toBe(
+      '500',
+    );
   });
 
   it('shouldShowTopHitsEmptyMessageWhenEmpty', async () => {

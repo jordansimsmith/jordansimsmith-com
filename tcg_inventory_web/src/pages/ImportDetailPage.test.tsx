@@ -251,7 +251,7 @@ describe('ImportDetailPage', () => {
     });
   });
 
-  it('places finish after name and bolds non-normal finishes', async () => {
+  it('places set then finish after name and bolds non-normal finishes', async () => {
     vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
       reviewImport({
         rows: [
@@ -266,6 +266,11 @@ describe('ImportDetailPage', () => {
             finish: 'etched',
             decision: 'keep',
           }),
+          importRow(4, {
+            name: 'Discarded Foil',
+            finish: 'foil',
+            decision: 'discard',
+          }),
         ],
       }),
     );
@@ -276,26 +281,68 @@ describe('ImportDetailPage', () => {
     const headers = screen
       .getAllByRole('columnheader')
       .map((header) => header.textContent);
-    expect(headers.indexOf('Finish')).toBe(headers.indexOf('Name') + 1);
+    expect(headers.indexOf('Set')).toBe(headers.indexOf('Name') + 1);
+    expect(headers.indexOf('Finish')).toBe(headers.indexOf('Set') + 1);
+    expect(headers.indexOf('Condition')).toBe(headers.indexOf('Finish') + 1);
+    expect(headers).not.toContain('#');
 
-    const cellAfterName = (name: string) => {
+    const cellsAfterName = (name: string) => {
       const row = screen.getByText(name).closest('tr') as HTMLElement;
-      return within(row).getAllByRole('cell')[2];
+      return within(row).getAllByRole('cell');
     };
 
-    const normalCell = cellAfterName('Normal Card');
-    expect(normalCell.textContent).toBe('normal');
-    expect(normalCell.style.fontWeight).toBe('');
+    const normalCells = cellsAfterName('Normal Card');
+    expect(normalCells[2].textContent).toBe('DOM#1');
+    expect(normalCells[3].textContent).toBe('normal');
+    expect(normalCells[3].style.fontWeight).toBe('');
 
-    const foilCell = cellAfterName('Foil Card');
-    expect(foilCell.textContent).toBe('foil');
-    expect(foilCell.style.fontWeight).toBe('700');
-    expect(foilCell.style.textTransform).toBe('capitalize');
+    const foilCells = cellsAfterName('Foil Card');
+    expect(foilCells[2].textContent).toBe('DOM#2');
+    expect(foilCells[3].textContent).toBe('foil');
+    expect(foilCells[3].style.fontWeight).toBe('700');
+    expect(foilCells[3].style.textTransform).toBe('capitalize');
+    expect(
+      screen.getByText('Foil Card').classList.contains('foil-finish'),
+    ).toBe(true);
+    expect(screen.getByText('Foil Card').style.fontWeight).toBe('700');
+    expect(screen.getByText('Normal Card').style.fontWeight).toBe('500');
 
-    const etchedCell = cellAfterName('Etched Card');
-    expect(etchedCell.textContent).toBe('etched');
-    expect(etchedCell.style.fontWeight).toBe('700');
-    expect(etchedCell.style.textTransform).toBe('capitalize');
+    const etchedCells = cellsAfterName('Etched Card');
+    expect(etchedCells[2].textContent).toBe('DOM#3');
+    expect(etchedCells[3].textContent).toBe('etched');
+    expect(etchedCells[3].style.fontWeight).toBe('700');
+    expect(etchedCells[3].style.textTransform).toBe('capitalize');
+    expect(
+      screen.getByText('Etched Card').classList.contains('foil-finish'),
+    ).toBe(false);
+    expect(
+      screen.getByText('Discarded Foil').classList.contains('foil-finish'),
+    ).toBe(false);
+    expect(screen.getByText('Discarded Foil').style.fontWeight).toBe('700');
+  });
+
+  it('greys out non-keep review row text', async () => {
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
+      reviewImport(),
+    );
+
+    renderImportDetailPage();
+    await screen.findByText('Top Card');
+
+    const keepRow = screen.getByText('Top Card').closest('tr') as HTMLElement;
+    const discardRow = screen
+      .getByText('Middle Card')
+      .closest('tr') as HTMLElement;
+    const reviewRow = screen
+      .getByText('Bottom Card')
+      .closest('tr') as HTMLElement;
+
+    expect(keepRow.style.opacity).toBe('');
+    expect(discardRow.style.opacity).toBe('');
+    expect(reviewRow.style.opacity).toBe('');
+    expect(keepRow.style.color).toBe('');
+    expect(discardRow.style.color).not.toBe('');
+    expect(reviewRow.style.color).not.toBe('');
   });
 
   it('renders review rows in stack order with decisions and prices', async () => {

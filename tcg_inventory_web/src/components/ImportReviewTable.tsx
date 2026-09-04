@@ -3,6 +3,7 @@ import { ActionIcon, Badge, NativeSelect, Table, Text } from '@mantine/core';
 import { IconTrash } from '@tabler/icons-react';
 import type { Condition, ImportRow, RowDecision } from '../api/client';
 import { CONDITIONS } from '../api/client';
+import { formatSetNumber } from '../domain/card-label';
 import { ImportRowPhotoStrip } from './ImportRowPhotoStrip';
 
 const DECISION_COLORS: Record<RowDecision, string> = {
@@ -50,9 +51,8 @@ export function ImportReviewTable({
         <Table.Tr>
           <Table.Th ta="right">Position</Table.Th>
           <Table.Th>Name</Table.Th>
-          <Table.Th>Finish</Table.Th>
           <Table.Th>Set</Table.Th>
-          <Table.Th>#</Table.Th>
+          <Table.Th>Finish</Table.Th>
           <Table.Th>Condition</Table.Th>
           <Table.Th ta="right">Market</Table.Th>
           <Table.Th ta="right">Suggested</Table.Th>
@@ -65,30 +65,37 @@ export function ImportReviewTable({
       <Table.Tbody>
         {rows.map((row, index) => {
           const selected = index === selectedIndex;
-          const showPhotos =
-            row.decision === 'keep' && (editable || row.photos.length > 0);
+          const keep = row.decision === 'keep';
+          const showPhotos = keep && (editable || row.photos.length > 0);
           return (
             <Table.Tr
               key={row.position}
               ref={selected ? selectedRowRef : undefined}
               data-selected={selected}
               bg={selected ? 'var(--mantine-color-blue-light)' : undefined}
+              c={keep ? undefined : 'dimmed'}
               onClick={() => onSelect(index)}
             >
               <Table.Td ta="right" c="dimmed">
                 {row.position}
               </Table.Td>
-              <Table.Td fw={500}>{row.name}</Table.Td>
+              <Table.Td
+                className={
+                  keep && row.finish === 'foil' ? 'foil-finish' : undefined
+                }
+                fw={row.finish === 'foil' ? 700 : 500}
+              >
+                {row.name}
+              </Table.Td>
+              <Table.Td title={row.set_name}>
+                {formatSetNumber(row.set_code, row.collector_number)}
+              </Table.Td>
               <Table.Td
                 fw={row.finish === 'normal' ? undefined : 700}
                 tt="capitalize"
               >
                 {row.finish}
               </Table.Td>
-              <Table.Td title={row.set_name}>
-                {row.set_code.toUpperCase()}
-              </Table.Td>
-              <Table.Td>{row.collector_number}</Table.Td>
               <Table.Td>
                 {editable && onConditionChange ? (
                   <NativeSelect
