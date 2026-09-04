@@ -41,7 +41,7 @@ public class SearchFactoryImplTest {
             .toList();
     assertThat(judged)
         .extracting(SearchFactory.Search::searchTerm)
-        .containsExactly("bulk", "collection", "assorted", "clear out", "clearout");
+        .containsExactly("bulk", "collection", "assorted", "clear out", "clearout", "lot");
     assertThat(judged)
         .allSatisfy(
             search -> {
@@ -110,7 +110,7 @@ public class SearchFactoryImplTest {
     var searches = factory.findSearches();
 
     // assert
-    assertThat(searches).hasSize(8);
+    assertThat(searches).hasSize(9);
     assertThat(searches).allSatisfy(search -> assertThat(search.judge()).isNotNull());
   }
 }
