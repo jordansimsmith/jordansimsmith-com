@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Table } from '@mantine/core';
 import type { OrderSummary } from '../api/client';
+import { formatDeliveryMode } from '../domain/deliveryMode';
 import { OrderStateBadge } from './OrderStateBadge';
 
 interface OrderTableProps {
@@ -54,7 +55,7 @@ export function OrderTable({ orders, selectedIndex, onOpen }: OrderTableProps) {
               <Table.Td ta="right">
                 {order.items_total_price ? `$${order.items_total_price}` : '—'}
               </Table.Td>
-              <Table.Td>{order.delivery_mode}</Table.Td>
+              <Table.Td>{formatDeliveryMode(order.delivery_mode)}</Table.Td>
               <Table.Td>
                 {new Date(order.accepted_at * 1000).toLocaleString()}
               </Table.Td>

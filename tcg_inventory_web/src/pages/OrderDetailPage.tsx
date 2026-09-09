@@ -21,6 +21,7 @@ import type {
   OrderUnit,
 } from '../api/client';
 import { ListPriceBadge } from '../components/ListPriceBadge';
+import { formatDeliveryMode } from '../domain/deliveryMode';
 
 function unitDescription(unit: OrderUnit): string {
   const parts = [
@@ -201,7 +202,8 @@ export function OrderDetailPage() {
                       </Text>
                     ))}
                   <Text size="sm" c="dimmed">
-                    {order.postage_option ?? order.delivery_mode}
+                    {order.postage_option ??
+                      formatDeliveryMode(order.delivery_mode)}
                   </Text>
                 </Stack>
               </Paper>

@@ -211,7 +211,7 @@ describe('OrderDetailPage', () => {
 
     renderOrderDetailPage();
 
-    expect(await screen.findByText('PICKUP')).toBeDefined();
+    expect(await screen.findByText('Pickup')).toBeDefined();
     expect(screen.queryByText('32 Abercrombie Street')).toBeNull();
   });
 

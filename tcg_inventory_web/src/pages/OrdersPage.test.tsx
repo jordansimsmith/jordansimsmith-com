@@ -40,7 +40,7 @@ const orderFixtures: OrderSummary[] = [
     order_id: '83611',
     state: 'fulfilled',
     accepted_at: 1765161732,
-    delivery_mode: 'SHIPPING',
+    delivery_mode: 'DELIVERY',
     total_price: '8.50',
     items_total_price: '8.50',
     listed_total_price: '8.50',
@@ -99,13 +99,14 @@ describe('OrdersPage', () => {
     expect(within(row).getByText('to pick')).toBeDefined();
     expect(within(row).getByText('3')).toBeDefined();
     expect(within(row).getByText('$10.90')).toBeDefined();
-    expect(within(row).getByText('PICKUP')).toBeDefined();
+    expect(within(row).getByText('Pickup')).toBeDefined();
     expect(within(row).queryByText(/vs list/)).toBeNull();
 
     const awaitingRow = screen
       .getByText('83663')
       .closest('tr') as HTMLTableRowElement;
     expect(within(awaitingRow).getByText('awaiting payment')).toBeDefined();
+    expect(within(awaitingRow).getByText('Delivery')).toBeDefined();
     // the card subtotal, not the postage-inclusive 488.40
     expect(within(awaitingRow).getByText('$479.90')).toBeDefined();
     expect(within(awaitingRow).queryByText('$488.40')).toBeNull();
@@ -187,7 +188,7 @@ describe('OrdersPage', () => {
       order_id: '83500',
       state: 'fulfilled',
       accepted_at: 1764802532,
-      delivery_mode: 'SHIPPING',
+      delivery_mode: 'DELIVERY',
       total_price: '2.00',
       items_total_price: '2.00',
       listed_total_price: '2.00',
