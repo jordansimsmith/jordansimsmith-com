@@ -20,6 +20,9 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
     state: 'to_pick',
     accepted_at: 1765420932,
     delivery_mode: 'PICKUP',
+    buyer_name: null,
+    buyer_address: null,
+    postage_option: null,
     total_price: '10.90',
     items_total_price: '10.90',
     listed_total_price: '13.00',
@@ -147,7 +150,7 @@ describe('OrderDetailPage', () => {
 
     expect(await screen.findByText('Order 83647')).toBeDefined();
     expect(screen.getByText('to pick')).toBeDefined();
-    expect(screen.getByText('PICKUP · $10.90')).toBeDefined();
+    expect(screen.getByText('Total $10.90')).toBeDefined();
     expect(screen.getByText('Offered $10.90 · Listed $13.00')).toBeDefined();
     expect(screen.getByText('−16% vs list')).toBeDefined();
     expect(screen.queryByText('Offer')).toBeNull();
@@ -172,6 +175,44 @@ describe('OrderDetailPage', () => {
       screen.getByText('Next · Counterspell · MH2 #267 · NM'),
     ).toBeDefined();
     expect(screen.getByRole('button', { name: 'Confirm pull' })).toBeDefined();
+  });
+
+  it('renders the buyer, address, and postage option', async () => {
+    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(
+      orderDetail({
+        delivery_mode: 'DELIVERY',
+        buyer_name: 'Chris Andrew (generic)',
+        buyer_address: {
+          line1: '32 Abercrombie Street',
+          line2: 'Unit 3',
+          suburb: 'Howick',
+          city: 'Auckland',
+          post_code: '2014',
+          country: 'NZ',
+        },
+        postage_option: 'Economy Tracked',
+      }),
+    );
+
+    renderOrderDetailPage();
+
+    expect(await screen.findByText('Chris Andrew (generic)')).toBeDefined();
+    expect(screen.getByText('32 Abercrombie Street')).toBeDefined();
+    expect(screen.getByText('Unit 3')).toBeDefined();
+    expect(screen.getByText('Howick, Auckland 2014')).toBeDefined();
+    expect(screen.getByText('NZ')).toBeDefined();
+    expect(screen.getByText('Economy Tracked')).toBeDefined();
+  });
+
+  it('falls back to the delivery mode when there is no postage option', async () => {
+    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(
+      orderDetail(),
+    );
+
+    renderOrderDetailPage();
+
+    expect(await screen.findByText('PICKUP')).toBeDefined();
+    expect(screen.queryByText('32 Abercrombie Street')).toBeNull();
   });
 
   it('confirms the pull and renders the fulfilled order', async () => {

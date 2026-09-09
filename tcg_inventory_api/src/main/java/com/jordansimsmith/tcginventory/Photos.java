@@ -45,11 +45,11 @@ public class Photos {
                     photo -> {
                       var map = new HashMap<String, AttributeValue>();
                       map.put(
-                          TcgInventoryItem.PHOTO_ID,
+                          TcgInventoryItem.Photo.PHOTO_ID,
                           AttributeValue.builder().s(photo.getPhotoId()).build());
                       if (photo.getFetchtcgUrl() != null) {
                         map.put(
-                            TcgInventoryItem.FETCHTCG_URL,
+                            TcgInventoryItem.Photo.FETCHTCG_URL,
                             AttributeValue.builder().s(photo.getFetchtcgUrl()).build());
                       }
                       return AttributeValue.builder().m(map).build();

@@ -143,7 +143,28 @@ public class HttpFetchTcgClientTest {
                   "id": 100,
                   "status": "ACCEPTED",
                   "currentAction": "AWAITING_PAYMENT",
+                  "deliveryMode": "DELIVERY",
                   "totalOfferPrice": 3.33,
+                  "buyerName": "Chris Andrew (generic)",
+                  "buyerProfileName": "generic",
+                  "buyerRegionAddress": {
+                    "suburb": "Howick",
+                    "city": "Auckland",
+                    "country": "NZ",
+                    "postCode": "2014",
+                    "latitude": -36.892998,
+                    "longitude": 174.9243368,
+                    "allowPickups": false,
+                    "line1": "32 Abercrombie Street",
+                    "line2": null
+                  },
+                  "shippingOption": {
+                    "id": 18271,
+                    "title": "Economy Tracked",
+                    "total": 7.5,
+                    "currencyCode": "NZD"
+                  },
+                  "paymentInstructions": "pay me at 00-0000-0000000-00",
                   "items": [
                     {
                       "quantity": 1,
@@ -172,7 +193,17 @@ public class HttpFetchTcgClientTest {
     assertThat(result.content().get(0).items()).hasSize(1);
     assertThat(result.content().get(0).items().get(0).listing().listedPrice())
         .isEqualByComparingTo("3.50");
+    assertThat(result.content().get(0).buyerName()).isEqualTo("Chris Andrew (generic)");
+    assertThat(result.content().get(0).shippingOption().title()).isEqualTo("Economy Tracked");
+    var address = result.content().get(0).buyerRegionAddress();
+    assertThat(address.line1()).isEqualTo("32 Abercrombie Street");
+    assertThat(address.line2()).isNull();
+    assertThat(address.suburb()).isEqualTo("Howick");
+    assertThat(address.city()).isEqualTo("Auckland");
+    assertThat(address.postCode()).isEqualTo("2014");
+    assertThat(address.country()).isEqualTo("NZ");
     assertThat(result.content().get(1).currentAction()).isNull();
+    assertThat(result.content().get(1).buyerRegionAddress()).isNull();
   }
 
   @Test

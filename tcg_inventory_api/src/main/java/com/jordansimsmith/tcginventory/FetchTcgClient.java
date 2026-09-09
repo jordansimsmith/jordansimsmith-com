@@ -61,8 +61,25 @@ public interface FetchTcgClient {
       @JsonProperty("currentAction") String currentAction,
       @JsonProperty("acceptedAt") String acceptedAt,
       @JsonProperty("deliveryMode") String deliveryMode,
+      @JsonProperty("buyerName") @Nullable String buyerName,
+      @JsonProperty("buyerRegionAddress") @Nullable BuyerRegionAddress buyerRegionAddress,
+      @JsonProperty("shippingOption") @Nullable ShippingOption shippingOption,
       @JsonProperty("totalOfferPrice") BigDecimal totalOfferPrice,
       @JsonProperty("items") List<OfferItem> items) {}
+
+  // deliberately narrow: the offer payload also carries geocoordinates and pickup flags that the
+  // service must not persist
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  record BuyerRegionAddress(
+      @JsonProperty("line1") @Nullable String line1,
+      @JsonProperty("line2") @Nullable String line2,
+      @JsonProperty("suburb") @Nullable String suburb,
+      @JsonProperty("city") @Nullable String city,
+      @JsonProperty("postCode") @Nullable String postCode,
+      @JsonProperty("country") @Nullable String country) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  record ShippingOption(@JsonProperty("title") @Nullable String title) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   record OfferItem(

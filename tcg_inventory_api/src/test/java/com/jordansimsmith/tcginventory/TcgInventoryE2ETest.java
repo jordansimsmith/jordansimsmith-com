@@ -237,7 +237,15 @@ public class TcgInventoryE2ETest {
     var orderDetailBody = objectMapper.readTree(orderDetailResponse.body());
     assertThat(orderDetailBody.get("order_id").asText()).isEqualTo("99001");
     assertThat(orderDetailBody.get("state").asText()).isEqualTo("to_pick");
-    assertThat(orderDetailBody.get("delivery_mode").asText()).isEqualTo("PICKUP");
+    assertThat(orderDetailBody.get("delivery_mode").asText()).isEqualTo("DELIVERY");
+    assertThat(orderDetailBody.get("buyer_name").asText()).isEqualTo("Chris Andrew (generic)");
+    assertThat(orderDetailBody.get("postage_option").asText()).isEqualTo("Economy Tracked");
+    var buyerAddress = orderDetailBody.get("buyer_address");
+    assertThat(buyerAddress.get("line1").asText()).isEqualTo("32 Abercrombie Street");
+    assertThat(buyerAddress.get("suburb").asText()).isEqualTo("Howick");
+    assertThat(buyerAddress.get("city").asText()).isEqualTo("Auckland");
+    assertThat(buyerAddress.get("post_code").asText()).isEqualTo("2014");
+    assertThat(buyerAddress.get("country").asText()).isEqualTo("NZ");
     assertThat(orderDetailBody.get("items_total_price").asText()).isEqualTo("1.50");
     assertThat(orderDetailBody.get("listed_total_price").asText()).isEqualTo("2.00");
     var orderLines = orderDetailBody.get("lines");

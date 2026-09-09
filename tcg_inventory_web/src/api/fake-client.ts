@@ -1,5 +1,6 @@
 import type {
   ApiClient,
+  BuyerAddress,
   Condition,
   ConfirmImportResponse,
   ConfirmOrderResponse,
@@ -508,6 +509,9 @@ interface FakeOrder {
   state: OrderState;
   accepted_at: number;
   delivery_mode: string;
+  buyer_name: string | null;
+  buyer_address: BuyerAddress | null;
+  postage_option: string | null;
   total_price: string;
   units: FakeOrderUnitRef[];
   lines: FakeOrderLine[];
@@ -572,7 +576,17 @@ function createSeedOrders(skus: FakeSku[]): FakeOrder[] {
       order_id: '83663',
       state: 'awaiting_payment',
       accepted_at: now - 2 * 60 * 60,
-      delivery_mode: 'SHIPPING',
+      delivery_mode: 'DELIVERY',
+      buyer_name: 'Chris Andrew (generic)',
+      buyer_address: {
+        line1: '32 Abercrombie Street',
+        line2: null,
+        suburb: 'Howick',
+        city: 'Auckland',
+        post_code: '2014',
+        country: 'NZ',
+      },
+      postage_option: 'Economy Tracked',
       total_price: '479.90',
       units: [
         ...aboveListUnits.signet,
@@ -596,6 +610,9 @@ function createSeedOrders(skus: FakeSku[]): FakeOrder[] {
       state: 'to_pick',
       accepted_at: now - 24 * 60 * 60,
       delivery_mode: 'PICKUP',
+      buyer_name: 'Ben Creagh (sideswipe)',
+      buyer_address: null,
+      postage_option: null,
       total_price: '10.90',
       units: [...discountedUnits.solRing, ...discountedUnits.aberration],
       lines: [
@@ -607,7 +624,17 @@ function createSeedOrders(skus: FakeSku[]): FakeOrder[] {
       order_id: '83611',
       state: 'fulfilled',
       accepted_at: now - 3 * 24 * 60 * 60,
-      delivery_mode: 'SHIPPING',
+      delivery_mode: 'DELIVERY',
+      buyer_name: 'Priya Raman (priyar)',
+      buyer_address: {
+        line1: '7B Kauri Road',
+        line2: 'Unit 3',
+        suburb: 'Riccarton',
+        city: 'Christchurch',
+        post_code: '8041',
+        country: 'NZ',
+      },
+      postage_option: 'Courier',
       total_price: '8.50',
       units: atListUnits,
       lines: [lineOf(atListUnits, '8.50', '8.50')],
@@ -617,6 +644,10 @@ function createSeedOrders(skus: FakeSku[]): FakeOrder[] {
       state: 'voided',
       accepted_at: now - 5 * 24 * 60 * 60,
       delivery_mode: 'PICKUP',
+      // ingested before fulfillment details existed
+      buyer_name: null,
+      buyer_address: null,
+      postage_option: null,
       total_price: '4.20',
       // the void released this unit back to stock; ingested before listed_price
       units: legacyUnits,
@@ -787,7 +818,14 @@ function toOrderDetail(order: FakeOrder, skus: FakeSku[]): OrderDetail {
       listed_price: line.listed_price,
     };
   });
-  return { ...toOrderSummary(order), lines, units };
+  return {
+    ...toOrderSummary(order),
+    buyer_name: order.buyer_name,
+    buyer_address: order.buyer_address,
+    postage_option: order.postage_option,
+    lines,
+    units,
+  };
 }
 
 export function createFakeClient(): ApiClient {

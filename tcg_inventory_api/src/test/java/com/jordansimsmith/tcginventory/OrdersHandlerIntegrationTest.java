@@ -271,6 +271,9 @@ public class OrdersHandlerIntegrationTest {
             "ACCEPTED",
             "SEND_PICKUP_ADDRESS",
             "PICKUP",
+            null,
+            null,
+            null,
             "3.50",
             lines,
             Instant.ofEpochSecond(1700000000));
@@ -298,6 +301,65 @@ public class OrdersHandlerIntegrationTest {
     assertThat(responseLines.get(0).get("listed_price").asText()).isEqualTo("2.00");
     assertThat(responseLines.get(1).get("name").asText()).isEqualTo("Sol Ring");
     assertThat(responseLines.get(1).get("listed_price").asText()).isEqualTo("1.80");
+  }
+
+  @Test
+  void getOrderShouldReturnFulfillmentDetails() throws Exception {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    var order =
+        TcgInventoryItem.createOrder(
+            "jordan",
+            "91329",
+            "to_pick",
+            "ACCEPTED",
+            "SEND_TRACKING_CODE",
+            "DELIVERY",
+            "Chris Andrew (generic)",
+            TcgInventoryItem.BuyerAddress.create(
+                "32 Abercrombie Street", null, "Howick", "Auckland", "2014", "NZ"),
+            "Economy Tracked",
+            "61.50",
+            "[]",
+            Instant.ofEpochSecond(1700000000));
+    tcgInventoryTable.putItem(order);
+
+    // act
+    var response =
+        getOrderHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("order_id", "91329")), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = objectMapper.readTree(response.getBody());
+    assertThat(body.get("buyer_name").asText()).isEqualTo("Chris Andrew (generic)");
+    assertThat(body.get("postage_option").asText()).isEqualTo("Economy Tracked");
+    var address = body.get("buyer_address");
+    assertThat(address.get("line1").asText()).isEqualTo("32 Abercrombie Street");
+    assertThat(address.get("line2").isNull()).isTrue();
+    assertThat(address.get("suburb").asText()).isEqualTo("Howick");
+    assertThat(address.get("city").asText()).isEqualTo("Auckland");
+    assertThat(address.get("post_code").asText()).isEqualTo("2014");
+    assertThat(address.get("country").asText()).isEqualTo("NZ");
+  }
+
+  @Test
+  void getOrderShouldReturnNullFulfillmentDetailsForLegacyOrders() throws Exception {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createOrder("jordan", "83663", "to_pick", "PICKUP", "3.33");
+
+    // act
+    var response =
+        getOrderHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("order_id", "83663")), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = objectMapper.readTree(response.getBody());
+    assertThat(body.get("buyer_name").isNull()).isTrue();
+    assertThat(body.get("buyer_address").isNull()).isTrue();
+    assertThat(body.get("postage_option").isNull()).isTrue();
   }
 
   @Test
@@ -537,6 +599,9 @@ public class OrdersHandlerIntegrationTest {
             "ACCEPTED",
             "SEND_PICKUP_ADDRESS",
             "PICKUP",
+            null,
+            null,
+            null,
             "30.00",
             objectMapper.writeValueAsString(lines),
             Instant.ofEpochSecond(1700000000));
@@ -628,6 +693,9 @@ public class OrdersHandlerIntegrationTest {
             "ACCEPTED",
             null,
             deliveryMode,
+            null,
+            null,
+            null,
             totalPrice,
             "[]",
             Instant.ofEpochSecond(1700000000));
@@ -715,6 +783,9 @@ public class OrdersHandlerIntegrationTest {
             "ACCEPTED",
             "SEND_PICKUP_ADDRESS",
             deliveryMode,
+            null,
+            null,
+            null,
             totalPrice,
             lines,
             Instant.ofEpochSecond(1700000000));

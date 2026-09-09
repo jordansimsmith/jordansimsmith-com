@@ -14,7 +14,12 @@ import { AppShellLayout } from '../layouts/AppShellLayout';
 import { OrderStateBadge } from '../components/OrderStateBadge';
 import { ConfirmPullModal } from '../components/ConfirmPullModal';
 import { apiClient } from '../api/client';
-import type { OrderDetail, OrderNeighborCard, OrderUnit } from '../api/client';
+import type {
+  BuyerAddress,
+  OrderDetail,
+  OrderNeighborCard,
+  OrderUnit,
+} from '../api/client';
 import { ListPriceBadge } from '../components/ListPriceBadge';
 
 function unitDescription(unit: OrderUnit): string {
@@ -26,6 +31,18 @@ function unitDescription(unit: OrderUnit): string {
     parts.push(unit.finish);
   }
   return parts.join(' · ');
+}
+
+function addressLines(address: BuyerAddress): string[] {
+  const locality = [
+    [address.suburb, address.city].filter(Boolean).join(', '),
+    address.post_code,
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return [address.line1, address.line2, locality, address.country].filter(
+    (line): line is string => line != null && line !== '',
+  );
 }
 
 function neighborDescription(card: OrderNeighborCard): string {
@@ -152,7 +169,7 @@ export function OrderDetailPage() {
                 </Text>
               </Group>
               <Text size="sm" c="dimmed">
-                {order.delivery_mode} · ${order.total_price}
+                Total ${order.total_price}
               </Text>
               {order.items_total_price != null && (
                 <Group gap="sm" align="center">
@@ -169,6 +186,25 @@ export function OrderDetailPage() {
                   )}
                 </Group>
               )}
+            </Stack>
+            <Stack gap="sm" maw={480}>
+              <Title order={3}>Delivery</Title>
+              <Paper withBorder p="md" radius="md">
+                <Stack gap={4}>
+                  {order.buyer_name != null && (
+                    <Text fw={500}>{order.buyer_name}</Text>
+                  )}
+                  {order.buyer_address != null &&
+                    addressLines(order.buyer_address).map((line) => (
+                      <Text key={line} size="sm">
+                        {line}
+                      </Text>
+                    ))}
+                  <Text size="sm" c="dimmed">
+                    {order.postage_option ?? order.delivery_mode}
+                  </Text>
+                </Stack>
+              </Paper>
             </Stack>
             <Stack gap="sm" maw={480}>
               <Title order={3}>

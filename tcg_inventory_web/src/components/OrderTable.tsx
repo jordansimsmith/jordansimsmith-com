@@ -29,7 +29,7 @@ export function OrderTable({ orders, selectedIndex, onOpen }: OrderTableProps) {
           <Table.Th>Order</Table.Th>
           <Table.Th>State</Table.Th>
           <Table.Th ta="right">Units</Table.Th>
-          <Table.Th ta="right">Total</Table.Th>
+          <Table.Th ta="right">Cards</Table.Th>
           <Table.Th>Delivery</Table.Th>
           <Table.Th>Accepted</Table.Th>
         </Table.Tr>
@@ -51,7 +51,9 @@ export function OrderTable({ orders, selectedIndex, onOpen }: OrderTableProps) {
                 <OrderStateBadge state={order.state} />
               </Table.Td>
               <Table.Td ta="right">{order.unit_count}</Table.Td>
-              <Table.Td ta="right">${order.total_price}</Table.Td>
+              <Table.Td ta="right">
+                {order.items_total_price ? `$${order.items_total_price}` : '—'}
+              </Table.Td>
               <Table.Td>{order.delivery_mode}</Table.Td>
               <Table.Td>
                 {new Date(order.accepted_at * 1000).toLocaleString()}

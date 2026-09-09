@@ -60,11 +60,22 @@ public class GetOrderHandler
       @JsonProperty("price") @Nullable String price,
       @JsonProperty("listed_price") @Nullable String listedPrice) {}
 
+  record BuyerAddressResponse(
+      @JsonProperty("line1") @Nullable String line1,
+      @JsonProperty("line2") @Nullable String line2,
+      @JsonProperty("suburb") @Nullable String suburb,
+      @JsonProperty("city") @Nullable String city,
+      @JsonProperty("post_code") @Nullable String postCode,
+      @JsonProperty("country") @Nullable String country) {}
+
   record OrderDetailResponse(
       @JsonProperty("order_id") String orderId,
       @JsonProperty("state") String state,
       @JsonProperty("accepted_at") long acceptedAt,
       @JsonProperty("delivery_mode") @Nullable String deliveryMode,
+      @JsonProperty("buyer_name") @Nullable String buyerName,
+      @JsonProperty("buyer_address") @Nullable BuyerAddressResponse buyerAddress,
+      @JsonProperty("postage_option") @Nullable String postageOption,
       @JsonProperty("total_price") @Nullable String totalPrice,
       @JsonProperty("items_total_price") @Nullable String itemsTotalPrice,
       @JsonProperty("listed_total_price") @Nullable String listedTotalPrice,
@@ -173,6 +184,9 @@ public class GetOrderHandler
             orderItem.getStatus(),
             orderItem.getCreatedAt() != null ? orderItem.getCreatedAt().getEpochSecond() : 0,
             orderItem.getDeliveryMode(),
+            orderItem.getBuyerName(),
+            toBuyerAddress(orderItem.getBuyerAddress()),
+            orderItem.getPostageOption(),
             orderItem.getTotalPrice(),
             OrderLines.itemsTotalPrice(orderLines),
             OrderLines.listedTotalPrice(orderLines),
@@ -268,6 +282,21 @@ public class GetOrderHandler
                     .partitionValue(pk)
                     .sortValue(TcgInventoryItem.formatSkuSk())
                     .build()));
+  }
+
+  @Nullable
+  private static BuyerAddressResponse toBuyerAddress(
+      @Nullable TcgInventoryItem.BuyerAddress address) {
+    if (address == null) {
+      return null;
+    }
+    return new BuyerAddressResponse(
+        address.getLine1(),
+        address.getLine2(),
+        address.getSuburb(),
+        address.getCity(),
+        address.getPostCode(),
+        address.getCountry());
   }
 
   @Nullable

@@ -13,6 +13,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
+import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -37,6 +38,11 @@ public class OrderPhaseProcessor {
           .optionalEnd()
           .appendOffset("+HHmm", "Z")
           .toFormatter();
+
+  private record Fulfillment(
+      @Nullable String buyerName,
+      @Nullable TcgInventoryItem.BuyerAddress buyerAddress,
+      @Nullable String postageOption) {}
 
   private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
   private final TcgInventoryItemRepository tcgInventoryItemRepository;
@@ -82,25 +88,40 @@ public class OrderPhaseProcessor {
     LOGGER.info("built listing-to-sku map with {} entries", listingToSkuId.size());
 
     int advancedCount = 0;
+    int refreshedCount = 0;
     for (var order : existingOrders) {
-      if (!"awaiting_payment".equals(order.getStatus())) {
+      var offer = offerMap.get(order.getOrderId());
+      if (offer == null) {
         continue;
       }
 
-      var offerId = order.getOrderId();
-      var offer = offerMap.get(offerId);
       var paymentReceived =
-          offer != null
-              && offer.currentAction() != null
-              && PAYMENT_ACTIONS.contains(offer.currentAction());
-
-      if (paymentReceived) {
+          offer.currentAction() != null && PAYMENT_ACTIONS.contains(offer.currentAction());
+      if ("awaiting_payment".equals(order.getStatus()) && paymentReceived) {
         tcgInventoryItemRepository.advanceOrderToPickReady(
             user, order.getOrderId(), offer.status(), offer.currentAction());
         advancedCount++;
       }
+
+      // the buyer supplies an address and picks a postage option after the offer is accepted, so
+      // unlike the priced line data these are mirrored on every run rather than frozen at ingest
+      var fulfillment = toFulfillment(offer);
+      var stored =
+          new Fulfillment(order.getBuyerName(), order.getBuyerAddress(), order.getPostageOption());
+      if (!fulfillment.equals(stored)) {
+        tcgInventoryItemRepository.updateOrderFulfillment(
+            user,
+            order.getOrderId(),
+            fulfillment.buyerName(),
+            fulfillment.buyerAddress(),
+            fulfillment.postageOption());
+        refreshedCount++;
+      }
     }
-    LOGGER.info("advanced {} orders to pick-ready", advancedCount);
+    LOGGER.info(
+        "advanced {} orders to pick-ready, refreshed fulfillment details on {}",
+        advancedCount,
+        refreshedCount);
 
     var existingOrderIds =
         existingOrders.stream().map(TcgInventoryItem::getOrderId).collect(Collectors.toSet());
@@ -263,6 +284,7 @@ public class OrderPhaseProcessor {
       throw new RuntimeException("failed to serialize order lines", e);
     }
 
+    var fulfillment = toFulfillment(offer);
     var orderItem =
         TcgInventoryItem.createOrder(
             user,
@@ -275,6 +297,9 @@ public class OrderPhaseProcessor {
             offer.status(),
             offer.currentAction(),
             offer.deliveryMode(),
+            fulfillment.buyerName(),
+            fulfillment.buyerAddress(),
+            fulfillment.postageOption(),
             offer.totalOfferPrice() != null ? offer.totalOfferPrice().toPlainString() : null,
             linesJson,
             clock.now());
@@ -284,5 +309,44 @@ public class OrderPhaseProcessor {
             .map(entry -> new TcgInventoryItemRepository.SkuUnits(entry.getKey(), entry.getValue()))
             .toList();
     tcgInventoryItemRepository.reserveOrder(user, orderItem, skuUnits);
+  }
+
+  private static Fulfillment toFulfillment(FetchTcgClient.SellerOffer offer) {
+    return new Fulfillment(
+        blankToNull(offer.buyerName()),
+        toBuyerAddress(offer.buyerRegionAddress()),
+        offer.shippingOption() != null ? blankToNull(offer.shippingOption().title()) : null);
+  }
+
+  @Nullable
+  private static TcgInventoryItem.BuyerAddress toBuyerAddress(
+      @Nullable FetchTcgClient.BuyerRegionAddress address) {
+    if (address == null) {
+      return null;
+    }
+
+    var line1 = blankToNull(address.line1());
+    var line2 = blankToNull(address.line2());
+    var suburb = blankToNull(address.suburb());
+    var city = blankToNull(address.city());
+    var postCode = blankToNull(address.postCode());
+    var country = blankToNull(address.country());
+
+    // FetchTCG returns the address object with every part null until the buyer supplies one
+    if (line1 == null
+        && line2 == null
+        && suburb == null
+        && city == null
+        && postCode == null
+        && country == null) {
+      return null;
+    }
+
+    return TcgInventoryItem.BuyerAddress.create(line1, line2, suburb, city, postCode, country);
+  }
+
+  @Nullable
+  private static String blankToNull(@Nullable String value) {
+    return value == null || value.isBlank() ? null : value;
   }
 }

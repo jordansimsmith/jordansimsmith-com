@@ -19,8 +19,9 @@ const orderFixtures: OrderSummary[] = [
     order_id: '83663',
     state: 'awaiting_payment',
     accepted_at: 1765420932,
-    delivery_mode: 'SHIPPING',
-    total_price: '479.90',
+    delivery_mode: 'DELIVERY',
+    // the buyer also paid 8.50 postage, which the Cards column must exclude
+    total_price: '488.40',
     items_total_price: '479.90',
     listed_total_price: '431.50',
     unit_count: 6,
@@ -51,7 +52,7 @@ const orderFixtures: OrderSummary[] = [
     accepted_at: 1764988932,
     delivery_mode: 'PICKUP',
     total_price: '4.20',
-    items_total_price: '4.20',
+    items_total_price: null,
     listed_total_price: null,
     unit_count: 1,
   },
@@ -105,6 +106,9 @@ describe('OrdersPage', () => {
       .getByText('83663')
       .closest('tr') as HTMLTableRowElement;
     expect(within(awaitingRow).getByText('awaiting payment')).toBeDefined();
+    // the card subtotal, not the postage-inclusive 488.40
+    expect(within(awaitingRow).getByText('$479.90')).toBeDefined();
+    expect(within(awaitingRow).queryByText('$488.40')).toBeNull();
     const fulfilledRow = screen
       .getByText('83611')
       .closest('tr') as HTMLTableRowElement;
@@ -113,6 +117,7 @@ describe('OrdersPage', () => {
       .getByText('83598')
       .closest('tr') as HTMLTableRowElement;
     expect(within(voidedRow).getByText('voided')).toBeDefined();
+    expect(within(voidedRow).getByText('—')).toBeDefined();
   });
 
   it('shows an empty state when there are no orders', async () => {

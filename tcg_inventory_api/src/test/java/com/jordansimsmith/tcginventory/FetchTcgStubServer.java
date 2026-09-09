@@ -50,8 +50,12 @@ public final class FetchTcgStubServer {
 
   private static final String SELLER_OFFERS_WITH_ORDER =
       """
-      {"content":[{"id":99001,"status":"ACCEPTED","currentAction":"SEND_PICKUP_ADDRESS",\
-      "deliveryMode":"PICKUP","totalOfferPrice":1.50,\
+      {"content":[{"id":99001,"status":"ACCEPTED","currentAction":"SEND_TRACKING_CODE",\
+      "deliveryMode":"DELIVERY","totalOfferPrice":1.50,\
+      "buyerName":"Chris Andrew (generic)",\
+      "buyerRegionAddress":{"line1":"32 Abercrombie Street","line2":null,"suburb":"Howick",\
+      "city":"Auckland","postCode":"2014","country":"NZ","latitude":-36.892998},\
+      "shippingOption":{"id":18271,"title":"Economy Tracked","total":7.50},\
       "items":[{"listing":{"id":900001,"condition":"raw-lp","listedPrice":2.00},"quantity":1,"price":1.50}]}],\
       "totalPages":1}\
       """;

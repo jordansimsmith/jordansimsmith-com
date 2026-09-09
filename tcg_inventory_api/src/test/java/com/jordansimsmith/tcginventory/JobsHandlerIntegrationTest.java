@@ -407,7 +407,11 @@ public class JobsHandlerIntegrationTest {
                 "ACCEPTED",
                 null,
                 "2026-08-11T04:42:12.476+0000",
-                "PICKUP",
+                "DELIVERY",
+                "Chris Andrew (generic)",
+                new FetchTcgClient.BuyerRegionAddress(
+                    "32 Abercrombie Street", "", "Howick", "Auckland", "2014", "NZ"),
+                new FetchTcgClient.ShippingOption("Economy Tracked"),
                 new BigDecimal("3.33"),
                 List.of(
                     new FetchTcgClient.OfferItem(
@@ -425,7 +429,13 @@ public class JobsHandlerIntegrationTest {
     var order = getOrder("jordan", "83663");
     assertThat(order).isNotNull();
     assertThat(order.getStatus()).isEqualTo("awaiting_payment");
-    assertThat(order.getDeliveryMode()).isEqualTo("PICKUP");
+    assertThat(order.getDeliveryMode()).isEqualTo("DELIVERY");
+    assertThat(order.getBuyerName()).isEqualTo("Chris Andrew (generic)");
+    assertThat(order.getPostageOption()).isEqualTo("Economy Tracked");
+    assertThat(order.getBuyerAddress())
+        .isEqualTo(
+            TcgInventoryItem.BuyerAddress.create(
+                "32 Abercrombie Street", null, "Howick", "Auckland", "2014", "NZ"));
     assertThat(order.getTotalPrice()).isEqualTo("3.33");
     assertThat(order.getFetchtcgStatus()).isEqualTo("ACCEPTED");
     assertThat(order.getLines()).contains("scryfall-1#normal#NM");
@@ -463,6 +473,9 @@ public class JobsHandlerIntegrationTest {
                 "SEND_PICKUP_ADDRESS",
                 "2026-08-11T04:42:12.476+0000",
                 "PICKUP",
+                null,
+                null,
+                null,
                 new BigDecimal("3.33"),
                 List.of())));
 
@@ -495,6 +508,9 @@ public class JobsHandlerIntegrationTest {
                 "SEND_TRACKING_CODE",
                 "2026-08-29T03:03:55.019+0000",
                 "DELIVERY",
+                null,
+                null,
+                null,
                 new BigDecimal("61.50"),
                 List.of())));
 
@@ -513,6 +529,112 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
+  void publishOrderPhaseShouldRefreshFulfillmentDetailsOnExistingOrders() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createExistingOrder("jordan", "91329", "awaiting_payment");
+
+    fakeFetchTcgClient.seedSellerOffers(
+        List.of(
+            new FetchTcgClient.SellerOffer(
+                91329,
+                "ACCEPTED",
+                "SEND_TRACKING_CODE",
+                "2026-08-29T03:03:55.019+0000",
+                "DELIVERY",
+                "Chris Andrew (generic)",
+                new FetchTcgClient.BuyerRegionAddress(
+                    "32 Abercrombie Street", null, "Howick", "Auckland", "2014", "NZ"),
+                new FetchTcgClient.ShippingOption("Economy Tracked"),
+                new BigDecimal("61.50"),
+                List.of())));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "91329");
+    assertThat(order.getBuyerName()).isEqualTo("Chris Andrew (generic)");
+    assertThat(order.getPostageOption()).isEqualTo("Economy Tracked");
+    assertThat(order.getBuyerAddress())
+        .isEqualTo(
+            TcgInventoryItem.BuyerAddress.create(
+                "32 Abercrombie Street", null, "Howick", "Auckland", "2014", "NZ"));
+
+    // the refresh moves no inventory or revenue, so it must not mark the report stale
+    var auditEventTypes = getAuditEntries("jordan").stream().map(TcgInventoryItem::getEventType);
+    assertThat(auditEventTypes).containsOnly("payment");
+  }
+
+  @Test
+  void publishOrderPhaseShouldStoreNoAddressWhenEveryPartIsBlank() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createExistingOrder("jordan", "83663", "awaiting_payment");
+
+    fakeFetchTcgClient.seedSellerOffers(
+        List.of(
+            new FetchTcgClient.SellerOffer(
+                83663,
+                "ACCEPTED",
+                "AWAITING_PAYMENT",
+                "2026-08-11T04:42:12.476+0000",
+                "PICKUP",
+                "Ben Creagh (sideswipe)",
+                new FetchTcgClient.BuyerRegionAddress(null, "", null, null, null, null),
+                null,
+                new BigDecimal("3.33"),
+                List.of())));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "83663");
+    assertThat(order.getBuyerName()).isEqualTo("Ben Creagh (sideswipe)");
+    assertThat(order.getBuyerAddress()).isNull();
+    assertThat(order.getPostageOption()).isNull();
+  }
+
+  @Test
+  void publishOrderPhaseShouldNotRewriteUnchangedFulfillmentDetails() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createExistingOrder("jordan", "83663", "to_pick");
+    fakeFetchTcgClient.seedSellerOffers(
+        List.of(
+            new FetchTcgClient.SellerOffer(
+                83663,
+                "ACCEPTED",
+                "SEND_REVIEW",
+                "2026-08-11T04:42:12.476+0000",
+                "PICKUP",
+                "Ben Creagh (sideswipe)",
+                null,
+                null,
+                new BigDecimal("3.33"),
+                List.of())));
+
+    fakeClock.setTime(Instant.ofEpochSecond(1700005000));
+    createPublishJob("jordan", "job1");
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    assertThat(getOrder("jordan", "83663").getUpdatedAt())
+        .isEqualTo(Instant.ofEpochSecond(1700005000));
+
+    // act
+    fakeClock.setTime(Instant.ofEpochSecond(1700009999));
+    createPublishJob("jordan", "job2");
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job2", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "83663");
+    assertThat(order.getBuyerName()).isEqualTo("Ben Creagh (sideswipe)");
+    assertThat(order.getUpdatedAt()).isEqualTo(Instant.ofEpochSecond(1700005000));
+  }
+
+  @Test
   void publishOrderPhaseShouldNotAdvanceWhenAwaitingPayment() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
@@ -527,6 +649,9 @@ public class JobsHandlerIntegrationTest {
                 "AWAITING_PAYMENT",
                 "2026-08-28T10:50:05.986+0000",
                 "DELIVERY",
+                null,
+                null,
+                null,
                 new BigDecimal("5.00"),
                 List.of())));
 
@@ -553,6 +678,9 @@ public class JobsHandlerIntegrationTest {
                 null,
                 "2026-08-11T04:42:12.476+0000",
                 "PICKUP",
+                null,
+                null,
+                null,
                 new BigDecimal("3.33"),
                 List.of())));
 
@@ -579,6 +707,9 @@ public class JobsHandlerIntegrationTest {
                 null,
                 "2026-08-11T04:42:12.476+0000",
                 "PICKUP",
+                null,
+                null,
+                null,
                 new BigDecimal("3.33"),
                 List.of(
                     new FetchTcgClient.OfferItem(
@@ -611,6 +742,9 @@ public class JobsHandlerIntegrationTest {
                 null,
                 "2026-08-11T04:42:12.476+0000",
                 "PICKUP",
+                null,
+                null,
+                null,
                 new BigDecimal("3.33"),
                 List.of(
                     new FetchTcgClient.OfferItem(
@@ -645,6 +779,9 @@ public class JobsHandlerIntegrationTest {
                 null,
                 null,
                 "PICKUP",
+                null,
+                null,
+                null,
                 new BigDecimal("3.33"),
                 List.of(
                     new FetchTcgClient.OfferItem(
@@ -675,6 +812,9 @@ public class JobsHandlerIntegrationTest {
                 null,
                 "2026-08-11T04:42:12.476+0000",
                 "PICKUP",
+                null,
+                null,
+                null,
                 new BigDecimal("3.33"),
                 List.of(
                     new FetchTcgClient.OfferItem(
@@ -707,6 +847,9 @@ public class JobsHandlerIntegrationTest {
                 null,
                 "2026-08-11T04:42:12.476+0000",
                 "PICKUP",
+                null,
+                null,
+                null,
                 new BigDecimal("3.33"),
                 List.of(
                     new FetchTcgClient.OfferItem(
@@ -747,6 +890,9 @@ public class JobsHandlerIntegrationTest {
                 null,
                 "2026-08-11T04:42:12.476+0000",
                 "DELIVERY",
+                null,
+                null,
+                null,
                 new BigDecimal("30.00"),
                 offerItems)));
 
@@ -811,6 +957,9 @@ public class JobsHandlerIntegrationTest {
                 null,
                 "2026-08-11T04:42:12.476+0000",
                 "PICKUP",
+                null,
+                null,
+                null,
                 new BigDecimal("3.33"),
                 List.of(
                     new FetchTcgClient.OfferItem(
@@ -1110,6 +1259,9 @@ public class JobsHandlerIntegrationTest {
             "ACCEPTED",
             null,
             "PICKUP",
+            null,
+            null,
+            null,
             "3.33",
             "[]",
             Instant.ofEpochSecond(1700000000));

@@ -186,7 +186,19 @@ export interface OrderLine {
   listed_price: string | null;
 }
 
+export interface BuyerAddress {
+  line1: string | null;
+  line2: string | null;
+  suburb: string | null;
+  city: string | null;
+  post_code: string | null;
+  country: string | null;
+}
+
 export interface OrderDetail extends OrderSummary {
+  buyer_name: string | null;
+  buyer_address: BuyerAddress | null;
+  postage_option: string | null;
   lines: OrderLine[];
   units: OrderUnit[];
 }

@@ -77,6 +77,9 @@ public class TcgInventoryItem {
   public static final String LAST_PUBLISHED_PRICE = "last_published_price";
   public static final String LAST_PUBLISHED_AT = "last_published_at";
   public static final String DELIVERY_MODE = "delivery_mode";
+  public static final String BUYER_NAME = "buyer_name";
+  public static final String BUYER_ADDRESS = "buyer_address";
+  public static final String POSTAGE_OPTION = "postage_option";
   public static final String TOTAL_PRICE = "total_price";
   public static final String LINES = "lines";
   public static final String FETCHTCG_STATUS = "fetchtcg_status";
@@ -88,8 +91,6 @@ public class TcgInventoryItem {
   public static final String CREATED_AT = "created_at";
   public static final String UPDATED_AT = "updated_at";
   public static final String PHOTOS = "photos";
-  public static final String PHOTO_ID = "photo_id";
-  public static final String FETCHTCG_URL = "fetchtcg_url";
 
   private String pk;
   private String sk;
@@ -133,6 +134,9 @@ public class TcgInventoryItem {
   private String lastPublishedPrice;
   private Instant lastPublishedAt;
   private String deliveryMode;
+  private String buyerName;
+  private BuyerAddress buyerAddress;
+  private String postageOption;
   private String totalPrice;
   private String lines;
   private String fetchtcgStatus;
@@ -573,6 +577,36 @@ public class TcgInventoryItem {
   }
 
   @Nullable
+  @DynamoDbAttribute(BUYER_NAME)
+  public String getBuyerName() {
+    return buyerName;
+  }
+
+  public void setBuyerName(@Nullable String buyerName) {
+    this.buyerName = buyerName;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(BUYER_ADDRESS)
+  public BuyerAddress getBuyerAddress() {
+    return buyerAddress;
+  }
+
+  public void setBuyerAddress(@Nullable BuyerAddress buyerAddress) {
+    this.buyerAddress = buyerAddress;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(POSTAGE_OPTION)
+  public String getPostageOption() {
+    return postageOption;
+  }
+
+  public void setPostageOption(@Nullable String postageOption) {
+    this.postageOption = postageOption;
+  }
+
+  @Nullable
   @DynamoDbAttribute(TOTAL_PRICE)
   public String getTotalPrice() {
     return totalPrice;
@@ -732,6 +766,9 @@ public class TcgInventoryItem {
         && Objects.equals(lastPublishedPrice, that.lastPublishedPrice)
         && Objects.equals(lastPublishedAt, that.lastPublishedAt)
         && Objects.equals(deliveryMode, that.deliveryMode)
+        && Objects.equals(buyerName, that.buyerName)
+        && Objects.equals(buyerAddress, that.buyerAddress)
+        && Objects.equals(postageOption, that.postageOption)
         && Objects.equals(totalPrice, that.totalPrice)
         && Objects.equals(lines, that.lines)
         && Objects.equals(fetchtcgStatus, that.fetchtcgStatus)
@@ -790,6 +827,9 @@ public class TcgInventoryItem {
         lastPublishedPrice,
         lastPublishedAt,
         deliveryMode,
+        buyerName,
+        buyerAddress,
+        postageOption,
         totalPrice,
         lines,
         fetchtcgStatus,
@@ -918,6 +958,14 @@ public class TcgInventoryItem {
         + lastPublishedAt
         + ", deliveryMode='"
         + deliveryMode
+        + '\''
+        + ", buyerName='"
+        + buyerName
+        + '\''
+        + ", buyerAddress="
+        + buyerAddress
+        + ", postageOption='"
+        + postageOption
         + '\''
         + ", totalPrice='"
         + totalPrice
@@ -1128,6 +1176,9 @@ public class TcgInventoryItem {
       @Nullable String fetchtcgStatus,
       @Nullable String fetchtcgCurrentAction,
       @Nullable String deliveryMode,
+      @Nullable String buyerName,
+      @Nullable BuyerAddress buyerAddress,
+      @Nullable String postageOption,
       @Nullable String totalPrice,
       @Nullable String lines,
       Instant createdAt) {
@@ -1139,6 +1190,9 @@ public class TcgInventoryItem {
     item.setFetchtcgStatus(fetchtcgStatus);
     item.setFetchtcgCurrentAction(fetchtcgCurrentAction);
     item.setDeliveryMode(deliveryMode);
+    item.setBuyerName(buyerName);
+    item.setBuyerAddress(buyerAddress);
+    item.setPostageOption(postageOption);
     item.setTotalPrice(totalPrice);
     item.setLines(lines);
     item.setCreatedAt(createdAt);
@@ -1180,6 +1234,9 @@ public class TcgInventoryItem {
 
   @DynamoDbBean
   public static class Photo {
+    public static final String PHOTO_ID = "photo_id";
+    public static final String FETCHTCG_URL = "fetchtcg_url";
+
     private String photoId;
     private String fetchtcgUrl;
 
@@ -1226,6 +1283,142 @@ public class TcgInventoryItem {
       photo.setPhotoId(photoId);
       photo.setFetchtcgUrl(fetchtcgUrl);
       return photo;
+    }
+  }
+
+  @DynamoDbBean
+  public static class BuyerAddress {
+    public static final String LINE1 = "line1";
+    public static final String LINE2 = "line2";
+    public static final String SUBURB = "suburb";
+    public static final String CITY = "city";
+    public static final String POST_CODE = "post_code";
+    public static final String COUNTRY = "country";
+
+    private String line1;
+    private String line2;
+    private String suburb;
+    private String city;
+    private String postCode;
+    private String country;
+
+    @Nullable
+    @DynamoDbAttribute(LINE1)
+    public String getLine1() {
+      return line1;
+    }
+
+    public void setLine1(@Nullable String line1) {
+      this.line1 = line1;
+    }
+
+    @Nullable
+    @DynamoDbAttribute(LINE2)
+    public String getLine2() {
+      return line2;
+    }
+
+    public void setLine2(@Nullable String line2) {
+      this.line2 = line2;
+    }
+
+    @Nullable
+    @DynamoDbAttribute(SUBURB)
+    public String getSuburb() {
+      return suburb;
+    }
+
+    public void setSuburb(@Nullable String suburb) {
+      this.suburb = suburb;
+    }
+
+    @Nullable
+    @DynamoDbAttribute(CITY)
+    public String getCity() {
+      return city;
+    }
+
+    public void setCity(@Nullable String city) {
+      this.city = city;
+    }
+
+    @Nullable
+    @DynamoDbAttribute(POST_CODE)
+    public String getPostCode() {
+      return postCode;
+    }
+
+    public void setPostCode(@Nullable String postCode) {
+      this.postCode = postCode;
+    }
+
+    @Nullable
+    @DynamoDbAttribute(COUNTRY)
+    public String getCountry() {
+      return country;
+    }
+
+    public void setCountry(@Nullable String country) {
+      this.country = country;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      BuyerAddress that = (BuyerAddress) o;
+      return Objects.equals(line1, that.line1)
+          && Objects.equals(line2, that.line2)
+          && Objects.equals(suburb, that.suburb)
+          && Objects.equals(city, that.city)
+          && Objects.equals(postCode, that.postCode)
+          && Objects.equals(country, that.country);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(line1, line2, suburb, city, postCode, country);
+    }
+
+    @Override
+    public String toString() {
+      return "BuyerAddress{"
+          + "line1='"
+          + line1
+          + '\''
+          + ", line2='"
+          + line2
+          + '\''
+          + ", suburb='"
+          + suburb
+          + '\''
+          + ", city='"
+          + city
+          + '\''
+          + ", postCode='"
+          + postCode
+          + '\''
+          + ", country='"
+          + country
+          + '\''
+          + '}';
+    }
+
+    public static BuyerAddress create(
+        @Nullable String line1,
+        @Nullable String line2,
+        @Nullable String suburb,
+        @Nullable String city,
+        @Nullable String postCode,
+        @Nullable String country) {
+      var address = new BuyerAddress();
+      address.setLine1(line1);
+      address.setLine2(line2);
+      address.setSuburb(suburb);
+      address.setCity(city);
+      address.setPostCode(postCode);
+      address.setCountry(country);
+      return address;
     }
   }
 }

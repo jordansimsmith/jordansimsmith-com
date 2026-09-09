@@ -291,6 +291,9 @@ public class ReportsHandlerIntegrationTest {
             null,
             null,
             "SHIPPING",
+            null,
+            null,
+            null,
             "10.50",
             "[{\"sku_id\":\"s\",\"fetchtcg_listing_id\":1,\"quantity\":1,\"price\":\"10.50\",\"allocated_sequence_numbers\":[]}]",
             Instant.ofEpochSecond(1699500000)));
@@ -302,6 +305,9 @@ public class ReportsHandlerIntegrationTest {
             null,
             null,
             "PICKUP",
+            null,
+            null,
+            null,
             "5.25",
             "[{\"sku_id\":\"s\",\"fetchtcg_listing_id\":1,\"quantity\":1,\"price\":\"5.25\",\"allocated_sequence_numbers\":[]}]",
             Instant.ofEpochSecond(1699600000)));
@@ -313,6 +319,9 @@ public class ReportsHandlerIntegrationTest {
             null,
             null,
             "PICKUP",
+            null,
+            null,
+            null,
             "100.00",
             "[{\"sku_id\":\"s\",\"fetchtcg_listing_id\":1,\"quantity\":1,\"price\":\"100.00\",\"allocated_sequence_numbers\":[]}]",
             Instant.ofEpochSecond(1699700000)));
@@ -515,6 +524,9 @@ public class ReportsHandlerIntegrationTest {
             "ACCEPTED",
             null,
             "PICKUP",
+            null,
+            null,
+            null,
             "3.33",
             "[]",
             Instant.ofEpochSecond(1699000000));
@@ -528,6 +540,9 @@ public class ReportsHandlerIntegrationTest {
                 "SEND_PICKUP_ADDRESS",
                 "2026-08-11T04:42:12.476+0000",
                 "PICKUP",
+                null,
+                null,
+                null,
                 new BigDecimal("3.33"),
                 List.of())));
 

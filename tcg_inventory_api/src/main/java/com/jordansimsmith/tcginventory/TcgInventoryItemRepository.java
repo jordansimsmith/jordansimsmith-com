@@ -129,6 +129,74 @@ public class TcgInventoryItemRepository {
                 Map.of(TcgInventoryItem.ORDER_ID, AttributeValue.builder().s(orderId).build()))));
   }
 
+  // fulfillment details mirror the offer and move neither inventory nor revenue, so this is a
+  // plain update with no audit entry: auditing it would mark the report stale for nothing
+  public void updateOrderFulfillment(
+      String user,
+      String orderId,
+      @Nullable String buyerName,
+      @Nullable TcgInventoryItem.BuyerAddress buyerAddress,
+      @Nullable String postageOption) {
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(TcgInventoryItem.TABLE_NAME)
+            .key(
+                Map.of(
+                    TcgInventoryItem.PK,
+                    AttributeValue.builder().s(TcgInventoryItem.formatUserPk(user)).build(),
+                    TcgInventoryItem.SK,
+                    AttributeValue.builder().s(TcgInventoryItem.formatOrderSk(orderId)).build()))
+            .updateExpression(
+                "SET "
+                    + TcgInventoryItem.BUYER_NAME
+                    + " = :buyerName, "
+                    + TcgInventoryItem.BUYER_ADDRESS
+                    + " = :buyerAddress, "
+                    + TcgInventoryItem.POSTAGE_OPTION
+                    + " = :postageOption, "
+                    + TcgInventoryItem.UPDATED_AT
+                    + " = :now")
+            .conditionExpression("attribute_exists(" + TcgInventoryItem.PK + ")")
+            .expressionAttributeValues(
+                Map.of(
+                    ":buyerName", toAttributeValue(buyerName),
+                    ":buyerAddress", toAttributeValue(buyerAddress),
+                    ":postageOption", toAttributeValue(postageOption),
+                    ":now",
+                        AttributeValue.builder()
+                            .n(String.valueOf(clock.now().getEpochSecond()))
+                            .build()))
+            .build());
+  }
+
+  private static AttributeValue toAttributeValue(@Nullable String value) {
+    return value == null
+        ? AttributeValue.builder().nul(true).build()
+        : AttributeValue.builder().s(value).build();
+  }
+
+  private static AttributeValue toAttributeValue(@Nullable TcgInventoryItem.BuyerAddress address) {
+    if (address == null) {
+      return AttributeValue.builder().nul(true).build();
+    }
+
+    var parts = new HashMap<String, AttributeValue>();
+    putAddressPart(parts, TcgInventoryItem.BuyerAddress.LINE1, address.getLine1());
+    putAddressPart(parts, TcgInventoryItem.BuyerAddress.LINE2, address.getLine2());
+    putAddressPart(parts, TcgInventoryItem.BuyerAddress.SUBURB, address.getSuburb());
+    putAddressPart(parts, TcgInventoryItem.BuyerAddress.CITY, address.getCity());
+    putAddressPart(parts, TcgInventoryItem.BuyerAddress.POST_CODE, address.getPostCode());
+    putAddressPart(parts, TcgInventoryItem.BuyerAddress.COUNTRY, address.getCountry());
+    return AttributeValue.builder().m(parts).build();
+  }
+
+  private static void putAddressPart(
+      Map<String, AttributeValue> parts, String attribute, @Nullable String value) {
+    if (value != null) {
+      parts.put(attribute, AttributeValue.builder().s(value).build());
+    }
+  }
+
   // the conditional order flip and the audit entry ride in the final chunk; a partially applied
   // confirm leaves the order to_pick so the client can retry, and the unit condition tolerates
   // units the failed attempt already sold
