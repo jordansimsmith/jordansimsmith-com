@@ -11,6 +11,16 @@ import './index.css';
 
 const theme = createTheme({
   primaryColor: 'blue',
+  components: {
+    Badge: {
+      styles: {
+        root: {
+          flexShrink: 0,
+          minWidth: 'max-content',
+        },
+      },
+    },
+  },
 });
 
 createRoot(document.getElementById('root')!).render(
