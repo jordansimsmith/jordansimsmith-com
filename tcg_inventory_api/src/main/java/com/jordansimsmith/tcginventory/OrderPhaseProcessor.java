@@ -30,6 +30,11 @@ public class OrderPhaseProcessor {
   private static final Set<String> PAYMENT_ACTIONS =
       Set.of("SEND_PICKUP_ADDRESS", "SEND_TRACKING_CODE", "SEND_REVIEW", "AWAIT_REVIEW");
 
+  // the post-acceptance members of FetchTCG's cancelled filter; its other members (REJECTED,
+  // WITHDRAWN_BY_BUYER) resolve before acceptance and never produce orders
+  private static final Set<String> CANCELLED_STATUSES =
+      Set.of("CANCELLED_BY_SELLER", "CANCELLED_BY_BUYER");
+
   private static final DateTimeFormatter ACCEPTED_AT_FORMATTER =
       new DateTimeFormatterBuilder()
           .append(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
@@ -88,19 +93,28 @@ public class OrderPhaseProcessor {
     LOGGER.info("built listing-to-sku map with {} entries", listingToSkuId.size());
 
     int advancedCount = 0;
+    int voidedCount = 0;
     int refreshedCount = 0;
     for (var order : existingOrders) {
+      // an order missing from the list keeps its reservations: a truncated page must never
+      // release stock
       var offer = offerMap.get(order.getOrderId());
       if (offer == null) {
         continue;
       }
 
+      var cancelled = offer.status() != null && CANCELLED_STATUSES.contains(offer.status());
       var paymentReceived =
           offer.currentAction() != null && PAYMENT_ACTIONS.contains(offer.currentAction());
-      if ("awaiting_payment".equals(order.getStatus()) && paymentReceived) {
-        tcgInventoryItemRepository.advanceOrderToPickReady(
-            user, order.getOrderId(), offer.status(), offer.currentAction());
-        advancedCount++;
+      if ("awaiting_payment".equals(order.getStatus())) {
+        if (cancelled) {
+          releaseCancelledOrder(user, order, offer);
+          voidedCount++;
+        } else if (paymentReceived) {
+          tcgInventoryItemRepository.advanceOrderToPickReady(
+              user, order.getOrderId(), offer.status(), offer.currentAction());
+          advancedCount++;
+        }
       }
 
       // the buyer supplies an address and picks a postage option after the offer is accepted, so
@@ -119,8 +133,10 @@ public class OrderPhaseProcessor {
       }
     }
     LOGGER.info(
-        "advanced {} orders to pick-ready, refreshed fulfillment details on {}",
+        "advanced {} orders to pick-ready, voided {} cancelled orders, refreshed fulfillment"
+            + " details on {}",
         advancedCount,
+        voidedCount,
         refreshedCount);
 
     var existingOrderIds =
@@ -309,6 +325,22 @@ public class OrderPhaseProcessor {
             .map(entry -> new TcgInventoryItemRepository.SkuUnits(entry.getKey(), entry.getValue()))
             .toList();
     tcgInventoryItemRepository.reserveOrder(user, orderItem, skuUnits);
+  }
+
+  private void releaseCancelledOrder(
+      String user, TcgInventoryItem order, FetchTcgClient.SellerOffer offer) {
+    var releasedUnits = new LinkedHashMap<String, List<Integer>>();
+    for (var line : OrderLines.parse(order.getLines(), objectMapper)) {
+      releasedUnits
+          .computeIfAbsent(line.skuId(), k -> new ArrayList<>())
+          .addAll(line.allocatedSequenceNumbers());
+    }
+
+    var skuUnits =
+        releasedUnits.entrySet().stream()
+            .map(entry -> new TcgInventoryItemRepository.SkuUnits(entry.getKey(), entry.getValue()))
+            .toList();
+    tcgInventoryItemRepository.releaseOrder(user, order.getOrderId(), offer.status(), skuUnits);
   }
 
   private static Fulfillment toFulfillment(FetchTcgClient.SellerOffer offer) {

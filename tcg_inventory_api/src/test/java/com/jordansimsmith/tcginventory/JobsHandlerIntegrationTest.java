@@ -13,6 +13,7 @@ import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.IntStream;
@@ -526,6 +527,203 @@ public class JobsHandlerIntegrationTest {
         getAuditEntries("jordan").stream().filter(a -> "payment".equals(a.getEventType())).toList();
     assertThat(paymentAudits).hasSize(1);
     assertThat(paymentAudits.get(0).getOrderId()).isEqualTo("91329");
+  }
+
+  @Test
+  void publishOrderPhaseShouldVoidOrderCancelledBySeller() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 3);
+    createReservedOrder("jordan", "83663", "awaiting_payment", "scryfall-1#normal#NM", 1001, 1, 2);
+
+    fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("succeeded");
+
+    var order = getOrder("jordan", "83663");
+    assertThat(order.getStatus()).isEqualTo("voided");
+    assertThat(order.getFetchtcgStatus()).isEqualTo("CANCELLED_BY_SELLER");
+    assertThat(order.getFetchtcgCurrentAction()).isNull();
+
+    var units = getUnits("jordan", "scryfall-1#normal#NM");
+    assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("in_stock"));
+    assertThat(units).allSatisfy(unit -> assertThat(unit.getOrderId()).isNull());
+
+    var releaseAudits =
+        getAuditEntries("jordan").stream().filter(a -> "release".equals(a.getEventType())).toList();
+    assertThat(releaseAudits).hasSize(1);
+    assertThat(releaseAudits.get(0).getOrderId()).isEqualTo("83663");
+
+    // the released units are dirty stock again, so the listing phase restores the full quantity
+    var sku = getSku("jordan", "scryfall-1#normal#NM");
+    assertThat(sku.getDirty()).isFalse();
+    assertThat(sku.getLastPublishedQuantity()).isEqualTo(3);
+  }
+
+  @Test
+  void publishOrderPhaseShouldVoidOrderCancelledByBuyer() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 2);
+    createReservedOrder("jordan", "83663", "awaiting_payment", "scryfall-1#normal#NM", 1001, 1);
+
+    fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(83663, "CANCELLED_BY_BUYER")));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "83663");
+    assertThat(order.getStatus()).isEqualTo("voided");
+    assertThat(order.getFetchtcgStatus()).isEqualTo("CANCELLED_BY_BUYER");
+
+    var units = getUnits("jordan", "scryfall-1#normal#NM");
+    assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("in_stock"));
+  }
+
+  @Test
+  void publishOrderPhaseShouldNotVoidOrderMissingFromSellerOffers() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 2);
+    createReservedOrder("jordan", "83663", "awaiting_payment", "scryfall-1#normal#NM", 1001, 1);
+
+    fakeFetchTcgClient.seedSellerOffers(List.of());
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "83663");
+    assertThat(order.getStatus()).isEqualTo("awaiting_payment");
+
+    var units = getUnits("jordan", "scryfall-1#normal#NM");
+    var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
+    assertThat(reserved).hasSize(1);
+    assertThat(reserved.get(0).getOrderId()).isEqualTo("83663");
+
+    assertThat(getAuditEntries("jordan")).noneMatch(a -> "release".equals(a.getEventType()));
+  }
+
+  @Test
+  void publishOrderPhaseShouldNotVoidPaidOrder() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 2);
+    createReservedOrder("jordan", "83663", "to_pick", "scryfall-1#normal#NM", 1001, 1);
+
+    fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "83663");
+    assertThat(order.getStatus()).isEqualTo("to_pick");
+
+    var units = getUnits("jordan", "scryfall-1#normal#NM");
+    var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
+    assertThat(reserved).hasSize(1);
+
+    assertThat(getAuditEntries("jordan")).noneMatch(a -> "release".equals(a.getEventType()));
+  }
+
+  @Test
+  void publishOrderPhaseShouldNotReleaseAgainWhenOrderAlreadyVoided() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 2);
+    createReservedOrder("jordan", "83663", "voided", "scryfall-1#normal#NM", 1001, 1);
+    releaseUnit("jordan", "scryfall-1#normal#NM", 1);
+
+    fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "83663");
+    assertThat(order.getStatus()).isEqualTo("voided");
+
+    var units = getUnits("jordan", "scryfall-1#normal#NM");
+    assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("in_stock"));
+
+    assertThat(getAuditEntries("jordan")).noneMatch(a -> "release".equals(a.getEventType()));
+  }
+
+  @Test
+  void publishOrderPhaseShouldFinishPartiallyAppliedRelease() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 2);
+    createReservedOrder("jordan", "83663", "awaiting_payment", "scryfall-1#normal#NM", 1001, 1, 2);
+
+    // simulate a run that released one unit before dying, leaving the order awaiting_payment
+    releaseUnit("jordan", "scryfall-1#normal#NM", 1);
+
+    fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "83663");
+    assertThat(order.getStatus()).isEqualTo("voided");
+
+    var units = getUnits("jordan", "scryfall-1#normal#NM");
+    assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("in_stock"));
+
+    var releaseAudits =
+        getAuditEntries("jordan").stream().filter(a -> "release".equals(a.getEventType())).toList();
+    assertThat(releaseAudits).hasSize(1);
+  }
+
+  @Test
+  void publishOrderPhaseShouldReleaseLargeOrderAcrossTransactions() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+
+    var orderLines = new ArrayList<OrderLines.OrderLine>();
+    for (int i = 1; i <= 60; i++) {
+      var skuId = "scryfall-" + i + "#normal#NM";
+      createSkuWithUnits("jordan", skuId, 1000 + i, 1);
+      reserveUnit("jordan", skuId, 1, "91329");
+      orderLines.add(new OrderLines.OrderLine(skuId, 1000 + i, 1, "0.50", "0.50", List.of(1)));
+    }
+    createOrderWithLines("jordan", "91329", "awaiting_payment", orderLines);
+
+    fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(91329, "CANCELLED_BY_SELLER")));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("succeeded");
+
+    var order = getOrder("jordan", "91329");
+    assertThat(order.getStatus()).isEqualTo("voided");
+
+    for (int i = 1; i <= 60; i++) {
+      var units = getUnits("jordan", "scryfall-" + i + "#normal#NM");
+      assertThat(units).hasSize(1);
+      assertThat(units.get(0).getStatus()).isEqualTo("in_stock");
+      assertThat(units.get(0).getOrderId()).isNull();
+    }
+
+    var releaseAudits =
+        getAuditEntries("jordan").stream().filter(a -> "release".equals(a.getEventType())).toList();
+    assertThat(releaseAudits).hasSize(1);
   }
 
   @Test
@@ -1266,6 +1464,89 @@ public class JobsHandlerIntegrationTest {
             "[]",
             Instant.ofEpochSecond(1700000000));
     tcgInventoryTable.putItem(order);
+  }
+
+  private void createReservedOrder(
+      String user,
+      String offerId,
+      String status,
+      String skuId,
+      int fetchtcgListingId,
+      int... sequenceNumbers) {
+    var allocated = Arrays.stream(sequenceNumbers).boxed().toList();
+    for (var sequenceNumber : allocated) {
+      reserveUnit(user, skuId, sequenceNumber, offerId);
+    }
+
+    createOrderWithLines(
+        user,
+        offerId,
+        status,
+        List.of(
+            new OrderLines.OrderLine(
+                skuId, fetchtcgListingId, allocated.size(), "3.33", "4.20", allocated)));
+  }
+
+  private void createOrderWithLines(
+      String user, String offerId, String status, List<OrderLines.OrderLine> lines) {
+    String linesJson;
+    try {
+      linesJson = objectMapper.writeValueAsString(lines);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+
+    var order =
+        TcgInventoryItem.createOrder(
+            user,
+            offerId,
+            status,
+            "ACCEPTED",
+            "AWAITING_PAYMENT",
+            "PICKUP",
+            null,
+            null,
+            null,
+            "3.33",
+            linesJson,
+            Instant.ofEpochSecond(1700000000));
+    tcgInventoryTable.putItem(order);
+  }
+
+  private void reserveUnit(String user, String skuId, int sequenceNumber, String orderId) {
+    var unit = getUnit(user, skuId, sequenceNumber);
+    unit.setStatus("reserved");
+    unit.setOrderId(orderId);
+    tcgInventoryTable.putItem(unit);
+  }
+
+  private void releaseUnit(String user, String skuId, int sequenceNumber) {
+    var unit = getUnit(user, skuId, sequenceNumber);
+    unit.setStatus("in_stock");
+    unit.setOrderId(null);
+    tcgInventoryTable.putItem(unit);
+  }
+
+  private TcgInventoryItem getUnit(String user, String skuId, int sequenceNumber) {
+    return tcgInventoryTable.getItem(
+        Key.builder()
+            .partitionValue(TcgInventoryItem.formatSkuPk(user, skuId))
+            .sortValue(TcgInventoryItem.formatUnitSk(sequenceNumber))
+            .build());
+  }
+
+  private static FetchTcgClient.SellerOffer cancelledOffer(int offerId, String status) {
+    return new FetchTcgClient.SellerOffer(
+        offerId,
+        status,
+        null,
+        "2026-08-11T04:42:12.476+0000",
+        "PICKUP",
+        null,
+        null,
+        null,
+        new BigDecimal("3.33"),
+        List.of());
   }
 
   private TcgInventoryItem getOrder(String user, String offerId) {

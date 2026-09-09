@@ -197,6 +197,29 @@ public class TcgInventoryItemRepository {
     }
   }
 
+  // the conditional order flip and the audit entry ride in the final chunk, so a partially applied
+  // release leaves the order awaiting_payment and the next run finishes it; the unit condition
+  // tolerates units the failed attempt already released
+  public void releaseOrder(
+      String user, String orderId, String fetchtcgStatus, List<SkuUnits> releases) {
+    var transactItems = new ArrayList<TransactWriteItem>();
+    for (var release : releases) {
+      transactItems.add(buildSkuDirtyUpdate(user, release.skuId()));
+      for (var sequenceNumber : release.sequenceNumbers()) {
+        transactItems.add(buildUnitReleaseUpdate(user, release.skuId(), sequenceNumber));
+      }
+    }
+
+    transactItems.add(buildOrderVoidedUpdate(user, orderId, fetchtcgStatus));
+    transactItems.add(
+        buildAuditPut(
+            user,
+            "release",
+            Map.of(TcgInventoryItem.ORDER_ID, AttributeValue.builder().s(orderId).build())));
+
+    executeChunked(transactItems);
+  }
+
   // the conditional order flip and the audit entry ride in the final chunk; a partially applied
   // confirm leaves the order to_pick so the client can retry, and the unit condition tolerates
   // units the failed attempt already sold
@@ -407,6 +430,37 @@ public class TcgInventoryItemRepository {
                 .expressionAttributeValues(
                     Map.of(
                         ":sold", AttributeValue.builder().s("sold").build(),
+                        ":reserved", AttributeValue.builder().s("reserved").build(),
+                        ":now",
+                            AttributeValue.builder()
+                                .n(String.valueOf(clock.now().getEpochSecond()))
+                                .build()))
+                .build())
+        .build();
+  }
+
+  private TransactWriteItem buildUnitReleaseUpdate(String user, String skuId, int sequenceNumber) {
+    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
+    var unitSk = TcgInventoryItem.formatUnitSk(sequenceNumber);
+
+    return TransactWriteItem.builder()
+        .update(
+            Update.builder()
+                .tableName(TcgInventoryItem.TABLE_NAME)
+                .key(
+                    Map.of(
+                        TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build(),
+                        TcgInventoryItem.SK, AttributeValue.builder().s(unitSk).build()))
+                .updateExpression(
+                    "SET #status = :inStock, "
+                        + TcgInventoryItem.UPDATED_AT
+                        + " = :now REMOVE "
+                        + TcgInventoryItem.ORDER_ID)
+                .conditionExpression("#status IN (:reserved, :inStock)")
+                .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+                .expressionAttributeValues(
+                    Map.of(
+                        ":inStock", AttributeValue.builder().s("in_stock").build(),
                         ":reserved", AttributeValue.builder().s("reserved").build(),
                         ":now",
                             AttributeValue.builder()
@@ -637,6 +691,42 @@ public class TcgInventoryItemRepository {
                         ":fetchtcgStatus", AttributeValue.builder().s(fetchtcgStatus).build(),
                         ":fetchtcgCurrentAction",
                             AttributeValue.builder().s(fetchtcgCurrentAction).build(),
+                        ":now",
+                            AttributeValue.builder()
+                                .n(String.valueOf(clock.now().getEpochSecond()))
+                                .build()))
+                .build())
+        .build();
+  }
+
+  // a cancelled offer carries no currentAction, so the stale one is dropped rather than kept
+  private TransactWriteItem buildOrderVoidedUpdate(
+      String user, String orderId, String fetchtcgStatus) {
+    var userPk = TcgInventoryItem.formatUserPk(user);
+    var orderSk = TcgInventoryItem.formatOrderSk(orderId);
+
+    return TransactWriteItem.builder()
+        .update(
+            Update.builder()
+                .tableName(TcgInventoryItem.TABLE_NAME)
+                .key(
+                    Map.of(
+                        TcgInventoryItem.PK, AttributeValue.builder().s(userPk).build(),
+                        TcgInventoryItem.SK, AttributeValue.builder().s(orderSk).build()))
+                .updateExpression(
+                    "SET #status = :voided, "
+                        + TcgInventoryItem.FETCHTCG_STATUS
+                        + " = :fetchtcgStatus, "
+                        + TcgInventoryItem.UPDATED_AT
+                        + " = :now REMOVE "
+                        + TcgInventoryItem.FETCHTCG_CURRENT_ACTION)
+                .conditionExpression("#status = :awaitingPayment")
+                .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+                .expressionAttributeValues(
+                    Map.of(
+                        ":voided", AttributeValue.builder().s("voided").build(),
+                        ":awaitingPayment", AttributeValue.builder().s("awaiting_payment").build(),
+                        ":fetchtcgStatus", AttributeValue.builder().s(fetchtcgStatus).build(),
                         ":now",
                             AttributeValue.builder()
                                 .n(String.valueOf(clock.now().getEpochSecond()))
