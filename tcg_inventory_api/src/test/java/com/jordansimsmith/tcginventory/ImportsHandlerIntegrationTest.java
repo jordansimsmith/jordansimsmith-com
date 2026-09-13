@@ -301,6 +301,54 @@ public class ImportsHandlerIntegrationTest {
     assertThat(row.get("scryfall_id").asText()).isEqualTo("581b7327-3215-4a4f-b4ae-d9d4002ba882");
     assertThat(row.get("decision").isNull()).isTrue();
     assertThat(row.get("decision_reason").isNull()).isTrue();
+    assertThat(body.get("total_suggested_price").asText()).isEqualTo("0.00");
+  }
+
+  @Test
+  void getImportShouldReturnTotalSuggestedPriceFromKeepRows() throws Exception {
+    // arrange
+    var importId = createReviewImportWithRow("jordan");
+    var discard =
+        TcgInventoryItem.createImportRow(
+            "jordan",
+            importId,
+            2,
+            "Opt",
+            "dom",
+            "Dominaria",
+            "60",
+            "normal",
+            "NM",
+            "scryfall-2",
+            "en");
+    discard.setDecision("discard");
+    tcgInventoryTable.putItem(discard);
+    var keepB =
+        TcgInventoryItem.createImportRow(
+            "jordan",
+            importId,
+            3,
+            "Sol Ring",
+            "cmr",
+            "Commander Legends",
+            "472",
+            "normal",
+            "NM",
+            "scryfall-3",
+            "en");
+    keepB.setDecision("keep");
+    keepB.setSuggestedPrice("3.10");
+    tcgInventoryTable.putItem(keepB);
+
+    // act
+    var response =
+        getImportHandler.handleRequest(
+            buildEventWithPathParam("jordan", Map.of("import_id", importId)), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = objectMapper.readTree(response.getBody());
+    assertThat(body.get("total_suggested_price").asText()).isEqualTo("4.50");
   }
 
   @Test

@@ -9,7 +9,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.time.Clock;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -110,11 +109,7 @@ public class ConfirmImportHandler
       tcgInventoryTable.putItem(importItem);
     }
 
-    var totalSuggestedPrice =
-        keepRows.stream()
-            .map(row -> new BigDecimal(row.getSuggestedPrice()))
-            .reduce(new BigDecimal("0.00"), BigDecimal::add)
-            .toPlainString();
+    var totalSuggestedPrice = ImportRows.totalSuggestedPrice(keepRows);
 
     if (keepRows.isEmpty()) {
       importItem.setStatus("confirmed");

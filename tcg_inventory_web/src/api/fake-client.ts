@@ -482,10 +482,26 @@ function toImportRow(row: FakeImportRow, revealed: boolean): ImportRow {
   };
 }
 
+function totalSuggestedPrice(importRecord: FakeImport): string {
+  const appraised = appraisedCount(importRecord);
+  const totalCents = importRecord.rows.reduce((sum, row, index) => {
+    if (
+      index >= appraised ||
+      row.decision !== 'keep' ||
+      row.suggested_price == null
+    ) {
+      return sum;
+    }
+    return sum + Math.round(Number(row.suggested_price) * 100);
+  }, 0);
+  return (totalCents / 100).toFixed(2);
+}
+
 function toImportDetail(importRecord: FakeImport): ImportDetail {
   const appraised = appraisedCount(importRecord);
   return {
     ...toImportSummary(importRecord),
+    total_suggested_price: totalSuggestedPrice(importRecord),
     rows: importRecord.rows.map((row, index) =>
       toImportRow(row, index < appraised),
     ),

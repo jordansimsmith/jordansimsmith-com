@@ -48,6 +48,7 @@ public class GetImportHandler
       @JsonProperty("row_count") int rowCount,
       @JsonProperty("appraisal_error") @Nullable String appraisalError,
       @JsonProperty("created_at") long createdAt,
+      @JsonProperty("total_suggested_price") String totalSuggestedPrice,
       @JsonProperty("rows") List<ImportRowResponse> rows) {}
 
   record ErrorResponse(@JsonProperty("message") String message) {}
@@ -107,9 +108,13 @@ public class GetImportHandler
             .scanIndexForward(true)
             .build();
 
-    var rows =
+    var rowItems =
         tcgInventoryTable.query(rowRequest).stream()
             .flatMap(page -> page.items().stream())
+            .toList();
+
+    var rows =
+        rowItems.stream()
             .map(
                 item ->
                     new ImportRowResponse(
@@ -138,6 +143,7 @@ public class GetImportHandler
             importItem.getRowCount() != null ? importItem.getRowCount() : 0,
             importItem.getError(),
             importItem.getCreatedAt() != null ? importItem.getCreatedAt().getEpochSecond() : 0,
+            ImportRows.totalSuggestedPrice(rowItems),
             rows));
   }
 

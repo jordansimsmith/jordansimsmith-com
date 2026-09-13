@@ -53,6 +53,7 @@ function importDetail(overrides: Partial<ImportDetail> = {}): ImportDetail {
     row_count: 40,
     appraisal_error: null,
     created_at: 1765420932,
+    total_suggested_price: '0.00',
     rows: appraisingRows(),
     ...overrides,
   };
@@ -85,6 +86,7 @@ function reviewImport(overrides: Partial<ImportDetail> = {}): ImportDetail {
   return importDetail({
     status: 'review',
     row_count: 3,
+    total_suggested_price: '4.50',
     rows: [
       importRow(1, {
         name: 'Top Card',
@@ -151,6 +153,7 @@ describe('ImportDetailPage', () => {
     expect(screen.getByText('Keep 16')).toBeDefined();
     expect(screen.getByText('Discard 3')).toBeDefined();
     expect(screen.getByText('Review 1')).toBeDefined();
+    expect(screen.queryByText(/Total suggested value/)).toBeNull();
   });
 
   it('polls every 2 seconds and stops when appraisal completes', async () => {
@@ -368,6 +371,7 @@ describe('ImportDetailPage', () => {
     expect(dataRows[2].textContent).toContain('Bottom Card');
     expect(dataRows[2].textContent).toContain('review');
     expect(dataRows[2].textContent).toContain('non-English card');
+    expect(screen.queryByText(/Total suggested value/)).toBeNull();
     expect(
       screen.getByRole('button', { name: 'Confirm import' }),
     ).toBeDefined();
@@ -550,6 +554,7 @@ describe('ImportDetailPage', () => {
     renderImportDetailPage();
 
     expect(await screen.findByText('Top Card')).toBeDefined();
+    expect(screen.getByText('Total suggested value $4.50')).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Confirm import' })).toBeNull();
   });
 

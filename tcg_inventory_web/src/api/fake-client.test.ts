@@ -255,6 +255,7 @@ describe('createFakeClient imports', () => {
 
     let detail = await client.getImport(created.import_id);
     expect(detail.rows[3].market_price).toBeNull();
+    expect(detail.total_suggested_price).toBe('0.00');
 
     vi.advanceTimersByTime(60_000);
     detail = await client.getImport(created.import_id);
@@ -264,6 +265,7 @@ describe('createFakeClient imports', () => {
     expect(detail.rows[3].decision).toBe('keep');
     expect(detail.rows[3].market_price).toMatch(/^\d+\.\d{2}$/);
     expect(detail.rows[3].suggested_price).toMatch(/^\d+\.\d{2}$/);
+    expect(detail.total_suggested_price).toBe('9.00');
 
     const confirmedSeed = await client.getImport('fake-import-1');
     const discardRow = confirmedSeed.rows.find(
@@ -335,6 +337,7 @@ describe('createFakeClient imports', () => {
 
     const detail = await client.getImport(created.import_id);
     expect(detail.status).toBe('confirmed');
+    expect(detail.total_suggested_price).toBe('9.00');
   });
 
   it('splits placement instructions at block boundaries', async () => {
@@ -404,6 +407,7 @@ describe('createFakeClient row photos', () => {
     const detail = await client.getImport('fake-import-3');
 
     expect(detail.status).toBe('review');
+    expect(detail.total_suggested_price).toBe('60.25');
     const flagged = detail.rows.find((row) => row.needs_photos);
     expect(flagged).toMatchObject({
       position: 1,

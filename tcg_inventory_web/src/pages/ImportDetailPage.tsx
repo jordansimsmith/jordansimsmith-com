@@ -324,6 +324,11 @@ export function ImportDetailPage() {
                   <Badge variant="light" color="yellow">
                     Review {reviewCount}
                   </Badge>
+                  {importDetail.status === 'confirmed' && (
+                    <Text size="sm" c="dimmed">
+                      {`Total suggested value $${importDetail.total_suggested_price}`}
+                    </Text>
+                  )}
                   {importDetail.status === 'review' && needsPhotosCount > 0 && (
                     <Text size="sm" c="dimmed">
                       {needsPhotosCount === 1

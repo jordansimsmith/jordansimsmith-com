@@ -105,6 +105,7 @@ export interface ImportRow {
 }
 
 export interface ImportDetail extends ImportSummary {
+  total_suggested_price: string;
   rows: ImportRow[];
 }
 
