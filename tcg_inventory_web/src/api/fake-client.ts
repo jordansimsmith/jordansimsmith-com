@@ -1381,6 +1381,16 @@ export function createFakeClient(): ApiClient {
             in_stock_units: 1,
           },
           {
+            sku_id: '48caf4c4-745c-4072-bf3d-1a3fa7c3bc9c#etched#NM',
+            name: 'Jeska, Thrice Reborn',
+            set_code: 'cmr',
+            collector_number: '186',
+            finish: 'etched',
+            condition: 'NM',
+            price: '22.00',
+            in_stock_units: 1,
+          },
+          {
             sku_id: 'd6914dba-0d27-4055-ac34-b3ebf5802221#normal#NM',
             name: 'Rhystic Study',
             set_code: 'jmp',

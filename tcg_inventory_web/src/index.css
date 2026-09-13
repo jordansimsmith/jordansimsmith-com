@@ -2,6 +2,14 @@ body {
   margin: 0;
 }
 
+.foil-finish,
+.etched-finish {
+  background-clip: text;
+  -webkit-background-clip: text;
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+
 .foil-finish {
   background-image: linear-gradient(
     90deg,
@@ -13,8 +21,17 @@ body {
     #5856d6,
     #af52de
   );
-  background-clip: text;
-  -webkit-background-clip: text;
-  color: transparent;
-  -webkit-text-fill-color: transparent;
+}
+
+.etched-finish {
+  background-image: linear-gradient(
+    90deg,
+    #5e5ce6,
+    #0a84ff,
+    #64d2ff,
+    #bf5af2,
+    #5856d6,
+    #007aff,
+    #af52de
+  );
 }

@@ -18,7 +18,11 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { JobFailureAlert } from '../components/JobFailureAlert';
 import { apiClient } from '../api/client';
-import { formatSetNumber } from '../domain/card-label';
+import {
+  finishNameClass,
+  finishNameWeight,
+  formatSetNumber,
+} from '../domain/card-label';
 import type {
   ReportAgingBand,
   ReportIntakeVsSales,
@@ -306,20 +310,15 @@ function TopHitsTable({ topHits }: { topHits: ReportTopHit[] }) {
               <Table.Tr key={hit.sku_id}>
                 <Table.Td c="dimmed">{index + 1}</Table.Td>
                 <Table.Td
-                  className={hit.finish === 'foil' ? 'foil-finish' : undefined}
-                  fw={hit.finish === 'foil' ? 700 : 500}
+                  className={finishNameClass(hit.finish)}
+                  fw={finishNameWeight(hit.finish)}
                 >
                   {hit.name}
                 </Table.Td>
                 <Table.Td>
                   {formatSetNumber(hit.set_code, hit.collector_number)}
                 </Table.Td>
-                <Table.Td
-                  fw={hit.finish === 'normal' ? undefined : 700}
-                  tt="capitalize"
-                >
-                  {hit.finish}
-                </Table.Td>
+                <Table.Td tt="capitalize">{hit.finish}</Table.Td>
                 <Table.Td>{hit.condition}</Table.Td>
                 <Table.Td
                   ta="right"

@@ -251,7 +251,7 @@ describe('ImportDetailPage', () => {
     });
   });
 
-  it('places set then finish after name and bolds non-normal finishes', async () => {
+  it('places set then finish after name and rainbows keep foil and etched names', async () => {
     vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
       reviewImport({
         rows: [
@@ -299,7 +299,7 @@ describe('ImportDetailPage', () => {
     const foilCells = cellsAfterName('Foil Card');
     expect(foilCells[2].textContent).toBe('DOM#2');
     expect(foilCells[3].textContent).toBe('foil');
-    expect(foilCells[3].style.fontWeight).toBe('700');
+    expect(foilCells[3].style.fontWeight).toBe('');
     expect(foilCells[3].style.textTransform).toBe('capitalize');
     expect(
       screen.getByText('Foil Card').classList.contains('foil-finish'),
@@ -310,11 +310,12 @@ describe('ImportDetailPage', () => {
     const etchedCells = cellsAfterName('Etched Card');
     expect(etchedCells[2].textContent).toBe('DOM#3');
     expect(etchedCells[3].textContent).toBe('etched');
-    expect(etchedCells[3].style.fontWeight).toBe('700');
+    expect(etchedCells[3].style.fontWeight).toBe('');
     expect(etchedCells[3].style.textTransform).toBe('capitalize');
     expect(
-      screen.getByText('Etched Card').classList.contains('foil-finish'),
-    ).toBe(false);
+      screen.getByText('Etched Card').classList.contains('etched-finish'),
+    ).toBe(true);
+    expect(screen.getByText('Etched Card').style.fontWeight).toBe('700');
     expect(
       screen.getByText('Discarded Foil').classList.contains('foil-finish'),
     ).toBe(false);

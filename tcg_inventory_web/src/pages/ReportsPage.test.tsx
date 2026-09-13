@@ -253,6 +253,16 @@ describe('ReportsPage', () => {
             price: '48.50',
             in_stock_units: 2,
           },
+          {
+            sku_id: 'sku3#etched#MP',
+            name: 'Jeska, Thrice Reborn',
+            set_code: 'cmr',
+            collector_number: '186',
+            finish: 'etched',
+            condition: 'MP',
+            price: '12.00',
+            in_stock_units: 1,
+          },
         ],
       },
     });
@@ -273,19 +283,22 @@ describe('ReportsPage', () => {
     expect(screen.getByText('Price')).toBeDefined();
     expect(screen.getByText('NM')).toBeDefined();
     expect(screen.getByText('LP')).toBeDefined();
+    expect(screen.getByText('MP')).toBeDefined();
     expect(screen.getByText('NM').style.fontWeight).toBe('');
     expect(screen.getByText('LP').style.fontWeight).toBe('');
     expect(screen.getByText('NM').style.color).toBe('');
     expect(screen.getByText('LP').style.color).toBe('');
-    // rank column: two hits ranked 1 and 2
     expect(screen.getByText('1')).toBeDefined();
     expect(screen.getByText('2')).toBeDefined();
     expect(screen.getByText('MH2#138')).toBeDefined();
     expect(screen.getByText('BBD#195')).toBeDefined();
+    expect(screen.getByText('CMR#186')).toBeDefined();
     expect(screen.getByText('normal')).toBeDefined();
     expect(screen.getByText('foil')).toBeDefined();
+    expect(screen.getByText('etched')).toBeDefined();
     expect(screen.getByText('normal').style.fontWeight).toBe('');
-    expect(screen.getByText('foil').style.fontWeight).toBe('700');
+    expect(screen.getByText('foil').style.fontWeight).toBe('');
+    expect(screen.getByText('etched').style.fontWeight).toBe('');
     const headers = screen
       .getAllByRole('columnheader')
       .map((header) => header.textContent);
@@ -295,6 +308,14 @@ describe('ReportsPage', () => {
       screen.getByText('Doubling Season').classList.contains('foil-finish'),
     ).toBe(true);
     expect(screen.getByText('Doubling Season').style.fontWeight).toBe('700');
+    expect(
+      screen
+        .getByText('Jeska, Thrice Reborn')
+        .classList.contains('etched-finish'),
+    ).toBe(true);
+    expect(screen.getByText('Jeska, Thrice Reborn').style.fontWeight).toBe(
+      '700',
+    );
     expect(
       screen
         .getByText('Ragavan, Nimble Pilferer')

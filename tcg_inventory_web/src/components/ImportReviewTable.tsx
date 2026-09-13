@@ -3,7 +3,11 @@ import { ActionIcon, Badge, NativeSelect, Table, Text } from '@mantine/core';
 import { IconTrash } from '@tabler/icons-react';
 import type { Condition, ImportRow, RowDecision } from '../api/client';
 import { CONDITIONS } from '../api/client';
-import { formatSetNumber } from '../domain/card-label';
+import {
+  finishNameClass,
+  finishNameWeight,
+  formatSetNumber,
+} from '../domain/card-label';
 import { ImportRowPhotoStrip } from './ImportRowPhotoStrip';
 
 const DECISION_COLORS: Record<RowDecision, string> = {
@@ -80,22 +84,15 @@ export function ImportReviewTable({
                 {row.position}
               </Table.Td>
               <Table.Td
-                className={
-                  keep && row.finish === 'foil' ? 'foil-finish' : undefined
-                }
-                fw={row.finish === 'foil' ? 700 : 500}
+                className={keep ? finishNameClass(row.finish) : undefined}
+                fw={finishNameWeight(row.finish)}
               >
                 {row.name}
               </Table.Td>
               <Table.Td title={row.set_name}>
                 {formatSetNumber(row.set_code, row.collector_number)}
               </Table.Td>
-              <Table.Td
-                fw={row.finish === 'normal' ? undefined : 700}
-                tt="capitalize"
-              >
-                {row.finish}
-              </Table.Td>
+              <Table.Td tt="capitalize">{row.finish}</Table.Td>
               <Table.Td>
                 {editable && onConditionChange ? (
                   <NativeSelect
