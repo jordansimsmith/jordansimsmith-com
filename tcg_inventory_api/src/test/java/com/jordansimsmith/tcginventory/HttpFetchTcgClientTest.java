@@ -383,6 +383,25 @@ public class HttpFetchTcgClientTest {
   }
 
   @Test
+  void searchCardsShouldUrlEncodeDiacriticsInCardName() throws IOException, InterruptedException {
+    // arrange
+    var response = createMockResponse(200, "{\"searchResults\": {\"content\": []}}");
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response);
+
+    // act
+    client.searchCards(3268, "Troll of Khazad-dûm", "normal");
+
+    // assert
+    var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+    verify(httpClient).send(requestCaptor.capture(), eq(HttpResponse.BodyHandlers.ofString()));
+    assertThat(requestCaptor.getValue().uri())
+        .isEqualTo(
+            URI.create(
+                "https://api.fetchtcg.com/v3/cards?gameIds=mtg&sets=3268&cardName=Troll+of+Khazad-d%C3%BBm&finishes=normal"));
+  }
+
+  @Test
   void getCardListingsShouldReturnParsedResponse() throws IOException, InterruptedException {
     // arrange
     var response =

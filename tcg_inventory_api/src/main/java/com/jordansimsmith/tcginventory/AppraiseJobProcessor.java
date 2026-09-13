@@ -3,6 +3,7 @@ package com.jordansimsmith.tcginventory;
 import com.jordansimsmith.time.Clock;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -129,6 +130,8 @@ class AppraiseJobProcessor {
       String scryfallId,
       Map<String, FetchTcgClient.GetCardResponse> cardCache) {
     var searchName = cardName.contains("//") ? cardName.split("//")[0].trim() : cardName;
+    // fetchtcg stores ascii names (khazad-dum); fold scryfall diacritics so search still hits
+    searchName = Normalizer.normalize(searchName, Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
     var setEntries = FetchTcgSetMapping.get(setCode);
     for (var entry : setEntries) {
       var searchResult = fetchTcgClient.searchCards(entry.setId(), searchName, finish);

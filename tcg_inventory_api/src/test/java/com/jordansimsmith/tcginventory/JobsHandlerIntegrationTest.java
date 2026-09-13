@@ -230,6 +230,52 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
+  void appraiseShouldResolveWhenCardNameHasDiacritics() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    var importItem =
+        TcgInventoryItem.createImport(
+            "jordan", "import1", "test.csv", 1, null, Instant.ofEpochSecond(1700000000));
+    tcgInventoryTable.putItem(importItem);
+    tcgInventoryTable.putItem(
+        TcgInventoryItem.createImportRow(
+            "jordan",
+            "import1",
+            1,
+            "Troll of Khazad-dûm",
+            "ltr",
+            "The Lord of the Rings: Tales of Middle-earth",
+            "111",
+            "normal",
+            "NM",
+            "scryfall-troll",
+            "en"));
+    createJob("jordan", "job1", "appraise", "queued", "import1");
+
+    fakeFetchTcgClient.seedSearchResult(
+        3268,
+        "Troll of Khazad-dum",
+        "normal",
+        new FetchTcgClient.SearchCardsResponse(
+            List.of(new FetchTcgClient.SearchCard("mtg_111_c_ltr_normal"))));
+    fakeFetchTcgClient.seedCard(
+        "mtg_111_c_ltr_normal",
+        new FetchTcgClient.GetCardResponse(
+            "mtg_111_c_ltr_normal",
+            "Troll of Khazad-dum",
+            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
+            new FetchTcgClient.ExternalReferences("scryfall-troll")));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
+
+    // assert
+    var row = getRow("jordan", "import1", 1);
+    assertThat(row.getDecision()).isEqualTo("keep");
+    assertThat(row.getFetchtcgCardId()).isEqualTo("mtg_111_c_ltr_normal");
+  }
+
+  @Test
   void appraiseShouldReviewWhenNoCandidateMatchesScryfallId() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));

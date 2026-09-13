@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
 import java.net.URI;
+import java.net.URLEncoder;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
@@ -153,7 +154,7 @@ public class HttpFetchTcgClient implements FetchTcgClient {
 
   private SearchCardsResponse doSearchCards(int setId, String cardName, String finish)
       throws IOException, InterruptedException {
-    var encodedName = cardName.replace(" ", "+");
+    var encodedName = URLEncoder.encode(cardName, StandardCharsets.UTF_8);
     var request =
         HttpRequest.newBuilder()
             .uri(
