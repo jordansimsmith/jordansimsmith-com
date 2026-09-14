@@ -1,0 +1,16 @@
+---
+bazelisk_version: 1.29.0
+bazelisk_artifacts:
+  x86_64:
+    architecture: amd64
+    checksum: sha256:5a408715e932c0250d28bd84555f12edbf70117de42f9181691c736eacc4a992
+  aarch64:
+    architecture: arm64
+    checksum: sha256:e20e8b0f4f240091b7a55bf17b9398bd4f40ee70ae0208dff95dd4c445fb4010
+
+docker_package_specs:
+  - docker-ce=5:29.8.0-1~debian.13~trixie
+  - docker-ce-cli=5:29.8.0-1~debian.13~trixie
+  - containerd.io=2.3.5-1~debian.13~trixie
+  - docker-buildx-plugin=0.37.1-1~debian.13~trixie
+  - docker-compose-plugin=5.5.1-1~debian.13~trixie

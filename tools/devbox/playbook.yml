@@ -1,0 +1,85 @@
+---
+- name: Configure the local development box
+  hosts: localhost
+  become: true
+  gather_facts: true
+  vars_files:
+    - vars.yml
+
+  pre_tasks:
+    - name: Require Debian 13
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == 'Debian'
+          - ansible_distribution_major_version == '13'
+        fail_msg: This setup requires Debian 13.
+
+    - name: Require a supported architecture
+      ansible.builtin.assert:
+        that: ansible_architecture in bazelisk_artifacts
+        fail_msg: This setup supports x86_64 and aarch64 hosts.
+
+  tasks:
+    - name: Install apt prerequisites
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - build-essential
+          - curl
+          - gnupg
+        state: present
+        update_cache: true
+
+    - name: Install Bazelisk
+      ansible.builtin.get_url:
+        url: https://github.com/bazelbuild/bazelisk/releases/download/v{{ bazelisk_version }}/bazelisk-linux-{{ bazelisk_artifacts[ansible_architecture].architecture }}
+        dest: /usr/local/bin/bazel
+        mode: '0755'
+        owner: root
+        group: root
+        checksum: '{{ bazelisk_artifacts[ansible_architecture].checksum }}'
+
+    - name: Create apt keyring directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Install Docker signing key
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/debian/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+        owner: root
+        group: root
+
+    - name: Configure Docker apt repository
+      ansible.builtin.apt_repository:
+        repo: deb [arch={{ 'amd64' if ansible_architecture == 'x86_64' else 'arm64' }} signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/debian trixie stable
+        filename: docker
+        state: present
+
+    - name: Install pinned Docker packages
+      ansible.builtin.apt:
+        name: '{{ docker_package_specs }}'
+        state: present
+        update_cache: true
+        allow_downgrade: true
+
+    - name: Hold Docker package versions
+      ansible.builtin.dpkg_selections:
+        name: '{{ item.split("=", 1)[0] }}'
+        selection: hold
+      loop: '{{ docker_package_specs }}'
+
+    - name: Enable Docker
+      ansible.builtin.systemd_service:
+        name: docker.service
+        enabled: true
+        state: started
+
+    - name: Grant the developer Docker access
+      ansible.builtin.user:
+        name: '{{ devbox_user }}'
+        groups: docker
+        append: true
