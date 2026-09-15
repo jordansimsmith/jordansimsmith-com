@@ -248,6 +248,29 @@ function toPrinting(card: ScryfallCard): Printing {
   };
 }
 
+function Crop({
+  image,
+  position,
+  label,
+}: {
+  image: string;
+  position: string;
+  label: string;
+}) {
+  return (
+    <div className="scan-crop">
+      <div
+        className="scan-crop-image"
+        style={{
+          backgroundImage: `url(${image})`,
+          backgroundPosition: position,
+        }}
+      />
+      <Text className="scan-crop-label">{label}</Text>
+    </div>
+  );
+}
+
 export function ScanPage() {
   const [view, setView] = useState<'jobs' | 'new' | 'review'>('jobs');
   const [cardIndex, setCardIndex] = useState(3);
@@ -281,6 +304,7 @@ export function ScanPage() {
   };
 
   const confirmAndAdvance = () => {
+    if (confirmed.has(sourceCardIndex)) return;
     setConfirmed((previous) => new Set(previous).add(sourceCardIndex));
     if (cardIndex < visibleCardIndexes.length - 1) moveCard(1);
   };
@@ -671,6 +695,42 @@ export function ScanPage() {
                   className="scan-card-image"
                 />
               </Paper>
+              <Paper
+                withBorder
+                radius="md"
+                p="sm"
+                className="scan-verification-panel"
+              >
+                <Text fw={600} size="sm" mb="xs">
+                  Print details
+                </Text>
+                <Stack gap="sm">
+                  <div className="scan-crop-pair">
+                    <Crop
+                      image={scanImage}
+                      position="left bottom"
+                      label="Your scan · set code"
+                    />
+                    <Crop
+                      image={printing.image}
+                      position="left bottom"
+                      label={`Scryfall · ${printing.code} ${printing.number}`}
+                    />
+                  </div>
+                  <div className="scan-crop-pair">
+                    <Crop
+                      image={scanImage}
+                      position="right center"
+                      label="Your scan · set symbol"
+                    />
+                    <Crop
+                      image={printing.image}
+                      position="right center"
+                      label="Scryfall · set symbol"
+                    />
+                  </div>
+                </Stack>
+              </Paper>
             </div>
 
             <Paper withBorder radius="md" p="sm">
@@ -799,6 +859,7 @@ export function ScanPage() {
                     size="md"
                     leftSection={<IconCheck size={17} />}
                     onClick={confirmAndAdvance}
+                    disabled={confirmed.has(sourceCardIndex)}
                   >
                     Confirm match
                   </Button>

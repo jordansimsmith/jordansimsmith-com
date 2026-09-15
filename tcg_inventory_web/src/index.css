@@ -55,11 +55,16 @@ body {
 .scan-status-dot.orange { background: var(--mantine-color-orange-5); }
 
 .scan-reviewer { min-width: 0; }
-.scan-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--mantine-spacing-md); }
+.scan-compare { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(280px, .8fr); gap: var(--mantine-spacing-md); }
 .scan-card-panel { min-width: 0; }
 .scan-match-panel { border-color: var(--mantine-color-teal-4); }
 img.scan-card-image { display: block; width: auto; max-width: 100%; height: min(56vh, 500px); margin: 0 auto; object-fit: contain; border-radius: var(--mantine-radius-sm); background: var(--mantine-color-dark-7); }
 img.scan-photo-treatment { filter: saturate(.87) contrast(1.05); }
+.scan-verification-panel { min-width: 0; }
+.scan-crop-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.scan-crop { overflow: hidden; border: 1px solid var(--mantine-color-gray-3); border-radius: var(--mantine-radius-sm); background: var(--mantine-color-dark-7); }
+.scan-crop-image { height: 120px; background-repeat: no-repeat; background-size: 360px auto; }
+.scan-crop-label { min-height: 31px; padding: 3px 6px; font-size: 10px; color: var(--mantine-color-dimmed); background: white; }
 .scan-printing-tabs button { min-width: 58px; border: 1px solid var(--mantine-color-gray-4); background: white; border-radius: var(--mantine-radius-sm); padding: 5px 8px; cursor: pointer; color: var(--mantine-color-text); font-size: 12px; }
 .scan-printing-tabs { overflow-x: auto; padding-bottom: 2px; }
 .scan-printing-tabs button.is-active { border-color: var(--mantine-color-blue-5); background: var(--mantine-color-blue-0); color: var(--mantine-color-blue-8); }
@@ -73,6 +78,8 @@ img.scan-photo-treatment { filter: saturate(.87) contrast(1.05); }
 @media (max-width: 900px) {
   .scan-review-layout { grid-template-columns: 1fr; }
   .scan-queue-list { max-height: 190px; }
+  .scan-compare { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .scan-verification-panel { grid-column: 1 / -1; }
 }
 
 @media (max-width: 600px) {
