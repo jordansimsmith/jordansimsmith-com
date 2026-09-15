@@ -51,6 +51,7 @@ body {
 .scan-confidence { margin-left: auto; color: var(--mantine-color-dimmed); font-size: 11px; }
 .scan-status-dot { width: 8px; height: 8px; border-radius: 999px; flex: 0 0 auto; margin-top: 5px; background: var(--mantine-color-orange-5); }
 .scan-status-dot.is-confirmed { background: var(--mantine-color-teal-5); }
+.scan-status-dot.gray { background: var(--mantine-color-gray-5); }
 .scan-status-dot.blue { background: var(--mantine-color-blue-5); }
 .scan-status-dot.orange { background: var(--mantine-color-orange-5); }
 

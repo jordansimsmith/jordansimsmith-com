@@ -28,7 +28,7 @@ import {
 } from '@tabler/icons-react';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 
-type ScanStatus = 'confirmed' | 'current' | 'needs-review';
+type ScanStatus = 'unreviewed' | 'current' | 'needs-review';
 
 interface ScannedCard {
   name: string;
@@ -163,21 +163,21 @@ const SCANNED_CARDS: ScannedCard[] = [
     set: '2X2',
     number: '117',
     confidence: 98,
-    status: 'confirmed',
+    status: 'unreviewed',
   },
   {
     name: 'Llanowar Elves',
     set: 'DMU',
     number: '168',
     confidence: 96,
-    status: 'confirmed',
+    status: 'unreviewed',
   },
   {
     name: 'Opt',
     set: 'M21',
     number: '59',
     confidence: 94,
-    status: 'confirmed',
+    status: 'unreviewed',
   },
   {
     name: 'Lightning Bolt',
@@ -261,7 +261,7 @@ function toPrinting(card: ScryfallCard): Printing {
 }
 
 function statusColor(status: ScanStatus) {
-  if (status === 'confirmed') return 'teal';
+  if (status === 'unreviewed') return 'gray';
   if (status === 'current') return 'blue';
   return 'orange';
 }
@@ -293,7 +293,7 @@ export function ScanPage() {
   const [view, setView] = useState<'jobs' | 'new' | 'review'>('jobs');
   const [cardIndex, setCardIndex] = useState(3);
   const [printingIndex, setPrintingIndex] = useState(0);
-  const [confirmed, setConfirmed] = useState(new Set([0, 1, 2]));
+  const [confirmed, setConfirmed] = useState(new Set<number>());
   const [deleted, setDeleted] = useState(new Set<number>());
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState('');
