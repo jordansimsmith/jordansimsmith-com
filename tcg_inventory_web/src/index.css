@@ -61,7 +61,7 @@ body {
 .scan-match-panel { border-color: var(--mantine-color-teal-4); }
 .scan-card-image img { width: 100%; aspect-ratio: 0.715; object-fit: contain; border-radius: var(--mantine-radius-sm); background: var(--mantine-color-dark-7); }
 .scan-photo-treatment img { filter: saturate(.87) contrast(1.05); }
-.scan-crop-comparison { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.scan-crop-comparison { display: grid; gap: 8px; }
 .scan-crop { overflow: hidden; border: 1px solid var(--mantine-color-gray-3); border-radius: var(--mantine-radius-sm); background: var(--mantine-color-dark-7); }
 .scan-crop-image { height: 68px; background-repeat: no-repeat; background-size: 265px auto; }
 .scan-crop-label { padding: 3px 6px; font-size: 10px; color: var(--mantine-color-dimmed); background: white; }
@@ -84,7 +84,6 @@ kbd { padding: 1px 4px; border: 1px solid var(--mantine-color-gray-4); border-bo
 
 @media (max-width: 600px) {
   .scan-compare { grid-template-columns: 1fr; }
-  .scan-crop-comparison { grid-template-columns: 1fr 1fr; }
   .scan-job { align-items: flex-start; }
 }
 
