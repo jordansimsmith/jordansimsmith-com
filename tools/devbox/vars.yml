@@ -1,5 +1,7 @@
 ---
 bazelisk_version: 1.29.0
+corepack_version: 0.34.7
+pnpm_version: 10.34.5
 bazelisk_artifacts:
   x86_64:
     architecture: amd64

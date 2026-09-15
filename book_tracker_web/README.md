@@ -214,8 +214,8 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP API clien
 
 ## Local development and smoke checks
 
-- Recommended local development: `cd book_tracker_web && pnpm vite dev`
-- Bazel dev server option: `bazel run //book_tracker_web:vite -- dev`
+- Install workspace dependencies once from the repository root: `pnpm install`
+- Start local development: `cd book_tracker_web && pnpm vite dev`
 - Development mode uses fake in-memory API data and fake Open Library results by default; no backend or internet dependency is required.
 - Basic smoke flow:
   - log in with any non-empty credentials in dev mode

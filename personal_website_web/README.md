@@ -146,7 +146,8 @@ sequenceDiagram
 
 ## Local development and smoke checks
 
-- Start dev server: `bazel run //personal_website_web:vite -- dev`
+- Install workspace dependencies once from the repository root: `pnpm install`
+- Start dev server: `cd personal_website_web && pnpm vite dev`
 - Build production assets: `bazel build //personal_website_web:build`
 - Preview built assets: `bazel run //personal_website_web:preview`
 

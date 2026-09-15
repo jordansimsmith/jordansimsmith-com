@@ -1,6 +1,6 @@
 # Devbox setup
 
-This directory provisions a Debian 13 development box for this repository. It installs Bazelisk, the native build toolchain, pinned Docker packages, and Docker access for the developer account.
+This directory provisions a Debian 13 development box for this repository. It installs Bazelisk, Node.js, pinned Corepack and pnpm, the native build toolchain, pinned Docker packages, and Docker access for the developer account.
 
 ## Setup
 
@@ -16,10 +16,12 @@ Log out and back in once it completes so the current user receives Docker-group 
 
 ```bash
 docker run --rm hello-world
+pnpm --version
+pnpm install
 bazel test //...
 ```
 
-The repository's Bazel configuration supplies its Java, Python, Node, and pnpm toolchains. No host installation of those tools is required to run the test suite.
+The host Node.js and pnpm installations support local frontend development. The repository's Bazel configuration still supplies Java, Python, Node, and pnpm toolchains for hermetic builds and tests.
 
 ## Updating provisioned tools
 

@@ -244,7 +244,8 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 
 ## Local development and smoke checks
 
-- Recommended: `cd tcg_inventory_web && pnpm vite dev` (fake mode, no backend needed); Bazel option: `bazel run //tcg_inventory_web:vite -- dev`.
+- Install workspace dependencies once from the repository root: `pnpm install`
+- Start local development: `cd tcg_inventory_web && pnpm vite dev` (fake mode, no backend needed).
 - Smoke flow in dev mode:
   1. Log in with any credentials.
   2. Open inventory, traverse with `j`/`k`, search with `/`, open a SKU with `Enter`; verify the card image renders, remove a unit, and change a unit's condition.

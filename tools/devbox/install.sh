@@ -44,5 +44,7 @@ cat <<'EOF'
 Setup complete. Log out and back in before using Docker without sudo, then run:
 
   docker run --rm hello-world
+  pnpm --version
+  pnpm install
   bazel test //...
 EOF

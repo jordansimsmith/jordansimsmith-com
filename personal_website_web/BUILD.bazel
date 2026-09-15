@@ -25,7 +25,7 @@ js_library(
 )
 
 bin.vite_binary(
-    name = "vite",
+    name = "vite-bin",
     chdir = package_name(),
     data = [
         "index.html",
@@ -36,6 +36,7 @@ bin.vite_binary(
         ":src",
         ":vite-config",
     ],
+    visibility = ["//visibility:private"],
 )
 
 js_library(
@@ -83,7 +84,7 @@ js_run_binary(
     ],
     args = ["build"],
     out_dirs = ["dist"],
-    tool = ":vite",
+    tool = ":vite-bin",
 )
 
 bin.vite_binary(

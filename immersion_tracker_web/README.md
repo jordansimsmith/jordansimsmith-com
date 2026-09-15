@@ -211,10 +211,8 @@ Notes:
 
 ## Local development and smoke checks
 
-- Recommended development server:
-  - `cd immersion_tracker_web && pnpm vite dev`
-- Bazel dev server alternative:
-  - `bazel run //immersion_tracker_web:vite -- dev`
+- Install workspace dependencies once from the repository root: `pnpm install`
+- Start local development: `cd immersion_tracker_web && pnpm vite dev`
 - Preview built output:
   - `bazel run //immersion_tracker_web:preview`
 - Development mode uses the fake client by default (no backend required).

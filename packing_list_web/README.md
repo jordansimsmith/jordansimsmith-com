@@ -187,8 +187,8 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client, w
 
 ## Local development and smoke checks
 
-- Recommended local development: `cd packing_list_web && pnpm vite dev`
-- Bazel development option: `bazel run //packing_list_web:vite -- dev`
+- Install workspace dependencies once from the repository root: `pnpm install`
+- Start local development: `cd packing_list_web && pnpm vite dev`
 - Development mode uses fake in-memory API data by default (no backend dependency).
 - Basic smoke flow:
   - log in with any credentials in dev mode

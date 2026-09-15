@@ -74,7 +74,7 @@ ts_project(
 )
 
 vite_bin.vite_binary(
-    name = "vite",
+    name = "vite-bin",
     chdir = package_name(),
     data = [
         "index.html",
@@ -86,6 +86,7 @@ vite_bin.vite_binary(
         ":tsconfig",
         ":vite-config",
     ],
+    visibility = ["//visibility:private"],
 )
 
 js_library(
@@ -166,7 +167,7 @@ js_run_binary(
     ],
     args = ["build"],
     out_dirs = ["dist"],
-    tool = ":vite",
+    tool = ":vite-bin",
 )
 
 vite_bin.vite_binary(

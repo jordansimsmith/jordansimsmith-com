@@ -27,8 +27,38 @@
           - build-essential
           - curl
           - gnupg
+          - nodejs
+          - npm
         state: present
         update_cache: true
+
+    - name: Check installed Corepack version
+      ansible.builtin.command: corepack --version
+      register: installed_corepack_version
+      changed_when: false
+      failed_when: false
+
+    - name: Install pinned Corepack
+      ansible.builtin.command: npm install --global corepack@{{ corepack_version }}
+      when: >-
+        installed_corepack_version.rc != 0 or
+        installed_corepack_version.stdout != corepack_version
+
+    - name: Enable Corepack shims
+      ansible.builtin.command: corepack enable
+      changed_when: false
+
+    - name: Check installed pnpm version
+      ansible.builtin.command: pnpm --version
+      register: installed_pnpm_version
+      changed_when: false
+      failed_when: false
+
+    - name: Install pinned pnpm
+      ansible.builtin.command: corepack install --global pnpm@{{ pnpm_version }}
+      when: >-
+        installed_pnpm_version.rc != 0 or
+        installed_pnpm_version.stdout != pnpm_version
 
     - name: Install Bazelisk
       ansible.builtin.get_url:

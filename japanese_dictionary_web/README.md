@@ -274,8 +274,8 @@ Build mode behaviour: production (`import.meta.env.PROD`) uses the HTTP client; 
 
 ## Local development and smoke checks
 
-- Recommended local development: `cd japanese_dictionary_web && pnpm vite dev`
-- Bazel development option: `bazel run //japanese_dictionary_web:vite -- dev`
+- Install workspace dependencies once from the repository root: `pnpm install`
+- Start local development: `cd japanese_dictionary_web && pnpm vite dev`
 - Development mode uses the fake in-memory API by default (no backend dependency); ~30 hand-picked fixture terms cover hiragana / katakana / kanji / romaji / pitch / image-bearing / null-frequency cases.
 - Basic smoke flow:
   - Log in with any credentials in dev mode (fake client always succeeds).
