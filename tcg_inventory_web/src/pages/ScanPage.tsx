@@ -28,14 +28,11 @@ import {
 } from '@tabler/icons-react';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 
-type ScanStatus = 'unreviewed' | 'current' | 'needs-review';
-
 interface ScannedCard {
   name: string;
   set: string;
   number: string;
   confidence: number;
-  status: ScanStatus;
 }
 
 interface Printing {
@@ -163,63 +160,54 @@ const SCANNED_CARDS: ScannedCard[] = [
     set: '2X2',
     number: '117',
     confidence: 98,
-    status: 'unreviewed',
   },
   {
     name: 'Llanowar Elves',
     set: 'DMU',
     number: '168',
     confidence: 96,
-    status: 'unreviewed',
   },
   {
     name: 'Opt',
     set: 'M21',
     number: '59',
     confidence: 94,
-    status: 'unreviewed',
   },
   {
     name: 'Lightning Bolt',
     set: '2X2',
     number: '117',
     confidence: 92,
-    status: 'current',
   },
   {
     name: 'Counterspell',
     set: '2X2',
     number: '47',
     confidence: 89,
-    status: 'needs-review',
   },
   {
     name: 'Swords to Plowshares',
     set: '2X2',
     number: '34',
     confidence: 87,
-    status: 'needs-review',
   },
   {
     name: 'Sol Ring',
     set: 'CMM',
     number: '396',
     confidence: 84,
-    status: 'needs-review',
   },
   {
     name: 'Birds of Paradise',
     set: 'M12',
     number: '165',
     confidence: 82,
-    status: 'needs-review',
   },
   {
     name: 'Ponder',
     set: 'M10',
     number: '68',
     confidence: 78,
-    status: 'needs-review',
   },
 ];
 
@@ -260,42 +248,12 @@ function toPrinting(card: ScryfallCard): Printing {
   };
 }
 
-function statusColor(status: ScanStatus) {
-  if (status === 'unreviewed') return 'gray';
-  if (status === 'current') return 'blue';
-  return 'orange';
-}
-
-function Crop({
-  image,
-  position,
-  label,
-}: {
-  image: string;
-  position: string;
-  label: string;
-}) {
-  return (
-    <div className="scan-crop">
-      <div
-        className="scan-crop-image"
-        style={{
-          backgroundImage: `url(${image})`,
-          backgroundPosition: position,
-        }}
-      />
-      <Text className="scan-crop-label">{label}</Text>
-    </div>
-  );
-}
-
 export function ScanPage() {
   const [view, setView] = useState<'jobs' | 'new' | 'review'>('jobs');
   const [cardIndex, setCardIndex] = useState(3);
   const [printingIndex, setPrintingIndex] = useState(0);
   const [confirmed, setConfirmed] = useState(new Set<number>());
   const [deleted, setDeleted] = useState(new Set<number>());
-  const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [searching, setSearching] = useState(false);
@@ -349,10 +307,10 @@ export function ScanPage() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
-      if (target.tagName === 'INPUT' || searchOpen) return;
+      if (target.tagName === 'INPUT') return;
       if (event.key === '/') {
         event.preventDefault();
-        setSearchOpen(true);
+        searchRef.current?.focus();
         return;
       }
       if (event.key === 'j') {
@@ -385,11 +343,7 @@ export function ScanPage() {
   });
 
   useEffect(() => {
-    if (searchOpen) setTimeout(() => searchRef.current?.focus(), 0);
-  }, [searchOpen]);
-
-  useEffect(() => {
-    if (!searchOpen || search.trim().length < 2) {
+    if (search.trim().length < 2) {
       setSuggestions([]);
       setSearchError(null);
       return;
@@ -420,7 +374,7 @@ export function ScanPage() {
       controller.abort();
       window.clearTimeout(timer);
     };
-  }, [search, searchOpen]);
+  }, [search]);
 
   useEffect(() => {
     cardRefs.current[cardIndex]?.scrollIntoView({ block: 'nearest' });
@@ -452,7 +406,6 @@ export function ScanPage() {
         return next;
       });
       setPrintingIndex(0);
-      setSearchOpen(false);
       setSearch('');
     } catch (error) {
       setSearchError(
@@ -607,9 +560,6 @@ export function ScanPage() {
             <Text size="sm" c="dimmed">
               {confirmed.size} of {visibleCardIndexes.length} confirmed
             </Text>
-            <Button variant="default" onClick={() => setView('jobs')}>
-              All scans
-            </Button>
             <Button disabled={confirmed.size < visibleCardIndexes.length}>
               Create import
             </Button>
@@ -626,9 +576,6 @@ export function ScanPage() {
             <div className="scan-queue-header">
               <Text fw={600} size="sm">
                 Cards
-              </Text>
-              <Text c="dimmed" size="xs">
-                j / k
               </Text>
             </div>
             <div className="scan-queue-list">
@@ -649,7 +596,7 @@ export function ScanPage() {
                     }}
                   >
                     <span
-                      className={`scan-status-dot ${confirmed.has(sourceIndex) ? 'is-confirmed' : statusColor(card.status)}`}
+                      className={`scan-status-dot ${confirmed.has(sourceIndex) ? 'is-confirmed' : card.confidence < 90 ? 'orange' : 'gray'}`}
                     />
                     <span>
                       <strong>{index + 1}</strong> {card.name}
@@ -684,10 +631,10 @@ export function ScanPage() {
                   </Text>
                 </div>
                 <Badge
-                  color={scan.confidence < 85 ? 'orange' : 'blue'}
+                  color={scan.confidence < 90 ? 'orange' : 'gray'}
                   variant="light"
                 >
-                  {scan.confidence < 85 ? 'check carefully' : 'high confidence'}
+                  {scan.confidence < 90 ? 'check carefully' : 'high confidence'}
                 </Badge>
               </Group>
             </Paper>
@@ -725,29 +672,6 @@ export function ScanPage() {
               </Paper>
             </div>
 
-            <div className="scan-crop-comparison">
-              <Crop
-                image={printing.image}
-                position="left bottom"
-                label="Your scan · set code + number"
-              />
-              <Crop
-                image={printing.image}
-                position="left bottom"
-                label={`Scryfall · ${printing.code} ${printing.number}`}
-              />
-              <Crop
-                image={printing.image}
-                position="right center"
-                label="Your scan · set symbol"
-              />
-              <Crop
-                image={printing.image}
-                position="right center"
-                label="Scryfall · set symbol"
-              />
-            </div>
-
             <Paper withBorder radius="md" p="sm">
               <Group justify="space-between" mb="xs">
                 <div>
@@ -755,7 +679,7 @@ export function ScanPage() {
                     Other printings
                   </Text>
                   <Text size="xs" c="dimmed">
-                    Same card · use h / l to compare
+                    Same card
                   </Text>
                 </div>
                 <Group gap={3}>
@@ -800,7 +724,7 @@ export function ScanPage() {
             </Paper>
 
             <Paper withBorder radius="md" p="sm">
-              <Group justify="space-between">
+              <div>
                 <div>
                   <Text fw={600} size="sm">
                     Wrong card?
@@ -809,47 +733,37 @@ export function ScanPage() {
                     Search Scryfall, then compare that card's printings here.
                   </Text>
                 </div>
-                <Button
-                  variant="default"
-                  size="compact-sm"
-                  leftSection={<IconSearch size={14} />}
-                  onClick={() => setSearchOpen(true)}
-                >
-                  Find another card
-                </Button>
-              </Group>
-              {searchOpen && (
-                <Stack gap={4} mt="sm">
-                  <TextInput
-                    ref={searchRef}
-                    value={search}
-                    onChange={(event) => setSearch(event.currentTarget.value)}
-                    placeholder="Search Scryfall by card name…"
-                    leftSection={<IconSearch size={16} />}
-                  />
-                  {searching && (
-                    <Text size="xs" c="dimmed">
-                      Searching Scryfall…
-                    </Text>
-                  )}
-                  {searchError && (
-                    <Text size="xs" c="red">
-                      {searchError}
-                    </Text>
-                  )}
-                  {suggestions.slice(0, 6).map((suggestion) => (
-                    <Button
-                      key={suggestion}
-                      variant="subtle"
-                      justify="flex-start"
-                      size="compact-sm"
-                      onClick={() => void selectScryfallCard(suggestion)}
-                    >
-                      {suggestion}
-                    </Button>
-                  ))}
-                </Stack>
-              )}
+              </div>
+              <Stack gap={4} mt="sm">
+                <TextInput
+                  ref={searchRef}
+                  value={search}
+                  onChange={(event) => setSearch(event.currentTarget.value)}
+                  placeholder="Search Scryfall by card name…"
+                  leftSection={<IconSearch size={16} />}
+                />
+                {searching && (
+                  <Text size="xs" c="dimmed">
+                    Searching Scryfall…
+                  </Text>
+                )}
+                {searchError && (
+                  <Text size="xs" c="red">
+                    {searchError}
+                  </Text>
+                )}
+                {suggestions.slice(0, 6).map((suggestion) => (
+                  <Button
+                    key={suggestion}
+                    variant="subtle"
+                    justify="flex-start"
+                    size="compact-sm"
+                    onClick={() => void selectScryfallCard(suggestion)}
+                  >
+                    {suggestion}
+                  </Button>
+                ))}
+              </Stack>
             </Paper>
 
             <Group justify="space-between" className="scan-actions">
@@ -858,7 +772,7 @@ export function ScanPage() {
                 leftSection={<IconArrowLeft size={16} />}
                 onClick={() => moveCard(-1)}
               >
-                Previous <kbd>k</kbd>
+                Previous
               </Button>
               <Button
                 color="teal"
@@ -866,7 +780,7 @@ export function ScanPage() {
                 leftSection={<IconCheck size={17} />}
                 onClick={confirmAndAdvance}
               >
-                Confirm match <kbd>c</kbd>
+                Confirm match
               </Button>
               <Button
                 variant="subtle"
@@ -874,23 +788,18 @@ export function ScanPage() {
                 leftSection={<IconTrash size={16} />}
                 onClick={deleteCurrentCard}
               >
-                Delete <kbd>d</kbd>
+                Delete
               </Button>
               <Button
                 variant="default"
                 rightSection={<IconArrowRight size={16} />}
                 onClick={() => moveCard(1)}
               >
-                Next <kbd>j</kbd>
+                Next
               </Button>
             </Group>
           </Stack>
         </div>
-        <Text size="xs" c="dimmed">
-          Keyboard: <kbd>j</kbd>/<kbd>k</kbd> card · <kbd>h</kbd>/<kbd>l</kbd>{' '}
-          printing · <kbd>c</kbd> confirm + next · <kbd>d</kbd> delete ·{' '}
-          <kbd>/</kbd> find card
-        </Text>
       </Stack>
     </AppShellLayout>
   );

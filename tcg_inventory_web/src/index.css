@@ -52,19 +52,15 @@ body {
 .scan-status-dot { width: 8px; height: 8px; border-radius: 999px; flex: 0 0 auto; margin-top: 5px; background: var(--mantine-color-orange-5); }
 .scan-status-dot.is-confirmed { background: var(--mantine-color-teal-5); }
 .scan-status-dot.gray { background: var(--mantine-color-gray-5); }
-.scan-status-dot.blue { background: var(--mantine-color-blue-5); }
 .scan-status-dot.orange { background: var(--mantine-color-orange-5); }
 
 .scan-reviewer { min-width: 0; }
 .scan-compare { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--mantine-spacing-md); }
 .scan-card-panel { min-width: 0; }
 .scan-match-panel { border-color: var(--mantine-color-teal-4); }
-.scan-card-image img { width: 100%; aspect-ratio: 0.715; object-fit: contain; border-radius: var(--mantine-radius-sm); background: var(--mantine-color-dark-7); }
+.scan-card-image { display: flex; justify-content: center; background: var(--mantine-color-dark-7); border-radius: var(--mantine-radius-sm); }
+.scan-card-image img { width: auto; max-width: 100%; height: min(56vh, 500px); object-fit: contain; border-radius: var(--mantine-radius-sm); }
 .scan-photo-treatment img { filter: saturate(.87) contrast(1.05); }
-.scan-crop-comparison { display: grid; gap: 8px; }
-.scan-crop { overflow: hidden; border: 1px solid var(--mantine-color-gray-3); border-radius: var(--mantine-radius-sm); background: var(--mantine-color-dark-7); }
-.scan-crop-image { height: 68px; background-repeat: no-repeat; background-size: 265px auto; }
-.scan-crop-label { padding: 3px 6px; font-size: 10px; color: var(--mantine-color-dimmed); background: white; }
 .scan-printing-tabs button { min-width: 58px; border: 1px solid var(--mantine-color-gray-4); background: white; border-radius: var(--mantine-radius-sm); padding: 5px 8px; cursor: pointer; color: var(--mantine-color-text); font-size: 12px; }
 .scan-printing-tabs { overflow-x: auto; padding-bottom: 2px; }
 .scan-printing-tabs button.is-active { border-color: var(--mantine-color-blue-5); background: var(--mantine-color-blue-0); color: var(--mantine-color-blue-8); }
@@ -75,7 +71,6 @@ body {
 .scan-job:last-child { border-bottom: 0; }
 .scan-job:hover { background: var(--mantine-color-gray-0); }
 .scan-job-state { display: flex; align-items: flex-end; flex-direction: column; gap: 4px; white-space: nowrap; }
-kbd { padding: 1px 4px; border: 1px solid var(--mantine-color-gray-4); border-bottom-width: 2px; border-radius: 3px; font-family: inherit; font-size: 11px; color: var(--mantine-color-dimmed); background: var(--mantine-color-gray-0); }
 
 @media (max-width: 900px) {
   .scan-review-layout { grid-template-columns: 1fr; }
