@@ -767,38 +767,44 @@ export function ScanPage() {
               </Stack>
             </Paper>
 
-            <Group justify="space-between" className="scan-actions">
-              <Button
-                variant="default"
-                leftSection={<IconArrowLeft size={16} />}
-                onClick={() => moveCard(-1)}
-              >
-                Previous
-              </Button>
-              <Button
-                color="teal"
-                size="md"
-                leftSection={<IconCheck size={17} />}
-                onClick={confirmAndAdvance}
-              >
-                Confirm match
-              </Button>
-              <Button
-                variant="subtle"
-                color="red"
-                leftSection={<IconTrash size={16} />}
-                onClick={deleteCurrentCard}
-              >
-                Delete
-              </Button>
-              <Button
-                variant="default"
-                rightSection={<IconArrowRight size={16} />}
-                onClick={() => moveCard(1)}
-              >
-                Next
-              </Button>
-            </Group>
+            <Paper withBorder radius="md" p="xs">
+              <Group justify="space-between">
+                <Group gap="xs">
+                  <Button
+                    variant="default"
+                    leftSection={<IconArrowLeft size={16} />}
+                    onClick={() => moveCard(-1)}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    variant="default"
+                    rightSection={<IconArrowRight size={16} />}
+                    onClick={() => moveCard(1)}
+                  >
+                    Next
+                  </Button>
+                </Group>
+                <Group gap="xs">
+                  <Button
+                    variant="subtle"
+                    color="red"
+                    leftSection={<IconTrash size={16} />}
+                    onClick={deleteCurrentCard}
+                  >
+                    Delete
+                  </Button>
+                  <Button
+                    color="teal"
+                    size="md"
+                    leftSection={<IconCheck size={17} />}
+                    onClick={confirmAndAdvance}
+                  >
+                    Confirm match
+                  </Button>
+                </Group>
+              </Group>
+            </Paper>
           </Stack>
         </div>
       </Stack>
