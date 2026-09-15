@@ -6,7 +6,6 @@ import {
   Button,
   Group,
   Image,
-  Modal,
   Paper,
   Progress,
   Select,
@@ -22,9 +21,10 @@ import {
   IconChevronLeft,
   IconChevronRight,
   IconPhoto,
+  IconPlus,
   IconSearch,
+  IconTrash,
   IconUpload,
-  IconX,
 } from '@tabler/icons-react';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 
@@ -44,6 +44,16 @@ interface Printing {
   code: string;
   number: string;
   image: string;
+}
+
+interface ScryfallCard {
+  id: string;
+  name: string;
+  set_name: string;
+  set: string;
+  collector_number: string;
+  image_uris?: { normal: string };
+  prints_search_uri: string;
 }
 
 const PRINTINGS = [
@@ -213,11 +223,42 @@ const SCANNED_CARDS: ScannedCard[] = [
   },
 ];
 
-const SEARCH_RESULTS = [
-  'Lightning Bolt — Double Masters 2022',
-  'Lightning Bolt — Double Masters 2022',
-  'Lava Spike — Champions of Kamigawa',
+const SCAN_JOBS = [
+  {
+    id: 'scan-2026-09-16-01',
+    label: 'September 16 · ADF batch',
+    detail: '100 cards · Near mint · Non-foil',
+    status: 'Reviewing',
+    confirmed: '3 / 100 confirmed',
+  },
+  {
+    id: 'scan-2026-09-14-01',
+    label: 'September 14 · Binder pages',
+    detail: '48 cards · Lightly played · Foil',
+    status: 'Ready to import',
+    confirmed: '48 / 48 confirmed',
+  },
+  {
+    id: 'scan-2026-09-09-01',
+    label: 'September 9 · ADF batch',
+    detail: '96 cards · Near mint · Non-foil',
+    status: 'Imported',
+    confirmed: '96 / 96 confirmed',
+  },
 ];
+
+function toPrinting(card: ScryfallCard): Printing {
+  if (!card.image_uris?.normal) {
+    throw new Error(`${card.name} does not have a single-faced card image`);
+  }
+  return {
+    name: card.name,
+    set: card.set_name,
+    code: card.set.toUpperCase(),
+    number: card.collector_number,
+    image: card.image_uris.normal,
+  };
+}
 
 function statusColor(status: ScanStatus) {
   if (status === 'confirmed') return 'teal';
@@ -249,28 +290,60 @@ function Crop({
 }
 
 export function ScanPage() {
-  const [reviewing, setReviewing] = useState(true);
+  const [view, setView] = useState<'jobs' | 'new' | 'review'>('jobs');
   const [cardIndex, setCardIndex] = useState(3);
   const [printingIndex, setPrintingIndex] = useState(0);
   const [confirmed, setConfirmed] = useState(new Set([0, 1, 2]));
+  const [deleted, setDeleted] = useState(new Set<number>());
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState('');
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [manualPrintings, setManualPrintings] = useState(
+    new Map<number, Printing[]>(),
+  );
   const searchRef = useRef<HTMLInputElement>(null);
   const cardRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const scan = SCANNED_CARDS[cardIndex];
-  const printings = MATCHES_BY_CARD[scan.name];
+  const visibleCardIndexes = SCANNED_CARDS.map((_, index) => index).filter(
+    (index) => !deleted.has(index),
+  );
+  const sourceCardIndex = visibleCardIndexes[cardIndex];
+  const scan = SCANNED_CARDS[sourceCardIndex];
+  const printings =
+    manualPrintings.get(sourceCardIndex) ?? MATCHES_BY_CARD[scan.name];
   const printing = printings[printingIndex];
 
   const moveCard = (change: number) => {
     setCardIndex((index) =>
-      Math.max(0, Math.min(SCANNED_CARDS.length - 1, index + change)),
+      Math.max(0, Math.min(visibleCardIndexes.length - 1, index + change)),
     );
     setPrintingIndex(0);
   };
 
   const confirmAndAdvance = () => {
-    setConfirmed((previous) => new Set(previous).add(cardIndex));
-    if (cardIndex < SCANNED_CARDS.length - 1) moveCard(1);
+    setConfirmed((previous) => new Set(previous).add(sourceCardIndex));
+    if (cardIndex < visibleCardIndexes.length - 1) moveCard(1);
+  };
+
+  const deleteCurrentCard = () => {
+    setDeleted((previous) => new Set(previous).add(sourceCardIndex));
+    setConfirmed((previous) => {
+      const next = new Set(previous);
+      next.delete(sourceCardIndex);
+      return next;
+    });
+    setManualPrintings((previous) => {
+      const next = new Map(previous);
+      next.delete(sourceCardIndex);
+      return next;
+    });
+    if (visibleCardIndexes.length === 1) {
+      setView('jobs');
+    } else {
+      setCardIndex((index) => Math.min(index, visibleCardIndexes.length - 2));
+      setPrintingIndex(0);
+    }
   };
 
   useEffect(() => {
@@ -302,6 +375,10 @@ export function ScanPage() {
         event.preventDefault();
         confirmAndAdvance();
       }
+      if (event.key === 'd') {
+        event.preventDefault();
+        deleteCurrentCard();
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -312,10 +389,138 @@ export function ScanPage() {
   }, [searchOpen]);
 
   useEffect(() => {
+    if (!searchOpen || search.trim().length < 2) {
+      setSuggestions([]);
+      setSearchError(null);
+      return;
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(async () => {
+      setSearching(true);
+      setSearchError(null);
+      try {
+        const response = await fetch(
+          `https://api.scryfall.com/cards/autocomplete?q=${encodeURIComponent(search)}`,
+          { signal: controller.signal },
+        );
+        if (!response.ok) throw new Error('Scryfall search is unavailable');
+        const data = (await response.json()) as { data: string[] };
+        if (!controller.signal.aborted) setSuggestions(data.data);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setSearchError(
+            error instanceof Error ? error.message : 'Scryfall search failed',
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) setSearching(false);
+      }
+    }, 250);
+    return () => {
+      controller.abort();
+      window.clearTimeout(timer);
+    };
+  }, [search, searchOpen]);
+
+  useEffect(() => {
     cardRefs.current[cardIndex]?.scrollIntoView({ block: 'nearest' });
   }, [cardIndex]);
 
-  if (!reviewing) {
+  const selectScryfallCard = async (name: string) => {
+    setSearching(true);
+    setSearchError(null);
+    try {
+      const selectedResponse = await fetch(
+        `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}`,
+      );
+      if (!selectedResponse.ok)
+        throw new Error('Scryfall could not find that card');
+      const selected = (await selectedResponse.json()) as ScryfallCard;
+      const printingsResponse = await fetch(selected.prints_search_uri);
+      if (!printingsResponse.ok)
+        throw new Error('Scryfall could not load printings');
+      const printingsData = (await printingsResponse.json()) as {
+        data: ScryfallCard[];
+      };
+      const allPrintings = [
+        selected,
+        ...printingsData.data.filter((card) => card.id !== selected.id),
+      ].map(toPrinting);
+      setManualPrintings((previous) => {
+        const next = new Map(previous);
+        next.set(sourceCardIndex, allPrintings);
+        return next;
+      });
+      setPrintingIndex(0);
+      setSearchOpen(false);
+      setSearch('');
+    } catch (error) {
+      setSearchError(
+        error instanceof Error ? error.message : 'Scryfall search failed',
+      );
+    } finally {
+      setSearching(false);
+    }
+  };
+
+  if (view === 'jobs') {
+    return (
+      <AppShellLayout>
+        <Stack gap="lg" maw={1000}>
+          <Group justify="space-between">
+            <div>
+              <Title order={2}>Scans</Title>
+              <Text c="dimmed">
+                Upload a batch, verify every card, then create an import.
+              </Text>
+            </div>
+            <Button
+              leftSection={<IconPlus size={17} />}
+              onClick={() => setView('new')}
+            >
+              New scan
+            </Button>
+          </Group>
+          <Paper withBorder radius="md" className="scan-jobs">
+            {SCAN_JOBS.map((job) => (
+              <button
+                key={job.id}
+                type="button"
+                className="scan-job"
+                onClick={() => setView('review')}
+              >
+                <span>
+                  <Text fw={600}>{job.label}</Text>
+                  <Text size="sm" c="dimmed">
+                    {job.detail}
+                  </Text>
+                </span>
+                <span className="scan-job-state">
+                  <Badge
+                    color={
+                      job.status === 'Imported'
+                        ? 'gray'
+                        : job.status === 'Reviewing'
+                          ? 'blue'
+                          : 'teal'
+                    }
+                    variant="light"
+                  >
+                    {job.status}
+                  </Badge>
+                  <Text size="sm" c="dimmed">
+                    {job.confirmed}
+                  </Text>
+                </span>
+              </button>
+            ))}
+          </Paper>
+        </Stack>
+      </AppShellLayout>
+    );
+  }
+
+  if (view === 'new') {
     return (
       <AppShellLayout>
         <Stack gap="xl" maw={900}>
@@ -363,7 +568,7 @@ export function ScanPage() {
                   <IconPhoto size={17} />
                   <Text size="sm">100 scans ready</Text>
                 </Group>
-                <Button onClick={() => setReviewing(true)}>
+                <Button onClick={() => setView('review')}>
                   Identify 100 cards
                 </Button>
               </Group>
@@ -400,15 +605,21 @@ export function ScanPage() {
           </div>
           <Group gap="sm">
             <Text size="sm" c="dimmed">
-              {confirmed.size} of 100 confirmed
+              {confirmed.size} of {visibleCardIndexes.length} confirmed
             </Text>
-            <Button variant="default" onClick={() => setReviewing(false)}>
-              New scan
+            <Button variant="default" onClick={() => setView('jobs')}>
+              All scans
             </Button>
-            <Button disabled={confirmed.size < 100}>Create import</Button>
+            <Button disabled={confirmed.size < visibleCardIndexes.length}>
+              Create import
+            </Button>
           </Group>
         </Group>
-        <Progress value={confirmed.size} size="sm" color="teal" />
+        <Progress
+          value={(confirmed.size / visibleCardIndexes.length) * 100}
+          size="sm"
+          color="teal"
+        />
 
         <div className="scan-review-layout">
           <Paper withBorder radius="md" className="scan-queue">
@@ -421,36 +632,41 @@ export function ScanPage() {
               </Text>
             </div>
             <div className="scan-queue-list">
-              {SCANNED_CARDS.map((card, index) => (
-                <button
-                  key={`${card.name}-${index}`}
-                  type="button"
-                  ref={(element) => {
-                    cardRefs.current[index] = element;
-                  }}
-                  aria-current={index === cardIndex ? 'true' : undefined}
-                  className={`scan-queue-card ${index === cardIndex ? 'is-selected' : ''}`}
-                  onClick={() => {
-                    setCardIndex(index);
-                    setPrintingIndex(0);
-                  }}
-                >
-                  <span
-                    className={`scan-status-dot ${confirmed.has(index) ? 'is-confirmed' : statusColor(card.status)}`}
-                  />
-                  <span>
-                    <strong>{index + 1}</strong> {card.name}
-                    <small>
-                      {card.set} · {card.number}
-                    </small>
-                  </span>
-                  {!confirmed.has(index) && (
-                    <span className="scan-confidence">{card.confidence}%</span>
-                  )}
-                </button>
-              ))}
+              {visibleCardIndexes.map((sourceIndex, index) => {
+                const card = SCANNED_CARDS[sourceIndex];
+                return (
+                  <button
+                    key={`${card.name}-${index}`}
+                    type="button"
+                    ref={(element) => {
+                      cardRefs.current[index] = element;
+                    }}
+                    aria-current={index === cardIndex ? 'true' : undefined}
+                    className={`scan-queue-card ${index === cardIndex ? 'is-selected' : ''}`}
+                    onClick={() => {
+                      setCardIndex(index);
+                      setPrintingIndex(0);
+                    }}
+                  >
+                    <span
+                      className={`scan-status-dot ${confirmed.has(sourceIndex) ? 'is-confirmed' : statusColor(card.status)}`}
+                    />
+                    <span>
+                      <strong>{index + 1}</strong> {card.name}
+                      <small>
+                        {card.set} · {card.number}
+                      </small>
+                    </span>
+                    {!confirmed.has(sourceIndex) && (
+                      <span className="scan-confidence">
+                        {card.confidence}%
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
               <Text px="sm" pt="xs" size="xs" c="dimmed">
-                91 more cards
+                {Math.max(0, visibleCardIndexes.length - 9)} more cards
               </Text>
             </div>
           </Paper>
@@ -460,7 +676,7 @@ export function ScanPage() {
               <Group justify="space-between" wrap="nowrap">
                 <div>
                   <Text size="xs" tt="uppercase" fw={700} c="dimmed">
-                    Card {cardIndex + 1} of 100
+                    Card {cardIndex + 1} of {visibleCardIndexes.length}
                   </Text>
                   <Title order={3}>{printing.name}</Title>
                   <Text size="sm" c="dimmed">
@@ -486,18 +702,6 @@ export function ScanPage() {
                   alt={`Scanned ${scan.name}`}
                   className="scan-card-image scan-photo-treatment"
                 />
-                <div className="scan-crops">
-                  <Crop
-                    image={printing.image}
-                    position="left bottom"
-                    label="Set code + number"
-                  />
-                  <Crop
-                    image={printing.image}
-                    position="right center"
-                    label="Set symbol"
-                  />
-                </div>
               </Paper>
               <Paper
                 withBorder
@@ -518,19 +722,30 @@ export function ScanPage() {
                   alt={`${printing.name}, ${printing.set}`}
                   className="scan-card-image"
                 />
-                <div className="scan-crops">
-                  <Crop
-                    image={printing.image}
-                    position="left bottom"
-                    label={`${printing.code} · ${printing.number}`}
-                  />
-                  <Crop
-                    image={printing.image}
-                    position="right center"
-                    label="Set symbol"
-                  />
-                </div>
               </Paper>
+            </div>
+
+            <div className="scan-crop-comparison">
+              <Crop
+                image={printing.image}
+                position="left bottom"
+                label="Your scan · set code + number"
+              />
+              <Crop
+                image={printing.image}
+                position="left bottom"
+                label={`Scryfall · ${printing.code} ${printing.number}`}
+              />
+              <Crop
+                image={printing.image}
+                position="right center"
+                label="Your scan · set symbol"
+              />
+              <Crop
+                image={printing.image}
+                position="right center"
+                label="Scryfall · set symbol"
+              />
             </div>
 
             <Paper withBorder radius="md" p="sm">
@@ -581,15 +796,60 @@ export function ScanPage() {
                     <small>#{option.number}</small>
                   </button>
                 ))}
+              </Group>
+            </Paper>
+
+            <Paper withBorder radius="md" p="sm">
+              <Group justify="space-between">
+                <div>
+                  <Text fw={600} size="sm">
+                    Wrong card?
+                  </Text>
+                  <Text size="xs" c="dimmed">
+                    Search Scryfall, then compare that card's printings here.
+                  </Text>
+                </div>
                 <Button
-                  variant="subtle"
+                  variant="default"
                   size="compact-sm"
                   leftSection={<IconSearch size={14} />}
                   onClick={() => setSearchOpen(true)}
                 >
-                  Find another
+                  Find another card
                 </Button>
               </Group>
+              {searchOpen && (
+                <Stack gap={4} mt="sm">
+                  <TextInput
+                    ref={searchRef}
+                    value={search}
+                    onChange={(event) => setSearch(event.currentTarget.value)}
+                    placeholder="Search Scryfall by card name…"
+                    leftSection={<IconSearch size={16} />}
+                  />
+                  {searching && (
+                    <Text size="xs" c="dimmed">
+                      Searching Scryfall…
+                    </Text>
+                  )}
+                  {searchError && (
+                    <Text size="xs" c="red">
+                      {searchError}
+                    </Text>
+                  )}
+                  {suggestions.slice(0, 6).map((suggestion) => (
+                    <Button
+                      key={suggestion}
+                      variant="subtle"
+                      justify="flex-start"
+                      size="compact-sm"
+                      onClick={() => void selectScryfallCard(suggestion)}
+                    >
+                      {suggestion}
+                    </Button>
+                  ))}
+                </Stack>
+              )}
             </Paper>
 
             <Group justify="space-between" className="scan-actions">
@@ -609,6 +869,14 @@ export function ScanPage() {
                 Confirm match <kbd>c</kbd>
               </Button>
               <Button
+                variant="subtle"
+                color="red"
+                leftSection={<IconTrash size={16} />}
+                onClick={deleteCurrentCard}
+              >
+                Delete <kbd>d</kbd>
+              </Button>
+              <Button
                 variant="default"
                 rightSection={<IconArrowRight size={16} />}
                 onClick={() => moveCard(1)}
@@ -620,52 +888,10 @@ export function ScanPage() {
         </div>
         <Text size="xs" c="dimmed">
           Keyboard: <kbd>j</kbd>/<kbd>k</kbd> card · <kbd>h</kbd>/<kbd>l</kbd>{' '}
-          printing · <kbd>c</kbd> confirm + next · <kbd>/</kbd> find card
+          printing · <kbd>c</kbd> confirm + next · <kbd>d</kbd> delete ·{' '}
+          <kbd>/</kbd> find card
         </Text>
       </Stack>
-
-      <Modal
-        opened={searchOpen}
-        onClose={() => setSearchOpen(false)}
-        title="Find the correct card"
-        centered
-      >
-        <Stack>
-          <TextInput
-            ref={searchRef}
-            value={search}
-            onChange={(event) => setSearch(event.currentTarget.value)}
-            placeholder="Search Scryfall by card name…"
-            leftSection={<IconSearch size={16} />}
-          />
-          <Text size="xs" c="dimmed">
-            Search results update the identified card, then you can select its
-            printing.
-          </Text>
-          {SEARCH_RESULTS.filter((result) =>
-            result.toLowerCase().includes(search.toLowerCase()),
-          ).map((result) => (
-            <Button
-              key={result}
-              variant="default"
-              justify="flex-start"
-              onClick={() => {
-                setPrintingIndex(result.includes('Double') ? 2 : 0);
-                setSearchOpen(false);
-              }}
-            >
-              {result}
-            </Button>
-          ))}
-          <Button
-            variant="subtle"
-            color="red"
-            leftSection={<IconX size={16} />}
-          >
-            Mark as unidentified
-          </Button>
-        </Stack>
-      </Modal>
     </AppShellLayout>
   );
 }
