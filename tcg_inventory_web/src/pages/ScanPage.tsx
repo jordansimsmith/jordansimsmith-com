@@ -704,7 +704,7 @@ export function ScanPage() {
                 <Text fw={600} size="sm" mb="xs">
                   Print details
                 </Text>
-                <Stack gap="sm">
+                <div className="scan-crop-groups">
                   <div className="scan-crop-pair">
                     <Crop
                       image={scanImage}
@@ -729,7 +729,7 @@ export function ScanPage() {
                       label="Scryfall · set symbol"
                     />
                   </div>
-                </Stack>
+                </div>
               </Paper>
             </div>
 
