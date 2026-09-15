@@ -8,6 +8,8 @@ Before implementing changes in any service project (e.g., auction_tracker_api, i
 
 For service README authoring and update standards, use the project skill at `.agents/skills/service-readme-authoring/SKILL.md`.
 
+Before implementing or materially revising a user interface, read the root `DESIGN.md` and treat it as the visual design contract. A service-local `DESIGN.md` takes precedence when present.
+
 ## Build and test commands
 
 - Build all: `bazel build //...`
