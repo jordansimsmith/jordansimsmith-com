@@ -38,6 +38,14 @@ interface ScannedCard {
   status: ScanStatus;
 }
 
+interface Printing {
+  name: string;
+  set: string;
+  code: string;
+  number: string;
+  image: string;
+}
+
 const PRINTINGS = [
   {
     name: 'Lightning Bolt',
@@ -64,6 +72,80 @@ const PRINTINGS = [
       'https://api.scryfall.com/cards/e768c957-3a1f-42f5-853a-96942f645df5?format=image&version=normal',
   },
 ];
+
+const MATCHES_BY_CARD: Record<string, Printing[]> = {
+  'Lightning Bolt': PRINTINGS,
+  'Llanowar Elves': [
+    {
+      name: 'Llanowar Elves',
+      set: 'Dominaria United',
+      code: 'DMU',
+      number: '168',
+      image:
+        'https://api.scryfall.com/cards/6a0b230b-d391-4998-a3f7-7b158a0ec2cd?format=image&version=normal',
+    },
+  ],
+  Opt: [
+    {
+      name: 'Opt',
+      set: 'Core Set 2021',
+      code: 'M21',
+      number: '59',
+      image:
+        'https://api.scryfall.com/cards/323db259-d35e-467d-9a46-4adcb2fc107c?format=image&version=normal',
+    },
+  ],
+  Counterspell: [
+    {
+      name: 'Counterspell',
+      set: 'Magic: The Gathering Foundations',
+      code: 'FDN',
+      number: '153',
+      image:
+        'https://api.scryfall.com/cards/4f616706-ec97-4923-bb1e-11a69fbaa1f8?format=image&version=normal',
+    },
+  ],
+  'Swords to Plowshares': [
+    {
+      name: 'Swords to Plowshares',
+      set: 'Mystery Booster 2',
+      code: 'MB2',
+      number: '257',
+      image:
+        'https://api.scryfall.com/cards/b4e9c870-23c0-413a-ae39-265f09da16d1?format=image&version=normal',
+    },
+  ],
+  'Sol Ring': [
+    {
+      name: 'Sol Ring',
+      set: 'Commander Masters',
+      code: 'CMM',
+      number: '396',
+      image:
+        'https://api.scryfall.com/cards/46ca0b66-a000-4483-b916-f5b89e710244?format=image&version=normal',
+    },
+  ],
+  'Birds of Paradise': [
+    {
+      name: 'Birds of Paradise',
+      set: 'Magic 2012',
+      code: 'M12',
+      number: '165',
+      image:
+        'https://api.scryfall.com/cards/307d4236-1e54-43e3-83f1-063d49d16dda?format=image&version=normal',
+    },
+  ],
+  Ponder: [
+    {
+      name: 'Ponder',
+      set: 'Magic 2010',
+      code: 'M10',
+      number: '68',
+      image:
+        'https://api.scryfall.com/cards/3c02b8ee-84cb-44cb-ba14-9e725a9d03ee?format=image&version=normal',
+    },
+  ],
+};
 
 const SCANNED_CARDS: ScannedCard[] = [
   {
@@ -174,8 +256,10 @@ export function ScanPage() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [search, setSearch] = useState('');
   const searchRef = useRef<HTMLInputElement>(null);
+  const cardRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const scan = SCANNED_CARDS[cardIndex];
-  const printing = PRINTINGS[printingIndex];
+  const printings = MATCHES_BY_CARD[scan.name];
+  const printing = printings[printingIndex];
 
   const moveCard = (change: number) => {
     setCardIndex((index) =>
@@ -192,19 +276,32 @@ export function ScanPage() {
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       const target = event.target as HTMLElement;
-      if (target.tagName === 'INPUT') return;
+      if (target.tagName === 'INPUT' || searchOpen) return;
       if (event.key === '/') {
         event.preventDefault();
         setSearchOpen(true);
         return;
       }
-      if (event.key === 'j') moveCard(1);
-      if (event.key === 'k') moveCard(-1);
-      if (event.key === 'h')
+      if (event.key === 'j') {
+        event.preventDefault();
+        moveCard(1);
+      }
+      if (event.key === 'k') {
+        event.preventDefault();
+        moveCard(-1);
+      }
+      if (event.key === 'h') {
+        event.preventDefault();
         setPrintingIndex((index) => Math.max(0, index - 1));
-      if (event.key === 'l')
-        setPrintingIndex((index) => Math.min(PRINTINGS.length - 1, index + 1));
-      if (event.key === 'c') confirmAndAdvance();
+      }
+      if (event.key === 'l') {
+        event.preventDefault();
+        setPrintingIndex((index) => Math.min(printings.length - 1, index + 1));
+      }
+      if (event.key === 'c') {
+        event.preventDefault();
+        confirmAndAdvance();
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
@@ -213,6 +310,10 @@ export function ScanPage() {
   useEffect(() => {
     if (searchOpen) setTimeout(() => searchRef.current?.focus(), 0);
   }, [searchOpen]);
+
+  useEffect(() => {
+    cardRefs.current[cardIndex]?.scrollIntoView({ block: 'nearest' });
+  }, [cardIndex]);
 
   if (!reviewing) {
     return (
@@ -324,6 +425,10 @@ export function ScanPage() {
                 <button
                   key={`${card.name}-${index}`}
                   type="button"
+                  ref={(element) => {
+                    cardRefs.current[index] = element;
+                  }}
+                  aria-current={index === cardIndex ? 'true' : undefined}
                   className={`scan-queue-card ${index === cardIndex ? 'is-selected' : ''}`}
                   onClick={() => {
                     setCardIndex(index);
@@ -378,7 +483,7 @@ export function ScanPage() {
                 </Text>
                 <Image
                   src={printing.image}
-                  alt="Scanned Lightning Bolt"
+                  alt={`Scanned ${scan.name}`}
                   className="scan-card-image scan-photo-treatment"
                 />
                 <div className="scan-crops">
@@ -417,7 +522,7 @@ export function ScanPage() {
                   <Crop
                     image={printing.image}
                     position="left bottom"
-                    label="{printing.code} · {printing.number}"
+                    label={`${printing.code} · ${printing.number}`}
                   />
                   <Crop
                     image={printing.image}
@@ -449,14 +554,14 @@ export function ScanPage() {
                     <IconChevronLeft size={16} />
                   </ActionIcon>
                   <Text size="sm" miw={38} ta="center">
-                    {printingIndex + 1} / {PRINTINGS.length}
+                    {printingIndex + 1} / {printings.length}
                   </Text>
                   <ActionIcon
                     variant="default"
                     aria-label="Next printing"
                     onClick={() =>
                       setPrintingIndex((index) =>
-                        Math.min(PRINTINGS.length - 1, index + 1),
+                        Math.min(printings.length - 1, index + 1),
                       )
                     }
                   >
@@ -465,7 +570,7 @@ export function ScanPage() {
                 </Group>
               </Group>
               <Group gap="xs" wrap="nowrap" className="scan-printing-tabs">
-                {PRINTINGS.map((option, index) => (
+                {printings.map((option, index) => (
                   <button
                     type="button"
                     key={option.code}
