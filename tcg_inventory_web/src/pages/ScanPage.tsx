@@ -268,6 +268,7 @@ export function ScanPage() {
   );
   const sourceCardIndex = visibleCardIndexes[cardIndex];
   const scan = SCANNED_CARDS[sourceCardIndex];
+  const scanImage = MATCHES_BY_CARD[scan.name][0].image;
   const printings =
     manualPrintings.get(sourceCardIndex) ?? MATCHES_BY_CARD[scan.name];
   const printing = printings[printingIndex];
@@ -645,7 +646,7 @@ export function ScanPage() {
                   Your scan
                 </Text>
                 <Image
-                  src={printing.image}
+                  src={scanImage}
                   alt={`Scanned ${scan.name}`}
                   className="scan-card-image scan-photo-treatment"
                 />
