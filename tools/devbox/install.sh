@@ -45,6 +45,9 @@ Setup complete. Log out and back in before using Docker without sudo, then run:
 
   docker run --rm hello-world
   pnpm --version
+  chromium --version
+  playwright --version
+  playwright install --list
   pnpm install
   bazel test //...
 EOF

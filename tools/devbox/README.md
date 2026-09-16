@@ -1,6 +1,6 @@
 # Devbox setup
 
-This directory provisions a Debian 13 development box for this repository. It installs Bazelisk, Node.js, pinned Corepack and pnpm, the native build toolchain, pinned Docker packages, and Docker access for the developer account.
+This directory provisions a Debian 13 development box for this repository. It installs Bazelisk, Node.js, pinned Corepack, pnpm and Playwright, Chromium, the native build toolchain, pinned Docker packages, and Docker access for the developer account.
 
 ## Setup
 
@@ -17,12 +17,15 @@ Log out and back in once it completes so the current user receives Docker-group 
 ```bash
 docker run --rm hello-world
 pnpm --version
+chromium --version
+playwright --version
+playwright install --list
 pnpm install
 bazel test //...
 ```
 
-The host Node.js and pnpm installations support local frontend development. The repository's Bazel configuration still supplies Java, Python, Node, and pnpm toolchains for hermetic builds and tests.
+The host Node.js, pnpm, Chromium, and Playwright installations support local frontend development and browser-driven UI inspection. Provisioning installs both Debian's Chromium browser and Playwright's matching Chromium runtime under the developer account. The repository's Bazel configuration still supplies Java, Python, Node, and pnpm toolchains for hermetic builds and tests.
 
 ## Updating provisioned tools
 
-Tool versions and Bazelisk checksums are pinned in `vars.yml`. Update them together only after validating the setup on a fresh Debian 13 devbox.
+Tool versions and Bazelisk checksums are pinned in `vars.yml`. Chromium follows the Debian security repository rather than being pinned. Update provisioned versions only after validating the setup on a fresh Debian 13 devbox.

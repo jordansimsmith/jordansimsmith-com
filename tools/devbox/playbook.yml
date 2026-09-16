@@ -19,12 +19,18 @@
         that: ansible_architecture in bazelisk_artifacts
         fail_msg: This setup supports x86_64 and aarch64 hosts.
 
+    - name: Read the developer account
+      ansible.builtin.getent:
+        database: passwd
+        key: '{{ devbox_user }}'
+
   tasks:
     - name: Install apt prerequisites
       ansible.builtin.apt:
         name:
           - ca-certificates
           - build-essential
+          - chromium
           - curl
           - gnupg
           - nodejs
@@ -59,6 +65,30 @@
       when: >-
         installed_pnpm_version.rc != 0 or
         installed_pnpm_version.stdout != pnpm_version
+
+    - name: Check installed Playwright version
+      ansible.builtin.command: playwright --version
+      register: installed_playwright_version
+      changed_when: false
+      failed_when: false
+
+    - name: Install pinned Playwright
+      ansible.builtin.command: npm install --global playwright@{{ playwright_version }}
+      environment:
+        PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      when: >-
+        installed_playwright_version.rc != 0 or
+        installed_playwright_version.stdout != 'Version ' + playwright_version
+
+    - name: Install Playwright Chromium runtime
+      ansible.builtin.command: playwright install chromium
+      become_user: '{{ devbox_user }}'
+      environment:
+        HOME: '{{ ansible_facts.getent_passwd[devbox_user][4] }}'
+      register: installed_playwright_chromium
+      changed_when: >-
+        installed_playwright_chromium.stdout != '' or
+        installed_playwright_chromium.stderr != ''
 
     - name: Install Bazelisk
       ansible.builtin.get_url:
