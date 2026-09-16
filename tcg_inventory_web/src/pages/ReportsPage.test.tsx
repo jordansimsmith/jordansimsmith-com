@@ -71,7 +71,7 @@ describe('ReportsPage', () => {
     expect(screen.getByText(/Data as of/)).toBeDefined();
   });
 
-  it('shouldRenderStatCards', async () => {
+  it('shouldRenderSummaryStrip', async () => {
     vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
       ...baseReport,
     });
@@ -79,22 +79,27 @@ describe('ReportsPage', () => {
     renderReportsPage();
     await act(async () => {});
 
+    expect(
+      screen.getByRole('region', { name: 'Inventory summary' }),
+    ).toBeDefined();
     expect(screen.getByText('$2,894')).toBeDefined();
-    expect(screen.getByText('at your listed prices')).toBeDefined();
-    expect(screen.getByText('9,412')).toBeDefined();
-    expect(screen.getByText('6,120')).toBeDefined();
-    expect(screen.getByText('14')).toBeDefined();
-    expect(screen.getByText('Sold · all-time')).toBeDefined();
-    expect(screen.getByText('862')).toBeDefined();
-    expect(screen.getByText('Revenue · all-time')).toBeDefined();
+    expect(
+      screen.getByRole('group', { name: 'Inventory at listed prices' }),
+    ).toBeDefined();
+    expect(screen.getByText('9,412 in stock')).toBeDefined();
+    expect(screen.getByText('6,120 SKUs')).toBeDefined();
+    expect(screen.getByText('14 reserved')).toBeDefined();
+    expect(
+      screen.getByRole('group', { name: 'Sales from paid orders' }),
+    ).toBeDefined();
+    expect(screen.getByText('862 sold all-time')).toBeDefined();
     expect(screen.getByText('$1,204.50')).toBeDefined();
-    expect(screen.getByText('from paid orders')).toBeDefined();
-    expect(screen.getByText('3')).toBeDefined();
-    expect(screen.getByText('Unpriced')).toBeDefined();
-    expect(screen.getByText('excluded from value')).toBeDefined();
+    expect(
+      screen.getByText('3 unpriced units excluded from value'),
+    ).toBeDefined();
   });
 
-  it('shouldHideUnpricedCardWhenZero', async () => {
+  it('shouldHideUnpricedItemWhenZero', async () => {
     vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue({
       ...baseReport,
       report: {
@@ -108,7 +113,7 @@ describe('ReportsPage', () => {
     renderReportsPage();
     await act(async () => {});
 
-    expect(screen.queryByText('Unpriced')).toBeNull();
+    expect(screen.queryByText(/unpriced units excluded/)).toBeNull();
   });
 
   it('shouldShowSkeletonsOnFirstVisit', async () => {
@@ -123,6 +128,7 @@ describe('ReportsPage', () => {
     await act(async () => {});
 
     expect(createReportMock).toHaveBeenCalled();
+    expect(screen.getByLabelText('Loading report')).toBeDefined();
     expect(screen.queryByText(/Data as of/)).toBeNull();
     expect(screen.queryByText('No report data yet.')).toBeNull();
 
@@ -272,6 +278,12 @@ describe('ReportsPage', () => {
 
     expect(screen.getByText('Top hits')).toBeDefined();
     expect(screen.getByText('Ragavan, Nimble Pilferer')).toBeDefined();
+    expect(
+      screen
+        .getByText('Ragavan, Nimble Pilferer')
+        .closest('td')
+        ?.getAttribute('data-field'),
+    ).toBe('name');
     expect(screen.getByText('$95.00')).toBeDefined();
     expect(screen.getByText('Doubling Season')).toBeDefined();
     expect(screen.getByText('$48.50')).toBeDefined();
@@ -362,7 +374,8 @@ describe('ReportsPage', () => {
     expect(screen.getByText('Stock aging')).toBeDefined();
     expect(screen.getByText('94 units')).toBeDefined();
     expect(screen.getByText('180+: 13% of stock')).toBeDefined();
-    expect(screen.getByText('0-30 days · 22 (23%)')).toBeDefined();
+    expect(screen.getByText('0-30 days')).toBeDefined();
+    expect(screen.getByText('22 (23%)')).toBeDefined();
   });
 
   it('shouldShowStockAgingEmptyMessageWhenEmpty', async () => {

@@ -10,13 +10,13 @@ import {
   Stack,
   Table,
   Text,
-  Title,
 } from '@mantine/core';
 import { BarChart, LineChart } from '@mantine/charts';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { JobFailureAlert } from '../components/JobFailureAlert';
+import { PageHeader } from '../components/PageHeader';
 import { apiClient } from '../api/client';
 import {
   finishNameClass,
@@ -50,8 +50,7 @@ const wholeCurrencyFormat = new Intl.NumberFormat('en-NZ', {
   maximumFractionDigits: 0,
 });
 
-// fresh-to-stale ramp for the aging bands, in band order
-const AGING_HUES = ['green', 'blue', 'yellow', 'red'];
+const AGING_SHADES = [3, 5, 7, 9];
 
 function formatGeneratedAt(epochSeconds: number): string {
   const now = Math.floor(Date.now() / 1000);
@@ -74,64 +73,15 @@ function formatCurrency(value: string | number): string {
   );
 }
 
-// the two hero tones bookend the strip: blue for held value, teal for banked
-// revenue, matching the revenue chart hue
-const STAT_TONES = {
-  value: {
-    background: 'var(--mantine-color-blue-light)',
-    color: 'blue.8',
-    hero: true,
-  },
-  revenue: {
-    background: 'var(--mantine-color-teal-light)',
-    color: 'teal.8',
-    hero: true,
-  },
-  warning: {
-    background: 'var(--mantine-color-yellow-light)',
-    color: 'yellow.9',
-    hero: false,
-  },
-} as const;
-
-function StatCard({
-  label,
-  value,
-  sub,
-  tone,
-}: {
-  label: string;
-  value: string;
-  sub?: string;
-  tone?: keyof typeof STAT_TONES;
-}) {
-  const style = tone ? STAT_TONES[tone] : undefined;
-  return (
-    <Paper p="md" radius="sm" withBorder bg={style?.background}>
-      <Text size="xs" c="dimmed" tt="uppercase" fw={700}>
-        {label}
-      </Text>
-      <Text
-        fz={style?.hero ? 26 : 20}
-        fw={style?.hero ? 800 : 700}
-        lh={1.3}
-        mt={4}
-        c={style?.color}
-      >
-        {value}
-      </Text>
-      {sub && (
-        <Text size="xs" c="dimmed" mt={4}>
-          {sub}
-        </Text>
-      )}
-    </Paper>
-  );
-}
-
 function FigureTitle({ title, subtitle }: { title: string; subtitle: string }) {
   return (
-    <Group justify="space-between" align="baseline" gap="xs" mb="md">
+    <Group
+      className="reports-figure-header"
+      justify="space-between"
+      align="baseline"
+      gap="xs"
+      mb="md"
+    >
       <Text size="sm" fw={700}>
         {title}
       </Text>
@@ -155,41 +105,53 @@ function ChartTooltip({ title, detail }: { title: string; detail: string }) {
 
 function TotalsStrip({ totals }: { totals: ReportTotals }) {
   return (
-    <SimpleGrid cols={{ base: 2, sm: 3, md: 6 }} spacing="md">
-      <StatCard
-        label="Inventory value (NZD)"
-        value={wholeCurrencyFormat.format(parseFloat(totals.inventory_value))}
-        sub="at your listed prices"
-        tone="value"
-      />
-      <StatCard
-        label="In stock"
-        value={totals.in_stock_units.toLocaleString()}
-      />
-      <StatCard label="SKUs" value={totals.sku_count.toLocaleString()} />
-      <StatCard
-        label="Reserved"
-        value={totals.reserved_units.toLocaleString()}
-      />
-      <StatCard
-        label="Sold · all-time"
-        value={totals.sold_units.toLocaleString()}
-      />
-      <StatCard
-        label="Revenue · all-time"
-        value={formatCurrency(totals.revenue_to_date)}
-        sub="from paid orders"
-        tone="revenue"
-      />
-      {totals.unpriced_units > 0 && (
-        <StatCard
-          label="Unpriced"
-          value={totals.unpriced_units.toLocaleString()}
-          sub="excluded from value"
-          tone="warning"
-        />
-      )}
-    </SimpleGrid>
+    <Paper
+      component="section"
+      aria-label="Inventory summary"
+      withBorder
+      radius="md"
+      p={0}
+      className="reports-overview"
+    >
+      <div
+        className="reports-overview-group"
+        role="group"
+        aria-label="Inventory at listed prices"
+      >
+        <Text size="sm" c="dimmed" fw={600}>
+          Inventory at listed prices
+        </Text>
+        <Text className="reports-overview-value">
+          {wholeCurrencyFormat.format(parseFloat(totals.inventory_value))}
+        </Text>
+        <Text size="sm" className="reports-overview-facts">
+          <span>{totals.in_stock_units.toLocaleString()} in stock</span> ·{' '}
+          <span>{totals.sku_count.toLocaleString()} SKUs</span> ·{' '}
+          <span>{totals.reserved_units.toLocaleString()} reserved</span>
+        </Text>
+        {totals.unpriced_units > 0 && (
+          <Text size="xs" c="dimmed" mt="xs">
+            {totals.unpriced_units.toLocaleString()} unpriced{' '}
+            {totals.unpriced_units === 1 ? 'unit' : 'units'} excluded from value
+          </Text>
+        )}
+      </div>
+      <div
+        className="reports-overview-group"
+        role="group"
+        aria-label="Sales from paid orders"
+      >
+        <Text size="sm" c="dimmed" fw={600}>
+          Sales from paid orders
+        </Text>
+        <Text className="reports-overview-value">
+          {formatCurrency(totals.revenue_to_date)}
+        </Text>
+        <Text size="sm" className="reports-overview-facts">
+          {totals.sold_units.toLocaleString()} sold all-time
+        </Text>
+      </div>
+    </Paper>
   );
 }
 
@@ -205,7 +167,7 @@ function RevenueByMonthChart({
   }));
 
   return (
-    <Paper p="md" radius="sm" withBorder>
+    <Paper p="md" radius="md" withBorder>
       <FigureTitle title="Revenue by month" subtitle="NZD · paid orders only" />
       {data.length === 0 ? (
         <Text size="sm" c="dimmed">
@@ -254,7 +216,7 @@ function IntakeVsSalesChart({
   }));
 
   return (
-    <Paper p="md" radius="sm" withBorder>
+    <Paper p="md" radius="md" withBorder>
       <FigureTitle title="Intake vs sales" subtitle="units per week" />
       {data.length === 0 ? (
         <Text size="sm" c="dimmed">
@@ -281,7 +243,7 @@ function IntakeVsSalesChart({
 
 function TopHitsTable({ topHits }: { topHits: ReportTopHit[] }) {
   return (
-    <Paper p="md" radius="sm" withBorder>
+    <Paper p="md" radius="md" withBorder>
       <FigureTitle title="Top hits" subtitle="in-stock cards by unit price" />
       {topHits.length === 0 ? (
         <Text size="sm" c="dimmed">
@@ -289,11 +251,11 @@ function TopHitsTable({ topHits }: { topHits: ReportTopHit[] }) {
         </Text>
       ) : (
         <Table
-          striped
           highlightOnHover
           verticalSpacing={4}
           horizontalSpacing="sm"
           fz="sm"
+          className="reports-top-hits-table"
         >
           <Table.Thead>
             <Table.Tr>
@@ -308,19 +270,31 @@ function TopHitsTable({ topHits }: { topHits: ReportTopHit[] }) {
           <Table.Tbody>
             {topHits.map((hit, index) => (
               <Table.Tr key={hit.sku_id}>
-                <Table.Td c="dimmed">{index + 1}</Table.Td>
+                <Table.Td data-field="rank" c="dimmed">
+                  {index + 1}
+                </Table.Td>
                 <Table.Td
+                  data-field="name"
                   className={finishNameClass(hit.finish)}
                   fw={finishNameWeight(hit.finish)}
                 >
                   {hit.name}
                 </Table.Td>
-                <Table.Td>
+                <Table.Td data-field="set" data-label="Set">
                   {formatSetNumber(hit.set_code, hit.collector_number)}
                 </Table.Td>
-                <Table.Td tt="capitalize">{hit.finish}</Table.Td>
-                <Table.Td>{hit.condition}</Table.Td>
                 <Table.Td
+                  data-field="finish"
+                  data-label="Finish"
+                  tt="capitalize"
+                >
+                  {hit.finish}
+                </Table.Td>
+                <Table.Td data-field="condition" data-label="Condition">
+                  {hit.condition}
+                </Table.Td>
+                <Table.Td
+                  data-field="price"
                   ta="right"
                   style={{ fontVariantNumeric: 'tabular-nums' }}
                 >
@@ -340,7 +314,7 @@ function StockAgingFigure({ agingBands }: { agingBands: ReportAgingBand[] }) {
   const oldest = agingBands[agingBands.length - 1];
 
   return (
-    <Paper p="md" radius="sm" withBorder>
+    <Paper p="md" radius="md" withBorder className="reports-aging-panel">
       <FigureTitle
         title="Stock aging"
         subtitle="in-stock units by days since intake"
@@ -350,16 +324,12 @@ function StockAgingFigure({ agingBands }: { agingBands: ReportAgingBand[] }) {
           No in-stock units.
         </Text>
       ) : (
-        <Stack gap="sm">
+        <Stack gap="sm" className="reports-aging-content">
           <Group justify="space-between">
             <Text size="sm" c="dimmed">
               {total.toLocaleString()} units
             </Text>
-            <Text
-              size="sm"
-              fw={600}
-              c={oldest.in_stock_units > 0 ? 'red.7' : 'dimmed'}
-            >
+            <Text size="sm" fw={600} c="dimmed">
               {oldest.label}:{' '}
               {Math.round((oldest.in_stock_units / total) * 100)}% of stock
             </Text>
@@ -369,24 +339,27 @@ function StockAgingFigure({ agingBands }: { agingBands: ReportAgingBand[] }) {
               <Progress.Section
                 key={band.label}
                 value={(band.in_stock_units / total) * 100}
-                color={`${AGING_HUES[index] ?? 'gray'}.6`}
+                color={`blue.${AGING_SHADES[index] ?? 9}`}
               />
             ))}
           </Progress.Root>
-          <Group gap="lg">
+          <div className="reports-aging-legend">
             {agingBands.map((band, index) => (
-              <Group key={band.label} gap={6}>
-                <ColorSwatch
-                  size={10}
-                  color={`var(--mantine-color-${AGING_HUES[index] ?? 'gray'}-6)`}
-                />
-                <Text size="xs" c="dimmed">
-                  {band.label} · {band.in_stock_units.toLocaleString()} (
+              <div className="reports-aging-row" key={band.label}>
+                <Group gap="xs" wrap="nowrap">
+                  <ColorSwatch
+                    size={10}
+                    color={`var(--mantine-color-blue-${AGING_SHADES[index] ?? 9})`}
+                  />
+                  <Text size="sm">{band.label}</Text>
+                </Group>
+                <Text size="sm" className="reports-aging-count">
+                  {band.in_stock_units.toLocaleString()} (
                   {Math.round((band.in_stock_units / total) * 100)}%)
                 </Text>
-              </Group>
+              </div>
             ))}
-          </Group>
+          </div>
         </Stack>
       )}
     </Paper>
@@ -401,7 +374,7 @@ function TopSetsChart({ topSets }: { topSets: ReportTopSet[] }) {
   }));
 
   return (
-    <Paper p="md" radius="sm" withBorder>
+    <Paper p="md" radius="md" withBorder>
       <FigureTitle title="Top sets" subtitle="in-stock units" />
       {data.length === 0 ? (
         <Text size="sm" c="dimmed">
@@ -450,7 +423,7 @@ function PriceBucketsChart({
   }));
 
   return (
-    <Paper p="md" radius="sm" withBorder>
+    <Paper p="md" radius="md" withBorder>
       <FigureTitle
         title="Price distribution"
         subtitle="in-stock units by listing price"
@@ -461,14 +434,30 @@ function PriceBucketsChart({
         </Text>
       ) : (
         <BarChart
-          h={300}
+          h={270}
           data={data}
           dataKey="label"
           series={[
             { name: 'in_stock_units', label: 'In stock', color: 'blue.6' },
           ]}
-          gridAxis="y"
-          tickLine="y"
+          orientation="vertical"
+          gridAxis="x"
+          tickLine="x"
+          yAxisProps={{ width: 96 }}
+          tooltipProps={{
+            content: ({ payload }) => {
+              const datum = payload?.[0]?.payload as
+                | (typeof data)[number]
+                | undefined;
+              if (!datum) return null;
+              return (
+                <ChartTooltip
+                  title={datum.label}
+                  detail={`${datum.in_stock_units.toLocaleString()} in stock`}
+                />
+              );
+            },
+          }}
         />
       )}
     </Paper>
@@ -548,24 +537,24 @@ export function ReportsPage() {
   return (
     <AppShellLayout>
       <Stack gap="lg">
-        <Group justify="space-between" align="center">
-          <Title order={2}>Reports</Title>
-          <Group gap="sm" align="center">
-            {refreshing && (
+        <PageHeader
+          title="Reports"
+          description={
+            report
+              ? `Data as of ${formatGeneratedAt(report.generated_at)}`
+              : 'Inventory value, movement, and stock composition.'
+          }
+          actions={
+            refreshing && (
               <Group gap={6} align="center">
                 <Loader size="xs" aria-label="Refreshing" />
                 <Text size="sm" c="dimmed">
                   Refreshing…
                 </Text>
               </Group>
-            )}
-            {report && (
-              <Text size="sm" c="dimmed">
-                Data as of {formatGeneratedAt(report.generated_at)}
-              </Text>
-            )}
-          </Group>
-        </Group>
+            )
+          }
+        />
 
         {report?.generation?.status === 'failed' && (
           <JobFailureAlert
@@ -576,10 +565,24 @@ export function ReportsPage() {
         )}
 
         {firstVisit && (
-          <Stack gap="xs">
-            <Skeleton height={20} width={280} />
-            <Skeleton height={120} />
-            <Skeleton height={120} />
+          <Stack gap="md" aria-label="Loading report">
+            <Paper withBorder radius="md" p={0} className="reports-overview">
+              {[0, 1].map((index) => (
+                <div className="reports-overview-group" key={index}>
+                  <Skeleton height={12} width="75%" />
+                  <Skeleton height={30} width="45%" mt="sm" />
+                  <Skeleton height={14} width="65%" mt="sm" />
+                </div>
+              ))}
+            </Paper>
+            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+              {[0, 1].map((item) => (
+                <Paper key={item} withBorder radius="md" p="md">
+                  <Skeleton height={16} width={160} mb="lg" />
+                  <Skeleton height={250} />
+                </Paper>
+              ))}
+            </SimpleGrid>
           </Stack>
         )}
 
@@ -587,7 +590,6 @@ export function ReportsPage() {
           <>
             <TotalsStrip totals={report.report.totals} />
 
-            {/* columns mirror the hero bookends: stock on the left, money on the right */}
             <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
               <IntakeVsSalesChart
                 intakeVsSales={report.report.intake_vs_sales_by_week ?? []}
@@ -597,7 +599,7 @@ export function ReportsPage() {
               />
             </SimpleGrid>
 
-            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+            <SimpleGrid cols={{ base: 1, xl: 2 }} spacing="md">
               <TopHitsTable topHits={report.report.top_hits ?? []} />
               <StockAgingFigure agingBands={report.report.aging_bands ?? []} />
             </SimpleGrid>
