@@ -146,7 +146,7 @@ Stack major regions in task order. Put identity and status first, working conten
 
 ## Elevation and depth
 
-Depth comes from 1 px borders and surface grouping, not shadows. Papers are flat white surfaces on a white canvas; borders and spacing establish their boundary. Shadows are reserved for floating layers that need separation, such as menus, popovers, or a login card.
+Depth comes from 1 px borders and surface grouping, not shadows. Papers are flat white surfaces on a white canvas; borders and spacing establish their boundary. Shadows are reserved for floating layers that overlap content, such as menus and popovers. The login paper uses a border alone.
 
 ## Shapes
 
@@ -204,7 +204,7 @@ Reports use one segmented headline strip followed by bordered analytical figures
 
 ### Authentication
 
-Login may use a small shadow because it is a floating, isolated surface. Keep it direct and quiet; it should introduce the application's tone without adding marketing copy or decorative artwork.
+Login uses a small, bordered paper without a shadow. Keep it direct and quiet; it should introduce the application's tone without adding marketing copy or decorative artwork.
 
 ## Responsive behavior
 

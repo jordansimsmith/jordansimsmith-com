@@ -25,7 +25,10 @@ describe('Login', () => {
   it('renders the app title and form fields', () => {
     renderLogin(vi.fn());
 
-    expect(screen.getByRole('heading', { name: /test app/i })).toBeDefined();
+    expect(screen.getByRole('main')).toBeDefined();
+    expect(
+      screen.getByRole('heading', { level: 1, name: /test app/i }),
+    ).toBeDefined();
     expect(screen.getByLabelText(/username/i)).toBeDefined();
     expect(screen.getByLabelText(/password/i)).toBeDefined();
     expect(screen.getByRole('button', { name: /log in/i })).toBeDefined();

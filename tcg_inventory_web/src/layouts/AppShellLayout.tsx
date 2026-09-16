@@ -58,24 +58,22 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
   };
 
   return (
-    <div className="tcg-app-shell">
-      <Layout
-        appTitle="TCG inventory"
-        username={session?.username ?? null}
-        onLogout={handleLogout}
-        navbar={
-          <Stack gap={4}>
-            <Text className="tcg-nav-section-label">Workspace</Text>
-            {WORKSPACE_LINKS.map(renderNavLink)}
-            <div className="tcg-nav-divider" />
-            {renderNavLink(SETTINGS_LINK)}
-          </Stack>
-        }
-        navbarOpened={navbarOpened}
-        onToggleNavbar={() => setNavbarOpened((opened) => !opened)}
-      >
-        {children}
-      </Layout>
-    </div>
+    <Layout
+      appTitle="TCG inventory"
+      username={session?.username ?? null}
+      onLogout={handleLogout}
+      navbar={
+        <Stack gap={4}>
+          <Text className="tcg-nav-section-label">Workspace</Text>
+          {WORKSPACE_LINKS.map(renderNavLink)}
+          <div className="tcg-nav-divider" />
+          {renderNavLink(SETTINGS_LINK)}
+        </Stack>
+      }
+      navbarOpened={navbarOpened}
+      onToggleNavbar={() => setNavbarOpened((opened) => !opened)}
+    >
+      {children}
+    </Layout>
   );
 }

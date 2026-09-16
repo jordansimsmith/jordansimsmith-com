@@ -33,7 +33,9 @@ export function Layout({
       }
       padding="md"
     >
-      <AppShell.Header>
+      <AppShell.Header
+        style={{ borderBottomColor: 'var(--mantine-color-gray-3)' }}
+      >
         <Group h="100%" px="md" justify="space-between" wrap="nowrap">
           <Group gap="sm" wrap="nowrap">
             {navbar && (
@@ -48,7 +50,12 @@ export function Layout({
                 aria-expanded={navbarOpened}
               />
             )}
-            <Title order={3} style={{ whiteSpace: 'nowrap' }}>
+            <Title
+              order={3}
+              fz="1.125rem"
+              fw={650}
+              style={{ whiteSpace: 'nowrap', letterSpacing: '-0.025em' }}
+            >
               {appTitle}
             </Title>
           </Group>
@@ -64,7 +71,14 @@ export function Layout({
           )}
         </Group>
       </AppShell.Header>
-      {navbar && <AppShell.Navbar p="xs">{navbar}</AppShell.Navbar>}
+      {navbar && (
+        <AppShell.Navbar
+          p="xs"
+          style={{ borderRightColor: 'var(--mantine-color-gray-3)' }}
+        >
+          {navbar}
+        </AppShell.Navbar>
+      )}
       <AppShell.Main>{children}</AppShell.Main>
     </AppShell>
   );

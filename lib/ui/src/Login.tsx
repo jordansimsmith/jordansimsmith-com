@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import {
+  Box,
   Container,
   Paper,
   Title,
+  Text,
   TextInput,
   PasswordInput,
   Button,
@@ -44,34 +46,53 @@ export function Login({ appTitle, onSubmit }: LoginProps) {
   };
 
   return (
-    <Container size={400} py="xl">
-      <Paper shadow="sm" p="xl" radius="md" withBorder>
-        <form onSubmit={form.onSubmit(handleSubmit)}>
-          <Stack>
-            <Title order={2} ta="center">
-              {appTitle}
-            </Title>
+    <Box
+      component="main"
+      style={{
+        minHeight: '100dvh',
+        display: 'flex',
+        alignItems: 'center',
+        paddingBlock: 'var(--mantine-spacing-xl)',
+      }}
+    >
+      <Container size={420} w="100%">
+        <Paper p="xl" radius="md" withBorder>
+          <Stack gap="xl">
+            <Stack gap={4}>
+              <Title order={1} fz="1.5rem" lh={1.2}>
+                {appTitle}
+              </Title>
+              <Text size="sm" c="dimmed">
+                Sign in to continue
+              </Text>
+            </Stack>
 
-            <TextInput
-              label="Username"
-              placeholder="Enter your username"
-              autoComplete="username"
-              {...form.getInputProps('username')}
-            />
+            <form onSubmit={form.onSubmit(handleSubmit)}>
+              <Stack gap="md">
+                <TextInput
+                  label="Username"
+                  placeholder="Enter your username"
+                  autoComplete="username"
+                  size="md"
+                  {...form.getInputProps('username')}
+                />
 
-            <PasswordInput
-              label="Password"
-              placeholder="Enter your password"
-              autoComplete="current-password"
-              {...form.getInputProps('password')}
-            />
+                <PasswordInput
+                  label="Password"
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                  size="md"
+                  {...form.getInputProps('password')}
+                />
 
-            <Button type="submit" fullWidth loading={loading}>
-              Log in
-            </Button>
+                <Button type="submit" fullWidth size="md" loading={loading}>
+                  Log in
+                </Button>
+              </Stack>
+            </form>
           </Stack>
-        </form>
-      </Paper>
-    </Container>
+        </Paper>
+      </Container>
+    </Box>
   );
 }
