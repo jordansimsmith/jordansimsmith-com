@@ -155,6 +155,15 @@ describe('OrderDetailPage', () => {
     expect(screen.getByText('−16% vs list')).toBeDefined();
     expect(screen.queryByText('Offer')).toBeNull();
     expect(screen.getByText('Pull sheet')).toBeDefined();
+    const summary = screen.getByRole('region', { name: 'Order summary' });
+    expect(within(summary).getByText('to pick')).toBeDefined();
+    expect(
+      within(summary).getByText('Offered $10.90 · Listed $13.00'),
+    ).toBeDefined();
+    const pullSheet = screen.getByRole('region', { name: 'Pull sheet' });
+    expect(
+      within(pullSheet).getByRole('button', { name: 'Confirm pull' }),
+    ).toBeDefined();
 
     // current locations render big with the insertion location struck through
     // beside them when they differ
@@ -197,6 +206,8 @@ describe('OrderDetailPage', () => {
     renderOrderDetailPage();
 
     expect(await screen.findByText('Chris Andrew (generic)')).toBeDefined();
+    const delivery = screen.getByRole('region', { name: 'Delivery' });
+    expect(within(delivery).getByText('Chris Andrew (generic)')).toBeDefined();
     expect(screen.getByText('32 Abercrombie Street')).toBeDefined();
     expect(screen.getByText('Unit 3')).toBeDefined();
     expect(screen.getByText('Howick, Auckland 2014')).toBeDefined();

@@ -21,6 +21,8 @@ function Harness({
   return (
     <div>
       <input ref={searchInputRef} aria-label="search" />
+      <button type="button">Load more</button>
+      <a href="#settings">Settings</a>
       <ul>
         {items.map((item, index) => (
           <li key={item} data-selected={index === selectedIndex}>
@@ -147,6 +149,19 @@ describe('useListNavigation', () => {
     await user.keyboard('{Enter}');
 
     expect(onOpen).toHaveBeenCalledWith(2);
+  });
+
+  it('does not open a row when activating a focused control', async () => {
+    const user = userEvent.setup();
+    const onOpen = vi.fn();
+    render(<Harness items={items} onOpen={onOpen} />);
+
+    screen.getByRole('button', { name: 'Load more' }).focus();
+    await user.keyboard('{Enter}');
+    screen.getByRole('link', { name: 'Settings' }).focus();
+    await user.keyboard('{Enter}');
+
+    expect(onOpen).not.toHaveBeenCalled();
   });
 
   it('does not open a row when the list is empty', async () => {

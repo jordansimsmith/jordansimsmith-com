@@ -53,6 +53,77 @@ body {
   gap: 1.5rem;
 }
 
+.order-detail-grid {
+  display: grid;
+  grid-template-areas: 'pull support';
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 320px);
+  align-items: start;
+  gap: 1rem;
+}
+
+.order-detail-support {
+  grid-area: support;
+  min-width: 0;
+}
+
+.order-pull-surface {
+  grid-area: pull;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.order-pull-header,
+.order-pull-row {
+  border-bottom: 1px solid var(--mantine-color-gray-2);
+}
+
+.order-pull-row {
+  display: grid;
+  grid-template-areas:
+    'position card price'
+    'position neighbors price';
+  grid-template-columns: minmax(0, 148px) minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 0.25rem 1rem;
+  padding: 1rem;
+}
+
+.order-pull-position {
+  grid-area: position;
+  min-width: 0;
+}
+
+.order-pull-card {
+  grid-area: card;
+  min-width: 0;
+}
+
+.order-pull-price {
+  grid-area: price;
+  text-align: right;
+}
+
+.order-pull-row:last-child {
+  border-bottom: 0;
+}
+
+.order-pull-footer {
+  border-top: 1px solid var(--mantine-color-gray-2);
+  background: var(--mantine-color-gray-0);
+}
+
+.order-location,
+.order-numeric {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.order-neighbors {
+  grid-area: neighbors;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .sku-card-image-frame {
   width: 100%;
   aspect-ratio: 488 / 680;
@@ -183,7 +254,38 @@ body {
   border-radius: var(--mantine-radius-sm);
 }
 
+@media (max-width: 64em) {
+  .order-detail-grid {
+    grid-template-areas:
+      'support'
+      'pull';
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (min-width: 54em) and (max-width: 64em) {
+  .order-detail-support {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+}
+
 @media (max-width: 48em) {
+  .order-pull-row {
+    grid-template-areas:
+      'position price'
+      'card card'
+      'neighbors neighbors';
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 0.25rem 0.75rem;
+  }
+
+  .order-pull-footer button {
+    width: 100%;
+    min-height: 44px;
+  }
+
   .sku-overview {
     grid-template-areas:
       'image details'

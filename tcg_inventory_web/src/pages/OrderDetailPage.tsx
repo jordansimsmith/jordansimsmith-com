@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  Box,
   Button,
   Group,
   Paper,
@@ -21,6 +22,7 @@ import type {
   OrderUnit,
 } from '../api/client';
 import { ListPriceBadge } from '../components/ListPriceBadge';
+import { PageHeader } from '../components/PageHeader';
 import { formatDeliveryMode } from '../domain/deliveryMode';
 
 function unitDescription(unit: OrderUnit): string {
@@ -114,8 +116,6 @@ export function OrderDetailPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [confirmOpen, navigate]);
 
-  // reserved cards are still boxed before the pull, so positions and neighbors
-  // only make sense until the order is fulfilled or voided
   const showPullContext =
     order?.state === 'awaiting_payment' || order?.state === 'to_pick';
 
@@ -161,100 +161,144 @@ export function OrderDetailPage() {
         )}
         {!loading && !error && order && (
           <>
-            <Stack gap="xs">
-              <Title order={2}>Order {order.order_id}</Title>
-              <Group gap="sm">
-                <OrderStateBadge state={order.state} />
-                <Text size="sm" c="dimmed">
-                  Accepted {new Date(order.accepted_at * 1000).toLocaleString()}
-                </Text>
-              </Group>
-              <Text size="sm" c="dimmed">
-                Total ${order.total_price}
-              </Text>
-              {order.items_total_price != null && (
-                <Group gap="sm" align="center">
-                  <Text size="sm" c="dimmed">
-                    Offered ${order.items_total_price}
-                    {order.listed_total_price != null &&
-                      ` · Listed $${order.listed_total_price}`}
-                  </Text>
-                  {order.listed_total_price != null && (
-                    <ListPriceBadge
-                      offered={order.items_total_price}
-                      listed={order.listed_total_price}
-                    />
-                  )}
-                </Group>
-              )}
-            </Stack>
-            <Stack gap="sm" maw={480}>
-              <Title order={3}>Delivery</Title>
-              <Paper withBorder p="md" radius="md">
-                <Stack gap={4}>
-                  {order.buyer_name != null && (
-                    <Text fw={500}>{order.buyer_name}</Text>
-                  )}
-                  {order.buyer_address != null &&
-                    addressLines(order.buyer_address).map((line) => (
-                      <Text key={line} size="sm">
-                        {line}
-                      </Text>
-                    ))}
-                  <Text size="sm" c="dimmed">
-                    {order.postage_option ??
-                      formatDeliveryMode(order.delivery_mode)}
-                  </Text>
-                </Stack>
-              </Paper>
-            </Stack>
-            <Stack gap="sm" maw={480}>
-              <Title order={3}>
-                {order.state === 'to_pick' ? 'Pull sheet' : 'Cards'}
-              </Title>
-              {order.units.map((unit) => (
-                <Paper key={unit.sequence_number} withBorder p="md" radius="md">
-                  <Stack gap={6}>
-                    <Group
-                      justify="space-between"
-                      align="flex-start"
-                      wrap="nowrap"
-                      gap="md"
-                    >
-                      <Group gap="xs" align="baseline" wrap="nowrap">
-                        <Text fz={28} fw={700} style={{ whiteSpace: 'nowrap' }}>
-                          {showPullContext
-                            ? unit.current_location
-                            : unit.location}
-                        </Text>
-                        {showPullContext &&
-                          unit.current_location !== unit.location && (
-                            <Text
-                              size="sm"
-                              c="dimmed"
-                              td="line-through"
-                              style={{ whiteSpace: 'nowrap' }}
-                            >
-                              {unit.location}
-                            </Text>
-                          )}
-                      </Group>
-                      {unit.price != null && (
-                        <Text fw={600} style={{ whiteSpace: 'nowrap' }}>
-                          ${unit.price}
-                        </Text>
-                      )}
+            <PageHeader
+              title={`Order ${order.order_id}`}
+              description={`Accepted ${new Date(order.accepted_at * 1000).toLocaleString()}`}
+              actions={
+                <Button variant="subtle" onClick={() => navigate('/orders')}>
+                  Back to orders
+                </Button>
+              }
+            />
+            <Box className="order-detail-grid">
+              <Stack gap="md" className="order-detail-support">
+                <Paper
+                  component="section"
+                  aria-label="Order summary"
+                  withBorder
+                  p="md"
+                  radius="md"
+                >
+                  <Stack gap="sm">
+                    <Group justify="space-between" gap="sm">
+                      <Title order={3} fz="md">
+                        Order summary
+                      </Title>
+                      <OrderStateBadge state={order.state} />
                     </Group>
-                    <Stack gap={2}>
+                    <Stack gap={4} className="order-numeric">
+                      <Text size="sm" fw={600}>
+                        Total ${order.total_price}
+                      </Text>
+                      {order.items_total_price != null && (
+                        <Group gap="xs" align="center">
+                          <Text size="sm" c="dimmed">
+                            Offered ${order.items_total_price}
+                            {order.listed_total_price != null &&
+                              ` · Listed $${order.listed_total_price}`}
+                          </Text>
+                          {order.listed_total_price != null && (
+                            <ListPriceBadge
+                              offered={order.items_total_price}
+                              listed={order.listed_total_price}
+                            />
+                          )}
+                        </Group>
+                      )}
+                    </Stack>
+                  </Stack>
+                </Paper>
+                <Paper
+                  component="section"
+                  aria-label="Delivery"
+                  withBorder
+                  p="md"
+                  radius="md"
+                >
+                  <Stack gap="sm">
+                    <Title order={3} fz="md">
+                      Delivery
+                    </Title>
+                    <Stack gap={4}>
+                      {order.buyer_name != null && (
+                        <Text fw={500}>{order.buyer_name}</Text>
+                      )}
+                      {order.buyer_address != null &&
+                        addressLines(order.buyer_address).map((line) => (
+                          <Text key={line} size="sm">
+                            {line}
+                          </Text>
+                        ))}
+                      <Text size="sm" c="dimmed">
+                        {order.postage_option ??
+                          formatDeliveryMode(order.delivery_mode)}
+                      </Text>
+                    </Stack>
+                  </Stack>
+                </Paper>
+              </Stack>
+              <Paper
+                component="section"
+                aria-label={order.state === 'to_pick' ? 'Pull sheet' : 'Cards'}
+                className="order-pull-surface"
+                withBorder
+                radius="md"
+              >
+                <Box p="md" className="order-pull-header">
+                  <Group justify="space-between" align="baseline" gap="sm">
+                    <Title order={3} fz="md">
+                      {order.state === 'to_pick' ? 'Pull sheet' : 'Cards'}
+                    </Title>
+                    <Text size="xs" c="dimmed" className="order-numeric">
+                      {order.unit_count}{' '}
+                      {order.unit_count === 1 ? 'card' : 'cards'}
+                      {order.state === 'to_pick' && ' · location order'}
+                    </Text>
+                  </Group>
+                </Box>
+                {order.units.map((unit) => (
+                  <Box key={unit.sequence_number} className="order-pull-row">
+                    <Group
+                      className="order-pull-position"
+                      align="baseline"
+                      wrap="nowrap"
+                      gap="xs"
+                    >
+                      <Text fz={26} fw={700} className="order-location">
+                        {showPullContext
+                          ? unit.current_location
+                          : unit.location}
+                      </Text>
+                      {showPullContext &&
+                        unit.current_location !== unit.location && (
+                          <Text
+                            size="sm"
+                            c="dimmed"
+                            td="line-through"
+                            className="order-location"
+                          >
+                            {unit.location}
+                          </Text>
+                        )}
+                    </Group>
+                    <Stack gap={2} className="order-pull-card">
                       <Text fw={500}>{unit.name}</Text>
                       <Text size="sm" c="dimmed">
                         {unitDescription(unit)}
                       </Text>
                     </Stack>
+                    {unit.price != null && (
+                      <Text
+                        fw={600}
+                        className="order-pull-price order-location"
+                      >
+                        ${unit.price}
+                      </Text>
+                    )}
                     {showPullContext &&
                       (unit.previous_card != null ||
                         unit.next_card != null) && (
-                        <Stack gap={2}>
+                        <Stack gap={2} className="order-neighbors">
                           {unit.previous_card != null && (
                             <Text size="xs" c="dimmed">
                               Prev · {neighborDescription(unit.previous_card)}
@@ -267,15 +311,17 @@ export function OrderDetailPage() {
                           )}
                         </Stack>
                       )}
-                  </Stack>
-                </Paper>
-              ))}
-              {order.state === 'to_pick' && (
-                <Button size="lg" onClick={() => setConfirmOpen(true)}>
-                  Confirm pull
-                </Button>
-              )}
-            </Stack>
+                  </Box>
+                ))}
+                {order.state === 'to_pick' && (
+                  <Box p="md" className="order-pull-footer">
+                    <Button onClick={() => setConfirmOpen(true)}>
+                      Confirm pull
+                    </Button>
+                  </Box>
+                )}
+              </Paper>
+            </Box>
             <ConfirmPullModal
               opened={confirmOpen}
               unitCount={order.unit_count}

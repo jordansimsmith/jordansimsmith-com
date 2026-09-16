@@ -53,7 +53,10 @@ export function useListNavigation({
         target instanceof HTMLInputElement ||
         target instanceof HTMLTextAreaElement ||
         target instanceof HTMLSelectElement ||
-        (target instanceof HTMLElement && target.isContentEditable)
+        (target instanceof HTMLElement &&
+          (target.isContentEditable ||
+            target.closest('button, a, [role="button"], [role="link"]') !=
+              null))
       ) {
         return;
       }
