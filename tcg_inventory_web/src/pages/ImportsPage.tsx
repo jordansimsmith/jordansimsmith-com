@@ -1,17 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  Button,
-  FileInput,
-  Group,
-  Skeleton,
-  Stack,
-  Text,
-  Title,
-} from '@mantine/core';
+import { Button, FileInput, Group, Stack } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
 import { AppShellLayout } from '../layouts/AppShellLayout';
+import {
+  CollectionLoadingState,
+  CollectionMessage,
+  CollectionSurface,
+} from '../components/CollectionSurface';
 import { ImportTable } from '../components/ImportTable';
+import { PageHeader } from '../components/PageHeader';
 import { apiClient } from '../api/client';
 import type { ImportSummary } from '../api/client';
 import { parseManaBoxCsv } from '../domain/manabox';
@@ -113,56 +111,69 @@ export function ImportsPage() {
 
   return (
     <AppShellLayout>
-      <Stack gap="md">
-        <Title order={2}>Imports</Title>
-        <Group align="flex-end" gap="sm">
-          <FileInput
-            value={file}
-            onChange={setFile}
-            accept=".csv,text/csv"
-            label="ManaBox CSV export"
-            placeholder="Select file"
-            clearable
-            w={320}
-          />
-          <Button onClick={handleUpload} disabled={!file} loading={uploading}>
-            Upload
-          </Button>
-        </Group>
-        {loading && (
-          <Stack gap="xs">
-            {[1, 2, 3].map((row) => (
-              <Skeleton key={row} height={28} />
-            ))}
-          </Stack>
-        )}
-        {!loading && error && (
-          <Text c="red" ta="center">
-            {error}
-          </Text>
-        )}
-        {!loading && !error && imports.length === 0 && (
-          <Text c="dimmed">No imports yet.</Text>
-        )}
-        {!loading && !error && imports.length > 0 && (
-          <>
+      <Stack gap="lg">
+        <PageHeader
+          title="Imports"
+          description="Upload ManaBox exports and track each intake through appraisal and placement."
+        />
+        <CollectionSurface
+          ariaLabel="Imports"
+          toolbar={
+            <Group align="flex-end" gap="sm" wrap="wrap">
+              <FileInput
+                value={file}
+                onChange={setFile}
+                accept=".csv,text/csv"
+                label="ManaBox CSV export"
+                placeholder="Select file"
+                clearable
+                style={{ flex: '1 1 16rem', maxWidth: 360 }}
+              />
+              <Button
+                onClick={handleUpload}
+                disabled={!file}
+                loading={uploading}
+              >
+                Upload
+              </Button>
+            </Group>
+          }
+          footer={
+            nextContinuation ? (
+              <Group justify="flex-end">
+                <Button
+                  variant="default"
+                  onClick={handleLoadMore}
+                  loading={loadingMore}
+                >
+                  Load more
+                </Button>
+              </Group>
+            ) : undefined
+          }
+        >
+          {loading && <CollectionLoadingState rows={3} />}
+          {!loading && error && (
+            <CollectionMessage
+              title="Imports could not be loaded"
+              description={error}
+              tone="error"
+            />
+          )}
+          {!loading && !error && imports.length === 0 && (
+            <CollectionMessage
+              title="No imports yet."
+              description="Choose a ManaBox CSV above to start an intake."
+            />
+          )}
+          {!loading && !error && imports.length > 0 && (
             <ImportTable
               imports={imports}
               selectedIndex={selectedIndex}
               onOpen={openImport}
             />
-            {nextContinuation && (
-              <Button
-                variant="default"
-                onClick={handleLoadMore}
-                loading={loadingMore}
-                w="fit-content"
-              >
-                Load more
-              </Button>
-            )}
-          </>
-        )}
+          )}
+        </CollectionSurface>
       </Stack>
     </AppShellLayout>
   );

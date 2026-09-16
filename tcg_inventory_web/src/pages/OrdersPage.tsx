@@ -1,9 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
-import { Button, Skeleton, Stack, Text, Title } from '@mantine/core';
+import { Button, Group, Stack } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
 import { AppShellLayout } from '../layouts/AppShellLayout';
+import {
+  CollectionLoadingState,
+  CollectionMessage,
+  CollectionSurface,
+} from '../components/CollectionSurface';
 import { OrderTable } from '../components/OrderTable';
+import { PageHeader } from '../components/PageHeader';
 import { apiClient } from '../api/client';
 import type { OrderSummary } from '../api/client';
 import { useListNavigation } from '../hooks/use-list-navigation';
@@ -84,42 +90,46 @@ export function OrdersPage() {
 
   return (
     <AppShellLayout>
-      <Stack gap="md">
-        <Title order={2}>Orders</Title>
-        {loading && (
-          <Stack gap="xs">
-            {[1, 2, 3].map((row) => (
-              <Skeleton key={row} height={28} />
-            ))}
-          </Stack>
-        )}
-        {!loading && error && (
-          <Text c="red" ta="center">
-            {error}
-          </Text>
-        )}
-        {!loading && !error && orders.length === 0 && (
-          <Text c="dimmed">No orders yet.</Text>
-        )}
-        {!loading && !error && orders.length > 0 && (
-          <>
+      <Stack gap="lg">
+        <PageHeader
+          title="Orders"
+          description="Review accepted orders and open pull sheets for fulfillment."
+        />
+        <CollectionSurface
+          ariaLabel="Orders"
+          footer={
+            nextContinuation ? (
+              <Group justify="flex-end">
+                <Button
+                  variant="default"
+                  onClick={handleLoadMore}
+                  loading={loadingMore}
+                >
+                  Load more
+                </Button>
+              </Group>
+            ) : undefined
+          }
+        >
+          {loading && <CollectionLoadingState rows={3} />}
+          {!loading && error && (
+            <CollectionMessage
+              title="Orders could not be loaded"
+              description={error}
+              tone="error"
+            />
+          )}
+          {!loading && !error && orders.length === 0 && (
+            <CollectionMessage title="No orders yet." />
+          )}
+          {!loading && !error && orders.length > 0 && (
             <OrderTable
               orders={orders}
               selectedIndex={selectedIndex}
               onOpen={openOrder}
             />
-            {nextContinuation && (
-              <Button
-                variant="default"
-                onClick={handleLoadMore}
-                loading={loadingMore}
-                w="fit-content"
-              >
-                Load more
-              </Button>
-            )}
-          </>
-        )}
+          )}
+        </CollectionSurface>
       </Stack>
     </AppShellLayout>
   );

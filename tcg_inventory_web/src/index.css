@@ -2,6 +2,221 @@ body {
   margin: 0;
 }
 
+.collection-table {
+  width: 100%;
+  font-variant-numeric: tabular-nums;
+}
+
+.collection-table thead th {
+  background: var(--mantine-color-gray-0);
+  border-bottom: 1px solid var(--mantine-color-gray-3);
+  color: var(--mantine-color-gray-7);
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 600;
+}
+
+.collection-table tbody td {
+  border-bottom: 1px solid var(--mantine-color-gray-2);
+}
+
+.collection-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.collection-table tbody tr:hover td {
+  background: var(--mantine-color-gray-0);
+}
+
+.collection-table tbody tr[data-selected='true'] td,
+.collection-table tbody tr[data-selected='true']:hover td {
+  background: var(--mantine-color-blue-0);
+  border-bottom-color: var(--mantine-color-blue-2);
+}
+
+.collection-table tbody tr[data-selected='true'] td:first-child {
+  box-shadow: inset 3px 0 0 var(--mantine-color-blue-6);
+}
+
+.collection-table [data-field='price'],
+.collection-table [data-field='rows'],
+.collection-table [data-field='units'],
+.collection-table [data-field='cards'],
+.collection-table [data-field='uploaded'],
+.collection-table [data-field='accepted'] {
+  white-space: nowrap;
+}
+
+@media (max-width: 48em) {
+  .collection-table {
+    display: block;
+    max-width: 100%;
+  }
+
+  .collection-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .collection-table tbody {
+    display: block;
+    width: 100%;
+  }
+
+  .collection-table tbody tr {
+    display: grid;
+    width: auto;
+    gap: 0.375rem 1rem;
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--mantine-color-gray-2);
+  }
+
+  .collection-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .collection-table tbody td {
+    display: flex;
+    min-width: 0;
+    align-items: baseline;
+    gap: 0.4rem;
+    padding: 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .collection-table tbody td::before {
+    flex: 0 0 auto;
+    content: attr(data-label);
+    color: var(--mantine-color-gray-6);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+    line-height: 1.45;
+    text-transform: uppercase;
+  }
+
+  .collection-table tbody td:not([data-label])::before {
+    content: none;
+  }
+
+  .collection-table tbody tr:hover td,
+  .collection-table tbody tr[data-selected='true'] td,
+  .collection-table tbody tr[data-selected='true']:hover td {
+    background: transparent;
+  }
+
+  .collection-table tbody tr[data-selected='true'] {
+    background: var(--mantine-color-blue-0);
+    box-shadow: inset 3px 0 0 var(--mantine-color-blue-6);
+  }
+
+  .collection-table tbody tr[data-selected='true'] td:first-child {
+    box-shadow: none;
+  }
+
+  .collection-table--skus tbody tr {
+    grid-template-areas:
+      'name price'
+      'set collector'
+      'finish condition';
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .collection-table--skus [data-field='name'] {
+    grid-area: name;
+  }
+
+  .collection-table--skus [data-field='set'] {
+    grid-area: set;
+  }
+
+  .collection-table--skus [data-field='collector'] {
+    grid-area: collector;
+  }
+
+  .collection-table--skus [data-field='finish'] {
+    grid-area: finish;
+  }
+
+  .collection-table--skus [data-field='condition'] {
+    grid-area: condition;
+  }
+
+  .collection-table--skus [data-field='price'] {
+    grid-area: price;
+    justify-content: flex-end;
+  }
+
+  .collection-table--imports tbody tr {
+    grid-template-areas:
+      'filename status'
+      'rows uploaded';
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .collection-table--imports [data-field='filename'] {
+    grid-area: filename;
+  }
+
+  .collection-table--imports [data-field='status'] {
+    grid-area: status;
+    justify-content: flex-end;
+  }
+
+  .collection-table--imports [data-field='rows'] {
+    grid-area: rows;
+    justify-content: flex-start;
+  }
+
+  .collection-table--imports [data-field='uploaded'] {
+    grid-area: uploaded;
+    justify-content: flex-end;
+  }
+
+  .collection-table--orders tbody tr {
+    grid-template-areas:
+      'order state'
+      'units cards'
+      'delivery delivery'
+      'accepted accepted';
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .collection-table--orders [data-field='order'] {
+    grid-area: order;
+  }
+
+  .collection-table--orders [data-field='state'] {
+    grid-area: state;
+    justify-content: flex-end;
+  }
+
+  .collection-table--orders [data-field='units'] {
+    grid-area: units;
+    justify-content: flex-start;
+  }
+
+  .collection-table--orders [data-field='cards'] {
+    grid-area: cards;
+    justify-content: flex-end;
+  }
+
+  .collection-table--orders [data-field='delivery'] {
+    grid-area: delivery;
+  }
+
+  .collection-table--orders [data-field='accepted'] {
+    grid-area: accepted;
+  }
+}
+
 .foil-finish,
 .etched-finish {
   background-clip: text;

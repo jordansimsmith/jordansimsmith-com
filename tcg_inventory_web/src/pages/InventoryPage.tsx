@@ -1,16 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import {
-  Button,
-  Group,
-  Skeleton,
-  Stack,
-  Text,
-  TextInput,
-  Title,
-} from '@mantine/core';
+import { Button, Group, Stack, TextInput } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
 import { AppShellLayout } from '../layouts/AppShellLayout';
+import {
+  CollectionLoadingState,
+  CollectionMessage,
+  CollectionSurface,
+} from '../components/CollectionSurface';
+import { PageHeader } from '../components/PageHeader';
 import { PublishWidget } from '../components/PublishWidget';
 import { SkuTable } from '../components/SkuTable';
 import { apiClient } from '../api/client';
@@ -103,53 +101,61 @@ export function InventoryPage() {
 
   return (
     <AppShellLayout>
-      <Stack gap="md">
-        <Group justify="space-between" align="flex-start">
-          <Title order={2}>Inventory</Title>
-          <PublishWidget />
-        </Group>
-        <TextInput
-          ref={searchInputRef}
-          value={search}
-          onChange={(event) => setSearch(event.currentTarget.value)}
-          placeholder="Search by name, / to focus"
-          aria-label="Search SKUs"
-          maw={400}
+      <Stack gap="lg">
+        <PageHeader
+          title="Inventory"
+          description="Find stock by card name and open a printing to view its units and locations."
+          actions={<PublishWidget />}
         />
-        {loading && (
-          <Stack gap="xs">
-            {[1, 2, 3, 4, 5].map((row) => (
-              <Skeleton key={row} height={28} />
-            ))}
-          </Stack>
-        )}
-        {!loading && error && (
-          <Text c="red" ta="center">
-            {error}
-          </Text>
-        )}
-        {!loading && !error && skus.length === 0 && (
-          <Text c="dimmed">No SKUs found.</Text>
-        )}
-        {!loading && !error && skus.length > 0 && (
-          <>
+        <CollectionSurface
+          ariaLabel="Inventory"
+          toolbar={
+            <TextInput
+              ref={searchInputRef}
+              value={search}
+              onChange={(event) => setSearch(event.currentTarget.value)}
+              label="Search inventory"
+              placeholder="Card name, / to focus"
+              aria-label="Search SKUs"
+              maw={400}
+            />
+          }
+          footer={
+            nextContinuation ? (
+              <Group justify="flex-end">
+                <Button
+                  variant="default"
+                  onClick={handleLoadMore}
+                  loading={loadingMore}
+                >
+                  Load more
+                </Button>
+              </Group>
+            ) : undefined
+          }
+        >
+          {loading && <CollectionLoadingState />}
+          {!loading && error && (
+            <CollectionMessage
+              title="Inventory could not be loaded"
+              description={error}
+              tone="error"
+            />
+          )}
+          {!loading && !error && skus.length === 0 && (
+            <CollectionMessage
+              title="No SKUs found."
+              description="Try a different card name."
+            />
+          )}
+          {!loading && !error && skus.length > 0 && (
             <SkuTable
               skus={skus}
               selectedIndex={selectedIndex}
               onOpen={openSku}
             />
-            {nextContinuation && (
-              <Button
-                variant="default"
-                onClick={handleLoadMore}
-                loading={loadingMore}
-                w="fit-content"
-              >
-                Load more
-              </Button>
-            )}
-          </>
-        )}
+          )}
+        </CollectionSurface>
       </Stack>
     </AppShellLayout>
   );

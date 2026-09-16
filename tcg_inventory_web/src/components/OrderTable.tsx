@@ -19,11 +19,11 @@ export function OrderTable({ orders, selectedIndex, onOpen }: OrderTableProps) {
 
   return (
     <Table
-      striped
       highlightOnHover
       verticalSpacing={4}
       horizontalSpacing="sm"
       fz="sm"
+      className="collection-table collection-table--orders"
     >
       <Table.Thead>
         <Table.Tr>
@@ -43,20 +43,25 @@ export function OrderTable({ orders, selectedIndex, onOpen }: OrderTableProps) {
               key={order.order_id}
               ref={selected ? selectedRowRef : undefined}
               data-selected={selected}
-              bg={selected ? 'var(--mantine-color-blue-light)' : undefined}
               onClick={() => onOpen(order)}
               style={{ cursor: 'pointer' }}
             >
-              <Table.Td fw={500}>{order.order_id}</Table.Td>
-              <Table.Td>
+              <Table.Td fw={500} data-field="order">
+                {order.order_id}
+              </Table.Td>
+              <Table.Td data-field="state" data-label="State">
                 <OrderStateBadge state={order.state} />
               </Table.Td>
-              <Table.Td ta="right">{order.unit_count}</Table.Td>
-              <Table.Td ta="right">
+              <Table.Td ta="right" data-field="units" data-label="Units">
+                {order.unit_count}
+              </Table.Td>
+              <Table.Td ta="right" data-field="cards" data-label="Cards">
                 {order.items_total_price ? `$${order.items_total_price}` : '—'}
               </Table.Td>
-              <Table.Td>{formatDeliveryMode(order.delivery_mode)}</Table.Td>
-              <Table.Td>
+              <Table.Td data-field="delivery" data-label="Delivery">
+                {formatDeliveryMode(order.delivery_mode)}
+              </Table.Td>
+              <Table.Td data-field="accepted" data-label="Accepted">
                 {new Date(order.accepted_at * 1000).toLocaleString()}
               </Table.Td>
             </Table.Tr>

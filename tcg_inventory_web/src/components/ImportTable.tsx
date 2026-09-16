@@ -22,11 +22,11 @@ export function ImportTable({
 
   return (
     <Table
-      striped
       highlightOnHover
       verticalSpacing={4}
       horizontalSpacing="sm"
       fz="sm"
+      className="collection-table collection-table--imports"
     >
       <Table.Thead>
         <Table.Tr>
@@ -44,16 +44,19 @@ export function ImportTable({
               key={importSummary.import_id}
               ref={selected ? selectedRowRef : undefined}
               data-selected={selected}
-              bg={selected ? 'var(--mantine-color-blue-light)' : undefined}
               onClick={() => onOpen(importSummary)}
               style={{ cursor: 'pointer' }}
             >
-              <Table.Td fw={500}>{importSummary.filename}</Table.Td>
-              <Table.Td>
+              <Table.Td fw={500} data-field="filename">
+                {importSummary.filename}
+              </Table.Td>
+              <Table.Td data-field="status" data-label="Status">
                 <ImportStatusBadge importSummary={importSummary} />
               </Table.Td>
-              <Table.Td ta="right">{importSummary.row_count}</Table.Td>
-              <Table.Td>
+              <Table.Td ta="right" data-field="rows" data-label="Rows">
+                {importSummary.row_count}
+              </Table.Td>
+              <Table.Td data-field="uploaded" data-label="Uploaded">
                 {new Date(importSummary.created_at * 1000).toLocaleString()}
               </Table.Td>
             </Table.Tr>
