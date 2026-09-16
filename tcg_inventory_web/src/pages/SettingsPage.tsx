@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import {
   Button,
   Group,
+  Paper,
   PasswordInput,
   Skeleton,
   Stack,
@@ -13,6 +14,7 @@ import { notifications } from '@mantine/notifications';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { apiClient } from '../api/client';
 import type { SettingsResponse } from '../api/client';
+import { PageHeader } from '../components/PageHeader';
 
 function epochToDateString(epoch: number): string {
   const date = new Date(epoch * 1000);
@@ -111,66 +113,121 @@ export function SettingsPage() {
 
   return (
     <AppShellLayout>
-      <Stack gap="xl" maw={480}>
-        <Title order={2}>Settings</Title>
+      <Stack gap="lg">
+        <PageHeader
+          title="Settings"
+          description="Configure marketplace access and order tracking."
+        />
         {loading && (
-          <Stack gap="xs">
-            <Skeleton height={20} width={280} />
-            <Skeleton height={56} />
-          </Stack>
+          <div className="settings-grid">
+            {[0, 1].map((item) => (
+              <Paper key={item} withBorder p="md" radius="md">
+                <Stack gap="md">
+                  <Skeleton height={20} width={180} />
+                  <Skeleton height={36} />
+                  <Skeleton height={18} width={160} />
+                  <Skeleton height={36} />
+                  <Skeleton height={36} width={110} />
+                </Stack>
+              </Paper>
+            ))}
+          </div>
         )}
-        {!loading && error && <Text c="red">{error}</Text>}
+        {!loading && error && (
+          <Paper withBorder p="md" radius="md">
+            <Text c="red">{error}</Text>
+          </Paper>
+        )}
         {!loading && !error && settings && (
-          <>
-            <Stack gap="sm">
-              <PasswordInput
-                label="FetchTCG refresh token"
-                description={
-                  settings.credential_set && settings.updated_at !== null
-                    ? `Last updated ${new Date(
-                        settings.updated_at * 1000,
-                      ).toLocaleString()}`
-                    : undefined
-                }
-                value={refreshToken}
-                onChange={(event) => setRefreshToken(event.currentTarget.value)}
-                placeholder={
-                  settings.credential_set
-                    ? '••••••••••••••••'
-                    : 'Enter refresh token'
-                }
-              />
-              <Group>
-                <Button
-                  onClick={handleSaveToken}
-                  loading={savingToken}
-                  disabled={refreshToken.trim() === ''}
-                >
-                  Save
-                </Button>
-              </Group>
-            </Stack>
+          <div className="settings-grid">
+            <Paper
+              component="section"
+              aria-label="FetchTCG connection"
+              withBorder
+              p="md"
+              radius="md"
+            >
+              <Stack gap="md" h="100%">
+                <Stack gap={4}>
+                  <Title order={3} fz="md">
+                    FetchTCG connection
+                  </Title>
+                  <Text size="sm" c="dimmed">
+                    Save a token for FetchTCG publishing and order sync.
+                  </Text>
+                </Stack>
+                {settings.credential_set && settings.updated_at !== null && (
+                  <Text size="sm" c="dimmed">
+                    Last updated{' '}
+                    {new Date(settings.updated_at * 1000).toLocaleString()}
+                  </Text>
+                )}
+                <PasswordInput
+                  label="FetchTCG refresh token"
+                  value={refreshToken}
+                  onChange={(event) =>
+                    setRefreshToken(event.currentTarget.value)
+                  }
+                  placeholder={
+                    settings.credential_set
+                      ? '••••••••••••••••'
+                      : 'Enter refresh token'
+                  }
+                />
+                <Group className="settings-section-actions">
+                  <Button
+                    onClick={handleSaveToken}
+                    loading={savingToken}
+                    disabled={refreshToken.trim() === ''}
+                  >
+                    Save token
+                  </Button>
+                </Group>
+              </Stack>
+            </Paper>
 
-            <Stack gap="sm">
-              <DateInput
-                label="Track orders after"
-                description="Orders accepted on FetchTCG from this date onwards are tracked (the date itself is included, starting at midnight in your local timezone); anything accepted earlier is ignored."
-                value={trackOrdersAfter ?? ''}
-                onChange={(value) => setTrackOrdersAfter(value || null)}
-                placeholder="Select date"
-                clearable
-              />
-              <Group>
-                <Button
-                  onClick={handleSaveDate}
-                  loading={savingDate}
-                  disabled={!trackOrdersAfter}
-                >
-                  Save
-                </Button>
-              </Group>
-            </Stack>
-          </>
+            <Paper
+              component="section"
+              aria-label="Order tracking"
+              withBorder
+              p="md"
+              radius="md"
+            >
+              <Stack gap="md" h="100%">
+                <Stack gap={4}>
+                  <Title order={3} fz="md">
+                    Order tracking
+                  </Title>
+                  <Text size="sm" c="dimmed">
+                    Orders accepted on or after this date are tracked; earlier
+                    orders are ignored. The cutoff starts at midnight in your
+                    local timezone.
+                  </Text>
+                </Stack>
+                <DateInput
+                  label="Track orders after"
+                  value={trackOrdersAfter ?? ''}
+                  onChange={(value) => setTrackOrdersAfter(value || null)}
+                  placeholder="No cutoff set"
+                />
+                <Group className="settings-section-actions">
+                  <Button
+                    onClick={handleSaveDate}
+                    loading={savingDate}
+                    disabled={
+                      !trackOrdersAfter ||
+                      trackOrdersAfter ===
+                        (settings.track_orders_after === null
+                          ? null
+                          : epochToDateString(settings.track_orders_after))
+                    }
+                  >
+                    Save date
+                  </Button>
+                </Group>
+              </Stack>
+            </Paper>
+          </div>
         )}
       </Stack>
     </AppShellLayout>
