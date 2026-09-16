@@ -42,7 +42,10 @@ export function Layout({
                 onClick={onToggleNavbar}
                 hiddenFrom="sm"
                 size="sm"
-                aria-label="Toggle navigation"
+                aria-label={
+                  navbarOpened ? 'Close navigation' : 'Open navigation'
+                }
+                aria-expanded={navbarOpened}
               />
             )}
             <Title order={3} style={{ whiteSpace: 'nowrap' }}>

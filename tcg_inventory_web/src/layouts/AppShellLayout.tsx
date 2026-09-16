@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { NavLink } from '@mantine/core';
+import { NavLink, Stack, Text } from '@mantine/core';
 import {
   IconCards,
   IconChartBar,
@@ -11,13 +11,17 @@ import { Layout } from '@jordansimsmith_com/ui';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getSession, clearSession } from '../auth/session';
 
-const NAV_LINKS = [
+const WORKSPACE_LINKS = [
   { label: 'Inventory', to: '/inventory', icon: IconCards },
   { label: 'Imports', to: '/imports', icon: IconFileImport },
   { label: 'Orders', to: '/orders', icon: IconPackage },
   { label: 'Reports', to: '/reports', icon: IconChartBar },
-  { label: 'Settings', to: '/settings', icon: IconSettings },
 ];
+const SETTINGS_LINK = {
+  label: 'Settings',
+  to: '/settings',
+  icon: IconSettings,
+};
 
 interface AppShellLayoutProps {
   children: React.ReactNode;
@@ -34,7 +38,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     navigate('/');
   };
 
-  const navbar = NAV_LINKS.map((link) => {
+  const renderNavLink = (link: (typeof WORKSPACE_LINKS)[number]) => {
     const active =
       location.pathname === link.to ||
       location.pathname.startsWith(`${link.to}/`);
@@ -46,21 +50,32 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
         label={link.label}
         leftSection={<link.icon size={18} stroke={1.5} />}
         active={active}
+        aria-current={active ? 'page' : undefined}
+        className="tcg-nav-link"
         onClick={() => setNavbarOpened(false)}
       />
     );
-  });
+  };
 
   return (
-    <Layout
-      appTitle="TCG inventory"
-      username={session?.username ?? null}
-      onLogout={handleLogout}
-      navbar={navbar}
-      navbarOpened={navbarOpened}
-      onToggleNavbar={() => setNavbarOpened((opened) => !opened)}
-    >
-      {children}
-    </Layout>
+    <div className="tcg-app-shell">
+      <Layout
+        appTitle="TCG inventory"
+        username={session?.username ?? null}
+        onLogout={handleLogout}
+        navbar={
+          <Stack gap={4}>
+            <Text className="tcg-nav-section-label">Workspace</Text>
+            {WORKSPACE_LINKS.map(renderNavLink)}
+            <div className="tcg-nav-divider" />
+            {renderNavLink(SETTINGS_LINK)}
+          </Stack>
+        }
+        navbarOpened={navbarOpened}
+        onToggleNavbar={() => setNavbarOpened((opened) => !opened)}
+      >
+        {children}
+      </Layout>
+    </div>
   );
 }

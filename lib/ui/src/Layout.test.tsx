@@ -73,7 +73,7 @@ describe('Layout', () => {
     renderLayout({});
 
     expect(
-      screen.queryByRole('button', { name: /toggle navigation/i }),
+      screen.queryByRole('button', { name: /open navigation/i }),
     ).toBeNull();
   });
 
@@ -82,9 +82,7 @@ describe('Layout', () => {
     const user = userEvent.setup();
     renderLayout({ navbar: <div>nav content</div>, onToggleNavbar });
 
-    await user.click(
-      screen.getByRole('button', { name: /toggle navigation/i }),
-    );
+    await user.click(screen.getByRole('button', { name: /open navigation/i }));
 
     expect(onToggleNavbar).toHaveBeenCalledTimes(1);
   });

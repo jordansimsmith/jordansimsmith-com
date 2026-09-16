@@ -2,6 +2,55 @@ body {
   margin: 0;
 }
 
+.tcg-app-shell .mantine-AppShell-header {
+  border-bottom-color: var(--mantine-color-gray-3);
+}
+
+.tcg-app-shell .mantine-AppShell-header h3 {
+  font-size: 1.125rem;
+  font-weight: 650;
+  letter-spacing: -0.025em;
+}
+
+.tcg-app-shell .mantine-AppShell-navbar {
+  border-right-color: var(--mantine-color-gray-3);
+}
+
+.tcg-nav-section-label {
+  padding: 0.75rem 0.75rem 0.375rem;
+  color: var(--mantine-color-gray-6);
+  font-size: 0.6875rem;
+  font-weight: 650;
+  letter-spacing: 0.05em;
+  line-height: 1.25;
+  text-transform: uppercase;
+}
+
+.tcg-nav-link {
+  min-height: 40px;
+  border-radius: var(--mantine-radius-sm);
+  font-weight: 500;
+}
+
+.tcg-nav-link:hover:not([data-active]) {
+  background: var(--mantine-color-gray-0);
+}
+
+.tcg-nav-link[data-active] {
+  box-shadow: inset 3px 0 0 var(--mantine-color-blue-6);
+  font-weight: 600;
+}
+
+.tcg-nav-link:focus-visible {
+  outline: 2px solid var(--mantine-color-blue-6);
+  outline-offset: -2px;
+}
+
+.tcg-nav-divider {
+  margin: 0.75rem 0.75rem 0.5rem;
+  border-top: 1px solid var(--mantine-color-gray-3);
+}
+
 .collection-table {
   width: 100%;
   font-variant-numeric: tabular-nums;
