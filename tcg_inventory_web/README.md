@@ -8,7 +8,7 @@ The TCG inventory web service is a keyboard-first single-page app for running a 
 - **Interface**: browser SPA served via CloudFront and S3
 - **Frontend stack**: React, TypeScript, Vite, Mantine, React Router
 - **Primary backend**: `tcg_inventory_api`
-- **Primary user**: single-user personal card-selling workflow; desktop-first with mobile support for physical flows
+- **Primary user**: single-user personal card-selling workflow; desktop-first with responsive support throughout and one-handed optimization for physical flows
 
 ## User stories
 
@@ -92,7 +92,7 @@ sequenceDiagram
 - Charts come from `@mantine/charts` (Recharts-backed, same version line as the Mantine kit); every report figure renders the API's prepared payload verbatim with no client-side aggregation.
 - Report freshness is stale-while-revalidate: the page always renders the stored snapshot immediately, auto-triggers regeneration when stale, and never unmounts content during a refresh; there is no manual refresh control (a browser reload or re-navigation is the escape hatch).
 - Implement vim-style navigation as one small custom hook (keydown handling scoped to the focused data view) rather than adopting a hotkey framework.
-- Desktop-first dense layouts: full-width compact Mantine tables, minimal chrome, no narrow content column. Mobile remains functional everywhere, with the pull sheet and placement screens explicitly designed for one-handed phone use.
+- Desktop-first dense layouts: full-width compact Mantine tables, minimal chrome, and no narrow content column. Narrow screens use deliberate mobile compositions rather than squeezed desktop tables; the pull sheet, import review, and placement screens are explicitly designed for one-handed physical use.
 - Store the session in `localStorage` so it survives browser restarts; logout clears it.
 - Poll job and import progress with a short interval while a job is running instead of adding streaming infrastructure.
 - Keep server state in page-level React state fed by the `ApiClient`; no global cache library.
@@ -233,8 +233,8 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 - Optimized for a single user with 5,000–10,000 SKUs: browse views paginate via continuation tokens and keep interactions immediate on desktop hardware.
 - Import review handles a few hundred rows with keyboard navigation; no virtualization until row counts demand it.
 - Polling intervals (~2 s) apply only while a job is running.
-- The report payload is a few KB of pre-aggregated figures; charts render prepared data with no client-side computation. The reports tab is desktop-first and functional on mobile without special optimization.
-- Mobile targets are the pull sheet and placement screens; they render fast on mid-range phones.
+- The report payload is a few KB of pre-aggregated figures; charts render prepared data with no client-side computation. The reports tab is desktop-first; on mobile its figures stack, and tables, charts, and legends remain contained within the viewport.
+- Every route remains contained and usable at phone widths. The pull sheet, import review, and placement screens receive the strongest mobile optimization because they support one-handed physical work, and they render fast on mid-range phones.
 
 ## Testing and quality gates
 
