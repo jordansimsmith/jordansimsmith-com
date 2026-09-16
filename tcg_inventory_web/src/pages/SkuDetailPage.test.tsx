@@ -116,6 +116,9 @@ describe('SkuDetailPage', () => {
     expect(screen.getByText('In stock: 2')).toBeDefined();
     expect(screen.getByText('Reserved: 1')).toBeDefined();
     expect(screen.getByText('Sold: 1')).toBeDefined();
+    expect(screen.getByRole('region', { name: 'Card overview' })).toBeDefined();
+    expect(screen.getByRole('region', { name: 'Units' })).toBeDefined();
+    expect(screen.getByRole('heading', { name: 'Units' })).toBeDefined();
 
     const image = screen.getByRole('img', { name: 'Sol Ring' });
     expect(image.getAttribute('src')).toBe(
@@ -131,6 +134,11 @@ describe('SkuDetailPage', () => {
     expect(
       screen.getAllByRole('button', { name: 'Edit condition' }),
     ).toHaveLength(2);
+    for (const action of ['Edit condition', 'Remove']) {
+      const button = screen.getAllByRole('button', { name: action })[0];
+      expect(button.textContent).toBe('');
+      expect(button.querySelector('svg')).not.toBeNull();
+    }
   });
 
   it('removes a unit with a reason and re-renders counts', async () => {

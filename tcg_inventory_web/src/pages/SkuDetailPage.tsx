@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import {
-  Badge,
+  Box,
   Button,
   Group,
   Image,
+  Paper,
   Skeleton,
   Stack,
   Text,
@@ -13,6 +14,7 @@ import { notifications } from '@mantine/notifications';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { UnitTable } from '../components/UnitTable';
+import { PageHeader } from '../components/PageHeader';
 import { RemoveUnitModal } from '../components/RemoveUnitModal';
 import { EditConditionModal } from '../components/EditConditionModal';
 import { apiClient } from '../api/client';
@@ -21,8 +23,6 @@ import type { Condition, SkuDetail, SkuUnit } from '../api/client';
 const CARD_IMAGE_FALLBACK =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='488' height='680'%3E%3Crect width='100%25' height='100%25' fill='%23e9ecef' rx='24'/%3E%3C/svg%3E";
 
-// scryfall "normal" images are 488x680; reserving the box prevents layout shift while loading
-const CARD_IMAGE_WIDTH = 260;
 const CARD_IMAGE_ASPECT_RATIO = '488 / 680';
 
 export function SkuDetailPage() {
@@ -129,20 +129,32 @@ export function SkuDetailPage() {
 
   return (
     <AppShellLayout>
-      <Stack gap="md">
+      <Stack gap="lg">
         {loading && (
-          <Group align="flex-start" gap="xl">
-            <Skeleton
-              width={CARD_IMAGE_WIDTH}
-              style={{ aspectRatio: CARD_IMAGE_ASPECT_RATIO }}
-              radius="md"
-            />
-            <Stack gap="sm" flex={1}>
-              <Skeleton height={32} width={280} />
-              <Skeleton height={20} width={200} />
-              <Skeleton height={20} width={240} />
+          <>
+            <Stack gap="xs">
+              <Skeleton height={29} width={220} />
+              <Skeleton height={18} width={280} />
             </Stack>
-          </Group>
+            <Paper withBorder radius="md" p="md">
+              <Box className="sku-overview">
+                <Skeleton className="sku-card-image-frame" />
+                <Stack gap="md" flex={1}>
+                  <Skeleton height={20} width={160} />
+                  <Skeleton height={44} />
+                  <Skeleton height={56} />
+                </Stack>
+              </Box>
+            </Paper>
+            <Paper withBorder radius="md" p="md">
+              <Skeleton height={24} width={100} mb="md" />
+              <Stack gap="xs">
+                <Skeleton height={36} />
+                <Skeleton height={36} />
+                <Skeleton height={36} />
+              </Stack>
+            </Paper>
+          </>
         )}
         {!loading && error && (
           <Stack align="flex-start" gap="md">
@@ -154,44 +166,98 @@ export function SkuDetailPage() {
         )}
         {!loading && !error && sku && (
           <>
-            <Group align="flex-start" gap="xl">
-              <Image
-                src={`https://api.scryfall.com/cards/${sku.scryfall_id}?format=image&version=normal`}
-                fallbackSrc={CARD_IMAGE_FALLBACK}
-                alt={sku.name}
-                w={CARD_IMAGE_WIDTH}
-                style={{ aspectRatio: CARD_IMAGE_ASPECT_RATIO }}
-                radius="md"
-              />
-              <Stack gap="xs" flex={1} miw={260}>
-                <Title order={2}>{sku.name}</Title>
-                <Text c="dimmed">
-                  {sku.set_name} ({sku.set_code.toUpperCase()}) · #
-                  {sku.collector_number}
-                </Text>
-                <Group gap="xs">
-                  <Badge variant="light">{sku.finish}</Badge>
-                  <Badge variant="light" color="grape">
-                    {sku.condition}
-                  </Badge>
-                </Group>
-                {sku.last_published_price != null && (
-                  <Text size="sm" mt="xs">
-                    Listed at ${sku.last_published_price}
-                  </Text>
-                )}
-                <Group gap="lg" mt="xs">
-                  <Text size="sm">In stock: {sku.in_stock_count}</Text>
-                  <Text size="sm">Reserved: {sku.reserved_count}</Text>
-                  <Text size="sm">Sold: {sku.sold_count}</Text>
-                </Group>
-              </Stack>
-            </Group>
-            <UnitTable
-              units={sku.units}
-              onRemove={setRemovingUnit}
-              onEditCondition={setEditingUnit}
+            <PageHeader
+              title={sku.name}
+              description={`${sku.set_name} (${sku.set_code.toUpperCase()}) · #${sku.collector_number}`}
+              actions={
+                <Button variant="subtle" onClick={() => navigate('/inventory')}>
+                  Back to inventory
+                </Button>
+              }
             />
+            <Paper
+              component="section"
+              aria-label="Card overview"
+              withBorder
+              radius="md"
+              p="md"
+            >
+              <Box className="sku-overview">
+                <Box className="sku-card-image-frame">
+                  <Image
+                    src={`https://api.scryfall.com/cards/${sku.scryfall_id}?format=image&version=normal`}
+                    fallbackSrc={CARD_IMAGE_FALLBACK}
+                    alt={sku.name}
+                    w="100%"
+                    h="100%"
+                    fit="contain"
+                    style={{ aspectRatio: CARD_IMAGE_ASPECT_RATIO }}
+                    radius="sm"
+                  />
+                </Box>
+                <Stack gap="md" className="sku-overview-details">
+                  <div className="sku-attributes">
+                    <div>
+                      <Text size="xs" c="dimmed" fw={600}>
+                        Finish
+                      </Text>
+                      <Text size="sm" tt="capitalize">
+                        {sku.finish}
+                      </Text>
+                    </div>
+                    <div>
+                      <Text size="xs" c="dimmed" fw={600}>
+                        Condition
+                      </Text>
+                      <Text size="sm">{sku.condition}</Text>
+                    </div>
+                    <div>
+                      <Text size="xs" c="dimmed" fw={600}>
+                        Listed price
+                      </Text>
+                      <Text size="sm" className="sku-numeric">
+                        {sku.last_published_price != null
+                          ? `$${sku.last_published_price}`
+                          : 'Not listed'}
+                      </Text>
+                    </div>
+                  </div>
+                  <div className="sku-stock-summary">
+                    <Text size="sm">In stock: {sku.in_stock_count}</Text>
+                    <Text size="sm">Reserved: {sku.reserved_count}</Text>
+                    <Text size="sm">Sold: {sku.sold_count}</Text>
+                  </div>
+                </Stack>
+              </Box>
+            </Paper>
+            <Paper
+              component="section"
+              aria-label="Units"
+              withBorder
+              radius="md"
+            >
+              <Group
+                justify="space-between"
+                gap="sm"
+                px="md"
+                py="sm"
+                className="sku-units-header"
+              >
+                <Title order={3} fz="md">
+                  Units
+                </Title>
+                <Text size="sm" c="dimmed" className="sku-numeric">
+                  {sku.units.length} {sku.units.length === 1 ? 'unit' : 'units'}
+                </Text>
+              </Group>
+              <Box style={{ overflowX: 'auto' }}>
+                <UnitTable
+                  units={sku.units}
+                  onRemove={setRemovingUnit}
+                  onEditCondition={setEditingUnit}
+                />
+              </Box>
+            </Paper>
             <RemoveUnitModal
               unit={removingUnit}
               loading={actionLoading}

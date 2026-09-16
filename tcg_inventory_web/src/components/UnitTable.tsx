@@ -1,4 +1,5 @@
-import { Badge, Button, Group, Image, Table } from '@mantine/core';
+import { ActionIcon, Badge, Group, Image, Table, Text } from '@mantine/core';
+import { IconPencil, IconTrash } from '@tabler/icons-react';
 import type { SkuUnit, UnitStatus } from '../api/client';
 
 const STATUS_COLORS: Record<UnitStatus, string> = {
@@ -23,27 +24,31 @@ export function UnitTable({
 }: UnitTableProps) {
   return (
     <Table
-      striped
       highlightOnHover
       verticalSpacing={4}
       horizontalSpacing="sm"
       fz="sm"
+      className="unit-table"
     >
       <Table.Thead>
         <Table.Tr>
-          <Table.Th>Sequence number</Table.Th>
+          <Table.Th>Sequence</Table.Th>
           <Table.Th>Location</Table.Th>
           <Table.Th>Status</Table.Th>
           <Table.Th>Photos</Table.Th>
-          <Table.Th />
+          <Table.Th data-field="actions">Actions</Table.Th>
         </Table.Tr>
       </Table.Thead>
       <Table.Tbody>
         {units.map((unit) => (
           <Table.Tr key={unit.sequence_number}>
-            <Table.Td>{unit.sequence_number}</Table.Td>
-            <Table.Td>{unit.location}</Table.Td>
-            <Table.Td>
+            <Table.Td data-field="sequence" data-label="Sequence">
+              {unit.sequence_number}
+            </Table.Td>
+            <Table.Td data-field="location" data-label="Location" fw={600}>
+              {unit.location}
+            </Table.Td>
+            <Table.Td data-field="status" data-label="Status">
               <Badge
                 size="sm"
                 variant="light"
@@ -52,39 +57,54 @@ export function UnitTable({
                 {unit.status.replace('_', ' ')}
               </Badge>
             </Table.Td>
-            <Table.Td>
-              <Group gap={6} wrap="nowrap">
-                {unit.photos.map((photo) => (
-                  <Image
-                    key={photo.photo_id}
-                    src={photo.url}
-                    alt={`Listing photo ${photo.photo_id}`}
-                    w={THUMB_SIZE}
-                    h={THUMB_SIZE}
-                    radius="sm"
-                    fit="cover"
-                  />
-                ))}
-              </Group>
+            <Table.Td data-field="photos" data-label="Photos">
+              {unit.photos.length > 0 ? (
+                <Group gap={6} wrap="wrap">
+                  {unit.photos.map((photo) => (
+                    <Image
+                      key={photo.photo_id}
+                      src={photo.url}
+                      alt={`Listing photo ${photo.photo_id}`}
+                      w={THUMB_SIZE}
+                      h={THUMB_SIZE}
+                      radius="sm"
+                      fit="cover"
+                    />
+                  ))}
+                </Group>
+              ) : (
+                <Text size="xs" c="dimmed">
+                  No photos
+                </Text>
+              )}
             </Table.Td>
-            <Table.Td>
+            <Table.Td data-field="actions">
               {unit.status === 'in_stock' && (
-                <Group gap="xs" justify="flex-end" wrap="nowrap">
-                  <Button
-                    size="compact-xs"
+                <Group
+                  gap="xs"
+                  justify="flex-end"
+                  wrap="wrap"
+                  className="unit-actions"
+                >
+                  <ActionIcon
+                    size={40}
                     variant="subtle"
                     onClick={() => onEditCondition(unit)}
+                    aria-label="Edit condition"
+                    title="Edit condition"
                   >
-                    Edit condition
-                  </Button>
-                  <Button
-                    size="compact-xs"
+                    <IconPencil size={18} />
+                  </ActionIcon>
+                  <ActionIcon
+                    size={40}
                     variant="subtle"
                     color="red"
                     onClick={() => onRemove(unit)}
+                    aria-label="Remove"
+                    title="Remove"
                   >
-                    Remove
-                  </Button>
+                    <IconTrash size={18} />
+                  </ActionIcon>
                 </Group>
               )}
             </Table.Td>
