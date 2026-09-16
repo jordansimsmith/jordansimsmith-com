@@ -45,11 +45,11 @@ export function ImportReviewTable({
 
   return (
     <Table
-      striped
       highlightOnHover
       verticalSpacing={4}
       horizontalSpacing="sm"
       fz="sm"
+      className="import-review-table"
     >
       <Table.Thead>
         <Table.Tr>
@@ -63,7 +63,7 @@ export function ImportReviewTable({
           <Table.Th>Decision</Table.Th>
           <Table.Th>Reason</Table.Th>
           <Table.Th>Photos</Table.Th>
-          {editable && <Table.Th />}
+          {editable && <Table.Th ta="right">Actions</Table.Th>}
         </Table.Tr>
       </Table.Thead>
       <Table.Tbody>
@@ -76,24 +76,26 @@ export function ImportReviewTable({
               key={row.position}
               ref={selected ? selectedRowRef : undefined}
               data-selected={selected}
-              bg={selected ? 'var(--mantine-color-blue-light)' : undefined}
               c={keep ? undefined : 'dimmed'}
               onClick={() => onSelect(index)}
             >
-              <Table.Td ta="right" c="dimmed">
+              <Table.Td data-field="position" ta="right" c="dimmed">
                 {row.position}
               </Table.Td>
               <Table.Td
+                data-field="name"
                 className={keep ? finishNameClass(row.finish) : undefined}
                 fw={finishNameWeight(row.finish)}
               >
                 {row.name}
               </Table.Td>
-              <Table.Td title={row.set_name}>
+              <Table.Td data-field="set" data-label="Set" title={row.set_name}>
                 {formatSetNumber(row.set_code, row.collector_number)}
               </Table.Td>
-              <Table.Td tt="capitalize">{row.finish}</Table.Td>
-              <Table.Td>
+              <Table.Td data-field="finish" data-label="Finish" tt="capitalize">
+                {row.finish}
+              </Table.Td>
+              <Table.Td data-field="condition" data-label="Condition">
                 {editable && onConditionChange ? (
                   <NativeSelect
                     size="xs"
@@ -112,13 +114,17 @@ export function ImportReviewTable({
                   row.condition
                 )}
               </Table.Td>
-              <Table.Td ta="right">
+              <Table.Td data-field="market" data-label="Market" ta="right">
                 {row.market_price !== null && `$${row.market_price}`}
               </Table.Td>
-              <Table.Td ta="right">
+              <Table.Td
+                data-field="suggested"
+                data-label="Suggested"
+                ta="right"
+              >
                 {row.suggested_price !== null && `$${row.suggested_price}`}
               </Table.Td>
-              <Table.Td>
+              <Table.Td data-field="decision">
                 {row.decision ? (
                   <Badge variant="light" color={DECISION_COLORS[row.decision]}>
                     {row.decision}
@@ -129,8 +135,10 @@ export function ImportReviewTable({
                   </Text>
                 )}
               </Table.Td>
-              <Table.Td c="dimmed">{row.decision_reason}</Table.Td>
-              <Table.Td>
+              <Table.Td data-field="reason" data-label="Reason" c="dimmed">
+                {row.decision_reason}
+              </Table.Td>
+              <Table.Td data-field="photos" data-label="Photos">
                 {showPhotos && (
                   <ImportRowPhotoStrip
                     position={row.position}
@@ -151,11 +159,11 @@ export function ImportReviewTable({
                 )}
               </Table.Td>
               {editable && onDeleteRow && (
-                <Table.Td>
+                <Table.Td data-field="actions">
                   <ActionIcon
                     variant="subtle"
                     color="red"
-                    size="sm"
+                    size={36}
                     onClick={(event) => {
                       event.stopPropagation();
                       onDeleteRow(row.position);

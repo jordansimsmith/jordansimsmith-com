@@ -3,15 +3,20 @@ import {
   Badge,
   Button,
   Group,
+  Paper,
   Progress,
   Skeleton,
   Stack,
   Text,
-  Title,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShellLayout } from '../layouts/AppShellLayout';
+import {
+  CollectionMessage,
+  CollectionSurface,
+} from '../components/CollectionSurface';
+import { PageHeader } from '../components/PageHeader';
 import { ImportStatusBadge } from '../components/ImportStatusBadge';
 import { JobFailureAlert } from '../components/JobFailureAlert';
 import { ImportReviewTable } from '../components/ImportReviewTable';
@@ -265,13 +270,26 @@ export function ImportDetailPage() {
 
   return (
     <AppShellLayout>
-      <Stack gap="md">
+      <Stack gap="lg">
         {loading && (
-          <Stack gap="sm">
-            <Skeleton height={32} width={280} />
-            <Skeleton height={20} width={200} />
-            <Skeleton height={20} width={240} />
-          </Stack>
+          <>
+            <Stack gap="xs">
+              <Skeleton height={29} width={280} />
+              <Skeleton height={18} width={220} />
+            </Stack>
+            <Paper withBorder radius="md" p="md">
+              <Skeleton height={24} width={140} mb="md" />
+              <Skeleton height={24} width="100%" maw={320} />
+            </Paper>
+            <Paper withBorder radius="md" p="md">
+              <Skeleton height={24} width={140} mb="md" />
+              <Stack gap="xs">
+                <Skeleton height={36} />
+                <Skeleton height={36} />
+                <Skeleton height={36} />
+              </Stack>
+            </Paper>
+          </>
         )}
         {!loading && error && (
           <Stack align="flex-start" gap="md">
@@ -283,16 +301,15 @@ export function ImportDetailPage() {
         )}
         {!loading && !error && importDetail && (
           <>
-            <Stack gap="xs">
-              <Title order={2}>{importDetail.filename}</Title>
-              <Group gap="sm">
-                <ImportStatusBadge importSummary={importDetail} />
-                <Text size="sm" c="dimmed">
-                  Uploaded{' '}
-                  {new Date(importDetail.created_at * 1000).toLocaleString()}
-                </Text>
-              </Group>
-            </Stack>
+            <PageHeader
+              title={importDetail.filename}
+              description={`Uploaded ${new Date(importDetail.created_at * 1000).toLocaleString()}`}
+              actions={
+                <Button variant="subtle" onClick={() => navigate('/imports')}>
+                  Back to imports
+                </Button>
+              }
+            />
             {importDetail.appraisal_error && (
               <JobFailureAlert
                 title="Appraisal failed"
@@ -300,20 +317,39 @@ export function ImportDetailPage() {
                 maw={480}
               />
             )}
-            {!importDetail.appraisal_error &&
-              importDetail.status === 'appraising' && (
-                <Stack gap="xs" maw={480}>
-                  <Text size="sm">
-                    Appraising {appraised} of {importDetail.row_count}
-                  </Text>
-                  <Progress
-                    value={(appraised / importDetail.row_count) * 100}
-                    animated
-                  />
-                </Stack>
-              )}
-            {confirmResult === null && (
-              <Group justify="space-between" align="center">
+            <Paper
+              component="section"
+              aria-label="Import summary"
+              withBorder
+              radius="md"
+              p="md"
+            >
+              <Stack gap="md">
+                <Group justify="space-between" gap="sm">
+                  <Group gap="sm">
+                    <Text fw={600} size="sm">
+                      Import summary
+                    </Text>
+                    <ImportStatusBadge importSummary={importDetail} />
+                  </Group>
+                  {importDetail.status === 'appraising' && (
+                    <Text size="sm" c="dimmed" className="import-numeric">
+                      {importDetail.row_count} rows
+                    </Text>
+                  )}
+                </Group>
+                {!importDetail.appraisal_error &&
+                  importDetail.status === 'appraising' && (
+                    <Stack gap="xs">
+                      <Text size="sm" className="import-numeric">
+                        Appraising {appraised} of {importDetail.row_count}
+                      </Text>
+                      <Progress
+                        value={(appraised / importDetail.row_count) * 100}
+                        animated
+                      />
+                    </Stack>
+                  )}
                 <Group gap="sm">
                   <Badge variant="light" color="green">
                     Keep {keepCount}
@@ -324,49 +360,74 @@ export function ImportDetailPage() {
                   <Badge variant="light" color="yellow">
                     Review {reviewCount}
                   </Badge>
-                  {importDetail.status === 'confirmed' && (
-                    <Text size="sm" c="dimmed">
-                      {`Total suggested value $${importDetail.total_suggested_price}`}
-                    </Text>
-                  )}
-                  {importDetail.status === 'review' && needsPhotosCount > 0 && (
-                    <Text size="sm" c="dimmed">
-                      {needsPhotosCount === 1
-                        ? '1 row needs photos before confirm'
-                        : `${needsPhotosCount} rows need photos before confirm`}
-                    </Text>
-                  )}
+                  {importDetail.status === 'confirmed' &&
+                    confirmResult === null && (
+                      <Text size="sm" c="dimmed" className="import-numeric">
+                        {`Total suggested value $${importDetail.total_suggested_price}`}
+                      </Text>
+                    )}
                 </Group>
-                {importDetail.status === 'review' && (
-                  <Group gap="sm">
-                    <Button
-                      variant="outline"
-                      color="red"
-                      onClick={() => setDeleteOpen(true)}
-                    >
-                      Delete import
-                    </Button>
-                    <Button
-                      onClick={() => setConfirmOpen(true)}
-                      disabled={needsPhotosCount > 0}
-                    >
-                      Confirm import
-                    </Button>
-                  </Group>
+                {importDetail.status === 'review' && needsPhotosCount > 0 && (
+                  <Text size="sm" c="orange.8">
+                    {needsPhotosCount === 1
+                      ? '1 row needs photos before confirm'
+                      : `${needsPhotosCount} rows need photos before confirm`}
+                  </Text>
                 )}
-              </Group>
-            )}
-            {showReview && rows.length > 0 && (
-              <ImportReviewTable
-                rows={rows}
-                selectedIndex={selectedIndex}
-                onSelect={setSelectedIndex}
-                editable={importDetail.status === 'review'}
-                onConditionChange={handleConditionChange}
-                onDeleteRow={handleDeleteRow}
-                onAddPhoto={handleAddPhoto}
-                onRemovePhoto={handleRemovePhoto}
-              />
+              </Stack>
+            </Paper>
+            {showReview && (
+              <CollectionSurface
+                ariaLabel="Import rows"
+                toolbar={
+                  <Group justify="space-between" gap="sm">
+                    <Text size="sm" fw={600}>
+                      Import rows
+                    </Text>
+                    <Text size="sm" c="dimmed" className="import-numeric">
+                      {rows.length} {rows.length === 1 ? 'row' : 'rows'}
+                    </Text>
+                  </Group>
+                }
+                footer={
+                  importDetail.status === 'review' ? (
+                    <Group
+                      className="import-actions"
+                      justify="space-between"
+                      gap="sm"
+                    >
+                      <Button
+                        variant="outline"
+                        color="red"
+                        onClick={() => setDeleteOpen(true)}
+                      >
+                        Delete import
+                      </Button>
+                      <Button
+                        onClick={() => setConfirmOpen(true)}
+                        disabled={needsPhotosCount > 0}
+                      >
+                        Confirm import
+                      </Button>
+                    </Group>
+                  ) : undefined
+                }
+              >
+                {rows.length > 0 ? (
+                  <ImportReviewTable
+                    rows={rows}
+                    selectedIndex={selectedIndex}
+                    onSelect={setSelectedIndex}
+                    editable={importDetail.status === 'review'}
+                    onConditionChange={handleConditionChange}
+                    onDeleteRow={handleDeleteRow}
+                    onAddPhoto={handleAddPhoto}
+                    onRemovePhoto={handleRemovePhoto}
+                  />
+                ) : (
+                  <CollectionMessage title="No rows in this import" />
+                )}
+              </CollectionSurface>
             )}
             {confirmResult && (
               <PlacementInstructionsView

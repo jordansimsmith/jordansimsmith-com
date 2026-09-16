@@ -12,7 +12,12 @@ export function PageHeader({ title, description, actions }: PageHeaderProps) {
     <Box component="header">
       <Group justify="space-between" align="flex-start" gap="md" wrap="wrap">
         <Stack gap={4} maw={720}>
-          <Title order={2} fz="xl" lh={1.2}>
+          <Title
+            order={2}
+            fz="xl"
+            lh={1.2}
+            style={{ overflowWrap: 'anywhere' }}
+          >
             {title}
           </Title>
           {description && (

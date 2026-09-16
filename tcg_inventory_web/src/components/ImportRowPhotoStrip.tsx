@@ -34,10 +34,10 @@ export function ImportRowPhotoStrip({
   const canAdd = editable && onAdd && photos.length < MAX_PHOTOS;
 
   return (
-    <Group gap={6} wrap="nowrap" onClick={(event) => event.stopPropagation()}>
+    <Group gap={6} wrap="wrap" onClick={(event) => event.stopPropagation()}>
       {canAdd && (
         <AddPhotoControl position={position} onAdd={onAdd}>
-          <ActionIcon component="span" variant="subtle" size="sm" color="gray">
+          <ActionIcon component="span" variant="subtle" size={36} color="gray">
             <IconCamera size={16} />
           </ActionIcon>
         </AddPhotoControl>
@@ -94,7 +94,10 @@ function AddPhotoControl({
   children: ReactNode;
 }) {
   return (
-    <label style={{ display: 'inline-flex', cursor: 'pointer' }}>
+    <label
+      className="import-photo-upload"
+      style={{ display: 'inline-flex', cursor: 'pointer' }}
+    >
       {children}
       <input
         type="file"

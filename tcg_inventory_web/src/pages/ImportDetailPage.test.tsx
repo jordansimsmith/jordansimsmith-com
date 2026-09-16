@@ -153,6 +153,19 @@ describe('ImportDetailPage', () => {
     expect(screen.getByText('Keep 16')).toBeDefined();
     expect(screen.getByText('Discard 3')).toBeDefined();
     expect(screen.getByText('Review 1')).toBeDefined();
+    expect(
+      screen.getByRole('region', { name: 'Import summary' }),
+    ).toBeDefined();
+    expect(
+      within(screen.getByRole('region', { name: 'Import summary' })).getByText(
+        'appraising',
+      ),
+    ).toBeDefined();
+    expect(
+      within(
+        screen.getByText('manabox-today.csv').closest('header') as HTMLElement,
+      ).queryByText('appraising'),
+    ).toBeNull();
     expect(screen.queryByText(/Total suggested value/)).toBeNull();
   });
 
@@ -357,8 +370,12 @@ describe('ImportDetailPage', () => {
     renderImportDetailPage();
 
     expect(await screen.findByText('Top Card')).toBeDefined();
+    expect(screen.getByRole('region', { name: 'Import rows' })).toBeDefined();
     const dataRows = screen.getAllByRole('row').slice(1);
     expect(dataRows).toHaveLength(3);
+    expect(dataRows[0].querySelector('[data-field="name"]')).not.toBeNull();
+    expect(dataRows[0].querySelector('[data-field="decision"]')).not.toBeNull();
+    expect(dataRows[0].querySelector('[data-field="photos"]')).not.toBeNull();
     expect(dataRows[0].textContent).toContain('Top Card');
     expect(dataRows[0].textContent).toContain('$4.55');
     expect(dataRows[0].textContent).toContain('$4.50');
@@ -444,6 +461,11 @@ describe('ImportDetailPage', () => {
     expect(screen.getByText('Llanowar Elves through Sol Ring')).toBeDefined();
     expect(screen.getByText('A42-0 through A42-86')).toBeDefined();
     expect(screen.getByText('confirmed')).toBeDefined();
+    expect(
+      within(screen.getByRole('region', { name: 'Import summary' })).getByText(
+        'confirmed',
+      ),
+    ).toBeDefined();
     expect(screen.queryByText('Top Card')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Confirm import' })).toBeNull();
   });
