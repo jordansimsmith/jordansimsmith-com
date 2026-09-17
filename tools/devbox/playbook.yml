@@ -107,6 +107,26 @@
         state: directory
         mode: '0755'
 
+    - name: Install HashiCorp signing key
+      ansible.builtin.get_url:
+        url: https://apt.releases.hashicorp.com/gpg
+        dest: /etc/apt/keyrings/hashicorp.asc
+        mode: '0644'
+        owner: root
+        group: root
+
+    - name: Configure HashiCorp apt repository
+      ansible.builtin.apt_repository:
+        repo: deb [signed-by=/etc/apt/keyrings/hashicorp.asc] https://apt.releases.hashicorp.com {{ ansible_distribution_release }} main
+        filename: hashicorp
+        state: present
+
+    - name: Install Terraform
+      ansible.builtin.apt:
+        name: terraform
+        state: present
+        update_cache: true
+
     - name: Install Docker signing key
       ansible.builtin.get_url:
         url: https://download.docker.com/linux/debian/gpg

@@ -45,6 +45,7 @@ Setup complete. Log out and back in before using Docker without sudo, then run:
 
   docker run --rm hello-world
   pip --version
+  terraform --version
   pnpm --version
   chromium --version
   playwright --version
