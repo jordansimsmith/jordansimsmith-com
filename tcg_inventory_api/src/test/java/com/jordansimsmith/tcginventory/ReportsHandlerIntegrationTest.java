@@ -286,7 +286,7 @@ public class ReportsHandlerIntegrationTest {
     tcgInventoryTable.putItem(
         TcgInventoryItem.createOrder(
             "jordan",
-            "order1",
+            "1",
             "fulfilled",
             null,
             null,
@@ -300,7 +300,7 @@ public class ReportsHandlerIntegrationTest {
     tcgInventoryTable.putItem(
         TcgInventoryItem.createOrder(
             "jordan",
-            "order2",
+            "2",
             "to_pick",
             null,
             null,
@@ -314,7 +314,7 @@ public class ReportsHandlerIntegrationTest {
     tcgInventoryTable.putItem(
         TcgInventoryItem.createOrder(
             "jordan",
-            "order3",
+            "3",
             "voided",
             null,
             null,
@@ -413,7 +413,7 @@ public class ReportsHandlerIntegrationTest {
     var revenueByMonth = reportJson.get("revenue_by_month");
     assertThat(revenueByMonth).isNotNull();
     assertThat(revenueByMonth.isArray()).isTrue();
-    // order1 created at 1699500000, order2 at 1699600000 -> both November 2023 NZ time
+    // orders 1 and 2 were created in November 2023 NZ time
     assertThat(revenueByMonth.size()).isEqualTo(1);
     assertThat(revenueByMonth.get(0).get("month").asText()).isEqualTo("2023-11");
     assertThat(revenueByMonth.get(0).get("revenue").asText()).isEqualTo("15.75");
