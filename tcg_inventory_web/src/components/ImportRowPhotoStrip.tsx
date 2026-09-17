@@ -2,6 +2,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { ActionIcon, Badge, Group, Image } from '@mantine/core';
 import { IconCamera, IconX } from '@tabler/icons-react';
 import type { RowPhoto } from '../api/client';
+import classes from './ImportRowPhotoStrip.module.css';
 
 const MAX_PHOTOS = 5;
 const THUMB_SIZE = 40;
@@ -95,7 +96,7 @@ function AddPhotoControl({
 }) {
   return (
     <label
-      className="import-photo-upload"
+      className={classes.upload}
       style={{ display: 'inline-flex', cursor: 'pointer' }}
     >
       {children}

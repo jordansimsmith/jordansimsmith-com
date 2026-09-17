@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { Table } from '@mantine/core';
 import type { SkuSummary } from '../api/client';
+import classes from './CollectionTable.module.css';
 
 interface SkuTableProps {
   skus: SkuSummary[];
@@ -21,7 +22,7 @@ export function SkuTable({ skus, selectedIndex, onOpen }: SkuTableProps) {
       verticalSpacing={4}
       horizontalSpacing="sm"
       fz="sm"
-      className="collection-table collection-table--skus"
+      className={`${classes.table} ${classes.skus}`}
     >
       <Table.Thead>
         <Table.Tr>

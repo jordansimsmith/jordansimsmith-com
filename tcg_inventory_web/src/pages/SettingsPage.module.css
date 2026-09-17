@@ -1,0 +1,22 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
+  gap: 1rem;
+}
+
+.grid > * {
+  min-width: 0;
+}
+
+.sectionActions {
+  margin-top: auto;
+  padding-top: 1rem;
+  border-top: 1px solid var(--mantine-color-gray-2);
+}
+
+@media (max-width: 60em) {
+  .grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

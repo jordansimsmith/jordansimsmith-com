@@ -31,6 +31,7 @@ import type {
 } from '../api/client';
 import { encodeListingPhoto } from '../domain/encode-listing-photo';
 import { useListNavigation } from '../hooks/use-list-navigation';
+import classes from './ImportDetailPage.module.css';
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -333,7 +334,7 @@ export function ImportDetailPage() {
                     <ImportStatusBadge importSummary={importDetail} />
                   </Group>
                   {importDetail.status === 'appraising' && (
-                    <Text size="sm" c="dimmed" className="import-numeric">
+                    <Text size="sm" c="dimmed" className={classes.numeric}>
                       {importDetail.row_count} rows
                     </Text>
                   )}
@@ -341,7 +342,7 @@ export function ImportDetailPage() {
                 {!importDetail.appraisal_error &&
                   importDetail.status === 'appraising' && (
                     <Stack gap="xs">
-                      <Text size="sm" className="import-numeric">
+                      <Text size="sm" className={classes.numeric}>
                         Appraising {appraised} of {importDetail.row_count}
                       </Text>
                       <Progress
@@ -362,7 +363,7 @@ export function ImportDetailPage() {
                   </Badge>
                   {importDetail.status === 'confirmed' &&
                     confirmResult === null && (
-                      <Text size="sm" c="dimmed" className="import-numeric">
+                      <Text size="sm" c="dimmed" className={classes.numeric}>
                         {`Total suggested value $${importDetail.total_suggested_price}`}
                       </Text>
                     )}
@@ -384,7 +385,7 @@ export function ImportDetailPage() {
                     <Text size="sm" fw={600}>
                       Import rows
                     </Text>
-                    <Text size="sm" c="dimmed" className="import-numeric">
+                    <Text size="sm" c="dimmed" className={classes.numeric}>
                       {rows.length} {rows.length === 1 ? 'row' : 'rows'}
                     </Text>
                   </Group>
@@ -392,7 +393,7 @@ export function ImportDetailPage() {
                 footer={
                   importDetail.status === 'review' ? (
                     <Group
-                      className="import-actions"
+                      className={classes.actions}
                       justify="space-between"
                       gap="sm"
                     >

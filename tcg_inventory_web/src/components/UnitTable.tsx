@@ -1,6 +1,7 @@
 import { ActionIcon, Badge, Group, Image, Table, Text } from '@mantine/core';
 import { IconPencil, IconTrash } from '@tabler/icons-react';
 import type { SkuUnit, UnitStatus } from '../api/client';
+import classes from './UnitTable.module.css';
 
 const STATUS_COLORS: Record<UnitStatus, string> = {
   in_stock: 'teal',
@@ -28,7 +29,7 @@ export function UnitTable({
       verticalSpacing={4}
       horizontalSpacing="sm"
       fz="sm"
-      className="unit-table"
+      className={classes.table}
     >
       <Table.Thead>
         <Table.Tr>
@@ -84,7 +85,7 @@ export function UnitTable({
                   gap="xs"
                   justify="flex-end"
                   wrap="wrap"
-                  className="unit-actions"
+                  className={classes.actions}
                 >
                   <ActionIcon
                     size={40}

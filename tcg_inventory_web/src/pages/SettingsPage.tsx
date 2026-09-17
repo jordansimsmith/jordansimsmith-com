@@ -15,6 +15,7 @@ import { AppShellLayout } from '../layouts/AppShellLayout';
 import { apiClient } from '../api/client';
 import type { SettingsResponse } from '../api/client';
 import { PageHeader } from '../components/PageHeader';
+import classes from './SettingsPage.module.css';
 
 function epochToDateString(epoch: number): string {
   const date = new Date(epoch * 1000);
@@ -119,7 +120,7 @@ export function SettingsPage() {
           description="Configure marketplace access and order tracking."
         />
         {loading && (
-          <div className="settings-grid">
+          <div className={classes.grid}>
             {[0, 1].map((item) => (
               <Paper key={item} withBorder p="md" radius="md">
                 <Stack gap="md">
@@ -139,7 +140,7 @@ export function SettingsPage() {
           </Paper>
         )}
         {!loading && !error && settings && (
-          <div className="settings-grid">
+          <div className={classes.grid}>
             <Paper
               component="section"
               aria-label="FetchTCG connection"
@@ -174,7 +175,7 @@ export function SettingsPage() {
                       : 'Enter refresh token'
                   }
                 />
-                <Group className="settings-section-actions">
+                <Group className={classes.sectionActions}>
                   <Button
                     onClick={handleSaveToken}
                     loading={savingToken}
@@ -210,7 +211,7 @@ export function SettingsPage() {
                   onChange={(value) => setTrackOrdersAfter(value || null)}
                   placeholder="No cutoff set"
                 />
-                <Group className="settings-section-actions">
+                <Group className={classes.sectionActions}>
                   <Button
                     onClick={handleSaveDate}
                     loading={savingDate}

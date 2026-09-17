@@ -1,0 +1,188 @@
+.table {
+  font-variant-numeric: tabular-nums;
+  width: 100%;
+}
+
+.table thead th {
+  background: var(--mantine-color-gray-0);
+  border-bottom: 1px solid var(--mantine-color-gray-3);
+  color: var(--mantine-color-gray-7);
+  font-size: var(--mantine-font-size-xs);
+  font-weight: 600;
+}
+
+.table thead th:nth-child(10) {
+  min-width: 184px;
+}
+
+.table tbody td {
+  border-bottom: 1px solid var(--mantine-color-gray-2);
+}
+
+.table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.table tbody tr:hover td {
+  background-color: var(--mantine-color-gray-0);
+}
+
+.table tbody tr[data-selected='true'] td,
+.table tbody tr[data-selected='true']:hover td {
+  background-color: var(--mantine-color-blue-0);
+  border-bottom-color: var(--mantine-color-blue-2);
+}
+
+.table tbody tr[data-selected='true'] td:first-child {
+  box-shadow: inset 3px 0 0 var(--mantine-color-blue-6);
+}
+
+.table [data-field='market'],
+.table [data-field='suggested'],
+.table [data-field='position'],
+.table [data-field='set'] {
+  white-space: nowrap;
+}
+
+.table [data-field='actions'] {
+  text-align: right;
+}
+
+@media (max-width: 48em) {
+  .table,
+  .table tbody {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .table tbody tr {
+    display: grid;
+    grid-template-areas:
+      'position name decision'
+      'set set finish'
+      'condition condition condition'
+      'market market suggested'
+      'reason reason reason'
+      'photos photos actions';
+    grid-template-columns: 24px minmax(0, 1fr) auto;
+    gap: 0.5rem 0.75rem;
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--mantine-color-gray-2);
+  }
+
+  .table tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .table tbody tr[data-selected='true'] {
+    background: var(--mantine-color-blue-0);
+    box-shadow: inset 3px 0 0 var(--mantine-color-blue-6);
+  }
+
+  .table tbody tr:hover td,
+  .table tbody tr[data-selected='true'] td,
+  .table tbody tr[data-selected='true']:hover td {
+    background-color: transparent;
+  }
+
+  .table tbody tr[data-selected='true'] td:first-child {
+    box-shadow: none;
+  }
+
+  .table tbody td {
+    display: flex;
+    min-width: 0;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .table tbody td:empty {
+    display: none;
+  }
+
+  .table tbody td::before {
+    flex: 0 0 auto;
+    content: attr(data-label);
+    color: var(--mantine-color-gray-6);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.025em;
+    text-transform: uppercase;
+  }
+
+  .table tbody td:not([data-label])::before {
+    content: none;
+  }
+
+  .table [data-field='position'] {
+    grid-area: position;
+  }
+
+  .table [data-field='name'] {
+    grid-area: name;
+  }
+
+  .table [data-field='decision'] {
+    grid-area: decision;
+    justify-content: flex-end;
+  }
+
+  .table [data-field='set'] {
+    grid-area: set;
+  }
+
+  .table [data-field='finish'] {
+    grid-area: finish;
+    justify-content: flex-end;
+  }
+
+  .table [data-field='condition'] {
+    grid-area: condition;
+  }
+
+  .table [data-field='condition'] select {
+    min-height: 36px;
+  }
+
+  .table [data-field='market'] {
+    grid-area: market;
+  }
+
+  .table [data-field='suggested'] {
+    grid-area: suggested;
+    justify-content: flex-end;
+  }
+
+  .table [data-field='reason'] {
+    grid-area: reason;
+  }
+
+  .table [data-field='photos'] {
+    grid-area: photos;
+  }
+
+  .table [data-field='photos']::before {
+    content: none;
+  }
+
+  .table [data-field='actions'] {
+    grid-area: actions;
+    justify-content: flex-end;
+  }
+}

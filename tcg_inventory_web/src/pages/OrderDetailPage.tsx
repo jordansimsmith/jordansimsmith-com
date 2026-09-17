@@ -24,6 +24,7 @@ import type {
 import { ListPriceBadge } from '../components/ListPriceBadge';
 import { PageHeader } from '../components/PageHeader';
 import { formatDeliveryMode } from '../domain/deliveryMode';
+import classes from './OrderDetailPage.module.css';
 
 function unitDescription(unit: OrderUnit): string {
   const parts = [
@@ -170,8 +171,8 @@ export function OrderDetailPage() {
                 </Button>
               }
             />
-            <Box className="order-detail-grid">
-              <Stack gap="md" className="order-detail-support">
+            <Box className={classes.detailGrid}>
+              <Stack gap="md" className={classes.detailSupport}>
                 <Paper
                   component="section"
                   aria-label="Order summary"
@@ -186,7 +187,7 @@ export function OrderDetailPage() {
                       </Title>
                       <OrderStateBadge state={order.state} />
                     </Group>
-                    <Stack gap={4} className="order-numeric">
+                    <Stack gap={4} className={classes.numeric}>
                       <Text size="sm" fw={600}>
                         Total ${order.total_price}
                       </Text>
@@ -240,16 +241,16 @@ export function OrderDetailPage() {
               <Paper
                 component="section"
                 aria-label={order.state === 'to_pick' ? 'Pull sheet' : 'Cards'}
-                className="order-pull-surface"
+                className={classes.pullSurface}
                 withBorder
                 radius="md"
               >
-                <Box p="md" className="order-pull-header">
+                <Box p="md" className={classes.pullHeader}>
                   <Group justify="space-between" align="baseline" gap="sm">
                     <Title order={3} fz="md">
                       {order.state === 'to_pick' ? 'Pull sheet' : 'Cards'}
                     </Title>
-                    <Text size="xs" c="dimmed" className="order-numeric">
+                    <Text size="xs" c="dimmed" className={classes.numeric}>
                       {order.unit_count}{' '}
                       {order.unit_count === 1 ? 'card' : 'cards'}
                       {order.state === 'to_pick' && ' · location order'}
@@ -257,14 +258,14 @@ export function OrderDetailPage() {
                   </Group>
                 </Box>
                 {order.units.map((unit) => (
-                  <Box key={unit.sequence_number} className="order-pull-row">
+                  <Box key={unit.sequence_number} className={classes.pullRow}>
                     <Group
-                      className="order-pull-position"
+                      className={classes.pullPosition}
                       align="baseline"
                       wrap="nowrap"
                       gap="xs"
                     >
-                      <Text fz={26} fw={700} className="order-location">
+                      <Text fz={26} fw={700} className={classes.location}>
                         {showPullContext
                           ? unit.current_location
                           : unit.location}
@@ -275,13 +276,13 @@ export function OrderDetailPage() {
                             size="sm"
                             c="dimmed"
                             td="line-through"
-                            className="order-location"
+                            className={classes.location}
                           >
                             {unit.location}
                           </Text>
                         )}
                     </Group>
-                    <Stack gap={2} className="order-pull-card">
+                    <Stack gap={2} className={classes.pullCard}>
                       <Text fw={500}>{unit.name}</Text>
                       <Text size="sm" c="dimmed">
                         {unitDescription(unit)}
@@ -290,7 +291,7 @@ export function OrderDetailPage() {
                     {unit.price != null && (
                       <Text
                         fw={600}
-                        className="order-pull-price order-location"
+                        className={`${classes.pullPrice} ${classes.location}`}
                       >
                         ${unit.price}
                       </Text>
@@ -298,7 +299,7 @@ export function OrderDetailPage() {
                     {showPullContext &&
                       (unit.previous_card != null ||
                         unit.next_card != null) && (
-                        <Stack gap={2} className="order-neighbors">
+                        <Stack gap={2} className={classes.neighbors}>
                           {unit.previous_card != null && (
                             <Text size="xs" c="dimmed">
                               Prev · {neighborDescription(unit.previous_card)}
@@ -314,7 +315,7 @@ export function OrderDetailPage() {
                   </Box>
                 ))}
                 {order.state === 'to_pick' && (
-                  <Box p="md" className="order-pull-footer">
+                  <Box p="md" className={classes.pullFooter}>
                     <Button onClick={() => setConfirmOpen(true)}>
                       Confirm pull
                     </Button>

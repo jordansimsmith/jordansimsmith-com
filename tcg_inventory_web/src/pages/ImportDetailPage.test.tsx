@@ -15,6 +15,7 @@ import { ImportDetailPage } from './ImportDetailPage';
 import * as clientModule from '../api/client';
 import type { ImportDetail, ImportRow } from '../api/client';
 import { encodeListingPhoto } from '../domain/encode-listing-photo';
+import finishClasses from '../components/CardFinishName.module.css';
 
 vi.mock('../domain/encode-listing-photo', () => ({
   encodeListingPhoto: vi.fn(),
@@ -318,7 +319,7 @@ describe('ImportDetailPage', () => {
     expect(foilCells[3].style.fontWeight).toBe('');
     expect(foilCells[3].style.textTransform).toBe('capitalize');
     expect(
-      screen.getByText('Foil Card').classList.contains('foil-finish'),
+      screen.getByText('Foil Card').classList.contains(finishClasses.foil),
     ).toBe(true);
     expect(screen.getByText('Foil Card').style.fontWeight).toBe('700');
     expect(screen.getByText('Normal Card').style.fontWeight).toBe('500');
@@ -329,11 +330,11 @@ describe('ImportDetailPage', () => {
     expect(etchedCells[3].style.fontWeight).toBe('');
     expect(etchedCells[3].style.textTransform).toBe('capitalize');
     expect(
-      screen.getByText('Etched Card').classList.contains('etched-finish'),
+      screen.getByText('Etched Card').classList.contains(finishClasses.etched),
     ).toBe(true);
     expect(screen.getByText('Etched Card').style.fontWeight).toBe('700');
     expect(
-      screen.getByText('Discarded Foil').classList.contains('foil-finish'),
+      screen.getByText('Discarded Foil').classList.contains(finishClasses.foil),
     ).toBe(false);
     expect(screen.getByText('Discarded Foil').style.fontWeight).toBe('700');
   });

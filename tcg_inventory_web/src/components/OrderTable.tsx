@@ -3,6 +3,7 @@ import { Table } from '@mantine/core';
 import type { OrderSummary } from '../api/client';
 import { formatDeliveryMode } from '../domain/deliveryMode';
 import { OrderStateBadge } from './OrderStateBadge';
+import classes from './CollectionTable.module.css';
 
 interface OrderTableProps {
   orders: OrderSummary[];
@@ -23,7 +24,7 @@ export function OrderTable({ orders, selectedIndex, onOpen }: OrderTableProps) {
       verticalSpacing={4}
       horizontalSpacing="sm"
       fz="sm"
-      className="collection-table collection-table--orders"
+      className={`${classes.table} ${classes.orders}`}
     >
       <Table.Thead>
         <Table.Tr>

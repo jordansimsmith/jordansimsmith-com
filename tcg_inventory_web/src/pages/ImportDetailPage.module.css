@@ -1,0 +1,20 @@
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 48em) {
+  .actions {
+    flex-wrap: nowrap;
+  }
+}
+
+@media (max-width: 25em) {
+  .actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .actions > button {
+    width: 100%;
+  }
+}

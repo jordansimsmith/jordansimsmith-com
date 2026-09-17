@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ReportsPage } from './ReportsPage';
 import * as clientModule from '../api/client';
 import type { ReportResponse } from '../api/client';
+import finishClasses from '../components/CardFinishName.module.css';
 
 const baseReport: ReportResponse = {
   generated_at: Math.floor(Date.now() / 1000) - 3600,
@@ -317,13 +318,15 @@ describe('ReportsPage', () => {
     expect(headers.indexOf('Finish')).toBe(headers.indexOf('Set') + 1);
     expect(headers.indexOf('Condition')).toBe(headers.indexOf('Finish') + 1);
     expect(
-      screen.getByText('Doubling Season').classList.contains('foil-finish'),
+      screen
+        .getByText('Doubling Season')
+        .classList.contains(finishClasses.foil),
     ).toBe(true);
     expect(screen.getByText('Doubling Season').style.fontWeight).toBe('700');
     expect(
       screen
         .getByText('Jeska, Thrice Reborn')
-        .classList.contains('etched-finish'),
+        .classList.contains(finishClasses.etched),
     ).toBe(true);
     expect(screen.getByText('Jeska, Thrice Reborn').style.fontWeight).toBe(
       '700',
@@ -331,7 +334,7 @@ describe('ReportsPage', () => {
     expect(
       screen
         .getByText('Ragavan, Nimble Pilferer')
-        .classList.contains('foil-finish'),
+        .classList.contains(finishClasses.foil),
     ).toBe(false);
     expect(screen.getByText('Ragavan, Nimble Pilferer').style.fontWeight).toBe(
       '500',

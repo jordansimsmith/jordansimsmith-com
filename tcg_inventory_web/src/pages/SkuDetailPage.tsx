@@ -19,6 +19,7 @@ import { RemoveUnitModal } from '../components/RemoveUnitModal';
 import { EditConditionModal } from '../components/EditConditionModal';
 import { apiClient } from '../api/client';
 import type { Condition, SkuDetail, SkuUnit } from '../api/client';
+import classes from './SkuDetailPage.module.css';
 
 const CARD_IMAGE_FALLBACK =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='488' height='680'%3E%3Crect width='100%25' height='100%25' fill='%23e9ecef' rx='24'/%3E%3C/svg%3E";
@@ -137,8 +138,8 @@ export function SkuDetailPage() {
               <Skeleton height={18} width={280} />
             </Stack>
             <Paper withBorder radius="md" p="md">
-              <Box className="sku-overview">
-                <Skeleton className="sku-card-image-frame" />
+              <Box className={classes.overview}>
+                <Skeleton className={classes.cardImageFrame} />
                 <Stack gap="md" flex={1}>
                   <Skeleton height={20} width={160} />
                   <Skeleton height={44} />
@@ -182,8 +183,8 @@ export function SkuDetailPage() {
               radius="md"
               p="md"
             >
-              <Box className="sku-overview">
-                <Box className="sku-card-image-frame">
+              <Box className={classes.overview}>
+                <Box className={classes.cardImageFrame}>
                   <Image
                     src={`https://api.scryfall.com/cards/${sku.scryfall_id}?format=image&version=normal`}
                     fallbackSrc={CARD_IMAGE_FALLBACK}
@@ -195,8 +196,8 @@ export function SkuDetailPage() {
                     radius="sm"
                   />
                 </Box>
-                <Stack gap="md" className="sku-overview-details">
-                  <div className="sku-attributes">
+                <Stack gap="md" className={classes.overviewDetails}>
+                  <div className={classes.attributes}>
                     <div>
                       <Text size="xs" c="dimmed" fw={600}>
                         Finish
@@ -215,14 +216,14 @@ export function SkuDetailPage() {
                       <Text size="xs" c="dimmed" fw={600}>
                         Listed price
                       </Text>
-                      <Text size="sm" className="sku-numeric">
+                      <Text size="sm" className={classes.numeric}>
                         {sku.last_published_price != null
                           ? `$${sku.last_published_price}`
                           : 'Not listed'}
                       </Text>
                     </div>
                   </div>
-                  <div className="sku-stock-summary">
+                  <div className={classes.stockSummary}>
                     <Text size="sm">In stock: {sku.in_stock_count}</Text>
                     <Text size="sm">Reserved: {sku.reserved_count}</Text>
                     <Text size="sm">Sold: {sku.sold_count}</Text>
@@ -241,12 +242,12 @@ export function SkuDetailPage() {
                 gap="sm"
                 px="md"
                 py="sm"
-                className="sku-units-header"
+                className={classes.unitsHeader}
               >
                 <Title order={3} fz="md">
                   Units
                 </Title>
-                <Text size="sm" c="dimmed" className="sku-numeric">
+                <Text size="sm" c="dimmed" className={classes.numeric}>
                   {sku.units.length} {sku.units.length === 1 ? 'unit' : 'units'}
                 </Text>
               </Group>

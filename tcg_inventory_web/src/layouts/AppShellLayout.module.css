@@ -1,0 +1,29 @@
+.sectionLabel {
+  padding: 0.75rem 0.75rem 0.375rem;
+  letter-spacing: 0.05em;
+  line-height: 1.25;
+}
+
+.navLink {
+  border-radius: var(--mantine-radius-sm);
+  font-weight: 500;
+}
+
+.navLink:hover:not([data-active]) {
+  background: var(--mantine-color-gray-0);
+}
+
+.navLink[data-active] {
+  box-shadow: inset 3px 0 0 var(--mantine-color-blue-6);
+  font-weight: 600;
+}
+
+.navLink:focus-visible {
+  outline: 2px solid var(--mantine-color-blue-6);
+  outline-offset: -2px;
+}
+
+.divider {
+  margin: 0.75rem 0.75rem 0.5rem;
+  border-top: 1px solid var(--mantine-color-gray-3);
+}

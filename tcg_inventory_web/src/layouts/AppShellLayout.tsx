@@ -10,6 +10,7 @@ import {
 import { Layout } from '@jordansimsmith_com/ui';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getSession, clearSession } from '../auth/session';
+import classes from './AppShellLayout.module.css';
 
 const WORKSPACE_LINKS = [
   { label: 'Inventory', to: '/inventory', icon: IconCards },
@@ -51,7 +52,8 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
         leftSection={<link.icon size={18} stroke={1.5} />}
         active={active}
         aria-current={active ? 'page' : undefined}
-        className="tcg-nav-link"
+        mih={40}
+        className={classes.navLink}
         onClick={() => setNavbarOpened(false)}
       />
     );
@@ -64,9 +66,17 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
       onLogout={handleLogout}
       navbar={
         <Stack gap={4}>
-          <Text className="tcg-nav-section-label">Workspace</Text>
+          <Text
+            c="gray.6"
+            fz="0.6875rem"
+            fw={650}
+            tt="uppercase"
+            className={classes.sectionLabel}
+          >
+            Workspace
+          </Text>
           {WORKSPACE_LINKS.map(renderNavLink)}
-          <div className="tcg-nav-divider" />
+          <div className={classes.divider} />
           {renderNavLink(SETTINGS_LINK)}
         </Stack>
       }

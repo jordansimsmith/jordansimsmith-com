@@ -17,12 +17,9 @@ import relativeTime from 'dayjs/plugin/relativeTime';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { JobFailureAlert } from '../components/JobFailureAlert';
 import { PageHeader } from '../components/PageHeader';
+import finishClasses from '../components/CardFinishName.module.css';
 import { apiClient } from '../api/client';
-import {
-  finishNameClass,
-  finishNameWeight,
-  formatSetNumber,
-} from '../domain/card-label';
+import { finishNameWeight, formatSetNumber } from '../domain/card-label';
 import type {
   ReportAgingBand,
   ReportIntakeVsSales,
@@ -33,6 +30,7 @@ import type {
   ReportTopSet,
   ReportTotals,
 } from '../api/client';
+import classes from './ReportsPage.module.css';
 
 dayjs.extend(relativeTime);
 
@@ -76,7 +74,7 @@ function formatCurrency(value: string | number): string {
 function FigureTitle({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <Group
-      className="reports-figure-header"
+      className={classes.figureHeader}
       justify="space-between"
       align="baseline"
       gap="xs"
@@ -111,20 +109,20 @@ function TotalsStrip({ totals }: { totals: ReportTotals }) {
       withBorder
       radius="md"
       p={0}
-      className="reports-overview"
+      className={classes.overview}
     >
       <div
-        className="reports-overview-group"
+        className={classes.overviewGroup}
         role="group"
         aria-label="Inventory at listed prices"
       >
         <Text size="sm" c="dimmed" fw={600}>
           Inventory at listed prices
         </Text>
-        <Text className="reports-overview-value">
+        <Text className={classes.overviewValue}>
           {wholeCurrencyFormat.format(parseFloat(totals.inventory_value))}
         </Text>
-        <Text size="sm" className="reports-overview-facts">
+        <Text size="sm" className={classes.overviewFacts}>
           <span>{totals.in_stock_units.toLocaleString()} in stock</span> ·{' '}
           <span>{totals.sku_count.toLocaleString()} SKUs</span> ·{' '}
           <span>{totals.reserved_units.toLocaleString()} reserved</span>
@@ -137,17 +135,17 @@ function TotalsStrip({ totals }: { totals: ReportTotals }) {
         )}
       </div>
       <div
-        className="reports-overview-group"
+        className={classes.overviewGroup}
         role="group"
         aria-label="Sales from paid orders"
       >
         <Text size="sm" c="dimmed" fw={600}>
           Sales from paid orders
         </Text>
-        <Text className="reports-overview-value">
+        <Text className={classes.overviewValue}>
           {formatCurrency(totals.revenue_to_date)}
         </Text>
-        <Text size="sm" className="reports-overview-facts">
+        <Text size="sm" className={classes.overviewFacts}>
           {totals.sold_units.toLocaleString()} sold all-time
         </Text>
       </div>
@@ -255,7 +253,7 @@ function TopHitsTable({ topHits }: { topHits: ReportTopHit[] }) {
           verticalSpacing={4}
           horizontalSpacing="sm"
           fz="sm"
-          className="reports-top-hits-table"
+          className={classes.topHitsTable}
         >
           <Table.Thead>
             <Table.Tr>
@@ -275,7 +273,7 @@ function TopHitsTable({ topHits }: { topHits: ReportTopHit[] }) {
                 </Table.Td>
                 <Table.Td
                   data-field="name"
-                  className={finishNameClass(hit.finish)}
+                  className={finishClasses[hit.finish]}
                   fw={finishNameWeight(hit.finish)}
                 >
                   {hit.name}
@@ -314,7 +312,7 @@ function StockAgingFigure({ agingBands }: { agingBands: ReportAgingBand[] }) {
   const oldest = agingBands[agingBands.length - 1];
 
   return (
-    <Paper p="md" radius="md" withBorder className="reports-aging-panel">
+    <Paper p="md" radius="md" withBorder className={classes.agingPanel}>
       <FigureTitle
         title="Stock aging"
         subtitle="in-stock units by days since intake"
@@ -324,7 +322,7 @@ function StockAgingFigure({ agingBands }: { agingBands: ReportAgingBand[] }) {
           No in-stock units.
         </Text>
       ) : (
-        <Stack gap="sm" className="reports-aging-content">
+        <Stack gap="sm" className={classes.agingContent}>
           <Group justify="space-between">
             <Text size="sm" c="dimmed">
               {total.toLocaleString()} units
@@ -343,9 +341,9 @@ function StockAgingFigure({ agingBands }: { agingBands: ReportAgingBand[] }) {
               />
             ))}
           </Progress.Root>
-          <div className="reports-aging-legend">
+          <div className={classes.agingLegend}>
             {agingBands.map((band, index) => (
-              <div className="reports-aging-row" key={band.label}>
+              <div className={classes.agingRow} key={band.label}>
                 <Group gap="xs" wrap="nowrap">
                   <ColorSwatch
                     size={10}
@@ -353,7 +351,7 @@ function StockAgingFigure({ agingBands }: { agingBands: ReportAgingBand[] }) {
                   />
                   <Text size="sm">{band.label}</Text>
                 </Group>
-                <Text size="sm" className="reports-aging-count">
+                <Text size="sm" className={classes.agingCount}>
                   {band.in_stock_units.toLocaleString()} (
                   {Math.round((band.in_stock_units / total) * 100)}%)
                 </Text>
@@ -566,9 +564,9 @@ export function ReportsPage() {
 
         {firstVisit && (
           <Stack gap="md" aria-label="Loading report">
-            <Paper withBorder radius="md" p={0} className="reports-overview">
+            <Paper withBorder radius="md" p={0} className={classes.overview}>
               {[0, 1].map((index) => (
-                <div className="reports-overview-group" key={index}>
+                <div className={classes.overviewGroup} key={index}>
                   <Skeleton height={12} width="75%" />
                   <Skeleton height={30} width="45%" mt="sm" />
                   <Skeleton height={14} width="65%" mt="sm" />

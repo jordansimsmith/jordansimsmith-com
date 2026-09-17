@@ -3,12 +3,10 @@ import { ActionIcon, Badge, NativeSelect, Table, Text } from '@mantine/core';
 import { IconTrash } from '@tabler/icons-react';
 import type { Condition, ImportRow, RowDecision } from '../api/client';
 import { CONDITIONS } from '../api/client';
-import {
-  finishNameClass,
-  finishNameWeight,
-  formatSetNumber,
-} from '../domain/card-label';
+import { finishNameWeight, formatSetNumber } from '../domain/card-label';
 import { ImportRowPhotoStrip } from './ImportRowPhotoStrip';
+import finishClasses from './CardFinishName.module.css';
+import classes from './ImportReviewTable.module.css';
 
 const DECISION_COLORS: Record<RowDecision, string> = {
   keep: 'green',
@@ -49,7 +47,7 @@ export function ImportReviewTable({
       verticalSpacing={4}
       horizontalSpacing="sm"
       fz="sm"
-      className="import-review-table"
+      className={classes.table}
     >
       <Table.Thead>
         <Table.Tr>
@@ -84,7 +82,7 @@ export function ImportReviewTable({
               </Table.Td>
               <Table.Td
                 data-field="name"
-                className={keep ? finishNameClass(row.finish) : undefined}
+                className={keep ? finishClasses[row.finish] : undefined}
                 fw={finishNameWeight(row.finish)}
               >
                 {row.name}

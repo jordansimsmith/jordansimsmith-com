@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { Table } from '@mantine/core';
 import type { ImportSummary } from '../api/client';
 import { ImportStatusBadge } from './ImportStatusBadge';
+import classes from './CollectionTable.module.css';
 
 interface ImportTableProps {
   imports: ImportSummary[];
@@ -26,7 +27,7 @@ export function ImportTable({
       verticalSpacing={4}
       horizontalSpacing="sm"
       fz="sm"
-      className="collection-table collection-table--imports"
+      className={`${classes.table} ${classes.imports}`}
     >
       <Table.Thead>
         <Table.Tr>

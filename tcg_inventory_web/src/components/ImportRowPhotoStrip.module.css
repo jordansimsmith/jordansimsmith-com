@@ -1,0 +1,5 @@
+.upload:focus-within {
+  outline: 2px solid var(--mantine-color-blue-6);
+  outline-offset: 2px;
+  border-radius: var(--mantine-radius-sm);
+}
