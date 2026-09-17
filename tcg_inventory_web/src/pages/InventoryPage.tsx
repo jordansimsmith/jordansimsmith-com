@@ -122,7 +122,7 @@ export function InventoryPage() {
           }
           footer={
             nextContinuation ? (
-              <Group justify="flex-end">
+              <Group justify="flex-start">
                 <Button
                   variant="default"
                   onClick={handleLoadMore}
