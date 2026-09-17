@@ -16,6 +16,7 @@ Log out and back in once it completes so the current user receives Docker-group 
 
 ```bash
 docker run --rm hello-world
+pip --version
 pnpm --version
 chromium --version
 playwright --version
@@ -24,7 +25,7 @@ pnpm install
 bazel test //...
 ```
 
-The host Node.js, pnpm, Chromium, and Playwright installations support local frontend development and browser-driven UI inspection. Provisioning installs both Debian's Chromium browser and Playwright's matching Chromium runtime under the developer account. The repository's Bazel configuration still supplies Java, Python, Node, and pnpm toolchains for hermetic builds and tests.
+The host Python pip and virtual-environment tools, Node.js, pnpm, Chromium, and Playwright installations support local development and browser-driven UI inspection. Provisioning installs both Debian's Chromium browser and Playwright's matching Chromium runtime under the developer account. The repository's Bazel configuration still supplies Java, Python, Node, and pnpm toolchains for hermetic builds and tests.
 
 ## Updating provisioned tools
 

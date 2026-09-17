@@ -60,10 +60,17 @@ public class ConfirmOrderHandler
     var user = requestContextFactory.createCtx(event).user();
     var orderId = event.getPathParameters().get("order_id");
 
+    String orderSk;
+    try {
+      orderSk = TcgInventoryItem.formatOrderSk(orderId);
+    } catch (IllegalArgumentException e) {
+      return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
+    }
+
     var orderKey =
         Key.builder()
             .partitionValue(TcgInventoryItem.formatUserPk(user))
-            .sortValue(TcgInventoryItem.formatOrderSk(orderId))
+            .sortValue(orderSk)
             .build();
 
     var orderItem = tcgInventoryTable.getItem(orderKey);

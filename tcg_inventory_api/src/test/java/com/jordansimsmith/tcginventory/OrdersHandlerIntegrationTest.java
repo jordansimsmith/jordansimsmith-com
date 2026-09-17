@@ -106,6 +106,35 @@ public class OrdersHandlerIntegrationTest {
   }
 
   @Test
+  void findOrdersShouldSortNumericallyAcrossIdLengths() throws Exception {
+    // arrange
+    createOrder("jordan", "99998", "fulfilled", "PICKUP", "1.00");
+    createOrder("jordan", "99999", "fulfilled", "PICKUP", "1.00");
+    createOrder("jordan", "100000", "to_pick", "SHIPPING", "1.00");
+    createOrder("other", "200000", "to_pick", "SHIPPING", "1.00");
+
+    // act
+    var response1 =
+        findOrdersHandler.handleRequest(
+            buildEventWithQuery("jordan", Map.of(), Map.of("limit", "2")), null);
+    var body1 = objectMapper.readTree(response1.getBody());
+    var response2 =
+        findOrdersHandler.handleRequest(
+            buildEventWithQuery(
+                "jordan",
+                Map.of(),
+                Map.of("continuation", body1.get("next_continuation").asText())),
+            null);
+    var body2 = objectMapper.readTree(response2.getBody());
+
+    // assert
+    assertThat(body1.get("orders").get(0).get("order_id").asText()).isEqualTo("100000");
+    assertThat(body1.get("orders").get(1).get("order_id").asText()).isEqualTo("99999");
+    assertThat(body2.get("orders").get(0).get("order_id").asText()).isEqualTo("99998");
+    assertThat(body2.get("next_continuation").isNull()).isTrue();
+  }
+
+  @Test
   void findOrdersShouldSupportContinuationPaging() throws Exception {
     // arrange
     createOrder("jordan", "10001", "awaiting_payment", "PICKUP", "2.00");

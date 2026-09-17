@@ -3,6 +3,7 @@ package com.jordansimsmith.tcginventory;
 import com.jordansimsmith.dynamodb.EpochSecondConverter;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import javax.annotation.Nullable;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
@@ -1028,7 +1029,10 @@ public class TcgInventoryItem {
   }
 
   public static String formatOrderSk(String offerId) {
-    return ORDER_PREFIX + offerId;
+    if (!offerId.matches("[1-9][0-9]*")) {
+      throw new IllegalArgumentException("order id must be a positive decimal number: " + offerId);
+    }
+    return ORDER_PREFIX + String.format(Locale.ROOT, "%020d", Long.parseLong(offerId));
   }
 
   public static String formatJobSk(String jobId) {
