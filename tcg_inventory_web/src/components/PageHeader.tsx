@@ -13,7 +13,7 @@ export function PageHeader({ title, description, actions }: PageHeaderProps) {
       <Group justify="space-between" align="flex-start" gap="md" wrap="wrap">
         <Stack gap={4} maw={720}>
           <Title
-            order={2}
+            order={1}
             fz="xl"
             lh={1.2}
             style={{ overflowWrap: 'anywhere' }}

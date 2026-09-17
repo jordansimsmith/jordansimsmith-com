@@ -76,7 +76,7 @@ describe('App', () => {
     renderApp('/');
 
     expect(
-      screen.getByRole('heading', { level: 2, name: /inventory/i }),
+      screen.getByRole('heading', { level: 1, name: /inventory/i }),
     ).toBeDefined();
   });
 
@@ -95,7 +95,7 @@ describe('App', () => {
     renderApp('/inventory');
 
     expect(
-      screen.getByRole('heading', { level: 2, name: /inventory/i }),
+      screen.getByRole('heading', { level: 1, name: /inventory/i }),
     ).toBeDefined();
 
     await user.click(screen.getByRole('button', { name: /log out/i }));

@@ -960,6 +960,17 @@ body {
   }
 }
 
+@media (max-width: 25em) {
+  .import-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .import-actions > button {
+    width: 100%;
+  }
+}
+
 .foil-finish,
 .etched-finish {
   background-clip: text;
