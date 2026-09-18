@@ -29,7 +29,7 @@ The auction tracker API service runs scheduled backend workflows that scrape Tra
 - Build search URLs with term, optional price filters, condition filter, and `sort_order=expirydesc`.
 - Fetch listing pages, normalize listing URLs, extract original start and Buy Now prices from the embedded Trade Me page state, exclude current bids from relist identity, and skip listings marked as reserve not met.
 - Extract seller usernames from embedded Trade Me page state and skip listings from the injected code-defined exclusion set, initially `roseshade`, before duplicate checks, judging, or persistence.
-- Judge new listings on searches with a configured judge (all nine searches: the six MTG searches `bulk`, `collection`, `assorted`, `clear out`, `clearout`, `lot` and the three RAM searches `g.skill`, `gskill`, `trident z`) using an OpenAI LLM against the judge's configured binary criteria, and persist the overall verdict.
+- Judge new listings on searches with a configured judge (all ten searches: the seven MTG searches `bulk`, `collection`, `assorted`, `clear out`, `clearout`, `lot`, `$1 reserve` and the three RAM searches `g.skill`, `gskill`, `trident z`) using an OpenAI LLM against the judge's configured binary criteria, and persist the overall verdict.
 - Carry judge configuration (prompt resource, model, reasoning effort, criteria) per search: the MTG searches share one judge config, the RAM searches share another.
 - Store newly discovered items in DynamoDB with deterministic key prefixes and 30-day TTL.
 - Prevent duplicate inserts for the same `(search_url, item_url)` pair using GSI `gsi1`.
@@ -134,7 +134,7 @@ sequenceDiagram
 - **Content fingerprint**: a deterministic SHA-256 identity derived from the exact scraped listing title, description, normalized original start price, and normalized Buy Now price, persisted as `fingerprint`, and used to derive `gsi2pk`.
 - **Seller-set price terms**: the original auction start price and optional Buy Now price embedded in Trade Me's server-rendered page state; current bids are excluded.
 - **Relisted item**: a listing with a new URL whose price-aware content fingerprint matches a record retained in `gsi2`.
-- **Judged search**: a search definition with a judge configuration (currently all nine searches: six MTG sharing `prompts/mtg-bulk-judge.md`, three RAM sharing `prompts/ram-judge.md`).
+- **Judged search**: a search definition with a judge configuration (currently all ten searches: seven MTG sharing `prompts/mtg-bulk-judge.md`, three RAM sharing `prompts/ram-judge.md`).
 - **Judgment**: the LLM verdict for a listing, `pass` or `fail`; overall pass requires all configured criteria to pass (MTG: `mtg_cards`, `bulk_scale`, `not_basic_lands`, `civilian_seller`, `fixed_collection`; RAM: `trident_z_family`, `ddr4`, `kit_2x16gb`, `speed_3200`, `timings_cl16`, `desktop_udimm`). MTG set origin and crossover branding, including Universes Within and Universes Beyond, do not affect eligibility.
 - **Digest window**: rolling 24-hour interval from the digest handler execution timestamp.
 - **Cross-search duplicate**: the same listing URL or price-aware content fingerprint appearing in multiple search definitions.
