@@ -173,7 +173,7 @@ export function OrderDetailPage() {
                     href={`https://www.fetchtcg.com/profile/sales/${encodeURIComponent(order.order_id)}`}
                     target="_blank"
                     rel="noopener noreferrer"
-                    variant="default"
+                    variant="subtle"
                     rightSection={<IconExternalLink size={16} />}
                   >
                     View in FetchTCG
