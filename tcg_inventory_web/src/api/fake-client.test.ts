@@ -1,5 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { createFakeClient } from './fake-client';
+import type { ScanConfirmationRow } from './client';
 
 async function findSkuId(
   client: ReturnType<typeof createFakeClient>,
@@ -394,6 +395,100 @@ describe('createFakeClient imports', () => {
     expect(response.first_sequence_number).toBeNull();
     expect(response.last_sequence_number).toBeNull();
     expect(response.placement_instructions).toEqual([]);
+  });
+});
+
+describe('createFakeClient scans', () => {
+  it('seeds resumable scan jobs in newest-first order', async () => {
+    const client = createFakeClient();
+
+    const firstPage = await client.findScans();
+
+    expect(firstPage.scans.map((scan) => scan.scan_id)).toEqual([
+      'fake-scan-uploading',
+      'fake-scan-identifying',
+      'fake-scan-reviewing',
+      'fake-scan-confirmed',
+    ]);
+    expect(firstPage.scans.map((scan) => scan.status)).toEqual([
+      'uploading',
+      'identifying',
+      'reviewing',
+      'confirmed',
+    ]);
+    expect(firstPage.next_continuation).toBeNull();
+    expect(firstPage.scans[3].import_id).toBe('fake-import-1');
+  });
+
+  it('creates lexical upload slots and returns defensive scan details', async () => {
+    const client = createFakeClient();
+
+    const created = await client.createScan({
+      condition: 'LP',
+      finish: 'foil',
+      files: [
+        { filename: '10.jpg', size_bytes: 200 },
+        { filename: '2.jpg', size_bytes: 100 },
+      ],
+    });
+
+    expect(created.status).toBe('uploading');
+    expect(created.rows.map((row) => row.filename)).toEqual([
+      '10.jpg',
+      '2.jpg',
+    ]);
+    expect(created.rows.every((row) => !row.uploaded)).toBe(true);
+    expect(created.rows[0].upload_headers).toEqual({
+      'Content-Type': 'image/jpeg',
+    });
+
+    created.rows[0].filename = 'mutated.jpg';
+    const reread = await client.getScan(created.scan_id);
+    expect(reread.rows[0].filename).toBe('10.jpg');
+  });
+
+  it('rejects identification until every upload slot is complete', async () => {
+    const client = createFakeClient();
+
+    await expect(client.identifyScan('fake-scan-uploading')).rejects.toThrow(
+      'all scan files must be uploaded',
+    );
+  });
+
+  it('confirms a reviewing scan once and creates rows in scan order', async () => {
+    const client = createFakeClient();
+    const scan = await client.getScan('fake-scan-reviewing');
+    const rows: ScanConfirmationRow[] = scan.rows.map((row, index) => ({
+      scan_position: row.scan_position,
+      scryfall_id: row.suggestions[0].scryfall_id,
+      name: row.suggestions[0].name,
+      set_code: index === 0 ? 'mh2' : 'dom',
+      set_name: index === 0 ? 'Modern Horizons 2' : 'Dominaria',
+      collector_number: String(index + 1),
+      confirmed: true,
+    }));
+
+    const confirmed = await client.confirmScan('fake-scan-reviewing', {
+      rows,
+    });
+    const retry = await client.confirmScan('fake-scan-reviewing', { rows });
+    const imported = await client.getImport(confirmed.import_id);
+
+    expect(confirmed.status).toBe('confirmed');
+    expect(retry).toEqual(confirmed);
+    expect(imported.rows.map((row) => row.name)).toEqual(
+      rows.map((row) => row.name),
+    );
+  });
+
+  it('keeps scan positions stable when a reviewing row is deleted', async () => {
+    const client = createFakeClient();
+
+    await client.deleteScanRow('fake-scan-reviewing', 2);
+    const scan = await client.getScan('fake-scan-reviewing');
+
+    expect(scan.rows.map((row) => row.scan_position)).toEqual([1, 3]);
+    expect(scan.row_count).toBe(2);
   });
 });
 

@@ -2,8 +2,13 @@ import { getSession } from '../auth/session';
 import type {
   ApiClient,
   Condition,
+  ConfirmScanRequest,
+  ConfirmScanResponse,
+  CreateScanRequest,
   ConfirmImportResponse,
   ConfirmOrderResponse,
+  FindScansParams,
+  FindScansResponse,
   FindImportsParams,
   FindImportsResponse,
   FindOrdersParams,
@@ -16,6 +21,8 @@ import type {
   OrderDetail,
   PublishResponse,
   ReportResponse,
+  IdentifyScanResponse,
+  ScanDetail,
   SettingsResponse,
   SkuDetail,
   UpdateSettingsRequest,
@@ -164,6 +171,70 @@ export function createHttpClient(): ApiClient {
         { method: 'POST' },
       );
       return response.json();
+    },
+
+    async createScan(request: CreateScanRequest): Promise<ScanDetail> {
+      const response = await authenticatedFetch('/scans', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      });
+      return response.json();
+    },
+
+    async findScans(params?: FindScansParams): Promise<FindScansResponse> {
+      const query = new URLSearchParams();
+      if (params?.continuation) {
+        query.set('continuation', params.continuation);
+      }
+      const queryString = query.toString();
+      const response = await authenticatedFetch(
+        queryString ? `/scans?${queryString}` : '/scans',
+      );
+      return response.json();
+    },
+
+    async getScan(scanId: string): Promise<ScanDetail> {
+      const response = await authenticatedFetch(
+        `/scans/${encodeURIComponent(scanId)}`,
+      );
+      return response.json();
+    },
+
+    async identifyScan(scanId: string): Promise<IdentifyScanResponse> {
+      const response = await authenticatedFetch(
+        `/scans/${encodeURIComponent(scanId)}/identify`,
+        { method: 'POST' },
+      );
+      return response.json();
+    },
+
+    async deleteScanRow(scanId: string, scanPosition: number): Promise<void> {
+      await authenticatedFetch(
+        `/scans/${encodeURIComponent(scanId)}/rows/${scanPosition}`,
+        { method: 'DELETE' },
+      );
+    },
+
+    async confirmScan(
+      scanId: string,
+      request: ConfirmScanRequest,
+    ): Promise<ConfirmScanResponse> {
+      const response = await authenticatedFetch(
+        `/scans/${encodeURIComponent(scanId)}/confirm`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(request),
+        },
+      );
+      return response.json();
+    },
+
+    async deleteScan(scanId: string): Promise<void> {
+      await authenticatedFetch(`/scans/${encodeURIComponent(scanId)}`, {
+        method: 'DELETE',
+      });
     },
 
     async findSkus(params?: FindSkusParams): Promise<FindSkusResponse> {

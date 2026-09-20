@@ -55,3 +55,125 @@ describe('http client row photos', () => {
     expect(json).not.toHaveBeenCalled();
   });
 });
+
+describe('http client scans', () => {
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    localStorage.clear();
+    setSession('alice', 'pw');
+  });
+
+  afterEach(() => {
+    clearSession();
+  });
+
+  it('creates a scan with JSON metadata', async () => {
+    const json = vi.fn().mockResolvedValue({ scan_id: 'scan-1' });
+    fetchSpy.mockResolvedValue({ ok: true, json });
+    const client = createHttpClient();
+
+    await client.createScan({
+      condition: 'LP',
+      finish: 'foil',
+      files: [{ filename: '001.jpg', size_bytes: 42 }],
+    });
+
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe('https://api.tcg-inventory.jordansimsmith.com/scans');
+    expect(init.method).toBe('POST');
+    expect(init.headers['Content-Type']).toBe('application/json');
+    expect(init.headers.Authorization).toBe(`Basic ${btoa('alice:pw')}`);
+    expect(init.body).toBe(
+      JSON.stringify({
+        condition: 'LP',
+        finish: 'foil',
+        files: [{ filename: '001.jpg', size_bytes: 42 }],
+      }),
+    );
+  });
+
+  it('lists scans with continuation', async () => {
+    const json = vi.fn().mockResolvedValue({ scans: [] });
+    fetchSpy.mockResolvedValue({ ok: true, json });
+    const client = createHttpClient();
+
+    await client.findScans({ continuation: 'page/2' });
+
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/scans?continuation=page%2F2',
+    );
+  });
+
+  it('gets and identifies an encoded scan', async () => {
+    const json = vi.fn().mockResolvedValue({ scan_id: 'scan/1' });
+    fetchSpy.mockResolvedValue({ ok: true, json });
+    const client = createHttpClient();
+
+    await client.getScan('scan/1');
+    await client.identifyScan('scan/1');
+
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/scans/scan%2F1',
+    );
+    expect(fetchSpy.mock.calls[1][0]).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/scans/scan%2F1/identify',
+    );
+    expect(fetchSpy.mock.calls[1][1].method).toBe('POST');
+  });
+
+  it('deletes a scan row without parsing a body', async () => {
+    const json = vi.fn();
+    fetchSpy.mockResolvedValue({ ok: true, json });
+    const client = createHttpClient();
+
+    await client.deleteScanRow('scan/1', 7);
+
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/scans/scan%2F1/rows/7',
+    );
+    expect(fetchSpy.mock.calls[0][1].method).toBe('DELETE');
+    expect(json).not.toHaveBeenCalled();
+  });
+
+  it('confirms a scan with the selected printing rows', async () => {
+    const json = vi.fn().mockResolvedValue({ import_id: 'import-1' });
+    fetchSpy.mockResolvedValue({ ok: true, json });
+    const client = createHttpClient();
+    const request = {
+      rows: [
+        {
+          scan_position: 1,
+          scryfall_id: 'card-1',
+          name: 'Opt',
+          set_code: 'dom',
+          set_name: 'Dominaria',
+          collector_number: '60',
+          confirmed: true as const,
+        },
+      ],
+    };
+
+    await client.confirmScan('scan/1', request);
+
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/scans/scan%2F1/confirm',
+    );
+    expect(fetchSpy.mock.calls[0][1].method).toBe('POST');
+    expect(fetchSpy.mock.calls[0][1].body).toBe(JSON.stringify(request));
+  });
+
+  it('deletes a scan without parsing a body', async () => {
+    const json = vi.fn();
+    fetchSpy.mockResolvedValue({ ok: true, json });
+    const client = createHttpClient();
+
+    await client.deleteScan('scan/1');
+
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/scans/scan%2F1',
+    );
+    expect(fetchSpy.mock.calls[0][1].method).toBe('DELETE');
+    expect(json).not.toHaveBeenCalled();
+  });
+});

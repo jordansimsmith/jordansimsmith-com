@@ -33,7 +33,18 @@ describe('AppShellLayout', () => {
         .getByRole('link', { name: 'Imports' })
         .getAttribute('aria-current'),
     ).toBeNull();
+    expect(
+      screen.getByRole('link', { name: 'Scans' }).getAttribute('aria-current'),
+    ).toBeNull();
     expect(screen.getByText('Workspace')).toBeDefined();
+  });
+
+  it('highlights the scan navigation item on the scan route', () => {
+    renderShell('/scan');
+
+    expect(
+      screen.getByRole('link', { name: 'Scans' }).getAttribute('aria-current'),
+    ).toBe('page');
   });
 
   it('closes the mobile navigation after a destination is selected', async () => {

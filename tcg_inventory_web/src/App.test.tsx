@@ -5,6 +5,7 @@ import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { LoginPage } from './pages/LoginPage';
 import { InventoryPage } from './pages/InventoryPage';
+import { ScanPage } from './pages/ScanPage';
 import { getSession } from './auth/session';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -34,6 +35,14 @@ function renderApp(initialRoute = '/') {
             element={
               <RequireAuth>
                 <InventoryPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/scan"
+            element={
+              <RequireAuth>
+                <ScanPage />
               </RequireAuth>
             }
           />
@@ -82,6 +91,15 @@ describe('App', () => {
 
   it('redirects unauthenticated users to login from protected routes', () => {
     renderApp('/inventory');
+
+    expect(
+      screen.getByRole('heading', { name: /tcg inventory/i }),
+    ).toBeDefined();
+    expect(screen.getByLabelText(/username/i)).toBeDefined();
+  });
+
+  it('protects the scan route', () => {
+    renderApp('/scan');
 
     expect(
       screen.getByRole('heading', { name: /tcg inventory/i }),

@@ -8,6 +8,7 @@ import { OrdersPage } from './pages/OrdersPage';
 import { OrderDetailPage } from './pages/OrderDetailPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { ScanPage } from './pages/ScanPage';
 import { getSession } from './auth/session';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -60,6 +61,14 @@ export function App() {
           element={
             <RequireAuth>
               <ImportDetailPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/scan"
+          element={
+            <RequireAuth>
+              <ScanPage />
             </RequireAuth>
           }
         />

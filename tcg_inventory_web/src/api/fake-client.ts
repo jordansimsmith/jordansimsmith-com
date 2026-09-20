@@ -2,14 +2,20 @@ import type {
   ApiClient,
   BuyerAddress,
   Condition,
+  ConfirmScanRequest,
+  ConfirmScanResponse,
   ConfirmImportResponse,
   ConfirmOrderResponse,
+  CreateScanRequest,
   Finish,
+  FindScansParams,
+  FindScansResponse,
   FindImportsResponse,
   FindOrdersResponse,
   FindSkusParams,
   FindSkusResponse,
   GenerationStatus,
+  IdentifyScanResponse,
   ImportDetail,
   ImportRow,
   ImportStatus,
@@ -26,6 +32,14 @@ import type {
   ReportResponse,
   RowDecision,
   RowPhoto,
+  ScanConfirmationRow,
+  ScanDetail,
+  ScanFile,
+  ScanRow,
+  ScanRowStatus,
+  ScanStatus,
+  ScanSuggestion,
+  ScanSummary,
   SettingsResponse,
   SkuDetail,
   SkuSummary,
@@ -36,6 +50,9 @@ import type {
 } from './client';
 import { parseManaBoxCsv } from '../domain/manabox';
 import type { ManaBoxRow } from '../domain/manabox';
+
+const VALID_CONDITIONS: Condition[] = ['NM', 'LP', 'MP', 'HP', 'DMG'];
+const VALID_FINISHES: Finish[] = ['normal', 'foil', 'etched'];
 
 type SeedSku = [
   scryfallId: string,
@@ -508,6 +525,349 @@ function toImportDetail(importRecord: FakeImport): ImportDetail {
   };
 }
 
+const SCAN_ROWS_PER_SECOND = 2;
+
+interface FakeScanRow extends ScanFile {
+  scan_position: number;
+  uploaded: boolean;
+  upload_url: string | null;
+  upload_headers: Record<string, string> | null;
+  status: ScanRowStatus | null;
+  needs_review: boolean;
+  suggestions: ScanSuggestion[];
+  source_url: string | null;
+  error: string | null;
+  deleted: boolean;
+}
+
+interface FakeScan {
+  scan_id: string;
+  status: ScanStatus;
+  condition: Condition;
+  finish: Finish;
+  error: string | null;
+  import_id: string | null;
+  created_at_ms: number;
+  processed_count: number;
+  identifying_started_at_ms: number | null;
+  rows: FakeScanRow[];
+  confirmed_rows: ScanConfirmationRow[];
+  confirmation_manifest: ScanConfirmationRow[] | null;
+}
+
+const FAKE_SCAN_SOURCE_URL =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='336'%3E%3Crect width='100%25' height='100%25' fill='%23f1f3f5'/%3E%3C/svg%3E";
+
+function scanSuggestion(
+  scryfallId: string,
+  name: string,
+  score: number,
+): ScanSuggestion {
+  return { scryfall_id: scryfallId, name, score };
+}
+
+function scanConfirmation(
+  scanPosition: number,
+  scryfallId: string,
+  name: string,
+  setCode: string,
+  setName: string,
+  collectorNumber: string,
+): ScanConfirmationRow {
+  return {
+    scan_position: scanPosition,
+    scryfall_id: scryfallId,
+    name,
+    set_code: setCode,
+    set_name: setName,
+    collector_number: collectorNumber,
+    confirmed: true,
+  };
+}
+
+function createFakeScanRow(
+  scanId: string,
+  scanPosition: number,
+  filename: string,
+  uploaded: boolean,
+  status: ScanRowStatus | null = null,
+  suggestions: ScanSuggestion[] = [],
+  error: string | null = null,
+): FakeScanRow {
+  return {
+    scan_position: scanPosition,
+    filename,
+    size_bytes: 400_000 + scanPosition * 1_003,
+    uploaded,
+    upload_url: uploaded
+      ? null
+      : `fake://scan/${scanId}/${String(scanPosition).padStart(6, '0')}`,
+    upload_headers: uploaded ? null : { 'Content-Type': 'image/jpeg' },
+    status,
+    needs_review: status === 'needs_review',
+    suggestions: suggestions.map((suggestion) => ({ ...suggestion })),
+    source_url: uploaded ? FAKE_SCAN_SOURCE_URL : null,
+    error,
+    deleted: false,
+  };
+}
+
+function createSeedScans(): FakeScan[] {
+  const now = Date.now();
+  const lightningBolt = scanSuggestion(
+    '4eaac0d0-0000-0000-0000-000000000001',
+    'Lightning Bolt',
+    0.93,
+  );
+  const llanowarElves = scanSuggestion(
+    '581b7327-3215-4a4f-b4ae-d9d4002ba882',
+    'Llanowar Elves',
+    0.87,
+  );
+  const opt = scanSuggestion(
+    '25f2e4d0-effd-4e83-b7aa-1a0d8f120951',
+    'Opt',
+    0.71,
+  );
+  const counterspell = scanSuggestion(
+    '1920dae4-fb92-4f19-ae4b-eb3276b8dac7',
+    'Counterspell',
+    0.96,
+  );
+  const confirmedRows = [
+    scanConfirmation(
+      1,
+      lightningBolt.scryfall_id,
+      lightningBolt.name,
+      'sta',
+      'Strixhaven Mystical Archive',
+      '42',
+    ),
+    scanConfirmation(
+      2,
+      llanowarElves.scryfall_id,
+      llanowarElves.name,
+      'dom',
+      'Dominaria',
+      '168',
+    ),
+  ];
+
+  return [
+    {
+      scan_id: 'fake-scan-uploading',
+      status: 'uploading',
+      condition: 'NM',
+      finish: 'normal',
+      error: null,
+      import_id: null,
+      created_at_ms: now - 15 * 60 * 1000,
+      processed_count: 0,
+      identifying_started_at_ms: null,
+      rows: [
+        createFakeScanRow('fake-scan-uploading', 1, '001.jpg', true),
+        createFakeScanRow('fake-scan-uploading', 2, '002.jpg', false),
+        createFakeScanRow('fake-scan-uploading', 3, '003.jpg', true),
+      ],
+      confirmed_rows: [],
+      confirmation_manifest: null,
+    },
+    {
+      scan_id: 'fake-scan-identifying',
+      status: 'identifying',
+      condition: 'LP',
+      finish: 'foil',
+      error: null,
+      import_id: null,
+      created_at_ms: now - 30 * 60 * 1000,
+      processed_count: 2,
+      identifying_started_at_ms: now - 1_000,
+      rows: [
+        {
+          ...createFakeScanRow(
+            'fake-scan-identifying',
+            1,
+            '001.jpg',
+            true,
+            'suggested',
+            [lightningBolt],
+          ),
+        },
+        {
+          ...createFakeScanRow(
+            'fake-scan-identifying',
+            2,
+            '002.jpg',
+            true,
+            'needs_review',
+            [opt],
+            'multiple close matches require manual review',
+          ),
+        },
+        createFakeScanRow('fake-scan-identifying', 3, '003.jpg', true),
+        createFakeScanRow('fake-scan-identifying', 4, '004.jpg', true),
+      ],
+      confirmed_rows: [],
+      confirmation_manifest: null,
+    },
+    {
+      scan_id: 'fake-scan-reviewing',
+      status: 'reviewing',
+      condition: 'MP',
+      finish: 'etched',
+      error: 'one image needs a manual printing choice',
+      import_id: null,
+      created_at_ms: now - 24 * 60 * 60 * 1000,
+      processed_count: 3,
+      identifying_started_at_ms: null,
+      rows: [
+        createFakeScanRow(
+          'fake-scan-reviewing',
+          1,
+          '001.jpg',
+          true,
+          'suggested',
+          [counterspell, lightningBolt],
+        ),
+        createFakeScanRow(
+          'fake-scan-reviewing',
+          2,
+          '002.jpg',
+          true,
+          'needs_review',
+          [opt],
+          'recognition was inconclusive',
+        ),
+        createFakeScanRow(
+          'fake-scan-reviewing',
+          3,
+          '003.jpg',
+          true,
+          'suggested',
+          [llanowarElves],
+        ),
+      ],
+      confirmed_rows: [],
+      confirmation_manifest: null,
+    },
+    {
+      scan_id: 'fake-scan-confirmed',
+      status: 'confirmed',
+      condition: 'NM',
+      finish: 'normal',
+      error: null,
+      import_id: 'fake-import-1',
+      created_at_ms: now - 2 * 24 * 60 * 60 * 1000,
+      processed_count: 2,
+      identifying_started_at_ms: null,
+      rows: [
+        createFakeScanRow(
+          'fake-scan-confirmed',
+          1,
+          '001.jpg',
+          true,
+          'suggested',
+          [lightningBolt],
+        ),
+        createFakeScanRow(
+          'fake-scan-confirmed',
+          2,
+          '002.jpg',
+          true,
+          'suggested',
+          [llanowarElves],
+        ),
+      ],
+      confirmed_rows: confirmedRows,
+      confirmation_manifest: confirmedRows,
+    },
+  ];
+}
+
+function activeScanRows(scan: FakeScan): FakeScanRow[] {
+  return scan.rows.filter((row) => !row.deleted);
+}
+
+function progressFakeScan(scan: FakeScan): void {
+  if (
+    scan.status !== 'identifying' ||
+    scan.identifying_started_at_ms === null
+  ) {
+    return;
+  }
+  const elapsedMs = Math.max(0, Date.now() - scan.identifying_started_at_ms);
+  const processedCount = Math.min(
+    activeScanRows(scan).length,
+    Math.floor((elapsedMs / 1000) * SCAN_ROWS_PER_SECOND),
+  );
+  const rows = activeScanRows(scan);
+  for (const [index, row] of rows.entries()) {
+    if (index >= processedCount || row.status !== null) {
+      continue;
+    }
+    row.status = index % 3 === 1 ? 'needs_review' : 'suggested';
+    row.needs_review = row.status === 'needs_review';
+    row.error = row.needs_review ? 'recognition needs manual review' : null;
+    row.suggestions = [
+      scanSuggestion(
+        index % 2 === 0
+          ? '4eaac0d0-0000-0000-0000-000000000001'
+          : '581b7327-3215-4a4f-b4ae-d9d4002ba882',
+        index % 2 === 0 ? 'Lightning Bolt' : 'Llanowar Elves',
+        index % 3 === 1 ? 0.61 : 0.9,
+      ),
+    ];
+    row.source_url = FAKE_SCAN_SOURCE_URL;
+  }
+  scan.processed_count = processedCount;
+  if (processedCount >= rows.length) {
+    scan.status = 'reviewing';
+    scan.identifying_started_at_ms = null;
+  }
+}
+
+function toScanSummary(scan: FakeScan): ScanSummary {
+  const rows = activeScanRows(scan);
+  return {
+    scan_id: scan.scan_id,
+    status: scan.status,
+    condition: scan.condition,
+    finish: scan.finish,
+    row_count: rows.length,
+    processed_count: Math.min(scan.processed_count, rows.length),
+    error: scan.error,
+    import_id: scan.import_id,
+    created_at: Math.floor(scan.created_at_ms / 1000),
+  };
+}
+
+function toScanRow(row: FakeScanRow): ScanRow {
+  return {
+    scan_position: row.scan_position,
+    filename: row.filename,
+    size_bytes: row.size_bytes,
+    uploaded: row.uploaded,
+    upload_url: row.upload_url,
+    upload_headers: row.upload_headers ? { ...row.upload_headers } : null,
+    status: row.status,
+    needs_review: row.needs_review,
+    suggestions: row.suggestions.map((suggestion) => ({ ...suggestion })),
+    source_url: row.source_url,
+    error: row.error,
+  };
+}
+
+function toScanDetail(scan: FakeScan): ScanDetail {
+  progressFakeScan(scan);
+  return {
+    ...toScanSummary(scan),
+    rows: activeScanRows(scan).map(toScanRow),
+    ...(scan.status === 'confirmed'
+      ? { confirmed_rows: scan.confirmed_rows.map((row) => ({ ...row })) }
+      : {}),
+  };
+}
+
 interface FakeOrderUnitRef {
   sku_id: string;
   sequence_number: number;
@@ -847,8 +1207,10 @@ function toOrderDetail(order: FakeOrder, skus: FakeSku[]): OrderDetail {
 export function createFakeClient(): ApiClient {
   const skus = createSeedState();
   const importRecords = createSeedImports();
+  const scans = createSeedScans();
   const orders = createSeedOrders(skus);
   let importCounter = importRecords.length;
+  let scanCounter = scans.length + 1;
   let photoCounter = 0;
   // seed units occupy sequence numbers 0-599 (blocks A0-A5)
   let nextSequenceNumber = 600;
@@ -948,6 +1310,15 @@ export function createFakeClient(): ApiClient {
     }
     progressAppraisal(importRecord);
     return importRecord;
+  };
+
+  const getScanOrThrow = (scanId: string): FakeScan => {
+    const scan = scans.find((candidate) => candidate.scan_id === scanId);
+    if (!scan) {
+      throw new Error('Not Found');
+    }
+    progressFakeScan(scan);
+    return scan;
   };
 
   const getOrderOrThrow = (orderId: string): FakeOrder => {
@@ -1197,6 +1568,237 @@ export function createFakeClient(): ApiClient {
         last_sequence_number: last,
         placement_instructions: placementInstructions,
       };
+    },
+
+    async createScan(request: CreateScanRequest): Promise<ScanDetail> {
+      if (!VALID_CONDITIONS.includes(request.condition)) {
+        throw new Error('invalid scan condition');
+      }
+      if (!VALID_FINISHES.includes(request.finish)) {
+        throw new Error('invalid scan finish');
+      }
+      if (request.files.length < 1 || request.files.length > 200) {
+        throw new Error('a scan must contain between 1 and 200 files');
+      }
+      if (
+        request.files.some(
+          (file) => file.size_bytes <= 0 || file.size_bytes > 10 * 1024 * 1024,
+        )
+      ) {
+        throw new Error('scan files must be between 1 byte and 10 MiB');
+      }
+      if (request.files.some((file) => !/\.(jpe?g)$/i.test(file.filename))) {
+        throw new Error('scan files must be JPEG images');
+      }
+      const filenames = request.files.map((file) => file.filename);
+      if (new Set(filenames).size !== filenames.length) {
+        throw new Error('scan filenames must be unique');
+      }
+      const files = [...request.files].sort((a, b) =>
+        a.filename < b.filename ? -1 : a.filename > b.filename ? 1 : 0,
+      );
+      const scanId = `fake-scan-${scanCounter}`;
+      scanCounter += 1;
+      const scan: FakeScan = {
+        scan_id: scanId,
+        status: 'uploading',
+        condition: request.condition,
+        finish: request.finish,
+        error: null,
+        import_id: null,
+        created_at_ms: Date.now(),
+        processed_count: 0,
+        identifying_started_at_ms: null,
+        rows: files.map((file, index) => {
+          const row = createFakeScanRow(
+            scanId,
+            index + 1,
+            file.filename,
+            false,
+          );
+          row.size_bytes = file.size_bytes;
+          return row;
+        }),
+        confirmed_rows: [],
+        confirmation_manifest: null,
+      };
+      scans.push(scan);
+      return toScanDetail(scan);
+    },
+
+    async findScans(params?: FindScansParams): Promise<FindScansResponse> {
+      const offset = params?.continuation
+        ? Number.parseInt(params.continuation, 10)
+        : 0;
+      if (!Number.isInteger(offset) || offset < 0) {
+        throw new Error('invalid continuation');
+      }
+      const ordered = [...scans]
+        .filter(
+          (scan) => !scan.confirmation_manifest || scan.status === 'confirmed',
+        )
+        .sort((a, b) => b.created_at_ms - a.created_at_ms);
+      const pageSize = 20;
+      const page = ordered.slice(offset, offset + pageSize).map((scan) => {
+        progressFakeScan(scan);
+        return toScanSummary(scan);
+      });
+      const nextOffset = offset + page.length;
+      return {
+        scans: page,
+        next_continuation:
+          nextOffset < ordered.length ? String(nextOffset) : null,
+      };
+    },
+
+    async getScan(scanId: string): Promise<ScanDetail> {
+      return toScanDetail(getScanOrThrow(scanId));
+    },
+
+    async identifyScan(scanId: string): Promise<IdentifyScanResponse> {
+      const scan = getScanOrThrow(scanId);
+      if (scan.status !== 'uploading') {
+        return { scan_id: scan.scan_id, status: scan.status };
+      }
+      if (activeScanRows(scan).some((row) => !row.uploaded)) {
+        throw new Error(
+          'all scan files must be uploaded before identification',
+        );
+      }
+      scan.status = 'identifying';
+      scan.processed_count = 0;
+      scan.identifying_started_at_ms = Date.now();
+      for (const row of activeScanRows(scan)) {
+        row.status = null;
+        row.needs_review = false;
+        row.suggestions = [];
+        row.error = null;
+      }
+      return { scan_id: scan.scan_id, status: scan.status };
+    },
+
+    async deleteScanRow(scanId: string, scanPosition: number): Promise<void> {
+      const scan = getScanOrThrow(scanId);
+      if (scan.status !== 'reviewing' || scan.confirmation_manifest !== null) {
+        throw new Error('scan is not in a deletable status');
+      }
+      const row = scan.rows.find(
+        (candidate) => candidate.scan_position === scanPosition,
+      );
+      if (!row || row.deleted) {
+        throw new Error('Not Found');
+      }
+      row.deleted = true;
+      row.uploaded = false;
+      row.upload_url = null;
+      row.upload_headers = null;
+      row.source_url = null;
+    },
+
+    async confirmScan(
+      scanId: string,
+      request: ConfirmScanRequest,
+    ): Promise<ConfirmScanResponse> {
+      const scan = getScanOrThrow(scanId);
+      const orderedRows = [...request.rows].sort(
+        (a, b) => a.scan_position - b.scan_position,
+      );
+      const matchesManifest =
+        scan.confirmation_manifest !== null &&
+        JSON.stringify(scan.confirmation_manifest) ===
+          JSON.stringify(orderedRows);
+      if (scan.status === 'confirmed') {
+        if (!matchesManifest) {
+          throw new Error(
+            'scan confirmation does not match the existing import',
+          );
+        }
+        return {
+          scan_id: scan.scan_id,
+          status: 'confirmed',
+          import_id: scan.import_id!,
+        };
+      }
+      if (scan.status !== 'reviewing') {
+        throw new Error('scan is not in reviewing status');
+      }
+      if (scan.confirmation_manifest !== null) {
+        if (!matchesManifest) {
+          throw new Error(
+            'scan confirmation does not match the existing import',
+          );
+        }
+        return {
+          scan_id: scan.scan_id,
+          status: 'confirmed',
+          import_id: scan.import_id!,
+        };
+      }
+      const rows = activeScanRows(scan);
+      if (
+        orderedRows.length === 0 ||
+        orderedRows.length !== rows.length ||
+        orderedRows.some((row, index) => {
+          const source = rows[index];
+          return (
+            row.confirmed !== true ||
+            source === undefined ||
+            row.scan_position !== source.scan_position ||
+            !row.scryfall_id ||
+            !row.name ||
+            !row.set_code ||
+            !row.set_name ||
+            !row.collector_number
+          );
+        })
+      ) {
+        throw new Error(
+          'every retained scan row must be confirmed exactly once',
+        );
+      }
+      const importId = `fake-import-for-${scan.scan_id}`;
+      const importRows: FakeImportRow[] = orderedRows.map((row, index) => ({
+        position: index + 1,
+        name: row.name,
+        set_code: row.set_code,
+        set_name: row.set_name,
+        collector_number: row.collector_number,
+        finish: scan.finish,
+        condition: scan.condition,
+        scryfall_id: row.scryfall_id,
+        decision: 'keep',
+        decision_reason: null,
+        ...appraisePrices('keep', index + 1),
+        photos: [],
+      }));
+      importRecords.push({
+        import_id: importId,
+        filename: `${scan.scan_id}.scan`,
+        status: 'appraising',
+        rows: importRows,
+        created_at_ms: Date.now(),
+      });
+      scan.confirmation_manifest = orderedRows.map((row) => ({ ...row }));
+      scan.confirmed_rows = orderedRows.map((row) => ({ ...row }));
+      scan.import_id = importId;
+      scan.status = 'confirmed';
+      return {
+        scan_id: scan.scan_id,
+        status: 'confirmed',
+        import_id: importId,
+      };
+    },
+
+    async deleteScan(scanId: string): Promise<void> {
+      const scan = getScanOrThrow(scanId);
+      if (scan.status === 'confirmed' || scan.confirmation_manifest !== null) {
+        throw new Error('confirmed scans cannot be deleted');
+      }
+      if (!['uploading', 'identifying', 'reviewing'].includes(scan.status)) {
+        throw new Error('scan is not in a deletable status');
+      }
+      const index = scans.indexOf(scan);
+      scans.splice(index, 1);
     },
 
     async findSkus(params?: FindSkusParams): Promise<FindSkusResponse> {

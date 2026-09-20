@@ -18,6 +18,8 @@ export type Condition = 'NM' | 'LP' | 'MP' | 'HP' | 'DMG';
 
 export const CONDITIONS: Condition[] = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
+export const FINISHES: Finish[] = ['normal', 'foil', 'etched'];
+
 export type UnitStatus = 'in_stock' | 'reserved' | 'sold' | 'removed';
 
 export interface SkuSummary {
@@ -126,6 +128,97 @@ export interface ConfirmImportResponse {
   first_sequence_number: number | null;
   last_sequence_number: number | null;
   placement_instructions: PlacementInstruction[];
+}
+
+export type ScanStatus =
+  | 'uploading'
+  | 'identifying'
+  | 'reviewing'
+  | 'confirmed';
+
+export type ScanRowStatus = 'suggested' | 'needs_review';
+
+export interface ScanSuggestion {
+  scryfall_id: string;
+  name: string;
+  score: number;
+}
+
+export interface ScanFile {
+  filename: string;
+  size_bytes: number;
+}
+
+export interface ScanUploadSlot extends ScanFile {
+  scan_position: number;
+  uploaded: boolean;
+  upload_url: string | null;
+  upload_headers: Record<string, string> | null;
+}
+
+export interface ScanConfirmationRow {
+  scan_position: number;
+  scryfall_id: string;
+  name: string;
+  set_code: string;
+  set_name: string;
+  collector_number: string;
+  confirmed: true;
+}
+
+export interface ScanRow extends ScanUploadSlot {
+  status: ScanRowStatus | null;
+  needs_review: boolean;
+  suggestions: ScanSuggestion[];
+  source_url: string | null;
+  error: string | null;
+}
+
+export interface ScanSummary {
+  scan_id: string;
+  status: ScanStatus;
+  condition: Condition;
+  finish: Finish;
+  row_count: number;
+  processed_count: number;
+  error: string | null;
+  import_id: string | null;
+  created_at: number;
+}
+
+export interface ScanDetail extends ScanSummary {
+  rows: ScanRow[];
+  confirmed_rows?: ScanConfirmationRow[];
+}
+
+export interface CreateScanRequest {
+  condition: Condition;
+  finish: Finish;
+  files: ScanFile[];
+}
+
+export interface FindScansParams {
+  continuation?: string;
+}
+
+export interface FindScansResponse {
+  scans: ScanSummary[];
+  next_continuation: string | null;
+}
+
+export interface IdentifyScanResponse {
+  scan_id: string;
+  status: ScanStatus;
+}
+
+export interface ConfirmScanRequest {
+  rows: ScanConfirmationRow[];
+}
+
+export interface ConfirmScanResponse {
+  scan_id: string;
+  status: 'confirmed';
+  import_id: string;
 }
 
 export type OrderState =
@@ -314,6 +407,16 @@ export interface ApiClient {
   ): Promise<void>;
   deleteImport(importId: string): Promise<void>;
   confirmImport(importId: string): Promise<ConfirmImportResponse>;
+  createScan(request: CreateScanRequest): Promise<ScanDetail>;
+  findScans(params?: FindScansParams): Promise<FindScansResponse>;
+  getScan(scanId: string): Promise<ScanDetail>;
+  identifyScan(scanId: string): Promise<IdentifyScanResponse>;
+  deleteScanRow(scanId: string, scanPosition: number): Promise<void>;
+  confirmScan(
+    scanId: string,
+    request: ConfirmScanRequest,
+  ): Promise<ConfirmScanResponse>;
+  deleteScan(scanId: string): Promise<void>;
   findSkus(params?: FindSkusParams): Promise<FindSkusResponse>;
   getSku(skuId: string): Promise<SkuDetail>;
   deleteUnit(

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink, Stack, Text } from '@mantine/core';
 import {
   IconCards,
+  IconCamera,
   IconChartBar,
   IconFileImport,
   IconPackage,
@@ -14,6 +15,7 @@ import classes from './AppShellLayout.module.css';
 
 const WORKSPACE_LINKS = [
   { label: 'Inventory', to: '/inventory', icon: IconCards },
+  { label: 'Scans', to: '/scan', icon: IconCamera },
   { label: 'Imports', to: '/imports', icon: IconFileImport },
   { label: 'Orders', to: '/orders', icon: IconPackage },
   { label: 'Reports', to: '/reports', icon: IconChartBar },
