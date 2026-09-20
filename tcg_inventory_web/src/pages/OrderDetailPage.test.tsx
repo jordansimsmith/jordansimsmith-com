@@ -149,6 +149,14 @@ describe('OrderDetailPage', () => {
     renderOrderDetailPage();
 
     expect(await screen.findByText('Order 83647')).toBeDefined();
+    const fetchOrderLink = screen.getByRole('link', {
+      name: 'View in FetchTCG',
+    });
+    expect(fetchOrderLink.getAttribute('href')).toBe(
+      'https://www.fetchtcg.com/profile/sales/83647',
+    );
+    expect(fetchOrderLink.getAttribute('target')).toBe('_blank');
+    expect(fetchOrderLink.getAttribute('rel')).toBe('noopener noreferrer');
     expect(screen.getByText('to pick')).toBeDefined();
     expect(screen.getByText('Total $10.90')).toBeDefined();
     expect(screen.getByText('Offered $10.90 · Listed $13.00')).toBeDefined();

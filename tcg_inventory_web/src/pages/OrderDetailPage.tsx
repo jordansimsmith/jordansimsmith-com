@@ -9,6 +9,7 @@ import {
   Text,
   Title,
 } from '@mantine/core';
+import { IconExternalLink } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShellLayout } from '../layouts/AppShellLayout';
@@ -166,9 +167,21 @@ export function OrderDetailPage() {
               title={`Order ${order.order_id}`}
               description={`Accepted ${new Date(order.accepted_at * 1000).toLocaleString()}`}
               actions={
-                <Button variant="subtle" onClick={() => navigate('/orders')}>
-                  Back to orders
-                </Button>
+                <Group gap="xs">
+                  <Button
+                    component="a"
+                    href={`https://www.fetchtcg.com/profile/sales/${encodeURIComponent(order.order_id)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    variant="default"
+                    rightSection={<IconExternalLink size={16} />}
+                  >
+                    View in FetchTCG
+                  </Button>
+                  <Button variant="subtle" onClick={() => navigate('/orders')}>
+                    Back to orders
+                  </Button>
+                </Group>
               }
             />
             <Box className={classes.detailGrid}>
