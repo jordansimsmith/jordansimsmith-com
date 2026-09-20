@@ -198,14 +198,14 @@ describe('OrderDetailPage', () => {
     vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(
       orderDetail({
         delivery_mode: 'DELIVERY',
-        buyer_name: 'Chris Andrew (generic)',
+        buyer_name: 'Mira Quasar (velvet-otter)',
         buyer_address: {
-          line1: '32 Abercrombie Street',
+          line1: '7315 Marble Comet Drive',
           line2: 'Unit 3',
-          suburb: 'Howick',
-          city: 'Auckland',
-          post_code: '2014',
-          country: 'NZ',
+          suburb: 'Glintmere',
+          city: 'Cloudmere',
+          post_code: '0000',
+          country: 'ZZ',
         },
         postage_option: 'Economy Tracked',
       }),
@@ -213,13 +213,15 @@ describe('OrderDetailPage', () => {
 
     renderOrderDetailPage();
 
-    expect(await screen.findByText('Chris Andrew (generic)')).toBeDefined();
+    expect(await screen.findByText('Mira Quasar (velvet-otter)')).toBeDefined();
     const delivery = screen.getByRole('region', { name: 'Delivery' });
-    expect(within(delivery).getByText('Chris Andrew (generic)')).toBeDefined();
-    expect(screen.getByText('32 Abercrombie Street')).toBeDefined();
+    expect(
+      within(delivery).getByText('Mira Quasar (velvet-otter)'),
+    ).toBeDefined();
+    expect(screen.getByText('7315 Marble Comet Drive')).toBeDefined();
     expect(screen.getByText('Unit 3')).toBeDefined();
-    expect(screen.getByText('Howick, Auckland 2014')).toBeDefined();
-    expect(screen.getByText('NZ')).toBeDefined();
+    expect(screen.getByText('Glintmere, Cloudmere 0000')).toBeDefined();
+    expect(screen.getByText('ZZ')).toBeDefined();
     expect(screen.getByText('Economy Tracked')).toBeDefined();
   });
 
@@ -231,7 +233,7 @@ describe('OrderDetailPage', () => {
     renderOrderDetailPage();
 
     expect(await screen.findByText('Pickup')).toBeDefined();
-    expect(screen.queryByText('32 Abercrombie Street')).toBeNull();
+    expect(screen.queryByText('7315 Marble Comet Drive')).toBeNull();
   });
 
   it('confirms the pull and renders the fulfilled order', async () => {
