@@ -321,6 +321,7 @@ describe('ImportDetailPage', () => {
     expect(
       screen.getByText('Foil Card').classList.contains(finishClasses.foil),
     ).toBe(true);
+    expect(foilCells[1].classList.contains(finishClasses.foil)).toBe(false);
     expect(screen.getByText('Foil Card').style.fontWeight).toBe('700');
     expect(screen.getByText('Normal Card').style.fontWeight).toBe('500');
 

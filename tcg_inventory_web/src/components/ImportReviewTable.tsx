@@ -80,12 +80,14 @@ export function ImportReviewTable({
               <Table.Td data-field="position" ta="right" c="dimmed">
                 {row.position}
               </Table.Td>
-              <Table.Td
-                data-field="name"
-                className={keep ? finishClasses[row.finish] : undefined}
-                fw={finishNameWeight(row.finish)}
-              >
-                {row.name}
+              <Table.Td data-field="name">
+                <Text
+                  component="span"
+                  className={keep ? finishClasses[row.finish] : undefined}
+                  fw={finishNameWeight(row.finish)}
+                >
+                  {row.name}
+                </Text>
               </Table.Td>
               <Table.Td data-field="set" data-label="Set" title={row.set_name}>
                 {formatSetNumber(row.set_code, row.collector_number)}
