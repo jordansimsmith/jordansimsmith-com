@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Badge,
   Button,
@@ -7,8 +7,10 @@ import {
   Select,
   Stack,
   Table,
+  Text,
 } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import { useNavigate } from 'react-router-dom';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import {
   CollectionLoadingState,
@@ -17,7 +19,9 @@ import {
 } from '../components/CollectionSurface';
 import { PageHeader } from '../components/PageHeader';
 import { apiClient, CONDITIONS, FINISHES } from '../api/client';
+import { scanUploader } from '../api/scan-uploader';
 import type { Condition, Finish, ScanStatus, ScanSummary } from '../api/client';
+import { sortScanFiles, validateScanFiles } from '../domain/scan-files';
 import { useListNavigation } from '../hooks/use-list-navigation';
 import classes from '../components/CollectionTable.module.css';
 
@@ -54,9 +58,10 @@ function ScanStatusBadge({ status }: { status: ScanStatus }) {
 interface ScanTableProps {
   scans: ScanSummary[];
   selectedIndex: number;
+  onOpen: (scan: ScanSummary) => void;
 }
 
-function ScanTable({ scans, selectedIndex }: ScanTableProps) {
+function ScanTable({ scans, selectedIndex, onOpen }: ScanTableProps) {
   const selectedRowRef = useRef<HTMLTableRowElement>(null);
 
   useEffect(() => {
@@ -88,6 +93,8 @@ function ScanTable({ scans, selectedIndex }: ScanTableProps) {
               key={scan.scan_id}
               ref={selected ? selectedRowRef : undefined}
               data-selected={selected}
+              onClick={() => onOpen(scan)}
+              style={{ cursor: 'pointer' }}
             >
               <Table.Td
                 fw={500}
@@ -118,6 +125,7 @@ function ScanTable({ scans, selectedIndex }: ScanTableProps) {
 }
 
 export function ScanPage() {
+  const navigate = useNavigate();
   const [scans, setScans] = useState<ScanSummary[]>([]);
   const [nextContinuation, setNextContinuation] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -127,13 +135,34 @@ export function ScanPage() {
   const [finish, setFinish] = useState<Finish>('normal');
   const [files, setFiles] = useState<File[]>([]);
   const [creating, setCreating] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const openScan = useCallback(() => {}, []);
+
+  const sortedFiles = useMemo(() => sortScanFiles(files), [files]);
+  const fileErrors = useMemo(() => validateScanFiles(files), [files]);
+  const openScan = useCallback(
+    (scan: ScanSummary) => {
+      navigate(`/scans/${encodeURIComponent(scan.scan_id)}`);
+    },
+    [navigate],
+  );
   const { selectedIndex } = useListNavigation({
     itemCount: scans.length,
-    onOpen: openScan,
+    onOpen: (index) => {
+      const scan = scans[index];
+      if (scan) {
+        openScan(scan);
+      }
+    },
     searchInputRef,
   });
+
+  const refreshScans = useCallback(async () => {
+    const response = await apiClient.findScans();
+    setScans(response.scans);
+    setNextContinuation(response.next_continuation);
+    setError(null);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,6 +172,7 @@ export function ScanPage() {
         if (!cancelled) {
           setScans(response.scans);
           setNextContinuation(response.next_continuation);
+          setError(null);
         }
       } catch (e) {
         if (!cancelled) {
@@ -184,24 +214,55 @@ export function ScanPage() {
     }
   };
 
+  const handleFilesChange = (nextFiles: File[] | null) => {
+    setFiles(nextFiles ?? []);
+    setSubmitError(null);
+  };
+
   const handleCreate = async () => {
-    if (files.length === 0) {
+    if (creating || sortedFiles.length === 0 || fileErrors.length > 0) {
       return;
     }
+
     setCreating(true);
+    setSubmitError(null);
     try {
       const created = await apiClient.createScan({
         condition,
         finish,
-        files: files.map((file) => ({
+        files: sortedFiles.map((file) => ({
           filename: file.name,
           size_bytes: file.size,
         })),
       });
-      setScans((previous) => [created, ...previous]);
+
+      await refreshScans();
+
+      const filesByName = new Map(sortedFiles.map((file) => [file.name, file]));
+      const uploads = created.rows.map((slot) => {
+        const file = filesByName.get(slot.filename);
+        if (!file || !slot.upload_url) {
+          throw new Error(`Missing upload slot for ${slot.filename}`);
+        }
+        return { slot, file };
+      });
+
+      await scanUploader.uploadBatch(created.scan_id, uploads);
+      const verified = await apiClient.getScan(created.scan_id);
+      if (
+        verified.rows.length !== sortedFiles.length ||
+        verified.rows.some((row) => !row.uploaded)
+      ) {
+        throw new Error('Upload verification found missing files');
+      }
+
+      await apiClient.identifyScan(created.scan_id);
       setFiles([]);
+      navigate(`/scans/${encodeURIComponent(created.scan_id)}`);
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'Failed to create scan';
+      const message =
+        e instanceof Error ? e.message : 'The scan batch could not be created';
+      setSubmitError(message);
       notifications.show({
         title: 'Scan creation failed',
         message,
@@ -217,44 +278,76 @@ export function ScanPage() {
       <Stack gap="lg">
         <PageHeader
           title="Scans"
-          description="Upload ordered card-front JPEGs, verify every printing, then create an import."
+          description="Upload card-front JPEGs to identify a physical stack."
         />
         <CollectionSurface
           ariaLabel="Scan jobs"
           toolbar={
-            <Group align="flex-end" gap="sm" wrap="wrap">
-              <Select
-                label="Condition"
-                value={condition}
-                onChange={(value) => setCondition(value as Condition)}
-                data={CONDITIONS}
-                style={{ flex: '0 1 10rem' }}
-              />
-              <Select
-                label="Finish"
-                value={finish}
-                onChange={(value) => setFinish(value as Finish)}
-                data={FINISHES}
-                style={{ flex: '0 1 10rem' }}
-              />
-              <FileInput
-                value={files}
-                onChange={setFiles}
-                multiple
-                accept=".jpg,.jpeg,image/jpeg"
-                label="Scanner JPEGs"
-                placeholder="Choose files"
-                clearable
-                style={{ flex: '1 1 16rem', maxWidth: 360 }}
-              />
-              <Button
-                onClick={handleCreate}
-                disabled={files.length === 0}
-                loading={creating}
-              >
-                Create scan
-              </Button>
-            </Group>
+            <Stack gap="sm">
+              <Group align="flex-end" gap="sm" wrap="wrap">
+                <FileInput
+                  value={files}
+                  onChange={handleFilesChange}
+                  multiple
+                  accept=".jpg,.jpeg,image/jpeg"
+                  label="Scanner JPEGs"
+                  description="Sorted by filename from bottom to top."
+                  placeholder="Select files"
+                  clearable
+                  disabled={creating}
+                  style={{ flex: '1 1 16rem', maxWidth: 360 }}
+                />
+                <Select
+                  label="Condition"
+                  value={condition}
+                  onChange={(value) => {
+                    if (value) {
+                      setCondition(value as Condition);
+                    }
+                  }}
+                  data={CONDITIONS}
+                  disabled={creating}
+                  style={{ flex: '0 1 10rem' }}
+                />
+                <Select
+                  label="Finish"
+                  value={finish}
+                  onChange={(value) => {
+                    if (value) {
+                      setFinish(value as Finish);
+                    }
+                  }}
+                  data={FINISHES}
+                  disabled={creating}
+                  style={{ flex: '0 1 10rem' }}
+                />
+                <Button
+                  onClick={handleCreate}
+                  disabled={
+                    creating ||
+                    sortedFiles.length === 0 ||
+                    fileErrors.length > 0
+                  }
+                  loading={creating}
+                >
+                  Create scan
+                </Button>
+              </Group>
+              {files.length > 0 && fileErrors.length > 0 && (
+                <Stack gap={2} role="alert">
+                  {fileErrors.map((fileError) => (
+                    <Text key={fileError} size="sm" c="red.7">
+                      {fileError}
+                    </Text>
+                  ))}
+                </Stack>
+              )}
+              {submitError && (
+                <Text size="sm" c="red.7" role="alert">
+                  {submitError}
+                </Text>
+              )}
+            </Stack>
           }
           footer={
             nextContinuation ? (
@@ -263,6 +356,7 @@ export function ScanPage() {
                   variant="default"
                   onClick={handleLoadMore}
                   loading={loadingMore}
+                  disabled={creating}
                 >
                   Load more
                 </Button>
@@ -285,7 +379,11 @@ export function ScanPage() {
             />
           )}
           {!loading && !error && scans.length > 0 && (
-            <ScanTable scans={scans} selectedIndex={selectedIndex} />
+            <ScanTable
+              scans={scans}
+              selectedIndex={selectedIndex}
+              onOpen={openScan}
+            />
           )}
         </CollectionSurface>
       </Stack>

@@ -15,7 +15,7 @@ import classes from './AppShellLayout.module.css';
 
 const WORKSPACE_LINKS = [
   { label: 'Inventory', to: '/inventory', icon: IconCards },
-  { label: 'Scans', to: '/scan', icon: IconCamera },
+  { label: 'Scans', to: '/scans', icon: IconCamera },
   { label: 'Imports', to: '/imports', icon: IconFileImport },
   { label: 'Orders', to: '/orders', icon: IconPackage },
   { label: 'Reports', to: '/reports', icon: IconChartBar },

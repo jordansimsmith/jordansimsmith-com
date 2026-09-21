@@ -40,7 +40,15 @@ describe('AppShellLayout', () => {
   });
 
   it('highlights the scan navigation item on the scan route', () => {
-    renderShell('/scan');
+    renderShell('/scans');
+
+    expect(
+      screen.getByRole('link', { name: 'Scans' }).getAttribute('aria-current'),
+    ).toBe('page');
+  });
+
+  it('highlights the scan navigation item on a scan detail route', () => {
+    renderShell('/scans/fake-scan-identifying');
 
     expect(
       screen.getByRole('link', { name: 'Scans' }).getAttribute('aria-current'),

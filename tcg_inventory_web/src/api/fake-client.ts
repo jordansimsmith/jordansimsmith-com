@@ -50,6 +50,7 @@ import type {
 } from './client';
 import { parseManaBoxCsv } from '../domain/manabox';
 import type { ManaBoxRow } from '../domain/manabox';
+import { compareScanFilenames } from '../domain/scan-files';
 
 const VALID_CONDITIONS: Condition[] = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 const VALID_FINISHES: Finish[] = ['normal', 'foil', 'etched'];
@@ -542,6 +543,7 @@ interface FakeScanRow extends ScanFile {
 
 interface FakeScan {
   scan_id: string;
+  assume_upload_success?: boolean;
   status: ScanStatus;
   condition: Condition;
   finish: Finish;
@@ -786,6 +788,18 @@ function createSeedScans(): FakeScan[] {
 
 function activeScanRows(scan: FakeScan): FakeScanRow[] {
   return scan.rows.filter((row) => !row.deleted);
+}
+
+function assumeFakeUploads(scan: FakeScan): void {
+  if (!scan.assume_upload_success || scan.status !== 'uploading') {
+    return;
+  }
+  for (const row of activeScanRows(scan)) {
+    row.uploaded = true;
+    row.upload_url = null;
+    row.upload_headers = null;
+    row.source_url = FAKE_SCAN_SOURCE_URL;
+  }
 }
 
 function progressFakeScan(scan: FakeScan): void {
@@ -1317,6 +1331,7 @@ export function createFakeClient(): ApiClient {
     if (!scan) {
       throw new Error('Not Found');
     }
+    assumeFakeUploads(scan);
     progressFakeScan(scan);
     return scan;
   };
@@ -1595,12 +1610,13 @@ export function createFakeClient(): ApiClient {
         throw new Error('scan filenames must be unique');
       }
       const files = [...request.files].sort((a, b) =>
-        a.filename < b.filename ? -1 : a.filename > b.filename ? 1 : 0,
+        compareScanFilenames(a.filename, b.filename),
       );
       const scanId = `fake-scan-${scanCounter}`;
       scanCounter += 1;
       const scan: FakeScan = {
         scan_id: scanId,
+        assume_upload_success: true,
         status: 'uploading',
         condition: request.condition,
         finish: request.finish,

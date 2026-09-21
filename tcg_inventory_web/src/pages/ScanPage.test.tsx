@@ -2,15 +2,16 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ScanPage } from './ScanPage';
 import * as clientModule from '../api/client';
-import type { ScanDetail, ScanSummary } from '../api/client';
+import * as uploaderModule from '../api/scan-uploader';
+import type { ScanDetail, ScanRow, ScanSummary } from '../api/client';
 
 const scanFixtures: ScanSummary[] = [
   {
-    scan_id: 'scan-new',
+    scan_id: 'scan-reviewing',
     status: 'reviewing',
     condition: 'NM',
     finish: 'normal',
@@ -21,7 +22,7 @@ const scanFixtures: ScanSummary[] = [
     created_at: 1765420932,
   },
   {
-    scan_id: 'scan-old',
+    scan_id: 'scan-confirmed',
     status: 'confirmed',
     condition: 'LP',
     finish: 'foil',
@@ -33,12 +34,46 @@ const scanFixtures: ScanSummary[] = [
   },
 ];
 
+function scanRow(overrides: Partial<ScanRow> = {}): ScanRow {
+  return {
+    scan_position: 1,
+    filename: '001.jpg',
+    size_bytes: 4,
+    uploaded: false,
+    upload_url: 'fake://scan-created/000001',
+    upload_headers: { 'Content-Type': 'image/jpeg' },
+    status: null,
+    needs_review: false,
+    suggestions: [],
+    source_url: null,
+    error: null,
+    ...overrides,
+  };
+}
+
+function scanDetail(overrides: Partial<ScanDetail> = {}): ScanDetail {
+  return {
+    ...scanFixtures[0],
+    scan_id: 'scan-created',
+    status: 'uploading',
+    row_count: 1,
+    processed_count: 0,
+    error: null,
+    import_id: null,
+    rows: [scanRow()],
+    ...overrides,
+  };
+}
+
 function renderScanPage() {
   return render(
     <MantineProvider>
       <Notifications />
-      <MemoryRouter initialEntries={['/scan']}>
-        <ScanPage />
+      <MemoryRouter initialEntries={['/scans']}>
+        <Routes>
+          <Route path="/scans" element={<ScanPage />} />
+          <Route path="/scans/:scanId" element={<div>Scan detail route</div>} />
+        </Routes>
       </MemoryRouter>
     </MantineProvider>,
   );
@@ -57,7 +92,7 @@ describe('ScanPage', () => {
     cleanup();
   });
 
-  it('renders the new scan surface above resumable jobs', async () => {
+  it('renders the compact intake surface without preview or confirmation controls', async () => {
     renderScanPage();
 
     const jobs = screen.getByRole('region', { name: 'Scan jobs' });
@@ -72,37 +107,54 @@ describe('ScanPage', () => {
     expect(within(jobs).getByText('100 / 100')).toBeDefined();
     expect(within(jobs).getByText('Foil')).toBeDefined();
     expect(
-      within(jobs).getByRole('columnheader', { name: 'Created' }),
-    ).toBeDefined();
-    expect(
-      within(jobs).queryByRole('columnheader', { name: 'Import' }),
+      screen.queryByRole('region', { name: 'Selected scan files' }),
     ).toBeNull();
-    expect(
-      screen.queryByText('one image needs a manual printing choice'),
-    ).toBeNull();
+    expect(screen.queryByRole('checkbox')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Identify scan' })).toBeNull();
   });
 
-  it('adds the created scan to the top of the table', async () => {
-    const created: ScanDetail = {
+  it('refreshes the table then uploads, verifies, identifies, and navigates', async () => {
+    const created = scanDetail();
+    const verified = scanDetail({
+      rows: [
+        scanRow({ uploaded: true, upload_url: null, upload_headers: null }),
+      ],
+    });
+    const refreshedScan: ScanSummary = {
       ...scanFixtures[0],
       scan_id: 'scan-created',
       status: 'uploading',
       row_count: 1,
       processed_count: 0,
       error: null,
-      import_id: null,
-      rows: [],
     };
+    const findScans = vi
+      .spyOn(clientModule.apiClient, 'findScans')
+      .mockResolvedValueOnce({ scans: scanFixtures, next_continuation: null })
+      .mockResolvedValueOnce({
+        scans: [refreshedScan],
+        next_continuation: null,
+      });
     const createScan = vi
       .spyOn(clientModule.apiClient, 'createScan')
       .mockResolvedValue(created);
+    const uploadBatch = vi
+      .spyOn(uploaderModule.scanUploader, 'uploadBatch')
+      .mockResolvedValue(undefined);
+    const getScan = vi
+      .spyOn(clientModule.apiClient, 'getScan')
+      .mockResolvedValue(verified);
+    const identifyScan = vi
+      .spyOn(clientModule.apiClient, 'identifyScan')
+      .mockResolvedValue({ scan_id: 'scan-created', status: 'identifying' });
     const user = userEvent.setup();
     const { container } = renderScanPage();
     const fileInput = container.querySelector('input[type="file"]');
-    expect(fileInput).not.toBeNull();
-    const file = new File(['jpeg'], '001.jpg', { type: 'image/jpeg' });
 
-    await user.upload(fileInput as HTMLInputElement, file);
+    await user.upload(
+      fileInput as HTMLInputElement,
+      new File(['jpeg'], '001.jpg', { type: 'image/jpeg' }),
+    );
     await user.click(screen.getByRole('button', { name: 'Create scan' }));
 
     expect(createScan).toHaveBeenCalledWith({
@@ -110,72 +162,98 @@ describe('ScanPage', () => {
       finish: 'normal',
       files: [{ filename: '001.jpg', size_bytes: 4 }],
     });
-    expect(await screen.findByText('0 / 1')).toBeDefined();
-  });
-
-  it('shows an empty state', async () => {
-    vi.spyOn(clientModule.apiClient, 'findScans').mockResolvedValue({
-      scans: [],
-      next_continuation: null,
-    });
-
-    renderScanPage();
-
-    expect(await screen.findByText('No scans yet.')).toBeDefined();
-  });
-
-  it('shows an error state when the list fails', async () => {
-    vi.spyOn(clientModule.apiClient, 'findScans').mockRejectedValue(
-      new Error('scan service unavailable'),
+    expect(findScans).toHaveBeenCalledTimes(2);
+    expect(uploadBatch).toHaveBeenCalledWith('scan-created', [
+      { slot: created.rows[0], file: expect.any(File) },
+    ]);
+    expect(getScan).toHaveBeenCalledWith('scan-created');
+    expect(identifyScan).toHaveBeenCalledWith('scan-created');
+    expect(findScans.mock.invocationCallOrder[1]).toBeLessThan(
+      uploadBatch.mock.invocationCallOrder[0],
     );
-
-    renderScanPage();
-
-    expect(await screen.findByText('Scans could not be loaded')).toBeDefined();
-    expect(screen.getAllByText('scan service unavailable')).toHaveLength(2);
+    expect(uploadBatch.mock.invocationCallOrder[0]).toBeLessThan(
+      getScan.mock.invocationCallOrder[0],
+    );
+    expect(getScan.mock.invocationCallOrder[0]).toBeLessThan(
+      identifyScan.mock.invocationCallOrder[0],
+    );
+    expect(await screen.findByText('Scan detail route')).toBeDefined();
   });
 
-  it('appends continuation results', async () => {
-    const olderScan: ScanSummary = {
-      ...scanFixtures[1],
-      scan_id: 'scan-oldest',
-      condition: 'DMG',
-    };
-    const findScans = vi.spyOn(clientModule.apiClient, 'findScans');
-    findScans
-      .mockResolvedValueOnce({
-        scans: scanFixtures,
-        next_continuation: 'page-2',
-      })
-      .mockResolvedValueOnce({ scans: [olderScan], next_continuation: null });
-
+  it('shows validation errors before creating a scan', async () => {
+    const createScan = vi.spyOn(clientModule.apiClient, 'createScan');
     const user = userEvent.setup();
-    renderScanPage();
-    await screen.findByText('100 / 100');
+    const { container } = renderScanPage();
+    const fileInput = container.querySelector('input[type="file"]');
 
-    await user.click(screen.getByRole('button', { name: 'Load more' }));
+    await user.upload(fileInput as HTMLInputElement, [
+      new File([''], 'same.jpg', { type: 'image/jpeg' }),
+      new File(['jpeg'], 'same.jpg', { type: 'image/jpeg' }),
+      new File(['png'], 'other.jpg', { type: 'image/png' }),
+    ]);
 
+    const validationAlert = screen.getByRole('alert');
+    expect(validationAlert.textContent).toContain('File names must be unique.');
+    expect(validationAlert.textContent).toContain('Files must not be empty.');
+    expect(validationAlert.textContent).toContain(
+      'Only .jpg and .jpeg files are supported.',
+    );
+    expect(
+      (screen.getByRole('button', { name: 'Create scan' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+    expect(createScan).not.toHaveBeenCalled();
+  });
+
+  it('retains the files and leaves a failed job without retry controls', async () => {
+    const created = scanDetail();
+    const failedSummary: ScanSummary = {
+      ...scanFixtures[0],
+      scan_id: 'scan-created',
+      status: 'uploading',
+      row_count: 1,
+      processed_count: 0,
+      error: null,
+    };
+    vi.spyOn(clientModule.apiClient, 'createScan').mockResolvedValue(created);
+    vi.spyOn(clientModule.apiClient, 'findScans')
+      .mockResolvedValueOnce({ scans: scanFixtures, next_continuation: null })
+      .mockResolvedValueOnce({
+        scans: [failedSummary],
+        next_continuation: null,
+      });
+    vi.spyOn(uploaderModule.scanUploader, 'uploadBatch').mockRejectedValue(
+      new Error('network interrupted'),
+    );
+    const user = userEvent.setup();
+    const { container } = renderScanPage();
+    const fileInput = container.querySelector(
+      'input[type="file"]',
+    ) as HTMLInputElement;
+    await user.upload(
+      fileInput,
+      new File(['jpeg'], '001.jpg', { type: 'image/jpeg' }),
+    );
+    await user.click(screen.getByRole('button', { name: 'Create scan' }));
+
+    expect(await screen.findAllByText('network interrupted')).not.toHaveLength(
+      0,
+    );
     expect(
       within(screen.getByRole('region', { name: 'Scan jobs' })).getByText(
-        'DMG',
+        'uploading',
       ),
     ).toBeDefined();
-    expect(findScans).toHaveBeenLastCalledWith({ continuation: 'page-2' });
-    expect(screen.queryByRole('button', { name: 'Load more' })).toBeNull();
+    expect(fileInput.files).toHaveLength(1);
+    expect(screen.queryByRole('button', { name: /retry|resume/i })).toBeNull();
   });
 
-  it('keeps the loading collection structure while the request is pending', () => {
-    vi.spyOn(clientModule.apiClient, 'findScans').mockReturnValue(
-      new Promise(() => {}),
-    );
-
+  it('opens a scan detail route when a table row is selected', async () => {
+    const user = userEvent.setup();
     renderScanPage();
 
-    expect(screen.getByLabelText('Loading collection')).toBeDefined();
-    expect(
-      within(screen.getByRole('region', { name: 'Scan jobs' })).getByLabelText(
-        'Condition',
-      ),
-    ).toBeDefined();
+    await user.click(await screen.findByText('reviewing'));
+
+    expect(await screen.findByText('Scan detail route')).toBeDefined();
   });
 });

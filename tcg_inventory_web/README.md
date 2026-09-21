@@ -13,8 +13,8 @@ The TCG inventory web service is a keyboard-first single-page app for running a 
 ## User stories
 
 - As a card seller working through a physical stack, I want to review an import top-of-stack first while pulling out its discard and review cards, so that daily intake tracks the cards in my hand.
-- As a card seller, I want to upload a batch of ordered card-front JPEGs and confirm each exact printing against Scryfall, so that the scanner can feed the ordinary import workflow.
-- As a card seller, I want my scan uploads and recognition suggestions to survive browser closure, so that I can resume identification without rescanning the stack.
+- As a card seller, I want to upload a batch of ordered card-front JPEGs and have identification start automatically, so that the scanner can begin processing without another confirmation step.
+- As a card seller, I want an identifying scan to show its progress on a dedicated page, so that I know when the batch is ready for review.
 - As a card seller revisiting a confirmed import, I want to see the total suggested value of its keepers, so that I can recall what that intake was worth without re-adding the row prices.
 - As a card seller reviewing an import on my desktop, I want rows needing photos flagged so I can add photos from my phone mid-review, so that high-value cards are photographed while still in hand.
 - As a card seller, I want a dense full-width inventory view with instant prefix search, so that I can find any SKU and its storage location in seconds.
@@ -33,8 +33,8 @@ The TCG inventory web service is a keyboard-first single-page app for running a 
 
 - Authenticate with username/password against the backend and persist a Basic auth session in `localStorage`; protect all routes and redirect unauthenticated users to `/`.
 - Import flow: upload a ManaBox CSV, watch appraisal progress, review appraisal decisions in stack order while pulling discard and review cards from the stack, confirm keepers, and display placement instructions with the card count and total suggested value. A confirmed import keeps that same keep-row total on the import page so reopening it still shows what the stack was worth.
-- Scanner intake: the `/scan` page places a new scan form above the scans list, like the imports list/new import pattern. Choose one condition and finish, upload an ordered JPEG folder, watch background recognition, review actual scans against Scryfall printings, explicitly confirm every retained row, and use Confirm scan to create an ordinary appraising import. The first scanned card is the first import row. Alternate art, double-faced cards, and tokens are supported.
-- Scan job management: retry an individual failed JPEG upload, reopen uploaded jobs after browser closure, permanently delete an outlier row while removing the physical card, delete an unfinished job, and inspect confirmed jobs read-only. Source scans are shown for identification only and are never automatically used as listing photos.
+- Scanner intake: the `/scans` page places a compact new scan form above the scans list, like the imports list/new import pattern. Choose one condition and finish, select 1–200 JPEG files, and submit the batch. Files are sorted by case-sensitive UTF-8 bytewise filename order; validation errors block creation before any API call. The Create button stays loading while the API creates the job, refreshes the table, uploads and verifies the complete batch, and starts identification. The browser then opens `/scans/{scan_id}`, where identification progress is polled until review is ready. The first scanned card is the first import row. Alternate art, double-faced cards, and tokens are supported.
+- Scan job management: an upload is one all-or-abandon batch attempt; an incomplete failed job remains `uploading` until it is deleted and cannot be retried or resumed. Scan rows open read-only job details, and identifying jobs show progress. Later review controls permanently delete an outlier row while requiring immediate physical removal, delete unfinished jobs, and inspect confirmed jobs read-only. Source scans are shown for identification only and are never automatically used as listing photos.
 - Listing photos during review: keep rows appraised at NZ$20+ carry a "needs photos" badge; a touch-friendly photo strip on keep rows supports add (camera or library) and remove — the first uploaded photo is the listing front image; confirm stays disabled while flagged rows lack photos; desktop picks up phone uploads on window refocus.
 - Inventory: dense SKU table with counts, prefix search, SKU detail with the Scryfall card image, units, derived locations, and per-unit photo thumbnails (view-only), and manual adjustments (remove unit, change condition).
 - Orders: list and detail with state badges, a Cards column carrying the card-line subtotal (postage excluded), a detail fulfillment panel with the buyer's name, delivery address, and postage option, order-level offered vs listed totals with an above/below-list badge when they differ, and a location-ordered pull sheet optimized for one-handed phone use — each entry shows the accepted per-card price, the current block position with the insertion location struck through beside it when gaps have shifted it, and the previous and next cards still in the block; confirm-pull action.
@@ -102,19 +102,15 @@ sequenceDiagram
   participant S as private S3
   participant C as Scryfall
 
-  U->>W: choose condition/finish and JPEG folder on /scan
+  U->>W: choose condition/finish and select JPEG files on /scans
   W->>A: POST /scans
   A-->>W: scan_id + row PUT URLs
-  W->>S: PUT each original JPEG, retry one if needed
+  W->>A: GET /scans to refresh the collection table
+  W->>S: PUT the complete JPEG batch once
+  W->>A: GET /scans/{scan_id} to verify every upload
   W->>A: POST /scans/{scan_id}/identify
   W->>A: GET /scans/{scan_id} while identifying
-  A-->>W: stored suggestions and source GET URLs
-  W->>C: search and paginate exact printings
-  C-->>W: card metadata and reference images
-  U->>W: explicitly confirm each retained row
-  W->>A: POST /scans/{scan_id}/confirm
-  A-->>W: import_id
-  W-->>U: open ordinary import progress
+  A-->>W: progress until review is ready
 ```
 
 ## Main technical decisions
@@ -128,7 +124,7 @@ sequenceDiagram
 - Poll job and import progress with a short interval while a job is running instead of adding streaming infrastructure.
 - Keep server state in page-level React state fed by the `ApiClient`; no global cache library.
 - Photo uploads are processed client-side before the API: a canvas re-encode to JPEG (max edge 2000 px, quality 0.85) normalizes iPhone HEIC and library picks, strips EXIF (including GPS), and keeps raw `image/jpeg` bodies far under Lambda's payload ceiling — no multipart, no presigned upload choreography.
-- Scanner JPEGs are different from listing photos: the browser preserves the original JPEG, uploads it directly to private S3 with a presigned PUT, and retries only a failed row. The API owns durable scan/job/suggestion state; manual printing selection and confirmation stay in page memory until Confirm scan.
+- Scanner JPEGs are different from listing photos: the browser preserves the original JPEG, creates the scan with `POST /scans`, refreshes the collection from `GET /scans`, uploads the selected files as one batch to private S3 with the initial presigned PUT URLs, and verifies the complete batch before automatic identification. The API owns durable scan/job/suggestion state; a failed/incomplete upload remains an abandoned `uploading` job with no retry or resume path. `GET /scans/{scan_id}` verifies uploads but does not issue replacement URLs.
 - Browser-direct Scryfall search, paginated `prints_search_uri` results, card metadata, and reference images follow the spike. Handle double-faced cards through `card_faces[].image_uris` when top-level `image_uris` is absent; store the exact Scryfall UUID on every selected printing. No browser score is presented as calibrated confidence.
 - Cross-device capture needs no live sync: the desktop review page refetches the import on window refocus (the reports pattern), so photos added from the phone appear when the user glances back.
 - Error surfaces split into two classes: transient request errors (short API `{"message"}` strings) surface as toasts or inline text, while persistent job failures use one shared failure alert component that renders the API's short error summary with defensive single-line truncation; deep diagnostics belong to backend logs rather than shipping to the browser.
@@ -137,8 +133,8 @@ sequenceDiagram
 
 Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it verbatim: SKU, unit, sequence number, block, location (`A42-42`), current location, import (`appraising` → `review` → `confirming` → `confirmed`; deletable before confirm), appraise and publish jobs, order states (`awaiting_payment`, `to_pick`, `fulfilled`, `voided`), pull sheet.
 
-- **Scan**: one ordered scanner batch with condition and finish fixed before identification; status `uploading` → `identifying` → `reviewing` → `confirmed`. Uploaded source images and suggestions survive browser closure; a confirmed scan is read-only.
-- **Scan row**: one source JPEG at an immutable bottom-first `scan_position`. The browser's selected exact printing and confirmation are local until Confirm scan; changing the selected UUID clears confirmation. Deleting a row is irreversible and means removing the same physical card.
+- **Scan**: one ordered scanner batch with condition and finish fixed before identification; status `uploading` → `identifying` → `reviewing` → `confirmed`. The `/scans` table is refreshed from the API after creation, and the identifying detail page polls durable progress. Uploaded source images and suggestions survive browser closure; a confirmed scan is read-only.
+- **Scan row**: one source JPEG at an immutable bottom-first `scan_position`. Recognition suggestions and later printing choices belong to the scan detail workflow; deleting a row is irreversible and means removing the same physical card.
 
 - **Keep/discard/review row**: an import row's appraisal decision; decisions are final for the import. Review cards are set aside physically, never ingested, and return through a later import once their cause is fixed.
 - **Placement instructions**: the post-confirm screen mapping the confirmed stack to block labels and location ranges, with the card names at each range boundary as physical checkpoints and a total suggested value for the confirmed stack. The same total stays on the import page when a confirmed import is reopened.
@@ -167,44 +163,44 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 
 ### Consumed backend endpoints
 
-| Method   | Path                                                     | Used by                                                                       |
-| -------- | -------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| `POST`   | `/imports`                                               | import upload                                                                 |
-| `GET`    | `/imports`                                               | imports list (continuation paging)                                            |
-| `GET`    | `/imports/{import_id}`                                   | appraisal progress + review rows + keep-row suggested total                   |
-| `POST`   | `/imports/{import_id}/confirm`                           | confirm flow + placement instructions and total suggested value               |
-| `DELETE` | `/imports/{import_id}`                                   | delete-import action                                                          |
-| `POST`   | `/imports/{import_id}/rows/{position}/photos`            | photo add from the review strip                                               |
-| `DELETE` | `/imports/{import_id}/rows/{position}/photos/{photo_id}` | photo remove                                                                  |
-| `POST`   | `/scans`                                                 | create batch and get initial row upload URLs                                  |
-| `GET`    | `/scans`                                                 | scans list (continuation paging)                                              |
-| `GET`    | `/scans/{scan_id}`                                       | scan rows, progress, suggestions, source URLs, fresh PUT URLs while uploading |
-| `POST`   | `/scans/{scan_id}/identify`                              | start recognition after all JPEG uploads                                      |
-| `DELETE` | `/scans/{scan_id}/rows/{scan_position}`                  | permanently remove an outlier row                                             |
-| `POST`   | `/scans/{scan_id}/confirm`                               | create one import from confirmed rows; return `import_id`                     |
-| `DELETE` | `/scans/{scan_id}`                                       | delete an unfinished scan and its uploads                                     |
-| `GET`    | `/skus`                                                  | inventory browse/search                                                       |
-| `GET`    | `/skus/{sku_id}`                                         | SKU detail + units                                                            |
-| `DELETE` | `/skus/{sku_id}/units/{sequence_number}`                 | remove-unit adjustment                                                        |
-| `PUT`    | `/skus/{sku_id}/units/{sequence_number}`                 | condition-change adjustment                                                   |
-| `GET`    | `/orders`                                                | orders list (continuation paging)                                             |
-| `GET`    | `/orders/{order_id}`                                     | order detail                                                                  |
-| `POST`   | `/orders/{order_id}/confirm`                             | confirm pull                                                                  |
-| `POST`   | `/publish`                                               | publish trigger                                                               |
-| `GET`    | `/publish`                                               | publish run polling + pending count                                           |
-| `GET`    | `/reports`                                               | reports tab snapshot + staleness + generation polling                         |
-| `POST`   | `/reports`                                               | automatic regeneration trigger when stale                                     |
-| `GET`    | `/settings`                                              | credential presence check + login probe + track orders after                  |
-| `PATCH`  | `/settings`                                              | partial update: credential and/or track orders after                          |
+| Method   | Path                                                     | Used by                                                                |
+| -------- | -------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `POST`   | `/imports`                                               | import upload                                                          |
+| `GET`    | `/imports`                                               | imports list (continuation paging)                                     |
+| `GET`    | `/imports/{import_id}`                                   | appraisal progress + review rows + keep-row suggested total            |
+| `POST`   | `/imports/{import_id}/confirm`                           | confirm flow + placement instructions and total suggested value        |
+| `DELETE` | `/imports/{import_id}`                                   | delete-import action                                                   |
+| `POST`   | `/imports/{import_id}/rows/{position}/photos`            | photo add from the review strip                                        |
+| `DELETE` | `/imports/{import_id}/rows/{position}/photos/{photo_id}` | photo remove                                                           |
+| `POST`   | `/scans`                                                 | create batch and get initial row upload URLs                           |
+| `GET`    | `/scans`                                                 | scans list (continuation paging)                                       |
+| `GET`    | `/scans/{scan_id}`                                       | scan rows, upload verification, progress, suggestions, and source URLs |
+| `POST`   | `/scans/{scan_id}/identify`                              | start recognition after all JPEG uploads                               |
+| `DELETE` | `/scans/{scan_id}/rows/{scan_position}`                  | permanently remove an outlier row                                      |
+| `POST`   | `/scans/{scan_id}/confirm`                               | create one import from confirmed rows; return `import_id`              |
+| `DELETE` | `/scans/{scan_id}`                                       | delete an unfinished scan and its uploads                              |
+| `GET`    | `/skus`                                                  | inventory browse/search                                                |
+| `GET`    | `/skus/{sku_id}`                                         | SKU detail + units                                                     |
+| `DELETE` | `/skus/{sku_id}/units/{sequence_number}`                 | remove-unit adjustment                                                 |
+| `PUT`    | `/skus/{sku_id}/units/{sequence_number}`                 | condition-change adjustment                                            |
+| `GET`    | `/orders`                                                | orders list (continuation paging)                                      |
+| `GET`    | `/orders/{order_id}`                                     | order detail                                                           |
+| `POST`   | `/orders/{order_id}/confirm`                             | confirm pull                                                           |
+| `POST`   | `/publish`                                               | publish trigger                                                        |
+| `GET`    | `/publish`                                               | publish run polling + pending count                                    |
+| `GET`    | `/reports`                                               | reports tab snapshot + staleness + generation polling                  |
+| `POST`   | `/reports`                                               | automatic regeneration trigger when stale                              |
+| `GET`    | `/settings`                                              | credential presence check + login probe + track orders after           |
+| `PATCH`  | `/settings`                                              | partial update: credential and/or track orders after                   |
 
 ### UI contract expectations
 
 - Requests and responses use snake_case fields; errors use `{"message":"..."}` and surface as user-visible feedback.
-- The scan form sits above the scans list on `/scan`. It requires condition (`NM`, `LP`, `MP`, `HP`, `DMG`) and finish (`normal`, `foil`, `etched`) before creating a batch, accepts only `.jpg`/`.jpeg` front images, previews bytewise filename order from bottom to top, and rejects duplicate filenames. It preserves original JPEG bytes and uploads each row to the presigned S3 PUT URL with `Content-Type: image/jpeg` and bounded concurrency. `GET /scans/{scan_id}` reports an S3-verified `uploaded` flag per row and a fresh URL for each missing/invalid row while `uploading`; the user can reselect the same folder after browser closure and retry only missing rows. `identify` is disabled until all rows are uploaded.
-- `GET /scans` lists durable jobs. `GET /scans/{scan_id}` supplies source image URLs, recognition status, top Scryfall suggestions, and short row/scan errors; the page polls while `identifying` and stops in `reviewing` or `confirmed`. It shows raw similarity only as an advisory rank, never as a percentage or automatic approval. The original scan appears beside the Scryfall reference, not a styled Scryfall stand-in.
+- The scan form sits above the scans list on `/scans`. It requires condition (`NM`, `LP`, `MP`, `HP`, `DMG`) and finish (`normal`, `foil`, `etched`) before creating a batch, accepts only 1–200 `.jpg`/`.jpeg` front files (10 MiB or smaller), and sorts case-sensitive UTF-8 bytewise filenames from bottom to top without a preview or confirmation step. Validation errors block creation before the API call. The Create button stays loading while `POST /scans` returns the initial upload slots, `GET /scans` refreshes the table, the complete batch uploads, `GET /scans/{scan_id}` verifies every row, and `POST /scans/{scan_id}/identify` starts recognition. `GET /scans/{scan_id}` reports an S3-verified `uploaded` flag per row and does not issue fresh upload URLs; any upload or verification failure leaves an incomplete `uploading` job that cannot be retried or resumed.
+- `GET /scans` lists durable jobs and is the collection table's source of truth. `/scans/{scan_id}` supplies status, progress, source image URLs, recognition suggestions, and short row/scan errors; the page polls while `identifying` and stops in `reviewing` or `confirmed`. It shows raw similarity only as an advisory rank, never as a percentage or automatic approval. The original scan appears beside the Scryfall reference, not as a styled Scryfall stand-in.
 - Scan review requires an explicit printing confirmation for every retained row, even a strong suggestion. The browser stores each selected Scryfall UUID plus name, set code/name, and collector number; changing the selected UUID clears confirmation. Search and printing pagination call Scryfall directly. A selectable printing has `lang=en` and offers the batch finish (`normal` maps to Scryfall `nonfoil`). Alternate art, double-faced cards, and tokens remain distinct printings; non-English and non-Magic selections are excluded. A `needs_review` row without a useful suggestion can be resolved through manual search.
 - Deleting a scan row first shows an irreversible dialog instructing immediate removal of the same physical card, then calls `DELETE /scans/{scan_id}/rows/{scan_position}`. Surviving positions do not change. Deleting an unfinished whole scan calls `DELETE /scans/{scan_id}`; confirmed scans expose no mutation controls.
-- Confirm scan is enabled only with at least one retained row and every retained row freshly confirmed. `POST /scans/{scan_id}/confirm` sends rows in ascending `scan_position` with `confirmed: true` and selected identity fields. On success the response's `import_id` opens `/imports/{import_id}`; the confirmed scan view does not need a back-link. On error the page keeps local selections and offers retry. Double submits are disabled. The first scanned card becomes the first import row. The existing import appraisal/review/photo/confirm screens handle the new import without a special scan mode.
+- Later scan review enables Confirm scan only with at least one retained row and every retained row freshly confirmed. `POST /scans/{scan_id}/confirm` sends rows in ascending `scan_position` with `confirmed: true` and selected identity fields. On success the response's `import_id` opens `/imports/{import_id}`. The Task 2 identifying detail is deliberately read-only; the existing import appraisal/review/photo/confirm screens handle the eventual new import without a special scan mode.
 - Login is validated by an authenticated `GET /settings` call; success persists the session.
 - Async work is observed through the affected resource: the UI polls `GET /imports/{import_id}` during appraisal and `GET /publish` during a publish run, every ~2 seconds while running. `POST /publish` is idempotent while a run is active (returns the existing run), so the trigger button cannot double-fire.
 - The order detail response is also the pull sheet: its `units` list is location-ordered and renders as the pick list when the order is `to_pick`. Every entry renders its per-unit `price` inline. While the order's cards are still boxed (`awaiting_payment`, `to_pick`) each entry renders the server-derived `current_location` big, with the insertion `location` struck through beside it when they differ, plus `previous_card`/`next_card` rows; `fulfilled` and `voided` orders render the insertion location only. The response's `lines` list is not rendered; the header shows `items_total_price` vs `listed_total_price` with a vs-list badge only when the offered total is above or below list. Above the pull sheet, a Delivery panel renders the detail-only `buyer_name`, `buyer_address`, and `postage_option`; each line is omitted when its field is null, the address renders as street lines followed by `<suburb>, <city> <post_code>` and the country, and postage falls back to a mapped `delivery_mode` label (`PICKUP` → `Pickup`, `DELIVERY` → `Delivery`) so pickup orders still state how the order leaves. The header carries `total_price` (postage included) so it stays distinct from the offered card subtotal beside it.
@@ -238,7 +234,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 ## Behavioral invariants and time semantics
 
 - The client never re-sorts import rows. ManaBox imports present top-of-stack first; scan-created imports preserve scan filename order, with the first scanned bottom card as row 1.
-- Scan settings are fixed before identification. Scan uploads and suggestions are server-owned and survive browser closure; selected printings and confirmations are browser memory until Confirm scan, so an incomplete review can reset on refresh. Once confirmed, the scan is read-only and its source images remain available indefinitely.
+- Scan settings are fixed before identification. The collection table is re-read from `GET /scans` after creation. Completed scan uploads and suggestions are server-owned and survive browser closure; a failed/incomplete upload remains an `uploading` job without retry or resume. Once confirmed, the scan is read-only and its source images remain available indefinitely.
 - Pull sheets and unit lists render in ascending sequence-number order (forward pass order).
 - Current locations and neighbor cards render only while the order's cards are still boxed (`awaiting_payment`, `to_pick`); fulfilled and voided orders show insertion locations only.
 - Import review is read-only; appraisal decisions are final for the import.
@@ -259,7 +255,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 
 - All API calls use HTTPS with Basic auth from the persisted session; the session token lives in `localStorage`, never in URLs.
 - Card images load directly from Scryfall using the public `scryfall_id`; no session, credential, or inventory data accompanies those requests.
-- Scan source images and uploads use short-lived API-issued S3 presigned URLs. The app never places Basic credentials in S3 requests or URLs, never logs presigns, and stops exposing upload controls after identification begins.
+- Scan source images and uploads use short-lived API-issued S3 presigned URLs. The app never places Basic credentials in S3 requests or URLs, never logs presigns, exposes no retry/resume controls, and stops exposing upload controls after identification begins.
 - The FetchTCG refresh token is entered into a password-type field, sent once via `PATCH /settings`, and never displayed, stored, or logged client-side.
 - Buyer names and addresses render only on the order detail page, straight from `GET /orders/{order_id}`; the client never caches them beyond page state and never puts them in URLs or logs.
 - Logout clears the session immediately.
@@ -284,7 +280,7 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 
 - Optimized for a single user with 5,000–10,000 SKUs: browse views paginate via continuation tokens and keep interactions immediate on desktop hardware.
 - Import review handles a few hundred rows with keyboard navigation; no virtualization until row counts demand it.
-- Scan intake handles a typical 100 JPEGs with bounded parallel S3 uploads and per-file progress/retry. Physical scanning under one minute is a useful capture goal, not a browser processing SLA. Scan list/detail polling runs only while identifying.
+- Scan intake handles a typical 100 JPEGs with one aggregate batch upload and no per-file progress, retry, or resume controls. Physical scanning under one minute is a useful capture goal, not a browser processing SLA. The Create button remains loading through the upload/verification/identify handoff; scan detail polling runs only while identifying.
 - Polling intervals (~2 s) apply only while a job is running.
 - The report payload is a few KB of pre-aggregated figures; charts render prepared data with no client-side computation. The reports tab is desktop-first; on mobile its figures stack, and tables, charts, and legends remain contained within the viewport.
 - Every route remains contained and usable at phone widths. The pull sheet, import review, and placement screens receive the strongest mobile optimization because they support one-handed physical work, and they render fast on mid-range phones.
@@ -293,7 +289,7 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 
 - Unit and component tests run with Vitest and React Testing Library in `jsdom`.
 - Key coverage: login and route protection, the vim navigation hook (movement, jumps, search focus), SKU detail adjustments (remove unit, condition change), imports list load more, import review rendering and the confirm transition, the import-page keep-row suggested total on confirmed imports (omitted before confirm), orders list load more, the list Cards column showing the card subtotal rather than the postage-inclusive total, the order detail fulfillment panel (name, address, postage option, pickup falling back to the delivery mode, null fields omitted), pull-sheet ordering and confirm flow (current vs struck-through insertion locations, per-card prices, neighbor rows, fulfilled orders reverting to insertion-only), the order-level offered-vs-listed totals badge (above/below only; omitted at list), publish trigger + job polling, the job-failure alert, masked credential form, reports tab rendering of every section from the fake client, the stale→regenerate→poll flow with figures kept visible, first-visit skeleton generation, the needs-photos badge and gated confirm, photo strip interactions (add via the canvas util, remove), refocus refetch of in-review imports, and read-only unit photo thumbnails.
-- Scan coverage: form/list layout, all condition/finish choices, filename order and duplicates, JPEG validation, individual PUT retry via detail URL refresh, browser restart preserving jobs but resetting choices, advisory suggestions, direct Scryfall search/pagination and double-faced image handling, confirmation reset on changed UUID, irreversible row deletion, confirmed read-only state, guarded Confirm scan and redirect to its returned import ID.
+- Scan coverage: `/scans` form/list and `/scans/:scanId` detail layout, all condition/finish choices, bytewise filename order and duplicates, JPEG/count/size validation, server table refresh after creation, aggregate batch upload and verification, automatic identification, failed batches remaining `uploading` without retry/resume controls, identifying progress polling, browser restart preserving completed jobs, advisory suggestions, direct Scryfall search/pagination and double-faced image handling, confirmation reset on changed UUID, irreversible row deletion, confirmed read-only state, guarded Confirm scan and redirect to its returned import ID.
 - Required checks: `bazel test //tcg_inventory_web:unit-tests`, `bazel build //tcg_inventory_web:typecheck`, `bazel build //tcg_inventory_web:build`.
 
 ## Local development and smoke checks
@@ -308,7 +304,7 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
   5. Trigger publish and watch the fake job drain the pending publish count.
   6. Set a credential in settings and verify only presence metadata renders.
   7. Open reports; verify every figure renders under the "data as of" stamp, then make an inventory change, revisit reports, and watch it regenerate automatically with figures swapping in place.
-  8. On `/scan`, choose LP/foil, add two JPEGs, retry one failed upload, identify, correct a Scryfall printing, confirm both rows, and confirm scan; verify the returned import opens. Reopen the scan and verify it is read-only.
+  8. On `/scans`, choose LP/foil, add two JPEGs, create the batch, verify the table refreshes from `GET /scans`, wait for the Create button to finish the upload/verification/identify handoff, and watch `/scans/{scan_id}` show identification progress. Later review and confirm the scan; verify the returned import opens. Reopen the scan and verify it is read-only.
 
 ## End-to-end scenarios
 
@@ -343,7 +339,7 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 
 ### Scenario 5: scanned stack to import
 
-1. User scans a stack into portrait front JPEGs; the lowest filename is the bottom physical card. The new scan form above the scans list previews that order and applies one condition/finish to the batch.
-2. The browser uploads each JPEG directly to S3, retries one failed row without resending the others, then starts identification. Closing the browser does not lose the scan or CollectorVision suggestions.
+1. User scans a stack into portrait front JPEGs; the lowest filename is the bottom physical card. The new form on `/scans` applies one condition/finish to the batch and validates the selected files before creation; filename order is implicit and bytewise.
+2. `POST /scans` creates the durable job, `GET /scans` refreshes the table, and the browser uploads the complete JPEG batch directly to S3 before verifying every row and starting identification. If any upload fails, the scan remains an incomplete `uploading` job and the user creates a new batch; there is no per-file retry or browser-session resume. `/scans/{scan_id}` shows the identifying progress, and closing the browser after a completed upload does not lose the scan or CollectorVision suggestions.
 3. The user returns, compares each actual scan with browser-direct Scryfall printings, searches manually for an ambiguous alternate art, and explicitly confirms every retained row. The user deletes one damaged row and removes the physical card immediately.
 4. Confirm scan returns an `import_id` and opens that ordinary import. Its first row is the first scanned card; the established appraisal, listing-photo gate, import confirmation, and placement flow follows. Reopening the confirmed scan shows images and identities without edit controls.

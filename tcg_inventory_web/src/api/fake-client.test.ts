@@ -1,5 +1,6 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { createFakeClient } from './fake-client';
+import { createFakeScanUploader } from './fake-scan-uploader';
 import type { ScanConfirmationRow } from './client';
 
 async function findSkuId(
@@ -399,7 +400,7 @@ describe('createFakeClient imports', () => {
 });
 
 describe('createFakeClient scans', () => {
-  it('seeds resumable scan jobs in newest-first order', async () => {
+  it('seeds scan jobs in newest-first order', async () => {
     const client = createFakeClient();
 
     const firstPage = await client.findScans();
@@ -453,6 +454,36 @@ describe('createFakeClient scans', () => {
     await expect(client.identifyScan('fake-scan-uploading')).rejects.toThrow(
       'all scan files must be uploaded',
     );
+  });
+
+  it('assumes a created batch uploads successfully on verification', async () => {
+    const client = createFakeClient();
+    const uploader = createFakeScanUploader();
+    const created = await client.createScan({
+      condition: 'LP',
+      finish: 'foil',
+      files: [
+        { filename: '001.jpg', size_bytes: 3 },
+        { filename: '002.jpg', size_bytes: 4 },
+      ],
+    });
+    await uploader.uploadBatch(
+      created.scan_id,
+      created.rows.map((slot) => ({
+        slot,
+        file: new File(['x'.repeat(slot.size_bytes)], slot.filename, {
+          type: 'image/jpeg',
+        }),
+      })),
+    );
+
+    expect(
+      (await client.getScan(created.scan_id)).rows.every((row) => row.uploaded),
+    ).toBe(true);
+    await expect(client.identifyScan(created.scan_id)).resolves.toEqual({
+      scan_id: created.scan_id,
+      status: 'identifying',
+    });
   });
 
   it('confirms a reviewing scan once and creates rows in scan order', async () => {

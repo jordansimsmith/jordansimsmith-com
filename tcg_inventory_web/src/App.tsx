@@ -9,6 +9,7 @@ import { OrderDetailPage } from './pages/OrderDetailPage';
 import { ReportsPage } from './pages/ReportsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ScanPage } from './pages/ScanPage';
+import { ScanDetailPage } from './pages/ScanDetailPage';
 import { getSession } from './auth/session';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -65,10 +66,18 @@ export function App() {
           }
         />
         <Route
-          path="/scan"
+          path="/scans"
           element={
             <RequireAuth>
               <ScanPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/scans/:scanId"
+          element={
+            <RequireAuth>
+              <ScanDetailPage />
             </RequireAuth>
           }
         />

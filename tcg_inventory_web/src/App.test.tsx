@@ -6,6 +6,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { LoginPage } from './pages/LoginPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { ScanPage } from './pages/ScanPage';
+import { ScanDetailPage } from './pages/ScanDetailPage';
 import { getSession } from './auth/session';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -39,10 +40,18 @@ function renderApp(initialRoute = '/') {
             }
           />
           <Route
-            path="/scan"
+            path="/scans"
             element={
               <RequireAuth>
                 <ScanPage />
+              </RequireAuth>
+            }
+          />
+          <Route
+            path="/scans/:scanId"
+            element={
+              <RequireAuth>
+                <ScanDetailPage />
               </RequireAuth>
             }
           />
@@ -99,7 +108,16 @@ describe('App', () => {
   });
 
   it('protects the scan route', () => {
-    renderApp('/scan');
+    renderApp('/scans');
+
+    expect(
+      screen.getByRole('heading', { name: /tcg inventory/i }),
+    ).toBeDefined();
+    expect(screen.getByLabelText(/username/i)).toBeDefined();
+  });
+
+  it('protects the scan detail route', () => {
+    renderApp('/scans/fake-scan-identifying');
 
     expect(
       screen.getByRole('heading', { name: /tcg inventory/i }),
