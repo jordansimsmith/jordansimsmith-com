@@ -16,6 +16,7 @@ import {
   CollectionSurface,
 } from '../components/CollectionSurface';
 import { PageHeader } from '../components/PageHeader';
+import { ScanReview } from '../components/ScanReview';
 import { apiClient } from '../api/client';
 import type { ScanDetail, ScanStatus } from '../api/client';
 
@@ -161,6 +162,12 @@ export function ScanDetailPage() {
       }
       const target = event.target;
       if (
+        target instanceof HTMLElement &&
+        target.closest('[data-scan-review]')
+      ) {
+        return;
+      }
+      if (
         target instanceof HTMLInputElement ||
         target instanceof HTMLTextAreaElement
       ) {
@@ -202,7 +209,11 @@ export function ScanDetailPage() {
                 </Button>
               }
             />
-            <ScanSummary scan={scan} />
+            {scan.status === 'reviewing' ? (
+              <ScanReview scan={scan} />
+            ) : (
+              <ScanSummary scan={scan} />
+            )}
           </>
         )}
       </Stack>

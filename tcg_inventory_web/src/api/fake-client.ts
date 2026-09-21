@@ -557,8 +557,13 @@ interface FakeScan {
   confirmation_manifest: ScanConfirmationRow[] | null;
 }
 
-const FAKE_SCAN_SOURCE_URL =
-  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='336'%3E%3Crect width='100%25' height='100%25' fill='%23f1f3f5'/%3E%3C/svg%3E";
+function fakeScanSourceUrl(scanId: string, scanPosition: number): string {
+  const colors = ['#dbeafe', '#dcfce7', '#fef3c7', '#fce7f3', '#ede9fe'];
+  const color = colors[(scanPosition - 1) % colors.length];
+  const label = `${scanId} · ${String(scanPosition).padStart(3, '0')}.jpg`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="240" height="336" viewBox="0 0 240 336"><rect width="240" height="336" fill="${color}"/><rect x="12" y="12" width="216" height="312" rx="8" fill="white" stroke="#94a3b8" stroke-width="2"/><text x="24" y="48" fill="#1e293b" font-family="sans-serif" font-size="15" font-weight="700">scanner source</text><text x="24" y="286" fill="#475569" font-family="sans-serif" font-size="11">${label}</text><text x="24" y="305" fill="#64748b" font-family="sans-serif" font-size="10">front JPEG fixture</text></svg>`;
+  return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+}
 
 function scanSuggestion(
   scryfallId: string,
@@ -608,7 +613,7 @@ function createFakeScanRow(
     status,
     needs_review: status === 'needs_review',
     suggestions: suggestions.map((suggestion) => ({ ...suggestion })),
-    source_url: uploaded ? FAKE_SCAN_SOURCE_URL : null,
+    source_url: uploaded ? fakeScanSourceUrl(scanId, scanPosition) : null,
     error,
     deleted: false,
   };
@@ -617,22 +622,22 @@ function createFakeScanRow(
 function createSeedScans(): FakeScan[] {
   const now = Date.now();
   const lightningBolt = scanSuggestion(
-    '4eaac0d0-0000-0000-0000-000000000001',
+    'f29ba16f-c8fb-42fe-aabf-87089cb214a7',
     'Lightning Bolt',
     0.93,
   );
   const llanowarElves = scanSuggestion(
-    '581b7327-3215-4a4f-b4ae-d9d4002ba882',
+    '6a0b230b-d391-4998-a3f7-7b158a0ec2cd',
     'Llanowar Elves',
     0.87,
   );
   const opt = scanSuggestion(
-    '25f2e4d0-effd-4e83-b7aa-1a0d8f120951',
+    '323db259-d35e-467d-9a46-4adcb2fc107c',
     'Opt',
     0.71,
   );
   const counterspell = scanSuggestion(
-    '1920dae4-fb92-4f19-ae4b-eb3276b8dac7',
+    '4f616706-ec97-4923-bb1e-11a69fbaa1f8',
     'Counterspell',
     0.96,
   );
@@ -798,7 +803,7 @@ function assumeFakeUploads(scan: FakeScan): void {
     row.uploaded = true;
     row.upload_url = null;
     row.upload_headers = null;
-    row.source_url = FAKE_SCAN_SOURCE_URL;
+    row.source_url = fakeScanSourceUrl(scan.scan_id, row.scan_position);
   }
 }
 
@@ -825,13 +830,13 @@ function progressFakeScan(scan: FakeScan): void {
     row.suggestions = [
       scanSuggestion(
         index % 2 === 0
-          ? '4eaac0d0-0000-0000-0000-000000000001'
-          : '581b7327-3215-4a4f-b4ae-d9d4002ba882',
+          ? 'f29ba16f-c8fb-42fe-aabf-87089cb214a7'
+          : '6a0b230b-d391-4998-a3f7-7b158a0ec2cd',
         index % 2 === 0 ? 'Lightning Bolt' : 'Llanowar Elves',
         index % 3 === 1 ? 0.61 : 0.9,
       ),
     ];
-    row.source_url = FAKE_SCAN_SOURCE_URL;
+    row.source_url = fakeScanSourceUrl(scan.scan_id, row.scan_position);
   }
   scan.processed_count = processedCount;
   if (processedCount >= rows.length) {

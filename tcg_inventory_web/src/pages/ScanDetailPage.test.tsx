@@ -77,10 +77,10 @@ describe('ScanDetailPage', () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
     expect(getScan).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('heading', { name: 'Scan' })).toBeDefined();
+    expect(screen.getByRole('region', { name: 'Scan summary' })).toBeDefined();
     expect(
-      screen.getByText(
-        'Identification is complete. This scan is ready for review.',
-      ),
+      screen.getByRole('progressbar', { name: 'Review confirmation progress' }),
     ).toBeDefined();
 
     await act(async () => {

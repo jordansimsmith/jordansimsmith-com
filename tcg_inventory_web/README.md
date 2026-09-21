@@ -147,6 +147,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 - List views (inventory, imports, orders): `j`/`k` move selection down/up, `gg`/`G` jump to first/last row, `/` focuses search, `Enter` opens the selected row, `Escape` closes detail or clears search focus.
 - Import review is read-only: the same movement keys track the selected row while the user leafs through the physical stack; rows carry no actions.
 - Scan review adapts the spike's `j`/`k` row movement, `h`/`l` printing movement, `/` search, and `c` confirm. `d` opens an irreversible delete dialog; it never deletes a row immediately. Confirm scan is an explicit button, not a single key.
+- Scan review shortcuts remain active after pointer selection and while buttons are focused; they pause only while typing into an input, textarea, select, or contenteditable control. `Escape` blurs the active text control or leaves the detail view.
 - Destructive or committing actions (confirm import, confirm pull, remove unit, delete import) are explicit buttons with confirmation dialogs — never single keys.
 - Keyboard interactions are desktop affordances; all actions remain reachable by touch.
 
@@ -340,6 +341,6 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 ### Scenario 5: scanned stack to import
 
 1. User scans a stack into portrait front JPEGs; the lowest filename is the bottom physical card. The new form on `/scans` applies one condition/finish to the batch and validates the selected files before creation; filename order is implicit and bytewise.
-2. `POST /scans` creates the durable job, `GET /scans` refreshes the table, and the browser uploads the complete JPEG batch directly to S3 before verifying every row and starting identification. If any upload fails, the scan remains an incomplete `uploading` job and the user creates a new batch; there is no per-file retry or browser-session resume. `/scans/{scan_id}` shows the identifying progress, and closing the browser after a completed upload does not lose the scan or CollectorVision suggestions.
+2. `POST /scans` creates the durable job, `GET /scans` refreshes the table, and the browser uploads the complete JPEG batch directly to S3 before verifying every row and starting identification. If any upload fails, the scan remains an incomplete `uploading` job and the user creates a new batch; there is no per-file retry or browser-session resume. `/scans/{scan_id}` shows the identifying progress, and closing the browser after a completed upload does not lose the scan or persisted suggestions.
 3. The user returns, compares each actual scan with browser-direct Scryfall printings, searches manually for an ambiguous alternate art, and explicitly confirms every retained row. The user deletes one damaged row and removes the physical card immediately.
 4. Confirm scan returns an `import_id` and opens that ordinary import. Its first row is the first scanned card; the established appraisal, listing-photo gate, import confirmation, and placement flow follows. Reopening the confirmed scan shows images and identities without edit controls.
