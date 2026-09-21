@@ -28,11 +28,14 @@ import classes from '../components/CollectionTable.module.css';
 const STATUS_COLORS: Record<ScanStatus, string> = {
   uploading: 'blue',
   identifying: 'blue',
-  reviewing: 'orange',
+  reviewing: 'yellow',
   confirmed: 'green',
 };
 
 function formatStatus(status: ScanStatus): string {
+  if (status === 'reviewing') {
+    return 'review';
+  }
   return status.replace('_', ' ');
 }
 

@@ -521,6 +521,30 @@ describe('createFakeClient scans', () => {
     expect(scan.rows.map((row) => row.scan_position)).toEqual([1, 3]);
     expect(scan.row_count).toBe(2);
   });
+
+  it('deletes unfinished scans but keeps confirmed scans immutable', async () => {
+    for (const scanId of [
+      'fake-scan-uploading',
+      'fake-scan-identifying',
+      'fake-scan-reviewing',
+    ]) {
+      const client = createFakeClient();
+
+      await client.deleteScan(scanId);
+
+      await expect(client.getScan(scanId)).rejects.toThrow('Not Found');
+      expect(
+        (await client.findScans()).scans.some(
+          (scan) => scan.scan_id === scanId,
+        ),
+      ).toBe(false);
+    }
+
+    const client = createFakeClient();
+    await expect(client.deleteScan('fake-scan-confirmed')).rejects.toThrow(
+      'confirmed scans cannot be deleted',
+    );
+  });
 });
 
 describe('createFakeClient row photos', () => {

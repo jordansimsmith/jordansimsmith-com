@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { Badge, Box, Group, Paper, Progress, Stack, Text } from '@mantine/core';
+import {
+  Badge,
+  Box,
+  Button,
+  Group,
+  Paper,
+  Progress,
+  Stack,
+  Text,
+} from '@mantine/core';
 import {
   IconAlertCircle,
   IconCircleCheck,
@@ -8,12 +17,14 @@ import {
 } from '@tabler/icons-react';
 import { scryfallClient } from '../api/scryfall-client';
 import type { ScryfallPrinting } from '../api/scryfall-client';
-import type { ScanDetail, ScanRow } from '../api/client';
+import type { ScanConfirmationRow, ScanDetail, ScanRow } from '../api/client';
 import classes from './ScanReview.module.css';
 import { ScanReviewPanels, type ReviewSelection } from './ScanReviewPanels';
 
 interface ScanReviewProps {
   scan: ScanDetail;
+  onDeleteRow: (scanPosition: number) => Promise<void>;
+  onConfirmScan: (rows: ScanConfirmationRow[]) => Promise<void>;
 }
 
 function formatFinish(finish: ScanDetail['finish']): string {
@@ -56,10 +67,18 @@ function ReviewSummary({
   scan,
   confirmedCount,
   rowCount,
+  canConfirm,
+  confirming,
+  confirmError,
+  onConfirm,
 }: {
   scan: ScanDetail;
   confirmedCount: number;
   rowCount: number;
+  canConfirm: boolean;
+  confirming: boolean;
+  confirmError: string | null;
+  onConfirm: () => void;
 }) {
   const progress = rowCount === 0 ? 0 : (confirmedCount / rowCount) * 100;
 
@@ -77,8 +96,8 @@ function ReviewSummary({
             <Text fw={600} size="sm">
               Scan summary
             </Text>
-            <Badge variant="light" color="orange">
-              reviewing
+            <Badge variant="light" color="yellow">
+              review
             </Badge>
           </Group>
           <Text size="sm" c="dimmed">
@@ -90,9 +109,19 @@ function ReviewSummary({
           <Badge variant="light">{formatFinish(scan.finish)}</Badge>
         </Group>
         <Stack gap="xs">
-          <Text size="sm">
-            {confirmedCount} of {rowCount} confirmed
-          </Text>
+          <Group justify="space-between" gap="sm" wrap="wrap">
+            <Text size="sm">
+              {confirmedCount} of {rowCount} confirmed
+            </Text>
+            <Button
+              color="teal"
+              loading={confirming}
+              disabled={!canConfirm || confirming}
+              onClick={onConfirm}
+            >
+              Confirm scan
+            </Button>
+          </Group>
           <Progress
             value={progress}
             size="sm"
@@ -100,6 +129,11 @@ function ReviewSummary({
             aria-label="Review confirmation progress"
           />
         </Stack>
+        {confirmError && (
+          <Text size="sm" c="red.7" role="alert">
+            {confirmError}
+          </Text>
+        )}
         <Text size="sm" c="dimmed">
           Identification is complete. This scan is ready for review.
         </Text>
@@ -113,7 +147,11 @@ function ReviewSummary({
   );
 }
 
-export function ScanReview({ scan }: ScanReviewProps) {
+export function ScanReview({
+  scan,
+  onDeleteRow,
+  onConfirmScan,
+}: ScanReviewProps) {
   const rows = [...scan.rows].sort(
     (left, right) => left.scan_position - right.scan_position,
   );
@@ -135,6 +173,10 @@ export function ScanReview({ scan }: ScanReviewProps) {
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchSelectionLoading, setSearchSelectionLoading] = useState(false);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const rowRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const suggestionRequestVersions = useRef(new Map<number, number>());
@@ -160,6 +202,8 @@ export function ScanReview({ scan }: ScanReviewProps) {
   const confirmedCount = rows.filter(
     (row) => selections.get(row.scan_position)?.confirmed === true,
   ).length;
+  const canConfirm =
+    rows.length > 0 && confirmedCount === rows.length && !deleteLoading;
 
   useEffect(() => {
     if (selectedPosition === undefined || selectedSuggestionId === undefined) {
@@ -377,6 +421,83 @@ export function ScanReview({ scan }: ScanReviewProps) {
     }
   };
 
+  const deleteCurrentRow = async (position: number) => {
+    if (deleteLoading || confirming) {
+      return;
+    }
+    const deletedIndex = rows.findIndex(
+      (row) => row.scan_position === position,
+    );
+    if (deletedIndex < 0) {
+      return;
+    }
+
+    setDeleteLoading(true);
+    setDeleteError(null);
+    try {
+      await onDeleteRow(position);
+      invalidateSuggestionRequest(position);
+      setSelections((previous) => {
+        const next = new Map(previous);
+        next.delete(position);
+        return next;
+      });
+      setPrintingsByPosition((previous) => {
+        const next = new Map(previous);
+        next.delete(position);
+        return next;
+      });
+      setRowErrors((previous) => {
+        const next = new Map(previous);
+        next.delete(position);
+        return next;
+      });
+      setSelectedIndex((index) =>
+        Math.max(0, Math.min(index, rows.length - 2)),
+      );
+    } catch (error: unknown) {
+      setDeleteError(
+        error instanceof Error ? error.message : 'Card deletion failed',
+      );
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  const confirmScan = async () => {
+    if (!canConfirm || confirming) {
+      return;
+    }
+    const confirmationRows: ScanConfirmationRow[] = [];
+    for (const row of rows) {
+      const selection = selections.get(row.scan_position);
+      if (!selection?.confirmed) {
+        return;
+      }
+      confirmationRows.push({
+        scan_position: row.scan_position,
+        scryfall_id: selection.printing.id,
+        name: selection.printing.name,
+        set_code: selection.printing.set_code,
+        set_name: selection.printing.set_name,
+        collector_number: selection.printing.collector_number,
+        confirmed: true as const,
+      });
+    }
+
+    setConfirming(true);
+    setConfirmError(null);
+    try {
+      await onConfirmScan(confirmationRows);
+    } catch (error: unknown) {
+      setConfirmError(
+        error instanceof Error ? error.message : 'Scan confirmation failed',
+      );
+    } finally {
+      setConfirming(false);
+    }
+  };
+
   const selectSearchResult = async (name: string) => {
     if (selectedPosition === undefined) {
       return;
@@ -428,6 +549,9 @@ export function ScanReview({ scan }: ScanReviewProps) {
       if (event.metaKey || event.ctrlKey || event.altKey) {
         return;
       }
+      if (confirming || deleteLoading) {
+        return;
+      }
 
       switch (event.key) {
         case '/':
@@ -464,11 +588,15 @@ export function ScanReview({ scan }: ScanReviewProps) {
 
   if (!selectedRow) {
     return (
-      <Stack gap="md" data-scan-review>
+      <Stack gap="md" data-scan-review data-scan-review-editable>
         <ReviewSummary
           scan={scan}
           confirmedCount={confirmedCount}
           rowCount={rows.length}
+          canConfirm={canConfirm}
+          confirming={confirming}
+          confirmError={confirmError}
+          onConfirm={() => void confirmScan()}
         />
         <Paper withBorder radius="md" p="md">
           <Text>There are no scan rows available for review.</Text>
@@ -484,11 +612,15 @@ export function ScanReview({ scan }: ScanReviewProps) {
       : rowErrors.get(selectedPosition);
 
   return (
-    <Stack gap="md" data-scan-review>
+    <Stack gap="md" data-scan-review data-scan-review-editable>
       <ReviewSummary
         scan={scan}
         confirmedCount={confirmedCount}
         rowCount={rows.length}
+        canConfirm={canConfirm}
+        confirming={confirming}
+        confirmError={confirmError}
+        onConfirm={() => void confirmScan()}
       />
 
       <div className={classes.layout}>
@@ -529,6 +661,7 @@ export function ScanReview({ scan }: ScanReviewProps) {
                   }}
                   type="button"
                   aria-current={index === selectedIndex ? 'true' : undefined}
+                  disabled={confirming || deleteLoading}
                   className={`${classes.queueItem} ${index === selectedIndex ? classes.queueItemSelected : ''}`}
                   onClick={() => setSelectedIndex(index)}
                 >
@@ -584,14 +717,27 @@ export function ScanReview({ scan }: ScanReviewProps) {
           searching={searching}
           searchError={searchError}
           searchSelectionLoading={searchSelectionLoading}
+          controlsDisabled={confirming || deleteLoading}
           onMoveRow={moveRow}
           onMovePrinting={movePrinting}
           onChoosePrinting={choosePrinting}
           onSearchChange={setSearch}
           onSearchResult={(name) => void selectSearchResult(name)}
           onConfirm={confirmCurrent}
+          onDelete={() => {
+            setDeleteError(null);
+            if (selectedPosition !== undefined) {
+              void deleteCurrentRow(selectedPosition);
+            }
+          }}
+          deleteDisabled={confirming || deleteLoading}
         />
       </div>
+      {deleteError && (
+        <Text size="sm" c="red.7" role="alert">
+          {deleteError}
+        </Text>
+      )}
     </Stack>
   );
 }

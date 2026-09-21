@@ -22,6 +22,7 @@ import {
   IconChevronRight,
   IconPhoto,
   IconSearch,
+  IconTrash,
 } from '@tabler/icons-react';
 import type { ScanRow, ScanSuggestion } from '../api/client';
 import type { ScryfallPrinting } from '../api/scryfall-client';
@@ -54,6 +55,9 @@ interface ScanReviewPanelsProps {
   onSearchChange: (value: string) => void;
   onSearchResult: (name: string) => void;
   onConfirm: () => void;
+  onDelete: () => void;
+  deleteDisabled: boolean;
+  controlsDisabled: boolean;
 }
 
 type CropRegion = 'bottom-left' | 'mid-right';
@@ -170,6 +174,9 @@ export function ScanReviewPanels({
   onSearchChange,
   onSearchResult,
   onConfirm,
+  onDelete,
+  deleteDisabled,
+  controlsDisabled,
 }: ScanReviewPanelsProps) {
   const currentName =
     selection?.printing.name ?? suggestion?.name ?? 'Manual selection required';
@@ -305,7 +312,7 @@ export function ScanReviewPanels({
             <ActionIcon
               variant="default"
               aria-label="Previous printing"
-              disabled={printingIndex <= 0}
+              disabled={controlsDisabled || printingIndex <= 0}
               onClick={() => onMovePrinting(-1)}
             >
               <IconChevronLeft size={16} />
@@ -319,7 +326,9 @@ export function ScanReviewPanels({
               variant="default"
               aria-label="Next printing"
               disabled={
-                printingIndex < 0 || printingIndex >= printings.length - 1
+                controlsDisabled ||
+                printingIndex < 0 ||
+                printingIndex >= printings.length - 1
               }
               onClick={() => onMovePrinting(1)}
             >
@@ -334,6 +343,7 @@ export function ScanReviewPanels({
                 type="button"
                 key={printing.id}
                 aria-pressed={printing.id === selection?.printing.id}
+                disabled={controlsDisabled}
                 className={`${classes.printingButton} ${printing.id === selection?.printing.id ? classes.printingButtonSelected : ''}`}
                 onClick={() => onChoosePrinting(printing)}
               >
@@ -367,7 +377,7 @@ export function ScanReviewPanels({
             onChange={(event) => onSearchChange(event.currentTarget.value)}
             placeholder="Search for a card by name…"
             leftSection={<IconSearch size={16} />}
-            disabled={searchSelectionLoading}
+            disabled={controlsDisabled || searchSelectionLoading}
           />
           {searching && (
             <Text size="xs" c="dimmed">
@@ -386,6 +396,7 @@ export function ScanReviewPanels({
               justify="flex-start"
               size="compact-sm"
               loading={searchSelectionLoading}
+              disabled={controlsDisabled}
               onClick={() => onSearchResult(name)}
             >
               {name}
@@ -400,7 +411,7 @@ export function ScanReviewPanels({
             <Button
               variant="default"
               leftSection={<IconArrowLeft size={16} />}
-              disabled={selectedIndex === 0}
+              disabled={controlsDisabled || selectedIndex === 0}
               onClick={() => onMoveRow(-1)}
             >
               Previous
@@ -408,21 +419,36 @@ export function ScanReviewPanels({
             <Button
               variant="default"
               rightSection={<IconArrowRight size={16} />}
-              disabled={selectedIndex >= rowCount - 1}
+              disabled={controlsDisabled || selectedIndex >= rowCount - 1}
               onClick={() => onMoveRow(1)}
             >
               Next
+            </Button>
+            <Button
+              color="red"
+              variant="subtle"
+              leftSection={<IconTrash size={16} />}
+              disabled={deleteDisabled || controlsDisabled}
+              title="Permanently delete this card and remove it from the physical stack"
+              onClick={onDelete}
+            >
+              Delete card
             </Button>
           </Group>
           <Button
             color="teal"
             leftSection={<IconCheck size={17} />}
-            disabled={!selection || selection.confirmed}
+            disabled={controlsDisabled || !selection || selection.confirmed}
             onClick={onConfirm}
           >
             {selection?.confirmed ? 'Match confirmed' : 'Confirm match'}
           </Button>
         </Group>
+        <Text size="xs" c="dimmed" mt="xs">
+          Deleting {selectedRow.filename} removes this scan row immediately.
+          Remove the matching physical card from the stack; this cannot be
+          undone.
+        </Text>
       </Paper>
     </Stack>
   );

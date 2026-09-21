@@ -103,7 +103,7 @@ describe('ScanPage', () => {
     expect(
       within(jobs).getByRole('button', { name: 'Create scan' }),
     ).toBeDefined();
-    expect(await within(jobs).findByText('reviewing')).toBeDefined();
+    expect(await within(jobs).findByText('review')).toBeDefined();
     expect(within(jobs).getByText('100 / 100')).toBeDefined();
     expect(within(jobs).getByText('Foil')).toBeDefined();
     expect(
@@ -252,7 +252,7 @@ describe('ScanPage', () => {
     const user = userEvent.setup();
     renderScanPage();
 
-    await user.click(await screen.findByText('reviewing'));
+    await user.click(await screen.findByText('review'));
 
     expect(await screen.findByText('Scan detail route')).toBeDefined();
   });

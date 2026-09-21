@@ -2,7 +2,7 @@ import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ScanDetail, ScanRow } from '../api/client';
+import type { ScanConfirmationRow, ScanDetail, ScanRow } from '../api/client';
 import * as scryfallModule from '../api/scryfall-client';
 import type { ScryfallPrinting } from '../api/scryfall-client';
 import { ScanReview } from './ScanReview';
@@ -64,12 +64,27 @@ function scan(rows: ScanRow[]): ScanDetail {
   };
 }
 
-function renderReview(detail: ScanDetail) {
-  return render(
+function renderReview(
+  detail: ScanDetail,
+  options: {
+    onDeleteRow?: (scanPosition: number) => Promise<void>;
+    onConfirmScan?: (rows: ScanConfirmationRow[]) => Promise<void>;
+  } = {},
+) {
+  const onDeleteRow =
+    options.onDeleteRow ?? vi.fn().mockResolvedValue(undefined);
+  const onConfirmScan =
+    options.onConfirmScan ?? vi.fn().mockResolvedValue(undefined);
+  const rendered = render(
     <MantineProvider>
-      <ScanReview scan={detail} />
+      <ScanReview
+        scan={detail}
+        onDeleteRow={onDeleteRow}
+        onConfirmScan={async (rows) => onConfirmScan(rows)}
+      />
     </MantineProvider>,
   );
+  return { ...rendered, onDeleteRow, onConfirmScan };
 }
 
 describe('ScanReview', () => {
@@ -350,5 +365,156 @@ describe('ScanReview', () => {
         screen.getByRole('button', { name: 'Confirm match' }),
       ).not.toHaveProperty('disabled', true),
     );
+  });
+
+  it('does not bind d to deletion', async () => {
+    const user = userEvent.setup();
+    const { onDeleteRow } = renderReview(scan([row()]));
+
+    await screen.findByRole('button', { name: 'Confirm match' });
+    await user.keyboard('d');
+
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(onDeleteRow).not.toHaveBeenCalled();
+  });
+
+  it('deletes through the focused button when activated with Enter', async () => {
+    const user = userEvent.setup();
+    const { onDeleteRow } = renderReview(scan([row()]));
+
+    const deleteButton = await screen.findByRole('button', {
+      name: 'Delete card',
+    });
+    expect(
+      screen.getByText(/matching physical card from the stack/),
+    ).toBeDefined();
+    deleteButton.focus();
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => expect(onDeleteRow).toHaveBeenCalledWith(1));
+  });
+
+  it('confirms row deletion and keeps surviving scan positions', async () => {
+    vi.spyOn(
+      scryfallModule.scryfallClient,
+      'getPrintingsForId',
+    ).mockResolvedValue(printings);
+    const user = userEvent.setup();
+    const initial = scan([
+      row(),
+      row({ scan_position: 2, filename: '002.jpg' }),
+      row({ scan_position: 3, filename: '003.jpg' }),
+    ]);
+    const onDeleteRow = vi.fn().mockResolvedValue(undefined);
+    const rendered = renderReview(initial, { onDeleteRow });
+
+    await screen.findByRole('button', { name: 'Confirm match' });
+    await user.click(screen.getByRole('button', { name: 'Delete card' }));
+    await waitFor(() => expect(onDeleteRow).toHaveBeenCalledWith(1));
+
+    const surviving = scan([initial.rows[1], initial.rows[2]]);
+    rendered.rerender(
+      <MantineProvider>
+        <ScanReview
+          scan={surviving}
+          onDeleteRow={onDeleteRow}
+          onConfirmScan={vi.fn().mockResolvedValue(undefined)}
+        />
+      </MantineProvider>,
+    );
+    expect(await screen.findByText('Card 1 of 2')).toBeDefined();
+  });
+
+  it('keeps the delete action available when row deletion fails', async () => {
+    const user = userEvent.setup();
+    const onDeleteRow = vi
+      .fn()
+      .mockRejectedValue(new Error('row deletion unavailable'));
+    renderReview(scan([row()]), { onDeleteRow });
+
+    await screen.findByRole('button', { name: 'Confirm match' });
+    await user.click(screen.getByRole('button', { name: 'Delete card' }));
+
+    expect(await screen.findByText('row deletion unavailable')).toBeDefined();
+    expect(screen.queryByRole('dialog')).toBeNull();
+  });
+
+  it('submits every confirmed printing in scan order', async () => {
+    vi.spyOn(
+      scryfallModule.scryfallClient,
+      'getPrintingsForId',
+    ).mockResolvedValue(printings);
+    const user = userEvent.setup();
+    const onConfirmScan = vi.fn().mockResolvedValue(undefined);
+    renderReview(
+      scan([row(), row({ scan_position: 2, filename: '002.jpg' })]),
+      { onConfirmScan },
+    );
+
+    const match = await screen.findByRole('button', { name: 'Confirm match' });
+    await waitFor(() => expect(match).not.toHaveProperty('disabled', true));
+    await user.click(match);
+    const secondMatch = screen.getByRole('button', { name: 'Confirm match' });
+    await waitFor(() =>
+      expect(secondMatch).not.toHaveProperty('disabled', true),
+    );
+    await user.click(secondMatch);
+
+    const confirmScan = screen.getByRole('button', { name: 'Confirm scan' });
+    await waitFor(() =>
+      expect(confirmScan).not.toHaveProperty('disabled', true),
+    );
+    await user.click(confirmScan);
+
+    await waitFor(() => expect(onConfirmScan).toHaveBeenCalledTimes(1));
+    expect(onConfirmScan).toHaveBeenCalledWith([
+      {
+        scan_position: 1,
+        scryfall_id: 'printing-1',
+        name: 'Lightning Bolt',
+        set_code: '2x2',
+        set_name: 'Double Masters 2022',
+        collector_number: '117',
+        confirmed: true,
+      },
+      {
+        scan_position: 2,
+        scryfall_id: 'printing-1',
+        name: 'Lightning Bolt',
+        set_code: '2x2',
+        set_name: 'Double Masters 2022',
+        collector_number: '117',
+        confirmed: true,
+      },
+    ]);
+  });
+
+  it('preserves confirmed choices for a retry after confirm failure', async () => {
+    vi.spyOn(
+      scryfallModule.scryfallClient,
+      'getPrintingsForId',
+    ).mockResolvedValue(printings);
+    const user = userEvent.setup();
+    const onConfirmScan = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('import handoff unavailable'))
+      .mockResolvedValueOnce(undefined);
+    renderReview(scan([row()]), { onConfirmScan });
+
+    const match = await screen.findByRole('button', { name: 'Confirm match' });
+    await waitFor(() => expect(match).not.toHaveProperty('disabled', true));
+    await user.click(match);
+    const confirmScan = screen.getByRole('button', { name: 'Confirm scan' });
+    await waitFor(() =>
+      expect(confirmScan).not.toHaveProperty('disabled', true),
+    );
+    await user.click(confirmScan);
+
+    expect(await screen.findByText('import handoff unavailable')).toBeDefined();
+    expect(
+      screen.getByRole('button', { name: 'Match confirmed' }),
+    ).toBeDefined();
+    await user.click(screen.getByRole('button', { name: 'Confirm scan' }));
+    await waitFor(() => expect(onConfirmScan).toHaveBeenCalledTimes(2));
   });
 });

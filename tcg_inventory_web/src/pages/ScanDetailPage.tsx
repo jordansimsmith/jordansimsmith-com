@@ -3,6 +3,7 @@ import {
   Badge,
   Button,
   Group,
+  Modal,
   Paper,
   Progress,
   Skeleton,
@@ -18,18 +19,25 @@ import {
 import { PageHeader } from '../components/PageHeader';
 import { ScanReview } from '../components/ScanReview';
 import { apiClient } from '../api/client';
-import type { ScanDetail, ScanStatus } from '../api/client';
+import type {
+  ScanConfirmationRow,
+  ScanDetail,
+  ScanStatus,
+} from '../api/client';
 
 const POLL_INTERVAL_MS = 2000;
 
 const STATUS_COLORS: Record<ScanStatus, string> = {
   uploading: 'blue',
   identifying: 'blue',
-  reviewing: 'orange',
+  reviewing: 'yellow',
   confirmed: 'green',
 };
 
 function formatStatus(status: ScanStatus): string {
+  if (status === 'reviewing') {
+    return 'review';
+  }
   return status.replace('_', ' ');
 }
 
@@ -117,6 +125,28 @@ export function ScanDetailPage() {
   const [scan, setScan] = useState<ScanDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteScanOpen, setDeleteScanOpen] = useState(false);
+  const [deleteScanLoading, setDeleteScanLoading] = useState(false);
+  const [deleteScanError, setDeleteScanError] = useState<string | null>(null);
+  const [reviewMutationLoading, setReviewMutationLoading] = useState(false);
+
+  const deleteScan = async () => {
+    if (!scanId || deleteScanLoading || reviewMutationLoading) {
+      return;
+    }
+    setDeleteScanLoading(true);
+    setDeleteScanError(null);
+    try {
+      await apiClient.deleteScan(scanId);
+      navigate('/scans');
+    } catch (e) {
+      setDeleteScanError(
+        e instanceof Error ? e.message : 'Scan deletion failed',
+      );
+    } finally {
+      setDeleteScanLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (!scanId) {
@@ -157,13 +187,13 @@ export function ScanDetailPage() {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') {
+      if (event.key !== 'Escape' || deleteScanOpen || reviewMutationLoading) {
         return;
       }
       const target = event.target;
       if (
         target instanceof HTMLElement &&
-        target.closest('[data-scan-review]')
+        target.closest('[data-scan-review-editable]')
       ) {
         return;
       }
@@ -178,7 +208,7 @@ export function ScanDetailPage() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [navigate]);
+  }, [deleteScanOpen, navigate, reviewMutationLoading]);
 
   return (
     <AppShellLayout>
@@ -204,18 +234,107 @@ export function ScanDetailPage() {
               title="Scan"
               description={`Created ${new Date(scan.created_at * 1000).toLocaleString()}`}
               actions={
-                <Button variant="subtle" onClick={() => navigate('/scans')}>
-                  Back to scans
-                </Button>
+                <Group gap="xs">
+                  {scan.status !== 'confirmed' && (
+                    <Button
+                      color="red"
+                      variant="subtle"
+                      disabled={reviewMutationLoading || deleteScanLoading}
+                      onClick={() => {
+                        setDeleteScanError(null);
+                        setDeleteScanOpen(true);
+                      }}
+                    >
+                      Delete scan
+                    </Button>
+                  )}
+                  {scan.status === 'confirmed' && scan.import_id && (
+                    <Button
+                      variant="light"
+                      onClick={() => navigate(`/imports/${scan.import_id}`)}
+                    >
+                      Open import
+                    </Button>
+                  )}
+                  <Button
+                    variant="subtle"
+                    disabled={reviewMutationLoading || deleteScanLoading}
+                    onClick={() => navigate('/scans')}
+                  >
+                    Back to scans
+                  </Button>
+                </Group>
               }
             />
             {scan.status === 'reviewing' ? (
-              <ScanReview scan={scan} />
+              <ScanReview
+                scan={scan}
+                onDeleteRow={async (scanPosition) => {
+                  setReviewMutationLoading(true);
+                  try {
+                    await apiClient.deleteScanRow(scan.scan_id, scanPosition);
+                    const refreshed = await apiClient.getScan(scan.scan_id);
+                    setScan(refreshed);
+                  } finally {
+                    setReviewMutationLoading(false);
+                  }
+                }}
+                onConfirmScan={async (rows: ScanConfirmationRow[]) => {
+                  setReviewMutationLoading(true);
+                  try {
+                    const response = await apiClient.confirmScan(scan.scan_id, {
+                      rows,
+                    });
+                    navigate(`/imports/${response.import_id}`);
+                  } finally {
+                    setReviewMutationLoading(false);
+                  }
+                }}
+              />
             ) : (
               <ScanSummary scan={scan} />
             )}
           </>
         )}
+        <Modal
+          opened={deleteScanOpen}
+          onClose={() => {
+            if (!deleteScanLoading && !reviewMutationLoading) {
+              setDeleteScanOpen(false);
+              setDeleteScanError(null);
+            }
+          }}
+          title="Delete scan"
+          centered
+        >
+          <Text mb="md">
+            Delete this unfinished scan and its {scan?.row_count ?? 0}{' '}
+            {scan?.row_count === 1 ? 'source card' : 'source cards'}? This
+            cannot be undone.
+          </Text>
+          {deleteScanError && (
+            <Text c="red.7" size="sm" role="alert" mb="md">
+              {deleteScanError}
+            </Text>
+          )}
+          <Group justify="flex-end">
+            <Button
+              variant="default"
+              disabled={deleteScanLoading || reviewMutationLoading}
+              onClick={() => setDeleteScanOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              color="red"
+              loading={deleteScanLoading}
+              disabled={reviewMutationLoading}
+              onClick={() => void deleteScan()}
+            >
+              Delete scan
+            </Button>
+          </Group>
+        </Modal>
       </Stack>
     </AppShellLayout>
   );
