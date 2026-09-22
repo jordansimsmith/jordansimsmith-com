@@ -69,7 +69,7 @@ describe('http client scans', () => {
   });
 
   it('creates a scan with JSON metadata', async () => {
-    const json = vi.fn().mockResolvedValue({ scan_id: 'scan-1' });
+    const json = vi.fn().mockResolvedValue({ scan_id: 'scan-1', rows: [] });
     fetchSpy.mockResolvedValue({ ok: true, json });
     const client = createHttpClient();
 

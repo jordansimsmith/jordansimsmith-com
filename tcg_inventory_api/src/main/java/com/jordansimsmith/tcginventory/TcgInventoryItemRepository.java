@@ -31,6 +31,9 @@ public class TcgInventoryItemRepository {
 
   public record SkuUnits(String skuId, List<Integer> sequenceNumbers) {}
 
+  public record ScanPage(
+      List<TcgInventoryItem> items, Map<String, AttributeValue> lastEvaluatedKey) {}
+
   private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
   private final DynamoDbClient dynamoDbClient;
   private final Clock clock;
@@ -45,6 +48,66 @@ public class TcgInventoryItemRepository {
     this.dynamoDbClient = dynamoDbClient;
     this.clock = clock;
     this.ulidGenerator = ulidGenerator;
+  }
+
+  public void createScan(TcgInventoryItem scanItem, List<TcgInventoryItem> rowItems) {
+    for (int start = 0; start < rowItems.size(); start += MAX_TRANSACT_ITEMS) {
+      var end = Math.min(start + MAX_TRANSACT_ITEMS, rowItems.size());
+      var writes = rowItems.subList(start, end).stream().map(this::buildScanPut).toList();
+      dynamoDbClient.transactWriteItems(
+          TransactWriteItemsRequest.builder().transactItems(writes).build());
+    }
+
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder().transactItems(List.of(buildScanPut(scanItem))).build());
+  }
+
+  public ScanPage findScans(
+      String user, int limit, @Nullable Map<String, AttributeValue> exclusiveStartKey) {
+    var requestBuilder =
+        QueryEnhancedRequest.builder()
+            .queryConditional(
+                QueryConditional.sortBeginsWith(
+                    Key.builder()
+                        .partitionValue(TcgInventoryItem.formatUserPk(user))
+                        .sortValue(TcgInventoryItem.SCAN_PREFIX)
+                        .build()))
+            .scanIndexForward(false)
+            .limit(limit);
+    if (exclusiveStartKey != null && !exclusiveStartKey.isEmpty()) {
+      requestBuilder.exclusiveStartKey(exclusiveStartKey);
+    }
+
+    var page = tcgInventoryTable.query(requestBuilder.build()).stream().findFirst().orElse(null);
+    if (page == null) {
+      return new ScanPage(List.of(), Map.of());
+    }
+    return new ScanPage(page.items(), page.lastEvaluatedKey());
+  }
+
+  public List<TcgInventoryItem> findScanRows(String user, String scanId) {
+    var request =
+        QueryEnhancedRequest.builder()
+            .queryConditional(
+                QueryConditional.sortBeginsWith(
+                    Key.builder()
+                        .partitionValue(TcgInventoryItem.formatScanRowPk(user, scanId))
+                        .sortValue(TcgInventoryItem.ROW_PREFIX)
+                        .build()))
+            .scanIndexForward(true)
+            .build();
+    return tcgInventoryTable.query(request).stream()
+        .flatMap(page -> page.items().stream())
+        .toList();
+  }
+
+  @Nullable
+  public TcgInventoryItem getScan(String user, String scanId) {
+    return tcgInventoryTable.getItem(
+        Key.builder()
+            .partitionValue(TcgInventoryItem.formatUserPk(user))
+            .sortValue(TcgInventoryItem.formatScanSk(scanId))
+            .build());
   }
 
   public List<TcgInventoryItem> findUnits(String user, String skuId) {
@@ -376,6 +439,17 @@ public class TcgInventoryItemRepository {
       dynamoDbClient.transactWriteItems(
           TransactWriteItemsRequest.builder().transactItems(chunk).build());
     }
+  }
+
+  private TransactWriteItem buildScanPut(TcgInventoryItem item) {
+    return TransactWriteItem.builder()
+        .put(
+            Put.builder()
+                .tableName(TcgInventoryItem.TABLE_NAME)
+                .item(tcgInventoryTable.tableSchema().itemToMap(item, true))
+                .conditionExpression("attribute_not_exists(" + TcgInventoryItem.PK + ")")
+                .build())
+        .build();
   }
 
   private TransactWriteItem buildUnitReserveUpdate(

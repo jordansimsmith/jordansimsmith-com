@@ -1,5 +1,5 @@
 export const MAX_SCAN_FILES = 200;
-export const MAX_SCAN_FILE_BYTES = 10 * 1024 * 1024;
+export const MAX_SCAN_FILE_BYTES = 1024 * 1024;
 
 const JPEG_FILENAME_PATTERN = /\.(?:jpe?g)$/i;
 
@@ -57,7 +57,7 @@ export function validateScanFiles(files: readonly File[]): string[] {
       errors.add('Files must not be empty.');
     }
     if (file.size > MAX_SCAN_FILE_BYTES) {
-      errors.add('Each file must be 10 MiB or smaller.');
+      errors.add('Each file must be 1 MiB or smaller.');
     }
   }
 

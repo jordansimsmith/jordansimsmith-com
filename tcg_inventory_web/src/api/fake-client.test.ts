@@ -433,7 +433,7 @@ describe('createFakeClient scans', () => {
       ],
     });
 
-    expect(created.status).toBe('uploading');
+    expect(created.scan_id).toMatch(/^fake-scan-/);
     expect(created.rows.map((row) => row.filename)).toEqual([
       '10.jpg',
       '2.jpg',

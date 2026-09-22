@@ -197,6 +197,11 @@ export interface CreateScanRequest {
   files: ScanFile[];
 }
 
+export interface CreateScanResponse {
+  scan_id: string;
+  rows: ScanUploadSlot[];
+}
+
 export interface FindScansParams {
   continuation?: string;
 }
@@ -407,7 +412,7 @@ export interface ApiClient {
   ): Promise<void>;
   deleteImport(importId: string): Promise<void>;
   confirmImport(importId: string): Promise<ConfirmImportResponse>;
-  createScan(request: CreateScanRequest): Promise<ScanDetail>;
+  createScan(request: CreateScanRequest): Promise<CreateScanResponse>;
   findScans(params?: FindScansParams): Promise<FindScansResponse>;
   getScan(scanId: string): Promise<ScanDetail>;
   identifyScan(scanId: string): Promise<IdentifyScanResponse>;

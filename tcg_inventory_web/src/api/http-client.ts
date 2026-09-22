@@ -5,6 +5,7 @@ import type {
   ConfirmScanRequest,
   ConfirmScanResponse,
   CreateScanRequest,
+  CreateScanResponse,
   ConfirmImportResponse,
   ConfirmOrderResponse,
   FindScansParams,
@@ -173,7 +174,7 @@ export function createHttpClient(): ApiClient {
       return response.json();
     },
 
-    async createScan(request: CreateScanRequest): Promise<ScanDetail> {
+    async createScan(request: CreateScanRequest): Promise<CreateScanResponse> {
       const response = await authenticatedFetch('/scans', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

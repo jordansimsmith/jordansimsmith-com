@@ -11,7 +11,7 @@ function jpeg(name: string, contents = 'jpeg', type = 'image/jpeg'): File {
 }
 
 describe('scan files', () => {
-  it('sorts names by UTF-8 byte order rather than numeric order', () => {
+  it('sorts ASCII names lexicographically rather than numerically', () => {
     const files = [jpeg('2.jpg'), jpeg('10.jpg'), jpeg('1.jpg')];
 
     expect(sortScanFiles(files).map((file) => file.name)).toEqual([
@@ -40,7 +40,7 @@ describe('scan files', () => {
     ]);
 
     expect(errors).toContain('Files must not be empty.');
-    expect(errors).toContain('Each file must be 10 MiB or smaller.');
+    expect(errors).toContain('Each file must be 1 MiB or smaller.');
   });
 
   it('allows an empty MIME type when the filename is a JPEG', () => {

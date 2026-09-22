@@ -21,6 +21,7 @@ public class TcgInventoryItem {
   public static final String SKU_PREFIX = "SKU" + DELIMITER;
   public static final String UNIT_PREFIX = "UNIT" + DELIMITER;
   public static final String IMPORT_PREFIX = "IMPORT" + DELIMITER;
+  public static final String SCAN_PREFIX = "SCAN" + DELIMITER;
   public static final String ROW_PREFIX = "ROW" + DELIMITER;
   public static final String ORDER_PREFIX = "ORDER" + DELIMITER;
   public static final String JOB_PREFIX = "JOB" + DELIMITER;
@@ -56,6 +57,9 @@ public class TcgInventoryItem {
   public static final String VERSION = "version";
   public static final String DIRTY = "dirty";
   public static final String SEQUENCE_NUMBER = "sequence_number";
+  public static final String SCAN_ID = "scan_id";
+  public static final String SCAN_POSITION = "scan_position";
+  public static final String SIZE_BYTES = "size_bytes";
   public static final String STATUS = "status";
   public static final String IMPORT_ID = "import_id";
   public static final String ORDER_ID = "order_id";
@@ -73,6 +77,7 @@ public class TcgInventoryItem {
   public static final String JOB_ID = "job_id";
   public static final String CONTINUATION = "continuation";
   public static final String PROCESSED_COUNT = "processed_count";
+  public static final String NEEDS_REVIEW = "needs_review";
   public static final String FETCHTCG_LISTING_ID = "fetchtcg_listing_id";
   public static final String LAST_PUBLISHED_QUANTITY = "last_published_quantity";
   public static final String LAST_PUBLISHED_PRICE = "last_published_price";
@@ -113,6 +118,9 @@ public class TcgInventoryItem {
   private Integer version;
   private Boolean dirty;
   private Integer sequenceNumber;
+  private String scanId;
+  private Integer scanPosition;
+  private Long sizeBytes;
   private String status;
   private String importId;
   private String orderId;
@@ -130,6 +138,7 @@ public class TcgInventoryItem {
   private String jobId;
   private Integer continuation;
   private Integer processedCount;
+  private Boolean needsReview;
   private Integer fetchtcgListingId;
   private Integer lastPublishedQuantity;
   private String lastPublishedPrice;
@@ -357,6 +366,36 @@ public class TcgInventoryItem {
   }
 
   @Nullable
+  @DynamoDbAttribute(SCAN_ID)
+  public String getScanId() {
+    return scanId;
+  }
+
+  public void setScanId(@Nullable String scanId) {
+    this.scanId = scanId;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(SCAN_POSITION)
+  public Integer getScanPosition() {
+    return scanPosition;
+  }
+
+  public void setScanPosition(@Nullable Integer scanPosition) {
+    this.scanPosition = scanPosition;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(SIZE_BYTES)
+  public Long getSizeBytes() {
+    return sizeBytes;
+  }
+
+  public void setSizeBytes(@Nullable Long sizeBytes) {
+    this.sizeBytes = sizeBytes;
+  }
+
+  @Nullable
   @DynamoDbAttribute(STATUS)
   public String getStatus() {
     return status;
@@ -524,6 +563,16 @@ public class TcgInventoryItem {
 
   public void setProcessedCount(@Nullable Integer processedCount) {
     this.processedCount = processedCount;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(NEEDS_REVIEW)
+  public Boolean getNeedsReview() {
+    return needsReview;
+  }
+
+  public void setNeedsReview(@Nullable Boolean needsReview) {
+    this.needsReview = needsReview;
   }
 
   @Nullable
@@ -745,6 +794,9 @@ public class TcgInventoryItem {
         && Objects.equals(version, that.version)
         && Objects.equals(dirty, that.dirty)
         && Objects.equals(sequenceNumber, that.sequenceNumber)
+        && Objects.equals(scanId, that.scanId)
+        && Objects.equals(scanPosition, that.scanPosition)
+        && Objects.equals(sizeBytes, that.sizeBytes)
         && Objects.equals(status, that.status)
         && Objects.equals(importId, that.importId)
         && Objects.equals(orderId, that.orderId)
@@ -762,6 +814,7 @@ public class TcgInventoryItem {
         && Objects.equals(jobId, that.jobId)
         && Objects.equals(continuation, that.continuation)
         && Objects.equals(processedCount, that.processedCount)
+        && Objects.equals(needsReview, that.needsReview)
         && Objects.equals(fetchtcgListingId, that.fetchtcgListingId)
         && Objects.equals(lastPublishedQuantity, that.lastPublishedQuantity)
         && Objects.equals(lastPublishedPrice, that.lastPublishedPrice)
@@ -806,6 +859,9 @@ public class TcgInventoryItem {
         version,
         dirty,
         sequenceNumber,
+        scanId,
+        scanPosition,
+        sizeBytes,
         status,
         importId,
         orderId,
@@ -823,6 +879,7 @@ public class TcgInventoryItem {
         jobId,
         continuation,
         processedCount,
+        needsReview,
         fetchtcgListingId,
         lastPublishedQuantity,
         lastPublishedPrice,
@@ -902,6 +959,13 @@ public class TcgInventoryItem {
         + dirty
         + ", sequenceNumber="
         + sequenceNumber
+        + ", scanId='"
+        + scanId
+        + '\''
+        + ", scanPosition="
+        + scanPosition
+        + ", sizeBytes="
+        + sizeBytes
         + ", status='"
         + status
         + '\''
@@ -948,6 +1012,8 @@ public class TcgInventoryItem {
         + continuation
         + ", processedCount="
         + processedCount
+        + ", needsReview="
+        + needsReview
         + ", fetchtcgListingId="
         + fetchtcgListingId
         + ", lastPublishedQuantity="
@@ -1020,12 +1086,24 @@ public class TcgInventoryItem {
     return IMPORT_PREFIX + importId;
   }
 
+  public static String formatScanSk(String scanId) {
+    return SCAN_PREFIX + scanId;
+  }
+
   public static String formatImportRowPk(String user, String importId) {
     return USER_PREFIX + user + DELIMITER + IMPORT_PREFIX + importId;
   }
 
   public static String formatImportRowSk(int stackPosition) {
     return ROW_PREFIX + String.format("%010d", stackPosition);
+  }
+
+  public static String formatScanRowPk(String user, String scanId) {
+    return USER_PREFIX + user + DELIMITER + SCAN_PREFIX + scanId;
+  }
+
+  public static String formatScanRowSk(int scanPosition) {
+    return ROW_PREFIX + String.format(Locale.ROOT, "%06d", scanPosition);
   }
 
   public static String formatOrderSk(String offerId) {
@@ -1170,6 +1248,41 @@ public class TcgInventoryItem {
     item.setCondition(condition);
     item.setScryfallId(scryfallId);
     item.setLanguage(language);
+    return item;
+  }
+
+  public static TcgInventoryItem createScan(
+      String user,
+      String scanId,
+      String condition,
+      String finish,
+      int rowCount,
+      Instant createdAt) {
+    var item = new TcgInventoryItem();
+    item.setPk(formatUserPk(user));
+    item.setSk(formatScanSk(scanId));
+    item.setScanId(scanId);
+    item.setStatus("uploading");
+    item.setCondition(condition);
+    item.setFinish(finish);
+    item.setRowCount(rowCount);
+    item.setProcessedCount(0);
+    item.setCreatedAt(createdAt);
+    item.setUpdatedAt(createdAt);
+    return item;
+  }
+
+  public static TcgInventoryItem createScanRow(
+      String user, String scanId, int scanPosition, String filename, long sizeBytes) {
+    var item = new TcgInventoryItem();
+    item.setPk(formatScanRowPk(user, scanId));
+    item.setSk(formatScanRowSk(scanPosition));
+    item.setScanId(scanId);
+    item.setScanPosition(scanPosition);
+    item.setFilename(filename);
+    item.setSizeBytes(sizeBytes);
+    item.setStatus("pending");
+    item.setNeedsReview(false);
     return item;
   }
 

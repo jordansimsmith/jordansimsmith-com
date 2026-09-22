@@ -194,6 +194,74 @@ java_binary(
 )
 
 java_binary(
+    name = "create-scan-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/CreateScanHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "//lib/time:lib",
+        "//lib/ulid:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+    ],
+)
+
+java_binary(
+    name = "find-scans-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/FindScansHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/dynamodb:lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+    ],
+)
+
+java_binary(
+    name = "get-scan-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/GetScanHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+    ],
+)
+
+java_binary(
     name = "delete-import-handler",
     srcs = ["src/main/java/com/jordansimsmith/tcginventory/DeleteImportHandler.java"],
     create_executable = False,
@@ -707,16 +775,19 @@ java_test_suite(
         ":create-import-row-photo-handler",
         ":create-publish-handler",
         ":create-report-handler",
+        ":create-scan-handler",
         ":delete-import-handler",
         ":delete-import-row-handler",
         ":delete-import-row-photo-handler",
         ":find-imports-handler",
         ":find-orders-handler",
+        ":find-scans-handler",
         ":find-skus-handler",
         ":get-import-handler",
         ":get-order-handler",
         ":get-publish-handler",
         ":get-reports-handler",
+        ":get-scan-handler",
         ":get-settings-handler",
         ":get-sku-handler",
         ":jobs-handler",

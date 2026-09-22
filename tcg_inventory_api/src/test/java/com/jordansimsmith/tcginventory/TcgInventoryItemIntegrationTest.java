@@ -159,6 +159,44 @@ public class TcgInventoryItemIntegrationTest {
   }
 
   @Test
+  void shouldRoundTripScanAndScanRowItems() {
+    // arrange
+    var createdAt = Instant.ofEpochSecond(1700000000);
+    var scan = TcgInventoryItem.createScan("jordan", "01JSCAN", "LP", "foil", 2, createdAt);
+    var row = TcgInventoryItem.createScanRow("jordan", "01JSCAN", 1, "001.jpg", 483200L);
+
+    // act
+    tcgInventoryTable.putItem(scan);
+    tcgInventoryTable.putItem(row);
+
+    var retrievedScan =
+        tcgInventoryTable.getItem(
+            Key.builder().partitionValue("USER#jordan").sortValue("SCAN#01JSCAN").build());
+    var retrievedRow =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue("USER#jordan#SCAN#01JSCAN")
+                .sortValue("ROW#000001")
+                .build());
+
+    // assert
+    assertThat(retrievedScan).isEqualTo(scan);
+    assertThat(retrievedScan.getStatus()).isEqualTo("uploading");
+    assertThat(retrievedScan.getCondition()).isEqualTo("LP");
+    assertThat(retrievedScan.getFinish()).isEqualTo("foil");
+    assertThat(retrievedScan.getRowCount()).isEqualTo(2);
+    assertThat(retrievedScan.getProcessedCount()).isZero();
+    assertThat(retrievedScan.getCreatedAt()).isEqualTo(createdAt);
+    assertThat(retrievedScan.getUpdatedAt()).isEqualTo(createdAt);
+    assertThat(retrievedRow).isEqualTo(row);
+    assertThat(retrievedRow.getScanPosition()).isEqualTo(1);
+    assertThat(retrievedRow.getFilename()).isEqualTo("001.jpg");
+    assertThat(retrievedRow.getSizeBytes()).isEqualTo(483200L);
+    assertThat(retrievedRow.getStatus()).isEqualTo("pending");
+    assertThat(retrievedRow.getNeedsReview()).isFalse();
+  }
+
+  @Test
   void shouldRoundTripItemWithNullGsiAttributes() {
     // arrange
     var user = "jordan";

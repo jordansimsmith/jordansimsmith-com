@@ -7,6 +7,7 @@ import type {
   ConfirmImportResponse,
   ConfirmOrderResponse,
   CreateScanRequest,
+  CreateScanResponse,
   Finish,
   FindScansParams,
   FindScansResponse,
@@ -36,6 +37,7 @@ import type {
   ScanDetail,
   ScanFile,
   ScanRow,
+  ScanUploadSlot,
   ScanRowStatus,
   ScanStatus,
   ScanSuggestion,
@@ -50,7 +52,10 @@ import type {
 } from './client';
 import { parseManaBoxCsv } from '../domain/manabox';
 import type { ManaBoxRow } from '../domain/manabox';
-import { compareScanFilenames } from '../domain/scan-files';
+import {
+  MAX_SCAN_FILE_BYTES,
+  compareScanFilenames,
+} from '../domain/scan-files';
 
 const VALID_CONDITIONS: Condition[] = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 const VALID_FINISHES: Finish[] = ['normal', 'foil', 'etched'];
@@ -860,6 +865,17 @@ function toScanSummary(scan: FakeScan): ScanSummary {
   };
 }
 
+function toScanUploadSlot(row: FakeScanRow): ScanUploadSlot {
+  return {
+    scan_position: row.scan_position,
+    filename: row.filename,
+    size_bytes: row.size_bytes,
+    uploaded: row.uploaded,
+    upload_url: row.upload_url,
+    upload_headers: row.upload_headers ? { ...row.upload_headers } : null,
+  };
+}
+
 function toScanRow(row: FakeScanRow): ScanRow {
   return {
     scan_position: row.scan_position,
@@ -1590,7 +1606,7 @@ export function createFakeClient(): ApiClient {
       };
     },
 
-    async createScan(request: CreateScanRequest): Promise<ScanDetail> {
+    async createScan(request: CreateScanRequest): Promise<CreateScanResponse> {
       if (!VALID_CONDITIONS.includes(request.condition)) {
         throw new Error('invalid scan condition');
       }
@@ -1602,10 +1618,11 @@ export function createFakeClient(): ApiClient {
       }
       if (
         request.files.some(
-          (file) => file.size_bytes <= 0 || file.size_bytes > 10 * 1024 * 1024,
+          (file) =>
+            file.size_bytes <= 0 || file.size_bytes > MAX_SCAN_FILE_BYTES,
         )
       ) {
-        throw new Error('scan files must be between 1 byte and 10 MiB');
+        throw new Error('scan files must be between 1 byte and 1 MiB');
       }
       if (request.files.some((file) => !/\.(jpe?g)$/i.test(file.filename))) {
         throw new Error('scan files must be JPEG images');
@@ -1644,7 +1661,10 @@ export function createFakeClient(): ApiClient {
         confirmation_manifest: null,
       };
       scans.push(scan);
-      return toScanDetail(scan);
+      return {
+        scan_id: scan.scan_id,
+        rows: activeScanRows(scan).map(toScanUploadSlot),
+      };
     },
 
     async findScans(params?: FindScansParams): Promise<FindScansResponse> {
