@@ -197,6 +197,17 @@ resource "aws_s3_bucket" "tcg_inventory" {
   bucket = "api.tcg-inventory.jordansimsmith.com"
 }
 
+resource "aws_s3_bucket_cors_configuration" "tcg_inventory" {
+  bucket = aws_s3_bucket.tcg_inventory.id
+
+  cors_rule {
+    allowed_headers = ["Content-Type", "If-None-Match"]
+    allowed_methods = ["GET", "PUT"]
+    allowed_origins = ["https://tcg-inventory.jordansimsmith.com"]
+    max_age_seconds = 3000
+  }
+}
+
 resource "aws_s3_bucket_server_side_encryption_configuration" "tcg_inventory" {
   bucket = aws_s3_bucket.tcg_inventory.id
 

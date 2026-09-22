@@ -13,6 +13,12 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.GetObjectRequest;
+import software.amazon.awssdk.services.s3.model.HeadObjectRequest;
+import software.amazon.awssdk.services.s3.model.S3Exception;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 public class GetScanHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
@@ -64,6 +70,8 @@ public class GetScanHandler
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final TcgInventoryItemRepository tcgInventoryItemRepository;
+  private final S3Client s3Client;
+  private final S3Presigner s3Presigner;
 
   public GetScanHandler() {
     this(TcgInventoryFactory.create());
@@ -74,6 +82,8 @@ public class GetScanHandler
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.tcgInventoryItemRepository = factory.tcgInventoryItemRepository();
+    this.s3Client = factory.s3Client();
+    this.s3Presigner = factory.s3Presigner();
   }
 
   @Override
@@ -99,9 +109,8 @@ public class GetScanHandler
     return httpResponseFactory.ok(toDetail(scanItem, rowItems));
   }
 
-  private static ScanDetailResponse toDetail(
-      TcgInventoryItem item, List<TcgInventoryItem> rowItems) {
-    var rows = rowItems.stream().map(GetScanHandler::toRow).toList();
+  private ScanDetailResponse toDetail(TcgInventoryItem item, List<TcgInventoryItem> rowItems) {
+    var rows = rowItems.stream().map(row -> toRow(item, row)).toList();
     var summary = toSummary(item);
     return new ScanDetailResponse(
         summary.scanId(),
@@ -129,20 +138,51 @@ public class GetScanHandler
         item.getCreatedAt() != null ? item.getCreatedAt().getEpochSecond() : 0);
   }
 
-  private static ScanRowResponse toRow(TcgInventoryItem item) {
+  private ScanRowResponse toRow(TcgInventoryItem scanItem, TcgInventoryItem item) {
     var status = publicStatus(item.getStatus());
     var sizeBytes = item.getSizeBytes() != null ? item.getSizeBytes() : 0;
+    var uploaded = true;
+    if ("uploading".equals(scanItem.getStatus())) {
+      try {
+        var head =
+            s3Client.headObject(
+                HeadObjectRequest.builder().bucket(ScanImages.BUCKET).key(item.getS3Key()).build());
+        uploaded =
+            head.contentLength() == sizeBytes && ScanImages.CONTENT_TYPE.equals(head.contentType());
+      } catch (S3Exception e) {
+        if (e.statusCode() == 404) {
+          uploaded = false;
+        } else {
+          throw e;
+        }
+      }
+    }
+    var sourceUrl =
+        uploaded
+            ? s3Presigner
+                .presignGetObject(
+                    GetObjectPresignRequest.builder()
+                        .signatureDuration(ScanImages.PRESIGN_TTL)
+                        .getObjectRequest(
+                            GetObjectRequest.builder()
+                                .bucket(ScanImages.BUCKET)
+                                .key(item.getS3Key())
+                                .build())
+                        .build())
+                .url()
+                .toString()
+            : null;
     return new ScanRowResponse(
         item.getScanPosition() != null ? item.getScanPosition() : 0,
         item.getFilename(),
         sizeBytes,
-        false,
+        uploaded,
         null,
         null,
         status,
         Boolean.TRUE.equals(item.getNeedsReview()) || "needs_review".equals(status),
         List.of(),
-        null,
+        sourceUrl,
         item.getError());
   }
 

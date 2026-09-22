@@ -163,7 +163,9 @@ public class TcgInventoryItemIntegrationTest {
     // arrange
     var createdAt = Instant.ofEpochSecond(1700000000);
     var scan = TcgInventoryItem.createScan("jordan", "01JSCAN", "LP", "foil", 2, createdAt);
-    var row = TcgInventoryItem.createScanRow("jordan", "01JSCAN", 1, "001.jpg", 483200L);
+    var row =
+        TcgInventoryItem.createScanRow(
+            "jordan", "01JSCAN", 1, "001.jpg", 483200L, "users/jordan/scans/01JSCAN/000001.jpg");
 
     // act
     tcgInventoryTable.putItem(scan);

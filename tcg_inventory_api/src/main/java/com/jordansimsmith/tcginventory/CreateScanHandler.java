@@ -21,12 +21,17 @@ import java.util.Set;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.PutObjectPresignRequest;
 
 public class CreateScanHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
   private static final Logger LOGGER = LoggerFactory.getLogger(CreateScanHandler.class);
   private static final int MAX_SCAN_FILES = 200;
   private static final long MAX_SCAN_FILE_BYTES = 1024 * 1024;
+  private static final Map<String, String> UPLOAD_HEADERS =
+      Map.of("Content-Type", ScanImages.CONTENT_TYPE, "If-None-Match", "*");
   private static final Set<String> VALID_FINISHES = Set.of("normal", "foil", "etched");
 
   record ScanFileRequest(
@@ -58,6 +63,7 @@ public class CreateScanHandler
   private final HttpResponseFactory httpResponseFactory;
   private final TcgInventoryItemRepository tcgInventoryItemRepository;
   private final UlidGenerator ulidGenerator;
+  private final S3Presigner s3Presigner;
 
   public CreateScanHandler() {
     this(TcgInventoryFactory.create());
@@ -71,6 +77,7 @@ public class CreateScanHandler
     this.httpResponseFactory = factory.httpResponseFactory();
     this.tcgInventoryItemRepository = factory.tcgInventoryItemRepository();
     this.ulidGenerator = factory.ulidGenerator();
+    this.s3Presigner = factory.s3Presigner();
   }
 
   @Override
@@ -115,30 +122,48 @@ public class CreateScanHandler
     var rowItems = new ArrayList<TcgInventoryItem>();
     for (int index = 0; index < files.size(); index++) {
       var file = files.get(index);
+      var scanPosition = index + 1;
+      var s3Key = "users/%s/scans/%s/%06d.jpg".formatted(user, scanId, scanPosition);
       rowItems.add(
           TcgInventoryItem.createScanRow(
-              user, scanId, index + 1, file.filename(), file.sizeBytes()));
+              user, scanId, scanPosition, file.filename(), file.sizeBytes(), s3Key));
     }
 
     tcgInventoryItemRepository.createScan(scanItem, rowItems);
     return httpResponseFactory.created(toResponse(scanItem, rowItems));
   }
 
-  private static CreateScanResponse toResponse(
+  private CreateScanResponse toResponse(
       TcgInventoryItem scanItem, List<TcgInventoryItem> rowItems) {
-    var rows = rowItems.stream().map(CreateScanHandler::toUploadSlot).toList();
+    var rows = rowItems.stream().map(this::toUploadSlot).toList();
     return new CreateScanResponse(scanItem.getScanId(), rows);
   }
 
-  private static ScanUploadSlotResponse toUploadSlot(TcgInventoryItem item) {
-    var sizeBytes = item.getSizeBytes() != null ? item.getSizeBytes() : 0;
+  private ScanUploadSlotResponse toUploadSlot(TcgInventoryItem item) {
+    var scanPosition = item.getScanPosition();
+    var sizeBytes = item.getSizeBytes();
+    var uploadUrl =
+        s3Presigner
+            .presignPutObject(
+                PutObjectPresignRequest.builder()
+                    .signatureDuration(ScanImages.PRESIGN_TTL)
+                    .putObjectRequest(
+                        PutObjectRequest.builder()
+                            .bucket(ScanImages.BUCKET)
+                            .key(item.getS3Key())
+                            .contentType(ScanImages.CONTENT_TYPE)
+                            .ifNoneMatch("*")
+                            .build())
+                    .build())
+            .url()
+            .toString();
     return new ScanUploadSlotResponse(
-        item.getScanPosition() != null ? item.getScanPosition() : 0,
+        scanPosition != null ? scanPosition : 0,
         item.getFilename(),
-        sizeBytes,
+        sizeBytes != null ? sizeBytes : 0,
         false,
-        null,
-        null);
+        uploadUrl,
+        UPLOAD_HEADERS);
   }
 
   @Nullable

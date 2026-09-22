@@ -6,9 +6,14 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.s3.S3Container;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
+import java.io.IOException;
 import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
@@ -22,20 +27,25 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.services.s3.S3Client;
 
 @Testcontainers
 public class ScansHandlerIntegrationTest {
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
+  @Container private static final S3Container s3Container = new S3Container();
 
-  private static final URI UNUSED_S3_ENDPOINT = URI.create("http://localhost:1");
+  private static final byte[] JPEG_BYTES =
+      new byte[] {(byte) 0xFF, (byte) 0xD8, 0x01, (byte) 0xFF, (byte) 0xD9};
 
   private TcgInventoryTestFactory factory;
   private FakeClock fakeClock;
   private FakeUlidGenerator fakeUlidGenerator;
   private ObjectMapper objectMapper;
   private DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private S3Client s3Client;
   private CreateScanHandler createScanHandler;
   private FindScansHandler findScansHandler;
   private GetScanHandler getScanHandler;
@@ -43,17 +53,24 @@ public class ScansHandlerIntegrationTest {
   @BeforeAll
   static void setUpBeforeClass() {
     var factory =
-        TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
+        TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), s3Container.getEndpoint());
     DynamoDbUtils.createTable(factory.dynamoDbClient(), factory.tcgInventoryTable());
+    factory.s3Client().createBucket(request -> request.bucket(ScanImages.BUCKET));
   }
 
   @BeforeEach
   void setUp() {
-    factory = TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
+    factory =
+        TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), s3Container.getEndpoint());
     fakeClock = factory.fakeClock();
     fakeUlidGenerator = factory.fakeUlidGenerator();
     objectMapper = factory.objectMapper();
     tcgInventoryTable = factory.tcgInventoryTable();
+    s3Client = factory.s3Client();
+    for (var object :
+        s3Client.listObjectsV2(request -> request.bucket(ScanImages.BUCKET)).contents()) {
+      s3Client.deleteObject(request -> request.bucket(ScanImages.BUCKET).key(object.key()));
+    }
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
@@ -101,8 +118,9 @@ public class ScansHandlerIntegrationTest {
       assertThat(row.has("source_url")).isFalse();
       assertThat(row.has("error")).isFalse();
       assertThat(row.get("uploaded").asBoolean()).isFalse();
-      assertThat(row.get("upload_url").isNull()).isTrue();
-      assertThat(row.get("upload_headers").isNull()).isTrue();
+      assertThat(row.get("upload_url").asText()).isNotBlank();
+      assertThat(row.get("upload_headers").get("Content-Type").asText()).isEqualTo("image/jpeg");
+      assertThat(row.get("upload_headers").get("If-None-Match").asText()).isEqualTo("*");
     }
 
     var scanItem =
@@ -112,6 +130,13 @@ public class ScansHandlerIntegrationTest {
                 .sortValue(TcgInventoryItem.formatScanSk(scanId))
                 .build());
     assertThat(scanItem).isNotNull();
+    var firstRow =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue(TcgInventoryItem.formatScanRowPk("jordan", scanId))
+                .sortValue(TcgInventoryItem.formatScanRowSk(1))
+                .build());
+    assertThat(firstRow.getS3Key()).isEqualTo("users/jordan/scans/%s/000001.jpg".formatted(scanId));
     assertThat(scanItem.getUpdatedAt()).isEqualTo(Instant.ofEpochSecond(1700000000));
 
     var reread =
@@ -120,6 +145,129 @@ public class ScansHandlerIntegrationTest {
     assertThat(reread.getStatusCode()).isEqualTo(200);
     assertThat(objectMapper.readTree(reread.getBody()).get("rows").get(0).get("filename").asText())
         .isEqualTo("1.jpg");
+    assertThat(
+            objectMapper.readTree(reread.getBody()).get("rows").get(0).get("upload_url").isNull())
+        .isTrue();
+  }
+
+  @Test
+  void scanDetailShouldVerifyPresignedUploadAndServeFreshGetUrl()
+      throws IOException, InterruptedException {
+    // arrange
+    var response =
+        createScanHandler.handleRequest(
+            buildEventWithBody(
+                "jordan",
+                "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"001.jpg\",\"size_bytes\":5}]}"),
+            null);
+    var body = objectMapper.readTree(response.getBody());
+    var row = body.get("rows").get(0);
+    var headers = row.get("upload_headers");
+    var httpClient = HttpClient.newHttpClient();
+
+    // act
+    var putResponse =
+        httpClient.send(
+            HttpRequest.newBuilder(URI.create(row.get("upload_url").asText()))
+                .header("Content-Type", headers.get("Content-Type").asText())
+                .header("If-None-Match", headers.get("If-None-Match").asText())
+                .PUT(HttpRequest.BodyPublishers.ofByteArray(JPEG_BYTES))
+                .build(),
+            HttpResponse.BodyHandlers.ofByteArray());
+    var detailResponse =
+        getScanHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("scan_id", body.get("scan_id").asText())), null);
+    var detailRow = objectMapper.readTree(detailResponse.getBody()).get("rows").get(0);
+    var getResponse =
+        httpClient.send(
+            HttpRequest.newBuilder(URI.create(detailRow.get("source_url").asText())).GET().build(),
+            HttpResponse.BodyHandlers.ofByteArray());
+
+    // assert
+    assertThat(putResponse.statusCode()).isEqualTo(200);
+    assertThat(detailRow.get("uploaded").asBoolean()).isTrue();
+    assertThat(detailRow.get("source_url").asText()).isNotBlank();
+    assertThat(detailRow.get("upload_url").isNull()).isTrue();
+    assertThat(detailRow.get("upload_headers").isNull()).isTrue();
+    assertThat(getResponse.statusCode()).isEqualTo(200);
+    assertThat(getResponse.body()).isEqualTo(JPEG_BYTES);
+  }
+
+  @Test
+  void scanDetailShouldRejectReplacementAndInvalidHeadMetadata()
+      throws IOException, InterruptedException {
+    // arrange
+    var response =
+        createScanHandler.handleRequest(
+            buildEventWithBody(
+                "jordan",
+                "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"001.jpg\",\"size_bytes\":5}]}"),
+            null);
+    var body = objectMapper.readTree(response.getBody());
+    var row = body.get("rows").get(0);
+    var headers = row.get("upload_headers");
+    var uploadRequest =
+        HttpRequest.newBuilder(URI.create(row.get("upload_url").asText()))
+            .header("Content-Type", headers.get("Content-Type").asText())
+            .header("If-None-Match", headers.get("If-None-Match").asText())
+            .PUT(HttpRequest.BodyPublishers.ofByteArray(JPEG_BYTES))
+            .build();
+    var httpClient = HttpClient.newHttpClient();
+
+    // act
+    var firstPut = httpClient.send(uploadRequest, HttpResponse.BodyHandlers.discarding());
+    var replacementPut =
+        httpClient.send(
+            HttpRequest.newBuilder(URI.create(row.get("upload_url").asText()))
+                .header("Content-Type", headers.get("Content-Type").asText())
+                .header("If-None-Match", headers.get("If-None-Match").asText())
+                .PUT(HttpRequest.BodyPublishers.ofByteArray(new byte[] {1, 2, 3, 4, 5}))
+                .build(),
+            HttpResponse.BodyHandlers.discarding());
+    var invalidScanId = createScan("jordan", "002.jpg");
+    s3Client.putObject(
+        request ->
+            request
+                .bucket(ScanImages.BUCKET)
+                .key("users/jordan/scans/%s/000001.jpg".formatted(invalidScanId))
+                .contentType("image/png"),
+        RequestBody.fromBytes(new byte[] {1}));
+    var invalidDetail =
+        getScanHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("scan_id", invalidScanId)), null);
+
+    // assert
+    assertThat(firstPut.statusCode()).isEqualTo(200);
+    assertThat(replacementPut.statusCode()).isEqualTo(412);
+    var invalidRow = objectMapper.readTree(invalidDetail.getBody()).get("rows").get(0);
+    assertThat(invalidRow.get("uploaded").asBoolean()).isFalse();
+    assertThat(invalidRow.get("source_url").isNull()).isTrue();
+    assertThat(invalidRow.get("upload_url").isNull()).isTrue();
+
+    // arrange
+    var wrongSizeScanId = createScan("jordan", "003.jpg", 2);
+    s3Client.putObject(
+        request ->
+            request
+                .bucket(ScanImages.BUCKET)
+                .key("users/jordan/scans/%s/000001.jpg".formatted(wrongSizeScanId))
+                .contentType("image/jpeg"),
+        RequestBody.fromBytes(new byte[] {1}));
+
+    // act
+    var wrongSizeDetail =
+        getScanHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("scan_id", wrongSizeScanId)), null);
+
+    // assert
+    assertThat(
+            objectMapper
+                .readTree(wrongSizeDetail.getBody())
+                .get("rows")
+                .get(0)
+                .get("uploaded")
+                .asBoolean())
+        .isFalse();
   }
 
   @Test
@@ -264,14 +412,20 @@ public class ScansHandlerIntegrationTest {
     assertThat(unknownResponse.getStatusCode()).isEqualTo(404);
   }
 
-  private String createScan(String user, String filename) throws Exception {
+  private String createScan(String user, String filename) throws IOException {
+    return createScan(user, filename, 1);
+  }
+
+  private String createScan(String user, String filename, int sizeBytes) throws IOException {
     var response =
         createScanHandler.handleRequest(
             buildEventWithBody(
                 user,
                 "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\""
                     + filename
-                    + "\",\"size_bytes\":1}]}"),
+                    + "\",\"size_bytes\":"
+                    + sizeBytes
+                    + "}]}"),
             null);
     assertThat(response.getStatusCode()).isEqualTo(201);
     return objectMapper.readTree(response.getBody()).get("scan_id").asText();

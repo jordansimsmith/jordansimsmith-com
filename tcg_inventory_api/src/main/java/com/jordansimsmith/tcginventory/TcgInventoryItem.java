@@ -60,6 +60,7 @@ public class TcgInventoryItem {
   public static final String SCAN_ID = "scan_id";
   public static final String SCAN_POSITION = "scan_position";
   public static final String SIZE_BYTES = "size_bytes";
+  public static final String S3_KEY = "s3_key";
   public static final String STATUS = "status";
   public static final String IMPORT_ID = "import_id";
   public static final String ORDER_ID = "order_id";
@@ -121,6 +122,7 @@ public class TcgInventoryItem {
   private String scanId;
   private Integer scanPosition;
   private Long sizeBytes;
+  private String s3Key;
   private String status;
   private String importId;
   private String orderId;
@@ -393,6 +395,16 @@ public class TcgInventoryItem {
 
   public void setSizeBytes(@Nullable Long sizeBytes) {
     this.sizeBytes = sizeBytes;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(S3_KEY)
+  public String getS3Key() {
+    return s3Key;
+  }
+
+  public void setS3Key(@Nullable String s3Key) {
+    this.s3Key = s3Key;
   }
 
   @Nullable
@@ -797,6 +809,7 @@ public class TcgInventoryItem {
         && Objects.equals(scanId, that.scanId)
         && Objects.equals(scanPosition, that.scanPosition)
         && Objects.equals(sizeBytes, that.sizeBytes)
+        && Objects.equals(s3Key, that.s3Key)
         && Objects.equals(status, that.status)
         && Objects.equals(importId, that.importId)
         && Objects.equals(orderId, that.orderId)
@@ -862,6 +875,7 @@ public class TcgInventoryItem {
         scanId,
         scanPosition,
         sizeBytes,
+        s3Key,
         status,
         importId,
         orderId,
@@ -966,6 +980,9 @@ public class TcgInventoryItem {
         + scanPosition
         + ", sizeBytes="
         + sizeBytes
+        + ", s3Key='"
+        + s3Key
+        + '\''
         + ", status='"
         + status
         + '\''
@@ -1273,7 +1290,7 @@ public class TcgInventoryItem {
   }
 
   public static TcgInventoryItem createScanRow(
-      String user, String scanId, int scanPosition, String filename, long sizeBytes) {
+      String user, String scanId, int scanPosition, String filename, long sizeBytes, String s3Key) {
     var item = new TcgInventoryItem();
     item.setPk(formatScanRowPk(user, scanId));
     item.setSk(formatScanRowSk(scanPosition));
@@ -1281,6 +1298,7 @@ public class TcgInventoryItem {
     item.setScanPosition(scanPosition);
     item.setFilename(filename);
     item.setSizeBytes(sizeBytes);
+    item.setS3Key(s3Key);
     item.setStatus("pending");
     item.setNeedsReview(false);
     return item;
