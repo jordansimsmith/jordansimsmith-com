@@ -55,6 +55,18 @@ public class TcgInventoryTestModule {
 
   @Provides
   @Singleton
+  FakeQueueClient<ScanMessage> fakeScanQueue() {
+    return new FakeQueueClient<>();
+  }
+
+  @Provides
+  @Singleton
+  QueueClient<ScanMessage> scanQueue(FakeQueueClient<ScanMessage> fakeScanQueue) {
+    return fakeScanQueue;
+  }
+
+  @Provides
+  @Singleton
   FakeFetchTcgClient fakeFetchTcgClient() {
     return new FakeFetchTcgClient();
   }

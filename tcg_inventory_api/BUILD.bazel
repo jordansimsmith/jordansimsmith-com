@@ -264,6 +264,29 @@ java_binary(
 )
 
 java_binary(
+    name = "identify-scan-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/IdentifyScanHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "//lib/queue:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_s3",
+    ],
+)
+
+java_binary(
     name = "delete-import-handler",
     srcs = ["src/main/java/com/jordansimsmith/tcginventory/DeleteImportHandler.java"],
     create_executable = False,
@@ -792,6 +815,7 @@ java_test_suite(
         ":get-scan-handler",
         ":get-settings-handler",
         ":get-sku-handler",
+        ":identify-scan-handler",
         ":jobs-handler",
         ":jobs-lib",
         ":lib",

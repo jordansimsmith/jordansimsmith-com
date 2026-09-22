@@ -3,9 +3,11 @@ package com.jordansimsmith.tcginventory;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
+import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.s3.S3Container;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
@@ -43,12 +45,14 @@ public class ScansHandlerIntegrationTest {
   private TcgInventoryTestFactory factory;
   private FakeClock fakeClock;
   private FakeUlidGenerator fakeUlidGenerator;
+  private FakeQueueClient<ScanMessage> fakeScanQueue;
   private ObjectMapper objectMapper;
   private DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
   private S3Client s3Client;
   private CreateScanHandler createScanHandler;
   private FindScansHandler findScansHandler;
   private GetScanHandler getScanHandler;
+  private IdentifyScanHandler identifyScanHandler;
 
   @BeforeAll
   static void setUpBeforeClass() {
@@ -64,6 +68,7 @@ public class ScansHandlerIntegrationTest {
         TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), s3Container.getEndpoint());
     fakeClock = factory.fakeClock();
     fakeUlidGenerator = factory.fakeUlidGenerator();
+    fakeScanQueue = factory.fakeScanQueue();
     objectMapper = factory.objectMapper();
     tcgInventoryTable = factory.tcgInventoryTable();
     s3Client = factory.s3Client();
@@ -74,9 +79,11 @@ public class ScansHandlerIntegrationTest {
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
+    fakeScanQueue.reset();
     createScanHandler = new CreateScanHandler(factory);
     findScansHandler = new FindScansHandler(factory);
     getScanHandler = new GetScanHandler(factory);
+    identifyScanHandler = new IdentifyScanHandler(factory);
   }
 
   @Test
@@ -271,6 +278,220 @@ public class ScansHandlerIntegrationTest {
   }
 
   @Test
+  void identifyScanShouldVerifyUploadsTransitionOnceAndEnqueueMessage() throws Exception {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    var createResponse =
+        createScanHandler.handleRequest(
+            buildEventWithBody(
+                "jordan",
+                "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":["
+                    + "{\"filename\":\"001.jpg\",\"size_bytes\":5},"
+                    + "{\"filename\":\"002.jpg\",\"size_bytes\":6}]}"),
+            null);
+    var createBody = objectMapper.readTree(createResponse.getBody());
+    var scanId = createBody.get("scan_id").asText();
+    var rows = createBody.get("rows");
+    s3Client.putObject(
+        request ->
+            request
+                .bucket(ScanImages.BUCKET)
+                .key("users/jordan/scans/%s/000001.jpg".formatted(scanId))
+                .contentType(ScanImages.CONTENT_TYPE),
+        RequestBody.fromBytes(JPEG_BYTES));
+    s3Client.putObject(
+        request ->
+            request
+                .bucket(ScanImages.BUCKET)
+                .key("users/jordan/scans/%s/000002.jpg".formatted(scanId))
+                .contentType(ScanImages.CONTENT_TYPE),
+        RequestBody.fromBytes(new byte[] {1, 2, 3, 4, 5, 6}));
+    fakeClock.setTime(Instant.ofEpochSecond(1700000100));
+
+    // act
+    var firstResponse =
+        identifyScanHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("scan_id", scanId)), null);
+    var secondResponse =
+        identifyScanHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("scan_id", scanId)), null);
+
+    // assert
+    assertThat(firstResponse.getStatusCode()).isEqualTo(202);
+    assertThat(objectMapper.readTree(firstResponse.getBody()))
+        .isEqualTo(
+            objectMapper.readTree(
+                "{\"scan_id\":\"%s\",\"status\":\"identifying\"}".formatted(scanId)));
+    assertThat(secondResponse.getStatusCode()).isEqualTo(202);
+    assertThat(objectMapper.readTree(secondResponse.getBody()))
+        .isEqualTo(
+            objectMapper.readTree(
+                "{\"scan_id\":\"%s\",\"status\":\"identifying\"}".formatted(scanId)));
+    assertThat(fakeScanQueue.getMessages()).containsExactly(new ScanMessage("jordan", scanId));
+    var scanItem =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
+                .sortValue(TcgInventoryItem.formatScanSk(scanId))
+                .build());
+    assertThat(scanItem.getStatus()).isEqualTo("identifying");
+    assertThat(scanItem.getUpdatedAt()).isEqualTo(Instant.ofEpochSecond(1700000100));
+    assertThat(rows).hasSize(2);
+  }
+
+  @Test
+  void identifyScanShouldRejectIncompleteUploadsWithoutTransitioning() throws Exception {
+    // arrange
+    var missingScanId = createScan("jordan", "missing.jpg", 5);
+    var wrongSizeScanId = createScan("jordan", "wrong-size.jpg", 5);
+    s3Client.putObject(
+        request ->
+            request
+                .bucket(ScanImages.BUCKET)
+                .key("users/jordan/scans/%s/000001.jpg".formatted(wrongSizeScanId))
+                .contentType(ScanImages.CONTENT_TYPE),
+        RequestBody.fromBytes(new byte[] {1, 2, 3, 4}));
+    var wrongTypeScanId = createScan("jordan", "wrong-type.jpg", 5);
+    s3Client.putObject(
+        request ->
+            request
+                .bucket(ScanImages.BUCKET)
+                .key("users/jordan/scans/%s/000001.jpg".formatted(wrongTypeScanId))
+                .contentType("image/png"),
+        RequestBody.fromBytes(JPEG_BYTES));
+
+    // act
+    var missingResponse = identify(missingScanId);
+    var wrongSizeResponse = identify(wrongSizeScanId);
+    var wrongTypeResponse = identify(wrongTypeScanId);
+
+    // assert
+    for (var response : List.of(missingResponse, wrongSizeResponse, wrongTypeResponse)) {
+      assertThat(response.getStatusCode()).isEqualTo(409);
+      assertThat(response.getBody())
+          .contains("all scan files must be uploaded before identification");
+    }
+    assertThat(fakeScanQueue.getMessages()).isEmpty();
+    assertThat(getScanItem("jordan", missingScanId).getStatus()).isEqualTo("uploading");
+    assertThat(getScanItem("jordan", wrongSizeScanId).getStatus()).isEqualTo("uploading");
+    assertThat(getScanItem("jordan", wrongTypeScanId).getStatus()).isEqualTo("uploading");
+  }
+
+  @Test
+  void identifyScanShouldReturnCurrentStateForLaterStates() throws Exception {
+    // arrange
+    var scanId = createScan("jordan", "001.jpg", 5);
+    var scanItem = getScanItem("jordan", scanId);
+    scanItem.setStatus("identifying");
+    tcgInventoryTable.putItem(scanItem);
+    var identifyingResponse = identify(scanId);
+    scanItem.setStatus("reviewing");
+    tcgInventoryTable.putItem(scanItem);
+    var reviewingResponse = identify(scanId);
+    scanItem.setStatus("confirmed");
+    tcgInventoryTable.putItem(scanItem);
+
+    // act
+    var confirmedResponse = identify(scanId);
+
+    // assert
+    assertThat(identifyingResponse.getStatusCode()).isEqualTo(202);
+    assertThat(objectMapper.readTree(identifyingResponse.getBody()).get("status").asText())
+        .isEqualTo("identifying");
+    assertThat(reviewingResponse.getStatusCode()).isEqualTo(202);
+    assertThat(objectMapper.readTree(reviewingResponse.getBody()).get("status").asText())
+        .isEqualTo("reviewing");
+    assertThat(confirmedResponse.getStatusCode()).isEqualTo(202);
+    assertThat(objectMapper.readTree(confirmedResponse.getBody()).get("status").asText())
+        .isEqualTo("confirmed");
+    assertThat(fakeScanQueue.getMessages()).isEmpty();
+  }
+
+  @Test
+  void identifyScanShouldRejectMissingAndForeignScans() throws Exception {
+    // arrange
+    var scanId = createScan("alice", "001.jpg", 5);
+    tcgInventoryTable.deleteItem(
+        Key.builder()
+            .partitionValue(TcgInventoryItem.formatUserPk("alice"))
+            .sortValue(TcgInventoryItem.formatScanSk(scanId))
+            .build());
+
+    // act
+    var deletedResponse =
+        identifyScanHandler.handleRequest(
+            buildEventWithPath("alice", Map.of("scan_id", scanId)), null);
+    var foreignScanId = createScan("alice", "002.jpg", 5);
+    var foreignResponse =
+        identifyScanHandler.handleRequest(
+            buildEventWithPath("bob", Map.of("scan_id", foreignScanId)), null);
+
+    // assert
+    assertThat(deletedResponse.getStatusCode()).isEqualTo(404);
+    assertThat(foreignResponse.getStatusCode()).isEqualTo(404);
+    assertThat(fakeScanQueue.getMessages()).isEmpty();
+  }
+
+  @Test
+  void scanDetailShouldExposePersistedRecognitionResults() throws Exception {
+    // arrange
+    var createResponse =
+        createScanHandler.handleRequest(
+            buildEventWithBody(
+                "jordan",
+                "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":["
+                    + "{\"filename\":\"001.jpg\",\"size_bytes\":5},"
+                    + "{\"filename\":\"002.jpg\",\"size_bytes\":5}]}"),
+            null);
+    var scanId = objectMapper.readTree(createResponse.getBody()).get("scan_id").asText();
+    var scanItem = getScanItem("jordan", scanId);
+    scanItem.setStatus("identifying");
+    scanItem.setProcessedCount(1);
+    scanItem.setError("one row needs manual review");
+    tcgInventoryTable.putItem(scanItem);
+    var row =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue(TcgInventoryItem.formatScanRowPk("jordan", scanId))
+                .sortValue(TcgInventoryItem.formatScanRowSk(1))
+                .build());
+    row.setStatus("suggested");
+    row.setSuggestions(
+        List.of(
+            TcgInventoryItem.ScanSuggestion.create(
+                "a9738cda-adb1-47fb-9f4c-ecd930228c4d", "Ragavan, Nimble Pilferer", 0.8300001)));
+    row.setNeedsReview(false);
+    tcgInventoryTable.putItem(row);
+    var reviewRow =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue(TcgInventoryItem.formatScanRowPk("jordan", scanId))
+                .sortValue(TcgInventoryItem.formatScanRowSk(2))
+                .build());
+    reviewRow.setStatus("needs_review");
+    reviewRow.setNeedsReview(true);
+    reviewRow.setError("corrupt JPEG");
+    tcgInventoryTable.putItem(reviewRow);
+
+    // act
+    var response =
+        getScanHandler.handleRequest(buildEventWithPath("jordan", Map.of("scan_id", scanId)), null);
+
+    // assert
+    var body = objectMapper.readTree(response.getBody());
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    assertThat(body.get("processed_count").asInt()).isEqualTo(1);
+    assertThat(body.get("error").asText()).isEqualTo("one row needs manual review");
+    assertThat(body.get("rows").get(0).get("status").asText()).isEqualTo("suggested");
+    assertThat(body.get("rows").get(0).get("needs_review").asBoolean()).isFalse();
+    assertThat(body.get("rows").get(0).get("suggestions").get(0).get("score").asDouble())
+        .isEqualTo(0.8300001);
+    assertThat(body.get("rows").get(1).get("status").asText()).isEqualTo("needs_review");
+    assertThat(body.get("rows").get(1).get("needs_review").asBoolean()).isTrue();
+    assertThat(body.get("rows").get(1).get("error").asText()).isEqualTo("corrupt JPEG");
+  }
+
+  @Test
   void createScanShouldRejectNonAsciiFilenames() throws Exception {
     // arrange
     var request =
@@ -429,6 +650,19 @@ public class ScansHandlerIntegrationTest {
             null);
     assertThat(response.getStatusCode()).isEqualTo(201);
     return objectMapper.readTree(response.getBody()).get("scan_id").asText();
+  }
+
+  private TcgInventoryItem getScanItem(String user, String scanId) {
+    return tcgInventoryTable.getItem(
+        Key.builder()
+            .partitionValue(TcgInventoryItem.formatUserPk(user))
+            .sortValue(TcgInventoryItem.formatScanSk(scanId))
+            .build());
+  }
+
+  private APIGatewayV2HTTPResponse identify(String scanId) {
+    return identifyScanHandler.handleRequest(
+        buildEventWithPath("jordan", Map.of("scan_id", scanId)), null);
   }
 
   private String validBody() {

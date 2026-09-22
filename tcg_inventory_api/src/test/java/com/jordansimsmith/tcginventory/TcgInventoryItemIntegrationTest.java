@@ -166,6 +166,15 @@ public class TcgInventoryItemIntegrationTest {
     var row =
         TcgInventoryItem.createScanRow(
             "jordan", "01JSCAN", 1, "001.jpg", 483200L, "users/jordan/scans/01JSCAN/000001.jpg");
+    scan.setCatalogVersion(36);
+    row.setSuggestions(
+        List.of(
+            TcgInventoryItem.ScanSuggestion.create(
+                "a9738cda-adb1-47fb-9f4c-ecd930228c4d", "Ragavan, Nimble Pilferer", 0.83),
+            TcgInventoryItem.ScanSuggestion.create(
+                "4ced112a-e775-4f97-97b3-74877e9dce12", "Dragon's Rage Channeler", 0.71)));
+    row.setNeedsReview(true);
+    row.setError("ambiguous match");
 
     // act
     tcgInventoryTable.putItem(scan);
@@ -188,6 +197,7 @@ public class TcgInventoryItemIntegrationTest {
     assertThat(retrievedScan.getFinish()).isEqualTo("foil");
     assertThat(retrievedScan.getRowCount()).isEqualTo(2);
     assertThat(retrievedScan.getProcessedCount()).isZero();
+    assertThat(retrievedScan.getCatalogVersion()).isEqualTo(36);
     assertThat(retrievedScan.getCreatedAt()).isEqualTo(createdAt);
     assertThat(retrievedScan.getUpdatedAt()).isEqualTo(createdAt);
     assertThat(retrievedRow).isEqualTo(row);
@@ -195,7 +205,14 @@ public class TcgInventoryItemIntegrationTest {
     assertThat(retrievedRow.getFilename()).isEqualTo("001.jpg");
     assertThat(retrievedRow.getSizeBytes()).isEqualTo(483200L);
     assertThat(retrievedRow.getStatus()).isEqualTo("pending");
-    assertThat(retrievedRow.getNeedsReview()).isFalse();
+    assertThat(retrievedRow.getNeedsReview()).isTrue();
+    assertThat(retrievedRow.getSuggestions()).hasSize(2);
+    assertThat(retrievedRow.getSuggestions().get(0).getScryfallId())
+        .isEqualTo("a9738cda-adb1-47fb-9f4c-ecd930228c4d");
+    assertThat(retrievedRow.getSuggestions().get(0).getName())
+        .isEqualTo("Ragavan, Nimble Pilferer");
+    assertThat(retrievedRow.getSuggestions().get(0).getScore()).isEqualTo(0.83);
+    assertThat(retrievedRow.getError()).isEqualTo("ambiguous match");
   }
 
   @Test

@@ -24,6 +24,7 @@ import software.amazon.awssdk.services.sqs.SqsClient;
 @Module
 public class TcgInventoryModule {
   static final String JOBS_QUEUE_NAME = "tcg_inventory_jobs.fifo";
+  static final String SCAN_QUEUE_NAME = "tcg_inventory_scan_jobs";
 
   @Provides
   @Singleton
@@ -59,6 +60,17 @@ public class TcgInventoryModule {
             .httpClientBuilder(AwsCrtHttpClient.builder())
             .build();
     return SqsQueueClient.create(sqsClient, objectMapper, JOBS_QUEUE_NAME);
+  }
+
+  @Provides
+  @Singleton
+  QueueClient<ScanMessage> scanQueue(ObjectMapper objectMapper) {
+    var sqsClient =
+        SqsClient.builder()
+            .region(Region.of(System.getenv("AWS_REGION")))
+            .httpClientBuilder(AwsCrtHttpClient.builder())
+            .build();
+    return SqsQueueClient.create(sqsClient, objectMapper, SCAN_QUEUE_NAME);
   }
 
   @Provides

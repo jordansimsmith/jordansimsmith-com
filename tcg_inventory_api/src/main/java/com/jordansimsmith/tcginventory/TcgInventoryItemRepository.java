@@ -15,6 +15,7 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.dynamodb.model.Delete;
 import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.ReturnValuesOnConditionCheckFailure;
@@ -83,6 +84,39 @@ public class TcgInventoryItemRepository {
       return new ScanPage(List.of(), Map.of());
     }
     return new ScanPage(page.items(), page.lastEvaluatedKey());
+  }
+
+  public boolean transitionScanToIdentifying(String user, String scanId) {
+    try {
+      dynamoDbClient.updateItem(
+          UpdateItemRequest.builder()
+              .tableName(TcgInventoryItem.TABLE_NAME)
+              .key(
+                  Map.of(
+                      TcgInventoryItem.PK,
+                          AttributeValue.builder().s(TcgInventoryItem.formatUserPk(user)).build(),
+                      TcgInventoryItem.SK,
+                          AttributeValue.builder()
+                              .s(TcgInventoryItem.formatScanSk(scanId))
+                              .build()))
+              .updateExpression(
+                  "SET #status = :identifying, " + TcgInventoryItem.UPDATED_AT + " = :now")
+              .conditionExpression(
+                  "attribute_exists(" + TcgInventoryItem.PK + ") AND #status = :uploading")
+              .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+              .expressionAttributeValues(
+                  Map.of(
+                      ":identifying", AttributeValue.builder().s("identifying").build(),
+                      ":uploading", AttributeValue.builder().s("uploading").build(),
+                      ":now",
+                          AttributeValue.builder()
+                              .n(String.valueOf(clock.now().getEpochSecond()))
+                              .build()))
+              .build());
+      return true;
+    } catch (ConditionalCheckFailedException e) {
+      return false;
+    }
   }
 
   public List<TcgInventoryItem> findScanRows(String user, String scanId) {

@@ -52,6 +52,8 @@ public interface TcgInventoryFactory {
 
   QueueClient<JobMessage> jobsQueue();
 
+  QueueClient<ScanMessage> scanQueue();
+
   UlidGenerator ulidGenerator();
 
   FetchTcgClient fetchTcgClient();

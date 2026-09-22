@@ -26,6 +26,10 @@ public class HttpResponseFactory {
     return APIGatewayV2HTTPResponse.builder().withStatusCode(202).withHeaders(headers).build();
   }
 
+  public APIGatewayV2HTTPResponse accepted(Object body) {
+    return buildResponse(202, body);
+  }
+
   public APIGatewayV2HTTPResponse noContent() {
     return APIGatewayV2HTTPResponse.builder().withStatusCode(204).withHeaders(headers).build();
   }

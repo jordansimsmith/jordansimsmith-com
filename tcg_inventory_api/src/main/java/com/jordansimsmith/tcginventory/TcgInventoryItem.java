@@ -79,6 +79,8 @@ public class TcgInventoryItem {
   public static final String CONTINUATION = "continuation";
   public static final String PROCESSED_COUNT = "processed_count";
   public static final String NEEDS_REVIEW = "needs_review";
+  public static final String CATALOG_VERSION = "catalog_version";
+  public static final String SUGGESTIONS = "suggestions";
   public static final String FETCHTCG_LISTING_ID = "fetchtcg_listing_id";
   public static final String LAST_PUBLISHED_QUANTITY = "last_published_quantity";
   public static final String LAST_PUBLISHED_PRICE = "last_published_price";
@@ -141,6 +143,8 @@ public class TcgInventoryItem {
   private Integer continuation;
   private Integer processedCount;
   private Boolean needsReview;
+  private Integer catalogVersion;
+  private List<ScanSuggestion> suggestions;
   private Integer fetchtcgListingId;
   private Integer lastPublishedQuantity;
   private String lastPublishedPrice;
@@ -588,6 +592,26 @@ public class TcgInventoryItem {
   }
 
   @Nullable
+  @DynamoDbAttribute(CATALOG_VERSION)
+  public Integer getCatalogVersion() {
+    return catalogVersion;
+  }
+
+  public void setCatalogVersion(@Nullable Integer catalogVersion) {
+    this.catalogVersion = catalogVersion;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(SUGGESTIONS)
+  public List<ScanSuggestion> getSuggestions() {
+    return suggestions;
+  }
+
+  public void setSuggestions(@Nullable List<ScanSuggestion> suggestions) {
+    this.suggestions = suggestions;
+  }
+
+  @Nullable
   @DynamoDbAttribute(FETCHTCG_LISTING_ID)
   public Integer getFetchtcgListingId() {
     return fetchtcgListingId;
@@ -828,6 +852,8 @@ public class TcgInventoryItem {
         && Objects.equals(continuation, that.continuation)
         && Objects.equals(processedCount, that.processedCount)
         && Objects.equals(needsReview, that.needsReview)
+        && Objects.equals(catalogVersion, that.catalogVersion)
+        && Objects.equals(suggestions, that.suggestions)
         && Objects.equals(fetchtcgListingId, that.fetchtcgListingId)
         && Objects.equals(lastPublishedQuantity, that.lastPublishedQuantity)
         && Objects.equals(lastPublishedPrice, that.lastPublishedPrice)
@@ -894,6 +920,8 @@ public class TcgInventoryItem {
         continuation,
         processedCount,
         needsReview,
+        catalogVersion,
+        suggestions,
         fetchtcgListingId,
         lastPublishedQuantity,
         lastPublishedPrice,
@@ -1031,6 +1059,10 @@ public class TcgInventoryItem {
         + processedCount
         + ", needsReview="
         + needsReview
+        + ", catalogVersion="
+        + catalogVersion
+        + ", suggestions="
+        + suggestions
         + ", fetchtcgListingId="
         + fetchtcgListingId
         + ", lastPublishedQuantity="
@@ -1365,6 +1397,84 @@ public class TcgInventoryItem {
     item.setAsOfAuditUlid(asOfAuditUlid);
     item.setUpdatedAt(updatedAt);
     return item;
+  }
+
+  @DynamoDbBean
+  public static class ScanSuggestion {
+    public static final String SCRYFALL_ID = "scryfall_id";
+    public static final String NAME = "name";
+    public static final String SCORE = "score";
+
+    private String scryfallId;
+    private String name;
+    private Double score;
+
+    @Nullable
+    @DynamoDbAttribute(SCRYFALL_ID)
+    public String getScryfallId() {
+      return scryfallId;
+    }
+
+    public void setScryfallId(@Nullable String scryfallId) {
+      this.scryfallId = scryfallId;
+    }
+
+    @Nullable
+    @DynamoDbAttribute(NAME)
+    public String getName() {
+      return name;
+    }
+
+    public void setName(@Nullable String name) {
+      this.name = name;
+    }
+
+    @Nullable
+    @DynamoDbAttribute(SCORE)
+    public Double getScore() {
+      return score;
+    }
+
+    public void setScore(@Nullable Double score) {
+      this.score = score;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      ScanSuggestion that = (ScanSuggestion) o;
+      return Objects.equals(scryfallId, that.scryfallId)
+          && Objects.equals(name, that.name)
+          && Objects.equals(score, that.score);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(scryfallId, name, score);
+    }
+
+    @Override
+    public String toString() {
+      return "ScanSuggestion{"
+          + "scryfallId='"
+          + scryfallId
+          + '\''
+          + ", name='"
+          + name
+          + '\''
+          + ", score="
+          + score
+          + '}';
+    }
+
+    public static ScanSuggestion create(String scryfallId, String name, double score) {
+      var suggestion = new ScanSuggestion();
+      suggestion.setScryfallId(scryfallId);
+      suggestion.setName(name);
+      suggestion.setScore(score);
+      return suggestion;
+    }
   }
 
   @DynamoDbBean

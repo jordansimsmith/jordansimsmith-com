@@ -181,9 +181,16 @@ public class GetScanHandler
         null,
         status,
         Boolean.TRUE.equals(item.getNeedsReview()) || "needs_review".equals(status),
-        List.of(),
+        item.getSuggestions() == null
+            ? List.of()
+            : item.getSuggestions().stream().map(GetScanHandler::toSuggestion).toList(),
         sourceUrl,
         item.getError());
+  }
+
+  private static ScanSuggestionResponse toSuggestion(TcgInventoryItem.ScanSuggestion suggestion) {
+    return new ScanSuggestionResponse(
+        suggestion.getScryfallId(), suggestion.getName(), suggestion.getScore());
   }
 
   @Nullable
