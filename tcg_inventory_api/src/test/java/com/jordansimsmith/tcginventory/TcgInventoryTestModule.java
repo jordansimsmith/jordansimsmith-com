@@ -26,19 +26,97 @@ public class TcgInventoryTestModule {
 
   @Provides
   @Singleton
-  DynamoDbTable<TcgInventoryItem> tcgInventoryTable(DynamoDbEnhancedClient dynamoDbEnhancedClient) {
-    var schema = TableSchema.fromBean(TcgInventoryItem.class);
-    return dynamoDbEnhancedClient.table(TcgInventoryItem.TABLE_NAME, schema);
+  DynamoDbTable<TcgInventoryTableDefinition> tableDefinition(
+      DynamoDbEnhancedClient dynamoDbEnhancedClient) {
+    var schema = TableSchema.fromBean(TcgInventoryTableDefinition.class);
+    return dynamoDbEnhancedClient.table(TcgInventoryTable.TABLE_NAME, schema);
   }
 
   @Provides
   @Singleton
-  TcgInventoryItemRepository tcgInventoryItemRepository(
-      DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
+  DynamoDbTable<SkuItem> skuTable(DynamoDbEnhancedClient client) {
+    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(SkuItem.class));
+  }
+
+  @Provides
+  @Singleton
+  DynamoDbTable<UnitItem> unitTable(DynamoDbEnhancedClient client) {
+    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(UnitItem.class));
+  }
+
+  @Provides
+  @Singleton
+  DynamoDbTable<ImportItem> importTable(DynamoDbEnhancedClient client) {
+    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(ImportItem.class));
+  }
+
+  @Provides
+  @Singleton
+  DynamoDbTable<ImportRowItem> importRowTable(DynamoDbEnhancedClient client) {
+    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(ImportRowItem.class));
+  }
+
+  @Provides
+  @Singleton
+  DynamoDbTable<ScanItem> scanTable(DynamoDbEnhancedClient client) {
+    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(ScanItem.class));
+  }
+
+  @Provides
+  @Singleton
+  DynamoDbTable<ScanRowItem> scanRowTable(DynamoDbEnhancedClient client) {
+    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(ScanRowItem.class));
+  }
+
+  @Provides
+  @Singleton
+  DynamoDbTable<OrderItem> orderTable(DynamoDbEnhancedClient client) {
+    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(OrderItem.class));
+  }
+
+  @Provides
+  @Singleton
+  DynamoDbTable<JobItem> jobTable(DynamoDbEnhancedClient client) {
+    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(JobItem.class));
+  }
+
+  @Provides
+  @Singleton
+  DynamoDbTable<SettingsItem> settingsTable(DynamoDbEnhancedClient client) {
+    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(SettingsItem.class));
+  }
+
+  @Provides
+  @Singleton
+  DynamoDbTable<ReportItem> reportTable(DynamoDbEnhancedClient client) {
+    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(ReportItem.class));
+  }
+
+  @Provides
+  @Singleton
+  DynamoDbTable<AuditItem> auditTable(DynamoDbEnhancedClient client) {
+    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(AuditItem.class));
+  }
+
+  @Provides
+  @Singleton
+  DynamoDbTable<SequenceCounterItem> sequenceCounterTable(DynamoDbEnhancedClient client) {
+    return client.table(
+        TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(SequenceCounterItem.class));
+  }
+
+  @Provides
+  @Singleton
+  TcgInventoryRepository tcgInventoryRepository(
+      DynamoDbTable<UnitItem> unitTable,
+      DynamoDbTable<ScanItem> scanTable,
+      DynamoDbTable<ScanRowItem> scanRowTable,
+      DynamoDbTable<OrderItem> orderTable,
       DynamoDbClient dynamoDbClient,
       Clock clock,
       UlidGenerator ulidGenerator) {
-    return new TcgInventoryItemRepository(tcgInventoryTable, dynamoDbClient, clock, ulidGenerator);
+    return new TcgInventoryRepository(
+        unitTable, scanTable, scanRowTable, orderTable, dynamoDbClient, clock, ulidGenerator);
   }
 
   @Provides

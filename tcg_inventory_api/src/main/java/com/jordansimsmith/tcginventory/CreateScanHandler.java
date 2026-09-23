@@ -61,7 +61,7 @@ public class CreateScanHandler
   private final Clock clock;
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final TcgInventoryItemRepository tcgInventoryItemRepository;
+  private final TcgInventoryRepository tcgInventoryRepository;
   private final UlidGenerator ulidGenerator;
   private final S3Presigner s3Presigner;
 
@@ -75,7 +75,7 @@ public class CreateScanHandler
     this.clock = factory.clock();
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryItemRepository = factory.tcgInventoryItemRepository();
+    this.tcgInventoryRepository = factory.tcgInventoryRepository();
     this.ulidGenerator = factory.ulidGenerator();
     this.s3Presigner = factory.s3Presigner();
   }
@@ -117,29 +117,26 @@ public class CreateScanHandler
     var now = clock.now();
     var scanId = ulidGenerator.generate();
     var scanItem =
-        TcgInventoryItem.createScan(
-            user, scanId, request.condition(), request.finish(), files.size(), now);
-    var rowItems = new ArrayList<TcgInventoryItem>();
+        ScanItem.create(user, scanId, request.condition(), request.finish(), files.size(), now);
+    var rowItems = new ArrayList<ScanRowItem>();
     for (int index = 0; index < files.size(); index++) {
       var file = files.get(index);
       var scanPosition = index + 1;
       var s3Key = "users/%s/scans/%s/%06d.jpg".formatted(user, scanId, scanPosition);
       rowItems.add(
-          TcgInventoryItem.createScanRow(
-              user, scanId, scanPosition, file.filename(), file.sizeBytes(), s3Key));
+          ScanRowItem.create(user, scanId, scanPosition, file.filename(), file.sizeBytes(), s3Key));
     }
 
-    tcgInventoryItemRepository.createScan(scanItem, rowItems);
+    tcgInventoryRepository.createScan(scanItem, rowItems);
     return httpResponseFactory.created(toResponse(scanItem, rowItems));
   }
 
-  private CreateScanResponse toResponse(
-      TcgInventoryItem scanItem, List<TcgInventoryItem> rowItems) {
+  private CreateScanResponse toResponse(ScanItem scanItem, List<ScanRowItem> rowItems) {
     var rows = rowItems.stream().map(this::toUploadSlot).toList();
     return new CreateScanResponse(scanItem.getScanId(), rows);
   }
 
-  private ScanUploadSlotResponse toUploadSlot(TcgInventoryItem item) {
+  private ScanUploadSlotResponse toUploadSlot(ScanRowItem item) {
     var scanPosition = item.getScanPosition();
     var sizeBytes = item.getSizeBytes();
     var uploadUrl =

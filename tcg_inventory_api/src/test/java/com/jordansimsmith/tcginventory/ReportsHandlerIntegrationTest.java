@@ -34,7 +34,12 @@ public class ReportsHandlerIntegrationTest {
   private FakeQueueClient<JobMessage> fakeJobsQueue;
   private FakeFetchTcgClient fakeFetchTcgClient;
   private ObjectMapper objectMapper;
-  private DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private DynamoDbTable<JobItem> jobTable;
+  private DynamoDbTable<ReportItem> reportTable;
+  private DynamoDbTable<AuditItem> auditTable;
+  private DynamoDbTable<SkuItem> skuTable;
+  private DynamoDbTable<UnitItem> unitTable;
+  private DynamoDbTable<OrderItem> orderTable;
 
   private CreateReportHandler createReportHandler;
   private GetReportsHandler getReportsHandler;
@@ -48,7 +53,7 @@ public class ReportsHandlerIntegrationTest {
   static void setUpBeforeClass() {
     var factory =
         TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
-    var table = factory.tcgInventoryTable();
+    var table = factory.tableDefinition();
     DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
   }
 
@@ -62,7 +67,12 @@ public class ReportsHandlerIntegrationTest {
     fakeJobsQueue = factory.fakeJobsQueue();
     fakeFetchTcgClient = factory.fakeFetchTcgClient();
     objectMapper = factory.objectMapper();
-    tcgInventoryTable = factory.tcgInventoryTable();
+    jobTable = factory.jobTable();
+    reportTable = factory.reportTable();
+    auditTable = factory.auditTable();
+    skuTable = factory.skuTable();
+    unitTable = factory.unitTable();
+    orderTable = factory.orderTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
@@ -102,10 +112,10 @@ public class ReportsHandlerIntegrationTest {
     var jobId = send.message().jobId();
     assertThat(send.messageDeduplicationId()).isEqualTo(jobId + "#0");
     var jobItem =
-        tcgInventoryTable.getItem(
+        jobTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatJobSk(jobId))
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(JobItem.formatSk(jobId))
                 .build());
     assertThat(jobItem).isNotNull();
     assertThat(jobItem.getJobType()).isEqualTo("report");
@@ -118,12 +128,11 @@ public class ReportsHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
     var jobItem =
-        TcgInventoryItem.createJob(
-            "jordan", "existing-job", "report", null, Instant.ofEpochSecond(1700000000));
+        JobItem.create("jordan", "existing-job", "report", null, Instant.ofEpochSecond(1700000000));
     jobItem.setStatus("running");
     jobItem.setProcessedCount(0);
     jobItem.setUpdatedAt(Instant.ofEpochSecond(1700000100));
-    tcgInventoryTable.putItem(jobItem);
+    jobTable.putItem(jobItem);
 
     // act
     var response = createReportHandler.handleRequest(buildHttpEvent("jordan"), null);
@@ -138,26 +147,25 @@ public class ReportsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
-    var auditEntry = new TcgInventoryItem();
-    auditEntry.setPk(TcgInventoryItem.formatAuditPk("jordan"));
+    var auditEntry = new AuditItem();
+    auditEntry.setPk(AuditItem.formatPk("jordan"));
     auditEntry.setSk("01JEXAMPLEULID0000000000");
     auditEntry.setEventType("import_confirm");
-    tcgInventoryTable.putItem(auditEntry);
+    auditTable.putItem(auditEntry);
 
     var jobItem =
-        TcgInventoryItem.createJob(
-            "jordan", "report-job", "report", null, Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(jobItem);
+        JobItem.create("jordan", "report-job", "report", null, Instant.ofEpochSecond(1700000000));
+    jobTable.putItem(jobItem);
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "report-job", "report"), null);
 
     // assert
     var reportItem =
-        tcgInventoryTable.getItem(
+        reportTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatReportSk())
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(ReportItem.formatSk())
                 .build());
     assertThat(reportItem).isNotNull();
     assertThat(reportItem.getAsOfAuditUlid()).isEqualTo("01JEXAMPLEULID0000000000");
@@ -165,10 +173,10 @@ public class ReportsHandlerIntegrationTest {
     assertThat(reportItem.getUpdatedAt()).isEqualTo(Instant.ofEpochSecond(1700000000));
 
     var updatedJob =
-        tcgInventoryTable.getItem(
+        jobTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatJobSk("report-job"))
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(JobItem.formatSk("report-job"))
                 .build());
     assertThat(updatedJob.getStatus()).isEqualTo("succeeded");
   }
@@ -179,7 +187,7 @@ public class ReportsHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
     var sku1 =
-        TcgInventoryItem.createSku(
+        SkuItem.create(
             "jordan",
             "scryfall1#normal#NM",
             "scryfall1",
@@ -192,10 +200,10 @@ public class ReportsHandlerIntegrationTest {
             null,
             "1.00");
     sku1.setLastPublishedPrice("1.50");
-    tcgInventoryTable.putItem(sku1);
+    skuTable.putItem(sku1);
 
     var sku2 =
-        TcgInventoryItem.createSku(
+        SkuItem.create(
             "jordan",
             "scryfall2#normal#NM",
             "scryfall2",
@@ -207,10 +215,10 @@ public class ReportsHandlerIntegrationTest {
             "472",
             null,
             "3.00");
-    tcgInventoryTable.putItem(sku2);
+    skuTable.putItem(sku2);
 
     var sku3 =
-        TcgInventoryItem.createSku(
+        SkuItem.create(
             "jordan",
             "scryfall3#normal#NM",
             "scryfall3",
@@ -222,34 +230,34 @@ public class ReportsHandlerIntegrationTest {
             "60",
             null,
             null);
-    tcgInventoryTable.putItem(sku3);
+    skuTable.putItem(sku3);
 
-    tcgInventoryTable.putItem(
-        TcgInventoryItem.createUnit(
+    unitTable.putItem(
+        UnitItem.create(
             "jordan",
             "scryfall1#normal#NM",
             1,
             "in_stock",
             "import1",
             Instant.ofEpochSecond(1699000000)));
-    tcgInventoryTable.putItem(
-        TcgInventoryItem.createUnit(
+    unitTable.putItem(
+        UnitItem.create(
             "jordan",
             "scryfall1#normal#NM",
             2,
             "in_stock",
             "import1",
             Instant.ofEpochSecond(1699000000)));
-    tcgInventoryTable.putItem(
-        TcgInventoryItem.createUnit(
+    unitTable.putItem(
+        UnitItem.create(
             "jordan",
             "scryfall1#normal#NM",
             3,
             "reserved",
             "import1",
             Instant.ofEpochSecond(1699000000)));
-    tcgInventoryTable.putItem(
-        TcgInventoryItem.createUnit(
+    unitTable.putItem(
+        UnitItem.create(
             "jordan",
             "scryfall2#normal#NM",
             4,
@@ -257,7 +265,7 @@ public class ReportsHandlerIntegrationTest {
             "import1",
             Instant.ofEpochSecond(1699000000)));
     var soldUnit =
-        TcgInventoryItem.createUnit(
+        UnitItem.create(
             "jordan",
             "scryfall2#normal#NM",
             5,
@@ -265,17 +273,17 @@ public class ReportsHandlerIntegrationTest {
             "import1",
             Instant.ofEpochSecond(1699000000));
     soldUnit.setUpdatedAt(Instant.ofEpochSecond(1699500000));
-    tcgInventoryTable.putItem(soldUnit);
-    tcgInventoryTable.putItem(
-        TcgInventoryItem.createUnit(
+    unitTable.putItem(soldUnit);
+    unitTable.putItem(
+        UnitItem.create(
             "jordan",
             "scryfall2#normal#NM",
             6,
             "removed",
             "import1",
             Instant.ofEpochSecond(1699000000)));
-    tcgInventoryTable.putItem(
-        TcgInventoryItem.createUnit(
+    unitTable.putItem(
+        UnitItem.create(
             "jordan",
             "scryfall3#normal#NM",
             7,
@@ -283,8 +291,8 @@ public class ReportsHandlerIntegrationTest {
             "import1",
             Instant.ofEpochSecond(1699000000)));
 
-    tcgInventoryTable.putItem(
-        TcgInventoryItem.createOrder(
+    orderTable.putItem(
+        OrderItem.create(
             "jordan",
             "1",
             "fulfilled",
@@ -297,8 +305,8 @@ public class ReportsHandlerIntegrationTest {
             "10.50",
             "[{\"sku_id\":\"s\",\"fetchtcg_listing_id\":1,\"quantity\":1,\"price\":\"10.50\",\"allocated_sequence_numbers\":[]}]",
             Instant.ofEpochSecond(1699500000)));
-    tcgInventoryTable.putItem(
-        TcgInventoryItem.createOrder(
+    orderTable.putItem(
+        OrderItem.create(
             "jordan",
             "2",
             "to_pick",
@@ -311,8 +319,8 @@ public class ReportsHandlerIntegrationTest {
             "5.25",
             "[{\"sku_id\":\"s\",\"fetchtcg_listing_id\":1,\"quantity\":1,\"price\":\"5.25\",\"allocated_sequence_numbers\":[]}]",
             Instant.ofEpochSecond(1699600000)));
-    tcgInventoryTable.putItem(
-        TcgInventoryItem.createOrder(
+    orderTable.putItem(
+        OrderItem.create(
             "jordan",
             "3",
             "voided",
@@ -327,19 +335,18 @@ public class ReportsHandlerIntegrationTest {
             Instant.ofEpochSecond(1699700000)));
 
     var jobItem =
-        TcgInventoryItem.createJob(
-            "jordan", "report-job", "report", null, Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(jobItem);
+        JobItem.create("jordan", "report-job", "report", null, Instant.ofEpochSecond(1700000000));
+    jobTable.putItem(jobItem);
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "report-job", "report"), null);
 
     // assert
     var reportItem =
-        tcgInventoryTable.getItem(
+        reportTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatReportSk())
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(ReportItem.formatSk())
                 .build());
     assertThat(reportItem).isNotNull();
 
@@ -438,24 +445,23 @@ public class ReportsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
-    var auditEntry = new TcgInventoryItem();
-    auditEntry.setPk(TcgInventoryItem.formatAuditPk("jordan"));
+    var auditEntry = new AuditItem();
+    auditEntry.setPk(AuditItem.formatPk("jordan"));
     auditEntry.setSk("01JEXAMPLEULID0000000000");
     auditEntry.setEventType("import_confirm");
-    tcgInventoryTable.putItem(auditEntry);
+    auditTable.putItem(auditEntry);
 
     var reportItem =
-        TcgInventoryItem.createReport(
+        ReportItem.create(
             "jordan", "{}", "01JEXAMPLEULID0000000000", Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(reportItem);
+    reportTable.putItem(reportItem);
 
     var jobItem =
-        TcgInventoryItem.createJob(
-            "jordan", "report-job", "report", null, Instant.ofEpochSecond(1699999900));
+        JobItem.create("jordan", "report-job", "report", null, Instant.ofEpochSecond(1699999900));
     jobItem.setStatus("succeeded");
     jobItem.setProcessedCount(0);
     jobItem.setUpdatedAt(Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(jobItem);
+    jobTable.putItem(jobItem);
 
     // act
     var response = getReportsHandler.handleRequest(buildHttpEvent("jordan"), null);
@@ -474,22 +480,22 @@ public class ReportsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
-    var auditEntry1 = new TcgInventoryItem();
-    auditEntry1.setPk(TcgInventoryItem.formatAuditPk("jordan"));
+    var auditEntry1 = new AuditItem();
+    auditEntry1.setPk(AuditItem.formatPk("jordan"));
     auditEntry1.setSk("01JEXAMPLEULID0000000000");
     auditEntry1.setEventType("import_confirm");
-    tcgInventoryTable.putItem(auditEntry1);
+    auditTable.putItem(auditEntry1);
 
     var reportItem =
-        TcgInventoryItem.createReport(
+        ReportItem.create(
             "jordan", "{}", "01JEXAMPLEULID0000000000", Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(reportItem);
+    reportTable.putItem(reportItem);
 
-    var auditEntry2 = new TcgInventoryItem();
-    auditEntry2.setPk(TcgInventoryItem.formatAuditPk("jordan"));
+    var auditEntry2 = new AuditItem();
+    auditEntry2.setPk(AuditItem.formatPk("jordan"));
     auditEntry2.setSk("01JLATERULID00000000000");
     auditEntry2.setEventType("adjustment");
-    tcgInventoryTable.putItem(auditEntry2);
+    auditTable.putItem(auditEntry2);
 
     // act
     var response = getReportsHandler.handleRequest(buildHttpEvent("jordan"), null);
@@ -505,19 +511,19 @@ public class ReportsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
-    var auditEntry = new TcgInventoryItem();
-    auditEntry.setPk(TcgInventoryItem.formatAuditPk("jordan"));
+    var auditEntry = new AuditItem();
+    auditEntry.setPk(AuditItem.formatPk("jordan"));
     auditEntry.setSk("01JEXAMPLEULID0000000000");
     auditEntry.setEventType("reserve");
-    tcgInventoryTable.putItem(auditEntry);
+    auditTable.putItem(auditEntry);
 
     var reportItem =
-        TcgInventoryItem.createReport(
+        ReportItem.create(
             "jordan", "{}", "01JEXAMPLEULID0000000000", Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(reportItem);
+    reportTable.putItem(reportItem);
 
     var order =
-        TcgInventoryItem.createOrder(
+        OrderItem.create(
             "jordan",
             "83663",
             "awaiting_payment",
@@ -530,7 +536,7 @@ public class ReportsHandlerIntegrationTest {
             "3.33",
             "[]",
             Instant.ofEpochSecond(1699000000));
-    tcgInventoryTable.putItem(order);
+    orderTable.putItem(order);
 
     fakeFetchTcgClient.seedSellerOffers(
         List.of(
@@ -546,8 +552,8 @@ public class ReportsHandlerIntegrationTest {
                 new BigDecimal("3.33"),
                 List.of())));
 
-    tcgInventoryTable.putItem(
-        TcgInventoryItem.createJob(
+    jobTable.putItem(
+        JobItem.create(
             "jordan", "publish-job", "publish", null, Instant.ofEpochSecond(1700000000)));
 
     // act
@@ -560,10 +566,10 @@ public class ReportsHandlerIntegrationTest {
     assertThat(body.get("stale").asBoolean()).isTrue();
 
     var updatedOrder =
-        tcgInventoryTable.getItem(
+        orderTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatOrderSk("83663"))
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(OrderItem.formatSk("83663"))
                 .build());
     assertThat(updatedOrder.getStatus()).isEqualTo("to_pick");
   }
@@ -574,8 +580,8 @@ public class ReportsHandlerIntegrationTest {
     var generatedAt = Instant.ofEpochSecond(1700000000);
     fakeClock.setTime(generatedAt.plus(Duration.ofHours(25)));
 
-    var reportItem = TcgInventoryItem.createReport("jordan", "{}", null, generatedAt);
-    tcgInventoryTable.putItem(reportItem);
+    var reportItem = ReportItem.create("jordan", "{}", null, generatedAt);
+    reportTable.putItem(reportItem);
 
     // act
     var response = getReportsHandler.handleRequest(buildHttpEvent("jordan"), null);
@@ -591,17 +597,15 @@ public class ReportsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
-    var reportItem =
-        TcgInventoryItem.createReport("jordan", "{}", null, Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(reportItem);
+    var reportItem = ReportItem.create("jordan", "{}", null, Instant.ofEpochSecond(1700000000));
+    reportTable.putItem(reportItem);
 
     var jobItem =
-        TcgInventoryItem.createJob(
-            "jordan", "failed-job", "report", null, Instant.ofEpochSecond(1699999900));
+        JobItem.create("jordan", "failed-job", "report", null, Instant.ofEpochSecond(1699999900));
     jobItem.setStatus("failed");
     jobItem.setError("out of memory");
     jobItem.setUpdatedAt(Instant.ofEpochSecond(1699999950));
-    tcgInventoryTable.putItem(jobItem);
+    jobTable.putItem(jobItem);
 
     // act
     var response = getReportsHandler.handleRequest(buildHttpEvent("jordan"), null);

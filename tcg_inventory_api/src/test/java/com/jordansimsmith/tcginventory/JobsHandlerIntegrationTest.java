@@ -34,7 +34,14 @@ public class JobsHandlerIntegrationTest {
   private FakeQueueClient<JobMessage> fakeJobsQueue;
   private FakeFetchTcgClient fakeFetchTcgClient;
   private ObjectMapper objectMapper;
-  private DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private DynamoDbTable<ImportItem> importTable;
+  private DynamoDbTable<ImportRowItem> importRowTable;
+  private DynamoDbTable<JobItem> jobTable;
+  private DynamoDbTable<SkuItem> skuTable;
+  private DynamoDbTable<UnitItem> unitTable;
+  private DynamoDbTable<SettingsItem> settingsTable;
+  private DynamoDbTable<OrderItem> orderTable;
+  private DynamoDbTable<AuditItem> auditTable;
 
   private JobsHandler jobsHandler;
 
@@ -46,7 +53,7 @@ public class JobsHandlerIntegrationTest {
   static void setUpBeforeClass() {
     var factory =
         TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
-    var table = factory.tcgInventoryTable();
+    var table = factory.tableDefinition();
     DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
   }
 
@@ -59,7 +66,14 @@ public class JobsHandlerIntegrationTest {
     fakeJobsQueue = factory.fakeJobsQueue();
     fakeFetchTcgClient = factory.fakeFetchTcgClient();
     objectMapper = factory.objectMapper();
-    tcgInventoryTable = factory.tcgInventoryTable();
+    importTable = factory.importTable();
+    importRowTable = factory.importRowTable();
+    jobTable = factory.jobTable();
+    skuTable = factory.skuTable();
+    unitTable = factory.unitTable();
+    settingsTable = factory.settingsTable();
+    orderTable = factory.orderTable();
+    auditTable = factory.auditTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeJobsQueue.reset();
@@ -234,11 +248,11 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     var importItem =
-        TcgInventoryItem.createImport(
+        ImportItem.create(
             "jordan", "import1", "test.csv", 1, null, Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(importItem);
-    tcgInventoryTable.putItem(
-        TcgInventoryItem.createImportRow(
+    importTable.putItem(importItem);
+    importRowTable.putItem(
+        ImportRowItem.create(
             "jordan",
             "import1",
             1,
@@ -386,13 +400,12 @@ public class JobsHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
     var jobItem =
-        TcgInventoryItem.createJob(
-            "jordan", "job1", "appraise", "import1", Instant.ofEpochSecond(1700000000));
+        JobItem.create("jordan", "job1", "appraise", "import1", Instant.ofEpochSecond(1700000000));
     jobItem.setStatus("succeeded");
     jobItem.setProcessedCount(5);
     jobItem.setContinuation(5);
     jobItem.setUpdatedAt(Instant.ofEpochSecond(1700000100));
-    tcgInventoryTable.putItem(jobItem);
+    jobTable.putItem(jobItem);
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
@@ -481,7 +494,7 @@ public class JobsHandlerIntegrationTest {
     assertThat(order.getPostageOption()).isEqualTo("Economy Tracked");
     assertThat(order.getBuyerAddress())
         .isEqualTo(
-            TcgInventoryItem.BuyerAddress.create(
+            OrderItem.BuyerAddress.create(
                 "32 Abercrombie Street", null, "Howick", "Auckland", "2014", "NZ"));
     assertThat(order.getTotalPrice()).isEqualTo("3.33");
     assertThat(order.getFetchtcgStatus()).isEqualTo("ACCEPTED");
@@ -803,11 +816,11 @@ public class JobsHandlerIntegrationTest {
     assertThat(order.getPostageOption()).isEqualTo("Economy Tracked");
     assertThat(order.getBuyerAddress())
         .isEqualTo(
-            TcgInventoryItem.BuyerAddress.create(
+            OrderItem.BuyerAddress.create(
                 "32 Abercrombie Street", null, "Howick", "Auckland", "2014", "NZ"));
 
     // the refresh moves no inventory or revenue, so it must not mark the report stale
-    var auditEventTypes = getAuditEntries("jordan").stream().map(TcgInventoryItem::getEventType);
+    var auditEventTypes = getAuditEntries("jordan").stream().map(AuditItem::getEventType);
     assertThat(auditEventTypes).containsOnly("payment");
   }
 
@@ -1179,18 +1192,18 @@ public class JobsHandlerIntegrationTest {
     // simulate a run that crashed after reserving units but before writing the order
     var sku = getSku("jordan", "scryfall-1#normal#NM");
     sku.setDirty(true);
-    sku.setGsi1pk(TcgInventoryItem.formatGsi1pk("jordan"));
-    tcgInventoryTable.putItem(sku);
+    sku.setGsi1pk(SkuItem.formatGsi1pk("jordan"));
+    skuTable.putItem(sku);
     for (int sequenceNumber : new int[] {1, 2}) {
       var unit =
-          tcgInventoryTable.getItem(
+          unitTable.getItem(
               Key.builder()
-                  .partitionValue(TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#NM"))
-                  .sortValue(TcgInventoryItem.formatUnitSk(sequenceNumber))
+                  .partitionValue(SkuItem.formatPk("jordan", "scryfall-1#normal#NM"))
+                  .sortValue(UnitItem.formatSk(sequenceNumber))
                   .build());
       unit.setStatus("reserved");
       unit.setOrderId("83663");
-      tcgInventoryTable.putItem(unit);
+      unitTable.putItem(unit);
     }
 
     fakeFetchTcgClient.seedSellerOffers(
@@ -1270,7 +1283,7 @@ public class JobsHandlerIntegrationTest {
     sku.setFetchtcgListingId(975737);
     sku.setLastPublishedQuantity(1);
     sku.setLastPublishedPrice("1.80");
-    tcgInventoryTable.putItem(sku);
+    skuTable.putItem(sku);
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1299,7 +1312,7 @@ public class JobsHandlerIntegrationTest {
     sku.setFetchtcgListingId(975737);
     sku.setLastPublishedQuantity(1);
     sku.setLastPublishedPrice("1.50");
-    tcgInventoryTable.putItem(sku);
+    skuTable.putItem(sku);
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1326,7 +1339,7 @@ public class JobsHandlerIntegrationTest {
     // (dirty = true AND version = :captured) fails at write time
     var sku = getSku("jordan", "scryfall-1#normal#NM");
     sku.setDirty(false);
-    tcgInventoryTable.putItem(sku);
+    skuTable.putItem(sku);
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1380,7 +1393,7 @@ public class JobsHandlerIntegrationTest {
       String user, String skuId, int unitCount, String suggestedPrice) {
     var parts = skuId.split("#");
     var skuItem =
-        TcgInventoryItem.createSku(
+        SkuItem.create(
             user,
             skuId,
             parts[0],
@@ -1392,26 +1405,24 @@ public class JobsHandlerIntegrationTest {
             "168",
             "mtg_168_c_dom_normal",
             suggestedPrice);
-    tcgInventoryTable.putItem(skuItem);
+    skuTable.putItem(skuItem);
 
     for (int i = 1; i <= unitCount; i++) {
       var unit =
-          TcgInventoryItem.createUnit(
-              user, skuId, i, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
-      tcgInventoryTable.putItem(unit);
+          UnitItem.create(user, skuId, i, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
+      unitTable.putItem(unit);
     }
   }
 
   private void createPublishJob(String user, String jobId) {
-    var jobItem =
-        TcgInventoryItem.createJob(user, jobId, "publish", null, Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(jobItem);
+    var jobItem = JobItem.create(user, jobId, "publish", null, Instant.ofEpochSecond(1700000000));
+    jobTable.putItem(jobItem);
   }
 
   private void createDirtySkuWithUnit(String user, String skuId, int sequenceNumber) {
     var parts = skuId.split("#");
     var skuItem =
-        TcgInventoryItem.createSku(
+        SkuItem.create(
             user,
             skuId,
             parts[0],
@@ -1423,18 +1434,18 @@ public class JobsHandlerIntegrationTest {
             "168",
             "mtg_168_c_dom_normal",
             "1.50");
-    tcgInventoryTable.putItem(skuItem);
+    skuTable.putItem(skuItem);
 
     var unit =
-        TcgInventoryItem.createUnit(
+        UnitItem.create(
             user, skuId, sequenceNumber, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(unit);
+    unitTable.putItem(unit);
   }
 
   private void createSkuWithUnits(String user, String skuId, int fetchtcgListingId, int unitCount) {
     var parts = skuId.split("#");
     var skuItem =
-        TcgInventoryItem.createSku(
+        SkuItem.create(
             user,
             skuId,
             parts[0],
@@ -1447,15 +1458,14 @@ public class JobsHandlerIntegrationTest {
             "mtg_168_c_dom_normal",
             "1.50");
     skuItem.setDirty(false);
-    skuItem.setGsi1pk(TcgInventoryItem.USER_PREFIX + user + "#CLEAN");
+    skuItem.setGsi1pk(SkuItem.USER_PREFIX + user + "#CLEAN");
     skuItem.setFetchtcgListingId(fetchtcgListingId);
-    tcgInventoryTable.putItem(skuItem);
+    skuTable.putItem(skuItem);
 
     for (int i = 1; i <= unitCount; i++) {
       var unit =
-          TcgInventoryItem.createUnit(
-              user, skuId, i, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
-      tcgInventoryTable.putItem(unit);
+          UnitItem.create(user, skuId, i, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
+      unitTable.putItem(unit);
     }
   }
 
@@ -1463,7 +1473,7 @@ public class JobsHandlerIntegrationTest {
       String user, String skuId, int fetchtcgListingId, int sequenceNumber) {
     var parts = skuId.split("#");
     var skuItem =
-        TcgInventoryItem.createSku(
+        SkuItem.create(
             user,
             skuId,
             parts[0],
@@ -1476,27 +1486,27 @@ public class JobsHandlerIntegrationTest {
             "mtg_168_c_dom_normal",
             "1.50");
     skuItem.setDirty(false);
-    skuItem.setGsi1pk(TcgInventoryItem.USER_PREFIX + user + "#CLEAN");
+    skuItem.setGsi1pk(SkuItem.USER_PREFIX + user + "#CLEAN");
     skuItem.setFetchtcgListingId(fetchtcgListingId);
-    tcgInventoryTable.putItem(skuItem);
+    skuTable.putItem(skuItem);
 
     var unit =
-        TcgInventoryItem.createUnit(
+        UnitItem.create(
             user, skuId, sequenceNumber, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(unit);
+    unitTable.putItem(unit);
   }
 
   private void createTrackOrdersAfter(String user, Instant trackOrdersAfter) {
-    var settingsItem = new TcgInventoryItem();
-    settingsItem.setPk(TcgInventoryItem.formatUserPk(user));
-    settingsItem.setSk(TcgInventoryItem.formatSettingsSk());
+    var settingsItem = new SettingsItem();
+    settingsItem.setPk(SkuItem.formatUserPk(user));
+    settingsItem.setSk(SettingsItem.formatSk());
     settingsItem.setTrackOrdersAfter(trackOrdersAfter);
-    tcgInventoryTable.putItem(settingsItem);
+    settingsTable.putItem(settingsItem);
   }
 
   private void createExistingOrder(String user, String offerId, String status) {
     var order =
-        TcgInventoryItem.createOrder(
+        OrderItem.create(
             user,
             offerId,
             status,
@@ -1509,7 +1519,7 @@ public class JobsHandlerIntegrationTest {
             "3.33",
             "[]",
             Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(order);
+    orderTable.putItem(order);
   }
 
   private void createReservedOrder(
@@ -1543,7 +1553,7 @@ public class JobsHandlerIntegrationTest {
     }
 
     var order =
-        TcgInventoryItem.createOrder(
+        OrderItem.create(
             user,
             offerId,
             status,
@@ -1556,28 +1566,28 @@ public class JobsHandlerIntegrationTest {
             "3.33",
             linesJson,
             Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(order);
+    orderTable.putItem(order);
   }
 
   private void reserveUnit(String user, String skuId, int sequenceNumber, String orderId) {
     var unit = getUnit(user, skuId, sequenceNumber);
     unit.setStatus("reserved");
     unit.setOrderId(orderId);
-    tcgInventoryTable.putItem(unit);
+    unitTable.putItem(unit);
   }
 
   private void releaseUnit(String user, String skuId, int sequenceNumber) {
     var unit = getUnit(user, skuId, sequenceNumber);
     unit.setStatus("in_stock");
     unit.setOrderId(null);
-    tcgInventoryTable.putItem(unit);
+    unitTable.putItem(unit);
   }
 
-  private TcgInventoryItem getUnit(String user, String skuId, int sequenceNumber) {
-    return tcgInventoryTable.getItem(
+  private UnitItem getUnit(String user, String skuId, int sequenceNumber) {
+    return unitTable.getItem(
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatSkuPk(user, skuId))
-            .sortValue(TcgInventoryItem.formatUnitSk(sequenceNumber))
+            .partitionValue(SkuItem.formatPk(user, skuId))
+            .sortValue(UnitItem.formatSk(sequenceNumber))
             .build());
   }
 
@@ -1595,46 +1605,46 @@ public class JobsHandlerIntegrationTest {
         List.of());
   }
 
-  private TcgInventoryItem getOrder(String user, String offerId) {
-    return tcgInventoryTable.getItem(
+  private OrderItem getOrder(String user, String offerId) {
+    return orderTable.getItem(
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatUserPk(user))
-            .sortValue(TcgInventoryItem.formatOrderSk(offerId))
+            .partitionValue(SkuItem.formatUserPk(user))
+            .sortValue(OrderItem.formatSk(offerId))
             .build());
   }
 
-  private TcgInventoryItem getSku(String user, String skuId) {
-    return tcgInventoryTable.getItem(
+  private SkuItem getSku(String user, String skuId) {
+    return skuTable.getItem(
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatSkuPk(user, skuId))
-            .sortValue(TcgInventoryItem.formatSkuSk())
+            .partitionValue(SkuItem.formatPk(user, skuId))
+            .sortValue(SkuItem.formatSk())
             .build());
   }
 
-  private List<TcgInventoryItem> getUnits(String user, String skuId) {
-    var results = new ArrayList<TcgInventoryItem>();
+  private List<UnitItem> getUnits(String user, String skuId) {
+    var results = new ArrayList<UnitItem>();
     var request =
         QueryEnhancedRequest.builder()
             .queryConditional(
                 QueryConditional.sortBeginsWith(
                     Key.builder()
-                        .partitionValue(TcgInventoryItem.formatSkuPk(user, skuId))
-                        .sortValue(TcgInventoryItem.UNIT_PREFIX)
+                        .partitionValue(SkuItem.formatPk(user, skuId))
+                        .sortValue(UnitItem.UNIT_PREFIX)
                         .build()))
             .build();
-    tcgInventoryTable.query(request).items().forEach(results::add);
+    unitTable.query(request).items().forEach(results::add);
     return results;
   }
 
-  private List<TcgInventoryItem> getAuditEntries(String user) {
-    var results = new ArrayList<TcgInventoryItem>();
+  private List<AuditItem> getAuditEntries(String user) {
+    var results = new ArrayList<AuditItem>();
     var request =
         QueryEnhancedRequest.builder()
             .queryConditional(
                 QueryConditional.keyEqualTo(
-                    Key.builder().partitionValue(TcgInventoryItem.formatAuditPk(user)).build()))
+                    Key.builder().partitionValue(AuditItem.formatPk(user)).build()))
             .build();
-    tcgInventoryTable.query(request).items().forEach(results::add);
+    auditTable.query(request).items().forEach(results::add);
     return results;
   }
 
@@ -1670,14 +1680,14 @@ public class JobsHandlerIntegrationTest {
 
   private void createImportWithRows(String user, String importId, List<RowSpec> rows) {
     var importItem =
-        TcgInventoryItem.createImport(
+        ImportItem.create(
             user, importId, "test.csv", rows.size(), null, Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(importItem);
+    importTable.putItem(importItem);
 
     for (int i = 0; i < rows.size(); i++) {
       var spec = rows.get(i);
       var rowItem =
-          TcgInventoryItem.createImportRow(
+          ImportRowItem.create(
               user,
               importId,
               i + 1,
@@ -1689,19 +1699,19 @@ public class JobsHandlerIntegrationTest {
               spec.condition(),
               spec.scryfallId(),
               spec.language());
-      tcgInventoryTable.putItem(rowItem);
+      importRowTable.putItem(rowItem);
     }
   }
 
   private void createImportWithNRows(String user, String importId, int rowCount) {
     var importItem =
-        TcgInventoryItem.createImport(
+        ImportItem.create(
             user, importId, "test.csv", rowCount, null, Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(importItem);
+    importTable.putItem(importItem);
 
     for (int i = 1; i <= rowCount; i++) {
       var rowItem =
-          TcgInventoryItem.createImportRow(
+          ImportRowItem.create(
               user,
               importId,
               i,
@@ -1713,43 +1723,41 @@ public class JobsHandlerIntegrationTest {
               "NM",
               "scryfall-" + i,
               "en");
-      tcgInventoryTable.putItem(rowItem);
+      importRowTable.putItem(rowItem);
     }
   }
 
-  private TcgInventoryItem createJob(
+  private JobItem createJob(
       String user, String jobId, String jobType, String status, String importId) {
-    var jobItem =
-        TcgInventoryItem.createJob(
-            user, jobId, jobType, importId, Instant.ofEpochSecond(1700000000));
+    var jobItem = JobItem.create(user, jobId, jobType, importId, Instant.ofEpochSecond(1700000000));
     if (!"queued".equals(status)) {
       jobItem.setStatus(status);
     }
-    tcgInventoryTable.putItem(jobItem);
+    jobTable.putItem(jobItem);
     return jobItem;
   }
 
-  private TcgInventoryItem getRow(String user, String importId, int position) {
-    return tcgInventoryTable.getItem(
+  private ImportRowItem getRow(String user, String importId, int position) {
+    return importRowTable.getItem(
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatImportRowPk(user, importId))
-            .sortValue(TcgInventoryItem.formatImportRowSk(position))
+            .partitionValue(ImportRowItem.formatPk(user, importId))
+            .sortValue(ImportRowItem.formatSk(position))
             .build());
   }
 
-  private TcgInventoryItem getImport(String user, String importId) {
-    return tcgInventoryTable.getItem(
+  private ImportItem getImport(String user, String importId) {
+    return importTable.getItem(
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatUserPk(user))
-            .sortValue(TcgInventoryItem.formatImportSk(importId))
+            .partitionValue(SkuItem.formatUserPk(user))
+            .sortValue(ImportItem.formatSk(importId))
             .build());
   }
 
-  private TcgInventoryItem getJob(String user, String jobId) {
-    return tcgInventoryTable.getItem(
+  private JobItem getJob(String user, String jobId) {
+    return jobTable.getItem(
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatUserPk(user))
-            .sortValue(TcgInventoryItem.formatJobSk(jobId))
+            .partitionValue(SkuItem.formatUserPk(user))
+            .sortValue(JobItem.formatSk(jobId))
             .build());
   }
 

@@ -40,7 +40,8 @@ public class UpdateImportRowHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<ImportItem> importTable;
+  private final DynamoDbTable<ImportRowItem> importRowTable;
   private final ObjectMapper objectMapper;
 
   public UpdateImportRowHandler() {
@@ -51,7 +52,8 @@ public class UpdateImportRowHandler
   UpdateImportRowHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.importTable = factory.importTable();
+    this.importRowTable = factory.importRowTable();
     this.objectMapper = factory.objectMapper();
   }
 
@@ -87,10 +89,10 @@ public class UpdateImportRowHandler
     }
 
     var importItem =
-        tcgInventoryTable.getItem(
+        importTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk(user))
-                .sortValue(TcgInventoryItem.formatImportSk(importId))
+                .partitionValue(SkuItem.formatUserPk(user))
+                .sortValue(ImportItem.formatSk(importId))
                 .build());
     if (importItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
@@ -101,17 +103,17 @@ public class UpdateImportRowHandler
     }
 
     var rowItem =
-        tcgInventoryTable.getItem(
+        importRowTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatImportRowPk(user, importId))
-                .sortValue(TcgInventoryItem.formatImportRowSk(position))
+                .partitionValue(ImportRowItem.formatPk(user, importId))
+                .sortValue(ImportRowItem.formatSk(position))
                 .build());
     if (rowItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
 
     rowItem.setCondition(body.condition());
-    tcgInventoryTable.putItem(rowItem);
+    importRowTable.putItem(rowItem);
 
     return httpResponseFactory.ok(
         new ImportRowResponse(

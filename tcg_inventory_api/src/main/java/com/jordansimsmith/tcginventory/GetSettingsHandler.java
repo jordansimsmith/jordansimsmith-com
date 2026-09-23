@@ -26,7 +26,7 @@ public class GetSettingsHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<SettingsItem> settingsTable;
 
   public GetSettingsHandler() {
     this(TcgInventoryFactory.create());
@@ -36,7 +36,7 @@ public class GetSettingsHandler
   GetSettingsHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.settingsTable = factory.settingsTable();
   }
 
   @Override
@@ -54,11 +54,11 @@ public class GetSettingsHandler
 
     var key =
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatUserPk(user))
-            .sortValue(TcgInventoryItem.formatSettingsSk())
+            .partitionValue(SettingsItem.formatPk(user))
+            .sortValue(SettingsItem.formatSk())
             .build();
 
-    var settingsItem = tcgInventoryTable.getItem(key);
+    var settingsItem = settingsTable.getItem(key);
 
     if (settingsItem == null) {
       return httpResponseFactory.ok(new GetSettingsResponse(false, null, null));

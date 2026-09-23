@@ -39,7 +39,7 @@ public class FindScansHandler
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final ObjectMapper objectMapper;
-  private final TcgInventoryItemRepository tcgInventoryItemRepository;
+  private final TcgInventoryRepository tcgInventoryRepository;
 
   public FindScansHandler() {
     this(TcgInventoryFactory.create());
@@ -50,7 +50,7 @@ public class FindScansHandler
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.objectMapper = factory.objectMapper();
-    this.tcgInventoryItemRepository = factory.tcgInventoryItemRepository();
+    this.tcgInventoryRepository = factory.tcgInventoryRepository();
   }
 
   @Override
@@ -82,13 +82,13 @@ public class FindScansHandler
     }
 
     var exclusiveStartKey = Continuations.decode(continuation, objectMapper);
-    var page = tcgInventoryItemRepository.findScans(user, limit, exclusiveStartKey);
+    var page = tcgInventoryRepository.findScans(user, limit, exclusiveStartKey);
     var scans = page.items().stream().map(FindScansHandler::toSummary).toList();
     var nextContinuation = Continuations.encode(page.lastEvaluatedKey(), objectMapper);
     return httpResponseFactory.ok(new FindScansResponse(scans, nextContinuation));
   }
 
-  private static ScanSummaryResponse toSummary(TcgInventoryItem item) {
+  private static ScanSummaryResponse toSummary(ScanItem item) {
     return new ScanSummaryResponse(
         item.getScanId(),
         item.getStatus(),

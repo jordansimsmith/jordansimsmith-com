@@ -25,7 +25,7 @@ public class PhotosTest {
   @Test
   void needsPhotosShouldBeFalseBelowGateOrNonKeepOrWhenPhotosPresent() {
     // arrange
-    var photos = List.of(TcgInventoryItem.Photo.create("01JEXAMPLEPHOTOULID00000", null));
+    var photos = List.of(ImportRowItem.Photo.create("01JEXAMPLEPHOTOULID00000", null));
 
     // act / assert
     assertThat(Photos.needsPhotos("keep", "19.99", null)).isFalse();
@@ -46,7 +46,7 @@ public class PhotosTest {
   @Test
   void needsPublishWarningShouldBeFalseBelowFiftyOrWhenPhotosPresent() {
     // arrange
-    var photos = List.of(TcgInventoryItem.Photo.create("01JEXAMPLEPHOTOULID00000", null));
+    var photos = List.of(UnitItem.Photo.create("01JEXAMPLEPHOTOULID00000", null));
 
     // act / assert
     assertThat(Photos.needsPublishWarning(new BigDecimal("49.99"), null)).isFalse();

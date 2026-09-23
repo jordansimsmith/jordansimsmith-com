@@ -25,7 +25,8 @@ public class DeleteImportHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<ImportItem> importTable;
+  private final DynamoDbTable<ImportRowItem> importRowTable;
 
   public DeleteImportHandler() {
     this(TcgInventoryFactory.create());
@@ -35,7 +36,8 @@ public class DeleteImportHandler
   DeleteImportHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.importTable = factory.importTable();
+    this.importRowTable = factory.importRowTable();
   }
 
   @Override
@@ -54,11 +56,11 @@ public class DeleteImportHandler
 
     var importKey =
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatUserPk(user))
-            .sortValue(TcgInventoryItem.formatImportSk(importId))
+            .partitionValue(SkuItem.formatUserPk(user))
+            .sortValue(ImportItem.formatSk(importId))
             .build();
 
-    var importItem = tcgInventoryTable.getItem(importKey);
+    var importItem = importTable.getItem(importKey);
     if (importItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
@@ -71,8 +73,8 @@ public class DeleteImportHandler
     var rowQueryConditional =
         QueryConditional.sortBeginsWith(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatImportRowPk(user, importId))
-                .sortValue(TcgInventoryItem.ROW_PREFIX)
+                .partitionValue(ImportRowItem.formatPk(user, importId))
+                .sortValue(ImportRowItem.ROW_PREFIX)
                 .build());
 
     var rowRequest =
@@ -81,18 +83,18 @@ public class DeleteImportHandler
             .scanIndexForward(true)
             .build();
 
-    tcgInventoryTable.query(rowRequest).stream()
+    importRowTable.query(rowRequest).stream()
         .flatMap(page -> page.items().stream())
         .forEach(
             rowItem ->
-                tcgInventoryTable.deleteItem(
+                importRowTable.deleteItem(
                     Key.builder()
                         .partitionValue(rowItem.getPk())
                         .sortValue(rowItem.getSk())
                         .build()));
 
     // delete import item
-    tcgInventoryTable.deleteItem(importKey);
+    importTable.deleteItem(importKey);
 
     return httpResponseFactory.noContent();
   }

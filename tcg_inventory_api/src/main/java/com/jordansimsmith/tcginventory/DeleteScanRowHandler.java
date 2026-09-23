@@ -21,7 +21,7 @@ public class DeleteScanRowHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final TcgInventoryItemRepository tcgInventoryItemRepository;
+  private final TcgInventoryRepository tcgInventoryRepository;
   private final S3Client s3Client;
 
   public DeleteScanRowHandler() {
@@ -32,7 +32,7 @@ public class DeleteScanRowHandler
   DeleteScanRowHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryItemRepository = factory.tcgInventoryItemRepository();
+    this.tcgInventoryRepository = factory.tcgInventoryRepository();
     this.s3Client = factory.s3Client();
   }
 
@@ -51,7 +51,7 @@ public class DeleteScanRowHandler
     var pathParameters = event.getPathParameters();
     var scanId = pathParameters.get("scan_id");
     var scanPosition = Integer.parseInt(pathParameters.get("scan_position"));
-    var scanItem = tcgInventoryItemRepository.getScan(user, scanId);
+    var scanItem = tcgInventoryRepository.getScan(user, scanId);
     if (scanItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
@@ -59,20 +59,20 @@ public class DeleteScanRowHandler
       return httpResponseFactory.conflict(new ErrorResponse("scan is not in a deletable status"));
     }
 
-    var rowItem = tcgInventoryItemRepository.getScanRow(user, scanId, scanPosition);
+    var rowItem = tcgInventoryRepository.getScanRow(user, scanId, scanPosition);
     if (rowItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
 
-    if (!tcgInventoryItemRepository.deleteScanRow(user, scanId, scanPosition)) {
-      var currentScan = tcgInventoryItemRepository.getScan(user, scanId);
+    if (!tcgInventoryRepository.deleteScanRow(user, scanId, scanPosition)) {
+      var currentScan = tcgInventoryRepository.getScan(user, scanId);
       if (currentScan == null) {
         return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
       }
       if (!"reviewing".equals(currentScan.getStatus())) {
         return httpResponseFactory.conflict(new ErrorResponse("scan is not in a deletable status"));
       }
-      var currentRow = tcgInventoryItemRepository.getScanRow(user, scanId, scanPosition);
+      var currentRow = tcgInventoryRepository.getScanRow(user, scanId, scanPosition);
       if (currentRow == null) {
         return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
       }

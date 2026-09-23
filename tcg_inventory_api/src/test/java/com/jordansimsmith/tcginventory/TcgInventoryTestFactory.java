@@ -16,6 +16,7 @@ import dagger.Component;
 import java.net.URI;
 import javax.inject.Named;
 import javax.inject.Singleton;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
 @Singleton
@@ -44,6 +45,8 @@ public interface TcgInventoryTestFactory extends TcgInventoryFactory {
   FakeFetchTcgClient fakeFetchTcgClient();
 
   DynamoDbClient dynamoDbClient();
+
+  DynamoDbTable<TcgInventoryTableDefinition> tableDefinition();
 
   @Component.Factory
   interface Factory {

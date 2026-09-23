@@ -41,7 +41,9 @@ public class GetReportsHandler
   private final Clock clock;
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<ReportItem> reportTable;
+  private final DynamoDbTable<AuditItem> auditTable;
+  private final DynamoDbTable<JobItem> jobTable;
 
   public GetReportsHandler() {
     this(TcgInventoryFactory.create());
@@ -52,7 +54,9 @@ public class GetReportsHandler
     this.clock = factory.clock();
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.reportTable = factory.reportTable();
+    this.auditTable = factory.auditTable();
+    this.jobTable = factory.jobTable();
   }
 
   @Override
@@ -69,10 +73,10 @@ public class GetReportsHandler
     var user = requestContextFactory.createCtx(event).user();
 
     var reportItem =
-        tcgInventoryTable.getItem(
+        reportTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk(user))
-                .sortValue(TcgInventoryItem.formatReportSk())
+                .partitionValue(SkuItem.formatUserPk(user))
+                .sortValue(ReportItem.formatSk())
                 .build());
 
     if (reportItem == null) {
@@ -117,24 +121,24 @@ public class GetReportsHandler
         QueryEnhancedRequest.builder()
             .queryConditional(
                 QueryConditional.keyEqualTo(
-                    Key.builder().partitionValue(TcgInventoryItem.formatAuditPk(user)).build()))
+                    Key.builder().partitionValue(AuditItem.formatPk(user)).build()))
             .scanIndexForward(false)
             .limit(1)
             .build();
 
-    return tcgInventoryTable.query(request).stream()
+    return auditTable.query(request).stream()
         .flatMap(page -> page.items().stream())
         .findFirst()
-        .map(TcgInventoryItem::getSk)
+        .map(AuditItem::getSk)
         .orElse(null);
   }
 
-  private TcgInventoryItem findLatestReportJob(String user) {
+  private JobItem findLatestReportJob(String user) {
     var queryConditional =
         QueryConditional.sortBeginsWith(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk(user))
-                .sortValue(TcgInventoryItem.JOB_PREFIX)
+                .partitionValue(SkuItem.formatUserPk(user))
+                .sortValue(JobItem.JOB_PREFIX)
                 .build());
 
     var request =
@@ -143,7 +147,7 @@ public class GetReportsHandler
             .scanIndexForward(false)
             .build();
 
-    return tcgInventoryTable.query(request).stream()
+    return jobTable.query(request).stream()
         .flatMap(page -> page.items().stream())
         .filter(item -> "report".equals(item.getJobType()))
         .findFirst()

@@ -41,7 +41,7 @@ public class UpdateSettingsHandler
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final Secrets secrets;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<SettingsItem> settingsTable;
 
   public UpdateSettingsHandler() {
     this(TcgInventoryFactory.create());
@@ -54,7 +54,7 @@ public class UpdateSettingsHandler
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.secrets = factory.secrets();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.settingsTable = factory.settingsTable();
   }
 
   @Override
@@ -81,15 +81,15 @@ public class UpdateSettingsHandler
 
     var key =
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatUserPk(user))
-            .sortValue(TcgInventoryItem.formatSettingsSk())
+            .partitionValue(SkuItem.formatUserPk(user))
+            .sortValue(SettingsItem.formatSk())
             .build();
 
-    var settingsItem = tcgInventoryTable.getItem(key);
+    var settingsItem = settingsTable.getItem(key);
     if (settingsItem == null) {
-      settingsItem = new TcgInventoryItem();
-      settingsItem.setPk(TcgInventoryItem.formatUserPk(user));
-      settingsItem.setSk(TcgInventoryItem.formatSettingsSk());
+      settingsItem = new SettingsItem();
+      settingsItem.setPk(SkuItem.formatUserPk(user));
+      settingsItem.setSk(SettingsItem.formatSk());
     }
 
     if (hasRefreshToken) {
@@ -104,7 +104,7 @@ public class UpdateSettingsHandler
       settingsItem.setTrackOrdersAfter(Instant.ofEpochSecond(request.trackOrdersAfter()));
     }
 
-    tcgInventoryTable.putItem(settingsItem);
+    settingsTable.putItem(settingsItem);
 
     var credentialSet = settingsItem.getUpdatedAt() != null;
     var updatedAt = credentialSet ? settingsItem.getUpdatedAt().getEpochSecond() : null;

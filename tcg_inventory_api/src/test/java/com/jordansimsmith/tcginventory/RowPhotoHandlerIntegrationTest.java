@@ -30,7 +30,8 @@ public class RowPhotoHandlerIntegrationTest {
 
   private FakeUlidGenerator fakeUlidGenerator;
   private ObjectMapper objectMapper;
-  private DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private DynamoDbTable<ImportItem> importTable;
+  private DynamoDbTable<ImportRowItem> importRowTable;
   private S3Client s3Client;
 
   private CreateImportRowPhotoHandler createImportRowPhotoHandler;
@@ -44,7 +45,7 @@ public class RowPhotoHandlerIntegrationTest {
   static void setUpBeforeClass() {
     var factory =
         TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), s3Container.getEndpoint());
-    DynamoDbUtils.createTable(factory.dynamoDbClient(), factory.tcgInventoryTable());
+    DynamoDbUtils.createTable(factory.dynamoDbClient(), factory.tableDefinition());
     factory.s3Client().createBucket(b -> b.bucket(Photos.BUCKET));
   }
 
@@ -55,7 +56,8 @@ public class RowPhotoHandlerIntegrationTest {
 
     fakeUlidGenerator = factory.fakeUlidGenerator();
     objectMapper = factory.objectMapper();
-    tcgInventoryTable = factory.tcgInventoryTable();
+    importTable = factory.importTable();
+    importRowTable = factory.importRowTable();
     s3Client = factory.s3Client();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
@@ -239,13 +241,13 @@ public class RowPhotoHandlerIntegrationTest {
     createImportRowPhotoHandler.handleRequest(
         buildCreateEvent("jordan", importId, 1, JPEG_BYTES), null);
     var importItem =
-        tcgInventoryTable.getItem(
+        importTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatImportSk(importId))
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(ImportItem.formatSk(importId))
                 .build());
     importItem.setStatus("confirmed");
-    tcgInventoryTable.putItem(importItem);
+    importTable.putItem(importItem);
 
     // act
     var response =
@@ -313,12 +315,12 @@ public class RowPhotoHandlerIntegrationTest {
     seedImport("jordan", "review", "keep", "19.99");
     var discardId = "import2";
     var discardImport =
-        TcgInventoryItem.createImport(
+        ImportItem.create(
             "jordan", discardId, "test.csv", 1, null, Instant.ofEpochSecond(1700000000));
     discardImport.setStatus("review");
-    tcgInventoryTable.putItem(discardImport);
+    importTable.putItem(discardImport);
     var discardRow =
-        TcgInventoryItem.createImportRow(
+        ImportRowItem.create(
             "jordan",
             discardId,
             1,
@@ -332,7 +334,7 @@ public class RowPhotoHandlerIntegrationTest {
             "en");
     discardRow.setDecision("discard");
     discardRow.setSuggestedPrice("50.00");
-    tcgInventoryTable.putItem(discardRow);
+    importRowTable.putItem(discardRow);
 
     // act
     var belowGate =
@@ -362,13 +364,12 @@ public class RowPhotoHandlerIntegrationTest {
   private String seedImport(String user, String status, String decision, String suggestedPrice) {
     var importId = "import1";
     var importItem =
-        TcgInventoryItem.createImport(
-            user, importId, "test.csv", 1, null, Instant.ofEpochSecond(1700000000));
+        ImportItem.create(user, importId, "test.csv", 1, null, Instant.ofEpochSecond(1700000000));
     importItem.setStatus(status);
-    tcgInventoryTable.putItem(importItem);
+    importTable.putItem(importItem);
 
     var rowItem =
-        TcgInventoryItem.createImportRow(
+        ImportRowItem.create(
             user,
             importId,
             1,
@@ -382,15 +383,15 @@ public class RowPhotoHandlerIntegrationTest {
             "en");
     rowItem.setDecision(decision);
     rowItem.setSuggestedPrice(suggestedPrice);
-    tcgInventoryTable.putItem(rowItem);
+    importRowTable.putItem(rowItem);
     return importId;
   }
 
-  private TcgInventoryItem getRow(String user, String importId, int position) {
-    return tcgInventoryTable.getItem(
+  private ImportRowItem getRow(String user, String importId, int position) {
+    return importRowTable.getItem(
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatImportRowPk(user, importId))
-            .sortValue(TcgInventoryItem.formatImportRowSk(position))
+            .partitionValue(ImportRowItem.formatPk(user, importId))
+            .sortValue(ImportRowItem.formatSk(position))
             .build());
   }
 

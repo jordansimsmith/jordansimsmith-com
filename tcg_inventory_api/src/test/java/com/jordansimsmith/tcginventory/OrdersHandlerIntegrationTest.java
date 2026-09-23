@@ -31,7 +31,10 @@ public class OrdersHandlerIntegrationTest {
   private FakeClock fakeClock;
   private FakeUlidGenerator fakeUlidGenerator;
   private ObjectMapper objectMapper;
-  private DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private DynamoDbTable<OrderItem> orderTable;
+  private DynamoDbTable<SkuItem> skuTable;
+  private DynamoDbTable<UnitItem> unitTable;
+  private DynamoDbTable<AuditItem> auditTable;
 
   private FindOrdersHandler findOrdersHandler;
   private GetOrderHandler getOrderHandler;
@@ -45,7 +48,7 @@ public class OrdersHandlerIntegrationTest {
   static void setUpBeforeClass() {
     var factory =
         TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
-    var table = factory.tcgInventoryTable();
+    var table = factory.tableDefinition();
     DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
   }
 
@@ -57,7 +60,10 @@ public class OrdersHandlerIntegrationTest {
     fakeClock = factory.fakeClock();
     fakeUlidGenerator = factory.fakeUlidGenerator();
     objectMapper = factory.objectMapper();
-    tcgInventoryTable = factory.tcgInventoryTable();
+    orderTable = factory.orderTable();
+    skuTable = factory.skuTable();
+    unitTable = factory.unitTable();
+    auditTable = factory.auditTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
@@ -293,7 +299,7 @@ public class OrdersHandlerIntegrationTest {
             + "\",\"fetchtcg_listing_id\":1002,\"quantity\":1,\"price\":\"2.00\""
             + ",\"listed_price\":\"1.80\",\"allocated_sequence_numbers\":[3]}]";
     var order =
-        TcgInventoryItem.createOrder(
+        OrderItem.create(
             "jordan",
             "83663",
             "to_pick",
@@ -306,7 +312,7 @@ public class OrdersHandlerIntegrationTest {
             "3.50",
             lines,
             Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(order);
+    orderTable.putItem(order);
 
     // act
     var response =
@@ -337,7 +343,7 @@ public class OrdersHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     var order =
-        TcgInventoryItem.createOrder(
+        OrderItem.create(
             "jordan",
             "91329",
             "to_pick",
@@ -345,13 +351,13 @@ public class OrdersHandlerIntegrationTest {
             "SEND_TRACKING_CODE",
             "DELIVERY",
             "Chris Andrew (generic)",
-            TcgInventoryItem.BuyerAddress.create(
+            OrderItem.BuyerAddress.create(
                 "32 Abercrombie Street", null, "Howick", "Auckland", "2014", "NZ"),
             "Economy Tracked",
             "61.50",
             "[]",
             Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(order);
+    orderTable.putItem(order);
 
     // act
     var response =
@@ -621,7 +627,7 @@ public class OrdersHandlerIntegrationTest {
       lines.add(new OrderLines.OrderLine(skuId, 1000 + i, 1, "0.50", "0.50", List.of(1)));
     }
     var order =
-        TcgInventoryItem.createOrder(
+        OrderItem.create(
             "jordan",
             "83663",
             "to_pick",
@@ -634,7 +640,7 @@ public class OrdersHandlerIntegrationTest {
             "30.00",
             objectMapper.writeValueAsString(lines),
             Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(order);
+    orderTable.putItem(order);
 
     // act
     var response =
@@ -666,8 +672,8 @@ public class OrdersHandlerIntegrationTest {
 
     var sku = getSkuItem("jordan", skuId);
     sku.setDirty(false);
-    sku.setGsi1pk(TcgInventoryItem.USER_PREFIX + "jordan" + "#CLEAN");
-    tcgInventoryTable.putItem(sku);
+    sku.setGsi1pk(SkuItem.USER_PREFIX + "jordan" + "#CLEAN");
+    skuTable.putItem(sku);
 
     reserveUnits("jordan", skuId, "83663", List.of(1));
     createOrderWithLines(
@@ -680,8 +686,7 @@ public class OrdersHandlerIntegrationTest {
     // assert
     var updatedSku = getSkuItem("jordan", skuId);
     assertThat(updatedSku.getDirty()).isFalse();
-    assertThat(updatedSku.getGsi1pk())
-        .isEqualTo(TcgInventoryItem.USER_PREFIX + "jordan" + "#CLEAN");
+    assertThat(updatedSku.getGsi1pk()).isEqualTo(SkuItem.USER_PREFIX + "jordan" + "#CLEAN");
   }
 
   @Test
@@ -715,7 +720,7 @@ public class OrdersHandlerIntegrationTest {
   private void createOrder(
       String user, String offerId, String status, String deliveryMode, String totalPrice) {
     var order =
-        TcgInventoryItem.createOrder(
+        OrderItem.create(
             user,
             offerId,
             status,
@@ -728,7 +733,7 @@ public class OrdersHandlerIntegrationTest {
             totalPrice,
             "[]",
             Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(order);
+    orderTable.putItem(order);
   }
 
   private void createSkuWithUnits(String user, String skuId, int unitCount) {
@@ -742,7 +747,7 @@ public class OrdersHandlerIntegrationTest {
       String user, String skuId, String name, String setCode, String collectorNumber) {
     var parts = skuId.split("#");
     var skuItem =
-        TcgInventoryItem.createSku(
+        SkuItem.create(
             user,
             skuId,
             parts[0],
@@ -754,30 +759,30 @@ public class OrdersHandlerIntegrationTest {
             collectorNumber,
             null,
             null);
-    tcgInventoryTable.putItem(skuItem);
+    skuTable.putItem(skuItem);
   }
 
   private void createUnit(
       String user, String skuId, int sequenceNumber, String status, String orderId) {
     var unit =
-        TcgInventoryItem.createUnit(
+        UnitItem.create(
             user, skuId, sequenceNumber, status, "import1", Instant.ofEpochSecond(1700000000));
     unit.setOrderId(orderId);
-    tcgInventoryTable.putItem(unit);
+    unitTable.putItem(unit);
   }
 
   private void reserveUnits(
       String user, String skuId, String orderId, List<Integer> sequenceNumbers) {
     for (var seqNum : sequenceNumbers) {
       var unit =
-          tcgInventoryTable.getItem(
+          unitTable.getItem(
               Key.builder()
-                  .partitionValue(TcgInventoryItem.formatSkuPk(user, skuId))
-                  .sortValue(TcgInventoryItem.formatUnitSk(seqNum))
+                  .partitionValue(SkuItem.formatPk(user, skuId))
+                  .sortValue(UnitItem.formatSk(seqNum))
                   .build());
       unit.setStatus("reserved");
       unit.setOrderId(orderId);
-      tcgInventoryTable.putItem(unit);
+      unitTable.putItem(unit);
     }
   }
 
@@ -805,7 +810,7 @@ public class OrdersHandlerIntegrationTest {
             + sequenceNumbers
             + "}]";
     var order =
-        TcgInventoryItem.createOrder(
+        OrderItem.create(
             user,
             offerId,
             status,
@@ -818,49 +823,49 @@ public class OrdersHandlerIntegrationTest {
             totalPrice,
             lines,
             Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(order);
+    orderTable.putItem(order);
   }
 
-  private TcgInventoryItem getOrderItem(String user, String offerId) {
-    return tcgInventoryTable.getItem(
+  private OrderItem getOrderItem(String user, String offerId) {
+    return orderTable.getItem(
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatUserPk(user))
-            .sortValue(TcgInventoryItem.formatOrderSk(offerId))
+            .partitionValue(SkuItem.formatUserPk(user))
+            .sortValue(OrderItem.formatSk(offerId))
             .build());
   }
 
-  private TcgInventoryItem getSkuItem(String user, String skuId) {
-    return tcgInventoryTable.getItem(
+  private SkuItem getSkuItem(String user, String skuId) {
+    return skuTable.getItem(
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatSkuPk(user, skuId))
-            .sortValue(TcgInventoryItem.formatSkuSk())
+            .partitionValue(SkuItem.formatPk(user, skuId))
+            .sortValue(SkuItem.formatSk())
             .build());
   }
 
-  private List<TcgInventoryItem> getUnits(String user, String skuId) {
-    var results = new ArrayList<TcgInventoryItem>();
+  private List<UnitItem> getUnits(String user, String skuId) {
+    var results = new ArrayList<UnitItem>();
     var request =
         QueryEnhancedRequest.builder()
             .queryConditional(
                 QueryConditional.sortBeginsWith(
                     Key.builder()
-                        .partitionValue(TcgInventoryItem.formatSkuPk(user, skuId))
-                        .sortValue(TcgInventoryItem.UNIT_PREFIX)
+                        .partitionValue(SkuItem.formatPk(user, skuId))
+                        .sortValue(UnitItem.UNIT_PREFIX)
                         .build()))
             .build();
-    tcgInventoryTable.query(request).items().forEach(results::add);
+    unitTable.query(request).items().forEach(results::add);
     return results;
   }
 
-  private List<TcgInventoryItem> getAuditEntries(String user) {
-    var results = new ArrayList<TcgInventoryItem>();
+  private List<AuditItem> getAuditEntries(String user) {
+    var results = new ArrayList<AuditItem>();
     var request =
         QueryEnhancedRequest.builder()
             .queryConditional(
                 QueryConditional.keyEqualTo(
-                    Key.builder().partitionValue(TcgInventoryItem.formatAuditPk(user)).build()))
+                    Key.builder().partitionValue(AuditItem.formatPk(user)).build()))
             .build();
-    tcgInventoryTable.query(request).items().forEach(results::add);
+    auditTable.query(request).items().forEach(results::add);
     return results;
   }
 

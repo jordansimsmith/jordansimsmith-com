@@ -34,7 +34,8 @@ public class GetPublishHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<JobItem> jobTable;
+  private final DynamoDbTable<SkuItem> skuTable;
 
   public GetPublishHandler() {
     this(TcgInventoryFactory.create());
@@ -44,7 +45,8 @@ public class GetPublishHandler
   GetPublishHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.jobTable = factory.jobTable();
+    this.skuTable = factory.skuTable();
   }
 
   @Override
@@ -88,12 +90,12 @@ public class GetPublishHandler
             dirtyCount));
   }
 
-  private TcgInventoryItem findLatestPublishJob(String user) {
+  private JobItem findLatestPublishJob(String user) {
     var queryConditional =
         QueryConditional.sortBeginsWith(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk(user))
-                .sortValue(TcgInventoryItem.JOB_PREFIX)
+                .partitionValue(SkuItem.formatUserPk(user))
+                .sortValue(JobItem.JOB_PREFIX)
                 .build());
 
     var request =
@@ -102,7 +104,7 @@ public class GetPublishHandler
             .scanIndexForward(false)
             .build();
 
-    return tcgInventoryTable.query(request).stream()
+    return jobTable.query(request).stream()
         .flatMap(page -> page.items().stream())
         .filter(item -> "publish".equals(item.getJobType()))
         .findFirst()
@@ -113,14 +115,14 @@ public class GetPublishHandler
     var queryConditional =
         QueryConditional.sortBeginsWith(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatGsi1pk(user))
-                .sortValue(TcgInventoryItem.SKU_PREFIX)
+                .partitionValue(SkuItem.formatGsi1pk(user))
+                .sortValue(SkuItem.SKU_PREFIX)
                 .build());
 
     var request = QueryEnhancedRequest.builder().queryConditional(queryConditional).build();
 
     return (int)
-        tcgInventoryTable.index(TcgInventoryItem.GSI1_NAME).query(request).stream()
+        skuTable.index(TcgInventoryTable.GSI1_NAME).query(request).stream()
             .flatMap(page -> page.items().stream())
             .count();
   }

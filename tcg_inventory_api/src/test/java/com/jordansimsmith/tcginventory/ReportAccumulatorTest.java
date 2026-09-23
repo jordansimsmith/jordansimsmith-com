@@ -163,12 +163,11 @@ public class ReportAccumulatorTest {
     assertThat(totals.skuCount()).isEqualTo(2);
   }
 
-  private static TcgInventoryItem createSku(
-      String skuId, String lastPublishedPrice, String suggestedPrice) {
+  private static SkuItem createSku(String skuId, String lastPublishedPrice, String suggestedPrice) {
     return createSku(skuId, lastPublishedPrice, suggestedPrice, "set1", "Set One");
   }
 
-  private static TcgInventoryItem createSku(
+  private static SkuItem createSku(
       String skuId,
       String lastPublishedPrice,
       String suggestedPrice,
@@ -177,14 +176,14 @@ public class ReportAccumulatorTest {
     return createSku(skuId, lastPublishedPrice, suggestedPrice, setCode, setName, "Card " + skuId);
   }
 
-  private static TcgInventoryItem createSku(
+  private static SkuItem createSku(
       String skuId,
       String lastPublishedPrice,
       String suggestedPrice,
       String setCode,
       String setName,
       String name) {
-    var item = new TcgInventoryItem();
+    var item = new SkuItem();
     item.setSkuId(skuId);
     item.setLastPublishedPrice(lastPublishedPrice);
     item.setSuggestedPrice(suggestedPrice);
@@ -197,22 +196,22 @@ public class ReportAccumulatorTest {
     return item;
   }
 
-  private static TcgInventoryItem createUnit(String status) {
-    var item = new TcgInventoryItem();
+  private static UnitItem createUnit(String status) {
+    var item = new UnitItem();
     item.setStatus(status);
     item.setCreatedAt(Instant.ofEpochSecond(1700000000));
     return item;
   }
 
-  private static TcgInventoryItem createUnit(String status, Instant createdAt) {
-    var item = new TcgInventoryItem();
+  private static UnitItem createUnit(String status, Instant createdAt) {
+    var item = new UnitItem();
     item.setStatus(status);
     item.setCreatedAt(createdAt);
     return item;
   }
 
-  private static TcgInventoryItem createUnit(String status, Instant createdAt, Instant updatedAt) {
-    var item = new TcgInventoryItem();
+  private static UnitItem createUnit(String status, Instant createdAt, Instant updatedAt) {
+    var item = new UnitItem();
     item.setStatus(status);
     item.setCreatedAt(createdAt);
     item.setUpdatedAt(updatedAt);
@@ -753,17 +752,17 @@ public class ReportAccumulatorTest {
     assertThat(bands.get(0).inStockUnits()).isEqualTo(1);
   }
 
-  private static TcgInventoryItem createOrder(String status, String totalPrice) {
+  private static OrderItem createOrder(String status, String totalPrice) {
     return createOrder(status, totalPrice, Instant.ofEpochSecond(1700000000));
   }
 
-  private static TcgInventoryItem createOrder(String status, String totalPrice, Instant createdAt) {
+  private static OrderItem createOrder(String status, String totalPrice, Instant createdAt) {
     return createOrder(status, totalPrice, totalPrice, createdAt);
   }
 
-  private static TcgInventoryItem createOrder(
+  private static OrderItem createOrder(
       String status, String totalPrice, String itemsTotal, Instant createdAt) {
-    var item = new TcgInventoryItem();
+    var item = new OrderItem();
     item.setStatus(status);
     item.setTotalPrice(totalPrice);
     item.setLines(

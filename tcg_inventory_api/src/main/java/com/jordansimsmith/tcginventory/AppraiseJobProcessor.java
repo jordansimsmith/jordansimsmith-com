@@ -17,31 +17,34 @@ import software.amazon.awssdk.enhanced.dynamodb.Key;
 class AppraiseJobProcessor {
   static final int BATCH_SIZE = 100;
 
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<ImportItem> importTable;
+  private final DynamoDbTable<ImportRowItem> importRowTable;
   private final Clock clock;
   private final FetchTcgClient fetchTcgClient;
   private final PricingPolicy pricingPolicy;
 
   AppraiseJobProcessor(
-      DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
+      DynamoDbTable<ImportItem> importTable,
+      DynamoDbTable<ImportRowItem> importRowTable,
       Clock clock,
       FetchTcgClient fetchTcgClient) {
-    this.tcgInventoryTable = tcgInventoryTable;
+    this.importTable = importTable;
+    this.importRowTable = importRowTable;
     this.clock = clock;
     this.fetchTcgClient = fetchTcgClient;
     this.pricingPolicy = new PricingPolicy();
   }
 
-  BatchResult processBatch(String user, TcgInventoryItem jobItem) {
+  BatchResult processBatch(String user, JobItem jobItem) {
     var importId = jobItem.getImportId();
     var continuation = jobItem.getContinuation() != null ? jobItem.getContinuation() : 0;
 
     var importKey =
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatUserPk(user))
-            .sortValue(TcgInventoryItem.formatImportSk(importId))
+            .partitionValue(SkuItem.formatUserPk(user))
+            .sortValue(ImportItem.formatSk(importId))
             .build();
-    var importItem = tcgInventoryTable.getItem(importKey);
+    var importItem = importTable.getItem(importKey);
     var totalRows = importItem.getRowCount() != null ? importItem.getRowCount() : 0;
 
     int batchEnd = Math.min(continuation + BATCH_SIZE, totalRows);
@@ -53,10 +56,10 @@ class AppraiseJobProcessor {
     for (int i = continuation + 1; i <= batchEnd; i++) {
       var rowKey =
           Key.builder()
-              .partitionValue(TcgInventoryItem.formatImportRowPk(user, importId))
-              .sortValue(TcgInventoryItem.formatImportRowSk(i))
+              .partitionValue(ImportRowItem.formatPk(user, importId))
+              .sortValue(ImportRowItem.formatSk(i))
               .build();
-      var rowItem = tcgInventoryTable.getItem(rowKey);
+      var rowItem = importRowTable.getItem(rowKey);
       if (rowItem == null || rowItem.getDecision() != null) {
         processed = i;
         continue;
@@ -69,7 +72,7 @@ class AppraiseJobProcessor {
       rowItem.setSuggestedPrice(decision.suggestedPrice());
       rowItem.setFetchtcgCardId(decision.fetchtcgCardId());
       rowItem.setFetchtcgSetId(decision.fetchtcgSetId());
-      tcgInventoryTable.putItem(rowItem);
+      importRowTable.putItem(rowItem);
 
       processed = i;
     }
@@ -79,13 +82,13 @@ class AppraiseJobProcessor {
       importItem.setStatus("review");
     }
     importItem.setUpdatedAt(clock.now());
-    tcgInventoryTable.putItem(importItem);
+    importTable.putItem(importItem);
 
     return new BatchResult(processed, complete);
   }
 
   private RowDecision appraiseRow(
-      TcgInventoryItem rowItem,
+      ImportRowItem rowItem,
       Map<String, ResolvedCard> batchCache,
       Map<String, FetchTcgClient.GetCardResponse> cardCache) {
     if (!"en".equals(rowItem.getLanguage())) {

@@ -24,8 +24,8 @@ public class RemoveUnitHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
-  private final TcgInventoryItemRepository tcgInventoryItemRepository;
+  private final DynamoDbTable<UnitItem> unitTable;
+  private final TcgInventoryRepository tcgInventoryRepository;
 
   public RemoveUnitHandler() {
     this(TcgInventoryFactory.create());
@@ -35,8 +35,8 @@ public class RemoveUnitHandler
   RemoveUnitHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
-    this.tcgInventoryItemRepository = factory.tcgInventoryItemRepository();
+    this.unitTable = factory.unitTable();
+    this.tcgInventoryRepository = factory.tcgInventoryRepository();
   }
 
   @Override
@@ -57,11 +57,10 @@ public class RemoveUnitHandler
     var queryParams = event.getQueryStringParameters();
     var reason = queryParams != null ? queryParams.get("reason") : null;
 
-    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
-    var unitSk = TcgInventoryItem.formatUnitSk(sequenceNumber);
+    var skuPk = SkuItem.formatPk(user, skuId);
+    var unitSk = UnitItem.formatSk(sequenceNumber);
 
-    var unitItem =
-        tcgInventoryTable.getItem(Key.builder().partitionValue(skuPk).sortValue(unitSk).build());
+    var unitItem = unitTable.getItem(Key.builder().partitionValue(skuPk).sortValue(unitSk).build());
     if (unitItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
@@ -70,7 +69,7 @@ public class RemoveUnitHandler
       return httpResponseFactory.conflict(new ErrorResponse("unit is not in stock"));
     }
 
-    tcgInventoryItemRepository.removeUnit(user, skuId, sequenceNumber, reason);
+    tcgInventoryRepository.removeUnit(user, skuId, sequenceNumber, reason);
 
     return httpResponseFactory.noContent();
   }

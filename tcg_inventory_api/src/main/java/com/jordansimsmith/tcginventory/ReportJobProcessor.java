@@ -14,25 +14,32 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 public class ReportJobProcessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReportJobProcessor.class);
 
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
-  private final TcgInventoryItemRepository tcgInventoryItemRepository;
-  private final DynamoDbIndex<TcgInventoryItem> gsi2Index;
+  private final DynamoDbTable<ReportItem> reportTable;
+  private final TcgInventoryRepository tcgInventoryRepository;
+  private final DynamoDbTable<AuditItem> auditTable;
+  private final DynamoDbTable<OrderItem> orderTable;
+  private final DynamoDbIndex<SkuItem> gsi2Index;
   private final ObjectMapper objectMapper;
   private final Clock clock;
 
   public ReportJobProcessor(
-      DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
-      TcgInventoryItemRepository tcgInventoryItemRepository,
+      DynamoDbTable<ReportItem> reportTable,
+      TcgInventoryRepository tcgInventoryRepository,
+      DynamoDbTable<AuditItem> auditTable,
+      DynamoDbTable<SkuItem> skuTable,
+      DynamoDbTable<OrderItem> orderTable,
       ObjectMapper objectMapper,
       Clock clock) {
-    this.tcgInventoryTable = tcgInventoryTable;
-    this.tcgInventoryItemRepository = tcgInventoryItemRepository;
-    this.gsi2Index = tcgInventoryTable.index(TcgInventoryItem.GSI2_NAME);
+    this.reportTable = reportTable;
+    this.tcgInventoryRepository = tcgInventoryRepository;
+    this.auditTable = auditTable;
+    this.orderTable = orderTable;
+    this.gsi2Index = skuTable.index(TcgInventoryTable.GSI2_NAME);
     this.objectMapper = objectMapper;
     this.clock = clock;
   }
 
-  public BatchResult processBatch(String user, TcgInventoryItem jobItem) {
+  public BatchResult processBatch(String user, JobItem jobItem) {
     LOGGER.info("starting report job for user {}", user);
 
     var asOfAuditUlid = findLatestAuditUlid(user);
@@ -42,7 +49,7 @@ public class ReportJobProcessor {
     var accumulator = new ReportAccumulator(now, objectMapper);
 
     for (var sku : pageGsi2Skus(user)) {
-      var units = tcgInventoryItemRepository.findUnits(user, sku.getSkuId());
+      var units = tcgInventoryRepository.findUnits(user, sku.getSkuId());
       accumulator.addSku(sku, units);
     }
 
@@ -61,8 +68,8 @@ public class ReportJobProcessor {
               accumulator.toRevenueByMonth(),
               accumulator.toIntakeVsSalesByWeek());
       var reportJson = objectMapper.writeValueAsString(payload);
-      var reportItem = TcgInventoryItem.createReport(user, reportJson, asOfAuditUlid, now);
-      tcgInventoryTable.putItem(reportItem);
+      var reportItem = ReportItem.create(user, reportJson, asOfAuditUlid, now);
+      reportTable.putItem(reportItem);
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -76,20 +83,20 @@ public class ReportJobProcessor {
         QueryEnhancedRequest.builder()
             .queryConditional(
                 QueryConditional.keyEqualTo(
-                    Key.builder().partitionValue(TcgInventoryItem.formatAuditPk(user)).build()))
+                    Key.builder().partitionValue(AuditItem.formatPk(user)).build()))
             .scanIndexForward(false)
             .limit(1)
             .build();
 
-    return tcgInventoryTable.query(request).stream()
+    return auditTable.query(request).stream()
         .flatMap(page -> page.items().stream())
         .findFirst()
-        .map(TcgInventoryItem::getSk)
+        .map(AuditItem::getSk)
         .orElse(null);
   }
 
-  private List<TcgInventoryItem> pageGsi2Skus(String user) {
-    var gsi2pk = TcgInventoryItem.formatGsi2pk(user);
+  private List<SkuItem> pageGsi2Skus(String user) {
+    var gsi2pk = SkuItem.formatGsi2pk(user);
     var request =
         QueryEnhancedRequest.builder()
             .queryConditional(
@@ -100,20 +107,18 @@ public class ReportJobProcessor {
     return gsi2Index.query(request).stream().flatMap(page -> page.items().stream()).toList();
   }
 
-  private List<TcgInventoryItem> pageOrders(String user) {
+  private List<OrderItem> pageOrders(String user) {
     var request =
         QueryEnhancedRequest.builder()
             .queryConditional(
                 QueryConditional.sortBeginsWith(
                     Key.builder()
-                        .partitionValue(TcgInventoryItem.formatUserPk(user))
-                        .sortValue(TcgInventoryItem.ORDER_PREFIX)
+                        .partitionValue(SkuItem.formatUserPk(user))
+                        .sortValue(OrderItem.ORDER_PREFIX)
                         .build()))
             .scanIndexForward(true)
             .build();
 
-    return tcgInventoryTable.query(request).stream()
-        .flatMap(page -> page.items().stream())
-        .toList();
+    return orderTable.query(request).stream().flatMap(page -> page.items().stream()).toList();
   }
 }

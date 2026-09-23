@@ -30,7 +30,9 @@ public class InventoryHandlerIntegrationTest {
   private FakeClock fakeClock;
   private FakeUlidGenerator fakeUlidGenerator;
   private ObjectMapper objectMapper;
-  private DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private DynamoDbTable<SkuItem> skuTable;
+  private DynamoDbTable<UnitItem> unitTable;
+  private DynamoDbTable<AuditItem> auditTable;
 
   private FindSkusHandler findSkusHandler;
   private GetSkuHandler getSkuHandler;
@@ -45,7 +47,7 @@ public class InventoryHandlerIntegrationTest {
   static void setUpBeforeClass() {
     var factory =
         TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
-    var table = factory.tcgInventoryTable();
+    var table = factory.tableDefinition();
     DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
   }
 
@@ -57,7 +59,9 @@ public class InventoryHandlerIntegrationTest {
     fakeClock = factory.fakeClock();
     fakeUlidGenerator = factory.fakeUlidGenerator();
     objectMapper = factory.objectMapper();
-    tcgInventoryTable = factory.tcgInventoryTable();
+    skuTable = factory.skuTable();
+    unitTable = factory.unitTable();
+    auditTable = factory.auditTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
@@ -231,20 +235,16 @@ public class InventoryHandlerIntegrationTest {
     // assert
     assertThat(response.getStatusCode()).isEqualTo(204);
 
-    var skuPk = TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#NM");
+    var skuPk = SkuItem.formatPk("jordan", "scryfall-1#normal#NM");
     var sku =
-        tcgInventoryTable.getItem(
-            Key.builder().partitionValue(skuPk).sortValue(TcgInventoryItem.formatSkuSk()).build());
+        skuTable.getItem(Key.builder().partitionValue(skuPk).sortValue(SkuItem.formatSk()).build());
     assertThat(sku.getDirty()).isTrue();
     assertThat(sku.getVersion()).isEqualTo(2);
-    assertThat(sku.getGsi1pk()).isEqualTo(TcgInventoryItem.formatGsi1pk("jordan"));
+    assertThat(sku.getGsi1pk()).isEqualTo(SkuItem.formatGsi1pk("jordan"));
 
     var unit =
-        tcgInventoryTable.getItem(
-            Key.builder()
-                .partitionValue(skuPk)
-                .sortValue(TcgInventoryItem.formatUnitSk(42))
-                .build());
+        unitTable.getItem(
+            Key.builder().partitionValue(skuPk).sortValue(UnitItem.formatSk(42)).build());
     assertThat(unit.getStatus()).isEqualTo("removed");
 
     var auditItems = queryAuditEntries("jordan");
@@ -307,41 +307,29 @@ public class InventoryHandlerIntegrationTest {
     var body = objectMapper.readTree(response.getBody());
     assertThat(body.get("sku_id").asText()).isEqualTo("scryfall-1#normal#LP");
 
-    var sourceSkuPk = TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#NM");
+    var sourceSkuPk = SkuItem.formatPk("jordan", "scryfall-1#normal#NM");
     var oldUnit =
-        tcgInventoryTable.getItem(
-            Key.builder()
-                .partitionValue(sourceSkuPk)
-                .sortValue(TcgInventoryItem.formatUnitSk(42))
-                .build());
+        unitTable.getItem(
+            Key.builder().partitionValue(sourceSkuPk).sortValue(UnitItem.formatSk(42)).build());
     assertThat(oldUnit).isNull();
 
-    var targetSkuPk = TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#LP");
+    var targetSkuPk = SkuItem.formatPk("jordan", "scryfall-1#normal#LP");
     var newUnit =
-        tcgInventoryTable.getItem(
-            Key.builder()
-                .partitionValue(targetSkuPk)
-                .sortValue(TcgInventoryItem.formatUnitSk(42))
-                .build());
+        unitTable.getItem(
+            Key.builder().partitionValue(targetSkuPk).sortValue(UnitItem.formatSk(42)).build());
     assertThat(newUnit).isNotNull();
     assertThat(newUnit.getSequenceNumber()).isEqualTo(42);
     assertThat(newUnit.getStatus()).isEqualTo("in_stock");
 
     var sourceSku =
-        tcgInventoryTable.getItem(
-            Key.builder()
-                .partitionValue(sourceSkuPk)
-                .sortValue(TcgInventoryItem.formatSkuSk())
-                .build());
+        skuTable.getItem(
+            Key.builder().partitionValue(sourceSkuPk).sortValue(SkuItem.formatSk()).build());
     assertThat(sourceSku.getDirty()).isTrue();
     assertThat(sourceSku.getVersion()).isEqualTo(2);
 
     var targetSku =
-        tcgInventoryTable.getItem(
-            Key.builder()
-                .partitionValue(targetSkuPk)
-                .sortValue(TcgInventoryItem.formatSkuSk())
-                .build());
+        skuTable.getItem(
+            Key.builder().partitionValue(targetSkuPk).sortValue(SkuItem.formatSk()).build());
     assertThat(targetSku.getDirty()).isTrue();
     assertThat(targetSku.getVersion()).isEqualTo(2);
 
@@ -357,8 +345,8 @@ public class InventoryHandlerIntegrationTest {
     createSku("jordan", "scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
     var photos =
         List.of(
-            TcgInventoryItem.Photo.create("photo-front", null),
-            TcgInventoryItem.Photo.create(
+            UnitItem.Photo.create("photo-front", null),
+            UnitItem.Photo.create(
                 "photo-back", "https://listing-img.fetchtcg.com/example/listing/photo.jpg"));
     createUnit("jordan", "scryfall-1#normal#NM", 42, "in_stock", "import1", photos);
 
@@ -374,22 +362,16 @@ public class InventoryHandlerIntegrationTest {
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
 
-    var sourceSkuPk = TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#NM");
+    var sourceSkuPk = SkuItem.formatPk("jordan", "scryfall-1#normal#NM");
     var oldUnit =
-        tcgInventoryTable.getItem(
-            Key.builder()
-                .partitionValue(sourceSkuPk)
-                .sortValue(TcgInventoryItem.formatUnitSk(42))
-                .build());
+        unitTable.getItem(
+            Key.builder().partitionValue(sourceSkuPk).sortValue(UnitItem.formatSk(42)).build());
     assertThat(oldUnit).isNull();
 
-    var targetSkuPk = TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#LP");
+    var targetSkuPk = SkuItem.formatPk("jordan", "scryfall-1#normal#LP");
     var newUnit =
-        tcgInventoryTable.getItem(
-            Key.builder()
-                .partitionValue(targetSkuPk)
-                .sortValue(TcgInventoryItem.formatUnitSk(42))
-                .build());
+        unitTable.getItem(
+            Key.builder().partitionValue(targetSkuPk).sortValue(UnitItem.formatSk(42)).build());
     assertThat(newUnit).isNotNull();
     assertThat(newUnit.getPhotos()).isEqualTo(photos);
   }
@@ -404,14 +386,14 @@ public class InventoryHandlerIntegrationTest {
         4242,
         "in_stock",
         "import1",
-        List.of(TcgInventoryItem.Photo.create("photo-in-stock", null)));
+        List.of(UnitItem.Photo.create("photo-in-stock", null)));
     createUnit(
         "jordan",
         "scryfall-1#normal#NM",
         1204,
         "reserved",
         "import1",
-        List.of(TcgInventoryItem.Photo.create("photo-reserved", null)));
+        List.of(UnitItem.Photo.create("photo-reserved", null)));
     createUnit("jordan", "scryfall-1#normal#NM", 4250, "in_stock", "import1");
     createUnit("jordan", "scryfall-1#normal#NM", 300, "removed", "import1");
 
@@ -465,21 +447,18 @@ public class InventoryHandlerIntegrationTest {
     var body = objectMapper.readTree(response.getBody());
     assertThat(body.get("sku_id").asText()).isEqualTo("scryfall-1#normal#LP");
 
-    var targetSkuPk = TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#LP");
+    var targetSkuPk = SkuItem.formatPk("jordan", "scryfall-1#normal#LP");
     var targetSku =
-        tcgInventoryTable.getItem(
-            Key.builder()
-                .partitionValue(targetSkuPk)
-                .sortValue(TcgInventoryItem.formatSkuSk())
-                .build());
+        skuTable.getItem(
+            Key.builder().partitionValue(targetSkuPk).sortValue(SkuItem.formatSk()).build());
     assertThat(targetSku).isNotNull();
     assertThat(targetSku.getSkuId()).isEqualTo("scryfall-1#normal#LP");
     assertThat(targetSku.getName()).isEqualTo("Elvish Mystic");
     assertThat(targetSku.getCondition()).isEqualTo("LP");
     assertThat(targetSku.getFinish()).isEqualTo("normal");
-    assertThat(targetSku.getGsi2pk()).isEqualTo(TcgInventoryItem.formatGsi2pk("jordan"));
+    assertThat(targetSku.getGsi2pk()).isEqualTo(SkuItem.formatGsi2pk("jordan"));
     assertThat(targetSku.getGsi2sk())
-        .isEqualTo(TcgInventoryItem.formatGsi2sk("elvish mystic", "scryfall-1#normal#LP"));
+        .isEqualTo(SkuItem.formatGsi2sk("elvish mystic", "scryfall-1#normal#LP"));
   }
 
   @Test
@@ -533,10 +512,9 @@ public class InventoryHandlerIntegrationTest {
         null);
 
     // assert
-    var skuPk = TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#NM");
+    var skuPk = SkuItem.formatPk("jordan", "scryfall-1#normal#NM");
     var sku =
-        tcgInventoryTable.getItem(
-            Key.builder().partitionValue(skuPk).sortValue(TcgInventoryItem.formatSkuSk()).build());
+        skuTable.getItem(Key.builder().partitionValue(skuPk).sortValue(SkuItem.formatSk()).build());
     assertThat(sku).isNotNull();
     assertThat(sku.getSkuId()).isEqualTo("scryfall-1#normal#NM");
 
@@ -561,7 +539,7 @@ public class InventoryHandlerIntegrationTest {
     var condition = parts[2];
 
     var item =
-        TcgInventoryItem.createSku(
+        SkuItem.create(
             user,
             skuId,
             scryfallId,
@@ -574,8 +552,8 @@ public class InventoryHandlerIntegrationTest {
             null,
             null);
     item.setDirty(false);
-    item.setGsi1pk(TcgInventoryItem.USER_PREFIX + user + "#CLEAN");
-    tcgInventoryTable.putItem(item);
+    item.setGsi1pk(SkuItem.USER_PREFIX + user + "#CLEAN");
+    skuTable.putItem(item);
   }
 
   private void createUnit(
@@ -589,21 +567,20 @@ public class InventoryHandlerIntegrationTest {
       int sequenceNumber,
       String status,
       String importId,
-      List<TcgInventoryItem.Photo> photos) {
+      List<UnitItem.Photo> photos) {
     var item =
-        TcgInventoryItem.createUnit(
+        UnitItem.create(
             user, skuId, sequenceNumber, status, importId, Instant.ofEpochSecond(1700000000));
     if (photos != null) {
       item.setPhotos(photos);
     }
-    tcgInventoryTable.putItem(item);
+    unitTable.putItem(item);
   }
 
-  private List<TcgInventoryItem> queryAuditEntries(String user) {
+  private List<AuditItem> queryAuditEntries(String user) {
     var queryConditional =
-        QueryConditional.keyEqualTo(
-            Key.builder().partitionValue(TcgInventoryItem.formatAuditPk(user)).build());
-    return tcgInventoryTable
+        QueryConditional.keyEqualTo(Key.builder().partitionValue(AuditItem.formatPk(user)).build());
+    return auditTable
         .query(QueryEnhancedRequest.builder().queryConditional(queryConditional).build())
         .stream()
         .flatMap(page -> page.items().stream())

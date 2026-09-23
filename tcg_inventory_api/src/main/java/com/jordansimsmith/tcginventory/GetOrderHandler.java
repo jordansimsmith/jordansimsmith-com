@@ -86,13 +86,13 @@ public class GetOrderHandler
   record ErrorResponse(@JsonProperty("message") String message) {}
 
   private record BlockPosition(
-      String currentLocation,
-      @Nullable TcgInventoryItem previousUnit,
-      @Nullable TcgInventoryItem nextUnit) {}
+      String currentLocation, @Nullable UnitItem previousUnit, @Nullable UnitItem nextUnit) {}
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<OrderItem> orderTable;
+  private final DynamoDbTable<UnitItem> unitTable;
+  private final DynamoDbTable<SkuItem> skuTable;
   private final ObjectMapper objectMapper;
 
   public GetOrderHandler() {
@@ -103,7 +103,9 @@ public class GetOrderHandler
   GetOrderHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.orderTable = factory.orderTable();
+    this.unitTable = factory.unitTable();
+    this.skuTable = factory.skuTable();
     this.objectMapper = factory.objectMapper();
   }
 
@@ -123,18 +125,15 @@ public class GetOrderHandler
 
     String orderSk;
     try {
-      orderSk = TcgInventoryItem.formatOrderSk(orderId);
+      orderSk = OrderItem.formatSk(orderId);
     } catch (IllegalArgumentException e) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
 
     var orderKey =
-        Key.builder()
-            .partitionValue(TcgInventoryItem.formatUserPk(user))
-            .sortValue(orderSk)
-            .build();
+        Key.builder().partitionValue(SkuItem.formatUserPk(user)).sortValue(orderSk).build();
 
-    var orderItem = tcgInventoryTable.getItem(orderKey);
+    var orderItem = orderTable.getItem(orderKey);
     if (orderItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
@@ -142,12 +141,12 @@ public class GetOrderHandler
     var orderLines = OrderLines.parse(orderItem.getLines(), objectMapper);
     var blockUnits = findBlockUnits(user, orderLines);
 
-    Map<String, TcgInventoryItem> skuCache = new HashMap<>();
+    Map<String, SkuItem> skuCache = new HashMap<>();
     var units = new ArrayList<OrderUnitResponse>();
     var lines = new ArrayList<OrderLineResponse>();
 
     for (var line : orderLines) {
-      var skuItem = getSku(TcgInventoryItem.formatSkuPk(user, line.skuId()), skuCache);
+      var skuItem = getSku(SkuItem.formatPk(user, line.skuId()), skuCache);
 
       if (skuItem == null) {
         continue;
@@ -202,7 +201,7 @@ public class GetOrderHandler
             units));
   }
 
-  private Map<Integer, List<TcgInventoryItem>> findBlockUnits(
+  private Map<Integer, List<UnitItem>> findBlockUnits(
       String user, List<OrderLines.OrderLine> orderLines) {
     var blocks = new TreeSet<Integer>();
     for (var line : orderLines) {
@@ -211,19 +210,19 @@ public class GetOrderHandler
       }
     }
 
-    var gsi3 = tcgInventoryTable.index(TcgInventoryItem.GSI3_NAME);
-    var blockUnits = new HashMap<Integer, List<TcgInventoryItem>>();
+    var gsi3 = unitTable.index(TcgInventoryTable.GSI3_NAME);
+    var blockUnits = new HashMap<Integer, List<UnitItem>>();
     for (var block : blocks) {
       var request =
           QueryEnhancedRequest.builder()
               .queryConditional(
                   QueryConditional.sortBetween(
                       Key.builder()
-                          .partitionValue(TcgInventoryItem.formatGsi3pk(user))
+                          .partitionValue(UnitItem.formatGsi3pk(user))
                           .sortValue(block * 100)
                           .build(),
                       Key.builder()
-                          .partitionValue(TcgInventoryItem.formatGsi3pk(user))
+                          .partitionValue(UnitItem.formatGsi3pk(user))
                           .sortValue(block * 100 + 99)
                           .build()))
               .build();
@@ -236,10 +235,10 @@ public class GetOrderHandler
   // current position and neighbors are a snapshot of the box at read time: sold and removed
   // units are gone, in-stock and reserved units still occupy their slots
   private BlockPosition computeBlockPosition(
-      Map<Integer, List<TcgInventoryItem>> blockUnits, int sequenceNumber) {
+      Map<Integer, List<UnitItem>> blockUnits, int sequenceNumber) {
     var offset = 0;
-    TcgInventoryItem previous = null;
-    TcgInventoryItem next = null;
+    UnitItem previous = null;
+    UnitItem next = null;
 
     for (var unit : blockUnits.get(sequenceNumber / 100)) {
       int unitSeq = unit.getSequenceNumber();
@@ -263,7 +262,7 @@ public class GetOrderHandler
 
   @Nullable
   private NeighborCardResponse toNeighborCard(
-      @Nullable TcgInventoryItem unit, Map<String, TcgInventoryItem> skuCache) {
+      @Nullable UnitItem unit, Map<String, SkuItem> skuCache) {
     if (unit == null) {
       return null;
     }
@@ -280,20 +279,16 @@ public class GetOrderHandler
   }
 
   @Nullable
-  private TcgInventoryItem getSku(String skuPk, Map<String, TcgInventoryItem> skuCache) {
+  private SkuItem getSku(String skuPk, Map<String, SkuItem> skuCache) {
     return skuCache.computeIfAbsent(
         skuPk,
         pk ->
-            tcgInventoryTable.getItem(
-                Key.builder()
-                    .partitionValue(pk)
-                    .sortValue(TcgInventoryItem.formatSkuSk())
-                    .build()));
+            skuTable.getItem(
+                Key.builder().partitionValue(pk).sortValue(SkuItem.formatSk()).build()));
   }
 
   @Nullable
-  private static BuyerAddressResponse toBuyerAddress(
-      @Nullable TcgInventoryItem.BuyerAddress address) {
+  private static BuyerAddressResponse toBuyerAddress(@Nullable OrderItem.BuyerAddress address) {
     if (address == null) {
       return null;
     }

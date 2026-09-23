@@ -42,7 +42,9 @@ public class ListingPhaseProcessorIntegrationTest {
   private FakeClock fakeClock;
   private FakeFetchTcgClient fakeFetchTcgClient;
   private ObjectMapper objectMapper;
-  private DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private DynamoDbTable<SkuItem> skuTable;
+  private DynamoDbTable<UnitItem> unitTable;
+  private DynamoDbTable<JobItem> jobTable;
   private S3Client s3Client;
   private JobsHandler jobsHandler;
   private ListAppender<ILoggingEvent> logAppender;
@@ -54,7 +56,7 @@ public class ListingPhaseProcessorIntegrationTest {
   static void setUpBeforeClass() {
     var factory =
         TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), s3Container.getEndpoint());
-    DynamoDbUtils.createTable(factory.dynamoDbClient(), factory.tcgInventoryTable());
+    DynamoDbUtils.createTable(factory.dynamoDbClient(), factory.tableDefinition());
     factory.s3Client().createBucket(b -> b.bucket(Photos.BUCKET));
   }
 
@@ -66,7 +68,9 @@ public class ListingPhaseProcessorIntegrationTest {
     fakeClock = factory.fakeClock();
     fakeFetchTcgClient = factory.fakeFetchTcgClient();
     objectMapper = factory.objectMapper();
-    tcgInventoryTable = factory.tcgInventoryTable();
+    skuTable = factory.skuTable();
+    unitTable = factory.unitTable();
+    jobTable = factory.jobTable();
     s3Client = factory.s3Client();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
@@ -133,7 +137,7 @@ public class ListingPhaseProcessorIntegrationTest {
     sku.setFetchtcgListingId(975737);
     sku.setLastPublishedQuantity(1);
     sku.setLastPublishedPrice("1.80");
-    tcgInventoryTable.putItem(sku);
+    skuTable.putItem(sku);
     createPhotographedUnit(
         "jordan",
         SKU_ID,
@@ -288,7 +292,7 @@ public class ListingPhaseProcessorIntegrationTest {
 
     var sold = getUnit("jordan", SKU_ID, 1);
     sold.setStatus("sold");
-    tcgInventoryTable.putItem(sold);
+    unitTable.putItem(sold);
     redirtySku("jordan", SKU_ID);
     createPublishJob("jordan", "job2");
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job2", "publish"), null);
@@ -312,7 +316,7 @@ public class ListingPhaseProcessorIntegrationTest {
   private void createDirtySku(String user, String skuId, String suggestedPrice) {
     var parts = skuId.split("#");
     var skuItem =
-        TcgInventoryItem.createSku(
+        SkuItem.create(
             user,
             skuId,
             parts[0],
@@ -324,7 +328,7 @@ public class ListingPhaseProcessorIntegrationTest {
             "168",
             "mtg_168_c_dom_normal",
             suggestedPrice);
-    tcgInventoryTable.putItem(skuItem);
+    skuTable.putItem(skuItem);
   }
 
   private void createPhotographedUnit(
@@ -333,10 +337,10 @@ public class ListingPhaseProcessorIntegrationTest {
       int sequenceNumber,
       List<String> photoIds,
       List<byte[]> jpegBytes) {
-    var photos = new ArrayList<TcgInventoryItem.Photo>();
+    var photos = new ArrayList<UnitItem.Photo>();
     for (int i = 0; i < photoIds.size(); i++) {
       var photoId = photoIds.get(i);
-      photos.add(TcgInventoryItem.Photo.create(photoId, null));
+      photos.add(UnitItem.Photo.create(photoId, null));
       s3Client.putObject(
           PutObjectRequest.builder()
               .bucket(Photos.BUCKET)
@@ -349,46 +353,41 @@ public class ListingPhaseProcessorIntegrationTest {
   }
 
   private void createUnit(
-      String user,
-      String skuId,
-      int sequenceNumber,
-      String status,
-      List<TcgInventoryItem.Photo> photos) {
+      String user, String skuId, int sequenceNumber, String status, List<UnitItem.Photo> photos) {
     var unit =
-        TcgInventoryItem.createUnit(
+        UnitItem.create(
             user, skuId, sequenceNumber, status, "import1", Instant.ofEpochSecond(1700000000));
     if (photos != null) {
       unit.setPhotos(photos);
     }
-    tcgInventoryTable.putItem(unit);
+    unitTable.putItem(unit);
   }
 
   private void redirtySku(String user, String skuId) {
     var sku = getSku(user, skuId);
     sku.setDirty(true);
-    sku.setGsi1pk(TcgInventoryItem.formatGsi1pk(user));
-    tcgInventoryTable.putItem(sku);
+    sku.setGsi1pk(SkuItem.formatGsi1pk(user));
+    skuTable.putItem(sku);
   }
 
   private void createPublishJob(String user, String jobId) {
-    var jobItem =
-        TcgInventoryItem.createJob(user, jobId, "publish", null, Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(jobItem);
+    var jobItem = JobItem.create(user, jobId, "publish", null, Instant.ofEpochSecond(1700000000));
+    jobTable.putItem(jobItem);
   }
 
-  private TcgInventoryItem getSku(String user, String skuId) {
-    return tcgInventoryTable.getItem(
+  private SkuItem getSku(String user, String skuId) {
+    return skuTable.getItem(
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatSkuPk(user, skuId))
-            .sortValue(TcgInventoryItem.formatSkuSk())
+            .partitionValue(SkuItem.formatPk(user, skuId))
+            .sortValue(SkuItem.formatSk())
             .build());
   }
 
-  private TcgInventoryItem getUnit(String user, String skuId, int sequenceNumber) {
-    return tcgInventoryTable.getItem(
+  private UnitItem getUnit(String user, String skuId, int sequenceNumber) {
+    return unitTable.getItem(
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatSkuPk(user, skuId))
-            .sortValue(TcgInventoryItem.formatUnitSk(sequenceNumber))
+            .partitionValue(SkuItem.formatPk(user, skuId))
+            .sortValue(UnitItem.formatSk(sequenceNumber))
             .build());
   }
 

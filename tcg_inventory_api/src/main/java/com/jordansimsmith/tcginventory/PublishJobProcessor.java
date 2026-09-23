@@ -19,7 +19,7 @@ public class PublishJobProcessor {
     this.listingPhaseProcessor = listingPhaseProcessor;
   }
 
-  public BatchResult processBatch(String user, TcgInventoryItem jobItem) {
+  public BatchResult processBatch(String user, JobItem jobItem) {
     LOGGER.info("starting publish job for user {}", user);
     var bearerToken = fetchTcgTokenMinter.mint(user);
     LOGGER.info("minted FetchTCG bearer token");

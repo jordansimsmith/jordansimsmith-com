@@ -29,7 +29,8 @@ public class PublishHandlerIntegrationTest {
   private FakeUlidGenerator fakeUlidGenerator;
   private FakeQueueClient<JobMessage> fakeJobsQueue;
   private ObjectMapper objectMapper;
-  private DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private DynamoDbTable<JobItem> jobTable;
+  private DynamoDbTable<SkuItem> skuTable;
 
   private CreatePublishHandler createPublishHandler;
   private GetPublishHandler getPublishHandler;
@@ -42,7 +43,7 @@ public class PublishHandlerIntegrationTest {
   static void setUpBeforeClass() {
     var factory =
         TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
-    var table = factory.tcgInventoryTable();
+    var table = factory.tableDefinition();
     DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
   }
 
@@ -55,7 +56,8 @@ public class PublishHandlerIntegrationTest {
     fakeUlidGenerator = factory.fakeUlidGenerator();
     fakeJobsQueue = factory.fakeJobsQueue();
     objectMapper = factory.objectMapper();
-    tcgInventoryTable = factory.tcgInventoryTable();
+    jobTable = factory.jobTable();
+    skuTable = factory.skuTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
@@ -84,10 +86,10 @@ public class PublishHandlerIntegrationTest {
     var jobId = send.message().jobId();
     assertThat(send.messageDeduplicationId()).isEqualTo(jobId + "#0");
     var jobItem =
-        tcgInventoryTable.getItem(
+        jobTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatJobSk(jobId))
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(JobItem.formatSk(jobId))
                 .build());
     assertThat(jobItem).isNotNull();
     assertThat(jobItem.getJobType()).isEqualTo("publish");
@@ -100,12 +102,12 @@ public class PublishHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
     var jobItem =
-        TcgInventoryItem.createJob(
+        JobItem.create(
             "jordan", "existing-job", "publish", null, Instant.ofEpochSecond(1700000000));
     jobItem.setStatus("running");
     jobItem.setProcessedCount(5);
     jobItem.setUpdatedAt(Instant.ofEpochSecond(1700000100));
-    tcgInventoryTable.putItem(jobItem);
+    jobTable.putItem(jobItem);
 
     // act
     var response = createPublishHandler.handleRequest(buildEvent("jordan"), null);
@@ -122,11 +124,10 @@ public class PublishHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
     var completedJob =
-        TcgInventoryItem.createJob(
-            "jordan", "old-job", "publish", null, Instant.ofEpochSecond(1699999000));
+        JobItem.create("jordan", "old-job", "publish", null, Instant.ofEpochSecond(1699999000));
     completedJob.setStatus("succeeded");
     completedJob.setProcessedCount(10);
-    tcgInventoryTable.putItem(completedJob);
+    jobTable.putItem(completedJob);
 
     // act
     var response = createPublishHandler.handleRequest(buildEvent("jordan"), null);
@@ -144,15 +145,14 @@ public class PublishHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
     var jobItem =
-        TcgInventoryItem.createJob(
-            "jordan", "pub-job", "publish", null, Instant.ofEpochSecond(1700000000));
+        JobItem.create("jordan", "pub-job", "publish", null, Instant.ofEpochSecond(1700000000));
     jobItem.setStatus("succeeded");
     jobItem.setProcessedCount(3);
     jobItem.setUpdatedAt(Instant.ofEpochSecond(1700000200));
-    tcgInventoryTable.putItem(jobItem);
+    jobTable.putItem(jobItem);
 
     var dirtySku =
-        TcgInventoryItem.createSku(
+        SkuItem.create(
             "jordan",
             "sku1#normal#NM",
             "sku1",
@@ -164,7 +164,7 @@ public class PublishHandlerIntegrationTest {
             "1",
             null,
             null);
-    tcgInventoryTable.putItem(dirtySku);
+    skuTable.putItem(dirtySku);
 
     // act
     var response = getPublishHandler.handleRequest(buildEvent("jordan"), null);

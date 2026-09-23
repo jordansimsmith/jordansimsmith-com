@@ -25,7 +25,7 @@ public class CreatePublishHandler
   private final Clock clock;
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<JobItem> jobTable;
   private final QueueClient<JobMessage> jobsQueue;
   private final UlidGenerator ulidGenerator;
 
@@ -38,7 +38,7 @@ public class CreatePublishHandler
     this.clock = factory.clock();
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.jobTable = factory.jobTable();
     this.jobsQueue = factory.jobsQueue();
     this.ulidGenerator = factory.ulidGenerator();
   }
@@ -64,8 +64,8 @@ public class CreatePublishHandler
     var now = clock.now();
     var jobId = ulidGenerator.generate();
 
-    var jobItem = TcgInventoryItem.createJob(user, jobId, "publish", null, now);
-    tcgInventoryTable.putItem(jobItem);
+    var jobItem = JobItem.create(user, jobId, "publish", null, now);
+    jobTable.putItem(jobItem);
 
     var jobMessage = new JobMessage(user, jobId, "publish");
     jobsQueue.send(jobMessage, user, jobMessage.deduplicationId(0));
@@ -73,12 +73,12 @@ public class CreatePublishHandler
     return httpResponseFactory.accepted();
   }
 
-  private TcgInventoryItem findActivePublishJob(String user) {
+  private JobItem findActivePublishJob(String user) {
     var queryConditional =
         QueryConditional.sortBeginsWith(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk(user))
-                .sortValue(TcgInventoryItem.JOB_PREFIX)
+                .partitionValue(JobItem.formatPk(user))
+                .sortValue(JobItem.JOB_PREFIX)
                 .build());
 
     var request =
@@ -87,7 +87,7 @@ public class CreatePublishHandler
             .scanIndexForward(false)
             .build();
 
-    return tcgInventoryTable.query(request).stream()
+    return jobTable.query(request).stream()
         .flatMap(page -> page.items().stream())
         .filter(item -> "publish".equals(item.getJobType()))
         .filter(item -> "queued".equals(item.getStatus()) || "running".equals(item.getStatus()))

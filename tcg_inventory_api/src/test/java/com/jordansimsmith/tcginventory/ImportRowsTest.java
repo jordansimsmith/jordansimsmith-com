@@ -30,8 +30,8 @@ public class ImportRowsTest {
         .isEqualTo("4.50");
   }
 
-  private static TcgInventoryItem row(String decision, String suggestedPrice) {
-    var item = new TcgInventoryItem();
+  private static ImportRowItem row(String decision, String suggestedPrice) {
+    var item = new ImportRowItem();
     item.setDecision(decision);
     item.setSuggestedPrice(suggestedPrice);
     return item;

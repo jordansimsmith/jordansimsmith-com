@@ -25,7 +25,8 @@ public class DeleteImportRowPhotoHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<ImportItem> importTable;
+  private final DynamoDbTable<ImportRowItem> importRowTable;
   private final S3Client s3Client;
 
   public DeleteImportRowPhotoHandler() {
@@ -36,7 +37,8 @@ public class DeleteImportRowPhotoHandler
   DeleteImportRowPhotoHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.importTable = factory.importTable();
+    this.importRowTable = factory.importRowTable();
     this.s3Client = factory.s3Client();
   }
 
@@ -57,10 +59,10 @@ public class DeleteImportRowPhotoHandler
     var photoId = event.getPathParameters().get("photo_id");
 
     var importItem =
-        tcgInventoryTable.getItem(
+        importTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk(user))
-                .sortValue(TcgInventoryItem.formatImportSk(importId))
+                .partitionValue(SkuItem.formatUserPk(user))
+                .sortValue(ImportItem.formatSk(importId))
                 .build());
     if (importItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
@@ -71,10 +73,10 @@ public class DeleteImportRowPhotoHandler
     }
 
     var rowItem =
-        tcgInventoryTable.getItem(
+        importRowTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatImportRowPk(user, importId))
-                .sortValue(TcgInventoryItem.formatImportRowSk(position))
+                .partitionValue(ImportRowItem.formatPk(user, importId))
+                .sortValue(ImportRowItem.formatSk(position))
                 .build());
     if (rowItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
@@ -85,7 +87,7 @@ public class DeleteImportRowPhotoHandler
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
 
-    var remaining = new ArrayList<TcgInventoryItem.Photo>();
+    var remaining = new ArrayList<ImportRowItem.Photo>();
     var found = false;
     for (var photo : existing) {
       if (photoId.equals(photo.getPhotoId())) {
@@ -102,7 +104,7 @@ public class DeleteImportRowPhotoHandler
         DeleteObjectRequest.builder().bucket(Photos.BUCKET).key(Photos.key(user, photoId)).build());
 
     rowItem.setPhotos(remaining);
-    tcgInventoryTable.putItem(rowItem);
+    importRowTable.putItem(rowItem);
 
     return httpResponseFactory.noContent();
   }

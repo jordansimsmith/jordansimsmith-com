@@ -22,7 +22,8 @@ public class DeleteImportRowHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<ImportItem> importTable;
+  private final DynamoDbTable<ImportRowItem> importRowTable;
 
   public DeleteImportRowHandler() {
     this(TcgInventoryFactory.create());
@@ -32,7 +33,8 @@ public class DeleteImportRowHandler
   DeleteImportRowHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.importTable = factory.importTable();
+    this.importRowTable = factory.importRowTable();
   }
 
   @Override
@@ -51,10 +53,10 @@ public class DeleteImportRowHandler
     var position = Integer.parseInt(event.getPathParameters().get("position"));
 
     var importItem =
-        tcgInventoryTable.getItem(
+        importTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk(user))
-                .sortValue(TcgInventoryItem.formatImportSk(importId))
+                .partitionValue(SkuItem.formatUserPk(user))
+                .sortValue(ImportItem.formatSk(importId))
                 .build());
     if (importItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
@@ -66,15 +68,15 @@ public class DeleteImportRowHandler
 
     var rowKey =
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatImportRowPk(user, importId))
-            .sortValue(TcgInventoryItem.formatImportRowSk(position))
+            .partitionValue(ImportRowItem.formatPk(user, importId))
+            .sortValue(ImportRowItem.formatSk(position))
             .build();
-    var rowItem = tcgInventoryTable.getItem(rowKey);
+    var rowItem = importRowTable.getItem(rowKey);
     if (rowItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
 
-    tcgInventoryTable.deleteItem(rowKey);
+    importRowTable.deleteItem(rowKey);
 
     return httpResponseFactory.noContent();
   }

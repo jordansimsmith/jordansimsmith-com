@@ -39,7 +39,7 @@ public class FindImportsHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<ImportItem> importTable;
   private final ObjectMapper objectMapper;
 
   public FindImportsHandler() {
@@ -50,7 +50,7 @@ public class FindImportsHandler
   FindImportsHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.importTable = factory.importTable();
     this.objectMapper = factory.objectMapper();
   }
 
@@ -75,8 +75,8 @@ public class FindImportsHandler
     var queryConditional =
         QueryConditional.sortBeginsWith(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk(user))
-                .sortValue(TcgInventoryItem.IMPORT_PREFIX)
+                .partitionValue(ImportItem.formatPk(user))
+                .sortValue(ImportItem.IMPORT_PREFIX)
                 .build());
 
     var requestBuilder =
@@ -92,7 +92,7 @@ public class FindImportsHandler
       }
     }
 
-    var page = tcgInventoryTable.query(requestBuilder.build()).stream().findFirst().orElse(null);
+    var page = importTable.query(requestBuilder.build()).stream().findFirst().orElse(null);
 
     if (page == null) {
       return httpResponseFactory.ok(new FindImportsResponse(List.of(), null));
@@ -109,7 +109,7 @@ public class FindImportsHandler
     return httpResponseFactory.ok(new FindImportsResponse(imports, nextContinuation));
   }
 
-  static ImportSummary toSummary(TcgInventoryItem item) {
+  static ImportSummary toSummary(ImportItem item) {
     return new ImportSummary(
         item.getImportId(),
         item.getFilename(),

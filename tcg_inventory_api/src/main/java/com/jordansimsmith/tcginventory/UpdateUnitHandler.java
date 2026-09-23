@@ -29,8 +29,9 @@ public class UpdateUnitHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
-  private final TcgInventoryItemRepository tcgInventoryItemRepository;
+  private final DynamoDbTable<SkuItem> skuTable;
+  private final DynamoDbTable<UnitItem> unitTable;
+  private final TcgInventoryRepository tcgInventoryRepository;
   private final ObjectMapper objectMapper;
 
   public UpdateUnitHandler() {
@@ -41,8 +42,9 @@ public class UpdateUnitHandler
   UpdateUnitHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
-    this.tcgInventoryItemRepository = factory.tcgInventoryItemRepository();
+    this.skuTable = factory.skuTable();
+    this.unitTable = factory.unitTable();
+    this.tcgInventoryRepository = factory.tcgInventoryRepository();
     this.objectMapper = factory.objectMapper();
   }
 
@@ -78,22 +80,18 @@ public class UpdateUnitHandler
       return httpResponseFactory.badRequest(new ErrorResponse("invalid condition"));
     }
 
-    var sourceSkuPk = TcgInventoryItem.formatSkuPk(user, skuId);
-    var unitSk = TcgInventoryItem.formatUnitSk(sequenceNumber);
+    var sourceSkuPk = SkuItem.formatPk(user, skuId);
+    var unitSk = UnitItem.formatSk(sequenceNumber);
 
     var skuItem =
-        tcgInventoryTable.getItem(
-            Key.builder()
-                .partitionValue(sourceSkuPk)
-                .sortValue(TcgInventoryItem.formatSkuSk())
-                .build());
+        skuTable.getItem(
+            Key.builder().partitionValue(sourceSkuPk).sortValue(SkuItem.formatSk()).build());
     if (skuItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
 
     var unitItem =
-        tcgInventoryTable.getItem(
-            Key.builder().partitionValue(sourceSkuPk).sortValue(unitSk).build());
+        unitTable.getItem(Key.builder().partitionValue(sourceSkuPk).sortValue(unitSk).build());
     if (unitItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
@@ -107,7 +105,7 @@ public class UpdateUnitHandler
     }
 
     var targetSkuId =
-        tcgInventoryItemRepository.updateUnitCondition(user, skuItem, unitItem, body.condition());
+        tcgInventoryRepository.updateUnitCondition(user, skuItem, unitItem, body.condition());
 
     return httpResponseFactory.ok(new UpdateUnitResponse(targetSkuId));
   }

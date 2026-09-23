@@ -25,7 +25,7 @@ public class Photos {
   public static boolean needsPhotos(
       @Nullable String decision,
       @Nullable String suggestedPrice,
-      @Nullable List<TcgInventoryItem.Photo> photos) {
+      @Nullable List<ImportRowItem.Photo> photos) {
     return "keep".equals(decision)
         && suggestedPrice != null
         && (photos == null || photos.isEmpty())
@@ -33,11 +33,11 @@ public class Photos {
   }
 
   public static boolean needsPublishWarning(
-      BigDecimal price, @Nullable List<TcgInventoryItem.Photo> photos) {
+      BigDecimal price, @Nullable List<UnitItem.Photo> photos) {
     return price.compareTo(PUBLISH_WARNING) >= 0 && (photos == null || photos.isEmpty());
   }
 
-  public static AttributeValue toAttributeValue(List<TcgInventoryItem.Photo> photos) {
+  public static AttributeValue toAttributeValue(List<UnitItem.Photo> photos) {
     return AttributeValue.builder()
         .l(
             photos.stream()
@@ -45,11 +45,11 @@ public class Photos {
                     photo -> {
                       var map = new HashMap<String, AttributeValue>();
                       map.put(
-                          TcgInventoryItem.Photo.PHOTO_ID,
+                          UnitItem.Photo.PHOTO_ID,
                           AttributeValue.builder().s(photo.getPhotoId()).build());
                       if (photo.getFetchtcgUrl() != null) {
                         map.put(
-                            TcgInventoryItem.Photo.FETCHTCG_URL,
+                            UnitItem.Photo.FETCHTCG_URL,
                             AttributeValue.builder().s(photo.getFetchtcgUrl()).build());
                       }
                       return AttributeValue.builder().m(map).build();

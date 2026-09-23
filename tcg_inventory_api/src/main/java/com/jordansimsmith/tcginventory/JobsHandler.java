@@ -19,7 +19,8 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
 
   private final ObjectMapper objectMapper;
   private final Clock clock;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<JobItem> jobTable;
+  private final DynamoDbTable<ImportItem> importTable;
   private final QueueClient<JobMessage> jobsQueue;
   private final AppraiseJobProcessor appraiseJobProcessor;
   private final PublishJobProcessor publishJobProcessor;
@@ -33,31 +34,40 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
   JobsHandler(TcgInventoryFactory factory) {
     this.objectMapper = factory.objectMapper();
     this.clock = factory.clock();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.jobTable = factory.jobTable();
+    this.importTable = factory.importTable();
     this.jobsQueue = factory.jobsQueue();
     this.appraiseJobProcessor =
         new AppraiseJobProcessor(
-            factory.tcgInventoryTable(), factory.clock(), factory.fetchTcgClient());
+            factory.importTable(),
+            factory.importRowTable(),
+            factory.clock(),
+            factory.fetchTcgClient());
     this.publishJobProcessor =
         new PublishJobProcessor(
             factory.fetchTcgTokenMinter(),
             new OrderPhaseProcessor(
-                factory.tcgInventoryTable(),
-                factory.tcgInventoryItemRepository(),
+                factory.orderTable(),
+                factory.skuTable(),
+                factory.settingsTable(),
+                factory.tcgInventoryRepository(),
                 factory.clock(),
                 factory.fetchTcgClient(),
                 factory.objectMapper()),
             new ListingPhaseProcessor(
-                factory.tcgInventoryTable(),
-                factory.tcgInventoryItemRepository(),
+                factory.skuTable(),
+                factory.tcgInventoryRepository(),
                 factory.dynamoDbClient(),
                 factory.clock(),
                 factory.fetchTcgClient(),
                 factory.s3Client()));
     this.reportJobProcessor =
         new ReportJobProcessor(
-            factory.tcgInventoryTable(),
-            factory.tcgInventoryItemRepository(),
+            factory.reportTable(),
+            factory.tcgInventoryRepository(),
+            factory.auditTable(),
+            factory.skuTable(),
+            factory.orderTable(),
             factory.objectMapper(),
             factory.clock());
   }
@@ -79,11 +89,11 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
 
     var jobKey =
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatUserPk(message.user()))
-            .sortValue(TcgInventoryItem.formatJobSk(message.jobId()))
+            .partitionValue(SkuItem.formatUserPk(message.user()))
+            .sortValue(JobItem.formatSk(message.jobId()))
             .build();
 
-    var jobItem = tcgInventoryTable.getItem(jobKey);
+    var jobItem = jobTable.getItem(jobKey);
     if (jobItem == null) {
       LOGGER.warn("job item not found: {}", message.jobId());
       return;
@@ -99,7 +109,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
       jobItem.setStatus("running");
       jobItem.setProcessedCount(0);
       jobItem.setUpdatedAt(clock.now());
-      tcgInventoryTable.putItem(jobItem);
+      jobTable.putItem(jobItem);
     }
 
     try {
@@ -110,7 +120,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
       jobItem.setStatus("failed");
       jobItem.setError(error);
       jobItem.setUpdatedAt(clock.now());
-      tcgInventoryTable.putItem(jobItem);
+      jobTable.putItem(jobItem);
 
       if ("appraise".equals(message.jobType()) && jobItem.getImportId() != null) {
         setImportError(message.user(), jobItem.getImportId(), error);
@@ -141,7 +151,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     return errorMessage;
   }
 
-  private void processBatch(JobMessage message, TcgInventoryItem jobItem) {
+  private void processBatch(JobMessage message, JobItem jobItem) {
     var previousContinuation = jobItem.getContinuation() != null ? jobItem.getContinuation() : 0;
 
     var result =
@@ -170,7 +180,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     if (result.complete()) {
       jobItem.setStatus("succeeded");
     }
-    tcgInventoryTable.putItem(jobItem);
+    jobTable.putItem(jobItem);
 
     if (!result.complete()) {
       jobsQueue.send(message, message.user(), message.deduplicationId(result.processedUpTo()));
@@ -180,14 +190,14 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
   private void setImportError(String user, String importId, String error) {
     var importKey =
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatUserPk(user))
-            .sortValue(TcgInventoryItem.formatImportSk(importId))
+            .partitionValue(SkuItem.formatUserPk(user))
+            .sortValue(ImportItem.formatSk(importId))
             .build();
-    var importItem = tcgInventoryTable.getItem(importKey);
+    var importItem = importTable.getItem(importKey);
     if (importItem != null) {
       importItem.setError(error);
       importItem.setUpdatedAt(clock.now());
-      tcgInventoryTable.putItem(importItem);
+      importTable.putItem(importItem);
     }
   }
 }

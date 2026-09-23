@@ -44,9 +44,31 @@ public interface TcgInventoryFactory {
 
   Secrets secrets();
 
-  DynamoDbTable<TcgInventoryItem> tcgInventoryTable();
+  DynamoDbTable<SkuItem> skuTable();
 
-  TcgInventoryItemRepository tcgInventoryItemRepository();
+  DynamoDbTable<UnitItem> unitTable();
+
+  DynamoDbTable<ImportItem> importTable();
+
+  DynamoDbTable<ImportRowItem> importRowTable();
+
+  DynamoDbTable<ScanItem> scanTable();
+
+  DynamoDbTable<ScanRowItem> scanRowTable();
+
+  DynamoDbTable<OrderItem> orderTable();
+
+  DynamoDbTable<JobItem> jobTable();
+
+  DynamoDbTable<SettingsItem> settingsTable();
+
+  DynamoDbTable<ReportItem> reportTable();
+
+  DynamoDbTable<AuditItem> auditTable();
+
+  DynamoDbTable<SequenceCounterItem> sequenceCounterTable();
+
+  TcgInventoryRepository tcgInventoryRepository();
 
   DynamoDbClient dynamoDbClient();
 

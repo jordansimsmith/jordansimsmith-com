@@ -29,8 +29,8 @@ public class ConfirmOrderHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
-  private final TcgInventoryItemRepository tcgInventoryItemRepository;
+  private final DynamoDbTable<OrderItem> orderTable;
+  private final TcgInventoryRepository tcgInventoryRepository;
   private final ObjectMapper objectMapper;
 
   public ConfirmOrderHandler() {
@@ -41,8 +41,8 @@ public class ConfirmOrderHandler
   ConfirmOrderHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
-    this.tcgInventoryItemRepository = factory.tcgInventoryItemRepository();
+    this.orderTable = factory.orderTable();
+    this.tcgInventoryRepository = factory.tcgInventoryRepository();
     this.objectMapper = factory.objectMapper();
   }
 
@@ -62,18 +62,15 @@ public class ConfirmOrderHandler
 
     String orderSk;
     try {
-      orderSk = TcgInventoryItem.formatOrderSk(orderId);
+      orderSk = OrderItem.formatSk(orderId);
     } catch (IllegalArgumentException e) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
 
     var orderKey =
-        Key.builder()
-            .partitionValue(TcgInventoryItem.formatUserPk(user))
-            .sortValue(orderSk)
-            .build();
+        Key.builder().partitionValue(SkuItem.formatUserPk(user)).sortValue(orderSk).build();
 
-    var orderItem = tcgInventoryTable.getItem(orderKey);
+    var orderItem = orderTable.getItem(orderKey);
     if (orderItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
@@ -92,9 +89,9 @@ public class ConfirmOrderHandler
 
     var skuUnits =
         soldUnits.entrySet().stream()
-            .map(entry -> new TcgInventoryItemRepository.SkuUnits(entry.getKey(), entry.getValue()))
+            .map(entry -> new TcgInventoryRepository.SkuUnits(entry.getKey(), entry.getValue()))
             .toList();
-    tcgInventoryItemRepository.sellOrder(user, orderId, skuUnits);
+    tcgInventoryRepository.sellOrder(user, orderId, skuUnits);
 
     return httpResponseFactory.ok(new ConfirmOrderResponse(orderId, "fulfilled"));
   }

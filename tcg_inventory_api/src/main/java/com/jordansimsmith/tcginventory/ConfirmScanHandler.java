@@ -45,8 +45,10 @@ public class ConfirmScanHandler
   private final Clock clock;
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final TcgInventoryItemRepository tcgInventoryItemRepository;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final TcgInventoryRepository tcgInventoryRepository;
+  private final DynamoDbTable<ImportItem> importTable;
+  private final DynamoDbTable<ImportRowItem> importRowTable;
+  private final DynamoDbTable<JobItem> jobTable;
   private final QueueClient<JobMessage> jobsQueue;
   private final UlidGenerator ulidGenerator;
 
@@ -60,8 +62,10 @@ public class ConfirmScanHandler
     this.clock = factory.clock();
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryItemRepository = factory.tcgInventoryItemRepository();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.tcgInventoryRepository = factory.tcgInventoryRepository();
+    this.importTable = factory.importTable();
+    this.importRowTable = factory.importRowTable();
+    this.jobTable = factory.jobTable();
     this.jobsQueue = factory.jobsQueue();
     this.ulidGenerator = factory.ulidGenerator();
   }
@@ -79,7 +83,7 @@ public class ConfirmScanHandler
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
     var user = requestContextFactory.createCtx(event).user();
     var scanId = event.getPathParameters().get("scan_id");
-    var scanItem = tcgInventoryItemRepository.getScan(user, scanId);
+    var scanItem = tcgInventoryRepository.getScan(user, scanId);
     if (scanItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
@@ -101,7 +105,7 @@ public class ConfirmScanHandler
       return httpResponseFactory.badRequest(new ErrorResponse("invalid request body"));
     }
 
-    var scanRows = tcgInventoryItemRepository.findScanRows(user, scanId);
+    var scanRows = tcgInventoryRepository.findScanRows(user, scanId);
     var orderedRows = orderRows(request);
     try {
       validate(orderedRows, scanRows);
@@ -113,14 +117,13 @@ public class ConfirmScanHandler
     var jobId = ulidGenerator.generate();
     var now = clock.now();
     var importItem =
-        TcgInventoryItem.createImport(
-            user, importId, scanId + ".scan", orderedRows.size(), jobId, now);
+        ImportItem.create(user, importId, scanId + ".scan", orderedRows.size(), jobId, now);
 
-    tcgInventoryTable.putItem(importItem);
+    importTable.putItem(importItem);
     for (int index = 0; index < orderedRows.size(); index++) {
       var selected = orderedRows.get(index);
-      tcgInventoryTable.putItem(
-          TcgInventoryItem.createImportRow(
+      importRowTable.putItem(
+          ImportRowItem.create(
               user,
               importId,
               index + 1,
@@ -134,13 +137,13 @@ public class ConfirmScanHandler
               "en"));
     }
 
-    var jobItem = TcgInventoryItem.createJob(user, jobId, "appraise", importId, now);
-    tcgInventoryTable.putItem(jobItem);
+    var jobItem = JobItem.create(user, jobId, "appraise", importId, now);
+    jobTable.putItem(jobItem);
     var jobMessage = new JobMessage(user, jobId, "appraise");
     jobsQueue.send(jobMessage, user, jobMessage.deduplicationId(0));
 
-    if (!tcgInventoryItemRepository.transitionScanToConfirmed(user, scanId, importId)) {
-      var currentScan = tcgInventoryItemRepository.getScan(user, scanId);
+    if (!tcgInventoryRepository.transitionScanToConfirmed(user, scanId, importId)) {
+      var currentScan = tcgInventoryRepository.getScan(user, scanId);
       if (currentScan == null) {
         return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
       }
@@ -155,7 +158,7 @@ public class ConfirmScanHandler
     return confirmed(scanItem);
   }
 
-  private APIGatewayV2HTTPResponse confirmed(TcgInventoryItem scanItem) {
+  private APIGatewayV2HTTPResponse confirmed(ScanItem scanItem) {
     return httpResponseFactory.ok(
         new ConfirmScanResponse(scanItem.getScanId(), "confirmed", scanItem.getImportId()));
   }
@@ -172,7 +175,7 @@ public class ConfirmScanHandler
         .toList();
   }
 
-  private static void validate(List<ConfirmScanRow> orderedRows, List<TcgInventoryItem> scanRows) {
+  private static void validate(List<ConfirmScanRow> orderedRows, List<ScanRowItem> scanRows) {
     if (orderedRows.isEmpty() || orderedRows.size() != scanRows.size()) {
       throw new IllegalArgumentException("every retained scan row must be selected exactly once");
     }

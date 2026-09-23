@@ -27,33 +27,41 @@ import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledExcepti
 import software.amazon.awssdk.services.dynamodb.model.Update;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
-public class TcgInventoryItemRepository {
-  private static final Logger LOGGER = LoggerFactory.getLogger(TcgInventoryItemRepository.class);
+public class TcgInventoryRepository {
+  private static final Logger LOGGER = LoggerFactory.getLogger(TcgInventoryRepository.class);
 
   private static final int MAX_TRANSACT_ITEMS = 100;
 
   public record SkuUnits(String skuId, List<Integer> sequenceNumbers) {}
 
-  public record ScanPage(
-      List<TcgInventoryItem> items, Map<String, AttributeValue> lastEvaluatedKey) {}
+  public record ScanPage(List<ScanItem> items, Map<String, AttributeValue> lastEvaluatedKey) {}
 
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<UnitItem> unitTable;
+  private final DynamoDbTable<ScanItem> scanTable;
+  private final DynamoDbTable<ScanRowItem> scanRowTable;
+  private final DynamoDbTable<OrderItem> orderTable;
   private final DynamoDbClient dynamoDbClient;
   private final Clock clock;
   private final UlidGenerator ulidGenerator;
 
-  public TcgInventoryItemRepository(
-      DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
+  public TcgInventoryRepository(
+      DynamoDbTable<UnitItem> unitTable,
+      DynamoDbTable<ScanItem> scanTable,
+      DynamoDbTable<ScanRowItem> scanRowTable,
+      DynamoDbTable<OrderItem> orderTable,
       DynamoDbClient dynamoDbClient,
       Clock clock,
       UlidGenerator ulidGenerator) {
-    this.tcgInventoryTable = tcgInventoryTable;
+    this.unitTable = unitTable;
+    this.scanTable = scanTable;
+    this.scanRowTable = scanRowTable;
+    this.orderTable = orderTable;
     this.dynamoDbClient = dynamoDbClient;
     this.clock = clock;
     this.ulidGenerator = ulidGenerator;
   }
 
-  public void createScan(TcgInventoryItem scanItem, List<TcgInventoryItem> rowItems) {
+  public void createScan(ScanItem scanItem, List<ScanRowItem> rowItems) {
     for (int start = 0; start < rowItems.size(); start += MAX_TRANSACT_ITEMS) {
       var end = Math.min(start + MAX_TRANSACT_ITEMS, rowItems.size());
       var writes = rowItems.subList(start, end).stream().map(this::buildScanPut).toList();
@@ -72,8 +80,8 @@ public class TcgInventoryItemRepository {
             .queryConditional(
                 QueryConditional.sortBeginsWith(
                     Key.builder()
-                        .partitionValue(TcgInventoryItem.formatUserPk(user))
-                        .sortValue(TcgInventoryItem.SCAN_PREFIX)
+                        .partitionValue(SkuItem.formatUserPk(user))
+                        .sortValue(ScanItem.SCAN_PREFIX)
                         .build()))
             .scanIndexForward(false)
             .limit(limit);
@@ -81,7 +89,7 @@ public class TcgInventoryItemRepository {
       requestBuilder.exclusiveStartKey(exclusiveStartKey);
     }
 
-    var page = tcgInventoryTable.query(requestBuilder.build()).stream().findFirst().orElse(null);
+    var page = scanTable.query(requestBuilder.build()).stream().findFirst().orElse(null);
     if (page == null) {
       return new ScanPage(List.of(), Map.of());
     }
@@ -92,20 +100,14 @@ public class TcgInventoryItemRepository {
     try {
       dynamoDbClient.updateItem(
           UpdateItemRequest.builder()
-              .tableName(TcgInventoryItem.TABLE_NAME)
+              .tableName(TcgInventoryTable.TABLE_NAME)
               .key(
                   Map.of(
-                      TcgInventoryItem.PK,
-                          AttributeValue.builder().s(TcgInventoryItem.formatUserPk(user)).build(),
-                      TcgInventoryItem.SK,
-                          AttributeValue.builder()
-                              .s(TcgInventoryItem.formatScanSk(scanId))
-                              .build()))
-              .updateExpression(
-                  "SET #status = :identifying, " + TcgInventoryItem.UPDATED_AT + " = :now")
-              .conditionExpression(
-                  "attribute_exists(" + TcgInventoryItem.PK + ") AND #status = :uploading")
-              .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+                      SkuItem.PK, AttributeValue.builder().s(SkuItem.formatUserPk(user)).build(),
+                      SkuItem.SK, AttributeValue.builder().s(ScanItem.formatSk(scanId)).build()))
+              .updateExpression("SET #status = :identifying, " + UnitItem.UPDATED_AT + " = :now")
+              .conditionExpression("attribute_exists(" + SkuItem.PK + ") AND #status = :uploading")
+              .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
               .expressionAttributeValues(
                   Map.of(
                       ":identifying", AttributeValue.builder().s("identifying").build(),
@@ -125,24 +127,19 @@ public class TcgInventoryItemRepository {
     try {
       dynamoDbClient.updateItem(
           UpdateItemRequest.builder()
-              .tableName(TcgInventoryItem.TABLE_NAME)
+              .tableName(TcgInventoryTable.TABLE_NAME)
               .key(
                   Map.of(
-                      TcgInventoryItem.PK,
-                          AttributeValue.builder().s(TcgInventoryItem.formatUserPk(user)).build(),
-                      TcgInventoryItem.SK,
-                          AttributeValue.builder()
-                              .s(TcgInventoryItem.formatScanSk(scanId))
-                              .build()))
+                      SkuItem.PK, AttributeValue.builder().s(SkuItem.formatUserPk(user)).build(),
+                      SkuItem.SK, AttributeValue.builder().s(ScanItem.formatSk(scanId)).build()))
               .updateExpression(
                   "SET #status = :confirmed, "
-                      + TcgInventoryItem.IMPORT_ID
+                      + ImportItem.IMPORT_ID
                       + " = :importId, "
-                      + TcgInventoryItem.UPDATED_AT
+                      + UnitItem.UPDATED_AT
                       + " = :now")
-              .conditionExpression(
-                  "attribute_exists(" + TcgInventoryItem.PK + ") AND #status = :reviewing")
-              .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+              .conditionExpression("attribute_exists(" + SkuItem.PK + ") AND #status = :reviewing")
+              .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
               .expressionAttributeValues(
                   Map.of(
                       ":confirmed", AttributeValue.builder().s("confirmed").build(),
@@ -162,16 +159,16 @@ public class TcgInventoryItemRepository {
   public boolean deleteScanRow(String user, String scanId, int scanPosition) {
     var scanKey =
         Map.of(
-            TcgInventoryItem.PK,
-            AttributeValue.builder().s(TcgInventoryItem.formatUserPk(user)).build(),
-            TcgInventoryItem.SK,
-            AttributeValue.builder().s(TcgInventoryItem.formatScanSk(scanId)).build());
+            SkuItem.PK,
+            AttributeValue.builder().s(SkuItem.formatUserPk(user)).build(),
+            SkuItem.SK,
+            AttributeValue.builder().s(ScanItem.formatSk(scanId)).build());
     var rowKey =
         Map.of(
-            TcgInventoryItem.PK,
-            AttributeValue.builder().s(TcgInventoryItem.formatScanRowPk(user, scanId)).build(),
-            TcgInventoryItem.SK,
-            AttributeValue.builder().s(TcgInventoryItem.formatScanRowSk(scanPosition)).build());
+            SkuItem.PK,
+            AttributeValue.builder().s(ScanRowItem.formatPk(user, scanId)).build(),
+            SkuItem.SK,
+            AttributeValue.builder().s(ScanRowItem.formatSk(scanPosition)).build());
 
     try {
       dynamoDbClient.transactWriteItems(
@@ -181,14 +178,13 @@ public class TcgInventoryItemRepository {
                       TransactWriteItem.builder()
                           .conditionCheck(
                               ConditionCheck.builder()
-                                  .tableName(TcgInventoryItem.TABLE_NAME)
+                                  .tableName(TcgInventoryTable.TABLE_NAME)
                                   .key(scanKey)
                                   .conditionExpression(
                                       "attribute_exists("
-                                          + TcgInventoryItem.PK
+                                          + SkuItem.PK
                                           + ") AND #status = :reviewing")
-                                  .expressionAttributeNames(
-                                      Map.of("#status", TcgInventoryItem.STATUS))
+                                  .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                                   .expressionAttributeValues(
                                       Map.of(
                                           ":reviewing",
@@ -198,10 +194,9 @@ public class TcgInventoryItemRepository {
                       TransactWriteItem.builder()
                           .delete(
                               Delete.builder()
-                                  .tableName(TcgInventoryItem.TABLE_NAME)
+                                  .tableName(TcgInventoryTable.TABLE_NAME)
                                   .key(rowKey)
-                                  .conditionExpression(
-                                      "attribute_exists(" + TcgInventoryItem.PK + ")")
+                                  .conditionExpression("attribute_exists(" + SkuItem.PK + ")")
                                   .build())
                           .build()))
               .build());
@@ -215,19 +210,19 @@ public class TcgInventoryItemRepository {
     try {
       dynamoDbClient.deleteItem(
           DeleteItemRequest.builder()
-              .tableName(TcgInventoryItem.TABLE_NAME)
+              .tableName(TcgInventoryTable.TABLE_NAME)
               .key(
                   Map.of(
-                      TcgInventoryItem.PK,
-                      AttributeValue.builder().s(TcgInventoryItem.formatUserPk(user)).build(),
-                      TcgInventoryItem.SK,
-                      AttributeValue.builder().s(TcgInventoryItem.formatScanSk(scanId)).build()))
+                      SkuItem.PK,
+                      AttributeValue.builder().s(SkuItem.formatUserPk(user)).build(),
+                      SkuItem.SK,
+                      AttributeValue.builder().s(ScanItem.formatSk(scanId)).build()))
               .conditionExpression(
                   "attribute_exists("
-                      + TcgInventoryItem.PK
+                      + SkuItem.PK
                       + ") AND #status IN (:uploading, "
                       + ":identifying, :reviewing)")
-              .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+              .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
               .expressionAttributeValues(
                   Map.of(
                       ":uploading", AttributeValue.builder().s("uploading").build(),
@@ -240,63 +235,59 @@ public class TcgInventoryItemRepository {
     }
   }
 
-  public void deleteScanRows(List<TcgInventoryItem> rowItems) {
+  public void deleteScanRows(List<ScanRowItem> rowItems) {
     executeChunked(rowItems.stream().map(this::buildScanRowDelete).toList());
   }
 
-  public List<TcgInventoryItem> findScanRows(String user, String scanId) {
+  public List<ScanRowItem> findScanRows(String user, String scanId) {
     var request =
         QueryEnhancedRequest.builder()
             .queryConditional(
                 QueryConditional.sortBeginsWith(
                     Key.builder()
-                        .partitionValue(TcgInventoryItem.formatScanRowPk(user, scanId))
-                        .sortValue(TcgInventoryItem.ROW_PREFIX)
+                        .partitionValue(ScanRowItem.formatPk(user, scanId))
+                        .sortValue(ImportRowItem.ROW_PREFIX)
                         .build()))
             .scanIndexForward(true)
             .build();
-    return tcgInventoryTable.query(request).stream()
-        .flatMap(page -> page.items().stream())
-        .toList();
+    return scanRowTable.query(request).stream().flatMap(page -> page.items().stream()).toList();
   }
 
   @Nullable
-  public TcgInventoryItem getScanRow(String user, String scanId, int scanPosition) {
-    return tcgInventoryTable.getItem(
+  public ScanRowItem getScanRow(String user, String scanId, int scanPosition) {
+    return scanRowTable.getItem(
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatScanRowPk(user, scanId))
-            .sortValue(TcgInventoryItem.formatScanRowSk(scanPosition))
+            .partitionValue(ScanRowItem.formatPk(user, scanId))
+            .sortValue(ScanRowItem.formatSk(scanPosition))
             .build());
   }
 
   @Nullable
-  public TcgInventoryItem getScan(String user, String scanId) {
-    return tcgInventoryTable.getItem(
+  public ScanItem getScan(String user, String scanId) {
+    return scanTable.getItem(
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatUserPk(user))
-            .sortValue(TcgInventoryItem.formatScanSk(scanId))
+            .partitionValue(SkuItem.formatUserPk(user))
+            .sortValue(ScanItem.formatSk(scanId))
             .build());
   }
 
-  public List<TcgInventoryItem> findUnits(String user, String skuId) {
+  public List<UnitItem> findUnits(String user, String skuId) {
     var request =
         QueryEnhancedRequest.builder()
             .queryConditional(
                 QueryConditional.sortBeginsWith(
                     Key.builder()
-                        .partitionValue(TcgInventoryItem.formatSkuPk(user, skuId))
-                        .sortValue(TcgInventoryItem.UNIT_PREFIX)
+                        .partitionValue(SkuItem.formatPk(user, skuId))
+                        .sortValue(UnitItem.UNIT_PREFIX)
                         .build()))
             .build();
 
-    return tcgInventoryTable.query(request).stream()
-        .flatMap(page -> page.items().stream())
-        .toList();
+    return unitTable.query(request).stream().flatMap(page -> page.items().stream()).toList();
   }
 
-  public List<TcgInventoryItem> findUnitsToAllocate(
+  public List<UnitItem> findUnitsToAllocate(
       String user, String skuId, String orderId, int quantity) {
-    var results = new ArrayList<TcgInventoryItem>();
+    var results = new ArrayList<UnitItem>();
     for (var item : findUnits(user, skuId)) {
       // units already reserved for this order were allocated by a run that died before
       // writing the order item; reclaiming them keeps retries convergent
@@ -314,8 +305,7 @@ public class TcgInventoryItemRepository {
   // the conditional order put and the audit entry ride in the final chunk, so the order item's
   // existence marks the whole reservation complete; a run that dies earlier leaves the offer
   // untracked and the next run reclaims the units it already reserved
-  public void reserveOrder(
-      String user, TcgInventoryItem orderItem, List<SkuUnits> newReservations) {
+  public void reserveOrder(String user, OrderItem orderItem, List<SkuUnits> newReservations) {
     var transactItems = new ArrayList<TransactWriteItem>();
     for (var reservation : newReservations) {
       transactItems.add(buildSkuDirtyUpdate(user, reservation.skuId()));
@@ -330,8 +320,8 @@ public class TcgInventoryItemRepository {
         TransactWriteItem.builder()
             .put(
                 Put.builder()
-                    .tableName(TcgInventoryItem.TABLE_NAME)
-                    .item(tcgInventoryTable.tableSchema().itemToMap(orderItem, true))
+                    .tableName(TcgInventoryTable.TABLE_NAME)
+                    .item(orderTable.tableSchema().itemToMap(orderItem, true))
                     .conditionExpression("attribute_not_exists(pk)")
                     .build())
             .build());
@@ -340,8 +330,7 @@ public class TcgInventoryItemRepository {
             user,
             "reserve",
             Map.of(
-                TcgInventoryItem.ORDER_ID,
-                AttributeValue.builder().s(orderItem.getOrderId()).build())));
+                OrderItem.ORDER_ID, AttributeValue.builder().s(orderItem.getOrderId()).build())));
 
     executeChunked(transactItems);
   }
@@ -357,7 +346,7 @@ public class TcgInventoryItemRepository {
             buildAuditPut(
                 user,
                 "payment",
-                Map.of(TcgInventoryItem.ORDER_ID, AttributeValue.builder().s(orderId).build()))));
+                Map.of(OrderItem.ORDER_ID, AttributeValue.builder().s(orderId).build()))));
   }
 
   // fulfillment details mirror the offer and move neither inventory nor revenue, so this is a
@@ -366,28 +355,28 @@ public class TcgInventoryItemRepository {
       String user,
       String orderId,
       @Nullable String buyerName,
-      @Nullable TcgInventoryItem.BuyerAddress buyerAddress,
+      @Nullable OrderItem.BuyerAddress buyerAddress,
       @Nullable String postageOption) {
     dynamoDbClient.updateItem(
         UpdateItemRequest.builder()
-            .tableName(TcgInventoryItem.TABLE_NAME)
+            .tableName(TcgInventoryTable.TABLE_NAME)
             .key(
                 Map.of(
-                    TcgInventoryItem.PK,
-                    AttributeValue.builder().s(TcgInventoryItem.formatUserPk(user)).build(),
-                    TcgInventoryItem.SK,
-                    AttributeValue.builder().s(TcgInventoryItem.formatOrderSk(orderId)).build()))
+                    SkuItem.PK,
+                    AttributeValue.builder().s(SkuItem.formatUserPk(user)).build(),
+                    SkuItem.SK,
+                    AttributeValue.builder().s(OrderItem.formatSk(orderId)).build()))
             .updateExpression(
                 "SET "
-                    + TcgInventoryItem.BUYER_NAME
+                    + OrderItem.BUYER_NAME
                     + " = :buyerName, "
-                    + TcgInventoryItem.BUYER_ADDRESS
+                    + OrderItem.BUYER_ADDRESS
                     + " = :buyerAddress, "
-                    + TcgInventoryItem.POSTAGE_OPTION
+                    + OrderItem.POSTAGE_OPTION
                     + " = :postageOption, "
-                    + TcgInventoryItem.UPDATED_AT
+                    + UnitItem.UPDATED_AT
                     + " = :now")
-            .conditionExpression("attribute_exists(" + TcgInventoryItem.PK + ")")
+            .conditionExpression("attribute_exists(" + SkuItem.PK + ")")
             .expressionAttributeValues(
                 Map.of(
                     ":buyerName", toAttributeValue(buyerName),
@@ -406,18 +395,18 @@ public class TcgInventoryItemRepository {
         : AttributeValue.builder().s(value).build();
   }
 
-  private static AttributeValue toAttributeValue(@Nullable TcgInventoryItem.BuyerAddress address) {
+  private static AttributeValue toAttributeValue(@Nullable OrderItem.BuyerAddress address) {
     if (address == null) {
       return AttributeValue.builder().nul(true).build();
     }
 
     var parts = new HashMap<String, AttributeValue>();
-    putAddressPart(parts, TcgInventoryItem.BuyerAddress.LINE1, address.getLine1());
-    putAddressPart(parts, TcgInventoryItem.BuyerAddress.LINE2, address.getLine2());
-    putAddressPart(parts, TcgInventoryItem.BuyerAddress.SUBURB, address.getSuburb());
-    putAddressPart(parts, TcgInventoryItem.BuyerAddress.CITY, address.getCity());
-    putAddressPart(parts, TcgInventoryItem.BuyerAddress.POST_CODE, address.getPostCode());
-    putAddressPart(parts, TcgInventoryItem.BuyerAddress.COUNTRY, address.getCountry());
+    putAddressPart(parts, OrderItem.BuyerAddress.LINE1, address.getLine1());
+    putAddressPart(parts, OrderItem.BuyerAddress.LINE2, address.getLine2());
+    putAddressPart(parts, OrderItem.BuyerAddress.SUBURB, address.getSuburb());
+    putAddressPart(parts, OrderItem.BuyerAddress.CITY, address.getCity());
+    putAddressPart(parts, OrderItem.BuyerAddress.POST_CODE, address.getPostCode());
+    putAddressPart(parts, OrderItem.BuyerAddress.COUNTRY, address.getCountry());
     return AttributeValue.builder().m(parts).build();
   }
 
@@ -446,7 +435,7 @@ public class TcgInventoryItemRepository {
         buildAuditPut(
             user,
             "release",
-            Map.of(TcgInventoryItem.ORDER_ID, AttributeValue.builder().s(orderId).build())));
+            Map.of(OrderItem.ORDER_ID, AttributeValue.builder().s(orderId).build())));
 
     executeChunked(transactItems);
   }
@@ -466,22 +455,20 @@ public class TcgInventoryItemRepository {
     transactItems.add(buildOrderFulfilledUpdate(user, orderId));
     transactItems.add(
         buildAuditPut(
-            user,
-            "sell",
-            Map.of(TcgInventoryItem.ORDER_ID, AttributeValue.builder().s(orderId).build())));
+            user, "sell", Map.of(OrderItem.ORDER_ID, AttributeValue.builder().s(orderId).build())));
 
     executeChunked(transactItems);
   }
 
   public void removeUnit(String user, String skuId, int sequenceNumber, @Nullable String reason) {
     var auditAttributes = new HashMap<String, AttributeValue>();
-    auditAttributes.put(TcgInventoryItem.SKU_ID, AttributeValue.builder().s(skuId).build());
+    auditAttributes.put(SkuItem.SKU_ID, AttributeValue.builder().s(skuId).build());
     auditAttributes.put(
-        TcgInventoryItem.SEQUENCE_NUMBER,
+        UnitItem.SEQUENCE_NUMBER,
         AttributeValue.builder().n(String.valueOf(sequenceNumber)).build());
     if (reason != null && !reason.isEmpty()) {
       auditAttributes.put(
-          TcgInventoryItem.DECISION_REASON, AttributeValue.builder().s(reason).build());
+          ImportRowItem.DECISION_REASON, AttributeValue.builder().s(reason).build());
     }
 
     executeChunked(
@@ -494,10 +481,10 @@ public class TcgInventoryItemRepository {
   // one transaction across both SKU partitions: the unit moves keeping its sequence number and
   // photos, the source SKU is dirtied, and the target SKU record is created or refreshed
   public String updateUnitCondition(
-      String user, TcgInventoryItem skuItem, TcgInventoryItem unitItem, String condition) {
+      String user, SkuItem skuItem, UnitItem unitItem, String condition) {
     var targetSkuId = skuItem.getScryfallId() + "#" + skuItem.getFinish() + "#" + condition;
     var targetSku =
-        TcgInventoryItem.createSku(
+        SkuItem.create(
             user,
             targetSkuId,
             skuItem.getScryfallId(),
@@ -511,7 +498,7 @@ public class TcgInventoryItemRepository {
             skuItem.getSuggestedPrice());
 
     var movedUnit =
-        TcgInventoryItem.createUnit(
+        UnitItem.create(
             user,
             targetSkuId,
             unitItem.getSequenceNumber(),
@@ -532,9 +519,9 @@ public class TcgInventoryItemRepository {
                 user,
                 "adjustment",
                 Map.of(
-                    TcgInventoryItem.SKU_ID,
+                    SkuItem.SKU_ID,
                     AttributeValue.builder().s(skuItem.getSkuId()).build(),
-                    TcgInventoryItem.SEQUENCE_NUMBER,
+                    UnitItem.SEQUENCE_NUMBER,
                     AttributeValue.builder()
                         .n(String.valueOf(unitItem.getSequenceNumber()))
                         .build()))));
@@ -546,36 +533,36 @@ public class TcgInventoryItemRepository {
     var response =
         dynamoDbClient.updateItem(
             UpdateItemRequest.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
+                .tableName(TcgInventoryTable.TABLE_NAME)
                 .key(
                     Map.of(
-                        TcgInventoryItem.PK,
-                        AttributeValue.builder().s(TcgInventoryItem.formatUserPk(user)).build(),
-                        TcgInventoryItem.SK,
-                        AttributeValue.builder().s(TcgInventoryItem.formatCounterSk()).build()))
-                .updateExpression("ADD " + TcgInventoryItem.NEXT_SEQUENCE_NUMBER + " :n")
+                        SkuItem.PK,
+                        AttributeValue.builder().s(SkuItem.formatUserPk(user)).build(),
+                        SkuItem.SK,
+                        AttributeValue.builder().s(SequenceCounterItem.formatSk()).build()))
+                .updateExpression("ADD " + SequenceCounterItem.NEXT_SEQUENCE_NUMBER + " :n")
                 .expressionAttributeValues(
                     Map.of(":n", AttributeValue.builder().n(String.valueOf(count)).build()))
                 .returnValues("ALL_NEW")
                 .build());
 
     int newValue =
-        Integer.parseInt(response.attributes().get(TcgInventoryItem.NEXT_SEQUENCE_NUMBER).n());
+        Integer.parseInt(response.attributes().get(SequenceCounterItem.NEXT_SEQUENCE_NUMBER).n());
     return newValue - count;
   }
 
   // deliberately a single transaction rather than a chunked sequence: a replayed chunk fails its
   // unit-exists condition and the whole transaction cancels atomically into a no-op
   public void confirmImportSku(
-      String user, String importId, TcgInventoryItem skuSeed, List<TcgInventoryItem> units) {
+      String user, String importId, SkuItem skuSeed, List<UnitItem> units) {
     var transactItems = new ArrayList<TransactWriteItem>();
     for (var unit : units) {
       transactItems.add(
           TransactWriteItem.builder()
               .put(
                   Put.builder()
-                      .tableName(TcgInventoryItem.TABLE_NAME)
-                      .item(tcgInventoryTable.tableSchema().itemToMap(unit, true))
+                      .tableName(TcgInventoryTable.TABLE_NAME)
+                      .item(unitTable.tableSchema().itemToMap(unit, true))
                       .conditionExpression("attribute_not_exists(pk)")
                       .returnValuesOnConditionCheckFailure(ReturnValuesOnConditionCheckFailure.NONE)
                       .build())
@@ -587,9 +574,9 @@ public class TcgInventoryItemRepository {
             user,
             "import_confirm",
             Map.of(
-                TcgInventoryItem.IMPORT_ID,
+                ImportItem.IMPORT_ID,
                 AttributeValue.builder().s(importId).build(),
-                TcgInventoryItem.SKU_ID,
+                SkuItem.SKU_ID,
                 AttributeValue.builder().s(skuSeed.getSkuId()).build())));
 
     try {
@@ -609,27 +596,38 @@ public class TcgInventoryItemRepository {
     }
   }
 
-  private TransactWriteItem buildScanPut(TcgInventoryItem item) {
+  private TransactWriteItem buildScanPut(ScanItem item) {
     return TransactWriteItem.builder()
         .put(
             Put.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
-                .item(tcgInventoryTable.tableSchema().itemToMap(item, true))
-                .conditionExpression("attribute_not_exists(" + TcgInventoryItem.PK + ")")
+                .tableName(TcgInventoryTable.TABLE_NAME)
+                .item(scanTable.tableSchema().itemToMap(item, true))
+                .conditionExpression("attribute_not_exists(" + SkuItem.PK + ")")
                 .build())
         .build();
   }
 
-  private TransactWriteItem buildScanRowDelete(TcgInventoryItem item) {
+  private TransactWriteItem buildScanPut(ScanRowItem item) {
+    return TransactWriteItem.builder()
+        .put(
+            Put.builder()
+                .tableName(TcgInventoryTable.TABLE_NAME)
+                .item(scanRowTable.tableSchema().itemToMap(item, true))
+                .conditionExpression("attribute_not_exists(" + SkuItem.PK + ")")
+                .build())
+        .build();
+  }
+
+  private TransactWriteItem buildScanRowDelete(ScanRowItem item) {
     return TransactWriteItem.builder()
         .delete(
             Delete.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
+                .tableName(TcgInventoryTable.TABLE_NAME)
                 .key(
                     Map.of(
-                        TcgInventoryItem.PK,
+                        SkuItem.PK,
                         AttributeValue.builder().s(item.getPk()).build(),
-                        TcgInventoryItem.SK,
+                        SkuItem.SK,
                         AttributeValue.builder().s(item.getSk()).build()))
                 .build())
         .build();
@@ -637,25 +635,25 @@ public class TcgInventoryItemRepository {
 
   private TransactWriteItem buildUnitReserveUpdate(
       String user, String skuId, int sequenceNumber, String orderId) {
-    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
-    var unitSk = TcgInventoryItem.formatUnitSk(sequenceNumber);
+    var skuPk = SkuItem.formatPk(user, skuId);
+    var unitSk = UnitItem.formatSk(sequenceNumber);
 
     return TransactWriteItem.builder()
         .update(
             Update.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
+                .tableName(TcgInventoryTable.TABLE_NAME)
                 .key(
                     Map.of(
-                        TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build(),
-                        TcgInventoryItem.SK, AttributeValue.builder().s(unitSk).build()))
+                        SkuItem.PK, AttributeValue.builder().s(skuPk).build(),
+                        SkuItem.SK, AttributeValue.builder().s(unitSk).build()))
                 .updateExpression(
                     "SET #status = :reserved, "
-                        + TcgInventoryItem.ORDER_ID
+                        + OrderItem.ORDER_ID
                         + " = :orderId, "
-                        + TcgInventoryItem.UPDATED_AT
+                        + UnitItem.UPDATED_AT
                         + " = :now")
                 .conditionExpression("#status = :inStock")
-                .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+                .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                 .expressionAttributeValues(
                     Map.of(
                         ":reserved", AttributeValue.builder().s("reserved").build(),
@@ -670,20 +668,20 @@ public class TcgInventoryItemRepository {
   }
 
   private TransactWriteItem buildUnitSellUpdate(String user, String skuId, int sequenceNumber) {
-    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
-    var unitSk = TcgInventoryItem.formatUnitSk(sequenceNumber);
+    var skuPk = SkuItem.formatPk(user, skuId);
+    var unitSk = UnitItem.formatSk(sequenceNumber);
 
     return TransactWriteItem.builder()
         .update(
             Update.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
+                .tableName(TcgInventoryTable.TABLE_NAME)
                 .key(
                     Map.of(
-                        TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build(),
-                        TcgInventoryItem.SK, AttributeValue.builder().s(unitSk).build()))
-                .updateExpression("SET #status = :sold, " + TcgInventoryItem.UPDATED_AT + " = :now")
+                        SkuItem.PK, AttributeValue.builder().s(skuPk).build(),
+                        SkuItem.SK, AttributeValue.builder().s(unitSk).build()))
+                .updateExpression("SET #status = :sold, " + UnitItem.UPDATED_AT + " = :now")
                 .conditionExpression("#status IN (:reserved, :sold)")
-                .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+                .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                 .expressionAttributeValues(
                     Map.of(
                         ":sold", AttributeValue.builder().s("sold").build(),
@@ -697,24 +695,24 @@ public class TcgInventoryItemRepository {
   }
 
   private TransactWriteItem buildUnitReleaseUpdate(String user, String skuId, int sequenceNumber) {
-    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
-    var unitSk = TcgInventoryItem.formatUnitSk(sequenceNumber);
+    var skuPk = SkuItem.formatPk(user, skuId);
+    var unitSk = UnitItem.formatSk(sequenceNumber);
 
     return TransactWriteItem.builder()
         .update(
             Update.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
+                .tableName(TcgInventoryTable.TABLE_NAME)
                 .key(
                     Map.of(
-                        TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build(),
-                        TcgInventoryItem.SK, AttributeValue.builder().s(unitSk).build()))
+                        SkuItem.PK, AttributeValue.builder().s(skuPk).build(),
+                        SkuItem.SK, AttributeValue.builder().s(unitSk).build()))
                 .updateExpression(
                     "SET #status = :inStock, "
-                        + TcgInventoryItem.UPDATED_AT
+                        + UnitItem.UPDATED_AT
                         + " = :now REMOVE "
-                        + TcgInventoryItem.ORDER_ID)
+                        + OrderItem.ORDER_ID)
                 .conditionExpression("#status IN (:reserved, :inStock)")
-                .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+                .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                 .expressionAttributeValues(
                     Map.of(
                         ":inStock", AttributeValue.builder().s("in_stock").build(),
@@ -728,21 +726,20 @@ public class TcgInventoryItemRepository {
   }
 
   private TransactWriteItem buildUnitRemoveUpdate(String user, String skuId, int sequenceNumber) {
-    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
-    var unitSk = TcgInventoryItem.formatUnitSk(sequenceNumber);
+    var skuPk = SkuItem.formatPk(user, skuId);
+    var unitSk = UnitItem.formatSk(sequenceNumber);
 
     return TransactWriteItem.builder()
         .update(
             Update.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
+                .tableName(TcgInventoryTable.TABLE_NAME)
                 .key(
                     Map.of(
-                        TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build(),
-                        TcgInventoryItem.SK, AttributeValue.builder().s(unitSk).build()))
-                .updateExpression(
-                    "SET #status = :removed, " + TcgInventoryItem.UPDATED_AT + " = :now")
+                        SkuItem.PK, AttributeValue.builder().s(skuPk).build(),
+                        SkuItem.SK, AttributeValue.builder().s(unitSk).build()))
+                .updateExpression("SET #status = :removed, " + UnitItem.UPDATED_AT + " = :now")
                 .conditionExpression("#status = :inStock")
-                .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+                .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                 .expressionAttributeValues(
                     Map.of(
                         ":removed", AttributeValue.builder().s("removed").build(),
@@ -756,63 +753,63 @@ public class TcgInventoryItemRepository {
   }
 
   private TransactWriteItem buildUnitDelete(String user, String skuId, int sequenceNumber) {
-    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
-    var unitSk = TcgInventoryItem.formatUnitSk(sequenceNumber);
+    var skuPk = SkuItem.formatPk(user, skuId);
+    var unitSk = UnitItem.formatSk(sequenceNumber);
 
     return TransactWriteItem.builder()
         .delete(
             Delete.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
+                .tableName(TcgInventoryTable.TABLE_NAME)
                 .key(
                     Map.of(
-                        TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build(),
-                        TcgInventoryItem.SK, AttributeValue.builder().s(unitSk).build()))
+                        SkuItem.PK, AttributeValue.builder().s(skuPk).build(),
+                        SkuItem.SK, AttributeValue.builder().s(unitSk).build()))
                 .conditionExpression("#status = :inStock")
-                .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+                .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                 .expressionAttributeValues(
                     Map.of(":inStock", AttributeValue.builder().s("in_stock").build()))
                 .build())
         .build();
   }
 
-  private TransactWriteItem buildUnitPut(TcgInventoryItem unitItem) {
+  private TransactWriteItem buildUnitPut(UnitItem unitItem) {
     return TransactWriteItem.builder()
         .put(
             Put.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
-                .item(tcgInventoryTable.tableSchema().itemToMap(unitItem, true))
+                .tableName(TcgInventoryTable.TABLE_NAME)
+                .item(unitTable.tableSchema().itemToMap(unitItem, true))
                 .build())
         .build();
   }
 
-  private TransactWriteItem buildSkuUpsert(TcgInventoryItem skuSeed) {
+  private TransactWriteItem buildSkuUpsert(SkuItem skuSeed) {
     var expression =
         new StringBuilder(
             "ADD "
-                + TcgInventoryItem.VERSION
+                + SkuItem.VERSION
                 + " :one SET "
-                + TcgInventoryItem.SKU_ID
+                + SkuItem.SKU_ID
                 + " = :skuId, "
-                + TcgInventoryItem.SCRYFALL_ID
+                + SkuItem.SCRYFALL_ID
                 + " = :scryfallId, "
                 + "#finish = :finish, "
                 + "#condition = :condition, "
                 + "#name = :cardName, "
-                + TcgInventoryItem.SET_CODE
+                + SkuItem.SET_CODE
                 + " = :setCode, "
-                + TcgInventoryItem.SET_NAME
+                + SkuItem.SET_NAME
                 + " = :setName, "
-                + TcgInventoryItem.COLLECTOR_NUMBER
+                + SkuItem.COLLECTOR_NUMBER
                 + " = :collectorNumber, "
-                + TcgInventoryItem.DIRTY
+                + SkuItem.DIRTY
                 + " = :dirty, "
-                + TcgInventoryItem.GSI1PK
+                + SkuItem.GSI1PK
                 + " = :gsi1pk, "
-                + TcgInventoryItem.GSI1SK
+                + SkuItem.GSI1SK
                 + " = :gsi1sk, "
-                + TcgInventoryItem.GSI2PK
+                + SkuItem.GSI2PK
                 + " = :gsi2pk, "
-                + TcgInventoryItem.GSI2SK
+                + SkuItem.GSI2SK
                 + " = :gsi2sk");
 
     var values = new HashMap<String, AttributeValue>();
@@ -833,17 +830,17 @@ public class TcgInventoryItemRepository {
     values.put(":gsi2sk", AttributeValue.builder().s(skuSeed.getGsi2sk()).build());
 
     if (skuSeed.getSuggestedPrice() != null) {
-      expression.append(", " + TcgInventoryItem.SUGGESTED_PRICE + " = :suggestedPrice");
+      expression.append(", " + SkuItem.SUGGESTED_PRICE + " = :suggestedPrice");
       values.put(
           ":suggestedPrice", AttributeValue.builder().s(skuSeed.getSuggestedPrice()).build());
     }
     if (skuSeed.getFetchtcgCardId() != null) {
-      expression.append(", " + TcgInventoryItem.FETCHTCG_CARD_ID + " = :fetchtcgCardId");
+      expression.append(", " + SkuItem.FETCHTCG_CARD_ID + " = :fetchtcgCardId");
       values.put(
           ":fetchtcgCardId", AttributeValue.builder().s(skuSeed.getFetchtcgCardId()).build());
     }
     if (skuSeed.getFetchtcgSetId() != null) {
-      expression.append(", " + TcgInventoryItem.FETCHTCG_SET_ID + " = :fetchtcgSetId");
+      expression.append(", " + SkuItem.FETCHTCG_SET_ID + " = :fetchtcgSetId");
       values.put(
           ":fetchtcgSetId",
           AttributeValue.builder().n(String.valueOf(skuSeed.getFetchtcgSetId())).build());
@@ -852,67 +849,62 @@ public class TcgInventoryItemRepository {
     return TransactWriteItem.builder()
         .update(
             Update.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
+                .tableName(TcgInventoryTable.TABLE_NAME)
                 .key(
                     Map.of(
-                        TcgInventoryItem.PK, AttributeValue.builder().s(skuSeed.getPk()).build(),
-                        TcgInventoryItem.SK, AttributeValue.builder().s(skuSeed.getSk()).build()))
+                        SkuItem.PK, AttributeValue.builder().s(skuSeed.getPk()).build(),
+                        SkuItem.SK, AttributeValue.builder().s(skuSeed.getSk()).build()))
                 .updateExpression(expression.toString())
                 .expressionAttributeNames(
                     Map.of(
-                        "#finish", TcgInventoryItem.FINISH,
-                        "#condition", TcgInventoryItem.CONDITION,
-                        "#name", TcgInventoryItem.NAME))
+                        "#finish", SkuItem.FINISH,
+                        "#condition", SkuItem.CONDITION,
+                        "#name", SkuItem.NAME))
                 .expressionAttributeValues(values)
                 .build())
         .build();
   }
 
   private TransactWriteItem buildSkuDirtyUpdate(String user, String skuId) {
-    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
+    var skuPk = SkuItem.formatPk(user, skuId);
 
     return TransactWriteItem.builder()
         .update(
             Update.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
+                .tableName(TcgInventoryTable.TABLE_NAME)
                 .key(
                     Map.of(
-                        TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build(),
-                        TcgInventoryItem.SK,
-                            AttributeValue.builder().s(TcgInventoryItem.formatSkuSk()).build()))
+                        SkuItem.PK, AttributeValue.builder().s(skuPk).build(),
+                        SkuItem.SK, AttributeValue.builder().s(SkuItem.formatSk()).build()))
                 .updateExpression(
                     "ADD "
-                        + TcgInventoryItem.VERSION
+                        + SkuItem.VERSION
                         + " :one SET "
-                        + TcgInventoryItem.DIRTY
+                        + SkuItem.DIRTY
                         + " = :dirty, "
-                        + TcgInventoryItem.GSI1PK
+                        + SkuItem.GSI1PK
                         + " = :gsi1pk")
                 .expressionAttributeValues(
                     Map.of(
                         ":one", AttributeValue.builder().n("1").build(),
                         ":dirty", AttributeValue.builder().bool(true).build(),
-                        ":gsi1pk",
-                            AttributeValue.builder()
-                                .s(TcgInventoryItem.formatGsi1pk(user))
-                                .build()))
+                        ":gsi1pk", AttributeValue.builder().s(SkuItem.formatGsi1pk(user)).build()))
                 .build())
         .build();
   }
 
   private TransactWriteItem buildSkuVersionBump(String user, String skuId) {
-    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
+    var skuPk = SkuItem.formatPk(user, skuId);
 
     return TransactWriteItem.builder()
         .update(
             Update.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
+                .tableName(TcgInventoryTable.TABLE_NAME)
                 .key(
                     Map.of(
-                        TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build(),
-                        TcgInventoryItem.SK,
-                            AttributeValue.builder().s(TcgInventoryItem.formatSkuSk()).build()))
-                .updateExpression("ADD " + TcgInventoryItem.VERSION + " :one")
+                        SkuItem.PK, AttributeValue.builder().s(skuPk).build(),
+                        SkuItem.SK, AttributeValue.builder().s(SkuItem.formatSk()).build()))
+                .updateExpression("ADD " + SkuItem.VERSION + " :one")
                 .expressionAttributeValues(Map.of(":one", AttributeValue.builder().n("1").build()))
                 .build())
         .build();
@@ -920,27 +912,27 @@ public class TcgInventoryItemRepository {
 
   private TransactWriteItem buildOrderPickReadyUpdate(
       String user, String orderId, String fetchtcgStatus, String fetchtcgCurrentAction) {
-    var userPk = TcgInventoryItem.formatUserPk(user);
-    var orderSk = TcgInventoryItem.formatOrderSk(orderId);
+    var userPk = SkuItem.formatUserPk(user);
+    var orderSk = OrderItem.formatSk(orderId);
 
     return TransactWriteItem.builder()
         .update(
             Update.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
+                .tableName(TcgInventoryTable.TABLE_NAME)
                 .key(
                     Map.of(
-                        TcgInventoryItem.PK, AttributeValue.builder().s(userPk).build(),
-                        TcgInventoryItem.SK, AttributeValue.builder().s(orderSk).build()))
+                        SkuItem.PK, AttributeValue.builder().s(userPk).build(),
+                        SkuItem.SK, AttributeValue.builder().s(orderSk).build()))
                 .updateExpression(
                     "SET #status = :toPick, "
-                        + TcgInventoryItem.FETCHTCG_STATUS
+                        + OrderItem.FETCHTCG_STATUS
                         + " = :fetchtcgStatus, "
-                        + TcgInventoryItem.FETCHTCG_CURRENT_ACTION
+                        + OrderItem.FETCHTCG_CURRENT_ACTION
                         + " = :fetchtcgCurrentAction, "
-                        + TcgInventoryItem.UPDATED_AT
+                        + UnitItem.UPDATED_AT
                         + " = :now")
                 .conditionExpression("#status = :awaitingPayment")
-                .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+                .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                 .expressionAttributeValues(
                     Map.of(
                         ":toPick", AttributeValue.builder().s("to_pick").build(),
@@ -959,26 +951,26 @@ public class TcgInventoryItemRepository {
   // a cancelled offer carries no currentAction, so the stale one is dropped rather than kept
   private TransactWriteItem buildOrderVoidedUpdate(
       String user, String orderId, String fetchtcgStatus) {
-    var userPk = TcgInventoryItem.formatUserPk(user);
-    var orderSk = TcgInventoryItem.formatOrderSk(orderId);
+    var userPk = SkuItem.formatUserPk(user);
+    var orderSk = OrderItem.formatSk(orderId);
 
     return TransactWriteItem.builder()
         .update(
             Update.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
+                .tableName(TcgInventoryTable.TABLE_NAME)
                 .key(
                     Map.of(
-                        TcgInventoryItem.PK, AttributeValue.builder().s(userPk).build(),
-                        TcgInventoryItem.SK, AttributeValue.builder().s(orderSk).build()))
+                        SkuItem.PK, AttributeValue.builder().s(userPk).build(),
+                        SkuItem.SK, AttributeValue.builder().s(orderSk).build()))
                 .updateExpression(
                     "SET #status = :voided, "
-                        + TcgInventoryItem.FETCHTCG_STATUS
+                        + OrderItem.FETCHTCG_STATUS
                         + " = :fetchtcgStatus, "
-                        + TcgInventoryItem.UPDATED_AT
+                        + UnitItem.UPDATED_AT
                         + " = :now REMOVE "
-                        + TcgInventoryItem.FETCHTCG_CURRENT_ACTION)
+                        + OrderItem.FETCHTCG_CURRENT_ACTION)
                 .conditionExpression("#status = :awaitingPayment")
-                .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+                .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                 .expressionAttributeValues(
                     Map.of(
                         ":voided", AttributeValue.builder().s("voided").build(),
@@ -993,21 +985,20 @@ public class TcgInventoryItemRepository {
   }
 
   private TransactWriteItem buildOrderFulfilledUpdate(String user, String orderId) {
-    var userPk = TcgInventoryItem.formatUserPk(user);
-    var orderSk = TcgInventoryItem.formatOrderSk(orderId);
+    var userPk = SkuItem.formatUserPk(user);
+    var orderSk = OrderItem.formatSk(orderId);
 
     return TransactWriteItem.builder()
         .update(
             Update.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
+                .tableName(TcgInventoryTable.TABLE_NAME)
                 .key(
                     Map.of(
-                        TcgInventoryItem.PK, AttributeValue.builder().s(userPk).build(),
-                        TcgInventoryItem.SK, AttributeValue.builder().s(orderSk).build()))
-                .updateExpression(
-                    "SET #status = :fulfilled, " + TcgInventoryItem.UPDATED_AT + " = :now")
+                        SkuItem.PK, AttributeValue.builder().s(userPk).build(),
+                        SkuItem.SK, AttributeValue.builder().s(orderSk).build()))
+                .updateExpression("SET #status = :fulfilled, " + UnitItem.UPDATED_AT + " = :now")
                 .conditionExpression("#status = :toPick")
-                .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+                .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                 .expressionAttributeValues(
                     Map.of(
                         ":fulfilled", AttributeValue.builder().s("fulfilled").build(),
@@ -1023,18 +1014,15 @@ public class TcgInventoryItemRepository {
   private TransactWriteItem buildAuditPut(
       String user, String eventType, Map<String, AttributeValue> attributes) {
     var auditItem = new HashMap<>(attributes);
+    auditItem.put(SkuItem.PK, AttributeValue.builder().s(AuditItem.formatPk(user)).build());
+    auditItem.put(SkuItem.SK, AttributeValue.builder().s(ulidGenerator.generate()).build());
+    auditItem.put(AuditItem.EVENT_TYPE, AttributeValue.builder().s(eventType).build());
     auditItem.put(
-        TcgInventoryItem.PK,
-        AttributeValue.builder().s(TcgInventoryItem.formatAuditPk(user)).build());
-    auditItem.put(
-        TcgInventoryItem.SK, AttributeValue.builder().s(ulidGenerator.generate()).build());
-    auditItem.put(TcgInventoryItem.EVENT_TYPE, AttributeValue.builder().s(eventType).build());
-    auditItem.put(
-        TcgInventoryItem.CREATED_AT,
+        UnitItem.CREATED_AT,
         AttributeValue.builder().n(String.valueOf(clock.now().getEpochSecond())).build());
 
     return TransactWriteItem.builder()
-        .put(Put.builder().tableName(TcgInventoryItem.TABLE_NAME).item(auditItem).build())
+        .put(Put.builder().tableName(TcgInventoryTable.TABLE_NAME).item(auditItem).build())
         .build();
   }
 }

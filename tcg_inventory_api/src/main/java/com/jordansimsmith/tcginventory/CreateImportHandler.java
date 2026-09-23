@@ -37,7 +37,9 @@ public class CreateImportHandler
   private final Clock clock;
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<ImportItem> importTable;
+  private final DynamoDbTable<ImportRowItem> importRowTable;
+  private final DynamoDbTable<JobItem> jobTable;
   private final QueueClient<JobMessage> jobsQueue;
   private final UlidGenerator ulidGenerator;
 
@@ -50,7 +52,9 @@ public class CreateImportHandler
     this.clock = factory.clock();
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.importTable = factory.importTable();
+    this.importRowTable = factory.importRowTable();
+    this.jobTable = factory.jobTable();
     this.jobsQueue = factory.jobsQueue();
     this.ulidGenerator = factory.ulidGenerator();
   }
@@ -102,15 +106,15 @@ public class CreateImportHandler
 
     int totalRows = reversed.stream().mapToInt(ManaBoxCsvParser.ParsedRow::quantity).sum();
 
-    var importItem = TcgInventoryItem.createImport(user, importId, filename, totalRows, jobId, now);
-    tcgInventoryTable.putItem(importItem);
+    var importItem = ImportItem.create(user, importId, filename, totalRows, jobId, now);
+    importTable.putItem(importItem);
 
     int position = 0;
     for (var parsedRow : reversed) {
       for (int copy = 0; copy < parsedRow.quantity(); copy++) {
         position++;
         var rowItem =
-            TcgInventoryItem.createImportRow(
+            ImportRowItem.create(
                 user,
                 importId,
                 position,
@@ -122,12 +126,12 @@ public class CreateImportHandler
                 parsedRow.condition(),
                 parsedRow.scryfallId(),
                 parsedRow.language());
-        tcgInventoryTable.putItem(rowItem);
+        importRowTable.putItem(rowItem);
       }
     }
 
-    var jobItem = TcgInventoryItem.createJob(user, jobId, "appraise", importId, now);
-    tcgInventoryTable.putItem(jobItem);
+    var jobItem = JobItem.create(user, jobId, "appraise", importId, now);
+    jobTable.putItem(jobItem);
 
     var jobMessage = new JobMessage(user, jobId, "appraise");
     jobsQueue.send(jobMessage, user, jobMessage.deduplicationId(0));

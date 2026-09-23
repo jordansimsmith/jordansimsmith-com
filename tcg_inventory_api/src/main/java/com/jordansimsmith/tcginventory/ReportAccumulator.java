@@ -61,7 +61,7 @@ public class ReportAccumulator {
     this.objectMapper = objectMapper;
   }
 
-  public void addSku(TcgInventoryItem sku, List<TcgInventoryItem> units) {
+  public void addSku(SkuItem sku, List<UnitItem> units) {
     skuCount++;
 
     var price = resolvePrice(sku);
@@ -122,7 +122,7 @@ public class ReportAccumulator {
     }
   }
 
-  public void addOrder(TcgInventoryItem order) {
+  public void addOrder(OrderItem order) {
     var status = order.getStatus();
     if (!"to_pick".equals(status) && !"fulfilled".equals(status)) {
       return;
@@ -258,7 +258,7 @@ public class ReportAccumulator {
     }
   }
 
-  private static BigDecimal resolvePrice(TcgInventoryItem sku) {
+  private static BigDecimal resolvePrice(SkuItem sku) {
     if (sku.getLastPublishedPrice() != null) {
       return new BigDecimal(sku.getLastPublishedPrice());
     }

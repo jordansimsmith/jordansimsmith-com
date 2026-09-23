@@ -46,23 +46,29 @@ public class OrderPhaseProcessor {
 
   private record Fulfillment(
       @Nullable String buyerName,
-      @Nullable TcgInventoryItem.BuyerAddress buyerAddress,
+      @Nullable OrderItem.BuyerAddress buyerAddress,
       @Nullable String postageOption) {}
 
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
-  private final TcgInventoryItemRepository tcgInventoryItemRepository;
+  private final DynamoDbTable<OrderItem> orderTable;
+  private final DynamoDbTable<SkuItem> skuTable;
+  private final DynamoDbTable<SettingsItem> settingsTable;
+  private final TcgInventoryRepository tcgInventoryRepository;
   private final Clock clock;
   private final FetchTcgClient fetchTcgClient;
   private final ObjectMapper objectMapper;
 
   public OrderPhaseProcessor(
-      DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
-      TcgInventoryItemRepository tcgInventoryItemRepository,
+      DynamoDbTable<OrderItem> orderTable,
+      DynamoDbTable<SkuItem> skuTable,
+      DynamoDbTable<SettingsItem> settingsTable,
+      TcgInventoryRepository tcgInventoryRepository,
       Clock clock,
       FetchTcgClient fetchTcgClient,
       ObjectMapper objectMapper) {
-    this.tcgInventoryTable = tcgInventoryTable;
-    this.tcgInventoryItemRepository = tcgInventoryItemRepository;
+    this.orderTable = orderTable;
+    this.skuTable = skuTable;
+    this.settingsTable = settingsTable;
+    this.tcgInventoryRepository = tcgInventoryRepository;
     this.clock = clock;
     this.fetchTcgClient = fetchTcgClient;
     this.objectMapper = objectMapper;
@@ -111,7 +117,7 @@ public class OrderPhaseProcessor {
           releaseCancelledOrder(user, order, offer);
           voidedCount++;
         } else if (paymentReceived) {
-          tcgInventoryItemRepository.advanceOrderToPickReady(
+          tcgInventoryRepository.advanceOrderToPickReady(
               user, order.getOrderId(), offer.status(), offer.currentAction());
           advancedCount++;
         }
@@ -123,7 +129,7 @@ public class OrderPhaseProcessor {
       var stored =
           new Fulfillment(order.getBuyerName(), order.getBuyerAddress(), order.getPostageOption());
       if (!fulfillment.equals(stored)) {
-        tcgInventoryItemRepository.updateOrderFulfillment(
+        tcgInventoryRepository.updateOrderFulfillment(
             user,
             order.getOrderId(),
             fulfillment.buyerName(),
@@ -140,7 +146,7 @@ public class OrderPhaseProcessor {
         refreshedCount);
 
     var existingOrderIds =
-        existingOrders.stream().map(TcgInventoryItem::getOrderId).collect(Collectors.toSet());
+        existingOrders.stream().map(OrderItem::getOrderId).collect(Collectors.toSet());
 
     int createdCount = 0;
     int skippedCount = 0;
@@ -185,10 +191,10 @@ public class OrderPhaseProcessor {
   private Instant loadTrackOrdersAfter(String user) {
     var key =
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatUserPk(user))
-            .sortValue(TcgInventoryItem.formatSettingsSk())
+            .partitionValue(SkuItem.formatUserPk(user))
+            .sortValue(SettingsItem.formatSk())
             .build();
-    var settingsItem = tcgInventoryTable.getItem(key);
+    var settingsItem = settingsTable.getItem(key);
     if (settingsItem == null) {
       return null;
     }
@@ -209,19 +215,19 @@ public class OrderPhaseProcessor {
     }
   }
 
-  private List<TcgInventoryItem> loadExistingOrders(String user) {
-    var results = new ArrayList<TcgInventoryItem>();
+  private List<OrderItem> loadExistingOrders(String user) {
+    var results = new ArrayList<OrderItem>();
     var request =
         QueryEnhancedRequest.builder()
             .queryConditional(
                 QueryConditional.sortBeginsWith(
                     Key.builder()
-                        .partitionValue(TcgInventoryItem.formatUserPk(user))
-                        .sortValue(TcgInventoryItem.ORDER_PREFIX)
+                        .partitionValue(SkuItem.formatUserPk(user))
+                        .sortValue(OrderItem.ORDER_PREFIX)
                         .build()))
             .build();
 
-    tcgInventoryTable.query(request).items().forEach(results::add);
+    orderTable.query(request).items().forEach(results::add);
     return results;
   }
 
@@ -232,12 +238,12 @@ public class OrderPhaseProcessor {
             .queryConditional(
                 QueryConditional.sortBeginsWith(
                     Key.builder()
-                        .partitionValue(TcgInventoryItem.formatGsi2pk(user))
-                        .sortValue(TcgInventoryItem.NAME_PREFIX)
+                        .partitionValue(SkuItem.formatGsi2pk(user))
+                        .sortValue(SkuItem.NAME_PREFIX)
                         .build()))
             .build();
 
-    tcgInventoryTable.index(TcgInventoryItem.GSI2_NAME).query(request).stream()
+    skuTable.index(TcgInventoryTable.GSI2_NAME).query(request).stream()
         .flatMap(page -> page.items().stream())
         .forEach(
             item -> {
@@ -264,7 +270,7 @@ public class OrderPhaseProcessor {
         }
 
         var units =
-            tcgInventoryItemRepository.findUnitsToAllocate(user, skuId, offerId, item.quantity());
+            tcgInventoryRepository.findUnitsToAllocate(user, skuId, offerId, item.quantity());
         if (units.size() < item.quantity()) {
           insufficientStock = true;
         }
@@ -302,7 +308,7 @@ public class OrderPhaseProcessor {
 
     var fulfillment = toFulfillment(offer);
     var orderItem =
-        TcgInventoryItem.createOrder(
+        OrderItem.create(
             user,
             offerId,
             insufficientStock
@@ -322,13 +328,13 @@ public class OrderPhaseProcessor {
 
     var skuUnits =
         newReservations.entrySet().stream()
-            .map(entry -> new TcgInventoryItemRepository.SkuUnits(entry.getKey(), entry.getValue()))
+            .map(entry -> new TcgInventoryRepository.SkuUnits(entry.getKey(), entry.getValue()))
             .toList();
-    tcgInventoryItemRepository.reserveOrder(user, orderItem, skuUnits);
+    tcgInventoryRepository.reserveOrder(user, orderItem, skuUnits);
   }
 
   private void releaseCancelledOrder(
-      String user, TcgInventoryItem order, FetchTcgClient.SellerOffer offer) {
+      String user, OrderItem order, FetchTcgClient.SellerOffer offer) {
     var releasedUnits = new LinkedHashMap<String, List<Integer>>();
     for (var line : OrderLines.parse(order.getLines(), objectMapper)) {
       releasedUnits
@@ -338,9 +344,9 @@ public class OrderPhaseProcessor {
 
     var skuUnits =
         releasedUnits.entrySet().stream()
-            .map(entry -> new TcgInventoryItemRepository.SkuUnits(entry.getKey(), entry.getValue()))
+            .map(entry -> new TcgInventoryRepository.SkuUnits(entry.getKey(), entry.getValue()))
             .toList();
-    tcgInventoryItemRepository.releaseOrder(user, order.getOrderId(), offer.status(), skuUnits);
+    tcgInventoryRepository.releaseOrder(user, order.getOrderId(), offer.status(), skuUnits);
   }
 
   private static Fulfillment toFulfillment(FetchTcgClient.SellerOffer offer) {
@@ -351,7 +357,7 @@ public class OrderPhaseProcessor {
   }
 
   @Nullable
-  private static TcgInventoryItem.BuyerAddress toBuyerAddress(
+  private static OrderItem.BuyerAddress toBuyerAddress(
       @Nullable FetchTcgClient.BuyerRegionAddress address) {
     if (address == null) {
       return null;
@@ -374,7 +380,7 @@ public class OrderPhaseProcessor {
       return null;
     }
 
-    return TcgInventoryItem.BuyerAddress.create(line1, line2, suburb, city, postCode, country);
+    return OrderItem.BuyerAddress.create(line1, line2, suburb, city, postCode, country);
   }
 
   @Nullable

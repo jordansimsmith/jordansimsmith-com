@@ -56,7 +56,11 @@ public class ScansHandlerIntegrationTest {
   private FakeQueueClient<JobMessage> fakeJobsQueue;
   private FakeQueueClient<ScanMessage> fakeScanQueue;
   private ObjectMapper objectMapper;
-  private DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private DynamoDbTable<ScanItem> scanTable;
+  private DynamoDbTable<ScanRowItem> scanRowTable;
+  private DynamoDbTable<ImportItem> importTable;
+  private DynamoDbTable<ImportRowItem> importRowTable;
+  private DynamoDbTable<JobItem> jobTable;
   private S3Client s3Client;
   private CreateScanHandler createScanHandler;
   private FindScansHandler findScansHandler;
@@ -70,7 +74,7 @@ public class ScansHandlerIntegrationTest {
   static void setUpBeforeClass() {
     var factory =
         TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), s3Container.getEndpoint());
-    DynamoDbUtils.createTable(factory.dynamoDbClient(), factory.tcgInventoryTable());
+    DynamoDbUtils.createTable(factory.dynamoDbClient(), factory.tableDefinition());
     factory.s3Client().createBucket(request -> request.bucket(ScanImages.BUCKET));
   }
 
@@ -83,7 +87,11 @@ public class ScansHandlerIntegrationTest {
     fakeJobsQueue = factory.fakeJobsQueue();
     fakeScanQueue = factory.fakeScanQueue();
     objectMapper = factory.objectMapper();
-    tcgInventoryTable = factory.tcgInventoryTable();
+    scanTable = factory.scanTable();
+    scanRowTable = factory.scanRowTable();
+    importTable = factory.importTable();
+    importRowTable = factory.importRowTable();
+    jobTable = factory.jobTable();
     s3Client = factory.s3Client();
     for (var object :
         s3Client.listObjectsV2(request -> request.bucket(ScanImages.BUCKET)).contents()) {
@@ -148,17 +156,17 @@ public class ScansHandlerIntegrationTest {
     }
 
     var scanItem =
-        tcgInventoryTable.getItem(
+        scanTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatScanSk(scanId))
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(ScanItem.formatSk(scanId))
                 .build());
     assertThat(scanItem).isNotNull();
     var firstRow =
-        tcgInventoryTable.getItem(
+        scanRowTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatScanRowPk("jordan", scanId))
-                .sortValue(TcgInventoryItem.formatScanRowSk(1))
+                .partitionValue(ScanRowItem.formatPk("jordan", scanId))
+                .sortValue(ScanRowItem.formatSk(1))
                 .build());
     assertThat(firstRow.getS3Key()).isEqualTo("users/jordan/scans/%s/000001.jpg".formatted(scanId));
     assertThat(scanItem.getUpdatedAt()).isEqualTo(Instant.ofEpochSecond(1700000000));
@@ -346,10 +354,10 @@ public class ScansHandlerIntegrationTest {
                 "{\"scan_id\":\"%s\",\"status\":\"identifying\"}".formatted(scanId)));
     assertThat(fakeScanQueue.getMessages()).containsExactly(new ScanMessage("jordan", scanId));
     var scanItem =
-        tcgInventoryTable.getItem(
+        scanTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatScanSk(scanId))
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(ScanItem.formatSk(scanId))
                 .build());
     assertThat(scanItem.getStatus()).isEqualTo("identifying");
     assertThat(scanItem.getUpdatedAt()).isEqualTo(Instant.ofEpochSecond(1700000100));
@@ -400,13 +408,13 @@ public class ScansHandlerIntegrationTest {
     var scanId = createScan("jordan", "001.jpg", 5);
     var scanItem = getScanItem("jordan", scanId);
     scanItem.setStatus("identifying");
-    tcgInventoryTable.putItem(scanItem);
+    scanTable.putItem(scanItem);
     var identifyingResponse = identify(scanId);
     scanItem.setStatus("reviewing");
-    tcgInventoryTable.putItem(scanItem);
+    scanTable.putItem(scanItem);
     var reviewingResponse = identify(scanId);
     scanItem.setStatus("confirmed");
-    tcgInventoryTable.putItem(scanItem);
+    scanTable.putItem(scanItem);
 
     // act
     var confirmedResponse = identify(scanId);
@@ -428,10 +436,10 @@ public class ScansHandlerIntegrationTest {
   void identifyScanShouldRejectMissingAndForeignScans() throws Exception {
     // arrange
     var scanId = createScan("alice", "001.jpg", 5);
-    tcgInventoryTable.deleteItem(
+    scanTable.deleteItem(
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatUserPk("alice"))
-            .sortValue(TcgInventoryItem.formatScanSk(scanId))
+            .partitionValue(SkuItem.formatUserPk("alice"))
+            .sortValue(ScanItem.formatSk(scanId))
             .build());
 
     // act
@@ -464,30 +472,30 @@ public class ScansHandlerIntegrationTest {
     var scanItem = getScanItem("jordan", scanId);
     scanItem.setStatus("identifying");
     scanItem.setError("one row needs manual review");
-    tcgInventoryTable.putItem(scanItem);
+    scanTable.putItem(scanItem);
     var row =
-        tcgInventoryTable.getItem(
+        scanRowTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatScanRowPk("jordan", scanId))
-                .sortValue(TcgInventoryItem.formatScanRowSk(1))
+                .partitionValue(ScanRowItem.formatPk("jordan", scanId))
+                .sortValue(ScanRowItem.formatSk(1))
                 .build());
     row.setStatus("suggested");
     row.setSuggestions(
         List.of(
-            TcgInventoryItem.ScanSuggestion.create(
+            ScanRowItem.ScanSuggestion.create(
                 "a9738cda-adb1-47fb-9f4c-ecd930228c4d", "Ragavan, Nimble Pilferer", 0.8300001)));
     row.setNeedsReview(false);
-    tcgInventoryTable.putItem(row);
+    scanRowTable.putItem(row);
     var reviewRow =
-        tcgInventoryTable.getItem(
+        scanRowTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatScanRowPk("jordan", scanId))
-                .sortValue(TcgInventoryItem.formatScanRowSk(2))
+                .partitionValue(ScanRowItem.formatPk("jordan", scanId))
+                .sortValue(ScanRowItem.formatSk(2))
                 .build());
     reviewRow.setStatus("needs_review");
     reviewRow.setNeedsReview(true);
     reviewRow.setError("corrupt JPEG");
-    tcgInventoryTable.putItem(reviewRow);
+    scanRowTable.putItem(reviewRow);
 
     // act
     var response =
@@ -655,11 +663,11 @@ public class ScansHandlerIntegrationTest {
     var scanId = createScanWithFiles("jordan", 3);
     var scanItem = getScanItem("jordan", scanId);
     scanItem.setStatus("reviewing");
-    tcgInventoryTable.putItem(scanItem);
-    var rows = factory.tcgInventoryItemRepository().findScanRows("jordan", scanId);
+    scanTable.putItem(scanItem);
+    var rows = factory.tcgInventoryRepository().findScanRows("jordan", scanId);
     for (var row : rows) {
       row.setStatus("suggested");
-      tcgInventoryTable.putItem(row);
+      scanRowTable.putItem(row);
       s3Client.putObject(
           request -> request.bucket(ScanImages.BUCKET).key(row.getS3Key()),
           RequestBody.fromBytes(JPEG_BYTES));
@@ -682,10 +690,10 @@ public class ScansHandlerIntegrationTest {
     assertThat(detail.has("processed_count")).isFalse();
     assertThat(detail.get("rows").findValuesAsText("scan_position")).containsExactly("1", "3");
     assertThat(
-            tcgInventoryTable.getItem(
+            scanRowTable.getItem(
                 Key.builder()
-                    .partitionValue(TcgInventoryItem.formatScanRowPk("jordan", scanId))
-                    .sortValue(TcgInventoryItem.formatScanRowSk(2))
+                    .partitionValue(ScanRowItem.formatPk("jordan", scanId))
+                    .sortValue(ScanRowItem.formatSk(2))
                     .build()))
         .isNull();
     assertThatThrownBy(
@@ -702,7 +710,7 @@ public class ScansHandlerIntegrationTest {
     var scanId = createScan("alice", "001.jpg", 5);
     var scan = getScanItem("alice", scanId);
     scan.setStatus("reviewing");
-    tcgInventoryTable.putItem(scan);
+    scanTable.putItem(scan);
 
     // act
     var foreignResponse =
@@ -727,7 +735,7 @@ public class ScansHandlerIntegrationTest {
     var identifyingScanId = createScan("alice", "002.jpg", 5);
     var identifyingScan = getScanItem("alice", identifyingScanId);
     identifyingScan.setStatus("identifying");
-    tcgInventoryTable.putItem(identifyingScan);
+    scanTable.putItem(identifyingScan);
     var conflictResponse =
         deleteScanRowHandler.handleRequest(
             buildEventWithPath("alice", Map.of("scan_id", identifyingScanId, "scan_position", "1")),
@@ -741,7 +749,7 @@ public class ScansHandlerIntegrationTest {
     var confirmedScanId = createScan("jordan", "confirmed.jpg", 5);
     var confirmedScan = getScanItem("jordan", confirmedScanId);
     confirmedScan.setStatus("confirmed");
-    tcgInventoryTable.putItem(confirmedScan);
+    scanTable.putItem(confirmedScan);
 
     // act
     var confirmedResponse =
@@ -767,8 +775,8 @@ public class ScansHandlerIntegrationTest {
       var scanId = scanIds.get(index);
       var scan = getScanItem("jordan", scanId);
       scan.setStatus(statuses.get(index));
-      tcgInventoryTable.putItem(scan);
-      var row = factory.tcgInventoryItemRepository().findScanRows("jordan", scanId).get(0);
+      scanTable.putItem(scan);
+      var row = factory.tcgInventoryRepository().findScanRows("jordan", scanId).get(0);
       keys.add(row.getS3Key());
       s3Client.putObject(
           request -> request.bucket(ScanImages.BUCKET).key(row.getS3Key()),
@@ -789,7 +797,7 @@ public class ScansHandlerIntegrationTest {
     for (var index = 0; index < scanIds.size(); index++) {
       var scanId = scanIds.get(index);
       assertThat(getScanItem("jordan", scanId)).isNull();
-      assertThat(factory.tcgInventoryItemRepository().findScanRows("jordan", scanId)).isEmpty();
+      assertThat(factory.tcgInventoryRepository().findScanRows("jordan", scanId)).isEmpty();
       var key = keys.get(index);
       assertThatThrownBy(
               () -> s3Client.headObject(request -> request.bucket(ScanImages.BUCKET).key(key)))
@@ -804,9 +812,9 @@ public class ScansHandlerIntegrationTest {
     var confirmedScanId = createScan("jordan", "confirmed.jpg", 5);
     var confirmedScan = getScanItem("jordan", confirmedScanId);
     confirmedScan.setStatus("confirmed");
-    tcgInventoryTable.putItem(confirmedScan);
+    scanTable.putItem(confirmedScan);
     var scanId = createScan("jordan", "001.jpg", 5);
-    var row = factory.tcgInventoryItemRepository().findScanRows("jordan", scanId).get(0);
+    var row = factory.tcgInventoryRepository().findScanRows("jordan", scanId).get(0);
 
     // act
     var confirmedResponse =
@@ -830,16 +838,16 @@ public class ScansHandlerIntegrationTest {
                     .dynamoDbClient()
                     .updateItem(
                         UpdateItemRequest.builder()
-                            .tableName(TcgInventoryItem.TABLE_NAME)
+                            .tableName(TcgInventoryTable.TABLE_NAME)
                             .key(
                                 Map.of(
-                                    TcgInventoryItem.PK,
+                                    SkuItem.PK,
                                     AttributeValue.builder().s(row.getPk()).build(),
-                                    TcgInventoryItem.SK,
+                                    SkuItem.SK,
                                     AttributeValue.builder().s(row.getSk()).build()))
                             .updateExpression("SET #status = :suggested")
                             .conditionExpression("attribute_exists(pk)")
-                            .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+                            .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                             .expressionAttributeValues(
                                 Map.of(
                                     ":suggested", AttributeValue.builder().s("suggested").build()))
@@ -853,7 +861,7 @@ public class ScansHandlerIntegrationTest {
     var scanId = createScanWithFiles("jordan", 2);
     var scan = getScanItem("jordan", scanId);
     scan.setStatus("reviewing");
-    tcgInventoryTable.putItem(scan);
+    scanTable.putItem(scan);
     var request =
         "{\"rows\":["
             + "{\"scan_position\":1,\"scryfall_id\":\"opaque-card-id\","
@@ -876,10 +884,10 @@ public class ScansHandlerIntegrationTest {
     assertThat(body.has("confirmed")).isFalse();
     var importId = body.get("import_id").asText();
     var importItem =
-        tcgInventoryTable.getItem(
+        importTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatImportSk(importId))
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(ImportItem.formatSk(importId))
                 .build());
     assertThat(importItem).isNotNull();
     assertThat(importItem.getStatus()).isEqualTo("appraising");
@@ -887,35 +895,34 @@ public class ScansHandlerIntegrationTest {
     assertThat(importItem.getJobId()).isNotBlank();
 
     var importRows =
-        tcgInventoryTable
+        importRowTable
             .query(
                 QueryEnhancedRequest.builder()
                     .queryConditional(
                         QueryConditional.sortBeginsWith(
                             Key.builder()
-                                .partitionValue(
-                                    TcgInventoryItem.formatImportRowPk("jordan", importId))
-                                .sortValue(TcgInventoryItem.ROW_PREFIX)
+                                .partitionValue(ImportRowItem.formatPk("jordan", importId))
+                                .sortValue(ImportRowItem.ROW_PREFIX)
                                 .build()))
                     .scanIndexForward(true)
                     .build())
             .stream()
             .flatMap(page -> page.items().stream())
             .toList();
-    assertThat(importRows).extracting(TcgInventoryItem::getPosition).containsExactly(1, 2);
+    assertThat(importRows).extracting(ImportRowItem::getPosition).containsExactly(1, 2);
     assertThat(importRows)
-        .extracting(TcgInventoryItem::getName)
+        .extracting(ImportRowItem::getName)
         .containsExactly("Ragavan, Nimble Pilferer", "Dragon's Rage Channeler");
     assertThat(importRows)
-        .extracting(TcgInventoryItem::getScryfallId)
+        .extracting(ImportRowItem::getScryfallId)
         .containsExactly("opaque-card-id", "4ced112a-e775-4f97-97b3-74877e9dce12");
     assertThat(importRows).allMatch(row -> "en".equals(row.getLanguage()));
 
     var jobItem =
-        tcgInventoryTable.getItem(
+        jobTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatJobSk(importItem.getJobId()))
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(JobItem.formatSk(importItem.getJobId()))
                 .build());
     assertThat(jobItem).isNotNull();
     assertThat(jobItem.getStatus()).isEqualTo("queued");
@@ -973,11 +980,11 @@ public class ScansHandlerIntegrationTest {
     return objectMapper.readTree(response.getBody()).get("scan_id").asText();
   }
 
-  private TcgInventoryItem getScanItem(String user, String scanId) {
-    return tcgInventoryTable.getItem(
+  private ScanItem getScanItem(String user, String scanId) {
+    return scanTable.getItem(
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatUserPk(user))
-            .sortValue(TcgInventoryItem.formatScanSk(scanId))
+            .partitionValue(SkuItem.formatUserPk(user))
+            .sortValue(ScanItem.formatSk(scanId))
             .build());
   }
 

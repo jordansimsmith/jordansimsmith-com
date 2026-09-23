@@ -67,7 +67,7 @@ public class GetScanHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final TcgInventoryItemRepository tcgInventoryItemRepository;
+  private final TcgInventoryRepository tcgInventoryRepository;
   private final S3Client s3Client;
   private final S3Presigner s3Presigner;
 
@@ -79,7 +79,7 @@ public class GetScanHandler
   GetScanHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryItemRepository = factory.tcgInventoryItemRepository();
+    this.tcgInventoryRepository = factory.tcgInventoryRepository();
     this.s3Client = factory.s3Client();
     this.s3Presigner = factory.s3Presigner();
   }
@@ -98,16 +98,16 @@ public class GetScanHandler
     var user = requestContextFactory.createCtx(event).user();
     Map<String, String> pathParameters = event.getPathParameters();
     var scanId = pathParameters.get("scan_id");
-    var scanItem = tcgInventoryItemRepository.getScan(user, scanId);
+    var scanItem = tcgInventoryRepository.getScan(user, scanId);
     if (scanItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
 
-    var rowItems = tcgInventoryItemRepository.findScanRows(user, scanId);
+    var rowItems = tcgInventoryRepository.findScanRows(user, scanId);
     return httpResponseFactory.ok(toDetail(scanItem, rowItems));
   }
 
-  private ScanDetailResponse toDetail(TcgInventoryItem item, List<TcgInventoryItem> rowItems) {
+  private ScanDetailResponse toDetail(ScanItem item, List<ScanRowItem> rowItems) {
     var rows = rowItems.stream().map(row -> toRow(item, row)).toList();
     var summary = toSummary(item);
     return new ScanDetailResponse(
@@ -122,7 +122,7 @@ public class GetScanHandler
         rows);
   }
 
-  private static ScanSummaryResponse toSummary(TcgInventoryItem item) {
+  private static ScanSummaryResponse toSummary(ScanItem item) {
     return new ScanSummaryResponse(
         item.getScanId(),
         item.getStatus(),
@@ -134,7 +134,7 @@ public class GetScanHandler
         item.getCreatedAt() != null ? item.getCreatedAt().getEpochSecond() : 0);
   }
 
-  private ScanRowResponse toRow(TcgInventoryItem scanItem, TcgInventoryItem item) {
+  private ScanRowResponse toRow(ScanItem scanItem, ScanRowItem item) {
     var status = publicStatus(item.getStatus());
     var sizeBytes = item.getSizeBytes() != null ? item.getSizeBytes() : 0;
     var uploaded = true;
@@ -184,7 +184,7 @@ public class GetScanHandler
         item.getError());
   }
 
-  private static ScanSuggestionResponse toSuggestion(TcgInventoryItem.ScanSuggestion suggestion) {
+  private static ScanSuggestionResponse toSuggestion(ScanRowItem.ScanSuggestion suggestion) {
     return new ScanSuggestionResponse(
         suggestion.getScryfallId(), suggestion.getName(), suggestion.getScore());
   }

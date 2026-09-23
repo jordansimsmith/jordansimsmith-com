@@ -34,7 +34,9 @@ public class ImportsHandlerIntegrationTest {
   private FakeUlidGenerator fakeUlidGenerator;
   private FakeQueueClient<JobMessage> fakeJobsQueue;
   private ObjectMapper objectMapper;
-  private DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private DynamoDbTable<ImportItem> importTable;
+  private DynamoDbTable<ImportRowItem> importRowTable;
+  private DynamoDbTable<JobItem> jobTable;
 
   private CreateImportHandler createImportHandler;
   private FindImportsHandler findImportsHandler;
@@ -51,7 +53,7 @@ public class ImportsHandlerIntegrationTest {
   static void setUpBeforeClass() {
     var factory =
         TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
-    var table = factory.tcgInventoryTable();
+    var table = factory.tableDefinition();
     DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
   }
 
@@ -64,7 +66,9 @@ public class ImportsHandlerIntegrationTest {
     fakeUlidGenerator = factory.fakeUlidGenerator();
     fakeJobsQueue = factory.fakeJobsQueue();
     objectMapper = factory.objectMapper();
-    tcgInventoryTable = factory.tcgInventoryTable();
+    importTable = factory.importTable();
+    importRowTable = factory.importRowTable();
+    jobTable = factory.jobTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
@@ -111,11 +115,11 @@ public class ImportsHandlerIntegrationTest {
     var rowQuery =
         QueryConditional.sortBeginsWith(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatImportRowPk("jordan", importId))
-                .sortValue(TcgInventoryItem.ROW_PREFIX)
+                .partitionValue(ImportRowItem.formatPk("jordan", importId))
+                .sortValue(ImportRowItem.ROW_PREFIX)
                 .build());
     var rows =
-        tcgInventoryTable
+        importRowTable
             .query(QueryEnhancedRequest.builder().queryConditional(rowQuery).build())
             .stream()
             .flatMap(page -> page.items().stream())
@@ -128,18 +132,18 @@ public class ImportsHandlerIntegrationTest {
 
     // verify job item in DynamoDB
     var importItem =
-        tcgInventoryTable.getItem(
+        importTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatImportSk(importId))
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(ImportItem.formatSk(importId))
                 .build());
     assertThat(importItem.getJobId()).isNotEmpty();
 
     var jobItem =
-        tcgInventoryTable.getItem(
+        jobTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatJobSk(importItem.getJobId()))
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(JobItem.formatSk(importItem.getJobId()))
                 .build());
     assertThat(jobItem).isNotNull();
     assertThat(jobItem.getJobType()).isEqualTo("appraise");
@@ -309,7 +313,7 @@ public class ImportsHandlerIntegrationTest {
     // arrange
     var importId = createReviewImportWithRow("jordan");
     var discard =
-        TcgInventoryItem.createImportRow(
+        ImportRowItem.create(
             "jordan",
             importId,
             2,
@@ -322,9 +326,9 @@ public class ImportsHandlerIntegrationTest {
             "scryfall-2",
             "en");
     discard.setDecision("discard");
-    tcgInventoryTable.putItem(discard);
+    importRowTable.putItem(discard);
     var keepB =
-        TcgInventoryItem.createImportRow(
+        ImportRowItem.create(
             "jordan",
             importId,
             3,
@@ -338,7 +342,7 @@ public class ImportsHandlerIntegrationTest {
             "en");
     keepB.setDecision("keep");
     keepB.setSuggestedPrice("3.10");
-    tcgInventoryTable.putItem(keepB);
+    importRowTable.putItem(keepB);
 
     // act
     var response =
@@ -373,13 +377,13 @@ public class ImportsHandlerIntegrationTest {
 
     // simulate review status (deletion only allowed in review)
     var importItem =
-        tcgInventoryTable.getItem(
+        importTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatImportSk(importId))
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(ImportItem.formatSk(importId))
                 .build());
     importItem.setStatus("review");
-    tcgInventoryTable.putItem(importItem);
+    importTable.putItem(importItem);
 
     // act
     var response =
@@ -390,21 +394,21 @@ public class ImportsHandlerIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(204);
 
     var deletedImport =
-        tcgInventoryTable.getItem(
+        importTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatImportSk(importId))
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(ImportItem.formatSk(importId))
                 .build());
     assertThat(deletedImport).isNull();
 
     var rowQuery =
         QueryConditional.sortBeginsWith(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatImportRowPk("jordan", importId))
-                .sortValue(TcgInventoryItem.ROW_PREFIX)
+                .partitionValue(ImportRowItem.formatPk("jordan", importId))
+                .sortValue(ImportRowItem.ROW_PREFIX)
                 .build());
     var rows =
-        tcgInventoryTable
+        importRowTable
             .query(QueryEnhancedRequest.builder().queryConditional(rowQuery).build())
             .stream()
             .flatMap(page -> page.items().stream())
@@ -440,13 +444,13 @@ public class ImportsHandlerIntegrationTest {
     var importId = objectMapper.readTree(createResponse.getBody()).get("import_id").asText();
 
     var importItem =
-        tcgInventoryTable.getItem(
+        importTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatImportSk(importId))
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(ImportItem.formatSk(importId))
                 .build());
     importItem.setStatus("confirmed");
-    tcgInventoryTable.putItem(importItem);
+    importTable.putItem(importItem);
 
     // act
     var response =
@@ -536,13 +540,12 @@ public class ImportsHandlerIntegrationTest {
   private String createReviewImportWithRow(String user) {
     var importId = "import1";
     var importItem =
-        TcgInventoryItem.createImport(
-            user, importId, "test.csv", 1, null, Instant.ofEpochSecond(1700000000));
+        ImportItem.create(user, importId, "test.csv", 1, null, Instant.ofEpochSecond(1700000000));
     importItem.setStatus("review");
-    tcgInventoryTable.putItem(importItem);
+    importTable.putItem(importItem);
 
     var rowItem =
-        TcgInventoryItem.createImportRow(
+        ImportRowItem.create(
             user,
             importId,
             1,
@@ -557,7 +560,7 @@ public class ImportsHandlerIntegrationTest {
     rowItem.setDecision("keep");
     rowItem.setMarketPrice("1.50");
     rowItem.setSuggestedPrice("1.40");
-    tcgInventoryTable.putItem(rowItem);
+    importRowTable.putItem(rowItem);
 
     return importId;
   }
@@ -583,10 +586,10 @@ public class ImportsHandlerIntegrationTest {
     assertThat(body.get("market_price").asText()).isEqualTo("1.50");
 
     var rowItem =
-        tcgInventoryTable.getItem(
+        importRowTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatImportRowPk("jordan", importId))
-                .sortValue(TcgInventoryItem.formatImportRowSk(1))
+                .partitionValue(ImportRowItem.formatPk("jordan", importId))
+                .sortValue(ImportRowItem.formatSk(1))
                 .build());
     assertThat(rowItem.getCondition()).isEqualTo("LP");
   }
@@ -596,13 +599,13 @@ public class ImportsHandlerIntegrationTest {
     // arrange
     var importId = createReviewImportWithRow("jordan");
     var importItem =
-        tcgInventoryTable.getItem(
+        importTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatImportSk(importId))
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(ImportItem.formatSk(importId))
                 .build());
     importItem.setStatus("appraising");
-    tcgInventoryTable.putItem(importItem);
+    importTable.putItem(importItem);
 
     // act
     var response =
@@ -666,10 +669,10 @@ public class ImportsHandlerIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(204);
 
     var rowItem =
-        tcgInventoryTable.getItem(
+        importRowTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatImportRowPk("jordan", "import1"))
-                .sortValue(TcgInventoryItem.formatImportRowSk(1))
+                .partitionValue(ImportRowItem.formatPk("jordan", "import1"))
+                .sortValue(ImportRowItem.formatSk(1))
                 .build());
     assertThat(rowItem).isNull();
   }
@@ -679,13 +682,13 @@ public class ImportsHandlerIntegrationTest {
     // arrange
     createReviewImportWithRow("jordan");
     var importItem =
-        tcgInventoryTable.getItem(
+        importTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatImportSk("import1"))
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(ImportItem.formatSk("import1"))
                 .build());
     importItem.setStatus("appraising");
-    tcgInventoryTable.putItem(importItem);
+    importTable.putItem(importItem);
 
     // act
     var response =

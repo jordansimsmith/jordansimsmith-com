@@ -52,7 +52,8 @@ public class GetSkuHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<SkuItem> skuTable;
+  private final DynamoDbTable<UnitItem> unitTable;
   private final S3Presigner s3Presigner;
 
   public GetSkuHandler() {
@@ -63,7 +64,8 @@ public class GetSkuHandler
   GetSkuHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.skuTable = factory.skuTable();
+    this.unitTable = factory.unitTable();
     this.s3Presigner = factory.s3Presigner();
   }
 
@@ -82,7 +84,7 @@ public class GetSkuHandler
     // api gateway rest proxy integrations pass path parameters still url-encoded
     var skuId = URLDecoder.decode(event.getPathParameters().get("sku_id"), StandardCharsets.UTF_8);
 
-    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
+    var skuPk = SkuItem.formatPk(user, skuId);
 
     var queryConditional = QueryConditional.keyEqualTo(Key.builder().partitionValue(skuPk).build());
     var request =
@@ -91,24 +93,17 @@ public class GetSkuHandler
             .scanIndexForward(true)
             .build();
 
-    var items =
-        tcgInventoryTable.query(request).stream().flatMap(page -> page.items().stream()).toList();
-
     var skuItem =
-        items.stream()
-            .filter(item -> TcgInventoryItem.formatSkuSk().equals(item.getSk()))
-            .findFirst()
-            .orElse(null);
+        skuTable.getItem(Key.builder().partitionValue(skuPk).sortValue(SkuItem.formatSk()).build());
 
     if (skuItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
 
     var unitItems =
-        items.stream()
-            .filter(
-                item ->
-                    item.getSk() != null && item.getSk().startsWith(TcgInventoryItem.UNIT_PREFIX))
+        unitTable.query(request).stream()
+            .flatMap(page -> page.items().stream())
+            .filter(item -> item.getSk() != null && item.getSk().startsWith(UnitItem.UNIT_PREFIX))
             .toList();
 
     int inStockCount = 0;
@@ -151,7 +146,7 @@ public class GetSkuHandler
             units));
   }
 
-  private List<PhotoResponse> toPhotoResponses(String user, List<TcgInventoryItem.Photo> photos) {
+  private List<PhotoResponse> toPhotoResponses(String user, List<UnitItem.Photo> photos) {
     if (photos == null) {
       return List.of();
     }

@@ -47,8 +47,9 @@ public class ConfirmImportHandler
   private final Clock clock;
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
-  private final TcgInventoryItemRepository tcgInventoryItemRepository;
+  private final DynamoDbTable<ImportItem> importTable;
+  private final DynamoDbTable<ImportRowItem> importRowTable;
+  private final TcgInventoryRepository tcgInventoryRepository;
 
   public ConfirmImportHandler() {
     this(TcgInventoryFactory.create());
@@ -59,8 +60,9 @@ public class ConfirmImportHandler
     this.clock = factory.clock();
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
-    this.tcgInventoryItemRepository = factory.tcgInventoryItemRepository();
+    this.importTable = factory.importTable();
+    this.importRowTable = factory.importRowTable();
+    this.tcgInventoryRepository = factory.tcgInventoryRepository();
   }
 
   @Override
@@ -79,10 +81,10 @@ public class ConfirmImportHandler
 
     var importKey =
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatUserPk(user))
-            .sortValue(TcgInventoryItem.formatImportSk(importId))
+            .partitionValue(SkuItem.formatUserPk(user))
+            .sortValue(ImportItem.formatSk(importId))
             .build();
-    var importItem = tcgInventoryTable.getItem(importKey);
+    var importItem = importTable.getItem(importKey);
     if (importItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
@@ -106,7 +108,7 @@ public class ConfirmImportHandler
     if ("review".equals(importItem.getStatus())) {
       importItem.setStatus("confirming");
       importItem.setUpdatedAt(clock.now());
-      tcgInventoryTable.putItem(importItem);
+      importTable.putItem(importItem);
     }
 
     var totalSuggestedPrice = ImportRows.totalSuggestedPrice(keepRows);
@@ -114,7 +116,7 @@ public class ConfirmImportHandler
     if (keepRows.isEmpty()) {
       importItem.setStatus("confirmed");
       importItem.setUpdatedAt(clock.now());
-      tcgInventoryTable.putItem(importItem);
+      importTable.putItem(importItem);
       return httpResponseFactory.ok(
           new ConfirmResponse(importId, "confirmed", 0, totalSuggestedPrice, 0, 0, List.of()));
     }
@@ -132,7 +134,7 @@ public class ConfirmImportHandler
 
     importItem.setStatus("confirmed");
     importItem.setUpdatedAt(clock.now());
-    tcgInventoryTable.putItem(importItem);
+    importTable.putItem(importItem);
 
     var placementInstructions = buildPlacementInstructions(keepRows);
 
@@ -147,12 +149,12 @@ public class ConfirmImportHandler
             placementInstructions));
   }
 
-  private List<TcgInventoryItem> queryKeepRows(String user, String importId) {
+  private List<ImportRowItem> queryKeepRows(String user, String importId) {
     var queryConditional =
         QueryConditional.sortBeginsWith(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatImportRowPk(user, importId))
-                .sortValue(TcgInventoryItem.ROW_PREFIX)
+                .partitionValue(ImportRowItem.formatPk(user, importId))
+                .sortValue(ImportRowItem.ROW_PREFIX)
                 .build());
 
     var request =
@@ -161,27 +163,27 @@ public class ConfirmImportHandler
             .scanIndexForward(true)
             .build();
 
-    return tcgInventoryTable.query(request).stream()
+    return importRowTable.query(request).stream()
         .flatMap(page -> page.items().stream())
         .filter(row -> "keep".equals(row.getDecision()))
         .toList();
   }
 
-  private int allocateSequenceRange(String user, int keepCount, List<TcgInventoryItem> keepRows) {
+  private int allocateSequenceRange(String user, int keepCount, List<ImportRowItem> keepRows) {
     var firstRowWithSeq =
         keepRows.stream().filter(r -> r.getSequenceNumber() != null).findFirst().orElse(null);
     if (firstRowWithSeq != null) {
       return keepRows.stream()
           .filter(r -> r.getSequenceNumber() != null)
-          .mapToInt(TcgInventoryItem::getSequenceNumber)
+          .mapToInt(ImportRowItem::getSequenceNumber)
           .min()
           .orElse(0);
     }
 
-    return tcgInventoryItemRepository.allocateSequenceRange(user, keepCount);
+    return tcgInventoryRepository.allocateSequenceRange(user, keepCount);
   }
 
-  private void assignSequenceNumbers(List<TcgInventoryItem> keepRows, int firstSeq) {
+  private void assignSequenceNumbers(List<ImportRowItem> keepRows, int firstSeq) {
     int seq = firstSeq;
     for (var row : keepRows) {
       if (row.getSequenceNumber() != null) {
@@ -189,13 +191,13 @@ public class ConfirmImportHandler
         continue;
       }
       row.setSequenceNumber(seq);
-      tcgInventoryTable.putItem(row);
+      importRowTable.putItem(row);
       seq++;
     }
   }
 
-  private Map<String, List<TcgInventoryItem>> groupBySkuId(List<TcgInventoryItem> keepRows) {
-    var groups = new HashMap<String, List<TcgInventoryItem>>();
+  private Map<String, List<ImportRowItem>> groupBySkuId(List<ImportRowItem> keepRows) {
+    var groups = new HashMap<String, List<ImportRowItem>>();
     for (var row : keepRows) {
       var skuId = row.getScryfallId() + "#" + row.getFinish() + "#" + row.getCondition();
       groups.computeIfAbsent(skuId, k -> new ArrayList<>()).add(row);
@@ -204,10 +206,10 @@ public class ConfirmImportHandler
   }
 
   private void confirmSkuChunk(
-      String user, String importId, String skuId, List<TcgInventoryItem> rows) {
+      String user, String importId, String skuId, List<ImportRowItem> rows) {
     var firstRow = rows.get(0);
     var skuSeed =
-        TcgInventoryItem.createSku(
+        SkuItem.create(
             user,
             skuId,
             firstRow.getScryfallId(),
@@ -221,21 +223,23 @@ public class ConfirmImportHandler
             firstRow.getSuggestedPrice());
     skuSeed.setFetchtcgSetId(firstRow.getFetchtcgSetId());
 
-    var units = new ArrayList<TcgInventoryItem>();
+    var units = new ArrayList<UnitItem>();
     for (var row : rows) {
       var unit =
-          TcgInventoryItem.createUnit(
-              user, skuId, row.getSequenceNumber(), "in_stock", importId, clock.now());
+          UnitItem.create(user, skuId, row.getSequenceNumber(), "in_stock", importId, clock.now());
       if (row.getPhotos() != null && !row.getPhotos().isEmpty()) {
-        unit.setPhotos(row.getPhotos());
+        unit.setPhotos(
+            row.getPhotos().stream()
+                .map(photo -> UnitItem.Photo.create(photo.getPhotoId(), photo.getFetchtcgUrl()))
+                .toList());
       }
       units.add(unit);
     }
 
-    tcgInventoryItemRepository.confirmImportSku(user, importId, skuSeed, units);
+    tcgInventoryRepository.confirmImportSku(user, importId, skuSeed, units);
   }
 
-  private List<PlacementInstruction> buildPlacementInstructions(List<TcgInventoryItem> keepRows) {
+  private List<PlacementInstruction> buildPlacementInstructions(List<ImportRowItem> keepRows) {
     var instructions = new ArrayList<PlacementInstruction>();
 
     int currentBlockNum = keepRows.get(0).getSequenceNumber() / 100;
@@ -259,7 +263,7 @@ public class ConfirmImportHandler
   }
 
   private PlacementInstruction buildInstruction(
-      List<TcgInventoryItem> rows, int startIdx, int endIdx, int blockNum) {
+      List<ImportRowItem> rows, int startIdx, int endIdx, int blockNum) {
     var block = InventoryLocation.formatBlock(blockNum);
     var firstRow = rows.get(startIdx);
     var lastRow = rows.get(endIdx);

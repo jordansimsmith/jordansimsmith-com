@@ -24,7 +24,7 @@ public class DeleteScanHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final TcgInventoryItemRepository tcgInventoryItemRepository;
+  private final TcgInventoryRepository tcgInventoryRepository;
   private final S3Client s3Client;
 
   public DeleteScanHandler() {
@@ -35,7 +35,7 @@ public class DeleteScanHandler
   DeleteScanHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryItemRepository = factory.tcgInventoryItemRepository();
+    this.tcgInventoryRepository = factory.tcgInventoryRepository();
     this.s3Client = factory.s3Client();
   }
 
@@ -52,7 +52,7 @@ public class DeleteScanHandler
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
     var user = requestContextFactory.createCtx(event).user();
     var scanId = event.getPathParameters().get("scan_id");
-    var scanItem = tcgInventoryItemRepository.getScan(user, scanId);
+    var scanItem = tcgInventoryRepository.getScan(user, scanId);
     if (scanItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
@@ -60,21 +60,21 @@ public class DeleteScanHandler
       return httpResponseFactory.conflict(new ErrorResponse("scan is not in a deletable status"));
     }
 
-    var rowItems = tcgInventoryItemRepository.findScanRows(user, scanId);
-    if (!tcgInventoryItemRepository.deleteScan(user, scanId)) {
-      var currentScan = tcgInventoryItemRepository.getScan(user, scanId);
+    var rowItems = tcgInventoryRepository.findScanRows(user, scanId);
+    if (!tcgInventoryRepository.deleteScan(user, scanId)) {
+      var currentScan = tcgInventoryRepository.getScan(user, scanId);
       if (currentScan == null) {
         return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
       }
       return httpResponseFactory.conflict(new ErrorResponse("scan is not in a deletable status"));
     }
 
-    tcgInventoryItemRepository.deleteScanRows(rowItems);
+    tcgInventoryRepository.deleteScanRows(rowItems);
     deleteSourceObjects(rowItems);
     return httpResponseFactory.noContent();
   }
 
-  private void deleteSourceObjects(List<TcgInventoryItem> rowItems) {
+  private void deleteSourceObjects(List<ScanRowItem> rowItems) {
     if (rowItems.isEmpty()) {
       return;
     }

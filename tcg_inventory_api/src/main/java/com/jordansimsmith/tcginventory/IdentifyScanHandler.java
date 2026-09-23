@@ -29,7 +29,7 @@ public class IdentifyScanHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final TcgInventoryItemRepository tcgInventoryItemRepository;
+  private final TcgInventoryRepository tcgInventoryRepository;
   private final S3Client s3Client;
   private final QueueClient<ScanMessage> scanQueue;
 
@@ -41,7 +41,7 @@ public class IdentifyScanHandler
   IdentifyScanHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryItemRepository = factory.tcgInventoryItemRepository();
+    this.tcgInventoryRepository = factory.tcgInventoryRepository();
     this.s3Client = factory.s3Client();
     this.scanQueue = factory.scanQueue();
   }
@@ -60,7 +60,7 @@ public class IdentifyScanHandler
     var user = requestContextFactory.createCtx(event).user();
     Map<String, String> pathParameters = event.getPathParameters();
     var scanId = pathParameters.get("scan_id");
-    var scanItem = tcgInventoryItemRepository.getScan(user, scanId);
+    var scanItem = tcgInventoryRepository.getScan(user, scanId);
     if (scanItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
@@ -69,14 +69,14 @@ public class IdentifyScanHandler
       return accepted(scanItem);
     }
 
-    var scanRows = tcgInventoryItemRepository.findScanRows(user, scanId);
+    var scanRows = tcgInventoryRepository.findScanRows(user, scanId);
     if (!areAllRowsUploaded(scanRows)) {
       return httpResponseFactory.conflict(
           new ErrorResponse("all scan files must be uploaded before identification"));
     }
 
-    if (!tcgInventoryItemRepository.transitionScanToIdentifying(user, scanId)) {
-      var currentScan = tcgInventoryItemRepository.getScan(user, scanId);
+    if (!tcgInventoryRepository.transitionScanToIdentifying(user, scanId)) {
+      var currentScan = tcgInventoryRepository.getScan(user, scanId);
       if (currentScan == null) {
         return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
       }
@@ -87,7 +87,7 @@ public class IdentifyScanHandler
     return httpResponseFactory.accepted(new IdentifyScanResponse(scanId, "identifying"));
   }
 
-  private boolean areAllRowsUploaded(List<TcgInventoryItem> scanRows) {
+  private boolean areAllRowsUploaded(List<ScanRowItem> scanRows) {
     for (var row : scanRows) {
       try {
         var head =
@@ -107,7 +107,7 @@ public class IdentifyScanHandler
     return true;
   }
 
-  private APIGatewayV2HTTPResponse accepted(TcgInventoryItem scanItem) {
+  private APIGatewayV2HTTPResponse accepted(ScanItem scanItem) {
     return httpResponseFactory.accepted(
         new IdentifyScanResponse(scanItem.getScanId(), scanItem.getStatus()));
   }

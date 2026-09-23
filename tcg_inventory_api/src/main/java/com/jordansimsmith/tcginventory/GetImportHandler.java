@@ -55,7 +55,8 @@ public class GetImportHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<ImportItem> importTable;
+  private final DynamoDbTable<ImportRowItem> importRowTable;
   private final S3Presigner s3Presigner;
 
   public GetImportHandler() {
@@ -66,7 +67,8 @@ public class GetImportHandler
   GetImportHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.importTable = factory.importTable();
+    this.importRowTable = factory.importRowTable();
     this.s3Presigner = factory.s3Presigner();
   }
 
@@ -86,11 +88,11 @@ public class GetImportHandler
 
     var importKey =
         Key.builder()
-            .partitionValue(TcgInventoryItem.formatUserPk(user))
-            .sortValue(TcgInventoryItem.formatImportSk(importId))
+            .partitionValue(SkuItem.formatUserPk(user))
+            .sortValue(ImportItem.formatSk(importId))
             .build();
 
-    var importItem = tcgInventoryTable.getItem(importKey);
+    var importItem = importTable.getItem(importKey);
     if (importItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
@@ -98,8 +100,8 @@ public class GetImportHandler
     var rowQueryConditional =
         QueryConditional.sortBeginsWith(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatImportRowPk(user, importId))
-                .sortValue(TcgInventoryItem.ROW_PREFIX)
+                .partitionValue(ImportRowItem.formatPk(user, importId))
+                .sortValue(ImportRowItem.ROW_PREFIX)
                 .build());
 
     var rowRequest =
@@ -109,9 +111,7 @@ public class GetImportHandler
             .build();
 
     var rowItems =
-        tcgInventoryTable.query(rowRequest).stream()
-            .flatMap(page -> page.items().stream())
-            .toList();
+        importRowTable.query(rowRequest).stream().flatMap(page -> page.items().stream()).toList();
 
     var rows =
         rowItems.stream()
@@ -147,7 +147,7 @@ public class GetImportHandler
             rows));
   }
 
-  private List<PhotoResponse> toPhotoResponses(String user, List<TcgInventoryItem.Photo> photos) {
+  private List<PhotoResponse> toPhotoResponses(String user, List<ImportRowItem.Photo> photos) {
     if (photos == null) {
       return List.of();
     }

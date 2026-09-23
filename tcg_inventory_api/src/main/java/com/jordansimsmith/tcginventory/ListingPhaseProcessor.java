@@ -23,22 +23,22 @@ public class ListingPhaseProcessor {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ListingPhaseProcessor.class);
 
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
-  private final TcgInventoryItemRepository tcgInventoryItemRepository;
+  private final DynamoDbTable<SkuItem> skuTable;
+  private final TcgInventoryRepository tcgInventoryRepository;
   private final DynamoDbClient dynamoDbClient;
   private final Clock clock;
   private final FetchTcgClient fetchTcgClient;
   private final S3Client s3Client;
 
   public ListingPhaseProcessor(
-      DynamoDbTable<TcgInventoryItem> tcgInventoryTable,
-      TcgInventoryItemRepository tcgInventoryItemRepository,
+      DynamoDbTable<SkuItem> skuTable,
+      TcgInventoryRepository tcgInventoryRepository,
       DynamoDbClient dynamoDbClient,
       Clock clock,
       FetchTcgClient fetchTcgClient,
       S3Client s3Client) {
-    this.tcgInventoryTable = tcgInventoryTable;
-    this.tcgInventoryItemRepository = tcgInventoryItemRepository;
+    this.skuTable = skuTable;
+    this.tcgInventoryRepository = tcgInventoryRepository;
     this.dynamoDbClient = dynamoDbClient;
     this.clock = clock;
     this.fetchTcgClient = fetchTcgClient;
@@ -67,19 +67,19 @@ public class ListingPhaseProcessor {
     return new BatchResult(continuation + processed, dirtySkus.size() < BATCH_SIZE);
   }
 
-  private List<TcgInventoryItem> loadDirtySkus(String user) {
-    var results = new ArrayList<TcgInventoryItem>();
+  private List<SkuItem> loadDirtySkus(String user) {
+    var results = new ArrayList<SkuItem>();
     var request =
         QueryEnhancedRequest.builder()
             .queryConditional(
                 QueryConditional.sortBeginsWith(
                     Key.builder()
-                        .partitionValue(TcgInventoryItem.formatGsi1pk(user))
-                        .sortValue(TcgInventoryItem.SKU_PREFIX)
+                        .partitionValue(SkuItem.formatGsi1pk(user))
+                        .sortValue(SkuItem.SKU_PREFIX)
                         .build()))
             .build();
 
-    tcgInventoryTable.index(TcgInventoryItem.GSI1_NAME).query(request).stream()
+    skuTable.index(TcgInventoryTable.GSI1_NAME).query(request).stream()
         .flatMap(page -> page.items().stream())
         .limit(BATCH_SIZE)
         .forEach(results::add);
@@ -88,8 +88,8 @@ public class ListingPhaseProcessor {
 
   private InStock loadInStock(String user, String skuId) {
     int count = 0;
-    TcgInventoryItem first = null;
-    for (var item : tcgInventoryItemRepository.findUnits(user, skuId)) {
+    UnitItem first = null;
+    for (var item : tcgInventoryRepository.findUnits(user, skuId)) {
       if ("in_stock".equals(item.getStatus())) {
         if (first == null) {
           first = item;
@@ -101,10 +101,10 @@ public class ListingPhaseProcessor {
   }
 
   private void publishSku(
-      String user, String bearerToken, TcgInventoryItem sku, InStock inStock, int capturedVersion) {
+      String user, String bearerToken, SkuItem sku, InStock inStock, int capturedVersion) {
     var photos =
         inStock.first().getPhotos() == null
-            ? new ArrayList<TcgInventoryItem.Photo>()
+            ? new ArrayList<UnitItem.Photo>()
             : new ArrayList<>(inStock.first().getPhotos());
     var imageUrls = new ArrayList<String>();
     for (var photo : photos) {
@@ -121,20 +121,18 @@ public class ListingPhaseProcessor {
             fetchTcgClient.uploadListingImage(bearerToken, bytes, photo.getPhotoId() + ".jpg"));
         dynamoDbClient.updateItem(
             UpdateItemRequest.builder()
-                .tableName(TcgInventoryItem.TABLE_NAME)
+                .tableName(TcgInventoryTable.TABLE_NAME)
                 .key(
                     Map.of(
-                        TcgInventoryItem.PK,
+                        SkuItem.PK,
                             AttributeValue.builder()
-                                .s(TcgInventoryItem.formatSkuPk(user, sku.getSkuId()))
+                                .s(SkuItem.formatPk(user, sku.getSkuId()))
                                 .build(),
-                        TcgInventoryItem.SK,
+                        SkuItem.SK,
                             AttributeValue.builder()
-                                .s(
-                                    TcgInventoryItem.formatUnitSk(
-                                        inStock.first().getSequenceNumber()))
+                                .s(UnitItem.formatSk(inStock.first().getSequenceNumber()))
                                 .build()))
-                .updateExpression("SET " + TcgInventoryItem.PHOTOS + " = :photos")
+                .updateExpression("SET " + UnitItem.PHOTOS + " = :photos")
                 .expressionAttributeValues(Map.of(":photos", Photos.toAttributeValue(photos)))
                 .build());
       }
@@ -170,47 +168,42 @@ public class ListingPhaseProcessor {
         price.toPlainString());
   }
 
-  private record InStock(int count, TcgInventoryItem first) {}
+  private record InStock(int count, UnitItem first) {}
 
-  private void delistSku(
-      String user, String bearerToken, TcgInventoryItem sku, int capturedVersion) {
+  private void delistSku(String user, String bearerToken, SkuItem sku, int capturedVersion) {
     fetchTcgClient.deleteListing(bearerToken, sku.getFetchtcgListingId());
     clearDirtyRemoveSnapshot(user, sku.getSkuId(), capturedVersion);
   }
 
   private void clearDirtyWithSnapshot(
       String user, String skuId, int capturedVersion, int listingId, int quantity, String price) {
-    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
-    var cleanGsi1pk = TcgInventoryItem.USER_PREFIX + user + "#CLEAN";
+    var skuPk = SkuItem.formatPk(user, skuId);
+    var cleanGsi1pk = SkuItem.USER_PREFIX + user + "#CLEAN";
 
     try {
       dynamoDbClient.updateItem(
           UpdateItemRequest.builder()
-              .tableName(TcgInventoryItem.TABLE_NAME)
+              .tableName(TcgInventoryTable.TABLE_NAME)
               .key(
                   Map.of(
-                      TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build(),
-                      TcgInventoryItem.SK,
-                          AttributeValue.builder().s(TcgInventoryItem.formatSkuSk()).build()))
+                      SkuItem.PK, AttributeValue.builder().s(skuPk).build(),
+                      SkuItem.SK, AttributeValue.builder().s(SkuItem.formatSk()).build()))
               .updateExpression(
                   "SET "
-                      + TcgInventoryItem.DIRTY
+                      + SkuItem.DIRTY
                       + " = :clean, "
-                      + TcgInventoryItem.GSI1PK
+                      + SkuItem.GSI1PK
                       + " = :gsi1pk, "
-                      + TcgInventoryItem.FETCHTCG_LISTING_ID
+                      + SkuItem.FETCHTCG_LISTING_ID
                       + " = :listingId, "
-                      + TcgInventoryItem.LAST_PUBLISHED_QUANTITY
+                      + SkuItem.LAST_PUBLISHED_QUANTITY
                       + " = :qty, "
-                      + TcgInventoryItem.LAST_PUBLISHED_PRICE
+                      + SkuItem.LAST_PUBLISHED_PRICE
                       + " = :price, "
-                      + TcgInventoryItem.LAST_PUBLISHED_AT
+                      + SkuItem.LAST_PUBLISHED_AT
                       + " = :now")
               .conditionExpression(
-                  TcgInventoryItem.DIRTY
-                      + " = :dirty AND "
-                      + TcgInventoryItem.VERSION
-                      + " = :version")
+                  SkuItem.DIRTY + " = :dirty AND " + SkuItem.VERSION + " = :version")
               .expressionAttributeValues(
                   Map.ofEntries(
                       Map.entry(":clean", AttributeValue.builder().bool(false).build()),
@@ -237,36 +230,32 @@ public class ListingPhaseProcessor {
   }
 
   private void clearDirtyRemoveSnapshot(String user, String skuId, int capturedVersion) {
-    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
-    var cleanGsi1pk = TcgInventoryItem.USER_PREFIX + user + "#CLEAN";
+    var skuPk = SkuItem.formatPk(user, skuId);
+    var cleanGsi1pk = SkuItem.USER_PREFIX + user + "#CLEAN";
 
     try {
       dynamoDbClient.updateItem(
           UpdateItemRequest.builder()
-              .tableName(TcgInventoryItem.TABLE_NAME)
+              .tableName(TcgInventoryTable.TABLE_NAME)
               .key(
                   Map.of(
-                      TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build(),
-                      TcgInventoryItem.SK,
-                          AttributeValue.builder().s(TcgInventoryItem.formatSkuSk()).build()))
+                      SkuItem.PK, AttributeValue.builder().s(skuPk).build(),
+                      SkuItem.SK, AttributeValue.builder().s(SkuItem.formatSk()).build()))
               .updateExpression(
                   "SET "
-                      + TcgInventoryItem.DIRTY
+                      + SkuItem.DIRTY
                       + " = :clean, "
-                      + TcgInventoryItem.GSI1PK
+                      + SkuItem.GSI1PK
                       + " = :gsi1pk REMOVE "
-                      + TcgInventoryItem.FETCHTCG_LISTING_ID
+                      + SkuItem.FETCHTCG_LISTING_ID
                       + ", "
-                      + TcgInventoryItem.LAST_PUBLISHED_QUANTITY
+                      + SkuItem.LAST_PUBLISHED_QUANTITY
                       + ", "
-                      + TcgInventoryItem.LAST_PUBLISHED_PRICE
+                      + SkuItem.LAST_PUBLISHED_PRICE
                       + ", "
-                      + TcgInventoryItem.LAST_PUBLISHED_AT)
+                      + SkuItem.LAST_PUBLISHED_AT)
               .conditionExpression(
-                  TcgInventoryItem.DIRTY
-                      + " = :dirty AND "
-                      + TcgInventoryItem.VERSION
-                      + " = :version")
+                  SkuItem.DIRTY + " = :dirty AND " + SkuItem.VERSION + " = :version")
               .expressionAttributeValues(
                   Map.of(
                       ":clean", AttributeValue.builder().bool(false).build(),
@@ -281,29 +270,21 @@ public class ListingPhaseProcessor {
   }
 
   private void clearDirty(String user, String skuId, int capturedVersion) {
-    var skuPk = TcgInventoryItem.formatSkuPk(user, skuId);
-    var cleanGsi1pk = TcgInventoryItem.USER_PREFIX + user + "#CLEAN";
+    var skuPk = SkuItem.formatPk(user, skuId);
+    var cleanGsi1pk = SkuItem.USER_PREFIX + user + "#CLEAN";
 
     try {
       dynamoDbClient.updateItem(
           UpdateItemRequest.builder()
-              .tableName(TcgInventoryItem.TABLE_NAME)
+              .tableName(TcgInventoryTable.TABLE_NAME)
               .key(
                   Map.of(
-                      TcgInventoryItem.PK, AttributeValue.builder().s(skuPk).build(),
-                      TcgInventoryItem.SK,
-                          AttributeValue.builder().s(TcgInventoryItem.formatSkuSk()).build()))
+                      SkuItem.PK, AttributeValue.builder().s(skuPk).build(),
+                      SkuItem.SK, AttributeValue.builder().s(SkuItem.formatSk()).build()))
               .updateExpression(
-                  "SET "
-                      + TcgInventoryItem.DIRTY
-                      + " = :clean, "
-                      + TcgInventoryItem.GSI1PK
-                      + " = :gsi1pk")
+                  "SET " + SkuItem.DIRTY + " = :clean, " + SkuItem.GSI1PK + " = :gsi1pk")
               .conditionExpression(
-                  TcgInventoryItem.DIRTY
-                      + " = :dirty AND "
-                      + TcgInventoryItem.VERSION
-                      + " = :version")
+                  SkuItem.DIRTY + " = :dirty AND " + SkuItem.VERSION + " = :version")
               .expressionAttributeValues(
                   Map.of(
                       ":clean", AttributeValue.builder().bool(false).build(),

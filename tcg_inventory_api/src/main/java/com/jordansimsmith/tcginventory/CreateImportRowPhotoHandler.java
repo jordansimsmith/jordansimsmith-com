@@ -28,7 +28,8 @@ public class CreateImportRowPhotoHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<ImportItem> importTable;
+  private final DynamoDbTable<ImportRowItem> importRowTable;
   private final S3Client s3Client;
   private final UlidGenerator ulidGenerator;
 
@@ -40,7 +41,8 @@ public class CreateImportRowPhotoHandler
   CreateImportRowPhotoHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.importTable = factory.importTable();
+    this.importRowTable = factory.importRowTable();
     this.s3Client = factory.s3Client();
     this.ulidGenerator = factory.ulidGenerator();
   }
@@ -84,10 +86,10 @@ public class CreateImportRowPhotoHandler
     var position = Integer.parseInt(event.getPathParameters().get("position"));
 
     var importItem =
-        tcgInventoryTable.getItem(
+        importTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk(user))
-                .sortValue(TcgInventoryItem.formatImportSk(importId))
+                .partitionValue(SkuItem.formatUserPk(user))
+                .sortValue(ImportItem.formatSk(importId))
                 .build());
     if (importItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
@@ -98,10 +100,10 @@ public class CreateImportRowPhotoHandler
     }
 
     var rowItem =
-        tcgInventoryTable.getItem(
+        importRowTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatImportRowPk(user, importId))
-                .sortValue(TcgInventoryItem.formatImportRowSk(position))
+                .partitionValue(ImportRowItem.formatPk(user, importId))
+                .sortValue(ImportRowItem.formatSk(position))
                 .build());
     if (rowItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
@@ -114,7 +116,7 @@ public class CreateImportRowPhotoHandler
 
     var photos =
         rowItem.getPhotos() == null
-            ? new ArrayList<TcgInventoryItem.Photo>()
+            ? new ArrayList<ImportRowItem.Photo>()
             : new ArrayList<>(rowItem.getPhotos());
     if (photos.size() >= Photos.MAX_PHOTOS) {
       return httpResponseFactory.badRequest(new ErrorResponse("a row may have at most 5 photos"));
@@ -129,9 +131,9 @@ public class CreateImportRowPhotoHandler
             .build(),
         RequestBody.fromBytes(bytes));
 
-    photos.add(TcgInventoryItem.Photo.create(photoId, null));
+    photos.add(ImportRowItem.Photo.create(photoId, null));
     rowItem.setPhotos(photos);
-    tcgInventoryTable.putItem(rowItem);
+    importRowTable.putItem(rowItem);
 
     return httpResponseFactory.noContent();
   }

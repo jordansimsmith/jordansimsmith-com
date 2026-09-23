@@ -30,7 +30,10 @@ public class ConfirmImportHandlerIntegrationTest {
   private FakeClock fakeClock;
   private FakeUlidGenerator fakeUlidGenerator;
   private ObjectMapper objectMapper;
-  private DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private DynamoDbTable<ImportItem> importTable;
+  private DynamoDbTable<ImportRowItem> importRowTable;
+  private DynamoDbTable<SkuItem> skuTable;
+  private DynamoDbTable<UnitItem> unitTable;
 
   private ConfirmImportHandler confirmImportHandler;
 
@@ -42,7 +45,7 @@ public class ConfirmImportHandlerIntegrationTest {
   static void setUpBeforeClass() {
     var factory =
         TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
-    var table = factory.tcgInventoryTable();
+    var table = factory.tableDefinition();
     DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
   }
 
@@ -54,7 +57,10 @@ public class ConfirmImportHandlerIntegrationTest {
     fakeClock = factory.fakeClock();
     fakeUlidGenerator = factory.fakeUlidGenerator();
     objectMapper = factory.objectMapper();
-    tcgInventoryTable = factory.tcgInventoryTable();
+    importTable = factory.importTable();
+    importRowTable = factory.importRowTable();
+    skuTable = factory.skuTable();
+    unitTable = factory.unitTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
@@ -85,37 +91,31 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(body.get("first_sequence_number").asInt()).isEqualTo(0);
     assertThat(body.get("last_sequence_number").asInt()).isEqualTo(2);
 
-    var sku1Pk = TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#NM");
+    var sku1Pk = SkuItem.formatPk("jordan", "scryfall-1#normal#NM");
     var unit0 =
-        tcgInventoryTable.getItem(
-            Key.builder()
-                .partitionValue(sku1Pk)
-                .sortValue(TcgInventoryItem.formatUnitSk(0))
-                .build());
+        unitTable.getItem(
+            Key.builder().partitionValue(sku1Pk).sortValue(UnitItem.formatSk(0)).build());
     assertThat(unit0).isNotNull();
     assertThat(unit0.getStatus()).isEqualTo("in_stock");
     assertThat(unit0.getImportId()).isEqualTo("import1");
 
     var unit1 =
-        tcgInventoryTable.getItem(
-            Key.builder()
-                .partitionValue(sku1Pk)
-                .sortValue(TcgInventoryItem.formatUnitSk(1))
-                .build());
+        unitTable.getItem(
+            Key.builder().partitionValue(sku1Pk).sortValue(UnitItem.formatSk(1)).build());
     assertThat(unit1).isNotNull();
 
     var sku1 =
-        tcgInventoryTable.getItem(
-            Key.builder().partitionValue(sku1Pk).sortValue(TcgInventoryItem.formatSkuSk()).build());
+        skuTable.getItem(
+            Key.builder().partitionValue(sku1Pk).sortValue(SkuItem.formatSk()).build());
     assertThat(countUnits(sku1Pk)).isEqualTo(2);
     assertThat(sku1.getVersion()).isEqualTo(1);
     assertThat(sku1.getDirty()).isTrue();
-    assertThat(sku1.getGsi1pk()).isEqualTo(TcgInventoryItem.formatGsi1pk("jordan"));
+    assertThat(sku1.getGsi1pk()).isEqualTo(SkuItem.formatGsi1pk("jordan"));
 
-    var sku2Pk = TcgInventoryItem.formatSkuPk("jordan", "scryfall-2#foil#LP");
+    var sku2Pk = SkuItem.formatPk("jordan", "scryfall-2#foil#LP");
     var sku2 =
-        tcgInventoryTable.getItem(
-            Key.builder().partitionValue(sku2Pk).sortValue(TcgInventoryItem.formatSkuSk()).build());
+        skuTable.getItem(
+            Key.builder().partitionValue(sku2Pk).sortValue(SkuItem.formatSk()).build());
     assertThat(countUnits(sku2Pk)).isEqualTo(1);
     assertThat(sku2.getVersion()).isEqualTo(1);
     assertThat(sku2.getDirty()).isTrue();
@@ -126,9 +126,8 @@ public class ConfirmImportHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     var importItem =
-        TcgInventoryItem.createImport(
-            "jordan", "import1", null, 1, null, Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(importItem);
+        ImportItem.create("jordan", "import1", null, 1, null, Instant.ofEpochSecond(1700000000));
+    importTable.putItem(importItem);
 
     // act
     var response =
@@ -144,10 +143,9 @@ public class ConfirmImportHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     var importItem =
-        TcgInventoryItem.createImport(
-            "jordan", "import1", null, 1, null, Instant.ofEpochSecond(1700000000));
+        ImportItem.create("jordan", "import1", null, 1, null, Instant.ofEpochSecond(1700000000));
     importItem.setStatus("confirmed");
-    tcgInventoryTable.putItem(importItem);
+    importTable.putItem(importItem);
 
     // act
     var response =
@@ -227,12 +225,9 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(body.get("unit_count").asInt()).isEqualTo(4);
     assertThat(body.get("total_suggested_price").asText()).isEqualTo("6.00");
 
-    assertThat(countUnits(TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#NM")))
-        .isEqualTo(2);
-    assertThat(countUnits(TcgInventoryItem.formatSkuPk("jordan", "scryfall-2#foil#LP")))
-        .isEqualTo(1);
-    assertThat(countUnits(TcgInventoryItem.formatSkuPk("jordan", "scryfall-3#normal#MP")))
-        .isEqualTo(1);
+    assertThat(countUnits(SkuItem.formatPk("jordan", "scryfall-1#normal#NM"))).isEqualTo(2);
+    assertThat(countUnits(SkuItem.formatPk("jordan", "scryfall-2#foil#LP"))).isEqualTo(1);
+    assertThat(countUnits(SkuItem.formatPk("jordan", "scryfall-3#normal#MP"))).isEqualTo(1);
   }
 
   @Test
@@ -241,13 +236,12 @@ public class ConfirmImportHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
     var importItem =
-        TcgInventoryItem.createImport(
-            "jordan", "import1", null, 2, null, Instant.ofEpochSecond(1700000000));
+        ImportItem.create("jordan", "import1", null, 2, null, Instant.ofEpochSecond(1700000000));
     importItem.setStatus("confirming");
-    tcgInventoryTable.putItem(importItem);
+    importTable.putItem(importItem);
 
     var row1 =
-        TcgInventoryItem.createImportRow(
+        ImportRowItem.create(
             "jordan",
             "import1",
             1,
@@ -264,10 +258,10 @@ public class ConfirmImportHandlerIntegrationTest {
     row1.setFetchtcgCardId("mtg_168_c_dom_normal");
     row1.setFetchtcgSetId(2624);
     row1.setSequenceNumber(0);
-    tcgInventoryTable.putItem(row1);
+    importRowTable.putItem(row1);
 
     var row2 =
-        TcgInventoryItem.createImportRow(
+        ImportRowItem.create(
             "jordan",
             "import1",
             2,
@@ -284,20 +278,20 @@ public class ConfirmImportHandlerIntegrationTest {
     row2.setFetchtcgCardId("mtg_168_c_dom_normal");
     row2.setFetchtcgSetId(2624);
     row2.setSequenceNumber(1);
-    tcgInventoryTable.putItem(row2);
+    importRowTable.putItem(row2);
 
     var existingUnit =
-        TcgInventoryItem.createUnit(
+        UnitItem.create(
             "jordan",
             "scryfall-1#normal#NM",
             0,
             "in_stock",
             "import1",
             Instant.ofEpochSecond(1700000000));
-    tcgInventoryTable.putItem(existingUnit);
+    unitTable.putItem(existingUnit);
 
     var existingSku =
-        TcgInventoryItem.createSku(
+        SkuItem.create(
             "jordan",
             "scryfall-1#normal#NM",
             "scryfall-1",
@@ -309,7 +303,7 @@ public class ConfirmImportHandlerIntegrationTest {
             "168",
             null,
             null);
-    tcgInventoryTable.putItem(existingSku);
+    skuTable.putItem(existingSku);
 
     // act
     var response =
@@ -323,18 +317,18 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(body.get("total_suggested_price").asText()).isEqualTo("3.00");
 
     var sku =
-        tcgInventoryTable.getItem(
+        skuTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#NM"))
-                .sortValue(TcgInventoryItem.formatSkuSk())
+                .partitionValue(SkuItem.formatPk("jordan", "scryfall-1#normal#NM"))
+                .sortValue(SkuItem.formatSk())
                 .build());
     assertThat(sku.getVersion()).isEqualTo(1);
 
     var importResult =
-        tcgInventoryTable.getItem(
+        importTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatImportSk("import1"))
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(ImportItem.formatSk("import1"))
                 .build());
     assertThat(importResult.getStatus()).isEqualTo("confirmed");
   }
@@ -391,16 +385,14 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(body.get("message").asText()).isEqualTo("2 rows need photos before confirm");
 
     var importResult =
-        tcgInventoryTable.getItem(
+        importTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
-                .sortValue(TcgInventoryItem.formatImportSk("import1"))
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(ImportItem.formatSk("import1"))
                 .build());
     assertThat(importResult.getStatus()).isEqualTo("review");
-    assertThat(countUnits(TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#NM")))
-        .isEqualTo(0);
-    assertThat(countUnits(TcgInventoryItem.formatSkuPk("jordan", "scryfall-2#normal#NM")))
-        .isEqualTo(0);
+    assertThat(countUnits(SkuItem.formatPk("jordan", "scryfall-1#normal#NM"))).isEqualTo(0);
+    assertThat(countUnits(SkuItem.formatPk("jordan", "scryfall-2#normal#NM"))).isEqualTo(0);
   }
 
   @Test
@@ -418,8 +410,8 @@ public class ConfirmImportHandlerIntegrationTest {
         "Hit A",
         "20.00",
         List.of(
-            TcgInventoryItem.Photo.create("photo-a1", null),
-            TcgInventoryItem.Photo.create("photo-a2", null)));
+            ImportRowItem.Photo.create("photo-a1", null),
+            ImportRowItem.Photo.create("photo-a2", null)));
     createKeepRow(
         "jordan",
         "import1",
@@ -429,7 +421,7 @@ public class ConfirmImportHandlerIntegrationTest {
         "NM",
         "Hit B",
         "25.00",
-        List.of(TcgInventoryItem.Photo.create("photo-b1", null)));
+        List.of(ImportRowItem.Photo.create("photo-b1", null)));
     createKeepRow(
         "jordan",
         "import1",
@@ -439,7 +431,7 @@ public class ConfirmImportHandlerIntegrationTest {
         "NM",
         "Bulk",
         "1.50",
-        List.of(TcgInventoryItem.Photo.create("photo-c1", null)));
+        List.of(ImportRowItem.Photo.create("photo-c1", null)));
 
     // act
     var response =
@@ -454,29 +446,29 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(body.get("total_suggested_price").asText()).isEqualTo("46.50");
 
     var unitA =
-        tcgInventoryTable.getItem(
+        unitTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatSkuPk("jordan", "scryfall-1#normal#NM"))
-                .sortValue(TcgInventoryItem.formatUnitSk(0))
+                .partitionValue(SkuItem.formatPk("jordan", "scryfall-1#normal#NM"))
+                .sortValue(UnitItem.formatSk(0))
                 .build());
     assertThat(unitA.getPhotos()).hasSize(2);
     assertThat(unitA.getPhotos().get(0).getPhotoId()).isEqualTo("photo-a1");
     assertThat(unitA.getPhotos().get(1).getPhotoId()).isEqualTo("photo-a2");
 
     var unitB =
-        tcgInventoryTable.getItem(
+        unitTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatSkuPk("jordan", "scryfall-2#normal#NM"))
-                .sortValue(TcgInventoryItem.formatUnitSk(1))
+                .partitionValue(SkuItem.formatPk("jordan", "scryfall-2#normal#NM"))
+                .sortValue(UnitItem.formatSk(1))
                 .build());
     assertThat(unitB.getPhotos()).hasSize(1);
     assertThat(unitB.getPhotos().get(0).getPhotoId()).isEqualTo("photo-b1");
 
     var unitC =
-        tcgInventoryTable.getItem(
+        unitTable.getItem(
             Key.builder()
-                .partitionValue(TcgInventoryItem.formatSkuPk("jordan", "scryfall-3#normal#NM"))
-                .sortValue(TcgInventoryItem.formatUnitSk(2))
+                .partitionValue(SkuItem.formatPk("jordan", "scryfall-3#normal#NM"))
+                .sortValue(UnitItem.formatSk(2))
                 .build());
     assertThat(unitC.getPhotos()).hasSize(1);
     assertThat(unitC.getPhotos().get(0).getPhotoId()).isEqualTo("photo-c1");
@@ -484,10 +476,10 @@ public class ConfirmImportHandlerIntegrationTest {
 
   private void createImportInReview(String user, String importId, int rowCount) {
     var importItem =
-        TcgInventoryItem.createImport(
+        ImportItem.create(
             user, importId, "test.csv", rowCount, null, Instant.ofEpochSecond(1700000000));
     importItem.setStatus("review");
-    tcgInventoryTable.putItem(importItem);
+    importTable.putItem(importItem);
   }
 
   private void createKeepRow(
@@ -510,9 +502,9 @@ public class ConfirmImportHandlerIntegrationTest {
       String condition,
       String name,
       String suggestedPrice,
-      List<TcgInventoryItem.Photo> photos) {
+      List<ImportRowItem.Photo> photos) {
     var rowItem =
-        TcgInventoryItem.createImportRow(
+        ImportRowItem.create(
             user,
             importId,
             position,
@@ -531,13 +523,13 @@ public class ConfirmImportHandlerIntegrationTest {
     if (photos != null) {
       rowItem.setPhotos(photos);
     }
-    tcgInventoryTable.putItem(rowItem);
+    importRowTable.putItem(rowItem);
   }
 
   private void createRowWithDecision(
       String user, String importId, int position, String decision, String reason) {
     var rowItem =
-        TcgInventoryItem.createImportRow(
+        ImportRowItem.create(
             user,
             importId,
             position,
@@ -551,14 +543,14 @@ public class ConfirmImportHandlerIntegrationTest {
             "en");
     rowItem.setDecision(decision);
     rowItem.setDecisionReason(reason);
-    tcgInventoryTable.putItem(rowItem);
+    importRowTable.putItem(rowItem);
   }
 
   private long countUnits(String skuPk) {
     var queryConditional =
         QueryConditional.sortBeginsWith(
-            Key.builder().partitionValue(skuPk).sortValue(TcgInventoryItem.UNIT_PREFIX).build());
-    return tcgInventoryTable
+            Key.builder().partitionValue(skuPk).sortValue(UnitItem.UNIT_PREFIX).build());
+    return unitTable
         .query(QueryEnhancedRequest.builder().queryConditional(queryConditional).build())
         .stream()
         .flatMap(page -> page.items().stream())

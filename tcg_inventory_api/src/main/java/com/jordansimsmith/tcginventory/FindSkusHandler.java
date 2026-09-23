@@ -41,7 +41,7 @@ public class FindSkusHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
+  private final DynamoDbTable<SkuItem> skuTable;
   private final ObjectMapper objectMapper;
 
   public FindSkusHandler() {
@@ -52,7 +52,7 @@ public class FindSkusHandler
   FindSkusHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.tcgInventoryTable = factory.tcgInventoryTable();
+    this.skuTable = factory.skuTable();
     this.objectMapper = factory.objectMapper();
   }
 
@@ -75,11 +75,11 @@ public class FindSkusHandler
     var limitParam = queryParams != null ? queryParams.get("limit") : null;
     int limit = limitParam != null ? Integer.parseInt(limitParam) : DEFAULT_LIMIT;
 
-    var gsi2pk = TcgInventoryItem.formatGsi2pk(user);
+    var gsi2pk = SkuItem.formatGsi2pk(user);
     var sortPrefix =
         search != null && !search.isEmpty()
-            ? TcgInventoryItem.NAME_PREFIX + search.toLowerCase()
-            : TcgInventoryItem.NAME_PREFIX;
+            ? SkuItem.NAME_PREFIX + search.toLowerCase()
+            : SkuItem.NAME_PREFIX;
 
     var queryConditional =
         QueryConditional.sortBeginsWith(
@@ -98,7 +98,7 @@ public class FindSkusHandler
       }
     }
 
-    var gsi2Index = tcgInventoryTable.index(TcgInventoryItem.GSI2_NAME);
+    var gsi2Index = skuTable.index(TcgInventoryTable.GSI2_NAME);
     var page = gsi2Index.query(requestBuilder.build()).stream().findFirst().orElse(null);
 
     if (page == null) {
