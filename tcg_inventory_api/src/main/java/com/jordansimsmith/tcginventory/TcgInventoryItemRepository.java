@@ -15,8 +15,10 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;
 import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.dynamodb.model.Delete;
+import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.ReturnValuesOnConditionCheckFailure;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
@@ -119,6 +121,91 @@ public class TcgInventoryItemRepository {
     }
   }
 
+  public boolean deleteScanRow(String user, String scanId, int scanPosition) {
+    var scanKey =
+        Map.of(
+            TcgInventoryItem.PK,
+            AttributeValue.builder().s(TcgInventoryItem.formatUserPk(user)).build(),
+            TcgInventoryItem.SK,
+            AttributeValue.builder().s(TcgInventoryItem.formatScanSk(scanId)).build());
+    var rowKey =
+        Map.of(
+            TcgInventoryItem.PK,
+            AttributeValue.builder().s(TcgInventoryItem.formatScanRowPk(user, scanId)).build(),
+            TcgInventoryItem.SK,
+            AttributeValue.builder().s(TcgInventoryItem.formatScanRowSk(scanPosition)).build());
+
+    try {
+      dynamoDbClient.transactWriteItems(
+          TransactWriteItemsRequest.builder()
+              .transactItems(
+                  List.of(
+                      TransactWriteItem.builder()
+                          .conditionCheck(
+                              ConditionCheck.builder()
+                                  .tableName(TcgInventoryItem.TABLE_NAME)
+                                  .key(scanKey)
+                                  .conditionExpression(
+                                      "attribute_exists("
+                                          + TcgInventoryItem.PK
+                                          + ") AND #status = :reviewing")
+                                  .expressionAttributeNames(
+                                      Map.of("#status", TcgInventoryItem.STATUS))
+                                  .expressionAttributeValues(
+                                      Map.of(
+                                          ":reviewing",
+                                          AttributeValue.builder().s("reviewing").build()))
+                                  .build())
+                          .build(),
+                      TransactWriteItem.builder()
+                          .delete(
+                              Delete.builder()
+                                  .tableName(TcgInventoryItem.TABLE_NAME)
+                                  .key(rowKey)
+                                  .conditionExpression(
+                                      "attribute_exists(" + TcgInventoryItem.PK + ")")
+                                  .build())
+                          .build()))
+              .build());
+      return true;
+    } catch (TransactionCanceledException e) {
+      return false;
+    }
+  }
+
+  public boolean deleteScan(String user, String scanId) {
+    try {
+      dynamoDbClient.deleteItem(
+          DeleteItemRequest.builder()
+              .tableName(TcgInventoryItem.TABLE_NAME)
+              .key(
+                  Map.of(
+                      TcgInventoryItem.PK,
+                      AttributeValue.builder().s(TcgInventoryItem.formatUserPk(user)).build(),
+                      TcgInventoryItem.SK,
+                      AttributeValue.builder().s(TcgInventoryItem.formatScanSk(scanId)).build()))
+              .conditionExpression(
+                  "attribute_exists("
+                      + TcgInventoryItem.PK
+                      + ") AND #status IN (:uploading, "
+                      + ":identifying, :reviewing)")
+              .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+              .expressionAttributeValues(
+                  Map.of(
+                      ":uploading", AttributeValue.builder().s("uploading").build(),
+                      ":identifying", AttributeValue.builder().s("identifying").build(),
+                      ":reviewing", AttributeValue.builder().s("reviewing").build()))
+              .build());
+      return true;
+    } catch (ConditionalCheckFailedException e) {
+      return false;
+    }
+  }
+
+  public void deleteScanRows(List<TcgInventoryItem> rowItems) {
+    executeChunked(rowItems.stream().map(this::buildScanRowDelete).toList());
+  }
+
   public List<TcgInventoryItem> findScanRows(String user, String scanId) {
     var request =
         QueryEnhancedRequest.builder()
@@ -133,6 +220,15 @@ public class TcgInventoryItemRepository {
     return tcgInventoryTable.query(request).stream()
         .flatMap(page -> page.items().stream())
         .toList();
+  }
+
+  @Nullable
+  public TcgInventoryItem getScanRow(String user, String scanId, int scanPosition) {
+    return tcgInventoryTable.getItem(
+        Key.builder()
+            .partitionValue(TcgInventoryItem.formatScanRowPk(user, scanId))
+            .sortValue(TcgInventoryItem.formatScanRowSk(scanPosition))
+            .build());
   }
 
   @Nullable
@@ -482,6 +578,21 @@ public class TcgInventoryItemRepository {
                 .tableName(TcgInventoryItem.TABLE_NAME)
                 .item(tcgInventoryTable.tableSchema().itemToMap(item, true))
                 .conditionExpression("attribute_not_exists(" + TcgInventoryItem.PK + ")")
+                .build())
+        .build();
+  }
+
+  private TransactWriteItem buildScanRowDelete(TcgInventoryItem item) {
+    return TransactWriteItem.builder()
+        .delete(
+            Delete.builder()
+                .tableName(TcgInventoryItem.TABLE_NAME)
+                .key(
+                    Map.of(
+                        TcgInventoryItem.PK,
+                        AttributeValue.builder().s(item.getPk()).build(),
+                        TcgInventoryItem.SK,
+                        AttributeValue.builder().s(item.getSk()).build()))
                 .build())
         .build();
   }

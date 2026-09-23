@@ -196,7 +196,7 @@ public class TcgInventoryItemIntegrationTest {
     assertThat(retrievedScan.getCondition()).isEqualTo("LP");
     assertThat(retrievedScan.getFinish()).isEqualTo("foil");
     assertThat(retrievedScan.getRowCount()).isEqualTo(2);
-    assertThat(retrievedScan.getProcessedCount()).isZero();
+    assertThat(retrievedScan.getProcessedCount()).isNull();
     assertThat(retrievedScan.getCatalogVersion()).isEqualTo(36);
     assertThat(retrievedScan.getCreatedAt()).isEqualTo(createdAt);
     assertThat(retrievedScan.getUpdatedAt()).isEqualTo(createdAt);

@@ -56,7 +56,6 @@ function scan(rows: ScanRow[]): ScanDetail {
     condition: 'NM',
     finish: 'normal',
     row_count: rows.length,
-    processed_count: rows.length,
     error: null,
     import_id: null,
     created_at: 1765420932,

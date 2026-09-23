@@ -1,6 +1,7 @@
 package com.jordansimsmith.tcginventory;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
@@ -18,6 +19,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -32,7 +34,11 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
+import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 import software.amazon.awssdk.services.s3.S3Client;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 @Testcontainers
 public class ScansHandlerIntegrationTest {
@@ -53,6 +59,8 @@ public class ScansHandlerIntegrationTest {
   private FindScansHandler findScansHandler;
   private GetScanHandler getScanHandler;
   private IdentifyScanHandler identifyScanHandler;
+  private DeleteScanRowHandler deleteScanRowHandler;
+  private DeleteScanHandler deleteScanHandler;
 
   @BeforeAll
   static void setUpBeforeClass() {
@@ -84,6 +92,8 @@ public class ScansHandlerIntegrationTest {
     findScansHandler = new FindScansHandler(factory);
     getScanHandler = new GetScanHandler(factory);
     identifyScanHandler = new IdentifyScanHandler(factory);
+    deleteScanRowHandler = new DeleteScanRowHandler(factory);
+    deleteScanHandler = new DeleteScanHandler(factory);
   }
 
   @Test
@@ -446,7 +456,6 @@ public class ScansHandlerIntegrationTest {
     var scanId = objectMapper.readTree(createResponse.getBody()).get("scan_id").asText();
     var scanItem = getScanItem("jordan", scanId);
     scanItem.setStatus("identifying");
-    scanItem.setProcessedCount(1);
     scanItem.setError("one row needs manual review");
     tcgInventoryTable.putItem(scanItem);
     var row =
@@ -480,7 +489,7 @@ public class ScansHandlerIntegrationTest {
     // assert
     var body = objectMapper.readTree(response.getBody());
     assertThat(response.getStatusCode()).isEqualTo(200);
-    assertThat(body.get("processed_count").asInt()).isEqualTo(1);
+    assertThat(body.has("processed_count")).isFalse();
     assertThat(body.get("error").asText()).isEqualTo("one row needs manual review");
     assertThat(body.get("rows").get(0).get("status").asText()).isEqualTo("suggested");
     assertThat(body.get("rows").get(0).get("needs_review").asBoolean()).isFalse();
@@ -633,6 +642,204 @@ public class ScansHandlerIntegrationTest {
     assertThat(unknownResponse.getStatusCode()).isEqualTo(404);
   }
 
+  @Test
+  void deleteScanRowShouldDeleteObjectPreserveCountsAndPositions() throws Exception {
+    // arrange
+    var scanId = createScanWithFiles("jordan", 3);
+    var scanItem = getScanItem("jordan", scanId);
+    scanItem.setStatus("reviewing");
+    tcgInventoryTable.putItem(scanItem);
+    var rows = factory.tcgInventoryItemRepository().findScanRows("jordan", scanId);
+    for (var row : rows) {
+      row.setStatus("suggested");
+      tcgInventoryTable.putItem(row);
+      s3Client.putObject(
+          request -> request.bucket(ScanImages.BUCKET).key(row.getS3Key()),
+          RequestBody.fromBytes(JPEG_BYTES));
+    }
+    var middleRow = rows.get(1);
+
+    // act
+    var response =
+        deleteScanRowHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("scan_id", scanId, "scan_position", "2")), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(204);
+    var detail =
+        objectMapper.readTree(
+            getScanHandler
+                .handleRequest(buildEventWithPath("jordan", Map.of("scan_id", scanId)), null)
+                .getBody());
+    assertThat(detail.get("row_count").asInt()).isEqualTo(3);
+    assertThat(detail.has("processed_count")).isFalse();
+    assertThat(detail.get("rows").findValuesAsText("scan_position")).containsExactly("1", "3");
+    assertThat(
+            tcgInventoryTable.getItem(
+                Key.builder()
+                    .partitionValue(TcgInventoryItem.formatScanRowPk("jordan", scanId))
+                    .sortValue(TcgInventoryItem.formatScanRowSk(2))
+                    .build()))
+        .isNull();
+    assertThatThrownBy(
+            () ->
+                s3Client.headObject(
+                    request -> request.bucket(ScanImages.BUCKET).key(middleRow.getS3Key())))
+        .isInstanceOfSatisfying(
+            S3Exception.class, exception -> assertThat(exception.statusCode()).isEqualTo(404));
+  }
+
+  @Test
+  void deleteScanRowShouldRejectMissingForeignAndImmutableRows() throws Exception {
+    // arrange
+    var scanId = createScan("alice", "001.jpg", 5);
+    var scan = getScanItem("alice", scanId);
+    scan.setStatus("reviewing");
+    tcgInventoryTable.putItem(scan);
+
+    // act
+    var foreignResponse =
+        deleteScanRowHandler.handleRequest(
+            buildEventWithPath("bob", Map.of("scan_id", scanId, "scan_position", "1")), null);
+    var missingResponse =
+        deleteScanRowHandler.handleRequest(
+            buildEventWithPath("alice", Map.of("scan_id", "missing", "scan_position", "1")), null);
+    var firstResponse =
+        deleteScanRowHandler.handleRequest(
+            buildEventWithPath("alice", Map.of("scan_id", scanId, "scan_position", "1")), null);
+    var repeatedResponse =
+        deleteScanRowHandler.handleRequest(
+            buildEventWithPath("alice", Map.of("scan_id", scanId, "scan_position", "1")), null);
+
+    // assert
+    assertThat(foreignResponse.getStatusCode()).isEqualTo(404);
+    assertThat(missingResponse.getStatusCode()).isEqualTo(404);
+    assertThat(firstResponse.getStatusCode()).isEqualTo(204);
+    assertThat(repeatedResponse.getStatusCode()).isEqualTo(404);
+
+    var identifyingScanId = createScan("alice", "002.jpg", 5);
+    var identifyingScan = getScanItem("alice", identifyingScanId);
+    identifyingScan.setStatus("identifying");
+    tcgInventoryTable.putItem(identifyingScan);
+    var conflictResponse =
+        deleteScanRowHandler.handleRequest(
+            buildEventWithPath("alice", Map.of("scan_id", identifyingScanId, "scan_position", "1")),
+            null);
+    assertThat(conflictResponse.getStatusCode()).isEqualTo(409);
+  }
+
+  @Test
+  void deleteScanRowShouldRejectConfirmedScans() throws Exception {
+    // arrange
+    var confirmedScanId = createScan("jordan", "confirmed.jpg", 5);
+    var confirmedScan = getScanItem("jordan", confirmedScanId);
+    confirmedScan.setStatus("confirmed");
+    tcgInventoryTable.putItem(confirmedScan);
+
+    // act
+    var confirmedResponse =
+        deleteScanRowHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("scan_id", confirmedScanId, "scan_position", "1")),
+            null);
+
+    // assert
+    assertThat(confirmedResponse.getStatusCode()).isEqualTo(409);
+  }
+
+  @Test
+  void deleteScanShouldRemoveParentRowsAndObjectsForEveryUnfinishedState() throws Exception {
+    // arrange
+    var scanIds =
+        List.of(
+            createScan("jordan", "uploading.jpg", 5),
+            createScan("jordan", "identifying.jpg", 5),
+            createScan("jordan", "reviewing.jpg", 5));
+    var statuses = List.of("uploading", "identifying", "reviewing");
+    var keys = new ArrayList<String>();
+    for (var index = 0; index < scanIds.size(); index++) {
+      var scanId = scanIds.get(index);
+      var scan = getScanItem("jordan", scanId);
+      scan.setStatus(statuses.get(index));
+      tcgInventoryTable.putItem(scan);
+      var row = factory.tcgInventoryItemRepository().findScanRows("jordan", scanId).get(0);
+      keys.add(row.getS3Key());
+      s3Client.putObject(
+          request -> request.bucket(ScanImages.BUCKET).key(row.getS3Key()),
+          RequestBody.fromBytes(JPEG_BYTES));
+    }
+
+    // act
+    var responses =
+        scanIds.stream()
+            .map(
+                scanId ->
+                    deleteScanHandler.handleRequest(
+                        buildEventWithPath("jordan", Map.of("scan_id", scanId)), null))
+            .toList();
+
+    // assert
+    assertThat(responses).allMatch(response -> response.getStatusCode() == 204);
+    for (var index = 0; index < scanIds.size(); index++) {
+      var scanId = scanIds.get(index);
+      assertThat(getScanItem("jordan", scanId)).isNull();
+      assertThat(factory.tcgInventoryItemRepository().findScanRows("jordan", scanId)).isEmpty();
+      var key = keys.get(index);
+      assertThatThrownBy(
+              () -> s3Client.headObject(request -> request.bucket(ScanImages.BUCKET).key(key)))
+          .isInstanceOfSatisfying(
+              S3Exception.class, exception -> assertThat(exception.statusCode()).isEqualTo(404));
+    }
+  }
+
+  @Test
+  void deleteScanShouldFenceConfirmedAndStaleWorkerWrites() throws Exception {
+    // arrange
+    var confirmedScanId = createScan("jordan", "confirmed.jpg", 5);
+    var confirmedScan = getScanItem("jordan", confirmedScanId);
+    confirmedScan.setStatus("confirmed");
+    tcgInventoryTable.putItem(confirmedScan);
+    var scanId = createScan("jordan", "001.jpg", 5);
+    var row = factory.tcgInventoryItemRepository().findScanRows("jordan", scanId).get(0);
+
+    // act
+    var confirmedResponse =
+        deleteScanHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("scan_id", confirmedScanId)), null);
+    var deleteResponse =
+        deleteScanHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("scan_id", scanId)), null);
+    var identifyResponse =
+        identifyScanHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("scan_id", scanId)), null);
+
+    // assert
+    assertThat(confirmedResponse.getStatusCode()).isEqualTo(409);
+    assertThat(deleteResponse.getStatusCode()).isEqualTo(204);
+    assertThat(identifyResponse.getStatusCode()).isEqualTo(404);
+    assertThat(fakeScanQueue.getMessages()).isEmpty();
+    assertThatThrownBy(
+            () ->
+                factory
+                    .dynamoDbClient()
+                    .updateItem(
+                        UpdateItemRequest.builder()
+                            .tableName(TcgInventoryItem.TABLE_NAME)
+                            .key(
+                                Map.of(
+                                    TcgInventoryItem.PK,
+                                    AttributeValue.builder().s(row.getPk()).build(),
+                                    TcgInventoryItem.SK,
+                                    AttributeValue.builder().s(row.getSk()).build()))
+                            .updateExpression("SET #status = :suggested")
+                            .conditionExpression("attribute_exists(pk)")
+                            .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+                            .expressionAttributeValues(
+                                Map.of(
+                                    ":suggested", AttributeValue.builder().s("suggested").build()))
+                            .build()))
+        .isInstanceOf(ConditionalCheckFailedException.class);
+  }
+
   private String createScan(String user, String filename) throws IOException {
     return createScan(user, filename, 1);
   }
@@ -647,6 +854,20 @@ public class ScansHandlerIntegrationTest {
                     + "\",\"size_bytes\":"
                     + sizeBytes
                     + "}]}"),
+            null);
+    assertThat(response.getStatusCode()).isEqualTo(201);
+    return objectMapper.readTree(response.getBody()).get("scan_id").asText();
+  }
+
+  private String createScanWithFiles(String user, int fileCount) throws IOException {
+    var files =
+        IntStream.rangeClosed(1, fileCount)
+            .mapToObj(index -> "{\"filename\":\"%03d.jpg\",\"size_bytes\":5}".formatted(index))
+            .collect(Collectors.joining(","));
+    var response =
+        createScanHandler.handleRequest(
+            buildEventWithBody(
+                user, "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[" + files + "]}"),
             null);
     assertThat(response.getStatusCode()).isEqualTo(201);
     return objectMapper.readTree(response.getBody()).get("scan_id").asText();

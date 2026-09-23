@@ -16,7 +16,6 @@ const scanFixtures: ScanSummary[] = [
     condition: 'NM',
     finish: 'normal',
     row_count: 100,
-    processed_count: 100,
     error: 'one image needs a manual printing choice',
     import_id: null,
     created_at: 1765420932,
@@ -27,7 +26,6 @@ const scanFixtures: ScanSummary[] = [
     condition: 'LP',
     finish: 'foil',
     row_count: 48,
-    processed_count: 48,
     error: null,
     import_id: 'import-7',
     created_at: 1764816132,
@@ -57,7 +55,6 @@ function scanDetail(overrides: Partial<ScanDetail> = {}): ScanDetail {
     scan_id: 'scan-created',
     status: 'uploading',
     row_count: 1,
-    processed_count: 0,
     error: null,
     import_id: null,
     rows: [scanRow()],
@@ -104,7 +101,7 @@ describe('ScanPage', () => {
       within(jobs).getByRole('button', { name: 'Create scan' }),
     ).toBeDefined();
     expect(await within(jobs).findByText('review')).toBeDefined();
-    expect(within(jobs).getByText('100 / 100')).toBeDefined();
+    expect(within(jobs).getByText('100')).toBeDefined();
     expect(within(jobs).getByText('Foil')).toBeDefined();
     expect(
       screen.queryByRole('region', { name: 'Selected scan files' }),
@@ -125,7 +122,6 @@ describe('ScanPage', () => {
       scan_id: 'scan-created',
       status: 'uploading',
       row_count: 1,
-      processed_count: 0,
       error: null,
     };
     const findScans = vi
@@ -212,7 +208,6 @@ describe('ScanPage', () => {
       scan_id: 'scan-created',
       status: 'uploading',
       row_count: 1,
-      processed_count: 0,
       error: null,
     };
     vi.spyOn(clientModule.apiClient, 'createScan').mockResolvedValue(created);

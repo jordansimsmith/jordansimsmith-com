@@ -53,8 +53,9 @@ function formatFinish(finish: ScanDetail['finish']): string {
 }
 
 function ScanSummary({ scan }: { scan: ScanDetail }) {
+  const processedCount = scan.rows.filter((row) => row.status !== null).length;
   const progress =
-    scan.row_count === 0 ? 0 : (scan.processed_count / scan.row_count) * 100;
+    scan.row_count === 0 ? 0 : (processedCount / scan.row_count) * 100;
 
   return (
     <Paper
@@ -85,7 +86,7 @@ function ScanSummary({ scan }: { scan: ScanDetail }) {
         {scan.status === 'identifying' && (
           <Stack gap="xs">
             <Text size="sm">
-              Identifying {scan.processed_count} of {scan.row_count}
+              Identifying {processedCount} of {scan.row_count}
             </Text>
             <Progress
               value={progress}

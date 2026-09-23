@@ -111,7 +111,7 @@ function ScanTable({ scans, selectedIndex, onOpen }: ScanTableProps) {
                 <ScanStatusBadge status={scan.status} />
               </Table.Td>
               <Table.Td ta="right" data-field="cards" data-label="Cards">
-                {scan.processed_count} / {scan.row_count}
+                {scan.row_count}
               </Table.Td>
               <Table.Td data-field="condition" data-label="Condition">
                 {scan.condition}

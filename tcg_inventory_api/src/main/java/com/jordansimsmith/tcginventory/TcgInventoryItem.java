@@ -1315,7 +1315,6 @@ public class TcgInventoryItem {
     item.setCondition(condition);
     item.setFinish(finish);
     item.setRowCount(rowCount);
-    item.setProcessedCount(0);
     item.setCreatedAt(createdAt);
     item.setUpdatedAt(createdAt);
     return item;

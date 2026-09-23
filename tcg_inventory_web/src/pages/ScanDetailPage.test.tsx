@@ -12,7 +12,23 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ScanDetailPage } from './ScanDetailPage';
 import * as clientModule from '../api/client';
-import type { ScanDetail } from '../api/client';
+import type { ScanDetail, ScanRow } from '../api/client';
+
+function row(scanPosition: number, status: ScanRow['status']): ScanRow {
+  return {
+    scan_position: scanPosition,
+    filename: `${String(scanPosition).padStart(3, '0')}.jpg`,
+    size_bytes: 4,
+    uploaded: true,
+    upload_url: null,
+    upload_headers: null,
+    status,
+    needs_review: status === 'needs_review',
+    suggestions: [],
+    source_url: 'data:image/svg+xml,source',
+    error: null,
+  };
+}
 
 function detail(overrides: Partial<ScanDetail> = {}): ScanDetail {
   return {
@@ -21,11 +37,15 @@ function detail(overrides: Partial<ScanDetail> = {}): ScanDetail {
     condition: 'LP',
     finish: 'foil',
     row_count: 4,
-    processed_count: 2,
     error: null,
     import_id: null,
     created_at: 1765420932,
-    rows: [],
+    rows: [
+      row(1, 'suggested'),
+      row(2, 'needs_review'),
+      row(3, null),
+      row(4, null),
+    ],
     ...overrides,
   };
 }
@@ -71,7 +91,7 @@ describe('ScanDetailPage', () => {
       .mockResolvedValue(
         detail({
           status: 'reviewing',
-          processed_count: 4,
+          rows: [],
         }),
       );
 
@@ -102,7 +122,6 @@ describe('ScanDetailPage', () => {
     vi.spyOn(clientModule.apiClient, 'getScan').mockResolvedValue(
       detail({
         status: 'uploading',
-        processed_count: 0,
       }),
     );
 
@@ -132,7 +151,7 @@ describe('ScanDetailPage', () => {
   it('deletes an unfinished scan through an explicit confirmation dialog', async () => {
     const user = userEvent.setup();
     vi.spyOn(clientModule.apiClient, 'getScan').mockResolvedValue(
-      detail({ status: 'uploading', processed_count: 0, row_count: 3 }),
+      detail({ status: 'uploading', row_count: 3 }),
     );
     const deleteScan = vi
       .spyOn(clientModule.apiClient, 'deleteScan')
@@ -158,7 +177,7 @@ describe('ScanDetailPage', () => {
   it('keeps the unfinished scan page when whole-scan deletion fails', async () => {
     const user = userEvent.setup();
     vi.spyOn(clientModule.apiClient, 'getScan').mockResolvedValue(
-      detail({ status: 'identifying', processed_count: 2 }),
+      detail({ status: 'identifying' }),
     );
     vi.spyOn(clientModule.apiClient, 'deleteScan').mockRejectedValue(
       new Error('scan deletion unavailable'),
@@ -209,7 +228,6 @@ describe('ScanDetailPage', () => {
       detail({
         status: 'confirmed',
         row_count: 1,
-        processed_count: 1,
         import_id: 'import-confirmed',
         rows: [],
       }),

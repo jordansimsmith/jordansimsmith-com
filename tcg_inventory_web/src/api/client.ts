@@ -180,7 +180,6 @@ export interface ScanSummary {
   condition: Condition;
   finish: Finish;
   row_count: number;
-  processed_count: number;
   error: string | null;
   import_id: string | null;
   created_at: number;

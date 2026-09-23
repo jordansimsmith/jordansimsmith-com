@@ -519,7 +519,7 @@ describe('createFakeClient scans', () => {
     const scan = await client.getScan('fake-scan-reviewing');
 
     expect(scan.rows.map((row) => row.scan_position)).toEqual([1, 3]);
-    expect(scan.row_count).toBe(2);
+    expect(scan.row_count).toBe(3);
   });
 
   it('deletes unfinished scans but keeps confirmed scans immutable', async () => {

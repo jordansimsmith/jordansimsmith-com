@@ -555,7 +555,6 @@ interface FakeScan {
   error: string | null;
   import_id: string | null;
   created_at_ms: number;
-  processed_count: number;
   identifying_started_at_ms: number | null;
   rows: FakeScanRow[];
   confirmed_rows: ScanConfirmationRow[];
@@ -674,7 +673,6 @@ function createSeedScans(): FakeScan[] {
       error: null,
       import_id: null,
       created_at_ms: now - 15 * 60 * 1000,
-      processed_count: 0,
       identifying_started_at_ms: null,
       rows: [
         createFakeScanRow('fake-scan-uploading', 1, '001.jpg', true),
@@ -692,7 +690,6 @@ function createSeedScans(): FakeScan[] {
       error: null,
       import_id: null,
       created_at_ms: now - 30 * 60 * 1000,
-      processed_count: 2,
       identifying_started_at_ms: now - 1_000,
       rows: [
         {
@@ -730,7 +727,6 @@ function createSeedScans(): FakeScan[] {
       error: 'one image needs a manual printing choice',
       import_id: null,
       created_at_ms: now - 24 * 60 * 60 * 1000,
-      processed_count: 3,
       identifying_started_at_ms: null,
       rows: [
         createFakeScanRow(
@@ -770,7 +766,6 @@ function createSeedScans(): FakeScan[] {
       error: null,
       import_id: 'fake-import-1',
       created_at_ms: now - 2 * 24 * 60 * 60 * 1000,
-      processed_count: 2,
       identifying_started_at_ms: null,
       rows: [
         createFakeScanRow(
@@ -843,7 +838,6 @@ function progressFakeScan(scan: FakeScan): void {
     ];
     row.source_url = fakeScanSourceUrl(scan.scan_id, row.scan_position);
   }
-  scan.processed_count = processedCount;
   if (processedCount >= rows.length) {
     scan.status = 'reviewing';
     scan.identifying_started_at_ms = null;
@@ -851,14 +845,12 @@ function progressFakeScan(scan: FakeScan): void {
 }
 
 function toScanSummary(scan: FakeScan): ScanSummary {
-  const rows = activeScanRows(scan);
   return {
     scan_id: scan.scan_id,
     status: scan.status,
     condition: scan.condition,
     finish: scan.finish,
-    row_count: rows.length,
-    processed_count: Math.min(scan.processed_count, rows.length),
+    row_count: scan.rows.length,
     error: scan.error,
     import_id: scan.import_id,
     created_at: Math.floor(scan.created_at_ms / 1000),
@@ -1645,7 +1637,6 @@ export function createFakeClient(): ApiClient {
         error: null,
         import_id: null,
         created_at_ms: Date.now(),
-        processed_count: 0,
         identifying_started_at_ms: null,
         rows: files.map((file, index) => {
           const row = createFakeScanRow(
@@ -1707,7 +1698,6 @@ export function createFakeClient(): ApiClient {
         );
       }
       scan.status = 'identifying';
-      scan.processed_count = 0;
       scan.identifying_started_at_ms = Date.now();
       for (const row of activeScanRows(scan)) {
         row.status = null;

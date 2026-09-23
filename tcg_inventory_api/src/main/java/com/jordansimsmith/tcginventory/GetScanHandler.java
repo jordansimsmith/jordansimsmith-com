@@ -32,7 +32,6 @@ public class GetScanHandler
       @JsonProperty("condition") String condition,
       @JsonProperty("finish") String finish,
       @JsonProperty("row_count") int rowCount,
-      @JsonProperty("processed_count") int processedCount,
       @JsonProperty("error") @Nullable String error,
       @JsonProperty("import_id") @Nullable String importId,
       @JsonProperty("created_at") long createdAt) {}
@@ -61,7 +60,6 @@ public class GetScanHandler
       @JsonProperty("condition") String condition,
       @JsonProperty("finish") String finish,
       @JsonProperty("row_count") int rowCount,
-      @JsonProperty("processed_count") int processedCount,
       @JsonProperty("error") @Nullable String error,
       @JsonProperty("import_id") @Nullable String importId,
       @JsonProperty("created_at") long createdAt,
@@ -118,7 +116,6 @@ public class GetScanHandler
         summary.condition(),
         summary.finish(),
         summary.rowCount(),
-        summary.processedCount(),
         summary.error(),
         summary.importId(),
         summary.createdAt(),
@@ -132,7 +129,6 @@ public class GetScanHandler
         item.getCondition(),
         item.getFinish(),
         item.getRowCount() != null ? item.getRowCount() : 0,
-        item.getProcessedCount() != null ? item.getProcessedCount() : 0,
         item.getError(),
         item.getImportId(),
         item.getCreatedAt() != null ? item.getCreatedAt().getEpochSecond() : 0);
