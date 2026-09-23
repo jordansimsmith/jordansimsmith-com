@@ -4,15 +4,28 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.tcginventory.imports.ImportItem;
+import com.jordansimsmith.tcginventory.imports.ImportRowItem;
+import com.jordansimsmith.tcginventory.inventory.SequenceCounterItem;
+import com.jordansimsmith.tcginventory.inventory.SkuItem;
+import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.orders.OrderItem;
+import com.jordansimsmith.tcginventory.reports.ReportItem;
+import com.jordansimsmith.tcginventory.scans.ScanItem;
+import com.jordansimsmith.tcginventory.scans.ScanMessage;
+import com.jordansimsmith.tcginventory.scans.ScanRepository;
+import com.jordansimsmith.tcginventory.scans.ScanRowItem;
+import com.jordansimsmith.tcginventory.settings.SettingsItem;
 import com.jordansimsmith.time.Clock;
-import com.jordansimsmith.ulid.UlidGenerator;
 import dagger.Module;
 import dagger.Provides;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
+import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Module
 public class TcgInventoryTestModule {
@@ -107,16 +120,18 @@ public class TcgInventoryTestModule {
 
   @Provides
   @Singleton
-  TcgInventoryRepository tcgInventoryRepository(
-      DynamoDbTable<UnitItem> unitTable,
+  SqsClient sqsClient() {
+    return SqsClient.builder().region(Region.of("ap-southeast-2")).build();
+  }
+
+  @Provides
+  @Singleton
+  ScanRepository scanRepository(
       DynamoDbTable<ScanItem> scanTable,
       DynamoDbTable<ScanRowItem> scanRowTable,
-      DynamoDbTable<OrderItem> orderTable,
       DynamoDbClient dynamoDbClient,
-      Clock clock,
-      UlidGenerator ulidGenerator) {
-    return new TcgInventoryRepository(
-        unitTable, scanTable, scanRowTable, orderTable, dynamoDbClient, clock, ulidGenerator);
+      Clock clock) {
+    return new ScanRepository(scanTable, scanRowTable, dynamoDbClient, clock);
   }
 
   @Provides

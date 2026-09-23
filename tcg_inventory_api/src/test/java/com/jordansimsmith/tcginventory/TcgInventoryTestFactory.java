@@ -7,6 +7,18 @@ import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.s3.S3TestModule;
 import com.jordansimsmith.secrets.FakeSecrets;
 import com.jordansimsmith.secrets.SecretsTestModule;
+import com.jordansimsmith.tcginventory.imports.ImportItem;
+import com.jordansimsmith.tcginventory.imports.ImportRowItem;
+import com.jordansimsmith.tcginventory.inventory.SequenceCounterItem;
+import com.jordansimsmith.tcginventory.inventory.SkuItem;
+import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.orders.OrderItem;
+import com.jordansimsmith.tcginventory.reports.ReportItem;
+import com.jordansimsmith.tcginventory.scans.ScanItem;
+import com.jordansimsmith.tcginventory.scans.ScanMessage;
+import com.jordansimsmith.tcginventory.scans.ScanRepository;
+import com.jordansimsmith.tcginventory.scans.ScanRowItem;
+import com.jordansimsmith.tcginventory.settings.SettingsItem;
 import com.jordansimsmith.time.ClockTestModule;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
@@ -47,6 +59,28 @@ public interface TcgInventoryTestFactory extends TcgInventoryFactory {
   DynamoDbClient dynamoDbClient();
 
   DynamoDbTable<TcgInventoryTableDefinition> tableDefinition();
+
+  DynamoDbTable<SkuItem> skuTable();
+
+  DynamoDbTable<UnitItem> unitTable();
+
+  DynamoDbTable<ImportItem> importTable();
+
+  DynamoDbTable<ImportRowItem> importRowTable();
+
+  DynamoDbTable<ScanItem> scanTable();
+
+  DynamoDbTable<ScanRowItem> scanRowTable();
+
+  DynamoDbTable<OrderItem> orderTable();
+
+  DynamoDbTable<ReportItem> reportTable();
+
+  DynamoDbTable<SettingsItem> settingsTable();
+
+  DynamoDbTable<SequenceCounterItem> sequenceCounterTable();
+
+  ScanRepository scanRepository();
 
   @Component.Factory
   interface Factory {

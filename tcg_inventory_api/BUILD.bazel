@@ -5,13 +5,29 @@ load("//lib/localstack:defs.bzl", "localstack_image")
 
 HANDLERS = glob(["src/main/java/**/*Handler.java"])
 
-JOBS_PROCESSORS = [
-    "src/main/java/com/jordansimsmith/tcginventory/AppraiseJobProcessor.java",
-    "src/main/java/com/jordansimsmith/tcginventory/BatchResult.java",
-    "src/main/java/com/jordansimsmith/tcginventory/ListingPhaseProcessor.java",
-    "src/main/java/com/jordansimsmith/tcginventory/OrderPhaseProcessor.java",
-    "src/main/java/com/jordansimsmith/tcginventory/PublishJobProcessor.java",
-    "src/main/java/com/jordansimsmith/tcginventory/ReportJobProcessor.java",
+COMMON_DEPS = [
+    "//lib/dynamodb:lib",
+    "//lib/http:lib",
+    "//lib/json:lib",
+    "//lib/queue:lib",
+    "//lib/s3:lib",
+    "//lib/secrets:lib",
+    "//lib/time:lib",
+    "//lib/ulid:lib",
+    "//third_party/dagger",
+    "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+    "@maven//:com_fasterxml_jackson_core_jackson_core",
+    "@maven//:com_fasterxml_jackson_core_jackson_databind",
+    "@maven//:com_fasterxml_jackson_dataformat_jackson_dataformat_csv",
+    "@maven//:com_google_code_findbugs_jsr305",
+    "@maven//:com_google_guava_guava",
+    "@maven//:org_slf4j_slf4j_api",
+    "@maven//:software_amazon_awssdk_aws_crt_client",
+    "@maven//:software_amazon_awssdk_dynamodb",
+    "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    "@maven//:software_amazon_awssdk_regions",
+    "@maven//:software_amazon_awssdk_s3",
+    "@maven//:software_amazon_awssdk_sqs",
 ]
 
 INTEGRATION_TESTS = glob(["src/test/java/**/*IntegrationTest.java"])
@@ -27,61 +43,99 @@ UNIT_TESTS = glob(
 java_library(
     name = "lib",
     srcs = glob(
-        ["src/main/java/**/*.java"],
-        exclude = HANDLERS + JOBS_PROCESSORS,
+        ["src/main/java/com/jordansimsmith/tcginventory/*.java"],
+        exclude = HANDLERS,
     ),
     resources = glob(["src/main/resources/**"]),
-    deps = [
-        "//lib/dynamodb:lib",
-        "//lib/http:lib",
-        "//lib/json:lib",
-        "//lib/queue:lib",
-        "//lib/s3:lib",
-        "//lib/secrets:lib",
-        "//lib/time:lib",
-        "//lib/ulid:lib",
-        "//third_party/dagger",
-        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
-        "@maven//:com_fasterxml_jackson_core_jackson_core",
-        "@maven//:com_fasterxml_jackson_core_jackson_databind",
-        "@maven//:com_fasterxml_jackson_dataformat_jackson_dataformat_csv",
-        "@maven//:com_google_code_findbugs_jsr305",
-        "@maven//:com_google_guava_guava",
-        "@maven//:org_slf4j_slf4j_api",
-        "@maven//:software_amazon_awssdk_aws_crt_client",
-        "@maven//:software_amazon_awssdk_dynamodb",
-        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-        "@maven//:software_amazon_awssdk_regions",
-        "@maven//:software_amazon_awssdk_s3",
-        "@maven//:software_amazon_awssdk_sqs",
-    ],
+    deps = COMMON_DEPS,
 )
 
 java_library(
-    name = "jobs-lib",
-    srcs = JOBS_PROCESSORS,
+    name = "scan-lib",
+    srcs = glob(
+        ["src/main/java/com/jordansimsmith/tcginventory/scans/*.java"],
+        exclude = ["src/main/java/com/jordansimsmith/tcginventory/scans/*Handler.java"],
+    ),
+    deps = [":lib"] + COMMON_DEPS,
+)
+
+java_library(
+    name = "import-lib",
+    srcs = glob(
+        ["src/main/java/com/jordansimsmith/tcginventory/imports/*.java"],
+        exclude = ["src/main/java/com/jordansimsmith/tcginventory/imports/*Handler.java"],
+    ),
+    deps = [":lib"] + COMMON_DEPS,
+)
+
+java_library(
+    name = "inventory-lib",
+    srcs = glob(
+        ["src/main/java/com/jordansimsmith/tcginventory/inventory/*.java"],
+        exclude = ["src/main/java/com/jordansimsmith/tcginventory/inventory/*Handler.java"],
+    ),
+    deps = [":lib"] + COMMON_DEPS,
+)
+
+java_library(
+    name = "order-lib",
+    srcs = glob(
+        ["src/main/java/com/jordansimsmith/tcginventory/orders/*.java"],
+        exclude = ["src/main/java/com/jordansimsmith/tcginventory/orders/*Handler.java"],
+    ),
     deps = [
+        ":inventory-lib",
         ":lib",
-        "//lib/time:lib",
-        "//lib/ulid:lib",
-        "@maven//:com_fasterxml_jackson_core_jackson_databind",
-        "@maven//:com_google_code_findbugs_jsr305",
-        "@maven//:org_slf4j_slf4j_api",
-        "@maven//:software_amazon_awssdk_dynamodb",
-        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-        "@maven//:software_amazon_awssdk_s3",
-    ],
+        ":settings-lib",
+    ] + COMMON_DEPS,
+)
+
+java_library(
+    name = "publish-lib",
+    srcs = glob(
+        ["src/main/java/com/jordansimsmith/tcginventory/publish/*.java"],
+        exclude = ["src/main/java/com/jordansimsmith/tcginventory/publish/*Handler.java"],
+    ),
+    deps = [
+        ":inventory-lib",
+        ":lib",
+        ":order-lib",
+        ":settings-lib",
+    ] + COMMON_DEPS,
+)
+
+java_library(
+    name = "report-lib",
+    srcs = glob(
+        ["src/main/java/com/jordansimsmith/tcginventory/reports/*.java"],
+        exclude = ["src/main/java/com/jordansimsmith/tcginventory/reports/*Handler.java"],
+    ),
+    deps = [
+        ":inventory-lib",
+        ":lib",
+        ":order-lib",
+    ] + COMMON_DEPS,
+)
+
+java_library(
+    name = "settings-lib",
+    srcs = glob(
+        ["src/main/java/com/jordansimsmith/tcginventory/settings/*.java"],
+        exclude = ["src/main/java/com/jordansimsmith/tcginventory/settings/*Handler.java"],
+    ),
+    deps = [":lib"] + COMMON_DEPS,
 )
 
 java_binary(
     name = "get-settings-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/GetSettingsHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/settings/GetSettingsHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
         ":lib",
+        ":settings-lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
@@ -97,13 +151,14 @@ java_binary(
 
 java_binary(
     name = "update-settings-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/UpdateSettingsHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/settings/UpdateSettingsHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
         ":lib",
+        ":settings-lib",
         "//lib/http:lib",
         "//lib/secrets:lib",
         "//lib/time:lib",
@@ -122,12 +177,13 @@ java_binary(
 
 java_binary(
     name = "create-import-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/CreateImportHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/imports/CreateImportHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":import-lib",
         ":lib",
         "//lib/http:lib",
         "//lib/queue:lib",
@@ -147,12 +203,13 @@ java_binary(
 
 java_binary(
     name = "find-imports-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/FindImportsHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/imports/FindImportsHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":import-lib",
         ":lib",
         "//lib/dynamodb:lib",
         "//lib/http:lib",
@@ -172,12 +229,13 @@ java_binary(
 
 java_binary(
     name = "get-import-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/GetImportHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/imports/GetImportHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":import-lib",
         ":lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
@@ -195,13 +253,14 @@ java_binary(
 
 java_binary(
     name = "create-scan-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/CreateScanHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/scans/CreateScanHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
         ":lib",
+        ":scan-lib",
         "//lib/http:lib",
         "//lib/time:lib",
         "//lib/ulid:lib",
@@ -220,13 +279,14 @@ java_binary(
 
 java_binary(
     name = "find-scans-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/FindScansHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/scans/FindScansHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
         ":lib",
+        ":scan-lib",
         "//lib/dynamodb:lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
@@ -243,13 +303,14 @@ java_binary(
 
 java_binary(
     name = "get-scan-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/GetScanHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/scans/GetScanHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
         ":lib",
+        ":scan-lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
@@ -265,13 +326,14 @@ java_binary(
 
 java_binary(
     name = "identify-scan-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/IdentifyScanHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/scans/IdentifyScanHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
         ":lib",
+        ":scan-lib",
         "//lib/http:lib",
         "//lib/queue:lib",
         "@maven//:ch_qos_logback_logback_classic",
@@ -288,13 +350,15 @@ java_binary(
 
 java_binary(
     name = "confirm-scan-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/ConfirmScanHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/scans/ConfirmScanHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":import-lib",
         ":lib",
+        ":scan-lib",
         "//lib/http:lib",
         "//lib/queue:lib",
         "//lib/time:lib",
@@ -315,13 +379,14 @@ java_binary(
 
 java_binary(
     name = "delete-scan-row-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/DeleteScanRowHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/scans/DeleteScanRowHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
         ":lib",
+        ":scan-lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
@@ -337,13 +402,14 @@ java_binary(
 
 java_binary(
     name = "delete-scan-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/DeleteScanHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/scans/DeleteScanHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
         ":lib",
+        ":scan-lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
@@ -359,12 +425,13 @@ java_binary(
 
 java_binary(
     name = "delete-import-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/DeleteImportHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/imports/DeleteImportHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":import-lib",
         ":lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
@@ -381,12 +448,14 @@ java_binary(
 
 java_binary(
     name = "confirm-import-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/ConfirmImportHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/imports/ConfirmImportHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":import-lib",
+        ":inventory-lib",
         ":lib",
         "//lib/http:lib",
         "//lib/time:lib",
@@ -404,14 +473,22 @@ java_binary(
 
 java_binary(
     name = "jobs-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/JobsHandler.java"],
+    srcs = [
+        "src/main/java/com/jordansimsmith/tcginventory/JobsHandler.java",
+    ],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
-        ":jobs-lib",
+        ":import-lib",
+        ":inventory-lib",
         ":lib",
+        ":order-lib",
+        ":publish-lib",
+        ":report-lib",
+        ":scan-lib",
+        ":settings-lib",
         "//lib/queue:lib",
         "//lib/time:lib",
         "@maven//:ch_qos_logback_logback_classic",
@@ -427,13 +504,14 @@ java_binary(
 
 java_binary(
     name = "create-publish-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/CreatePublishHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/publish/CreatePublishHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
         ":lib",
+        ":publish-lib",
         "//lib/http:lib",
         "//lib/queue:lib",
         "//lib/time:lib",
@@ -452,13 +530,15 @@ java_binary(
 
 java_binary(
     name = "get-publish-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/GetPublishHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/publish/GetPublishHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":inventory-lib",
         ":lib",
+        ":publish-lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
@@ -474,13 +554,14 @@ java_binary(
 
 java_binary(
     name = "create-report-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/CreateReportHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/reports/CreateReportHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
         ":lib",
+        ":report-lib",
         "//lib/http:lib",
         "//lib/queue:lib",
         "//lib/time:lib",
@@ -499,13 +580,14 @@ java_binary(
 
 java_binary(
     name = "get-reports-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/GetReportsHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/reports/GetReportsHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
         ":lib",
+        ":report-lib",
         "//lib/http:lib",
         "//lib/time:lib",
         "@maven//:ch_qos_logback_logback_classic",
@@ -522,12 +604,13 @@ java_binary(
 
 java_binary(
     name = "find-skus-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/FindSkusHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/inventory/FindSkusHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":inventory-lib",
         ":lib",
         "//lib/dynamodb:lib",
         "//lib/http:lib",
@@ -547,12 +630,13 @@ java_binary(
 
 java_binary(
     name = "get-sku-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/GetSkuHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/inventory/GetSkuHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":inventory-lib",
         ":lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
@@ -570,12 +654,13 @@ java_binary(
 
 java_binary(
     name = "remove-unit-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/RemoveUnitHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/inventory/RemoveUnitHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":inventory-lib",
         ":lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
@@ -591,12 +676,13 @@ java_binary(
 
 java_binary(
     name = "update-unit-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/UpdateUnitHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/inventory/UpdateUnitHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":inventory-lib",
         ":lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
@@ -613,12 +699,13 @@ java_binary(
 
 java_binary(
     name = "update-import-row-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/UpdateImportRowHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/imports/UpdateImportRowHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":import-lib",
         ":lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
@@ -636,13 +723,14 @@ java_binary(
 
 java_binary(
     name = "find-orders-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/FindOrdersHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/orders/FindOrdersHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
         ":lib",
+        ":order-lib",
         "//lib/dynamodb:lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
@@ -662,13 +750,15 @@ java_binary(
 
 java_binary(
     name = "get-order-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/GetOrderHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/orders/GetOrderHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":inventory-lib",
         ":lib",
+        ":order-lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
@@ -686,13 +776,15 @@ java_binary(
 
 java_binary(
     name = "confirm-order-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/ConfirmOrderHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/orders/ConfirmOrderHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":inventory-lib",
         ":lib",
+        ":order-lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
@@ -709,12 +801,13 @@ java_binary(
 
 java_binary(
     name = "delete-import-row-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/DeleteImportRowHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/imports/DeleteImportRowHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":import-lib",
         ":lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
@@ -730,12 +823,13 @@ java_binary(
 
 java_binary(
     name = "create-import-row-photo-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/CreateImportRowPhotoHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/imports/CreateImportRowPhotoHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":import-lib",
         ":lib",
         "//lib/http:lib",
         "//lib/ulid:lib",
@@ -754,12 +848,13 @@ java_binary(
 
 java_binary(
     name = "delete-import-row-photo-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/DeleteImportRowPhotoHandler.java"],
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/imports/DeleteImportRowPhotoHandler.java"],
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":import-lib",
         ":lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
@@ -805,7 +900,14 @@ java_library(
         "src/test/resources/test.properties",
     ],
     deps = [
+        ":import-lib",
+        ":inventory-lib",
         ":lib",
+        ":order-lib",
+        ":publish-lib",
+        ":report-lib",
+        ":scan-lib",
+        ":settings-lib",
         "//lib/dynamodb:test-lib",
         "//lib/http:lib",
         "//lib/http:test-lib",
@@ -826,7 +928,9 @@ java_library(
         "@maven//:org_testcontainers_testcontainers",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_regions",
         "@maven//:software_amazon_awssdk_s3",
+        "@maven//:software_amazon_awssdk_sqs",
     ],
 )
 
@@ -838,7 +942,14 @@ java_test_suite(
     test_suffixes = ["Test.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":import-lib",
+        ":inventory-lib",
         ":lib",
+        ":order-lib",
+        ":publish-lib",
+        ":report-lib",
+        ":scan-lib",
+        ":settings-lib",
         ":test-lib",
         "//lib/secrets:lib",
         "//lib/secrets:test-lib",
@@ -892,10 +1003,16 @@ java_test_suite(
         ":get-settings-handler",
         ":get-sku-handler",
         ":identify-scan-handler",
+        ":import-lib",
+        ":inventory-lib",
         ":jobs-handler",
-        ":jobs-lib",
         ":lib",
+        ":order-lib",
+        ":publish-lib",
         ":remove-unit-handler",
+        ":report-lib",
+        ":scan-lib",
+        ":settings-lib",
         ":test-lib",
         ":update-import-row-handler",
         ":update-settings-handler",
@@ -980,7 +1097,14 @@ java_test_suite(
     test_suffixes = ["E2ETest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":import-lib",
+        ":inventory-lib",
         ":lib",
+        ":order-lib",
+        ":publish-lib",
+        ":report-lib",
+        ":scan-lib",
+        ":settings-lib",
         ":test-lib",
         "//lib/dynamodb:test-lib",
         "//lib/http:test-lib",

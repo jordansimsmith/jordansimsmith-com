@@ -131,39 +131,39 @@ iam_client.put_role_policy(
 
 lambdas = {
     "get_settings": {
-        "handler": "com.jordansimsmith.tcginventory.GetSettingsHandler",
+        "handler": "com.jordansimsmith.tcginventory.settings.GetSettingsHandler",
         "zip_file": "get-settings-handler_deploy.jar",
     },
     "update_settings": {
-        "handler": "com.jordansimsmith.tcginventory.UpdateSettingsHandler",
+        "handler": "com.jordansimsmith.tcginventory.settings.UpdateSettingsHandler",
         "zip_file": "update-settings-handler_deploy.jar",
     },
     "create_import": {
-        "handler": "com.jordansimsmith.tcginventory.CreateImportHandler",
+        "handler": "com.jordansimsmith.tcginventory.imports.CreateImportHandler",
         "zip_file": "create-import-handler_deploy.jar",
     },
     "find_imports": {
-        "handler": "com.jordansimsmith.tcginventory.FindImportsHandler",
+        "handler": "com.jordansimsmith.tcginventory.imports.FindImportsHandler",
         "zip_file": "find-imports-handler_deploy.jar",
     },
     "get_import": {
-        "handler": "com.jordansimsmith.tcginventory.GetImportHandler",
+        "handler": "com.jordansimsmith.tcginventory.imports.GetImportHandler",
         "zip_file": "get-import-handler_deploy.jar",
     },
     "delete_import": {
-        "handler": "com.jordansimsmith.tcginventory.DeleteImportHandler",
+        "handler": "com.jordansimsmith.tcginventory.imports.DeleteImportHandler",
         "zip_file": "delete-import-handler_deploy.jar",
     },
     "confirm_import": {
-        "handler": "com.jordansimsmith.tcginventory.ConfirmImportHandler",
+        "handler": "com.jordansimsmith.tcginventory.imports.ConfirmImportHandler",
         "zip_file": "confirm-import-handler_deploy.jar",
     },
     "create_publish": {
-        "handler": "com.jordansimsmith.tcginventory.CreatePublishHandler",
+        "handler": "com.jordansimsmith.tcginventory.publish.CreatePublishHandler",
         "zip_file": "create-publish-handler_deploy.jar",
     },
     "get_publish": {
-        "handler": "com.jordansimsmith.tcginventory.GetPublishHandler",
+        "handler": "com.jordansimsmith.tcginventory.publish.GetPublishHandler",
         "zip_file": "get-publish-handler_deploy.jar",
     },
     "jobs_handler": {
@@ -177,58 +177,58 @@ lambdas = {
         },
     },
     "find_skus": {
-        "handler": "com.jordansimsmith.tcginventory.FindSkusHandler",
+        "handler": "com.jordansimsmith.tcginventory.inventory.FindSkusHandler",
         "zip_file": "find-skus-handler_deploy.jar",
     },
     "get_sku": {
-        "handler": "com.jordansimsmith.tcginventory.GetSkuHandler",
+        "handler": "com.jordansimsmith.tcginventory.inventory.GetSkuHandler",
         "zip_file": "get-sku-handler_deploy.jar",
     },
     "remove_unit": {
-        "handler": "com.jordansimsmith.tcginventory.RemoveUnitHandler",
+        "handler": "com.jordansimsmith.tcginventory.inventory.RemoveUnitHandler",
         "zip_file": "remove-unit-handler_deploy.jar",
     },
     "update_unit": {
-        "handler": "com.jordansimsmith.tcginventory.UpdateUnitHandler",
+        "handler": "com.jordansimsmith.tcginventory.inventory.UpdateUnitHandler",
         "zip_file": "update-unit-handler_deploy.jar",
     },
     "find_orders": {
-        "handler": "com.jordansimsmith.tcginventory.FindOrdersHandler",
+        "handler": "com.jordansimsmith.tcginventory.orders.FindOrdersHandler",
         "zip_file": "find-orders-handler_deploy.jar",
     },
     "get_order": {
-        "handler": "com.jordansimsmith.tcginventory.GetOrderHandler",
+        "handler": "com.jordansimsmith.tcginventory.orders.GetOrderHandler",
         "zip_file": "get-order-handler_deploy.jar",
     },
     "confirm_order": {
-        "handler": "com.jordansimsmith.tcginventory.ConfirmOrderHandler",
+        "handler": "com.jordansimsmith.tcginventory.orders.ConfirmOrderHandler",
         "zip_file": "confirm-order-handler_deploy.jar",
     },
     "update_import_row": {
-        "handler": "com.jordansimsmith.tcginventory.UpdateImportRowHandler",
+        "handler": "com.jordansimsmith.tcginventory.imports.UpdateImportRowHandler",
         "zip_file": "update-import-row-handler_deploy.jar",
     },
     "delete_import_row": {
-        "handler": "com.jordansimsmith.tcginventory.DeleteImportRowHandler",
+        "handler": "com.jordansimsmith.tcginventory.imports.DeleteImportRowHandler",
         "zip_file": "delete-import-row-handler_deploy.jar",
     },
     "create_import_row_photo": {
-        "handler": "com.jordansimsmith.tcginventory.CreateImportRowPhotoHandler",
+        "handler": "com.jordansimsmith.tcginventory.imports.CreateImportRowPhotoHandler",
         "zip_file": "create-import-row-photo-handler_deploy.jar",
     },
     "delete_import_row_photo": {
-        "handler": "com.jordansimsmith.tcginventory.DeleteImportRowPhotoHandler",
+        "handler": "com.jordansimsmith.tcginventory.imports.DeleteImportRowPhotoHandler",
         "zip_file": "delete-import-row-photo-handler_deploy.jar",
     },
     "create_report": {
-        "handler": "com.jordansimsmith.tcginventory.CreateReportHandler",
+        "handler": "com.jordansimsmith.tcginventory.reports.CreateReportHandler",
         "zip_file": "create-report-handler_deploy.jar",
         "environment": {
             "JOBS_QUEUE_URL": queue_url,
         },
     },
     "get_reports": {
-        "handler": "com.jordansimsmith.tcginventory.GetReportsHandler",
+        "handler": "com.jordansimsmith.tcginventory.reports.GetReportsHandler",
         "zip_file": "get-reports-handler_deploy.jar",
     },
 }

@@ -2,10 +2,7 @@ package com.jordansimsmith.tcginventory;
 
 import java.math.BigDecimal;
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.List;
 import javax.annotation.Nullable;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
@@ -23,39 +20,15 @@ public class Photos {
   }
 
   public static boolean needsPhotos(
-      @Nullable String decision,
-      @Nullable String suggestedPrice,
-      @Nullable List<ImportRowItem.Photo> photos) {
+      @Nullable String decision, @Nullable String suggestedPrice, int photoCount) {
     return "keep".equals(decision)
         && suggestedPrice != null
-        && (photos == null || photos.isEmpty())
+        && photoCount == 0
         && new BigDecimal(suggestedPrice).compareTo(IMPORT_GATE) >= 0;
   }
 
-  public static boolean needsPublishWarning(
-      BigDecimal price, @Nullable List<UnitItem.Photo> photos) {
-    return price.compareTo(PUBLISH_WARNING) >= 0 && (photos == null || photos.isEmpty());
-  }
-
-  public static AttributeValue toAttributeValue(List<UnitItem.Photo> photos) {
-    return AttributeValue.builder()
-        .l(
-            photos.stream()
-                .map(
-                    photo -> {
-                      var map = new HashMap<String, AttributeValue>();
-                      map.put(
-                          UnitItem.Photo.PHOTO_ID,
-                          AttributeValue.builder().s(photo.getPhotoId()).build());
-                      if (photo.getFetchtcgUrl() != null) {
-                        map.put(
-                            UnitItem.Photo.FETCHTCG_URL,
-                            AttributeValue.builder().s(photo.getFetchtcgUrl()).build());
-                      }
-                      return AttributeValue.builder().m(map).build();
-                    })
-                .toList())
-        .build();
+  public static boolean needsPublishWarning(BigDecimal price, int photoCount) {
+    return price.compareTo(PUBLISH_WARNING) >= 0 && photoCount == 0;
   }
 
   public static String presignedGetUrl(S3Presigner s3Presigner, String user, String photoId) {

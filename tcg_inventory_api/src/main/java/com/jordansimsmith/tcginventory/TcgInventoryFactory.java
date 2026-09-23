@@ -16,10 +16,12 @@ import com.jordansimsmith.ulid.UlidGenerator;
 import com.jordansimsmith.ulid.UlidModule;
 import dagger.Component;
 import javax.inject.Singleton;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Singleton
 @Component(
@@ -44,37 +46,17 @@ public interface TcgInventoryFactory {
 
   Secrets secrets();
 
-  DynamoDbTable<SkuItem> skuTable();
-
-  DynamoDbTable<UnitItem> unitTable();
-
-  DynamoDbTable<ImportItem> importTable();
-
-  DynamoDbTable<ImportRowItem> importRowTable();
-
-  DynamoDbTable<ScanItem> scanTable();
-
-  DynamoDbTable<ScanRowItem> scanRowTable();
-
-  DynamoDbTable<OrderItem> orderTable();
+  DynamoDbEnhancedClient dynamoDbEnhancedClient();
 
   DynamoDbTable<JobItem> jobTable();
 
-  DynamoDbTable<SettingsItem> settingsTable();
-
-  DynamoDbTable<ReportItem> reportTable();
-
   DynamoDbTable<AuditItem> auditTable();
-
-  DynamoDbTable<SequenceCounterItem> sequenceCounterTable();
-
-  TcgInventoryRepository tcgInventoryRepository();
 
   DynamoDbClient dynamoDbClient();
 
-  QueueClient<JobMessage> jobsQueue();
+  SqsClient sqsClient();
 
-  QueueClient<ScanMessage> scanQueue();
+  QueueClient<JobMessage> jobsQueue();
 
   UlidGenerator ulidGenerator();
 

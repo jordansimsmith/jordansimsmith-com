@@ -54,91 +54,91 @@ module "java_api" {
 
   lambdas = {
     get_settings = {
-      handler  = "com.jordansimsmith.tcginventory.GetSettingsHandler"
+      handler  = "com.jordansimsmith.tcginventory.settings.GetSettingsHandler"
       artifact = var.artifacts["get_settings"]
     }
     update_settings = {
-      handler  = "com.jordansimsmith.tcginventory.UpdateSettingsHandler"
+      handler  = "com.jordansimsmith.tcginventory.settings.UpdateSettingsHandler"
       artifact = var.artifacts["update_settings"]
     }
     create_import = {
-      handler  = "com.jordansimsmith.tcginventory.CreateImportHandler"
+      handler  = "com.jordansimsmith.tcginventory.imports.CreateImportHandler"
       artifact = var.artifacts["create_import"]
     }
     find_imports = {
-      handler  = "com.jordansimsmith.tcginventory.FindImportsHandler"
+      handler  = "com.jordansimsmith.tcginventory.imports.FindImportsHandler"
       artifact = var.artifacts["find_imports"]
     }
     get_import = {
-      handler  = "com.jordansimsmith.tcginventory.GetImportHandler"
+      handler  = "com.jordansimsmith.tcginventory.imports.GetImportHandler"
       artifact = var.artifacts["get_import"]
     }
     delete_import = {
-      handler  = "com.jordansimsmith.tcginventory.DeleteImportHandler"
+      handler  = "com.jordansimsmith.tcginventory.imports.DeleteImportHandler"
       artifact = var.artifacts["delete_import"]
     }
     confirm_import = {
-      handler  = "com.jordansimsmith.tcginventory.ConfirmImportHandler"
+      handler  = "com.jordansimsmith.tcginventory.imports.ConfirmImportHandler"
       artifact = var.artifacts["confirm_import"]
     }
     update_import_row = {
-      handler  = "com.jordansimsmith.tcginventory.UpdateImportRowHandler"
+      handler  = "com.jordansimsmith.tcginventory.imports.UpdateImportRowHandler"
       artifact = var.artifacts["update_import_row"]
     }
     delete_import_row = {
-      handler  = "com.jordansimsmith.tcginventory.DeleteImportRowHandler"
+      handler  = "com.jordansimsmith.tcginventory.imports.DeleteImportRowHandler"
       artifact = var.artifacts["delete_import_row"]
     }
     create_import_row_photo = {
-      handler  = "com.jordansimsmith.tcginventory.CreateImportRowPhotoHandler"
+      handler  = "com.jordansimsmith.tcginventory.imports.CreateImportRowPhotoHandler"
       artifact = var.artifacts["create_import_row_photo"]
     }
     delete_import_row_photo = {
-      handler  = "com.jordansimsmith.tcginventory.DeleteImportRowPhotoHandler"
+      handler  = "com.jordansimsmith.tcginventory.imports.DeleteImportRowPhotoHandler"
       artifact = var.artifacts["delete_import_row_photo"]
     }
     create_publish = {
-      handler  = "com.jordansimsmith.tcginventory.CreatePublishHandler"
+      handler  = "com.jordansimsmith.tcginventory.publish.CreatePublishHandler"
       artifact = var.artifacts["create_publish"]
     }
     get_publish = {
-      handler  = "com.jordansimsmith.tcginventory.GetPublishHandler"
+      handler  = "com.jordansimsmith.tcginventory.publish.GetPublishHandler"
       artifact = var.artifacts["get_publish"]
     }
     create_report = {
-      handler  = "com.jordansimsmith.tcginventory.CreateReportHandler"
+      handler  = "com.jordansimsmith.tcginventory.reports.CreateReportHandler"
       artifact = var.artifacts["create_report"]
     }
     get_reports = {
-      handler  = "com.jordansimsmith.tcginventory.GetReportsHandler"
+      handler  = "com.jordansimsmith.tcginventory.reports.GetReportsHandler"
       artifact = var.artifacts["get_reports"]
     }
     find_skus = {
-      handler  = "com.jordansimsmith.tcginventory.FindSkusHandler"
+      handler  = "com.jordansimsmith.tcginventory.inventory.FindSkusHandler"
       artifact = var.artifacts["find_skus"]
     }
     get_sku = {
-      handler  = "com.jordansimsmith.tcginventory.GetSkuHandler"
+      handler  = "com.jordansimsmith.tcginventory.inventory.GetSkuHandler"
       artifact = var.artifacts["get_sku"]
     }
     remove_unit = {
-      handler  = "com.jordansimsmith.tcginventory.RemoveUnitHandler"
+      handler  = "com.jordansimsmith.tcginventory.inventory.RemoveUnitHandler"
       artifact = var.artifacts["remove_unit"]
     }
     update_unit = {
-      handler  = "com.jordansimsmith.tcginventory.UpdateUnitHandler"
+      handler  = "com.jordansimsmith.tcginventory.inventory.UpdateUnitHandler"
       artifact = var.artifacts["update_unit"]
     }
     find_orders = {
-      handler  = "com.jordansimsmith.tcginventory.FindOrdersHandler"
+      handler  = "com.jordansimsmith.tcginventory.orders.FindOrdersHandler"
       artifact = var.artifacts["find_orders"]
     }
     get_order = {
-      handler  = "com.jordansimsmith.tcginventory.GetOrderHandler"
+      handler  = "com.jordansimsmith.tcginventory.orders.GetOrderHandler"
       artifact = var.artifacts["get_order"]
     }
     confirm_order = {
-      handler  = "com.jordansimsmith.tcginventory.ConfirmOrderHandler"
+      handler  = "com.jordansimsmith.tcginventory.orders.ConfirmOrderHandler"
       artifact = var.artifacts["confirm_order"]
     }
     jobs_handler = {

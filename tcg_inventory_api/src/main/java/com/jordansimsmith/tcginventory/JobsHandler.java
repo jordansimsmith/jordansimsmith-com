@@ -6,6 +6,20 @@ import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.tcginventory.imports.AppraiseJobProcessor;
+import com.jordansimsmith.tcginventory.imports.ImportItem;
+import com.jordansimsmith.tcginventory.imports.ImportRowItem;
+import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
+import com.jordansimsmith.tcginventory.inventory.SkuItem;
+import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.orders.OrderItem;
+import com.jordansimsmith.tcginventory.orders.OrderPhaseProcessor;
+import com.jordansimsmith.tcginventory.orders.OrderRepository;
+import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
+import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
+import com.jordansimsmith.tcginventory.reports.ReportItem;
+import com.jordansimsmith.tcginventory.reports.ReportJobProcessor;
+import com.jordansimsmith.tcginventory.settings.SettingsItem;
 import com.jordansimsmith.time.Clock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,43 +45,52 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
   }
 
   @VisibleForTesting
-  JobsHandler(TcgInventoryFactory factory) {
+  public JobsHandler(TcgInventoryFactory factory) {
     this.objectMapper = factory.objectMapper();
     this.clock = factory.clock();
     this.jobTable = factory.jobTable();
-    this.importTable = factory.importTable();
+    this.importTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class);
+    var importRowTable =
+        TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
+    var unitTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class);
+    var inventoryRepository =
+        new InventoryRepository(
+            unitTable, factory.dynamoDbClient(), factory.clock(), factory.ulidGenerator());
+    var orderTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderItem.class);
+    var orderRepository =
+        new OrderRepository(
+            orderTable, inventoryRepository, factory.dynamoDbClient(), factory.clock());
+    var skuTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), SkuItem.class);
+    var reportTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ReportItem.class);
     this.jobsQueue = factory.jobsQueue();
     this.appraiseJobProcessor =
         new AppraiseJobProcessor(
-            factory.importTable(),
-            factory.importRowTable(),
-            factory.clock(),
-            factory.fetchTcgClient());
+            importTable, importRowTable, factory.clock(), factory.fetchTcgClient());
     this.publishJobProcessor =
         new PublishJobProcessor(
             factory.fetchTcgTokenMinter(),
             new OrderPhaseProcessor(
-                factory.orderTable(),
-                factory.skuTable(),
-                factory.settingsTable(),
-                factory.tcgInventoryRepository(),
+                orderTable,
+                skuTable,
+                TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), SettingsItem.class),
+                orderRepository,
                 factory.clock(),
                 factory.fetchTcgClient(),
                 factory.objectMapper()),
             new ListingPhaseProcessor(
-                factory.skuTable(),
-                factory.tcgInventoryRepository(),
+                skuTable,
+                inventoryRepository,
                 factory.dynamoDbClient(),
                 factory.clock(),
                 factory.fetchTcgClient(),
                 factory.s3Client()));
     this.reportJobProcessor =
         new ReportJobProcessor(
-            factory.reportTable(),
-            factory.tcgInventoryRepository(),
+            reportTable,
+            inventoryRepository,
             factory.auditTable(),
-            factory.skuTable(),
-            factory.orderTable(),
+            skuTable,
+            orderTable,
             factory.objectMapper(),
             factory.clock());
   }
@@ -89,7 +112,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
 
     var jobKey =
         Key.builder()
-            .partitionValue(SkuItem.formatUserPk(message.user()))
+            .partitionValue(JobItem.formatPk(message.user()))
             .sortValue(JobItem.formatSk(message.jobId()))
             .build();
 
@@ -190,7 +213,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
   private void setImportError(String user, String importId, String error) {
     var importKey =
         Key.builder()
-            .partitionValue(SkuItem.formatUserPk(user))
+            .partitionValue(ImportItem.formatPk(user))
             .sortValue(ImportItem.formatSk(importId))
             .build();
     var importItem = importTable.getItem(importKey);
