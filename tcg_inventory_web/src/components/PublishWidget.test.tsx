@@ -127,7 +127,7 @@ describe('PublishWidget', () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
 
-    expect(screen.getByText(/Last publish succeeded/)).toBeDefined();
+    expect(screen.getByText(/Last published/)).toBeDefined();
     expect(publishButton()?.disabled).toBe(false);
     expect(screen.queryByText('0')).toBeNull();
 
@@ -153,7 +153,7 @@ describe('PublishWidget', () => {
     await act(async () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
-    expect(screen.getByText(/Last publish succeeded/)).toBeDefined();
+    expect(screen.getByText(/Last published/)).toBeDefined();
     expect(getPublishMock).toHaveBeenCalledTimes(2);
   });
 
@@ -183,5 +183,17 @@ describe('PublishWidget', () => {
       await vi.advanceTimersByTimeAsync(6000);
     });
     expect(getPublishMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the last publish time as relative time', async () => {
+    vi.setSystemTime(new Date((1765420932 + 3600) * 1000));
+    vi.spyOn(clientModule.apiClient, 'getPublish').mockResolvedValue(
+      succeededResponse,
+    );
+
+    renderPublishWidget();
+    await act(async () => {});
+
+    expect(screen.getByText('Last published an hour ago')).toBeDefined();
   });
 });

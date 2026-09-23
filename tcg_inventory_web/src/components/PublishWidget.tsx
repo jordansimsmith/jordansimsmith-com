@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Badge, Button, Group, Progress, Stack, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
+import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
 import { apiClient } from '../api/client';
 import type { PublishResponse } from '../api/client';
 import { JobFailureAlert } from './JobFailureAlert';
 
 const POLL_INTERVAL_MS = 2000;
+
+dayjs.extend(relativeTime);
 
 export function PublishWidget() {
   const [publish, setPublish] = useState<PublishResponse | null>(null);
@@ -81,8 +85,7 @@ export function PublishWidget() {
         publish?.status === 'succeeded' &&
         publish.finished_at !== null && (
           <Text size="sm" c="dimmed">
-            Last publish succeeded{' '}
-            {new Date(publish.finished_at * 1000).toLocaleString()}
+            Last published {dayjs(publish.finished_at * 1000).fromNow()}
           </Text>
         )}
       {!runActive && publish?.status === 'failed' && (
