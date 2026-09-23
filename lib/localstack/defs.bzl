@@ -38,7 +38,6 @@ def localstack_image(name, handler_jars, init_resources, repo_tag):
         base = "@localstack//:localstack",
         env = {
             "LOCALSTACK_LAMBDA_IGNORE_ARCHITECTURE": "1",
-            "LOCALSTACK_LAMBDA_KEEPALIVE_MS": "0",
         },
         tars = [
             ":" + name + "-init-resources-tar",

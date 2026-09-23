@@ -7,6 +7,7 @@ java_library(
     visibility = ["//visibility:public"],
     deps = [
         "//lib/testcontainers:test-lib",
+        "@maven//:com_github_docker_java_docker_java_api",
         "@maven//:com_google_guava_guava",
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:org_testcontainers_testcontainers",
