@@ -163,7 +163,6 @@ export interface ScanConfirmationRow {
   set_code: string;
   set_name: string;
   collector_number: string;
-  confirmed: true;
 }
 
 export interface ScanRow extends ScanUploadSlot {
@@ -187,7 +186,6 @@ export interface ScanSummary {
 
 export interface ScanDetail extends ScanSummary {
   rows: ScanRow[];
-  confirmed_rows?: ScanConfirmationRow[];
 }
 
 export interface CreateScanRequest {

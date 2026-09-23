@@ -481,7 +481,6 @@ export function ScanReview({
         set_code: selection.printing.set_code,
         set_name: selection.printing.set_name,
         collector_number: selection.printing.collector_number,
-        confirmed: true as const,
       });
     }
 

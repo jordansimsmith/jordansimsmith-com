@@ -121,6 +121,44 @@ public class TcgInventoryItemRepository {
     }
   }
 
+  public boolean transitionScanToConfirmed(String user, String scanId, String importId) {
+    try {
+      dynamoDbClient.updateItem(
+          UpdateItemRequest.builder()
+              .tableName(TcgInventoryItem.TABLE_NAME)
+              .key(
+                  Map.of(
+                      TcgInventoryItem.PK,
+                          AttributeValue.builder().s(TcgInventoryItem.formatUserPk(user)).build(),
+                      TcgInventoryItem.SK,
+                          AttributeValue.builder()
+                              .s(TcgInventoryItem.formatScanSk(scanId))
+                              .build()))
+              .updateExpression(
+                  "SET #status = :confirmed, "
+                      + TcgInventoryItem.IMPORT_ID
+                      + " = :importId, "
+                      + TcgInventoryItem.UPDATED_AT
+                      + " = :now")
+              .conditionExpression(
+                  "attribute_exists(" + TcgInventoryItem.PK + ") AND #status = :reviewing")
+              .expressionAttributeNames(Map.of("#status", TcgInventoryItem.STATUS))
+              .expressionAttributeValues(
+                  Map.of(
+                      ":confirmed", AttributeValue.builder().s("confirmed").build(),
+                      ":reviewing", AttributeValue.builder().s("reviewing").build(),
+                      ":importId", AttributeValue.builder().s(importId).build(),
+                      ":now",
+                          AttributeValue.builder()
+                              .n(String.valueOf(clock.now().getEpochSecond()))
+                              .build()))
+              .build());
+      return true;
+    } catch (ConditionalCheckFailedException e) {
+      return false;
+    }
+  }
+
   public boolean deleteScanRow(String user, String scanId, int scanPosition) {
     var scanKey =
         Map.of(

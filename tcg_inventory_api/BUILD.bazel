@@ -287,6 +287,33 @@ java_binary(
 )
 
 java_binary(
+    name = "confirm-scan-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/ConfirmScanHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "//lib/queue:lib",
+        "//lib/time:lib",
+        "//lib/ulid:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
     name = "delete-scan-row-handler",
     srcs = ["src/main/java/com/jordansimsmith/tcginventory/DeleteScanRowHandler.java"],
     create_executable = False,
@@ -840,6 +867,7 @@ java_test_suite(
     deps = [
         ":confirm-import-handler",
         ":confirm-order-handler",
+        ":confirm-scan-handler",
         ":create-import-handler",
         ":create-import-row-photo-handler",
         ":create-publish-handler",

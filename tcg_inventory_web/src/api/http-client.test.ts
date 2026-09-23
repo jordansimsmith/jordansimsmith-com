@@ -149,7 +149,6 @@ describe('http client scans', () => {
           set_code: 'dom',
           set_name: 'Dominaria',
           collector_number: '60',
-          confirmed: true as const,
         },
       ],
     };

@@ -33,7 +33,6 @@ import type {
   ReportResponse,
   RowDecision,
   RowPhoto,
-  ScanConfirmationRow,
   ScanDetail,
   ScanFile,
   ScanRow,
@@ -557,8 +556,6 @@ interface FakeScan {
   created_at_ms: number;
   identifying_started_at_ms: number | null;
   rows: FakeScanRow[];
-  confirmed_rows: ScanConfirmationRow[];
-  confirmation_manifest: ScanConfirmationRow[] | null;
 }
 
 function fakeScanSourceUrl(scanId: string, scanPosition: number): string {
@@ -575,25 +572,6 @@ function scanSuggestion(
   score: number,
 ): ScanSuggestion {
   return { scryfall_id: scryfallId, name, score };
-}
-
-function scanConfirmation(
-  scanPosition: number,
-  scryfallId: string,
-  name: string,
-  setCode: string,
-  setName: string,
-  collectorNumber: string,
-): ScanConfirmationRow {
-  return {
-    scan_position: scanPosition,
-    scryfall_id: scryfallId,
-    name,
-    set_code: setCode,
-    set_name: setName,
-    collector_number: collectorNumber,
-    confirmed: true,
-  };
 }
 
 function createFakeScanRow(
@@ -645,25 +623,6 @@ function createSeedScans(): FakeScan[] {
     'Counterspell',
     0.96,
   );
-  const confirmedRows = [
-    scanConfirmation(
-      1,
-      lightningBolt.scryfall_id,
-      lightningBolt.name,
-      'sta',
-      'Strixhaven Mystical Archive',
-      '42',
-    ),
-    scanConfirmation(
-      2,
-      llanowarElves.scryfall_id,
-      llanowarElves.name,
-      'dom',
-      'Dominaria',
-      '168',
-    ),
-  ];
-
   return [
     {
       scan_id: 'fake-scan-uploading',
@@ -679,8 +638,6 @@ function createSeedScans(): FakeScan[] {
         createFakeScanRow('fake-scan-uploading', 2, '002.jpg', false),
         createFakeScanRow('fake-scan-uploading', 3, '003.jpg', true),
       ],
-      confirmed_rows: [],
-      confirmation_manifest: null,
     },
     {
       scan_id: 'fake-scan-identifying',
@@ -716,8 +673,6 @@ function createSeedScans(): FakeScan[] {
         createFakeScanRow('fake-scan-identifying', 3, '003.jpg', true),
         createFakeScanRow('fake-scan-identifying', 4, '004.jpg', true),
       ],
-      confirmed_rows: [],
-      confirmation_manifest: null,
     },
     {
       scan_id: 'fake-scan-reviewing',
@@ -755,8 +710,6 @@ function createSeedScans(): FakeScan[] {
           [llanowarElves],
         ),
       ],
-      confirmed_rows: [],
-      confirmation_manifest: null,
     },
     {
       scan_id: 'fake-scan-confirmed',
@@ -785,8 +738,6 @@ function createSeedScans(): FakeScan[] {
           [llanowarElves],
         ),
       ],
-      confirmed_rows: confirmedRows,
-      confirmation_manifest: confirmedRows,
     },
   ];
 }
@@ -889,9 +840,6 @@ function toScanDetail(scan: FakeScan): ScanDetail {
   return {
     ...toScanSummary(scan),
     rows: activeScanRows(scan).map(toScanRow),
-    ...(scan.status === 'confirmed'
-      ? { confirmed_rows: scan.confirmed_rows.map((row) => ({ ...row })) }
-      : {}),
   };
 }
 
@@ -1648,8 +1596,6 @@ export function createFakeClient(): ApiClient {
           row.size_bytes = file.size_bytes;
           return row;
         }),
-        confirmed_rows: [],
-        confirmation_manifest: null,
       };
       scans.push(scan);
       return {
@@ -1665,11 +1611,9 @@ export function createFakeClient(): ApiClient {
       if (!Number.isInteger(offset) || offset < 0) {
         throw new Error('invalid continuation');
       }
-      const ordered = [...scans]
-        .filter(
-          (scan) => !scan.confirmation_manifest || scan.status === 'confirmed',
-        )
-        .sort((a, b) => b.created_at_ms - a.created_at_ms);
+      const ordered = [...scans].sort(
+        (a, b) => b.created_at_ms - a.created_at_ms,
+      );
       const pageSize = 20;
       const page = ordered.slice(offset, offset + pageSize).map((scan) => {
         progressFakeScan(scan);
@@ -1710,7 +1654,7 @@ export function createFakeClient(): ApiClient {
 
     async deleteScanRow(scanId: string, scanPosition: number): Promise<void> {
       const scan = getScanOrThrow(scanId);
-      if (scan.status !== 'reviewing' || scan.confirmation_manifest !== null) {
+      if (scan.status !== 'reviewing') {
         throw new Error('scan is not in a deletable status');
       }
       const row = scan.rows.find(
@@ -1731,19 +1675,7 @@ export function createFakeClient(): ApiClient {
       request: ConfirmScanRequest,
     ): Promise<ConfirmScanResponse> {
       const scan = getScanOrThrow(scanId);
-      const orderedRows = [...request.rows].sort(
-        (a, b) => a.scan_position - b.scan_position,
-      );
-      const matchesManifest =
-        scan.confirmation_manifest !== null &&
-        JSON.stringify(scan.confirmation_manifest) ===
-          JSON.stringify(orderedRows);
       if (scan.status === 'confirmed') {
-        if (!matchesManifest) {
-          throw new Error(
-            'scan confirmation does not match the existing import',
-          );
-        }
         return {
           scan_id: scan.scan_id,
           status: 'confirmed',
@@ -1753,18 +1685,9 @@ export function createFakeClient(): ApiClient {
       if (scan.status !== 'reviewing') {
         throw new Error('scan is not in reviewing status');
       }
-      if (scan.confirmation_manifest !== null) {
-        if (!matchesManifest) {
-          throw new Error(
-            'scan confirmation does not match the existing import',
-          );
-        }
-        return {
-          scan_id: scan.scan_id,
-          status: 'confirmed',
-          import_id: scan.import_id!,
-        };
-      }
+      const orderedRows = [...(request.rows ?? [])].sort(
+        (a, b) => a.scan_position - b.scan_position,
+      );
       const rows = activeScanRows(scan);
       if (
         orderedRows.length === 0 ||
@@ -1772,7 +1695,6 @@ export function createFakeClient(): ApiClient {
         orderedRows.some((row, index) => {
           const source = rows[index];
           return (
-            row.confirmed !== true ||
             source === undefined ||
             row.scan_position !== source.scan_position ||
             !row.scryfall_id ||
@@ -1787,7 +1709,8 @@ export function createFakeClient(): ApiClient {
           'every retained scan row must be confirmed exactly once',
         );
       }
-      const importId = `fake-import-for-${scan.scan_id}`;
+      importCounter += 1;
+      const importId = `fake-import-${importCounter}`;
       const importRows: FakeImportRow[] = orderedRows.map((row, index) => ({
         position: index + 1,
         name: row.name,
@@ -1809,8 +1732,6 @@ export function createFakeClient(): ApiClient {
         rows: importRows,
         created_at_ms: Date.now(),
       });
-      scan.confirmation_manifest = orderedRows.map((row) => ({ ...row }));
-      scan.confirmed_rows = orderedRows.map((row) => ({ ...row }));
       scan.import_id = importId;
       scan.status = 'confirmed';
       return {
@@ -1822,7 +1743,7 @@ export function createFakeClient(): ApiClient {
 
     async deleteScan(scanId: string): Promise<void> {
       const scan = getScanOrThrow(scanId);
-      if (scan.status === 'confirmed' || scan.confirmation_manifest !== null) {
+      if (scan.status === 'confirmed') {
         throw new Error('confirmed scans cannot be deleted');
       }
       if (!['uploading', 'identifying', 'reviewing'].includes(scan.status)) {

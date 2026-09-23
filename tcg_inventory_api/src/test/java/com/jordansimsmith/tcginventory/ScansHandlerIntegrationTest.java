@@ -34,6 +34,8 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
@@ -51,6 +53,7 @@ public class ScansHandlerIntegrationTest {
   private TcgInventoryTestFactory factory;
   private FakeClock fakeClock;
   private FakeUlidGenerator fakeUlidGenerator;
+  private FakeQueueClient<JobMessage> fakeJobsQueue;
   private FakeQueueClient<ScanMessage> fakeScanQueue;
   private ObjectMapper objectMapper;
   private DynamoDbTable<TcgInventoryItem> tcgInventoryTable;
@@ -59,6 +62,7 @@ public class ScansHandlerIntegrationTest {
   private FindScansHandler findScansHandler;
   private GetScanHandler getScanHandler;
   private IdentifyScanHandler identifyScanHandler;
+  private ConfirmScanHandler confirmScanHandler;
   private DeleteScanRowHandler deleteScanRowHandler;
   private DeleteScanHandler deleteScanHandler;
 
@@ -76,6 +80,7 @@ public class ScansHandlerIntegrationTest {
         TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), s3Container.getEndpoint());
     fakeClock = factory.fakeClock();
     fakeUlidGenerator = factory.fakeUlidGenerator();
+    fakeJobsQueue = factory.fakeJobsQueue();
     fakeScanQueue = factory.fakeScanQueue();
     objectMapper = factory.objectMapper();
     tcgInventoryTable = factory.tcgInventoryTable();
@@ -87,11 +92,13 @@ public class ScansHandlerIntegrationTest {
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
+    fakeJobsQueue.reset();
     fakeScanQueue.reset();
     createScanHandler = new CreateScanHandler(factory);
     findScansHandler = new FindScansHandler(factory);
     getScanHandler = new GetScanHandler(factory);
     identifyScanHandler = new IdentifyScanHandler(factory);
+    confirmScanHandler = new ConfirmScanHandler(factory);
     deleteScanRowHandler = new DeleteScanRowHandler(factory);
     deleteScanHandler = new DeleteScanHandler(factory);
   }
@@ -840,6 +847,99 @@ public class ScansHandlerIntegrationTest {
         .isInstanceOf(ConditionalCheckFailedException.class);
   }
 
+  @Test
+  void confirmScanShouldCreateOrdinaryImportAndQueueAppraisal() throws Exception {
+    // arrange
+    var scanId = createScanWithFiles("jordan", 2);
+    var scan = getScanItem("jordan", scanId);
+    scan.setStatus("reviewing");
+    tcgInventoryTable.putItem(scan);
+    var request =
+        "{\"rows\":["
+            + "{\"scan_position\":1,\"scryfall_id\":\"opaque-card-id\","
+            + "\"name\":\"Ragavan, Nimble Pilferer\",\"set_code\":\"mh2\","
+            + "\"set_name\":\"Modern Horizons 2\",\"collector_number\":\"138\"},"
+            + "{\"scan_position\":2,\"scryfall_id\":\"4ced112a-e775-4f97-97b3-74877e9dce12\","
+            + "\"name\":\"Dragon's Rage Channeler\",\"set_code\":\"mh2\","
+            + "\"set_name\":\"Modern Horizons 2\",\"collector_number\":\"121\"}]}";
+
+    // act
+    var response =
+        confirmScanHandler.handleRequest(
+            buildEventWithPathAndBody("jordan", Map.of("scan_id", scanId), request), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = objectMapper.readTree(response.getBody());
+    assertThat(body.get("scan_id").asText()).isEqualTo(scanId);
+    assertThat(body.get("status").asText()).isEqualTo("confirmed");
+    assertThat(body.has("confirmed")).isFalse();
+    var importId = body.get("import_id").asText();
+    var importItem =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
+                .sortValue(TcgInventoryItem.formatImportSk(importId))
+                .build());
+    assertThat(importItem).isNotNull();
+    assertThat(importItem.getStatus()).isEqualTo("appraising");
+    assertThat(importItem.getRowCount()).isEqualTo(2);
+    assertThat(importItem.getJobId()).isNotBlank();
+
+    var importRows =
+        tcgInventoryTable
+            .query(
+                QueryEnhancedRequest.builder()
+                    .queryConditional(
+                        QueryConditional.sortBeginsWith(
+                            Key.builder()
+                                .partitionValue(
+                                    TcgInventoryItem.formatImportRowPk("jordan", importId))
+                                .sortValue(TcgInventoryItem.ROW_PREFIX)
+                                .build()))
+                    .scanIndexForward(true)
+                    .build())
+            .stream()
+            .flatMap(page -> page.items().stream())
+            .toList();
+    assertThat(importRows).extracting(TcgInventoryItem::getPosition).containsExactly(1, 2);
+    assertThat(importRows)
+        .extracting(TcgInventoryItem::getName)
+        .containsExactly("Ragavan, Nimble Pilferer", "Dragon's Rage Channeler");
+    assertThat(importRows)
+        .extracting(TcgInventoryItem::getScryfallId)
+        .containsExactly("opaque-card-id", "4ced112a-e775-4f97-97b3-74877e9dce12");
+    assertThat(importRows).allMatch(row -> "en".equals(row.getLanguage()));
+
+    var jobItem =
+        tcgInventoryTable.getItem(
+            Key.builder()
+                .partitionValue(TcgInventoryItem.formatUserPk("jordan"))
+                .sortValue(TcgInventoryItem.formatJobSk(importItem.getJobId()))
+                .build());
+    assertThat(jobItem).isNotNull();
+    assertThat(jobItem.getStatus()).isEqualTo("queued");
+    assertThat(fakeJobsQueue.getSends()).hasSize(1);
+    assertThat(fakeJobsQueue.getSends().get(0).message().jobId()).isEqualTo(importItem.getJobId());
+    assertThat(getScanItem("jordan", scanId).getStatus()).isEqualTo("confirmed");
+    var retryResponse =
+        confirmScanHandler.handleRequest(
+            buildEventWithPathAndBody("jordan", Map.of("scan_id", scanId), request), null);
+    assertThat(retryResponse.getStatusCode()).isEqualTo(200);
+    assertThat(objectMapper.readTree(retryResponse.getBody()).get("import_id").asText())
+        .isEqualTo(importId);
+    assertThat(fakeJobsQueue.getSends()).hasSize(1);
+    assertThat(
+            objectMapper
+                .readTree(
+                    getScanHandler
+                        .handleRequest(
+                            buildEventWithPath("jordan", Map.of("scan_id", scanId)), null)
+                        .getBody())
+                .has("confirmed_rows"))
+        .isFalse();
+  }
+
   private String createScan(String user, String filename) throws IOException {
     return createScan(user, filename, 1);
   }
@@ -884,6 +984,13 @@ public class ScansHandlerIntegrationTest {
   private APIGatewayV2HTTPResponse identify(String scanId) {
     return identifyScanHandler.handleRequest(
         buildEventWithPath("jordan", Map.of("scan_id", scanId)), null);
+  }
+
+  private APIGatewayV2HTTPEvent buildEventWithPathAndBody(
+      String user, Map<String, String> pathParams, String body) {
+    var event = buildEventWithPath(user, pathParams);
+    event.setBody(body);
+    return event;
   }
 
   private String validBody() {

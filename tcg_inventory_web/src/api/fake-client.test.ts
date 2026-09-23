@@ -496,7 +496,6 @@ describe('createFakeClient scans', () => {
       set_code: index === 0 ? 'mh2' : 'dom',
       set_name: index === 0 ? 'Modern Horizons 2' : 'Dominaria',
       collector_number: String(index + 1),
-      confirmed: true,
     }));
 
     const confirmed = await client.confirmScan('fake-scan-reviewing', {

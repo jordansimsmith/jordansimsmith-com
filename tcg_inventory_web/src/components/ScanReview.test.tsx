@@ -474,7 +474,6 @@ describe('ScanReview', () => {
         set_code: '2x2',
         set_name: 'Double Masters 2022',
         collector_number: '117',
-        confirmed: true,
       },
       {
         scan_position: 2,
@@ -483,7 +482,6 @@ describe('ScanReview', () => {
         set_code: '2x2',
         set_name: 'Double Masters 2022',
         collector_number: '117',
-        confirmed: true,
       },
     ]);
   });
