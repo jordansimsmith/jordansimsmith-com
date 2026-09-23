@@ -2,6 +2,7 @@ import {
   render,
   screen,
   cleanup,
+  fireEvent,
   waitFor,
   within,
 } from '@testing-library/react';
@@ -54,6 +55,7 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
         sequence_number: 37,
         location: 'A0-37',
         current_location: 'A0-35',
+        scryfall_id: '58b26011-e103-45c4-a253-900f4e6b2eeb',
         name: 'Sol Ring',
         set_code: 'cmr',
         collector_number: '472',
@@ -79,6 +81,7 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
         sequence_number: 74,
         location: 'A0-74',
         current_location: 'A0-70',
+        scryfall_id: '58b26011-e103-45c4-a253-900f4e6b2eeb',
         name: 'Sol Ring',
         set_code: 'cmr',
         collector_number: '472',
@@ -98,6 +101,7 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
         sequence_number: 259,
         location: 'A2-59',
         current_location: 'A2-59',
+        scryfall_id: 'f0a51425-d796-48b8-b68c-bc21fb465c81',
         name: 'Elvish Aberration',
         set_code: 'a25',
         collector_number: '167',
@@ -192,6 +196,25 @@ describe('OrderDetailPage', () => {
       screen.getByText('Next · Counterspell · MH2 #267 · NM'),
     ).toBeDefined();
     expect(screen.getByRole('button', { name: 'Confirm pull' })).toBeDefined();
+
+    const images = Array.from(
+      document.querySelectorAll<HTMLImageElement>('img'),
+    );
+    expect(images).toHaveLength(3);
+    expect(images.map((image) => image.src)).toEqual([
+      'https://api.scryfall.com/cards/58b26011-e103-45c4-a253-900f4e6b2eeb?format=image&version=small',
+      'https://api.scryfall.com/cards/58b26011-e103-45c4-a253-900f4e6b2eeb?format=image&version=small',
+      'https://api.scryfall.com/cards/f0a51425-d796-48b8-b68c-bc21fb465c81?format=image&version=small',
+    ]);
+    expect(
+      images.every((image) => image.getAttribute('loading') === 'lazy'),
+    ).toBe(true);
+    expect(
+      images.every((image) => image.getAttribute('decoding') === 'async'),
+    ).toBe(true);
+    expect(
+      images.every((image) => image.getAttribute('fetchpriority') === 'low'),
+    ).toBe(true);
   });
 
   it('renders the buyer, address, and postage option', async () => {
@@ -319,6 +342,7 @@ describe('OrderDetailPage', () => {
             sequence_number: 1,
             location: 'A0-1',
             current_location: 'A0-1',
+            scryfall_id: '0bc3401f-935b-45ce-b1e6-300a5d9dfd4f',
             name: 'Hellkite Tyrant',
             set_code: 'gtc',
             collector_number: '94',
@@ -353,6 +377,36 @@ describe('OrderDetailPage', () => {
     expect(screen.queryByRole('button', { name: 'Confirm pull' })).toBeNull();
     // reserved cards are still boxed, so pull context renders before payment
     expect(screen.getByText('A0-35')).toBeDefined();
+    expect(document.querySelectorAll('img')).toHaveLength(3);
+  });
+
+  it('renders thumbnails for voided orders', async () => {
+    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(
+      orderDetail({ state: 'voided' }),
+    );
+
+    renderOrderDetailPage();
+
+    expect(await screen.findByText('Order 83647')).toBeDefined();
+    expect(screen.getByText('voided')).toBeDefined();
+    expect(document.querySelectorAll('img')).toHaveLength(3);
+  });
+
+  it('uses a neutral fallback when a thumbnail fails to load', async () => {
+    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(
+      orderDetail(),
+    );
+
+    renderOrderDetailPage();
+
+    await screen.findByText('Order 83647');
+    fireEvent.error(document.querySelector('img')!);
+
+    await waitFor(() => {
+      expect(document.querySelector('img')?.getAttribute('src')).toContain(
+        'data:image/svg+xml',
+      );
+    });
   });
 
   it('returns to the orders list on Escape', async () => {

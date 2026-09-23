@@ -1144,6 +1144,7 @@ function toOrderDetail(order: FakeOrder, skus: FakeSku[]): OrderDetail {
         sequence_number: ref.sequence_number,
         location: deriveLocation(ref.sequence_number),
         name: sku.name,
+        scryfall_id: sku.scryfall_id,
         set_code: sku.set_code,
         collector_number: sku.collector_number,
         finish: sku.finish,

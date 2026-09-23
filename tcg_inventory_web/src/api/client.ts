@@ -261,6 +261,7 @@ export interface OrderUnit {
   sequence_number: number;
   location: string;
   current_location: string;
+  scryfall_id: string;
   name: string;
   set_code: string;
   collector_number: string;

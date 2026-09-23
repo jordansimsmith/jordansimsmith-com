@@ -699,6 +699,7 @@ describe('createFakeClient orders', () => {
     for (const unit of detail.units) {
       const block = Math.floor(unit.sequence_number / 100);
       expect(unit.location).toBe(`A${block}-${unit.sequence_number % 100}`);
+      expect(unit.scryfall_id).toMatch(/^[0-9a-f-]{36}$/);
     }
     for (const unit of detail.units) {
       expect(unit.current_location).toMatch(/^A\d+-\d+$/);

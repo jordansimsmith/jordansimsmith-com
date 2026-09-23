@@ -25,12 +25,26 @@
 .pullRow {
   display: grid;
   grid-template-areas:
-    'position card price'
-    'position neighbors price';
-  grid-template-columns: minmax(0, 148px) minmax(0, 1fr) auto;
+    'image position card price'
+    'image position neighbors price';
+  grid-template-columns: 64px minmax(0, 148px) minmax(0, 1fr) auto;
   align-items: start;
   gap: 0.25rem 1rem;
   padding: 1rem;
+}
+
+.pullImage {
+  grid-area: image;
+  width: 64px;
+  aspect-ratio: 146 / 204;
+  border: 1px solid var(--mantine-color-gray-2);
+  border-radius: var(--mantine-radius-sm);
+  overflow: hidden;
+  background: var(--mantine-color-gray-0);
+}
+
+.pullImage img {
+  display: block;
 }
 
 .pullPosition {
@@ -89,10 +103,10 @@
 @media (max-width: 48em) {
   .pullRow {
     grid-template-areas:
-      'position price'
-      'card card'
-      'neighbors neighbors';
-    grid-template-columns: minmax(0, 1fr) auto;
+      'image position price'
+      'image card card'
+      'image neighbors neighbors';
+    grid-template-columns: 64px minmax(0, 1fr) auto;
     gap: 0.25rem 0.75rem;
   }
 

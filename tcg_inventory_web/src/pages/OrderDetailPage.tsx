@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Group,
+  Image,
   Paper,
   Skeleton,
   Stack,
@@ -26,6 +27,13 @@ import { ListPriceBadge } from '../components/ListPriceBadge';
 import { PageHeader } from '../components/PageHeader';
 import { formatDeliveryMode } from '../domain/deliveryMode';
 import classes from './OrderDetailPage.module.css';
+
+const CARD_IMAGE_FALLBACK =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='146' height='204' viewBox='0 0 146 204'%3E%3Crect width='146' height='204' rx='8' fill='%23e9ecef' stroke='%23ced4da'/%3E%3C/svg%3E";
+
+function cardImageUrl(scryfallId: string): string {
+  return `https://api.scryfall.com/cards/${encodeURIComponent(scryfallId)}?format=image&version=small`;
+}
 
 function unitDescription(unit: OrderUnit): string {
   const parts = [
@@ -272,6 +280,20 @@ export function OrderDetailPage() {
                 </Box>
                 {order.units.map((unit) => (
                   <Box key={unit.sequence_number} className={classes.pullRow}>
+                    <Box className={classes.pullImage}>
+                      <Image
+                        src={cardImageUrl(unit.scryfall_id)}
+                        fallbackSrc={CARD_IMAGE_FALLBACK}
+                        alt=""
+                        fit="contain"
+                        w="100%"
+                        h="100%"
+                        loading="lazy"
+                        decoding="async"
+                        fetchPriority="low"
+                        radius="sm"
+                      />
+                    </Box>
                     <Group
                       className={classes.pullPosition}
                       align="baseline"
