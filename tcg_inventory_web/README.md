@@ -48,7 +48,7 @@ The TCG inventory web service is a keyboard-first single-page app for running a 
 ### Out of scope
 
 - Manual report refresh controls (regeneration is automatic on visit and refocus) and real-time or streaming report updates.
-- Camera capture, PNG/TIFF/PDF scans, non-English/non-Magic cards, scan quality grading, automatic recognition retry, saved partial confirmation choices across browser closures, and use of source scans as listing photos.
+- Camera capture, PNG/TIFF/PDF scans, non-English/non-Magic cards, scan quality grading, automatic per-image recognition retry, saved partial confirmation choices across browser closures, and use of source scans as listing photos.
 - Post-confirm photo management (unit photos render view-only; retakes go through remove + re-import).
 - Offline support, background sync, or push notifications.
 - Multi-marketplace views, repricing controls, and offer negotiation (accept/counter happens on FetchTCG).

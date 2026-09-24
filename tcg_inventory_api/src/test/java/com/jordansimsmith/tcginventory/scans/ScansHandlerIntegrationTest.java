@@ -361,6 +361,9 @@ public class ScansHandlerIntegrationTest {
             objectMapper.readTree(
                 "{\"scan_id\":\"%s\",\"status\":\"identifying\"}".formatted(scanId)));
     assertThat(fakeScanQueue.getMessages()).containsExactly(new ScanMessage("jordan", scanId));
+    assertThat(fakeScanQueue.getSends()).hasSize(1);
+    assertThat(fakeScanQueue.getSends().get(0).messageGroupId()).isEqualTo(scanId);
+    assertThat(fakeScanQueue.getSends().get(0).messageDeduplicationId()).isEqualTo(scanId + "#0");
     var scanItem =
         scanTable.getItem(
             Key.builder()

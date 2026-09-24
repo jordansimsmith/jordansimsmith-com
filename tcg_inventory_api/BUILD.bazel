@@ -1,5 +1,6 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 load("@rules_java//java:defs.bzl", "java_binary", "java_library")
+load("@rules_python//python:defs.bzl", "py_library", "py_test")
 load("//lib/http:defs.bzl", "stub_server_image")
 load("//lib/localstack:defs.bzl", "localstack_image")
 load("//tcg_inventory_api:collectorvision.bzl", "collectorvision_image")
@@ -7,8 +8,37 @@ load("//tcg_inventory_api:collectorvision.bzl", "collectorvision_image")
 collectorvision_image(
     name = "scan-worker-image",
     base = "@lambda_python312//:lambda_python312",
-    handler = "tcg_inventory_scan_worker.offline_smoke.lambda_handler",
+    handler = "tcg_inventory_scan_worker.worker.lambda_handler",
     repo_tag = "bazel/tcg-inventory-scan-worker:latest",
+)
+
+py_library(
+    name = "scan-worker-lib",
+    srcs = ["src/main/python/tcg_inventory_scan_worker/worker.py"],
+    imports = ["src/main/python"],
+    deps = [
+        "@pypi//boto3",
+        "@pypi//collectorvision",
+        "@pypi//pillow",
+    ],
+)
+
+py_test(
+    name = "scan-worker-unit-tests",
+    size = "small",
+    srcs = [
+        "src/test/python/tcg_inventory_scan_worker/test_runner.py",
+        "src/test/python/tcg_inventory_scan_worker/test_worker.py",
+    ],
+    imports = [
+        "src/main/python",
+        "src/test/python",
+    ],
+    main = "src/test/python/tcg_inventory_scan_worker/test_runner.py",
+    deps = [
+        ":scan-worker-lib",
+        "@pypi//pytest",
+    ],
 )
 
 HANDLERS = glob(["src/main/java/**/*Handler.java"])

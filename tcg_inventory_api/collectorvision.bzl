@@ -183,7 +183,10 @@ def collectorvision_image(name, base, handler, repo_tag):
 
     python_package_layers = []
     for package in [
+        "boto3",
+        "botocore",
         "collectorvision",
+        "jmespath",
         "numpy",
         "opencv_python_headless",
         "pillow",
@@ -193,8 +196,12 @@ def collectorvision_image(name, base, handler, repo_tag):
         "coloredlogs",
         "humanfriendly",
         "protobuf",
+        "python_dateutil",
+        "s3transfer",
+        "six",
         "sympy",
         "mpmath",
+        "urllib3",
     ]:
         package_layer = name + "-" + package.replace("_", "-") + "-dependencies"
         pkg_tar(
@@ -215,7 +222,7 @@ def collectorvision_image(name, base, handler, repo_tag):
         name = application,
         files = {
             "src/main/python/tcg_inventory_scan_worker/__init__.py": "tcg_inventory_scan_worker/__init__.py",
-            "src/main/python/tcg_inventory_scan_worker/offline_smoke.py": "tcg_inventory_scan_worker/offline_smoke.py",
+            "src/main/python/tcg_inventory_scan_worker/worker.py": "tcg_inventory_scan_worker/worker.py",
         },
         package_dir = "/var/task",
     )

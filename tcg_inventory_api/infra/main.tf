@@ -188,6 +188,7 @@ module "java_api" {
   # bucket at startup, so they must exist before any lambda version is published
   depends_on = [
     aws_sqs_queue.jobs,
+    aws_sqs_queue.scan_jobs,
     aws_dynamodb_table.tcg_inventory,
     aws_s3_bucket.tcg_inventory,
   ]
@@ -329,6 +330,24 @@ resource "aws_lambda_event_source_mapping" "jobs" {
   maximum_batching_window_in_seconds = 0
 }
 
+resource "aws_sqs_queue" "scan_jobs_dlq" {
+  name                        = "tcg_inventory_scan_jobs_dlq.fifo"
+  fifo_queue                  = true
+  content_based_deduplication = false
+}
+
+resource "aws_sqs_queue" "scan_jobs" {
+  name                        = "tcg_inventory_scan_jobs.fifo"
+  fifo_queue                  = true
+  content_based_deduplication = false
+  visibility_timeout_seconds  = 960
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.scan_jobs_dlq.arn
+    maxReceiveCount     = 5
+  })
+}
+
 resource "aws_secretsmanager_secret" "tcg_inventory" {
   name                    = "tcg_inventory"
   recovery_window_in_days = 0
@@ -375,6 +394,8 @@ data "aws_iam_policy_document" "lambda_sqs" {
     resources = [
       aws_sqs_queue.jobs.arn,
       aws_sqs_queue.jobs_dlq.arn,
+      aws_sqs_queue.scan_jobs.arn,
+      aws_sqs_queue.scan_jobs_dlq.arn,
     ]
 
     actions = [

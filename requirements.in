@@ -1,6 +1,7 @@
 openai
 pytest
 requests
+boto3
 collectorvision @ https://codeload.github.com/HanClinto/CollectorVision/zip/2a122d00d25c8d112a90e47bf235a021e0c53b0c
 numpy==1.26.4
 opencv-python-headless==4.10.0.84

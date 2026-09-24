@@ -364,7 +364,7 @@
   "moduleExtensions": {
     "//tcg_inventory_api:collectorvision.bzl%collectorvision": {
       "general": {
-        "bzlTransitiveDigest": "L+ZI3y+DPiH60GTYiM93NzqXjgRiAMup3oA6qybF/6E=",
+        "bzlTransitiveDigest": "Gy6ct1legRbiTTZvebjI9Ne+lcCnzScTyZ3UAMSepy8=",
         "usagesDigest": "Inpbr4BaLPPgmDj7EICeE48Ye8LOxfDofdGFbL9cdJk=",
         "recordedInputs": [
           "REPO_MAPPING:,rules_oci rules_oci+",

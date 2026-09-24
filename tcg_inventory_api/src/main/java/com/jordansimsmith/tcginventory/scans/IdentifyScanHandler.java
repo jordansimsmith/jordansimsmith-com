@@ -45,7 +45,7 @@ public class IdentifyScanHandler
     this(
         factory,
         SqsQueueClient.create(
-            factory.sqsClient(), factory.objectMapper(), "tcg_inventory_scan_jobs"));
+            factory.sqsClient(), factory.objectMapper(), "tcg_inventory_scan_jobs.fifo"));
   }
 
   @VisibleForTesting
@@ -99,7 +99,8 @@ public class IdentifyScanHandler
       return accepted(currentScan);
     }
 
-    scanQueue.send(new ScanMessage(user, scanId));
+    var message = new ScanMessage(user, scanId);
+    scanQueue.send(message, scanId, message.deduplicationId(0));
     return httpResponseFactory.accepted(new IdentifyScanResponse(scanId, "identifying"));
   }
 
