@@ -362,6 +362,72 @@
   },
   "selectedYankedVersions": {},
   "moduleExtensions": {
+    "//tcg_inventory_api:collectorvision.bzl%collectorvision": {
+      "general": {
+        "bzlTransitiveDigest": "L+ZI3y+DPiH60GTYiM93NzqXjgRiAMup3oA6qybF/6E=",
+        "usagesDigest": "Inpbr4BaLPPgmDj7EICeE48Ye8LOxfDofdGFbL9cdJk=",
+        "recordedInputs": [
+          "REPO_MAPPING:,rules_oci rules_oci+",
+          "REPO_MAPPING:,rules_pkg rules_pkg+",
+          "REPO_MAPPING:aspect_bazel_lib+,bazel_lib bazel_lib+",
+          "REPO_MAPPING:aspect_bazel_lib+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:aspect_bazel_lib+,bazel_tools bazel_tools",
+          "REPO_MAPPING:aspect_bazel_lib+,jq.bzl jq.bzl+",
+          "REPO_MAPPING:bazel_features+,bazel_features_globals bazel_features++version_extension+bazel_features_globals",
+          "REPO_MAPPING:bazel_features+,bazel_features_version bazel_features++version_extension+bazel_features_version",
+          "REPO_MAPPING:bazel_lib+,bazel_lib bazel_lib+",
+          "REPO_MAPPING:bazel_lib+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:bazel_lib+,bazel_tools bazel_tools",
+          "REPO_MAPPING:jq.bzl+,bazel_lib bazel_lib+",
+          "REPO_MAPPING:rules_oci+,aspect_bazel_lib aspect_bazel_lib+",
+          "REPO_MAPPING:rules_oci+,bazel_features bazel_features+",
+          "REPO_MAPPING:rules_oci+,bazel_skylib bazel_skylib+",
+          "REPO_MAPPING:rules_oci+,platforms platforms"
+        ],
+        "generatedRepoSpecs": {
+          "collectorvision_catalog_records": {
+            "repoRuleId": "@@//tcg_inventory_api:collectorvision.bzl%collectorvision_download",
+            "attributes": {
+              "filename": "records.jsonl.gz",
+              "sha256": "cd566e2d103c532c9e79644e152496a53494a9b04b3cd1a43c5baf3e8589bff9",
+              "urls": [
+                "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/scryfall-mtg/version/40/base/records.jsonl.gz"
+              ]
+            }
+          },
+          "collectorvision_catalog_embeddings": {
+            "repoRuleId": "@@//tcg_inventory_api:collectorvision.bzl%collectorvision_download",
+            "attributes": {
+              "filename": "embeddings.f16.gz",
+              "sha256": "bbe2eab30e2db5d1c2811c2429cecb9435a6d537319bd82c521733407becdd40",
+              "urls": [
+                "https://hanclinto.github.io/CollectorVisionCatalog/catalog-v2/scryfall-mtg/version/40/base/embeddings.f16.gz"
+              ]
+            }
+          },
+          "collectorvision_milo": {
+            "repoRuleId": "@@//tcg_inventory_api:collectorvision.bzl%collectorvision_download",
+            "attributes": {
+              "filename": "milo.onnx",
+              "sha256": "bd13d8d60383c69da04dce261f32e93fdaeaa8fd618fbc991e7385f71b3d45df",
+              "urls": [
+                "https://raw.githubusercontent.com/HanClinto/CollectorVision/2a122d00d25c8d112a90e47bf235a021e0c53b0c/collector_vision/weights/milo.onnx"
+              ]
+            }
+          },
+          "collectorvision_license": {
+            "repoRuleId": "@@//tcg_inventory_api:collectorvision.bzl%collectorvision_download",
+            "attributes": {
+              "filename": "LICENSE",
+              "sha256": "0d96a4ff68ad6d4b6f1f30f713b18d5184912ba8dd389f86aa7710db079abcb0",
+              "urls": [
+                "https://raw.githubusercontent.com/HanClinto/CollectorVision/2a122d00d25c8d112a90e47bf235a021e0c53b0c/LICENSE"
+              ]
+            }
+          }
+        }
+      }
+    },
     "@@apple_rules_lint+//lint:extensions.bzl%linter": {
       "general": {
         "bzlTransitiveDigest": "g7izj5kLCmsajh8IospHh4ZQ35dyM0FIrA8D4HapAsM=",
@@ -424,32 +490,10 @@
         }
       }
     },
-    "@@pybind11_bazel+//:internal_configure.bzl%internal_configure_extension": {
-      "general": {
-        "bzlTransitiveDigest": "06cynZ1bCvvy8zHPrrDlXq+Z68xmjctHpfFxi+zEpJY=",
-        "usagesDigest": "D1r3lfzMuUBFxgG8V6o0bQTLMk3GkaGOaPzw53wrwyw=",
-        "recordedInputs": [
-          "REPO_MAPPING:pybind11_bazel+,bazel_tools bazel_tools",
-          "FILE:@@pybind11_bazel+//MODULE.bazel e6f4c20442eaa7c90d7190d8dc539d0ab422f95c65a57cc59562170c58ae3d34"
-        ],
-        "generatedRepoSpecs": {
-          "pybind11": {
-            "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
-            "attributes": {
-              "build_file": "@@pybind11_bazel+//:pybind11-BUILD.bazel",
-              "strip_prefix": "pybind11-2.12.0",
-              "urls": [
-                "https://github.com/pybind/pybind11/archive/v2.12.0.zip"
-              ]
-            }
-          }
-        }
-      }
-    },
     "@@rules_android+//bzlmod_extensions:apksig.bzl%apksig_extension": {
       "general": {
-        "bzlTransitiveDigest": "KrgiB8lWxqVdbipL9YIYOuGjS80xlZIM/EBvUg8SVd0=",
-        "usagesDigest": "zr/niBQ/s2fHozWAsg4vI70wAxcuFjG+QtM15qGkq9o=",
+        "bzlTransitiveDigest": "5N4tKbzMVf98oP5CP0J1/NPWmoF8syDDh4FpVPaQ//Q=",
+        "usagesDigest": "S8lLnnZxdeYUYq3kIGhVMk0wQ9Fd6elmCskvn+SL6iw=",
         "recordedInputs": [
           "REPO_MAPPING:rules_android+,bazel_tools bazel_tools"
         ],
@@ -457,7 +501,10 @@
           "apksig": {
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
             "attributes": {
-              "url": "https://android.googlesource.com/platform/tools/apksig/+archive/24e3075e68ebe17c0b529bb24bfda819db5e2f3b.tar.gz",
+              "urls": [
+                "https://mirror.bazel.build/android.googlesource.com/platform/tools/apksig/+archive/24e3075e68ebe17c0b529bb24bfda819db5e2f3b.tar.gz"
+              ],
+              "sha256": "12e44fdbd219c5e1cc62099c2a01d775957603d2d4f693f8285f9d95d9a04e77",
               "build_file": "@@rules_android+//bzlmod_extensions:apksig.BUILD"
             }
           }
@@ -466,8 +513,8 @@
     },
     "@@rules_android+//bzlmod_extensions:com_android_dex.bzl%com_android_dex_extension": {
       "general": {
-        "bzlTransitiveDigest": "WYXjwqaZbEnV+ZWsKE3oDMpF5XVw8hxzet83NtyT8TM=",
-        "usagesDigest": "c1Y/KGGjUYCyd8zNIVTUh1bynVXRFz6xGKaSCBpQANM=",
+        "bzlTransitiveDigest": "FUaeAOaRd7cGQ5+VpB0KwPF+z9V9wFe8cahZtqoqRg4=",
+        "usagesDigest": "0hluQmaWiWak6sVMP5L4wXhNyIwv9fw0y5JJ8lnPb1c=",
         "recordedInputs": [
           "REPO_MAPPING:rules_android+,bazel_tools bazel_tools"
         ],
@@ -475,8 +522,11 @@
           "com_android_dex": {
             "repoRuleId": "@@bazel_tools//tools/build_defs/repo:http.bzl%http_archive",
             "attributes": {
-              "url": "https://android.googlesource.com/platform/dalvik/+archive/5a81c499a569731e2395f7c8d13c0e0d4e17a2b6.tar.gz",
-              "build_file": "@@rules_android+//bzlmod_extensions:com_android_dex.BUILD"
+              "urls": [
+                "https://mirror.bazel.build/android.googlesource.com/platform/dalvik/+archive/5a81c499a569731e2395f7c8d13c0e0d4e17a2b6.tar.gz"
+              ],
+              "build_file": "@@rules_android+//bzlmod_extensions:com_android_dex.BUILD",
+              "sha256": "86b4848c038bf687fadc812239cb01fb8d1d15cef3125b480a0448360992b95d"
             }
           }
         }
@@ -838,7 +888,7 @@
     },
     "@@rules_rust+//crate_universe/private:internal_extensions.bzl%cu_nr": {
       "general": {
-        "bzlTransitiveDigest": "PMUmQ/O8VFcT6sCfJCM2aniFl6S2beVIxGgvc2l58zM=",
+        "bzlTransitiveDigest": "cV4I0o/7RYpNjMEim+5Q1yJYwYLJZkZvzT+/ILlpLiw=",
         "usagesDigest": "dQ7SQZ7uSSL3vVKSMBKRxKJUm9OVrZZA+S1/QQfT570=",
         "recordedInputs": [
           "REPO_MAPPING:bazel_features+,bazel_features_globals bazel_features++version_extension+bazel_features_globals",

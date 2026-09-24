@@ -130,12 +130,20 @@ oci.pull(
     ],
     tag = "21-jre",
 )
+oci.pull(
+    name = "lambda_python312",
+    digest = "sha256:55c58877e6c357f07bb0ab48a3ebe06369b1282819037a45f3639f69eed59141",
+    image = "public.ecr.aws/lambda/python",
+    platforms = ["linux/amd64"],
+    tag = "3.12",
+)
 use_repo(oci, "dynamodb", "dynamodb_linux_amd64", "dynamodb_linux_arm64")
 use_repo(oci, "alpine", "alpine_linux_amd64", "alpine_linux_arm64_v8")
 use_repo(oci, "ryuk", "ryuk_linux_amd64", "ryuk_linux_arm64")
 use_repo(oci, "localstack", "localstack_linux_amd64", "localstack_linux_arm64")
 use_repo(oci, "minio", "minio_linux_amd64", "minio_linux_arm64")
 use_repo(oci, "temurin21jre", "temurin21jre_linux_amd64", "temurin21jre_linux_arm64_v8")
+use_repo(oci, "lambda_python312", "lambda_python312_linux_amd64")
 
 bazel_dep(name = "aspect_rules_lint", version = "2.5.0")
 
@@ -147,15 +155,24 @@ bazel_dep(
 
 bazel_dep(name = "rules_python", version = "2.0.0")
 
+collectorvision = use_extension("//tcg_inventory_api:collectorvision.bzl", "collectorvision")
+use_repo(
+    collectorvision,
+    "collectorvision_catalog_embeddings",
+    "collectorvision_catalog_records",
+    "collectorvision_license",
+    "collectorvision_milo",
+)
+
 python = use_extension("@rules_python//python/extensions:python.bzl", "python")
 python.toolchain(
-    python_version = "3.11",
+    python_version = "3.12",
 )
 
 pip = use_extension("@rules_python//python/extensions:pip.bzl", "pip")
 pip.parse(
     hub_name = "pypi",
-    python_version = "3.11",
+    python_version = "3.12",
     requirements_lock = "//:requirements.txt",
 )
 use_repo(pip, "pypi")

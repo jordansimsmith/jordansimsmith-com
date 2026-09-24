@@ -2,6 +2,14 @@ load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 load("@rules_java//java:defs.bzl", "java_binary", "java_library")
 load("//lib/http:defs.bzl", "stub_server_image")
 load("//lib/localstack:defs.bzl", "localstack_image")
+load("//tcg_inventory_api:collectorvision.bzl", "collectorvision_image")
+
+collectorvision_image(
+    name = "scan-worker-image",
+    base = "@lambda_python312//:lambda_python312",
+    handler = "tcg_inventory_scan_worker.offline_smoke.lambda_handler",
+    repo_tag = "bazel/tcg-inventory-scan-worker:latest",
+)
 
 HANDLERS = glob(["src/main/java/**/*Handler.java"])
 
