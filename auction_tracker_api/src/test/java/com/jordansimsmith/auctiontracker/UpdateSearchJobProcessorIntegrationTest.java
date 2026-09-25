@@ -29,6 +29,19 @@ public class UpdateSearchJobProcessorIntegrationTest {
           "gpt-5.4-mini",
           "none",
           List.of("mtg_cards", "bulk_scale", "not_basic_lands", "fixed_collection"));
+  private static final SearchFactory.Judge POKEMON_JUDGE =
+      new SearchFactory.Judge(
+          "prompts/pokemon-bulk-judge.md",
+          "gpt-6-luna",
+          "none",
+          List.of(
+              "pokemon_cards",
+              "bulk_scale",
+              "accepted_language",
+              "not_basic_energy",
+              "not_mega_evolution_era",
+              "acceptable_condition",
+              "fixed_collection"));
 
   private FakeClock fakeClock;
   private FakeExcludedSellerUsernameFactory fakeExcludedSellerUsernameFactory;
@@ -590,6 +603,68 @@ public class UpdateSearchJobProcessorIntegrationTest {
   }
 
   @Test
+  void processShouldStorePokemonJudgmentsForDigestFiltering() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
+    var baseUrl = "https://www.trademe.co.nz/a/marketplace/gaming/trading-cards/pokemon/search";
+    var search =
+        new SearchFactory.Search(
+            "pokemon-bulk",
+            URI.create(baseUrl),
+            "bulk",
+            null,
+            200.0,
+            SearchFactory.Condition.USED,
+            POKEMON_JUDGE);
+    fakeSearchFactory.addSearches(List.of(search));
+    fakeTradeMeClient.addSearchResponse(
+        URI.create(baseUrl),
+        "bulk",
+        null,
+        200.0,
+        SearchFactory.Condition.USED,
+        List.of(
+            new TradeMeClient.TradeMeItem(
+                "pokemon-pass",
+                "Pokemon bulk collection",
+                "500 English and Japanese cards from one fixed pile",
+                "seller",
+                START_PRICE,
+                BUY_NOW_PRICE),
+            new TradeMeClient.TradeMeItem(
+                "pokemon-fail",
+                "Pokemon bulk Mega Evolution",
+                "500 cards, mostly Mega Evolution",
+                "seller",
+                START_PRICE,
+                BUY_NOW_PRICE)));
+    fakeLlmClient.addResponse(judgmentJson(POKEMON_JUDGE.criteria(), true));
+    fakeLlmClient.addResponse(
+        judgmentJson(POKEMON_JUDGE.criteria(), List.of("not_mega_evolution_era")));
+
+    // act
+    updateSearchJobProcessor.process("pokemon-bulk");
+
+    // assert
+    var items = auctionTrackerTable.scan().items().stream().toList();
+    assertThat(items).hasSize(2);
+    assertThat(
+            items.stream()
+                .filter(item -> item.getUrl().equals("pokemon-pass"))
+                .findFirst()
+                .orElseThrow()
+                .getJudgment())
+        .isEqualTo(AuctionTrackerItem.Judgment.PASS);
+    assertThat(
+            items.stream()
+                .filter(item -> item.getUrl().equals("pokemon-fail"))
+                .findFirst()
+                .orElseThrow()
+                .getJudgment())
+        .isEqualTo(AuctionTrackerItem.Judgment.FAIL);
+  }
+
+  @Test
   void processShouldNotJudgeExistingItems() {
     // arrange
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
@@ -822,6 +897,28 @@ public class UpdateSearchJobProcessorIntegrationTest {
   private static String judgmentJson(boolean pass) {
     var result = pass ? "pass" : "fail";
     var criteria = List.of("mtg_cards", "bulk_scale", "not_basic_lands", "fixed_collection");
+    return judgmentJson(criteria, result);
+  }
+
+  private static String judgmentJson(List<String> criteria, boolean pass) {
+    return judgmentJson(criteria, pass ? "pass" : "fail");
+  }
+
+  private static String judgmentJson(List<String> criteria, List<String> failingCriteria) {
+    var builder = new StringBuilder("{");
+    for (var i = 0; i < criteria.size(); i++) {
+      var result = failingCriteria.contains(criteria.get(i)) ? "fail" : "pass";
+      builder.append(
+          "\"%s\": {\"reasoning\": \"because\", \"result\": \"%s\"}"
+              .formatted(criteria.get(i), result));
+      if (i < criteria.size() - 1) {
+        builder.append(",");
+      }
+    }
+    return builder.append("}").toString();
+  }
+
+  private static String judgmentJson(List<String> criteria, String result) {
     var builder = new StringBuilder("{");
     for (var i = 0; i < criteria.size(); i++) {
       builder.append(

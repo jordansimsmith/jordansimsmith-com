@@ -20,6 +20,20 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 
 @Testcontainers
 public class SendDigestJobProcessorIntegrationTest {
+  private static final SearchFactory.Judge POKEMON_JUDGE =
+      new SearchFactory.Judge(
+          "prompts/pokemon-bulk-judge.md",
+          "gpt-6-luna",
+          "none",
+          List.of(
+              "pokemon_cards",
+              "bulk_scale",
+              "accepted_language",
+              "not_basic_energy",
+              "not_mega_evolution_era",
+              "acceptable_condition",
+              "fixed_collection"));
+
   private FakeClock fakeClock;
   private FakeNotificationPublisher fakeNotificationPublisher;
   private FakeSearchFactory fakeSearchFactory;
@@ -352,6 +366,60 @@ public class SendDigestJobProcessorIntegrationTest {
         .contains("https://www.trademe.co.nz/listing/123")
         .doesNotContain("Pokemon bulk lot")
         .doesNotContain("https://www.trademe.co.nz/listing/456");
+  }
+
+  @Test
+  void processShouldSendOnlyPassingPokemonJudgmentsToDigest() {
+    // arrange
+    var currentTime = Instant.ofEpochSecond(2_000_000);
+    fakeClock.setTime(currentTime);
+    var yesterdayTime = currentTime.minus(1, ChronoUnit.DAYS);
+
+    var baseUrl = "https://www.trademe.co.nz/a/marketplace/gaming/trading-cards/pokemon/search";
+    var expectedSearchUrl =
+        baseUrl + "?search_string=bulk&price_max=200&condition=used&sort_order=expirydesc";
+    var search =
+        new SearchFactory.Search(
+            "pokemon-bulk",
+            URI.create(baseUrl),
+            "bulk",
+            null,
+            200.0,
+            SearchFactory.Condition.USED,
+            POKEMON_JUDGE);
+    fakeSearchFactory.addSearches(List.of(search));
+
+    var passItem =
+        AuctionTrackerItem.create(
+            expectedSearchUrl,
+            "https://www.trademe.co.nz/a/marketplace/gaming/trading-cards/pokemon/listing/pass",
+            "Pokemon English and Japanese bulk collection",
+            "pokemon-pass-fingerprint",
+            yesterdayTime.plus(1, ChronoUnit.HOURS),
+            AuctionTrackerItem.Judgment.PASS);
+    var failItem =
+        AuctionTrackerItem.create(
+            expectedSearchUrl,
+            "https://www.trademe.co.nz/a/marketplace/gaming/trading-cards/pokemon/listing/fail",
+            "Pokemon Basic Energy bundle",
+            "pokemon-fail-fingerprint",
+            yesterdayTime.plus(2, ChronoUnit.HOURS),
+            AuctionTrackerItem.Judgment.FAIL);
+
+    auctionTrackerTable.putItem(passItem);
+    auctionTrackerTable.putItem(failItem);
+
+    // act
+    sendDigestJobProcessor.process(currentTime);
+
+    // assert
+    var notifications = fakeNotificationPublisher.findNotifications("auction_tracker_api_digest");
+    assertThat(notifications).hasSize(1);
+    assertThat(notifications.get(0).message())
+        .contains("Pokemon English and Japanese bulk collection")
+        .contains("/listing/pass")
+        .doesNotContain("Pokemon Basic Energy bundle")
+        .doesNotContain("/listing/fail");
   }
 
   @Test

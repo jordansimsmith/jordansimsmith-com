@@ -24,8 +24,24 @@ public class SearchFactoryImpl implements SearchFactory {
               "timings_cl16",
               "desktop_udimm"));
 
+  private static final Judge POKEMON_JUDGE =
+      new Judge(
+          "prompts/pokemon-bulk-judge.md",
+          "gpt-6-luna",
+          "none",
+          List.of(
+              "pokemon_cards",
+              "bulk_scale",
+              "accepted_language",
+              "not_basic_energy",
+              "not_mega_evolution_era",
+              "acceptable_condition",
+              "fixed_collection"));
+
   private static final String RAM_SEARCH_PATH =
       "/a/marketplace/computers/components/memory-ram/16gb-or-more/search";
+  private static final String POKEMON_SEARCH_PATH =
+      "/a/marketplace/gaming/trading-cards/pokemon/search";
 
   private final List<Search> searches;
 
@@ -111,7 +127,63 @@ public class SearchFactoryImpl implements SearchFactory {
                 null,
                 200.0,
                 Condition.USED,
-                MTG_JUDGE));
+                MTG_JUDGE),
+            new Search(
+                "pokemon-bulk",
+                baseUri.resolve(POKEMON_SEARCH_PATH),
+                "bulk",
+                null,
+                200.0,
+                Condition.USED,
+                POKEMON_JUDGE),
+            new Search(
+                "pokemon-collection",
+                baseUri.resolve(POKEMON_SEARCH_PATH),
+                "collection",
+                null,
+                200.0,
+                Condition.USED,
+                POKEMON_JUDGE),
+            new Search(
+                "pokemon-assorted",
+                baseUri.resolve(POKEMON_SEARCH_PATH),
+                "assorted",
+                null,
+                200.0,
+                Condition.USED,
+                POKEMON_JUDGE),
+            new Search(
+                "pokemon-clear-out",
+                baseUri.resolve(POKEMON_SEARCH_PATH),
+                "clear out",
+                null,
+                200.0,
+                Condition.USED,
+                POKEMON_JUDGE),
+            new Search(
+                "pokemon-clearout",
+                baseUri.resolve(POKEMON_SEARCH_PATH),
+                "clearout",
+                null,
+                200.0,
+                Condition.USED,
+                POKEMON_JUDGE),
+            new Search(
+                "pokemon-lot",
+                baseUri.resolve(POKEMON_SEARCH_PATH),
+                "lot",
+                null,
+                200.0,
+                Condition.USED,
+                POKEMON_JUDGE),
+            new Search(
+                "pokemon-one-dollar-reserve",
+                baseUri.resolve(POKEMON_SEARCH_PATH),
+                "$1 reserve",
+                null,
+                200.0,
+                Condition.USED,
+                POKEMON_JUDGE));
   }
 
   @Override

@@ -20,6 +20,17 @@ public final class TradeMeWebsiteStubServer {
       </html>
       """;
 
+  private static final String POKEMON_SEARCH_HTML =
+      """
+      <html>
+        <body>
+          <div class="tm-search-results">
+            <a href="/a/marketplace/gaming/trading-cards/pokemon/listing/5337003624">Pokemon bulk collection</a>
+          </div>
+        </body>
+      </html>
+      """;
+
   private static final String ITEM1_HTML =
       """
       <html>
@@ -65,6 +76,22 @@ public final class TradeMeWebsiteStubServer {
       </html>
       """;
 
+  private static final String POKEMON_ITEM_HTML =
+      """
+      <html>
+        <body>
+          <h1 class="tm-marketplace-buyer-options__listing_title">Pokemon bulk collection</h1>
+          <div class="tm-marketplace-listing-body__container">
+            <p>500 English and Japanese Pokemon cards from one fixed collection.</p>
+            <p>Mostly near mint and lightly played.</p>
+          </div>
+          <script id="frend-state" type="application/json">
+            {"NGRX_STATE":{"listing":{"cachedDetails":{"entities":{"5337003624":{"item":{"startPrice":1,"buyNowPrice":150,"maxBidAmount":20,"member":{"nickname":"allowed-seller"}}}}}}}}
+          </script>
+        </body>
+      </html>
+      """;
+
   private TradeMeWebsiteStubServer() {}
 
   public static void main(String[] args) throws Exception {
@@ -79,7 +106,11 @@ public final class TradeMeWebsiteStubServer {
         exchange -> {
           var path = exchange.getRequestURI().getPath();
           if (path.contains("/search")) {
-            respond(exchange, 200, "text/html; charset=utf-8", SEARCH_HTML);
+            respond(
+                exchange,
+                200,
+                "text/html; charset=utf-8",
+                path.contains("/trading-cards/pokemon/") ? POKEMON_SEARCH_HTML : SEARCH_HTML);
             return;
           }
 
@@ -90,6 +121,7 @@ public final class TradeMeWebsiteStubServer {
                   case "5337003621" -> ITEM1_HTML;
                   case "5337003622" -> ITEM2_HTML;
                   case "5337003623" -> ITEM_WITH_RESERVE_NOT_MET_HTML;
+                  case "5337003624" -> POKEMON_ITEM_HTML;
                   default -> null;
                 };
             if (html == null) {

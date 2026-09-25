@@ -22,7 +22,7 @@ import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
 import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 
 public class AuctionTrackerE2ETest {
-  // union of the MTG and RAM judges' criteria so the one stubbed response satisfies both judges
+  // union of the configured judges' criteria so the one stubbed response satisfies each judge
   private static final String PASS_JUDGMENT =
       """
       {
@@ -30,6 +30,11 @@ public class AuctionTrackerE2ETest {
         "bulk_scale": {"reasoning": "ok", "result": "pass"},
         "not_basic_lands": {"reasoning": "ok", "result": "pass"},
         "fixed_collection": {"reasoning": "ok", "result": "pass"},
+        "pokemon_cards": {"reasoning": "ok", "result": "pass"},
+        "accepted_language": {"reasoning": "ok", "result": "pass"},
+        "not_basic_energy": {"reasoning": "ok", "result": "pass"},
+        "not_mega_evolution_era": {"reasoning": "ok", "result": "pass"},
+        "acceptable_condition": {"reasoning": "ok", "result": "pass"},
         "trident_z_family": {"reasoning": "ok", "result": "pass"},
         "ddr4": {"reasoning": "ok", "result": "pass"},
         "kit_2x16gb": {"reasoning": "ok", "result": "pass"},
@@ -94,7 +99,7 @@ public class AuctionTrackerE2ETest {
     var scheduledAt = Instant.now().plusSeconds(3600);
 
     // act - enqueue ordered searches and the digest behind them in the FIFO stream
-    for (var searchId : List.of("mtg-bulk", "mtg-collection")) {
+    for (var searchId : List.of("mtg-bulk", "mtg-collection", "pokemon-bulk")) {
       sqsClient.sendMessage(
           SendMessageRequest.builder()
               .queueUrl(jobsQueueUrl)
@@ -134,6 +139,7 @@ public class AuctionTrackerE2ETest {
                 messageBody ->
                     messageBody.contains("Auction Tracker Daily Digest")
                         && messageBody.contains("Titleist iron set")
+                        && messageBody.contains("Pokemon bulk collection")
                         && !messageBody.contains("Callaway iron set"));
     assertThat(hasExpectedMessage).isTrue();
 
@@ -145,7 +151,9 @@ public class AuctionTrackerE2ETest {
         dynamoDbClient.scan(b -> b.tableName("auction_tracker")).items().stream()
             .map(item -> item.get("title").s())
             .toList();
-    assertThat(storedTitles).contains("Titleist iron set").doesNotContain("Callaway iron set");
+    assertThat(storedTitles)
+        .contains("Titleist iron set", "Pokemon bulk collection")
+        .doesNotContain("Callaway iron set");
   }
 
   @Test

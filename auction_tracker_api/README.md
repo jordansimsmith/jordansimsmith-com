@@ -19,6 +19,7 @@ The auction tracker API service runs scheduled queued workflows that scrape Trad
 - As a digest subscriber, I want listings from known seller usernames excluded, so that my own listings do not appear in the digest.
 - As a maintainer, I want duplicate detection by listing URL, exact listing content, and seller-set price terms, so that persisted records, judge calls, and digests stay clean.
 - As an MTG bulk-lot hunter, I want junk listings (wrong game, single cards, basic lands, store repacks) filtered by an LLM judge, so that the digest only surfaces lots worth a look.
+- As a Pokémon bulk-lot hunter, I want energy-heavy, small, repeatable, poor-condition, non-English, and current Mega Evolution-era lots filtered by an LLM judge, so that the digest only surfaces worthwhile Pokémon collections.
 - As a RAM kit hunter, I want mismatched listings (wrong family, DDR generation, configuration, speed, timings, or form factor) filtered by an LLM judge, so that the digest only surfaces kits matching my existing G.Skill Trident Z 2x16GB DDR4-3200 CL16 kit.
 
 ## Features and scope boundaries
@@ -26,12 +27,12 @@ The auction tracker API service runs scheduled queued workflows that scrape Trad
 ### In scope
 
 - Queue one `update_search` job per configured Trade Me search every 15 minutes. Each job invokes the worker for exactly one search.
-- Identify the ten code-defined searches with stable IDs: `ram-g-skill`, `ram-gskill`, `ram-trident-z`, `mtg-bulk`, `mtg-collection`, `mtg-assorted`, `mtg-clear-out`, `mtg-clearout`, `mtg-lot`, and `mtg-one-dollar-reserve`.
+- Identify the seventeen code-defined searches with stable IDs: `ram-g-skill`, `ram-gskill`, `ram-trident-z`, the seven MTG IDs (`mtg-bulk`, `mtg-collection`, `mtg-assorted`, `mtg-clear-out`, `mtg-clearout`, `mtg-lot`, `mtg-one-dollar-reserve`), and the seven Pokémon IDs (`pokemon-bulk`, `pokemon-collection`, `pokemon-assorted`, `pokemon-clear-out`, `pokemon-clearout`, `pokemon-lot`, `pokemon-one-dollar-reserve`).
 - Build search URLs with term, optional price filters, condition filter, and `sort_order=expirydesc`.
 - Fetch listing pages, normalize listing URLs, extract original start and Buy Now prices from the embedded Trade Me page state, exclude current bids from relist identity, and skip listings marked as reserve not met.
 - Extract seller usernames from embedded Trade Me page state and skip listings from the injected code-defined exclusion set, initially `roseshade`, before duplicate checks, judging, or persistence.
-- Judge new listings on searches with a configured judge (all ten searches: the seven MTG searches `bulk`, `collection`, `assorted`, `clear out`, `clearout`, `lot`, `$1 reserve` and the three RAM searches `g.skill`, `gskill`, `trident z`) using an OpenAI LLM against the judge's configured binary criteria, and persist the overall verdict.
-- Carry judge configuration (prompt resource, model, reasoning effort, criteria) per search: the MTG searches share one judge config, the RAM searches share another.
+- Judge new listings on searches with a configured judge (all seventeen searches: seven MTG searches, seven Pokémon searches, and three RAM searches) using an OpenAI LLM against the judge's configured binary criteria, and persist the overall verdict.
+- Carry judge configuration (prompt resource, model, reasoning effort, criteria) per search: the seven MTG searches share one config, the seven Pokémon searches share one config, and the three RAM searches share one config.
 - Store newly discovered items in DynamoDB with deterministic key prefixes and 30-day TTL.
 - Prevent duplicate inserts for the same `(search_url, item_url)` pair using GSI `gsi1`.
 - Suppress relists globally before judging when GSI `gsi2` contains the same exact title, description, start price, and Buy Now price SHA-256 fingerprint.
@@ -57,7 +58,7 @@ The auction tracker API service runs scheduled queued workflows that scrape Trad
 
 ```mermaid
 flowchart TD
-  updateSchedules[EventBridge Scheduler: ten 15-minute schedules] --> jobsQueue[SQS FIFO auction_tracker_jobs.fifo]
+  updateSchedules[EventBridge Scheduler: seventeen 15-minute schedules] --> jobsQueue[SQS FIFO auction_tracker_jobs.fifo]
   digestSchedule[EventBridge Scheduler: 9:05pm Pacific/Auckland] --> jobsQueue
   jobsQueue --> jobsHandler[JobsHandler Lambda: batch size 1]
   jobsHandler --> searchProcessor[UpdateSearchJobProcessor]
@@ -115,7 +116,7 @@ sequenceDiagram
 
 ## Main technical decisions
 
-- Use ten EventBridge Scheduler schedules to enqueue one message per search into a single FIFO queue. Use a second Scheduler schedule for the digest message.
+- Use seventeen EventBridge Scheduler schedules to enqueue one message per search into a single FIFO queue. Use a second Scheduler schedule for the digest message.
 - Use one constant FIFO message group (`auction-tracker`) and Lambda event-source batch size one to serialize upstream load and keep each invocation scoped to one job.
 - Keep `JobsHandler` limited to SQS message parsing and dispatch; `UpdateSearchJobProcessor` owns one-search scraping and persistence, while `SendDigestJobProcessor` owns digest selection and SNS publication.
 - Use content-based deduplication, a 14-day retention period, a 1,800-second visibility timeout, and a five-receive redrive policy to one FIFO worker DLQ. Do not add claim records, transactions, a message ledger, or a Scheduler DLQ.
@@ -134,24 +135,26 @@ sequenceDiagram
 - Existing title-and-description fingerprints are not backfilled. They do not match price-aware fingerprints, so the first relist after deployment can produce one notification even when its price is unchanged; subsequent relists use price-aware suppression.
 - Carry judge configuration as a nullable nested `Judge` record (`prompt`, `model`, `reasoningEffort`, `criteria`) on each `SearchFactory.Search`, with one shared constant per judge in `SearchFactoryImpl`; criteria ride with the config because verdict validation is per-judge.
 - MTG judge: `gpt-5.4-mini` with reasoning effort `none` via the shared `lib/llm` client; retain the configuration selected by the eval harness in `evals/mtg_bulk/` while using the v6 prompt with the four current criteria.
+- Pokémon judge: `gpt-6-luna` with reasoning effort `none` via the shared `lib/llm` client. Three-trial dev evaluation selected it as the cheapest qualifying available candidate (100% TPR/TNR for every criterion and overall); the same thresholds held on the 40-example test split. The shared prompt applies seven independent criteria: Pokémon cards, bulk scale, accepted English/Japanese language, not primarily Basic Energy, not primarily the current Mega Evolution era, acceptable condition, and one fixed collection. The current-era exclusion is Mega Evolution, Phantasmal Flames, Ascended Heroes, Perfect Order, Chaos Rising, Pitch Black, and non-30th Mega Evolution promos; 30th-anniversary cards, including 30th Celebration and 30th Classic Collection, are explicit exceptions. Old XY-era Mega EX and XY Evolutions are not excluded.
+- The Pokémon eval preflight accepted all requested API candidates (`gpt-5.4-nano`/`low`, `gpt-5.4-mini`/`none` and `low`, `gpt-5.6-luna`/`none` and `low`, and `gpt-6-luna`/`none` and `low`); every run records its model, effort, prompt hash, split, trials, token usage, and cost under `evals/pokemon_bulk/runs/`. Rate-limit responses are retried with bounded backoff by the shared harness.
 - RAM judge: `gpt-5.4-nano` with reasoning effort `low`; selected by the eval harness in `evals/ram/` (perfect test-split TPR/TNR at roughly 3.6x lower cost than the mini candidate).
 - Broaden RAM coverage with three brand searches (`g.skill`, `gskill`, `trident z`) because Trade Me tokenizes `g.skill` and `gskill` differently and the previous narrow term returned almost nothing; spec-based terms stay out to keep results within the single scraped page.
-- Freeze each production system prompt (current eval prompt plus train-split few-shot examples) as a checked-in resource loaded through `lib/prompts`: `src/main/resources/prompts/mtg-bulk-judge.md` (mtg_bulk v6) and `src/main/resources/prompts/ram-judge.md` (ram v3).
+- Freeze each production system prompt (current eval prompt plus train-split few-shot examples) as a checked-in resource loaded through `lib/prompts`: `src/main/resources/prompts/mtg-bulk-judge.md` (mtg_bulk v6), `src/main/resources/prompts/pokemon-bulk-judge.md` (pokemon_bulk v1), and `src/main/resources/prompts/ram-judge.md` (ram v3).
 - Fail closed on judge errors: exceptions fail the invocation so the same SQS message is retried; already-persisted items are not re-judged.
 - Persist listing discovery time from the worker's actual processing time, not the Scheduler's scheduled time, so delayed searches remain eligible for the next unsent digest window.
 
 ## Domain glossary
 
 - **Search definition**: one configured Trade Me query with a stable ID, base URL, search term, optional price bounds, condition, and optional judge configuration. The ID is stored directly on `SearchFactory.Search` and is the only identifier accepted by `SearchFactory.getSearch`.
-- **Judge configuration**: a prompt resource name, OpenAI model, reasoning effort, and ordered criteria list shared by the searches that use it (one config for MTG, one for RAM).
+- **Judge configuration**: a prompt resource name, OpenAI model, reasoning effort, and ordered criteria list shared by the searches that use it (one config each for MTG, Pokémon, and RAM).
 - **Discovered item**: one listing found and parsed from Trade Me with normalized URL, title, transient description, transient seller username, and transient seller-set price terms.
 - **Excluded seller username**: a normalized Trade Me member nickname in the injected global exclusion set; matching listings are discarded before any storage lookup, LLM call, or persistence.
 - **URL duplicate**: an item where the same search URL and listing URL already exists in `gsi1`.
 - **Content fingerprint**: a deterministic SHA-256 identity derived from the exact scraped listing title, description, normalized original start price, and normalized Buy Now price, persisted as `fingerprint`, and used to derive `gsi2pk`.
 - **Seller-set price terms**: the original auction start price and optional Buy Now price embedded in Trade Me's server-rendered page state; current bids are excluded.
 - **Relisted item**: a listing with a new URL whose price-aware content fingerprint matches a record retained in `gsi2`.
-- **Judged search**: a search definition with a judge configuration (currently all ten searches: seven MTG sharing `prompts/mtg-bulk-judge.md`, three RAM sharing `prompts/ram-judge.md`).
-- **Judgment**: the LLM verdict for a listing, `pass` or `fail`; overall pass requires all configured criteria to pass (MTG: `mtg_cards`, `bulk_scale`, `not_basic_lands`, `fixed_collection`; RAM: `trident_z_family`, `ddr4`, `kit_2x16gb`, `speed_3200`, `timings_cl16`, `desktop_udimm`). The MTG `not_basic_lands` criterion fails only when basic lands are the primary contents; mentioning some lands in a mixed lot is not enough. MTG set origin and crossover branding, including Universes Within and Universes Beyond, do not affect eligibility.
+- **Judged search**: a search definition with a judge configuration (currently all seventeen searches: seven MTG sharing `prompts/mtg-bulk-judge.md`, seven Pokémon sharing `prompts/pokemon-bulk-judge.md`, and three RAM sharing `prompts/ram-judge.md`).
+- **Judgment**: the LLM verdict for a listing, `pass` or `fail`; overall pass requires all configured criteria to pass. MTG uses `mtg_cards`, `bulk_scale`, `not_basic_lands`, and `fixed_collection`; Pokémon uses `pokemon_cards`, `bulk_scale`, `accepted_language`, `not_basic_energy`, `not_mega_evolution_era`, `acceptable_condition`, and `fixed_collection`; RAM uses `trident_z_family`, `ddr4`, `kit_2x16gb`, `speed_3200`, `timings_cl16`, and `desktop_udimm`. MTG set origin and crossover branding, including Universes Within and Universes Beyond, do not affect eligibility. Pokémon border color is ignored, and ambiguous language, quantity, era share, and condition default to pass unless positive text proves failure.
 - **Search ID**: stable code-defined identifier carried by an `update_search` job (for example `mtg-bulk` or `ram-g-skill`).
 - **Worker job**: one `update_search` or `send_digest` message delivered from the FIFO queue to `JobsHandler`.
 - **Digest window**: interval from the preceding local 9:05pm `Pacific/Auckland` boundary (exclusive) through the job's `scheduled_at` upper boundary (inclusive).
@@ -165,8 +168,8 @@ sequenceDiagram
 - **Amazon DynamoDB**: outbound reads/writes against table `auction_tracker`. Update flow performs per-search URL checks, global content-fingerprint checks, and inserts; digest flow queries per-search partitions for recent items.
 - **Amazon SNS**: outbound publish to topic `auction_tracker_api_digest` when at least one new item exists in the digest window. Topic ARN is resolved by listing topics and matching by topic-name suffix.
 - **Amazon SQS**: FIFO queue `auction_tracker_jobs.fifo` receives one message per configured search every 15 minutes and one digest message at 9:05pm. Content-based deduplication is enabled, all messages use group `auction-tracker`, retention is 14 days, and the worker event source uses batch size one. Failed messages are retried and routed after five receives to FIFO DLQ `auction_tracker_jobs_dlq.fifo`, which also retains messages for 14 days.
-- **Amazon EventBridge Scheduler**: ten schedules enqueue `update_search` jobs with `cron(0/15 * * * ? *)`; one schedule enqueues `send_digest` with `cron(5 21 * * ? *)`, all in the `Pacific/Auckland` timezone. Each schedule uses the universal SQS `sendMessage` target with the FIFO queue URL, one constant message group, and a JSON `MessageBody` containing `<aws.scheduler.scheduled-time>`; Scheduler replaces that context attribute before SQS delivery. Scheduler retries delivery up to five times for one hour. No Scheduler DLQ is configured; a delivery still failing after those retries is an accepted missed run. A dedicated scheduler role can send only to the FIFO jobs queue.
-- **OpenAI chat completions API**: outbound `POST /v1/chat/completions` for new listings on judged searches, with the search's configured model and reasoning effort (`gpt-5.4-mini`/`none` for MTG, `gpt-5.4-nano`/`low` for RAM) and JSON response format. The base origin defaults to `https://api.openai.com` and can be overridden with `AUCTION_TRACKER_OPENAI_BASE_URL` (used in E2E tests). The API key is read from the `auction_tracker_api` secret. Request failures and malformed verdicts fail the invocation.
+- **Amazon EventBridge Scheduler**: seventeen schedules enqueue `update_search` jobs with `cron(0/15 * * * ? *)`; one schedule enqueues `send_digest` with `cron(5 21 * * ? *)`, all in the `Pacific/Auckland` timezone. Each schedule uses the universal SQS `sendMessage` target with the FIFO queue URL, one constant message group, and a JSON `MessageBody` containing `<aws.scheduler.scheduled-time>`; Scheduler replaces that context attribute before SQS delivery. Scheduler retries delivery up to five times for one hour. No Scheduler DLQ is configured; a delivery still failing after those retries is an accepted missed run. A dedicated scheduler role can send only to the FIFO jobs queue.
+- **OpenAI chat completions API**: outbound `POST /v1/chat/completions` for new listings on judged searches, with the search's configured model and reasoning effort (`gpt-5.4-mini`/`none` for MTG, `gpt-6-luna`/`none` for Pokémon, `gpt-5.4-nano`/`low` for RAM) and JSON response format. The base origin defaults to `https://api.openai.com` and can be overridden with `AUCTION_TRACKER_OPENAI_BASE_URL` (used in E2E tests). The API key is read from the `auction_tracker_api` secret. Request failures and malformed verdicts fail the invocation.
 - **AWS Secrets Manager**: outbound read of secret `auction_tracker_api` for the OpenAI API key, resolved lazily on the first judged listing per Lambda instance.
 
 ## API contracts
@@ -303,16 +306,16 @@ Representative record:
 
 ## Source of truth
 
-| Entity                     | Authoritative source                                                                      | Notes                                                                                                        |
-| -------------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| Search definitions         | `SearchFactoryImpl` in service code                                                       | current definitions are static and code-controlled                                                           |
-| Excluded seller usernames  | `ExcludedSellerUsernameFactoryImpl` in service code                                       | global normalized set, initially `roseshade`; injected behind `ExcludedSellerUsernameFactory`                |
-| Listing content snapshot   | Trade Me listing pages at scrape time                                                     | title/url/fingerprint are persisted; description, seller username, and seller-set prices are transient       |
-| Judge prompts              | `src/main/resources/prompts/mtg-bulk-judge.md`, `src/main/resources/prompts/ram-judge.md` | frozen system prompts (MTG v6, RAM v3) validated by the eval harnesses in `evals/mtg_bulk/` and `evals/ram/` |
-| Judge model and effort     | `Judge` constants in `SearchFactoryImpl`                                                  | MTG `gpt-5.4-mini`/`none`, RAM `gpt-5.4-nano`/`low`                                                          |
-| Persisted discovered items | DynamoDB `auction_tracker` table                                                          | canonical history used for duplicate checks, verdicts, and digests                                           |
-| Digest recipients          | SNS topic subscriptions in Terraform                                                      | email endpoints are infra-managed                                                                            |
-| Search IDs and schedules   | `SearchFactoryImpl` and `infra/main.tf`                                                   | ten stable IDs; update `cron(0/15 * * * ? *)`; digest `cron(5 21 * * ? *)` in `Pacific/Auckland`             |
+| Entity                     | Authoritative source                                                                                                                          | Notes                                                                                                               |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Search definitions         | `SearchFactoryImpl` in service code                                                                                                           | current definitions are static and code-controlled                                                                  |
+| Excluded seller usernames  | `ExcludedSellerUsernameFactoryImpl` in service code                                                                                           | global normalized set, initially `roseshade`; injected behind `ExcludedSellerUsernameFactory`                       |
+| Listing content snapshot   | Trade Me listing pages at scrape time                                                                                                         | title/url/fingerprint are persisted; description, seller username, and seller-set prices are transient              |
+| Judge prompts              | `src/main/resources/prompts/mtg-bulk-judge.md`, `src/main/resources/prompts/pokemon-bulk-judge.md`, `src/main/resources/prompts/ram-judge.md` | frozen system prompts validated by the eval harnesses in `evals/mtg_bulk/`, `evals/pokemon_bulk/`, and `evals/ram/` |
+| Judge model and effort     | `Judge` constants in `SearchFactoryImpl`                                                                                                      | MTG `gpt-5.4-mini`/`none`, Pokémon `gpt-6-luna`/`none`, RAM `gpt-5.4-nano`/`low`                                    |
+| Persisted discovered items | DynamoDB `auction_tracker` table                                                                                                              | canonical history used for duplicate checks, verdicts, and digests                                                  |
+| Digest recipients          | SNS topic subscriptions in Terraform                                                                                                          | email endpoints are infra-managed                                                                                   |
+| Search IDs and schedules   | `SearchFactoryImpl` and `infra/main.tf`                                                                                                       | seventeen stable IDs; update `cron(0/15 * * * ? *)`; digest `cron(5 21 * * ? *)` in `Pacific/Auckland`              |
 
 ## Security and privacy
 
@@ -348,13 +351,13 @@ Secrets Manager secret `auction_tracker_api` (value set manually after Terraform
 
 ## Performance envelope
 
-- Ten search schedules run every 15 minutes; the digest schedule runs daily at 9:05pm in `Pacific/Auckland`, including across daylight-saving transitions.
+- Seventeen search schedules run every 15 minutes; the digest schedule runs daily at 9:05pm in `Pacific/Auckland`, including across daylight-saving transitions.
 - The worker Lambda uses `memory_size = 1024` MB and a `300` second timeout. The FIFO queue visibility timeout is `1,800` seconds, leaving room for Lambda retries and long scraping/judging calls.
 - The event-source mapping uses batch size one and one constant message group, so upstream Trade Me/OpenAI load is serialized even if Lambda capacity increases.
 - Jsoup HTTP requests use a `30` second timeout per request.
 - Each new URL performs one per-search `gsi1` query and, when not found, one global `gsi2` query before any optional LLM call.
 - Excluded sellers are rejected before DynamoDB reads or LLM calls.
-- Judging costs roughly $0.011 per judged MTG listing and $0.0014 per judged RAM listing at current model pricing; steady-state runs judge only newly discovered listings.
+- Judging costs roughly $0.011 per judged MTG listing and $0.0014 per judged RAM listing at the recorded model rates. Pokémon candidate comparison passed $0.20 per million input / $1.20 per million output for `gpt-5.6-luna` and $0.10 per million input / $0.50 per million output for `gpt-6-luna`; production uses `gpt-6-luna`/`none` at the latter rates. The final three-trial dev run measured about $0.00144 per listing and the test run about $0.00144 per listing. Steady-state runs judge only newly discovered listings.
 - Per-item network fetch failures are non-fatal for a run (warn and continue), while required-field parsing failures, processor-level failures, and judge errors bubble as invocation errors.
 
 ## Testing and quality gates
@@ -362,7 +365,8 @@ Secrets Manager secret `auction_tracker_api` (value set manually after Terraform
 - Unit tests (`JsoupTradeMeClientTest`, `Sha256ListingFingerprinterTest`) cover URL generation, listing parsing, query-parameter stripping, reserve filtering, required seller-username extraction, fail-closed seller and price parsing, current-bid exclusion, decimal normalization, and exact content-and-price fingerprint semantics.
 - Unit tests (`ExcludedSellerUsernameFactoryImplTest`) lock down the production exclusion set.
 - Unit tests (`LlmListingJudgeTest`) cover verdict parsing, criterion failure, malformed responses, and the exact LLM request shape (per-judge model, effort, and criteria) against both real checked-in prompt resources.
-- Unit tests (`SearchFactoryImplTest`) cover the ten search definitions, stable IDs, their filters, and judge config wiring.
+- Unit tests (`SearchFactoryImplTest`) cover all seventeen search definitions, stable IDs, their filters, and judge config wiring, including the seven Pokémon terms and category path.
+- Unit tests (`LlmListingJudgeTest`) and integration tests (`UpdateSearchJobProcessorIntegrationTest`) cover the Pokémon prompt, model/effort, all seven criteria, malformed verdict handling, and persisted pass/fail judgments used by digest filtering.
 - Integration tests (`UpdateSearchJobProcessorIntegrationTest`, `SendDigestJobProcessorIntegrationTest`) cover one-search processing, invalid jobs and unknown IDs, dependency failures, repeated delivery safety, excluded-seller suppression before judging, URL duplicate prevention, global relist suppression before judging, changed-description and changed-price handling, judgment persistence, the fixed local digest window including DST, fail-judged exclusion, price-aware fingerprint digest deduplication, legacy URL fallback, and SNS failure propagation (LLM and SNS calls are faked).
 - E2E tests enqueue an ordered search message followed by a digest message into the LocalStack FIFO queue and validate queue-driven DynamoDB persistence and SNS/SQS notification delivery, including an excluded `roseshade` listing.
 - Required checks before merge:
@@ -397,7 +401,7 @@ Inspect the failed message in `auction_tracker_jobs_dlq.fifo` and the correspond
 
 ### Scenario 2: new listing on a judged search is judged before persistence
 
-1. `UpdateSearchJobProcessor` discovers a new listing on a judged search (an MTG search or a RAM search).
+1. `UpdateSearchJobProcessor` discovers a new listing on a judged search (an MTG, Pokémon, or RAM search).
 2. The processor confirms the URL and content fingerprint are new, then sends the listing title and description to the OpenAI API using the search's configured model, reasoning effort, and frozen system prompt.
 3. The judge parses the JSON verdict against the search's configured criteria; overall pass requires every configured criterion to pass, and failed criteria are logged with their reasoning.
 4. The processor persists the record with `judgment` = `pass` or `fail`. A repeated or overlapping job can perform the work again, but GSI checks and digest grouping keep duplicate user-visible listings suppressed.

@@ -1,0 +1,67 @@
+{
+  "judge": "pokemon_bulk",
+  "prompt": "prompts/v1.md",
+  "criteria": [
+    "pokemon_cards",
+    "bulk_scale",
+    "accepted_language",
+    "not_basic_energy",
+    "not_mega_evolution_era",
+    "acceptable_condition",
+    "fixed_collection"
+  ],
+  "dev_thresholds": {
+    "keeper_retention_tnr": 0.95,
+    "junk_detection_tpr": 0.9
+  },
+  "test_thresholds": {
+    "keeper_retention_tnr": 0.95,
+    "junk_detection_tpr": 0.9
+  },
+  "candidates": [
+    {
+      "model": "gpt-5.4-nano",
+      "reasoning_effort": "low",
+      "preflight": "available"
+    },
+    {
+      "model": "gpt-5.4-mini",
+      "reasoning_effort": "none",
+      "preflight": "available"
+    },
+    {
+      "model": "gpt-5.4-mini",
+      "reasoning_effort": "low",
+      "preflight": "available"
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "reasoning_effort": "none",
+      "preflight": "available"
+    },
+    {
+      "model": "gpt-5.6-luna",
+      "reasoning_effort": "low",
+      "preflight": "available"
+    },
+    {
+      "model": "gpt-6-luna",
+      "reasoning_effort": "none",
+      "preflight": "available"
+    },
+    {
+      "model": "gpt-6-luna",
+      "reasoning_effort": "low",
+      "preflight": "available"
+    }
+  ],
+  "winner": {
+    "model": "gpt-6-luna",
+    "reasoning_effort": "none",
+    "price_per_million_tokens": { "input": 0.1, "output": 0.5 },
+    "dev_run": "runs/20260925-233130-gpt-6-luna-none-dev",
+    "test_run": "runs/20260925-233555-gpt-6-luna-none-test",
+    "dev_overall": { "tpr": 1.0, "tnr": 1.0 },
+    "test_overall": { "tpr": 1.0, "tnr": 1.0 }
+  }
+}

@@ -35,7 +35,11 @@ from openai import OpenAI
 # under bazel run, __file__ lives in the runfiles tree (dataset and prompts are
 # data deps) and run records are written back to the source tree
 HERE = pathlib.Path(__file__).resolve().parent
-DEFAULT_PROMPTS = {"mtg_bulk": "prompts/v5.md", "ram": "prompts/v3.md"}
+DEFAULT_PROMPTS = {
+    "mtg_bulk": "prompts/v5.md",
+    "pokemon_bulk": "prompts/v1.md",
+    "ram": "prompts/v3.md",
+}
 
 
 def load_dataset(dataset_dir):
@@ -85,13 +89,20 @@ def judge_once(client, model, system_prompt, criteria, fixture, reasoning_effort
     if reasoning_effort:
         kwargs["reasoning_effort"] = reasoning_effort
     start = time.monotonic()
-    try:
-        response = client.chat.completions.create(temperature=0, **kwargs)
-    except Exception as e:
-        # some reasoning models reject explicit temperature
-        if "temperature" not in str(e):
-            raise
-        response = client.chat.completions.create(**kwargs)
+    for attempt in range(6):
+        try:
+            try:
+                response = client.chat.completions.create(temperature=0, **kwargs)
+            except Exception as e:
+                # some reasoning models reject explicit temperature
+                if "temperature" not in str(e):
+                    raise
+                response = client.chat.completions.create(**kwargs)
+            break
+        except Exception as e:
+            if "429" not in str(e) or attempt == 5:
+                raise
+            time.sleep(min(2**attempt, 30))
     latency = time.monotonic() - start
 
     parsed = json.loads(response.choices[0].message.content)

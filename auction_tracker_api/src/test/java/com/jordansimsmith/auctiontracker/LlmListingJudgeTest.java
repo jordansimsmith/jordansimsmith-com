@@ -32,6 +32,20 @@ public class LlmListingJudgeTest {
               "timings_cl16",
               "desktop_udimm"));
 
+  private static final SearchFactory.Judge POKEMON_JUDGE =
+      new SearchFactory.Judge(
+          "prompts/pokemon-bulk-judge.md",
+          "gpt-6-luna",
+          "none",
+          List.of(
+              "pokemon_cards",
+              "bulk_scale",
+              "accepted_language",
+              "not_basic_energy",
+              "not_mega_evolution_era",
+              "acceptable_condition",
+              "fixed_collection"));
+
   private FakeLlmClient fakeLlmClient;
   private LlmListingJudge listingJudge;
 
@@ -140,6 +154,58 @@ public class LlmListingJudgeTest {
 
     // assert
     assertThat(pass).isFalse();
+  }
+
+  @Test
+  void judgeShouldUsePokemonJudgeConfiguration() {
+    // arrange
+    fakeLlmClient.addResponse(judgmentJson(POKEMON_JUDGE.criteria(), List.of()));
+
+    // act
+    var pass =
+        listingJudge.judge(
+            POKEMON_JUDGE,
+            "Pokemon bulk collection",
+            "500 English and Japanese cards, one fixed pile, mostly near mint");
+
+    // assert
+    assertThat(pass).isTrue();
+    var request = fakeLlmClient.findRequests().getFirst();
+    assertThat(request.model()).isEqualTo("gpt-6-luna");
+    assertThat(request.reasoningEffort()).isEqualTo("none");
+    assertThat(request.messages().get(0).content())
+        .contains("Basic Energy")
+        .contains("30th anniversary")
+        .contains("pokemon_cards")
+        .contains("fixed_collection");
+  }
+
+  @Test
+  void judgeShouldReturnFailWhenPokemonCriterionFails() {
+    // arrange
+    fakeLlmClient.addResponse(
+        judgmentJson(POKEMON_JUDGE.criteria(), List.of("not_mega_evolution_era")));
+
+    // act
+    var pass =
+        listingJudge.judge(
+            POKEMON_JUDGE,
+            "Pokemon bulk collection",
+            "500 cards, mostly Mega Evolution and Phantasmal Flames");
+
+    // assert
+    assertThat(pass).isFalse();
+  }
+
+  @Test
+  void judgeShouldThrowWhenPokemonCriterionMissing() {
+    // arrange
+    fakeLlmClient.addResponse("{\"pokemon_cards\": {\"reasoning\": \"ok\", \"result\": \"pass\"}}");
+
+    // act & assert
+    assertThatThrownBy(() -> listingJudge.judge(POKEMON_JUDGE, "Pokemon bulk lot", "500 cards"))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessageContaining("bulk_scale");
   }
 
   @Test

@@ -33,16 +33,23 @@ locals {
   application_id = "auction_tracker_api"
   subscriptions  = ["jordansimsmith@gmail.com"]
   search_ids = {
-    ram_g_skill            = "ram-g-skill"
-    ram_gskill             = "ram-gskill"
-    ram_trident_z          = "ram-trident-z"
-    mtg_bulk               = "mtg-bulk"
-    mtg_collection         = "mtg-collection"
-    mtg_assorted           = "mtg-assorted"
-    mtg_clear_out          = "mtg-clear-out"
-    mtg_clearout           = "mtg-clearout"
-    mtg_lot                = "mtg-lot"
-    mtg_one_dollar_reserve = "mtg-one-dollar-reserve"
+    ram_g_skill                = "ram-g-skill"
+    ram_gskill                 = "ram-gskill"
+    ram_trident_z              = "ram-trident-z"
+    mtg_bulk                   = "mtg-bulk"
+    mtg_collection             = "mtg-collection"
+    mtg_assorted               = "mtg-assorted"
+    mtg_clear_out              = "mtg-clear-out"
+    mtg_clearout               = "mtg-clearout"
+    mtg_lot                    = "mtg-lot"
+    mtg_one_dollar_reserve     = "mtg-one-dollar-reserve"
+    pokemon_bulk               = "pokemon-bulk"
+    pokemon_collection         = "pokemon-collection"
+    pokemon_assorted           = "pokemon-assorted"
+    pokemon_clear_out          = "pokemon-clear-out"
+    pokemon_clearout           = "pokemon-clearout"
+    pokemon_lot                = "pokemon-lot"
+    pokemon_one_dollar_reserve = "pokemon-one-dollar-reserve"
   }
 }
 

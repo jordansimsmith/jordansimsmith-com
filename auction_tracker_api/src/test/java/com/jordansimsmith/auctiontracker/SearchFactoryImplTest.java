@@ -100,6 +100,48 @@ public class SearchFactoryImplTest {
   }
 
   @Test
+  void findSearchesShouldAttachSharedJudgeConfigToPokemonSearches() {
+    // arrange
+    var factory = new SearchFactoryImpl(URI.create("https://www.trademe.co.nz"));
+
+    // act
+    var searches = factory.findSearches();
+
+    // assert
+    var judged =
+        searches.stream()
+            .filter(
+                search ->
+                    search.judge() != null
+                        && search.judge().prompt().equals("prompts/pokemon-bulk-judge.md"))
+            .toList();
+    assertThat(judged)
+        .extracting(SearchFactory.Search::searchTerm)
+        .containsExactly(
+            "bulk", "collection", "assorted", "clear out", "clearout", "lot", "$1 reserve");
+    assertThat(judged)
+        .allSatisfy(
+            search -> {
+              assertThat(search.judge().model()).isEqualTo("gpt-6-luna");
+              assertThat(search.judge().reasoningEffort()).isEqualTo("none");
+              assertThat(search.judge().criteria())
+                  .containsExactly(
+                      "pokemon_cards",
+                      "bulk_scale",
+                      "accepted_language",
+                      "not_basic_energy",
+                      "not_mega_evolution_era",
+                      "acceptable_condition",
+                      "fixed_collection");
+              assertThat(search.minPrice()).isNull();
+              assertThat(search.maxPrice()).isEqualTo(200.0);
+              assertThat(search.condition()).isEqualTo(SearchFactory.Condition.USED);
+              assertThat(search.baseUrl().getPath())
+                  .isEqualTo("/a/marketplace/gaming/trading-cards/pokemon/search");
+            });
+  }
+
+  @Test
   void findSearchesShouldJudgeEverySearch() {
     // arrange
     var factory = new SearchFactoryImpl(URI.create("https://www.trademe.co.nz"));
@@ -108,7 +150,7 @@ public class SearchFactoryImplTest {
     var searches = factory.findSearches();
 
     // assert
-    assertThat(searches).hasSize(10);
+    assertThat(searches).hasSize(17);
     assertThat(searches)
         .extracting(SearchFactory.Search::id)
         .containsExactly(
@@ -121,7 +163,14 @@ public class SearchFactoryImplTest {
             "mtg-clear-out",
             "mtg-clearout",
             "mtg-lot",
-            "mtg-one-dollar-reserve");
+            "mtg-one-dollar-reserve",
+            "pokemon-bulk",
+            "pokemon-collection",
+            "pokemon-assorted",
+            "pokemon-clear-out",
+            "pokemon-clearout",
+            "pokemon-lot",
+            "pokemon-one-dollar-reserve");
     assertThat(searches).allSatisfy(search -> assertThat(search.judge()).isNotNull());
   }
 
@@ -134,6 +183,9 @@ public class SearchFactoryImplTest {
     assertThat(factory.getSearch("ram-g-skill").searchTerm()).isEqualTo("g.skill");
     assertThat(factory.getSearch("mtg-bulk").searchTerm()).isEqualTo("bulk");
     assertThat(factory.getSearch("mtg-one-dollar-reserve").searchTerm()).isEqualTo("$1 reserve");
+    assertThat(factory.getSearch("pokemon-bulk").searchTerm()).isEqualTo("bulk");
+    assertThat(factory.getSearch("pokemon-one-dollar-reserve").searchTerm())
+        .isEqualTo("$1 reserve");
     assertThatThrownBy(() -> factory.getSearch("unknown-search"))
         .isInstanceOf(IllegalArgumentException.class);
   }
