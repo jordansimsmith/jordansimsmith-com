@@ -105,17 +105,6 @@ When performing the code review step, check for:
 - When a test factory gains a dependency, pass it at every call site even if the test does not use it (for example `UNUSED_S3_ENDPOINT`)
 - Maintain a testing pyramid: many unit tests, fewer integration tests, fewest E2E tests
 
-## TDD approach
-
-- Write tests before implementation code
-- Follow steps: stub implementation, write integration tests, ensure it builds, implement feature, write unit tests
-- Keep iterations minimal with working, tested code
-- Prioritize integration tests for top-level interfaces, then unit tests for internals
-- Make minimal changes at each step to enable tight iteration on small code changes
-- Build incrementally, releasing small chunks of working, tested functionality
-- Complete one full cycle before starting the next feature iteration
-- Prefer multiple small PRs over a single large PR when possible
-
 ## Service consistency
 
 - Check other services for corresponding boilerplate or similar functionality
