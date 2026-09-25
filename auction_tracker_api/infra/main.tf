@@ -334,12 +334,16 @@ resource "aws_scheduler_schedule" "update_search" {
   }
 
   target {
-    arn      = aws_sqs_queue.jobs.arn
+    arn      = "arn:aws:scheduler:::aws-sdk:sqs:sendMessage"
     role_arn = aws_iam_role.jobs_scheduler.arn
     input = jsonencode({
-      job_type     = "update_search"
-      search_id    = each.value
-      scheduled_at = "<aws.scheduler.scheduled-time>"
+      QueueUrl = aws_sqs_queue.jobs.url
+      MessageBody = jsonencode({
+        job_type     = "update_search"
+        search_id    = each.value
+        scheduled_at = "<aws.scheduler.scheduled-time>"
+      })
+      MessageGroupId = "auction-tracker"
     })
 
     retry_policy {
@@ -347,9 +351,6 @@ resource "aws_scheduler_schedule" "update_search" {
       maximum_retry_attempts       = 5
     }
 
-    sqs_parameters {
-      message_group_id = "auction-tracker"
-    }
   }
 }
 
@@ -365,11 +366,15 @@ resource "aws_scheduler_schedule" "send_digest" {
   }
 
   target {
-    arn      = aws_sqs_queue.jobs.arn
+    arn      = "arn:aws:scheduler:::aws-sdk:sqs:sendMessage"
     role_arn = aws_iam_role.jobs_scheduler.arn
     input = jsonencode({
-      job_type     = "send_digest"
-      scheduled_at = "<aws.scheduler.scheduled-time>"
+      QueueUrl = aws_sqs_queue.jobs.url
+      MessageBody = jsonencode({
+        job_type     = "send_digest"
+        scheduled_at = "<aws.scheduler.scheduled-time>"
+      })
+      MessageGroupId = "auction-tracker"
     })
 
     retry_policy {
@@ -377,8 +382,5 @@ resource "aws_scheduler_schedule" "send_digest" {
       maximum_retry_attempts       = 5
     }
 
-    sqs_parameters {
-      message_group_id = "auction-tracker"
-    }
   }
 }
