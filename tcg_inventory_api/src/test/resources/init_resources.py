@@ -90,6 +90,12 @@ queue_arn = sqs_client.get_queue_attributes(
     QueueUrl=queue_url, AttributeNames=["QueueArn"]
 )["Attributes"]["QueueArn"]
 
+scan_queue_name = "tcg_inventory_scan_jobs.fifo"
+sqs_client.create_queue(
+    QueueName=scan_queue_name,
+    Attributes={"FifoQueue": "true", "ContentBasedDeduplication": "false"},
+)
+
 secretsmanager_client.create_secret(
     Name="tcg_inventory",
     SecretString="{}",
@@ -157,6 +163,34 @@ lambdas = {
     "confirm_import": {
         "handler": "com.jordansimsmith.tcginventory.imports.ConfirmImportHandler",
         "zip_file": "confirm-import-handler_deploy.jar",
+    },
+    "create_scan": {
+        "handler": "com.jordansimsmith.tcginventory.scans.CreateScanHandler",
+        "zip_file": "create-scan-handler_deploy.jar",
+    },
+    "find_scans": {
+        "handler": "com.jordansimsmith.tcginventory.scans.FindScansHandler",
+        "zip_file": "find-scans-handler_deploy.jar",
+    },
+    "get_scan": {
+        "handler": "com.jordansimsmith.tcginventory.scans.GetScanHandler",
+        "zip_file": "get-scan-handler_deploy.jar",
+    },
+    "identify_scan": {
+        "handler": "com.jordansimsmith.tcginventory.scans.IdentifyScanHandler",
+        "zip_file": "identify-scan-handler_deploy.jar",
+    },
+    "confirm_scan": {
+        "handler": "com.jordansimsmith.tcginventory.scans.ConfirmScanHandler",
+        "zip_file": "confirm-scan-handler_deploy.jar",
+    },
+    "delete_scan_row": {
+        "handler": "com.jordansimsmith.tcginventory.scans.DeleteScanRowHandler",
+        "zip_file": "delete-scan-row-handler_deploy.jar",
+    },
+    "delete_scan": {
+        "handler": "com.jordansimsmith.tcginventory.scans.DeleteScanHandler",
+        "zip_file": "delete-scan-handler_deploy.jar",
     },
     "create_publish": {
         "handler": "com.jordansimsmith.tcginventory.publish.CreatePublishHandler",
@@ -236,6 +270,7 @@ lambdas = {
 root_resources = {
     "settings": {"path": "settings"},
     "imports": {"path": "imports"},
+    "scans": {"path": "scans"},
     "publish": {"path": "publish"},
     "reports": {"path": "reports"},
     "skus": {"path": "skus"},
@@ -249,6 +284,11 @@ child_resources = {
     "import_row_detail": {"parent": "import_rows", "path": "{position}"},
     "import_row_photos": {"parent": "import_row_detail", "path": "photos"},
     "import_row_photo_detail": {"parent": "import_row_photos", "path": "{photo_id}"},
+    "scan_detail": {"parent": "scans", "path": "{scan_id}"},
+    "scan_identify": {"parent": "scan_detail", "path": "identify"},
+    "scan_confirm": {"parent": "scan_detail", "path": "confirm"},
+    "scan_rows": {"parent": "scan_detail", "path": "rows"},
+    "scan_row_detail": {"parent": "scan_rows", "path": "{scan_position}"},
     "sku_detail": {"parent": "skus", "path": "{sku_id}"},
     "sku_units": {"parent": "sku_detail", "path": "units"},
     "sku_unit_detail": {"parent": "sku_units", "path": "{sequence_number}"},
@@ -303,6 +343,29 @@ endpoints = {
         "resource": "import_confirm",
         "method": "POST",
         "lambda": "confirm_import",
+    },
+    "create_scan": {"resource": "scans", "method": "POST", "lambda": "create_scan"},
+    "find_scans": {"resource": "scans", "method": "GET", "lambda": "find_scans"},
+    "get_scan": {"resource": "scan_detail", "method": "GET", "lambda": "get_scan"},
+    "identify_scan": {
+        "resource": "scan_identify",
+        "method": "POST",
+        "lambda": "identify_scan",
+    },
+    "confirm_scan": {
+        "resource": "scan_confirm",
+        "method": "POST",
+        "lambda": "confirm_scan",
+    },
+    "delete_scan_row": {
+        "resource": "scan_row_detail",
+        "method": "DELETE",
+        "lambda": "delete_scan_row",
+    },
+    "delete_scan": {
+        "resource": "scan_detail",
+        "method": "DELETE",
+        "lambda": "delete_scan",
     },
     "find_skus": {"resource": "skus", "method": "GET", "lambda": "find_skus"},
     "get_sku": {"resource": "sku_detail", "method": "GET", "lambda": "get_sku"},

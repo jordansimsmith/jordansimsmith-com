@@ -40,6 +40,13 @@ variable "artifacts" {
   type = map(string)
 }
 
+variable "images" {
+  type = map(object({
+    repository = string
+    uri        = string
+  }))
+}
+
 locals {
   application_id = "tcg_inventory_api"
 }
@@ -80,6 +87,34 @@ module "java_api" {
     confirm_import = {
       handler  = "com.jordansimsmith.tcginventory.imports.ConfirmImportHandler"
       artifact = var.artifacts["confirm_import"]
+    }
+    create_scan = {
+      handler  = "com.jordansimsmith.tcginventory.scans.CreateScanHandler"
+      artifact = var.artifacts["create_scan"]
+    }
+    find_scans = {
+      handler  = "com.jordansimsmith.tcginventory.scans.FindScansHandler"
+      artifact = var.artifacts["find_scans"]
+    }
+    get_scan = {
+      handler  = "com.jordansimsmith.tcginventory.scans.GetScanHandler"
+      artifact = var.artifacts["get_scan"]
+    }
+    identify_scan = {
+      handler  = "com.jordansimsmith.tcginventory.scans.IdentifyScanHandler"
+      artifact = var.artifacts["identify_scan"]
+    }
+    confirm_scan = {
+      handler  = "com.jordansimsmith.tcginventory.scans.ConfirmScanHandler"
+      artifact = var.artifacts["confirm_scan"]
+    }
+    delete_scan_row = {
+      handler  = "com.jordansimsmith.tcginventory.scans.DeleteScanRowHandler"
+      artifact = var.artifacts["delete_scan_row"]
+    }
+    delete_scan = {
+      handler  = "com.jordansimsmith.tcginventory.scans.DeleteScanHandler"
+      artifact = var.artifacts["delete_scan"]
     }
     update_import_row = {
       handler  = "com.jordansimsmith.tcginventory.imports.UpdateImportRowHandler"
@@ -156,6 +191,13 @@ module "java_api" {
     get_import              = { path = "imports/{import_id}", method = "GET", lambda = "get_import" }
     delete_import           = { path = "imports/{import_id}", method = "DELETE", lambda = "delete_import" }
     confirm_import          = { path = "imports/{import_id}/confirm", method = "POST", lambda = "confirm_import" }
+    create_scan             = { path = "scans", method = "POST", lambda = "create_scan" }
+    find_scans              = { path = "scans", method = "GET", lambda = "find_scans" }
+    get_scan                = { path = "scans/{scan_id}", method = "GET", lambda = "get_scan" }
+    identify_scan           = { path = "scans/{scan_id}/identify", method = "POST", lambda = "identify_scan" }
+    confirm_scan            = { path = "scans/{scan_id}/confirm", method = "POST", lambda = "confirm_scan" }
+    delete_scan_row         = { path = "scans/{scan_id}/rows/{scan_position}", method = "DELETE", lambda = "delete_scan_row" }
+    delete_scan             = { path = "scans/{scan_id}", method = "DELETE", lambda = "delete_scan" }
     update_import_row       = { path = "imports/{import_id}/rows/{position}", method = "PUT", lambda = "update_import_row" }
     delete_import_row       = { path = "imports/{import_id}/rows/{position}", method = "DELETE", lambda = "delete_import_row" }
     create_import_row_photo = { path = "imports/{import_id}/rows/{position}/photos", method = "POST", lambda = "create_import_row_photo" }
@@ -348,6 +390,27 @@ resource "aws_sqs_queue" "scan_jobs" {
   })
 }
 
+data "aws_iam_policy_document" "scan_worker_ecr" {
+  statement {
+    effect = "Allow"
+
+    principals {
+      type        = "Service"
+      identifiers = ["lambda.amazonaws.com"]
+    }
+
+    actions = [
+      "ecr:BatchGetImage",
+      "ecr:GetDownloadUrlForLayer",
+    ]
+  }
+}
+
+resource "aws_ecr_repository_policy" "scan_worker" {
+  repository = var.images["scan_worker"].repository
+  policy     = data.aws_iam_policy_document.scan_worker_ecr.json
+}
+
 resource "aws_secretsmanager_secret" "tcg_inventory" {
   name                    = "tcg_inventory"
   recovery_window_in_days = 0
@@ -372,6 +435,7 @@ data "aws_iam_policy_document" "lambda_dynamodb" {
       "dynamodb:Query",
       "dynamodb:DeleteItem",
       "dynamodb:ConditionCheckItem",
+      "dynamodb:TransactWriteItems",
     ]
   }
 
@@ -393,9 +457,6 @@ data "aws_iam_policy_document" "lambda_sqs" {
 
     resources = [
       aws_sqs_queue.jobs.arn,
-      aws_sqs_queue.jobs_dlq.arn,
-      aws_sqs_queue.scan_jobs.arn,
-      aws_sqs_queue.scan_jobs_dlq.arn,
     ]
 
     actions = [
@@ -404,6 +465,19 @@ data "aws_iam_policy_document" "lambda_sqs" {
       "sqs:DeleteMessage",
       "sqs:GetQueueUrl",
       "sqs:GetQueueAttributes",
+    ]
+  }
+
+  statement {
+    effect = "Allow"
+
+    resources = [
+      aws_sqs_queue.scan_jobs.arn,
+    ]
+
+    actions = [
+      "sqs:SendMessage",
+      "sqs:GetQueueUrl",
     ]
   }
 }
@@ -451,6 +525,7 @@ data "aws_iam_policy_document" "lambda_s3" {
     actions = [
       "s3:PutObject",
       "s3:GetObject",
+      "s3:DeleteObject",
     ]
   }
 
@@ -464,4 +539,106 @@ data "aws_iam_policy_document" "lambda_s3" {
 resource "aws_iam_policy" "lambda_s3" {
   name   = "${local.application_id}_lambda_s3"
   policy = data.aws_iam_policy_document.lambda_s3.json
+}
+
+data "aws_iam_policy_document" "scan_worker" {
+  statement {
+    effect = "Allow"
+
+    resources = [
+      aws_dynamodb_table.tcg_inventory.arn,
+      "${aws_dynamodb_table.tcg_inventory.arn}/index/*",
+    ]
+
+    actions = [
+      "dynamodb:GetItem",
+      "dynamodb:Query",
+      "dynamodb:TransactWriteItems",
+      "dynamodb:UpdateItem",
+    ]
+  }
+
+  statement {
+    effect    = "Allow"
+    resources = ["${aws_s3_bucket.tcg_inventory.arn}/users/*/scans/*"]
+    actions   = ["s3:GetObject"]
+  }
+
+  statement {
+    effect    = "Allow"
+    resources = [aws_sqs_queue.scan_jobs.arn]
+    actions = [
+      "sqs:DeleteMessage",
+      "sqs:GetQueueAttributes",
+      "sqs:GetQueueUrl",
+      "sqs:ReceiveMessage",
+      "sqs:SendMessage",
+    ]
+  }
+}
+
+resource "aws_iam_policy" "scan_worker" {
+  name   = "${local.application_id}_scan_worker"
+  policy = data.aws_iam_policy_document.scan_worker.json
+}
+
+module "scan_worker" {
+  source = "../../infra/modules/container_lambda"
+
+  application_id = local.application_id
+  name           = "scan_worker"
+  image_uri      = var.images["scan_worker"].uri
+  memory_size    = 1769
+  timeout        = 900
+  architectures  = ["x86_64"]
+
+  environment = {
+    SCAN_TABLE_NAME       = aws_dynamodb_table.tcg_inventory.name
+    SCAN_BUCKET_NAME      = aws_s3_bucket.tcg_inventory.bucket
+    COLLECTORVISION_CACHE = "/opt/collectorvision"
+  }
+
+  role_policy_arns = {
+    scan_worker = aws_iam_policy.scan_worker.arn
+  }
+
+  event_source_mappings = {
+    scan_jobs = {
+      event_source_arn                   = aws_sqs_queue.scan_jobs.arn
+      batch_size                         = 1
+      maximum_batching_window_in_seconds = 0
+    }
+  }
+
+  depends_on = [aws_ecr_repository_policy.scan_worker]
+}
+
+moved {
+  from = aws_iam_role.scan_worker
+  to   = module.scan_worker.aws_iam_role.lambda_role
+}
+
+moved {
+  from = aws_iam_role_policy_attachment.scan_worker_basic
+  to   = module.scan_worker.aws_iam_role_policy_attachment.lambda_basic
+}
+
+moved {
+  from = aws_iam_role_policy_attachment.scan_worker
+  to   = module.scan_worker.aws_iam_role_policy_attachment.lambda_custom["scan_worker"]
+}
+
+moved {
+  from = aws_cloudwatch_log_group.scan_worker
+  to   = module.scan_worker.aws_cloudwatch_log_group.lambda
+}
+
+moved {
+  from = aws_lambda_function.scan_worker
+  to   = module.scan_worker.aws_lambda_function.lambda
+}
+
+moved {
+  from = aws_lambda_event_source_mapping.scan_jobs
+  to   = module.scan_worker.aws_lambda_event_source_mapping.lambda["scan_jobs"]
 }

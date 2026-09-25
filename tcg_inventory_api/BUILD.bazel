@@ -1,5 +1,6 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 load("@rules_java//java:defs.bzl", "java_binary", "java_library")
+load("@rules_oci//oci:defs.bzl", "oci_push")
 load("@rules_python//python:defs.bzl", "py_library", "py_test")
 load("//lib/http:defs.bzl", "stub_server_image")
 load("//lib/localstack:defs.bzl", "localstack_image")
@@ -10,6 +11,11 @@ collectorvision_image(
     base = "@lambda_python312//:lambda_python312",
     handler = "tcg_inventory_scan_worker.worker.lambda_handler",
     repo_tag = "bazel/tcg-inventory-scan-worker:latest",
+)
+
+oci_push(
+    name = "scan-worker-image-push",
+    image = ":scan-worker-image",
 )
 
 py_library(
@@ -1083,14 +1089,21 @@ localstack_image(
     handler_jars = [
         ":confirm-import-handler_deploy.jar",
         ":confirm-order-handler_deploy.jar",
+        ":confirm-scan-handler_deploy.jar",
         ":create-import-handler_deploy.jar",
         ":create-import-row-photo-handler_deploy.jar",
         ":create-publish-handler_deploy.jar",
         ":create-report-handler_deploy.jar",
+        ":create-scan-handler_deploy.jar",
+        ":delete-scan-handler_deploy.jar",
+        ":delete-scan-row-handler_deploy.jar",
         ":find-orders-handler_deploy.jar",
         ":find-skus-handler_deploy.jar",
+        ":find-scans-handler_deploy.jar",
         ":get-order-handler_deploy.jar",
         ":get-sku-handler_deploy.jar",
+        ":get-scan-handler_deploy.jar",
+        ":identify-scan-handler_deploy.jar",
         ":remove-unit-handler_deploy.jar",
         ":delete-import-row-handler_deploy.jar",
         ":delete-import-row-photo-handler_deploy.jar",

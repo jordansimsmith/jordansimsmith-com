@@ -11,7 +11,6 @@ py_binary(
         "//:MODULE.bazel",
         "//tools/terraform:manifest.json",
     ],
-    visibility = [
-        "//:__pkg__",
-    ],
+    visibility = ["//visibility:public"],
+    deps = ["@pypi//boto3"],
 )

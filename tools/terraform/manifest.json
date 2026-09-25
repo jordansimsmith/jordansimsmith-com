@@ -133,6 +133,13 @@
         "find_imports": "//tcg_inventory_api:find-imports-handler_deploy.jar",
         "get_import": "//tcg_inventory_api:get-import-handler_deploy.jar",
         "delete_import": "//tcg_inventory_api:delete-import-handler_deploy.jar",
+        "create_scan": "//tcg_inventory_api:create-scan-handler_deploy.jar",
+        "find_scans": "//tcg_inventory_api:find-scans-handler_deploy.jar",
+        "get_scan": "//tcg_inventory_api:get-scan-handler_deploy.jar",
+        "identify_scan": "//tcg_inventory_api:identify-scan-handler_deploy.jar",
+        "confirm_scan": "//tcg_inventory_api:confirm-scan-handler_deploy.jar",
+        "delete_scan_row": "//tcg_inventory_api:delete-scan-row-handler_deploy.jar",
+        "delete_scan": "//tcg_inventory_api:delete-scan-handler_deploy.jar",
         "confirm_import": "//tcg_inventory_api:confirm-import-handler_deploy.jar",
         "update_import_row": "//tcg_inventory_api:update-import-row-handler_deploy.jar",
         "delete_import_row": "//tcg_inventory_api:delete-import-row-handler_deploy.jar",
@@ -150,6 +157,14 @@
         "get_order": "//tcg_inventory_api:get-order-handler_deploy.jar",
         "confirm_order": "//tcg_inventory_api:confirm-order-handler_deploy.jar",
         "jobs_handler": "//tcg_inventory_api:jobs-handler_deploy.jar"
+      },
+      "images": {
+        "scan_worker": {
+          "push": "//tcg_inventory_api:scan-worker-image-push",
+          "digest": "//tcg_inventory_api:scan-worker-image.digest",
+          "repository": "tcg_inventory_scan_worker",
+          "region": "ap-southeast-2"
+        }
       }
     },
     {
