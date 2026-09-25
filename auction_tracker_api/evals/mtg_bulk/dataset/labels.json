@@ -206,6 +206,15 @@
     "overall": "fail",
     "notes": "production miss: assembled-on-demand collection bundle with rarity guarantees (display-only photos, 'carefully assembled', guaranteed 20 rares / 60 uncommons)"
   },
+  "6142534736": {
+    "mtg_cards": "pass",
+    "bulk_scale": "pass",
+    "not_basic_lands": "pass",
+    "civilian_seller": "pass",
+    "fixed_collection": "pass",
+    "overall": "pass",
+    "notes": "production miss: the judge incorrectly failed not_basic_lands because the description mentions foil and full-art basic lands, despite giving no evidence that basic lands are the primary contents"
+  },
   "s001": {
     "mtg_cards": "pass",
     "bulk_scale": "pass",
