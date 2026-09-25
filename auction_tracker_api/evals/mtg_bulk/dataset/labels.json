@@ -3,7 +3,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "fail",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "fail",
     "notes": "not bulk scale"
@@ -12,7 +11,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "fail",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "fail",
     "notes": null
@@ -21,7 +19,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "fail",
     "not_basic_lands": "fail",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "fail",
     "notes": "\"land cards\" assumed to mean basic lands (default: lands are basic unless specified otherwise)"
@@ -30,7 +27,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "this is a great listing"
@@ -39,7 +35,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "fail",
     "not_basic_lands": "pass",
-    "civilian_seller": "fail",
     "fixed_collection": "pass",
     "overall": "fail",
     "notes": "single card from store"
@@ -48,7 +43,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "great listing, someone trying to dump their collection without caring too much about it"
@@ -57,7 +51,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": null
@@ -66,7 +59,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "fail",
     "not_basic_lands": "pass",
-    "civilian_seller": "fail",
     "fixed_collection": "fail",
     "overall": "fail",
     "notes": null
@@ -75,7 +67,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "fail",
     "fixed_collection": "fail",
     "overall": "fail",
     "notes": null
@@ -84,7 +75,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "fail",
     "not_basic_lands": "fail",
-    "civilian_seller": "pass",
     "fixed_collection": "fail",
     "overall": "fail",
     "notes": null
@@ -93,7 +83,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "great listing"
@@ -102,7 +91,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "fail",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "fail",
     "notes": "single card"
@@ -111,7 +99,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "fail",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "fail",
     "notes": "enumerated rares - no change of values since the seller already has gone through them"
@@ -120,7 +107,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "great listing"
@@ -129,7 +115,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "fail",
     "overall": "fail",
     "notes": "not a fixed collection, probably chaff/sifted"
@@ -138,7 +123,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": null
@@ -147,16 +131,14 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
-    "notes": "50/50 on civilian seller tbh but better to be optimistic here rather than over aggressively filtering"
+    "notes": null
   },
   "6015889153": {
     "mtg_cards": "fail",
     "bulk_scale": null,
     "not_basic_lands": null,
-    "civilian_seller": null,
     "fixed_collection": null,
     "overall": "fail",
     "notes": "not magic cards"
@@ -165,7 +147,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "fail",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "fail",
     "notes": "basic lands"
@@ -174,7 +155,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "great listing!"
@@ -183,7 +163,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "great listing!"
@@ -192,7 +171,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "fail",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "fail",
     "notes": "not enough volume, otherwise a good listing"
@@ -201,7 +179,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "fail",
     "fixed_collection": "fail",
     "overall": "fail",
     "notes": "production miss: assembled-on-demand collection bundle with rarity guarantees (display-only photos, 'carefully assembled', guaranteed 20 rares / 60 uncommons)"
@@ -210,7 +187,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "production miss: the judge incorrectly failed not_basic_lands because the description mentions foil and full-art basic lands, despite giving no evidence that basic lands are the primary contents"
@@ -219,7 +195,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "synthetic: Universes Beyond (Marvel) bulk remains eligible"
@@ -228,7 +203,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "synthetic: Universes Beyond (TMNT and Marvel) bulk remains eligible"
@@ -237,7 +211,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "synthetic: Universes Beyond (Doctor Who) bulk remains eligible"
@@ -246,7 +219,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "synthetic: Universes Beyond (Fallout) bulk remains eligible"
@@ -255,7 +227,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "synthetic: primarily Universes Beyond mixed lot remains eligible"
@@ -264,7 +235,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "synthetic: Universes Beyond cards mixed into regular MTG bulk remain eligible"
@@ -273,7 +243,6 @@
     "mtg_cards": "fail",
     "bulk_scale": null,
     "not_basic_lands": null,
-    "civilian_seller": null,
     "fixed_collection": null,
     "overall": "fail",
     "notes": "synthetic: not MTG (Pokemon), miscategorized"
@@ -282,7 +251,6 @@
     "mtg_cards": "fail",
     "bulk_scale": null,
     "not_basic_lands": null,
-    "civilian_seller": null,
     "fixed_collection": null,
     "overall": "fail",
     "notes": "synthetic: not MTG (Yu-Gi-Oh) despite mentioning Magic"
@@ -291,7 +259,6 @@
     "mtg_cards": "fail",
     "bulk_scale": null,
     "not_basic_lands": null,
-    "civilian_seller": null,
     "fixed_collection": null,
     "overall": "fail",
     "notes": "synthetic: MTG branded but zero cards (adversarial - says Magic everywhere)"
@@ -300,7 +267,6 @@
     "mtg_cards": "fail",
     "bulk_scale": null,
     "not_basic_lands": null,
-    "civilian_seller": null,
     "fixed_collection": null,
     "overall": "fail",
     "notes": "synthetic: not MTG (Flesh and Blood)"
@@ -309,7 +275,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "fail",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "fail",
     "notes": "synthetic: unqualified 'lands' assumed basic - fail"
@@ -318,7 +283,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "fail",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "fail",
     "notes": "synthetic: primarily basic lands mixed lot - fail"
@@ -327,7 +291,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "synthetic: lands lot explicitly nonbasic - must pass (adversarial pass)"
@@ -336,52 +299,44 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "fail",
     "fixed_collection": "pass",
-    "overall": "fail",
-    "notes": "synthetic: card store explicitly sifted bulk - civilian fail"
+    "overall": "pass"
   },
   "s015": {
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "fail",
     "fixed_collection": "fail",
     "overall": "fail",
-    "notes": "synthetic: wholesaler + multiple lots - civilian and fixed_collection fail"
+    "notes": "synthetic: multiple lots - fixed_collection fails"
   },
   "s016": {
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "fail",
     "fixed_collection": "pass",
-    "overall": "fail",
-    "notes": "synthetic: card-business machinery (scryfall stock photo, in-cart threshold)"
+    "overall": "pass"
   },
   "s017": {
     "mtg_cards": "pass",
     "bulk_scale": "fail",
     "not_basic_lands": "pass",
-    "civilian_seller": "fail",
     "fixed_collection": "fail",
     "overall": "fail",
-    "notes": "synthetic: on-demand repack; fails fixed_collection, bulk_scale (50 cards), and civilian_seller (rarity-guarantee repacking implies sifting, per 6011120058 precedent)"
+    "notes": "synthetic: on-demand repack; fails fixed_collection and bulk_scale (50 cards)"
   },
   "s018": {
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "fail",
     "overall": "fail",
-    "notes": "synthetic: assembled per order from civilian - fixed_collection fail only"
+    "notes": "synthetic: assembled per order - fixed_collection fail only"
   },
   "s019": {
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "synthetic: pass with named highlights (tests highlights_ok decision)"
@@ -390,7 +345,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "synthetic: clean pass, unsifted attic find"
@@ -399,7 +353,6 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "synthetic: clean pass, weight-based volume"
@@ -408,16 +361,14 @@
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
-    "notes": "synthetic: power-seller boilerplate around one-off estate lot - civilian must pass (adversarial pass)"
+    "notes": "synthetic: power-seller boilerplate around one-off estate lot (adversarial pass)"
   },
   "s023": {
     "mtg_cards": "pass",
     "bulk_scale": "pass",
     "not_basic_lands": "pass",
-    "civilian_seller": "pass",
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "synthetic: clean pass"

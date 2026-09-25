@@ -1,7 +1,1 @@
-[
-  "mtg_cards",
-  "bulk_scale",
-  "not_basic_lands",
-  "civilian_seller",
-  "fixed_collection"
-]
+["mtg_cards", "bulk_scale", "not_basic_lands", "fixed_collection"]

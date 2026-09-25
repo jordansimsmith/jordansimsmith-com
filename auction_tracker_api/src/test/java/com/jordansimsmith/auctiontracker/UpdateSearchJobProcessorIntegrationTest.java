@@ -28,8 +28,7 @@ public class UpdateSearchJobProcessorIntegrationTest {
           "prompts/mtg-bulk-judge.md",
           "gpt-5.4-mini",
           "none",
-          List.of(
-              "mtg_cards", "bulk_scale", "not_basic_lands", "civilian_seller", "fixed_collection"));
+          List.of("mtg_cards", "bulk_scale", "not_basic_lands", "fixed_collection"));
 
   private FakeClock fakeClock;
   private FakeExcludedSellerUsernameFactory fakeExcludedSellerUsernameFactory;
@@ -822,9 +821,7 @@ public class UpdateSearchJobProcessorIntegrationTest {
 
   private static String judgmentJson(boolean pass) {
     var result = pass ? "pass" : "fail";
-    var criteria =
-        List.of(
-            "mtg_cards", "bulk_scale", "not_basic_lands", "civilian_seller", "fixed_collection");
+    var criteria = List.of("mtg_cards", "bulk_scale", "not_basic_lands", "fixed_collection");
     var builder = new StringBuilder("{");
     for (var i = 0; i < criteria.size(); i++) {
       builder.append(

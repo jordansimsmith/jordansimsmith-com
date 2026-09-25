@@ -10,7 +10,7 @@ codebook) and prompts/ (versioned system prompts).
 
 Usage:
     OPENAI_API_KEY=... bazel run //auction_tracker_api:run-eval -- \
-        --judge mtg_bulk --model MODEL [--split dev] [--prompt prompts/v1.md]
+        --judge mtg_bulk --model MODEL [--split dev] [--prompt PROMPT]
         [--trials 1] [--limit N] [--price-input $/1M]
         [--price-cached-input $/1M] [--price-cache-write $/1M]
         [--price-output $/1M]
@@ -35,6 +35,7 @@ from openai import OpenAI
 # under bazel run, __file__ lives in the runfiles tree (dataset and prompts are
 # data deps) and run records are written back to the source tree
 HERE = pathlib.Path(__file__).resolve().parent
+DEFAULT_PROMPTS = {"mtg_bulk": "prompts/v5.md", "ram": "prompts/v3.md"}
 
 
 def load_dataset(dataset_dir):
@@ -189,7 +190,8 @@ def main():
         "--split", default="dev", choices=["train", "dev", "test", "all"]
     )
     parser.add_argument(
-        "--prompt", default="prompts/v1.md", help="path relative to the judge directory"
+        "--prompt",
+        help="path relative to the judge directory (defaults to the latest prompt for the judge)",
     )
     parser.add_argument(
         "--reasoning-effort",
@@ -219,7 +221,8 @@ def main():
     if args.limit:
         ids = ids[: args.limit]
 
-    prompt_path = judge_dir / args.prompt
+    prompt_file = args.prompt or DEFAULT_PROMPTS[args.judge]
+    prompt_path = judge_dir / prompt_file
     system_prompt = build_system_prompt(
         prompt_path, criteria, fixtures, labels, splits["train"]
     )
@@ -299,7 +302,7 @@ def main():
         "split": args.split,
         "trials": args.trials,
         "limit": args.limit,
-        "prompt_file": args.prompt,
+        "prompt_file": prompt_file,
         "prompt_sha256": hashlib.sha256(system_prompt.encode()).hexdigest(),
         "labels_sha256": hashlib.sha256(
             (dataset_dir / "labels.json").read_bytes()

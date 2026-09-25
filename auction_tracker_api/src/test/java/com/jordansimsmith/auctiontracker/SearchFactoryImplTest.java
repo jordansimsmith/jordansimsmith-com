@@ -51,11 +51,7 @@ public class SearchFactoryImplTest {
               assertThat(search.judge().reasoningEffort()).isEqualTo("none");
               assertThat(search.judge().criteria())
                   .containsExactly(
-                      "mtg_cards",
-                      "bulk_scale",
-                      "not_basic_lands",
-                      "civilian_seller",
-                      "fixed_collection");
+                      "mtg_cards", "bulk_scale", "not_basic_lands", "fixed_collection");
               assertThat(search.maxPrice()).isEqualTo(200.0);
               assertThat(search.condition()).isEqualTo(SearchFactory.Condition.USED);
               assertThat(search.baseUrl().getPath())

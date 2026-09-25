@@ -7,12 +7,12 @@ Labeled dataset for evaluating an LLM judge that filters Trade Me auction listin
 - `<listing_id>.json`: fixture scraped from a real Trade Me listing. Fields `url`, `title`, `description` match what `JsoupTradeMeClient.parseItemPage` extracts (same selectors, whitespace collapsing, 1000-character truncation, query params stripped). Descriptions include listing-page boilerplate (condition, shipping, payment); that boilerplate is signal, not noise.
 - `s<nnn>.json`: synthetic fixture (`"synthetic": true`, url `synthetic://<id>`) authored in the same style to fill label gaps, pre-labeled by construction and human-reviewed.
 - `criteria.json`: ordered list of the criterion names below, read by the eval harness.
-- `labels.json`: one entry per fixture with a `pass`/`fail` label per criterion, an `overall` verdict, and optional `notes`. When `mtg_cards` is `fail`, the other four criteria are `null` (inapplicable) and are skipped when scoring.
+- `labels.json`: one entry per fixture with a `pass`/`fail` label per criterion, an `overall` verdict, and optional `notes`. When `mtg_cards` is `fail`, the other three criteria are `null` (inapplicable) and are skipped when scoring.
 - `splits.json`: train/dev/test membership (roughly 20/40/40, seed 42), stratified so per-criterion fail counts and the synthetic fraction are balanced. Near-duplicate listings from the same seller share a split to avoid few-shot leakage. Train supplies few-shot prompt examples; dev is for iterating on prompts and models; test is reserved for final candidate comparison.
 
 ## Overall verdict
 
-A listing passes only if all five criteria pass. Rarity mix (commons through mythics) and set origin are never by themselves reasons to fail. Universes Within and Universes Beyond cards are treated identically.
+A listing passes only if all four criteria pass. Rarity mix (commons through mythics) and set origin are never by themselves reasons to fail. Universes Within and Universes Beyond cards are treated identically.
 
 ## Criteria
 
@@ -28,10 +28,6 @@ The lot is genuinely bulk: a large pile whose contents are substantially unenume
 
 The lot is not primarily basic lands (Plains, Island, Swamp, Mountain, Forest). Premium or full-art basics are still basics. Unqualified "lands" is assumed to mean basic lands; a lands lot passes only when described as nonbasic.
 
-### civilian_seller
-
-The cards come from a private individual's collection, not a card retailer or wholesaler's sifted inventory. Judged on the cards' provenance, not the seller's selling style: generic power-seller boilerplate (auction T&Cs, warranty text, courier policies) around a one-off personal lot passes. Card-business machinery fails: card-database stock photos ("Card image from scryfall.com"), in-cart order thresholds, productized bulk lines, explicit sifting or wholesale framing. Rarity-guarantee repacking ("Minimum 1 Rare guaranteed") also fails, even from a hobbyist: composing lots by rarity implies the seller sorts and knows cards. A business that is not a card business (games store, general second-hand dealer) selling a one-off MTG lot passes. Lean optimistic; no signal passes.
-
 ### fixed_collection
 
 The listing is one specific physical collection, not an abstract quantity assembled per sale ("Multiple of these available", "made up fresh for each order"). Explicit repeatability language is not required: per-sale composition also shows in display-only photo disclaimers, "exact cards will vary", and curated "carefully assembled" product framing with guaranteed contents breakdowns. A listing anchored to one specific pile ("one box only", "contents as photographed") passes even alongside a stock-photo disclaimer. No signal passes.
@@ -39,5 +35,5 @@ The listing is one specific physical collection, not an abstract quantity assemb
 ## Labeling conventions
 
 - Labels were hand-authored by Jordan (the sole user and domain expert) from fixture text only, without LLM assistance. Synthetic fixtures are labeled by construction and were human-reviewed.
-- Disqualifier criteria (`civilian_seller`, `fixed_collection`) require positive evidence to fail; absence of signal is a pass.
-- `overall` is the labeler's gut verdict recorded before deriving from criteria; it is consistent with the AND of the five criteria across the dataset and that consistency should be preserved when labels change.
+- The disqualifier criterion (`fixed_collection`) requires positive evidence to fail; absence of signal is a pass.
+- `overall` is the labeler's gut verdict recorded before deriving from criteria; it is consistent with the AND of the four criteria across the dataset and that consistency should be preserved when labels change.

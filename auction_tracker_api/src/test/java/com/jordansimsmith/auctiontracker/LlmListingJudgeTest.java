@@ -17,8 +17,7 @@ public class LlmListingJudgeTest {
           "prompts/mtg-bulk-judge.md",
           "gpt-5.4-mini",
           "none",
-          List.of(
-              "mtg_cards", "bulk_scale", "not_basic_lands", "civilian_seller", "fixed_collection"));
+          List.of("mtg_cards", "bulk_scale", "not_basic_lands", "fixed_collection"));
 
   private static final SearchFactory.Judge RAM_JUDGE =
       new SearchFactory.Judge(
@@ -76,10 +75,10 @@ public class LlmListingJudgeTest {
   @Test
   void judgeShouldReturnFailWhenAnyCriterionFails() {
     // arrange
-    fakeLlmClient.addResponse(judgmentJson("civilian_seller"));
+    fakeLlmClient.addResponse(judgmentJson("fixed_collection"));
 
     // act
-    var pass = listingJudge.judge(JUDGE, "MTG bulk lot", "store repack, 1 rare guaranteed");
+    var pass = listingJudge.judge(JUDGE, "MTG bulk lot", "random repack, multiple available");
 
     // assert
     assertThat(pass).isFalse();

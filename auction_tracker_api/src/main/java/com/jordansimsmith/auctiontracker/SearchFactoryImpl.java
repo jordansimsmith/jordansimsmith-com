@@ -9,8 +9,7 @@ public class SearchFactoryImpl implements SearchFactory {
           "prompts/mtg-bulk-judge.md",
           "gpt-5.4-mini",
           "none",
-          List.of(
-              "mtg_cards", "bulk_scale", "not_basic_lands", "civilian_seller", "fixed_collection"));
+          List.of("mtg_cards", "bulk_scale", "not_basic_lands", "fixed_collection"));
 
   private static final Judge RAM_JUDGE =
       new Judge(
