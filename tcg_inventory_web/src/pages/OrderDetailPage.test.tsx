@@ -161,6 +161,7 @@ describe('OrderDetailPage', () => {
     );
     expect(fetchOrderLink.getAttribute('target')).toBe('_blank');
     expect(fetchOrderLink.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(fetchOrderLink.getAttribute('data-variant')).toBe('default');
     expect(screen.getByText('to pick')).toBeDefined();
     expect(screen.getByText('Total $10.90')).toBeDefined();
     expect(screen.getByText('Offered $10.90 · Listed $13.00')).toBeDefined();
@@ -297,6 +298,47 @@ describe('OrderDetailPage', () => {
     expect(locations).toEqual(['A0-37', 'A0-74', 'A2-59']);
     expect(screen.queryByText(/^Prev ·/)).toBeNull();
     expect(screen.queryByText(/^Next ·/)).toBeNull();
+  });
+
+  it('renders neutral external actions in the right column for a fulfilled order', async () => {
+    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(
+      orderDetail({ state: 'fulfilled' }),
+    );
+
+    renderOrderDetailPage();
+
+    expect(await screen.findByText('Order 83647')).toBeDefined();
+    const actions = screen.getByRole('region', { name: 'Order actions' });
+    const fetchOrderLink = within(actions).getByRole('link', {
+      name: 'View in FetchTCG',
+    });
+    expect(fetchOrderLink.getAttribute('data-variant')).toBe('default');
+    const courierLink = within(actions).getByRole('link', {
+      name: 'Book a courier',
+    });
+    expect(courierLink.getAttribute('href')).toBe(
+      'https://www.trademe.co.nz/a/marketplace/book-courier/select',
+    );
+    expect(courierLink.getAttribute('target')).toBe('_blank');
+    expect(courierLink.getAttribute('rel')).toBe('noopener noreferrer');
+    expect(courierLink.getAttribute('data-variant')).toBe('default');
+    expect(within(actions).getByText('Order actions')).toBeDefined();
+    expect(
+      screen
+        .getByRole('button', { name: 'Back to orders' })
+        .getAttribute('data-variant'),
+    ).toBe('subtle');
+  });
+
+  it('does not offer courier booking before an order is fulfilled', async () => {
+    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(
+      orderDetail({ state: 'to_pick' }),
+    );
+
+    renderOrderDetailPage();
+
+    expect(await screen.findByText('Order 83647')).toBeDefined();
+    expect(screen.queryByRole('link', { name: 'Book a courier' })).toBeNull();
   });
 
   it('surfaces confirm failures and stays on the pull sheet', async () => {

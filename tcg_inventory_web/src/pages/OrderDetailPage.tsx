@@ -30,6 +30,8 @@ import classes from './OrderDetailPage.module.css';
 
 const CARD_IMAGE_FALLBACK =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='146' height='204' viewBox='0 0 146 204'%3E%3Crect width='146' height='204' rx='8' fill='%23e9ecef' stroke='%23ced4da'/%3E%3C/svg%3E";
+const TRADEME_COURIER_URL =
+  'https://www.trademe.co.nz/a/marketplace/book-courier/select';
 
 function cardImageUrl(scryfallId: string): string {
   return `https://api.scryfall.com/cards/${encodeURIComponent(scryfallId)}?format=image&version=small`;
@@ -175,21 +177,9 @@ export function OrderDetailPage() {
               title={`Order ${order.order_id}`}
               description={`Accepted ${new Date(order.accepted_at * 1000).toLocaleString()}`}
               actions={
-                <Group gap="xs">
-                  <Button
-                    component="a"
-                    href={`https://www.fetchtcg.com/profile/sales/${encodeURIComponent(order.order_id)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    variant="subtle"
-                    rightSection={<IconExternalLink size={16} />}
-                  >
-                    View in FetchTCG
-                  </Button>
-                  <Button variant="subtle" onClick={() => navigate('/orders')}>
-                    Back to orders
-                  </Button>
-                </Group>
+                <Button variant="subtle" onClick={() => navigate('/orders')}>
+                  Back to orders
+                </Button>
               }
             />
             <Box className={classes.detailGrid}>
@@ -255,6 +245,47 @@ export function OrderDetailPage() {
                         {order.postage_option ??
                           formatDeliveryMode(order.delivery_mode)}
                       </Text>
+                    </Stack>
+                  </Stack>
+                </Paper>
+                <Paper
+                  component="section"
+                  aria-label="Order actions"
+                  withBorder
+                  p="md"
+                  radius="md"
+                >
+                  <Stack gap="sm">
+                    <Title order={3} fz="md">
+                      Order actions
+                    </Title>
+                    <Stack gap="xs">
+                      <Button
+                        component="a"
+                        href={`https://www.fetchtcg.com/profile/sales/${encodeURIComponent(order.order_id)}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        variant="default"
+                        fullWidth
+                        justify="space-between"
+                        rightSection={<IconExternalLink size={16} />}
+                      >
+                        View in FetchTCG
+                      </Button>
+                      {order.state === 'fulfilled' && (
+                        <Button
+                          component="a"
+                          href={TRADEME_COURIER_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          variant="default"
+                          fullWidth
+                          justify="space-between"
+                          rightSection={<IconExternalLink size={16} />}
+                        >
+                          Book a courier
+                        </Button>
+                      )}
                     </Stack>
                   </Stack>
                 </Paper>
