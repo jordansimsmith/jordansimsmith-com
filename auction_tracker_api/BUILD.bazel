@@ -31,6 +31,7 @@ java_library(
         "//lib/secrets:lib",
         "//lib/time:lib",
         "//third_party/dagger",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
@@ -42,8 +43,8 @@ java_library(
 )
 
 java_binary(
-    name = "update-items-handler",
-    srcs = glob(["src/main/java/com/jordansimsmith/auctiontracker/UpdateItemsHandler.java"]),
+    name = "jobs-handler",
+    srcs = glob(["src/main/java/com/jordansimsmith/auctiontracker/JobsHandler.java"]),
     create_executable = False,
     resources = [
         "src/main/resources/logback.xml",
@@ -56,28 +57,8 @@ java_binary(
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
         "@maven//:com_amazonaws_aws_lambda_java_events",
-        "@maven//:com_google_code_findbugs_jsr305",
-        "@maven//:com_google_guava_guava",
-        "@maven//:org_slf4j_slf4j_api",
-        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-    ],
-)
-
-java_binary(
-    name = "send-digest-handler",
-    srcs = glob(["src/main/java/com/jordansimsmith/auctiontracker/SendDigestHandler.java"]),
-    create_executable = False,
-    resources = [
-        "src/main/resources/logback.xml",
-    ],
-    deps = [
-        ":lib",
-        "//lib/notifications:lib",
-        "//lib/time:lib",
-        "@maven//:ch_qos_logback_logback_classic",
-        "@maven//:ch_qos_logback_logback_core",
-        "@maven//:com_amazonaws_aws_lambda_java_core",
-        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:org_slf4j_slf4j_api",
@@ -122,6 +103,7 @@ java_library(
         ":lib",
         "//lib/dynamodb:test-lib",
         "//lib/http:test-lib",
+        "//lib/json:lib",
         "//lib/llm:lib",
         "//lib/llm:test-lib",
         "//lib/localstack:lib",
@@ -132,6 +114,7 @@ java_library(
         "//third_party/dagger",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
@@ -185,10 +168,9 @@ java_test_suite(
     test_suffixes = ["IntegrationTest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":jobs-handler",
         ":lib",
-        ":send-digest-handler",
         ":test-lib",
-        ":update-items-handler",
         "//lib/dynamodb:test-lib",
         "//lib/llm:test-lib",
         "//lib/notifications:test-lib",
@@ -210,8 +192,7 @@ java_test_suite(
 localstack_image(
     name = "local",
     handler_jars = [
-        ":send-digest-handler_deploy.jar",
-        ":update-items-handler_deploy.jar",
+        ":jobs-handler_deploy.jar",
     ],
     init_resources = "src/test/resources/init_resources.py",
     repo_tag = "bazel/auction-tracker-local:latest",

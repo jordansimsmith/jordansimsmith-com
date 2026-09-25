@@ -12,8 +12,7 @@
     {
       "path": "auction_tracker_api/infra",
       "artifacts": {
-        "update_items_handler": "//auction_tracker_api:update-items-handler_deploy.jar",
-        "send_digest_handler": "//auction_tracker_api:send-digest-handler_deploy.jar"
+        "jobs_handler": "//auction_tracker_api:jobs-handler_deploy.jar"
       }
     },
     {

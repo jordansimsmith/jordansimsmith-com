@@ -32,6 +32,18 @@ variable "artifacts" {
 locals {
   application_id = "auction_tracker_api"
   subscriptions  = ["jordansimsmith@gmail.com"]
+  search_ids = {
+    ram_g_skill            = "ram-g-skill"
+    ram_gskill             = "ram-gskill"
+    ram_trident_z          = "ram-trident-z"
+    mtg_bulk               = "mtg-bulk"
+    mtg_collection         = "mtg-collection"
+    mtg_assorted           = "mtg-assorted"
+    mtg_clear_out          = "mtg-clear-out"
+    mtg_clearout           = "mtg-clearout"
+    mtg_lot                = "mtg-lot"
+    mtg_one_dollar_reserve = "mtg-one-dollar-reserve"
+  }
 }
 
 module "java_lambda" {
@@ -40,15 +52,10 @@ module "java_lambda" {
   application_id = local.application_id
 
   lambdas = {
-    update_items_handler = {
-      handler  = "com.jordansimsmith.auctiontracker.UpdateItemsHandler"
-      artifact = var.artifacts["update_items_handler"]
+    jobs_handler = {
+      handler  = "com.jordansimsmith.auctiontracker.JobsHandler"
+      artifact = var.artifacts["jobs_handler"]
       timeout  = 300
-    }
-    send_digest_handler = {
-      handler  = "com.jordansimsmith.auctiontracker.SendDigestHandler"
-      artifact = var.artifacts["send_digest_handler"]
-      timeout  = 30
     }
   }
 
@@ -56,6 +63,7 @@ module "java_lambda" {
     dynamodb       = aws_iam_policy.lambda_dynamodb.arn
     secretsmanager = aws_iam_policy.lambda_secretsmanager.arn
     sns            = aws_iam_policy.lambda_sns.arn
+    sqs            = aws_iam_policy.lambda_sqs.arn
   }
 }
 
@@ -229,32 +237,54 @@ resource "aws_iam_policy" "lambda_sns" {
   policy = data.aws_iam_policy_document.lambda_sns.json
 }
 
-resource "aws_cloudwatch_event_rule" "update_items" {
-  name                = "${local.application_id}_update_items"
-  description         = "Triggers the UpdateItemsHandler Lambda function"
-  schedule_expression = "rate(15 minutes)"
+resource "aws_sqs_queue" "jobs_dlq" {
+  name                        = "auction_tracker_jobs_dlq.fifo"
+  fifo_queue                  = true
+  content_based_deduplication = true
+  message_retention_seconds   = 1209600
 }
 
-resource "aws_cloudwatch_event_target" "update_items_lambda" {
-  rule      = aws_cloudwatch_event_rule.update_items.name
-  target_id = "UpdateItemsHandler"
-  arn       = module.java_lambda.lambda_functions["update_items_handler"].qualified_arn
+resource "aws_sqs_queue" "jobs" {
+  name                        = "auction_tracker_jobs.fifo"
+  fifo_queue                  = true
+  content_based_deduplication = true
+  message_retention_seconds   = 1209600
+  visibility_timeout_seconds  = 1800
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.jobs_dlq.arn
+    maxReceiveCount     = 5
+  })
 }
 
-resource "aws_lambda_permission" "allow_eventbridge_update_items" {
-  statement_id  = "AllowEventBridgeInvokeUpdateItems"
-  action        = "lambda:InvokeFunction"
-  function_name = module.java_lambda.lambda_functions["update_items_handler"].function_name
-  qualifier     = module.java_lambda.lambda_functions["update_items_handler"].version
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.update_items.arn
+data "aws_iam_policy_document" "lambda_sqs" {
+  statement {
+    effect = "Allow"
 
-  lifecycle {
-    create_before_destroy = true
+    resources = [aws_sqs_queue.jobs.arn]
+
+    actions = [
+      "sqs:DeleteMessage",
+      "sqs:GetQueueAttributes",
+      "sqs:ReceiveMessage",
+      "sqs:ChangeMessageVisibility",
+    ]
   }
 }
 
-data "aws_iam_policy_document" "send_digest_scheduler_assume_role" {
+resource "aws_iam_policy" "lambda_sqs" {
+  name   = "${local.application_id}_lambda_sqs"
+  policy = data.aws_iam_policy_document.lambda_sqs.json
+}
+
+resource "aws_lambda_event_source_mapping" "jobs" {
+  event_source_arn                   = aws_sqs_queue.jobs.arn
+  function_name                      = module.java_lambda.lambda_functions["jobs_handler"].qualified_arn
+  batch_size                         = 1
+  maximum_batching_window_in_seconds = 0
+}
+
+data "aws_iam_policy_document" "jobs_scheduler_assume_role" {
   statement {
     effect  = "Allow"
     actions = ["sts:AssumeRole"]
@@ -266,47 +296,89 @@ data "aws_iam_policy_document" "send_digest_scheduler_assume_role" {
   }
 }
 
-resource "aws_iam_role" "send_digest_scheduler" {
-  name               = "${local.application_id}_send_digest_scheduler"
-  assume_role_policy = data.aws_iam_policy_document.send_digest_scheduler_assume_role.json
+resource "aws_iam_role" "jobs_scheduler" {
+  name               = "${local.application_id}_jobs_scheduler"
+  assume_role_policy = data.aws_iam_policy_document.jobs_scheduler_assume_role.json
 }
 
-data "aws_iam_policy_document" "send_digest_scheduler_invoke_lambda" {
+data "aws_iam_policy_document" "jobs_scheduler_sqs" {
   statement {
     effect = "Allow"
 
-    resources = [
-      module.java_lambda.lambda_functions["send_digest_handler"].qualified_arn
-    ]
+    resources = [aws_sqs_queue.jobs.arn]
 
-    actions = ["lambda:InvokeFunction"]
+    actions = ["sqs:SendMessage"]
   }
 }
 
-resource "aws_iam_policy" "send_digest_scheduler_invoke_lambda" {
-  name   = "${local.application_id}_send_digest_scheduler_invoke_lambda"
-  policy = data.aws_iam_policy_document.send_digest_scheduler_invoke_lambda.json
+resource "aws_iam_policy" "jobs_scheduler_sqs" {
+  name   = "${local.application_id}_jobs_scheduler_sqs"
+  policy = data.aws_iam_policy_document.jobs_scheduler_sqs.json
 }
 
-resource "aws_iam_role_policy_attachment" "send_digest_scheduler_invoke_lambda" {
-  role       = aws_iam_role.send_digest_scheduler.name
-  policy_arn = aws_iam_policy.send_digest_scheduler_invoke_lambda.arn
+resource "aws_iam_role_policy_attachment" "jobs_scheduler_sqs" {
+  role       = aws_iam_role.jobs_scheduler.name
+  policy_arn = aws_iam_policy.jobs_scheduler_sqs.arn
 }
 
-resource "aws_scheduler_schedule" "send_digest" {
-  name                         = "${local.application_id}_send_digest"
-  description                  = "Triggers the SendDigestHandler Lambda function"
-  schedule_expression          = "cron(0 21 * * ? *)"
+resource "aws_scheduler_schedule" "update_search" {
+  for_each                     = local.search_ids
+  name                         = "${local.application_id}_update_${each.key}"
+  description                  = "Queues the ${each.value} auction search"
+  schedule_expression          = "cron(0/15 * * * ? *)"
   schedule_expression_timezone = "Pacific/Auckland"
-  depends_on                   = [aws_iam_role_policy_attachment.send_digest_scheduler_invoke_lambda]
+  depends_on                   = [aws_iam_role_policy_attachment.jobs_scheduler_sqs]
 
   flexible_time_window {
     mode = "OFF"
   }
 
   target {
-    arn      = module.java_lambda.lambda_functions["send_digest_handler"].qualified_arn
-    role_arn = aws_iam_role.send_digest_scheduler.arn
-    input    = jsonencode({})
+    arn      = aws_sqs_queue.jobs.arn
+    role_arn = aws_iam_role.jobs_scheduler.arn
+    input = jsonencode({
+      job_type     = "update_search"
+      search_id    = each.value
+      scheduled_at = "<aws.scheduler.scheduled-time>"
+    })
+
+    retry_policy {
+      maximum_event_age_in_seconds = 3600
+      maximum_retry_attempts       = 5
+    }
+
+    sqs_parameters {
+      message_group_id = "auction-tracker"
+    }
+  }
+}
+
+resource "aws_scheduler_schedule" "send_digest" {
+  name                         = "${local.application_id}_send_digest"
+  description                  = "Queues the daily auction digest"
+  schedule_expression          = "cron(5 21 * * ? *)"
+  schedule_expression_timezone = "Pacific/Auckland"
+  depends_on                   = [aws_iam_role_policy_attachment.jobs_scheduler_sqs]
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = aws_sqs_queue.jobs.arn
+    role_arn = aws_iam_role.jobs_scheduler.arn
+    input = jsonencode({
+      job_type     = "send_digest"
+      scheduled_at = "<aws.scheduler.scheduled-time>"
+    })
+
+    retry_policy {
+      maximum_event_age_in_seconds = 3600
+      maximum_retry_attempts       = 5
+    }
+
+    sqs_parameters {
+      message_group_id = "auction-tracker"
+    }
   }
 }

@@ -6,12 +6,20 @@ import java.util.List;
 
 public class FakeNotificationPublisher implements NotificationPublisher {
   private final Multimap<String, Notification> notifications = ArrayListMultimap.create();
+  private RuntimeException failure;
 
   public record Notification(String subject, String message) {}
 
   @Override
   public void publish(String topic, String subject, String message) {
+    if (failure != null) {
+      throw failure;
+    }
     notifications.put(topic, new Notification(subject, message));
+  }
+
+  public void failWith(RuntimeException failure) {
+    this.failure = failure;
   }
 
   public List<Notification> findNotifications(String topic) {
@@ -20,5 +28,6 @@ public class FakeNotificationPublisher implements NotificationPublisher {
 
   public void reset() {
     notifications.clear();
+    failure = null;
   }
 }

@@ -5,26 +5,23 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.llm.OpenAiStubContainer;
 import com.jordansimsmith.queue.QueueUtils;
-import java.util.Base64;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.List;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.testcontainers.containers.Network;
-import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.lambda.LambdaClient;
-import software.amazon.awssdk.services.lambda.model.InvocationType;
-import software.amazon.awssdk.services.lambda.model.InvokeRequest;
-import software.amazon.awssdk.services.lambda.model.LogType;
 import software.amazon.awssdk.services.sqs.SqsClient;
+import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
+import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 
 public class AuctionTrackerE2ETest {
-  private static final Logger LOGGER = LoggerFactory.getLogger(AuctionTrackerE2ETest.class);
-
   // union of the MTG and RAM judges' criteria so the one stubbed response satisfies both judges
   private static final String PASS_JUDGMENT =
       """
@@ -91,40 +88,30 @@ public class AuctionTrackerE2ETest {
   @Test
   void shouldUpdateItemsAndSendDigestWithNotification() throws Exception {
     // arrange
-    var lambdaClient =
-        LambdaClient.builder().endpointOverride(auctionTrackerContainer.getLocalstackUrl()).build();
     var sqsClient =
         SqsClient.builder().endpointOverride(auctionTrackerContainer.getLocalstackUrl()).build();
+    var jobsQueueUrl =
+        sqsClient.getQueueUrl(b -> b.queueName("auction_tracker_jobs.fifo").build()).queueUrl();
+    var scheduledAt = Instant.now().plusSeconds(3600);
 
-    // act - invoke update items handler
-    var updateRequest =
-        InvokeRequest.builder()
-            .functionName("update_items_handler")
-            .invocationType(InvocationType.REQUEST_RESPONSE)
-            .logType(LogType.TAIL)
-            .payload(SdkBytes.fromUtf8String("{}"))
-            .build();
-    var updateResponse = lambdaClient.invoke(updateRequest);
-    LOGGER.info(new String(Base64.getDecoder().decode(updateResponse.logResult())));
-    assertThat(updateResponse.statusCode()).isEqualTo(200);
-    assertThat(updateResponse.functionError())
-        .withFailMessage(new String(updateResponse.payload().asByteArray()))
-        .isNull();
-
-    // act - invoke send digest handler
-    var digestRequest =
-        InvokeRequest.builder()
-            .functionName("send_digest_handler")
-            .invocationType(InvocationType.REQUEST_RESPONSE)
-            .logType(LogType.TAIL)
-            .payload(SdkBytes.fromUtf8String("{}"))
-            .build();
-    var digestResponse = lambdaClient.invoke(digestRequest);
-    LOGGER.info(new String(Base64.getDecoder().decode(digestResponse.logResult())));
-    assertThat(digestResponse.statusCode()).isEqualTo(200);
-    assertThat(digestResponse.functionError())
-        .withFailMessage(new String(digestResponse.payload().asByteArray()))
-        .isNull();
+    // act - enqueue ordered searches and the digest behind them in the FIFO stream
+    for (var searchId : List.of("mtg-bulk", "mtg-collection")) {
+      sqsClient.sendMessage(
+          SendMessageRequest.builder()
+              .queueUrl(jobsQueueUrl)
+              .messageBody(
+                  "{\"job_type\":\"update_search\",\"search_id\":\"%s\",\"scheduled_at\":\"%s\"}"
+                      .formatted(searchId, scheduledAt))
+              .messageGroupId("auction-tracker")
+              .build());
+    }
+    sqsClient.sendMessage(
+        SendMessageRequest.builder()
+            .queueUrl(jobsQueueUrl)
+            .messageBody(
+                "{\"job_type\":\"send_digest\",\"scheduled_at\":\"%s\"}".formatted(scheduledAt))
+            .messageGroupId("auction-tracker")
+            .build());
 
     // assert - verify digest message was sent to SNS/SQS
     var queueName = "auction-tracker-test-queue";
@@ -133,9 +120,12 @@ public class AuctionTrackerE2ETest {
         ReceiveMessageRequest.builder()
             .queueUrl(queueUrl)
             .maxNumberOfMessages(10)
-            .waitTimeSeconds(10)
+            .waitTimeSeconds(20)
             .build();
-    var messages = sqsClient.receiveMessage(receiveRequest).messages();
+    var messages = new ArrayList<Message>();
+    for (var attempt = 0; attempt < 3 && messages.isEmpty(); attempt++) {
+      messages.addAll(sqsClient.receiveMessage(receiveRequest).messages());
+    }
     assertThat(messages).isNotEmpty();
 
     var hasExpectedMessage =
@@ -147,5 +137,53 @@ public class AuctionTrackerE2ETest {
                         && messageBody.contains("Titleist iron set")
                         && !messageBody.contains("Callaway iron set"));
     assertThat(hasExpectedMessage).isTrue();
+
+    var dynamoDbClient =
+        DynamoDbClient.builder()
+            .endpointOverride(auctionTrackerContainer.getLocalstackUrl())
+            .build();
+    var storedTitles =
+        dynamoDbClient.scan(b -> b.tableName("auction_tracker")).items().stream()
+            .map(item -> item.get("title").s())
+            .toList();
+    assertThat(storedTitles).contains("Titleist iron set").doesNotContain("Callaway iron set");
+  }
+
+  @Test
+  void shouldRoutePoisonMessageToWorkerDlqAfterFiveReceives() {
+    // arrange
+    var sqsClient =
+        SqsClient.builder().endpointOverride(auctionTrackerContainer.getLocalstackUrl()).build();
+    var jobsQueueUrl =
+        sqsClient.getQueueUrl(b -> b.queueName("auction_tracker_jobs.fifo").build()).queueUrl();
+    var jobsDlqUrl =
+        sqsClient.getQueueUrl(b -> b.queueName("auction_tracker_jobs_dlq.fifo").build()).queueUrl();
+    var poisonBody = "{\"job_type\":\"unknown\",\"scheduled_at\":\"2026-09-25T09:00:00Z\"}";
+
+    // act
+    sqsClient.sendMessage(
+        SendMessageRequest.builder()
+            .queueUrl(jobsQueueUrl)
+            .messageBody(poisonBody)
+            .messageGroupId("auction-tracker")
+            .build());
+
+    // assert
+    var dlqMessage =
+        IntStream.range(0, 30)
+            .mapToObj(
+                ignored ->
+                    sqsClient
+                        .receiveMessage(
+                            ReceiveMessageRequest.builder()
+                                .queueUrl(jobsDlqUrl)
+                                .maxNumberOfMessages(1)
+                                .waitTimeSeconds(1)
+                                .build())
+                        .messages())
+            .flatMap(Collection::stream)
+            .findFirst();
+    assertThat(dlqMessage).isPresent();
+    assertThat(dlqMessage.orElseThrow().body()).isEqualTo(poisonBody);
   }
 }

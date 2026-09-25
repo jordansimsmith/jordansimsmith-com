@@ -324,7 +324,13 @@ public class JsoupTradeMeClientTest {
     // arrange
     var search =
         new SearchFactory.Search(
-            URI.create(BASE_URL), "titleist wedge", null, 70.0, SearchFactory.Condition.ALL, null);
+            "titleist-wedge",
+            URI.create(BASE_URL),
+            "titleist wedge",
+            null,
+            70.0,
+            SearchFactory.Condition.ALL,
+            null);
 
     // act
     var searchUrl = client.getSearchUrl(search);
@@ -339,7 +345,13 @@ public class JsoupTradeMeClientTest {
     // arrange
     var search =
         new SearchFactory.Search(
-            URI.create(BASE_URL), "callaway wedge", 50.0, 150.0, SearchFactory.Condition.ALL, null);
+            "callaway-wedge",
+            URI.create(BASE_URL),
+            "callaway wedge",
+            50.0,
+            150.0,
+            SearchFactory.Condition.ALL,
+            null);
 
     // act
     var searchUrl = client.getSearchUrl(search);

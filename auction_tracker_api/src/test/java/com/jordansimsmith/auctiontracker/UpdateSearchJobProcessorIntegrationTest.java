@@ -2,7 +2,7 @@ package com.jordansimsmith.auctiontracker;
 
 import static org.assertj.core.api.Assertions.*;
 
-import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
+import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.llm.FakeLlmClient;
@@ -20,7 +20,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 
 @Testcontainers
-public class UpdateItemsHandlerIntegrationTest {
+public class UpdateSearchJobProcessorIntegrationTest {
   private static final BigDecimal START_PRICE = new BigDecimal("100");
   private static final BigDecimal BUY_NOW_PRICE = new BigDecimal("150");
   private static final SearchFactory.Judge MTG_JUDGE =
@@ -38,7 +38,8 @@ public class UpdateItemsHandlerIntegrationTest {
   private FakeLlmClient fakeLlmClient;
   private DynamoDbTable<AuctionTrackerItem> auctionTrackerTable;
 
-  private UpdateItemsHandler updateItemsHandler;
+  private JobsHandler jobsHandler;
+  private UpdateSearchJobProcessor updateSearchJobProcessor;
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
@@ -62,11 +63,20 @@ public class UpdateItemsHandlerIntegrationTest {
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
 
-    updateItemsHandler = new UpdateItemsHandler(factory);
+    jobsHandler = new JobsHandler(factory);
+    updateSearchJobProcessor =
+        new UpdateSearchJobProcessor(
+            factory.clock(),
+            factory.excludedSellerUsernameFactory(),
+            factory.searchFactory(),
+            factory.tradeMeClient(),
+            factory.listingFingerprinter(),
+            factory.listingJudge(),
+            auctionTrackerTable);
   }
 
   @Test
-  void handleRequestShouldStoreNewItems() {
+  void processShouldStoreNewItems() {
     // arrange
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var baseUrl = "https://www.trademe.co.nz/a/marketplace/sports/golf/search";
@@ -74,7 +84,7 @@ public class UpdateItemsHandlerIntegrationTest {
         "https://www.trademe.co.nz/a/marketplace/sports/golf/search?search_string=wedge&condition=used&sort_order=expirydesc";
     var search =
         new SearchFactory.Search(
-            URI.create(baseUrl), "wedge", null, null, SearchFactory.Condition.USED, null);
+            "wedge", URI.create(baseUrl), "wedge", null, null, SearchFactory.Condition.USED, null);
     fakeSearchFactory.addSearches(List.of(search));
 
     var tradeMeItems =
@@ -97,7 +107,7 @@ public class UpdateItemsHandlerIntegrationTest {
         URI.create(baseUrl), "wedge", null, null, SearchFactory.Condition.USED, tradeMeItems);
 
     // act
-    updateItemsHandler.handleRequest(new ScheduledEvent(), null);
+    runSearches();
 
     // assert
     var items = auctionTrackerTable.scan().items().stream().toList();
@@ -151,13 +161,19 @@ public class UpdateItemsHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldNotStoreOrJudgeItemsFromExcludedSellerUsernames() {
+  void processShouldNotStoreOrJudgeItemsFromExcludedSellerUsernames() {
     // arrange
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var baseUrl = "https://www.trademe.co.nz/a/marketplace/gaming/trading-cards/magic/search";
     var search =
         new SearchFactory.Search(
-            URI.create(baseUrl), "bulk", null, 200.0, SearchFactory.Condition.USED, MTG_JUDGE);
+            "bulk",
+            URI.create(baseUrl),
+            "bulk",
+            null,
+            200.0,
+            SearchFactory.Condition.USED,
+            MTG_JUDGE);
     fakeSearchFactory.addSearches(List.of(search));
     fakeExcludedSellerUsernameFactory.addExcludedSellerUsernames(Set.of("roseshade"));
     fakeTradeMeClient.addSearchResponse(
@@ -184,7 +200,7 @@ public class UpdateItemsHandlerIntegrationTest {
     fakeLlmClient.addResponse(judgmentJson(true));
 
     // act
-    updateItemsHandler.handleRequest(new ScheduledEvent(), null);
+    runSearches();
 
     // assert
     var items = auctionTrackerTable.scan().items().stream().toList();
@@ -196,7 +212,7 @@ public class UpdateItemsHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldNotStoreDuplicateItems() {
+  void processShouldNotStoreDuplicateItems() {
     // arrange
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var baseUrl = "https://www.trademe.co.nz/a/marketplace/sports/golf/search";
@@ -204,7 +220,7 @@ public class UpdateItemsHandlerIntegrationTest {
         "https://www.trademe.co.nz/a/marketplace/sports/golf/search?search_string=wedge&condition=used&sort_order=expirydesc";
     var search =
         new SearchFactory.Search(
-            URI.create(baseUrl), "wedge", null, null, SearchFactory.Condition.USED, null);
+            "wedge", URI.create(baseUrl), "wedge", null, null, SearchFactory.Condition.USED, null);
     fakeSearchFactory.addSearches(List.of(search));
 
     var tradeMeItem =
@@ -240,7 +256,7 @@ public class UpdateItemsHandlerIntegrationTest {
     auctionTrackerTable.putItem(existingItem);
 
     // act
-    updateItemsHandler.handleRequest(new ScheduledEvent(), null);
+    runSearches();
 
     // assert
     var items = auctionTrackerTable.scan().items().stream().toList();
@@ -249,13 +265,14 @@ public class UpdateItemsHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldNotStoreOrJudgeRelistedItemWithMatchingContent() {
+  void processShouldNotStoreOrJudgeRelistedItemWithMatchingContent() {
     // arrange
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var existingSearchUrl =
         "https://www.trademe.co.nz/search1?search_string=bulk&condition=used&sort_order=expirydesc";
     var search =
         new SearchFactory.Search(
+            "collection",
             URI.create("https://www.trademe.co.nz/search2"),
             "collection",
             null,
@@ -294,7 +311,7 @@ public class UpdateItemsHandlerIntegrationTest {
     auctionTrackerTable.putItem(existingItem);
 
     // act
-    updateItemsHandler.handleRequest(new ScheduledEvent(), null);
+    runSearches();
 
     // assert
     var items = auctionTrackerTable.scan().items().stream().toList();
@@ -305,14 +322,14 @@ public class UpdateItemsHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldStoreItemWhenDescriptionDiffersFromExistingItem() {
+  void processShouldStoreItemWhenDescriptionDiffersFromExistingItem() {
     // arrange
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var baseUrl = "https://www.trademe.co.nz/search";
     var expectedSearchUrl = baseUrl + "?search_string=ram&condition=used&sort_order=expirydesc";
     var search =
         new SearchFactory.Search(
-            URI.create(baseUrl), "ram", null, null, SearchFactory.Condition.USED, null);
+            "ram", URI.create(baseUrl), "ram", null, null, SearchFactory.Condition.USED, null);
     fakeSearchFactory.addSearches(List.of(search));
     fakeTradeMeClient.addSearchResponse(
         URI.create(baseUrl),
@@ -339,21 +356,21 @@ public class UpdateItemsHandlerIntegrationTest {
             null));
 
     // act
-    updateItemsHandler.handleRequest(new ScheduledEvent(), null);
+    runSearches();
 
     // assert
     assertThat(auctionTrackerTable.scan().items().stream().toList()).hasSize(2);
   }
 
   @Test
-  void handleRequestShouldStoreAndJudgeItemWhenSellerPriceDiffersFromExistingItem() {
+  void processShouldStoreAndJudgeItemWhenSellerPriceDiffersFromExistingItem() {
     // arrange
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var baseUrl = "https://www.trademe.co.nz/search";
     var expectedSearchUrl = baseUrl + "?search_string=ram&condition=used&sort_order=expirydesc";
     var search =
         new SearchFactory.Search(
-            URI.create(baseUrl), "ram", null, null, SearchFactory.Condition.USED, MTG_JUDGE);
+            "ram", URI.create(baseUrl), "ram", null, null, SearchFactory.Condition.USED, MTG_JUDGE);
     fakeSearchFactory.addSearches(List.of(search));
     fakeTradeMeClient.addSearchResponse(
         URI.create(baseUrl),
@@ -381,7 +398,7 @@ public class UpdateItemsHandlerIntegrationTest {
     fakeLlmClient.addResponse(judgmentJson(false));
 
     // act
-    updateItemsHandler.handleRequest(new ScheduledEvent(), null);
+    runSearches();
 
     // assert
     var items = auctionTrackerTable.scan().items().stream().toList();
@@ -393,11 +410,12 @@ public class UpdateItemsHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldProcessMultipleSearches() {
+  void processShouldProcessMultipleSearches() {
     // arrange
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var search1 =
         new SearchFactory.Search(
+            "term1",
             URI.create("https://www.trademe.co.nz/search1"),
             "term1",
             null,
@@ -406,6 +424,7 @@ public class UpdateItemsHandlerIntegrationTest {
             null);
     var search2 =
         new SearchFactory.Search(
+            "term2",
             URI.create("https://www.trademe.co.nz/search2"),
             "term2",
             100.0,
@@ -434,7 +453,7 @@ public class UpdateItemsHandlerIntegrationTest {
                 "url2", "title2", "desc2", "seller", START_PRICE, BUY_NOW_PRICE)));
 
     // act
-    updateItemsHandler.handleRequest(new ScheduledEvent(), null);
+    runSearches();
 
     // assert
     var items = auctionTrackerTable.scan().items().stream().toList();
@@ -444,11 +463,12 @@ public class UpdateItemsHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldHandleEmptySearchResults() {
+  void processShouldHandleEmptySearchResults() {
     // arrange
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var search =
         new SearchFactory.Search(
+            "term",
             URI.create("https://www.trademe.co.nz/search"),
             "term",
             null,
@@ -465,7 +485,7 @@ public class UpdateItemsHandlerIntegrationTest {
         List.of());
 
     // act
-    updateItemsHandler.handleRequest(new ScheduledEvent(), null);
+    runSearches();
 
     // assert
     var items = auctionTrackerTable.scan().items().stream().toList();
@@ -473,13 +493,69 @@ public class UpdateItemsHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldStoreJudgmentForJudgedSearch() {
+  void jobsHandlerShouldFailInvalidJobForRetry() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
+
+    // act & assert
+    var event = new SQSEvent();
+    var message = new SQSEvent.SQSMessage();
+    message.setBody("{\"job_type\":\"not_a_job\",\"scheduled_at\":\"2026-09-25T09:00:00Z\"}");
+    event.setRecords(List.of(message));
+    assertThatThrownBy(() -> jobsHandler.handleRequest(event, null))
+        .hasRootCauseInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void processShouldFailUnknownSearchForRetry() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
+
+    // act & assert
+    assertThatThrownBy(() -> updateSearchJobProcessor.process("unknown-search"))
+        .isInstanceOf(IllegalArgumentException.class);
+  }
+
+  @Test
+  void processShouldRemainSafeWhenMessageIsDeliveredAgain() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
+    var baseUrl = "https://www.trademe.co.nz/search";
+    var search =
+        new SearchFactory.Search(
+            "term", URI.create(baseUrl), "term", null, null, SearchFactory.Condition.USED, null);
+    fakeSearchFactory.addSearches(List.of(search));
+    fakeTradeMeClient.addSearchResponse(
+        URI.create(baseUrl),
+        "term",
+        null,
+        null,
+        SearchFactory.Condition.USED,
+        List.of(
+            new TradeMeClient.TradeMeItem(
+                "url1", "title1", "desc1", "seller", START_PRICE, BUY_NOW_PRICE)));
+    // act
+    updateSearchJobProcessor.process("term");
+    updateSearchJobProcessor.process("term");
+
+    // assert
+    assertThat(auctionTrackerTable.scan().items().stream().toList()).hasSize(1);
+  }
+
+  @Test
+  void processShouldStoreJudgmentForJudgedSearch() {
     // arrange
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var baseUrl = "https://www.trademe.co.nz/a/marketplace/gaming/trading-cards/magic/search";
     var search =
         new SearchFactory.Search(
-            URI.create(baseUrl), "bulk", null, 100.0, SearchFactory.Condition.USED, MTG_JUDGE);
+            "bulk",
+            URI.create(baseUrl),
+            "bulk",
+            null,
+            100.0,
+            SearchFactory.Condition.USED,
+            MTG_JUDGE);
     fakeSearchFactory.addSearches(List.of(search));
 
     fakeTradeMeClient.addSearchResponse(
@@ -502,7 +578,7 @@ public class UpdateItemsHandlerIntegrationTest {
     fakeLlmClient.addResponse(judgmentJson(false));
 
     // act
-    updateItemsHandler.handleRequest(new ScheduledEvent(), null);
+    runSearches();
 
     // assert
     var items = auctionTrackerTable.scan().items().stream().toList();
@@ -515,7 +591,7 @@ public class UpdateItemsHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldNotJudgeExistingItems() {
+  void processShouldNotJudgeExistingItems() {
     // arrange
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var baseUrl = "https://www.trademe.co.nz/a/marketplace/gaming/trading-cards/magic/search";
@@ -523,7 +599,13 @@ public class UpdateItemsHandlerIntegrationTest {
         baseUrl + "?search_string=bulk&price_max=100&condition=used&sort_order=expirydesc";
     var search =
         new SearchFactory.Search(
-            URI.create(baseUrl), "bulk", null, 100.0, SearchFactory.Condition.USED, MTG_JUDGE);
+            "bulk",
+            URI.create(baseUrl),
+            "bulk",
+            null,
+            100.0,
+            SearchFactory.Condition.USED,
+            MTG_JUDGE);
     fakeSearchFactory.addSearches(List.of(search));
 
     fakeTradeMeClient.addSearchResponse(
@@ -552,7 +634,7 @@ public class UpdateItemsHandlerIntegrationTest {
     auctionTrackerTable.putItem(existingItem);
 
     // act
-    updateItemsHandler.handleRequest(new ScheduledEvent(), null);
+    runSearches();
 
     // assert
     var items = auctionTrackerTable.scan().items().stream().toList();
@@ -562,15 +644,22 @@ public class UpdateItemsHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldStoreAndJudgeOnceWhenMatchingContentIsInMultipleSearches() {
+  void processShouldProcessOnlySearchInMessage() {
     // arrange
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var baseUrl = "https://www.trademe.co.nz/a/marketplace/gaming/trading-cards/magic/search";
     var search1 =
         new SearchFactory.Search(
-            URI.create(baseUrl), "bulk", null, 100.0, SearchFactory.Condition.USED, MTG_JUDGE);
+            "bulk",
+            URI.create(baseUrl),
+            "bulk",
+            null,
+            100.0,
+            SearchFactory.Condition.USED,
+            MTG_JUDGE);
     var search2 =
         new SearchFactory.Search(
+            "collection",
             URI.create(baseUrl),
             "collection",
             null,
@@ -610,7 +699,7 @@ public class UpdateItemsHandlerIntegrationTest {
     fakeLlmClient.addResponse(judgmentJson(false));
 
     // act
-    updateItemsHandler.handleRequest(new ScheduledEvent(), null);
+    updateSearchJobProcessor.process("bulk");
 
     // assert
     var items = auctionTrackerTable.scan().items().stream().toList();
@@ -622,7 +711,7 @@ public class UpdateItemsHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldUseConfiguredModelPerJudge() {
+  void processShouldUseConfiguredModelPerJudge() {
     // arrange
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var otherJudge =
@@ -630,6 +719,7 @@ public class UpdateItemsHandlerIntegrationTest {
             "prompts/mtg-bulk-judge.md", "gpt-5.4-nano", "low", List.of("mtg_cards"));
     var search1 =
         new SearchFactory.Search(
+            "term1",
             URI.create("https://www.trademe.co.nz/search1"),
             "term1",
             null,
@@ -638,6 +728,7 @@ public class UpdateItemsHandlerIntegrationTest {
             MTG_JUDGE);
     var search2 =
         new SearchFactory.Search(
+            "term2",
             URI.create("https://www.trademe.co.nz/search2"),
             "term2",
             null,
@@ -669,7 +760,7 @@ public class UpdateItemsHandlerIntegrationTest {
         "{\"mtg_cards\": {\"reasoning\": \"because\", \"result\": \"pass\"}}");
 
     // act
-    updateItemsHandler.handleRequest(new ScheduledEvent(), null);
+    runSearches();
 
     // assert
     var requests = fakeLlmClient.findRequests();
@@ -687,13 +778,19 @@ public class UpdateItemsHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldThrowWhenJudgeFails() {
+  void processShouldThrowWhenJudgeFails() {
     // arrange
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var baseUrl = "https://www.trademe.co.nz/a/marketplace/gaming/trading-cards/magic/search";
     var search =
         new SearchFactory.Search(
-            URI.create(baseUrl), "bulk", null, 100.0, SearchFactory.Condition.USED, MTG_JUDGE);
+            "bulk",
+            URI.create(baseUrl),
+            "bulk",
+            null,
+            100.0,
+            SearchFactory.Condition.USED,
+            MTG_JUDGE);
     fakeSearchFactory.addSearches(List.of(search));
 
     fakeTradeMeClient.addSearchResponse(
@@ -713,9 +810,14 @@ public class UpdateItemsHandlerIntegrationTest {
     // no llm response queued, so the judge call fails
 
     // act & assert
-    assertThatThrownBy(() -> updateItemsHandler.handleRequest(new ScheduledEvent(), null))
-        .isInstanceOf(RuntimeException.class);
+    assertThatThrownBy(this::runSearches).isInstanceOf(RuntimeException.class);
     assertThat(auctionTrackerTable.scan().items().stream().toList()).isEmpty();
+  }
+
+  private void runSearches() {
+    for (var search : fakeSearchFactory.findSearches()) {
+      updateSearchJobProcessor.process(search.id());
+    }
   }
 
   private static String judgmentJson(boolean pass) {

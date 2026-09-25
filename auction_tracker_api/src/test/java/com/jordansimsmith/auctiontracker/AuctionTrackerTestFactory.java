@@ -1,6 +1,7 @@
 package com.jordansimsmith.auctiontracker;
 
 import com.jordansimsmith.dynamodb.DynamoDbTestModule;
+import com.jordansimsmith.json.ObjectMapperModule;
 import com.jordansimsmith.llm.FakeLlmClient;
 import com.jordansimsmith.notifications.FakeNotificationPublisher;
 import com.jordansimsmith.notifications.NotificationTestModule;
@@ -18,6 +19,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
     modules = {
       ClockTestModule.class,
       DynamoDbTestModule.class,
+      ObjectMapperModule.class,
       NotificationTestModule.class,
       AuctionTrackerTestModule.class,
     })

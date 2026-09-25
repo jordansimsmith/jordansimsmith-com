@@ -1,15 +1,7 @@
 package com.jordansimsmith.auctiontracker;
 
-import com.amazonaws.services.lambda.runtime.Context;
-import com.amazonaws.services.lambda.runtime.RequestHandler;
-import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
-import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.time.Clock;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbIndex;
@@ -18,8 +10,8 @@ import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
-public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(UpdateItemsHandler.class);
+public class UpdateSearchJobProcessor {
+  private static final Logger LOGGER = LoggerFactory.getLogger(UpdateSearchJobProcessor.class);
 
   private final Clock clock;
   private final ExcludedSellerUsernameFactory excludedSellerUsernameFactory;
@@ -31,52 +23,32 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
   private final DynamoDbIndex<AuctionTrackerItem> gsi1;
   private final DynamoDbIndex<AuctionTrackerItem> gsi2;
 
-  public UpdateItemsHandler() {
-    this(AuctionTrackerFactory.create());
-  }
-
-  @VisibleForTesting
-  UpdateItemsHandler(AuctionTrackerFactory factory) {
-    this.clock = factory.clock();
-    this.excludedSellerUsernameFactory = factory.excludedSellerUsernameFactory();
-    this.searchFactory = factory.searchFactory();
-    this.tradeMeClient = factory.tradeMeClient();
-    this.listingFingerprinter = factory.listingFingerprinter();
-    this.listingJudge = factory.listingJudge();
-    this.auctionTrackerTable = factory.auctionTrackerTable();
+  public UpdateSearchJobProcessor(
+      Clock clock,
+      ExcludedSellerUsernameFactory excludedSellerUsernameFactory,
+      SearchFactory searchFactory,
+      TradeMeClient tradeMeClient,
+      ListingFingerprinter listingFingerprinter,
+      ListingJudge listingJudge,
+      DynamoDbTable<AuctionTrackerItem> auctionTrackerTable) {
+    this.clock = clock;
+    this.excludedSellerUsernameFactory = excludedSellerUsernameFactory;
+    this.searchFactory = searchFactory;
+    this.tradeMeClient = tradeMeClient;
+    this.listingFingerprinter = listingFingerprinter;
+    this.listingJudge = listingJudge;
+    this.auctionTrackerTable = auctionTrackerTable;
     this.gsi1 = auctionTrackerTable.index("gsi1");
     this.gsi2 = auctionTrackerTable.index("gsi2");
   }
 
-  @Override
-  public Void handleRequest(ScheduledEvent event, Context context) {
-    try {
-      return doHandleRequest();
-    } catch (Exception e) {
-      LOGGER.error("Error processing auction updates", e);
-      throw new RuntimeException(e);
+  public void process(String searchId) {
+    if (searchId == null || searchId.isBlank()) {
+      throw new IllegalArgumentException("update_search message is missing search_id");
     }
-  }
 
-  private Void doHandleRequest() {
-    var searches = searchFactory.findSearches();
+    var search = searchFactory.getSearch(searchId);
     var excludedSellerUsernames = excludedSellerUsernameFactory.findExcludedSellerUsernames();
-
-    // memoize judgments so a listing found by multiple judged searches is judged once per run
-    var judgments = new HashMap<String, Boolean>();
-    var contentFingerprints = new HashSet<String>();
-    for (var search : searches) {
-      processSearch(search, excludedSellerUsernames, judgments, contentFingerprints);
-    }
-
-    return null;
-  }
-
-  private void processSearch(
-      SearchFactory.Search search,
-      Set<String> excludedSellerUsernames,
-      Map<String, Boolean> judgments,
-      Set<String> contentFingerprints) {
     var tradeMeItems =
         tradeMeClient.searchItems(
             search.baseUrl(),
@@ -103,19 +75,14 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
       }
 
       var contentFingerprint = listingFingerprinter.create(tradeMeItem);
-      if (contentFingerprints.contains(contentFingerprint)
-          || contentFingerprintExists(contentFingerprint)) {
+      if (contentFingerprintExists(contentFingerprint)) {
         continue;
       }
 
       AuctionTrackerItem.Judgment judgment = null;
       if (search.judge() != null) {
         var pass =
-            judgments.computeIfAbsent(
-                search.judge().prompt() + AuctionTrackerItem.DELIMITER + tradeMeItem.url(),
-                key ->
-                    listingJudge.judge(
-                        search.judge(), tradeMeItem.title(), tradeMeItem.description()));
+            listingJudge.judge(search.judge(), tradeMeItem.title(), tradeMeItem.description());
         judgment = pass ? AuctionTrackerItem.Judgment.PASS : AuctionTrackerItem.Judgment.FAIL;
       }
 
@@ -128,7 +95,6 @@ public class UpdateItemsHandler implements RequestHandler<ScheduledEvent, Void> 
               currentTime,
               judgment);
       auctionTrackerTable.putItem(auctionTrackerItem);
-      contentFingerprints.add(contentFingerprint);
     }
   }
 

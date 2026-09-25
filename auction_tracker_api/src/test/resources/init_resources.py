@@ -53,6 +53,33 @@ sqs_client.set_queue_attributes(
 
 sns_client.subscribe(TopicArn=topic_arn, Protocol="sqs", Endpoint=queue_arn)
 
+jobs_dlq_name = "auction_tracker_jobs_dlq.fifo"
+jobs_dlq_url = sqs_client.create_queue(
+    QueueName=jobs_dlq_name,
+    Attributes={"FifoQueue": "true", "ContentBasedDeduplication": "true"},
+)["QueueUrl"]
+jobs_dlq_arn = sqs_client.get_queue_attributes(
+    QueueUrl=jobs_dlq_url, AttributeNames=["QueueArn"]
+)["Attributes"]["QueueArn"]
+
+jobs_queue_name = "auction_tracker_jobs.fifo"
+jobs_queue_url = sqs_client.create_queue(
+    QueueName=jobs_queue_name,
+    Attributes={
+        "FifoQueue": "true",
+        "ContentBasedDeduplication": "true",
+        # keep local poison-message tests fast; production visibility is 1,800 seconds
+        "VisibilityTimeout": "1",
+        "MessageRetentionPeriod": "1209600",
+        "RedrivePolicy": json.dumps(
+            {"deadLetterTargetArn": jobs_dlq_arn, "maxReceiveCount": "5"}
+        ),
+    },
+)["QueueUrl"]
+jobs_queue_arn = sqs_client.get_queue_attributes(
+    QueueUrl=jobs_queue_url, AttributeNames=["QueueArn"]
+)["Attributes"]["QueueArn"]
+
 table_name = "auction_tracker"
 dynamodb_client.create_table(
     TableName=table_name,
@@ -127,14 +154,9 @@ iam_client.put_role_policy(
 
 configs = [
     {
-        "function_name": "update_items_handler",
-        "handler_name": "com.jordansimsmith.auctiontracker.UpdateItemsHandler",
-        "zip_file": "update-items-handler_deploy.jar",
-    },
-    {
-        "function_name": "send_digest_handler",
-        "handler_name": "com.jordansimsmith.auctiontracker.SendDigestHandler",
-        "zip_file": "send-digest-handler_deploy.jar",
+        "function_name": "jobs_handler",
+        "handler_name": "com.jordansimsmith.auctiontracker.JobsHandler",
+        "zip_file": "jobs-handler_deploy.jar",
     },
 ]
 
@@ -156,7 +178,7 @@ for config in configs:
         Role=role_arn,
         Handler=config["handler_name"],
         Code={"ZipFile": zip_file_bytes},
-        Timeout=30,
+        Timeout=300,
         MemorySize=1024,
         Architectures=["x86_64"],
         Environment={"Variables": lambda_env},
@@ -167,3 +189,9 @@ for config in configs:
     lambda_client.get_waiter("function_active_v2").wait(
         FunctionName=config["function_name"]
     )
+
+lambda_client.create_event_source_mapping(
+    EventSourceArn=jobs_queue_arn,
+    FunctionName="jobs_handler",
+    BatchSize=1,
+)

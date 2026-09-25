@@ -2,13 +2,13 @@ package com.jordansimsmith.auctiontracker;
 
 import static org.assertj.core.api.Assertions.*;
 
-import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.notifications.FakeNotificationPublisher;
 import com.jordansimsmith.time.FakeClock;
 import java.net.URI;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
@@ -19,13 +19,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 
 @Testcontainers
-public class SendDigestHandlerIntegrationTest {
+public class SendDigestJobProcessorIntegrationTest {
   private FakeClock fakeClock;
   private FakeNotificationPublisher fakeNotificationPublisher;
   private FakeSearchFactory fakeSearchFactory;
   private DynamoDbTable<AuctionTrackerItem> auctionTrackerTable;
 
-  private SendDigestHandler sendDigestHandler;
+  private SendDigestJobProcessor sendDigestJobProcessor;
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
@@ -47,11 +47,16 @@ public class SendDigestHandlerIntegrationTest {
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
 
-    sendDigestHandler = new SendDigestHandler(factory);
+    sendDigestJobProcessor =
+        new SendDigestJobProcessor(
+            factory.searchFactory(),
+            factory.tradeMeClient(),
+            factory.notificationPublisher(),
+            auctionTrackerTable);
   }
 
   @Test
-  void handleRequestShouldSendDigestWithNewItemsFromLast24Hours() {
+  void processShouldSendDigestWithNewItemsFromDailyWindow() {
     // arrange
     var currentTime = Instant.ofEpochSecond(2_000_000);
     fakeClock.setTime(currentTime);
@@ -63,7 +68,7 @@ public class SendDigestHandlerIntegrationTest {
         "https://www.trademe.co.nz/search?search_string=wedge&condition=used&sort_order=expirydesc";
     var search =
         new SearchFactory.Search(
-            URI.create(baseUrl), "wedge", null, null, SearchFactory.Condition.USED, null);
+            "wedge", URI.create(baseUrl), "wedge", null, null, SearchFactory.Condition.USED, null);
     fakeSearchFactory.addSearches(List.of(search));
 
     // create items - some within 24h, some older
@@ -97,7 +102,7 @@ public class SendDigestHandlerIntegrationTest {
     auctionTrackerTable.putItem(oldItem);
 
     // act
-    sendDigestHandler.handleRequest(new ScheduledEvent(), null);
+    sendDigestJobProcessor.process(currentTime);
 
     // assert
     var notifications = fakeNotificationPublisher.findNotifications("auction_tracker_api_digest");
@@ -106,7 +111,7 @@ public class SendDigestHandlerIntegrationTest {
     var notification = notifications.get(0);
     assertThat(notification.subject()).isEqualTo("Auction Tracker Daily Digest - 2 new items");
     assertThat(notification.message())
-        .contains("New auction items found in the last 24 hours:")
+        .contains("New auction items found in the last daily window:")
         .contains("Recent Wedge 1")
         .contains("https://www.trademe.co.nz/listing/123")
         .contains("Recent Wedge 2")
@@ -114,7 +119,7 @@ public class SendDigestHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldDeduplicateLegacyListingsByUrlAcrossMultipleSearches() {
+  void processShouldDeduplicateLegacyListingsByUrlAcrossMultipleSearches() {
     // arrange
     var currentTime = Instant.ofEpochSecond(2_000_000);
     fakeClock.setTime(currentTime);
@@ -129,10 +134,10 @@ public class SendDigestHandlerIntegrationTest {
 
     var search1 =
         new SearchFactory.Search(
-            URI.create(baseUrl1), "item", null, null, SearchFactory.Condition.ALL, null);
+            "item-1", URI.create(baseUrl1), "item", null, null, SearchFactory.Condition.ALL, null);
     var search2 =
         new SearchFactory.Search(
-            URI.create(baseUrl2), "item", null, null, SearchFactory.Condition.ALL, null);
+            "item-2", URI.create(baseUrl2), "item", null, null, SearchFactory.Condition.ALL, null);
     fakeSearchFactory.addSearches(List.of(search1, search2));
 
     var duplicateListingUrl = "https://www.trademe.co.nz/listing/123";
@@ -179,7 +184,7 @@ public class SendDigestHandlerIntegrationTest {
     auctionTrackerTable.putItem(uniqueItem);
 
     // act
-    sendDigestHandler.handleRequest(new ScheduledEvent(), null);
+    sendDigestJobProcessor.process(currentTime);
 
     // assert
     var notifications = fakeNotificationPublisher.findNotifications("auction_tracker_api_digest");
@@ -188,7 +193,7 @@ public class SendDigestHandlerIntegrationTest {
     var notification = notifications.get(0);
     assertThat(notification.subject()).isEqualTo("Auction Tracker Daily Digest - 2 new items");
     assertThat(notification.message())
-        .contains("New auction items found in the last 24 hours:")
+        .contains("New auction items found in the last daily window:")
         .contains("Duplicate Item")
         .contains("https://www.trademe.co.nz/listing/123")
         .contains("Unique Item")
@@ -196,7 +201,7 @@ public class SendDigestHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldDeduplicateRelistedItemsByFingerprint() {
+  void processShouldDeduplicateRelistedItemsByFingerprint() {
     // arrange
     var currentTime = Instant.ofEpochSecond(2_000_000);
     fakeClock.setTime(currentTime);
@@ -211,9 +216,21 @@ public class SendDigestHandlerIntegrationTest {
     fakeSearchFactory.addSearches(
         List.of(
             new SearchFactory.Search(
-                URI.create(baseUrl1), "item", null, null, SearchFactory.Condition.ALL, null),
+                "item-1",
+                URI.create(baseUrl1),
+                "item",
+                null,
+                null,
+                SearchFactory.Condition.ALL,
+                null),
             new SearchFactory.Search(
-                URI.create(baseUrl2), "item", null, null, SearchFactory.Condition.ALL, null)));
+                "item-2",
+                URI.create(baseUrl2),
+                "item",
+                null,
+                null,
+                SearchFactory.Condition.ALL,
+                null)));
 
     var itemFromSearch1 =
         AuctionTrackerItem.create(
@@ -235,7 +252,7 @@ public class SendDigestHandlerIntegrationTest {
     auctionTrackerTable.putItem(itemFromSearch2);
 
     // act
-    sendDigestHandler.handleRequest(new ScheduledEvent(), null);
+    sendDigestJobProcessor.process(currentTime);
 
     // assert
     var notifications = fakeNotificationPublisher.findNotifications("auction_tracker_api_digest");
@@ -250,7 +267,7 @@ public class SendDigestHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldNotSendDigestWhenNoNewItems() {
+  void processShouldNotSendDigestWhenNoNewItems() {
     // arrange
     var currentTime = Instant.ofEpochSecond(2_000_000);
     fakeClock.setTime(currentTime);
@@ -261,7 +278,7 @@ public class SendDigestHandlerIntegrationTest {
         "https://www.trademe.co.nz/search?search_string=wedge&condition=used&sort_order=expirydesc";
     var search =
         new SearchFactory.Search(
-            URI.create(baseUrl), "wedge", null, null, SearchFactory.Condition.USED, null);
+            "wedge", URI.create(baseUrl), "wedge", null, null, SearchFactory.Condition.USED, null);
     fakeSearchFactory.addSearches(List.of(search));
 
     // create only old items
@@ -276,7 +293,7 @@ public class SendDigestHandlerIntegrationTest {
     auctionTrackerTable.putItem(oldItem);
 
     // act
-    sendDigestHandler.handleRequest(new ScheduledEvent(), null);
+    sendDigestJobProcessor.process(currentTime);
 
     // assert
     var notifications = fakeNotificationPublisher.findNotifications("auction_tracker_api_digest");
@@ -284,7 +301,7 @@ public class SendDigestHandlerIntegrationTest {
   }
 
   @Test
-  void handleRequestShouldExcludeFailJudgedItemsFromDigest() {
+  void processShouldExcludeFailJudgedItemsFromDigest() {
     // arrange
     var currentTime = Instant.ofEpochSecond(2_000_000);
     fakeClock.setTime(currentTime);
@@ -298,7 +315,7 @@ public class SendDigestHandlerIntegrationTest {
             "prompts/mtg-bulk-judge.md", "gpt-5.4-mini", "none", List.of("mtg_cards"));
     var search =
         new SearchFactory.Search(
-            URI.create(baseUrl), "bulk", null, 100.0, SearchFactory.Condition.USED, judge);
+            "bulk", URI.create(baseUrl), "bulk", null, 100.0, SearchFactory.Condition.USED, judge);
     fakeSearchFactory.addSearches(List.of(search));
 
     var passItem =
@@ -322,7 +339,7 @@ public class SendDigestHandlerIntegrationTest {
     auctionTrackerTable.putItem(failItem);
 
     // act
-    sendDigestHandler.handleRequest(new ScheduledEvent(), null);
+    sendDigestJobProcessor.process(currentTime);
 
     // assert
     var notifications = fakeNotificationPublisher.findNotifications("auction_tracker_api_digest");
@@ -335,5 +352,90 @@ public class SendDigestHandlerIntegrationTest {
         .contains("https://www.trademe.co.nz/listing/123")
         .doesNotContain("Pokemon bulk lot")
         .doesNotContain("https://www.trademe.co.nz/listing/456");
+  }
+
+  @Test
+  void processShouldRetainScheduledWindowAcrossDstBoundary() {
+    // arrange
+    var scheduledAt = Instant.parse("2026-04-05T09:05:00Z");
+    var baseUrl = "https://www.trademe.co.nz/search";
+    var expectedSearchUrl =
+        "https://www.trademe.co.nz/search?search_string=wedge&condition=used&sort_order=expirydesc";
+    fakeSearchFactory.addSearches(
+        List.of(
+            new SearchFactory.Search(
+                "wedge",
+                URI.create(baseUrl),
+                "wedge",
+                null,
+                null,
+                SearchFactory.Condition.USED,
+                null)));
+
+    var localWindowStart =
+        scheduledAt.atZone(ZoneId.of("Pacific/Auckland")).minusDays(1).toInstant();
+    var includedItem =
+        AuctionTrackerItem.create(
+            expectedSearchUrl,
+            "https://www.trademe.co.nz/listing/included",
+            "Included across DST",
+            "included-fingerprint",
+            localWindowStart.plusSeconds(1),
+            null);
+    var excludedItem =
+        AuctionTrackerItem.create(
+            expectedSearchUrl,
+            "https://www.trademe.co.nz/listing/excluded",
+            "Excluded before local boundary",
+            "excluded-fingerprint",
+            localWindowStart.minusSeconds(1),
+            null);
+    auctionTrackerTable.putItem(includedItem);
+    auctionTrackerTable.putItem(excludedItem);
+
+    // act
+    sendDigestJobProcessor.process(scheduledAt);
+
+    // assert
+    var notifications = fakeNotificationPublisher.findNotifications("auction_tracker_api_digest");
+    assertThat(notifications)
+        .singleElement()
+        .satisfies(
+            notification ->
+                assertThat(notification.message())
+                    .contains("Included across DST")
+                    .doesNotContain("Excluded before local boundary"));
+  }
+
+  @Test
+  void processShouldPropagateSnsFailureForRetry() {
+    // arrange
+    var scheduledAt = Instant.parse("2026-09-25T09:05:00Z");
+    var baseUrl = "https://www.trademe.co.nz/search";
+    var expectedSearchUrl =
+        "https://www.trademe.co.nz/search?search_string=wedge&condition=used&sort_order=expirydesc";
+    fakeSearchFactory.addSearches(
+        List.of(
+            new SearchFactory.Search(
+                "wedge",
+                URI.create(baseUrl),
+                "wedge",
+                null,
+                null,
+                SearchFactory.Condition.USED,
+                null)));
+    auctionTrackerTable.putItem(
+        AuctionTrackerItem.create(
+            expectedSearchUrl,
+            "https://www.trademe.co.nz/listing/123",
+            "Recent Wedge",
+            "fingerprint",
+            scheduledAt.minus(1, ChronoUnit.HOURS),
+            null));
+    fakeNotificationPublisher.failWith(new IllegalStateException("sns unavailable"));
+
+    // act & assert
+    assertThatThrownBy(() -> sendDigestJobProcessor.process(scheduledAt))
+        .isInstanceOf(IllegalStateException.class);
   }
 }

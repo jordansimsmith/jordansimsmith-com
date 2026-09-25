@@ -1,6 +1,7 @@
 package com.jordansimsmith.auctiontracker;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URI;
 import org.junit.jupiter.api.Test;
@@ -112,6 +113,32 @@ public class SearchFactoryImplTest {
 
     // assert
     assertThat(searches).hasSize(10);
+    assertThat(searches)
+        .extracting(SearchFactory.Search::id)
+        .containsExactly(
+            "ram-g-skill",
+            "ram-gskill",
+            "ram-trident-z",
+            "mtg-bulk",
+            "mtg-collection",
+            "mtg-assorted",
+            "mtg-clear-out",
+            "mtg-clearout",
+            "mtg-lot",
+            "mtg-one-dollar-reserve");
     assertThat(searches).allSatisfy(search -> assertThat(search.judge()).isNotNull());
+  }
+
+  @Test
+  void getSearchShouldResolveStableIds() {
+    // arrange
+    var factory = new SearchFactoryImpl(URI.create("https://www.trademe.co.nz"));
+
+    // act & assert
+    assertThat(factory.getSearch("ram-g-skill").searchTerm()).isEqualTo("g.skill");
+    assertThat(factory.getSearch("mtg-bulk").searchTerm()).isEqualTo("bulk");
+    assertThat(factory.getSearch("mtg-one-dollar-reserve").searchTerm()).isEqualTo("$1 reserve");
+    assertThatThrownBy(() -> factory.getSearch("unknown-search"))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 }

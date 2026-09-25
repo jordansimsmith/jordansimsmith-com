@@ -1,13 +1,8 @@
 package com.jordansimsmith.auctiontracker;
 
-import com.amazonaws.services.lambda.runtime.Context;
-import com.amazonaws.services.lambda.runtime.RequestHandler;
-import com.amazonaws.services.lambda.runtime.events.ScheduledEvent;
-import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.notifications.NotificationPublisher;
-import com.jordansimsmith.time.Clock;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
@@ -17,50 +12,35 @@ import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
-public class SendDigestHandler implements RequestHandler<ScheduledEvent, Void> {
-  private static final Logger LOGGER = LoggerFactory.getLogger(SendDigestHandler.class);
+public class SendDigestJobProcessor {
+  private static final Logger LOGGER = LoggerFactory.getLogger(SendDigestJobProcessor.class);
   private static final String SNS_TOPIC = "auction_tracker_api_digest";
+  private static final ZoneId DIGEST_TIME_ZONE = ZoneId.of("Pacific/Auckland");
 
-  private final Clock clock;
   private final SearchFactory searchFactory;
   private final TradeMeClient tradeMeClient;
   private final NotificationPublisher notificationPublisher;
   private final DynamoDbTable<AuctionTrackerItem> auctionTrackerTable;
 
-  public SendDigestHandler() {
-    this(AuctionTrackerFactory.create());
+  public SendDigestJobProcessor(
+      SearchFactory searchFactory,
+      TradeMeClient tradeMeClient,
+      NotificationPublisher notificationPublisher,
+      DynamoDbTable<AuctionTrackerItem> auctionTrackerTable) {
+    this.searchFactory = searchFactory;
+    this.tradeMeClient = tradeMeClient;
+    this.notificationPublisher = notificationPublisher;
+    this.auctionTrackerTable = auctionTrackerTable;
   }
 
-  @VisibleForTesting
-  SendDigestHandler(AuctionTrackerFactory factory) {
-    this.clock = factory.clock();
-    this.searchFactory = factory.searchFactory();
-    this.tradeMeClient = factory.tradeMeClient();
-    this.notificationPublisher = factory.notificationPublisher();
-    this.auctionTrackerTable = factory.auctionTrackerTable();
-  }
-
-  @Override
-  public Void handleRequest(ScheduledEvent event, Context context) {
-    try {
-      return doHandleRequest();
-    } catch (Exception e) {
-      LOGGER.error("Error sending auction digest", e);
-      throw new RuntimeException(e);
-    }
-  }
-
-  private Void doHandleRequest() {
-    var searches = searchFactory.findSearches();
-    var currentTime = clock.now();
-    var yesterdayTime = currentTime.minus(1, ChronoUnit.DAYS);
-
+  public void process(Instant windowEnd) {
+    var windowStart = windowEnd.atZone(DIGEST_TIME_ZONE).minusDays(1).toInstant();
     var allNewItems =
-        searches.stream()
+        searchFactory.findSearches().stream()
             .flatMap(
                 search ->
                     findNewItemsForSearch(
-                        tradeMeClient.getSearchUrl(search).toString(), yesterdayTime)
+                        tradeMeClient.getSearchUrl(search).toString(), windowStart, windowEnd)
                         .stream())
             .filter(item -> item.getJudgment() != AuctionTrackerItem.Judgment.FAIL)
             .collect(
@@ -68,24 +48,22 @@ public class SendDigestHandler implements RequestHandler<ScheduledEvent, Void> {
                     item -> item.getFingerprint() != null ? item.getFingerprint() : item.getUrl()))
             .values()
             .stream()
-            .map(items -> items.get(0))
+            .map(items -> items.getFirst())
             .toList();
 
     if (allNewItems.isEmpty()) {
-      LOGGER.info("No new auction items found in the last 24 hours");
-      return null;
+      LOGGER.info("No new auction items found in digest window ending {}", windowEnd);
+      return;
     }
 
     var digestMessage = buildDigestMessage(allNewItems);
     var subject = String.format("Auction Tracker Daily Digest - %d new items", allNewItems.size());
-
     notificationPublisher.publish(SNS_TOPIC, subject, digestMessage);
     LOGGER.info("Sent digest with {} new auction items", allNewItems.size());
-
-    return null;
   }
 
-  private List<AuctionTrackerItem> findNewItemsForSearch(String searchUrl, Instant since) {
+  private List<AuctionTrackerItem> findNewItemsForSearch(
+      String searchUrl, Instant since, Instant until) {
     var partitionKey = AuctionTrackerItem.formatPk(searchUrl);
     var sortKeyPrefix = AuctionTrackerItem.formatSk(since, null);
 
@@ -101,12 +79,13 @@ public class SendDigestHandler implements RequestHandler<ScheduledEvent, Void> {
                 .build())
         .items()
         .stream()
+        .filter(item -> !item.getTimestamp().isAfter(until))
         .toList();
   }
 
   private String buildDigestMessage(List<AuctionTrackerItem> items) {
     var messageBuilder = new StringBuilder();
-    messageBuilder.append("New auction items found in the last 24 hours:\n\n");
+    messageBuilder.append("New auction items found in the last daily window:\n\n");
 
     for (var item : items) {
       messageBuilder.append(item.getTitle()).append("\n");

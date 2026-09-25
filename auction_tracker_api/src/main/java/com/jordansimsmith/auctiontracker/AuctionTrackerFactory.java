@@ -1,5 +1,6 @@
 package com.jordansimsmith.auctiontracker;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbModule;
 import com.jordansimsmith.json.ObjectMapperModule;
 import com.jordansimsmith.notifications.NotificationModule;
@@ -24,6 +25,8 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
       AuctionTrackerModule.class
     })
 public interface AuctionTrackerFactory {
+  ObjectMapper objectMapper();
+
   Clock clock();
 
   DynamoDbTable<AuctionTrackerItem> auctionTrackerTable();

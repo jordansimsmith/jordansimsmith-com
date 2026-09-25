@@ -11,6 +11,14 @@ public class FakeSearchFactory implements SearchFactory {
     return List.copyOf(searches);
   }
 
+  @Override
+  public Search getSearch(String id) {
+    return searches.stream()
+        .filter(search -> search.id().equals(id))
+        .findFirst()
+        .orElseThrow(() -> new IllegalArgumentException("unknown search: " + id));
+  }
+
   public void addSearches(List<Search> newSearches) {
     searches.addAll(newSearches);
   }

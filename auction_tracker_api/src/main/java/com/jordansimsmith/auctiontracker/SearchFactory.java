@@ -14,6 +14,7 @@ public interface SearchFactory {
   record Judge(String prompt, String model, String reasoningEffort, List<String> criteria) {}
 
   record Search(
+      String id,
       URI baseUrl,
       String searchTerm,
       @Nullable Double minPrice,
@@ -22,4 +23,6 @@ public interface SearchFactory {
       @Nullable Judge judge) {}
 
   List<Search> findSearches();
+
+  Search getSearch(String id);
 }

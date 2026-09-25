@@ -34,6 +34,7 @@ public class SearchFactoryImpl implements SearchFactory {
     this.searches =
         List.of(
             new Search(
+                "ram-g-skill",
                 baseUri.resolve(RAM_SEARCH_PATH),
                 "g.skill",
                 null,
@@ -41,8 +42,15 @@ public class SearchFactoryImpl implements SearchFactory {
                 Condition.USED,
                 RAM_JUDGE),
             new Search(
-                baseUri.resolve(RAM_SEARCH_PATH), "gskill", null, 200.0, Condition.USED, RAM_JUDGE),
+                "ram-gskill",
+                baseUri.resolve(RAM_SEARCH_PATH),
+                "gskill",
+                null,
+                200.0,
+                Condition.USED,
+                RAM_JUDGE),
             new Search(
+                "ram-trident-z",
                 baseUri.resolve(RAM_SEARCH_PATH),
                 "trident z",
                 null,
@@ -50,6 +58,7 @@ public class SearchFactoryImpl implements SearchFactory {
                 Condition.USED,
                 RAM_JUDGE),
             new Search(
+                "mtg-bulk",
                 baseUri.resolve("/a/marketplace/gaming/trading-cards/magic/search"),
                 "bulk",
                 null,
@@ -57,6 +66,7 @@ public class SearchFactoryImpl implements SearchFactory {
                 Condition.USED,
                 MTG_JUDGE),
             new Search(
+                "mtg-collection",
                 baseUri.resolve("/a/marketplace/gaming/trading-cards/magic/search"),
                 "collection",
                 null,
@@ -64,6 +74,7 @@ public class SearchFactoryImpl implements SearchFactory {
                 Condition.USED,
                 MTG_JUDGE),
             new Search(
+                "mtg-assorted",
                 baseUri.resolve("/a/marketplace/gaming/trading-cards/magic/search"),
                 "assorted",
                 null,
@@ -71,6 +82,7 @@ public class SearchFactoryImpl implements SearchFactory {
                 Condition.USED,
                 MTG_JUDGE),
             new Search(
+                "mtg-clear-out",
                 baseUri.resolve("/a/marketplace/gaming/trading-cards/magic/search"),
                 "clear out",
                 null,
@@ -78,6 +90,7 @@ public class SearchFactoryImpl implements SearchFactory {
                 Condition.USED,
                 MTG_JUDGE),
             new Search(
+                "mtg-clearout",
                 baseUri.resolve("/a/marketplace/gaming/trading-cards/magic/search"),
                 "clearout",
                 null,
@@ -85,6 +98,7 @@ public class SearchFactoryImpl implements SearchFactory {
                 Condition.USED,
                 MTG_JUDGE),
             new Search(
+                "mtg-lot",
                 baseUri.resolve("/a/marketplace/gaming/trading-cards/magic/search"),
                 "lot",
                 null,
@@ -92,6 +106,7 @@ public class SearchFactoryImpl implements SearchFactory {
                 Condition.USED,
                 MTG_JUDGE),
             new Search(
+                "mtg-one-dollar-reserve",
                 baseUri.resolve("/a/marketplace/gaming/trading-cards/magic/search"),
                 "$1 reserve",
                 null,
@@ -103,5 +118,13 @@ public class SearchFactoryImpl implements SearchFactory {
   @Override
   public List<Search> findSearches() {
     return searches;
+  }
+
+  @Override
+  public Search getSearch(String id) {
+    return searches.stream()
+        .filter(search -> search.id().equals(id))
+        .findFirst()
+        .orElseThrow(() -> new IllegalArgumentException("unknown search: " + id));
   }
 }
