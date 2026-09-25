@@ -37,8 +37,17 @@
           - npm
           - python3-pip
           - python3-venv
+          - unzip
         state: present
         update_cache: true
+
+    - name: Install AWS CLI
+      ansible.builtin.shell:
+        cmd: |
+          set -o pipefail
+          curl -fsSL https://awscli.amazonaws.com/v2/install.sh | bash -s -- --system
+        creates: /usr/local/bin/aws
+        executable: /bin/bash
 
     - name: Check installed Corepack version
       ansible.builtin.command: corepack --version

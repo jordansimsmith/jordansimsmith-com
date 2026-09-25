@@ -1,6 +1,6 @@
 # Devbox setup
 
-This directory provisions a Debian 13 development box for this repository. It installs Bazelisk, Node.js, pinned Corepack, pnpm and Playwright, Chromium, the native build toolchain, pinned Docker packages, and Docker access for the developer account.
+This directory provisions a Debian 13 development box for this repository. It installs Bazelisk, the AWS CLI, Node.js, pinned Corepack, pnpm and Playwright, Chromium, the native build toolchain, pinned Docker packages, and Docker access for the developer account.
 
 ## Setup
 
@@ -18,6 +18,7 @@ Log out and back in once it completes so the current user receives Docker-group 
 docker run --rm hello-world
 pip --version
 terraform --version
+aws --version
 pnpm --version
 chromium --version
 playwright --version
