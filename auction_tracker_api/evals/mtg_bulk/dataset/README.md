@@ -26,7 +26,7 @@ The lot is genuinely bulk: a large pile whose contents are substantially unenume
 
 ### not_basic_lands
 
-The lot is not primarily basic lands (Plains, Island, Swamp, Mountain, Forest). Premium or full-art basics are still basics. Unqualified "lands" is assumed to mean basic lands; a lands lot passes only when described as nonbasic.
+The lot is not primarily basic land cards (Plains, Island, Swamp, Mountain, Forest). Fail only when the listing provides positive evidence that basic lands are the primary contents: for example, it says mostly or primarily basic lands, gives a basic-land majority, or is clearly a dedicated basic-land lot. Premium and full-art basics still count as basic lands when deciding whether they are primary. A mixed bulk lot passes when it merely mentions some "lands" alongside commons, uncommons, rares, foils, or other cards; an unqualified mention of "lands" alone is not enough. A lands lot explicitly described as nonbasic passes.
 
 ### fixed_collection
 

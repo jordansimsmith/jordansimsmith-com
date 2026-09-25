@@ -30,7 +30,9 @@ When no count or size is stated at all, do NOT fail on volume: a listing framed 
 
 ### not_basic_lands
 
-The lot is not primarily basic land cards (Plains, Island, Swamp, Mountain, Forest). Full-art or otherwise premium basic lands are still basic lands and still fail. When a listing says "lands" without qualification, assume basic lands: an unqualified lands lot fails. A lands lot explicitly described as nonbasic (duals, taplands, utility lands, "no basics") passes.
+The lot passes unless the listing provides positive evidence that basic land cards (Plains, Island, Swamp, Mountain, Forest) are the primary contents. Fail when the text says the lot is mostly or primarily basic lands, gives a basic-land majority, or clearly presents the lot as dedicated to basic lands. Full-art or otherwise premium basic lands still count as basic lands for this primary-contents test.
+
+A mixed bulk listing passes when it merely mentions some "lands" alongside commons, uncommons, rares, foils, or other cards. An unqualified mention of "lands" alone is not enough to fail; a listing presented as a lands-only or lands-dominated lot is enough. A lot explicitly described as nonbasic (duals, taplands, utility lands, "no basics") passes.
 
 ### fixed_collection
 
