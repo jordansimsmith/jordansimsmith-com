@@ -5,7 +5,6 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
@@ -103,7 +102,6 @@ public class GetOrderHandler
   private final DynamoDbTable<OrderItem> orderTable;
   private final DynamoDbTable<UnitItem> unitTable;
   private final DynamoDbTable<SkuItem> skuTable;
-  private final ObjectMapper objectMapper;
 
   public GetOrderHandler() {
     this(TcgInventoryFactory.create());
@@ -116,7 +114,6 @@ public class GetOrderHandler
     this.orderTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderItem.class);
     this.unitTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class);
     this.skuTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), SkuItem.class);
-    this.objectMapper = factory.objectMapper();
   }
 
   @Override
@@ -148,14 +145,14 @@ public class GetOrderHandler
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
 
-    var orderLines = OrderLines.parse(orderItem.getLines(), objectMapper);
+    var orderLines = orderItem.getLines();
     Map<String, SkuItem> skuCache = new HashMap<>();
     var blockUnits = findBlockUnits(user, orderLines, skuCache);
     var units = new ArrayList<OrderUnitResponse>();
     var lines = new ArrayList<OrderLineResponse>();
 
     for (var line : orderLines) {
-      var skuItem = getSku(SkuItem.formatPk(user, line.skuId()), skuCache);
+      var skuItem = getSku(SkuItem.formatPk(user, line.getSkuId()), skuCache);
 
       lines.add(
           new OrderLineResponse(
@@ -164,12 +161,12 @@ public class GetOrderHandler
               skuItem.getCollectorNumber(),
               skuItem.getFinish(),
               skuItem.getCondition(),
-              line.quantity(),
-              line.price(),
-              line.listedPrice()));
+              line.getQuantity(),
+              line.getPrice(),
+              line.getListedPrice()));
 
       var unitPrice = perUnitPrice(line);
-      for (var seqNum : line.allocatedSequenceNumbers()) {
+      for (var seqNum : line.getAllocatedSequenceNumbers()) {
         var position = computeBlockPosition(blockUnits, skuItem.getGame(), seqNum);
         units.add(
             new OrderUnitResponse(
@@ -211,11 +208,11 @@ public class GetOrderHandler
   }
 
   private Map<GameBlock, List<UnitItem>> findBlockUnits(
-      String user, List<OrderLines.OrderLine> orderLines, Map<String, SkuItem> skuCache) {
+      String user, List<OrderItem.OrderLine> orderLines, Map<String, SkuItem> skuCache) {
     var blocks = new HashSet<GameBlock>();
     for (var line : orderLines) {
-      var skuItem = getSku(SkuItem.formatPk(user, line.skuId()), skuCache);
-      for (var seqNum : line.allocatedSequenceNumbers()) {
+      var skuItem = getSku(SkuItem.formatPk(user, line.getSkuId()), skuCache);
+      for (var seqNum : line.getAllocatedSequenceNumbers()) {
         blocks.add(new GameBlock(skuItem.getGame(), seqNum / 100));
       }
     }
@@ -314,12 +311,12 @@ public class GetOrderHandler
   }
 
   @Nullable
-  private static String perUnitPrice(OrderLines.OrderLine line) {
-    if (line.price() == null) {
+  private static String perUnitPrice(OrderItem.OrderLine line) {
+    if (line.getPrice() == null) {
       return null;
     }
-    return new BigDecimal(line.price())
-        .divide(BigDecimal.valueOf(line.quantity()), 2, RoundingMode.HALF_UP)
+    return new BigDecimal(line.getPrice())
+        .divide(BigDecimal.valueOf(line.getQuantity()), 2, RoundingMode.HALF_UP)
         .toPlainString();
   }
 }

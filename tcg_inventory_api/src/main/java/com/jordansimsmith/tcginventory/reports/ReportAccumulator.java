@@ -1,6 +1,5 @@
 package com.jordansimsmith.tcginventory.reports;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
@@ -42,7 +41,6 @@ public class ReportAccumulator {
   };
 
   private final LocalDate generationDate;
-  private final ObjectMapper objectMapper;
 
   private BigDecimal inventoryValue = BigDecimal.ZERO;
   private int inStockUnits = 0;
@@ -60,9 +58,8 @@ public class ReportAccumulator {
   private final TreeMap<LocalDate, Integer> addedByWeek = new TreeMap<>();
   private final TreeMap<LocalDate, Integer> soldByWeek = new TreeMap<>();
 
-  public ReportAccumulator(Instant generationTime, ObjectMapper objectMapper) {
+  public ReportAccumulator(Instant generationTime) {
     this.generationDate = generationTime.atZone(AUCKLAND).toLocalDate();
-    this.objectMapper = objectMapper;
   }
 
   public void addSku(SkuItem sku, List<UnitItem> units) {
@@ -131,7 +128,7 @@ public class ReportAccumulator {
     if (!"to_pick".equals(status) && !"fulfilled".equals(status)) {
       return;
     }
-    var price = OrderLines.itemsTotal(OrderLines.parse(order.getLines(), objectMapper));
+    var price = OrderLines.itemsTotal(order.getLines());
     revenueToDate = revenueToDate.add(price);
 
     var month = YearMonth.from(order.getCreatedAt().atZone(AUCKLAND));

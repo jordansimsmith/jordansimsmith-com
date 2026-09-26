@@ -327,7 +327,7 @@ public class ReportsHandlerIntegrationTest {
             null,
             null,
             "10.50",
-            "[{\"sku_id\":\"s\",\"fetchtcg_listing_id\":1,\"quantity\":1,\"price\":\"10.50\",\"allocated_sequence_numbers\":[]}]",
+            List.of(new OrderItem.OrderLine("s", 1, 1, "10.50", null, List.of())),
             Instant.ofEpochSecond(1699500000)));
     orderTable.putItem(
         OrderItem.create(
@@ -341,7 +341,7 @@ public class ReportsHandlerIntegrationTest {
             null,
             null,
             "5.25",
-            "[{\"sku_id\":\"s\",\"fetchtcg_listing_id\":1,\"quantity\":1,\"price\":\"5.25\",\"allocated_sequence_numbers\":[]}]",
+            List.of(new OrderItem.OrderLine("s", 1, 1, "5.25", null, List.of())),
             Instant.ofEpochSecond(1699600000)));
     orderTable.putItem(
         OrderItem.create(
@@ -355,7 +355,7 @@ public class ReportsHandlerIntegrationTest {
             null,
             null,
             "100.00",
-            "[{\"sku_id\":\"s\",\"fetchtcg_listing_id\":1,\"quantity\":1,\"price\":\"100.00\",\"allocated_sequence_numbers\":[]}]",
+            List.of(new OrderItem.OrderLine("s", 1, 1, "100.00", null, List.of())),
             Instant.ofEpochSecond(1699700000)));
 
     var jobItem =
@@ -558,7 +558,7 @@ public class ReportsHandlerIntegrationTest {
             null,
             null,
             "3.33",
-            "[]",
+            List.of(),
             Instant.ofEpochSecond(1699000000));
     orderTable.putItem(order);
 

@@ -1,44 +1,22 @@
 package com.jordansimsmith.tcginventory.orders;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.List;
 import javax.annotation.Nullable;
 
 public class OrderLines {
-  public record OrderLine(
-      @JsonProperty("sku_id") String skuId,
-      @JsonProperty("fetchtcg_listing_id") int fetchtcgListingId,
-      @JsonProperty("quantity") int quantity,
-      @JsonProperty("price") String price,
-      @JsonProperty("listed_price") @Nullable String listedPrice,
-      @JsonProperty("allocated_sequence_numbers") List<Integer> allocatedSequenceNumbers) {}
-
-  public static List<OrderLine> parse(String linesJson, ObjectMapper objectMapper) {
-    if (linesJson == null || linesJson.isEmpty()) {
-      return List.of();
-    }
-    try {
-      return objectMapper.readValue(linesJson, new TypeReference<List<OrderLine>>() {});
-    } catch (Exception e) {
-      throw new RuntimeException("failed to parse order lines", e);
-    }
-  }
-
-  public static BigDecimal itemsTotal(List<OrderLine> lines) {
+  public static BigDecimal itemsTotal(List<OrderItem.OrderLine> lines) {
     var total = BigDecimal.ZERO;
     for (var line : lines) {
-      if (line.price() != null) {
-        total = total.add(new BigDecimal(line.price()));
+      if (line.getPrice() != null) {
+        total = total.add(new BigDecimal(line.getPrice()));
       }
     }
     return total;
   }
 
   @Nullable
-  public static String itemsTotalPrice(List<OrderLine> lines) {
+  public static String itemsTotalPrice(List<OrderItem.OrderLine> lines) {
     if (lines.isEmpty()) {
       return null;
     }
@@ -46,18 +24,19 @@ public class OrderLines {
   }
 
   @Nullable
-  public static String listedTotalPrice(List<OrderLine> lines) {
+  public static String listedTotalPrice(List<OrderItem.OrderLine> lines) {
     if (lines.isEmpty()) {
       return null;
     }
     var total = BigDecimal.ZERO;
     for (var line : lines) {
-      if (line.listedPrice() == null) {
+      if (line.getListedPrice() == null) {
         return null;
       }
       total =
           total.add(
-              new BigDecimal(line.listedPrice()).multiply(BigDecimal.valueOf(line.quantity())));
+              new BigDecimal(line.getListedPrice())
+                  .multiply(BigDecimal.valueOf(line.getQuantity())));
     }
     return total.toPlainString();
   }

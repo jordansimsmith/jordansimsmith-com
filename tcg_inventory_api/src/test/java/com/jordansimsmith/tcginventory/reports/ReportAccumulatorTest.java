@@ -2,7 +2,6 @@ package com.jordansimsmith.tcginventory.reports;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
@@ -14,12 +13,11 @@ import org.junit.jupiter.api.Test;
 public class ReportAccumulatorTest {
   private static final ZoneId AUCKLAND = ZoneId.of("Pacific/Auckland");
   private static final Instant GENERATION_TIME = Instant.ofEpochSecond(1700000000);
-  private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
   @Test
   void addSkuShouldPreferLastPublishedPriceOverSuggestedPrice() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     var sku = createSku("sku1", "2.00", "1.00");
     var units = List.of(createUnit("in_stock"));
 
@@ -35,7 +33,7 @@ public class ReportAccumulatorTest {
   @Test
   void addSkuShouldFallBackToSuggestedPriceWhenLastPublishedPriceIsNull() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     var sku = createSku("sku1", null, "1.50");
     var units = List.of(createUnit("in_stock"));
 
@@ -50,7 +48,7 @@ public class ReportAccumulatorTest {
   @Test
   void addSkuShouldCountUnpricedUnitsWhenBothPricesAreNull() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     var sku = createSku("sku1", null, null);
     var units = List.of(createUnit("in_stock"), createUnit("in_stock"));
 
@@ -67,7 +65,7 @@ public class ReportAccumulatorTest {
   @Test
   void addSkuShouldCountReservedUnitsOnlyInReservedCount() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     var sku = createSku("sku1", "5.00", null);
     var units = List.of(createUnit("in_stock"), createUnit("reserved"), createUnit("reserved"));
 
@@ -84,7 +82,7 @@ public class ReportAccumulatorTest {
   @Test
   void addSkuShouldExcludeRemovedUnitsFromEverything() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     var sku = createSku("sku1", "3.00", null);
     var units = List.of(createUnit("in_stock"), createUnit("removed"), createUnit("sold"));
 
@@ -103,7 +101,7 @@ public class ReportAccumulatorTest {
   @Test
   void addOrderShouldOnlyCountPaidOrders() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
 
     // act
     accumulator.addOrder(createOrder("to_pick", "10.50"));
@@ -119,7 +117,7 @@ public class ReportAccumulatorTest {
   @Test
   void addOrderShouldExcludeShippingFromRevenue() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
 
     // act
     accumulator.addOrder(
@@ -133,7 +131,7 @@ public class ReportAccumulatorTest {
   @Test
   void toTotalsShouldReturnZeroesWhenEmpty() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
 
     // act
     var totals = accumulator.toTotals();
@@ -151,7 +149,7 @@ public class ReportAccumulatorTest {
   @Test
   void addSkuShouldAccumulateValueAcrossMultipleSkus() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     var sku1 = createSku("sku1", "1.50", null);
     var sku2 = createSku("sku2", "2.50", null);
 
@@ -224,7 +222,7 @@ public class ReportAccumulatorTest {
   @Test
   void toTopSetsShouldReturnSetsOrderedByInStockUnitsDescending() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
         createSku("sku1", "1.00", null, "a25", "Masters 25"),
         List.of(createUnit("in_stock"), createUnit("in_stock"), createUnit("in_stock")));
@@ -252,7 +250,7 @@ public class ReportAccumulatorTest {
   @Test
   void toTopSetsShouldLimitToTenSets() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     for (int i = 0; i < 12; i++) {
       accumulator.addSku(
           createSku("sku" + i, "1.00", null, "set" + i, "Set " + i),
@@ -269,7 +267,7 @@ public class ReportAccumulatorTest {
   @Test
   void toTopSetsShouldTieBreakBySetNameAscending() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
         createSku("sku1", "1.00", null, "dom", "Dominaria"),
         List.of(createUnit("in_stock"), createUnit("in_stock")));
@@ -293,7 +291,7 @@ public class ReportAccumulatorTest {
   @Test
   void toTopSetsShouldAggregateAcrossMultipleSkusInSameSet() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
         createSku("sku1", "1.00", null, "a25", "Masters 25"),
         List.of(createUnit("in_stock"), createUnit("in_stock")));
@@ -313,7 +311,7 @@ public class ReportAccumulatorTest {
   @Test
   void toTopSetsShouldExcludeNonInStockUnits() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
         createSku("sku1", "1.00", null, "a25", "Masters 25"),
         List.of(
@@ -333,7 +331,7 @@ public class ReportAccumulatorTest {
   @Test
   void toTopSetsShouldReturnEmptyWhenNoInStockUnits() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
         createSku("sku1", "1.00", null, "a25", "Masters 25"),
         List.of(createUnit("sold"), createUnit("removed")));
@@ -348,7 +346,7 @@ public class ReportAccumulatorTest {
   @Test
   void toPriceBucketsShouldPlacePrice025InFirstBucket() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(createSku("sku1", "0.25", null), List.of(createUnit("in_stock")));
 
     // act
@@ -364,7 +362,7 @@ public class ReportAccumulatorTest {
   @Test
   void toPriceBucketsShouldPlacePrice050InSecondBucket() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(createSku("sku1", "0.50", null), List.of(createUnit("in_stock")));
 
     // act
@@ -379,7 +377,7 @@ public class ReportAccumulatorTest {
   @Test
   void toPriceBucketsShouldPlacePrice1000InLastBucket() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(createSku("sku1", "10.00", null), List.of(createUnit("in_stock")));
 
     // act
@@ -394,7 +392,7 @@ public class ReportAccumulatorTest {
   @Test
   void toPriceBucketsShouldEmitAllBucketsEvenWhenEmpty() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
 
     // act
     var buckets = accumulator.toPriceBuckets();
@@ -415,7 +413,7 @@ public class ReportAccumulatorTest {
   @Test
   void toPriceBucketsShouldExcludeUnpricedUnits() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
         createSku("sku1", null, null), List.of(createUnit("in_stock"), createUnit("in_stock")));
 
@@ -431,7 +429,7 @@ public class ReportAccumulatorTest {
   @Test
   void toPriceBucketsShouldDistributeAcrossMultipleBuckets() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(createSku("sku1", "0.30", null), List.of(createUnit("in_stock")));
     accumulator.addSku(createSku("sku2", "0.75", null), List.of(createUnit("in_stock")));
     accumulator.addSku(
@@ -455,7 +453,7 @@ public class ReportAccumulatorTest {
   @Test
   void toTopHitsShouldOrderByPriceDescending() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
         createSku("sku1", "1.00", null, "a25", "Masters 25", "Cheap Card"),
         List.of(createUnit("in_stock")));
@@ -482,7 +480,7 @@ public class ReportAccumulatorTest {
   @Test
   void toTopHitsShouldTieBreakByNameAscending() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
         createSku("sku1", "5.00", null, "a25", "Masters 25", "Zebra Card"),
         List.of(createUnit("in_stock")));
@@ -506,7 +504,7 @@ public class ReportAccumulatorTest {
   @Test
   void toTopHitsShouldLimitToTen() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     for (int i = 0; i < 12; i++) {
       accumulator.addSku(
           createSku("sku" + i, String.valueOf(i + 1) + ".00", null, "a25", "Masters 25"),
@@ -525,7 +523,7 @@ public class ReportAccumulatorTest {
   @Test
   void toTopHitsShouldExcludeUnpricedSkus() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
         createSku("sku1", "5.00", null, "a25", "Masters 25", "Priced Card"),
         List.of(createUnit("in_stock")));
@@ -544,7 +542,7 @@ public class ReportAccumulatorTest {
   @Test
   void toTopHitsShouldExcludeSkusWithZeroInStockUnits() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
         createSku("sku1", "5.00", null, "a25", "Masters 25", "In Stock Card"),
         List.of(createUnit("in_stock")));
@@ -563,7 +561,7 @@ public class ReportAccumulatorTest {
   @Test
   void toTopHitsShouldIncludeIdentityFieldsAndInStockCount() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     var sku = createSku("my-sku-id", "7.50", null, "mh2", "Modern Horizons 2", "Ragavan");
     sku.setCollectorNumber("138");
     sku.setFinish("foil");
@@ -590,7 +588,7 @@ public class ReportAccumulatorTest {
   void toAgingBandsShouldPlaceZeroDaysInFirstBand() {
     // arrange
     var generationTime = GENERATION_TIME;
-    var accumulator = new ReportAccumulator(generationTime, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(generationTime);
     var unitCreatedAt = generationTime;
     accumulator.addSku(
         createSku("sku1", "1.00", null), List.of(createUnit("in_stock", unitCreatedAt)));
@@ -609,7 +607,7 @@ public class ReportAccumulatorTest {
     var generationDate = GENERATION_TIME.atZone(AUCKLAND).toLocalDate();
     var unitDate = generationDate.minusDays(30);
     var unitCreatedAt = unitDate.atStartOfDay(AUCKLAND).toInstant();
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
         createSku("sku1", "1.00", null), List.of(createUnit("in_stock", unitCreatedAt)));
 
@@ -627,7 +625,7 @@ public class ReportAccumulatorTest {
     var generationDate = GENERATION_TIME.atZone(AUCKLAND).toLocalDate();
     var unitDate = generationDate.minusDays(31);
     var unitCreatedAt = unitDate.atStartOfDay(AUCKLAND).toInstant();
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
         createSku("sku1", "1.00", null), List.of(createUnit("in_stock", unitCreatedAt)));
 
@@ -646,7 +644,7 @@ public class ReportAccumulatorTest {
     var generationDate = GENERATION_TIME.atZone(AUCKLAND).toLocalDate();
     var unitDate = generationDate.minusDays(90);
     var unitCreatedAt = unitDate.atStartOfDay(AUCKLAND).toInstant();
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
         createSku("sku1", "1.00", null), List.of(createUnit("in_stock", unitCreatedAt)));
 
@@ -664,7 +662,7 @@ public class ReportAccumulatorTest {
     var generationDate = GENERATION_TIME.atZone(AUCKLAND).toLocalDate();
     var unitDate = generationDate.minusDays(91);
     var unitCreatedAt = unitDate.atStartOfDay(AUCKLAND).toInstant();
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
         createSku("sku1", "1.00", null), List.of(createUnit("in_stock", unitCreatedAt)));
 
@@ -683,7 +681,7 @@ public class ReportAccumulatorTest {
     var generationDate = GENERATION_TIME.atZone(AUCKLAND).toLocalDate();
     var unitDate = generationDate.minusDays(180);
     var unitCreatedAt = unitDate.atStartOfDay(AUCKLAND).toInstant();
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
         createSku("sku1", "1.00", null), List.of(createUnit("in_stock", unitCreatedAt)));
 
@@ -701,7 +699,7 @@ public class ReportAccumulatorTest {
     var generationDate = GENERATION_TIME.atZone(AUCKLAND).toLocalDate();
     var unitDate = generationDate.minusDays(181);
     var unitCreatedAt = unitDate.atStartOfDay(AUCKLAND).toInstant();
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
         createSku("sku1", "1.00", null), List.of(createUnit("in_stock", unitCreatedAt)));
 
@@ -717,7 +715,7 @@ public class ReportAccumulatorTest {
   @Test
   void toAgingBandsShouldEmitAllFourBandsWhenEmpty() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
 
     // act
     var bands = accumulator.toAgingBands();
@@ -739,7 +737,7 @@ public class ReportAccumulatorTest {
     var generationDate = GENERATION_TIME.atZone(AUCKLAND).toLocalDate();
     var unitDate = generationDate.minusDays(10);
     var unitCreatedAt = unitDate.atStartOfDay(AUCKLAND).toInstant();
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
         createSku("sku1", "1.00", null),
         List.of(
@@ -768,10 +766,7 @@ public class ReportAccumulatorTest {
     var item = new OrderItem();
     item.setStatus(status);
     item.setTotalPrice(totalPrice);
-    item.setLines(
-        "[{\"sku_id\":\"s\",\"fetchtcg_listing_id\":1,\"quantity\":1,\"price\":\""
-            + itemsTotal
-            + "\",\"allocated_sequence_numbers\":[]}]");
+    item.setLines(List.of(new OrderItem.OrderLine("s", 1, 1, itemsTotal, null, List.of())));
     item.setCreatedAt(createdAt);
     return item;
   }
@@ -779,7 +774,7 @@ public class ReportAccumulatorTest {
   @Test
   void toRevenueByMonthShouldIncludePaidOrdersOnly() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     // 2023-11-14 in Pacific/Auckland
     var nov2023 = Instant.ofEpochSecond(1700000000);
 
@@ -801,7 +796,7 @@ public class ReportAccumulatorTest {
   @Test
   void toRevenueByMonthShouldAggregateOrdersInSameMonth() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     // both in November 2023 NZ time
     var earlyNov = Instant.ofEpochSecond(1698800000);
     var lateNov = Instant.ofEpochSecond(1700000000);
@@ -822,7 +817,7 @@ public class ReportAccumulatorTest {
   @Test
   void toRevenueByMonthShouldSortChronologically() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     // March 2023
     var march = Instant.parse("2023-03-15T00:00:00Z");
     // January 2023
@@ -849,7 +844,7 @@ public class ReportAccumulatorTest {
   @Test
   void toRevenueByMonthShouldReturnEmptyWhenNoOrders() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
 
     // act
     var result = accumulator.toRevenueByMonth();
@@ -861,7 +856,7 @@ public class ReportAccumulatorTest {
   @Test
   void toRevenueByMonthShouldSumRevenueCorrectlyAsBigDecimal() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     var instant = Instant.ofEpochSecond(1700000000);
 
     // act
@@ -877,7 +872,7 @@ public class ReportAccumulatorTest {
   @Test
   void toIntakeVsSalesByWeekShouldCountAllNonRemovedStatusesAsAdded() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     // Wednesday 2023-11-15 NZ time -> week start Monday 2023-11-13
     var createdAt = Instant.ofEpochSecond(1700000000);
     var soldAt = Instant.ofEpochSecond(1700100000);
@@ -900,7 +895,7 @@ public class ReportAccumulatorTest {
   @Test
   void toIntakeVsSalesByWeekShouldExcludeRemovedFromAddedCount() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     var createdAt = Instant.ofEpochSecond(1700000000);
     accumulator.addSku(
         createSku("sku1", "1.00", null),
@@ -917,7 +912,7 @@ public class ReportAccumulatorTest {
   @Test
   void toIntakeVsSalesByWeekShouldBucketSoldUnitsByUpdatedAtNotCreatedAt() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     // created Monday 2023-11-06 NZ time
     var createdAt = Instant.parse("2023-11-05T22:00:00Z");
     // sold Wednesday 2023-11-15 NZ time -> week start Monday 2023-11-13
@@ -943,7 +938,7 @@ public class ReportAccumulatorTest {
   @Test
   void toIntakeVsSalesByWeekShouldAlignWednesdayToPrecedingMonday() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     // 1700000000 is 2023-11-15 in NZ (Wednesday) -> week start 2023-11-13 (Monday)
     var wednesday = Instant.ofEpochSecond(1700000000);
     accumulator.addSku(createSku("sku1", "1.00", null), List.of(createUnit("in_stock", wednesday)));
@@ -959,7 +954,7 @@ public class ReportAccumulatorTest {
   @Test
   void toIntakeVsSalesByWeekShouldMergeWeeksFromBothMaps() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     // week 1: only adds
     var week1Created = Instant.parse("2023-11-06T00:00:00Z");
     // week 2: only sales (unit was created in week 1 but sold in week 2)
@@ -984,7 +979,7 @@ public class ReportAccumulatorTest {
   @Test
   void toIntakeVsSalesByWeekShouldSortChronologically() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
     // add units in reverse chronological order
     var laterWeek = Instant.parse("2023-11-13T12:00:00Z");
     var earlierWeek = Instant.parse("2023-11-06T12:00:00Z");
@@ -1004,7 +999,7 @@ public class ReportAccumulatorTest {
   @Test
   void toIntakeVsSalesByWeekShouldReturnEmptyWhenNoUnits() {
     // arrange
-    var accumulator = new ReportAccumulator(GENERATION_TIME, OBJECT_MAPPER);
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
 
     // act
     var result = accumulator.toIntakeVsSalesByWeek();

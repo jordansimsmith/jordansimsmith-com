@@ -14,7 +14,6 @@ import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
-import com.jordansimsmith.tcginventory.orders.OrderLines;
 import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
 import com.jordansimsmith.tcginventory.settings.SettingsItem;
 import com.jordansimsmith.time.FakeClock;
@@ -544,12 +543,12 @@ public class JobsHandlerIntegrationTest {
                 "32 Abercrombie Street", null, "Howick", "Auckland", "2014", "NZ"));
     assertThat(order.getTotalPrice()).isEqualTo("3.33");
     assertThat(order.getFetchtcgStatus()).isEqualTo("ACCEPTED");
-    assertThat(order.getLines()).contains("mtg#scryfall#scryfall-1#normal#NM");
-    var orderLines = OrderLines.parse(order.getLines(), objectMapper);
+    var orderLines = order.getLines();
     assertThat(orderLines).hasSize(1);
-    assertThat(orderLines.get(0).price()).isEqualTo("1.50");
-    assertThat(orderLines.get(0).listedPrice()).isEqualTo("2.00");
-    assertThat(orderLines.get(0).quantity()).isEqualTo(2);
+    assertThat(orderLines.get(0).getSkuId()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
+    assertThat(orderLines.get(0).getPrice()).isEqualTo("1.50");
+    assertThat(orderLines.get(0).getListedPrice()).isEqualTo("2.00");
+    assertThat(orderLines.get(0).getQuantity()).isEqualTo(2);
 
     var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(sku.getDirty()).isFalse();
@@ -803,12 +802,12 @@ public class JobsHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
 
-    var orderLines = new ArrayList<OrderLines.OrderLine>();
+    var orderLines = new ArrayList<OrderItem.OrderLine>();
     for (int i = 1; i <= 60; i++) {
       var skuId = "mtg#scryfall#scryfall-" + i + "#normal#NM";
       createSkuWithUnits("jordan", skuId, 1000 + i, 1);
       reserveUnit("jordan", skuId, 1, "91329");
-      orderLines.add(new OrderLines.OrderLine(skuId, 1000 + i, 1, "0.50", "0.50", List.of(1)));
+      orderLines.add(new OrderItem.OrderLine(skuId, 1000 + i, 1, "0.50", "0.50", List.of(1)));
     }
     createOrderWithLines("jordan", "91329", "awaiting_payment", orderLines);
 
@@ -1214,10 +1213,10 @@ public class JobsHandlerIntegrationTest {
     var order = getOrder("jordan", "91329");
     assertThat(order).isNotNull();
     assertThat(order.getStatus()).isEqualTo("awaiting_payment");
-    var orderLines = OrderLines.parse(order.getLines(), objectMapper);
+    var orderLines = order.getLines();
     assertThat(orderLines).hasSize(60);
     var allocated =
-        orderLines.stream().flatMap(l -> l.allocatedSequenceNumbers().stream()).toList();
+        orderLines.stream().flatMap(l -> l.getAllocatedSequenceNumbers().stream()).toList();
     assertThat(allocated)
         .containsExactlyInAnyOrderElementsOf(IntStream.rangeClosed(1, 60).boxed().toList());
 
@@ -1282,10 +1281,10 @@ public class JobsHandlerIntegrationTest {
     var order = getOrder("jordan", "83663");
     assertThat(order).isNotNull();
     assertThat(order.getStatus()).isEqualTo("awaiting_payment");
-    var orderLines = OrderLines.parse(order.getLines(), objectMapper);
+    var orderLines = order.getLines();
     assertThat(orderLines).hasSize(1);
-    assertThat(orderLines.get(0).quantity()).isEqualTo(2);
-    assertThat(orderLines.get(0).allocatedSequenceNumbers()).containsExactly(1, 2);
+    assertThat(orderLines.get(0).getQuantity()).isEqualTo(2);
+    assertThat(orderLines.get(0).getAllocatedSequenceNumbers()).containsExactly(1, 2);
 
     var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
@@ -1590,7 +1589,7 @@ public class JobsHandlerIntegrationTest {
             null,
             null,
             "3.33",
-            "[]",
+            List.of(),
             Instant.ofEpochSecond(1700000000));
     orderTable.putItem(order);
   }
@@ -1612,19 +1611,12 @@ public class JobsHandlerIntegrationTest {
         offerId,
         status,
         List.of(
-            new OrderLines.OrderLine(
+            new OrderItem.OrderLine(
                 skuId, fetchtcgListingId, allocated.size(), "3.33", "4.20", allocated)));
   }
 
   private void createOrderWithLines(
-      String user, String offerId, String status, List<OrderLines.OrderLine> lines) {
-    String linesJson;
-    try {
-      linesJson = objectMapper.writeValueAsString(lines);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-
+      String user, String offerId, String status, List<OrderItem.OrderLine> lines) {
     var order =
         OrderItem.create(
             user,
@@ -1637,7 +1629,7 @@ public class JobsHandlerIntegrationTest {
             null,
             null,
             "3.33",
-            linesJson,
+            lines,
             Instant.ofEpochSecond(1700000000));
     orderTable.putItem(order);
   }

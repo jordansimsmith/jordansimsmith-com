@@ -2,6 +2,7 @@ package com.jordansimsmith.tcginventory.orders;
 
 import com.jordansimsmith.dynamodb.EpochSecondConverter;
 import java.time.Instant;
+import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -42,7 +43,7 @@ public class OrderItem {
   private BuyerAddress buyerAddress;
   private String postageOption;
   private String totalPrice;
-  private String lines;
+  private List<OrderLine> lines;
   private Instant createdAt;
   private Instant updatedAt;
 
@@ -148,11 +149,11 @@ public class OrderItem {
   }
 
   @DynamoDbAttribute(LINES)
-  public String getLines() {
+  public List<OrderLine> getLines() {
     return lines;
   }
 
-  public void setLines(@Nullable String lines) {
+  public void setLines(List<OrderLine> lines) {
     this.lines = lines;
   }
 
@@ -198,7 +199,7 @@ public class OrderItem {
       @Nullable BuyerAddress buyerAddress,
       @Nullable String postageOption,
       @Nullable String totalPrice,
-      @Nullable String lines,
+      List<OrderLine> lines,
       Instant createdAt) {
     var item = new OrderItem();
     item.setPk(formatPk(user));
@@ -216,6 +217,96 @@ public class OrderItem {
     item.setCreatedAt(createdAt);
     item.setUpdatedAt(createdAt);
     return item;
+  }
+
+  @DynamoDbBean
+  public static class OrderLine {
+    public static final String SKU_ID = "sku_id";
+    public static final String FETCHTCG_LISTING_ID = "fetchtcg_listing_id";
+    public static final String QUANTITY = "quantity";
+    public static final String PRICE = "price";
+    public static final String LISTED_PRICE = "listed_price";
+    public static final String ALLOCATED_SEQUENCE_NUMBERS = "allocated_sequence_numbers";
+
+    private String skuId;
+    private int fetchtcgListingId;
+    private int quantity;
+    private String price;
+    private String listedPrice;
+    private List<Integer> allocatedSequenceNumbers;
+
+    public OrderLine() {}
+
+    public OrderLine(
+        String skuId,
+        int fetchtcgListingId,
+        int quantity,
+        @Nullable String price,
+        @Nullable String listedPrice,
+        List<Integer> allocatedSequenceNumbers) {
+      this.skuId = skuId;
+      this.fetchtcgListingId = fetchtcgListingId;
+      this.quantity = quantity;
+      this.price = price;
+      this.listedPrice = listedPrice;
+      this.allocatedSequenceNumbers = allocatedSequenceNumbers;
+    }
+
+    @DynamoDbAttribute(SKU_ID)
+    public String getSkuId() {
+      return skuId;
+    }
+
+    public void setSkuId(String skuId) {
+      this.skuId = skuId;
+    }
+
+    @DynamoDbAttribute(FETCHTCG_LISTING_ID)
+    public int getFetchtcgListingId() {
+      return fetchtcgListingId;
+    }
+
+    public void setFetchtcgListingId(int fetchtcgListingId) {
+      this.fetchtcgListingId = fetchtcgListingId;
+    }
+
+    @DynamoDbAttribute(QUANTITY)
+    public int getQuantity() {
+      return quantity;
+    }
+
+    public void setQuantity(int quantity) {
+      this.quantity = quantity;
+    }
+
+    @Nullable
+    @DynamoDbAttribute(PRICE)
+    public String getPrice() {
+      return price;
+    }
+
+    public void setPrice(@Nullable String price) {
+      this.price = price;
+    }
+
+    @Nullable
+    @DynamoDbAttribute(LISTED_PRICE)
+    public String getListedPrice() {
+      return listedPrice;
+    }
+
+    public void setListedPrice(@Nullable String listedPrice) {
+      this.listedPrice = listedPrice;
+    }
+
+    @DynamoDbAttribute(ALLOCATED_SEQUENCE_NUMBERS)
+    public List<Integer> getAllocatedSequenceNumbers() {
+      return allocatedSequenceNumbers;
+    }
+
+    public void setAllocatedSequenceNumbers(List<Integer> allocatedSequenceNumbers) {
+      this.allocatedSequenceNumbers = allocatedSequenceNumbers;
+    }
   }
 
   @DynamoDbBean

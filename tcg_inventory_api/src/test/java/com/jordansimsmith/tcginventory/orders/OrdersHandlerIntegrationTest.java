@@ -298,14 +298,9 @@ public class OrdersHandlerIntegrationTest {
     createUnit("jordan", skuId2, 4, "in_stock", null);
 
     var lines =
-        "[{\"sku_id\":\""
-            + skuId1
-            + "\",\"fetchtcg_listing_id\":1001,\"quantity\":1,\"price\":\"1.50\""
-            + ",\"listed_price\":\"2.00\",\"allocated_sequence_numbers\":[1]},"
-            + "{\"sku_id\":\""
-            + skuId2
-            + "\",\"fetchtcg_listing_id\":1002,\"quantity\":1,\"price\":\"2.00\""
-            + ",\"listed_price\":\"1.80\",\"allocated_sequence_numbers\":[3]}]";
+        List.of(
+            new OrderItem.OrderLine(skuId1, 1001, 1, "1.50", "2.00", List.of(1)),
+            new OrderItem.OrderLine(skuId2, 1002, 1, "2.00", "1.80", List.of(3)));
     var order =
         OrderItem.create(
             "jordan",
@@ -420,7 +415,7 @@ public class OrdersHandlerIntegrationTest {
                 "32 Abercrombie Street", null, "Howick", "Auckland", "2014", "NZ"),
             "Economy Tracked",
             "61.50",
-            "[]",
+            List.of(),
             Instant.ofEpochSecond(1700000000));
     orderTable.putItem(order);
 
@@ -684,12 +679,12 @@ public class OrdersHandlerIntegrationTest {
   void confirmOrderShouldSellLargeOrderAcrossTransactions() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var lines = new ArrayList<OrderLines.OrderLine>();
+    var lines = new ArrayList<OrderItem.OrderLine>();
     for (int i = 1; i <= 60; i++) {
       var skuId = "mtg#scryfall#scryfall-" + i + "#normal#NM";
       createSkuWithUnits("jordan", skuId, 1);
       reserveUnits("jordan", skuId, "83663", List.of(1));
-      lines.add(new OrderLines.OrderLine(skuId, 1000 + i, 1, "0.50", "0.50", List.of(1)));
+      lines.add(new OrderItem.OrderLine(skuId, 1000 + i, 1, "0.50", "0.50", List.of(1)));
     }
     var order =
         OrderItem.create(
@@ -703,7 +698,7 @@ public class OrdersHandlerIntegrationTest {
             null,
             null,
             "30.00",
-            objectMapper.writeValueAsString(lines),
+            lines,
             Instant.ofEpochSecond(1700000000));
     orderTable.putItem(order);
 
@@ -796,7 +791,7 @@ public class OrdersHandlerIntegrationTest {
             null,
             null,
             totalPrice,
-            "[]",
+            List.of(),
             Instant.ofEpochSecond(1700000000));
     orderTable.putItem(order);
   }
@@ -869,19 +864,10 @@ public class OrdersHandlerIntegrationTest {
       String totalPrice,
       String linePrice,
       String listedPrice) {
-    var listedPriceJson = listedPrice != null ? ",\"listed_price\":\"" + listedPrice + "\"" : "";
     var lines =
-        "[{\"sku_id\":\""
-            + skuId
-            + "\",\"fetchtcg_listing_id\":1001,\"quantity\":"
-            + sequenceNumbers.size()
-            + ",\"price\":\""
-            + linePrice
-            + "\""
-            + listedPriceJson
-            + ",\"allocated_sequence_numbers\":"
-            + sequenceNumbers
-            + "}]";
+        List.of(
+            new OrderItem.OrderLine(
+                skuId, 1001, sequenceNumbers.size(), linePrice, listedPrice, sequenceNumbers));
     var order =
         OrderItem.create(
             user,

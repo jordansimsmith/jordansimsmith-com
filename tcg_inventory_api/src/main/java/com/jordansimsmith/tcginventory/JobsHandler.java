@@ -75,8 +75,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
                 TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), SettingsItem.class),
                 orderRepository,
                 factory.clock(),
-                factory.fetchTcgClient(),
-                factory.objectMapper()),
+                factory.fetchTcgClient()),
             new ListingPhaseProcessor(
                 skuTable,
                 inventoryRepository,

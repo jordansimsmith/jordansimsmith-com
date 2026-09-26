@@ -5,7 +5,6 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
@@ -36,7 +35,6 @@ public class ConfirmOrderHandler
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<OrderItem> orderTable;
   private final OrderRepository orderRepository;
-  private final ObjectMapper objectMapper;
 
   public ConfirmOrderHandler() {
     this(TcgInventoryFactory.create());
@@ -56,7 +54,6 @@ public class ConfirmOrderHandler
     this.orderRepository =
         new OrderRepository(
             this.orderTable, inventoryRepository, factory.dynamoDbClient(), factory.clock());
-    this.objectMapper = factory.objectMapper();
   }
 
   @Override
@@ -92,12 +89,12 @@ public class ConfirmOrderHandler
       return httpResponseFactory.conflict(new ErrorResponse("order is not ready to pick"));
     }
 
-    var orderLines = OrderLines.parse(orderItem.getLines(), objectMapper);
+    var orderLines = orderItem.getLines();
     var soldUnits = new LinkedHashMap<String, List<Integer>>();
     for (var line : orderLines) {
       soldUnits
-          .computeIfAbsent(line.skuId(), k -> new ArrayList<>())
-          .addAll(line.allocatedSequenceNumbers());
+          .computeIfAbsent(line.getSkuId(), k -> new ArrayList<>())
+          .addAll(line.getAllocatedSequenceNumbers());
     }
 
     var skuUnits =

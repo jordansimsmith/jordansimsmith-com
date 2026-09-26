@@ -106,10 +106,10 @@ public class FindOrdersHandler
         page.items().stream()
             .map(
                 item -> {
-                  var orderLines = OrderLines.parse(item.getLines(), objectMapper);
+                  var orderLines = item.getLines();
                   var unitCount = 0;
                   for (var line : orderLines) {
-                    unitCount += line.quantity();
+                    unitCount += line.getQuantity();
                   }
                   return new OrderSummary(
                       item.getOrderId(),

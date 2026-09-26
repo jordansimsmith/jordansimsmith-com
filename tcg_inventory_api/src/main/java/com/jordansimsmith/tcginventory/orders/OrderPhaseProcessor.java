@@ -1,6 +1,5 @@
 package com.jordansimsmith.tcginventory.orders;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.tcginventory.FetchTcgClient;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
@@ -59,7 +58,6 @@ public class OrderPhaseProcessor {
   private final OrderRepository orderRepository;
   private final Clock clock;
   private final FetchTcgClient fetchTcgClient;
-  private final ObjectMapper objectMapper;
 
   public OrderPhaseProcessor(
       DynamoDbTable<OrderItem> orderTable,
@@ -67,15 +65,13 @@ public class OrderPhaseProcessor {
       DynamoDbTable<SettingsItem> settingsTable,
       OrderRepository orderRepository,
       Clock clock,
-      FetchTcgClient fetchTcgClient,
-      ObjectMapper objectMapper) {
+      FetchTcgClient fetchTcgClient) {
     this.orderTable = orderTable;
     this.skuTable = skuTable;
     this.settingsTable = settingsTable;
     this.orderRepository = orderRepository;
     this.clock = clock;
     this.fetchTcgClient = fetchTcgClient;
-    this.objectMapper = objectMapper;
   }
 
   public void process(String user, String bearerToken) {
@@ -261,7 +257,7 @@ public class OrderPhaseProcessor {
   private void reserveForNewOffer(
       String user, FetchTcgClient.SellerOffer offer, Map<Integer, String> listingToSkuId) {
     var offerId = String.valueOf(offer.id());
-    var orderLines = new ArrayList<OrderLines.OrderLine>();
+    var orderLines = new ArrayList<OrderItem.OrderLine>();
     var newReservations = new LinkedHashMap<String, List<Integer>>();
     boolean insufficientStock = false;
 
@@ -290,7 +286,7 @@ public class OrderPhaseProcessor {
         }
 
         orderLines.add(
-            new OrderLines.OrderLine(
+            new OrderItem.OrderLine(
                 skuId,
                 item.listing().id(),
                 item.quantity(),
@@ -300,13 +296,6 @@ public class OrderPhaseProcessor {
                     : null,
                 allocatedSequenceNumbers));
       }
-    }
-
-    String linesJson;
-    try {
-      linesJson = objectMapper.writeValueAsString(orderLines);
-    } catch (Exception e) {
-      throw new RuntimeException("failed to serialize order lines", e);
     }
 
     var fulfillment = toFulfillment(offer);
@@ -326,7 +315,7 @@ public class OrderPhaseProcessor {
             fulfillment.buyerAddress(),
             fulfillment.postageOption(),
             offer.totalOfferPrice() != null ? offer.totalOfferPrice().toPlainString() : null,
-            linesJson,
+            orderLines,
             clock.now());
 
     var skuUnits =
@@ -339,10 +328,10 @@ public class OrderPhaseProcessor {
   private void releaseCancelledOrder(
       String user, OrderItem order, FetchTcgClient.SellerOffer offer) {
     var releasedUnits = new LinkedHashMap<String, List<Integer>>();
-    for (var line : OrderLines.parse(order.getLines(), objectMapper)) {
+    for (var line : order.getLines()) {
       releasedUnits
-          .computeIfAbsent(line.skuId(), k -> new ArrayList<>())
-          .addAll(line.allocatedSequenceNumbers());
+          .computeIfAbsent(line.getSkuId(), k -> new ArrayList<>())
+          .addAll(line.getAllocatedSequenceNumbers());
     }
 
     var skuUnits =
