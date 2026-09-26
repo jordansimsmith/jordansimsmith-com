@@ -38,7 +38,9 @@ public class GetSkuHandler
 
   record SkuDetailResponse(
       @JsonProperty("sku_id") String skuId,
-      @JsonProperty("scryfall_id") String scryfallId,
+      @JsonProperty("game") String game,
+      @JsonProperty("external_source") String externalSource,
+      @JsonProperty("external_id") String externalId,
       @JsonProperty("name") String name,
       @JsonProperty("set_code") String setCode,
       @JsonProperty("set_name") String setName,
@@ -135,6 +137,8 @@ public class GetSkuHandler
     return httpResponseFactory.ok(
         new SkuDetailResponse(
             skuItem.getSkuId(),
+            skuItem.getGame(),
+            skuItem.getExternalSource(),
             skuItem.getExternalId(),
             skuItem.getName(),
             skuItem.getSetCode(),

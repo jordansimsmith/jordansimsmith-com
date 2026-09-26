@@ -196,7 +196,7 @@ public class TcgInventoryE2ETest {
     assertThat(confirmBody.get("unit_count").asInt()).isEqualTo(2);
 
     // assert - one sku with both units carrying photos
-    var skusResponse = get("/skus");
+    var skusResponse = get("/skus?game=mtg");
     assertThat(skusResponse.statusCode()).isEqualTo(200);
     var skusBody = objectMapper.readTree(skusResponse.body());
     assertThat(skusBody.get("skus")).hasSize(1);

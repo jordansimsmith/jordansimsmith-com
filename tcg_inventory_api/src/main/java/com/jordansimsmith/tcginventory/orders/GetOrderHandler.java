@@ -47,7 +47,8 @@ public class GetOrderHandler
       @JsonProperty("sequence_number") int sequenceNumber,
       @JsonProperty("location") String location,
       @JsonProperty("current_location") String currentLocation,
-      @JsonProperty("scryfall_id") String scryfallId,
+      @JsonProperty("external_source") String externalSource,
+      @JsonProperty("external_id") String externalId,
       @JsonProperty("name") String name,
       @JsonProperty("set_code") String setCode,
       @JsonProperty("collector_number") String collectorNumber,
@@ -58,6 +59,7 @@ public class GetOrderHandler
       @JsonProperty("next_card") @Nullable NeighborCardResponse nextCard) {}
 
   record OrderLineResponse(
+      @JsonProperty("game") String game,
       @JsonProperty("name") String name,
       @JsonProperty("set_code") String setCode,
       @JsonProperty("collector_number") String collectorNumber,
@@ -156,6 +158,7 @@ public class GetOrderHandler
 
       lines.add(
           new OrderLineResponse(
+              skuItem.getGame(),
               skuItem.getName(),
               skuItem.getSetCode(),
               skuItem.getCollectorNumber(),
@@ -174,6 +177,7 @@ public class GetOrderHandler
                 seqNum,
                 InventoryLocation.formatLocation(seqNum),
                 position.currentLocation(),
+                skuItem.getExternalSource(),
                 skuItem.getExternalId(),
                 skuItem.getName(),
                 skuItem.getSetCode(),

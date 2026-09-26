@@ -251,6 +251,7 @@ public class OrdersHandlerIntegrationTest {
 
     var lines = body.get("lines");
     assertThat(lines).hasSize(1);
+    assertThat(lines.get(0).get("game").asText()).isEqualTo("mtg");
     assertThat(lines.get(0).get("name").asText()).isEqualTo("Test Card");
     assertThat(lines.get(0).get("set_code").asText()).isEqualTo("dom");
     assertThat(lines.get(0).get("collector_number").asText()).isEqualTo("168");
@@ -266,7 +267,9 @@ public class OrdersHandlerIntegrationTest {
     assertThat(units.get(0).get("sequence_number").asInt()).isEqualTo(1);
     assertThat(units.get(0).get("location").asText()).isEqualTo("A0-1");
     assertThat(units.get(0).get("current_location").asText()).isEqualTo("A0-0");
-    assertThat(units.get(0).get("scryfall_id").asText()).isEqualTo("scryfall-1");
+    assertThat(units.get(0).get("external_source").asText()).isEqualTo("scryfall");
+    assertThat(units.get(0).get("external_id").asText()).isEqualTo("scryfall-1");
+    assertThat(units.get(0).has("scryfall_id")).isFalse();
     assertThat(units.get(0).get("name").asText()).isEqualTo("Test Card");
     assertThat(units.get(0).get("set_code").asText()).isEqualTo("dom");
     assertThat(units.get(0).get("collector_number").asText()).isEqualTo("168");
@@ -275,7 +278,7 @@ public class OrdersHandlerIntegrationTest {
     assertThat(units.get(0).get("price").asText()).isEqualTo("1.67");
     assertThat(units.get(0).get("previous_card").isNull()).isTrue();
     assertThat(units.get(0).get("next_card").get("name").asText()).isEqualTo("Test Card");
-    assertThat(units.get(0).get("next_card").has("scryfall_id")).isFalse();
+    assertThat(units.get(0).get("next_card").has("external_id")).isFalse();
     assertThat(units.get(1).get("sequence_number").asInt()).isEqualTo(3);
     assertThat(units.get(1).get("location").asText()).isEqualTo("A0-3");
     assertThat(units.get(1).get("current_location").asText()).isEqualTo("A0-2");
@@ -328,10 +331,12 @@ public class OrdersHandlerIntegrationTest {
     var units = body.get("units");
     assertThat(units).hasSize(2);
     assertThat(units.get(0).get("name").asText()).isEqualTo("Lightning Bolt");
-    assertThat(units.get(0).get("scryfall_id").asText()).isEqualTo("scryfall-1");
+    assertThat(units.get(0).get("external_source").asText()).isEqualTo("scryfall");
+    assertThat(units.get(0).get("external_id").asText()).isEqualTo("scryfall-1");
     assertThat(units.get(0).get("price").asText()).isEqualTo("1.50");
     assertThat(units.get(1).get("name").asText()).isEqualTo("Sol Ring");
-    assertThat(units.get(1).get("scryfall_id").asText()).isEqualTo("scryfall-2");
+    assertThat(units.get(1).get("external_source").asText()).isEqualTo("scryfall");
+    assertThat(units.get(1).get("external_id").asText()).isEqualTo("scryfall-2");
     assertThat(units.get(1).get("price").asText()).isEqualTo("2.00");
 
     var responseLines = body.get("lines");

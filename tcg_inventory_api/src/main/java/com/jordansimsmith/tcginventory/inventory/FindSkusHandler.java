@@ -10,6 +10,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.dynamodb.Continuations;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
+import com.jordansimsmith.tcginventory.Games;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import java.util.List;
@@ -29,6 +30,7 @@ public class FindSkusHandler
 
   record SkuSummaryResponse(
       @JsonProperty("sku_id") String skuId,
+      @JsonProperty("game") String game,
       @JsonProperty("name") String name,
       @JsonProperty("set_code") String setCode,
       @JsonProperty("set_name") String setName,
@@ -40,6 +42,8 @@ public class FindSkusHandler
   record FindSkusResponse(
       @JsonProperty("skus") List<SkuSummaryResponse> skus,
       @JsonProperty("next_continuation") @Nullable String nextContinuation) {}
+
+  record ErrorResponse(@JsonProperty("message") String message) {}
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
@@ -72,16 +76,26 @@ public class FindSkusHandler
     var user = requestContextFactory.createCtx(event).user();
 
     var queryParams = event.getQueryStringParameters();
+    var game = queryParams != null ? queryParams.get("game") : null;
     var search = queryParams != null ? queryParams.get("search") : null;
     var continuation = queryParams != null ? queryParams.get("continuation") : null;
     var limitParam = queryParams != null ? queryParams.get("limit") : null;
     int limit = limitParam != null ? Integer.parseInt(limitParam) : DEFAULT_LIMIT;
 
+    if (game == null || game.isBlank()) {
+      return httpResponseFactory.badRequest(new ErrorResponse("game is required"));
+    }
+    try {
+      Games.get(game);
+    } catch (IllegalArgumentException e) {
+      return httpResponseFactory.badRequest(new ErrorResponse(e.getMessage()));
+    }
+
     var gsi2pk = SkuItem.formatGsi2pk(user);
     var sortPrefix =
         search != null && !search.isEmpty()
-            ? SkuItem.NAME_PREFIX + search.toLowerCase()
-            : SkuItem.NAME_PREFIX;
+            ? SkuItem.formatGsi2skPrefix(game, search.toLowerCase())
+            : SkuItem.formatGsi2skPrefix(game, "");
 
     var queryConditional =
         QueryConditional.sortBeginsWith(
@@ -113,6 +127,7 @@ public class FindSkusHandler
                 item ->
                     new SkuSummaryResponse(
                         item.getSkuId(),
+                        item.getGame(),
                         item.getName(),
                         item.getSetCode(),
                         item.getSetName(),

@@ -236,11 +236,8 @@ public class OrderPhaseProcessor {
     var request =
         QueryEnhancedRequest.builder()
             .queryConditional(
-                QueryConditional.sortBeginsWith(
-                    Key.builder()
-                        .partitionValue(SkuItem.formatGsi2pk(user))
-                        .sortValue(SkuItem.NAME_PREFIX)
-                        .build()))
+                QueryConditional.keyEqualTo(
+                    Key.builder().partitionValue(SkuItem.formatGsi2pk(user)).build()))
             .build();
 
     skuTable.index(TcgInventoryTable.GSI2_NAME).query(request).stream()

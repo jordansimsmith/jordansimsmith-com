@@ -19,6 +19,7 @@ public class SkuItem {
   public static final String SKU_PREFIX = "SKU" + DELIMITER;
   public static final String DIRTY_SUFFIX = "DIRTY";
   public static final String SKUS_SUFFIX = "SKUS";
+  public static final String GAME_PREFIX = "GAME" + DELIMITER;
   public static final String NAME_PREFIX = "NAME" + DELIMITER;
   public static final String PK = "pk";
   public static final String SK = "sk";
@@ -328,8 +329,12 @@ public class SkuItem {
     return USER_PREFIX + user + DELIMITER + SKUS_SUFFIX;
   }
 
-  public static String formatGsi2sk(String normalizedName, String skuId) {
-    return NAME_PREFIX + normalizedName + DELIMITER + skuId;
+  public static String formatGsi2sk(String game, String normalizedName, String skuId) {
+    return GAME_PREFIX + game + DELIMITER + NAME_PREFIX + normalizedName + DELIMITER + skuId;
+  }
+
+  public static String formatGsi2skPrefix(String game, String normalizedName) {
+    return GAME_PREFIX + game + DELIMITER + NAME_PREFIX + normalizedName;
   }
 
   public static SkuItem create(
@@ -366,7 +371,7 @@ public class SkuItem {
     item.setGsi1pk(formatGsi1pk(user));
     item.setGsi1sk(formatGsi1sk(skuId));
     item.setGsi2pk(formatGsi2pk(user));
-    item.setGsi2sk(formatGsi2sk(name.toLowerCase(), skuId));
+    item.setGsi2sk(formatGsi2sk(game, name.toLowerCase(), skuId));
     return item;
   }
 }

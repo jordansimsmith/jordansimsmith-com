@@ -86,7 +86,9 @@ public class InventoryHandlerIntegrationTest {
         "jordan", "mtg#scryfall#scryfall-e#foil#LP", "Elvish Mystic", "m14", "Magic 2014", "169");
 
     // act
-    var response = findSkusHandler.handleRequest(buildEvent("jordan", Map.of()), null);
+    var response =
+        findSkusHandler.handleRequest(
+            buildEventWithQuery("jordan", Map.of(), Map.of("game", "mtg")), null);
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
@@ -98,7 +100,25 @@ public class InventoryHandlerIntegrationTest {
     assertThat(skus.get(2).get("name").asText()).isEqualTo("Zombie Knight");
     assertThat(skus.get(1).get("finish").asText()).isEqualTo("foil");
     assertThat(skus.get(1).get("condition").asText()).isEqualTo("LP");
+    assertThat(skus.get(1).get("game").asText()).isEqualTo("mtg");
     assertThat(body.get("next_continuation").isNull()).isTrue();
+  }
+
+  @Test
+  void findSkusShouldRequireSupportedGame() throws Exception {
+    // act
+    var missingGame = findSkusHandler.handleRequest(buildEvent("jordan", Map.of()), null);
+    var unsupportedGame =
+        findSkusHandler.handleRequest(
+            buildEventWithQuery("jordan", Map.of(), Map.of("game", "pokemon")), null);
+
+    // assert
+    assertThat(missingGame.getStatusCode()).isEqualTo(400);
+    assertThat(objectMapper.readTree(missingGame.getBody()).get("message").asText())
+        .isEqualTo("game is required");
+    assertThat(unsupportedGame.getStatusCode()).isEqualTo(400);
+    assertThat(objectMapper.readTree(unsupportedGame.getBody()).get("message").asText())
+        .isEqualTo("unsupported game: pokemon");
   }
 
   @Test
@@ -119,7 +139,7 @@ public class InventoryHandlerIntegrationTest {
     // act
     var response =
         findSkusHandler.handleRequest(
-            buildEventWithQuery("jordan", Map.of(), Map.of("search", "elv")), null);
+            buildEventWithQuery("jordan", Map.of(), Map.of("game", "mtg", "search", "elv")), null);
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
@@ -140,7 +160,7 @@ public class InventoryHandlerIntegrationTest {
     // act - first page
     var response1 =
         findSkusHandler.handleRequest(
-            buildEventWithQuery("jordan", Map.of(), Map.of("limit", "2")), null);
+            buildEventWithQuery("jordan", Map.of(), Map.of("game", "mtg", "limit", "2")), null);
 
     // assert - first page
     assertThat(response1.getStatusCode()).isEqualTo(200);
@@ -155,7 +175,9 @@ public class InventoryHandlerIntegrationTest {
     // act - second page
     var response2 =
         findSkusHandler.handleRequest(
-            buildEventWithQuery("jordan", Map.of(), Map.of("continuation", continuation)), null);
+            buildEventWithQuery(
+                "jordan", Map.of(), Map.of("game", "mtg", "continuation", continuation)),
+            null);
 
     // assert - second page
     assertThat(response2.getStatusCode()).isEqualTo(200);
@@ -185,7 +207,10 @@ public class InventoryHandlerIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
     assertThat(body.get("sku_id").asText()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(body.get("scryfall_id").asText()).isEqualTo("scryfall-1");
+    assertThat(body.get("game").asText()).isEqualTo("mtg");
+    assertThat(body.get("external_source").asText()).isEqualTo("scryfall");
+    assertThat(body.get("external_id").asText()).isEqualTo("scryfall-1");
+    assertThat(body.has("scryfall_id")).isFalse();
     assertThat(body.get("name").asText()).isEqualTo("Elvish Mystic");
     assertThat(body.get("in_stock_count").asInt()).isEqualTo(2);
     assertThat(body.get("reserved_count").asInt()).isEqualTo(1);
@@ -492,7 +517,8 @@ public class InventoryHandlerIntegrationTest {
     assertThat(targetSku.getFinish()).isEqualTo("normal");
     assertThat(targetSku.getGsi2pk()).isEqualTo(SkuItem.formatGsi2pk("jordan"));
     assertThat(targetSku.getGsi2sk())
-        .isEqualTo(SkuItem.formatGsi2sk("elvish mystic", "mtg#scryfall#scryfall-1#normal#LP"));
+        .isEqualTo(
+            SkuItem.formatGsi2sk("mtg", "elvish mystic", "mtg#scryfall#scryfall-1#normal#LP"));
   }
 
   @Test
