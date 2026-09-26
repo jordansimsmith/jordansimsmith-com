@@ -1,0 +1,49 @@
+.importForm {
+  display: grid;
+  grid-template-areas: 'game file upload';
+  grid-template-columns: minmax(12rem, 0.8fr) minmax(16rem, 1.4fr) max-content;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.game {
+  grid-area: game;
+  min-width: 0;
+}
+
+.file {
+  grid-area: file;
+  min-width: 0;
+}
+
+.upload {
+  grid-area: upload;
+  justify-self: start;
+}
+
+@media (max-width: 56em) {
+  .importForm {
+    grid-template-areas:
+      'game file'
+      'upload upload';
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .upload {
+    justify-self: end;
+  }
+}
+
+@media (max-width: 42em) {
+  .importForm {
+    grid-template-areas:
+      'game'
+      'file'
+      'upload';
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .upload {
+    justify-self: stretch;
+  }
+}

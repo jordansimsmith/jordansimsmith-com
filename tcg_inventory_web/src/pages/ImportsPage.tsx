@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Button, FileInput, Group, Stack } from '@mantine/core';
+import { Button, FileInput, Group, Select, Stack, Text } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
 import { AppShellLayout } from '../layouts/AppShellLayout';
@@ -12,7 +12,10 @@ import { ImportTable } from '../components/ImportTable';
 import { PageHeader } from '../components/PageHeader';
 import { apiClient } from '../api/client';
 import type { ImportSummary } from '../api/client';
+import { GAMES, MAGIC_THE_GATHERING } from '../domain/games';
+import type { GameId } from '../domain/games';
 import { parseManaBoxCsv } from '../domain/manabox';
+import classes from './ImportsPage.module.css';
 
 export function ImportsPage() {
   const navigate = useNavigate();
@@ -21,8 +24,10 @@ export function ImportsPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [game, setGame] = useState<GameId | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const canUpload = game === MAGIC_THE_GATHERING.id;
   const openImport = (importSummary: ImportSummary) => {
     navigate(`/imports/${encodeURIComponent(importSummary.import_id)}`);
   };
@@ -77,7 +82,7 @@ export function ImportsPage() {
   };
 
   const handleUpload = async () => {
-    if (!file) {
+    if (!file || !canUpload) {
       return;
     }
     setUploading(true);
@@ -104,24 +109,53 @@ export function ImportsPage() {
         <CollectionSurface
           ariaLabel="Imports"
           toolbar={
-            <Group align="flex-end" gap="sm" wrap="wrap">
-              <FileInput
-                value={file}
-                onChange={setFile}
-                accept=".csv,text/csv"
-                label="ManaBox CSV export"
-                placeholder="Select CSV"
-                clearable
-                style={{ flex: '1 1 16rem', maxWidth: 360 }}
-              />
-              <Button
-                onClick={handleUpload}
-                disabled={!file}
-                loading={uploading}
-              >
-                Upload
-              </Button>
-            </Group>
+            <Stack gap="xs">
+              <div className={classes.importForm}>
+                <Select
+                  className={classes.game}
+                  label="Game"
+                  value={game}
+                  onChange={(value) => {
+                    const nextGame = value as GameId | null;
+                    if (nextGame !== game) {
+                      setFile(null);
+                    }
+                    setGame(nextGame);
+                  }}
+                  data={GAMES.map(({ id, label }) => ({ value: id, label }))}
+                  placeholder="Select game"
+                  required
+                  disabled={uploading}
+                />
+                <FileInput
+                  className={classes.file}
+                  value={file}
+                  onChange={setFile}
+                  accept=".csv,text/csv"
+                  label="CSV export"
+                  placeholder={
+                    canUpload
+                      ? 'ManaBox CSV export'
+                      : game === null
+                        ? 'Select game first'
+                        : 'Unavailable for this game'
+                  }
+                  clearable
+                  disabled={!canUpload || uploading}
+                />
+                <Button
+                  className={classes.upload}
+                  onClick={handleUpload}
+                  disabled={!canUpload || !file}
+                  loading={uploading}
+                >
+                  Upload
+                </Button>
+              </div>
+              <Text size="xs" c="dimmed">
+                CSV imports are available for Magic: The Gathering.
+              </Text>
+            </Stack>
           }
           footer={
             nextContinuation ? (

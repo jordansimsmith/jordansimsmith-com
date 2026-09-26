@@ -23,6 +23,7 @@
   border-bottom: 1px solid var(--mantine-color-gray-2);
 }
 
+.pullHeader,
 .gameHeader {
   background: var(--mantine-color-gray-0);
 }
