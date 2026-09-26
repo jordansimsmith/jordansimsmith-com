@@ -38,7 +38,8 @@ function row(overrides: Partial<ScanRow> = {}): ScanRow {
     needs_review: false,
     suggestions: [
       {
-        scryfall_id: 'printing-1',
+        external_source: 'scryfall',
+        external_id: 'printing-1',
         name: 'Lightning Bolt',
         score: 0.98,
       },
@@ -52,6 +53,7 @@ function row(overrides: Partial<ScanRow> = {}): ScanRow {
 function scan(rows: ScanRow[]): ScanDetail {
   return {
     scan_id: 'scan-reviewing',
+    game: 'mtg',
     status: 'reviewing',
     condition: 'NM',
     finish: 'normal',
@@ -122,7 +124,8 @@ describe('ScanReview', () => {
           suggestions: [
             { ...row().suggestions[0], score: 0.4 },
             {
-              scryfall_id: 'printing-2',
+              external_source: 'scryfall',
+              external_id: 'printing-2',
               name: 'Lightning Bolt',
               score: 0.99,
             },
@@ -155,7 +158,12 @@ describe('ScanReview', () => {
           scan_position: 2,
           filename: '002.jpg',
           suggestions: [
-            { scryfall_id: 'printing-1', name: 'Lightning Bolt', score: 0.7 },
+            {
+              external_source: 'scryfall',
+              external_id: 'printing-1',
+              name: 'Lightning Bolt',
+              score: 0.7,
+            },
           ],
         }),
       ]),
@@ -469,7 +477,8 @@ describe('ScanReview', () => {
     expect(onConfirmScan).toHaveBeenCalledWith([
       {
         scan_position: 1,
-        scryfall_id: 'printing-1',
+        external_source: 'scryfall',
+        external_id: 'printing-1',
         name: 'Lightning Bolt',
         set_code: '2x2',
         set_name: 'Double Masters 2022',
@@ -477,7 +486,8 @@ describe('ScanReview', () => {
       },
       {
         scan_position: 2,
-        scryfall_id: 'printing-1',
+        external_source: 'scryfall',
+        external_id: 'printing-1',
         name: 'Lightning Bolt',
         set_code: '2x2',
         set_name: 'Double Masters 2022',

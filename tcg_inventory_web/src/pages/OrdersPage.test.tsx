@@ -143,34 +143,6 @@ describe('OrdersPage', () => {
     expect(messages.length).toBeGreaterThan(0);
   });
 
-  it('moves the selection with j and k', async () => {
-    const user = userEvent.setup();
-    renderOrdersPage();
-    await screen.findByText('83663');
-
-    const rowFor = (orderId: string) => screen.getByText(orderId).closest('tr');
-    expect(rowFor('83663')?.getAttribute('data-selected')).toBe('true');
-
-    await user.keyboard('j');
-    expect(rowFor('83647')?.getAttribute('data-selected')).toBe('true');
-
-    await user.keyboard('k');
-    expect(rowFor('83663')?.getAttribute('data-selected')).toBe('true');
-  });
-
-  it('opens the selected order with Enter', async () => {
-    const user = userEvent.setup();
-    renderOrdersPage();
-    await screen.findByText('83663');
-
-    await user.keyboard('j');
-    await user.keyboard('{Enter}');
-
-    await waitFor(() => {
-      expect(screen.getByText('Order detail 83647')).toBeDefined();
-    });
-  });
-
   it('navigates when a row is clicked', async () => {
     const user = userEvent.setup();
     renderOrdersPage();

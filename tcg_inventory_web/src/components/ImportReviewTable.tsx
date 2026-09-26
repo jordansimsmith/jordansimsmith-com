@@ -1,4 +1,3 @@
-import { useEffect, useRef } from 'react';
 import { ActionIcon, Badge, NativeSelect, Table, Text } from '@mantine/core';
 import { IconTrash } from '@tabler/icons-react';
 import type { Condition, ImportRow, RowDecision } from '../api/client';
@@ -16,8 +15,6 @@ const DECISION_COLORS: Record<RowDecision, string> = {
 
 interface ImportReviewTableProps {
   rows: ImportRow[];
-  selectedIndex: number;
-  onSelect: (index: number) => void;
   editable?: boolean;
   onConditionChange?: (position: number, condition: Condition) => void;
   onDeleteRow?: (position: number) => void;
@@ -27,20 +24,12 @@ interface ImportReviewTableProps {
 
 export function ImportReviewTable({
   rows,
-  selectedIndex,
-  onSelect,
   editable = false,
   onConditionChange,
   onDeleteRow,
   onAddPhoto,
   onRemovePhoto,
 }: ImportReviewTableProps) {
-  const selectedRowRef = useRef<HTMLTableRowElement>(null);
-
-  useEffect(() => {
-    selectedRowRef.current?.scrollIntoView({ block: 'nearest' });
-  }, [selectedIndex]);
-
   return (
     <Table
       highlightOnHover
@@ -65,18 +54,11 @@ export function ImportReviewTable({
         </Table.Tr>
       </Table.Thead>
       <Table.Tbody>
-        {rows.map((row, index) => {
-          const selected = index === selectedIndex;
+        {rows.map((row) => {
           const keep = row.decision === 'keep';
           const showPhotos = keep && (editable || row.photos.length > 0);
           return (
-            <Table.Tr
-              key={row.position}
-              ref={selected ? selectedRowRef : undefined}
-              data-selected={selected}
-              c={keep ? undefined : 'dimmed'}
-              onClick={() => onSelect(index)}
-            >
+            <Table.Tr key={row.position} c={keep ? undefined : 'dimmed'}>
               <Table.Td data-field="position" ta="right" c="dimmed">
                 {row.position}
               </Table.Td>
@@ -85,6 +67,7 @@ export function ImportReviewTable({
                   component="span"
                   className={keep ? finishClasses[row.finish] : undefined}
                   fw={finishNameWeight(row.finish)}
+                  fz="sm"
                 >
                   {row.name}
                 </Text>
@@ -107,7 +90,6 @@ export function ImportReviewTable({
                         event.currentTarget.value as Condition,
                       )
                     }
-                    onClick={(event) => event.stopPropagation()}
                     aria-label={`Condition for row ${row.position}`}
                   />
                 ) : (

@@ -238,8 +238,8 @@ export function createHttpClient(): ApiClient {
       });
     },
 
-    async findSkus(params?: FindSkusParams): Promise<FindSkusResponse> {
-      const query = new URLSearchParams();
+    async findSkus(params: FindSkusParams): Promise<FindSkusResponse> {
+      const query = new URLSearchParams({ game: params.game });
       if (params?.search) {
         query.set('search', params.search);
       }

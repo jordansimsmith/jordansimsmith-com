@@ -20,6 +20,7 @@ import type { ScryfallPrinting } from '../api/scryfall-client';
 import type { ScanConfirmationRow, ScanDetail, ScanRow } from '../api/client';
 import classes from './ScanReview.module.css';
 import { ScanReviewPanels, type ReviewSelection } from './ScanReviewPanels';
+import { getGame } from '../domain/games';
 
 interface ScanReviewProps {
   scan: ScanDetail;
@@ -185,7 +186,7 @@ export function ScanReview({
   const selectedSuggestion = selectedRow
     ? highestSuggestion(selectedRow)
     : undefined;
-  const selectedSuggestionId = selectedSuggestion?.scryfall_id;
+  const selectedSuggestionId = selectedSuggestion?.external_id;
   const selectedSelection =
     selectedPosition === undefined
       ? undefined
@@ -212,7 +213,6 @@ export function ScanReview({
     if (selections.has(selectedPosition) || rowErrors.has(selectedPosition)) {
       return;
     }
-
     let cancelled = false;
     const requestVersion =
       (suggestionRequestVersions.current.get(selectedPosition) ?? 0) + 1;
@@ -476,7 +476,8 @@ export function ScanReview({
       }
       confirmationRows.push({
         scan_position: row.scan_position,
-        scryfall_id: selection.printing.id,
+        external_source: getGame(scan.game).externalSource,
+        external_id: selection.printing.id,
         name: selection.printing.name,
         set_code: selection.printing.set_code,
         set_name: selection.printing.set_name,

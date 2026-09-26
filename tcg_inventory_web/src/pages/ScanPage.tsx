@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Badge,
   Button,
@@ -18,12 +18,14 @@ import {
   CollectionSurface,
 } from '../components/CollectionSurface';
 import { PageHeader } from '../components/PageHeader';
-import { apiClient, CONDITIONS, FINISHES } from '../api/client';
+import { apiClient, CONDITIONS } from '../api/client';
 import { scanUploader } from '../api/scan-uploader';
 import type { Condition, Finish, ScanStatus, ScanSummary } from '../api/client';
 import { sortScanFiles, validateScanFiles } from '../domain/scan-files';
-import { useListNavigation } from '../hooks/use-list-navigation';
+import { GAMES, gameLabel, getGame } from '../domain/games';
+import type { GameId } from '../domain/games';
 import classes from '../components/CollectionTable.module.css';
+import formClasses from './ScanPage.module.css';
 
 const STATUS_COLORS: Record<ScanStatus, string> = {
   uploading: 'blue',
@@ -60,17 +62,10 @@ function ScanStatusBadge({ status }: { status: ScanStatus }) {
 
 interface ScanTableProps {
   scans: ScanSummary[];
-  selectedIndex: number;
   onOpen: (scan: ScanSummary) => void;
 }
 
-function ScanTable({ scans, selectedIndex, onOpen }: ScanTableProps) {
-  const selectedRowRef = useRef<HTMLTableRowElement>(null);
-
-  useEffect(() => {
-    selectedRowRef.current?.scrollIntoView({ block: 'nearest' });
-  }, [selectedIndex]);
-
+function ScanTable({ scans, onOpen }: ScanTableProps) {
   return (
     <Table
       highlightOnHover
@@ -82,6 +77,7 @@ function ScanTable({ scans, selectedIndex, onOpen }: ScanTableProps) {
       <Table.Thead>
         <Table.Tr>
           <Table.Th>Created</Table.Th>
+          <Table.Th>Game</Table.Th>
           <Table.Th>Status</Table.Th>
           <Table.Th ta="right">Cards</Table.Th>
           <Table.Th>Condition</Table.Th>
@@ -89,39 +85,37 @@ function ScanTable({ scans, selectedIndex, onOpen }: ScanTableProps) {
         </Table.Tr>
       </Table.Thead>
       <Table.Tbody>
-        {scans.map((scan, index) => {
-          const selected = index === selectedIndex;
-          return (
-            <Table.Tr
-              key={scan.scan_id}
-              ref={selected ? selectedRowRef : undefined}
-              data-selected={selected}
-              onClick={() => onOpen(scan)}
-              style={{ cursor: 'pointer' }}
+        {scans.map((scan) => (
+          <Table.Tr
+            key={scan.scan_id}
+            onClick={() => onOpen(scan)}
+            style={{ cursor: 'pointer' }}
+          >
+            <Table.Td
+              fw={500}
+              data-field="created"
+              data-label="Created"
+              style={{ whiteSpace: 'nowrap' }}
             >
-              <Table.Td
-                fw={500}
-                data-field="created"
-                data-label="Created"
-                style={{ whiteSpace: 'nowrap' }}
-              >
-                {new Date(scan.created_at * 1000).toLocaleString()}
-              </Table.Td>
-              <Table.Td data-field="status" data-label="Status">
-                <ScanStatusBadge status={scan.status} />
-              </Table.Td>
-              <Table.Td ta="right" data-field="cards" data-label="Cards">
-                {scan.row_count}
-              </Table.Td>
-              <Table.Td data-field="condition" data-label="Condition">
-                {scan.condition}
-              </Table.Td>
-              <Table.Td data-field="finish" data-label="Finish">
-                {formatFinish(scan.finish)}
-              </Table.Td>
-            </Table.Tr>
-          );
-        })}
+              {new Date(scan.created_at * 1000).toLocaleString()}
+            </Table.Td>
+            <Table.Td data-field="game" data-label="Game">
+              {gameLabel(scan.game)}
+            </Table.Td>
+            <Table.Td data-field="status" data-label="Status">
+              <ScanStatusBadge status={scan.status} />
+            </Table.Td>
+            <Table.Td ta="right" data-field="cards" data-label="Cards">
+              {scan.row_count}
+            </Table.Td>
+            <Table.Td data-field="condition" data-label="Condition">
+              {scan.condition}
+            </Table.Td>
+            <Table.Td data-field="finish" data-label="Finish">
+              {formatFinish(scan.finish)}
+            </Table.Td>
+          </Table.Tr>
+        ))}
       </Table.Tbody>
     </Table>
   );
@@ -134,12 +128,12 @@ export function ScanPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [game, setGame] = useState<GameId | null>(null);
   const [condition, setCondition] = useState<Condition>('NM');
-  const [finish, setFinish] = useState<Finish>('normal');
+  const [finish, setFinish] = useState<Finish | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [creating, setCreating] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const sortedFiles = useMemo(() => sortScanFiles(files), [files]);
   const fileErrors = useMemo(() => validateScanFiles(files), [files]);
@@ -149,17 +143,6 @@ export function ScanPage() {
     },
     [navigate],
   );
-  const { selectedIndex } = useListNavigation({
-    itemCount: scans.length,
-    onOpen: (index) => {
-      const scan = scans[index];
-      if (scan) {
-        openScan(scan);
-      }
-    },
-    searchInputRef,
-  });
-
   const refreshScans = useCallback(async () => {
     const response = await apiClient.findScans();
     setScans(response.scans);
@@ -223,7 +206,13 @@ export function ScanPage() {
   };
 
   const handleCreate = async () => {
-    if (creating || sortedFiles.length === 0 || fileErrors.length > 0) {
+    if (
+      creating ||
+      game === null ||
+      finish === null ||
+      sortedFiles.length === 0 ||
+      fileErrors.length > 0
+    ) {
       return;
     }
 
@@ -231,6 +220,7 @@ export function ScanPage() {
     setSubmitError(null);
     try {
       const created = await apiClient.createScan({
+        game,
         condition,
         finish,
         files: sortedFiles.map((file) => ({
@@ -287,20 +277,32 @@ export function ScanPage() {
           ariaLabel="Scan jobs"
           toolbar={
             <Stack gap="sm">
-              <Group align="flex-end" gap="sm" wrap="wrap">
-                <FileInput
-                  value={files}
-                  onChange={handleFilesChange}
-                  multiple
-                  accept=".jpg,.jpeg,image/jpeg"
-                  label="Scanner JPEGs"
-                  description="Sorted by filename from bottom to top."
-                  placeholder="Select files"
-                  clearable
+              <div className={formClasses.createScanForm}>
+                <Select
+                  className={formClasses.game}
+                  label="Game"
+                  value={game}
+                  onChange={(value) => {
+                    if (!value) {
+                      setGame(null);
+                      setFinish(null);
+                      return;
+                    }
+                    const nextGame = getGame(value);
+                    setGame(nextGame.id);
+                    setFinish((currentFinish) =>
+                      currentFinish && nextGame.finishes.includes(currentFinish)
+                        ? currentFinish
+                        : (nextGame.finishes[0] ?? null),
+                    );
+                  }}
+                  data={GAMES.map(({ id, label }) => ({ value: id, label }))}
+                  placeholder="Select game"
+                  required
                   disabled={creating}
-                  style={{ flex: '1 1 16rem', maxWidth: 360 }}
                 />
                 <Select
+                  className={formClasses.condition}
                   label="Condition"
                   value={condition}
                   onChange={(value) => {
@@ -310,9 +312,9 @@ export function ScanPage() {
                   }}
                   data={CONDITIONS}
                   disabled={creating}
-                  style={{ flex: '0 1 10rem' }}
                 />
                 <Select
+                  className={formClasses.finish}
                   label="Finish"
                   value={finish}
                   onChange={(value) => {
@@ -320,14 +322,39 @@ export function ScanPage() {
                       setFinish(value as Finish);
                     }
                   }}
-                  data={FINISHES}
+                  data={
+                    game === null
+                      ? []
+                      : [...getGame(game).finishes].map((value) => ({
+                          value,
+                          label: formatFinish(value),
+                        }))
+                  }
+                  placeholder={
+                    game === null ? 'Select game first' : 'Select finish'
+                  }
+                  disabled={creating || game === null}
+                  required
+                />
+                <FileInput
+                  className={formClasses.files}
+                  value={files}
+                  onChange={handleFilesChange}
+                  multiple
+                  accept=".jpg,.jpeg,image/jpeg"
+                  label="Scanner JPEGs"
+                  placeholder="Select files"
+                  clearable
                   disabled={creating}
-                  style={{ flex: '0 1 10rem' }}
+                  required
                 />
                 <Button
+                  className={formClasses.create}
                   onClick={handleCreate}
                   disabled={
                     creating ||
+                    game === null ||
+                    finish === null ||
                     sortedFiles.length === 0 ||
                     fileErrors.length > 0
                   }
@@ -335,7 +362,10 @@ export function ScanPage() {
                 >
                   Create scan
                 </Button>
-              </Group>
+              </div>
+              <Text size="xs" c="dimmed">
+                Files are sorted by filename from bottom to top.
+              </Text>
               {files.length > 0 && fileErrors.length > 0 && (
                 <Stack gap={2} role="alert">
                   {fileErrors.map((fileError) => (
@@ -382,11 +412,7 @@ export function ScanPage() {
             />
           )}
           {!loading && !error && scans.length > 0 && (
-            <ScanTable
-              scans={scans}
-              selectedIndex={selectedIndex}
-              onOpen={openScan}
-            />
+            <ScanTable scans={scans} onOpen={openScan} />
           )}
         </CollectionSurface>
       </Stack>

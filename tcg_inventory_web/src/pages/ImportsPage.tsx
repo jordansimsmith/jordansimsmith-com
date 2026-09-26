@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, FileInput, Group, Stack } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
@@ -13,7 +13,6 @@ import { PageHeader } from '../components/PageHeader';
 import { apiClient } from '../api/client';
 import type { ImportSummary } from '../api/client';
 import { parseManaBoxCsv } from '../domain/manabox';
-import { useListNavigation } from '../hooks/use-list-navigation';
 
 export function ImportsPage() {
   const navigate = useNavigate();
@@ -24,23 +23,9 @@ export function ImportsPage() {
   const [error, setError] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  // this page has no search input; the ref keeps the navigation hook inert on "/"
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
   const openImport = (importSummary: ImportSummary) => {
     navigate(`/imports/${encodeURIComponent(importSummary.import_id)}`);
   };
-
-  const { selectedIndex } = useListNavigation({
-    itemCount: imports.length,
-    onOpen: (index) => {
-      const importSummary = imports[index];
-      if (importSummary) {
-        openImport(importSummary);
-      }
-    },
-    searchInputRef,
-  });
 
   useEffect(() => {
     let cancelled = false;
@@ -125,7 +110,7 @@ export function ImportsPage() {
                 onChange={setFile}
                 accept=".csv,text/csv"
                 label="ManaBox CSV export"
-                placeholder="Select file"
+                placeholder="Select CSV"
                 clearable
                 style={{ flex: '1 1 16rem', maxWidth: 360 }}
               />
@@ -167,11 +152,7 @@ export function ImportsPage() {
             />
           )}
           {!loading && !error && imports.length > 0 && (
-            <ImportTable
-              imports={imports}
-              selectedIndex={selectedIndex}
-              onOpen={openImport}
-            />
+            <ImportTable imports={imports} onOpen={openImport} />
           )}
         </CollectionSurface>
       </Stack>

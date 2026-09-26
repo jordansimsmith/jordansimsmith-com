@@ -74,6 +74,7 @@ describe('http client scans', () => {
     const client = createHttpClient();
 
     await client.createScan({
+      game: 'mtg',
       condition: 'LP',
       finish: 'foil',
       files: [{ filename: '001.jpg', size_bytes: 42 }],
@@ -86,6 +87,7 @@ describe('http client scans', () => {
     expect(init.headers.Authorization).toBe(`Basic ${btoa('alice:pw')}`);
     expect(init.body).toBe(
       JSON.stringify({
+        game: 'mtg',
         condition: 'LP',
         finish: 'foil',
         files: [{ filename: '001.jpg', size_bytes: 42 }],
@@ -144,7 +146,8 @@ describe('http client scans', () => {
       rows: [
         {
           scan_position: 1,
-          scryfall_id: 'card-1',
+          external_source: 'scryfall',
+          external_id: 'card-1',
           name: 'Opt',
           set_code: 'dom',
           set_name: 'Dominaria',
@@ -160,6 +163,20 @@ describe('http client scans', () => {
     );
     expect(fetchSpy.mock.calls[0][1].method).toBe('POST');
     expect(fetchSpy.mock.calls[0][1].body).toBe(JSON.stringify(request));
+  });
+
+  it('requires a game when listing SKUs', async () => {
+    const json = vi
+      .fn()
+      .mockResolvedValue({ skus: [], next_continuation: null });
+    fetchSpy.mockResolvedValue({ ok: true, json });
+    const client = createHttpClient();
+
+    await client.findSkus({ game: 'mtg', search: 'sol ring' });
+
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/skus?game=mtg&search=sol+ring',
+    );
   });
 
   it('deletes a scan without parsing a body', async () => {

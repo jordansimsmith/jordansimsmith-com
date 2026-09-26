@@ -49,6 +49,7 @@ function appraisingRows(): ImportRow[] {
 function importDetail(overrides: Partial<ImportDetail> = {}): ImportDetail {
   return {
     import_id: 'import-2',
+    game: 'mtg',
     filename: 'manabox-today.csv',
     status: 'appraising',
     row_count: 40,
@@ -72,7 +73,8 @@ function importRow(
     collector_number: String(position),
     finish: 'normal',
     condition: 'NM',
-    scryfall_id: `00000000-0000-4000-8000-${String(position).padStart(12, '0')}`,
+    external_source: 'scryfall',
+    external_id: `00000000-0000-4000-8000-${String(position).padStart(12, '0')}`,
     decision: 'keep',
     decision_reason: null,
     market_price: '1.00',
@@ -252,22 +254,6 @@ describe('ImportDetailPage', () => {
     });
   });
 
-  it('returns to the imports list on Escape', async () => {
-    const user = userEvent.setup();
-    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
-      importDetail({ status: 'review' }),
-    );
-
-    renderImportDetailPage();
-    await screen.findByText('manabox-today.csv');
-
-    await user.keyboard('{Escape}');
-
-    await waitFor(() => {
-      expect(screen.getByText('Imports list')).toBeDefined();
-    });
-  });
-
   it('places set then finish after name and rainbows keep foil and etched names', async () => {
     vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
       reviewImport({
@@ -394,25 +380,6 @@ describe('ImportDetailPage', () => {
     expect(
       screen.getByRole('button', { name: 'Confirm import' }),
     ).toBeDefined();
-  });
-
-  it('moves the selected row with j and k', async () => {
-    const user = userEvent.setup();
-    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
-      reviewImport(),
-    );
-
-    renderImportDetailPage();
-    await screen.findByText('Top Card');
-
-    const rowFor = (name: string) => screen.getByText(name).closest('tr');
-    expect(rowFor('Top Card')?.getAttribute('data-selected')).toBe('true');
-
-    await user.keyboard('j');
-    expect(rowFor('Middle Card')?.getAttribute('data-selected')).toBe('true');
-
-    await user.keyboard('k');
-    expect(rowFor('Top Card')?.getAttribute('data-selected')).toBe('true');
   });
 
   it('confirms the import and shows placement instructions', async () => {

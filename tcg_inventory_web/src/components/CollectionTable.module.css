@@ -23,16 +23,6 @@
   background: var(--mantine-color-gray-0);
 }
 
-.table tbody tr[data-selected='true'] td,
-.table tbody tr[data-selected='true']:hover td {
-  background: var(--mantine-color-blue-0);
-  border-bottom-color: var(--mantine-color-blue-2);
-}
-
-.table tbody tr[data-selected='true'] td:first-child {
-  box-shadow: inset 3px 0 0 var(--mantine-color-blue-6);
-}
-
 .table [data-field='price'],
 .table [data-field='rows'],
 .table [data-field='units'],
@@ -40,6 +30,18 @@
 .table [data-field='uploaded'],
 .table [data-field='accepted'] {
   white-space: nowrap;
+}
+
+@media (min-width: 48.01em) {
+  .skus {
+    table-layout: fixed;
+  }
+
+  .skus thead th:nth-child(1),
+  .skus tbody td[data-field='name'] {
+    width: 32%;
+    overflow-wrap: anywhere;
+  }
 }
 
 @media (max-width: 48em) {
@@ -102,19 +104,8 @@
     content: none;
   }
 
-  .table tbody tr:hover td,
-  .table tbody tr[data-selected='true'] td,
-  .table tbody tr[data-selected='true']:hover td {
+  .table tbody tr:hover td {
     background: transparent;
-  }
-
-  .table tbody tr[data-selected='true'] {
-    background: var(--mantine-color-blue-0);
-    box-shadow: inset 3px 0 0 var(--mantine-color-blue-6);
-  }
-
-  .table tbody tr[data-selected='true'] td:first-child {
-    box-shadow: none;
   }
 
   .skus tbody tr {

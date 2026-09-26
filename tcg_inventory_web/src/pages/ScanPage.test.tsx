@@ -12,6 +12,7 @@ import type { ScanDetail, ScanRow, ScanSummary } from '../api/client';
 const scanFixtures: ScanSummary[] = [
   {
     scan_id: 'scan-reviewing',
+    game: 'mtg',
     status: 'reviewing',
     condition: 'NM',
     finish: 'normal',
@@ -22,6 +23,7 @@ const scanFixtures: ScanSummary[] = [
   },
   {
     scan_id: 'scan-confirmed',
+    game: 'mtg',
     status: 'confirmed',
     condition: 'LP',
     finish: 'foil',
@@ -94,13 +96,26 @@ describe('ScanPage', () => {
 
     const jobs = screen.getByRole('region', { name: 'Scan jobs' });
 
-    expect(within(jobs).getByLabelText('Condition')).toBeDefined();
-    expect(within(jobs).getByLabelText('Finish')).toBeDefined();
-    expect(within(jobs).getByLabelText('Scanner JPEGs')).toBeDefined();
+    expect(within(jobs).getByRole('textbox', { name: 'Game' })).toBeDefined();
     expect(
-      within(jobs).getByRole('button', { name: 'Create scan' }),
+      within(jobs).getByRole('textbox', { name: 'Condition' }),
     ).toBeDefined();
+    const finishInput = within(jobs).getByRole('textbox', { name: 'Finish' });
+    expect(finishInput.getAttribute('placeholder')).toBe('Select game first');
+    expect(finishInput.hasAttribute('disabled')).toBe(true);
+    expect(within(jobs).getByLabelText(/Scanner JPEGs/)).toBeDefined();
+    expect(
+      (
+        within(jobs).getByRole('button', {
+          name: 'Create scan',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
     expect(await within(jobs).findByText('review')).toBeDefined();
+    const scanRow = within(jobs)
+      .getByText('100')
+      .closest('tr') as HTMLTableRowElement;
+    expect(within(scanRow).getByText('Magic: The Gathering')).toBeDefined();
     expect(within(jobs).getByText('100')).toBeDefined();
     expect(within(jobs).getByText('Foil')).toBeDefined();
     expect(
@@ -147,6 +162,9 @@ describe('ScanPage', () => {
     const { container } = renderScanPage();
     const fileInput = container.querySelector('input[type="file"]');
 
+    await user.click(screen.getByRole('textbox', { name: 'Game' }));
+    await user.keyboard('{ArrowDown}{Enter}');
+
     await user.upload(
       fileInput as HTMLInputElement,
       new File(['jpeg'], '001.jpg', { type: 'image/jpeg' }),
@@ -154,6 +172,7 @@ describe('ScanPage', () => {
     await user.click(screen.getByRole('button', { name: 'Create scan' }));
 
     expect(createScan).toHaveBeenCalledWith({
+      game: 'mtg',
       condition: 'NM',
       finish: 'normal',
       files: [{ filename: '001.jpg', size_bytes: 4 }],
@@ -229,6 +248,8 @@ describe('ScanPage', () => {
       fileInput,
       new File(['jpeg'], '001.jpg', { type: 'image/jpeg' }),
     );
+    await user.click(screen.getByRole('textbox', { name: 'Game' }));
+    await user.keyboard('{ArrowDown}{Enter}');
     await user.click(screen.getByRole('button', { name: 'Create scan' }));
 
     expect(await screen.findAllByText('network interrupted')).not.toHaveLength(

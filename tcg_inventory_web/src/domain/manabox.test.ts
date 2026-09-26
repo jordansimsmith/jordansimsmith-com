@@ -53,7 +53,8 @@ describe('parseManaBoxCsv', () => {
       collector_number: '42',
       finish: 'normal',
       condition: 'NM',
-      scryfall_id: '4eaac4fd-95f5-4f38-b593-0101e79a20f9',
+      external_source: 'scryfall',
+      external_id: '4eaac4fd-95f5-4f38-b593-0101e79a20f9',
       quantity: 3,
       language: 'en',
     });

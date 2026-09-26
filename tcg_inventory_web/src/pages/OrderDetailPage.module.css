@@ -18,8 +18,13 @@
 }
 
 .pullHeader,
+.gameHeader,
 .pullRow {
   border-bottom: 1px solid var(--mantine-color-gray-2);
+}
+
+.gameHeader {
+  background: var(--mantine-color-gray-0);
 }
 
 .pullRow {

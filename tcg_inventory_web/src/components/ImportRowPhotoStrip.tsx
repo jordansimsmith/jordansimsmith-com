@@ -33,15 +33,30 @@ export function ImportRowPhotoStrip({
   onRemove,
 }: ImportRowPhotoStripProps) {
   const canAdd = editable && onAdd && photos.length < MAX_PHOTOS;
+  const showNeedsPhotos = needsPhotos && photos.length === 0;
 
   return (
     <Group gap={6} wrap="wrap" onClick={(event) => event.stopPropagation()}>
-      {canAdd && (
-        <AddPhotoControl position={position} onAdd={onAdd}>
-          <ActionIcon component="span" variant="subtle" size={36} color="gray">
-            <IconCamera size={16} />
-          </ActionIcon>
-        </AddPhotoControl>
+      {(canAdd || showNeedsPhotos) && (
+        <Group gap={6} wrap="nowrap" preventGrowOverflow={false}>
+          {canAdd && (
+            <AddPhotoControl position={position} onAdd={onAdd}>
+              <ActionIcon
+                component="span"
+                variant="subtle"
+                size={36}
+                color="gray"
+              >
+                <IconCamera size={16} />
+              </ActionIcon>
+            </AddPhotoControl>
+          )}
+          {showNeedsPhotos && (
+            <Badge variant="light" color="orange">
+              Needs photos
+            </Badge>
+          )}
+        </Group>
       )}
       {photos.map((photo) => (
         <div
@@ -76,11 +91,6 @@ export function ImportRowPhotoStrip({
           )}
         </div>
       ))}
-      {needsPhotos && photos.length === 0 && (
-        <Badge variant="light" color="orange">
-          Needs photos
-        </Badge>
-      )}
     </Group>
   );
 }

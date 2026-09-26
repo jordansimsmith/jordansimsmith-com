@@ -24,6 +24,7 @@ import type {
   ScanDetail,
   ScanStatus,
 } from '../api/client';
+import { gameLabel } from '../domain/games';
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -233,7 +234,7 @@ export function ScanDetailPage() {
           <>
             <PageHeader
               title="Scan"
-              description={`Created ${new Date(scan.created_at * 1000).toLocaleString()}`}
+              description={`${gameLabel(scan.game)} · Created ${new Date(scan.created_at * 1000).toLocaleString()}`}
               actions={
                 <Group gap="xs">
                   {scan.status !== 'confirmed' && (

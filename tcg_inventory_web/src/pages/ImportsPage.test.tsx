@@ -17,6 +17,7 @@ import type { ImportSummary } from '../api/client';
 const importFixtures: ImportSummary[] = [
   {
     import_id: 'import-2',
+    game: 'mtg',
     filename: 'manabox-today.csv',
     status: 'appraising',
     row_count: 40,
@@ -25,6 +26,7 @@ const importFixtures: ImportSummary[] = [
   },
   {
     import_id: 'import-1',
+    game: 'mtg',
     filename: 'manabox-last-week.csv',
     status: 'confirmed',
     row_count: 24,
@@ -89,6 +91,7 @@ describe('ImportsPage', () => {
       'tr',
     ) as HTMLTableRowElement;
 
+    expect(within(row).getByText('Magic: The Gathering')).toBeDefined();
     expect(within(row).getByText('appraising')).toBeDefined();
     expect(within(row).getByText('40')).toBeDefined();
     const confirmedRow = screen
@@ -145,19 +148,6 @@ describe('ImportsPage', () => {
     expect(clientModule.apiClient.createImport).not.toHaveBeenCalled();
   });
 
-  it('opens the selected import with Enter', async () => {
-    const user = userEvent.setup();
-    renderImportsPage();
-    await screen.findByText('manabox-today.csv');
-
-    await user.keyboard('j');
-    await user.keyboard('{Enter}');
-
-    await waitFor(() => {
-      expect(screen.getByText('Import detail import-1')).toBeDefined();
-    });
-  });
-
   it('navigates when a row is clicked', async () => {
     const user = userEvent.setup();
     renderImportsPage();
@@ -173,6 +163,7 @@ describe('ImportsPage', () => {
   it('appends the next page when load more is clicked', async () => {
     const nextPage: ImportSummary = {
       import_id: 'import-0',
+      game: 'mtg',
       filename: 'manabox-older.csv',
       status: 'confirmed',
       row_count: 12,

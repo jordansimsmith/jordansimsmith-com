@@ -51,14 +51,15 @@ import type {
 } from './client';
 import { parseManaBoxCsv } from '../domain/manabox';
 import type { ManaBoxRow } from '../domain/manabox';
+import { GAMES, MAGIC_THE_GATHERING, getGame } from '../domain/games';
+import type { GameId } from '../domain/games';
 import {
   MAX_SCAN_FILE_BYTES,
   compareScanFilenames,
 } from '../domain/scan-files';
 
 const VALID_CONDITIONS: Condition[] = ['NM', 'LP', 'MP', 'HP', 'DMG'];
-const VALID_FINISHES: Finish[] = ['normal', 'foil', 'etched'];
-
+const SKU_PAGE_SIZE = 20;
 type SeedSku = [
   scryfallId: string,
   name: string,
@@ -128,7 +129,9 @@ const SEEDED_UNIT_PHOTO_URL =
 
 interface FakeSku {
   sku_id: string;
-  scryfall_id: string;
+  game: GameId;
+  external_source: string;
+  external_id: string;
   name: string;
   set_code: string;
   set_name: string;
@@ -174,8 +177,10 @@ function createSeedState(): FakeSku[] {
       }
       const hasStock = inStockCount > 0;
       return {
-        sku_id: `${scryfallId}#${finish}#${condition}`,
-        scryfall_id: scryfallId,
+        sku_id: crypto.randomUUID(),
+        game: MAGIC_THE_GATHERING.id,
+        external_source: MAGIC_THE_GATHERING.externalSource,
+        external_id: scryfallId,
         name,
         set_code: setCode,
         set_name: setName,
@@ -221,6 +226,7 @@ function countByStatus(sku: FakeSku, status: UnitStatus): number {
 function toSummary(sku: FakeSku): SkuSummary {
   return {
     sku_id: sku.sku_id,
+    game: sku.game,
     name: sku.name,
     set_code: sku.set_code,
     set_name: sku.set_name,
@@ -242,7 +248,8 @@ function toDetail(sku: FakeSku): SkuDetail {
     }));
   return {
     ...toSummary(sku),
-    scryfall_id: sku.scryfall_id,
+    external_source: sku.external_source,
+    external_id: sku.external_id,
     in_stock_count: countByStatus(sku, 'in_stock'),
     reserved_count: countByStatus(sku, 'reserved'),
     sold_count: countByStatus(sku, 'sold'),
@@ -272,7 +279,8 @@ interface FakeImportRow {
   collector_number: string;
   finish: Finish;
   condition: Condition;
-  scryfall_id: string;
+  external_source: string;
+  external_id: string;
   decision: RowDecision;
   decision_reason: string | null;
   market_price: string | null;
@@ -307,6 +315,7 @@ function appraisePrices(
 
 interface FakeImport {
   import_id: string;
+  game: GameId;
   filename: string;
   status: ImportStatus;
   rows: FakeImportRow[];
@@ -356,7 +365,8 @@ function createSeedImportRows(count: number): FakeImportRow[] {
       collector_number: collectorNumber,
       finish,
       condition,
-      scryfall_id: scryfallId,
+      external_source: MAGIC_THE_GATHERING.externalSource,
+      external_id: scryfallId,
       decision,
       decision_reason: decisionReason,
       ...appraisePrices(decision, position),
@@ -371,6 +381,7 @@ function createSeedImports(): FakeImport[] {
   return [
     {
       import_id: 'fake-import-1',
+      game: MAGIC_THE_GATHERING.id,
       filename: 'manabox-2026-08-05.csv',
       status: 'confirmed',
       // review rows must be resolved before confirm, so none remain here
@@ -384,6 +395,7 @@ function createSeedImports(): FakeImport[] {
     {
       // partway through appraisal at app load; finishes ~10s later
       import_id: 'fake-import-2',
+      game: MAGIC_THE_GATHERING.id,
       filename: 'manabox-2026-08-12.csv',
       status: 'appraising',
       rows: createSeedImportRows(40),
@@ -391,6 +403,7 @@ function createSeedImports(): FakeImport[] {
     },
     {
       import_id: 'fake-import-3',
+      game: MAGIC_THE_GATHERING.id,
       filename: 'manabox-2026-08-19.csv',
       status: 'review',
       rows: [
@@ -402,7 +415,8 @@ function createSeedImports(): FakeImport[] {
           collector_number: '195',
           finish: 'normal',
           condition: 'NM',
-          scryfall_id: '29ba5a2d-d787-4214-8cd7-7f2bcea938f8',
+          external_source: MAGIC_THE_GATHERING.externalSource,
+          external_id: '29ba5a2d-d787-4214-8cd7-7f2bcea938f8',
           decision: 'keep',
           decision_reason: null,
           market_price: '62.00',
@@ -417,7 +431,8 @@ function createSeedImports(): FakeImport[] {
           collector_number: '168',
           finish: 'normal',
           condition: 'NM',
-          scryfall_id: '581b7327-3215-4a4f-b4ae-d9d4002ba882',
+          external_source: MAGIC_THE_GATHERING.externalSource,
+          external_id: '581b7327-3215-4a4f-b4ae-d9d4002ba882',
           decision: 'keep',
           decision_reason: null,
           market_price: '0.30',
@@ -432,7 +447,8 @@ function createSeedImports(): FakeImport[] {
           collector_number: '60',
           finish: 'normal',
           condition: 'NM',
-          scryfall_id: '25f2e4d0-effd-4e83-b7aa-1a0d8f120951',
+          external_source: MAGIC_THE_GATHERING.externalSource,
+          external_id: '25f2e4d0-effd-4e83-b7aa-1a0d8f120951',
           decision: 'discard',
           decision_reason: DISCARD_REASON,
           market_price: '0.10',
@@ -468,6 +484,7 @@ function progressAppraisal(importRecord: FakeImport): void {
 function toImportSummary(importRecord: FakeImport): ImportSummary {
   return {
     import_id: importRecord.import_id,
+    game: importRecord.game,
     filename: importRecord.filename,
     status: importRecord.status,
     row_count: importRecord.rows.length,
@@ -494,7 +511,8 @@ function toImportRow(row: FakeImportRow, revealed: boolean): ImportRow {
     collector_number: row.collector_number,
     finish: row.finish,
     condition: row.condition,
-    scryfall_id: row.scryfall_id,
+    external_source: row.external_source,
+    external_id: row.external_id,
     decision: revealed ? row.decision : null,
     decision_reason: revealed ? row.decision_reason : null,
     market_price: revealed ? row.market_price : null,
@@ -547,6 +565,7 @@ interface FakeScanRow extends ScanFile {
 
 interface FakeScan {
   scan_id: string;
+  game: GameId;
   assume_upload_success?: boolean;
   status: ScanStatus;
   condition: Condition;
@@ -567,11 +586,16 @@ function fakeScanSourceUrl(scanId: string, scanPosition: number): string {
 }
 
 function scanSuggestion(
-  scryfallId: string,
+  externalId: string,
   name: string,
   score: number,
 ): ScanSuggestion {
-  return { scryfall_id: scryfallId, name, score };
+  return {
+    external_source: MAGIC_THE_GATHERING.externalSource,
+    external_id: externalId,
+    name,
+    score,
+  };
 }
 
 function createFakeScanRow(
@@ -626,6 +650,7 @@ function createSeedScans(): FakeScan[] {
   return [
     {
       scan_id: 'fake-scan-uploading',
+      game: MAGIC_THE_GATHERING.id,
       status: 'uploading',
       condition: 'NM',
       finish: 'normal',
@@ -641,6 +666,7 @@ function createSeedScans(): FakeScan[] {
     },
     {
       scan_id: 'fake-scan-identifying',
+      game: MAGIC_THE_GATHERING.id,
       status: 'identifying',
       condition: 'LP',
       finish: 'foil',
@@ -676,6 +702,7 @@ function createSeedScans(): FakeScan[] {
     },
     {
       scan_id: 'fake-scan-reviewing',
+      game: MAGIC_THE_GATHERING.id,
       status: 'reviewing',
       condition: 'MP',
       finish: 'etched',
@@ -713,6 +740,7 @@ function createSeedScans(): FakeScan[] {
     },
     {
       scan_id: 'fake-scan-confirmed',
+      game: MAGIC_THE_GATHERING.id,
       status: 'confirmed',
       condition: 'NM',
       finish: 'normal',
@@ -798,6 +826,7 @@ function progressFakeScan(scan: FakeScan): void {
 function toScanSummary(scan: FakeScan): ScanSummary {
   return {
     scan_id: scan.scan_id,
+    game: scan.game,
     status: scan.status,
     condition: scan.condition,
     finish: scan.finish,
@@ -1087,6 +1116,7 @@ function toNeighborCard(unit: BlockUnit | null): OrderNeighborCard | null {
 // removed units are gone and in-stock and reserved units still occupy slots
 function computeBlockPosition(
   allUnits: BlockUnit[],
+  game: GameId,
   sequenceNumber: number,
 ): Pick<OrderUnit, 'current_location' | 'previous_card' | 'next_card'> {
   const block = Math.floor(sequenceNumber / 100);
@@ -1096,6 +1126,7 @@ function computeBlockPosition(
   for (const unit of allUnits) {
     if (
       unit.sequence_number === sequenceNumber ||
+      unit.sku.game !== game ||
       Math.floor(unit.sequence_number / 100) !== block ||
       unit.status === 'sold' ||
       unit.status === 'removed'
@@ -1141,25 +1172,31 @@ function toOrderDetail(order: FakeOrder, skus: FakeSku[]): OrderDetail {
         throw new Error('Not Found');
       }
       return {
+        game: sku.game,
         sequence_number: ref.sequence_number,
         location: deriveLocation(ref.sequence_number),
         name: sku.name,
-        scryfall_id: sku.scryfall_id,
+        external_source: sku.external_source,
+        external_id: sku.external_id,
         set_code: sku.set_code,
         collector_number: sku.collector_number,
         finish: sku.finish,
         condition: sku.condition,
         price: unitPriceBySkuId.get(ref.sku_id) ?? null,
-        ...computeBlockPosition(allUnits, ref.sequence_number),
+        ...computeBlockPosition(allUnits, sku.game, ref.sequence_number),
       };
     })
-    .sort((a, b) => a.sequence_number - b.sequence_number);
+    .sort(
+      (a, b) =>
+        a.game.localeCompare(b.game) || a.sequence_number - b.sequence_number,
+    );
   const lines: OrderLine[] = order.lines.map((line) => {
     const sku = skus.find((candidate) => candidate.sku_id === line.sku_id);
     if (!sku) {
       throw new Error('Not Found');
     }
     return {
+      game: sku.game,
       name: sku.name,
       set_code: sku.set_code,
       collector_number: sku.collector_number,
@@ -1188,8 +1225,23 @@ export function createFakeClient(): ApiClient {
   let importCounter = importRecords.length;
   let scanCounter = scans.length + 1;
   let photoCounter = 0;
-  // seed units occupy sequence numbers 0-599 (blocks A0-A5)
-  let nextSequenceNumber = 600;
+  // fake Magic intake starts after its seeded A0-A5 stock
+  const fakeSeedSequenceNumberByGame: Partial<Record<GameId, number>> = {
+    [MAGIC_THE_GATHERING.id]: 600,
+  };
+  const nextSequenceNumberByGame = new Map<GameId, number>(
+    GAMES.map(({ id }) => {
+      const sequences = skus
+        .filter((sku) => sku.game === id)
+        .flatMap((sku) => sku.units.map((unit) => unit.sequence_number));
+      const nextSeedSequenceNumber =
+        sequences.length === 0 ? 0 : Math.max(...sequences) + 1;
+      return [
+        id,
+        Math.max(nextSeedSequenceNumber, fakeSeedSequenceNumberByGame[id] ?? 0),
+      ];
+    }),
+  );
   // every 4th seed SKU starts dirty so the pending publish badge is non-zero
   const dirtySkuIds = new Set<string>(
     skus.filter((_, index) => index % 4 === 0).map((sku) => sku.sku_id),
@@ -1347,7 +1399,8 @@ export function createFakeClient(): ApiClient {
             collector_number: parsed.collector_number,
             finish: parsed.finish,
             condition: parsed.condition,
-            scryfall_id: parsed.scryfall_id,
+            external_source: parsed.external_source,
+            external_id: parsed.external_id,
             ...decided,
             ...appraisePrices(decided.decision, position),
             photos: [],
@@ -1357,6 +1410,7 @@ export function createFakeClient(): ApiClient {
       importCounter += 1;
       const importRecord: FakeImport = {
         import_id: `fake-import-${importCounter}`,
+        game: MAGIC_THE_GATHERING.id,
         filename,
         status: 'appraising',
         rows,
@@ -1478,14 +1532,25 @@ export function createFakeClient(): ApiClient {
         .filter((row) => row.decision === 'keep');
       const sequenceNumbers: number[] = [];
       for (const row of keepRows) {
-        const sequenceNumber = nextSequenceNumber;
-        nextSequenceNumber += 1;
-        const skuId = `${row.scryfall_id}#${row.finish}#${row.condition}`;
-        let sku = skus.find((candidate) => candidate.sku_id === skuId);
+        const sequenceNumber = nextSequenceNumberByGame.get(importRecord.game);
+        if (sequenceNumber === undefined) {
+          throw new Error(`Unsupported game: ${importRecord.game}`);
+        }
+        nextSequenceNumberByGame.set(importRecord.game, sequenceNumber + 1);
+        let sku = skus.find(
+          (candidate) =>
+            candidate.game === importRecord.game &&
+            candidate.external_source === row.external_source &&
+            candidate.external_id === row.external_id &&
+            candidate.finish === row.finish &&
+            candidate.condition === row.condition,
+        );
         if (!sku) {
           sku = {
-            sku_id: skuId,
-            scryfall_id: row.scryfall_id,
+            sku_id: crypto.randomUUID(),
+            game: importRecord.game,
+            external_source: row.external_source,
+            external_id: row.external_id,
             name: row.name,
             set_code: row.set_code,
             set_name: row.set_name,
@@ -1548,10 +1613,11 @@ export function createFakeClient(): ApiClient {
     },
 
     async createScan(request: CreateScanRequest): Promise<CreateScanResponse> {
+      const game = getGame(request.game);
       if (!VALID_CONDITIONS.includes(request.condition)) {
         throw new Error('invalid scan condition');
       }
-      if (!VALID_FINISHES.includes(request.finish)) {
+      if (!game.finishes.includes(request.finish)) {
         throw new Error('invalid scan finish');
       }
       if (request.files.length < 1 || request.files.length > 200) {
@@ -1579,6 +1645,7 @@ export function createFakeClient(): ApiClient {
       scanCounter += 1;
       const scan: FakeScan = {
         scan_id: scanId,
+        game: request.game,
         assume_upload_success: true,
         status: 'uploading',
         condition: request.condition,
@@ -1698,7 +1765,8 @@ export function createFakeClient(): ApiClient {
           return (
             source === undefined ||
             row.scan_position !== source.scan_position ||
-            !row.scryfall_id ||
+            !row.external_source ||
+            !row.external_id ||
             !row.name ||
             !row.set_code ||
             !row.set_name ||
@@ -1720,7 +1788,8 @@ export function createFakeClient(): ApiClient {
         collector_number: row.collector_number,
         finish: scan.finish,
         condition: scan.condition,
-        scryfall_id: row.scryfall_id,
+        external_source: row.external_source,
+        external_id: row.external_id,
         decision: 'keep',
         decision_reason: null,
         ...appraisePrices('keep', index + 1),
@@ -1728,6 +1797,7 @@ export function createFakeClient(): ApiClient {
       }));
       importRecords.push({
         import_id: importId,
+        game: scan.game,
         filename: `${scan.scan_id}.scan`,
         status: 'appraising',
         rows: importRows,
@@ -1754,13 +1824,27 @@ export function createFakeClient(): ApiClient {
       scans.splice(index, 1);
     },
 
-    async findSkus(params?: FindSkusParams): Promise<FindSkusResponse> {
-      const search = params?.search?.trim().toLowerCase() ?? '';
+    async findSkus(params: FindSkusParams): Promise<FindSkusResponse> {
+      const offset = params.continuation ? Number(params.continuation) : 0;
+      if (!Number.isInteger(offset) || offset < 0) {
+        throw new Error('invalid continuation');
+      }
+      const search = params.search?.trim().toLowerCase() ?? '';
       const matches = skus
         .map(toSummary)
-        .filter((sku) => sku.name.toLowerCase().startsWith(search))
+        .filter(
+          (sku) =>
+            sku.game === params.game &&
+            sku.name.toLowerCase().startsWith(search),
+        )
         .sort((a, b) => (browseKey(a) < browseKey(b) ? -1 : 1));
-      return { skus: matches, next_continuation: null };
+      const page = matches.slice(offset, offset + SKU_PAGE_SIZE);
+      const nextOffset = offset + page.length;
+      return {
+        skus: page,
+        next_continuation:
+          nextOffset < matches.length ? String(nextOffset) : null,
+      };
     },
 
     async getSku(skuId: string): Promise<SkuDetail> {
@@ -1791,12 +1875,18 @@ export function createFakeClient(): ApiClient {
       if (condition === sku.condition) {
         return { sku_id: sku.sku_id };
       }
-      const targetSkuId = `${sku.scryfall_id}#${sku.finish}#${condition}`;
-      let target = skus.find((candidate) => candidate.sku_id === targetSkuId);
+      let target = skus.find(
+        (candidate) =>
+          candidate.game === sku.game &&
+          candidate.external_source === sku.external_source &&
+          candidate.external_id === sku.external_id &&
+          candidate.finish === sku.finish &&
+          candidate.condition === condition,
+      );
       if (!target) {
         target = {
           ...sku,
-          sku_id: targetSkuId,
+          sku_id: crypto.randomUUID(),
           condition,
           last_published_price: null,
           units: [],
@@ -1812,7 +1902,7 @@ export function createFakeClient(): ApiClient {
       dirtySkuIds.add(sku.sku_id);
       dirtySkuIds.add(target.sku_id);
       reportStale = true;
-      return { sku_id: targetSkuId };
+      return { sku_id: target.sku_id };
     },
 
     async findOrders(): Promise<FindOrdersResponse> {

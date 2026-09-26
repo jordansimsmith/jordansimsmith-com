@@ -17,6 +17,7 @@ import type { SkuSummary } from '../api/client';
 const skuFixtures: SkuSummary[] = [
   {
     sku_id: '11111111-1111-4111-8111-111111111111#normal#NM',
+    game: 'mtg',
     name: 'Lightning Bolt',
     set_code: 'sta',
     set_name: 'Strixhaven Mystical Archive',
@@ -27,6 +28,7 @@ const skuFixtures: SkuSummary[] = [
   },
   {
     sku_id: '22222222-2222-4222-8222-222222222222#foil#LP',
+    game: 'mtg',
     name: 'Opt',
     set_code: 'dom',
     set_name: 'Dominaria',
@@ -37,6 +39,7 @@ const skuFixtures: SkuSummary[] = [
   },
   {
     sku_id: '33333333-3333-4333-8333-333333333333#normal#MP',
+    game: 'mtg',
     name: 'Sol Ring',
     set_code: 'cmr',
     set_name: 'Commander Legends',
@@ -71,10 +74,12 @@ describe('InventoryPage', () => {
     vi.clearAllMocks();
     vi.spyOn(clientModule.apiClient, 'findSkus').mockImplementation(
       async (params) => {
-        const search = params?.search?.toLowerCase() ?? '';
+        const search = params.search?.toLowerCase() ?? '';
         return {
-          skus: skuFixtures.filter((sku) =>
-            sku.name.toLowerCase().startsWith(search),
+          skus: skuFixtures.filter(
+            (sku) =>
+              sku.game === params.game &&
+              sku.name.toLowerCase().startsWith(search),
           ),
           next_continuation: null,
         };
@@ -109,30 +114,47 @@ describe('InventoryPage', () => {
     renderInventoryPage();
     await screen.findByText('Lightning Bolt');
 
-    await user.type(screen.getByLabelText('Search SKUs'), 'sol');
+    await user.type(
+      screen.getByLabelText('Search Magic: The Gathering inventory'),
+      'sol',
+    );
 
     await waitFor(() => {
       expect(screen.queryByText('Lightning Bolt')).toBeNull();
     });
     expect(screen.getByText('Sol Ring')).toBeDefined();
     expect(clientModule.apiClient.findSkus).toHaveBeenLastCalledWith({
+      game: 'mtg',
       search: 'sol',
     });
   });
 
-  it('opens the selected row with Enter', async () => {
+  it('focuses the active game search with slash', async () => {
     const user = userEvent.setup();
     renderInventoryPage();
     await screen.findByText('Lightning Bolt');
 
-    await user.keyboard('j');
-    await user.keyboard('{Enter}');
+    await user.keyboard('/');
 
-    await waitFor(() => {
-      expect(
-        screen.getByText(`SKU detail ${skuFixtures[1].sku_id}`),
-      ).toBeDefined();
+    const search = screen.getByRole('textbox', {
+      name: 'Search Magic: The Gathering inventory',
     });
+    expect(document.activeElement).toBe(search);
+    expect(search).toHaveProperty('value', '');
+  });
+
+  it('does not steal slash while typing in a control', async () => {
+    const user = userEvent.setup();
+    renderInventoryPage();
+    await screen.findByText('Lightning Bolt');
+
+    const search = screen.getByRole('textbox', {
+      name: 'Search Magic: The Gathering inventory',
+    });
+    await user.click(search);
+    await user.keyboard('/');
+
+    expect(search).toHaveProperty('value', '/');
   });
 
   it('navigates when a row is clicked', async () => {

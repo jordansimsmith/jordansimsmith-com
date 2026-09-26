@@ -18,7 +18,9 @@ const SCRYFALL_ID = 'aaaa1111-2222-4333-8444-555566667777';
 
 const nmDetail: SkuDetail = {
   sku_id: `${SCRYFALL_ID}#normal#NM`,
-  scryfall_id: SCRYFALL_ID,
+  game: 'mtg',
+  external_source: 'scryfall',
+  external_id: SCRYFALL_ID,
   name: 'Sol Ring',
   set_code: 'cmr',
   set_name: 'Commander Legends',
@@ -54,7 +56,9 @@ const nmDetail: SkuDetail = {
 
 const lpDetail: SkuDetail = {
   sku_id: `${SCRYFALL_ID}#normal#LP`,
-  scryfall_id: SCRYFALL_ID,
+  game: 'mtg',
+  external_source: 'scryfall',
+  external_id: SCRYFALL_ID,
   name: 'Sol Ring',
   set_code: 'cmr',
   set_name: 'Commander Legends',
@@ -236,16 +240,6 @@ describe('SkuDetailPage', () => {
       );
     });
     expect(await screen.findByText('In stock: 5')).toBeDefined();
-  });
-
-  it('navigates back to inventory on Escape', async () => {
-    const user = userEvent.setup();
-    renderSkuDetailPage();
-    await screen.findByRole('heading', { name: 'Sol Ring' });
-
-    await user.keyboard('{Escape}');
-
-    expect(await screen.findByText('Inventory page')).toBeDefined();
   });
 
   it('renders view-only photo thumbnails on photographed units of any status', async () => {

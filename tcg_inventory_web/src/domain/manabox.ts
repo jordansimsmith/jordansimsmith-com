@@ -1,4 +1,5 @@
 import type { Condition, Finish } from '../api/client';
+import { MAGIC_THE_GATHERING } from './games';
 
 export const REQUIRED_COLUMNS = [
   'Name',
@@ -12,7 +13,7 @@ export const REQUIRED_COLUMNS = [
   'Language',
 ];
 
-const FINISHES: Finish[] = ['normal', 'foil', 'etched'];
+const MAGIC_FINISHES: readonly Finish[] = MAGIC_THE_GATHERING.finishes;
 
 const MANABOX_CONDITIONS: Record<string, Condition> = {
   mint: 'NM',
@@ -34,7 +35,8 @@ export interface ManaBoxRow {
   collector_number: string;
   finish: Finish;
   condition: Condition;
-  scryfall_id: string;
+  external_source: string;
+  external_id: string;
   quantity: number;
   language: string;
 }
@@ -120,7 +122,7 @@ function parseRow(
   }
 
   const finish = required('Foil').toLowerCase() as Finish;
-  if (!FINISHES.includes(finish)) {
+  if (!MAGIC_FINISHES.includes(finish)) {
     throw new Error(`row ${rowNumber}: Foil must be normal, foil, or etched`);
   }
 
@@ -142,7 +144,8 @@ function parseRow(
     collector_number: required('Collector number'),
     finish,
     condition,
-    scryfall_id: scryfallId,
+    external_source: MAGIC_THE_GATHERING.externalSource,
+    external_id: scryfallId,
     quantity,
     language: required('Language').toLowerCase(),
   };

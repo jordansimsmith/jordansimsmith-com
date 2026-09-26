@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Group, Stack } from '@mantine/core';
 import { notifications } from '@mantine/notifications';
 import { useNavigate } from 'react-router-dom';
@@ -12,7 +12,6 @@ import { OrderTable } from '../components/OrderTable';
 import { PageHeader } from '../components/PageHeader';
 import { apiClient } from '../api/client';
 import type { OrderSummary } from '../api/client';
-import { useListNavigation } from '../hooks/use-list-navigation';
 
 export function OrdersPage() {
   const navigate = useNavigate();
@@ -21,23 +20,9 @@ export function OrdersPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // this page has no search input; the ref keeps the navigation hook inert on "/"
-  const searchInputRef = useRef<HTMLInputElement>(null);
-
   const openOrder = (order: OrderSummary) => {
     navigate(`/orders/${encodeURIComponent(order.order_id)}`);
   };
-
-  const { selectedIndex } = useListNavigation({
-    itemCount: orders.length,
-    onOpen: (index) => {
-      const order = orders[index];
-      if (order) {
-        openOrder(order);
-      }
-    },
-    searchInputRef,
-  });
 
   useEffect(() => {
     let cancelled = false;
@@ -123,11 +108,7 @@ export function OrdersPage() {
             <CollectionMessage title="No orders yet." />
           )}
           {!loading && !error && orders.length > 0 && (
-            <OrderTable
-              orders={orders}
-              selectedIndex={selectedIndex}
-              onOpen={openOrder}
-            />
+            <OrderTable orders={orders} onOpen={openOrder} />
           )}
         </CollectionSurface>
       </Stack>

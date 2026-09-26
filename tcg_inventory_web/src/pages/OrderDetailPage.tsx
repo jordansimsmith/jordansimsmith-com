@@ -25,17 +25,15 @@ import type {
 } from '../api/client';
 import { ListPriceBadge } from '../components/ListPriceBadge';
 import { PageHeader } from '../components/PageHeader';
+import { cardImageUrl } from '../domain/card-image';
 import { formatDeliveryMode } from '../domain/deliveryMode';
+import { gameLabel } from '../domain/games';
 import classes from './OrderDetailPage.module.css';
 
 const CARD_IMAGE_FALLBACK =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='146' height='204' viewBox='0 0 146 204'%3E%3Crect width='146' height='204' rx='8' fill='%23e9ecef' stroke='%23ced4da'/%3E%3C/svg%3E";
 const TRADEME_COURIER_URL =
   'https://www.trademe.co.nz/a/marketplace/book-courier/select';
-
-function cardImageUrl(scryfallId: string): string {
-  return `https://api.scryfall.com/cards/${encodeURIComponent(scryfallId)}?format=image&version=small`;
-}
 
 function unitDescription(unit: OrderUnit): string {
   const parts = [
@@ -109,27 +107,14 @@ export function OrderDetailPage() {
     };
   }, [orderId]);
 
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || confirmOpen) {
-        return;
-      }
-      const target = event.target;
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement
-      ) {
-        return;
-      }
-      navigate('/orders');
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [confirmOpen, navigate]);
-
   const showPullContext =
     order?.state === 'awaiting_payment' || order?.state === 'to_pick';
+  const unitsByGame = new Map<string, OrderUnit[]>();
+  for (const unit of order?.units ?? []) {
+    const gameUnits = unitsByGame.get(unit.game) ?? [];
+    gameUnits.push(unit);
+    unitsByGame.set(unit.game, gameUnits);
+  }
 
   const handleConfirm = async () => {
     if (!orderId) {
@@ -309,75 +294,97 @@ export function OrderDetailPage() {
                     </Text>
                   </Group>
                 </Box>
-                {order.units.map((unit) => (
-                  <Box key={unit.sequence_number} className={classes.pullRow}>
-                    <Box className={classes.pullImage}>
-                      <Image
-                        src={cardImageUrl(unit.scryfall_id)}
-                        fallbackSrc={CARD_IMAGE_FALLBACK}
-                        alt=""
-                        fit="contain"
-                        w="100%"
-                        h="100%"
-                        loading="lazy"
-                        decoding="async"
-                        fetchPriority="low"
-                        radius="sm"
-                      />
-                    </Box>
-                    <Group
-                      className={classes.pullPosition}
-                      align="baseline"
-                      wrap="nowrap"
-                      gap="xs"
-                    >
-                      <Text fz={26} fw={700} className={classes.location}>
-                        {showPullContext
-                          ? unit.current_location
-                          : unit.location}
+                {[...unitsByGame].map(([game, units]) => (
+                  <Box
+                    key={game}
+                    component="section"
+                    aria-label={gameLabel(game)}
+                  >
+                    <Box px="md" py="xs" className={classes.gameHeader}>
+                      <Text size="sm" fw={600}>
+                        {gameLabel(game)}
                       </Text>
-                      {showPullContext &&
-                        unit.current_location !== unit.location && (
+                    </Box>
+                    {units.map((unit) => (
+                      <Box
+                        key={`${unit.game}:${unit.sequence_number}`}
+                        className={classes.pullRow}
+                      >
+                        <Box className={classes.pullImage}>
+                          <Image
+                            src={cardImageUrl(
+                              unit.game,
+                              unit.external_source,
+                              unit.external_id,
+                              'small',
+                            )}
+                            fallbackSrc={CARD_IMAGE_FALLBACK}
+                            alt=""
+                            fit="contain"
+                            w="100%"
+                            h="100%"
+                            loading="lazy"
+                            decoding="async"
+                            fetchPriority="low"
+                            radius="sm"
+                          />
+                        </Box>
+                        <Group
+                          className={classes.pullPosition}
+                          align="baseline"
+                          wrap="nowrap"
+                          gap="xs"
+                        >
+                          <Text fz={26} fw={700} className={classes.location}>
+                            {showPullContext
+                              ? unit.current_location
+                              : unit.location}
+                          </Text>
+                          {showPullContext &&
+                            unit.current_location !== unit.location && (
+                              <Text
+                                size="sm"
+                                c="dimmed"
+                                td="line-through"
+                                className={classes.location}
+                              >
+                                {unit.location}
+                              </Text>
+                            )}
+                        </Group>
+                        <Stack gap={2} className={classes.pullCard}>
+                          <Text fw={500}>{unit.name}</Text>
+                          <Text size="sm" c="dimmed">
+                            {unitDescription(unit)}
+                          </Text>
+                        </Stack>
+                        {unit.price != null && (
                           <Text
-                            size="sm"
-                            c="dimmed"
-                            td="line-through"
-                            className={classes.location}
+                            fw={600}
+                            className={`${classes.pullPrice} ${classes.location}`}
                           >
-                            {unit.location}
+                            ${unit.price}
                           </Text>
                         )}
-                    </Group>
-                    <Stack gap={2} className={classes.pullCard}>
-                      <Text fw={500}>{unit.name}</Text>
-                      <Text size="sm" c="dimmed">
-                        {unitDescription(unit)}
-                      </Text>
-                    </Stack>
-                    {unit.price != null && (
-                      <Text
-                        fw={600}
-                        className={`${classes.pullPrice} ${classes.location}`}
-                      >
-                        ${unit.price}
-                      </Text>
-                    )}
-                    {showPullContext &&
-                      (unit.previous_card != null ||
-                        unit.next_card != null) && (
-                        <Stack gap={2} className={classes.neighbors}>
-                          {unit.previous_card != null && (
-                            <Text size="xs" c="dimmed">
-                              Prev · {neighborDescription(unit.previous_card)}
-                            </Text>
+                        {showPullContext &&
+                          (unit.previous_card != null ||
+                            unit.next_card != null) && (
+                            <Stack gap={2} className={classes.neighbors}>
+                              {unit.previous_card != null && (
+                                <Text size="xs" c="dimmed">
+                                  Prev ·{' '}
+                                  {neighborDescription(unit.previous_card)}
+                                </Text>
+                              )}
+                              {unit.next_card != null && (
+                                <Text size="xs" c="dimmed">
+                                  Next · {neighborDescription(unit.next_card)}
+                                </Text>
+                              )}
+                            </Stack>
                           )}
-                          {unit.next_card != null && (
-                            <Text size="xs" c="dimmed">
-                              Next · {neighborDescription(unit.next_card)}
-                            </Text>
-                          )}
-                        </Stack>
-                      )}
+                      </Box>
+                    ))}
                   </Box>
                 ))}
                 {order.state === 'to_pick' && (

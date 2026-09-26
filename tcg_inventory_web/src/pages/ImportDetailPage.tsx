@@ -30,7 +30,7 @@ import type {
   ImportDetail,
 } from '../api/client';
 import { encodeListingPhoto } from '../domain/encode-listing-photo';
-import { useListNavigation } from '../hooks/use-list-navigation';
+import { gameLabel } from '../domain/games';
 import classes from './ImportDetailPage.module.css';
 
 const POLL_INTERVAL_MS = 2000;
@@ -47,8 +47,6 @@ export function ImportDetailPage() {
     useState<ConfirmImportResponse | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  // this page has no search input; the ref keeps the navigation hook inert on "/"
-  const searchInputRef = useRef<HTMLInputElement>(null);
   const importDetailRef = useRef(importDetail);
   importDetailRef.current = importDetail;
 
@@ -58,12 +56,6 @@ export function ImportDetailPage() {
     importDetail.status !== 'appraising' &&
     !importDetail.appraisal_error &&
     confirmResult === null;
-
-  const { selectedIndex, setSelectedIndex } = useListNavigation({
-    itemCount: showReview ? rows.length : 0,
-    onOpen: () => {},
-    searchInputRef,
-  });
 
   useEffect(() => {
     if (!importId) {
@@ -101,25 +93,6 @@ export function ImportDetailPage() {
       clearTimeout(timer);
     };
   }, [importId]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || confirmOpen || deleteOpen) {
-        return;
-      }
-      const target = event.target;
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement
-      ) {
-        return;
-      }
-      navigate('/imports');
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [confirmOpen, deleteOpen, navigate]);
 
   useEffect(() => {
     const handleVisibilityChange = async () => {
@@ -304,7 +277,7 @@ export function ImportDetailPage() {
           <>
             <PageHeader
               title={importDetail.filename}
-              description={`Uploaded ${new Date(importDetail.created_at * 1000).toLocaleString()}`}
+              description={`${gameLabel(importDetail.game)} · Uploaded ${new Date(importDetail.created_at * 1000).toLocaleString()}`}
               actions={
                 <Button variant="subtle" onClick={() => navigate('/imports')}>
                   Back to imports
@@ -417,8 +390,6 @@ export function ImportDetailPage() {
                 {rows.length > 0 ? (
                   <ImportReviewTable
                     rows={rows}
-                    selectedIndex={selectedIndex}
-                    onSelect={setSelectedIndex}
                     editable={importDetail.status === 'review'}
                     onConditionChange={handleConditionChange}
                     onDeleteRow={handleDeleteRow}

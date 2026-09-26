@@ -33,6 +33,7 @@ function row(scanPosition: number, status: ScanRow['status']): ScanRow {
 function detail(overrides: Partial<ScanDetail> = {}): ScanDetail {
   return {
     scan_id: 'scan-identifying',
+    game: 'mtg',
     status: 'identifying',
     condition: 'LP',
     finish: 'foil',

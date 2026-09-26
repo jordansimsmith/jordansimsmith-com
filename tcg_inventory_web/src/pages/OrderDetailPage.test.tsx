@@ -30,6 +30,7 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
     unit_count: 3,
     lines: [
       {
+        game: 'mtg',
         name: 'Sol Ring',
         set_code: 'cmr',
         collector_number: '472',
@@ -40,6 +41,7 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
         listed_price: '5.00',
       },
       {
+        game: 'mtg',
         name: 'Elvish Aberration',
         set_code: 'a25',
         collector_number: '167',
@@ -52,10 +54,12 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
     ],
     units: [
       {
+        game: 'mtg',
         sequence_number: 37,
         location: 'A0-37',
         current_location: 'A0-35',
-        scryfall_id: '58b26011-e103-45c4-a253-900f4e6b2eeb',
+        external_source: 'scryfall',
+        external_id: '58b26011-e103-45c4-a253-900f4e6b2eeb',
         name: 'Sol Ring',
         set_code: 'cmr',
         collector_number: '472',
@@ -78,10 +82,12 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
         },
       },
       {
+        game: 'mtg',
         sequence_number: 74,
         location: 'A0-74',
         current_location: 'A0-70',
-        scryfall_id: '58b26011-e103-45c4-a253-900f4e6b2eeb',
+        external_source: 'scryfall',
+        external_id: '58b26011-e103-45c4-a253-900f4e6b2eeb',
         name: 'Sol Ring',
         set_code: 'cmr',
         collector_number: '472',
@@ -98,10 +104,12 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
         next_card: null,
       },
       {
+        game: 'mtg',
         sequence_number: 259,
         location: 'A2-59',
         current_location: 'A2-59',
-        scryfall_id: 'f0a51425-d796-48b8-b68c-bc21fb465c81',
+        external_source: 'scryfall',
+        external_id: 'f0a51425-d796-48b8-b68c-bc21fb465c81',
         name: 'Elvish Aberration',
         set_code: 'a25',
         collector_number: '167',
@@ -174,6 +182,9 @@ describe('OrderDetailPage', () => {
       within(summary).getByText('Offered $10.90 · Listed $13.00'),
     ).toBeDefined();
     const pullSheet = screen.getByRole('region', { name: 'Pull sheet' });
+    expect(
+      within(pullSheet).getByRole('region', { name: 'Magic: The Gathering' }),
+    ).toBeDefined();
     expect(
       within(pullSheet).getByRole('button', { name: 'Confirm pull' }),
     ).toBeDefined();
@@ -369,6 +380,7 @@ describe('OrderDetailPage', () => {
         listed_total_price: '8.50',
         lines: [
           {
+            game: 'mtg',
             name: 'Hellkite Tyrant',
             set_code: 'gtc',
             collector_number: '94',
@@ -381,10 +393,12 @@ describe('OrderDetailPage', () => {
         ],
         units: [
           {
+            game: 'mtg',
             sequence_number: 1,
             location: 'A0-1',
             current_location: 'A0-1',
-            scryfall_id: '0bc3401f-935b-45ce-b1e6-300a5d9dfd4f',
+            external_source: 'scryfall',
+            external_id: '0bc3401f-935b-45ce-b1e6-300a5d9dfd4f',
             name: 'Hellkite Tyrant',
             set_code: 'gtc',
             collector_number: '94',
@@ -448,22 +462,6 @@ describe('OrderDetailPage', () => {
       expect(document.querySelector('img')?.getAttribute('src')).toContain(
         'data:image/svg+xml',
       );
-    });
-  });
-
-  it('returns to the orders list on Escape', async () => {
-    const user = userEvent.setup();
-    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(
-      orderDetail(),
-    );
-
-    renderOrderDetailPage();
-    await screen.findByText('Order 83647');
-
-    await user.keyboard('{Escape}');
-
-    await waitFor(() => {
-      expect(screen.getByText('Orders list')).toBeDefined();
     });
   });
 

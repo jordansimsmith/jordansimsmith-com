@@ -3,19 +3,10 @@ import { createFakeClient } from './fake-client';
 import { createFakeScanUploader } from './fake-scan-uploader';
 import type { ScanConfirmationRow } from './client';
 
-async function findSkuId(
-  client: ReturnType<typeof createFakeClient>,
-  search: string,
-  index = 0,
-): Promise<string> {
-  const response = await client.findSkus({ search });
-  return response.skus[index].sku_id;
-}
-
 describe('createFakeClient', () => {
   it('derives detail counts from units', async () => {
     const client = createFakeClient();
-    const response = await client.findSkus({ search: 'sol ring' });
+    const response = await client.findSkus({ game: 'mtg', search: 'sol ring' });
     const nmSku = response.skus.find((sku) => sku.condition === 'NM');
 
     const detail = await client.getSku(nmSku!.sku_id);
@@ -26,7 +17,13 @@ describe('createFakeClient', () => {
 
   it('returns units ascending with derived locations', async () => {
     const client = createFakeClient();
-    const skuId = await findSkuId(client, 'sol ring', 1);
+    const solRingSkus = await client.findSkus({
+      game: 'mtg',
+      search: 'sol ring',
+    });
+    const skuId = solRingSkus.skus.find(
+      (sku) => sku.condition === 'NM',
+    )!.sku_id;
 
     const detail = await client.getSku(skuId);
 
@@ -44,7 +41,11 @@ describe('createFakeClient', () => {
 
   it('seeds a photographed Doubling Season unit', async () => {
     const client = createFakeClient();
-    const skuId = await findSkuId(client, 'doubling season');
+    const doublingSeasonSkus = await client.findSkus({
+      game: 'mtg',
+      search: 'doubling season',
+    });
+    const skuId = doublingSeasonSkus.skus[0].sku_id;
     const detail = await client.getSku(skuId);
 
     expect(detail.units).toHaveLength(1);
@@ -55,7 +56,13 @@ describe('createFakeClient', () => {
       },
     ]);
 
-    const solRingId = await findSkuId(client, 'sol ring', 1);
+    const solRingSkus = await client.findSkus({
+      game: 'mtg',
+      search: 'sol ring',
+    });
+    const solRingId = solRingSkus.skus.find(
+      (sku) => sku.condition === 'NM',
+    )!.sku_id;
     const solRing = await client.getSku(solRingId);
     expect(solRing.units.every((unit) => unit.photos.length === 0)).toBe(true);
   });
@@ -70,7 +77,11 @@ describe('createFakeClient', () => {
 
   it('marks a unit removed and updates counts on deleteUnit', async () => {
     const client = createFakeClient();
-    const skuId = await findSkuId(client, 'brainstorm');
+    const brainstormSkus = await client.findSkus({
+      game: 'mtg',
+      search: 'brainstorm',
+    });
+    const skuId = brainstormSkus.skus[0].sku_id;
     const detail = await client.getSku(skuId);
     const unit = detail.units.find((entry) => entry.status === 'in_stock');
 
@@ -87,7 +98,11 @@ describe('createFakeClient', () => {
 
   it('rejects deleteUnit for units that are not in stock', async () => {
     const client = createFakeClient();
-    const skuId = await findSkuId(client, 'mana crypt');
+    const manaCryptSkus = await client.findSkus({
+      game: 'mtg',
+      search: 'mana crypt',
+    });
+    const skuId = manaCryptSkus.skus[0].sku_id;
     const detail = await client.getSku(skuId);
 
     expect(detail.units[0].status).toBe('reserved');
@@ -98,7 +113,13 @@ describe('createFakeClient', () => {
 
   it('moves a unit to an existing SKU on updateUnit', async () => {
     const client = createFakeClient();
-    const sourceId = await findSkuId(client, 'lightning bolt', 1);
+    const lightningBoltSkus = await client.findSkus({
+      game: 'mtg',
+      search: 'lightning bolt',
+    });
+    const sourceId = lightningBoltSkus.skus.find(
+      (sku) => sku.condition === 'NM',
+    )!.sku_id;
     const source = await client.getSku(sourceId);
     expect(source.condition).toBe('NM');
     const unit = source.units.find((entry) => entry.status === 'in_stock');
@@ -109,7 +130,9 @@ describe('createFakeClient', () => {
       'LP',
     );
 
-    const targetId = await findSkuId(client, 'lightning bolt', 0);
+    const targetId = lightningBoltSkus.skus.find(
+      (sku) => sku.condition === 'LP',
+    )!.sku_id;
     expect(response.sku_id).toBe(targetId);
     const target = await client.getSku(targetId);
     expect(target.condition).toBe('LP');
@@ -126,7 +149,11 @@ describe('createFakeClient', () => {
 
   it('creates the target SKU on updateUnit when it does not exist', async () => {
     const client = createFakeClient();
-    const sourceId = await findSkuId(client, 'sylvan library');
+    const sylvanLibrarySkus = await client.findSkus({
+      game: 'mtg',
+      search: 'sylvan library',
+    });
+    const sourceId = sylvanLibrarySkus.skus[0].sku_id;
     const source = await client.getSku(sourceId);
     const unit = source.units[0];
 
@@ -136,14 +163,20 @@ describe('createFakeClient', () => {
       'DMG',
     );
 
-    expect(response.sku_id).toBe(`${source.scryfall_id}#normal#DMG`);
+    expect(response.sku_id).not.toBe(source.sku_id);
     const target = await client.getSku(response.sku_id);
+    expect(target.game).toBe(source.game);
+    expect(target.external_source).toBe(source.external_source);
+    expect(target.external_id).toBe(source.external_id);
     expect(target.name).toBe('Sylvan Library');
     expect(target.condition).toBe('DMG');
     expect(target.in_stock_count).toBe(1);
     expect(target.units[0].sequence_number).toBe(unit.sequence_number);
 
-    const browse = await client.findSkus({ search: 'sylvan library' });
+    const browse = await client.findSkus({
+      game: 'mtg',
+      search: 'sylvan library',
+    });
     expect(browse.skus).toHaveLength(2);
   });
 });
@@ -319,23 +352,48 @@ describe('createFakeClient imports', () => {
     ]);
 
     // the stack bottom (llanowar elves, csv row 1) gets the first sequence number
-    const elves = await client.getSku(
-      '581b7327-3215-4a4f-b4ae-d9d4002ba882#normal#NM',
+    const elvesCandidates = await client.findSkus({
+      game: 'mtg',
+      search: 'llanowar elves',
+    });
+    const elvesDetails = await Promise.all(
+      elvesCandidates.skus.map((sku) => client.getSku(sku.sku_id)),
     );
+    const elves = elvesDetails.find(
+      (sku) => sku.external_id === '581b7327-3215-4a4f-b4ae-d9d4002ba882',
+    )!;
     expect(elves.in_stock_count).toBe(7);
     expect(elves.units.map((unit) => unit.sequence_number)).toContain(600);
 
     // the lp opt sku did not exist and is created by the confirm
-    const opt = await client.getSku(
-      '25f2e4d0-effd-4e83-b7aa-1a0d8f120951#normal#LP',
+    const optCandidates = await client.findSkus({ game: 'mtg', search: 'opt' });
+    const optDetails = await Promise.all(
+      optCandidates.skus.map((sku) => client.getSku(sku.sku_id)),
     );
+    const opt = optDetails.find(
+      (sku) =>
+        sku.external_id === '25f2e4d0-effd-4e83-b7aa-1a0d8f120951' &&
+        sku.condition === 'LP',
+    )!;
     expect(opt.in_stock_count).toBe(2);
     expect(opt.units.map((unit) => unit.sequence_number)).toEqual([601, 602]);
 
     // the review row (non-english ponder) never becomes a unit
-    await expect(
-      client.getSku('81c908ee-e70a-4406-a32d-ab5ab17e67b1#normal#MP'),
-    ).rejects.toThrow('Not Found');
+    const ponderCandidates = await client.findSkus({
+      game: 'mtg',
+      search: 'ponder',
+    });
+    const ponderDetails = await Promise.all(
+      ponderCandidates.skus.map((sku) => client.getSku(sku.sku_id)),
+    );
+    expect(
+      ponderDetails.some(
+        (sku) =>
+          sku.external_id === '81c908ee-e70a-4406-a32d-ab5ab17e67b1' &&
+          sku.finish === 'normal' &&
+          sku.condition === 'MP',
+      ),
+    ).toBe(false);
 
     const detail = await client.getImport(created.import_id);
     expect(detail.status).toBe('confirmed');
@@ -425,6 +483,7 @@ describe('createFakeClient scans', () => {
     const client = createFakeClient();
 
     const created = await client.createScan({
+      game: 'mtg',
       condition: 'LP',
       finish: 'foil',
       files: [
@@ -460,6 +519,7 @@ describe('createFakeClient scans', () => {
     const client = createFakeClient();
     const uploader = createFakeScanUploader();
     const created = await client.createScan({
+      game: 'mtg',
       condition: 'LP',
       finish: 'foil',
       files: [
@@ -491,7 +551,8 @@ describe('createFakeClient scans', () => {
     const scan = await client.getScan('fake-scan-reviewing');
     const rows: ScanConfirmationRow[] = scan.rows.map((row, index) => ({
       scan_position: row.scan_position,
-      scryfall_id: row.suggestions[0].scryfall_id,
+      external_source: row.suggestions[0].external_source,
+      external_id: row.suggestions[0].external_id,
       name: row.suggestions[0].name,
       set_code: index === 0 ? 'mh2' : 'dom',
       set_name: index === 0 ? 'Modern Horizons 2' : 'Dominaria',
@@ -699,7 +760,9 @@ describe('createFakeClient orders', () => {
     for (const unit of detail.units) {
       const block = Math.floor(unit.sequence_number / 100);
       expect(unit.location).toBe(`A${block}-${unit.sequence_number % 100}`);
-      expect(unit.scryfall_id).toMatch(/^[0-9a-f-]{36}$/);
+      expect(unit.game).toBe('mtg');
+      expect(unit.external_source).toBe('scryfall');
+      expect(unit.external_id).toMatch(/^[0-9a-f-]{36}$/);
     }
     for (const unit of detail.units) {
       expect(unit.current_location).toMatch(/^A\d+-\d+$/);
@@ -732,6 +795,7 @@ describe('createFakeClient orders', () => {
     expect(aberration?.price).toBe('2.90');
     expect(detail.lines).toEqual([
       {
+        game: 'mtg',
         name: 'Sol Ring',
         set_code: 'cmr',
         collector_number: '472',
@@ -742,6 +806,7 @@ describe('createFakeClient orders', () => {
         listed_price: '5.00',
       },
       {
+        game: 'mtg',
         name: 'Elvish Aberration',
         set_code: 'a25',
         collector_number: '167',
@@ -771,16 +836,26 @@ describe('createFakeClient orders', () => {
     expect(detail.state).toBe('fulfilled');
     expect(detail.units).toHaveLength(3);
 
-    const solRing = await client.getSku(
-      '58b26011-e103-45c4-a253-900f4e6b2eeb#normal#NM',
-    );
+    const solRingSkus = await client.findSkus({
+      game: 'mtg',
+      search: 'sol ring',
+    });
+    const solRingSummary = solRingSkus.skus.find(
+      (sku) => sku.condition === 'NM',
+    )!;
+    const solRing = await client.getSku(solRingSummary.sku_id);
     expect(solRing.reserved_count).toBe(0);
     expect(solRing.sold_count).toBe(2);
     expect(solRing.in_stock_count).toBe(6);
 
-    const aberration = await client.getSku(
-      'f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM',
-    );
+    const aberrationSkus = await client.findSkus({
+      game: 'mtg',
+      search: 'elvish aberration',
+    });
+    const aberrationSummary = aberrationSkus.skus.find(
+      (sku) => sku.condition === 'NM',
+    )!;
+    const aberration = await client.getSku(aberrationSummary.sku_id);
     expect(aberration.reserved_count).toBe(0);
     expect(aberration.sold_count).toBe(1);
 
@@ -872,7 +947,11 @@ describe('createFakeClient publish', () => {
     const client = createFakeClient();
     await drainPublish(client);
 
-    const skuId = await findSkuId(client, 'brainstorm');
+    const brainstormSkus = await client.findSkus({
+      game: 'mtg',
+      search: 'brainstorm',
+    });
+    const skuId = brainstormSkus.skus[0].sku_id;
     const detail = await client.getSku(skuId);
     const unit = detail.units.find((entry) => entry.status === 'in_stock');
     await client.deleteUnit(skuId, unit!.sequence_number);
@@ -907,7 +986,11 @@ describe('createFakeClient publish', () => {
     await client.confirmOrder('83647');
     expect((await client.getPublish()).pending_sku_count).toBe(0);
 
-    const skuId = await findSkuId(client, 'brainstorm');
+    const brainstormSkus = await client.findSkus({
+      game: 'mtg',
+      search: 'brainstorm',
+    });
+    const skuId = brainstormSkus.skus[0].sku_id;
     const detail = await client.getSku(skuId);
     const units = detail.units.filter((entry) => entry.status === 'in_stock');
     await client.deleteUnit(skuId, units[0].sequence_number);

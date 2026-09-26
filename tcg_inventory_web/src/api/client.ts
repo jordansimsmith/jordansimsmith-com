@@ -1,5 +1,8 @@
 import { createFakeClient } from './fake-client';
 import { createHttpClient } from './http-client';
+import type { Finish, GameId } from '../domain/games';
+
+export type { Finish, GameId } from '../domain/games';
 
 export interface SettingsResponse {
   credential_set: boolean;
@@ -12,18 +15,15 @@ export interface UpdateSettingsRequest {
   track_orders_after?: number;
 }
 
-export type Finish = 'normal' | 'foil' | 'etched';
-
 export type Condition = 'NM' | 'LP' | 'MP' | 'HP' | 'DMG';
 
 export const CONDITIONS: Condition[] = ['NM', 'LP', 'MP', 'HP', 'DMG'];
-
-export const FINISHES: Finish[] = ['normal', 'foil', 'etched'];
 
 export type UnitStatus = 'in_stock' | 'reserved' | 'sold' | 'removed';
 
 export interface SkuSummary {
   sku_id: string;
+  game: GameId;
   name: string;
   set_code: string;
   set_name: string;
@@ -39,6 +39,7 @@ export interface FindSkusResponse {
 }
 
 export interface FindSkusParams {
+  game: GameId;
   search?: string;
   continuation?: string;
 }
@@ -51,7 +52,8 @@ export interface SkuUnit {
 }
 
 export interface SkuDetail extends SkuSummary {
-  scryfall_id: string;
+  external_source: string;
+  external_id: string;
   in_stock_count: number;
   reserved_count: number;
   sold_count: number;
@@ -68,6 +70,7 @@ export type RowDecision = 'keep' | 'discard' | 'review';
 
 export interface ImportSummary {
   import_id: string;
+  game: GameId;
   filename: string;
   status: ImportStatus;
   row_count: number;
@@ -97,7 +100,8 @@ export interface ImportRow {
   collector_number: string;
   finish: Finish;
   condition: Condition;
-  scryfall_id: string;
+  external_source: string;
+  external_id: string;
   decision: RowDecision | null;
   decision_reason: string | null;
   market_price: string | null;
@@ -139,7 +143,8 @@ export type ScanStatus =
 export type ScanRowStatus = 'suggested' | 'needs_review';
 
 export interface ScanSuggestion {
-  scryfall_id: string;
+  external_source: string;
+  external_id: string;
   name: string;
   score: number;
 }
@@ -158,7 +163,8 @@ export interface ScanUploadSlot extends ScanFile {
 
 export interface ScanConfirmationRow {
   scan_position: number;
-  scryfall_id: string;
+  external_source: string;
+  external_id: string;
   name: string;
   set_code: string;
   set_name: string;
@@ -175,6 +181,7 @@ export interface ScanRow extends ScanUploadSlot {
 
 export interface ScanSummary {
   scan_id: string;
+  game: GameId;
   status: ScanStatus;
   condition: Condition;
   finish: Finish;
@@ -189,6 +196,7 @@ export interface ScanDetail extends ScanSummary {
 }
 
 export interface CreateScanRequest {
+  game: GameId;
   condition: Condition;
   finish: Finish;
   files: ScanFile[];
@@ -258,10 +266,12 @@ export interface OrderNeighborCard {
 }
 
 export interface OrderUnit {
+  game: GameId;
   sequence_number: number;
   location: string;
   current_location: string;
-  scryfall_id: string;
+  external_source: string;
+  external_id: string;
   name: string;
   set_code: string;
   collector_number: string;
@@ -273,6 +283,7 @@ export interface OrderUnit {
 }
 
 export interface OrderLine {
+  game: GameId;
   name: string;
   set_code: string;
   collector_number: string;
@@ -420,7 +431,7 @@ export interface ApiClient {
     request: ConfirmScanRequest,
   ): Promise<ConfirmScanResponse>;
   deleteScan(scanId: string): Promise<void>;
-  findSkus(params?: FindSkusParams): Promise<FindSkusResponse>;
+  findSkus(params: FindSkusParams): Promise<FindSkusResponse>;
   getSku(skuId: string): Promise<SkuDetail>;
   deleteUnit(
     skuId: string,

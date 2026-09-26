@@ -19,6 +19,7 @@ import { RemoveUnitModal } from '../components/RemoveUnitModal';
 import { EditConditionModal } from '../components/EditConditionModal';
 import { apiClient } from '../api/client';
 import type { Condition, SkuDetail, SkuUnit } from '../api/client';
+import { cardImageUrl } from '../domain/card-image';
 import classes from './SkuDetailPage.module.css';
 
 const CARD_IMAGE_FALLBACK =
@@ -65,25 +66,6 @@ export function SkuDetailPage() {
       cancelled = true;
     };
   }, [skuId]);
-
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || removingUnit || editingUnit) {
-        return;
-      }
-      const target = event.target;
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement
-      ) {
-        return;
-      }
-      navigate('/inventory');
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editingUnit, navigate, removingUnit]);
 
   const handleRemoveConfirm = async (reason: string) => {
     if (!sku || !removingUnit) {
@@ -186,7 +168,12 @@ export function SkuDetailPage() {
               <Box className={classes.overview}>
                 <Box className={classes.cardImageFrame}>
                   <Image
-                    src={`https://api.scryfall.com/cards/${sku.scryfall_id}?format=image&version=normal`}
+                    src={cardImageUrl(
+                      sku.game,
+                      sku.external_source,
+                      sku.external_id,
+                      'normal',
+                    )}
                     fallbackSrc={CARD_IMAGE_FALLBACK}
                     alt={sku.name}
                     w="100%"
