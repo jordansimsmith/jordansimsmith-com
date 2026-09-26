@@ -28,7 +28,7 @@ public class TcgInventoryE2ETest {
           + Base64.getEncoder().encodeToString("jordan:password".getBytes(StandardCharsets.UTF_8));
 
   private static final String HIT_SCRYFALL_ID = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
-  private static final String HIT_SKU_ID = HIT_SCRYFALL_ID + "#normal#NM";
+  private static final String HIT_SKU_ID = "mtg#scryfall#" + HIT_SCRYFALL_ID + "#normal#NM";
 
   private static final String CSV_BODY =
       "Name,Set code,Set name,Collector number,Foil,Quantity,Scryfall ID,Condition,Language\n"

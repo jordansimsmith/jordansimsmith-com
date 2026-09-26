@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.queue.FakeQueueClient;
+import com.jordansimsmith.tcginventory.Games;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
@@ -158,7 +159,9 @@ public class PublishHandlerIntegrationTest {
     var dirtySku =
         SkuItem.create(
             "jordan",
-            "sku1#normal#NM",
+            "mtg#scryfall#sku1#normal#NM",
+            Games.MAGIC_THE_GATHERING.id(),
+            Games.MAGIC_THE_GATHERING.externalSource(),
             "sku1",
             "normal",
             "NM",

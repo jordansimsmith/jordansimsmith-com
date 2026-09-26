@@ -11,6 +11,7 @@ import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.FakeFetchTcgClient;
 import com.jordansimsmith.tcginventory.FetchTcgClient;
+import com.jordansimsmith.tcginventory.Games;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.JobsHandler;
@@ -199,7 +200,9 @@ public class ReportsHandlerIntegrationTest {
     var sku1 =
         SkuItem.create(
             "jordan",
-            "scryfall1#normal#NM",
+            "mtg#scryfall#scryfall1#normal#NM",
+            Games.MAGIC_THE_GATHERING.id(),
+            Games.MAGIC_THE_GATHERING.externalSource(),
             "scryfall1",
             "normal",
             "NM",
@@ -215,7 +218,9 @@ public class ReportsHandlerIntegrationTest {
     var sku2 =
         SkuItem.create(
             "jordan",
-            "scryfall2#normal#NM",
+            "mtg#scryfall#scryfall2#normal#NM",
+            Games.MAGIC_THE_GATHERING.id(),
+            Games.MAGIC_THE_GATHERING.externalSource(),
             "scryfall2",
             "normal",
             "NM",
@@ -230,7 +235,9 @@ public class ReportsHandlerIntegrationTest {
     var sku3 =
         SkuItem.create(
             "jordan",
-            "scryfall3#normal#NM",
+            "mtg#scryfall#scryfall3#normal#NM",
+            Games.MAGIC_THE_GATHERING.id(),
+            Games.MAGIC_THE_GATHERING.externalSource(),
             "scryfall3",
             "normal",
             "NM",
@@ -245,7 +252,8 @@ public class ReportsHandlerIntegrationTest {
     unitTable.putItem(
         UnitItem.create(
             "jordan",
-            "scryfall1#normal#NM",
+            "mtg",
+            "mtg#scryfall#scryfall1#normal#NM",
             1,
             "in_stock",
             "import1",
@@ -253,7 +261,8 @@ public class ReportsHandlerIntegrationTest {
     unitTable.putItem(
         UnitItem.create(
             "jordan",
-            "scryfall1#normal#NM",
+            "mtg",
+            "mtg#scryfall#scryfall1#normal#NM",
             2,
             "in_stock",
             "import1",
@@ -261,7 +270,8 @@ public class ReportsHandlerIntegrationTest {
     unitTable.putItem(
         UnitItem.create(
             "jordan",
-            "scryfall1#normal#NM",
+            "mtg",
+            "mtg#scryfall#scryfall1#normal#NM",
             3,
             "reserved",
             "import1",
@@ -269,7 +279,8 @@ public class ReportsHandlerIntegrationTest {
     unitTable.putItem(
         UnitItem.create(
             "jordan",
-            "scryfall2#normal#NM",
+            "mtg",
+            "mtg#scryfall#scryfall2#normal#NM",
             4,
             "in_stock",
             "import1",
@@ -277,7 +288,8 @@ public class ReportsHandlerIntegrationTest {
     var soldUnit =
         UnitItem.create(
             "jordan",
-            "scryfall2#normal#NM",
+            "mtg",
+            "mtg#scryfall#scryfall2#normal#NM",
             5,
             "sold",
             "import1",
@@ -287,7 +299,8 @@ public class ReportsHandlerIntegrationTest {
     unitTable.putItem(
         UnitItem.create(
             "jordan",
-            "scryfall2#normal#NM",
+            "mtg",
+            "mtg#scryfall#scryfall2#normal#NM",
             6,
             "removed",
             "import1",
@@ -295,7 +308,8 @@ public class ReportsHandlerIntegrationTest {
     unitTable.putItem(
         UnitItem.create(
             "jordan",
-            "scryfall3#normal#NM",
+            "mtg",
+            "mtg#scryfall#scryfall3#normal#NM",
             7,
             "in_stock",
             "import1",

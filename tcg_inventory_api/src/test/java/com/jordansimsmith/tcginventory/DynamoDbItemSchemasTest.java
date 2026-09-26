@@ -29,7 +29,9 @@ public class DynamoDbItemSchemasTest {
     var item =
         SkuItem.create(
             "jordan",
-            "scryfall-1#normal#NM",
+            "mtg#scryfall#scryfall-1#normal#NM",
+            Games.MAGIC_THE_GATHERING.id(),
+            Games.MAGIC_THE_GATHERING.externalSource(),
             "scryfall-1",
             "normal",
             "NM",
@@ -44,10 +46,13 @@ public class DynamoDbItemSchemasTest {
 
     var roundTripped = roundTrip(SkuItem.class, item);
 
-    assertThat(roundTripped.getPk()).isEqualTo("USER#jordan#SKU#scryfall-1#normal#NM");
+    assertThat(roundTripped.getPk()).isEqualTo("USER#jordan#SKU#mtg#scryfall#scryfall-1#normal#NM");
     assertThat(roundTripped.getSk()).isEqualTo("SKU");
     assertThat(roundTripped.getGsi1pk()).isEqualTo("USER#jordan#DIRTY");
-    assertThat(roundTripped.getGsi1sk()).isEqualTo("SKU#scryfall-1#normal#NM");
+    assertThat(roundTripped.getGsi1sk()).isEqualTo("SKU#mtg#scryfall#scryfall-1#normal#NM");
+    assertThat(roundTripped.getGame()).isEqualTo("mtg");
+    assertThat(roundTripped.getExternalSource()).isEqualTo("scryfall");
+    assertThat(roundTripped.getExternalId()).isEqualTo("scryfall-1");
     assertThat(roundTripped.getGsi2pk()).isEqualTo("USER#jordan#SKUS");
     assertThat(roundTripped.getGsi2sk()).startsWith("NAME#elvish aberration#");
     assertThat(roundTripped.getLastPublishedAt()).isNull();
@@ -56,7 +61,14 @@ public class DynamoDbItemSchemasTest {
   @Test
   void shouldRoundTripUnitItemWithPhotosAndGsiKey() {
     var item =
-        UnitItem.create("jordan", "scryfall-1#normal#NM", 4242, "in_stock", "import-1", CREATED_AT);
+        UnitItem.create(
+            "jordan",
+            "mtg",
+            "mtg#scryfall#scryfall-1#normal#NM",
+            4242,
+            "in_stock",
+            "import-1",
+            CREATED_AT);
     item.setUpdatedAt(UPDATED_AT);
     item.setPhotos(
         List.of(
@@ -65,9 +77,10 @@ public class DynamoDbItemSchemasTest {
 
     var roundTripped = roundTrip(UnitItem.class, item);
 
-    assertThat(roundTripped.getPk()).isEqualTo("USER#jordan#SKU#scryfall-1#normal#NM");
+    assertThat(roundTripped.getPk()).isEqualTo("USER#jordan#SKU#mtg#scryfall#scryfall-1#normal#NM");
     assertThat(roundTripped.getSk()).isEqualTo("UNIT#0000004242");
-    assertThat(roundTripped.getGsi3pk()).isEqualTo("USER#jordan#UNITS");
+    assertThat(roundTripped.getGsi3pk()).isEqualTo("USER#jordan#UNITS#mtg");
+    assertThat(roundTripped.getGame()).isEqualTo("mtg");
     assertThat(roundTripped.getSequenceNumber()).isEqualTo(4242);
     assertThat(roundTripped.getCreatedAt()).isEqualTo(CREATED_AT);
     assertThat(roundTripped.getUpdatedAt()).isEqualTo(UPDATED_AT);
@@ -249,7 +262,7 @@ public class DynamoDbItemSchemasTest {
     item.setSk("audit-1");
     item.setEventType("unit_created");
     item.setImportId("import-1");
-    item.setSkuId("scryfall-1#normal#NM");
+    item.setSkuId("mtg#scryfall#scryfall-1#normal#NM");
     item.setSequenceNumber(42);
     item.setOrderId("100000");
     item.setDecisionReason("keep");
@@ -267,13 +280,15 @@ public class DynamoDbItemSchemasTest {
   void shouldRoundTripSequenceCounterItem() {
     var item = new SequenceCounterItem();
     item.setPk(SequenceCounterItem.formatPk("jordan"));
-    item.setSk(SequenceCounterItem.formatSk());
+    item.setSk(SequenceCounterItem.formatSk("mtg"));
+    item.setGame("mtg");
     item.setNextSequenceNumber(4243);
 
     var roundTripped = roundTrip(SequenceCounterItem.class, item);
 
     assertThat(roundTripped.getPk()).isEqualTo("USER#jordan");
-    assertThat(roundTripped.getSk()).isEqualTo("COUNTER#SEQUENCE");
+    assertThat(roundTripped.getSk()).isEqualTo("COUNTER#SEQUENCE#mtg");
+    assertThat(roundTripped.getGame()).isEqualTo("mtg");
     assertThat(roundTripped.getNextSequenceNumber()).isEqualTo(4243);
   }
 

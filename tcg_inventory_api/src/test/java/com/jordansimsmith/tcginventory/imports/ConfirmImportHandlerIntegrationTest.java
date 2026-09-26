@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
+import com.jordansimsmith.tcginventory.inventory.SequenceCounterItem;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.time.FakeClock;
@@ -37,6 +38,7 @@ public class ConfirmImportHandlerIntegrationTest {
   private DynamoDbTable<ImportRowItem> importRowTable;
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
+  private DynamoDbTable<SequenceCounterItem> sequenceCounterTable;
 
   private ConfirmImportHandler confirmImportHandler;
 
@@ -64,6 +66,7 @@ public class ConfirmImportHandlerIntegrationTest {
     importRowTable = factory.importRowTable();
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
+    sequenceCounterTable = factory.sequenceCounterTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
@@ -94,13 +97,15 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(body.get("first_sequence_number").asInt()).isEqualTo(0);
     assertThat(body.get("last_sequence_number").asInt()).isEqualTo(2);
 
-    var sku1Pk = SkuItem.formatPk("jordan", "scryfall-1#normal#NM");
+    var sku1Pk = SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     var unit0 =
         unitTable.getItem(
             Key.builder().partitionValue(sku1Pk).sortValue(UnitItem.formatSk(0)).build());
     assertThat(unit0).isNotNull();
     assertThat(unit0.getStatus()).isEqualTo("in_stock");
     assertThat(unit0.getImportId()).isEqualTo("import1");
+    assertThat(unit0.getGame()).isEqualTo("mtg");
+    assertThat(unit0.getGsi3pk()).isEqualTo("USER#jordan#UNITS#mtg");
 
     var unit1 =
         unitTable.getItem(
@@ -114,8 +119,21 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(sku1.getVersion()).isEqualTo(1);
     assertThat(sku1.getDirty()).isTrue();
     assertThat(sku1.getGsi1pk()).isEqualTo(SkuItem.formatGsi1pk("jordan"));
+    assertThat(sku1.getSkuId()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
+    assertThat(sku1.getGame()).isEqualTo("mtg");
+    assertThat(sku1.getExternalSource()).isEqualTo("scryfall");
+    assertThat(sku1.getExternalId()).isEqualTo("scryfall-1");
 
-    var sku2Pk = SkuItem.formatPk("jordan", "scryfall-2#foil#LP");
+    var sequenceCounter =
+        sequenceCounterTable.getItem(
+            Key.builder()
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(SequenceCounterItem.formatSk("mtg"))
+                .build());
+    assertThat(sequenceCounter.getGame()).isEqualTo("mtg");
+    assertThat(sequenceCounter.getNextSequenceNumber()).isEqualTo(3);
+
+    var sku2Pk = SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-2#foil#LP");
     var sku2 =
         skuTable.getItem(
             Key.builder().partitionValue(sku2Pk).sortValue(SkuItem.formatSk()).build());
@@ -230,9 +248,12 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(body.get("unit_count").asInt()).isEqualTo(4);
     assertThat(body.get("total_suggested_price").asText()).isEqualTo("6.00");
 
-    assertThat(countUnits(SkuItem.formatPk("jordan", "scryfall-1#normal#NM"))).isEqualTo(2);
-    assertThat(countUnits(SkuItem.formatPk("jordan", "scryfall-2#foil#LP"))).isEqualTo(1);
-    assertThat(countUnits(SkuItem.formatPk("jordan", "scryfall-3#normal#MP"))).isEqualTo(1);
+    assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
+        .isEqualTo(2);
+    assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-2#foil#LP")))
+        .isEqualTo(1);
+    assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-3#normal#MP")))
+        .isEqualTo(1);
   }
 
   @Test
@@ -291,7 +312,8 @@ public class ConfirmImportHandlerIntegrationTest {
     var existingUnit =
         UnitItem.create(
             "jordan",
-            "scryfall-1#normal#NM",
+            "mtg",
+            "mtg#scryfall#scryfall-1#normal#NM",
             0,
             "in_stock",
             "import1",
@@ -301,7 +323,9 @@ public class ConfirmImportHandlerIntegrationTest {
     var existingSku =
         SkuItem.create(
             "jordan",
-            "scryfall-1#normal#NM",
+            "mtg#scryfall#scryfall-1#normal#NM",
+            "mtg",
+            "scryfall",
             "scryfall-1",
             "normal",
             "NM",
@@ -327,7 +351,7 @@ public class ConfirmImportHandlerIntegrationTest {
     var sku =
         skuTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatPk("jordan", "scryfall-1#normal#NM"))
+                .partitionValue(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM"))
                 .sortValue(SkuItem.formatSk())
                 .build());
     assertThat(sku.getVersion()).isEqualTo(1);
@@ -399,8 +423,10 @@ public class ConfirmImportHandlerIntegrationTest {
                 .sortValue(ImportItem.formatSk("import1"))
                 .build());
     assertThat(importResult.getStatus()).isEqualTo("review");
-    assertThat(countUnits(SkuItem.formatPk("jordan", "scryfall-1#normal#NM"))).isEqualTo(0);
-    assertThat(countUnits(SkuItem.formatPk("jordan", "scryfall-2#normal#NM"))).isEqualTo(0);
+    assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
+        .isEqualTo(0);
+    assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-2#normal#NM")))
+        .isEqualTo(0);
   }
 
   @Test
@@ -456,7 +482,7 @@ public class ConfirmImportHandlerIntegrationTest {
     var unitA =
         unitTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatPk("jordan", "scryfall-1#normal#NM"))
+                .partitionValue(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM"))
                 .sortValue(UnitItem.formatSk(0))
                 .build());
     assertThat(unitA.getPhotos()).hasSize(2);
@@ -466,7 +492,7 @@ public class ConfirmImportHandlerIntegrationTest {
     var unitB =
         unitTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatPk("jordan", "scryfall-2#normal#NM"))
+                .partitionValue(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-2#normal#NM"))
                 .sortValue(UnitItem.formatSk(1))
                 .build());
     assertThat(unitB.getPhotos()).hasSize(1);
@@ -475,7 +501,7 @@ public class ConfirmImportHandlerIntegrationTest {
     var unitC =
         unitTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatPk("jordan", "scryfall-3#normal#NM"))
+                .partitionValue(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-3#normal#NM"))
                 .sortValue(UnitItem.formatSk(2))
                 .build());
     assertThat(unitC.getPhotos()).hasSize(1);

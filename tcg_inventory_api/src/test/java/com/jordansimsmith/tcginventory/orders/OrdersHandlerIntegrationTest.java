@@ -1,6 +1,7 @@
 package com.jordansimsmith.tcginventory.orders;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -183,7 +184,7 @@ public class OrdersHandlerIntegrationTest {
   void findOrdersShouldReturnItemAndListedTotals() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "scryfall-1#normal#NM";
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
     createSkuWithUnits("jordan", skuId, 2);
     createOrderWithLines(
         "jordan", "83663", "to_pick", skuId, List.of(1, 2), "PICKUP", "3.00", "1.50", "2.00");
@@ -205,7 +206,7 @@ public class OrdersHandlerIntegrationTest {
   void findOrdersShouldOmitListedTotalWhenBaselineMissing() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "scryfall-1#normal#NM";
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
     createSkuWithUnits("jordan", skuId, 1);
     createOrderWithLines(
         "jordan", "83663", "to_pick", skuId, List.of(1), "PICKUP", "1.50", "1.50", null);
@@ -225,7 +226,7 @@ public class OrdersHandlerIntegrationTest {
   void getOrderShouldReturnDetailWithUnitsAndLocations() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "scryfall-1#normal#NM";
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
     createSkuWithUnits("jordan", skuId, 3);
     reserveUnits("jordan", skuId, "83663", List.of(1, 3));
     createOrderWithLines(
@@ -261,6 +262,7 @@ public class OrdersHandlerIntegrationTest {
 
     var units = body.get("units");
     assertThat(units).hasSize(2);
+    assertThat(units.get(0).get("game").asText()).isEqualTo("mtg");
     assertThat(units.get(0).get("sequence_number").asInt()).isEqualTo(1);
     assertThat(units.get(0).get("location").asText()).isEqualTo("A0-1");
     assertThat(units.get(0).get("current_location").asText()).isEqualTo("A0-0");
@@ -286,8 +288,8 @@ public class OrdersHandlerIntegrationTest {
   void getOrderShouldReturnUnitsFromMultipleSkus() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId1 = "scryfall-1#normal#NM";
-    var skuId2 = "scryfall-2#foil#LP";
+    var skuId1 = "mtg#scryfall#scryfall-1#normal#NM";
+    var skuId2 = "mtg#scryfall#scryfall-2#foil#LP";
     createSku("jordan", skuId1, "Lightning Bolt", "dom", "168");
     createSku("jordan", skuId2, "Sol Ring", "c21", "100");
     createUnit("jordan", skuId1, 1, "reserved", "83663");
@@ -344,6 +346,61 @@ public class OrdersHandlerIntegrationTest {
     assertThat(responseLines.get(0).get("listed_price").asText()).isEqualTo("2.00");
     assertThat(responseLines.get(1).get("name").asText()).isEqualTo("Sol Ring");
     assertThat(responseLines.get(1).get("listed_price").asText()).isEqualTo("1.80");
+  }
+
+  @Test
+  void getOrderShouldFailWhenSkuIsMissing() {
+    // arrange
+    var skuId = "mtg#scryfall#missing#normal#NM";
+    createOrderWithLines(
+        "jordan", "83663", "to_pick", skuId, List.of(1), "PICKUP", "1.50", "1.50", null);
+
+    // act
+    var assertion =
+        assertThatThrownBy(
+            () ->
+                getOrderHandler.handleRequest(
+                    buildEventWithPath("jordan", Map.of("order_id", "83663")), null));
+
+    // assert
+    assertion
+        .hasCauseInstanceOf(IllegalStateException.class)
+        .hasRootCauseMessage("sku record missing: " + SkuItem.formatPk("jordan", skuId));
+  }
+
+  @Test
+  void getOrderShouldFailWhenSkuGameIsNotRegistered() {
+    // arrange
+    var skuId = "pokemon#tcgcsv#123#normal#NM";
+    skuTable.putItem(
+        SkuItem.create(
+            "jordan",
+            skuId,
+            "pokemon",
+            "tcgcsv",
+            "123",
+            "normal",
+            "NM",
+            "Test Card",
+            "set",
+            "Test Set",
+            "1",
+            null,
+            null));
+    createOrderWithLines(
+        "jordan", "83663", "to_pick", skuId, List.of(1), "PICKUP", "1.50", "1.50", null);
+
+    // act
+    var assertion =
+        assertThatThrownBy(
+            () ->
+                getOrderHandler.handleRequest(
+                    buildEventWithPath("jordan", Map.of("order_id", "83663")), null));
+
+    // assert
+    assertion
+        .hasCauseInstanceOf(IllegalArgumentException.class)
+        .hasRootCauseMessage("unsupported game: pokemon");
   }
 
   @Test
@@ -409,7 +466,7 @@ public class OrdersHandlerIntegrationTest {
   void getOrderShouldReturnNullListedPriceForLegacyOrders() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "scryfall-1#normal#NM";
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
     createSkuWithUnits("jordan", skuId, 1);
     reserveUnits("jordan", skuId, "83663", List.of(1));
     createOrderWithLines(
@@ -436,8 +493,8 @@ public class OrdersHandlerIntegrationTest {
   void getOrderShouldReturnCurrentLocationAccountingForSoldAndRemovedGaps() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "scryfall-1#normal#NM";
-    var otherSkuId = "scryfall-2#normal#NM";
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    var otherSkuId = "mtg#scryfall#scryfall-2#normal#NM";
     createSku("jordan", skuId, "Test Card", "dom", "168");
     createSku("jordan", otherSkuId, "Other Card", "c21", "100");
     createUnit("jordan", skuId, 10, "sold", null);
@@ -472,8 +529,8 @@ public class OrdersHandlerIntegrationTest {
   void getOrderShouldCountReservedUnitsAsStillBoxed() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "scryfall-1#normal#NM";
-    var otherSkuId = "scryfall-2#normal#NM";
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    var otherSkuId = "mtg#scryfall#scryfall-2#normal#NM";
     createSku("jordan", skuId, "Test Card", "dom", "168");
     createSku("jordan", otherSkuId, "Other Card", "c21", "100");
     createUnit("jordan", otherSkuId, 3, "in_stock", null);
@@ -509,8 +566,8 @@ public class OrdersHandlerIntegrationTest {
   void getOrderShouldReturnNullNeighborsAtBlockEdges() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "scryfall-1#normal#NM";
-    var otherSkuId = "scryfall-2#normal#NM";
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    var otherSkuId = "mtg#scryfall#scryfall-2#normal#NM";
     createSku("jordan", skuId, "Test Card", "dom", "168");
     createSku("jordan", otherSkuId, "Other Card", "c21", "100");
     createUnit("jordan", skuId, 0, "reserved", "83663");
@@ -545,8 +602,8 @@ public class OrdersHandlerIntegrationTest {
   void getOrderShouldComputeCurrentLocationForFulfilledOrder() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "scryfall-1#normal#NM";
-    var otherSkuId = "scryfall-2#normal#NM";
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    var otherSkuId = "mtg#scryfall#scryfall-2#normal#NM";
     createSku("jordan", skuId, "Test Card", "dom", "168");
     createSku("jordan", otherSkuId, "Other Card", "c21", "100");
     createUnit("jordan", otherSkuId, 1, "in_stock", null);
@@ -585,7 +642,7 @@ public class OrdersHandlerIntegrationTest {
   void confirmOrderShouldMarkUnitsAsSold() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "scryfall-1#normal#NM";
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
     createSkuWithUnits("jordan", skuId, 3);
     reserveUnits("jordan", skuId, "83663", List.of(1, 2));
     createOrderWithLines(
@@ -629,7 +686,7 @@ public class OrdersHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     var lines = new ArrayList<OrderLines.OrderLine>();
     for (int i = 1; i <= 60; i++) {
-      var skuId = "scryfall-" + i + "#normal#NM";
+      var skuId = "mtg#scryfall#scryfall-" + i + "#normal#NM";
       createSkuWithUnits("jordan", skuId, 1);
       reserveUnits("jordan", skuId, "83663", List.of(1));
       lines.add(new OrderLines.OrderLine(skuId, 1000 + i, 1, "0.50", "0.50", List.of(1)));
@@ -661,7 +718,7 @@ public class OrdersHandlerIntegrationTest {
     assertThat(updatedOrder.getStatus()).isEqualTo("fulfilled");
 
     for (int i = 1; i <= 60; i++) {
-      var units = getUnits("jordan", "scryfall-" + i + "#normal#NM");
+      var units = getUnits("jordan", "mtg#scryfall#scryfall-" + i + "#normal#NM");
       assertThat(units).hasSize(1);
       assertThat(units.get(0).getStatus()).isEqualTo("sold");
     }
@@ -675,7 +732,7 @@ public class OrdersHandlerIntegrationTest {
   void confirmOrderShouldNotSetDirtyFlag() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "scryfall-1#normal#NM";
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
     createSkuWithUnits("jordan", skuId, 2);
 
     var sku = getSkuItem("jordan", skuId);
@@ -761,6 +818,8 @@ public class OrdersHandlerIntegrationTest {
             parts[0],
             parts[1],
             parts[2],
+            parts[3],
+            parts[4],
             name,
             setCode,
             "Test Set",
@@ -774,7 +833,13 @@ public class OrdersHandlerIntegrationTest {
       String user, String skuId, int sequenceNumber, String status, String orderId) {
     var unit =
         UnitItem.create(
-            user, skuId, sequenceNumber, status, "import1", Instant.ofEpochSecond(1700000000));
+            user,
+            "mtg",
+            skuId,
+            sequenceNumber,
+            status,
+            "import1",
+            Instant.ofEpochSecond(1700000000));
     unit.setOrderId(orderId);
     unitTable.putItem(unit);
   }

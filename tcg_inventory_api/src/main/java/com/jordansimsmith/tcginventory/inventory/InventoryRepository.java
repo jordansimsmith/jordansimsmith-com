@@ -1,6 +1,9 @@
 package com.jordansimsmith.tcginventory.inventory;
 
 import com.jordansimsmith.tcginventory.AuditItem;
+import com.jordansimsmith.tcginventory.CardIdentity;
+import com.jordansimsmith.tcginventory.Condition;
+import com.jordansimsmith.tcginventory.SkuIds;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
@@ -99,12 +102,16 @@ public class InventoryRepository {
   // photos, the source SKU is dirtied, and the target SKU record is created or refreshed
   public String updateUnitCondition(
       String user, SkuItem skuItem, UnitItem unitItem, String condition) {
-    var targetSkuId = skuItem.getScryfallId() + "#" + skuItem.getFinish() + "#" + condition;
+    var identity =
+        new CardIdentity(skuItem.getGame(), skuItem.getExternalSource(), skuItem.getExternalId());
+    var targetSkuId = SkuIds.format(identity, skuItem.getFinish(), Condition.valueOf(condition));
     var targetSku =
         SkuItem.create(
             user,
             targetSkuId,
-            skuItem.getScryfallId(),
+            identity.game(),
+            identity.externalSource(),
+            identity.externalId(),
             skuItem.getFinish(),
             condition,
             skuItem.getName(),
@@ -117,6 +124,7 @@ public class InventoryRepository {
     var movedUnit =
         UnitItem.create(
             user,
+            identity.game(),
             targetSkuId,
             unitItem.getSequenceNumber(),
             "in_stock",
@@ -146,7 +154,7 @@ public class InventoryRepository {
     return targetSkuId;
   }
 
-  public int allocateSequenceRange(String user, int count) {
+  public int allocateSequenceRange(String user, String game, int count) {
     var response =
         dynamoDbClient.updateItem(
             UpdateItemRequest.builder()
@@ -156,10 +164,19 @@ public class InventoryRepository {
                         SkuItem.PK,
                         AttributeValue.builder().s(SkuItem.formatUserPk(user)).build(),
                         SkuItem.SK,
-                        AttributeValue.builder().s(SequenceCounterItem.formatSk()).build()))
-                .updateExpression("ADD " + SequenceCounterItem.NEXT_SEQUENCE_NUMBER + " :n")
+                        AttributeValue.builder().s(SequenceCounterItem.formatSk(game)).build()))
+                .updateExpression(
+                    "SET "
+                        + SequenceCounterItem.GAME
+                        + " = :game ADD "
+                        + SequenceCounterItem.NEXT_SEQUENCE_NUMBER
+                        + " :n")
                 .expressionAttributeValues(
-                    Map.of(":n", AttributeValue.builder().n(String.valueOf(count)).build()))
+                    Map.of(
+                        ":game",
+                        AttributeValue.builder().s(game).build(),
+                        ":n",
+                        AttributeValue.builder().n(String.valueOf(count)).build()))
                 .returnValues("ALL_NEW")
                 .build());
 
@@ -370,8 +387,12 @@ public class InventoryRepository {
                 + " :one SET "
                 + SkuItem.SKU_ID
                 + " = :skuId, "
-                + SkuItem.SCRYFALL_ID
-                + " = :scryfallId, "
+                + SkuItem.GAME
+                + " = :game, "
+                + SkuItem.EXTERNAL_SOURCE
+                + " = :externalSource, "
+                + SkuItem.EXTERNAL_ID
+                + " = :externalId, "
                 + "#finish = :finish, "
                 + "#condition = :condition, "
                 + "#name = :cardName, "
@@ -395,7 +416,9 @@ public class InventoryRepository {
     var values = new HashMap<String, AttributeValue>();
     values.put(":one", AttributeValue.builder().n("1").build());
     values.put(":skuId", AttributeValue.builder().s(skuSeed.getSkuId()).build());
-    values.put(":scryfallId", AttributeValue.builder().s(skuSeed.getScryfallId()).build());
+    values.put(":game", AttributeValue.builder().s(skuSeed.getGame()).build());
+    values.put(":externalSource", AttributeValue.builder().s(skuSeed.getExternalSource()).build());
+    values.put(":externalId", AttributeValue.builder().s(skuSeed.getExternalId()).build());
     values.put(":finish", AttributeValue.builder().s(skuSeed.getFinish()).build());
     values.put(":condition", AttributeValue.builder().s(skuSeed.getCondition()).build());
     values.put(":cardName", AttributeValue.builder().s(skuSeed.getName()).build());

@@ -88,6 +88,7 @@ When performing the code review step, check for:
 - Let exceptions bubble up naturally when appropriate instead of unnecessarily catching them
 - Always use imports instead of fully qualified names (e.g., `import java.util.ArrayList;` instead of `java.util.ArrayList`)
 - When a signature gains a required parameter, update every call site; do not add an overload, default, or dummy wrapper to avoid touching existing callers
+- Keep DynamoDB item `create` methods as persistence mappers: accept attribute values as they should be stored, including precomputed IDs and their standalone fields. Do not pass domain objects into item creation to validate them or derive business IDs there; keep that logic in the caller. Item creation may derive persistence keys and initialize storage fields.
 - Members are public or private. Package-private is allowed only when annotated `@VisibleForTesting`
 - Classes with only static methods are ordinary public classes: do not mark them `final` or add a private constructor to prevent instantiation
 
@@ -103,6 +104,7 @@ When performing the code review step, check for:
 - E2E tests: Build local stack of complete system, test real user workflows
 - With DynamoDB test containers, no need to clean up data after tests - containers are reset between tests
 - When a test factory gains a dependency, pass it at every call site even if the test does not use it (for example `UNUSED_S3_ENDPOINT`)
+- Keep test fixtures and setup self-contained in the test file that uses them. Do not extract shared fixture factories or helpers across test files just to reduce duplication; keep construction inline unless a shared test utility has clear value or is explicitly requested.
 - Maintain a testing pyramid: many unit tests, fewer integration tests, fewest E2E tests
 
 ## Service consistency

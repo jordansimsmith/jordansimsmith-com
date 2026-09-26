@@ -13,10 +13,12 @@ public class SequenceCounterItem {
   public static final String COUNTER_PREFIX = "COUNTER" + DELIMITER;
   public static final String PK = "pk";
   public static final String SK = "sk";
+  public static final String GAME = "game";
   public static final String NEXT_SEQUENCE_NUMBER = "next_sequence_number";
 
   private String pk;
   private String sk;
+  private String game;
   private Integer nextSequenceNumber;
 
   @DynamoDbPartitionKey
@@ -39,6 +41,15 @@ public class SequenceCounterItem {
     this.sk = sk;
   }
 
+  @DynamoDbAttribute(GAME)
+  public String getGame() {
+    return game;
+  }
+
+  public void setGame(@Nullable String game) {
+    this.game = game;
+  }
+
   @DynamoDbAttribute(NEXT_SEQUENCE_NUMBER)
   public Integer getNextSequenceNumber() {
     return nextSequenceNumber;
@@ -52,7 +63,7 @@ public class SequenceCounterItem {
     return USER_PREFIX + user;
   }
 
-  public static String formatSk() {
-    return COUNTER_PREFIX + "SEQUENCE";
+  public static String formatSk(String game) {
+    return COUNTER_PREFIX + "SEQUENCE" + DELIMITER + game;
   }
 }

@@ -8,7 +8,10 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
+import com.jordansimsmith.tcginventory.CardIdentity;
+import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.Photos;
+import com.jordansimsmith.tcginventory.SkuIds;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.inventory.InventoryLocation;
@@ -106,6 +109,7 @@ public class ConfirmImportHandler
       return httpResponseFactory.conflict(new ErrorResponse("import is not in review status"));
     }
     var keepRows = queryKeepRows(user, importId);
+    var skuGroups = groupBySkuId(importItem.getGame(), keepRows);
     long rowsNeedingPhotos =
         keepRows.stream()
             .filter(
@@ -137,14 +141,13 @@ public class ConfirmImportHandler
     }
 
     int keepCount = keepRows.size();
-    int firstSeq = allocateSequenceRange(user, keepCount, keepRows);
+    int firstSeq = allocateSequenceRange(user, importItem.getGame(), keepCount, keepRows);
     int lastSeq = firstSeq + keepCount - 1;
 
     assignSequenceNumbers(keepRows, firstSeq);
 
-    var skuGroups = groupBySkuId(keepRows);
     for (var entry : skuGroups.entrySet()) {
-      confirmSkuChunk(user, importId, entry.getKey(), entry.getValue());
+      confirmSkuChunk(user, importItem.getGame(), importId, entry.getKey(), entry.getValue());
     }
 
     importItem.setStatus("confirmed");
@@ -184,7 +187,8 @@ public class ConfirmImportHandler
         .toList();
   }
 
-  private int allocateSequenceRange(String user, int keepCount, List<ImportRowItem> keepRows) {
+  private int allocateSequenceRange(
+      String user, String game, int keepCount, List<ImportRowItem> keepRows) {
     var firstRowWithSeq =
         keepRows.stream().filter(r -> r.getSequenceNumber() != null).findFirst().orElse(null);
     if (firstRowWithSeq != null) {
@@ -195,7 +199,7 @@ public class ConfirmImportHandler
           .orElse(0);
     }
 
-    return inventoryRepository.allocateSequenceRange(user, keepCount);
+    return inventoryRepository.allocateSequenceRange(user, game, keepCount);
   }
 
   private void assignSequenceNumbers(List<ImportRowItem> keepRows, int firstSeq) {
@@ -211,22 +215,25 @@ public class ConfirmImportHandler
     }
   }
 
-  private Map<String, List<ImportRowItem>> groupBySkuId(List<ImportRowItem> keepRows) {
+  private Map<String, List<ImportRowItem>> groupBySkuId(String game, List<ImportRowItem> keepRows) {
     var groups = new HashMap<String, List<ImportRowItem>>();
     for (var row : keepRows) {
-      var skuId = row.getExternalId() + "#" + row.getFinish() + "#" + row.getCondition();
+      var identity = new CardIdentity(game, row.getExternalSource(), row.getExternalId());
+      var skuId = SkuIds.format(identity, row.getFinish(), Condition.valueOf(row.getCondition()));
       groups.computeIfAbsent(skuId, k -> new ArrayList<>()).add(row);
     }
     return groups;
   }
 
   private void confirmSkuChunk(
-      String user, String importId, String skuId, List<ImportRowItem> rows) {
+      String user, String game, String importId, String skuId, List<ImportRowItem> rows) {
     var firstRow = rows.get(0);
     var skuSeed =
         SkuItem.create(
             user,
             skuId,
+            game,
+            firstRow.getExternalSource(),
             firstRow.getExternalId(),
             firstRow.getFinish(),
             firstRow.getCondition(),
@@ -241,7 +248,8 @@ public class ConfirmImportHandler
     var units = new ArrayList<UnitItem>();
     for (var row : rows) {
       var unit =
-          UnitItem.create(user, skuId, row.getSequenceNumber(), "in_stock", importId, clock.now());
+          UnitItem.create(
+              user, game, skuId, row.getSequenceNumber(), "in_stock", importId, clock.now());
       if (row.getPhotos() != null && !row.getPhotos().isEmpty()) {
         unit.setPhotos(
             row.getPhotos().stream()

@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
+import com.jordansimsmith.tcginventory.Games;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.inventory.InventoryLocation;
@@ -19,9 +20,9 @@ import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeSet;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,6 +44,7 @@ public class GetOrderHandler
       @JsonProperty("condition") String condition) {}
 
   record OrderUnitResponse(
+      @JsonProperty("game") String game,
       @JsonProperty("sequence_number") int sequenceNumber,
       @JsonProperty("location") String location,
       @JsonProperty("current_location") String currentLocation,
@@ -93,6 +95,8 @@ public class GetOrderHandler
 
   private record BlockPosition(
       String currentLocation, @Nullable UnitItem previousUnit, @Nullable UnitItem nextUnit) {}
+
+  private record GameBlock(String game, int blockNumber) {}
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
@@ -145,18 +149,13 @@ public class GetOrderHandler
     }
 
     var orderLines = OrderLines.parse(orderItem.getLines(), objectMapper);
-    var blockUnits = findBlockUnits(user, orderLines);
-
     Map<String, SkuItem> skuCache = new HashMap<>();
+    var blockUnits = findBlockUnits(user, orderLines, skuCache);
     var units = new ArrayList<OrderUnitResponse>();
     var lines = new ArrayList<OrderLineResponse>();
 
     for (var line : orderLines) {
       var skuItem = getSku(SkuItem.formatPk(user, line.skuId()), skuCache);
-
-      if (skuItem == null) {
-        continue;
-      }
 
       lines.add(
           new OrderLineResponse(
@@ -171,13 +170,14 @@ public class GetOrderHandler
 
       var unitPrice = perUnitPrice(line);
       for (var seqNum : line.allocatedSequenceNumbers()) {
-        var position = computeBlockPosition(blockUnits, seqNum);
+        var position = computeBlockPosition(blockUnits, skuItem.getGame(), seqNum);
         units.add(
             new OrderUnitResponse(
+                skuItem.getGame(),
                 seqNum,
                 InventoryLocation.formatLocation(seqNum),
                 position.currentLocation(),
-                skuItem.getScryfallId(),
+                skuItem.getExternalId(),
                 skuItem.getName(),
                 skuItem.getSetCode(),
                 skuItem.getCollectorNumber(),
@@ -189,7 +189,9 @@ public class GetOrderHandler
       }
     }
 
-    units.sort(Comparator.comparingInt(OrderUnitResponse::sequenceNumber));
+    units.sort(
+        Comparator.comparing(OrderUnitResponse::game)
+            .thenComparingInt(OrderUnitResponse::sequenceNumber));
 
     return httpResponseFactory.ok(
         new OrderDetailResponse(
@@ -208,29 +210,30 @@ public class GetOrderHandler
             units));
   }
 
-  private Map<Integer, List<UnitItem>> findBlockUnits(
-      String user, List<OrderLines.OrderLine> orderLines) {
-    var blocks = new TreeSet<Integer>();
+  private Map<GameBlock, List<UnitItem>> findBlockUnits(
+      String user, List<OrderLines.OrderLine> orderLines, Map<String, SkuItem> skuCache) {
+    var blocks = new HashSet<GameBlock>();
     for (var line : orderLines) {
+      var skuItem = getSku(SkuItem.formatPk(user, line.skuId()), skuCache);
       for (var seqNum : line.allocatedSequenceNumbers()) {
-        blocks.add(seqNum / 100);
+        blocks.add(new GameBlock(skuItem.getGame(), seqNum / 100));
       }
     }
 
     var gsi3 = unitTable.index(TcgInventoryTable.GSI3_NAME);
-    var blockUnits = new HashMap<Integer, List<UnitItem>>();
+    var blockUnits = new HashMap<GameBlock, List<UnitItem>>();
     for (var block : blocks) {
       var request =
           QueryEnhancedRequest.builder()
               .queryConditional(
                   QueryConditional.sortBetween(
                       Key.builder()
-                          .partitionValue(UnitItem.formatGsi3pk(user))
-                          .sortValue(block * 100)
+                          .partitionValue(UnitItem.formatGsi3pk(user, block.game()))
+                          .sortValue(block.blockNumber() * 100)
                           .build(),
                       Key.builder()
-                          .partitionValue(UnitItem.formatGsi3pk(user))
-                          .sortValue(block * 100 + 99)
+                          .partitionValue(UnitItem.formatGsi3pk(user, block.game()))
+                          .sortValue(block.blockNumber() * 100 + 99)
                           .build()))
               .build();
       blockUnits.put(
@@ -242,12 +245,12 @@ public class GetOrderHandler
   // current position and neighbors are a snapshot of the box at read time: sold and removed
   // units are gone, in-stock and reserved units still occupy their slots
   private BlockPosition computeBlockPosition(
-      Map<Integer, List<UnitItem>> blockUnits, int sequenceNumber) {
+      Map<GameBlock, List<UnitItem>> blockUnits, String game, int sequenceNumber) {
     var offset = 0;
     UnitItem previous = null;
     UnitItem next = null;
 
-    for (var unit : blockUnits.get(sequenceNumber / 100)) {
+    for (var unit : blockUnits.get(new GameBlock(game, sequenceNumber / 100))) {
       int unitSeq = unit.getSequenceNumber();
       var status = unit.getStatus();
       if (unitSeq == sequenceNumber || "sold".equals(status) || "removed".equals(status)) {
@@ -274,9 +277,6 @@ public class GetOrderHandler
       return null;
     }
     var skuItem = getSku(unit.getPk(), skuCache);
-    if (skuItem == null) {
-      throw new IllegalStateException("sku record missing for unit " + unit.getSequenceNumber());
-    }
     return new NeighborCardResponse(
         skuItem.getName(),
         skuItem.getSetCode(),
@@ -285,13 +285,18 @@ public class GetOrderHandler
         skuItem.getCondition());
   }
 
-  @Nullable
   private SkuItem getSku(String skuPk, Map<String, SkuItem> skuCache) {
-    return skuCache.computeIfAbsent(
-        skuPk,
-        pk ->
-            skuTable.getItem(
-                Key.builder().partitionValue(pk).sortValue(SkuItem.formatSk()).build()));
+    var skuItem =
+        skuCache.computeIfAbsent(
+            skuPk,
+            pk ->
+                skuTable.getItem(
+                    Key.builder().partitionValue(pk).sortValue(SkuItem.formatSk()).build()));
+    if (skuItem == null) {
+      throw new IllegalStateException("sku record missing: " + skuPk);
+    }
+    Games.get(skuItem.getGame());
+    return skuItem;
   }
 
   @Nullable

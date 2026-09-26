@@ -135,7 +135,7 @@ public class GetSkuHandler
     return httpResponseFactory.ok(
         new SkuDetailResponse(
             skuItem.getSkuId(),
-            skuItem.getScryfallId(),
+            skuItem.getExternalId(),
             skuItem.getName(),
             skuItem.getSetCode(),
             skuItem.getSetName(),

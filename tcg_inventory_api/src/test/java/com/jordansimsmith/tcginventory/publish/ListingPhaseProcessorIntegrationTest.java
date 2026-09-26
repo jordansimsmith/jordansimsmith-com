@@ -46,7 +46,7 @@ public class ListingPhaseProcessorIntegrationTest {
   private static final String FRONT_PHOTO_ID = "photo-front";
   private static final String BACK_PHOTO_ID = "photo-back";
   private static final String UNIT_TWO_FRONT_ID = "photo-unit-2-front";
-  private static final String SKU_ID = "scryfall-1#normal#NM";
+  private static final String SKU_ID = "mtg#scryfall#scryfall-1#normal#NM";
 
   private FakeClock fakeClock;
   private FakeFetchTcgClient fakeFetchTcgClient;
@@ -331,6 +331,8 @@ public class ListingPhaseProcessorIntegrationTest {
             parts[0],
             parts[1],
             parts[2],
+            parts[3],
+            parts[4],
             "Test Card",
             "dom",
             "Dominaria",
@@ -365,7 +367,13 @@ public class ListingPhaseProcessorIntegrationTest {
       String user, String skuId, int sequenceNumber, String status, List<UnitItem.Photo> photos) {
     var unit =
         UnitItem.create(
-            user, skuId, sequenceNumber, status, "import1", Instant.ofEpochSecond(1700000000));
+            user,
+            "mtg",
+            skuId,
+            sequenceNumber,
+            status,
+            "import1",
+            Instant.ofEpochSecond(1700000000));
     if (photos != null) {
       unit.setPhotos(photos);
     }

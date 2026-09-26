@@ -38,7 +38,7 @@ The TCG inventory API service is the source of truth for a physical Magic: The G
 - Listing photos: up to 5 JPEG photos per keep row, captured during import review (raw-body upload, stored durably in S3, served via short-lived presigned URLs); confirm is blocked while any keep row appraised at NZ$20+ has no photos; photos freeze onto units at confirm and are immutable afterwards.
 - Manual audited adjustments: remove a unit; change a unit's condition (moving it between SKUs).
 - Publish job (single two-phase job): order phase ingests FetchTCG seller offers (reserve, pick-ready, void release on cancellation), then publish phase drains dirty SKUs to FetchTCG — create and update as absolute listing quantities projecting the first in-stock unit's photos as the listing images, delete the listing when the in-stock count reaches zero.
-- Pull sheets for paid orders, sorted by unit sequence number; each entry carries the offered per-unit price, the unit's Scryfall ID, the unit's current block position (gaps from sold and removed cards collapsed), and the neighboring cards still in the block; order confirm marks pulled units sold.
+- Pull sheets for paid orders, sorted by game and then unit sequence number; each entry carries the offered per-unit price, the unit's external ID in the current Magic `scryfall_id` response field, the unit's current block position (gaps from sold and removed cards collapsed), and the neighboring cards still in the same game's block; order confirm marks pulled units sold.
 - Offer vs listed price: each ingested offer line stores the FetchTCG listing's `listedPrice` at ingest time; `GET /orders` returns item and listed subtotals (shipping excluded) and `GET /orders/{order_id}` returns the same subtotals plus per-line offered and listed prices.
 - Fulfillment details on orders: the buyer's display name, delivery address, and selected postage option are captured from the offer and refreshed on every order-phase run, so `GET /orders/{order_id}` carries what packing a parcel needs.
 - Reports: an async report job aggregates the entire inventory into a stored dashboard snapshot (headline totals, monthly revenue, weekly intake vs sales, top sets, price buckets, top hits, aging bands); `GET /reports` serves the latest snapshot with staleness metadata and generation status.
@@ -166,14 +166,14 @@ Bazel mirrors this layout with `:scan-lib`, `:import-lib`, `:inventory-lib`, `:o
 - Inventory is the source of truth; FetchTCG listings are an absolute projection: listing quantity = count of `in_stock` units per SKU. Re-importing already-listed cards converges to a no-op, and FetchTCG's own decrement at offer acceptance converges without a write.
 - Dirty-marker outbox for the projection: every mutation transaction sets a plain boolean `dirty` on affected SKU records. Only mutation transactions can set the flag, which makes every FetchTCG write traceable to an audited inventory event; blind reconciliation never changes quantities. Coalescing is inherent because the projection is absolute.
 - Stock counts are never stored: SKU detail derives `in_stock`/`reserved`/`sold` counts from the unit items in its own partition query. SKU browse returns only identity fields (no counts, no unit fan-out) — users click through to the detail page for counts. With no denormalized aggregate there is nothing to drift or verify. Every mutation transaction bumps a plain `version` number on the affected SKU (`ADD version :1`); the publish phase recounts unit items for its absolute write and clears `dirty` conditionally on the version being unchanged since the recount, so a mutation landing mid-publish fails the clear and the SKU stays dirty for the next run.
-- The `tcg_inventory` table remains a single physical-table storage contract, while each persisted record type has its own independent `@DynamoDbBean` schema (`SkuItem`, `UnitItem`, `ImportItem`, `ImportRowItem`, `ScanItem`, `ScanRowItem`, `OrderItem`, `JobItem`, `SettingsItem`, `ReportItem`, `AuditItem`, and `SequenceCounterItem`). Each bean owns its `pk`, `sk`, attributes, and applicable GSI keys; key formats, attribute names, converters, indexes, and REST payloads remain unchanged. Object values used by only one record schema stay nested in that bean, including separate `Photo` value types for units and import rows even though their shapes currently match. Cross-record atomic operations continue to use low-level DynamoDB requests with the concrete table schema for each serialized item.
+- The `tcg_inventory` table remains a single physical-table storage contract, while each persisted record type has its own independent `@DynamoDbBean` schema (`SkuItem`, `UnitItem`, `ImportItem`, `ImportRowItem`, `ScanItem`, `ScanRowItem`, `OrderItem`, `JobItem`, `SettingsItem`, `ReportItem`, `AuditItem`, and `SequenceCounterItem`). Each bean owns its `pk`, `sk`, attributes, and applicable GSI keys. Object values used by only one record schema stay nested in that bean, including separate `Photo` value types for units and import rows even though their shapes currently match. Cross-record atomic operations continue to use low-level DynamoDB requests with the concrete table schema for each serialized item.
 - SQS FIFO work queue with continuation messages: messages carry only `{user, job_id, job_type}`; the job item's `continuation` is authoritative. The queue is FIFO with one message group per user because the group is what serializes the consumer to concurrency 1 (Lambda event source mappings cannot set maximum concurrency below 2 on standard queues), serializing all FetchTCG traffic and all inventory-mutating jobs (no job lease needed). Each slice does bounded work, checkpoints, and re-enqueues.
 - Slice messages for one job are byte-identical, so content-based deduplication is disabled and every send sets an explicit `MessageDeduplicationId` of `<job_id>#<continuation>`: distinct slices are never deduplicated, duplicate re-sends of the same slice within the 5-minute dedup window are suppressed, and a send missing a dedup ID fails loudly instead of silently swallowing a continuation.
 - Duplicate SQS delivery is expected and absorbed: slices read the job item fresh, DynamoDB effects are conditionally guarded, FetchTCG effects are absolute upserts keyed by `cardId` + condition.
 - One publish job with two ordered phases (order phase before publish phase) structurally prevents relisting stock committed to a pending offer.
-- Units are append-only with a globally monotonic `sequence_number` allocated by an atomic counter; storage blocks and locations are pure derivations of it. Sold and removed units leave gaps; nothing is renumbered or reshuffled. Order detail derives each pull unit's current block position at read time by querying the block's sequence range through `gsi3`; stored data never renumbers.
+- Units are append-only with a monotonic `sequence_number` per user and game, allocated by an atomic game-scoped counter. Each game starts at sequence zero and has its own physical box locations. Storage blocks and locations are pure derivations of the sequence number. Sold and removed units leave gaps; nothing is renumbered or reshuffled. Order detail derives each pull unit's current block position at read time by querying that game's block range through `gsi3`; stored data never renumbers.
 - The offer lifecycle is modeled with reservations: acceptance reserves forward-most in-stock units, payment makes the order pickable, non-payment voids and releases. Confirming a pull sets no dirty flag — the units left the projection at reservation and FetchTCG already decremented at acceptance.
-- SKU identity is the deterministic composite `scryfall_id#finish#condition` — computable offline from a ManaBox row with no lookup. SKU records cache the resolved `fetchtcg_card_id` and are never deleted.
+- SKU identity is the deterministic composite `game#external_source#external_id#finish#condition` — computable from the intake row and its parent import without a lookup. SKU records store that identity and cache the resolved `fetchtcg_card_id`; they are never deleted.
 - Conditions use the 5-level TCGplayer-style scale; ManaBox's 7 values collapse at import and FetchTCG codes are a boundary translation. NM is the default when no condition is provided.
 - FetchTCG traffic is sequential with 1–2 s random request spacing, bounded retries, an endpoint allowlist, and fail-closed bearer handling. Every job run mints a fresh one-hour bearer from the stored refresh token and persists a rotated refresh token when Firebase returns one.
 - Reports are a stored snapshot, not live aggregation: a `report` job pages all SKU records via `gsi2` (projection ALL), derives every figure from unit and order items, and overwrites a singleton report item stamped with the latest audit ULID captured at generation start. `GET /reports` computes staleness (comparing the latest audit ULID against the snapshot's as-of audit ULID, plus a 24-hour backstop) without touching inventory partitions. Stock counts stay unstored; the report is a disposable projection regenerated on demand.
@@ -193,10 +193,10 @@ Bazel mirrors this layout with `:scan-lib`, `:import-lib`, `:inventory-lib`, `:o
 - **Printing**: a specific card printing identified by Scryfall ID (set-specific; encodes name, set, collector number, language).
 - **Finish**: `normal` | `foil` | `etched`.
 - **Condition**: `NM` | `LP` | `MP` | `HP` | `DMG`. ManaBox import mapping: mint→NM, near_mint→NM, excellent→LP, good→MP, light_played→HP, played→HP, poor→DMG. FetchTCG listing mapping: NM→`raw-nm`, LP→`raw-lp`, MP→`raw-mp`, HP→`raw-hp`, DMG→`raw-d` (`raw-m` is never listed).
-- **SKU**: printing + finish + condition; the sellable identity. One FetchTCG listing per SKU. Permanent once created.
+- **SKU**: game + external source + external printing ID + finish + condition; the sellable identity. One FetchTCG listing per SKU. Permanent once created.
 - **Unit**: one physical card. Status lifecycle: `in_stock` → `reserved` → `sold`; `reserved` → `in_stock` on void; `in_stock` → `removed` by adjustment.
 - **Photo**: a JPEG of a specific physical card (max 5 per row/unit, in upload order; the first uploaded is the listing front image), captured on a keep row during review, stored durably in S3, frozen onto the unit at confirm.
-- **Sequence number**: globally monotonic integer per unit, assigned at import confirm; the canonical physical position.
+- **Sequence number**: monotonic integer per user and game, assigned at import confirm; the canonical physical position within that game's boxes.
 - **Block**: `floor(sequence_number / 100)`, labeled `A0` … `A99`, `B0` … (letter advances every 100 blocks). Labels are logical and append-only; a block physically lives wherever its labeled divider sits.
 - **Location**: display form `<block>-<offset>` with zero-based offset = `sequence_number % 100` (4242 → `A42-42`). Derived, never stored. Offsets are placement order; pulls leave gaps but preserve relative order, guaranteeing single-forward-pass pulls.
 - **Current location**: `<block>-<current offset>` where the current offset counts the cards physically ahead of the unit in its block as of the read: sold and removed units are gone; in-stock and reserved units (including the order's own) still occupy their slots. Derived at read time via `gsi3`, never stored.
@@ -209,7 +209,7 @@ Bazel mirrors this layout with `:scan-lib`, `:import-lib`, `:inventory-lib`, `:o
 - **Publish**: the job that projects inventory to FetchTCG; order phase (ingest offers) then publish phase (drain dirty SKUs).
 - **Order**: an accepted FetchTCG offer. State: `awaiting_payment` → `to_pick` → `fulfilled`, or `awaiting_payment` → `voided`. An order created with an unmapped listing or insufficient stock enters `flagged` (requires manual review). Each line stores the offered line total (`price`) and the per-unit listing price captured at ingest (`listed_price`).
 - **Fulfillment details**: the buyer's display name, delivery address, and selected postage option on an order — what the seller needs to address a parcel. Mirrored from the offer on every order-phase run, never edited locally.
-- **Pull sheet**: pick list for a paid order, sorted by sequence number, forward-most duplicate first. Each entry carries the offered per-unit price, the current location, and the previous and next cards still in the block.
+- **Pull sheet**: pick list for a paid order, grouped by game and sorted by sequence number within each game, forward-most duplicate first. Each entry carries the offered per-unit price, the current location, and the previous and next cards still in the block.
 - **Dirty**: boolean on a SKU meaning its FetchTCG listing may not reflect current in-stock count; set only inside mutation transactions.
 - **Report**: the singleton stored dashboard snapshot (totals, trends, composition figures) produced by the report job; overwritten in place, no history. Stale when any audited mutation postdates its as-of audit ULID or it is older than 24 hours.
 
@@ -322,11 +322,11 @@ Representative failures: `409` unless the import is in review; `400` for a non-k
 
 `GET /skus/{sku_id}`
 
-Response `200` (units sorted ascending by sequence number; locations and the `*_count` fields are derived server-side from unit items, never stored; unit `photos` are read-only — photo management exists only on review rows):
+Response `200` (units sorted ascending by sequence number; locations and the `*_count` fields are derived server-side from unit items, never stored; unit `photos` are read-only — photo management exists only on review rows; `scryfall_id` is the Magic external ID exposed under the current browser contract):
 
 ```json
 {
-  "sku_id": "f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
+  "sku_id": "mtg#scryfall#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
   "scryfall_id": "f0a51425-d796-48b8-b68c-bc21fb465c81",
   "name": "Elvish Aberration",
   "set_code": "a25",
@@ -365,11 +365,11 @@ Response `200` (units sorted ascending by sequence number; locations and the `*_
 }
 ```
 
-Adjustment responses: `DELETE /skus/{sku_id}/units/{sequence_number}` responds `200` with the updated SKU detail (same shape as `GET /skus/{sku_id}`); `PUT /skus/{sku_id}/units/{sequence_number}` with body `{"condition": "LP"}` responds `200` with `{"sku_id": "f0a51425-d796-48b8-b68c-bc21fb465c81#normal#LP"}`.
+Adjustment responses: `DELETE /skus/{sku_id}/units/{sequence_number}` responds `200` with the updated SKU detail (same shape as `GET /skus/{sku_id}`); `PUT /skus/{sku_id}/units/{sequence_number}` with body `{"condition": "LP"}` responds `200` with `{"sku_id": "mtg#scryfall#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#LP"}`.
 
 `GET /orders/{order_id}`
 
-Response `200` (the `units` list, sorted by sequence number, is the pull sheet when the order is `to_pick`; `lines` are offer lines in payload order; line `price` is the offered line total and `listed_price` is the per-unit asking price captured at ingest, or `null` on orders ingested before this field existed; `items_total_price` and `listed_total_price` follow the `GET /orders` semantics; unit `price` is the line total divided evenly across its quantity; `scryfall_id` is the stored public Scryfall printing ID for the target unit; `current_location`, `previous_card`, and `next_card` are a snapshot of the block as of the read, with neighbors `null` at block edges):
+Response `200` (the `units` list, sorted by game then sequence number, is the pull sheet when the order is `to_pick`; `lines` are offer lines in payload order; line `price` is the offered line total and `listed_price` is the per-unit asking price captured at ingest, or `null` on orders ingested before this field existed; `items_total_price` and `listed_total_price` follow the `GET /orders` semantics; unit `price` is the line total divided evenly across its quantity; each unit carries its `game`; `scryfall_id` is the Magic external ID from the SKU; `current_location`, `previous_card`, and `next_card` are a snapshot of the same game's block as of the read, with neighbors `null` at block edges):
 
 ```json
 {
@@ -405,6 +405,7 @@ Response `200` (the `units` list, sorted by sequence number, is the pull sheet w
   ],
   "units": [
     {
+      "game": "mtg",
       "sequence_number": 1204,
       "location": "A12-4",
       "current_location": "A12-1",
@@ -474,7 +475,7 @@ Response `200` (arrays shown with one representative entry; empty buckets and ba
     "price_buckets": [{ "label": "$0.25-$0.50", "in_stock_units": 5120 }],
     "top_hits": [
       {
-        "sku_id": "f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
+        "sku_id": "mtg#scryfall#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
         "name": "Ragavan, Nimble Pilferer",
         "set_code": "mh2",
         "collector_number": "138",
@@ -580,22 +581,22 @@ price = max(0.25, round_nearest_half_up(benchmark, 0.05))
 - **Table**: `tcg_inventory`, keys `pk`/`sk`, PAY_PER_REQUEST.
 - **`gsi1`** (dirty index): `gsi1pk` = `USER#<user>#DIRTY` (dirty) or `USER#<user>#CLEAN` (published), `gsi1sk = SKU#<sku_id>` (set once at SKU creation, never changed). Querying `gsi1pk = USER#<user>#DIRTY` returns exactly the dirty set. The publish phase flips `gsi1pk` to `CLEAN`; mutations flip it back to `DIRTY`.
 - **`gsi2`**: SKU browse (`gsi2pk = USER#<user>#SKUS`, `gsi2sk = NAME#<normalized name>#<sku_id>`), supporting alphabetical listing and `begins_with` prefix search.
-- **`gsi3`** (units by sequence): `gsi3pk = USER#<user>#UNITS` with the existing numeric `sequence_number` attribute as the range key; set on every unit at creation and preserved by status flips. Order detail queries each relevant block's sequence range (`block*100` to `block*100+99`) to derive current locations and neighboring cards; sold and removed units stay in the index and are filtered in code. Units created before the index existed are backfilled by `migrations/000-backfill-unit-gsi3.py`.
+- **`gsi3`** (units by game and sequence): `gsi3pk = USER#<user>#UNITS#<game>` with numeric `sequence_number` as the range key; both `game` and the index partition are set on each unit at creation and game is preserved by status changes. Order detail queries each relevant game block's sequence range (`block*100` to `block*100+99`) to derive current locations and neighboring cards; sold and removed units stay in the index and are filtered in code.
 - Order sort keys use the original positive decimal FetchTCG ID padded to 20 digits, with the original ID stored separately as `order_id`. The `migrations/001-pad-order-keys.py` migration moves existing unpadded orders to this key shape before the new application version is deployed.
-- `sku_id` is `<scryfall_id>#<finish>#<condition>`. A SKU record and its unit items share a partition so one query serves detail, recount, and allocation.
+- `sku_id` is `<game>#<external_source>#<external_id>#<finish>#<condition>`. A SKU record and its unit items share a partition so one query serves detail, recount, and allocation.
 
 | Item             | pk                            | sk                                              | Notable attributes                                                                                                                                                                                                                                                                                          |
 | ---------------- | ----------------------------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| SKU              | `USER#<u>#SKU#<sku_id>`       | `SKU`                                           | scryfall_id, finish, condition, name, set_code, set_name, collector_number, fetchtcg_card_id, fetchtcg_set_id, `version`, `dirty`, `fetchtcg_listing_id`, `last_published_quantity`, `last_published_price`, `last_published_at`                                                                            |
-| Unit             | `USER#<u>#SKU#<sku_id>`       | `UNIT#<sequence_number>`                        | sequence_number, status, import_id, order_id (when reserved/sold), timestamps, `gsi3pk`, `photos` (ordered `{photo_id, fetchtcg_url once uploaded}` list)                                                                                                                                                   |
+| SKU              | `USER#<u>#SKU#<sku_id>`       | `SKU`                                           | game, external_source, external_id, finish, condition, name, set_code, set_name, collector_number, fetchtcg_card_id, fetchtcg_set_id, `version`, `dirty`, `fetchtcg_listing_id`, `last_published_quantity`, `last_published_price`, `last_published_at`                                                     |
+| Unit             | `USER#<u>#SKU#<sku_id>`       | `UNIT#<sequence_number>`                        | game, sequence_number, status, import_id, order_id (when reserved/sold), timestamps, `gsi3pk`, `photos` (ordered `{photo_id, fetchtcg_url once uploaded}` list)                                                                                                                                             |
 | Import           | `USER#<u>`                    | `IMPORT#<ulid>`                                 | filename, status, row counts, error (when the appraise job fails), timestamps                                                                                                                                                                                                                               |
 | Import row       | `USER#<u>#IMPORT#<import_id>` | `ROW#<stack position, padded>`                  | submitted identity fields (CSV or confirmed scan), resolved identity, decision + reason, appraisal evidence (market price, rival evidence, suggested price), assigned sequence_number, `photos` (ordered `{photo_id}` list)                                                                                 |
 | Scan             | `USER#<u>`                    | `SCAN#<scan_id>`                                | scan_id, status, condition, finish, immutable initial `row_count`, catalog_version, import_id after confirm, error, timestamps; no TTL                                                                                                                                                                      |
-| Scan row         | `USER#<u>#SCAN#<scan_id>`     | `ROW#<scan_position, padded>`                   | scan_id, scan_position, filename, size_bytes, s3_key, status, suggestions (`scryfall_id`, name, raw score), needs_review, error                                                                                                                                                                             |
+| Scan row         | `USER#<u>#SCAN#<scan_id>`     | `ROW#<scan_position, padded>`                   | scan_id, scan_position, filename, size_bytes, s3_key, status, suggestions (`external_source`, `external_id`, name, score), needs_review, error                                                                                                                                                              |
 | Order            | `USER#<u>`                    | `ORDER#<fetchtcg_offer_id padded to 20 digits>` | order_id (original ID), state, FetchTCG status/currentAction snapshot, accepted_at, delivery_mode, financial totals, fulfillment details (`buyer_name`, `buyer_address` map, `postage_option`), embedded lines `[{sku_id, fetchtcg_listing_id, quantity, price, listed_price, allocated sequence_numbers}]` |
 | Audit entry      | `USER#<u>#AUDIT`              | `<ulid>`                                        | event_type (`import_confirm`, `adjustment`, `reserve`, `payment`, `release`, `sell`, `publish`), affected sku_ids / unit sequence_numbers / order_id / import_id, before/after summary                                                                                                                      |
 | Job              | `USER#<u>`                    | `JOB#<ulid>`                                    | internal continuation state, never an API resource: type (`appraise` \| `publish` \| `report`), status (`queued` \| `running` \| `succeeded` \| `failed`), continuation, progress counters, error                                                                                                           |
-| Sequence counter | `USER#<u>`                    | `COUNTER#SEQUENCE`                              | `next_sequence_number`                                                                                                                                                                                                                                                                                      |
+| Sequence counter | `USER#<u>`                    | `COUNTER#SEQUENCE#<game>`                       | game, `next_sequence_number`                                                                                                                                                                                                                                                                                |
 | Settings         | `USER#<u>`                    | `SETTINGS`                                      | credential metadata (set-at timestamp only), `track_orders_after` (epoch seconds)                                                                                                                                                                                                                           |
 | Report           | `USER#<u>`                    | `REPORT`                                        | singleton snapshot: `report` (JSON string in the API's `report` shape), `as_of_audit_ulid` (the latest audit ULID at generation start), `updated_at` (generation instant)                                                                                                                                   |
 
@@ -603,10 +604,12 @@ price = max(0.25, round_nearest_half_up(benchmark, 0.05))
 
 ```json
 {
-  "pk": "USER#jordan#SKU#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
+  "pk": "USER#jordan#SKU#mtg#scryfall#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
   "sk": "SKU",
-  "sku_id": "f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
-  "scryfall_id": "f0a51425-d796-48b8-b68c-bc21fb465c81",
+  "sku_id": "mtg#scryfall#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
+  "game": "mtg",
+  "external_source": "scryfall",
+  "external_id": "f0a51425-d796-48b8-b68c-bc21fb465c81",
   "finish": "normal",
   "condition": "NM",
   "name": "Elvish Aberration",
@@ -617,9 +620,9 @@ price = max(0.25, round_nearest_half_up(benchmark, 0.05))
   "version": 7,
   "dirty": true,
   "gsi1pk": "USER#jordan#DIRTY",
-  "gsi1sk": "SKU#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
+  "gsi1sk": "SKU#mtg#scryfall#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
   "gsi2pk": "USER#jordan#SKUS",
-  "gsi2sk": "NAME#elvish aberration#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
+  "gsi2sk": "NAME#elvish aberration#mtg#scryfall#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
   "fetchtcg_listing_id": 975737,
   "last_published_quantity": 3,
   "last_published_price": "0.30",
@@ -629,9 +632,10 @@ price = max(0.25, round_nearest_half_up(benchmark, 0.05))
 
 ```json
 {
-  "pk": "USER#jordan#SKU#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
+  "pk": "USER#jordan#SKU#mtg#scryfall#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
   "sk": "UNIT#0000004242",
-  "gsi3pk": "USER#jordan#UNITS",
+  "gsi3pk": "USER#jordan#UNITS#mtg",
+  "game": "mtg",
   "sequence_number": 4242,
   "status": "in_stock",
   "import_id": "01JEXAMPLEULID0000000000",
@@ -671,7 +675,7 @@ Scan row example:
 
 Inventory mutations are `TransactWriteItems` including their audit entry; every SKU-affecting mutation bumps the affected SKU's `version` with `ADD version :1` and sets `gsi1pk` to the dirty value. Scan preparation and import creation do not mutate inventory; the later import confirm audits the resulting units. Order-lifecycle mutations that scale with order size (reserve, sell) split their writes into ordered transactions of at most 100 items (the `TransactWriteItems` cap), with the order write and the audit entry riding in the final transaction so the order item's state marks the mutation complete.
 
-- **Import confirm**: conditional status flip `review → confirming` (single confirmer), one `UpdateItem ADD next_sequence_number :n` allocating the range, sequence numbers recorded on rows (skipped on retry if present), then chunked per-SKU transactions — conditional unit puts (carrying each row's `photos` list verbatim) + SKU dirty/version updates — where a replayed chunk fails its unit-exists condition and no-ops atomically; final flip `confirming → confirmed`. Confirm rejects with 409 while any keep row appraised at NZ$20+ has zero photos.
+- **Import confirm**: conditional status flip `review → confirming` (single confirmer), one `UpdateItem` sets the game's standalone counter attribute and atomically adds the count to `next_sequence_number`, sequence numbers recorded on rows (skipped on retry if present), then chunked per-SKU transactions — conditional unit puts (carrying the parent import's `game` and each row's `photos` list verbatim) + SKU dirty/version updates — where a replayed chunk fails its unit-exists condition and no-ops atomically; final flip `confirming → confirmed`. Confirm rejects with 409 while any keep row appraised at NZ$20+ has zero photos.
 - **Scan confirm**: generate fresh import/job IDs, write the ordinary import parent and rows in ascending retained scan position, write the appraise job, queue it, then conditionally flip the scan to `confirmed`. A retry after the flip returns the stored import ID. A failure between writes can leave a partial or orphaned ordinary import, which is manually cleaned up if needed. The scan stores only the resulting import ID; the appraise job ID belongs to the import and job items. No scan source fields are written onto import/row items.
 - **Scan deletion**: row deletion transactionally checks an unfenced `reviewing` scan and deletes the row without changing the immutable initial batch size; whole-scan deletion conditionally removes the unfinished parent first, fencing queued or in-flight worker writes, then removes child rows and S3 objects. Child-row removal precedes S3 cleanup; cleanup is not transactional with DynamoDB, so a failed cleanup can leave private orphaned objects.
 - **Reserve**: per SKU, a dirty + version update followed by that SKU's unit `in_stock → reserved` transitions, chunked at 100 items in that order (any landed unit flip implies its SKU dirty landed in the same or an earlier chunk); the conditional order put keyed by FetchTCG offer id and the reserve audit land in the final chunk. Allocation reclaims units already `reserved` with the same offer id (a prior run that died before the order put), so retries converge without re-writing them.
@@ -690,7 +694,7 @@ Inventory mutations are `TransactWriteItems` including their audit entry; every 
 - Scan deletion is irreversible. A deleted row is absent without renumbering surviving positions; a whole scan is absent as soon as its parent item is deleted. Worker writes must condition on an existing parent scan and row, and cleanup failures may leave unreachable private S3 objects.
 - Confirmation and deletion are not coordinated; the single-user workflow assumes they are not concurrent.
 - Deleting the ordinary import created from a confirmed scan does not reopen or mutate the source scan. A failed confirmation attempt may leave an orphaned ordinary import that is cleaned up manually; deleting it does not reopen the source scan.
-- Sequence numbers are unique per user: allocation is an atomic counter `ADD` (disjoint ranges by construction), the confirming-status gate prevents double allocation for one import, and unit keys embed the sequence number so within-SKU duplicates are unwritable.
+- Sequence numbers are unique per user and game: allocation uses a game-scoped atomic counter `ADD` (disjoint ranges by construction), the confirming-status gate prevents double allocation for one import, and unit keys embed the sequence number so within-SKU duplicates are unwritable. Different games start at zero independently.
 - Discarded and review rows never create units; only `keep` rows are confirmed. Appraisal decisions are final for an import: review cards are set aside physically and return through a later import once their cause is fixed.
 - Import `total_suggested_price` is derived from keep-row suggested prices at read time and never stored.
 - Import deletion is allowed only while `review` (409 otherwise) and removes the import and all its rows.
@@ -702,7 +706,7 @@ Inventory mutations are `TransactWriteItems` including their audit entry; every 
 - Only FetchTCG offers with `acceptedAt` strictly after the user's `track_orders_after` setting create order records and reservations. The cutoff comparison uses epoch-seconds instants; the advance loop for existing orders is unfiltered (orders already tracked cannot be orphaned by a date change).
 - Order fulfillment details (`buyer_name`, `buyer_address`, `postage_option`) mirror the offer on every order-phase run and are rewritten whenever any of them changed, in a single plain update that writes no audit entry: nothing about inventory or revenue moved, so the refresh must not mark the report stale. A run where none of the three changed writes nothing. An address whose parts are all null stores as no address rather than an empty map, and voided or fulfilled orders keep the details they last saw.
 - Order line `listed_price` is captured once at ingest from the offer payload and never rewritten. Orders ingested before this field existed deserialize it as null; `listed_total_price` is then omitted. `items[].price` is a line total; `listedPrice` is per-unit. `total_price` includes shipping and is not compared against listed value.
-- Order detail unit `price` is the line's offered total divided evenly across its quantity (2 dp, half-up) — a display value; stored line totals stay authoritative for sums. Each target unit returns its non-null stored `scryfall_id` from the SKU record; the API does not fetch or proxy card imagery, and neighbor cards intentionally carry only text identity fields. `current_location`, `previous_card`, and `next_card` are a snapshot of the block at read time: sold and removed units are excluded; in-stock and reserved units, including the order's own, count as boxed. Neighbors never cross block boundaries and are `null` at block edges.
+- Order detail unit `price` is the line's offered total divided evenly across its quantity (2 dp, half-up) — a display value; stored line totals stay authoritative for sums. Each target unit returns the SKU's external ID in the current Magic `scryfall_id` response field; the API does not fetch or proxy card imagery, and neighbor cards intentionally carry only text identity fields. `current_location`, `previous_card`, and `next_card` are a snapshot of the same game's block at read time: sold and removed units are excluded; in-stock and reserved units, including the order's own, count as boxed. Neighbors never cross game or block boundaries and are `null` at block edges.
 - Advancing an order `awaiting_payment → to_pick` touches no units and sets no dirty flag, but writes a `payment` audit entry transactionally with the conditional status flip: revenue counts paid orders, so the advance marks the report stale like every other revenue-affecting mutation.
 - Confirming a pull writes nothing to FetchTCG. Voiding an order releases units and dirties SKUs; the restored quantity reaches FetchTCG on the next publish run unless the seller already relisted on FetchTCG, in which case the projection converges as a no-op.
 - Only an `awaiting_payment` order voids, and only when its offer is present in the seller list with a cancelled status: an order missing from the list keeps its reservations, and a cancellation arriving after payment leaves a `to_pick` order alone for manual handling. Release chunks like reserve and sell with the order write last, so a partially applied release leaves the order `awaiting_payment` and the next run finishes it.

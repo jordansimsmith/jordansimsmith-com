@@ -470,7 +470,7 @@ public class JobsHandlerIntegrationTest {
     int totalSkus = ListingPhaseProcessor.BATCH_SIZE + 2;
     createPublishJob("jordan", "job1");
     for (int i = 1; i <= totalSkus; i++) {
-      createDirtySkuWithUnit("jordan", "scryfall-" + i + "#normal#NM", i);
+      createDirtySkuWithUnit("jordan", "mtg#scryfall#scryfall-" + i + "#normal#NM", i);
     }
 
     // act
@@ -504,7 +504,7 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 3);
+    createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
 
     fakeFetchTcgClient.seedSellerOffers(
         List.of(
@@ -544,18 +544,18 @@ public class JobsHandlerIntegrationTest {
                 "32 Abercrombie Street", null, "Howick", "Auckland", "2014", "NZ"));
     assertThat(order.getTotalPrice()).isEqualTo("3.33");
     assertThat(order.getFetchtcgStatus()).isEqualTo("ACCEPTED");
-    assertThat(order.getLines()).contains("scryfall-1#normal#NM");
+    assertThat(order.getLines()).contains("mtg#scryfall#scryfall-1#normal#NM");
     var orderLines = OrderLines.parse(order.getLines(), objectMapper);
     assertThat(orderLines).hasSize(1);
     assertThat(orderLines.get(0).price()).isEqualTo("1.50");
     assertThat(orderLines.get(0).listedPrice()).isEqualTo("2.00");
     assertThat(orderLines.get(0).quantity()).isEqualTo(2);
 
-    var sku = getSku("jordan", "scryfall-1#normal#NM");
+    var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(sku.getDirty()).isFalse();
     assertThat(sku.getLastPublishedQuantity()).isEqualTo(1);
 
-    var units = getUnits("jordan", "scryfall-1#normal#NM");
+    var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
     assertThat(reserved).hasSize(2);
     assertThat(reserved.get(0).getOrderId()).isEqualTo("83663");
@@ -639,8 +639,9 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 3);
-    createReservedOrder("jordan", "83663", "awaiting_payment", "scryfall-1#normal#NM", 1001, 1, 2);
+    createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
+    createReservedOrder(
+        "jordan", "83663", "awaiting_payment", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1, 2);
 
     fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
 
@@ -655,7 +656,7 @@ public class JobsHandlerIntegrationTest {
     assertThat(order.getFetchtcgStatus()).isEqualTo("CANCELLED_BY_SELLER");
     assertThat(order.getFetchtcgCurrentAction()).isNull();
 
-    var units = getUnits("jordan", "scryfall-1#normal#NM");
+    var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("in_stock"));
     assertThat(units).allSatisfy(unit -> assertThat(unit.getOrderId()).isNull());
 
@@ -665,7 +666,7 @@ public class JobsHandlerIntegrationTest {
     assertThat(releaseAudits.get(0).getOrderId()).isEqualTo("83663");
 
     // the released units are dirty stock again, so the listing phase restores the full quantity
-    var sku = getSku("jordan", "scryfall-1#normal#NM");
+    var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(sku.getDirty()).isFalse();
     assertThat(sku.getLastPublishedQuantity()).isEqualTo(3);
   }
@@ -675,8 +676,9 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 2);
-    createReservedOrder("jordan", "83663", "awaiting_payment", "scryfall-1#normal#NM", 1001, 1);
+    createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 2);
+    createReservedOrder(
+        "jordan", "83663", "awaiting_payment", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1);
 
     fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(83663, "CANCELLED_BY_BUYER")));
 
@@ -688,7 +690,7 @@ public class JobsHandlerIntegrationTest {
     assertThat(order.getStatus()).isEqualTo("voided");
     assertThat(order.getFetchtcgStatus()).isEqualTo("CANCELLED_BY_BUYER");
 
-    var units = getUnits("jordan", "scryfall-1#normal#NM");
+    var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("in_stock"));
   }
 
@@ -697,8 +699,9 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 2);
-    createReservedOrder("jordan", "83663", "awaiting_payment", "scryfall-1#normal#NM", 1001, 1);
+    createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 2);
+    createReservedOrder(
+        "jordan", "83663", "awaiting_payment", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1);
 
     fakeFetchTcgClient.seedSellerOffers(List.of());
 
@@ -709,7 +712,7 @@ public class JobsHandlerIntegrationTest {
     var order = getOrder("jordan", "83663");
     assertThat(order.getStatus()).isEqualTo("awaiting_payment");
 
-    var units = getUnits("jordan", "scryfall-1#normal#NM");
+    var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
     assertThat(reserved).hasSize(1);
     assertThat(reserved.get(0).getOrderId()).isEqualTo("83663");
@@ -722,8 +725,8 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 2);
-    createReservedOrder("jordan", "83663", "to_pick", "scryfall-1#normal#NM", 1001, 1);
+    createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 2);
+    createReservedOrder("jordan", "83663", "to_pick", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1);
 
     fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
 
@@ -734,7 +737,7 @@ public class JobsHandlerIntegrationTest {
     var order = getOrder("jordan", "83663");
     assertThat(order.getStatus()).isEqualTo("to_pick");
 
-    var units = getUnits("jordan", "scryfall-1#normal#NM");
+    var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
     assertThat(reserved).hasSize(1);
 
@@ -746,9 +749,9 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 2);
-    createReservedOrder("jordan", "83663", "voided", "scryfall-1#normal#NM", 1001, 1);
-    releaseUnit("jordan", "scryfall-1#normal#NM", 1);
+    createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 2);
+    createReservedOrder("jordan", "83663", "voided", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1);
+    releaseUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1);
 
     fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
 
@@ -759,7 +762,7 @@ public class JobsHandlerIntegrationTest {
     var order = getOrder("jordan", "83663");
     assertThat(order.getStatus()).isEqualTo("voided");
 
-    var units = getUnits("jordan", "scryfall-1#normal#NM");
+    var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("in_stock"));
 
     assertThat(getAuditEntries("jordan")).noneMatch(a -> "release".equals(a.getEventType()));
@@ -770,11 +773,12 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 2);
-    createReservedOrder("jordan", "83663", "awaiting_payment", "scryfall-1#normal#NM", 1001, 1, 2);
+    createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 2);
+    createReservedOrder(
+        "jordan", "83663", "awaiting_payment", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1, 2);
 
     // simulate a run that released one unit before dying, leaving the order awaiting_payment
-    releaseUnit("jordan", "scryfall-1#normal#NM", 1);
+    releaseUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1);
 
     fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
 
@@ -785,7 +789,7 @@ public class JobsHandlerIntegrationTest {
     var order = getOrder("jordan", "83663");
     assertThat(order.getStatus()).isEqualTo("voided");
 
-    var units = getUnits("jordan", "scryfall-1#normal#NM");
+    var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("in_stock"));
 
     var releaseAudits =
@@ -801,7 +805,7 @@ public class JobsHandlerIntegrationTest {
 
     var orderLines = new ArrayList<OrderLines.OrderLine>();
     for (int i = 1; i <= 60; i++) {
-      var skuId = "scryfall-" + i + "#normal#NM";
+      var skuId = "mtg#scryfall#scryfall-" + i + "#normal#NM";
       createSkuWithUnits("jordan", skuId, 1000 + i, 1);
       reserveUnit("jordan", skuId, 1, "91329");
       orderLines.add(new OrderLines.OrderLine(skuId, 1000 + i, 1, "0.50", "0.50", List.of(1)));
@@ -820,7 +824,7 @@ public class JobsHandlerIntegrationTest {
     assertThat(order.getStatus()).isEqualTo("voided");
 
     for (int i = 1; i <= 60; i++) {
-      var units = getUnits("jordan", "scryfall-" + i + "#normal#NM");
+      var units = getUnits("jordan", "mtg#scryfall#scryfall-" + i + "#normal#NM");
       assertThat(units).hasSize(1);
       assertThat(units.get(0).getStatus()).isEqualTo("in_stock");
       assertThat(units.get(0).getOrderId()).isNull();
@@ -1000,7 +1004,7 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 1);
+    createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1);
 
     fakeFetchTcgClient.seedSellerOffers(
         List.of(
@@ -1034,7 +1038,7 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 3);
+    createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
     createTrackOrdersAfter("jordan", Instant.parse("2026-08-15T00:00:00Z"));
 
     fakeFetchTcgClient.seedSellerOffers(
@@ -1062,7 +1066,7 @@ public class JobsHandlerIntegrationTest {
     var order = getOrder("jordan", "83663");
     assertThat(order).isNull();
 
-    var units = getUnits("jordan", "scryfall-1#normal#NM");
+    var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(units.stream().allMatch(u -> "in_stock".equals(u.getStatus()))).isTrue();
   }
 
@@ -1071,7 +1075,7 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 3);
+    createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
     createTrackOrdersAfter("jordan", Instant.parse("2026-08-01T00:00:00Z"));
 
     fakeFetchTcgClient.seedSellerOffers(
@@ -1105,7 +1109,7 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 3);
+    createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
 
     fakeFetchTcgClient.seedSellerOffers(
         List.of(
@@ -1139,7 +1143,7 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 3);
+    createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
     createTrackOrdersAfter("jordan", Instant.parse("2026-08-10T00:00:00Z"));
 
     fakeFetchTcgClient.seedSellerOffers(
@@ -1177,7 +1181,8 @@ public class JobsHandlerIntegrationTest {
 
     var offerItems = new ArrayList<FetchTcgClient.OfferItem>();
     for (int i = 1; i <= 60; i++) {
-      createSkuWithUnitAtSequence("jordan", "scryfall-" + i + "#normal#NM", 2000 + i, i);
+      createSkuWithUnitAtSequence(
+          "jordan", "mtg#scryfall#scryfall-" + i + "#normal#NM", 2000 + i, i);
       offerItems.add(
           new FetchTcgClient.OfferItem(
               new FetchTcgClient.OfferListing(2000 + i, "raw-nm", new BigDecimal("0.50")),
@@ -1217,7 +1222,7 @@ public class JobsHandlerIntegrationTest {
         .containsExactlyInAnyOrderElementsOf(IntStream.rangeClosed(1, 60).boxed().toList());
 
     for (int i = 1; i <= 60; i++) {
-      var units = getUnits("jordan", "scryfall-" + i + "#normal#NM");
+      var units = getUnits("jordan", "mtg#scryfall#scryfall-" + i + "#normal#NM");
       assertThat(units).hasSize(1);
       assertThat(units.get(0).getStatus()).isEqualTo("reserved");
       assertThat(units.get(0).getOrderId()).isEqualTo("91329");
@@ -1233,10 +1238,10 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createSkuWithUnits("jordan", "scryfall-1#normal#NM", 1001, 3);
+    createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
 
     // simulate a run that crashed after reserving units but before writing the order
-    var sku = getSku("jordan", "scryfall-1#normal#NM");
+    var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     sku.setDirty(true);
     sku.setGsi1pk(SkuItem.formatGsi1pk("jordan"));
     skuTable.putItem(sku);
@@ -1244,7 +1249,7 @@ public class JobsHandlerIntegrationTest {
       var unit =
           unitTable.getItem(
               Key.builder()
-                  .partitionValue(SkuItem.formatPk("jordan", "scryfall-1#normal#NM"))
+                  .partitionValue(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM"))
                   .sortValue(UnitItem.formatSk(sequenceNumber))
                   .build());
       unit.setStatus("reserved");
@@ -1282,7 +1287,7 @@ public class JobsHandlerIntegrationTest {
     assertThat(orderLines.get(0).quantity()).isEqualTo(2);
     assertThat(orderLines.get(0).allocatedSequenceNumbers()).containsExactly(1, 2);
 
-    var units = getUnits("jordan", "scryfall-1#normal#NM");
+    var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
     assertThat(reserved).hasSize(2);
     assertThat(reserved).allSatisfy(u -> assertThat(u.getOrderId()).isEqualTo("83663"));
@@ -1296,13 +1301,13 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createDirtySkuWithUnits("jordan", "scryfall-1#normal#NM", 2, "1.50");
+    createDirtySkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 2, "1.50");
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
     // assert
-    var sku = getSku("jordan", "scryfall-1#normal#NM");
+    var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(sku.getDirty()).isFalse();
     assertThat(sku.getFetchtcgListingId()).isNotNull();
     assertThat(sku.getLastPublishedQuantity()).isEqualTo(2);
@@ -1324,8 +1329,8 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createDirtySkuWithUnits("jordan", "scryfall-1#normal#NM", 3, "2.00");
-    var sku = getSku("jordan", "scryfall-1#normal#NM");
+    createDirtySkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 3, "2.00");
+    var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     sku.setFetchtcgListingId(975737);
     sku.setLastPublishedQuantity(1);
     sku.setLastPublishedPrice("1.80");
@@ -1335,7 +1340,7 @@ public class JobsHandlerIntegrationTest {
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
     // assert
-    var updated = getSku("jordan", "scryfall-1#normal#NM");
+    var updated = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(updated.getDirty()).isFalse();
     assertThat(updated.getLastPublishedQuantity()).isEqualTo(3);
     assertThat(updated.getLastPublishedPrice()).isEqualTo("2.00");
@@ -1353,8 +1358,8 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createDirtySkuWithUnits("jordan", "scryfall-1#normal#NM", 0, "1.50");
-    var sku = getSku("jordan", "scryfall-1#normal#NM");
+    createDirtySkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 0, "1.50");
+    var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     sku.setFetchtcgListingId(975737);
     sku.setLastPublishedQuantity(1);
     sku.setLastPublishedPrice("1.50");
@@ -1364,7 +1369,7 @@ public class JobsHandlerIntegrationTest {
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
     // assert
-    var updated = getSku("jordan", "scryfall-1#normal#NM");
+    var updated = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(updated.getDirty()).isFalse();
     assertThat(updated.getFetchtcgListingId()).isNull();
     assertThat(updated.getLastPublishedQuantity()).isNull();
@@ -1379,11 +1384,11 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createDirtySkuWithUnits("jordan", "scryfall-1#normal#NM", 2, "1.50");
+    createDirtySkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 2, "1.50");
 
     // set dirty=false directly to simulate a race where the condition check
     // (dirty = true AND version = :captured) fails at write time
-    var sku = getSku("jordan", "scryfall-1#normal#NM");
+    var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     sku.setDirty(false);
     skuTable.putItem(sku);
 
@@ -1394,7 +1399,7 @@ public class JobsHandlerIntegrationTest {
     assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(1);
 
     // but the listing snapshot was NOT written (condition failed)
-    var updated = getSku("jordan", "scryfall-1#normal#NM");
+    var updated = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(updated.getFetchtcgListingId()).isNull();
     assertThat(updated.getLastPublishedQuantity()).isNull();
   }
@@ -1445,6 +1450,8 @@ public class JobsHandlerIntegrationTest {
             parts[0],
             parts[1],
             parts[2],
+            parts[3],
+            parts[4],
             "Test Card",
             "dom",
             "Dominaria",
@@ -1455,7 +1462,8 @@ public class JobsHandlerIntegrationTest {
 
     for (int i = 1; i <= unitCount; i++) {
       var unit =
-          UnitItem.create(user, skuId, i, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
+          UnitItem.create(
+              user, "mtg", skuId, i, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
       unitTable.putItem(unit);
     }
   }
@@ -1474,6 +1482,8 @@ public class JobsHandlerIntegrationTest {
             parts[0],
             parts[1],
             parts[2],
+            parts[3],
+            parts[4],
             "Test Card",
             "dom",
             "Dominaria",
@@ -1484,7 +1494,13 @@ public class JobsHandlerIntegrationTest {
 
     var unit =
         UnitItem.create(
-            user, skuId, sequenceNumber, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
+            user,
+            "mtg",
+            skuId,
+            sequenceNumber,
+            "in_stock",
+            "import1",
+            Instant.ofEpochSecond(1700000000));
     unitTable.putItem(unit);
   }
 
@@ -1497,6 +1513,8 @@ public class JobsHandlerIntegrationTest {
             parts[0],
             parts[1],
             parts[2],
+            parts[3],
+            parts[4],
             "Test Card",
             "dom",
             "Dominaria",
@@ -1510,7 +1528,8 @@ public class JobsHandlerIntegrationTest {
 
     for (int i = 1; i <= unitCount; i++) {
       var unit =
-          UnitItem.create(user, skuId, i, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
+          UnitItem.create(
+              user, "mtg", skuId, i, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
       unitTable.putItem(unit);
     }
   }
@@ -1525,6 +1544,8 @@ public class JobsHandlerIntegrationTest {
             parts[0],
             parts[1],
             parts[2],
+            parts[3],
+            parts[4],
             "Test Card",
             "dom",
             "Dominaria",
@@ -1538,7 +1559,13 @@ public class JobsHandlerIntegrationTest {
 
     var unit =
         UnitItem.create(
-            user, skuId, sequenceNumber, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
+            user,
+            "mtg",
+            skuId,
+            sequenceNumber,
+            "in_stock",
+            "import1",
+            Instant.ofEpochSecond(1700000000));
     unitTable.putItem(unit);
   }
 

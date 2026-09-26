@@ -27,7 +27,9 @@ public class SkuItem {
   public static final String GSI2PK = "gsi2pk";
   public static final String GSI2SK = "gsi2sk";
   public static final String SKU_ID = "sku_id";
-  public static final String SCRYFALL_ID = "scryfall_id";
+  public static final String GAME = "game";
+  public static final String EXTERNAL_SOURCE = "external_source";
+  public static final String EXTERNAL_ID = "external_id";
   public static final String FINISH = "finish";
   public static final String CONDITION = "condition";
   public static final String NAME = "name";
@@ -51,7 +53,9 @@ public class SkuItem {
   private String gsi2pk;
   private String gsi2sk;
   private String skuId;
-  private String scryfallId;
+  private String game;
+  private String externalSource;
+  private String externalId;
   private String finish;
   private String condition;
   private String name;
@@ -137,13 +141,31 @@ public class SkuItem {
     this.skuId = skuId;
   }
 
-  @DynamoDbAttribute(SCRYFALL_ID)
-  public String getScryfallId() {
-    return scryfallId;
+  @DynamoDbAttribute(GAME)
+  public String getGame() {
+    return game;
   }
 
-  public void setScryfallId(@Nullable String scryfallId) {
-    this.scryfallId = scryfallId;
+  public void setGame(@Nullable String game) {
+    this.game = game;
+  }
+
+  @DynamoDbAttribute(EXTERNAL_SOURCE)
+  public String getExternalSource() {
+    return externalSource;
+  }
+
+  public void setExternalSource(@Nullable String externalSource) {
+    this.externalSource = externalSource;
+  }
+
+  @DynamoDbAttribute(EXTERNAL_ID)
+  public String getExternalId() {
+    return externalId;
+  }
+
+  public void setExternalId(@Nullable String externalId) {
+    this.externalId = externalId;
   }
 
   @DynamoDbAttribute(FINISH)
@@ -313,7 +335,9 @@ public class SkuItem {
   public static SkuItem create(
       String user,
       String skuId,
-      String scryfallId,
+      String game,
+      String externalSource,
+      String externalId,
       String finish,
       String condition,
       String name,
@@ -326,7 +350,9 @@ public class SkuItem {
     item.setPk(formatPk(user, skuId));
     item.setSk(formatSk());
     item.setSkuId(skuId);
-    item.setScryfallId(scryfallId);
+    item.setGame(game);
+    item.setExternalSource(externalSource);
+    item.setExternalId(externalId);
     item.setFinish(finish);
     item.setCondition(condition);
     item.setName(name);

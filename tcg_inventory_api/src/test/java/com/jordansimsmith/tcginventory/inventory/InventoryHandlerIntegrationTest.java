@@ -78,9 +78,12 @@ public class InventoryHandlerIntegrationTest {
   @Test
   void findSkusShouldReturnSkusAlphabetically() throws Exception {
     // arrange
-    createSku("jordan", "scryfall-z#normal#NM", "Zombie Knight", "dom", "Dominaria", "100");
-    createSku("jordan", "scryfall-a#normal#NM", "Angel of Mercy", "dom", "Dominaria", "101");
-    createSku("jordan", "scryfall-e#foil#LP", "Elvish Mystic", "m14", "Magic 2014", "169");
+    createSku(
+        "jordan", "mtg#scryfall#scryfall-z#normal#NM", "Zombie Knight", "dom", "Dominaria", "100");
+    createSku(
+        "jordan", "mtg#scryfall#scryfall-a#normal#NM", "Angel of Mercy", "dom", "Dominaria", "101");
+    createSku(
+        "jordan", "mtg#scryfall#scryfall-e#foil#LP", "Elvish Mystic", "m14", "Magic 2014", "169");
 
     // act
     var response = findSkusHandler.handleRequest(buildEvent("jordan", Map.of()), null);
@@ -101,9 +104,17 @@ public class InventoryHandlerIntegrationTest {
   @Test
   void findSkusShouldSupportPrefixSearch() throws Exception {
     // arrange
-    createSku("jordan", "scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
-    createSku("jordan", "scryfall-2#normal#NM", "Elvish Aberration", "a25", "Masters 25", "167");
-    createSku("jordan", "scryfall-3#normal#NM", "Sol Ring", "c21", "Commander 2021", "167");
+    createSku(
+        "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
+    createSku(
+        "jordan",
+        "mtg#scryfall#scryfall-2#normal#NM",
+        "Elvish Aberration",
+        "a25",
+        "Masters 25",
+        "167");
+    createSku(
+        "jordan", "mtg#scryfall#scryfall-3#normal#NM", "Sol Ring", "c21", "Commander 2021", "167");
 
     // act
     var response =
@@ -122,9 +133,9 @@ public class InventoryHandlerIntegrationTest {
   @Test
   void findSkusShouldSupportContinuationPaging() throws Exception {
     // arrange
-    createSku("jordan", "scryfall-1#normal#NM", "Alpha Card", "dom", "Dominaria", "1");
-    createSku("jordan", "scryfall-2#normal#NM", "Beta Card", "dom", "Dominaria", "2");
-    createSku("jordan", "scryfall-3#normal#NM", "Gamma Card", "dom", "Dominaria", "3");
+    createSku("jordan", "mtg#scryfall#scryfall-1#normal#NM", "Alpha Card", "dom", "Dominaria", "1");
+    createSku("jordan", "mtg#scryfall#scryfall-2#normal#NM", "Beta Card", "dom", "Dominaria", "2");
+    createSku("jordan", "mtg#scryfall#scryfall-3#normal#NM", "Gamma Card", "dom", "Dominaria", "3");
 
     // act - first page
     var response1 =
@@ -157,22 +168,23 @@ public class InventoryHandlerIntegrationTest {
   @Test
   void getSkuShouldReturnDetailWithUnitsSortedBySequenceNumber() throws Exception {
     // arrange
-    createSku("jordan", "scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
-    createUnit("jordan", "scryfall-1#normal#NM", 4242, "in_stock", "import1");
-    createUnit("jordan", "scryfall-1#normal#NM", 1204, "reserved", "import1");
-    createUnit("jordan", "scryfall-1#normal#NM", 4250, "in_stock", "import1");
-    createUnit("jordan", "scryfall-1#normal#NM", 500, "sold", "import1");
-    createUnit("jordan", "scryfall-1#normal#NM", 300, "removed", "import1");
+    createSku(
+        "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
+    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 4242, "in_stock", "import1");
+    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1204, "reserved", "import1");
+    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 4250, "in_stock", "import1");
+    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 500, "sold", "import1");
+    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 300, "removed", "import1");
 
     // act
     var response =
         getSkuHandler.handleRequest(
-            buildEvent("jordan", Map.of("sku_id", "scryfall-1#normal#NM")), null);
+            buildEvent("jordan", Map.of("sku_id", "mtg#scryfall#scryfall-1#normal#NM")), null);
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
-    assertThat(body.get("sku_id").asText()).isEqualTo("scryfall-1#normal#NM");
+    assertThat(body.get("sku_id").asText()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
     assertThat(body.get("scryfall_id").asText()).isEqualTo("scryfall-1");
     assertThat(body.get("name").asText()).isEqualTo("Elvish Mystic");
     assertThat(body.get("in_stock_count").asInt()).isEqualTo(2);
@@ -193,18 +205,20 @@ public class InventoryHandlerIntegrationTest {
   @Test
   void getSkuShouldDecodeUrlEncodedSkuId() throws Exception {
     // arrange
-    createSku("jordan", "scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
-    createUnit("jordan", "scryfall-1#normal#NM", 4242, "in_stock", "import1");
+    createSku(
+        "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
+    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 4242, "in_stock", "import1");
 
     // act
     var response =
         getSkuHandler.handleRequest(
-            buildEvent("jordan", Map.of("sku_id", "scryfall-1%23normal%23NM")), null);
+            buildEvent("jordan", Map.of("sku_id", "mtg%23scryfall%23scryfall-1%23normal%23NM")),
+            null);
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
-    assertThat(body.get("sku_id").asText()).isEqualTo("scryfall-1#normal#NM");
+    assertThat(body.get("sku_id").asText()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
   }
 
   @Test
@@ -212,7 +226,7 @@ public class InventoryHandlerIntegrationTest {
     // act
     var response =
         getSkuHandler.handleRequest(
-            buildEvent("jordan", Map.of("sku_id", "nonexistent#normal#NM")), null);
+            buildEvent("jordan", Map.of("sku_id", "mtg#scryfall#nonexistent#normal#NM")), null);
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(404);
@@ -222,23 +236,24 @@ public class InventoryHandlerIntegrationTest {
   void removeUnitShouldSetStatusToRemovedAndDirtySku() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createSku("jordan", "scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
-    createUnit("jordan", "scryfall-1#normal#NM", 42, "in_stock", "import1");
-    createUnit("jordan", "scryfall-1#normal#NM", 43, "in_stock", "import1");
+    createSku(
+        "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
+    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 42, "in_stock", "import1");
+    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 43, "in_stock", "import1");
 
     // act
     var response =
         removeUnitHandler.handleRequest(
             buildEventWithQuery(
                 "jordan",
-                Map.of("sku_id", "scryfall-1#normal#NM", "sequence_number", "42"),
+                Map.of("sku_id", "mtg#scryfall#scryfall-1#normal#NM", "sequence_number", "42"),
                 Map.of("reason", "damaged")),
             null);
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(204);
 
-    var skuPk = SkuItem.formatPk("jordan", "scryfall-1#normal#NM");
+    var skuPk = SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     var sku =
         skuTable.getItem(Key.builder().partitionValue(skuPk).sortValue(SkuItem.formatSk()).build());
     assertThat(sku.getDirty()).isTrue();
@@ -253,18 +268,21 @@ public class InventoryHandlerIntegrationTest {
     var auditItems = queryAuditEntries("jordan");
     assertThat(auditItems).hasSize(1);
     assertThat(auditItems.get(0).getEventType()).isEqualTo("adjustment");
-    assertThat(auditItems.get(0).getSkuId()).isEqualTo("scryfall-1#normal#NM");
+    assertThat(auditItems.get(0).getSkuId()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
   }
 
   @Test
   void removeUnitShouldReturn404ForMissingUnit() {
     // arrange
-    createSku("jordan", "scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
+    createSku(
+        "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
 
     // act
     var response =
         removeUnitHandler.handleRequest(
-            buildEvent("jordan", Map.of("sku_id", "scryfall-1#normal#NM", "sequence_number", "99")),
+            buildEvent(
+                "jordan",
+                Map.of("sku_id", "mtg#scryfall#scryfall-1#normal#NM", "sequence_number", "99")),
             null);
 
     // assert
@@ -274,13 +292,16 @@ public class InventoryHandlerIntegrationTest {
   @Test
   void removeUnitShouldReturn409ForNonInStockUnit() {
     // arrange
-    createSku("jordan", "scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
-    createUnit("jordan", "scryfall-1#normal#NM", 42, "reserved", "import1");
+    createSku(
+        "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
+    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 42, "reserved", "import1");
 
     // act
     var response =
         removeUnitHandler.handleRequest(
-            buildEvent("jordan", Map.of("sku_id", "scryfall-1#normal#NM", "sequence_number", "42")),
+            buildEvent(
+                "jordan",
+                Map.of("sku_id", "mtg#scryfall#scryfall-1#normal#NM", "sequence_number", "42")),
             null);
 
     // assert
@@ -291,37 +312,40 @@ public class InventoryHandlerIntegrationTest {
   void updateUnitShouldMoveUnitBetweenSkus() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createSku("jordan", "scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
-    createSku("jordan", "scryfall-1#normal#LP", "Elvish Mystic", "m14", "Magic 2014", "169");
-    createUnit("jordan", "scryfall-1#normal#NM", 42, "in_stock", "import1");
-    createUnit("jordan", "scryfall-1#normal#LP", 10, "in_stock", "import1");
+    createSku(
+        "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
+    createSku(
+        "jordan", "mtg#scryfall#scryfall-1#normal#LP", "Elvish Mystic", "m14", "Magic 2014", "169");
+    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 42, "in_stock", "import1");
+    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#LP", 10, "in_stock", "import1");
 
     // act
     var response =
         updateUnitHandler.handleRequest(
             buildEventWithBody(
                 "jordan",
-                Map.of("sku_id", "scryfall-1#normal#NM", "sequence_number", "42"),
+                Map.of("sku_id", "mtg#scryfall#scryfall-1#normal#NM", "sequence_number", "42"),
                 "{\"condition\":\"LP\"}"),
             null);
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
-    assertThat(body.get("sku_id").asText()).isEqualTo("scryfall-1#normal#LP");
+    assertThat(body.get("sku_id").asText()).isEqualTo("mtg#scryfall#scryfall-1#normal#LP");
 
-    var sourceSkuPk = SkuItem.formatPk("jordan", "scryfall-1#normal#NM");
+    var sourceSkuPk = SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     var oldUnit =
         unitTable.getItem(
             Key.builder().partitionValue(sourceSkuPk).sortValue(UnitItem.formatSk(42)).build());
     assertThat(oldUnit).isNull();
 
-    var targetSkuPk = SkuItem.formatPk("jordan", "scryfall-1#normal#LP");
+    var targetSkuPk = SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#LP");
     var newUnit =
         unitTable.getItem(
             Key.builder().partitionValue(targetSkuPk).sortValue(UnitItem.formatSk(42)).build());
     assertThat(newUnit).isNotNull();
     assertThat(newUnit.getSequenceNumber()).isEqualTo(42);
+    assertThat(newUnit.getGame()).isEqualTo("mtg");
     assertThat(newUnit.getStatus()).isEqualTo("in_stock");
 
     var sourceSku =
@@ -335,6 +359,10 @@ public class InventoryHandlerIntegrationTest {
             Key.builder().partitionValue(targetSkuPk).sortValue(SkuItem.formatSk()).build());
     assertThat(targetSku.getDirty()).isTrue();
     assertThat(targetSku.getVersion()).isEqualTo(2);
+    assertThat(targetSku.getSkuId()).isEqualTo("mtg#scryfall#scryfall-1#normal#LP");
+    assertThat(targetSku.getGame()).isEqualTo("mtg");
+    assertThat(targetSku.getExternalSource()).isEqualTo("scryfall");
+    assertThat(targetSku.getExternalId()).isEqualTo("scryfall-1");
 
     var auditItems = queryAuditEntries("jordan");
     assertThat(auditItems).hasSize(1);
@@ -345,33 +373,34 @@ public class InventoryHandlerIntegrationTest {
   void updateUnitShouldCarryPhotosAcrossSkuPartitions() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createSku("jordan", "scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
+    createSku(
+        "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
     var photos =
         List.of(
             UnitItem.Photo.create("photo-front", null),
             UnitItem.Photo.create(
                 "photo-back", "https://listing-img.fetchtcg.com/example/listing/photo.jpg"));
-    createUnit("jordan", "scryfall-1#normal#NM", 42, "in_stock", "import1", photos);
+    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 42, "in_stock", "import1", photos);
 
     // act
     var response =
         updateUnitHandler.handleRequest(
             buildEventWithBody(
                 "jordan",
-                Map.of("sku_id", "scryfall-1#normal#NM", "sequence_number", "42"),
+                Map.of("sku_id", "mtg#scryfall#scryfall-1#normal#NM", "sequence_number", "42"),
                 "{\"condition\":\"LP\"}"),
             null);
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
 
-    var sourceSkuPk = SkuItem.formatPk("jordan", "scryfall-1#normal#NM");
+    var sourceSkuPk = SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     var oldUnit =
         unitTable.getItem(
             Key.builder().partitionValue(sourceSkuPk).sortValue(UnitItem.formatSk(42)).build());
     assertThat(oldUnit).isNull();
 
-    var targetSkuPk = SkuItem.formatPk("jordan", "scryfall-1#normal#LP");
+    var targetSkuPk = SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#LP");
     var newUnit =
         unitTable.getItem(
             Key.builder().partitionValue(targetSkuPk).sortValue(UnitItem.formatSk(42)).build());
@@ -382,28 +411,29 @@ public class InventoryHandlerIntegrationTest {
   @Test
   void getSkuShouldReturnUnitPhotosWithPresignedUrls() throws Exception {
     // arrange
-    createSku("jordan", "scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
+    createSku(
+        "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
     createUnit(
         "jordan",
-        "scryfall-1#normal#NM",
+        "mtg#scryfall#scryfall-1#normal#NM",
         4242,
         "in_stock",
         "import1",
         List.of(UnitItem.Photo.create("photo-in-stock", null)));
     createUnit(
         "jordan",
-        "scryfall-1#normal#NM",
+        "mtg#scryfall#scryfall-1#normal#NM",
         1204,
         "reserved",
         "import1",
         List.of(UnitItem.Photo.create("photo-reserved", null)));
-    createUnit("jordan", "scryfall-1#normal#NM", 4250, "in_stock", "import1");
-    createUnit("jordan", "scryfall-1#normal#NM", 300, "removed", "import1");
+    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 4250, "in_stock", "import1");
+    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 300, "removed", "import1");
 
     // act
     var response =
         getSkuHandler.handleRequest(
-            buildEvent("jordan", Map.of("sku_id", "scryfall-1#normal#NM")), null);
+            buildEvent("jordan", Map.of("sku_id", "mtg#scryfall#scryfall-1#normal#NM")), null);
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
@@ -433,49 +463,51 @@ public class InventoryHandlerIntegrationTest {
   void updateUnitShouldCreateTargetSkuWhenNotExists() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createSku("jordan", "scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
-    createUnit("jordan", "scryfall-1#normal#NM", 42, "in_stock", "import1");
+    createSku(
+        "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
+    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 42, "in_stock", "import1");
 
     // act
     var response =
         updateUnitHandler.handleRequest(
             buildEventWithBody(
                 "jordan",
-                Map.of("sku_id", "scryfall-1#normal#NM", "sequence_number", "42"),
+                Map.of("sku_id", "mtg#scryfall#scryfall-1#normal#NM", "sequence_number", "42"),
                 "{\"condition\":\"LP\"}"),
             null);
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
-    assertThat(body.get("sku_id").asText()).isEqualTo("scryfall-1#normal#LP");
+    assertThat(body.get("sku_id").asText()).isEqualTo("mtg#scryfall#scryfall-1#normal#LP");
 
-    var targetSkuPk = SkuItem.formatPk("jordan", "scryfall-1#normal#LP");
+    var targetSkuPk = SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#LP");
     var targetSku =
         skuTable.getItem(
             Key.builder().partitionValue(targetSkuPk).sortValue(SkuItem.formatSk()).build());
     assertThat(targetSku).isNotNull();
-    assertThat(targetSku.getSkuId()).isEqualTo("scryfall-1#normal#LP");
+    assertThat(targetSku.getSkuId()).isEqualTo("mtg#scryfall#scryfall-1#normal#LP");
     assertThat(targetSku.getName()).isEqualTo("Elvish Mystic");
     assertThat(targetSku.getCondition()).isEqualTo("LP");
     assertThat(targetSku.getFinish()).isEqualTo("normal");
     assertThat(targetSku.getGsi2pk()).isEqualTo(SkuItem.formatGsi2pk("jordan"));
     assertThat(targetSku.getGsi2sk())
-        .isEqualTo(SkuItem.formatGsi2sk("elvish mystic", "scryfall-1#normal#LP"));
+        .isEqualTo(SkuItem.formatGsi2sk("elvish mystic", "mtg#scryfall#scryfall-1#normal#LP"));
   }
 
   @Test
   void updateUnitShouldReturn409ForNonInStockUnit() {
     // arrange
-    createSku("jordan", "scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
-    createUnit("jordan", "scryfall-1#normal#NM", 42, "reserved", "import1");
+    createSku(
+        "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
+    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 42, "reserved", "import1");
 
     // act
     var response =
         updateUnitHandler.handleRequest(
             buildEventWithBody(
                 "jordan",
-                Map.of("sku_id", "scryfall-1#normal#NM", "sequence_number", "42"),
+                Map.of("sku_id", "mtg#scryfall#scryfall-1#normal#NM", "sequence_number", "42"),
                 "{\"condition\":\"LP\"}"),
             null);
 
@@ -486,15 +518,16 @@ public class InventoryHandlerIntegrationTest {
   @Test
   void updateUnitShouldReturn409ForSameCondition() {
     // arrange
-    createSku("jordan", "scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
-    createUnit("jordan", "scryfall-1#normal#NM", 42, "in_stock", "import1");
+    createSku(
+        "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
+    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 42, "in_stock", "import1");
 
     // act
     var response =
         updateUnitHandler.handleRequest(
             buildEventWithBody(
                 "jordan",
-                Map.of("sku_id", "scryfall-1#normal#NM", "sequence_number", "42"),
+                Map.of("sku_id", "mtg#scryfall#scryfall-1#normal#NM", "sequence_number", "42"),
                 "{\"condition\":\"NM\"}"),
             null);
 
@@ -506,24 +539,27 @@ public class InventoryHandlerIntegrationTest {
   void zeroCountSkuShouldPersistAfterRemoval() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createSku("jordan", "scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
-    createUnit("jordan", "scryfall-1#normal#NM", 42, "in_stock", "import1");
+    createSku(
+        "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
+    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 42, "in_stock", "import1");
 
     // act
     removeUnitHandler.handleRequest(
-        buildEvent("jordan", Map.of("sku_id", "scryfall-1#normal#NM", "sequence_number", "42")),
+        buildEvent(
+            "jordan",
+            Map.of("sku_id", "mtg#scryfall#scryfall-1#normal#NM", "sequence_number", "42")),
         null);
 
     // assert
-    var skuPk = SkuItem.formatPk("jordan", "scryfall-1#normal#NM");
+    var skuPk = SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     var sku =
         skuTable.getItem(Key.builder().partitionValue(skuPk).sortValue(SkuItem.formatSk()).build());
     assertThat(sku).isNotNull();
-    assertThat(sku.getSkuId()).isEqualTo("scryfall-1#normal#NM");
+    assertThat(sku.getSkuId()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
 
     var getResponse =
         getSkuHandler.handleRequest(
-            buildEvent("jordan", Map.of("sku_id", "scryfall-1#normal#NM")), null);
+            buildEvent("jordan", Map.of("sku_id", "mtg#scryfall#scryfall-1#normal#NM")), null);
     var body = objectMapper.readTree(getResponse.getBody());
     assertThat(body.get("in_stock_count").asInt()).isEqualTo(0);
     assertThat(body.get("units")).isEmpty();
@@ -537,15 +573,17 @@ public class InventoryHandlerIntegrationTest {
       String setName,
       String collectorNumber) {
     var parts = skuId.split("#");
-    var scryfallId = parts[0];
-    var finish = parts[1];
-    var condition = parts[2];
+    var externalId = parts[2];
+    var finish = parts[3];
+    var condition = parts[4];
 
     var item =
         SkuItem.create(
             user,
             skuId,
-            scryfallId,
+            parts[0],
+            parts[1],
+            externalId,
             finish,
             condition,
             name,
@@ -573,7 +611,13 @@ public class InventoryHandlerIntegrationTest {
       List<UnitItem.Photo> photos) {
     var item =
         UnitItem.create(
-            user, skuId, sequenceNumber, status, importId, Instant.ofEpochSecond(1700000000));
+            user,
+            "mtg",
+            skuId,
+            sequenceNumber,
+            status,
+            importId,
+            Instant.ofEpochSecond(1700000000));
     if (photos != null) {
       item.setPhotos(photos);
     }

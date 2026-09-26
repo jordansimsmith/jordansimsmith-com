@@ -24,6 +24,7 @@ public class UnitItem {
   public static final String PK = "pk";
   public static final String SK = "sk";
   public static final String GSI3PK = "gsi3pk";
+  public static final String GAME = "game";
   public static final String SEQUENCE_NUMBER = "sequence_number";
   public static final String STATUS = "status";
   public static final String IMPORT_ID = "import_id";
@@ -35,6 +36,7 @@ public class UnitItem {
   private String pk;
   private String sk;
   private String gsi3pk;
+  private String game;
   private Integer sequenceNumber;
   private String status;
   private String importId;
@@ -71,6 +73,15 @@ public class UnitItem {
 
   public void setGsi3pk(@Nullable String gsi3pk) {
     this.gsi3pk = gsi3pk;
+  }
+
+  @DynamoDbAttribute(GAME)
+  public String getGame() {
+    return game;
+  }
+
+  public void setGame(@Nullable String game) {
+    this.game = game;
   }
 
   @DynamoDbSecondarySortKey(indexNames = TcgInventoryTable.GSI3_NAME)
@@ -147,12 +158,13 @@ public class UnitItem {
     return UNIT_PREFIX + String.format("%010d", sequenceNumber);
   }
 
-  public static String formatGsi3pk(String user) {
-    return USER_PREFIX + user + DELIMITER + UNITS_SUFFIX;
+  public static String formatGsi3pk(String user, String game) {
+    return USER_PREFIX + user + DELIMITER + UNITS_SUFFIX + DELIMITER + game;
   }
 
   public static UnitItem create(
       String user,
+      String game,
       String skuId,
       int sequenceNumber,
       String status,
@@ -161,7 +173,8 @@ public class UnitItem {
     var item = new UnitItem();
     item.setPk(formatPk(user, skuId));
     item.setSk(formatSk(sequenceNumber));
-    item.setGsi3pk(formatGsi3pk(user));
+    item.setGame(game);
+    item.setGsi3pk(formatGsi3pk(user, game));
     item.setSequenceNumber(sequenceNumber);
     item.setStatus(status);
     item.setImportId(importId);
