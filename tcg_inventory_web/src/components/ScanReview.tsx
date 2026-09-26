@@ -18,9 +18,9 @@ import {
 import { scryfallClient } from '../api/scryfall-client';
 import type { ScryfallPrinting } from '../api/scryfall-client';
 import type { ScanConfirmationRow, ScanDetail, ScanRow } from '../api/client';
+import { MAGIC_THE_GATHERING } from '../domain/games';
 import classes from './ScanReview.module.css';
 import { ScanReviewPanels, type ReviewSelection } from './ScanReviewPanels';
-import { getGame } from '../domain/games';
 
 interface ScanReviewProps {
   scan: ScanDetail;
@@ -29,14 +29,7 @@ interface ScanReviewProps {
 }
 
 function formatFinish(finish: ScanDetail['finish']): string {
-  switch (finish) {
-    case 'normal':
-      return 'Normal';
-    case 'foil':
-      return 'Foil';
-    case 'etched':
-      return 'Etched';
-  }
+  return finish.charAt(0).toUpperCase() + finish.slice(1);
 }
 
 function highestSuggestion(row: ScanRow) {
@@ -258,9 +251,7 @@ export function ScanReview({
           setRowErrors((previous) =>
             new Map(previous).set(
               selectedPosition,
-              error instanceof Error
-                ? error.message.replace(/scryfall/gi, 'card lookup')
-                : 'Card lookup failed',
+              error instanceof Error ? error.message : 'Card lookup failed',
             ),
           );
         }
@@ -319,9 +310,7 @@ export function ScanReview({
         .catch((error: unknown) => {
           if (!controller.signal.aborted) {
             setSearchError(
-              error instanceof Error
-                ? error.message.replace(/scryfall/gi, 'card search')
-                : 'Card search failed',
+              error instanceof Error ? error.message : 'Card search failed',
             );
           }
         })
@@ -476,7 +465,7 @@ export function ScanReview({
       }
       confirmationRows.push({
         scan_position: row.scan_position,
-        external_source: getGame(scan.game).externalSource,
+        external_source: MAGIC_THE_GATHERING.externalSource,
         external_id: selection.printing.id,
         name: selection.printing.name,
         set_code: selection.printing.set_code,
@@ -518,9 +507,7 @@ export function ScanReview({
       setSearchSuggestions([]);
     } catch (error: unknown) {
       setSearchError(
-        error instanceof Error
-          ? error.message.replace(/scryfall/gi, 'card search')
-          : 'Card search failed',
+        error instanceof Error ? error.message : 'Card search failed',
       );
     } finally {
       setSearchSelectionLoading(false);

@@ -28,9 +28,9 @@ public class FakeFetchTcgClient implements FetchTcgClient {
   }
 
   @Override
-  public SearchCardsResponse searchCards(int setId, String cardName, String finish) {
+  public SearchCardsResponse searchCards(String gameId, int setId, String cardName, String finish) {
     searchCallCount++;
-    var key = setId + "#" + cardName + "#" + finish;
+    var key = gameId + "#" + setId + "#" + cardName + "#" + finish;
     var response = searchResults.get(key);
     if (response == null) {
       return new SearchCardsResponse(List.of());
@@ -81,8 +81,8 @@ public class FakeFetchTcgClient implements FetchTcgClient {
   }
 
   public void seedSearchResult(
-      int setId, String cardName, String finish, SearchCardsResponse response) {
-    searchResults.put(setId + "#" + cardName + "#" + finish, response);
+      String gameId, int setId, String cardName, String finish, SearchCardsResponse response) {
+    searchResults.put(gameId + "#" + setId + "#" + cardName + "#" + finish, response);
   }
 
   public void seedListings(String cardId, GetCardListingsResponse response) {

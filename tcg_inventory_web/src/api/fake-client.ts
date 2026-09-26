@@ -1952,6 +1952,22 @@ export function createFakeClient(): ApiClient {
     },
 
     async getReport(): Promise<ReportResponse> {
+      const reportSkuId = (
+        externalId: string,
+        finish: Finish,
+        condition: Condition,
+      ) => {
+        const sku = skus.find(
+          (candidate) =>
+            candidate.external_id === externalId &&
+            candidate.finish === finish &&
+            candidate.condition === condition,
+        );
+        if (!sku) {
+          throw new Error(`Missing fake report SKU for ${externalId}`);
+        }
+        return sku.sku_id;
+      };
       const uniqueCardNames = new Set(
         skus
           .filter((sku) => sku.units.some((unit) => unit.status === 'in_stock'))
@@ -2032,7 +2048,11 @@ export function createFakeClient(): ApiClient {
             ],
             top_hits: [
               {
-                sku_id: '29ba5a2d-d787-4214-8cd7-7f2bcea938f8#normal#NM',
+                sku_id: reportSkuId(
+                  '29ba5a2d-d787-4214-8cd7-7f2bcea938f8',
+                  'normal',
+                  'NM',
+                ),
                 name: 'Doubling Season',
                 set_code: 'bbd',
                 collector_number: '195',
@@ -2042,7 +2062,11 @@ export function createFakeClient(): ApiClient {
                 in_stock_units: 1,
               },
               {
-                sku_id: 'd5b5d2a7-8185-4df0-a35a-f89c12857f87#normal#LP',
+                sku_id: reportSkuId(
+                  'd5b5d2a7-8185-4df0-a35a-f89c12857f87',
+                  'normal',
+                  'LP',
+                ),
                 name: 'Sylvan Library',
                 set_code: 'ema',
                 collector_number: '187',
@@ -2052,7 +2076,11 @@ export function createFakeClient(): ApiClient {
                 in_stock_units: 1,
               },
               {
-                sku_id: '205c4689-8b02-4d40-9274-3c1fcafa8b82#normal#LP',
+                sku_id: reportSkuId(
+                  '205c4689-8b02-4d40-9274-3c1fcafa8b82',
+                  'normal',
+                  'LP',
+                ),
                 name: 'Cyclonic Rift',
                 set_code: 'rtr',
                 collector_number: '35',
@@ -2062,7 +2090,11 @@ export function createFakeClient(): ApiClient {
                 in_stock_units: 2,
               },
               {
-                sku_id: 'e9be371c-c688-44ad-ab71-bd4c9f242d58#foil#NM',
+                sku_id: reportSkuId(
+                  'e9be371c-c688-44ad-ab71-bd4c9f242d58',
+                  'foil',
+                  'NM',
+                ),
                 name: 'Force of Negation',
                 set_code: 'mh1',
                 collector_number: '52',
@@ -2072,7 +2104,11 @@ export function createFakeClient(): ApiClient {
                 in_stock_units: 1,
               },
               {
-                sku_id: '48caf4c4-745c-4072-bf3d-1a3fa7c3bc9c#etched#NM',
+                sku_id: reportSkuId(
+                  '48caf4c4-745c-4072-bf3d-1a3fa7c3bc9c',
+                  'etched',
+                  'NM',
+                ),
                 name: 'Jeska, Thrice Reborn',
                 set_code: 'cmr',
                 collector_number: '186',
@@ -2082,7 +2118,11 @@ export function createFakeClient(): ApiClient {
                 in_stock_units: 1,
               },
               {
-                sku_id: 'd6914dba-0d27-4055-ac34-b3ebf5802221#normal#NM',
+                sku_id: reportSkuId(
+                  'd6914dba-0d27-4055-ac34-b3ebf5802221',
+                  'normal',
+                  'NM',
+                ),
                 name: 'Rhystic Study',
                 set_code: 'jmp',
                 collector_number: '169',

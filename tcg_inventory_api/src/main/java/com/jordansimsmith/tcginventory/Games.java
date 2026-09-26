@@ -7,18 +7,14 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 public class Games {
-  public record Game(
-      String id,
-      String externalSource,
-      String fetchTcgExternalReferenceField,
-      Set<String> finishes) {
+  public record Game(String id, String externalSource, Set<String> finishes) {
     public Game {
       finishes = Set.copyOf(finishes);
     }
   }
 
   public static final Game MAGIC_THE_GATHERING =
-      new Game("mtg", "scryfall", "scryfallId", Set.of("normal", "foil", "etched"));
+      new Game("mtg", "scryfall", Set.of("normal", "foil", "etched"));
 
   private static final List<Game> GAMES = List.of(MAGIC_THE_GATHERING);
 

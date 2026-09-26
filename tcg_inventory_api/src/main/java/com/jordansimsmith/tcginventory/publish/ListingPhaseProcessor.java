@@ -2,6 +2,7 @@ package com.jordansimsmith.tcginventory.publish;
 
 import com.jordansimsmith.tcginventory.BatchResult;
 import com.jordansimsmith.tcginventory.Condition;
+import com.jordansimsmith.tcginventory.Games;
 import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
@@ -59,6 +60,7 @@ public class ListingPhaseProcessor {
     int processed = 0;
 
     for (var sku : dirtySkus) {
+      Games.get(sku.getGame());
       var skuId = sku.getSkuId();
       var capturedVersion = sku.getVersion();
       var inStock = loadInStock(user, skuId);

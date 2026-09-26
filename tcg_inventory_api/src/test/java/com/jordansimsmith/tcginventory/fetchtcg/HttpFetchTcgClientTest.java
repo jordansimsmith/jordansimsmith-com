@@ -355,7 +355,7 @@ public class HttpFetchTcgClientTest {
         .thenReturn(response);
 
     // act
-    var result = client.searchCards(42, "Lightning Bolt", "normal");
+    var result = client.searchCards("mtg", 42, "Lightning Bolt", "normal");
 
     // assert
     assertThat(result.content()).hasSize(1);
@@ -370,7 +370,7 @@ public class HttpFetchTcgClientTest {
         .thenReturn(response);
 
     // act
-    client.searchCards(78, "Spidersilk Net", "normal");
+    client.searchCards("mtg", 78, "Spidersilk Net", "normal");
 
     // assert
     var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
@@ -390,7 +390,7 @@ public class HttpFetchTcgClientTest {
         .thenReturn(response);
 
     // act
-    client.searchCards(3268, "Troll of Khazad-dûm", "normal");
+    client.searchCards("provider-game", 3268, "Troll of Khazad-dûm", "normal");
 
     // assert
     var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
@@ -398,7 +398,7 @@ public class HttpFetchTcgClientTest {
     assertThat(requestCaptor.getValue().uri())
         .isEqualTo(
             URI.create(
-                "https://api.fetchtcg.com/v3/cards?gameIds=mtg&sets=3268&cardName=Troll+of+Khazad-d%C3%BBm&finishes=normal"));
+                "https://api.fetchtcg.com/v3/cards?gameIds=provider-game&sets=3268&cardName=Troll+of+Khazad-d%C3%BBm&finishes=normal"));
   }
 
   @Test

@@ -10,7 +10,7 @@ import javax.annotation.Nullable;
 public interface FetchTcgClient {
   GetCardResponse getCard(String cardId);
 
-  SearchCardsResponse searchCards(int setId, String cardName, String finish);
+  SearchCardsResponse searchCards(String fetchTcgGameId, int setId, String cardName, String finish);
 
   GetCardListingsResponse getCardListings(String cardId);
 

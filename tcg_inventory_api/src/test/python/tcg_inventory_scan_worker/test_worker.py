@@ -10,10 +10,12 @@ from PIL import Image
 
 from tcg_inventory_scan_worker.worker import (
     LambdaRuntime,
+    RecognitionProfile,
     RecognitionWorker,
     Scan,
     ScanRow,
     SqsContinuationQueue,
+    _magic_eligible_suggestions,
 )
 
 
@@ -181,11 +183,17 @@ class FakeSqsClient:
 
 
 def _worker(store, images=None, catalog=None, queue=None, loader=None):
+    def load_recognition(game):
+        if game != "mtg":
+            raise ValueError(f"no recognition integration configured for game: {game}")
+        loaded_catalog = loader(game) if loader else catalog or FakeCatalog()
+        return RecognitionProfile(loaded_catalog, _magic_eligible_suggestions)
+
     return RecognitionWorker(
         store=store,
         images=images or FakeImages(),
         continuations=queue or FakeQueue(),
-        catalog_loader=loader or (lambda game: catalog or FakeCatalog()),
+        recognition_loader=load_recognition,
     )
 
 
@@ -366,28 +374,28 @@ def test_filters_language_and_finish_and_deduplicates_faces():
 
 
 def test_treats_external_ids_as_opaque():
-    suggestions = RecognitionWorker._eligible_suggestions(
-        [_record("not-a-uuid")], "normal"
-    )
+    suggestions = _magic_eligible_suggestions([_record("not-a-uuid")], "normal")
 
     assert suggestions[0]["external_id"] == "not-a-uuid"
 
 
-def test_game_without_catalog_fails_before_image_processing():
-    store = FakeStore(_scan_rows(1), game="pokemon")
+def test_game_without_recognition_integration_fails_before_image_processing():
+    store = FakeStore(_scan_rows(1), game="unknown_game")
+    images = FakeImages()
     catalog_loader_calls = []
 
     def load_catalog(game):
         catalog_loader_calls.append(game)
-        raise ValueError(f"no recognition catalog configured for game: {game}")
+        raise ValueError(f"no recognition integration configured for game: {game}")
 
     with pytest.raises(
-        ValueError, match="no recognition catalog configured for game: pokemon"
+        ValueError, match="no recognition integration configured for game: unknown_game"
     ):
-        worker = _worker(store, loader=load_catalog)
+        worker = _worker(store, images=images, loader=load_catalog)
         worker.handle_message({"user": "jordan", "scan_id": "scan-1"})
 
-    assert catalog_loader_calls == ["pokemon"]
+    assert catalog_loader_calls == []
+    assert images.read_keys == []
     assert store.results == []
 
 
@@ -395,9 +403,9 @@ def test_runtime_fails_before_catalog_loading_when_game_has_no_catalog():
     runtime = LambdaRuntime()
 
     with pytest.raises(
-        ValueError, match="no recognition catalog configured for game: pokemon"
+        ValueError, match="no recognition integration configured for game: unknown_game"
     ):
-        runtime._load_catalog("pokemon")
+        runtime._load_recognition("unknown_game")
 
     assert runtime._catalog is None
 

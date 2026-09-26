@@ -103,6 +103,7 @@ public class JobsHandlerIntegrationTest {
     createJob("jordan", "job1", "appraise", "queued", "import1");
 
     fakeFetchTcgClient.seedSearchResult(
+        "mtg",
         2624,
         "Card 1",
         "normal",
@@ -142,6 +143,7 @@ public class JobsHandlerIntegrationTest {
     createJob("jordan", "job1", "appraise", "queued", "import1");
 
     fakeFetchTcgClient.seedSearchResult(
+        "mtg",
         2624,
         "Card 1",
         "normal",
@@ -224,6 +226,7 @@ public class JobsHandlerIntegrationTest {
     createJob("jordan", "job1", "appraise", "queued", "import1");
 
     fakeFetchTcgClient.seedSearchResult(
+        "mtg",
         2624,
         "Card 1",
         "normal",
@@ -281,6 +284,7 @@ public class JobsHandlerIntegrationTest {
     createJob("jordan", "job1", "appraise", "queued", "import1");
 
     fakeFetchTcgClient.seedSearchResult(
+        "mtg",
         3268,
         "Troll of Khazad-dum",
         "normal",
@@ -311,6 +315,7 @@ public class JobsHandlerIntegrationTest {
     createJob("jordan", "job1", "appraise", "queued", "import1");
 
     fakeFetchTcgClient.seedSearchResult(
+        "mtg",
         2624,
         "Card 1",
         "normal",
@@ -380,6 +385,7 @@ public class JobsHandlerIntegrationTest {
     createJob("jordan", "job1", "appraise", "queued", "import1");
 
     fakeFetchTcgClient.seedSearchResult(
+        "mtg",
         2624,
         "Card 1",
         "normal",
@@ -1718,6 +1724,7 @@ public class JobsHandlerIntegrationTest {
 
   private void seedDefaultCardForDom168() {
     fakeFetchTcgClient.seedSearchResult(
+        "mtg",
         2624,
         "Card 1",
         "normal",

@@ -8,6 +8,7 @@ import logging
 import os
 import time
 from dataclasses import dataclass
+from typing import Callable
 
 import boto3
 from PIL import Image
@@ -23,6 +24,13 @@ CATALOG_VERSION = 40
 BATCH_SIZE = 100
 SEARCH_TOP_K = 25
 MAX_SUGGESTIONS = 5
+MAGIC_GAME_ID = "mtg"
+MAGIC_EXTERNAL_SOURCE = "scryfall"
+MAGIC_FINISH_TO_CATALOG_FINISH = {
+    "normal": "nonfoil",
+    "foil": "foil",
+    "etched": "etched",
+}
 
 
 @dataclass(frozen=True)
@@ -41,6 +49,48 @@ class ScanRow:
     scan_position: int
     status: str
     s3_key: str
+
+
+@dataclass(frozen=True)
+class RecognitionProfile:
+    catalog: object
+    convert_suggestions: Callable[[list[dict], str], list[dict]]
+
+
+def _magic_eligible_suggestions(records: list[dict], finish: str) -> list[dict]:
+    required_finish = MAGIC_FINISH_TO_CATALOG_FINISH[finish]
+    suggestions: list[dict] = []
+    seen: set[str] = set()
+    for record in records:
+        identifiers = record.get("identifiers") or {}
+        external_id = identifiers.get("scryfall_card") or record.get("id")
+        metadata = record.get("metadata") or {}
+        if metadata.get("lang") != "en":
+            continue
+        if required_finish not in set(record.get("finishes") or ()):
+            continue
+        name = record.get("name")
+        score = record.get("score")
+        if not isinstance(external_id, str) or not external_id.strip():
+            continue
+        if not isinstance(name, str) or not name:
+            continue
+        if not isinstance(score, (float, int)) or isinstance(score, bool):
+            continue
+        if external_id in seen:
+            continue
+        seen.add(external_id)
+        suggestions.append(
+            {
+                "external_source": MAGIC_EXTERNAL_SOURCE,
+                "external_id": external_id,
+                "name": name,
+                "score": float(score),
+            }
+        )
+        if len(suggestions) >= MAX_SUGGESTIONS:
+            break
+    return suggestions
 
 
 class DynamoScanStore:
@@ -284,61 +334,19 @@ class SqsContinuationQueue:
 
 
 class RecognitionWorker:
-    _FINISH_TO_CATALOG_FINISH = {
-        "normal": "nonfoil",
-        "foil": "foil",
-        "etched": "etched",
-    }
-
     def __init__(
         self,
         store,
         images,
         continuations,
-        catalog_loader,
+        recognition_loader,
         logger: logging.Logger | None = None,
     ):
         self._store = store
         self._images = images
         self._continuations = continuations
-        self._catalog_loader = catalog_loader
+        self._recognition_loader = recognition_loader
         self._logger = logger or LOGGER
-
-    @classmethod
-    def _eligible_suggestions(cls, records: list[dict], finish: str) -> list[dict]:
-        required_finish = cls._FINISH_TO_CATALOG_FINISH[finish]
-        suggestions: list[dict] = []
-        seen: set[str] = set()
-        for record in records:
-            identifiers = record.get("identifiers") or {}
-            external_id = identifiers.get("scryfall_card") or record.get("id")
-            metadata = record.get("metadata") or {}
-            if metadata.get("lang") != "en":
-                continue
-            if required_finish not in set(record.get("finishes") or ()):
-                continue
-            name = record.get("name")
-            score = record.get("score")
-            if not isinstance(external_id, str) or not external_id.strip():
-                continue
-            if not isinstance(name, str) or not name:
-                continue
-            if not isinstance(score, (float, int)) or isinstance(score, bool):
-                continue
-            if external_id in seen:
-                continue
-            seen.add(external_id)
-            suggestions.append(
-                {
-                    "external_source": "scryfall",
-                    "external_id": external_id,
-                    "name": name,
-                    "score": float(score),
-                }
-            )
-            if len(suggestions) >= MAX_SUGGESTIONS:
-                break
-        return suggestions
 
     def handle_event(self, event: dict) -> dict[str, int]:
         records = event.get("Records", [])
@@ -353,7 +361,7 @@ class RecognitionWorker:
         scan = self._store.get_scan(user, scan_id)
         if scan is None or scan.status != "identifying":
             return
-        catalog = self._catalog_loader(scan.game)
+        profile = self._recognition_loader(scan.game)
 
         rows = self._store.get_rows(user, scan_id)
         if not rows:
@@ -364,12 +372,17 @@ class RecognitionWorker:
             return
 
         for row in pending[:BATCH_SIZE]:
-            if not self._recognize_row(scan, row, catalog):
+            if not self._recognize_row(scan, row, profile):
                 return
 
         self._reconcile(scan)
 
-    def _recognize_row(self, scan: Scan, row: ScanRow, catalog) -> bool:
+    def _recognize_row(
+        self,
+        scan: Scan,
+        row: ScanRow,
+        profile: RecognitionProfile,
+    ) -> bool:
         image_bytes = self._images.read(row.s3_key)
         try:
             with Image.open(io.BytesIO(image_bytes)) as image:
@@ -377,9 +390,10 @@ class RecognitionWorker:
                     raise ValueError("unsupported image format")
                 image.load()
                 rgb_image = image.convert("RGB")
-            embedding = catalog.embedder.embed(rgb_image)
-            candidates = self._eligible_suggestions(
-                catalog.search_records(embedding, top_k=SEARCH_TOP_K), scan.finish
+            embedding = profile.catalog.embedder.embed(rgb_image)
+            candidates = profile.convert_suggestions(
+                profile.catalog.search_records(embedding, top_k=SEARCH_TOP_K),
+                scan.finish,
             )
             if not candidates:
                 status = "needs_review"
@@ -435,24 +449,24 @@ class LambdaRuntime:
     def handle_event(self, event: dict) -> dict[str, int]:
         return self._get_worker().handle_event(event)
 
-    def _load_catalog(self, game: str):
-        catalog_loader = {"mtg": self._load_mtg_catalog}.get(game)
-        if catalog_loader is None:
-            raise ValueError(f"no recognition catalog configured for game: {game}")
-        return catalog_loader()
+    def _load_recognition(self, game: str) -> RecognitionProfile:
+        integration_loader = {MAGIC_GAME_ID: self._load_mtg_recognition}.get(game)
+        if integration_loader is None:
+            raise ValueError(f"no recognition integration configured for game: {game}")
+        return integration_loader()
 
-    def _load_mtg_catalog(self):
+    def _load_mtg_recognition(self) -> RecognitionProfile:
         if self._catalog is None:
             self._catalog = Catalog.load(
-                "mtg",
-                source="scryfall",
+                MAGIC_GAME_ID,
+                source=MAGIC_EXTERNAL_SOURCE,
                 family="milo1",
                 cache_dir=os.environ[CACHE_ENV],
                 offline=True,
                 version=CATALOG_VERSION,
             )
             _ = self._catalog.embedder
-        return self._catalog
+        return RecognitionProfile(self._catalog, _magic_eligible_suggestions)
 
     def _get_worker(self) -> RecognitionWorker:
         if self._worker is None:
@@ -462,7 +476,7 @@ class LambdaRuntime:
                 store=DynamoScanStore(boto3.client("dynamodb"), table_name),
                 images=S3ImageStore(boto3.client("s3"), bucket_name),
                 continuations=SqsContinuationQueue(boto3.client("sqs")),
-                catalog_loader=self._load_catalog,
+                recognition_loader=self._load_recognition,
             )
         return self._worker
 

@@ -3,14 +3,11 @@ package com.jordansimsmith.tcginventory.imports;
 import com.jordansimsmith.tcginventory.BatchResult;
 import com.jordansimsmith.tcginventory.CardIdentity;
 import com.jordansimsmith.tcginventory.Condition;
-import com.jordansimsmith.tcginventory.Games;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgSetMapping;
+import com.jordansimsmith.tcginventory.imports.AppraisalCatalogs.AppraisalCatalog;
 import com.jordansimsmith.time.Clock;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -57,7 +54,8 @@ public class AppraiseJobProcessor {
     int batchEnd = Math.min(continuation + BATCH_SIZE, totalRows);
     int processed = continuation;
 
-    Map<String, ResolvedCard> batchCache = new HashMap<>();
+    var appraisalCatalog = AppraisalCatalogs.get(importItem.getGame());
+    Map<String, AppraisalCatalog.ResolvedCard> batchCache = new HashMap<>();
     Map<String, FetchTcgClient.GetCardResponse> cardCache = new HashMap<>();
 
     for (int i = continuation + 1; i <= batchEnd; i++) {
@@ -72,7 +70,8 @@ public class AppraiseJobProcessor {
         continue;
       }
 
-      var decision = appraiseRow(importItem.getGame(), rowItem, batchCache, cardCache);
+      var decision =
+          appraiseRow(importItem.getGame(), appraisalCatalog, rowItem, batchCache, cardCache);
       rowItem.setDecision(decision.decision());
       rowItem.setDecisionReason(decision.reason());
       rowItem.setMarketPrice(decision.marketPrice());
@@ -96,20 +95,11 @@ public class AppraiseJobProcessor {
 
   private RowDecision appraiseRow(
       String game,
+      AppraisalCatalog appraisalCatalog,
       ImportRowItem rowItem,
-      Map<String, ResolvedCard> batchCache,
+      Map<String, AppraisalCatalog.ResolvedCard> batchCache,
       Map<String, FetchTcgClient.GetCardResponse> cardCache) {
     var identity = new CardIdentity(game, rowItem.getExternalSource(), rowItem.getExternalId());
-    var fetchTcgExternalReferenceField = Games.get(game).fetchTcgExternalReferenceField();
-    if (!"en".equals(rowItem.getLanguage())) {
-      return RowDecision.review("non-english");
-    }
-
-    var setCode = rowItem.getSetCode();
-    if (!FetchTcgSetMapping.contains(setCode)) {
-      return RowDecision.review("unmapped set");
-    }
-
     var dedupeKey =
         identity.game()
             + "#"
@@ -117,20 +107,18 @@ public class AppraiseJobProcessor {
             + "#"
             + identity.externalId()
             + "#"
-            + rowItem.getFinish();
+            + rowItem.getFinish()
+            + "#"
+            + rowItem.getSetCode()
+            + "#"
+            + rowItem.getLanguage();
     var cached = batchCache.get(dedupeKey);
     if (cached == null) {
-      cached =
-          resolveCard(
-              setCode,
-              rowItem.getName(),
-              rowItem.getFinish(),
-              fetchTcgExternalReferenceField,
-              identity.externalId(),
-              cardCache);
-      if (cached == null) {
-        return RowDecision.review("unresolvable");
+      var resolution = appraisalCatalog.resolve(identity, rowItem, fetchTcgClient, cardCache);
+      if (resolution.reviewReason() != null) {
+        return RowDecision.review(resolution.reviewReason());
       }
+      cached = resolution.card();
       batchCache.put(dedupeKey, cached);
     }
 
@@ -146,40 +134,6 @@ public class AppraiseJobProcessor {
         result.suggestedPrice().toPlainString(),
         cached.cardId(),
         cached.setId());
-  }
-
-  private ResolvedCard resolveCard(
-      String setCode,
-      String cardName,
-      String finish,
-      String fetchTcgExternalReferenceField,
-      String externalId,
-      Map<String, FetchTcgClient.GetCardResponse> cardCache) {
-    var searchName = cardName.contains("//") ? cardName.split("//")[0].trim() : cardName;
-    // fetchtcg stores ascii names (khazad-dum); fold scryfall diacritics so search still hits
-    searchName = Normalizer.normalize(searchName, Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
-    var setEntries = FetchTcgSetMapping.get(setCode);
-    for (var entry : setEntries) {
-      var searchResult = fetchTcgClient.searchCards(entry.setId(), searchName, finish);
-      for (var card : searchResult.content()) {
-        var cardDetails = cardCache.computeIfAbsent(card.id(), fetchTcgClient::getCard);
-        var externalReferences = cardDetails.externalReferences();
-        if (externalReferences == null
-            || !externalId.equalsIgnoreCase(
-                externalReferences.get(fetchTcgExternalReferenceField))) {
-          continue;
-        }
-        var pricingData = cardDetails.pricingData();
-        var nzPricing = pricingData != null ? pricingData.get("NZ") : null;
-        var marketPrice =
-            nzPricing != null && nzPricing.tcgMarketPrice() != null
-                ? nzPricing.tcgMarketPrice()
-                : BigDecimal.ZERO;
-        return new ResolvedCard(
-            card.id(), entry.setId(), marketPrice.setScale(2, RoundingMode.HALF_UP));
-      }
-    }
-    return null;
   }
 
   private List<PricingPolicy.RivalTier> buildRivalTiers(String cardId, String condition) {
@@ -203,8 +157,6 @@ public class AppraiseJobProcessor {
     }
     return tiers;
   }
-
-  private record ResolvedCard(String cardId, int setId, BigDecimal marketPrice) {}
 
   private record RowDecision(
       String decision,

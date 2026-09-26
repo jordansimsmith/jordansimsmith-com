@@ -282,7 +282,7 @@ describe('ScanReview', () => {
     renderReview(scan([row()]));
 
     expect(
-      await screen.findByText('card lookup request failed (503)'),
+      await screen.findByText('Scryfall request failed (503)'),
     ).toBeDefined();
     expect(screen.getAllByText('Needs review').length).toBeGreaterThan(0);
     expect(

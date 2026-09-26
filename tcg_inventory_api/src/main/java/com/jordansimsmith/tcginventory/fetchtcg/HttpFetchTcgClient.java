@@ -52,9 +52,10 @@ public class HttpFetchTcgClient implements FetchTcgClient {
   }
 
   @Override
-  public SearchCardsResponse searchCards(int setId, String cardName, String finish) {
+  public SearchCardsResponse searchCards(
+      String fetchTcgGameId, int setId, String cardName, String finish) {
     try {
-      return doSearchCards(setId, cardName, finish);
+      return doSearchCards(fetchTcgGameId, setId, cardName, finish);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
@@ -152,14 +153,18 @@ public class HttpFetchTcgClient implements FetchTcgClient {
     return objectMapper.readValue(body, GetCardResponse.class);
   }
 
-  private SearchCardsResponse doSearchCards(int setId, String cardName, String finish)
+  private SearchCardsResponse doSearchCards(
+      String fetchTcgGameId, int setId, String cardName, String finish)
       throws IOException, InterruptedException {
     var encodedName = URLEncoder.encode(cardName, StandardCharsets.UTF_8);
+    var encodedGameId = URLEncoder.encode(fetchTcgGameId, StandardCharsets.UTF_8);
     var request =
         HttpRequest.newBuilder()
             .uri(
                 baseUri.resolve(
-                    "/v3/cards?gameIds=mtg&sets="
+                    "/v3/cards?gameIds="
+                        + encodedGameId
+                        + "&sets="
                         + setId
                         + "&cardName="
                         + encodedName

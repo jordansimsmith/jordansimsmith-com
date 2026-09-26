@@ -1,5 +1,6 @@
 package com.jordansimsmith.tcginventory.orders;
 
+import com.jordansimsmith.tcginventory.Games;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
@@ -244,6 +245,7 @@ public class OrderPhaseProcessor {
         .flatMap(page -> page.items().stream())
         .forEach(
             item -> {
+              Games.get(item.getGame());
               if (item.getFetchtcgListingId() != null) {
                 map.put(item.getFetchtcgListingId(), item.getSkuId());
               }
