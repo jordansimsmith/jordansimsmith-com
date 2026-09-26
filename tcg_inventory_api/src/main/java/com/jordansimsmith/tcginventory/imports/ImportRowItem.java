@@ -23,7 +23,8 @@ public class ImportRowItem {
   public static final String COLLECTOR_NUMBER = "collector_number";
   public static final String FINISH = "finish";
   public static final String CONDITION = "condition";
-  public static final String SCRYFALL_ID = "scryfall_id";
+  public static final String EXTERNAL_SOURCE = "external_source";
+  public static final String EXTERNAL_ID = "external_id";
   public static final String LANGUAGE = "language";
   public static final String DECISION = "decision";
   public static final String DECISION_REASON = "decision_reason";
@@ -43,7 +44,8 @@ public class ImportRowItem {
   private String collectorNumber;
   private String finish;
   private String condition;
-  private String scryfallId;
+  private String externalSource;
+  private String externalId;
   private String language;
   private String decision;
   private String decisionReason;
@@ -137,13 +139,22 @@ public class ImportRowItem {
     this.condition = condition;
   }
 
-  @DynamoDbAttribute(SCRYFALL_ID)
-  public String getScryfallId() {
-    return scryfallId;
+  @DynamoDbAttribute(EXTERNAL_SOURCE)
+  public String getExternalSource() {
+    return externalSource;
   }
 
-  public void setScryfallId(@Nullable String scryfallId) {
-    this.scryfallId = scryfallId;
+  public void setExternalSource(@Nullable String externalSource) {
+    this.externalSource = externalSource;
+  }
+
+  @DynamoDbAttribute(EXTERNAL_ID)
+  public String getExternalId() {
+    return externalId;
+  }
+
+  public void setExternalId(@Nullable String externalId) {
+    this.externalId = externalId;
   }
 
   @DynamoDbAttribute(LANGUAGE)
@@ -245,7 +256,8 @@ public class ImportRowItem {
       String collectorNumber,
       String finish,
       String condition,
-      String scryfallId,
+      String externalSource,
+      String externalId,
       String language) {
     var item = new ImportRowItem();
     item.setPk(formatPk(user, importId));
@@ -257,7 +269,8 @@ public class ImportRowItem {
     item.setCollectorNumber(collectorNumber);
     item.setFinish(finish);
     item.setCondition(condition);
-    item.setScryfallId(scryfallId);
+    item.setExternalSource(externalSource);
+    item.setExternalId(externalId);
     item.setLanguage(language);
     return item;
   }

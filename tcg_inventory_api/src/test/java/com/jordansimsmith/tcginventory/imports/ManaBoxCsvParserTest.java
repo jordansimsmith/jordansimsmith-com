@@ -3,6 +3,7 @@ package com.jordansimsmith.tcginventory.imports;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.jordansimsmith.tcginventory.Games;
 import org.junit.jupiter.api.Test;
 
 public class ManaBoxCsvParserTest {
@@ -17,7 +18,7 @@ public class ManaBoxCsvParserTest {
         HEADER
             + "\n"
             + "Llanowar"
-            + " Elves,DOM,Dominaria,168,Normal,Common,1,581b7327-3215-4a4f-b4ae-d9d4002ba882,false,false,near_mint,en";
+            + " Elves,DOM,Dominaria,168,Normal,Common,1,581B7327-3215-4A4F-B4AE-D9D4002BA882,false,false,near_mint,en";
 
     // act
     var rows = ManaBoxCsvParser.parse(csv);
@@ -31,9 +32,20 @@ public class ManaBoxCsvParserTest {
     assertThat(row.collectorNumber()).isEqualTo("168");
     assertThat(row.finish()).isEqualTo("normal");
     assertThat(row.condition()).isEqualTo("NM");
-    assertThat(row.scryfallId()).isEqualTo("581b7327-3215-4a4f-b4ae-d9d4002ba882");
+    assertThat(row.externalSource()).isEqualTo(Games.MAGIC_THE_GATHERING.externalSource());
+    assertThat(row.externalId()).isEqualTo("581B7327-3215-4A4F-B4AE-D9D4002BA882");
     assertThat(row.language()).isEqualTo("en");
     assertThat(row.quantity()).isEqualTo(1);
+  }
+
+  @Test
+  void parseShouldPreserveAnAsciiIdWithoutApplyingScryfallSpecificValidation() {
+    var csv =
+        HEADER + "\n" + "Card,SET,Set Name,1,Normal,Common,1,not-a-uuid,false,false,near_mint,en";
+
+    var row = ManaBoxCsvParser.parse(csv).get(0);
+
+    assertThat(row.externalId()).isEqualTo("not-a-uuid");
   }
 
   @Test
@@ -141,14 +153,14 @@ public class ManaBoxCsvParserTest {
   }
 
   @Test
-  void parseShouldRejectInvalidScryfallId() {
+  void parseShouldRejectExternalIdOutsideCardIdentityCharacterSet() {
     // arrange
-    var csv = HEADER + "\nCard,SET,Set Name,1,Normal,Common,1,not-a-uuid,false,false,near_mint,en";
+    var csv = HEADER + "\nCard,SET,Set Name,1,Normal,Common,1,bad/id,false,false,near_mint,en";
 
     // act & assert
     assertThatThrownBy(() -> ManaBoxCsvParser.parse(csv))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessageContaining("Scryfall ID must be a UUID");
+        .hasMessageContaining("external id must contain only ASCII unreserved characters");
   }
 
   @Test

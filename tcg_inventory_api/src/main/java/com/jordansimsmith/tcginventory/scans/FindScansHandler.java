@@ -24,6 +24,7 @@ public class FindScansHandler
 
   record ScanSummaryResponse(
       @JsonProperty("scan_id") String scanId,
+      @JsonProperty("game") String game,
       @JsonProperty("status") String status,
       @JsonProperty("condition") String condition,
       @JsonProperty("finish") String finish,
@@ -98,6 +99,7 @@ public class FindScansHandler
   private static ScanSummaryResponse toSummary(ScanItem item) {
     return new ScanSummaryResponse(
         item.getScanId(),
+        item.getGame(),
         item.getStatus(),
         item.getCondition(),
         item.getFinish(),

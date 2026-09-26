@@ -4,14 +4,18 @@ import java.util.Map;
 import java.util.Set;
 
 public class Games {
-  public record Game(String id, Set<String> finishes) {
+  public record Game(
+      String id,
+      String externalSource,
+      String fetchTcgExternalReferenceField,
+      Set<String> finishes) {
     public Game {
       finishes = Set.copyOf(finishes);
     }
   }
 
   public static final Game MAGIC_THE_GATHERING =
-      new Game("mtg", Set.of("normal", "foil", "etched"));
+      new Game("mtg", "scryfall", "scryfallId", Set.of("normal", "foil", "etched"));
 
   private static final Map<String, Game> GAMES =
       Map.of(MAGIC_THE_GATHERING.id(), MAGIC_THE_GATHERING);

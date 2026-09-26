@@ -30,6 +30,7 @@ class Scan:
     user: str
     scan_id: str
     status: str
+    game: str
     finish: str
 
 
@@ -77,7 +78,8 @@ class DynamoScanStore:
     def _suggestion_attribute(suggestion: dict) -> dict:
         return {
             "M": {
-                "scryfall_id": {"S": suggestion["scryfall_id"]},
+                "external_source": {"S": suggestion["external_source"]},
+                "external_id": {"S": suggestion["external_id"]},
                 "name": {"S": suggestion["name"]},
                 "score": {"N": str(suggestion["score"])},
             }
@@ -106,6 +108,7 @@ class DynamoScanStore:
             user=user,
             scan_id=scan_id,
             status=self._string(item, "status"),
+            game=self._string(item, "game"),
             finish=self._string(item, "finish"),
         )
 
@@ -308,7 +311,7 @@ class RecognitionWorker:
         seen: set[str] = set()
         for record in records:
             identifiers = record.get("identifiers") or {}
-            scryfall_id = identifiers.get("scryfall_card") or record.get("id")
+            external_id = identifiers.get("scryfall_card") or record.get("id")
             metadata = record.get("metadata") or {}
             if metadata.get("lang") != "en":
                 continue
@@ -316,17 +319,22 @@ class RecognitionWorker:
                 continue
             name = record.get("name")
             score = record.get("score")
-            if not isinstance(scryfall_id, str) or not scryfall_id:
+            if not isinstance(external_id, str) or not external_id.strip():
                 continue
             if not isinstance(name, str) or not name:
                 continue
             if not isinstance(score, (float, int)) or isinstance(score, bool):
                 continue
-            if scryfall_id in seen:
+            if external_id in seen:
                 continue
-            seen.add(scryfall_id)
+            seen.add(external_id)
             suggestions.append(
-                {"scryfall_id": scryfall_id, "name": name, "score": float(score)}
+                {
+                    "external_source": "scryfall",
+                    "external_id": external_id,
+                    "name": name,
+                    "score": float(score),
+                }
             )
             if len(suggestions) >= MAX_SUGGESTIONS:
                 break
@@ -345,6 +353,7 @@ class RecognitionWorker:
         scan = self._store.get_scan(user, scan_id)
         if scan is None or scan.status != "identifying":
             return
+        catalog = self._catalog_loader(scan.game)
 
         rows = self._store.get_rows(user, scan_id)
         if not rows:
@@ -353,8 +362,6 @@ class RecognitionWorker:
         if not pending:
             self._reconcile(scan)
             return
-
-        catalog = self._catalog_loader()
 
         for row in pending[:BATCH_SIZE]:
             if not self._recognize_row(scan, row, catalog):
@@ -428,7 +435,13 @@ class LambdaRuntime:
     def handle_event(self, event: dict) -> dict[str, int]:
         return self._get_worker().handle_event(event)
 
-    def _load_catalog(self):
+    def _load_catalog(self, game: str):
+        catalog_loader = {"mtg": self._load_mtg_catalog}.get(game)
+        if catalog_loader is None:
+            raise ValueError(f"no recognition catalog configured for game: {game}")
+        return catalog_loader()
+
+    def _load_mtg_catalog(self):
         if self._catalog is None:
             self._catalog = Catalog.load(
                 "mtg",

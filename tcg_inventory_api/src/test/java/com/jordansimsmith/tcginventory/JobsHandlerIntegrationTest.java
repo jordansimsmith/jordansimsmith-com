@@ -1,6 +1,7 @@
 package com.jordansimsmith.tcginventory;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -57,6 +58,7 @@ public class JobsHandlerIntegrationTest {
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
   private static final URI UNUSED_S3_ENDPOINT = URI.create("http://localhost:1");
+  private static final String SCRYFALL_ID = "29ba5a2d-d787-4214-8cd7-7f2bcea938f8";
 
   @BeforeAll
   static void setUpBeforeClass() {
@@ -110,7 +112,7 @@ public class JobsHandlerIntegrationTest {
             "mtg_168_c_dom_normal",
             "Card 1",
             Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
-            new FetchTcgClient.ExternalReferences("scryfall-1")));
+            Map.of("scryfallId", SCRYFALL_ID)));
     fakeFetchTcgClient.seedListings(
         "mtg_168_c_dom_normal",
         new FetchTcgClient.GetCardListingsResponse(
@@ -149,7 +151,7 @@ public class JobsHandlerIntegrationTest {
             "mtg_168_c_dom_normal",
             "Card 1",
             Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("0.10"))),
-            new FetchTcgClient.ExternalReferences("scryfall-1")));
+            Map.of("scryfallId", SCRYFALL_ID)));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
@@ -233,14 +235,14 @@ public class JobsHandlerIntegrationTest {
             "mtg_168_c_dom_normal",
             "Card 1",
             Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
-            new FetchTcgClient.ExternalReferences("scryfall-other")));
+            Map.of("scryfallId", "scryfall-other")));
     fakeFetchTcgClient.seedCard(
         "mtg_410_c_dom_B_normal",
         new FetchTcgClient.GetCardResponse(
             "mtg_410_c_dom_B_normal",
             "Card 1 (Borderless)",
             Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("27.43"))),
-            new FetchTcgClient.ExternalReferences("scryfall-1")));
+            Map.of("scryfallId", SCRYFALL_ID)));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
@@ -258,7 +260,7 @@ public class JobsHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     var importItem =
         ImportItem.create(
-            "jordan", "import1", "test.csv", 1, null, Instant.ofEpochSecond(1700000000));
+            "jordan", "mtg", "import1", "test.csv", 1, null, Instant.ofEpochSecond(1700000000));
     importTable.putItem(importItem);
     importRowTable.putItem(
         ImportRowItem.create(
@@ -271,7 +273,8 @@ public class JobsHandlerIntegrationTest {
             "111",
             "normal",
             "NM",
-            "scryfall-troll",
+            "scryfall",
+            SCRYFALL_ID,
             "en"));
     createJob("jordan", "job1", "appraise", "queued", "import1");
 
@@ -287,7 +290,7 @@ public class JobsHandlerIntegrationTest {
             "mtg_111_c_ltr_normal",
             "Troll of Khazad-dum",
             Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
-            new FetchTcgClient.ExternalReferences("scryfall-troll")));
+            Map.of("scryfallId", SCRYFALL_ID)));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
@@ -317,7 +320,7 @@ public class JobsHandlerIntegrationTest {
             "mtg_168_c_dom_normal",
             "Card 1",
             Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
-            new FetchTcgClient.ExternalReferences("scryfall-other")));
+            Map.of("scryfallId", "scryfall-other")));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
@@ -329,6 +332,40 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
+  void appraiseShouldRejectInvalidScryfallIdBeforeProviderLookup() {
+    // arrange
+    var importItem =
+        ImportItem.create(
+            "jordan", "mtg", "import1", "test.csv", 1, null, Instant.ofEpochSecond(1700000000));
+    importTable.putItem(importItem);
+    importRowTable.putItem(
+        ImportRowItem.create(
+            "jordan",
+            "import1",
+            1,
+            "Forest",
+            "lea",
+            "Limited Edition Alpha",
+            "1",
+            "normal",
+            "NM",
+            "scryfall",
+            "not/a-uuid",
+            "en"));
+    var jobItem = createJob("jordan", "job1", "appraise", "queued", "import1");
+
+    // act & assert
+    assertThatThrownBy(
+            () ->
+                new AppraiseJobProcessor(importTable, importRowTable, fakeClock, fakeFetchTcgClient)
+                    .processBatch("jordan", jobItem))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("external id must contain only ASCII unreserved characters");
+    assertThat(fakeFetchTcgClient.getSearchCallCount()).isZero();
+    assertThat(getRow("jordan", "import1", 1).getDecision()).isNull();
+  }
+
+  @Test
   void appraiseShouldDedupeWithinBatch() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
@@ -336,8 +373,8 @@ public class JobsHandlerIntegrationTest {
         "jordan",
         "import1",
         List.of(
-            new RowSpec("dom", "168", "normal", "NM", "en", "scryfall-1"),
-            new RowSpec("dom", "168", "normal", "LP", "en", "scryfall-1")));
+            new RowSpec("dom", "168", "normal", "NM", "en", SCRYFALL_ID),
+            new RowSpec("dom", "168", "normal", "LP", "en", SCRYFALL_ID)));
     createJob("jordan", "job1", "appraise", "queued", "import1");
 
     fakeFetchTcgClient.seedSearchResult(
@@ -352,7 +389,7 @@ public class JobsHandlerIntegrationTest {
             "mtg_168_c_dom_normal",
             "Card 1",
             Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
-            new FetchTcgClient.ExternalReferences("scryfall-1")));
+            Map.of("scryfallId", SCRYFALL_ID)));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
@@ -1670,7 +1707,7 @@ public class JobsHandlerIntegrationTest {
             "mtg_168_c_dom_normal",
             "Card 1",
             Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
-            new FetchTcgClient.ExternalReferences("scryfall-1")));
+            Map.of("scryfallId", SCRYFALL_ID)));
   }
 
   private void createImportWithRow(
@@ -1684,13 +1721,19 @@ public class JobsHandlerIntegrationTest {
     createImportWithRows(
         user,
         importId,
-        List.of(new RowSpec(setCode, collectorNumber, finish, condition, language, "scryfall-1")));
+        List.of(new RowSpec(setCode, collectorNumber, finish, condition, language, SCRYFALL_ID)));
   }
 
   private void createImportWithRows(String user, String importId, List<RowSpec> rows) {
     var importItem =
         ImportItem.create(
-            user, importId, "test.csv", rows.size(), null, Instant.ofEpochSecond(1700000000));
+            user,
+            "mtg",
+            importId,
+            "test.csv",
+            rows.size(),
+            null,
+            Instant.ofEpochSecond(1700000000));
     importTable.putItem(importItem);
 
     for (int i = 0; i < rows.size(); i++) {
@@ -1706,6 +1749,7 @@ public class JobsHandlerIntegrationTest {
               spec.collectorNumber(),
               spec.finish(),
               spec.condition(),
+              "scryfall",
               spec.scryfallId(),
               spec.language());
       importRowTable.putItem(rowItem);
@@ -1715,7 +1759,7 @@ public class JobsHandlerIntegrationTest {
   private void createImportWithNRows(String user, String importId, int rowCount) {
     var importItem =
         ImportItem.create(
-            user, importId, "test.csv", rowCount, null, Instant.ofEpochSecond(1700000000));
+            user, "mtg", importId, "test.csv", rowCount, null, Instant.ofEpochSecond(1700000000));
     importTable.putItem(importItem);
 
     for (int i = 1; i <= rowCount; i++) {
@@ -1730,7 +1774,8 @@ public class JobsHandlerIntegrationTest {
               "168",
               "normal",
               "NM",
-              "scryfall-" + i,
+              "scryfall",
+              SCRYFALL_ID,
               "en");
       importRowTable.putItem(rowItem);
     }

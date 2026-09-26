@@ -1,9 +1,11 @@
 package com.jordansimsmith.tcginventory.imports;
 
 import com.jordansimsmith.tcginventory.BatchResult;
+import com.jordansimsmith.tcginventory.CardIdentity;
 import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.FetchTcgClient;
 import com.jordansimsmith.tcginventory.FetchTcgSetMapping;
+import com.jordansimsmith.tcginventory.Games;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.time.Clock;
 import java.math.BigDecimal;
@@ -70,7 +72,7 @@ public class AppraiseJobProcessor {
         continue;
       }
 
-      var decision = appraiseRow(rowItem, batchCache, cardCache);
+      var decision = appraiseRow(importItem.getGame(), rowItem, batchCache, cardCache);
       rowItem.setDecision(decision.decision());
       rowItem.setDecisionReason(decision.reason());
       rowItem.setMarketPrice(decision.marketPrice());
@@ -93,9 +95,12 @@ public class AppraiseJobProcessor {
   }
 
   private RowDecision appraiseRow(
+      String game,
       ImportRowItem rowItem,
       Map<String, ResolvedCard> batchCache,
       Map<String, FetchTcgClient.GetCardResponse> cardCache) {
+    var identity = new CardIdentity(game, rowItem.getExternalSource(), rowItem.getExternalId());
+    var fetchTcgExternalReferenceField = Games.get(game).fetchTcgExternalReferenceField();
     if (!"en".equals(rowItem.getLanguage())) {
       return RowDecision.review("non-english");
     }
@@ -105,12 +110,24 @@ public class AppraiseJobProcessor {
       return RowDecision.review("unmapped set");
     }
 
-    var dedupeKey = rowItem.getScryfallId() + "#" + rowItem.getFinish();
+    var dedupeKey =
+        identity.game()
+            + "#"
+            + identity.externalSource()
+            + "#"
+            + identity.externalId()
+            + "#"
+            + rowItem.getFinish();
     var cached = batchCache.get(dedupeKey);
     if (cached == null) {
       cached =
           resolveCard(
-              setCode, rowItem.getName(), rowItem.getFinish(), rowItem.getScryfallId(), cardCache);
+              setCode,
+              rowItem.getName(),
+              rowItem.getFinish(),
+              fetchTcgExternalReferenceField,
+              identity.externalId(),
+              cardCache);
       if (cached == null) {
         return RowDecision.review("unresolvable");
       }
@@ -135,7 +152,8 @@ public class AppraiseJobProcessor {
       String setCode,
       String cardName,
       String finish,
-      String scryfallId,
+      String fetchTcgExternalReferenceField,
+      String externalId,
       Map<String, FetchTcgClient.GetCardResponse> cardCache) {
     var searchName = cardName.contains("//") ? cardName.split("//")[0].trim() : cardName;
     // fetchtcg stores ascii names (khazad-dum); fold scryfall diacritics so search still hits
@@ -147,7 +165,8 @@ public class AppraiseJobProcessor {
         var cardDetails = cardCache.computeIfAbsent(card.id(), fetchTcgClient::getCard);
         var externalReferences = cardDetails.externalReferences();
         if (externalReferences == null
-            || !scryfallId.equalsIgnoreCase(externalReferences.scryfallId())) {
+            || !externalId.equalsIgnoreCase(
+                externalReferences.get(fetchTcgExternalReferenceField))) {
           continue;
         }
         var pricingData = cardDetails.pricingData();

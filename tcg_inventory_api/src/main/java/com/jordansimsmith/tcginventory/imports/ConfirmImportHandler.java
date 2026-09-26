@@ -105,7 +105,6 @@ public class ConfirmImportHandler
     if (!"review".equals(importItem.getStatus()) && !"confirming".equals(importItem.getStatus())) {
       return httpResponseFactory.conflict(new ErrorResponse("import is not in review status"));
     }
-
     var keepRows = queryKeepRows(user, importId);
     long rowsNeedingPhotos =
         keepRows.stream()
@@ -215,7 +214,7 @@ public class ConfirmImportHandler
   private Map<String, List<ImportRowItem>> groupBySkuId(List<ImportRowItem> keepRows) {
     var groups = new HashMap<String, List<ImportRowItem>>();
     for (var row : keepRows) {
-      var skuId = row.getScryfallId() + "#" + row.getFinish() + "#" + row.getCondition();
+      var skuId = row.getExternalId() + "#" + row.getFinish() + "#" + row.getCondition();
       groups.computeIfAbsent(skuId, k -> new ArrayList<>()).add(row);
     }
     return groups;
@@ -228,7 +227,7 @@ public class ConfirmImportHandler
         SkuItem.create(
             user,
             skuId,
-            firstRow.getScryfallId(),
+            firstRow.getExternalId(),
             firstRow.getFinish(),
             firstRow.getCondition(),
             firstRow.getName(),

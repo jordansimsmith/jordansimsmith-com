@@ -165,21 +165,32 @@ public class ScanRowItem {
 
   @DynamoDbBean
   public static class ScanSuggestion {
-    public static final String SCRYFALL_ID = "scryfall_id";
+    public static final String EXTERNAL_SOURCE = "external_source";
+    public static final String EXTERNAL_ID = "external_id";
     public static final String NAME = "name";
     public static final String SCORE = "score";
 
-    private String scryfallId;
+    private String externalSource;
+    private String externalId;
     private String name;
     private Double score;
 
-    @DynamoDbAttribute(SCRYFALL_ID)
-    public String getScryfallId() {
-      return scryfallId;
+    @DynamoDbAttribute(EXTERNAL_SOURCE)
+    public String getExternalSource() {
+      return externalSource;
     }
 
-    public void setScryfallId(@Nullable String scryfallId) {
-      this.scryfallId = scryfallId;
+    public void setExternalSource(@Nullable String externalSource) {
+      this.externalSource = externalSource;
+    }
+
+    @DynamoDbAttribute(EXTERNAL_ID)
+    public String getExternalId() {
+      return externalId;
+    }
+
+    public void setExternalId(@Nullable String externalId) {
+      this.externalId = externalId;
     }
 
     @DynamoDbAttribute(NAME)
@@ -200,9 +211,11 @@ public class ScanRowItem {
       this.score = score;
     }
 
-    public static ScanSuggestion create(String scryfallId, String name, double score) {
+    public static ScanSuggestion create(
+        String externalSource, String externalId, String name, double score) {
       var suggestion = new ScanSuggestion();
-      suggestion.setScryfallId(scryfallId);
+      suggestion.setExternalSource(externalSource);
+      suggestion.setExternalId(externalId);
       suggestion.setName(name);
       suggestion.setScore(score);
       return suggestion;
@@ -213,14 +226,15 @@ public class ScanRowItem {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
       ScanSuggestion that = (ScanSuggestion) o;
-      return Objects.equals(scryfallId, that.scryfallId)
+      return Objects.equals(externalSource, that.externalSource)
+          && Objects.equals(externalId, that.externalId)
           && Objects.equals(name, that.name)
           && Objects.equals(score, that.score);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(scryfallId, name, score);
+      return Objects.hash(externalSource, externalId, name, score);
     }
   }
 }

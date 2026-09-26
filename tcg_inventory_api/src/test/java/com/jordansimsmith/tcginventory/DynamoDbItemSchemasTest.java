@@ -76,13 +76,14 @@ public class DynamoDbItemSchemasTest {
 
   @Test
   void shouldRoundTripImportItemWithNullableAttributes() {
-    var item = ImportItem.create("jordan", "import-1", "cards.csv", 3, null, CREATED_AT);
+    var item = ImportItem.create("jordan", "mtg", "import-1", "cards.csv", 3, null, CREATED_AT);
     item.setUpdatedAt(UPDATED_AT);
 
     var roundTripped = roundTrip(ImportItem.class, item);
 
     assertThat(roundTripped.getPk()).isEqualTo("USER#jordan");
     assertThat(roundTripped.getSk()).isEqualTo("IMPORT#import-1");
+    assertThat(roundTripped.getGame()).isEqualTo("mtg");
     assertThat(roundTripped.getJobId()).isNull();
     assertThat(roundTripped.getError()).isNull();
     assertThat(roundTripped.getCreatedAt()).isEqualTo(CREATED_AT);
@@ -104,6 +105,7 @@ public class DynamoDbItemSchemasTest {
             "168",
             "normal",
             "NM",
+            "scryfall",
             "scryfall-1",
             "en");
     item.setDecision("keep");
@@ -115,6 +117,9 @@ public class DynamoDbItemSchemasTest {
 
     assertThat(roundTripped.getPk()).isEqualTo("USER#jordan#IMPORT#import-1");
     assertThat(roundTripped.getSk()).isEqualTo("ROW#0000000001");
+    assertThat(roundTrippedMap(ImportRowItem.class, item)).doesNotContainKey("game");
+    assertThat(roundTripped.getExternalSource()).isEqualTo("scryfall");
+    assertThat(roundTripped.getExternalId()).isEqualTo("scryfall-1");
     assertThat(roundTripped.getDecision()).isEqualTo("keep");
     assertThat(roundTripped.getSequenceNumber()).isEqualTo(12);
     assertThat(roundTripped.getPhotos()).containsExactlyElementsOf(item.getPhotos());
@@ -122,7 +127,7 @@ public class DynamoDbItemSchemasTest {
 
   @Test
   void shouldRoundTripScanItemWithTimestamps() {
-    var item = ScanItem.create("jordan", "scan-1", "LP", "foil", 2, CREATED_AT);
+    var item = ScanItem.create("jordan", "mtg", "scan-1", "LP", "foil", 2, CREATED_AT);
     item.setCatalogVersion(36);
     item.setUpdatedAt(UPDATED_AT);
 
@@ -131,6 +136,7 @@ public class DynamoDbItemSchemasTest {
     assertThat(roundTripped.getPk()).isEqualTo("USER#jordan");
     assertThat(roundTripped.getSk()).isEqualTo("SCAN#scan-1");
     assertThat(roundTripped.getStatus()).isEqualTo("uploading");
+    assertThat(roundTripped.getGame()).isEqualTo("mtg");
     assertThat(roundTripped.getCatalogVersion()).isEqualTo(36);
     assertThat(roundTripped.getCreatedAt()).isEqualTo(CREATED_AT);
     assertThat(roundTripped.getUpdatedAt()).isEqualTo(UPDATED_AT);
@@ -142,8 +148,10 @@ public class DynamoDbItemSchemasTest {
     item.setNeedsReview(true);
     item.setSuggestions(
         List.of(
-            ScanRowItem.ScanSuggestion.create("scryfall-1", "Ragavan, Nimble Pilferer", 0.83),
-            ScanRowItem.ScanSuggestion.create("scryfall-2", "Dragon's Rage Channeler", 0.71)));
+            ScanRowItem.ScanSuggestion.create(
+                "scryfall", "scryfall-1", "Ragavan, Nimble Pilferer", 0.83),
+            ScanRowItem.ScanSuggestion.create(
+                "scryfall", "scryfall-2", "Dragon's Rage Channeler", 0.71)));
     item.setError("ambiguous match");
 
     var roundTripped = roundTrip(ScanRowItem.class, item);
@@ -151,7 +159,10 @@ public class DynamoDbItemSchemasTest {
     assertThat(roundTripped.getPk()).isEqualTo("USER#jordan#SCAN#scan-1");
     assertThat(roundTripped.getSk()).isEqualTo("ROW#000001");
     assertThat(roundTripped.getNeedsReview()).isTrue();
+    assertThat(roundTrippedMap(ScanRowItem.class, item)).doesNotContainKey("game");
     assertThat(roundTripped.getSuggestions()).containsExactlyElementsOf(item.getSuggestions());
+    assertThat(roundTripped.getSuggestions().get(0).getExternalSource()).isEqualTo("scryfall");
+    assertThat(roundTripped.getSuggestions().get(0).getExternalId()).isEqualTo("scryfall-1");
     assertThat(roundTripped.getError()).isEqualTo("ambiguous match");
   }
 

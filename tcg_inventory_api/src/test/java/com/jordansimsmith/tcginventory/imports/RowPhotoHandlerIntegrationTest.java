@@ -319,7 +319,7 @@ public class RowPhotoHandlerIntegrationTest {
     var discardId = "import2";
     var discardImport =
         ImportItem.create(
-            "jordan", discardId, "test.csv", 1, null, Instant.ofEpochSecond(1700000000));
+            "jordan", "mtg", discardId, "test.csv", 1, null, Instant.ofEpochSecond(1700000000));
     discardImport.setStatus("review");
     importTable.putItem(discardImport);
     var discardRow =
@@ -333,6 +333,7 @@ public class RowPhotoHandlerIntegrationTest {
             "1",
             "normal",
             "NM",
+            "scryfall",
             "scryfall-2",
             "en");
     discardRow.setDecision("discard");
@@ -367,7 +368,8 @@ public class RowPhotoHandlerIntegrationTest {
   private String seedImport(String user, String status, String decision, String suggestedPrice) {
     var importId = "import1";
     var importItem =
-        ImportItem.create(user, importId, "test.csv", 1, null, Instant.ofEpochSecond(1700000000));
+        ImportItem.create(
+            user, "mtg", importId, "test.csv", 1, null, Instant.ofEpochSecond(1700000000));
     importItem.setStatus(status);
     importTable.putItem(importItem);
 
@@ -382,6 +384,7 @@ public class RowPhotoHandlerIntegrationTest {
             "168",
             "normal",
             "NM",
+            "scryfall",
             "scryfall-1",
             "en");
     rowItem.setDecision(decision);

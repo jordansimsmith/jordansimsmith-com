@@ -32,7 +32,8 @@ public class ConfirmScanHandler
 
   record ConfirmScanRow(
       @JsonProperty("scan_position") @Nullable Integer scanPosition,
-      @JsonProperty("scryfall_id") @Nullable String scryfallId,
+      @JsonProperty("external_source") @Nullable String externalSource,
+      @JsonProperty("external_id") @Nullable String externalId,
       @JsonProperty("name") @Nullable String name,
       @JsonProperty("set_code") @Nullable String setCode,
       @JsonProperty("set_name") @Nullable String setName,
@@ -109,7 +110,6 @@ public class ConfirmScanHandler
     if (!"reviewing".equals(scanItem.getStatus())) {
       return httpResponseFactory.conflict(new ErrorResponse("scan is not in reviewing status"));
     }
-
     ConfirmScanRequest request;
     try {
       request = objectMapper.readValue(event.getBody(), ConfirmScanRequest.class);
@@ -129,7 +129,8 @@ public class ConfirmScanHandler
     var jobId = ulidGenerator.generate();
     var now = clock.now();
     var importItem =
-        ImportItem.create(user, importId, scanId + ".scan", orderedRows.size(), jobId, now);
+        ImportItem.create(
+            user, scanItem.getGame(), importId, scanId + ".scan", orderedRows.size(), jobId, now);
 
     importTable.putItem(importItem);
     for (int index = 0; index < orderedRows.size(); index++) {
@@ -145,7 +146,8 @@ public class ConfirmScanHandler
               selected.collectorNumber(),
               scanItem.getFinish(),
               scanItem.getCondition(),
-              selected.scryfallId(),
+              selected.externalSource(),
+              selected.externalId(),
               "en"));
     }
 
@@ -197,7 +199,8 @@ public class ConfirmScanHandler
           || row.scanPosition() == null
           || row.scanPosition() <= 0
           || !positions.add(row.scanPosition())
-          || isBlank(row.scryfallId())
+          || isBlank(row.externalSource())
+          || isBlank(row.externalId())
           || isBlank(row.name())
           || isBlank(row.setCode())
           || isBlank(row.setName())

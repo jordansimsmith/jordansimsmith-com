@@ -9,6 +9,7 @@ import pytest
 from PIL import Image
 
 from tcg_inventory_scan_worker.worker import (
+    LambdaRuntime,
     RecognitionWorker,
     Scan,
     ScanRow,
@@ -30,7 +31,9 @@ def _scan_rows(count: int, status: str = "pending") -> list[ScanRow]:
 
 
 def _record(
-    card_id: str = "card-1", name: str = "Forest", finish: str = "nonfoil"
+    card_id: str = "a9738cda-adb1-47fb-9f4c-ecd930228c4d",
+    name: str = "Forest",
+    finish: str = "nonfoil",
 ) -> dict:
     return {
         "id": card_id,
@@ -44,9 +47,13 @@ def _record(
 
 class FakeStore:
     def __init__(
-        self, rows: list[ScanRow], status: str = "identifying", finish: str = "normal"
+        self,
+        rows: list[ScanRow],
+        status: str = "identifying",
+        finish: str = "normal",
+        game: str = "mtg",
     ):
-        self.scan = Scan("jordan", "scan-1", status, finish)
+        self.scan = Scan("jordan", "scan-1", status, game, finish)
         self.rows = rows
         self.results: list[tuple[int, str]] = []
         self.suggestions: dict[int, list[dict]] = {}
@@ -100,7 +107,11 @@ class FakeStore:
             return False
         self.transitions.append(("reviewing", error))
         self.scan = Scan(
-            self.scan.user, self.scan.scan_id, "reviewing", self.scan.finish
+            self.scan.user,
+            self.scan.scan_id,
+            "reviewing",
+            self.scan.game,
+            self.scan.finish,
         )
         return True
 
@@ -174,7 +185,7 @@ def _worker(store, images=None, catalog=None, queue=None, loader=None):
         store=store,
         images=images or FakeImages(),
         continuations=queue or FakeQueue(),
-        catalog_loader=loader or (lambda: catalog or FakeCatalog()),
+        catalog_loader=loader or (lambda game: catalog or FakeCatalog()),
     )
 
 
@@ -326,12 +337,14 @@ def test_continuation_message_uses_next_pending_position():
 
 
 def test_filters_language_and_finish_and_deduplicates_faces():
-    french_record = _record("card-3", "French Forest", "nonfoil")
+    french_record = _record(
+        "c6f20488-891b-4d8e-a8fd-aa253dd5991b", "French Forest", "nonfoil"
+    )
     french_record["metadata"]["lang"] = "fr"
     records = [
-        _record("card-1", "Forest", "nonfoil"),
-        _record("card-1", "Forest", "nonfoil"),
-        _record("card-2", "Foil Forest", "foil"),
+        _record("a9738cda-adb1-47fb-9f4c-ecd930228c4d", "Forest", "nonfoil"),
+        _record("a9738cda-adb1-47fb-9f4c-ecd930228c4d", "Forest", "nonfoil"),
+        _record("4ced112a-e775-4f97-97b3-74877e9dce12", "Foil Forest", "foil"),
         french_record,
     ]
     store = FakeStore(_scan_rows(1))
@@ -342,9 +355,51 @@ def test_filters_language_and_finish_and_deduplicates_faces():
 
     assert store.rows[0].status == "suggested"
     assert store.suggestions[1] == [
-        {"scryfall_id": "card-1", "name": "Forest", "score": 0.83}
+        {
+            "external_source": "scryfall",
+            "external_id": "a9738cda-adb1-47fb-9f4c-ecd930228c4d",
+            "name": "Forest",
+            "score": 0.83,
+        }
     ]
     assert catalog.search_calls == 1
+
+
+def test_treats_external_ids_as_opaque():
+    suggestions = RecognitionWorker._eligible_suggestions(
+        [_record("not-a-uuid")], "normal"
+    )
+
+    assert suggestions[0]["external_id"] == "not-a-uuid"
+
+
+def test_game_without_catalog_fails_before_image_processing():
+    store = FakeStore(_scan_rows(1), game="pokemon")
+    catalog_loader_calls = []
+
+    def load_catalog(game):
+        catalog_loader_calls.append(game)
+        raise ValueError(f"no recognition catalog configured for game: {game}")
+
+    with pytest.raises(
+        ValueError, match="no recognition catalog configured for game: pokemon"
+    ):
+        worker = _worker(store, loader=load_catalog)
+        worker.handle_message({"user": "jordan", "scan_id": "scan-1"})
+
+    assert catalog_loader_calls == ["pokemon"]
+    assert store.results == []
+
+
+def test_runtime_fails_before_catalog_loading_when_game_has_no_catalog():
+    runtime = LambdaRuntime()
+
+    with pytest.raises(
+        ValueError, match="no recognition catalog configured for game: pokemon"
+    ):
+        runtime._load_catalog("pokemon")
+
+    assert runtime._catalog is None
 
 
 def test_corrupt_image_becomes_manual_review():
@@ -401,7 +456,7 @@ def test_catalog_initialization_failure_propagates_without_marking_rows():
     with pytest.raises(RuntimeError, match="offline catalog failed"):
         _worker(
             store,
-            loader=lambda: (_ for _ in ()).throw(
+            loader=lambda game: (_ for _ in ()).throw(
                 RuntimeError("offline catalog failed")
             ),
         ).handle_message({"user": "jordan", "scan_id": "scan-1"})

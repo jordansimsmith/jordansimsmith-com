@@ -36,7 +36,8 @@ public class GetImportHandler
       @JsonProperty("collector_number") String collectorNumber,
       @JsonProperty("finish") String finish,
       @JsonProperty("condition") String condition,
-      @JsonProperty("scryfall_id") String scryfallId,
+      @JsonProperty("external_source") String externalSource,
+      @JsonProperty("external_id") String externalId,
       @JsonProperty("decision") @Nullable String decision,
       @JsonProperty("decision_reason") @Nullable String decisionReason,
       @JsonProperty("market_price") @Nullable String marketPrice,
@@ -46,6 +47,7 @@ public class GetImportHandler
 
   record ImportDetailResponse(
       @JsonProperty("import_id") String importId,
+      @JsonProperty("game") String game,
       @JsonProperty("filename") String filename,
       @JsonProperty("status") String status,
       @JsonProperty("row_count") int rowCount,
@@ -129,7 +131,8 @@ public class GetImportHandler
                         item.getCollectorNumber(),
                         item.getFinish(),
                         item.getCondition(),
-                        item.getScryfallId(),
+                        item.getExternalSource(),
+                        item.getExternalId(),
                         item.getDecision(),
                         item.getDecisionReason(),
                         item.getMarketPrice(),
@@ -144,6 +147,7 @@ public class GetImportHandler
     return httpResponseFactory.ok(
         new ImportDetailResponse(
             importItem.getImportId(),
+            importItem.getGame(),
             importItem.getFilename(),
             importItem.getStatus(),
             importItem.getRowCount() != null ? importItem.getRowCount() : 0,

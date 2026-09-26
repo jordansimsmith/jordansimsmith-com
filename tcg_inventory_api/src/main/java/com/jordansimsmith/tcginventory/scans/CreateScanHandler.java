@@ -11,6 +11,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.tcginventory.Condition;
+import com.jordansimsmith.tcginventory.Games;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.time.Clock;
@@ -20,7 +21,6 @@ import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,13 +35,13 @@ public class CreateScanHandler
   private static final long MAX_SCAN_FILE_BYTES = 1024 * 1024;
   private static final Map<String, String> UPLOAD_HEADERS =
       Map.of("Content-Type", ScanImages.CONTENT_TYPE, "If-None-Match", "*");
-  private static final Set<String> VALID_FINISHES = Set.of("normal", "foil", "etched");
 
   record ScanFileRequest(
       @JsonProperty("filename") @Nullable String filename,
       @JsonProperty("size_bytes") @Nullable Long sizeBytes) {}
 
   record CreateScanRequest(
+      @JsonProperty("game") @Nullable String game,
       @JsonProperty("condition") @Nullable String condition,
       @JsonProperty("finish") @Nullable String finish,
       @JsonProperty("files") @Nullable List<ScanFileRequest> files) {}
@@ -125,7 +125,8 @@ public class CreateScanHandler
     var now = clock.now();
     var scanId = ulidGenerator.generate();
     var scanItem =
-        ScanItem.create(user, scanId, request.condition(), request.finish(), files.size(), now);
+        ScanItem.create(
+            user, request.game(), scanId, request.condition(), request.finish(), files.size(), now);
     var rowItems = new ArrayList<ScanRowItem>();
     for (int index = 0; index < files.size(); index++) {
       var file = files.get(index);
@@ -176,10 +177,19 @@ public class CreateScanHandler
     if (request == null) {
       return "invalid request body";
     }
+    if (request.game() == null) {
+      return "scan game is required";
+    }
+    Games.Game game;
+    try {
+      game = Games.get(request.game());
+    } catch (IllegalArgumentException e) {
+      return "unsupported scan game";
+    }
     if (request.condition() == null || !isValidCondition(request.condition())) {
       return "invalid scan condition";
     }
-    if (request.finish() == null || !VALID_FINISHES.contains(request.finish())) {
+    if (request.finish() == null || !game.finishes().contains(request.finish())) {
       return "invalid scan finish";
     }
     if (request.files() == null

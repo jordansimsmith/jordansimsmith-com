@@ -124,7 +124,7 @@ public class ScansHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     var request =
-        "{\"condition\":\"LP\",\"finish\":\"foil\",\"files\":["
+        "{\"game\":\"mtg\",\"condition\":\"LP\",\"finish\":\"foil\",\"files\":["
             + "{\"filename\":\"2.jpg\",\"size_bytes\":100},"
             + "{\"filename\":\"10.jpg\",\"size_bytes\":200},"
             + "{\"filename\":\"1.jpg\",\"size_bytes\":300}]}";
@@ -170,6 +170,7 @@ public class ScansHandlerIntegrationTest {
                 .sortValue(ScanItem.formatSk(scanId))
                 .build());
     assertThat(scanItem).isNotNull();
+    assertThat(scanItem.getGame()).isEqualTo("mtg");
     var firstRow =
         scanRowTable.getItem(
             Key.builder()
@@ -188,6 +189,7 @@ public class ScansHandlerIntegrationTest {
     assertThat(
             objectMapper.readTree(reread.getBody()).get("rows").get(0).get("upload_url").isNull())
         .isTrue();
+    assertThat(objectMapper.readTree(reread.getBody()).get("game").asText()).isEqualTo("mtg");
   }
 
   @Test
@@ -198,7 +200,7 @@ public class ScansHandlerIntegrationTest {
         createScanHandler.handleRequest(
             buildEventWithBody(
                 "jordan",
-                "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"001.jpg\",\"size_bytes\":5}]}"),
+                "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"001.jpg\",\"size_bytes\":5}]}"),
             null);
     var body = objectMapper.readTree(response.getBody());
     var row = body.get("rows").get(0);
@@ -241,7 +243,7 @@ public class ScansHandlerIntegrationTest {
         createScanHandler.handleRequest(
             buildEventWithBody(
                 "jordan",
-                "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"001.jpg\",\"size_bytes\":5}]}"),
+                "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"001.jpg\",\"size_bytes\":5}]}"),
             null);
     var body = objectMapper.readTree(response.getBody());
     var row = body.get("rows").get(0);
@@ -318,7 +320,7 @@ public class ScansHandlerIntegrationTest {
         createScanHandler.handleRequest(
             buildEventWithBody(
                 "jordan",
-                "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":["
+                "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":["
                     + "{\"filename\":\"001.jpg\",\"size_bytes\":5},"
                     + "{\"filename\":\"002.jpg\",\"size_bytes\":6}]}"),
             null);
@@ -475,7 +477,7 @@ public class ScansHandlerIntegrationTest {
         createScanHandler.handleRequest(
             buildEventWithBody(
                 "jordan",
-                "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":["
+                "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":["
                     + "{\"filename\":\"001.jpg\",\"size_bytes\":5},"
                     + "{\"filename\":\"002.jpg\",\"size_bytes\":5}]}"),
             null);
@@ -494,7 +496,10 @@ public class ScansHandlerIntegrationTest {
     row.setSuggestions(
         List.of(
             ScanRowItem.ScanSuggestion.create(
-                "a9738cda-adb1-47fb-9f4c-ecd930228c4d", "Ragavan, Nimble Pilferer", 0.8300001)));
+                "scryfall",
+                "a9738cda-adb1-47fb-9f4c-ecd930228c4d",
+                "Ragavan, Nimble Pilferer",
+                0.8300001)));
     row.setNeedsReview(false);
     scanRowTable.putItem(row);
     var reviewRow =
@@ -521,6 +526,12 @@ public class ScansHandlerIntegrationTest {
     assertThat(body.get("rows").get(0).get("needs_review").asBoolean()).isFalse();
     assertThat(body.get("rows").get(0).get("suggestions").get(0).get("score").asDouble())
         .isEqualTo(0.8300001);
+    assertThat(body.get("game").asText()).isEqualTo("mtg");
+    assertThat(body.get("rows").get(0).get("suggestions").get(0).get("external_source").asText())
+        .isEqualTo("scryfall");
+    assertThat(body.get("rows").get(0).get("suggestions").get(0).get("external_id").asText())
+        .isEqualTo("a9738cda-adb1-47fb-9f4c-ecd930228c4d");
+    assertThat(body.get("rows").get(0).get("suggestions").get(0).has("scryfall_id")).isFalse();
     assertThat(body.get("rows").get(1).get("status").asText()).isEqualTo("needs_review");
     assertThat(body.get("rows").get(1).get("needs_review").asBoolean()).isTrue();
     assertThat(body.get("rows").get(1).get("error").asText()).isEqualTo("corrupt JPEG");
@@ -530,7 +541,7 @@ public class ScansHandlerIntegrationTest {
   void createScanShouldRejectNonAsciiFilenames() throws Exception {
     // arrange
     var request =
-        "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":["
+        "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":["
             + "{\"filename\":\"café.jpg\",\"size_bytes\":1}]}";
 
     // act
@@ -554,7 +565,7 @@ public class ScansHandlerIntegrationTest {
     for (var condition : conditions) {
       for (var finish : finishes) {
         var body =
-            "{\"condition\":\""
+            "{\"game\":\"mtg\",\"condition\":\""
                 + condition
                 + "\",\"finish\":\""
                 + finish
@@ -583,15 +594,19 @@ public class ScansHandlerIntegrationTest {
     var invalidBodies =
         List.of(
             "{bad",
-            "{\"condition\":\"ZZ\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":1}]}",
-            "{\"condition\":\"NM\",\"finish\":\"glitter\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":1}]}",
-            "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[]}",
-            "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":0}]}",
-            "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":1.5}]}",
-            "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":1048577}]}",
-            "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.png\",\"size_bytes\":1}]}",
-            "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":1},{\"filename\":\"1.jpg\",\"size_bytes\":1}]}",
-            "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[" + tooManyFiles + "]}");
+            "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":1}]}",
+            "{\"game\":\"pokemon\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":1}]}",
+            "{\"game\":\"mtg\",\"condition\":\"ZZ\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":1}]}",
+            "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"glitter\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":1}]}",
+            "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[]}",
+            "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":0}]}",
+            "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":1.5}]}",
+            "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":1048577}]}",
+            "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.png\",\"size_bytes\":1}]}",
+            "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":1},{\"filename\":\"1.jpg\",\"size_bytes\":1}]}",
+            "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":["
+                + tooManyFiles
+                + "]}");
 
     // act
     for (var body : invalidBodies) {
@@ -875,12 +890,12 @@ public class ScansHandlerIntegrationTest {
     scanTable.putItem(scan);
     var request =
         "{\"rows\":["
-            + "{\"scan_position\":1,\"scryfall_id\":\"opaque-card-id\","
-            + "\"name\":\"Ragavan, Nimble Pilferer\",\"set_code\":\"mh2\","
-            + "\"set_name\":\"Modern Horizons 2\",\"collector_number\":\"138\"},"
-            + "{\"scan_position\":2,\"scryfall_id\":\"4ced112a-e775-4f97-97b3-74877e9dce12\","
-            + "\"name\":\"Dragon's Rage Channeler\",\"set_code\":\"mh2\","
-            + "\"set_name\":\"Modern Horizons 2\",\"collector_number\":\"121\"}]}";
+            + "{\"scan_position\":1,\"external_source\":\"scryfall\",\"external_id\":\"a9738cda-adb1-47fb-9f4c-ecd930228c4d\",\"name\":\"Ragavan,"
+            + " Nimble Pilferer\",\"set_code\":\"mh2\",\"set_name\":\"Modern Horizons"
+            + " 2\",\"collector_number\":\"138\"},"
+            + "{\"scan_position\":2,\"external_source\":\"scryfall\",\"external_id\":\"4ced112a-e775-4f97-97b3-74877e9dce12\",\"name\":\"Dragon's"
+            + " Rage Channeler\",\"set_code\":\"mh2\",\"set_name\":\"Modern Horizons"
+            + " 2\",\"collector_number\":\"121\"}]}";
 
     // act
     var response =
@@ -902,6 +917,7 @@ public class ScansHandlerIntegrationTest {
                 .build());
     assertThat(importItem).isNotNull();
     assertThat(importItem.getStatus()).isEqualTo("appraising");
+    assertThat(importItem.getGame()).isEqualTo("mtg");
     assertThat(importItem.getRowCount()).isEqualTo(2);
     assertThat(importItem.getJobId()).isNotBlank();
 
@@ -924,9 +940,11 @@ public class ScansHandlerIntegrationTest {
     assertThat(importRows)
         .extracting(ImportRowItem::getName)
         .containsExactly("Ragavan, Nimble Pilferer", "Dragon's Rage Channeler");
+    assertThat(importRows).extracting(ImportRowItem::getExternalSource).containsOnly("scryfall");
     assertThat(importRows)
-        .extracting(ImportRowItem::getScryfallId)
-        .containsExactly("opaque-card-id", "4ced112a-e775-4f97-97b3-74877e9dce12");
+        .extracting(ImportRowItem::getExternalId)
+        .containsExactly(
+            "a9738cda-adb1-47fb-9f4c-ecd930228c4d", "4ced112a-e775-4f97-97b3-74877e9dce12");
     assertThat(importRows).allMatch(row -> "en".equals(row.getLanguage()));
 
     var jobItem =
@@ -958,6 +976,44 @@ public class ScansHandlerIntegrationTest {
         .isFalse();
   }
 
+  @Test
+  void confirmScanShouldRejectBlankExternalIdentityBeforeCreatingImport() throws Exception {
+    // arrange
+    var scanId = createScanWithFiles("jordan", 1);
+    var scan = getScanItem("jordan", scanId);
+    scan.setStatus("reviewing");
+    scanTable.putItem(scan);
+    var request =
+        "{\"rows\":[{\"scan_position\":1,\"external_source\":\"scryfall\","
+            + "\"external_id\":\"\",\"name\":\"Forest\","
+            + "\"set_code\":\"lea\",\"set_name\":\"Limited Edition Alpha\","
+            + "\"collector_number\":\"1\"}]}";
+
+    // act
+    var response =
+        confirmScanHandler.handleRequest(
+            buildEventWithPathAndBody("jordan", Map.of("scan_id", scanId), request), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(400);
+    assertThat(getScanItem("jordan", scanId).getStatus()).isEqualTo("reviewing");
+    assertThat(fakeJobsQueue.getSends()).isEmpty();
+    assertThat(
+            importTable
+                .query(
+                    QueryEnhancedRequest.builder()
+                        .queryConditional(
+                            QueryConditional.sortBeginsWith(
+                                Key.builder()
+                                    .partitionValue(SkuItem.formatUserPk("jordan"))
+                                    .sortValue(ImportItem.IMPORT_PREFIX)
+                                    .build()))
+                        .build())
+                .stream()
+                .flatMap(page -> page.items().stream()))
+        .isEmpty();
+  }
+
   private String createScan(String user, String filename) throws IOException {
     return createScan(user, filename, 1);
   }
@@ -967,7 +1023,7 @@ public class ScansHandlerIntegrationTest {
         createScanHandler.handleRequest(
             buildEventWithBody(
                 user,
-                "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\""
+                "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\""
                     + filename
                     + "\",\"size_bytes\":"
                     + sizeBytes
@@ -985,7 +1041,10 @@ public class ScansHandlerIntegrationTest {
     var response =
         createScanHandler.handleRequest(
             buildEventWithBody(
-                user, "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[" + files + "]}"),
+                user,
+                "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":["
+                    + files
+                    + "]}"),
             null);
     assertThat(response.getStatusCode()).isEqualTo(201);
     return objectMapper.readTree(response.getBody()).get("scan_id").asText();
@@ -1012,7 +1071,7 @@ public class ScansHandlerIntegrationTest {
   }
 
   private String validBody() {
-    return "{\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"001.jpg\",\"size_bytes\":1}]}";
+    return "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"001.jpg\",\"size_bytes\":1}]}";
   }
 
   private APIGatewayV2HTTPEvent buildEvent(String user) {

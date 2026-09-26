@@ -129,7 +129,8 @@ public class ConfirmImportHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     var importItem =
-        ImportItem.create("jordan", "import1", null, 1, null, Instant.ofEpochSecond(1700000000));
+        ImportItem.create(
+            "jordan", "mtg", "import1", null, 1, null, Instant.ofEpochSecond(1700000000));
     importTable.putItem(importItem);
 
     // act
@@ -146,7 +147,8 @@ public class ConfirmImportHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     var importItem =
-        ImportItem.create("jordan", "import1", null, 1, null, Instant.ofEpochSecond(1700000000));
+        ImportItem.create(
+            "jordan", "mtg", "import1", null, 1, null, Instant.ofEpochSecond(1700000000));
     importItem.setStatus("confirmed");
     importTable.putItem(importItem);
 
@@ -239,7 +241,8 @@ public class ConfirmImportHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
     var importItem =
-        ImportItem.create("jordan", "import1", null, 2, null, Instant.ofEpochSecond(1700000000));
+        ImportItem.create(
+            "jordan", "mtg", "import1", null, 2, null, Instant.ofEpochSecond(1700000000));
     importItem.setStatus("confirming");
     importTable.putItem(importItem);
 
@@ -254,6 +257,7 @@ public class ConfirmImportHandlerIntegrationTest {
             "168",
             "normal",
             "NM",
+            "scryfall",
             "scryfall-1",
             "en");
     row1.setDecision("keep");
@@ -274,6 +278,7 @@ public class ConfirmImportHandlerIntegrationTest {
             "169",
             "normal",
             "NM",
+            "scryfall",
             "scryfall-1",
             "en");
     row2.setDecision("keep");
@@ -480,7 +485,7 @@ public class ConfirmImportHandlerIntegrationTest {
   private void createImportInReview(String user, String importId, int rowCount) {
     var importItem =
         ImportItem.create(
-            user, importId, "test.csv", rowCount, null, Instant.ofEpochSecond(1700000000));
+            user, "mtg", importId, "test.csv", rowCount, null, Instant.ofEpochSecond(1700000000));
     importItem.setStatus("review");
     importTable.putItem(importItem);
   }
@@ -517,6 +522,7 @@ public class ConfirmImportHandlerIntegrationTest {
             String.valueOf(position),
             finish,
             condition,
+            "scryfall",
             scryfallId,
             "en");
     rowItem.setDecision("keep");
@@ -542,6 +548,7 @@ public class ConfirmImportHandlerIntegrationTest {
             String.valueOf(position),
             "normal",
             "NM",
+            "scryfall",
             "scryfall-" + position,
             "en");
     rowItem.setDecision(decision);

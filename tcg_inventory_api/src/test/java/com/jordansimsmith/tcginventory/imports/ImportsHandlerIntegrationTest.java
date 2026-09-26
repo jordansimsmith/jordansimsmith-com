@@ -286,6 +286,8 @@ public class ImportsHandlerIntegrationTest {
             + " Elves,DOM,Dominaria,168,Normal,Common,1,581b7327-3215-4a4f-b4ae-d9d4002ba882,false,false,near_mint,en";
     var createResponse =
         createImportHandler.handleRequest(buildCreateEvent("jordan", csv, "test.csv"), null);
+    assertThat(objectMapper.readTree(createResponse.getBody()).get("game").asText())
+        .isEqualTo("mtg");
     var importId = objectMapper.readTree(createResponse.getBody()).get("import_id").asText();
 
     // act
@@ -297,6 +299,7 @@ public class ImportsHandlerIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
     assertThat(body.get("import_id").asText()).isEqualTo(importId);
+    assertThat(body.get("game").asText()).isEqualTo("mtg");
     assertThat(body.get("filename").asText()).isEqualTo("test.csv");
     assertThat(body.get("rows")).hasSize(1);
 
@@ -306,7 +309,9 @@ public class ImportsHandlerIntegrationTest {
     assertThat(row.get("set_code").asText()).isEqualTo("dom");
     assertThat(row.get("finish").asText()).isEqualTo("normal");
     assertThat(row.get("condition").asText()).isEqualTo("NM");
-    assertThat(row.get("scryfall_id").asText()).isEqualTo("581b7327-3215-4a4f-b4ae-d9d4002ba882");
+    assertThat(row.has("game")).isFalse();
+    assertThat(row.get("external_source").asText()).isEqualTo("scryfall");
+    assertThat(row.get("external_id").asText()).isEqualTo("581b7327-3215-4a4f-b4ae-d9d4002ba882");
     assertThat(row.get("decision").isNull()).isTrue();
     assertThat(row.get("decision_reason").isNull()).isTrue();
     assertThat(body.get("total_suggested_price").asText()).isEqualTo("0.00");
@@ -327,6 +332,7 @@ public class ImportsHandlerIntegrationTest {
             "60",
             "normal",
             "NM",
+            "scryfall",
             "scryfall-2",
             "en");
     discard.setDecision("discard");
@@ -342,6 +348,7 @@ public class ImportsHandlerIntegrationTest {
             "472",
             "normal",
             "NM",
+            "scryfall",
             "scryfall-3",
             "en");
     keepB.setDecision("keep");
@@ -544,7 +551,8 @@ public class ImportsHandlerIntegrationTest {
   private String createReviewImportWithRow(String user) {
     var importId = "import1";
     var importItem =
-        ImportItem.create(user, importId, "test.csv", 1, null, Instant.ofEpochSecond(1700000000));
+        ImportItem.create(
+            user, "mtg", importId, "test.csv", 1, null, Instant.ofEpochSecond(1700000000));
     importItem.setStatus("review");
     importTable.putItem(importItem);
 
@@ -559,6 +567,7 @@ public class ImportsHandlerIntegrationTest {
             "168",
             "normal",
             "NM",
+            "scryfall",
             "scryfall-1",
             "en");
     rowItem.setDecision("keep");

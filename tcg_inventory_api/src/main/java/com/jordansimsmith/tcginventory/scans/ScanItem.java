@@ -17,6 +17,7 @@ public class ScanItem {
   public static final String PK = "pk";
   public static final String SK = "sk";
   public static final String SCAN_ID = "scan_id";
+  public static final String GAME = "game";
   public static final String STATUS = "status";
   public static final String CONDITION = "condition";
   public static final String FINISH = "finish";
@@ -30,6 +31,7 @@ public class ScanItem {
   private String pk;
   private String sk;
   private String scanId;
+  private String game;
   private String status;
   private String condition;
   private String finish;
@@ -67,6 +69,15 @@ public class ScanItem {
 
   public void setScanId(@Nullable String scanId) {
     this.scanId = scanId;
+  }
+
+  @DynamoDbAttribute(GAME)
+  public String getGame() {
+    return game;
+  }
+
+  public void setGame(@Nullable String game) {
+    this.game = game;
   }
 
   @DynamoDbAttribute(STATUS)
@@ -162,6 +173,7 @@ public class ScanItem {
 
   public static ScanItem create(
       String user,
+      String game,
       String scanId,
       String condition,
       String finish,
@@ -171,6 +183,7 @@ public class ScanItem {
     item.setPk(formatPk(user));
     item.setSk(formatSk(scanId));
     item.setScanId(scanId);
+    item.setGame(game);
     item.setStatus("uploading");
     item.setCondition(condition);
     item.setFinish(finish);

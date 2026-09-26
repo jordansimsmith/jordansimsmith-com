@@ -4,19 +4,14 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
+import com.jordansimsmith.tcginventory.CardIdentity;
 import com.jordansimsmith.tcginventory.Condition;
+import com.jordansimsmith.tcginventory.Games;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
-import java.util.regex.Pattern;
 
 public class ManaBoxCsvParser {
-  private static final Set<String> VALID_FINISHES = Set.of("normal", "foil", "etched");
-
-  private static final Pattern UUID_PATTERN =
-      Pattern.compile("^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$");
-
   @JsonIgnoreProperties(ignoreUnknown = true)
   public record ManaBoxRow(
       @JsonProperty("Name") String name,
@@ -36,7 +31,8 @@ public class ManaBoxCsvParser {
       String collectorNumber,
       String finish,
       String condition,
-      String scryfallId,
+      String externalSource,
+      String externalId,
       String language,
       int quantity) {}
 
@@ -81,15 +77,13 @@ public class ManaBoxCsvParser {
     }
 
     var finish = raw.finish() == null ? "" : raw.finish().toLowerCase();
-    if (!VALID_FINISHES.contains(finish)) {
+    if (!Games.MAGIC_THE_GATHERING.finishes().contains(finish)) {
       throw new IllegalArgumentException(
           "row " + rowNumber + ": Foil must be normal, foil, or etched");
     }
 
-    var scryfallId = raw.scryfallId() == null ? "" : raw.scryfallId().toLowerCase();
-    if (!UUID_PATTERN.matcher(scryfallId).matches()) {
-      throw new IllegalArgumentException("row " + rowNumber + ": Scryfall ID must be a UUID");
-    }
+    var game = Games.MAGIC_THE_GATHERING;
+    var identity = new CardIdentity(game.id(), game.externalSource(), raw.scryfallId());
 
     requireNonBlank(raw.condition(), "Condition", rowNumber);
     var conditionValue = raw.condition().toLowerCase();
@@ -106,7 +100,8 @@ public class ManaBoxCsvParser {
         raw.collectorNumber(),
         finish,
         condition.name(),
-        scryfallId,
+        identity.externalSource(),
+        identity.externalId(),
         raw.language().toLowerCase(),
         raw.quantity());
   }

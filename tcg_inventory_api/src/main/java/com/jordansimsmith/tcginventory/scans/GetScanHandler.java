@@ -30,6 +30,7 @@ public class GetScanHandler
 
   record ScanSummaryResponse(
       @JsonProperty("scan_id") String scanId,
+      @JsonProperty("game") String game,
       @JsonProperty("status") String status,
       @JsonProperty("condition") String condition,
       @JsonProperty("finish") String finish,
@@ -39,7 +40,8 @@ public class GetScanHandler
       @JsonProperty("created_at") long createdAt) {}
 
   record ScanSuggestionResponse(
-      @JsonProperty("scryfall_id") String scryfallId,
+      @JsonProperty("external_source") String externalSource,
+      @JsonProperty("external_id") String externalId,
       @JsonProperty("name") String name,
       @JsonProperty("score") double score) {}
 
@@ -58,6 +60,7 @@ public class GetScanHandler
 
   record ScanDetailResponse(
       @JsonProperty("scan_id") String scanId,
+      @JsonProperty("game") String game,
       @JsonProperty("status") String status,
       @JsonProperty("condition") String condition,
       @JsonProperty("finish") String finish,
@@ -119,6 +122,7 @@ public class GetScanHandler
     var summary = toSummary(item);
     return new ScanDetailResponse(
         summary.scanId(),
+        summary.game(),
         summary.status(),
         summary.condition(),
         summary.finish(),
@@ -132,6 +136,7 @@ public class GetScanHandler
   private static ScanSummaryResponse toSummary(ScanItem item) {
     return new ScanSummaryResponse(
         item.getScanId(),
+        item.getGame(),
         item.getStatus(),
         item.getCondition(),
         item.getFinish(),
@@ -193,7 +198,10 @@ public class GetScanHandler
 
   private static ScanSuggestionResponse toSuggestion(ScanRowItem.ScanSuggestion suggestion) {
     return new ScanSuggestionResponse(
-        suggestion.getScryfallId(), suggestion.getName(), suggestion.getScore());
+        suggestion.getExternalSource(),
+        suggestion.getExternalId(),
+        suggestion.getName(),
+        suggestion.getScore());
   }
 
   @Nullable

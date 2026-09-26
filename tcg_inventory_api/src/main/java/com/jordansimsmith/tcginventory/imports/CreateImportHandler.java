@@ -9,6 +9,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.tcginventory.Games;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
@@ -30,6 +31,7 @@ public class CreateImportHandler
 
   record ImportSummaryResponse(
       @JsonProperty("import_id") String importId,
+      @JsonProperty("game") String game,
       @JsonProperty("filename") String filename,
       @JsonProperty("status") String status,
       @JsonProperty("row_count") int rowCount,
@@ -111,7 +113,9 @@ public class CreateImportHandler
 
     int totalRows = reversed.stream().mapToInt(ManaBoxCsvParser.ParsedRow::quantity).sum();
 
-    var importItem = ImportItem.create(user, importId, filename, totalRows, jobId, now);
+    var importItem =
+        ImportItem.create(
+            user, Games.MAGIC_THE_GATHERING.id(), importId, filename, totalRows, jobId, now);
     importTable.putItem(importItem);
 
     int position = 0;
@@ -129,7 +133,8 @@ public class CreateImportHandler
                 parsedRow.collectorNumber(),
                 parsedRow.finish(),
                 parsedRow.condition(),
-                parsedRow.scryfallId(),
+                parsedRow.externalSource(),
+                parsedRow.externalId(),
                 parsedRow.language());
         importRowTable.putItem(rowItem);
       }
@@ -143,6 +148,12 @@ public class CreateImportHandler
 
     return httpResponseFactory.ok(
         new ImportSummaryResponse(
-            importId, filename, "appraising", totalRows, null, now.getEpochSecond()));
+            importId,
+            Games.MAGIC_THE_GATHERING.id(),
+            filename,
+            "appraising",
+            totalRows,
+            null,
+            now.getEpochSecond()));
   }
 }

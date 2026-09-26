@@ -17,6 +17,7 @@ public class ImportItem {
   public static final String PK = "pk";
   public static final String SK = "sk";
   public static final String IMPORT_ID = "import_id";
+  public static final String GAME = "game";
   public static final String FILENAME = "filename";
   public static final String STATUS = "status";
   public static final String ROW_COUNT = "row_count";
@@ -28,6 +29,7 @@ public class ImportItem {
   private String pk;
   private String sk;
   private String importId;
+  private String game;
   private String filename;
   private String status;
   private Integer rowCount;
@@ -59,6 +61,15 @@ public class ImportItem {
   @DynamoDbAttribute(IMPORT_ID)
   public String getImportId() {
     return importId;
+  }
+
+  @DynamoDbAttribute(GAME)
+  public String getGame() {
+    return game;
+  }
+
+  public void setGame(@Nullable String game) {
+    this.game = game;
   }
 
   public void setImportId(@Nullable String importId) {
@@ -140,6 +151,7 @@ public class ImportItem {
 
   public static ImportItem create(
       String user,
+      String game,
       String importId,
       String filename,
       int rowCount,
@@ -149,6 +161,7 @@ public class ImportItem {
     item.setPk(formatPk(user));
     item.setSk(formatSk(importId));
     item.setImportId(importId);
+    item.setGame(game);
     item.setFilename(filename);
     item.setStatus("appraising");
     item.setRowCount(rowCount);

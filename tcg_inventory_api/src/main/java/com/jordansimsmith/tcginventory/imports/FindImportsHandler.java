@@ -29,6 +29,7 @@ public class FindImportsHandler
 
   record ImportSummary(
       @JsonProperty("import_id") String importId,
+      @JsonProperty("game") String game,
       @JsonProperty("filename") String filename,
       @JsonProperty("status") String status,
       @JsonProperty("row_count") int rowCount,
@@ -114,6 +115,7 @@ public class FindImportsHandler
   static ImportSummary toSummary(ImportItem item) {
     return new ImportSummary(
         item.getImportId(),
+        item.getGame(),
         item.getFilename(),
         item.getStatus(),
         item.getRowCount() != null ? item.getRowCount() : 0,

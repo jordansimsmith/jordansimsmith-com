@@ -27,10 +27,7 @@ public interface FetchTcgClient {
       @JsonProperty("id") String id,
       @JsonProperty("name") String name,
       @JsonProperty("pricingData") Map<String, PricingData> pricingData,
-      @JsonProperty("externalReferences") ExternalReferences externalReferences) {}
-
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  record ExternalReferences(@JsonProperty("scryfallId") String scryfallId) {}
+      @JsonProperty("externalReferences") Map<String, String> externalReferences) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   record PricingData(@JsonProperty("tcgMarketPrice") BigDecimal tcgMarketPrice) {}
