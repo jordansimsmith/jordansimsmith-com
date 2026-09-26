@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory;
+package com.jordansimsmith.tcginventory.fetchtcg;
 
 public class FetchTcgAuthException extends RuntimeException {
   private final int statusCode;

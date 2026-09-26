@@ -2,9 +2,9 @@ package com.jordansimsmith.tcginventory.publish;
 
 import com.jordansimsmith.tcginventory.BatchResult;
 import com.jordansimsmith.tcginventory.Condition;
-import com.jordansimsmith.tcginventory.FetchTcgClient;
 import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
+import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;

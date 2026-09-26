@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory;
+package com.jordansimsmith.tcginventory.fetchtcg;
 
 import com.jordansimsmith.http.HttpStubContainer;
 
@@ -9,7 +9,7 @@ public class FetchTcgStubContainer extends HttpStubContainer<FetchTcgStubContain
         "tcginventoryfetchtcgstub.image.name",
         "tcginventoryfetchtcgstub.image.loader",
         "/opt/code/fetchtcg-stub/fetchtcg-stub-server_deploy.jar",
-        "com.jordansimsmith.tcginventory.FetchTcgStubServer",
+        "com.jordansimsmith.tcginventory.fetchtcg.FetchTcgStubServer",
         "/health",
         "fetchtcg-stub");
   }

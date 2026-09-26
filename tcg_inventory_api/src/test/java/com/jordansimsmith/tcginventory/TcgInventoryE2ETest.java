@@ -6,6 +6,7 @@ import static org.awaitility.Awaitility.await;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgStubContainer;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLEncoder;

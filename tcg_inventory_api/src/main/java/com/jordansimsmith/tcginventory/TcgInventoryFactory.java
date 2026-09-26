@@ -10,6 +10,9 @@ import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.s3.S3Module;
 import com.jordansimsmith.secrets.Secrets;
 import com.jordansimsmith.secrets.SecretsModule;
+import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
+import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgModule;
+import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgTokenMinter;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.time.ClockModule;
 import com.jordansimsmith.ulid.UlidGenerator;
@@ -33,7 +36,8 @@ import software.amazon.awssdk.services.sqs.SqsClient;
       RequestContextModule.class,
       UlidModule.class,
       S3Module.class,
-      TcgInventoryModule.class
+      TcgInventoryModule.class,
+      FetchTcgModule.class
     })
 public interface TcgInventoryFactory {
   ObjectMapper objectMapper();

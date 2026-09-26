@@ -1,8 +1,8 @@
 package com.jordansimsmith.tcginventory.publish;
 
 import com.jordansimsmith.tcginventory.BatchResult;
-import com.jordansimsmith.tcginventory.FetchTcgTokenMinter;
 import com.jordansimsmith.tcginventory.JobItem;
+import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgTokenMinter;
 import com.jordansimsmith.tcginventory.orders.OrderPhaseProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

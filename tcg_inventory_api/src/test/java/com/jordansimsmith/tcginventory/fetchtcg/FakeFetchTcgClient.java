@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory;
+package com.jordansimsmith.tcginventory.fetchtcg;
 
 import java.util.ArrayList;
 import java.util.HashMap;

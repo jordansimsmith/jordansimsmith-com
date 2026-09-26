@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory;
+package com.jordansimsmith.tcginventory.fetchtcg;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory;
+package com.jordansimsmith.tcginventory.fetchtcg;
 
 public class FakeFetchTcgTokenMinter implements FetchTcgTokenMinter {
   public static final String FAKE_BEARER_TOKEN = "fake-bearer-token";

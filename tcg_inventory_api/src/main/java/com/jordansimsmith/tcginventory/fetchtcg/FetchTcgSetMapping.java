@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory;
+package com.jordansimsmith.tcginventory.fetchtcg;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 public class FetchTcgSetMapping {
   public record FetchTcgSetEntry(int setId, String setName) {}
 
-  private static final String RESOURCE_PATH = "/fetchtcg_set_mapping.json";
+  private static final String RESOURCE_PATH = "/fetchtcg/fetchtcg_set_mapping.json";
   private static final Map<String, List<FetchTcgSetEntry>> MAPPING = loadMapping();
 
   public static List<FetchTcgSetEntry> get(String scryfallSetCode) {

@@ -85,13 +85,31 @@ UNIT_TESTS = glob(
 )
 
 java_library(
+    name = "fetchtcg-lib",
+    srcs = glob(["src/main/java/com/jordansimsmith/tcginventory/fetchtcg/*.java"]),
+    resources = ["src/main/resources/fetchtcg/fetchtcg_set_mapping.json"],
+    deps = [
+        "//lib/secrets:lib",
+        "//third_party/dagger",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:org_slf4j_slf4j_api",
+    ],
+)
+
+java_library(
     name = "lib",
     srcs = glob(
         ["src/main/java/com/jordansimsmith/tcginventory/*.java"],
         exclude = HANDLERS,
     ),
-    resources = glob(["src/main/resources/**"]),
-    deps = COMMON_DEPS,
+    resources = glob(
+        ["src/main/resources/**"],
+        exclude = ["src/main/resources/fetchtcg/fetchtcg_set_mapping.json"],
+    ),
+    deps = [":fetchtcg-lib"] + COMMON_DEPS,
 )
 
 java_library(
@@ -109,7 +127,10 @@ java_library(
         ["src/main/java/com/jordansimsmith/tcginventory/imports/*.java"],
         exclude = ["src/main/java/com/jordansimsmith/tcginventory/imports/*Handler.java"],
     ),
-    deps = [":lib"] + COMMON_DEPS,
+    deps = [
+        ":fetchtcg-lib",
+        ":lib",
+    ] + COMMON_DEPS,
 )
 
 java_library(
@@ -128,6 +149,7 @@ java_library(
         exclude = ["src/main/java/com/jordansimsmith/tcginventory/orders/*Handler.java"],
     ),
     deps = [
+        ":fetchtcg-lib",
         ":inventory-lib",
         ":lib",
         ":settings-lib",
@@ -141,6 +163,7 @@ java_library(
         exclude = ["src/main/java/com/jordansimsmith/tcginventory/publish/*Handler.java"],
     ),
     deps = [
+        ":fetchtcg-lib",
         ":inventory-lib",
         ":lib",
         ":order-lib",
@@ -525,6 +548,7 @@ java_binary(
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":fetchtcg-lib",
         ":import-lib",
         ":inventory-lib",
         ":lib",
@@ -916,7 +940,7 @@ java_binary(
 java_binary(
     name = "fetchtcg-stub-server",
     testonly = True,
-    srcs = ["src/test/java/com/jordansimsmith/tcginventory/FetchTcgStubServer.java"],
+    srcs = ["src/test/java/com/jordansimsmith/tcginventory/fetchtcg/FetchTcgStubServer.java"],
     create_executable = False,
 )
 
@@ -944,6 +968,7 @@ java_library(
         "src/test/resources/test.properties",
     ],
     deps = [
+        ":fetchtcg-lib",
         ":import-lib",
         ":inventory-lib",
         ":lib",
@@ -986,6 +1011,7 @@ java_test_suite(
     test_suffixes = ["Test.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":fetchtcg-lib",
         ":import-lib",
         ":inventory-lib",
         ":lib",
@@ -1035,6 +1061,7 @@ java_test_suite(
         ":delete-import-row-photo-handler",
         ":delete-scan-handler",
         ":delete-scan-row-handler",
+        ":fetchtcg-lib",
         ":find-imports-handler",
         ":find-orders-handler",
         ":find-scans-handler",
@@ -1148,6 +1175,7 @@ java_test_suite(
     test_suffixes = ["E2ETest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":fetchtcg-lib",
         ":import-lib",
         ":inventory-lib",
         ":lib",
