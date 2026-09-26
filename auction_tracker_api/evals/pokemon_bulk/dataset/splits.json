@@ -1,6 +1,6 @@
 {
   "seed": 42,
-  "strategy": "owner-labeled real listings grouped by relist identity plus targeted synthetic label-gap cases; seed 42; synthetic labels require owner review before measured release selection",
+  "strategy": "owner-labeled real listings grouped by relist identity plus targeted synthetic label-gap cases; seed 42; the 6150549502 bundle listing is held out in dev, no-duplicate/guaranteed-EX pack example s076 is in train, and guaranteed-EX pack s077 plus exact-pile near-miss s078 are held out in test",
   "train": [
     "6139138583",
     "6139617498",
@@ -21,7 +21,8 @@
     "s007",
     "s008",
     "s009",
-    "s010"
+    "s010",
+    "s076"
   ],
   "dev": [
     "6139287994",
@@ -63,7 +64,8 @@
     "s042",
     "s043",
     "s044",
-    "s045"
+    "s045",
+    "6150549502"
   ],
   "test": [
     "6141953620",
@@ -105,6 +107,8 @@
     "s072",
     "s073",
     "s074",
-    "s075"
+    "s075",
+    "s077",
+    "s078"
   ]
 }

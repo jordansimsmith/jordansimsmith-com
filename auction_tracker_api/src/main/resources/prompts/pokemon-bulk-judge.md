@@ -46,7 +46,7 @@ The cards are primarily in an acceptable condition. Mint, pack fresh, Near Mint,
 
 ### fixed_collection
 
-The listing is one specific physical collection, not an abstract quantity assembled repeatedly per sale. Fail when the seller says or clearly implies multiple lots are available, random cards are freshly assembled for each order, contents vary by purchase, the pictured cards are display-only, or the listing is a repeatable curated/bundled product. A listing anchored to one exact pile or one seller-owned clear-out passes, even when it says contents are shown in photos or includes a binder/container. Seller store framing, combined shipping, or other listings are not evidence of repeatability by themselves.
+The listing must be anchored to one specific physical pile or seller-owned clear-out. Fail random bundles, repacks, multiple available lots, contents assembled or varying per purchase, display-only examples, and repeatable curated products. Also fail a consumer-facing bundle format that promises a standard count, mix, or rarity instead of identifying the exact physical pile in this auction. Signals include titles like “X500 Mixed Bulk Bundle,” wording like “in this bundle you will receive,” a breakdown such as 400 commons/uncommons plus 100 holo/reverse holos, or per-bundle claims like “no duplicates” or “guaranteed EX.” These describe what each customer receives from stock and can indicate a repack even without an explicit statement that cards are random or that more lots are available. A listing that clearly identifies one exact pile or says all pictured cards are the one physical lot passes, even when it uses the word “bundle” or notes that the pile has no duplicates or includes an EX. Seller store framing, combined shipping, and other listings alone do not prove repeatability.
 
 ## Output format
 
@@ -98,3 +98,7 @@ Expected judgment: {"pokemon_cards":{"result":"pass"},"bulk_scale":{"result":"fa
 Title: 100 Bulk Pokémon Cards - Mixed Rares, Holos & Commons
 Description: Bulk lot of 100 authentic Pokémon TCG cards, leftover duplicates. Great to Near Mint condition, mostly pack fresh. This listing is for one lot of 100 cards; multiple lots can be purchased.
 Expected judgment: {"pokemon_cards":{"result":"pass"},"bulk_scale":{"result":"fail"},"accepted_language":{"result":"pass"},"not_basic_energy":{"result":"pass"},"not_mega_evolution_era":{"result":"pass"},"acceptable_condition":{"result":"pass"},"fixed_collection":{"result":"fail"}}
+
+Title: Pokemon X500 bulk bundle - no duplicates, guaranteed EX
+Description: Each bundle contains 500 mixed Pokemon cards, with no duplicates and one guaranteed EX. These are packed from my bulk stock; the photos show examples of the kind of cards you will receive, and contents vary between bundles.
+Expected judgment: {"pokemon_cards":{"result":"pass"},"bulk_scale":{"result":"pass"},"accepted_language":{"result":"pass"},"not_basic_energy":{"result":"pass"},"not_mega_evolution_era":{"result":"pass"},"acceptable_condition":{"result":"pass"},"fixed_collection":{"result":"fail"}}

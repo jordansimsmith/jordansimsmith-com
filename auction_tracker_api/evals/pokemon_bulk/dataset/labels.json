@@ -1092,5 +1092,49 @@
     "fixed_collection": "pass",
     "overall": "fail",
     "notes": "targeted synthetic coverage for not_mega_evolution_era; owner review pending"
+  },
+  "6150549502": {
+    "pokemon_cards": "pass",
+    "bulk_scale": "pass",
+    "accepted_language": "pass",
+    "not_basic_energy": "pass",
+    "not_mega_evolution_era": "pass",
+    "acceptable_condition": "pass",
+    "fixed_collection": "fail",
+    "overall": "fail",
+    "notes": "owner-labeled: the 500-card mix is offered as a consumer bundle with promised contents, not one identified physical pile"
+  },
+  "s076": {
+    "pokemon_cards": "pass",
+    "bulk_scale": "pass",
+    "accepted_language": "pass",
+    "not_basic_energy": "pass",
+    "not_mega_evolution_era": "pass",
+    "acceptable_condition": "pass",
+    "fixed_collection": "fail",
+    "overall": "fail",
+    "notes": "owner-directed synthetic: no-duplicate and guaranteed-EX promises describe variable consumer bundles from bulk stock"
+  },
+  "s077": {
+    "pokemon_cards": "pass",
+    "bulk_scale": "pass",
+    "accepted_language": "pass",
+    "not_basic_energy": "pass",
+    "not_mega_evolution_era": "pass",
+    "acceptable_condition": "pass",
+    "fixed_collection": "fail",
+    "overall": "fail",
+    "notes": "targeted synthetic coverage for guaranteed-EX offers assembled from stock as orders come in"
+  },
+  "s078": {
+    "pokemon_cards": "pass",
+    "bulk_scale": "pass",
+    "accepted_language": "pass",
+    "not_basic_energy": "pass",
+    "not_mega_evolution_era": "pass",
+    "acceptable_condition": "pass",
+    "fixed_collection": "pass",
+    "overall": "pass",
+    "notes": "near-miss: no duplicates and an EX card describe one exact photographed physical collection, not a repeatable product"
   }
 }

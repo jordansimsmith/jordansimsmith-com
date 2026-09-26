@@ -34,11 +34,13 @@ Mint, Near Mint, and Lightly Played pass. A majority explicitly Moderately Playe
 
 ### fixed_collection
 
-One specific physical pile passes. Random, repeatable, display-only, or per-order assembled bundles fail. Store framing and combined shipping are not enough to fail.
+One specific physical pile or seller-owned clear-out passes. Fail when the listing sells a consumer bundle format instead of identifying the actual pile in this auction. A generic count/mix promise such as “X500 mixed bulk bundle” with “in this bundle you will receive” language is a productized offer when no exact pile is identified. Per-bundle promises such as “no duplicates” or “guaranteed EX” are also evidence of a curated pack from stock when photos are representative or contents can vary. Random, repeatable, display-only, and per-order assembled bundles fail. The word “bundle” alone does not fail when the text anchors the auction to one exact physical pile. Store framing and combined shipping are not enough to fail.
+
+The owner-labeled Trade Me listing `6150549502` is a fail: it offers an “X500 Mixed Bulk Bundle,” promises a 400 common/uncommon plus 100 holo/reverse holo mix, and says “In this bundle you will receive” without identifying one exact pile. The synthetic `s078` is a near-miss pass: “no duplicates” and an included EX card describe one exact photographed collection, not a repeatable pack.
 
 ## Dataset status
 
-The corpus contains 25 owner-labeled live listings from the planning session and 75 targeted synthetic label-gap fixtures. The owner’s rulings intentionally include hard cases for Mega-era mixtures, 30th-anniversary exceptions, language ambiguity, Energy bundles, repeatable bundles, quantity defaults, and damaged collections. Synthetic labels are explicit constructions of one criterion at a time and are marked `owner review pending`; the owner should review the label sheet before using measured scores for a release decision. The fixed seed-42 split is 20 train, 40 dev, and 40 test, with relist identities kept together.
+The corpus contains 26 owner-labeled live listings and 78 targeted synthetic label-gap fixtures. The new cases cover the linked mixed bundle, per-bundle “no duplicates” and “guaranteed EX” promises, and an exact-pile near miss with the same terms. The owner’s rulings also cover hard cases for Mega-era mixtures, 30th-anniversary exceptions, language ambiguity, Energy bundles, quantity defaults, and damaged collections. Earlier synthetic labels remain marked `owner review pending`; the new labels encode the owner’s explicit rule that repackaged bundle promises fail while claims about a clearly identified physical pile do not. The seed-42 split is 21 train, 41 dev, and 42 test, with relist identities kept together.
 
 The owner review sheet is `labels.json`: each real listing retains its supplied verdict and reason, while synthetic entries include a note naming the targeted criterion. Keep prompt versions immutable once a measured run has been recorded.
 
