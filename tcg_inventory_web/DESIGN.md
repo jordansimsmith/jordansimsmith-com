@@ -200,7 +200,7 @@ Import review and order pulling must remain usable while handling physical cards
 
 ### Reports
 
-Reports use one segmented headline strip followed by bordered analytical figures. Charts share a restrained palette and consistent title treatment. Tables and legends remain contained at narrow widths. Reports may be visually richer than operational pages, but must still feel like the same product.
+Reports show combined inventory value, paid revenue, and activity trends first, followed by horizontally scrollable game tabs. Show the combined inventory value to two decimal places. In each tab, use one bordered summary with three aligned sections: a smaller inventory-value figure, unique card names with in-stock units as supporting detail, and paid revenue with units sold as supporting detail. Do not turn each metric into a separate card. On narrow screens, stack the three sections and retain their hierarchy. Supporting sections use plain labels that explain their measures: highest-value cards by unit price, sets ranked by in-stock card count, time since intake, and in-stock units by current price range. In paired game breakdowns, each paper surface should stretch to the full height of its row. The monthly revenue line uses the same softly rounded treatment as weekly movement, with small markers and a useful tooltip. Charts share a quiet palette and consistent title treatment. Tables and legends remain contained at narrow widths. Reports may be visually richer than operational pages, but must still feel like the same product.
 
 ### Authentication
 

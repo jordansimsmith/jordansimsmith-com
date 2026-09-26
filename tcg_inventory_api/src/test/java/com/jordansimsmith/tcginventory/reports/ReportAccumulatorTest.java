@@ -164,6 +164,23 @@ public class ReportAccumulatorTest {
     assertThat(totals.skuCount()).isEqualTo(2);
   }
 
+  @Test
+  void uniqueCardNamesCountShouldDeduplicateInStockSkus() {
+    // arrange
+    var accumulator = new ReportAccumulator(GENERATION_TIME);
+    var firstPrinting = createSku("sku1", "1.50", null, "set1", "Set One", "Lightning Bolt");
+    var secondPrinting = createSku("sku2", "2.50", null, "set2", "Set Two", "Lightning Bolt");
+    var soldOutCard = createSku("sku3", "3.50", null, "set3", "Set Three", "Opt");
+
+    // act
+    accumulator.addSku(firstPrinting, List.of(createUnit("in_stock")));
+    accumulator.addSku(secondPrinting, List.of(createUnit("in_stock")));
+    accumulator.addSku(soldOutCard, List.of(createUnit("sold")));
+
+    // assert
+    assertThat(accumulator.uniqueCardNamesCount()).isEqualTo(1);
+  }
+
   private static SkuItem createSku(String skuId, String lastPublishedPrice, String suggestedPrice) {
     return createSku(skuId, lastPublishedPrice, suggestedPrice, "set1", "Set One");
   }
@@ -815,7 +832,7 @@ public class ReportAccumulatorTest {
   }
 
   @Test
-  void toRevenueByMonthShouldSortChronologically() {
+  void toRevenueByMonthShouldIncludeZeroMonthsBetweenPaidOrders() {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
     // March 2023
@@ -832,13 +849,16 @@ public class ReportAccumulatorTest {
 
     // assert
     var result = accumulator.toRevenueByMonth();
-    assertThat(result).hasSize(3);
+    assertThat(result).hasSize(11);
     assertThat(result.get(0).month()).isEqualTo("2023-01");
     assertThat(result.get(0).revenue()).isEqualTo("3.00");
-    assertThat(result.get(1).month()).isEqualTo("2023-03");
-    assertThat(result.get(1).revenue()).isEqualTo("5.00");
-    assertThat(result.get(2).month()).isEqualTo("2023-11");
-    assertThat(result.get(2).revenue()).isEqualTo("7.00");
+    assertThat(result.get(1).month()).isEqualTo("2023-02");
+    assertThat(result.get(1).revenue()).isEqualTo("0");
+    assertThat(result.get(1).orderCount()).isZero();
+    assertThat(result.get(2).month()).isEqualTo("2023-03");
+    assertThat(result.get(2).revenue()).isEqualTo("5.00");
+    assertThat(result.get(10).month()).isEqualTo("2023-11");
+    assertThat(result.get(10).revenue()).isEqualTo("7.00");
   }
 
   @Test

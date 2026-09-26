@@ -41,7 +41,7 @@ The TCG inventory API service is the source of truth for a physical Magic: The G
 - Pull sheets for paid orders, sorted by game and then unit sequence number; each entry carries the offered per-unit price, the unit's game and external identity, its current block position (gaps from sold and removed cards collapsed), and neighboring cards still in the same game's block; order confirm marks pulled units sold.
 - Offer vs listed price: each ingested offer line stores the FetchTCG listing's `listedPrice` at ingest time; `GET /orders` returns item and listed subtotals (shipping excluded) and `GET /orders/{order_id}` returns the same subtotals plus per-line offered and listed prices.
 - Fulfillment details on orders: the buyer's display name, delivery address, and selected postage option are captured from the offer and refreshed on every order-phase run, so `GET /orders/{order_id}` carries what packing a parcel needs.
-- Reports: an async report job aggregates the entire inventory into a stored dashboard snapshot (headline totals, monthly revenue, weekly intake vs sales, top sets, price buckets, top hits, aging bands); `GET /reports` serves the latest snapshot with staleness metadata and generation status.
+- Reports: an async report job aggregates the entire inventory into a stored dashboard snapshot with combined headline totals and activity trends, plus a stock breakdown for every registered game; `GET /reports` serves the latest snapshot with staleness metadata and generation status.
 - Per-user FetchTCG refresh-token storage with masked reads; fresh one-hour bearer minted per job run.
 - Append-only audit log written transactionally with every mutation.
 
@@ -176,7 +176,7 @@ Bazel mirrors this layout with `:scan-lib`, `:import-lib`, `:inventory-lib`, `:o
 - SKU identity is the deterministic composite `game#external_source#external_id#finish#condition` — computable from the intake row and its parent import without a lookup. SKU records store that identity and cache the resolved `fetchtcg_card_id`; they are never deleted.
 - Conditions use the 5-level TCGplayer-style scale; ManaBox's 7 values collapse at import and FetchTCG codes are a boundary translation. NM is the default when no condition is provided.
 - FetchTCG traffic is sequential with 1–2 s random request spacing, bounded retries, an endpoint allowlist, and fail-closed bearer handling. Every job run mints a fresh one-hour bearer from the stored refresh token and persists a rotated refresh token when Firebase returns one.
-- Reports are a stored snapshot, not live aggregation: a `report` job pages all SKU records via `gsi2` (projection ALL), derives every figure from unit and order items, and overwrites a singleton report item stamped with the latest audit ULID captured at generation start. `GET /reports` computes staleness (comparing the latest audit ULID against the snapshot's as-of audit ULID, plus a 24-hour backstop) without touching inventory partitions. Stock counts stay unstored; the report is a disposable projection regenerated on demand.
+- Reports are a stored snapshot, not live aggregation: a `report` job pages all SKU records via `gsi2` (projection ALL), derives combined and per-game figures from unit and order items, and overwrites a singleton report item stamped with the latest audit ULID captured at generation start. Paid order line revenue is attributed to the referenced SKU's game; a missing SKU reference or unsupported stored game fails the job. Monthly revenue includes zero-value months between the first and latest paid-order month. `GET /reports` computes staleness (comparing the latest audit ULID against the snapshot's as-of audit ULID, plus a 24-hour backstop) without touching inventory partitions. The later migration must clear the old singleton report snapshot before deploying this payload contract so the client requests a new generation. Stock counts stay unstored; the report is a disposable projection regenerated on demand.
 - Identity resolution is verified, never ranked: appraisal searches FetchTCG by set, front-face name, and finish, then accepts the first candidate whose `externalReferences.scryfallId` equals the row's Scryfall ID. Search relevance ranking is never trusted, so multiple printings of one name in a set (borderless, showcase, extended art) cannot collapse onto the wrong card; a row with no verified candidate becomes `review`. The search name is diacritic-folded to ASCII so FetchTCG's ASCII catalog names (for example `Khazad-dum`) still match Scryfall spellings, and the query string is URL-encoded so those characters cannot break the request URI.
 - The static Scryfall→FetchTCG set mapping is a generated, checked-in artifact; unmapped sets stop appraisal into `review` rather than guessing. The generator maps each FetchTCG set to every distinct Scryfall code found by sampling unique card names from both the newest and oldest ends of that set, so reprint printings filed under an older FetchTCG set (for example MH1 and MH2 Timeshifts under Modern Horizons) still resolve.
 - Photos are per-unit, captured on keep rows during import review (the only moment cards are in hand) and immutable after confirm — no unit-level photo mutations exist, so no photo-driven dirty flags or audit events. The import gate is NZ$20 against FetchTCG's NZ$50 client-side rule: the margin makes a sub-gate card later drifting past $50 negligible, and FetchTCG's API never rejects photo-less listings anyway (verified live — it defaults the front image to the stock card image), so a photo-less NZ$50+ upsert logs a warning and proceeds rather than blocking publish.
@@ -447,7 +447,7 @@ Query parameters: optional `continuation` (opaque token from a previous page) an
 
 `GET /reports`
 
-Response `200` (arrays shown with one representative entry; empty buckets and bands are still emitted so charts render stable axes; money values are NZD decimal strings):
+Response `200` (arrays shown with one representative entry; empty game buckets and bands are still emitted so the browser renders stable scales; money values are NZD decimal strings):
 
 ```json
 {
@@ -475,23 +475,38 @@ Response `200` (arrays shown with one representative entry; empty buckets and ba
     "intake_vs_sales_by_week": [
       { "week_start": "2026-07-06", "added_units": 240, "sold_units": 31 }
     ],
-    "top_sets": [
-      { "set_code": "a25", "set_name": "Masters 25", "in_stock_units": 812 }
-    ],
-    "price_buckets": [{ "label": "$0.25-$0.50", "in_stock_units": 5120 }],
-    "top_hits": [
+    "games": [
       {
-        "sku_id": "mtg#scryfall#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
-        "name": "Ragavan, Nimble Pilferer",
-        "set_code": "mh2",
-        "collector_number": "138",
-        "finish": "normal",
-        "condition": "NM",
-        "price": "95.00",
-        "in_stock_units": 1
+        "game": "mtg",
+        "unique_card_names": 5980,
+        "totals": {
+          "inventory_value": "2894.35",
+          "in_stock_units": 9412,
+          "sku_count": 6120,
+          "reserved_units": 14,
+          "sold_units": 862,
+          "revenue_to_date": "1204.50",
+          "unpriced_units": 3
+        },
+        "top_sets": [
+          { "set_code": "a25", "set_name": "Masters 25", "in_stock_units": 812 }
+        ],
+        "price_buckets": [{ "label": "$0.25-$0.50", "in_stock_units": 5120 }],
+        "top_hits": [
+          {
+            "sku_id": "mtg#scryfall#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
+            "name": "Ragavan, Nimble Pilferer",
+            "set_code": "mh2",
+            "collector_number": "138",
+            "finish": "normal",
+            "condition": "NM",
+            "price": "95.00",
+            "in_stock_units": 1
+          }
+        ],
+        "aging_bands": [{ "label": "0-30 days", "in_stock_units": 1200 }]
       }
-    ],
-    "aging_bands": [{ "label": "0-30 days", "in_stock_units": 1200 }]
+    ]
   }
 }
 ```
@@ -730,7 +745,7 @@ Inventory mutations are `TransactWriteItems` including their audit entry; every 
 - Market appraisal deduplicates FetchTCG reads per printing + finish within a job run and caches card detail reads per card id within a batch, so verifying ambiguous names never re-fetches the same candidate.
 - Report generation is a single-slice job of pure reads plus one snapshot overwrite; re-runs and duplicate deliveries converge on the same result. At most one report job is queued or running per user (`POST /reports` responds 202 either way, mirroring publish).
 - Report staleness: the job captures the latest audit ULID before reading any data; `GET /reports` reports stale when a later audit entry exists or the snapshot is older than 24 hours, so mutations landing mid-generation surface as stale on the next read.
-- Report figures count `in_stock` units only for value, price buckets, top sets, top hits, and aging; reserved units appear only in the headline reserved count; `removed` units are excluded everywhere. Intake trends count every unit by `created_at` (preserved across condition edits); sold trends use the sell-time `updated_at`; revenue counts paid orders (`to_pick`, `fulfilled`) as the sum of offer line totals (shipping excluded) bucketed by first-seen month. A unit's price is its SKU's `last_published_price` falling back to appraisal `suggested_price`; SKUs with neither surface as an unpriced count and are excluded from value figures.
+- Report figures count `in_stock` units only for value, price buckets, top sets, top hits, and aging; each game also counts distinct card names among SKUs with at least one in-stock unit, so extra printings, finishes, and conditions do not inflate that count. Reserved units appear only in the reserved count; `removed` units are excluded everywhere. Intake trends count every unit by `created_at` (preserved across condition edits); sold trends use the sell-time `updated_at`; revenue counts paid orders (`to_pick`, `fulfilled`) as the sum of offer line totals (shipping excluded), bucketed by first-seen month in the combined trend and attributed by referenced SKU game in each game summary. The report includes every registered game in registry order, including games with no SKUs. A unit's price is its SKU's `last_published_price` falling back to appraisal `suggested_price`; SKUs with neither surface as an unpriced count and are excluded from value figures.
 - Report week and month bucketing and aging bands use the fixed `Pacific/Auckland` timezone; weeks start Monday. Top hits rank by per-unit price (quantity is display detail), tie-broken by name ascending.
 - Photos are immutable after confirm: management exists only on keep rows while the import is in review (max 5, JPEG, 4 MB), and the confirm gate (409 while any keep row appraised at NZ$20+ is photo-less) is the only photo enforcement anywhere — publish never blocks on photos.
 - Listing upserts always project full image state: a photographed SKU sends its first (lowest sequence) in-stock unit's photos (`frontImage` first, the rest as `additionalImages`); a photo-less SKU omits `frontImage` (FetchTCG defaults to the stock card image) and sends `additionalImages: []`. An upsert at NZ$50+ with a photo-less first unit logs a warning and proceeds.
@@ -782,7 +797,7 @@ Inventory mutations are `TransactWriteItems` including their audit entry; every 
 | `SCAN_BUCKET_NAME`      | yes (Python worker)   | existing private service S3 bucket             | startup fails if absent               |
 | `COLLECTORVISION_CACHE` | yes (Python worker)   | bundled catalog/model cache path               | startup fails if missing/incompatible |
 
-Fixed configuration lives in code: request spacing 1–2 s, bounded retries, request budgets, list page size 20, slice sizes (~100 rows per appraise slice, ~100 dirty SKUs per publish listing slice), country `NZ`, currency `NZD`, keep threshold NZ$0.25, price increment NZ$0.05, seller floor NZ$0.25. Photo constants: import gate NZ$20, publish warning NZ$50, 5 photos per row/unit, 4 MB max upload, 15-minute presign TTL. Report constants: staleness backstop 24 h, bucketing timezone `Pacific/Auckland`, price buckets $0.25–$0.50 / $0.50–$1 / $1–$2 / $2–$5 / $5–$10 / $10+ NZD, aging bands 0–30 / 31–90 / 91–180 / 180+ days, top sets 10, top hits 10.
+Fixed configuration lives in code: request spacing 1–2 s, bounded retries, request budgets, list page size 20, slice sizes (~100 rows per appraise slice, ~100 dirty SKUs per publish listing slice), country `NZ`, currency `NZD`, keep threshold NZ$0.25, price increment NZ$0.05, seller floor NZ$0.25. Photo constants: import gate NZ$20, publish warning NZ$50, 5 photos per row/unit, 4 MB max upload, 15-minute presign TTL. Report constants: staleness backstop 24 h, bucketing timezone `Pacific/Auckland`, price buckets $0.25–$0.50 / $0.50–$1 / $1–$2 / $2–$5 / $5–$10 / $10+ NZD, aging bands 0–30 / 31–90 / 91–180 / 180+ days, top sets 10 and top hits 10 per game.
 
 The Java app and Python worker use the fixed queue names `tcg_inventory_jobs.fifo` and `tcg_inventory_scan_jobs.fifo` rather than a queue URL setting. Scan constants: 1–200 JPEGs per batch, 1 MiB per JPEG, 15-minute source presigns, up to five advisory suggestions per row, at most 100 pending rows per worker batch, one logical recognition attempt per row, and five source-queue receives before passive DLQ routing. Pin the CollectorVision source, Scryfall MTG catalog snapshot, model identity, and AWS SDK asset versions in the worker image. Updating the catalog means deploying a new image; the worker does not download it at startup.
 
@@ -813,8 +828,8 @@ Rotated refresh tokens returned by Firebase are written back to the same key.
 
 ## Testing and quality gates
 
-- Unit tests: pricing policy scenarios (keep filter, undercut tick, deep-discount guard, supported floor, sole-source premium, rounding, floor), condition translation, set mapping, sequence/block/location derivation, FetchTCG client pacing/retries/allowlist/fail-closed auth/delete-of-missing-listing tolerance with fixture responses (including seller-offer `listedPrice`, `buyerName`, `buyerRegionAddress`, and `shippingOption` parsing, card `externalReferences.scryfallId` parsing, and search-name URL encoding), offer state mapping, report aggregation (price fallback chain, bucket and band edges, NZ-timezone bucketing, top-hits ordering and tie-break, paid-order filter, shipping excluded from revenue, removed-unit exclusion), report staleness comparison (as-of audit ULID and 24 h backstop), image-state projection (object shape, omission and replace rules, NZ$50 warning), and FetchTCG multipart upload encoding.
-- Integration tests (DynamoDB Testcontainers, LocalStack SQS): import upload→rows, import list continuation paging, import detail keep-row suggested total, order list continuation paging and unit_count, order detail block positions (sold and removed gaps collapsing the current offset, reserved units counted as boxed, block-edge null neighbors, cross-SKU neighbors), per-unit offered prices and detail subtotals, appraisal identity verification (variant printings resolve by Scryfall ID, unverified candidates fall through to review, diacritic-folded names still resolve), confirm idempotency and double-confirm rejection, adjustments, reserve/advance/release/sell transitions (the advance asserting its `payment` audit, the release covering both cancelled statuses, its `release` audit, the no-ops for a missing offer and a `to_pick` order, and convergence on replay and on a partially applied release), chunked reserve, release, and sell for orders past the 100-item transaction cap, crashed-reserve reclaim convergence, publish create/update/delist and conditional clear, publish checkpointing and continuation across listing slices, duplicate-delivery no-ops, masked credential handling, report job snapshot writes, `GET /reports` staleness transitions, `POST /reports` idempotency while active, row photo CRUD against LocalStack S3 (caps, status gates, 204 mutations, `GET` import `photos`/`needs_photos` and presigned reads), confirm photo freeze and gate 409, condition-edit photo carry, publish image projection with one-time `fetchtcg_url` persistence, order-phase `listed_price` capture, order-phase fulfillment capture and refresh (an address arriving on a later run, an all-null address storing as none, no write when nothing changed), and order list/detail offered-vs-listed fields (including null baseline on legacy lines).
+- Unit tests: pricing policy scenarios (keep filter, undercut tick, deep-discount guard, supported floor, sole-source premium, rounding, floor), condition translation, set mapping, sequence/block/location derivation, FetchTCG client pacing/retries/allowlist/fail-closed auth/delete-of-missing-listing tolerance with fixture responses (including seller-offer `listedPrice`, `buyerName`, `buyerRegionAddress`, and `shippingOption` parsing, card `externalReferences.scryfallId` parsing, and search-name URL encoding), offer state mapping, report aggregation (price fallback chain, distinct in-stock name counting, bucket and band edges, NZ-timezone bucketing, top-hits ordering and tie-break, paid-order filter, shipping excluded from revenue, removed-unit exclusion), report staleness comparison (as-of audit ULID and 24 h backstop), image-state projection (object shape, omission and replace rules, NZ$50 warning), and FetchTCG multipart upload encoding.
+- Integration tests (DynamoDB Testcontainers, LocalStack SQS): import upload→rows, import list continuation paging, import detail keep-row suggested total, order list continuation paging and unit_count, order detail block positions (sold and removed gaps collapsing the current offset, reserved units counted as boxed, block-edge null neighbors, cross-SKU neighbors), per-unit offered prices and detail subtotals, appraisal identity verification (variant printings resolve by Scryfall ID, unverified candidates fall through to review, diacritic-folded names still resolve), confirm idempotency and double-confirm rejection, adjustments, reserve/advance/release/sell transitions (the advance asserting its `payment` audit, the release covering both cancelled statuses, its `release` audit, the no-ops for a missing offer and a `to_pick` order, and convergence on replay and on a partially applied release), chunked reserve, release, and sell for orders past the 100-item transaction cap, crashed-reserve reclaim convergence, publish create/update/delist and conditional clear, publish checkpointing and continuation across listing slices, duplicate-delivery no-ops, masked credential handling, report job snapshots with empty game breakdowns, distinct-name counts, and line revenue attribution, missing-SKU report failure, `GET /reports` staleness transitions, `POST /reports` idempotency while active, row photo CRUD against LocalStack S3 (caps, status gates, 204 mutations, `GET` import `photos`/`needs_photos` and presigned reads), confirm photo freeze and gate 409, condition-edit photo carry, publish image projection with one-time `fetchtcg_url` persistence, order-phase `listed_price` capture, order-phase fulfillment capture and refresh (an address arriving on a later run, an all-null address storing as none, no write when nothing changed), and order list/detail offered-vs-listed fields (including null baseline on legacy lines).
 - E2E (LocalStack): import → appraise → confirm → publish → order → pull → confirm loop, then report generation and retrieval, plus the photo lifecycle (flagged row → photo → gated confirm → published images → sale swaps the listing to the next unit's photos). The ingested order asserts offered 1.50 against listed 2.00, its buyer name, delivery address, and postage option, and the pull sheet's per-unit price, current location, and block neighbors.
 - Tests never call the live FetchTCG API.
 - Scan tests cover ASCII filename ordering, batch condition/finish validation, rejection of non-ASCII names, complete-batch upload verification with no replacement URLs, owner-scoped source URLs, FIFO group/deduplication attributes, 100-row worker batches and continuation messages, direct result writes without claims, duplicate/overlapping delivery convergence, partial-batch retry, continuation-send failure recovery, finish/language filtering and face-result deduplication, corrupt/empty recognition results, infrastructure failure propagation, irreversible scan-row and whole-scan deletion, deletion fences for stale identify/worker writes, direct import parent/row/job writes, confirmed retry response, and first-scanned-first-import row order. Real scanner fixtures and ambiguity-threshold calibration are manual rehearsal work; the worker's packaged catalog/model must open offline with network disabled.

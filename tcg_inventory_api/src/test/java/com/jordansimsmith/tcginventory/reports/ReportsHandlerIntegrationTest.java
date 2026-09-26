@@ -183,6 +183,17 @@ public class ReportsHandlerIntegrationTest {
     assertThat(reportItem.getReport()).isNotNull();
     assertThat(reportItem.getUpdatedAt()).isEqualTo(Instant.ofEpochSecond(1700000000));
 
+    var reportJson = objectMapper.readTree(reportItem.getReport());
+    assertThat(reportJson.get("games")).hasSize(1);
+    var gameReport = reportJson.get("games").get(0);
+    assertThat(gameReport.get("game").asText()).isEqualTo("mtg");
+    assertThat(gameReport.get("unique_card_names").asInt()).isZero();
+    assertThat(gameReport.get("totals").get("sku_count").asInt()).isZero();
+    assertThat(gameReport.get("top_hits")).isEmpty();
+    assertThat(gameReport.get("top_sets")).isEmpty();
+    assertThat(gameReport.get("aging_bands")).hasSize(4);
+    assertThat(gameReport.get("price_buckets")).hasSize(6);
+
     var updatedJob =
         jobTable.getItem(
             Key.builder()
@@ -327,7 +338,11 @@ public class ReportsHandlerIntegrationTest {
             null,
             null,
             "10.50",
-            List.of(new OrderItem.OrderLine("s", 1, 1, "10.50", null, List.of())),
+            List.of(
+                new OrderItem.OrderLine(
+                    "mtg#scryfall#scryfall1#normal#NM", 1, 2, "10.50", null, List.of()),
+                new OrderItem.OrderLine(
+                    "mtg#scryfall#scryfall1#normal#NM", 2, 1, null, null, List.of())),
             Instant.ofEpochSecond(1699500000)));
     orderTable.putItem(
         OrderItem.create(
@@ -341,7 +356,9 @@ public class ReportsHandlerIntegrationTest {
             null,
             null,
             "5.25",
-            List.of(new OrderItem.OrderLine("s", 1, 1, "5.25", null, List.of())),
+            List.of(
+                new OrderItem.OrderLine(
+                    "mtg#scryfall#scryfall2#normal#NM", 1, 1, "5.25", null, List.of())),
             Instant.ofEpochSecond(1699600000)));
     orderTable.putItem(
         OrderItem.create(
@@ -355,7 +372,9 @@ public class ReportsHandlerIntegrationTest {
             null,
             null,
             "100.00",
-            List.of(new OrderItem.OrderLine("s", 1, 1, "100.00", null, List.of())),
+            List.of(
+                new OrderItem.OrderLine(
+                    "mtg#scryfall#scryfall2#normal#NM", 1, 1, "100.00", null, List.of())),
             Instant.ofEpochSecond(1699700000)));
 
     var jobItem =
@@ -389,7 +408,18 @@ public class ReportsHandlerIntegrationTest {
     // sku3 has 1 in_stock unit with no price
     assertThat(totals.get("unpriced_units").asInt()).isEqualTo(1);
 
-    var topSets = reportJson.get("top_sets");
+    assertThat(reportJson.get("games").size()).isEqualTo(1);
+    var gameReport = reportJson.get("games").get(0);
+    assertThat(gameReport.get("game").asText()).isEqualTo("mtg");
+    assertThat(gameReport.get("unique_card_names").asInt()).isEqualTo(3);
+    assertThat(gameReport.get("totals")).isEqualTo(totals);
+    assertThat(gameReport.get("totals").get("revenue_to_date").asText()).isEqualTo("15.75");
+    assertThat(reportJson.has("top_sets")).isFalse();
+    assertThat(reportJson.has("top_hits")).isFalse();
+    assertThat(reportJson.has("aging_bands")).isFalse();
+    assertThat(reportJson.has("price_buckets")).isFalse();
+
+    var topSets = gameReport.get("top_sets");
     assertThat(topSets).isNotNull();
     assertThat(topSets.isArray()).isTrue();
     assertThat(topSets.size()).isEqualTo(3);
@@ -405,7 +435,7 @@ public class ReportsHandlerIntegrationTest {
     assertThat(topSets.get(2).get("set_name").asText()).isEqualTo("Dominaria");
     assertThat(topSets.get(2).get("in_stock_units").asInt()).isEqualTo(1);
 
-    var priceBuckets = reportJson.get("price_buckets");
+    var priceBuckets = gameReport.get("price_buckets");
     assertThat(priceBuckets).isNotNull();
     assertThat(priceBuckets.isArray()).isTrue();
     assertThat(priceBuckets.size()).isEqualTo(6);
@@ -415,7 +445,7 @@ public class ReportsHandlerIntegrationTest {
     assertThat(priceBuckets.get(2).get("in_stock_units").asInt()).isEqualTo(2);
     assertThat(priceBuckets.get(3).get("in_stock_units").asInt()).isEqualTo(1);
 
-    var topHits = reportJson.get("top_hits");
+    var topHits = gameReport.get("top_hits");
     assertThat(topHits).isNotNull();
     assertThat(topHits.isArray()).isTrue();
     // sku2 (Sol Ring, $3.00) first, sku1 (Lightning Bolt, $1.50) second; sku3 unpriced excluded
@@ -427,7 +457,7 @@ public class ReportsHandlerIntegrationTest {
     assertThat(topHits.get(1).get("price").asText()).isEqualTo("1.50");
     assertThat(topHits.get(1).get("in_stock_units").asInt()).isEqualTo(2);
 
-    var agingBands = reportJson.get("aging_bands");
+    var agingBands = gameReport.get("aging_bands");
     assertThat(agingBands).isNotNull();
     assertThat(agingBands.isArray()).isTrue();
     assertThat(agingBands.size()).isEqualTo(4);
@@ -462,6 +492,41 @@ public class ReportsHandlerIntegrationTest {
     assertThat(intakeVsSales.get(1).get("week_start").asText()).isEqualTo("2023-11-06");
     assertThat(intakeVsSales.get(1).get("added_units").asInt()).isEqualTo(0);
     assertThat(intakeVsSales.get(1).get("sold_units").asInt()).isEqualTo(1);
+  }
+
+  @Test
+  void jobShouldFailWhenOrderLineReferencesMissingSku() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    orderTable.putItem(
+        OrderItem.create(
+            "jordan",
+            "1",
+            "fulfilled",
+            null,
+            null,
+            "SHIPPING",
+            null,
+            null,
+            null,
+            "10.00",
+            List.of(new OrderItem.OrderLine("missing-sku", 1, 1, "10.00", null, List.of())),
+            Instant.ofEpochSecond(1699500000)));
+    jobTable.putItem(
+        JobItem.create("jordan", "report-job", "report", null, Instant.ofEpochSecond(1700000000)));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "report-job", "report"), null);
+
+    // assert
+    var job =
+        jobTable.getItem(
+            Key.builder()
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(JobItem.formatSk("report-job"))
+                .build());
+    assertThat(job.getStatus()).isEqualTo("failed");
+    assertThat(job.getError()).contains("order line references missing SKU: missing-sku");
   }
 
   @Test

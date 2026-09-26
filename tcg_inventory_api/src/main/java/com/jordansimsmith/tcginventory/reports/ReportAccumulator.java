@@ -15,8 +15,10 @@ import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
@@ -53,6 +55,7 @@ public class ReportAccumulator {
   private final int[] priceBucketCounts = new int[6];
   private final int[] agingBandCounts = new int[4];
   private final Map<String, SetAccumulator> setMap = new HashMap<>();
+  private final Set<String> inStockCardNames = new HashSet<>();
   private final List<HitCandidate> hitCandidates = new ArrayList<>();
   private final TreeMap<YearMonth, MonthAccumulator> monthMap = new TreeMap<>();
   private final TreeMap<LocalDate, Integer> addedByWeek = new TreeMap<>();
@@ -104,6 +107,7 @@ public class ReportAccumulator {
     }
 
     if (skuInStockCount > 0) {
+      inStockCardNames.add(sku.getName());
       setMap
           .computeIfAbsent(sku.getSetCode(), k -> new SetAccumulator(sku.getSetName()))
           .addUnits(skuInStockCount);
@@ -129,10 +133,14 @@ public class ReportAccumulator {
       return;
     }
     var price = OrderLines.itemsTotal(order.getLines());
-    revenueToDate = revenueToDate.add(price);
+    addRevenue(price);
 
     var month = YearMonth.from(order.getCreatedAt().atZone(AUCKLAND));
     monthMap.computeIfAbsent(month, k -> new MonthAccumulator()).add(price);
+  }
+
+  public void addRevenue(BigDecimal price) {
+    revenueToDate = revenueToDate.add(price);
   }
 
   public ReportPayload.Totals toTotals() {
@@ -144,6 +152,10 @@ public class ReportAccumulator {
         soldUnits,
         revenueToDate.toPlainString(),
         unpricedUnits);
+  }
+
+  public int uniqueCardNamesCount() {
+    return inStockCardNames.size();
   }
 
   public List<ReportPayload.TopSet> toTopSets() {
@@ -199,14 +211,23 @@ public class ReportAccumulator {
   }
 
   public List<ReportPayload.RevenueByMonth> toRevenueByMonth() {
-    return monthMap.entrySet().stream()
-        .map(
-            e ->
-                new ReportPayload.RevenueByMonth(
-                    e.getKey().toString(),
-                    e.getValue().revenue.toPlainString(),
-                    e.getValue().orderCount))
-        .toList();
+    if (monthMap.isEmpty()) {
+      return List.of();
+    }
+
+    var revenueByMonth = new ArrayList<ReportPayload.RevenueByMonth>();
+    var month = monthMap.firstKey();
+    var lastMonth = monthMap.lastKey();
+    while (!month.isAfter(lastMonth)) {
+      var accumulator = monthMap.get(month);
+      revenueByMonth.add(
+          new ReportPayload.RevenueByMonth(
+              month.toString(),
+              accumulator == null ? "0" : accumulator.revenue.toPlainString(),
+              accumulator == null ? 0 : accumulator.orderCount));
+      month = month.plusMonths(1);
+    }
+    return revenueByMonth;
   }
 
   public List<ReportPayload.IntakeVsSalesByWeek> toIntakeVsSalesByWeek() {

@@ -310,8 +310,12 @@ public class TcgInventoryE2ETest {
     assertThat(totals.get("revenue_to_date")).isNotNull();
     assertThat(totals.get("unpriced_units").asInt()).isGreaterThanOrEqualTo(0);
 
+    // assert - magic breakdown
+    var magicReport = report.get("games").get(0);
+    assertThat(magicReport.get("game").asText()).isEqualTo("mtg");
+
     // assert - top sets
-    var topSets = report.get("top_sets");
+    var topSets = magicReport.get("top_sets");
     assertThat(topSets).isNotNull();
     assertThat(topSets.isArray()).isTrue();
     assertThat(topSets).isNotEmpty();
@@ -322,7 +326,7 @@ public class TcgInventoryE2ETest {
     }
 
     // assert - price buckets (always exactly 6 entries)
-    var priceBuckets = report.get("price_buckets");
+    var priceBuckets = magicReport.get("price_buckets");
     assertThat(priceBuckets).isNotNull();
     assertThat(priceBuckets).hasSize(6);
     for (var bucket : priceBuckets) {
@@ -331,7 +335,7 @@ public class TcgInventoryE2ETest {
     }
 
     // assert - top hits
-    var topHits = report.get("top_hits");
+    var topHits = magicReport.get("top_hits");
     assertThat(topHits).isNotNull();
     assertThat(topHits.isArray()).isTrue();
     assertThat(topHits).isNotEmpty();
@@ -347,7 +351,7 @@ public class TcgInventoryE2ETest {
     }
 
     // assert - aging bands (always exactly 4 entries)
-    var agingBands = report.get("aging_bands");
+    var agingBands = magicReport.get("aging_bands");
     assertThat(agingBands).isNotNull();
     assertThat(agingBands).hasSize(4);
     for (var band : agingBands) {

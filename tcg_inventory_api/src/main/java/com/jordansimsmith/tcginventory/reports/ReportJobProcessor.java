@@ -3,12 +3,16 @@ package com.jordansimsmith.tcginventory.reports;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.BatchResult;
+import com.jordansimsmith.tcginventory.Games;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.time.Clock;
+import java.math.BigDecimal;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -54,26 +58,54 @@ public class ReportJobProcessor {
 
     var now = clock.now();
     var accumulator = new ReportAccumulator(now);
+    var gameAccumulators = new LinkedHashMap<String, ReportAccumulator>();
+    for (var game : Games.all()) {
+      gameAccumulators.put(game.id(), new ReportAccumulator(now));
+    }
+    var skuGames = new HashMap<String, String>();
 
     for (var sku : pageGsi2Skus(user)) {
+      var game = Games.get(sku.getGame());
+      skuGames.put(sku.getSkuId(), game.id());
       var units = inventoryRepository.findUnits(user, sku.getSkuId());
       accumulator.addSku(sku, units);
+      gameAccumulators.get(game.id()).addSku(sku, units);
     }
 
     for (var order : pageOrders(user)) {
       accumulator.addOrder(order);
+      var paid = "to_pick".equals(order.getStatus()) || "fulfilled".equals(order.getStatus());
+      for (var line : order.getLines()) {
+        var game = skuGames.get(line.getSkuId());
+        if (game == null) {
+          throw new IllegalStateException("order line references missing SKU: " + line.getSkuId());
+        }
+        if (paid && line.getPrice() != null) {
+          gameAccumulators.get(game).addRevenue(new BigDecimal(line.getPrice()));
+        }
+      }
     }
 
     try {
       var payload =
           new ReportPayload(
               accumulator.toTotals(),
-              accumulator.toTopSets(),
-              accumulator.toPriceBuckets(),
-              accumulator.toTopHits(),
-              accumulator.toAgingBands(),
               accumulator.toRevenueByMonth(),
-              accumulator.toIntakeVsSalesByWeek());
+              accumulator.toIntakeVsSalesByWeek(),
+              Games.all().stream()
+                  .map(
+                      game -> {
+                        var gameAccumulator = gameAccumulators.get(game.id());
+                        return new ReportPayload.GameReport(
+                            game.id(),
+                            gameAccumulator.uniqueCardNamesCount(),
+                            gameAccumulator.toTotals(),
+                            gameAccumulator.toTopHits(),
+                            gameAccumulator.toTopSets(),
+                            gameAccumulator.toAgingBands(),
+                            gameAccumulator.toPriceBuckets());
+                      })
+                  .toList());
       var reportJson = objectMapper.writeValueAsString(payload);
       var reportItem = ReportItem.create(user, reportJson, asOfAuditUlid, now);
       reportTable.putItem(reportItem);

@@ -384,14 +384,21 @@ export interface ReportTopHit {
   in_stock_units: number;
 }
 
+export interface ReportGame {
+  game: GameId;
+  unique_card_names: number;
+  totals: ReportTotals;
+  top_hits: ReportTopHit[];
+  top_sets: ReportTopSet[];
+  aging_bands: ReportAgingBand[];
+  price_buckets: ReportPriceBucket[];
+}
+
 export interface Report {
-  totals?: ReportTotals;
-  top_sets?: ReportTopSet[];
-  price_buckets?: ReportPriceBucket[];
-  top_hits?: ReportTopHit[];
-  aging_bands?: ReportAgingBand[];
-  revenue_by_month?: ReportRevenueByMonth[];
-  intake_vs_sales_by_week?: ReportIntakeVsSales[];
+  totals: ReportTotals;
+  revenue_by_month: ReportRevenueByMonth[];
+  intake_vs_sales_by_week: ReportIntakeVsSales[];
+  games: ReportGame[];
 }
 
 export interface ReportResponse {

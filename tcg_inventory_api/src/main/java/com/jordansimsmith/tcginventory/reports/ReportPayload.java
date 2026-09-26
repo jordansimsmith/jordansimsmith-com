@@ -1,20 +1,22 @@
 package com.jordansimsmith.tcginventory.reports;
 
-import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
-import javax.annotation.Nullable;
 
-@JsonInclude(JsonInclude.Include.NON_NULL)
 public record ReportPayload(
-    @JsonProperty("totals") @Nullable Totals totals,
-    @JsonProperty("top_sets") @Nullable List<TopSet> topSets,
-    @JsonProperty("price_buckets") @Nullable List<PriceBucket> priceBuckets,
-    @JsonProperty("top_hits") @Nullable List<TopHit> topHits,
-    @JsonProperty("aging_bands") @Nullable List<AgingBand> agingBands,
-    @JsonProperty("revenue_by_month") @Nullable List<RevenueByMonth> revenueByMonth,
-    @JsonProperty("intake_vs_sales_by_week") @Nullable
-        List<IntakeVsSalesByWeek> intakeVsSalesByWeek) {
+    @JsonProperty("totals") Totals totals,
+    @JsonProperty("revenue_by_month") List<RevenueByMonth> revenueByMonth,
+    @JsonProperty("intake_vs_sales_by_week") List<IntakeVsSalesByWeek> intakeVsSalesByWeek,
+    @JsonProperty("games") List<GameReport> games) {
+
+  public record GameReport(
+      @JsonProperty("game") String game,
+      @JsonProperty("unique_card_names") int uniqueCardNames,
+      @JsonProperty("totals") Totals totals,
+      @JsonProperty("top_hits") List<TopHit> topHits,
+      @JsonProperty("top_sets") List<TopSet> topSets,
+      @JsonProperty("aging_bands") List<AgingBand> agingBands,
+      @JsonProperty("price_buckets") List<PriceBucket> priceBuckets) {}
 
   public record Totals(
       @JsonProperty("inventory_value") String inventoryValue,

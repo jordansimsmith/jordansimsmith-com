@@ -8,10 +8,11 @@ import {
   SimpleGrid,
   Skeleton,
   Stack,
+  Tabs,
   Table,
   Text,
 } from '@mantine/core';
-import { BarChart, LineChart } from '@mantine/charts';
+import { LineChart } from '@mantine/charts';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { AppShellLayout } from '../layouts/AppShellLayout';
@@ -20,8 +21,10 @@ import { PageHeader } from '../components/PageHeader';
 import finishClasses from '../components/CardFinishName.module.css';
 import { apiClient } from '../api/client';
 import { finishNameWeight, formatSetNumber } from '../domain/card-label';
+import { GAMES, gameLabel } from '../domain/games';
 import type {
   ReportAgingBand,
+  ReportGame,
   ReportIntakeVsSales,
   ReportPriceBucket,
   ReportResponse,
@@ -30,6 +33,7 @@ import type {
   ReportTopSet,
   ReportTotals,
 } from '../api/client';
+import type { GameId } from '../domain/games';
 import classes from './ReportsPage.module.css';
 
 dayjs.extend(relativeTime);
@@ -48,7 +52,7 @@ const wholeCurrencyFormat = new Intl.NumberFormat('en-NZ', {
   maximumFractionDigits: 0,
 });
 
-const AGING_SHADES = [3, 5, 7, 9];
+const AGING_SHADES = [3, 4, 5, 6];
 
 function formatGeneratedAt(epochSeconds: number): string {
   const now = Math.floor(Date.now() / 1000);
@@ -80,7 +84,7 @@ function FigureTitle({ title, subtitle }: { title: string; subtitle: string }) {
       gap="xs"
       mb="md"
     >
-      <Text size="sm" fw={700}>
+      <Text component="h2" m={0} size="sm" fw={700}>
         {title}
       </Text>
       <Text size="xs" c="dimmed">
@@ -114,13 +118,13 @@ function TotalsStrip({ totals }: { totals: ReportTotals }) {
       <div
         className={classes.overviewGroup}
         role="group"
-        aria-label="Inventory at listed prices"
+        aria-label="In-stock inventory value"
       >
         <Text size="sm" c="dimmed" fw={600}>
-          Inventory at listed prices
+          In-stock inventory value
         </Text>
         <Text className={classes.overviewValue}>
-          {wholeCurrencyFormat.format(parseFloat(totals.inventory_value))}
+          {formatCurrency(totals.inventory_value)}
         </Text>
         <Text size="sm" className={classes.overviewFacts}>
           <span>{totals.in_stock_units.toLocaleString()} in stock</span> ·{' '}
@@ -137,16 +141,16 @@ function TotalsStrip({ totals }: { totals: ReportTotals }) {
       <div
         className={classes.overviewGroup}
         role="group"
-        aria-label="Sales from paid orders"
+        aria-label="Paid order revenue"
       >
         <Text size="sm" c="dimmed" fw={600}>
-          Sales from paid orders
+          Paid order revenue
         </Text>
         <Text className={classes.overviewValue}>
           {formatCurrency(totals.revenue_to_date)}
         </Text>
         <Text size="sm" className={classes.overviewFacts}>
-          {totals.sold_units.toLocaleString()} sold all-time
+          {totals.sold_units.toLocaleString()} units sold to date
         </Text>
       </div>
     </Paper>
@@ -166,19 +170,24 @@ function RevenueByMonthChart({
 
   return (
     <Paper p="md" radius="md" withBorder>
-      <FigureTitle title="Revenue by month" subtitle="NZD · paid orders only" />
+      <FigureTitle
+        title="Monthly revenue"
+        subtitle="Paid orders · NZD, postage excluded"
+      />
       {data.length === 0 ? (
         <Text size="sm" c="dimmed">
           No paid orders yet.
         </Text>
       ) : (
-        <BarChart
-          h={300}
+        <LineChart
+          h={280}
           data={data}
           dataKey="month"
-          series={[{ name: 'revenue', label: 'Revenue', color: 'teal.6' }]}
+          series={[{ name: 'revenue', label: 'Revenue', color: 'blue.6' }]}
           gridAxis="y"
           tickLine="y"
+          curveType="monotone"
+          strokeWidth={2}
           valueFormatter={(v) => wholeCurrencyFormat.format(v)}
           tooltipProps={{
             content: ({ payload }) => {
@@ -215,10 +224,13 @@ function IntakeVsSalesChart({
 
   return (
     <Paper p="md" radius="md" withBorder>
-      <FigureTitle title="Intake vs sales" subtitle="units per week" />
+      <FigureTitle
+        title="Weekly card movement"
+        subtitle="Cards added and sold"
+      />
       {data.length === 0 ? (
         <Text size="sm" c="dimmed">
-          No weekly activity yet.
+          No card movement yet.
         </Text>
       ) : (
         <LineChart
@@ -242,10 +254,13 @@ function IntakeVsSalesChart({
 function TopHitsTable({ topHits }: { topHits: ReportTopHit[] }) {
   return (
     <Paper p="md" radius="md" withBorder>
-      <FigureTitle title="Top hits" subtitle="in-stock cards by unit price" />
+      <FigureTitle
+        title="Highest-value cards"
+        subtitle="In stock · sorted by unit price"
+      />
       {topHits.length === 0 ? (
         <Text size="sm" c="dimmed">
-          No in-stock hits yet.
+          No priced cards in stock.
         </Text>
       ) : (
         <Table
@@ -257,12 +272,12 @@ function TopHitsTable({ topHits }: { topHits: ReportTopHit[] }) {
         >
           <Table.Thead>
             <Table.Tr>
-              <Table.Th>#</Table.Th>
+              <Table.Th>Rank</Table.Th>
               <Table.Th>Name</Table.Th>
-              <Table.Th>Set</Table.Th>
+              <Table.Th>Set / no.</Table.Th>
               <Table.Th>Finish</Table.Th>
               <Table.Th>Condition</Table.Th>
-              <Table.Th ta="right">Price</Table.Th>
+              <Table.Th ta="right">Unit price</Table.Th>
             </Table.Tr>
           </Table.Thead>
           <Table.Tbody>
@@ -278,7 +293,7 @@ function TopHitsTable({ topHits }: { topHits: ReportTopHit[] }) {
                 >
                   {hit.name}
                 </Table.Td>
-                <Table.Td data-field="set" data-label="Set">
+                <Table.Td data-field="set" data-label="Set / no.">
                   {formatSetNumber(hit.set_code, hit.collector_number)}
                 </Table.Td>
                 <Table.Td
@@ -293,6 +308,7 @@ function TopHitsTable({ topHits }: { topHits: ReportTopHit[] }) {
                 </Table.Td>
                 <Table.Td
                   data-field="price"
+                  data-label="Unit price"
                   ta="right"
                   style={{ fontVariantNumeric: 'tabular-nums' }}
                 >
@@ -309,35 +325,25 @@ function TopHitsTable({ topHits }: { topHits: ReportTopHit[] }) {
 
 function StockAgingFigure({ agingBands }: { agingBands: ReportAgingBand[] }) {
   const total = agingBands.reduce((sum, band) => sum + band.in_stock_units, 0);
-  const oldest = agingBands[agingBands.length - 1];
 
   return (
     <Paper p="md" radius="md" withBorder className={classes.agingPanel}>
-      <FigureTitle
-        title="Stock aging"
-        subtitle="in-stock units by days since intake"
-      />
+      <FigureTitle title="Time in stock" subtitle="Days since intake" />
       {total === 0 ? (
         <Text size="sm" c="dimmed">
-          No in-stock units.
+          No cards in stock.
         </Text>
       ) : (
         <Stack gap="sm" className={classes.agingContent}>
-          <Group justify="space-between">
-            <Text size="sm" c="dimmed">
-              {total.toLocaleString()} units
-            </Text>
-            <Text size="sm" fw={600} c="dimmed">
-              {oldest.label}:{' '}
-              {Math.round((oldest.in_stock_units / total) * 100)}% of stock
-            </Text>
-          </Group>
-          <Progress.Root size={18} radius="sm">
+          <Text size="sm" c="dimmed">
+            {total.toLocaleString()} in-stock units
+          </Text>
+          <Progress.Root size={8} radius="xl">
             {agingBands.map((band, index) => (
               <Progress.Section
                 key={band.label}
                 value={(band.in_stock_units / total) * 100}
-                color={`blue.${AGING_SHADES[index] ?? 9}`}
+                color={`gray.${AGING_SHADES[index] ?? 6}`}
               />
             ))}
           </Progress.Root>
@@ -346,8 +352,8 @@ function StockAgingFigure({ agingBands }: { agingBands: ReportAgingBand[] }) {
               <div className={classes.agingRow} key={band.label}>
                 <Group gap="xs" wrap="nowrap">
                   <ColorSwatch
-                    size={10}
-                    color={`var(--mantine-color-blue-${AGING_SHADES[index] ?? 9})`}
+                    size={8}
+                    color={`var(--mantine-color-gray-${AGING_SHADES[index] ?? 6})`}
                   />
                   <Text size="sm">{band.label}</Text>
                 </Group>
@@ -364,47 +370,41 @@ function StockAgingFigure({ agingBands }: { agingBands: ReportAgingBand[] }) {
   );
 }
 
-function TopSetsChart({ topSets }: { topSets: ReportTopSet[] }) {
-  const data = topSets.map((s) => ({
-    code: s.set_code.toUpperCase(),
-    set_name: s.set_name,
-    in_stock_units: s.in_stock_units,
-  }));
-
+function TopSetsList({ topSets }: { topSets: ReportTopSet[] }) {
   return (
     <Paper p="md" radius="md" withBorder>
-      <FigureTitle title="Top sets" subtitle="in-stock units" />
-      {data.length === 0 ? (
+      <FigureTitle
+        title="Largest sets in stock"
+        subtitle="Ranked by card count"
+      />
+      {topSets.length === 0 ? (
         <Text size="sm" c="dimmed">
-          No sets in stock.
+          No sets with cards in stock.
         </Text>
       ) : (
-        <BarChart
-          h={300}
-          data={data}
-          dataKey="code"
-          series={[
-            { name: 'in_stock_units', label: 'In stock', color: 'blue.6' },
-          ]}
-          orientation="vertical"
-          gridAxis="x"
-          tickLine="x"
-          yAxisProps={{ width: 52 }}
-          tooltipProps={{
-            content: ({ payload }) => {
-              const datum = payload?.[0]?.payload as
-                | (typeof data)[number]
-                | undefined;
-              if (!datum) return null;
-              return (
-                <ChartTooltip
-                  title={datum.set_name}
-                  detail={`${datum.in_stock_units.toLocaleString()} in stock`}
-                />
-              );
-            },
-          }}
-        />
+        <ol
+          className={classes.topSetsList}
+          aria-label="Sets ranked by in-stock card count"
+        >
+          {topSets.map((set, index) => (
+            <li className={classes.topSetRow} key={set.set_code}>
+              <Text size="xs" c="dimmed" className={classes.topSetRank}>
+                {index + 1}
+              </Text>
+              <div className={classes.topSetIdentity}>
+                <Text size="sm" fw={500}>
+                  {set.set_name}
+                </Text>
+                <Text size="xs" c="dimmed" tt="uppercase">
+                  {set.set_code}
+                </Text>
+              </div>
+              <Text size="sm" className={classes.topSetCount}>
+                {set.in_stock_units.toLocaleString()}
+              </Text>
+            </li>
+          ))}
+        </ol>
       )}
     </Paper>
   );
@@ -415,55 +415,122 @@ function PriceBucketsChart({
 }: {
   priceBuckets: ReportPriceBucket[];
 }) {
-  const data = priceBuckets.map((b) => ({
-    label: b.label,
-    in_stock_units: b.in_stock_units,
-  }));
+  const highestCount = Math.max(
+    ...priceBuckets.map((bucket) => bucket.in_stock_units),
+    0,
+  );
 
   return (
     <Paper p="md" radius="md" withBorder>
       <FigureTitle
-        title="Price distribution"
-        subtitle="in-stock units by listing price"
+        title="Stock by price"
+        subtitle="In-stock units · unit price in NZD"
       />
-      {data.length === 0 ? (
+      {highestCount === 0 ? (
         <Text size="sm" c="dimmed">
-          No priced units in stock.
+          No in-stock cards have a price.
         </Text>
       ) : (
-        <BarChart
-          h={270}
-          data={data}
-          dataKey="label"
-          series={[
-            { name: 'in_stock_units', label: 'In stock', color: 'blue.6' },
-          ]}
-          orientation="vertical"
-          gridAxis="x"
-          tickLine="x"
-          yAxisProps={{ width: 96 }}
-          tooltipProps={{
-            content: ({ payload }) => {
-              const datum = payload?.[0]?.payload as
-                | (typeof data)[number]
-                | undefined;
-              if (!datum) return null;
-              return (
-                <ChartTooltip
-                  title={datum.label}
-                  detail={`${datum.in_stock_units.toLocaleString()} in stock`}
+        <Stack gap="sm" className={classes.distributionList}>
+          {priceBuckets.map((bucket) => (
+            <div className={classes.distributionRow} key={bucket.label}>
+              <Text size="sm">{bucket.label}</Text>
+              <div className={classes.distributionTrack} aria-hidden="true">
+                <div
+                  className={classes.distributionFill}
+                  style={{
+                    width: `${(bucket.in_stock_units / highestCount) * 100}%`,
+                  }}
                 />
-              );
-            },
-          }}
-        />
+              </div>
+              <Text size="sm" className={classes.distributionCount}>
+                {bucket.in_stock_units.toLocaleString()}
+              </Text>
+            </div>
+          ))}
+        </Stack>
       )}
     </Paper>
   );
 }
 
+function GameSummary({ gameReport }: { gameReport: ReportGame }) {
+  const { totals } = gameReport;
+
+  return (
+    <Paper
+      component="section"
+      aria-label={`${gameLabel(gameReport.game)} inventory summary`}
+      withBorder
+      radius="md"
+      p={0}
+      className={classes.gameSummary}
+    >
+      <div
+        className={classes.gameSummaryGroup}
+        role="group"
+        aria-label="Inventory value"
+      >
+        <Text size="sm" c="dimmed" fw={600}>
+          Inventory value
+        </Text>
+        <Text className={classes.gameSummaryValue}>
+          {formatCurrency(totals.inventory_value)}
+        </Text>
+      </div>
+      <div
+        className={classes.gameSummaryGroup}
+        role="group"
+        aria-label="Unique card names"
+      >
+        <Text size="sm" c="dimmed" fw={600}>
+          Unique card names
+        </Text>
+        <Text className={classes.gameSummaryValue}>
+          {gameReport.unique_card_names.toLocaleString()}
+        </Text>
+        <Text size="xs" c="dimmed" className={classes.gameSummarySecondary}>
+          {totals.in_stock_units.toLocaleString()} units in stock
+        </Text>
+      </div>
+      <div
+        className={classes.gameSummaryGroup}
+        role="group"
+        aria-label="Paid revenue"
+      >
+        <Text size="sm" c="dimmed" fw={600}>
+          Paid revenue
+        </Text>
+        <Text className={classes.gameSummaryValue}>
+          {formatCurrency(totals.revenue_to_date)}
+        </Text>
+        <Text size="xs" c="dimmed" className={classes.gameSummarySecondary}>
+          {totals.sold_units.toLocaleString()} units sold
+        </Text>
+      </div>
+    </Paper>
+  );
+}
+
+function GameBreakdown({ gameReport }: { gameReport: ReportGame }) {
+  return (
+    <Stack gap="md" aria-label={`${gameLabel(gameReport.game)} report`}>
+      <GameSummary gameReport={gameReport} />
+      <SimpleGrid cols={{ base: 1, xl: 2 }} spacing="md">
+        <TopHitsTable topHits={gameReport.top_hits} />
+        <TopSetsList topSets={gameReport.top_sets} />
+      </SimpleGrid>
+      <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
+        <StockAgingFigure agingBands={gameReport.aging_bands} />
+        <PriceBucketsChart priceBuckets={gameReport.price_buckets} />
+      </SimpleGrid>
+    </Stack>
+  );
+}
+
 export function ReportsPage() {
   const [report, setReport] = useState<ReportResponse | null>(null);
+  const [activeGame, setActiveGame] = useState<GameId>(GAMES[0].id);
   const [firstVisit, setFirstVisit] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [pollEpoch, setPollEpoch] = useState(0);
@@ -540,7 +607,7 @@ export function ReportsPage() {
           description={
             report
               ? `Data as of ${formatGeneratedAt(report.generated_at)}`
-              : 'Inventory value, movement, and stock composition.'
+              : 'Inventory value, sales, and the cards currently in stock.'
           }
           actions={
             refreshing && (
@@ -584,35 +651,53 @@ export function ReportsPage() {
           </Stack>
         )}
 
-        {!firstVisit && report?.report?.totals && (
+        {!firstVisit && report?.report.totals && (
           <>
             <TotalsStrip totals={report.report.totals} />
 
             <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
               <IntakeVsSalesChart
-                intakeVsSales={report.report.intake_vs_sales_by_week ?? []}
+                intakeVsSales={report.report.intake_vs_sales_by_week}
               />
               <RevenueByMonthChart
-                revenueByMonth={report.report.revenue_by_month ?? []}
+                revenueByMonth={report.report.revenue_by_month}
               />
             </SimpleGrid>
 
-            <SimpleGrid cols={{ base: 1, xl: 2 }} spacing="md">
-              <TopHitsTable topHits={report.report.top_hits ?? []} />
-              <StockAgingFigure agingBands={report.report.aging_bands ?? []} />
-            </SimpleGrid>
-
-            <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
-              <TopSetsChart topSets={report.report.top_sets ?? []} />
-              <PriceBucketsChart
-                priceBuckets={report.report.price_buckets ?? []}
-              />
-            </SimpleGrid>
+            <Tabs
+              className={classes.gameTabs}
+              value={activeGame}
+              onChange={(value) => {
+                if (value) {
+                  setActiveGame(value as GameId);
+                }
+              }}
+            >
+              <Tabs.List
+                className={classes.gameTabsList}
+                aria-label="Report game"
+              >
+                {GAMES.map((game) => (
+                  <Tabs.Tab key={game.id} value={game.id}>
+                    {game.label}
+                  </Tabs.Tab>
+                ))}
+              </Tabs.List>
+              {GAMES.map((game) => {
+                const gameReport = report.report.games.find(
+                  (entry) => entry.game === game.id,
+                );
+                if (!gameReport) {
+                  throw new Error(`Report is missing ${game.id} breakdown`);
+                }
+                return (
+                  <Tabs.Panel key={game.id} value={game.id} pt="md">
+                    <GameBreakdown gameReport={gameReport} />
+                  </Tabs.Panel>
+                );
+              })}
+            </Tabs>
           </>
-        )}
-
-        {!firstVisit && report && !report.report?.totals && (
-          <Text c="dimmed">No report data yet.</Text>
         )}
       </Stack>
     </AppShellLayout>
