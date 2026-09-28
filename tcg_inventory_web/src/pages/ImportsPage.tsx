@@ -24,7 +24,7 @@ export function ImportsPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [game, setGame] = useState<GameId | null>(null);
+  const [game, setGame] = useState<GameId | null>(GAMES[0].id);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
   const canUpload = game === MAGIC_THE_GATHERING.id;

@@ -128,9 +128,9 @@ export function ScanPage() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [game, setGame] = useState<GameId | null>(null);
+  const [game, setGame] = useState<GameId | null>(GAMES[0].id);
   const [condition, setCondition] = useState<Condition>('NM');
-  const [finish, setFinish] = useState<Finish | null>(null);
+  const [finish, setFinish] = useState<Finish | null>(GAMES[0].finishes[0]);
   const [files, setFiles] = useState<File[]>([]);
   const [creating, setCreating] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
