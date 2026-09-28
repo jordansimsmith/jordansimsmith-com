@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.jsoup.Jsoup;
@@ -33,9 +34,10 @@ public class JsoupTradeMeClient implements TradeMeClient {
       String searchTerm,
       @Nullable Double minPrice,
       @Nullable Double maxPrice,
-      SearchFactory.Condition condition) {
+      SearchFactory.Condition condition,
+      Predicate<String> shouldFetchItem) {
     try {
-      return doSearchItems(baseUrl, searchTerm, minPrice, maxPrice, condition);
+      return doSearchItems(baseUrl, searchTerm, minPrice, maxPrice, condition, shouldFetchItem);
     } catch (Exception e) {
       throw new RuntimeException("Failed to search items", e);
     }
@@ -46,7 +48,8 @@ public class JsoupTradeMeClient implements TradeMeClient {
       String searchTerm,
       @Nullable Double minPrice,
       @Nullable Double maxPrice,
-      SearchFactory.Condition condition)
+      SearchFactory.Condition condition,
+      Predicate<String> shouldFetchItem)
       throws Exception {
     var searchUrl = buildSearchUrl(baseUrl, searchTerm, minPrice, maxPrice, condition);
     LOGGER.info("Searching {}", searchUrl);
@@ -62,9 +65,12 @@ public class JsoupTradeMeClient implements TradeMeClient {
               + " Consider narrowing search criteria to fit results on one page.");
     }
 
-    // fetch details for each item
     var items = new ArrayList<TradeMeItem>();
     for (var itemUrl : itemUrls) {
+      if (!shouldFetchItem.test(stripQueryParams(itemUrl))) {
+        continue;
+      }
+
       Document itemPage;
       try {
         itemPage = fetchDocument(itemUrl);

@@ -425,7 +425,7 @@ public class SendDigestJobProcessorIntegrationTest {
   @Test
   void processShouldRetainScheduledWindowAcrossDstBoundary() {
     // arrange
-    var scheduledAt = Instant.parse("2026-04-05T09:05:00Z");
+    var scheduledAt = Instant.parse("2026-04-05T08:55:00Z");
     var baseUrl = "https://www.trademe.co.nz/search";
     var expectedSearchUrl =
         "https://www.trademe.co.nz/search?search_string=wedge&condition=used&sort_order=expirydesc";
@@ -478,7 +478,7 @@ public class SendDigestJobProcessorIntegrationTest {
   @Test
   void processShouldPropagateSnsFailureForRetry() {
     // arrange
-    var scheduledAt = Instant.parse("2026-09-25T09:05:00Z");
+    var scheduledAt = Instant.parse("2026-09-25T08:55:00Z");
     var baseUrl = "https://www.trademe.co.nz/search";
     var expectedSearchUrl =
         "https://www.trademe.co.nz/search?search_string=wedge&condition=used&sort_order=expirydesc";

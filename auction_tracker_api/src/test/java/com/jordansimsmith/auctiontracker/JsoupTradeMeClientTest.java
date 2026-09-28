@@ -286,7 +286,8 @@ public class JsoupTradeMeClientTest {
 
     // act
     var items =
-        client.searchItems(baseUrl, searchTerm, minPrice, maxPrice, SearchFactory.Condition.ALL);
+        client.searchItems(
+            baseUrl, searchTerm, minPrice, maxPrice, SearchFactory.Condition.ALL, url -> true);
 
     // assert
     assertThat(items).hasSize(2);
@@ -373,7 +374,8 @@ public class JsoupTradeMeClientTest {
 
     // act
     var items =
-        client.searchItems(baseUrl, searchTerm, minPrice, maxPrice, SearchFactory.Condition.ALL);
+        client.searchItems(
+            baseUrl, searchTerm, minPrice, maxPrice, SearchFactory.Condition.ALL, url -> true);
 
     // assert
     assertThat(items).hasSize(2);
@@ -401,6 +403,43 @@ public class JsoupTradeMeClientTest {
   }
 
   @Test
+  void searchItemsShouldSkipKnownListingBeforeFetchingDetails() {
+    // arrange
+    var searchClient =
+        new JsoupTradeMeClient(new ObjectMapper()) {
+          @Override
+          protected Document fetchDocument(String url) {
+            if (url.equals(BASE_URL + "?search_string=query+param+test&sort_order=expirydesc")) {
+              return Jsoup.parse(SEARCH_HTML_WITH_QUERY_PARAMS, BASE_URL);
+            }
+            if (url.endsWith("/listing/5337003624?rsqid=xyz789-uvw012&ref=search")) {
+              return Jsoup.parse(ITEM4_HTML);
+            }
+            throw new AssertionError("Unexpected listing fetch: " + url);
+          }
+        };
+
+    // act
+    var items =
+        searchClient.searchItems(
+            URI.create(BASE_URL),
+            "query param test",
+            null,
+            null,
+            SearchFactory.Condition.ALL,
+            url -> {
+              assertThat(url).doesNotContain("?");
+              return !url.endsWith("/listing/5337003623");
+            });
+
+    // assert
+    assertThat(items)
+        .singleElement()
+        .extracting(TradeMeClient.TradeMeItem::title)
+        .isEqualTo("Ping Glide Wedge 60* Black Dot");
+  }
+
+  @Test
   void searchItemsShouldFilterOutListingsWithUnmetReserves() {
     // arrange
     var baseUrl = URI.create(BASE_URL);
@@ -410,7 +449,8 @@ public class JsoupTradeMeClientTest {
 
     // act
     var items =
-        client.searchItems(baseUrl, searchTerm, minPrice, maxPrice, SearchFactory.Condition.ALL);
+        client.searchItems(
+            baseUrl, searchTerm, minPrice, maxPrice, SearchFactory.Condition.ALL, url -> true);
 
     // assert
     assertThat(items).hasSize(1);
@@ -438,7 +478,7 @@ public class JsoupTradeMeClientTest {
     assertThatThrownBy(
             () ->
                 client.searchItems(
-                    baseUrl, "missing price", null, null, SearchFactory.Condition.ALL))
+                    baseUrl, "missing price", null, null, SearchFactory.Condition.ALL, url -> true))
         .isInstanceOf(RuntimeException.class)
         .hasMessage("Failed to search items")
         .hasRootCauseMessage(
@@ -455,7 +495,12 @@ public class JsoupTradeMeClientTest {
     assertThatThrownBy(
             () ->
                 client.searchItems(
-                    baseUrl, "malformed price", null, null, SearchFactory.Condition.ALL))
+                    baseUrl,
+                    "malformed price",
+                    null,
+                    null,
+                    SearchFactory.Condition.ALL,
+                    url -> true))
         .isInstanceOf(RuntimeException.class)
         .hasMessage("Failed to search items")
         .hasRootCauseMessage(
@@ -472,7 +517,12 @@ public class JsoupTradeMeClientTest {
     assertThatThrownBy(
             () ->
                 client.searchItems(
-                    baseUrl, "missing seller", null, null, SearchFactory.Condition.ALL))
+                    baseUrl,
+                    "missing seller",
+                    null,
+                    null,
+                    SearchFactory.Condition.ALL,
+                    url -> true))
         .isInstanceOf(RuntimeException.class)
         .hasMessage("Failed to search items")
         .hasRootCauseMessage(

@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 import javax.annotation.Nullable;
 
 public class FakeTradeMeClient implements TradeMeClient {
@@ -18,9 +19,12 @@ public class FakeTradeMeClient implements TradeMeClient {
       String searchTerm,
       @Nullable Double minPrice,
       @Nullable Double maxPrice,
-      SearchFactory.Condition condition) {
+      SearchFactory.Condition condition,
+      Predicate<String> shouldFetchItem) {
     var fullSearchUrl = buildSearchUrl(baseUrl, searchTerm, minPrice, maxPrice, condition);
-    return searchResponses.getOrDefault(fullSearchUrl, List.of());
+    return searchResponses.getOrDefault(fullSearchUrl, List.of()).stream()
+        .filter(item -> shouldFetchItem.test(item.url()))
+        .toList();
   }
 
   @Override

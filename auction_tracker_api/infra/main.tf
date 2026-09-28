@@ -60,9 +60,10 @@ module "java_lambda" {
 
   lambdas = {
     jobs_handler = {
-      handler  = "com.jordansimsmith.auctiontracker.JobsHandler"
-      artifact = var.artifacts["jobs_handler"]
-      timeout  = 300
+      handler     = "com.jordansimsmith.auctiontracker.JobsHandler"
+      artifact    = var.artifacts["jobs_handler"]
+      memory_size = 1024
+      timeout     = 300
     }
   }
 
@@ -332,7 +333,7 @@ resource "aws_scheduler_schedule" "update_search" {
   for_each                     = local.search_ids
   name                         = "${local.application_id}_update_${each.key}"
   description                  = "Queues the ${each.value} auction search"
-  schedule_expression          = "cron(0/15 * * * ? *)"
+  schedule_expression          = "cron(0 * * * ? *)"
   schedule_expression_timezone = "Pacific/Auckland"
   depends_on                   = [aws_iam_role_policy_attachment.jobs_scheduler_sqs]
 
@@ -362,7 +363,7 @@ resource "aws_scheduler_schedule" "update_search" {
 resource "aws_scheduler_schedule" "send_digest" {
   name                         = "${local.application_id}_send_digest"
   description                  = "Queues the daily auction digest"
-  schedule_expression          = "cron(5 21 * * ? *)"
+  schedule_expression          = "cron(55 20 * * ? *)"
   schedule_expression_timezone = "Pacific/Auckland"
   depends_on                   = [aws_iam_role_policy_attachment.jobs_scheduler_sqs]
 

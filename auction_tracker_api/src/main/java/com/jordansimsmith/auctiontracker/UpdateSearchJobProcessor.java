@@ -49,15 +49,16 @@ public class UpdateSearchJobProcessor {
 
     var search = searchFactory.getSearch(searchId);
     var excludedSellerUsernames = excludedSellerUsernameFactory.findExcludedSellerUsernames();
+    var searchUrl = tradeMeClient.getSearchUrl(search).toString();
     var tradeMeItems =
         tradeMeClient.searchItems(
             search.baseUrl(),
             search.searchTerm(),
             search.minPrice(),
             search.maxPrice(),
-            search.condition());
+            search.condition(),
+            itemUrl -> !itemExists(searchUrl, itemUrl));
 
-    var searchUrl = tradeMeClient.getSearchUrl(search).toString();
     var currentTime = clock.now();
 
     for (var tradeMeItem : tradeMeItems) {
@@ -67,10 +68,6 @@ public class UpdateSearchJobProcessor {
             "Skipping listing from excluded seller {}: {}",
             tradeMeItem.sellerUsername(),
             tradeMeItem.url());
-        continue;
-      }
-
-      if (itemExists(searchUrl, tradeMeItem.url())) {
         continue;
       }
 

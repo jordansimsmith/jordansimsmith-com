@@ -26,17 +26,17 @@ The auction tracker API service runs scheduled queued workflows that scrape Trad
 
 ### In scope
 
-- Queue one `update_search` job per configured Trade Me search every 15 minutes. Each job invokes the worker for exactly one search.
+- Queue one `update_search` job per configured Trade Me search every hour. Each job invokes the worker for exactly one search.
 - Identify the seventeen code-defined searches with stable IDs: `ram-g-skill`, `ram-gskill`, `ram-trident-z`, the seven MTG IDs (`mtg-bulk`, `mtg-collection`, `mtg-assorted`, `mtg-clear-out`, `mtg-clearout`, `mtg-lot`, `mtg-one-dollar-reserve`), and the seven Pokémon IDs (`pokemon-bulk`, `pokemon-collection`, `pokemon-assorted`, `pokemon-clear-out`, `pokemon-clearout`, `pokemon-lot`, `pokemon-one-dollar-reserve`).
 - Build search URLs with term, optional price filters, condition filter, and `sort_order=expirydesc`.
 - Fetch listing pages, normalize listing URLs, extract original start and Buy Now prices from the embedded Trade Me page state, exclude current bids from relist identity, and skip listings marked as reserve not met.
-- Extract seller usernames from embedded Trade Me page state and skip listings from the injected code-defined exclusion set, initially `roseshade`, before duplicate checks, judging, or persistence.
+- Extract seller usernames from embedded Trade Me page state and skip listings from the injected code-defined exclusion set, initially `roseshade`, after URL duplicate checks and before fingerprint checks, judging, or persistence.
 - Judge new listings on searches with a configured judge (all seventeen searches: seven MTG searches, seven Pokémon searches, and three RAM searches) using an OpenAI LLM against the judge's configured binary criteria, and persist the overall verdict.
 - Carry judge configuration (prompt resource, model, reasoning effort, criteria) per search: the seven MTG searches share one config, the seven Pokémon searches share one config, and the three RAM searches share one config.
 - Store newly discovered items in DynamoDB with deterministic key prefixes and 30-day TTL.
 - Prevent duplicate inserts for the same `(search_url, item_url)` pair using GSI `gsi1`.
 - Suppress relists globally before judging when GSI `gsi2` contains the same exact title, description, start price, and Buy Now price SHA-256 fingerprint.
-- Queue one `send_digest` job daily at 9:05pm `Pacific/Auckland`. The worker publishes a digest for the preceding local daily window, excluding listings judged `fail`.
+- Queue one `send_digest` job daily at 8:55pm `Pacific/Auckland`, before the 9:00pm search run. The worker publishes a digest for the preceding local daily window, excluding listings judged `fail`.
 - Deduplicate digest entries by price-aware content fingerprint, falling back to listing URL for records created before content fingerprinting.
 - Retry failed worker messages through the FIFO queue and route messages that fail five receives to the passive worker DLQ. The DLQ is inspected and redriven by a human after the cause is fixed.
 - Accept at-least-once processing: duplicate deliveries can repeat scraping, judging, DynamoDB writes, or SNS publication. Existing GSI and digest deduplication limits user-visible duplicates.
@@ -58,8 +58,8 @@ The auction tracker API service runs scheduled queued workflows that scrape Trad
 
 ```mermaid
 flowchart TD
-  updateSchedules[EventBridge Scheduler: seventeen 15-minute schedules] --> jobsQueue[SQS FIFO auction_tracker_jobs.fifo]
-  digestSchedule[EventBridge Scheduler: 9:05pm Pacific/Auckland] --> jobsQueue
+  updateSchedules[EventBridge Scheduler: seventeen hourly schedules] --> jobsQueue[SQS FIFO auction_tracker_jobs.fifo]
+  digestSchedule[EventBridge Scheduler: 8:55pm Pacific/Auckland] --> jobsQueue
   jobsQueue --> jobsHandler[JobsHandler Lambda: batch size 1]
   jobsHandler --> searchProcessor[UpdateSearchJobProcessor]
   jobsHandler --> digestProcessor[SendDigestJobProcessor]
@@ -92,9 +92,10 @@ sequenceDiagram
   UpdateSchedule->>JobsQueue: enqueue one update_search per search
   JobsQueue->>JobsHandler: deliver one FIFO message
   JobsHandler->>SearchProcessor: resolve and process search ID
-  SearchProcessor->>TradeMe: fetch one search page and listing pages
+  SearchProcessor->>TradeMe: fetch one search page
+  SearchProcessor->>DynamoDB: query gsi1 for each canonical listing URL
+  SearchProcessor->>TradeMe: fetch only new listing pages
   SearchProcessor->>SearchProcessor: skip configured seller usernames
-  SearchProcessor->>DynamoDB: query gsi1 for URL duplicate check
   SearchProcessor->>SearchProcessor: hash title, description, start price, and Buy Now price
   SearchProcessor->>DynamoDB: query gsi2 for global relist fingerprint
   alt URL and fingerprint are new
@@ -104,7 +105,7 @@ sequenceDiagram
     end
     SearchProcessor->>DynamoDB: put new SEARCH/TIMESTAMP item record with judgment and fingerprint
   end
-  UpdateSchedule->>JobsQueue: enqueue send_digest at 9:05pm with scheduled_at
+  UpdateSchedule->>JobsQueue: enqueue send_digest at 8:55pm with scheduled_at
   JobsQueue->>JobsHandler: deliver digest after earlier FIFO messages
   JobsHandler->>DigestProcessor: process scheduled digest window
   DigestProcessor->>DynamoDB: query each search partition for the prior local daily window
@@ -116,7 +117,7 @@ sequenceDiagram
 
 ## Main technical decisions
 
-- Use seventeen EventBridge Scheduler schedules to enqueue one message per search into a single FIFO queue. Use a second Scheduler schedule for the digest message.
+- Use seventeen hourly EventBridge Scheduler schedules to enqueue one message per search into a single FIFO queue. Use a second Scheduler schedule for the digest message.
 - Use one constant FIFO message group (`auction-tracker`) and Lambda event-source batch size one to serialize upstream load and keep each invocation scoped to one job.
 - Keep `JobsHandler` limited to SQS message parsing and dispatch; `UpdateSearchJobProcessor` owns one-search scraping and persistence, while `SendDigestJobProcessor` owns digest selection and SNS publication.
 - Use content-based deduplication, a 14-day retention period, a 1,800-second visibility timeout, and a five-receive redrive policy to one FIFO worker DLQ. Do not add claim records, transactions, a message ledger, or a Scheduler DLQ.
@@ -126,7 +127,7 @@ sequenceDiagram
 - Keep table and topic names code-defined (`auction_tracker`, `auction_tracker_api_digest`) to reduce configuration complexity.
 - Keep search definitions in code (`SearchFactoryImpl`) for deterministic behavior and easy testability.
 - Inject excluded seller usernames through `ExcludedSellerUsernameFactory`; keep the production set in `ExcludedSellerUsernameFactoryImpl` and use a fake in integration tests.
-- Run the digest at 9:05pm New Zealand local time using `cron(5 21 * * ? *)` with the `Pacific/Auckland` schedule timezone. Use the message's `scheduled_at` as the upper boundary and the preceding local 9:05pm boundary as the lower boundary, including across daylight-saving transitions.
+- Run the digest at 8:55pm New Zealand local time using `cron(55 20 * * ? *)` with the `Pacific/Auckland` schedule timezone. Use the message's `scheduled_at` as the upper boundary and the preceding local 8:55pm boundary as the lower boundary, including across daylight-saving transitions.
 - Use browser-like headers and cookies in scrape requests to improve compatibility with Trade Me page delivery.
 - Judge listings at scrape time (the only moment descriptions exist in memory) and persist the verdict, so matching fingerprinted relists are skipped before judging and the digest filters purely from storage.
 - Define relist identity through the injected `ListingFingerprinter`; `Sha256ListingFingerprinter` hashes the exact scraped title, description, normalized original start price, and normalized Buy Now price separated by null characters. Current bids are excluded because they are bidder-driven rather than seller-set; any content or seller-price change produces a new fingerprint.
@@ -157,7 +158,7 @@ sequenceDiagram
 - **Judgment**: the LLM verdict for a listing, `pass` or `fail`; overall pass requires all configured criteria to pass. MTG uses `mtg_cards`, `bulk_scale`, `not_basic_lands`, and `fixed_collection`; Pokémon uses `pokemon_cards`, `bulk_scale`, `accepted_language`, `not_basic_energy`, `not_mega_evolution_era`, `acceptable_condition`, and `fixed_collection`; RAM uses `trident_z_family`, `ddr4`, `kit_2x16gb`, `speed_3200`, `timings_cl16`, and `desktop_udimm`. MTG set origin and crossover branding, including Universes Within and Universes Beyond, do not affect eligibility. Pokémon border color is ignored, and ambiguous language, quantity, era share, and condition default to pass unless positive text proves failure.
 - **Search ID**: stable code-defined identifier carried by an `update_search` job (for example `mtg-bulk` or `ram-g-skill`).
 - **Worker job**: one `update_search` or `send_digest` message delivered from the FIFO queue to `JobsHandler`.
-- **Digest window**: interval from the preceding local 9:05pm `Pacific/Auckland` boundary (exclusive) through the job's `scheduled_at` upper boundary (inclusive).
+- **Digest window**: interval from the preceding local 8:55pm `Pacific/Auckland` boundary (exclusive) through the job's `scheduled_at` upper boundary (inclusive).
 - **Cross-search duplicate**: the same listing URL or price-aware content fingerprint appearing in multiple search definitions.
 
 ## Integration contracts
@@ -167,8 +168,8 @@ sequenceDiagram
 - **Trade Me website**: outbound `GET` requests to search and listing pages derived from configured searches. The base origin defaults to `https://www.trademe.co.nz` and can be overridden with `AUCTION_TRACKER_TRADEME_BASE_URL` (used in E2E tests). Requests include browser-like headers/cookies and a 30-second timeout. Individual item-page fetch failures are logged and skipped; missing or malformed required title, description, seller username, or seller-price data and unrecoverable search errors fail the invocation. Seller usernames are read from `item.member.nickname`.
 - **Amazon DynamoDB**: outbound reads/writes against table `auction_tracker`. Update flow performs per-search URL checks, global content-fingerprint checks, and inserts; digest flow queries per-search partitions for recent items.
 - **Amazon SNS**: outbound publish to topic `auction_tracker_api_digest` when at least one new item exists in the digest window. Topic ARN is resolved by listing topics and matching by topic-name suffix.
-- **Amazon SQS**: FIFO queue `auction_tracker_jobs.fifo` receives one message per configured search every 15 minutes and one digest message at 9:05pm. Content-based deduplication is enabled, all messages use group `auction-tracker`, retention is 14 days, and the worker event source uses batch size one. Failed messages are retried and routed after five receives to FIFO DLQ `auction_tracker_jobs_dlq.fifo`, which also retains messages for 14 days.
-- **Amazon EventBridge Scheduler**: seventeen schedules enqueue `update_search` jobs with `cron(0/15 * * * ? *)`; one schedule enqueues `send_digest` with `cron(5 21 * * ? *)`, all in the `Pacific/Auckland` timezone. Each schedule uses the universal SQS `sendMessage` target with the FIFO queue URL, one constant message group, and a JSON `MessageBody` containing `<aws.scheduler.scheduled-time>`; Scheduler replaces that context attribute before SQS delivery. Scheduler retries delivery up to five times for one hour. No Scheduler DLQ is configured; a delivery still failing after those retries is an accepted missed run. A dedicated scheduler role can send only to the FIFO jobs queue.
+- **Amazon SQS**: FIFO queue `auction_tracker_jobs.fifo` receives one message per configured search every hour and one digest message at 8:55pm. Content-based deduplication is enabled, all messages use group `auction-tracker`, retention is 14 days, and the worker event source uses batch size one. Failed messages are retried and routed after five receives to FIFO DLQ `auction_tracker_jobs_dlq.fifo`, which also retains messages for 14 days.
+- **Amazon EventBridge Scheduler**: seventeen schedules enqueue `update_search` jobs with `cron(0 * * * ? *)`; one schedule enqueues `send_digest` with `cron(55 20 * * ? *)`, all in the `Pacific/Auckland` timezone. Each schedule uses the universal SQS `sendMessage` target with the FIFO queue URL, one constant message group, and a JSON `MessageBody` containing `<aws.scheduler.scheduled-time>`; Scheduler replaces that context attribute before SQS delivery. Scheduler retries delivery up to five times for one hour. No Scheduler DLQ is configured; a delivery still failing after those retries is an accepted missed run. A dedicated scheduler role can send only to the FIFO jobs queue.
 - **OpenAI chat completions API**: outbound `POST /v1/chat/completions` for new listings on judged searches, with the search's configured model and reasoning effort (`gpt-5.4-mini`/`none` for MTG, `gpt-6-luna`/`none` for Pokémon, `gpt-5.4-nano`/`low` for RAM) and JSON response format. The base origin defaults to `https://api.openai.com` and can be overridden with `AUCTION_TRACKER_OPENAI_BASE_URL` (used in E2E tests). The API key is read from the `auction_tracker_api` secret. Request failures and malformed verdicts fail the invocation.
 - **AWS Secrets Manager**: outbound read of secret `auction_tracker_api` for the OpenAI API key, resolved lazily on the first judged listing per Lambda instance.
 
@@ -205,7 +206,7 @@ Digest message (representative):
 ```json
 {
   "job_type": "send_digest",
-  "scheduled_at": "2026-09-25T09:05:00Z"
+  "scheduled_at": "2026-09-25T08:55:00Z"
 }
 ```
 
@@ -251,7 +252,7 @@ null
 - **Access patterns**:
   - URL duplicate check: query `gsi1` on exact `gsi1pk` + `gsi1sk`
   - relist check: query `gsi2` on exact `gsi2pk`
-  - digest query: query one search partition for items after the previous local 9:05pm boundary, then retain items through the message's scheduled upper boundary
+  - digest query: query one search partition for items after the previous local 8:55pm boundary, then retain items through the message's scheduled upper boundary
 - **Retention behavior**:
   - DynamoDB TTL is enabled on `ttl`; items and their GSI entries expire approximately 30 days after discovery
 
@@ -279,9 +280,9 @@ Representative record:
 
 - Every `update_search` invocation resolves exactly one stable search ID and processes only that search.
 - Every update invocation loads the global excluded seller username set once from `ExcludedSellerUsernameFactory`.
-- Seller usernames are trimmed and compared case-insensitively with the normalized exclusion set. A match is skipped before `gsi1`, fingerprint, `gsi2`, judge, or persistence work and can never reach the digest.
-- A missing or blank seller username fails the invocation before the listing can enter duplicate, relist, judging, or persistence behavior.
-- A previously indexed exact `(search_url, item_url)` match in `gsi1` is skipped before fingerprinting or judging.
+- Seller usernames are trimmed and compared case-insensitively with the normalized exclusion set. A match is skipped before fingerprint, `gsi2`, judge, or persistence work and can never reach the digest.
+- A missing or blank seller username on a fetched listing fails the invocation before relist, judging, or persistence behavior.
+- A previously indexed exact `(search_url, item_url)` match in `gsi1` is skipped before fetching its listing page, using the URL from search results after query parameters are removed.
 - New records receive a standalone deterministic `fingerprint` attribute from the exact scraped title, description, normalized original start price, and normalized Buy Now price separated by null characters; `gsi2pk` is derived from it.
 - A new listing is skipped before judging when its fingerprint exists anywhere in `gsi2`, regardless of the search or prior judgment.
 - Any title, description, original start price, or Buy Now price change produces a different fingerprint and is treated as new; changes to the current bid do not affect the fingerprint.
@@ -293,7 +294,7 @@ Representative record:
 - Every judged search's verdict is validated against its own criteria list; a response missing any configured criterion is malformed and fails the invocation.
 - Judging is fail-closed: an LLM error or malformed verdict fails the SQS invocation so the message is retried and eventually routed to the worker DLQ after five receives if the cause persists.
 - Items with `judgment` = `fail` are never included in digest messages; items with `judgment` = `pass` or no judgment are included.
-- Digest selection window is deterministic from `scheduled_at`: items after the preceding local 9:05pm boundary and no later than the scheduled upper boundary. Subtracting one local day preserves the intended wall-clock boundary across DST changes.
+- Digest selection window is deterministic from `scheduled_at`: items after the preceding local 8:55pm boundary and no later than the scheduled upper boundary. Subtracting one local day preserves the intended wall-clock boundary across DST changes.
 - Persisted discovery timestamps come from the worker's actual processing clock, not `scheduled_at`, so delayed search jobs are included in the next appropriate digest window.
 - SNS publication errors fail the digest invocation; the message is not acknowledged and a later retry can publish the same digest again after an ambiguous post-publication failure.
 - Digest output deduplicates fingerprinted records by the standalone `fingerprint` attribute across all configured searches and falls back to listing URL for legacy records.
@@ -315,7 +316,7 @@ Representative record:
 | Judge model and effort     | `Judge` constants in `SearchFactoryImpl`                                                                                                      | MTG `gpt-5.4-mini`/`none`, Pokémon `gpt-6-luna`/`none`, RAM `gpt-5.4-nano`/`low`                                    |
 | Persisted discovered items | DynamoDB `auction_tracker` table                                                                                                              | canonical history used for duplicate checks, verdicts, and digests                                                  |
 | Digest recipients          | SNS topic subscriptions in Terraform                                                                                                          | email endpoints are infra-managed                                                                                   |
-| Search IDs and schedules   | `SearchFactoryImpl` and `infra/main.tf`                                                                                                       | seventeen stable IDs; update `cron(0/15 * * * ? *)`; digest `cron(5 21 * * ? *)` in `Pacific/Auckland`              |
+| Search IDs and schedules   | `SearchFactoryImpl` and `infra/main.tf`                                                                                                       | seventeen stable IDs; hourly update `cron(0 * * * ? *)`; digest `cron(55 20 * * ? *)` in `Pacific/Auckland`         |
 
 ## Security and privacy
 
@@ -351,12 +352,12 @@ Secrets Manager secret `auction_tracker_api` (value set manually after Terraform
 
 ## Performance envelope
 
-- Seventeen search schedules run every 15 minutes; the digest schedule runs daily at 9:05pm in `Pacific/Auckland`, including across daylight-saving transitions.
+- Seventeen search schedules run hourly; the digest schedule runs daily at 8:55pm in `Pacific/Auckland`, including across daylight-saving transitions.
 - The worker Lambda uses `memory_size = 1024` MB and a `300` second timeout. The FIFO queue visibility timeout is `1,800` seconds, leaving room for Lambda retries and long scraping/judging calls.
 - The event-source mapping uses batch size one and one constant message group, so upstream Trade Me/OpenAI load is serialized even if Lambda capacity increases.
 - Jsoup HTTP requests use a `30` second timeout per request.
-- Each new URL performs one per-search `gsi1` query and, when not found, one global `gsi2` query before any optional LLM call.
-- Excluded sellers are rejected before DynamoDB reads or LLM calls.
+- Each search-result URL performs one per-search `gsi1` query before its listing page is fetched; a new URL also performs one global `gsi2` query before any optional LLM call.
+- Excluded sellers are rejected after the URL duplicate check and before fingerprint queries or LLM calls.
 - Judging costs roughly $0.011 per judged MTG listing and $0.0014 per judged RAM listing at the recorded model rates. Pokémon candidate comparison passed $0.20 per million input / $1.20 per million output for `gpt-5.6-luna` and $0.10 per million input / $0.50 per million output for `gpt-6-luna`; production uses `gpt-6-luna`/`none` at the latter rates. The final three-trial dev run measured about $0.00144 per listing and the test run about $0.00144 per listing. Steady-state runs judge only newly discovered listings.
 - Per-item network fetch failures are non-fatal for a run (warn and continue), while required-field parsing failures, processor-level failures, and judge errors bubble as invocation errors.
 
@@ -392,10 +393,10 @@ Inspect the failed message in `auction_tracker_jobs_dlq.fifo` and the correspond
 
 ### Scenario 1: scheduled scrape ingests new listings
 
-1. EventBridge Scheduler enqueues one `update_search` message for each stable search ID on the 15-minute cadence.
+1. EventBridge Scheduler enqueues one `update_search` message for each stable search ID every hour.
 2. The FIFO event source invokes `JobsHandler` with one message; it delegates the stable ID to `UpdateSearchJobProcessor`, which resolves it from `SearchFactoryImpl`, loads excluded seller usernames, and scrapes only that search.
-3. For each discovered listing, the search processor skips a case-insensitive seller username match before any downstream work.
-4. For an allowed listing, the search processor checks `gsi1` for an existing `(search_url, item_url)` record.
+3. For each canonical listing URL in the search results, the search processor checks `gsi1` for an existing `(search_url, item_url)` record and fetches only new listing pages.
+4. For each fetched listing, the search processor skips a case-insensitive seller username match before fingerprinting, judging, or persistence.
 5. For a new URL, the search processor reads the original start and Buy Now prices from the embedded page state, computes the price-aware content fingerprint, and checks global `gsi2`.
 6. The search processor writes only new URLs and fingerprints to DynamoDB with timestamp, TTL, and prefixed primary/GSI keys.
 
@@ -408,7 +409,7 @@ Inspect the failed message in `auction_tracker_jobs_dlq.fifo` and the correspond
 
 ### Scenario 3: daily digest publishes recent unique listings
 
-1. EventBridge Scheduler enqueues `send_digest` daily at 9:05pm in `Pacific/Auckland`, after the 9:00pm search messages.
-2. `SendDigestJobProcessor` uses the message's scheduled time as the upper bound and queries each search partition after the preceding local 9:05pm boundary.
+1. EventBridge Scheduler enqueues `send_digest` daily at 8:55pm in `Pacific/Auckland`, before the 9:00pm search messages.
+2. `SendDigestJobProcessor` uses the message's scheduled time as the upper bound and queries each search partition after the preceding local 8:55pm boundary.
 3. The processor excludes records with `judgment` = `fail` and deduplicates merged results by the price-aware fingerprint, falling back to listing URL for records created before fingerprinting.
 4. The processor publishes one SNS digest when at least one item exists; otherwise it logs that no new items were found.
