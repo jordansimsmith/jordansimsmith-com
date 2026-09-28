@@ -120,7 +120,7 @@ sequenceDiagram
 - Use seventeen hourly EventBridge Scheduler schedules to enqueue one message per search into a single FIFO queue. Use a second Scheduler schedule for the digest message.
 - Use one constant FIFO message group (`auction-tracker`) and Lambda event-source batch size one to serialize upstream load and keep each invocation scoped to one job.
 - Keep `JobsHandler` limited to SQS message parsing and dispatch; `UpdateSearchJobProcessor` owns one-search scraping and persistence, while `SendDigestJobProcessor` owns digest selection and SNS publication.
-- Use content-based deduplication, a 14-day retention period, a 1,800-second visibility timeout, and a five-receive redrive policy to one FIFO worker DLQ. Do not add claim records, transactions, a message ledger, or a Scheduler DLQ.
+- Use content-based deduplication, a 14-day retention period, a 720-second visibility timeout, and a five-receive redrive policy to one FIFO worker DLQ. The visibility timeout is six times the worker's 120-second Lambda timeout, as required for the SQS event source. Do not add claim records, transactions, a message ledger, or a Scheduler DLQ.
 - Treat worker processing as at least once. Duplicate scraping, judging, persistence, and SNS publication are acceptable; GSI URL/fingerprint checks and digest grouping remain the suppression mechanisms.
 - Use Jsoup scraping against Trade Me server-rendered pages instead of a browser automation stack.
 - Use DynamoDB `pk`/`sk` prefixes with `gsi1` and `gsi2` so URL duplicate and relist checks are direct key lookups, not scans.
@@ -353,7 +353,7 @@ Secrets Manager secret `auction_tracker_api` (value set manually after Terraform
 ## Performance envelope
 
 - Seventeen search schedules run hourly; the digest schedule runs daily at 8:55pm in `Pacific/Auckland`, including across daylight-saving transitions.
-- The worker Lambda uses `memory_size = 1024` MB and a `300` second timeout. The FIFO queue visibility timeout is `1,800` seconds, leaving room for Lambda retries and long scraping/judging calls.
+- The worker Lambda uses `memory_size = 1024` MB and a `120` second timeout. The FIFO queue visibility timeout is `720` seconds (six times the Lambda timeout), leaving room for Lambda retries while bounding how long an unacknowledged message stays hidden.
 - The event-source mapping uses batch size one and one constant message group, so upstream Trade Me/OpenAI load is serialized even if Lambda capacity increases.
 - Jsoup HTTP requests use a `30` second timeout per request.
 - Each search-result URL performs one per-search `gsi1` query before its listing page is fetched; a new URL also performs one global `gsi2` query before any optional LLM call.

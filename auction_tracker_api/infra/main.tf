@@ -63,7 +63,7 @@ module "java_lambda" {
       handler     = "com.jordansimsmith.auctiontracker.JobsHandler"
       artifact    = var.artifacts["jobs_handler"]
       memory_size = 1024
-      timeout     = 300
+      timeout     = 120
     }
   }
 
@@ -257,7 +257,7 @@ resource "aws_sqs_queue" "jobs" {
   fifo_queue                  = true
   content_based_deduplication = true
   message_retention_seconds   = 1209600
-  visibility_timeout_seconds  = 1800
+  visibility_timeout_seconds  = 720
 
   redrive_policy = jsonencode({
     deadLetterTargetArn = aws_sqs_queue.jobs_dlq.arn
