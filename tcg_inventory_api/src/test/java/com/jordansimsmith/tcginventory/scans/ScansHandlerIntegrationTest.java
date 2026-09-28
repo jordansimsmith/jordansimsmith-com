@@ -127,7 +127,7 @@ public class ScansHandlerIntegrationTest {
         "{\"game\":\"mtg\",\"condition\":\"LP\",\"finish\":\"foil\",\"files\":["
             + "{\"filename\":\"2.jpg\",\"size_bytes\":100},"
             + "{\"filename\":\"10.jpg\",\"size_bytes\":200},"
-            + "{\"filename\":\"1.jpg\",\"size_bytes\":300}]}";
+            + "{\"filename\":\"1.jpg\",\"size_bytes\":10485760}]}";
 
     // act
     var response = createScanHandler.handleRequest(buildEventWithBody("jordan", request), null);
@@ -178,6 +178,7 @@ public class ScansHandlerIntegrationTest {
                 .sortValue(ScanRowItem.formatSk(1))
                 .build());
     assertThat(firstRow.getS3Key()).isEqualTo("users/jordan/scans/%s/000001.jpg".formatted(scanId));
+    assertThat(firstRow.getSizeBytes()).isEqualTo(10485760L);
     assertThat(scanItem.getUpdatedAt()).isEqualTo(Instant.ofEpochSecond(1700000000));
 
     var reread =
@@ -601,7 +602,7 @@ public class ScansHandlerIntegrationTest {
             "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[]}",
             "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":0}]}",
             "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":1.5}]}",
-            "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":1048577}]}",
+            "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":10485761}]}",
             "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.png\",\"size_bytes\":1}]}",
             "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":1},{\"filename\":\"1.jpg\",\"size_bytes\":1}]}",
             "{\"game\":\"mtg\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":["

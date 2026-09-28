@@ -1629,7 +1629,7 @@ export function createFakeClient(): ApiClient {
             file.size_bytes <= 0 || file.size_bytes > MAX_SCAN_FILE_BYTES,
         )
       ) {
-        throw new Error('scan files must be between 1 byte and 1 MiB');
+        throw new Error('scan files must be between 1 byte and 10 MiB');
       }
       if (request.files.some((file) => !/\.(jpe?g)$/i.test(file.filename))) {
         throw new Error('scan files must be JPEG images');

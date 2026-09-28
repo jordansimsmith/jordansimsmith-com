@@ -40,7 +40,13 @@ describe('scan files', () => {
     ]);
 
     expect(errors).toContain('Files must not be empty.');
-    expect(errors).toContain('Each file must be 1 MiB or smaller.');
+    expect(errors).toContain('Each file must be 10 MiB or smaller.');
+  });
+
+  it('allows a file at the 10 MiB limit', () => {
+    expect(
+      validateScanFiles([jpeg('large.jpg', 'x'.repeat(MAX_SCAN_FILE_BYTES))]),
+    ).toEqual([]);
   });
 
   it('allows an empty MIME type when the filename is a JPEG', () => {

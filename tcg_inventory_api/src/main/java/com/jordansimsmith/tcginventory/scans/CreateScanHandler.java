@@ -32,7 +32,7 @@ public class CreateScanHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
   private static final Logger LOGGER = LoggerFactory.getLogger(CreateScanHandler.class);
   private static final int MAX_SCAN_FILES = 200;
-  private static final long MAX_SCAN_FILE_BYTES = 1024 * 1024;
+  private static final long MAX_SCAN_FILE_BYTES = 10L * 1024 * 1024;
   private static final Map<String, String> UPLOAD_HEADERS =
       Map.of("Content-Type", ScanImages.CONTENT_TYPE, "If-None-Match", "*");
 
@@ -116,7 +116,7 @@ public class CreateScanHandler
     }
     if (!hasIntegralFileSizes(requestNode)) {
       return httpResponseFactory.badRequest(
-          new ErrorResponse("scan files must be between 1 byte and 1 MiB"));
+          new ErrorResponse("scan files must be between 1 byte and 10 MiB"));
     }
 
     var files = new ArrayList<>(request.files());
@@ -215,7 +215,7 @@ public class CreateScanHandler
       if (file.sizeBytes() == null
           || file.sizeBytes() <= 0
           || file.sizeBytes() > MAX_SCAN_FILE_BYTES) {
-        return "scan files must be between 1 byte and 1 MiB";
+        return "scan files must be between 1 byte and 10 MiB";
       }
     }
     return null;
