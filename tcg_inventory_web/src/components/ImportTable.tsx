@@ -3,6 +3,7 @@ import type { ImportSummary } from '../api/client';
 import { ImportStatusBadge } from './ImportStatusBadge';
 import classes from './CollectionTable.module.css';
 import { gameLabel } from '../domain/games';
+import { importDisplayName } from '../domain/import-display-name';
 
 interface ImportTableProps {
   imports: ImportSummary[];
@@ -20,7 +21,7 @@ export function ImportTable({ imports, onOpen }: ImportTableProps) {
     >
       <Table.Thead>
         <Table.Tr>
-          <Table.Th>Filename</Table.Th>
+          <Table.Th>Import</Table.Th>
           <Table.Th>Game</Table.Th>
           <Table.Th>Status</Table.Th>
           <Table.Th ta="right">Rows</Table.Th>
@@ -35,7 +36,7 @@ export function ImportTable({ imports, onOpen }: ImportTableProps) {
             style={{ cursor: 'pointer' }}
           >
             <Table.Td fw={500} data-field="filename">
-              {importSummary.filename}
+              {importDisplayName(importSummary.filename)}
             </Table.Td>
             <Table.Td data-field="game" data-label="Game">
               {gameLabel(importSummary.game)}

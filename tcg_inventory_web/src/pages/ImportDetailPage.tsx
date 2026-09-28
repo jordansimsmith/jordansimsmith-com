@@ -31,6 +31,7 @@ import type {
 } from '../api/client';
 import { encodeListingPhoto } from '../domain/encode-listing-photo';
 import { gameLabel } from '../domain/games';
+import { importDisplayName } from '../domain/import-display-name';
 import classes from './ImportDetailPage.module.css';
 
 const POLL_INTERVAL_MS = 2000;
@@ -276,7 +277,7 @@ export function ImportDetailPage() {
         {!loading && !error && importDetail && (
           <>
             <PageHeader
-              title={importDetail.filename}
+              title={importDisplayName(importDetail.filename)}
               description={`${gameLabel(importDetail.game)} · Uploaded ${new Date(importDetail.created_at * 1000).toLocaleString()}`}
               actions={
                 <Button variant="subtle" onClick={() => navigate('/imports')}>
