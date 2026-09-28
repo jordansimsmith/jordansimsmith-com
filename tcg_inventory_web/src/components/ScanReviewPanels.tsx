@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { RefObject } from 'react';
 import {
   ActionIcon,
+  Autocomplete,
   Badge,
   Box,
   Button,
@@ -11,7 +12,6 @@ import {
   Skeleton,
   Stack,
   Text,
-  TextInput,
   Title,
 } from '@mantine/core';
 import {
@@ -178,6 +178,7 @@ export function ScanReviewPanels({
   deleteDisabled,
   controlsDisabled,
 }: ScanReviewPanelsProps) {
+  const submittedSuggestion = useRef<string | null>(null);
   const currentName =
     selection?.printing.name ?? suggestion?.name ?? 'Manual selection required';
   const sourceImage = selectedRow.source_url;
@@ -187,6 +188,15 @@ export function ScanReviewPanels({
     selectedRow.error !== null ||
     suggestion === undefined ||
     error !== undefined;
+
+  const handleSearchChange = (value: string) => {
+    if (submittedSuggestion.current === value) {
+      submittedSuggestion.current = null;
+      return;
+    }
+    submittedSuggestion.current = null;
+    onSearchChange(value);
+  };
 
   return (
     <Stack gap="sm" className={classes.reviewer}>
@@ -370,11 +380,18 @@ export function ScanReviewPanels({
           Search for a card, then compare its printings here.
         </Text>
         <Stack gap={4} mt="sm">
-          <TextInput
+          <Autocomplete
             ref={searchRef}
             aria-label="Search for a card by name"
             value={search}
-            onChange={(event) => onSearchChange(event.currentTarget.value)}
+            onChange={handleSearchChange}
+            onOptionSubmit={(name) => {
+              submittedSuggestion.current = name;
+              onSearchResult(name);
+            }}
+            data={searchSuggestions}
+            filter={({ options }) => options}
+            limit={6}
             placeholder="Search for a card by name…"
             leftSection={<IconSearch size={16} />}
             disabled={controlsDisabled || searchSelectionLoading}
@@ -389,23 +406,10 @@ export function ScanReviewPanels({
               {searchError}
             </Text>
           )}
-          {searchSuggestions.slice(0, 6).map((name) => (
-            <Button
-              key={name}
-              variant="subtle"
-              justify="flex-start"
-              size="compact-sm"
-              loading={searchSelectionLoading}
-              disabled={controlsDisabled}
-              onClick={() => onSearchResult(name)}
-            >
-              {name}
-            </Button>
-          ))}
         </Stack>
       </Paper>
 
-      <Paper withBorder radius="md" p="xs" className={classes.actionBar}>
+      <Paper withBorder radius="md" p="xs">
         <Group justify="space-between" wrap="wrap" gap="xs">
           <Group gap="xs">
             <Button

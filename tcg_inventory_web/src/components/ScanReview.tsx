@@ -708,7 +708,12 @@ export function ScanReview({
           onMoveRow={moveRow}
           onMovePrinting={movePrinting}
           onChoosePrinting={choosePrinting}
-          onSearchChange={setSearch}
+          onSearchChange={(value) => {
+            setSearch(value);
+            setSearchSuggestions([]);
+            setSearchError(null);
+            setSearching(false);
+          }}
           onSearchResult={(name) => void selectSearchResult(name)}
           onConfirm={confirmCurrent}
           onDelete={() => {
