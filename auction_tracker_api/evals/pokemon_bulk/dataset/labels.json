@@ -1104,6 +1104,39 @@
     "overall": "fail",
     "notes": "owner-labeled: the 500-card mix is offered as a consumer bundle with promised contents, not one identified physical pile"
   },
+  "6153519596": {
+    "pokemon_cards": "pass",
+    "bulk_scale": "fail",
+    "accepted_language": "pass",
+    "not_basic_energy": "pass",
+    "not_mega_evolution_era": "pass",
+    "acceptable_condition": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "owner-labeled: bundle title and description give no card count or evidence of a large pile"
+  },
+  "6153488007": {
+    "pokemon_cards": "pass",
+    "bulk_scale": "fail",
+    "accepted_language": "pass",
+    "not_basic_energy": "pass",
+    "not_mega_evolution_era": "pass",
+    "acceptable_condition": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "owner-labeled: bundle title and description give no card count or evidence of a large pile"
+  },
+  "6153501092": {
+    "pokemon_cards": "pass",
+    "bulk_scale": "fail",
+    "accepted_language": "pass",
+    "not_basic_energy": "pass",
+    "not_mega_evolution_era": "pass",
+    "acceptable_condition": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "owner-labeled: promo bundle title and description give no card count or evidence of a large pile"
+  },
   "s076": {
     "pokemon_cards": "pass",
     "bulk_scale": "pass",

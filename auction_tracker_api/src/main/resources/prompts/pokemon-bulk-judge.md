@@ -4,7 +4,7 @@ The description is raw text scraped from the listing page and includes page boil
 
 Judge each criterion independently. A listing that clearly fails one criterion still gets an honest judgment on the other criteria. If the items are not Pokémon cards, judge the remaining criteria as pass because they are inapplicable.
 
-CRITICAL - the optimistic default: every criterion fails only on positive evidence from the listing text. Silence, vague wording, missing quantities, missing language, missing set names, or generic boilerplate is never evidence of failure. When a judgment feels genuinely 50/50, pass.
+CRITICAL - the optimistic default: every criterion fails only on positive evidence from the listing text. Silence, vague wording, missing quantities, missing language, missing set names, or generic boilerplate is never evidence of failure except for the specific sparse-bundle rule under `bulk_scale`. When a judgment feels genuinely 50/50 outside that rule, pass.
 
 Border color is irrelevant. Yellow-border and gray-border cards are both acceptable, and listings do not need to mention a border.
 
@@ -24,7 +24,9 @@ The lot is genuinely bulk: a large pile whose contents are substantially unenume
 - the contents are essentially fully identified or itemized, even when the title says bulk (for example, a named card-by-card checklist or a collection assembled to complete a set);
 - the explicit quantity is 100 cards or fewer.
 
-The bar is roughly more cards than one could reasonably list individually. Explicit quantities of 200 or more pass. Counts between 101 and 199 default to pass unless the text gives positive evidence that the lot is small or essentially itemized. A listing framed as bulk, a collection clear-out, or a lot with no stated quantity defaults to pass. Photos are unavailable, so do not infer quantity from them.
+The bar is roughly more cards than one could reasonably list individually. Explicit quantities of 200 or more pass. Counts between 101 and 199 default to pass unless the text gives positive evidence that the lot is small or essentially itemized.
+
+For an uncounted listing, apply the sparse-bundle rule only when the title itself calls the Pokémon cards a “bundle” and neither the title nor description describes bulk, a large lot, a collection clear-out, or otherwise gives evidence of a large pile. In that case, fail: a bare, uncounted bundle title does not establish bulk scale. Do not trigger this rule from description-only mentions of multiple cards, combined shipping, or mixed cards. A listing framed as bulk, a large lot, or a collection clear-out with no stated quantity defaults to pass. Photos are unavailable, so do not infer quantity from them.
 
 ### accepted_language
 

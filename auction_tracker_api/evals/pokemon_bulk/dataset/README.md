@@ -14,7 +14,9 @@ The actual items are Pokémon Trading Card Game cards, not another game or acces
 
 ### bulk_scale
 
-Singles, effectively itemized collections, and explicit quantities of 100 or fewer fail. Explicit quantities of 200 or more pass. Unstated quantities and ambiguous 101–199-card lots default to pass when framed as bulk, a lot, or a collection clear-out.
+Singles, effectively itemized collections, and explicit quantities of 100 or fewer fail. Explicit quantities of 200 or more pass. Unstated quantities and ambiguous 101–199-card lots default to pass when framed as bulk, a large lot, or a collection clear-out. A bundle title with no count and no text establishing a large pile fails: the sparse bundle wording does not establish bulk scale. A bundle with a count above 100 or clear evidence of a large pile passes; the explicit 100-or-fewer rule still applies.
+
+The owner-labeled listings `6153519596` (“Pokemon Camorant bundle”), `6153488007` (“Pokemon Card Bundle $55”), and `6153501092` (“Scarlet & Violet Promo Bundle”) fail because their scraped titles and descriptions provide no card count or evidence of a large pile. Their `fixed_collection` labels pass because the text does not establish a repeatable or assembled product.
 
 ### accepted_language
 
@@ -40,7 +42,7 @@ The owner-labeled Trade Me listing `6150549502` is a fail: it offers an “X500 
 
 ## Dataset status
 
-The corpus contains 26 owner-labeled live listings and 78 targeted synthetic label-gap fixtures. The new cases cover the linked mixed bundle, per-bundle “no duplicates” and “guaranteed EX” promises, and an exact-pile near miss with the same terms. The owner’s rulings also cover hard cases for Mega-era mixtures, 30th-anniversary exceptions, language ambiguity, Energy bundles, quantity defaults, and damaged collections. Earlier synthetic labels remain marked `owner review pending`; the new labels encode the owner’s explicit rule that repackaged bundle promises fail while claims about a clearly identified physical pile do not. The seed-42 split is 21 train, 41 dev, and 42 test, with relist identities kept together.
+The corpus contains 29 owner-labeled live listings and 78 targeted synthetic label-gap fixtures. The real cases include the three sparse bundle listings; other cases cover a linked mixed bundle, per-bundle “no duplicates” and “guaranteed EX” promises, and an exact-pile near miss with the same terms. The owner’s rulings also cover hard cases for Mega-era mixtures, 30th-anniversary exceptions, language ambiguity, Energy bundles, quantity defaults, and damaged collections. Earlier synthetic labels remain marked `owner review pending`; the seed-42 split is 21 train, 43 dev, and 43 test, with relist identities kept together.
 
 The owner review sheet is `labels.json`: each real listing retains its supplied verdict and reason, while synthetic entries include a note naming the targeted criterion. Keep prompt versions immutable once a measured run has been recorded.
 
