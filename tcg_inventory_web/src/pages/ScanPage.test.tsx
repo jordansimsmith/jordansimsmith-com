@@ -96,13 +96,14 @@ describe('ScanPage', () => {
 
     const jobs = screen.getByRole('region', { name: 'Scan jobs' });
 
-    expect(within(jobs).getByRole('textbox', { name: 'Game' })).toBeDefined();
+    const gameInput = within(jobs).getByRole('textbox', { name: 'Game' });
+    expect((gameInput as HTMLInputElement).value).toBe('Magic: The Gathering');
     expect(
       within(jobs).getByRole('textbox', { name: 'Condition' }),
     ).toBeDefined();
     const finishInput = within(jobs).getByRole('textbox', { name: 'Finish' });
-    expect(finishInput.getAttribute('placeholder')).toBe('Select game first');
-    expect(finishInput.hasAttribute('disabled')).toBe(true);
+    expect((finishInput as HTMLInputElement).value).toBe('Normal');
+    expect(finishInput.hasAttribute('disabled')).toBe(false);
     expect(within(jobs).getByLabelText(/Scanner JPEGs/)).toBeDefined();
     expect(
       (
@@ -161,9 +162,6 @@ describe('ScanPage', () => {
     const user = userEvent.setup();
     const { container } = renderScanPage();
     const fileInput = container.querySelector('input[type="file"]');
-
-    await user.click(screen.getByRole('textbox', { name: 'Game' }));
-    await user.keyboard('{ArrowDown}{Enter}');
 
     await user.upload(
       fileInput as HTMLInputElement,
@@ -248,8 +246,6 @@ describe('ScanPage', () => {
       fileInput,
       new File(['jpeg'], '001.jpg', { type: 'image/jpeg' }),
     );
-    await user.click(screen.getByRole('textbox', { name: 'Game' }));
-    await user.keyboard('{ArrowDown}{Enter}');
     await user.click(screen.getByRole('button', { name: 'Create scan' }));
 
     expect(await screen.findAllByText('network interrupted')).not.toHaveLength(

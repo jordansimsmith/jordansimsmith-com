@@ -214,9 +214,9 @@ describe('ScanReview', () => {
     const getPrintingsForId = vi
       .spyOn(scryfallModule.scryfallClient, 'getPrintingsForId')
       .mockResolvedValue(printings);
-    vi.spyOn(scryfallModule.scryfallClient, 'autocomplete').mockResolvedValue([
-      'Counterspell',
-    ]);
+    const autocomplete = vi
+      .spyOn(scryfallModule.scryfallClient, 'autocomplete')
+      .mockResolvedValue(['Counterspell']);
     vi.spyOn(
       scryfallModule.scryfallClient,
       'getPrintingsByName',
@@ -239,10 +239,13 @@ describe('ScanReview', () => {
       name: 'Search for a card by name',
     });
     await user.type(search, 'Counter');
-    expect(
-      await screen.findByRole('button', { name: 'Counterspell' }),
-    ).toBeDefined();
-    await user.click(screen.getByRole('button', { name: 'Counterspell' }));
+    await waitFor(() =>
+      expect(autocomplete).toHaveBeenCalledWith(
+        'Counter',
+        expect.any(AbortSignal),
+      ),
+    );
+    await user.keyboard('{ArrowDown}{Enter}');
 
     expect(await screen.findAllByText('Counterspell')).not.toHaveLength(0);
     expect(

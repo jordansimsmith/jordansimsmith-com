@@ -117,9 +117,6 @@ describe('ImportsPage', () => {
     renderImportsPage();
     await screen.findByText('manabox-today.csv');
 
-    await user.click(screen.getByRole('textbox', { name: 'Game' }));
-    await user.keyboard('{ArrowDown}{Enter}');
-
     const file = new File([VALID_CSV], 'bulk.csv', { type: 'text/csv' });
     await user.upload(getFileInput(), file);
     await user.click(screen.getByRole('button', { name: 'Upload' }));
@@ -137,9 +134,6 @@ describe('ImportsPage', () => {
     const user = userEvent.setup();
     renderImportsPage();
     await screen.findByText('manabox-today.csv');
-
-    await user.click(screen.getByRole('textbox', { name: 'Game' }));
-    await user.keyboard('{ArrowDown}{Enter}');
 
     const file = new File(['Name,Quantity\nOpt,1'], 'bad.csv', {
       type: 'text/csv',
