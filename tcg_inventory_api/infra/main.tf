@@ -551,6 +551,7 @@ data "aws_iam_policy_document" "scan_worker" {
     ]
 
     actions = [
+      "dynamodb:ConditionCheckItem",
       "dynamodb:GetItem",
       "dynamodb:Query",
       "dynamodb:TransactWriteItems",
