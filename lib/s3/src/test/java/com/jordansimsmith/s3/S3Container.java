@@ -9,21 +9,23 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
 
 public class S3Container extends GenericContainer<S3Container> {
-  private static final int S3_PORT = 9000;
-  static final String ROOT_USER = "minioadmin";
-  static final String ROOT_PASSWORD = "minioadmin";
+  private static final int S3_PORT = 4566;
+  static final String ACCESS_KEY = "test";
+  static final String SECRET_KEY = "test";
 
   public S3Container() {
     super(
         LoadedImage.loadImage(
-            getProperty("minio.properties", "minio.image.name"),
-            getProperty("minio.properties", "minio.image.loader")));
+            getProperty("s3.properties", "s3.image.name"),
+            getProperty("s3.properties", "s3.image.loader")));
 
     this.withExposedPorts(S3_PORT);
-    this.withEnv("MINIO_ROOT_USER", ROOT_USER);
-    this.withEnv("MINIO_ROOT_PASSWORD", ROOT_PASSWORD);
-    this.withCommand("server", "/data");
-    this.waitingFor(Wait.forHttp("/minio/health/live").forPort(S3_PORT));
+    this.withEnv("SERVICES", "s3");
+    this.withEnv("AWS_ACCESS_KEY_ID", ACCESS_KEY);
+    this.withEnv("AWS_SECRET_ACCESS_KEY", SECRET_KEY);
+    this.withEnv("AWS_DEFAULT_REGION", "us-east-1");
+    this.withEnv("AWS_REGION", "us-east-1");
+    this.waitingFor(Wait.forHttp("/_localstack/health").forPort(S3_PORT));
   }
 
   private static String getProperty(String propertyFileName, String key) {

@@ -47,17 +47,17 @@ oci_load(
 )
 
 oci_image(
-    name = "minio-image",
+    name = "s3-image",
     testonly = True,
-    base = "@minio//:minio",
+    base = "@localstack//:localstack",
 )
 
 oci_load(
-    name = "minio-load",
+    name = "s3-load",
     testonly = True,
-    image = ":minio-image",
+    image = ":s3-image",
     repo_tags = [
-        "bazel/minio:latest",
+        "bazel/s3:latest",
     ],
 )
 
@@ -68,8 +68,8 @@ java_library(
     data = [
         ":alpine-load",
         ":dynamodb-load",
-        ":minio-load",
         ":ryuk-load",
+        ":s3-load",
     ],
     resources = glob([
         "src/test/resources/**/*.properties",

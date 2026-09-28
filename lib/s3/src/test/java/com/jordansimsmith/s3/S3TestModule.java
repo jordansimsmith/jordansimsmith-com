@@ -7,6 +7,7 @@ import javax.inject.Named;
 import javax.inject.Singleton;
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
+import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.S3Configuration;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
@@ -15,13 +16,14 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 public class S3TestModule {
   private static final StaticCredentialsProvider CREDENTIALS =
       StaticCredentialsProvider.create(
-          AwsBasicCredentials.create(S3Container.ROOT_USER, S3Container.ROOT_PASSWORD));
+          AwsBasicCredentials.create(S3Container.ACCESS_KEY, S3Container.SECRET_KEY));
 
   @Provides
   @Singleton
   S3Client s3Client(@Named("s3Endpoint") URI s3Endpoint) {
     return S3Client.builder()
         .endpointOverride(s3Endpoint)
+        .region(Region.US_EAST_1)
         .forcePathStyle(true)
         .credentialsProvider(CREDENTIALS)
         .build();
@@ -32,6 +34,7 @@ public class S3TestModule {
   S3Presigner s3Presigner(@Named("s3Endpoint") URI s3Endpoint) {
     return S3Presigner.builder()
         .endpointOverride(s3Endpoint)
+        .region(Region.US_EAST_1)
         .credentialsProvider(CREDENTIALS)
         .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
         .build();
