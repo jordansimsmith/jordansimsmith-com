@@ -151,6 +151,20 @@ class FakeCatalog:
         return self.records
 
 
+class FakeDetector:
+    def __init__(self, card_present: bool = True):
+        self.card_present = card_present
+        self.calls = 0
+
+    def detect(self, image):
+        assert image.shape == (2, 2, 3)
+        self.calls += 1
+        return self
+
+    def dewarp(self, image):
+        return Image.new("RGB", (2, 2), color=(10, 20, 30))
+
+
 class FakeQueue:
     def __init__(self, failure: Exception | None = None):
         self.messages: list[dict] = []
@@ -182,12 +196,14 @@ class FakeSqsClient:
         self.messages.append(kwargs)
 
 
-def _worker(store, images=None, catalog=None, queue=None, loader=None):
+def _worker(store, images=None, catalog=None, detector=None, queue=None, loader=None):
     def load_recognition(game):
         if game != "mtg":
             raise ValueError(f"no recognition integration configured for game: {game}")
         loaded_catalog = loader(game) if loader else catalog or FakeCatalog()
-        return RecognitionProfile(loaded_catalog, _magic_eligible_suggestions)
+        return RecognitionProfile(
+            loaded_catalog, detector or FakeDetector(), _magic_eligible_suggestions
+        )
 
     return RecognitionWorker(
         store=store,
@@ -239,7 +255,7 @@ def test_terminal_rows_are_not_reprocessed():
         {"user": "jordan", "scan_id": "scan-1"}
     )
 
-    assert catalog.embedder.calls == 2
+    assert catalog.embedder.calls == 4
 
 
 def test_overlapping_workers_repeat_results_and_enqueue_same_continuation():
@@ -370,7 +386,39 @@ def test_filters_language_and_finish_and_deduplicates_faces():
             "score": 0.83,
         }
     ]
-    assert catalog.search_calls == 1
+    assert catalog.search_calls == 2
+
+
+def test_uses_higher_scoring_card_orientation():
+    class OrientationCatalog(FakeCatalog):
+        def search_records(self, embedding, top_k: int):
+            self.search_calls += 1
+            if self.search_calls == 1:
+                return [_record(name="Wrong card") | {"score": 0.3}]
+            return [_record(name="Correct card") | {"score": 0.9}]
+
+    store = FakeStore(_scan_rows(1))
+    detector = FakeDetector()
+    catalog = OrientationCatalog()
+
+    _worker(store, catalog=catalog, detector=detector).handle_message(
+        {"user": "jordan", "scan_id": "scan-1"}
+    )
+
+    assert detector.calls == 1
+    assert store.suggestions[1][0]["name"] == "Correct card"
+
+
+def test_missing_card_becomes_manual_review_without_search():
+    store = FakeStore(_scan_rows(1))
+    catalog = FakeCatalog()
+
+    _worker(store, catalog=catalog, detector=FakeDetector(False)).handle_message(
+        {"user": "jordan", "scan_id": "scan-1"}
+    )
+
+    assert store.rows[0].status == "needs_review"
+    assert catalog.search_calls == 0
 
 
 def test_treats_external_ids_as_opaque():
@@ -413,6 +461,16 @@ def test_runtime_fails_before_catalog_loading_when_game_has_no_catalog():
 def test_corrupt_image_becomes_manual_review():
     store = FakeStore(_scan_rows(1))
     _worker(store, images=FakeImages(b"not a jpeg")).handle_message(
+        {"user": "jordan", "scan_id": "scan-1"}
+    )
+
+    assert store.rows[0].status == "needs_review"
+    assert store.results == [(1, "needs_review")]
+
+
+def test_truncated_jpeg_becomes_manual_review():
+    store = FakeStore(_scan_rows(1))
+    _worker(store, images=FakeImages(b"\xff\xd8\xff\xe0broken")).handle_message(
         {"user": "jordan", "scan_id": "scan-1"}
     )
 

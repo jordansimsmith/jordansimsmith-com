@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import io
 import json
 import logging
 import os
@@ -11,8 +10,9 @@ from dataclasses import dataclass
 from typing import Callable
 
 import boto3
-from PIL import Image
-from collector_vision import Catalog
+import cv2
+import numpy as np
+from collector_vision import Catalog, NeuralCornerDetector, rotate_card_180
 
 LOGGER = logging.getLogger(__name__)
 
@@ -54,6 +54,7 @@ class ScanRow:
 @dataclass(frozen=True)
 class RecognitionProfile:
     catalog: object
+    detector: object
     convert_suggestions: Callable[[list[dict], str], list[dict]]
 
 
@@ -385,21 +386,37 @@ class RecognitionWorker:
     ) -> bool:
         image_bytes = self._images.read(row.s3_key)
         try:
-            with Image.open(io.BytesIO(image_bytes)) as image:
-                if image.format != "JPEG":
-                    raise ValueError("unsupported image format")
-                image.load()
-                rgb_image = image.convert("RGB")
-            embedding = profile.catalog.embedder.embed(rgb_image)
-            candidates = profile.convert_suggestions(
-                profile.catalog.search_records(embedding, top_k=SEARCH_TOP_K),
-                scan.finish,
+            if not image_bytes.startswith(b"\xff\xd8\xff"):
+                raise ValueError("unsupported image format")
+            image_bgr = cv2.imdecode(
+                np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR
             )
+            if image_bgr is None:
+                raise ValueError("unable to decode image")
+            detection = profile.detector.detect(image_bgr)
+            if not detection.card_present:
+                candidates = []
+                error = "no card detected"
+            else:
+                card = detection.dewarp(image_bgr)
+                searches = [
+                    profile.catalog.search_records(
+                        profile.catalog.embedder.embed(orientation), top_k=SEARCH_TOP_K
+                    )
+                    for orientation in (card, rotate_card_180(card))
+                ]
+                records = max(
+                    searches,
+                    key=lambda results: (
+                        results[0]["score"] if results else float("-inf")
+                    ),
+                )
+                candidates = profile.convert_suggestions(records, scan.finish)
+                error = "no eligible recognition candidates" if not candidates else None
             if not candidates:
                 status = "needs_review"
                 needs_review = True
                 suggestions = None
-                error = "no eligible recognition candidates"
             else:
                 status = "suggested"
                 needs_review = False
@@ -445,6 +462,7 @@ class LambdaRuntime:
     def __init__(self):
         self._worker: RecognitionWorker | None = None
         self._catalog = None
+        self._detector = None
 
     def handle_event(self, event: dict) -> dict[str, int]:
         return self._get_worker().handle_event(event)
@@ -466,7 +484,11 @@ class LambdaRuntime:
                 version=CATALOG_VERSION,
             )
             _ = self._catalog.embedder
-        return RecognitionProfile(self._catalog, _magic_eligible_suggestions)
+        if self._detector is None:
+            self._detector = NeuralCornerDetector(provider="cpu")
+        return RecognitionProfile(
+            self._catalog, self._detector, _magic_eligible_suggestions
+        )
 
     def _get_worker(self) -> RecognitionWorker:
         if self._worker is None:

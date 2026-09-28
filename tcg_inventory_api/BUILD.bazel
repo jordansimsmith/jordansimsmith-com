@@ -25,7 +25,8 @@ py_library(
     deps = [
         "@pypi//boto3",
         "@pypi//collectorvision",
-        "@pypi//pillow",
+        "@pypi//numpy",
+        "@pypi//opencv_python_headless",
     ],
 )
 
@@ -43,6 +44,7 @@ py_test(
     main = "src/test/python/tcg_inventory_scan_worker/test_runner.py",
     deps = [
         ":scan-worker-lib",
+        "@pypi//pillow",
         "@pypi//pytest",
     ],
 )
