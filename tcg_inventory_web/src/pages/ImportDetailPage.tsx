@@ -26,7 +26,7 @@ import { PlacementInstructionsView } from '../components/PlacementInstructionsVi
 import { apiClient } from '../api/client';
 import type {
   Condition,
-  ConfirmImportResponse,
+  ImportConfirmationResult,
   ImportDetail,
 } from '../api/client';
 import { encodeListingPhoto } from '../domain/encode-listing-photo';
@@ -45,8 +45,9 @@ export function ImportDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [confirmationPollVersion, setConfirmationPollVersion] = useState(0);
   const [confirmResult, setConfirmResult] =
-    useState<ConfirmImportResponse | null>(null);
+    useState<ImportConfirmationResult | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const importDetailRef = useRef(importDetail);
@@ -74,7 +75,13 @@ export function ImportDetailPage() {
         }
         setImportDetail(response);
         setError(null);
-        if (response.status === 'appraising' && !response.appraisal_error) {
+        if (response.status === 'confirmed' && response.confirmation_result) {
+          setConfirmResult(response.confirmation_result);
+        }
+        if (
+          (response.status === 'appraising' && !response.appraisal_error) ||
+          (response.status === 'confirming' && !response.confirmation_error)
+        ) {
           timer = setTimeout(poll, POLL_INTERVAL_MS);
         }
       } catch (e) {
@@ -82,6 +89,13 @@ export function ImportDetailPage() {
           return;
         }
         setError(e instanceof Error ? e.message : 'Failed to load import');
+        const current = importDetailRef.current;
+        if (
+          (current?.status === 'appraising' && !current.appraisal_error) ||
+          (current?.status === 'confirming' && !current.confirmation_error)
+        ) {
+          timer = setTimeout(poll, POLL_INTERVAL_MS);
+        }
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -94,14 +108,17 @@ export function ImportDetailPage() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [importId]);
+  }, [importId, confirmationPollVersion]);
 
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState !== 'visible' || !importId) {
         return;
       }
-      if (importDetailRef.current?.status !== 'review') {
+      if (
+        importDetailRef.current?.status !== 'review' &&
+        importDetailRef.current?.status !== 'confirming'
+      ) {
         return;
       }
       try {
@@ -206,11 +223,18 @@ export function ImportDetailPage() {
     }
     setConfirming(true);
     try {
-      const response = await apiClient.confirmImport(importId);
-      setConfirmResult(response);
+      await apiClient.confirmImport(importId);
       setConfirmOpen(false);
+      setConfirmResult(null);
+      setConfirmationPollVersion((current) => current + 1);
       setImportDetail((current) =>
-        current ? { ...current, status: response.status } : current,
+        current
+          ? {
+              ...current,
+              status: 'confirming',
+              confirmation_error: null,
+            }
+          : current,
       );
     } catch (e) {
       const message =
@@ -290,6 +314,13 @@ export function ImportDetailPage() {
               <JobFailureAlert
                 title="Appraisal failed"
                 error={importDetail.appraisal_error}
+                maw={480}
+              />
+            )}
+            {importDetail.confirmation_error && (
+              <JobFailureAlert
+                title="Confirmation failed"
+                error={importDetail.confirmation_error}
                 maw={480}
               />
             )}
@@ -385,6 +416,22 @@ export function ImportDetailPage() {
                       >
                         Confirm import
                       </Button>
+                    </Group>
+                  ) : importDetail.status === 'confirming' ? (
+                    <Group
+                      className={classes.actions}
+                      justify="flex-end"
+                      gap="sm"
+                    >
+                      {importDetail.confirmation_error ? (
+                        <Button loading={confirming} onClick={handleConfirm}>
+                          Retry confirmation
+                        </Button>
+                      ) : (
+                        <Text size="sm" c="dimmed">
+                          Confirming inventory units…
+                        </Text>
+                      )}
                     </Group>
                   ) : undefined
                 }

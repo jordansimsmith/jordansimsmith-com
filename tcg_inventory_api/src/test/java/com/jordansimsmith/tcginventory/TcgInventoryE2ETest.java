@@ -227,9 +227,19 @@ public class TcgInventoryE2ETest {
 
     // act - confirm import
     var confirmResponse = post("/imports/" + importId + "/confirm");
-    assertThat(confirmResponse.statusCode()).isEqualTo(200);
-    var confirmBody = objectMapper.readTree(confirmResponse.body());
-    assertThat(confirmBody.get("status").asText()).isEqualTo("confirmed");
+    assertThat(confirmResponse.statusCode()).isEqualTo(202);
+    await()
+        .atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(
+            () -> {
+              var pollResponse = get("/imports/" + importId);
+              assertThat(pollResponse.statusCode()).isEqualTo(200);
+              var body = objectMapper.readTree(pollResponse.body());
+              assertThat(body.get("status").asText()).isEqualTo("confirmed");
+            });
+    var confirmBody =
+        objectMapper.readTree(get("/imports/" + importId).body()).get("confirmation_result");
     assertThat(confirmBody.get("unit_count").asInt()).isEqualTo(2);
 
     // assert - one sku with both units carrying photos
@@ -306,9 +316,20 @@ public class TcgInventoryE2ETest {
 
     // act - confirm pull
     var confirmOrderResponse = post("/orders/99001/confirm");
-    assertThat(confirmOrderResponse.statusCode()).isEqualTo(200);
+    assertThat(confirmOrderResponse.statusCode()).isEqualTo(202);
+    await()
+        .atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(
+            () -> {
+              var pollResponse = get("/orders/99001");
+              assertThat(pollResponse.statusCode()).isEqualTo(200);
+              var body = objectMapper.readTree(pollResponse.body());
+              assertThat(body.get("state").asText()).isEqualTo("fulfilled");
+            });
     var confirmOrderBody = objectMapper.readTree(confirmOrderResponse.body());
-    assertThat(confirmOrderBody.get("state").asText()).isEqualTo("fulfilled");
+    assertThat(confirmOrderBody.get("order_id").asText()).isEqualTo("99001");
+    assertThat(confirmOrderBody.has("state")).isFalse();
 
     // assert - verify order is fulfilled
     var finalOrdersResponse = get("/orders");
@@ -444,7 +465,17 @@ public class TcgInventoryE2ETest {
             });
 
     var confirmResponse2 = post("/imports/" + importId2 + "/confirm");
-    assertThat(confirmResponse2.statusCode()).isEqualTo(200);
+    assertThat(confirmResponse2.statusCode()).isEqualTo(202);
+    await()
+        .atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(
+            () -> {
+              var pollResponse = get("/imports/" + importId2);
+              assertThat(pollResponse.statusCode()).isEqualTo(200);
+              var body = objectMapper.readTree(pollResponse.body());
+              assertThat(body.get("status").asText()).isEqualTo("confirmed");
+            });
 
     // assert - report is now stale after mutation
     var staleReportResponse = get("/reports");

@@ -12,8 +12,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
@@ -21,19 +19,14 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.Delete;
+import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.Put;
-import software.amazon.awssdk.services.dynamodb.model.ReturnValuesOnConditionCheckFailure;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
-import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 import software.amazon.awssdk.services.dynamodb.model.Update;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 public class InventoryRepository {
-  private static final Logger LOGGER = LoggerFactory.getLogger(InventoryRepository.class);
-
-  private static final int MAX_TRANSACT_ITEMS = 100;
-
   private final DynamoDbTable<UnitItem> unitTable;
   private final DynamoDbClient dynamoDbClient;
   private final Clock clock;
@@ -81,21 +74,29 @@ public class InventoryRepository {
     return results;
   }
 
-  public void removeUnit(String user, String skuId, int sequenceNumber, @Nullable String reason) {
+  public void removeUnit(String user, String skuId, UnitItem unitItem, @Nullable String reason) {
     var auditAttributes = new HashMap<String, AttributeValue>();
     auditAttributes.put(SkuItem.SKU_ID, AttributeValue.builder().s(skuId).build());
     auditAttributes.put(
         UnitItem.SEQUENCE_NUMBER,
-        AttributeValue.builder().n(String.valueOf(sequenceNumber)).build());
+        AttributeValue.builder().n(String.valueOf(unitItem.getSequenceNumber())).build());
+    auditAttributes.put("import_id", AttributeValue.builder().s(unitItem.getImportId()).build());
+    auditAttributes.put("before_status", AttributeValue.builder().s("in_stock").build());
+    auditAttributes.put("after_status", AttributeValue.builder().s("removed").build());
+    auditAttributes.put("before_owner", AttributeValue.builder().s("none").build());
+    auditAttributes.put("after_owner", AttributeValue.builder().s("none").build());
     if (reason != null && !reason.isEmpty()) {
       auditAttributes.put("decision_reason", AttributeValue.builder().s(reason).build());
     }
 
-    executeChunked(
-        List.of(
-            buildSkuDirtyUpdate(user, skuId),
-            buildUnitRemoveUpdate(user, skuId, sequenceNumber),
-            buildAuditPut(user, "adjustment", auditAttributes)));
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                List.of(
+                    buildSkuDirtyUpdate(user, skuId),
+                    buildUnitRemoveUpdate(user, skuId, unitItem.getSequenceNumber()),
+                    buildAuditPut(user, "adjustment", auditAttributes)))
+            .build());
   }
 
   // one transaction across both SKU partitions: the unit moves keeping its sequence number and
@@ -134,22 +135,37 @@ public class InventoryRepository {
       movedUnit.setPhotos(unitItem.getPhotos());
     }
 
-    executeChunked(
-        List.of(
-            buildUnitDelete(user, skuItem.getSkuId(), unitItem.getSequenceNumber()),
-            buildUnitPut(movedUnit),
-            buildSkuDirtyUpdate(user, skuItem.getSkuId()),
-            buildSkuUpsert(targetSku),
-            buildAuditPut(
-                user,
-                "adjustment",
-                Map.of(
-                    SkuItem.SKU_ID,
-                    AttributeValue.builder().s(skuItem.getSkuId()).build(),
-                    UnitItem.SEQUENCE_NUMBER,
-                    AttributeValue.builder()
-                        .n(String.valueOf(unitItem.getSequenceNumber()))
-                        .build()))));
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                List.of(
+                    buildUnitDelete(user, skuItem.getSkuId(), unitItem.getSequenceNumber()),
+                    buildUnitPut(movedUnit),
+                    buildSkuDirtyUpdate(user, skuItem.getSkuId()),
+                    buildSkuUpsert(targetSku),
+                    buildAuditPut(
+                        user,
+                        "adjustment",
+                        Map.of(
+                            SkuItem.SKU_ID,
+                            AttributeValue.builder().s(skuItem.getSkuId()).build(),
+                            "target_sku_id",
+                            AttributeValue.builder().s(targetSkuId).build(),
+                            "import_id",
+                            AttributeValue.builder().s(unitItem.getImportId()).build(),
+                            UnitItem.SEQUENCE_NUMBER,
+                            AttributeValue.builder()
+                                .n(String.valueOf(unitItem.getSequenceNumber()))
+                                .build(),
+                            "before_status",
+                            AttributeValue.builder().s("in_stock").build(),
+                            "after_status",
+                            AttributeValue.builder().s("in_stock").build(),
+                            "before_owner",
+                            AttributeValue.builder().s("none").build(),
+                            "after_owner",
+                            AttributeValue.builder().s("none").build()))))
+            .build());
 
     return targetSkuId;
   }
@@ -185,49 +201,82 @@ public class InventoryRepository {
     return newValue - count;
   }
 
-  // deliberately a single transaction rather than a chunked sequence: a replayed chunk fails its
-  // unit-exists condition and the whole transaction cancels atomically into a no-op
-  public void confirmImportSku(
-      String user, String importId, SkuItem skuSeed, List<UnitItem> units) {
-    var transactItems = new ArrayList<TransactWriteItem>();
-    for (var unit : units) {
-      transactItems.add(
-          TransactWriteItem.builder()
-              .put(
-                  Put.builder()
-                      .tableName(TcgInventoryTable.TABLE_NAME)
-                      .item(unitTable.tableSchema().itemToMap(unit, true))
-                      .conditionExpression("attribute_not_exists(pk)")
-                      .returnValuesOnConditionCheckFailure(ReturnValuesOnConditionCheckFailure.NONE)
-                      .build())
-              .build());
-    }
-    transactItems.add(buildSkuUpsert(skuSeed));
-    transactItems.add(
-        buildAuditPut(
-            user,
-            "import_confirm",
-            Map.of(
-                "import_id",
-                AttributeValue.builder().s(importId).build(),
-                SkuItem.SKU_ID,
-                AttributeValue.builder().s(skuSeed.getSkuId()).build())));
-
-    try {
-      dynamoDbClient.transactWriteItems(
-          TransactWriteItemsRequest.builder().transactItems(transactItems).build());
-    } catch (TransactionCanceledException e) {
-      LOGGER.info("transaction cancelled for SKU chunk {} (likely replay)", skuSeed.getSkuId());
-    }
+  public UnitItem getUnitConsistent(String user, String skuId, int sequenceNumber) {
+    var response =
+        dynamoDbClient.getItem(
+            GetItemRequest.builder()
+                .tableName(TcgInventoryTable.TABLE_NAME)
+                .key(
+                    Map.of(
+                        UnitItem.PK,
+                        AttributeValue.builder().s(UnitItem.formatPk(user, skuId)).build(),
+                        UnitItem.SK,
+                        AttributeValue.builder().s(UnitItem.formatSk(sequenceNumber)).build()))
+                .consistentRead(true)
+                .build());
+    return response.hasItem() ? unitTable.tableSchema().mapToItem(response.item()) : null;
   }
 
-  public void executeChunked(List<TransactWriteItem> transactItems) {
-    for (int start = 0; start < transactItems.size(); start += MAX_TRANSACT_ITEMS) {
-      var chunk =
-          transactItems.subList(start, Math.min(start + MAX_TRANSACT_ITEMS, transactItems.size()));
-      dynamoDbClient.transactWriteItems(
-          TransactWriteItemsRequest.builder().transactItems(chunk).build());
-    }
+  public void confirmImportUnit(
+      String user,
+      String importId,
+      UnitItem unit,
+      SkuItem skuSeed,
+      TransactWriteItem parentCheck,
+      TransactWriteItem rowCompletion) {
+    var auditAttributes = new HashMap<String, AttributeValue>();
+    auditAttributes.put("import_id", AttributeValue.builder().s(importId).build());
+    auditAttributes.put(SkuItem.SKU_ID, AttributeValue.builder().s(skuSeed.getSkuId()).build());
+    auditAttributes.put(
+        UnitItem.SEQUENCE_NUMBER,
+        AttributeValue.builder().n(String.valueOf(unit.getSequenceNumber())).build());
+    auditAttributes.put("before_status", AttributeValue.builder().s("absent").build());
+    auditAttributes.put("before_owner", AttributeValue.builder().s("none").build());
+    auditAttributes.put("after_status", AttributeValue.builder().s("in_stock").build());
+    auditAttributes.put("after_owner", AttributeValue.builder().s("none").build());
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                List.of(
+                    parentCheck,
+                    buildImportUnitPut(unit),
+                    buildSkuUpsert(skuSeed),
+                    buildAuditPut(user, "unit_import", auditAttributes),
+                    rowCompletion))
+            .build());
+  }
+
+  public void completeLegacyImportUnit(
+      String user,
+      String importId,
+      String skuId,
+      int sequenceNumber,
+      TransactWriteItem parentCheck,
+      TransactWriteItem rowCompletion) {
+    var attributes =
+        Map.of(
+            "import_id",
+            AttributeValue.builder().s(importId).build(),
+            SkuItem.SKU_ID,
+            AttributeValue.builder().s(skuId).build(),
+            UnitItem.SEQUENCE_NUMBER,
+            AttributeValue.builder().n(String.valueOf(sequenceNumber)).build(),
+            "before_status",
+            AttributeValue.builder().s("in_stock").build(),
+            "after_status",
+            AttributeValue.builder().s("in_stock").build(),
+            "before_owner",
+            AttributeValue.builder().s("none").build(),
+            "after_owner",
+            AttributeValue.builder().s("none").build());
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                List.of(
+                    parentCheck,
+                    rowCompletion,
+                    buildAuditPut(user, "unit_import_recovered", attributes)))
+            .build());
   }
 
   public TransactWriteItem buildUnitReserveUpdate(
@@ -249,7 +298,7 @@ public class InventoryRepository {
                         + " = :orderId, "
                         + UnitItem.UPDATED_AT
                         + " = :now")
-                .conditionExpression("#status = :inStock")
+                .conditionExpression("#status = :inStock AND attribute_not_exists(order_id)")
                 .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                 .expressionAttributeValues(
                     Map.of(
@@ -264,7 +313,8 @@ public class InventoryRepository {
         .build();
   }
 
-  public TransactWriteItem buildUnitSellUpdate(String user, String skuId, int sequenceNumber) {
+  public TransactWriteItem buildUnitSellUpdate(
+      String user, String skuId, int sequenceNumber, String orderId) {
     var skuPk = SkuItem.formatPk(user, skuId);
     var unitSk = UnitItem.formatSk(sequenceNumber);
 
@@ -277,12 +327,13 @@ public class InventoryRepository {
                         SkuItem.PK, AttributeValue.builder().s(skuPk).build(),
                         SkuItem.SK, AttributeValue.builder().s(unitSk).build()))
                 .updateExpression("SET #status = :sold, " + UnitItem.UPDATED_AT + " = :now")
-                .conditionExpression("#status IN (:reserved, :sold)")
+                .conditionExpression("#status = :reserved AND order_id = :orderId")
                 .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                 .expressionAttributeValues(
                     Map.of(
                         ":sold", AttributeValue.builder().s("sold").build(),
                         ":reserved", AttributeValue.builder().s("reserved").build(),
+                        ":orderId", AttributeValue.builder().s(orderId).build(),
                         ":now",
                             AttributeValue.builder()
                                 .n(String.valueOf(clock.now().getEpochSecond()))
@@ -291,7 +342,8 @@ public class InventoryRepository {
         .build();
   }
 
-  public TransactWriteItem buildUnitReleaseUpdate(String user, String skuId, int sequenceNumber) {
+  public TransactWriteItem buildUnitReleaseUpdate(
+      String user, String skuId, int sequenceNumber, String orderId) {
     var skuPk = SkuItem.formatPk(user, skuId);
     var unitSk = UnitItem.formatSk(sequenceNumber);
 
@@ -308,12 +360,13 @@ public class InventoryRepository {
                         + UnitItem.UPDATED_AT
                         + " = :now REMOVE "
                         + "order_id")
-                .conditionExpression("#status IN (:reserved, :inStock)")
+                .conditionExpression("#status = :reserved AND order_id = :orderId")
                 .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                 .expressionAttributeValues(
                     Map.of(
                         ":inStock", AttributeValue.builder().s("in_stock").build(),
                         ":reserved", AttributeValue.builder().s("reserved").build(),
+                        ":orderId", AttributeValue.builder().s(orderId).build(),
                         ":now",
                             AttributeValue.builder()
                                 .n(String.valueOf(clock.now().getEpochSecond()))
@@ -335,7 +388,7 @@ public class InventoryRepository {
                         SkuItem.PK, AttributeValue.builder().s(skuPk).build(),
                         SkuItem.SK, AttributeValue.builder().s(unitSk).build()))
                 .updateExpression("SET #status = :removed, " + UnitItem.UPDATED_AT + " = :now")
-                .conditionExpression("#status = :inStock")
+                .conditionExpression("#status = :inStock AND attribute_not_exists(order_id)")
                 .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                 .expressionAttributeValues(
                     Map.of(
@@ -361,7 +414,7 @@ public class InventoryRepository {
                     Map.of(
                         SkuItem.PK, AttributeValue.builder().s(skuPk).build(),
                         SkuItem.SK, AttributeValue.builder().s(unitSk).build()))
-                .conditionExpression("#status = :inStock")
+                .conditionExpression("#status = :inStock AND attribute_not_exists(order_id)")
                 .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                 .expressionAttributeValues(
                     Map.of(":inStock", AttributeValue.builder().s("in_stock").build()))
@@ -375,6 +428,17 @@ public class InventoryRepository {
             Put.builder()
                 .tableName(TcgInventoryTable.TABLE_NAME)
                 .item(unitTable.tableSchema().itemToMap(unitItem, true))
+                .build())
+        .build();
+  }
+
+  private TransactWriteItem buildImportUnitPut(UnitItem unitItem) {
+    return TransactWriteItem.builder()
+        .put(
+            Put.builder()
+                .tableName(TcgInventoryTable.TABLE_NAME)
+                .item(unitTable.tableSchema().itemToMap(unitItem, true))
+                .conditionExpression("attribute_not_exists(" + UnitItem.PK + ")")
                 .build())
         .build();
   }

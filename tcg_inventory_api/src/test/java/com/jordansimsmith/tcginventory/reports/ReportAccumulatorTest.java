@@ -105,13 +105,16 @@ public class ReportAccumulatorTest {
 
     // act
     accumulator.addOrder(createOrder("to_pick", "10.50"));
+    accumulator.addOrder(createOrder("fulfilling", "8.25"));
     accumulator.addOrder(createOrder("fulfilled", "5.25"));
     accumulator.addOrder(createOrder("awaiting_payment", "100.00"));
+    accumulator.addOrder(createOrder("reserving", "100.00"));
+    accumulator.addOrder(createOrder("releasing", "100.00"));
     accumulator.addOrder(createOrder("voided", "20.00"));
 
     // assert
     var totals = accumulator.toTotals();
-    assertThat(totals.revenueToDate()).isEqualTo("15.75");
+    assertThat(totals.revenueToDate()).isEqualTo("24.00");
   }
 
   @Test

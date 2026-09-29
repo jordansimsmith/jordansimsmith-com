@@ -20,6 +20,7 @@ public class JobItem {
   public static final String JOB_TYPE = "job_type";
   public static final String STATUS = "status";
   public static final String IMPORT_ID = "import_id";
+  public static final String ORDER_ID = "order_id";
   public static final String CONTINUATION = "continuation";
   public static final String PROCESSED_COUNT = "processed_count";
   public static final String ERROR = "error";
@@ -32,6 +33,7 @@ public class JobItem {
   private String jobType;
   private String status;
   private String importId;
+  private String orderId;
   private Integer continuation;
   private Integer processedCount;
   private String error;
@@ -94,6 +96,15 @@ public class JobItem {
     this.importId = importId;
   }
 
+  @DynamoDbAttribute(ORDER_ID)
+  public String getOrderId() {
+    return orderId;
+  }
+
+  public void setOrderId(@Nullable String orderId) {
+    this.orderId = orderId;
+  }
+
   @DynamoDbAttribute(CONTINUATION)
   public Integer getContinuation() {
     return continuation;
@@ -147,6 +158,10 @@ public class JobItem {
 
   public static String formatSk(String jobId) {
     return JOB_PREFIX + jobId;
+  }
+
+  public static String formatResourceJobId(String jobType, String resourceId) {
+    return jobType + DELIMITER + resourceId;
   }
 
   public static JobItem create(

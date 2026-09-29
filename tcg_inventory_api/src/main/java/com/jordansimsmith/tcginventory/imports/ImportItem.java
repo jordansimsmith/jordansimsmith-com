@@ -23,6 +23,8 @@ public class ImportItem {
   public static final String ROW_COUNT = "row_count";
   public static final String JOB_ID = "job_id";
   public static final String ERROR = "error";
+  public static final String FIRST_SEQUENCE_NUMBER = "first_sequence_number";
+  public static final String CONFIRMATION_UNIT_COUNT = "confirmation_unit_count";
   public static final String CREATED_AT = "created_at";
   public static final String UPDATED_AT = "updated_at";
 
@@ -35,6 +37,8 @@ public class ImportItem {
   private Integer rowCount;
   private String jobId;
   private String error;
+  private Integer firstSequenceNumber;
+  private Integer confirmationUnitCount;
   private Instant createdAt;
   private Instant updatedAt;
 
@@ -119,6 +123,24 @@ public class ImportItem {
 
   public void setError(@Nullable String error) {
     this.error = error;
+  }
+
+  @DynamoDbAttribute(FIRST_SEQUENCE_NUMBER)
+  public Integer getFirstSequenceNumber() {
+    return firstSequenceNumber;
+  }
+
+  public void setFirstSequenceNumber(@Nullable Integer firstSequenceNumber) {
+    this.firstSequenceNumber = firstSequenceNumber;
+  }
+
+  @DynamoDbAttribute(CONFIRMATION_UNIT_COUNT)
+  public Integer getConfirmationUnitCount() {
+    return confirmationUnitCount;
+  }
+
+  public void setConfirmationUnitCount(@Nullable Integer confirmationUnitCount) {
+    this.confirmationUnitCount = confirmationUnitCount;
   }
 
   @DynamoDbConvertedBy(EpochSecondConverter.class)

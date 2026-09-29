@@ -13,7 +13,7 @@ interface ImportStatusBadgeProps {
 }
 
 export function ImportStatusBadge({ importSummary }: ImportStatusBadgeProps) {
-  if (importSummary.appraisal_error) {
+  if (importSummary.appraisal_error || importSummary.confirmation_error) {
     return (
       <Badge variant="light" color="red">
         failed

@@ -1,7 +1,7 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { createFakeClient } from './fake-client';
 import { createFakeScanUploader } from './fake-scan-uploader';
-import type { ScanConfirmationRow } from './client';
+import type { ImportConfirmationResult, ScanConfirmationRow } from './client';
 
 describe('createFakeClient', () => {
   it('returns the Magic game registry with ordered finishes and capabilities', async () => {
@@ -313,7 +313,7 @@ describe('createFakeClient imports', () => {
     expect(discardRow?.suggested_price).toBeNull();
   });
 
-  it('rejects confirm unless the import is in review', async () => {
+  it('returns the current state when confirming an already confirmed import', async () => {
     vi.useFakeTimers();
     const client = createFakeClient();
     const created = await client.createImport('mtg', 'bulk.csv', UPLOAD_BODY);
@@ -324,9 +324,9 @@ describe('createFakeClient imports', () => {
 
     vi.advanceTimersByTime(60_000);
     await client.confirmImport(created.import_id);
-    await expect(client.confirmImport(created.import_id)).rejects.toThrow(
-      'import is not in review status',
-    );
+    await expect(client.confirmImport(created.import_id)).resolves.toEqual({
+      import_id: created.import_id,
+    });
   });
 
   it('confirms keep rows bottom-up into inventory and skips review rows', async () => {
@@ -338,12 +338,12 @@ describe('createFakeClient imports', () => {
     const response = await client.confirmImport(created.import_id);
 
     expect(response.import_id).toBe(created.import_id);
-    expect(response.status).toBe('confirmed');
-    expect(response.unit_count).toBe(3);
-    expect(response.total_suggested_price).toBe('9.00');
-    expect(response.first_sequence_number).toBe(600);
-    expect(response.last_sequence_number).toBe(602);
-    expect(response.placement_instructions).toEqual([
+    const detail = await client.getImport(created.import_id);
+    expect(detail.confirmation_result?.unit_count).toBe(3);
+    expect(detail.confirmation_result?.total_suggested_price).toBe('9.00');
+    expect(detail.confirmation_result?.first_sequence_number).toBe(600);
+    expect(detail.confirmation_result?.last_sequence_number).toBe(602);
+    expect(detail.confirmation_result?.placement_instructions).toEqual([
       {
         block: 'A6',
         from_location: 'A6-0',
@@ -398,7 +398,6 @@ describe('createFakeClient imports', () => {
       ),
     ).toBe(false);
 
-    const detail = await client.getImport(created.import_id);
     expect(detail.status).toBe('confirmed');
     expect(detail.total_suggested_price).toBe('9.00');
   });
@@ -406,8 +405,7 @@ describe('createFakeClient imports', () => {
   it('splits placement instructions at block boundaries', async () => {
     vi.useFakeTimers();
     const client = createFakeClient();
-    let response: Awaited<ReturnType<typeof client.confirmImport>> | null =
-      null;
+    let response: ImportConfirmationResult | null = null;
     for (let importNumber = 0; importNumber < 34; importNumber += 1) {
       const created = await client.createImport(
         'mtg',
@@ -415,7 +413,10 @@ describe('createFakeClient imports', () => {
         UPLOAD_BODY,
       );
       vi.advanceTimersByTime(60_000);
-      response = await client.confirmImport(created.import_id);
+      const result = await client.confirmImport(created.import_id);
+      expect(result.import_id).toBe(created.import_id);
+      response =
+        (await client.getImport(created.import_id)).confirmation_result ?? null;
     }
 
     expect(response?.unit_count).toBe(3);
@@ -439,12 +440,14 @@ describe('createFakeClient imports', () => {
     }
 
     const response = await client.confirmImport(importId);
-
-    expect(response.unit_count).toBe(0);
-    expect(response.total_suggested_price).toBe('0.00');
-    expect(response.first_sequence_number).toBeNull();
-    expect(response.last_sequence_number).toBeNull();
-    expect(response.placement_instructions).toEqual([]);
+    expect(response).toEqual({ import_id: importId });
+    expect((await client.getImport(importId)).confirmation_result).toEqual({
+      unit_count: 0,
+      total_suggested_price: '0.00',
+      first_sequence_number: null,
+      last_sequence_number: null,
+      placement_instructions: [],
+    });
   });
 });
 
@@ -821,7 +824,7 @@ describe('createFakeClient orders', () => {
 
     const confirmed = await client.confirmOrder('83647');
 
-    expect(confirmed).toEqual({ order_id: '83647', state: 'fulfilled' });
+    expect(confirmed).toEqual({ order_id: '83647' });
 
     const detail = await client.getOrder('83647');
     expect(detail.state).toBe('fulfilled');

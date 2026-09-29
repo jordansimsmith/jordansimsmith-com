@@ -60,24 +60,22 @@ public class DeleteScanHandler
     var user = requestContextFactory.createCtx(event).user();
     var scanId = event.getPathParameters().get("scan_id");
     var scanItem = scanRepository.getScan(user, scanId);
-    if (scanItem == null) {
-      return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
-    }
-    if (!isDeletableStatus(scanItem.getStatus())) {
-      return httpResponseFactory.conflict(new ErrorResponse("scan is not in a deletable status"));
+    if (scanItem != null) {
+      if (!isDeletableStatus(scanItem.getStatus())) {
+        return httpResponseFactory.conflict(new ErrorResponse("scan is not in a deletable status"));
+      }
+      if (!scanRepository.deleteScan(user, scanId)) {
+        var currentScan = scanRepository.getScan(user, scanId);
+        if (currentScan != null) {
+          return httpResponseFactory.conflict(
+              new ErrorResponse("scan is not in a deletable status"));
+        }
+      }
     }
 
     var rowItems = scanRepository.findScanRows(user, scanId);
-    if (!scanRepository.deleteScan(user, scanId)) {
-      var currentScan = scanRepository.getScan(user, scanId);
-      if (currentScan == null) {
-        return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
-      }
-      return httpResponseFactory.conflict(new ErrorResponse("scan is not in a deletable status"));
-    }
-
-    scanRepository.deleteScanRows(rowItems);
     deleteSourceObjects(rowItems);
+    scanRepository.deleteScanRows(rowItems);
     return httpResponseFactory.noContent();
   }
 

@@ -1,5 +1,6 @@
 package com.jordansimsmith.tcginventory.scans;
 
+import com.jordansimsmith.tcginventory.DynamoBatchWriter;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.time.Clock;
 import java.util.List;
@@ -15,15 +16,17 @@ import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;
 import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.dynamodb.model.Delete;
 import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
-import software.amazon.awssdk.services.dynamodb.model.Put;
+import software.amazon.awssdk.services.dynamodb.model.DeleteRequest;
+import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.PutRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.WriteRequest;
 
 public class ScanRepository {
-  private static final int MAX_TRANSACT_ITEMS = 100;
-
   public record ScanPage(List<ScanItem> items, Map<String, AttributeValue> lastEvaluatedKey) {}
 
   private final DynamoDbTable<ScanItem> scanTable;
@@ -43,15 +46,25 @@ public class ScanRepository {
   }
 
   public void createScan(ScanItem scanItem, List<ScanRowItem> rowItems) {
-    for (int start = 0; start < rowItems.size(); start += MAX_TRANSACT_ITEMS) {
-      var end = Math.min(start + MAX_TRANSACT_ITEMS, rowItems.size());
-      var writes = rowItems.subList(start, end).stream().map(this::buildScanRowPut).toList();
-      dynamoDbClient.transactWriteItems(
-          TransactWriteItemsRequest.builder().transactItems(writes).build());
-    }
-
-    dynamoDbClient.transactWriteItems(
-        TransactWriteItemsRequest.builder().transactItems(List.of(buildScanPut(scanItem))).build());
+    DynamoBatchWriter.write(
+        dynamoDbClient,
+        TcgInventoryTable.TABLE_NAME,
+        rowItems.stream()
+            .map(
+                row ->
+                    WriteRequest.builder()
+                        .putRequest(
+                            PutRequest.builder()
+                                .item(scanRowTable.tableSchema().itemToMap(row, true))
+                                .build())
+                        .build())
+            .toList());
+    dynamoDbClient.putItem(
+        PutItemRequest.builder()
+            .tableName(TcgInventoryTable.TABLE_NAME)
+            .item(scanTable.tableSchema().itemToMap(scanItem, true))
+            .conditionExpression("attribute_not_exists(" + ScanItem.PK + ")")
+            .build());
   }
 
   public ScanPage findScans(
@@ -218,7 +231,24 @@ public class ScanRepository {
   }
 
   public void deleteScanRows(List<ScanRowItem> rowItems) {
-    executeChunked(rowItems.stream().map(this::buildScanRowDelete).toList());
+    DynamoBatchWriter.write(
+        dynamoDbClient,
+        TcgInventoryTable.TABLE_NAME,
+        rowItems.stream()
+            .map(
+                row ->
+                    WriteRequest.builder()
+                        .deleteRequest(
+                            DeleteRequest.builder()
+                                .key(
+                                    Map.of(
+                                        ScanRowItem.PK,
+                                            AttributeValue.builder().s(row.getPk()).build(),
+                                        ScanRowItem.SK,
+                                            AttributeValue.builder().s(row.getSk()).build()))
+                                .build())
+                        .build())
+            .toList());
   }
 
   public List<ScanRowItem> findScanRows(String user, String scanId) {
@@ -231,6 +261,7 @@ public class ScanRepository {
                         .sortValue(ScanRowItem.ROW_PREFIX)
                         .build()))
             .scanIndexForward(true)
+            .consistentRead(true)
             .build();
     return scanRowTable.query(request).stream().flatMap(page -> page.items().stream()).toList();
   }
@@ -246,54 +277,16 @@ public class ScanRepository {
 
   @Nullable
   public ScanItem getScan(String user, String scanId) {
-    return scanTable.getItem(
-        Key.builder()
-            .partitionValue(ScanItem.formatPk(user))
-            .sortValue(ScanItem.formatSk(scanId))
-            .build());
-  }
-
-  private TransactWriteItem buildScanPut(ScanItem item) {
-    return TransactWriteItem.builder()
-        .put(
-            Put.builder()
-                .tableName(TcgInventoryTable.TABLE_NAME)
-                .item(scanTable.tableSchema().itemToMap(item, true))
-                .conditionExpression("attribute_not_exists(" + ScanItem.PK + ")")
-                .build())
-        .build();
-  }
-
-  private TransactWriteItem buildScanRowPut(ScanRowItem item) {
-    return TransactWriteItem.builder()
-        .put(
-            Put.builder()
-                .tableName(TcgInventoryTable.TABLE_NAME)
-                .item(scanRowTable.tableSchema().itemToMap(item, true))
-                .conditionExpression("attribute_not_exists(" + ScanRowItem.PK + ")")
-                .build())
-        .build();
-  }
-
-  private TransactWriteItem buildScanRowDelete(ScanRowItem item) {
-    return TransactWriteItem.builder()
-        .delete(
-            Delete.builder()
+    var response =
+        dynamoDbClient.getItem(
+            GetItemRequest.builder()
                 .tableName(TcgInventoryTable.TABLE_NAME)
                 .key(
                     Map.of(
-                        ScanRowItem.PK, AttributeValue.builder().s(item.getPk()).build(),
-                        ScanRowItem.SK, AttributeValue.builder().s(item.getSk()).build()))
-                .build())
-        .build();
-  }
-
-  private void executeChunked(List<TransactWriteItem> transactItems) {
-    for (int start = 0; start < transactItems.size(); start += MAX_TRANSACT_ITEMS) {
-      var chunk =
-          transactItems.subList(start, Math.min(start + MAX_TRANSACT_ITEMS, transactItems.size()));
-      dynamoDbClient.transactWriteItems(
-          TransactWriteItemsRequest.builder().transactItems(chunk).build());
-    }
+                        ScanItem.PK, AttributeValue.builder().s(ScanItem.formatPk(user)).build(),
+                        ScanItem.SK, AttributeValue.builder().s(ScanItem.formatSk(scanId)).build()))
+                .consistentRead(true)
+                .build());
+    return response.hasItem() ? scanTable.tableSchema().mapToItem(response.item()) : null;
   }
 }

@@ -8,58 +8,29 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import com.jordansimsmith.tcginventory.CardIdentity;
-import com.jordansimsmith.tcginventory.Condition;
+import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.Photos;
-import com.jordansimsmith.tcginventory.SkuIds;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.tcginventory.inventory.InventoryLocation;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
-import com.jordansimsmith.time.Clock;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
-import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 public class ConfirmImportHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(ConfirmImportHandler.class);
 
-  record ConfirmResponse(
-      @JsonProperty("import_id") String importId,
-      @JsonProperty("status") String status,
-      @JsonProperty("unit_count") int unitCount,
-      @JsonProperty("total_suggested_price") String totalSuggestedPrice,
-      @JsonProperty("first_sequence_number") int firstSequenceNumber,
-      @JsonProperty("last_sequence_number") int lastSequenceNumber,
-      @JsonProperty("placement_instructions") List<PlacementInstruction> placementInstructions) {}
-
-  record PlacementInstruction(
-      @JsonProperty("block") String block,
-      @JsonProperty("from_location") String fromLocation,
-      @JsonProperty("to_location") String toLocation,
-      @JsonProperty("from_name") String fromName,
-      @JsonProperty("to_name") String toName,
-      @JsonProperty("unit_count") int unitCount) {}
+  record ConfirmImportResponse(@JsonProperty("import_id") String importId) {}
 
   record ErrorResponse(@JsonProperty("message") String message) {}
 
-  private final Clock clock;
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<ImportItem> importTable;
-  private final DynamoDbTable<ImportRowItem> importRowTable;
-  private final InventoryRepository inventoryRepository;
+  private final ImportRepository importRepository;
+  private final QueueClient<JobMessage> jobsQueue;
 
   public ConfirmImportHandler() {
     this(TcgInventoryFactory.create());
@@ -67,18 +38,24 @@ public class ConfirmImportHandler
 
   @VisibleForTesting
   ConfirmImportHandler(TcgInventoryFactory factory) {
-    this.clock = factory.clock();
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.importTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class);
-    this.importRowTable =
-        TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
-    this.inventoryRepository =
+    var dynamoDbClient = factory.dynamoDbClient();
+    var inventoryRepository =
         new InventoryRepository(
             TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class),
-            factory.dynamoDbClient(),
+            dynamoDbClient,
             factory.clock(),
             factory.ulidGenerator());
+    this.importRepository =
+        new ImportRepository(
+            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class),
+            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class),
+            factory.jobTable(),
+            inventoryRepository,
+            dynamoDbClient,
+            factory.clock());
+    this.jobsQueue = factory.jobsQueue();
   }
 
   @Override
@@ -94,211 +71,44 @@ public class ConfirmImportHandler
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
     var user = requestContextFactory.createCtx(event).user();
     var importId = event.getPathParameters().get("import_id");
-
-    var importKey =
-        Key.builder()
-            .partitionValue(SkuItem.formatUserPk(user))
-            .sortValue(ImportItem.formatSk(importId))
-            .build();
-    var importItem = importTable.getItem(importKey);
+    var importItem = importRepository.getImport(user, importId);
     if (importItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
-
+    if ("confirmed".equals(importItem.getStatus())) {
+      return httpResponseFactory.ok(new ConfirmImportResponse(importId));
+    }
+    if ("review".equals(importItem.getStatus())) {
+      var keepRows = importRepository.findKeepRows(user, importId);
+      var rowsNeedingPhotos =
+          keepRows.stream()
+              .filter(
+                  row ->
+                      Photos.needsPhotos(
+                          row.getDecision(),
+                          row.getSuggestedPrice(),
+                          row.getPhotos() == null ? 0 : row.getPhotos().size()))
+              .count();
+      if (rowsNeedingPhotos > 0) {
+        return httpResponseFactory.conflict(
+            new ErrorResponse(rowsNeedingPhotos + " rows need photos before confirm"));
+      }
+    }
     if (!"review".equals(importItem.getStatus()) && !"confirming".equals(importItem.getStatus())) {
       return httpResponseFactory.conflict(new ErrorResponse("import is not in review status"));
     }
-    var keepRows = queryKeepRows(user, importId);
-    var skuGroups = groupBySkuId(importItem.getGame(), keepRows);
-    long rowsNeedingPhotos =
-        keepRows.stream()
-            .filter(
-                row ->
-                    Photos.needsPhotos(
-                        row.getDecision(),
-                        row.getSuggestedPrice(),
-                        row.getPhotos() == null ? 0 : row.getPhotos().size()))
-            .count();
-    if (rowsNeedingPhotos > 0) {
-      return httpResponseFactory.conflict(
-          new ErrorResponse(rowsNeedingPhotos + " rows need photos before confirm"));
+
+    var job = importRepository.ensureConfirmationJob(user, importId);
+    importItem = importRepository.getImport(user, importId);
+    if ("confirmed".equals(importItem.getStatus())) {
+      return httpResponseFactory.ok(new ConfirmImportResponse(importId));
     }
-
-    if ("review".equals(importItem.getStatus())) {
-      importItem.setStatus("confirming");
-      importItem.setUpdatedAt(clock.now());
-      importTable.putItem(importItem);
+    if (job == null) {
+      throw new IllegalStateException("confirming import is missing its confirmation job");
     }
-
-    var totalSuggestedPrice = ImportRows.totalSuggestedPrice(keepRows);
-
-    if (keepRows.isEmpty()) {
-      importItem.setStatus("confirmed");
-      importItem.setUpdatedAt(clock.now());
-      importTable.putItem(importItem);
-      return httpResponseFactory.ok(
-          new ConfirmResponse(importId, "confirmed", 0, totalSuggestedPrice, 0, 0, List.of()));
-    }
-
-    int keepCount = keepRows.size();
-    int firstSeq = allocateSequenceRange(user, importItem.getGame(), keepCount, keepRows);
-    int lastSeq = firstSeq + keepCount - 1;
-
-    assignSequenceNumbers(keepRows, firstSeq);
-
-    for (var entry : skuGroups.entrySet()) {
-      confirmSkuChunk(user, importItem.getGame(), importId, entry.getKey(), entry.getValue());
-    }
-
-    importItem.setStatus("confirmed");
-    importItem.setUpdatedAt(clock.now());
-    importTable.putItem(importItem);
-
-    var placementInstructions = buildPlacementInstructions(keepRows);
-
-    return httpResponseFactory.ok(
-        new ConfirmResponse(
-            importId,
-            "confirmed",
-            keepCount,
-            totalSuggestedPrice,
-            firstSeq,
-            lastSeq,
-            placementInstructions));
-  }
-
-  private List<ImportRowItem> queryKeepRows(String user, String importId) {
-    var queryConditional =
-        QueryConditional.sortBeginsWith(
-            Key.builder()
-                .partitionValue(ImportRowItem.formatPk(user, importId))
-                .sortValue(ImportRowItem.ROW_PREFIX)
-                .build());
-
-    var request =
-        QueryEnhancedRequest.builder()
-            .queryConditional(queryConditional)
-            .scanIndexForward(true)
-            .build();
-
-    return importRowTable.query(request).stream()
-        .flatMap(page -> page.items().stream())
-        .filter(row -> "keep".equals(row.getDecision()))
-        .toList();
-  }
-
-  private int allocateSequenceRange(
-      String user, String game, int keepCount, List<ImportRowItem> keepRows) {
-    var firstRowWithSeq =
-        keepRows.stream().filter(r -> r.getSequenceNumber() != null).findFirst().orElse(null);
-    if (firstRowWithSeq != null) {
-      return keepRows.stream()
-          .filter(r -> r.getSequenceNumber() != null)
-          .mapToInt(ImportRowItem::getSequenceNumber)
-          .min()
-          .orElse(0);
-    }
-
-    return inventoryRepository.allocateSequenceRange(user, game, keepCount);
-  }
-
-  private void assignSequenceNumbers(List<ImportRowItem> keepRows, int firstSeq) {
-    int seq = firstSeq;
-    for (var row : keepRows) {
-      if (row.getSequenceNumber() != null) {
-        seq++;
-        continue;
-      }
-      row.setSequenceNumber(seq);
-      importRowTable.putItem(row);
-      seq++;
-    }
-  }
-
-  private Map<String, List<ImportRowItem>> groupBySkuId(String game, List<ImportRowItem> keepRows) {
-    var groups = new HashMap<String, List<ImportRowItem>>();
-    for (var row : keepRows) {
-      var identity = new CardIdentity(game, row.getExternalSource(), row.getExternalId());
-      var skuId = SkuIds.format(identity, row.getFinish(), Condition.valueOf(row.getCondition()));
-      groups.computeIfAbsent(skuId, k -> new ArrayList<>()).add(row);
-    }
-    return groups;
-  }
-
-  private void confirmSkuChunk(
-      String user, String game, String importId, String skuId, List<ImportRowItem> rows) {
-    var firstRow = rows.get(0);
-    var skuSeed =
-        SkuItem.create(
-            user,
-            skuId,
-            game,
-            firstRow.getExternalSource(),
-            firstRow.getExternalId(),
-            firstRow.getFinish(),
-            firstRow.getCondition(),
-            firstRow.getName(),
-            firstRow.getSetCode(),
-            firstRow.getSetName(),
-            firstRow.getCollectorNumber(),
-            firstRow.getFetchtcgCardId(),
-            firstRow.getSuggestedPrice());
-    skuSeed.setFetchtcgSetId(firstRow.getFetchtcgSetId());
-
-    var units = new ArrayList<UnitItem>();
-    for (var row : rows) {
-      var unit =
-          UnitItem.create(
-              user, game, skuId, row.getSequenceNumber(), "in_stock", importId, clock.now());
-      if (row.getPhotos() != null && !row.getPhotos().isEmpty()) {
-        unit.setPhotos(
-            row.getPhotos().stream()
-                .map(photo -> UnitItem.Photo.create(photo.getPhotoId(), photo.getFetchtcgUrl()))
-                .toList());
-      }
-      units.add(unit);
-    }
-
-    inventoryRepository.confirmImportSku(user, importId, skuSeed, units);
-  }
-
-  private List<PlacementInstruction> buildPlacementInstructions(List<ImportRowItem> keepRows) {
-    var instructions = new ArrayList<PlacementInstruction>();
-
-    int currentBlockNum = keepRows.get(0).getSequenceNumber() / 100;
-    int blockStartIdx = 0;
-
-    for (int i = 0; i < keepRows.size(); i++) {
-      int seq = keepRows.get(i).getSequenceNumber();
-      int blockNum = seq / 100;
-
-      if (blockNum != currentBlockNum) {
-        instructions.add(buildInstruction(keepRows, blockStartIdx, i - 1, currentBlockNum));
-        currentBlockNum = blockNum;
-        blockStartIdx = i;
-      }
-    }
-
-    instructions.add(
-        buildInstruction(keepRows, blockStartIdx, keepRows.size() - 1, currentBlockNum));
-
-    return instructions;
-  }
-
-  private PlacementInstruction buildInstruction(
-      List<ImportRowItem> rows, int startIdx, int endIdx, int blockNum) {
-    var block = InventoryLocation.formatBlock(blockNum);
-    var firstRow = rows.get(startIdx);
-    var lastRow = rows.get(endIdx);
-    int firstSeq = firstRow.getSequenceNumber();
-    int lastSeq = lastRow.getSequenceNumber();
-
-    return new PlacementInstruction(
-        block,
-        InventoryLocation.formatLocation(firstSeq),
-        InventoryLocation.formatLocation(lastSeq),
-        firstRow.getName(),
-        lastRow.getName(),
-        endIdx - startIdx + 1);
+    var jobMessage = new JobMessage(user, job.getJobId(), "confirm_import");
+    var continuation = job.getContinuation() == null ? 0 : job.getContinuation();
+    jobsQueue.send(jobMessage, user, jobMessage.deduplicationId(continuation));
+    return httpResponseFactory.accepted(new ConfirmImportResponse(importId));
   }
 }

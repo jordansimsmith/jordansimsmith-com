@@ -148,7 +148,7 @@ function renderImportDetailPage() {
 
 describe('ImportDetailPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   afterEach(() => {
@@ -401,12 +401,7 @@ describe('ImportDetailPage', () => {
 
   it('confirms the import and shows placement instructions', async () => {
     const user = userEvent.setup();
-    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
-      reviewImport(),
-    );
-    vi.spyOn(clientModule.apiClient, 'confirmImport').mockResolvedValue({
-      import_id: 'import-2',
-      status: 'confirmed',
+    const completedResult = {
       unit_count: 87,
       total_suggested_price: '342.50',
       first_sequence_number: 4200,
@@ -421,6 +416,17 @@ describe('ImportDetailPage', () => {
           unit_count: 87,
         },
       ],
+    };
+    vi.spyOn(clientModule.apiClient, 'getImport')
+      .mockResolvedValueOnce(reviewImport())
+      .mockResolvedValue(
+        importDetail({
+          status: 'confirmed',
+          confirmation_result: completedResult,
+        }),
+      );
+    vi.spyOn(clientModule.apiClient, 'confirmImport').mockResolvedValue({
+      import_id: 'import-2',
     });
 
     renderImportDetailPage();
@@ -440,7 +446,9 @@ describe('ImportDetailPage', () => {
         'import-2',
       );
     });
-    expect(await screen.findByText('Placement instructions')).toBeDefined();
+    await waitFor(() => {
+      expect(screen.getByText('Placement instructions')).toBeDefined();
+    });
     expect(screen.getByText('Total suggested value $342.50')).toBeDefined();
     expect(screen.getByText('A42')).toBeDefined();
     expect(screen.getByText('87 cards')).toBeDefined();
@@ -454,6 +462,87 @@ describe('ImportDetailPage', () => {
     ).toBeDefined();
     expect(screen.queryByText('Top Card')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Confirm import' })).toBeNull();
+  });
+
+  it('polls an accepted confirmation until placement instructions are available', async () => {
+    const user = userEvent.setup();
+    const completedResult = {
+      unit_count: 1,
+      total_suggested_price: '4.50',
+      first_sequence_number: 4200,
+      last_sequence_number: 4200,
+      placement_instructions: [
+        {
+          block: 'A42',
+          from_location: 'A42-0',
+          to_location: 'A42-0',
+          from_name: 'Top Card',
+          to_name: 'Top Card',
+          unit_count: 1,
+        },
+      ],
+    };
+    const getImportMock = vi
+      .spyOn(clientModule.apiClient, 'getImport')
+      .mockResolvedValueOnce(reviewImport())
+      .mockResolvedValueOnce(importDetail({ status: 'confirming' }))
+      .mockResolvedValueOnce(
+        importDetail({
+          status: 'confirmed',
+          confirmation_result: completedResult,
+        }),
+      );
+    vi.spyOn(clientModule.apiClient, 'confirmImport').mockResolvedValue({
+      import_id: 'import-2',
+    });
+
+    renderImportDetailPage();
+    await act(async () => {});
+    await user.click(screen.getByRole('button', { name: 'Confirm import' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+    await act(async () => {});
+
+    expect(screen.getByText('Confirming inventory units…')).toBeDefined();
+    expect(getImportMock).toHaveBeenCalledTimes(2);
+
+    await waitFor(
+      () => expect(screen.getByText('Placement instructions')).toBeDefined(),
+      { timeout: 4000 },
+    );
+    expect(screen.getByText('A42-0 through A42-0')).toBeDefined();
+    expect(getImportMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('offers confirmation retry after a failed confirmation job', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(clientModule.apiClient, 'getImport')
+      .mockResolvedValueOnce(
+        importDetail({
+          status: 'confirming',
+          confirmation_error: 'existing unit has conflicting provenance',
+        }),
+      )
+      .mockResolvedValue(importDetail({ status: 'confirming' }));
+    vi.spyOn(clientModule.apiClient, 'confirmImport').mockResolvedValue({
+      import_id: 'import-2',
+    });
+
+    renderImportDetailPage();
+
+    expect(
+      await screen.findByText('existing unit has conflicting provenance'),
+    ).toBeDefined();
+    await user.click(
+      screen.getByRole('button', { name: 'Retry confirmation' }),
+    );
+
+    await waitFor(() => {
+      expect(clientModule.apiClient.confirmImport).toHaveBeenCalledWith(
+        'import-2',
+      );
+    });
+    expect(screen.getByText('Confirming inventory units…')).toBeDefined();
   });
 
   it('surfaces confirm failures and stays on the review table', async () => {
@@ -556,13 +645,33 @@ describe('ImportDetailPage', () => {
 
   it('renders a confirmed import read-only without a confirm button', async () => {
     vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
-      reviewImport({ status: 'confirmed' }),
+      reviewImport({
+        status: 'confirmed',
+        confirmation_result: {
+          unit_count: 1,
+          total_suggested_price: '4.50',
+          first_sequence_number: 4200,
+          last_sequence_number: 4200,
+          placement_instructions: [
+            {
+              block: 'A42',
+              from_location: 'A42-0',
+              to_location: 'A42-0',
+              from_name: 'Top Card',
+              to_name: 'Top Card',
+              unit_count: 1,
+            },
+          ],
+        },
+      }),
     );
 
     renderImportDetailPage();
 
     expect(await screen.findByText('Top Card')).toBeDefined();
     expect(screen.getByText('Total suggested value $4.50')).toBeDefined();
+    expect(screen.getByText('Placement instructions')).toBeDefined();
+    expect(screen.getByText('A42-0 through A42-0')).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Confirm import' })).toBeNull();
   });
 

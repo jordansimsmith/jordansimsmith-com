@@ -15,6 +15,7 @@ import { notifications } from '@mantine/notifications';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { OrderStateBadge } from '../components/OrderStateBadge';
+import { JobFailureAlert } from '../components/JobFailureAlert';
 import { ConfirmPullModal } from '../components/ConfirmPullModal';
 import { apiClient } from '../api/client';
 import type {
@@ -36,6 +37,7 @@ const CARD_IMAGE_FALLBACK =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='146' height='204' viewBox='0 0 146 204'%3E%3Crect width='146' height='204' rx='8' fill='%23e9ecef' stroke='%23ced4da'/%3E%3C/svg%3E";
 const TRADEME_COURIER_URL =
   'https://www.trademe.co.nz/a/marketplace/book-courier/select';
+const POLL_INTERVAL_MS = 2000;
 
 function unitDescription(
   unit: OrderUnit,
@@ -113,6 +115,38 @@ export function OrderDetailPage() {
     };
   }, [orderId]);
 
+  useEffect(() => {
+    if (!orderId || order?.state !== 'fulfilling' || order.fulfillment_error) {
+      return;
+    }
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const poll = async () => {
+      try {
+        const response = await apiClient.getOrder(orderId);
+        if (cancelled) {
+          return;
+        }
+        setOrder(response);
+        if (response.state === 'fulfilling' && !response.fulfillment_error) {
+          timer = setTimeout(poll, POLL_INTERVAL_MS);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          const message =
+            e instanceof Error ? e.message : 'Failed to refresh order';
+          notifications.show({ title: 'Error', message, color: 'red' });
+          timer = setTimeout(poll, POLL_INTERVAL_MS);
+        }
+      }
+    };
+    timer = setTimeout(poll, POLL_INTERVAL_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [orderId, order?.state, order?.fulfillment_error]);
+
   const showPullContext =
     order?.state === 'awaiting_payment' || order?.state === 'to_pick';
   const unitsByGame = new Map<string, OrderUnit[]>();
@@ -129,13 +163,29 @@ export function OrderDetailPage() {
     setConfirming(true);
     try {
       await apiClient.confirmOrder(orderId);
-      setOrder(await apiClient.getOrder(orderId));
-      setConfirmOpen(false);
-      notifications.show({
-        title: 'Order fulfilled',
-        message: 'All units are marked sold.',
-        color: 'green',
+      const updatedOrder = await apiClient.getOrder(orderId);
+      const updatedState =
+        updatedOrder.state === 'to_pick' ? 'fulfilling' : updatedOrder.state;
+      setOrder({
+        ...updatedOrder,
+        state: updatedState,
+        fulfillment_error:
+          updatedState === 'fulfilling' ? null : updatedOrder.fulfillment_error,
       });
+      setConfirmOpen(false);
+      if (updatedState === 'fulfilled') {
+        notifications.show({
+          title: 'Order fulfilled',
+          message: 'All units are marked sold.',
+          color: 'green',
+        });
+      } else {
+        notifications.show({
+          title: 'Fulfillment started',
+          message: 'This order will update as its units are completed.',
+          color: 'blue',
+        });
+      }
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Failed to confirm pull';
       notifications.show({ title: 'Error', message, color: 'red' });
@@ -175,6 +225,12 @@ export function OrderDetailPage() {
             />
             <Box className={classes.detailGrid}>
               <Stack gap="md" className={classes.detailSupport}>
+                {order.fulfillment_error && (
+                  <JobFailureAlert
+                    title="Fulfillment failed"
+                    error={order.fulfillment_error}
+                  />
+                )}
                 <Paper
                   component="section"
                   aria-label="Order summary"
@@ -277,6 +333,16 @@ export function OrderDetailPage() {
                           Book a courier
                         </Button>
                       )}
+                      {order.state === 'fulfilling' &&
+                        order.fulfillment_error && (
+                          <Button
+                            onClick={handleConfirm}
+                            loading={confirming}
+                            fullWidth
+                          >
+                            Retry fulfillment
+                          </Button>
+                        )}
                     </Stack>
                   </Stack>
                 </Paper>

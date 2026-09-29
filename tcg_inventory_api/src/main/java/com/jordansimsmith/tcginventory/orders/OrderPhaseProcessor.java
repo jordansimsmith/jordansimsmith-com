@@ -12,7 +12,6 @@ import java.time.format.DateTimeFormatterBuilder;
 import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -76,6 +75,9 @@ public class OrderPhaseProcessor {
   }
 
   public void process(String user, String bearerToken) {
+    var existingOrders = loadExistingOrders(user);
+    resumeTransitions(user, existingOrders);
+
     var allOffers = paginateOffers(bearerToken);
     LOGGER.info("fetched {} offers from FetchTCG for user {}", allOffers.size(), user);
 
@@ -93,7 +95,6 @@ public class OrderPhaseProcessor {
     var offerMap =
         allOffers.stream().collect(Collectors.toMap(o -> String.valueOf(o.id()), o -> o));
 
-    var existingOrders = loadExistingOrders(user);
     LOGGER.info("found {} existing orders in DynamoDB", existingOrders.size());
 
     var listingToSkuId = buildListingToSkuMap(user);
@@ -175,6 +176,19 @@ public class OrderPhaseProcessor {
         cutoffSkippedCount);
   }
 
+  private void resumeTransitions(String user, List<OrderItem> existingOrders) {
+    for (var order : existingOrders) {
+      if ("reserving".equals(order.getStatus())) {
+        orderRepository.resumeReservingOrder(user, order);
+        order.setStatus(order.getReservationTargetStatus());
+        order.setReservationTargetStatus(null);
+      } else if ("releasing".equals(order.getStatus())) {
+        orderRepository.resumeReleasingOrder(user, order);
+        order.setStatus("voided");
+      }
+    }
+  }
+
   private List<FetchTcgClient.SellerOffer> paginateOffers(String bearerToken) {
     var allOffers = new ArrayList<FetchTcgClient.SellerOffer>();
     int page = 0;
@@ -226,6 +240,7 @@ public class OrderPhaseProcessor {
                         .partitionValue(SkuItem.formatUserPk(user))
                         .sortValue(OrderItem.ORDER_PREFIX)
                         .build()))
+            .consistentRead(true)
             .build();
 
     orderTable.query(request).items().forEach(results::add);
@@ -257,7 +272,6 @@ public class OrderPhaseProcessor {
       String user, FetchTcgClient.SellerOffer offer, Map<Integer, String> listingToSkuId) {
     var offerId = String.valueOf(offer.id());
     var orderLines = new ArrayList<OrderItem.OrderLine>();
-    var newReservations = new LinkedHashMap<String, List<Integer>>();
     boolean insufficientStock = false;
 
     if (offer.items() != null) {
@@ -276,12 +290,6 @@ public class OrderPhaseProcessor {
         var allocatedSequenceNumbers = new ArrayList<Integer>();
         for (var unit : units) {
           allocatedSequenceNumbers.add(unit.getSequenceNumber());
-          // units already reserved for this offer by a prior partial run need no write
-          if ("in_stock".equals(unit.getStatus())) {
-            newReservations
-                .computeIfAbsent(skuId, k -> new ArrayList<>())
-                .add(unit.getSequenceNumber());
-          }
         }
 
         orderLines.add(
@@ -298,15 +306,17 @@ public class OrderPhaseProcessor {
     }
 
     var fulfillment = toFulfillment(offer);
+    var targetStatus =
+        insufficientStock
+            ? "flagged"
+            : (offer.currentAction() != null && PAYMENT_ACTIONS.contains(offer.currentAction()))
+                ? "to_pick"
+                : "awaiting_payment";
     var orderItem =
         OrderItem.create(
             user,
             offerId,
-            insufficientStock
-                ? "flagged"
-                : (offer.currentAction() != null && PAYMENT_ACTIONS.contains(offer.currentAction()))
-                    ? "to_pick"
-                    : "awaiting_payment",
+            "reserving",
             offer.status(),
             offer.currentAction(),
             offer.deliveryMode(),
@@ -316,28 +326,13 @@ public class OrderPhaseProcessor {
             offer.totalOfferPrice() != null ? offer.totalOfferPrice().toPlainString() : null,
             orderLines,
             clock.now());
-
-    var skuUnits =
-        newReservations.entrySet().stream()
-            .map(entry -> new OrderRepository.SkuUnits(entry.getKey(), entry.getValue()))
-            .toList();
-    orderRepository.reserveOrder(user, orderItem, skuUnits);
+    orderItem.setReservationTargetStatus(targetStatus);
+    orderRepository.reserveOrder(user, orderItem);
   }
 
   private void releaseCancelledOrder(
       String user, OrderItem order, FetchTcgClient.SellerOffer offer) {
-    var releasedUnits = new LinkedHashMap<String, List<Integer>>();
-    for (var line : order.getLines()) {
-      releasedUnits
-          .computeIfAbsent(line.getSkuId(), k -> new ArrayList<>())
-          .addAll(line.getAllocatedSequenceNumbers());
-    }
-
-    var skuUnits =
-        releasedUnits.entrySet().stream()
-            .map(entry -> new OrderRepository.SkuUnits(entry.getKey(), entry.getValue()))
-            .toList();
-    orderRepository.releaseOrder(user, order.getOrderId(), offer.status(), skuUnits);
+    orderRepository.releaseOrder(user, order, offer.status());
   }
 
   private static Fulfillment toFulfillment(FetchTcgClient.SellerOffer offer) {

@@ -10,6 +10,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.tcginventory.DynamoBatchWriter;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
@@ -18,6 +19,7 @@ import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -25,6 +27,9 @@ import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.PutRequest;
+import software.amazon.awssdk.services.dynamodb.model.WriteRequest;
 
 public class ConfirmScanHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
@@ -56,6 +61,7 @@ public class ConfirmScanHandler
   private final DynamoDbTable<ImportItem> importTable;
   private final DynamoDbTable<ImportRowItem> importRowTable;
   private final DynamoDbTable<JobItem> jobTable;
+  private final DynamoDbClient dynamoDbClient;
   private final QueueClient<JobMessage> jobsQueue;
   private final UlidGenerator ulidGenerator;
 
@@ -79,6 +85,7 @@ public class ConfirmScanHandler
     this.importRowTable =
         TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
     this.jobTable = factory.jobTable();
+    this.dynamoDbClient = factory.dynamoDbClient();
     this.jobsQueue = factory.jobsQueue();
     this.ulidGenerator = factory.ulidGenerator();
   }
@@ -133,9 +140,10 @@ public class ConfirmScanHandler
             user, scanItem.getGame(), importId, scanId + ".scan", orderedRows.size(), jobId, now);
 
     importTable.putItem(importItem);
+    var importRows = new ArrayList<ImportRowItem>();
     for (int index = 0; index < orderedRows.size(); index++) {
       var selected = orderedRows.get(index);
-      importRowTable.putItem(
+      importRows.add(
           ImportRowItem.create(
               user,
               importId,
@@ -150,6 +158,19 @@ public class ConfirmScanHandler
               selected.externalId(),
               "en"));
     }
+    DynamoBatchWriter.write(
+        dynamoDbClient,
+        TcgInventoryTable.TABLE_NAME,
+        importRows.stream()
+            .map(
+                row ->
+                    WriteRequest.builder()
+                        .putRequest(
+                            PutRequest.builder()
+                                .item(importRowTable.tableSchema().itemToMap(row, true))
+                                .build())
+                        .build())
+            .toList());
 
     var jobItem = JobItem.create(user, jobId, "appraise", importId, now);
     jobTable.putItem(jobItem);

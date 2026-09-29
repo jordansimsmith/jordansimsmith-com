@@ -12,6 +12,8 @@ import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
+import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
+import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
@@ -34,6 +36,7 @@ public class FindImportsHandler
       @JsonProperty("status") String status,
       @JsonProperty("row_count") int rowCount,
       @JsonProperty("appraisal_error") @Nullable String appraisalError,
+      @JsonProperty("confirmation_error") @Nullable String confirmationError,
       @JsonProperty("created_at") long createdAt) {}
 
   record FindImportsResponse(
@@ -43,6 +46,7 @@ public class FindImportsHandler
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<ImportItem> importTable;
+  private final ImportRepository importRepository;
   private final ObjectMapper objectMapper;
 
   public FindImportsHandler() {
@@ -54,6 +58,21 @@ public class FindImportsHandler
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.importTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class);
+    var dynamoDbClient = factory.dynamoDbClient();
+    var inventoryRepository =
+        new InventoryRepository(
+            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class),
+            dynamoDbClient,
+            factory.clock(),
+            factory.ulidGenerator());
+    this.importRepository =
+        new ImportRepository(
+            importTable,
+            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class),
+            factory.jobTable(),
+            inventoryRepository,
+            dynamoDbClient,
+            factory.clock());
     this.objectMapper = factory.objectMapper();
   }
 
@@ -101,7 +120,7 @@ public class FindImportsHandler
       return httpResponseFactory.ok(new FindImportsResponse(List.of(), null));
     }
 
-    var imports = page.items().stream().map(FindImportsHandler::toSummary).toList();
+    var imports = page.items().stream().map(item -> toSummary(user, item)).toList();
 
     var lastEvaluatedKey = page.lastEvaluatedKey();
     String nextContinuation = null;
@@ -112,7 +131,7 @@ public class FindImportsHandler
     return httpResponseFactory.ok(new FindImportsResponse(imports, nextContinuation));
   }
 
-  static ImportSummary toSummary(ImportItem item) {
+  private ImportSummary toSummary(String user, ImportItem item) {
     return new ImportSummary(
         item.getImportId(),
         item.getGame(),
@@ -120,6 +139,7 @@ public class FindImportsHandler
         item.getStatus(),
         item.getRowCount() != null ? item.getRowCount() : 0,
         item.getError(),
+        importRepository.getConfirmationError(user, item),
         item.getCreatedAt() != null ? item.getCreatedAt().getEpochSecond() : 0);
   }
 }

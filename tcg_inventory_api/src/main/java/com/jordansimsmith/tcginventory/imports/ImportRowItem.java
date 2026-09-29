@@ -34,6 +34,7 @@ public class ImportRowItem {
   public static final String FETCHTCG_SET_ID = "fetchtcg_set_id";
   public static final String SEQUENCE_NUMBER = "sequence_number";
   public static final String PHOTOS = "photos";
+  public static final String CONFIRMED = "confirmed";
 
   private String pk;
   private String sk;
@@ -55,6 +56,7 @@ public class ImportRowItem {
   private Integer fetchtcgSetId;
   private Integer sequenceNumber;
   private List<Photo> photos;
+  private Boolean confirmed;
 
   @DynamoDbPartitionKey
   @DynamoDbAttribute(PK)
@@ -236,6 +238,15 @@ public class ImportRowItem {
 
   public void setPhotos(@Nullable List<Photo> photos) {
     this.photos = photos;
+  }
+
+  @DynamoDbAttribute(CONFIRMED)
+  public Boolean getConfirmed() {
+    return confirmed;
+  }
+
+  public void setConfirmed(@Nullable Boolean confirmed) {
+    this.confirmed = confirmed;
   }
 
   public static String formatPk(String user, String importId) {

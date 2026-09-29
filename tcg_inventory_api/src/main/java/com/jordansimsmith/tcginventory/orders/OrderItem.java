@@ -31,6 +31,7 @@ public class OrderItem {
   public static final String LINES = "lines";
   public static final String CREATED_AT = "created_at";
   public static final String UPDATED_AT = "updated_at";
+  public static final String RESERVATION_TARGET_STATUS = "reservation_target_status";
 
   private String pk;
   private String sk;
@@ -46,6 +47,7 @@ public class OrderItem {
   private List<OrderLine> lines;
   private Instant createdAt;
   private Instant updatedAt;
+  private String reservationTargetStatus;
 
   @DynamoDbPartitionKey
   @DynamoDbAttribute(PK)
@@ -175,6 +177,15 @@ public class OrderItem {
 
   public void setUpdatedAt(@Nullable Instant updatedAt) {
     this.updatedAt = updatedAt;
+  }
+
+  @DynamoDbAttribute(RESERVATION_TARGET_STATUS)
+  public String getReservationTargetStatus() {
+    return reservationTargetStatus;
+  }
+
+  public void setReservationTargetStatus(@Nullable String reservationTargetStatus) {
+    this.reservationTargetStatus = reservationTargetStatus;
   }
 
   public static String formatPk(String user) {

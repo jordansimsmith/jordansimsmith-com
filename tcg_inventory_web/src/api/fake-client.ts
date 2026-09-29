@@ -5,6 +5,7 @@ import type {
   ConfirmScanRequest,
   ConfirmScanResponse,
   ConfirmImportResponse,
+  ImportConfirmationResult,
   ConfirmOrderResponse,
   CreateScanRequest,
   CreateScanResponse,
@@ -389,6 +390,7 @@ interface FakeImport {
   status: ImportStatus;
   rows: FakeImportRow[];
   created_at_ms: number;
+  confirmation_result?: ImportConfirmationResult;
 }
 
 function createSeedImportRows(count: number): FakeImportRow[] {
@@ -545,6 +547,7 @@ function toImportSummary(importRecord: FakeImport): ImportSummary {
     status: importRecord.status,
     row_count: importRecord.rows.length,
     appraisal_error: null,
+    confirmation_error: null,
     created_at: Math.floor(importRecord.created_at_ms / 1000),
   };
 }
@@ -598,6 +601,7 @@ function toImportDetail(importRecord: FakeImport): ImportDetail {
   return {
     ...toImportSummary(importRecord),
     total_suggested_price: totalSuggestedPrice(importRecord),
+    confirmation_result: importRecord.confirmation_result ?? null,
     rows: importRecord.rows.map((row, index) =>
       toImportRow(row, index < appraised),
     ),
@@ -1268,6 +1272,7 @@ function toOrderDetail(order: FakeOrder, skus: FakeSku[]): OrderDetail {
     buyer_name: order.buyer_name,
     buyer_address: order.buyer_address,
     postage_option: order.postage_option,
+    fulfillment_error: null,
     lines,
     units,
   };
@@ -1581,6 +1586,9 @@ export function createFakeClient(): ApiClient {
 
     async confirmImport(importId: string): Promise<ConfirmImportResponse> {
       const importRecord = getImportOrThrow(importId);
+      if (importRecord.status === 'confirmed') {
+        return { import_id: importRecord.import_id };
+      }
       if (importRecord.status !== 'review') {
         throw new Error('import is not in review status');
       }
@@ -1659,15 +1667,15 @@ export function createFakeClient(): ApiClient {
         0,
       );
 
-      return {
-        import_id: importRecord.import_id,
-        status: importRecord.status,
+      const result: ImportConfirmationResult = {
         unit_count: sequenceNumbers.length,
         total_suggested_price: (totalSuggestedCents / 100).toFixed(2),
         first_sequence_number: first,
         last_sequence_number: last,
         placement_instructions: placementInstructions,
       };
+      importRecord.confirmation_result = result;
+      return { import_id: importRecord.import_id };
     },
 
     async createScan(request: CreateScanRequest): Promise<CreateScanResponse> {
@@ -1989,7 +1997,7 @@ export function createFakeClient(): ApiClient {
       order.state = 'fulfilled';
       reportStale = true;
       // mirror the real API: a transition receipt, not the order detail
-      return { order_id: orderId, state: order.state };
+      return { order_id: orderId };
     },
 
     async createPublish(): Promise<void> {

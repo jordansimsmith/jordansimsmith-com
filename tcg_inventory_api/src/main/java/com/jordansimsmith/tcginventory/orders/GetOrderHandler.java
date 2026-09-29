@@ -12,6 +12,7 @@ import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.games.Games;
 import com.jordansimsmith.tcginventory.inventory.InventoryLocation;
+import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import java.math.BigDecimal;
@@ -80,6 +81,7 @@ public class GetOrderHandler
   record OrderDetailResponse(
       @JsonProperty("order_id") String orderId,
       @JsonProperty("state") String state,
+      @JsonProperty("fulfillment_error") @Nullable String fulfillmentError,
       @JsonProperty("accepted_at") long acceptedAt,
       @JsonProperty("delivery_mode") @Nullable String deliveryMode,
       @JsonProperty("buyer_name") @Nullable String buyerName,
@@ -104,6 +106,7 @@ public class GetOrderHandler
   private final DynamoDbTable<OrderItem> orderTable;
   private final DynamoDbTable<UnitItem> unitTable;
   private final DynamoDbTable<SkuItem> skuTable;
+  private final OrderRepository orderRepository;
 
   public GetOrderHandler() {
     this(TcgInventoryFactory.create());
@@ -116,6 +119,15 @@ public class GetOrderHandler
     this.orderTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderItem.class);
     this.unitTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class);
     this.skuTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), SkuItem.class);
+    var dynamoDbClient = factory.dynamoDbClient();
+    this.orderRepository =
+        new OrderRepository(
+            orderTable,
+            factory.jobTable(),
+            new InventoryRepository(
+                unitTable, dynamoDbClient, factory.clock(), factory.ulidGenerator()),
+            dynamoDbClient,
+            factory.clock());
   }
 
   @Override
@@ -132,22 +144,19 @@ public class GetOrderHandler
     var user = requestContextFactory.createCtx(event).user();
     var orderId = event.getPathParameters().get("order_id");
 
-    String orderSk;
     try {
-      orderSk = OrderItem.formatSk(orderId);
+      OrderItem.formatSk(orderId);
     } catch (IllegalArgumentException e) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
 
-    var orderKey =
-        Key.builder().partitionValue(SkuItem.formatUserPk(user)).sortValue(orderSk).build();
-
-    var orderItem = orderTable.getItem(orderKey);
+    var orderItem = orderRepository.getOrder(user, orderId);
     if (orderItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
 
     var orderLines = orderItem.getLines();
+    var fulfillmentError = orderRepository.getFulfillmentError(user, orderItem);
     Map<String, SkuItem> skuCache = new HashMap<>();
     var blockUnits = findBlockUnits(user, orderLines, skuCache);
     var units = new ArrayList<OrderUnitResponse>();
@@ -198,6 +207,7 @@ public class GetOrderHandler
         new OrderDetailResponse(
             orderItem.getOrderId(),
             orderItem.getStatus(),
+            fulfillmentError,
             orderItem.getCreatedAt() != null ? orderItem.getCreatedAt().getEpochSecond() : 0,
             orderItem.getDeliveryMode(),
             orderItem.getBuyerName(),

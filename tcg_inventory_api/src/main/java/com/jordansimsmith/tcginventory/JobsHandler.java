@@ -8,11 +8,14 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgAuthException;
 import com.jordansimsmith.tcginventory.imports.AppraiseJobProcessor;
+import com.jordansimsmith.tcginventory.imports.ConfirmImportJobProcessor;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
+import com.jordansimsmith.tcginventory.imports.ImportRepository;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.orders.FulfillOrderJobProcessor;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.tcginventory.orders.OrderPhaseProcessor;
 import com.jordansimsmith.tcginventory.orders.OrderRepository;
@@ -22,10 +25,14 @@ import com.jordansimsmith.tcginventory.reports.ReportItem;
 import com.jordansimsmith.tcginventory.reports.ReportJobProcessor;
 import com.jordansimsmith.tcginventory.settings.SettingsItem;
 import com.jordansimsmith.time.Clock;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 
 public class JobsHandler implements RequestHandler<SQSEvent, Void> {
 
@@ -36,8 +43,11 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
   private final Clock clock;
   private final DynamoDbTable<JobItem> jobTable;
   private final DynamoDbTable<ImportItem> importTable;
+  private final DynamoDbClient dynamoDbClient;
   private final QueueClient<JobMessage> jobsQueue;
   private final AppraiseJobProcessor appraiseJobProcessor;
+  private final ConfirmImportJobProcessor confirmImportJobProcessor;
+  private final FulfillOrderJobProcessor fulfillOrderJobProcessor;
   private final PublishJobProcessor publishJobProcessor;
   private final ReportJobProcessor reportJobProcessor;
 
@@ -50,6 +60,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     this.objectMapper = factory.objectMapper();
     this.clock = factory.clock();
     this.jobTable = factory.jobTable();
+    this.dynamoDbClient = factory.dynamoDbClient();
     this.importTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class);
     var importRowTable =
         TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
@@ -60,13 +71,28 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     var orderTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderItem.class);
     var orderRepository =
         new OrderRepository(
-            orderTable, inventoryRepository, factory.dynamoDbClient(), factory.clock());
+            orderTable,
+            factory.jobTable(),
+            inventoryRepository,
+            factory.dynamoDbClient(),
+            factory.clock());
+    this.fulfillOrderJobProcessor = new FulfillOrderJobProcessor(orderRepository);
     var skuTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), SkuItem.class);
     var reportTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ReportItem.class);
     this.jobsQueue = factory.jobsQueue();
     this.appraiseJobProcessor =
         new AppraiseJobProcessor(
             importTable, importRowTable, factory.clock(), factory.fetchTcgClient());
+    var importRepository =
+        new ImportRepository(
+            importTable,
+            importRowTable,
+            factory.jobTable(),
+            inventoryRepository,
+            factory.dynamoDbClient(),
+            factory.clock());
+    this.confirmImportJobProcessor =
+        new ConfirmImportJobProcessor(importRepository, factory.clock());
     this.publishJobProcessor =
         new PublishJobProcessor(
             factory.fetchTcgTokenMinter(),
@@ -110,13 +136,20 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     var record = event.getRecords().get(0);
     var message = objectMapper.readValue(record.getBody(), JobMessage.class);
 
-    var jobKey =
-        Key.builder()
-            .partitionValue(JobItem.formatPk(message.user()))
-            .sortValue(JobItem.formatSk(message.jobId()))
-            .build();
-
-    var jobItem = jobTable.getItem(jobKey);
+    var jobResponse =
+        dynamoDbClient.getItem(
+            GetItemRequest.builder()
+                .tableName(TcgInventoryTable.TABLE_NAME)
+                .key(
+                    Map.of(
+                        JobItem.PK,
+                            AttributeValue.builder().s(JobItem.formatPk(message.user())).build(),
+                        JobItem.SK,
+                            AttributeValue.builder().s(JobItem.formatSk(message.jobId())).build()))
+                .consistentRead(true)
+                .build());
+    var jobItem =
+        jobResponse.hasItem() ? jobTable.tableSchema().mapToItem(jobResponse.item()) : null;
     if (jobItem == null) {
       LOGGER.warn("job item not found: {}", message.jobId());
       return;
@@ -182,6 +215,8 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
           case "appraise" -> appraiseJobProcessor.processBatch(message.user(), jobItem);
           case "publish" -> publishJobProcessor.processBatch(message.user(), jobItem);
           case "report" -> reportJobProcessor.processBatch(message.user(), jobItem);
+          case "confirm_import" -> confirmImportJobProcessor.processBatch(message.user(), jobItem);
+          case "fulfill_order" -> fulfillOrderJobProcessor.processBatch(message.user(), jobItem);
           default -> throw new IllegalArgumentException("unknown job type: " + message.jobType());
         };
 

@@ -92,6 +92,7 @@ export interface ImportSummary {
   status: ImportStatus;
   row_count: number;
   appraisal_error: string | null;
+  confirmation_error?: string | null;
   created_at: number;
 }
 
@@ -130,6 +131,7 @@ export interface ImportRow {
 export interface ImportDetail extends ImportSummary {
   total_suggested_price: string;
   rows: ImportRow[];
+  confirmation_result?: ImportConfirmationResult | null;
 }
 
 export interface PlacementInstruction {
@@ -141,14 +143,16 @@ export interface PlacementInstruction {
   unit_count: number;
 }
 
-export interface ConfirmImportResponse {
-  import_id: string;
-  status: ImportStatus;
+export interface ImportConfirmationResult {
   unit_count: number;
   total_suggested_price: string;
   first_sequence_number: number | null;
   last_sequence_number: number | null;
   placement_instructions: PlacementInstruction[];
+}
+
+export interface ConfirmImportResponse {
+  import_id: string;
 }
 
 export type ScanStatus =
@@ -250,7 +254,11 @@ export interface ConfirmScanResponse {
 
 export type OrderState =
   | 'awaiting_payment'
+  | 'flagged'
+  | 'reserving'
+  | 'releasing'
   | 'to_pick'
+  | 'fulfilling'
   | 'fulfilled'
   | 'voided';
 
@@ -321,6 +329,7 @@ export interface BuyerAddress {
 }
 
 export interface OrderDetail extends OrderSummary {
+  fulfillment_error?: string | null;
   buyer_name: string | null;
   buyer_address: BuyerAddress | null;
   postage_option: string | null;
@@ -330,7 +339,6 @@ export interface OrderDetail extends OrderSummary {
 
 export interface ConfirmOrderResponse {
   order_id: string;
-  state: OrderState;
 }
 
 export type PublishRunStatus = 'queued' | 'running' | 'succeeded' | 'failed';

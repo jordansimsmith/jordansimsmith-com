@@ -1,8 +1,8 @@
 import { Button, Group, Paper, Stack, Text, Title } from '@mantine/core';
-import type { ConfirmImportResponse } from '../api/client';
+import type { ImportConfirmationResult } from '../api/client';
 
 interface PlacementInstructionsViewProps {
-  result: ConfirmImportResponse;
+  result: ImportConfirmationResult;
   onDone: () => void;
 }
 

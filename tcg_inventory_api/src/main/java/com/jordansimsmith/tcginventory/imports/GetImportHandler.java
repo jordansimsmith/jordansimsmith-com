@@ -11,14 +11,12 @@ import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
+import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
+import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
-import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 public class GetImportHandler
@@ -52,6 +50,8 @@ public class GetImportHandler
       @JsonProperty("status") String status,
       @JsonProperty("row_count") int rowCount,
       @JsonProperty("appraisal_error") @Nullable String appraisalError,
+      @JsonProperty("confirmation_error") @Nullable String confirmationError,
+      @JsonProperty("confirmation_result") @Nullable ImportConfirmationResult confirmationResult,
       @JsonProperty("created_at") long createdAt,
       @JsonProperty("total_suggested_price") String totalSuggestedPrice,
       @JsonProperty("rows") List<ImportRowResponse> rows) {}
@@ -60,8 +60,7 @@ public class GetImportHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final DynamoDbTable<ImportItem> importTable;
-  private final DynamoDbTable<ImportRowItem> importRowTable;
+  private final ImportRepository importRepository;
   private final S3Presigner s3Presigner;
 
   public GetImportHandler() {
@@ -72,9 +71,21 @@ public class GetImportHandler
   GetImportHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.importTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class);
-    this.importRowTable =
-        TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
+    var dynamoDbClient = factory.dynamoDbClient();
+    var inventoryRepository =
+        new InventoryRepository(
+            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class),
+            dynamoDbClient,
+            factory.clock(),
+            factory.ulidGenerator());
+    this.importRepository =
+        new ImportRepository(
+            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class),
+            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class),
+            factory.jobTable(),
+            inventoryRepository,
+            dynamoDbClient,
+            factory.clock());
     this.s3Presigner = factory.s3Presigner();
   }
 
@@ -92,32 +103,11 @@ public class GetImportHandler
     var user = requestContextFactory.createCtx(event).user();
     var importId = event.getPathParameters().get("import_id");
 
-    var importKey =
-        Key.builder()
-            .partitionValue(ImportItem.formatPk(user))
-            .sortValue(ImportItem.formatSk(importId))
-            .build();
-
-    var importItem = importTable.getItem(importKey);
+    var importItem = importRepository.getImport(user, importId);
     if (importItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
-
-    var rowQueryConditional =
-        QueryConditional.sortBeginsWith(
-            Key.builder()
-                .partitionValue(ImportRowItem.formatPk(user, importId))
-                .sortValue(ImportRowItem.ROW_PREFIX)
-                .build());
-
-    var rowRequest =
-        QueryEnhancedRequest.builder()
-            .queryConditional(rowQueryConditional)
-            .scanIndexForward(true)
-            .build();
-
-    var rowItems =
-        importRowTable.query(rowRequest).stream().flatMap(page -> page.items().stream()).toList();
+    var rowItems = importRepository.findRows(user, importId);
 
     var rows =
         rowItems.stream()
@@ -152,6 +142,12 @@ public class GetImportHandler
             importItem.getStatus(),
             importItem.getRowCount() != null ? importItem.getRowCount() : 0,
             importItem.getError(),
+            importRepository.getConfirmationError(user, importItem),
+            "confirmed".equals(importItem.getStatus())
+                ? ImportConfirmationResult.from(
+                    importItem,
+                    rowItems.stream().filter(row -> "keep".equals(row.getDecision())).toList())
+                : null,
             importItem.getCreatedAt() != null ? importItem.getCreatedAt().getEpochSecond() : 0,
             ImportRows.totalSuggestedPrice(rowItems),
             rows));

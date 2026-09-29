@@ -163,7 +163,7 @@ function renderOrderDetailPage() {
 
 describe('OrderDetailPage', () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
   });
 
   afterEach(() => {
@@ -299,7 +299,6 @@ describe('OrderDetailPage', () => {
       .mockResolvedValue(orderDetail({ state: 'fulfilled' }));
     vi.spyOn(clientModule.apiClient, 'confirmOrder').mockResolvedValue({
       order_id: '83647',
-      state: 'fulfilled',
     });
 
     renderOrderDetailPage();
@@ -330,6 +329,60 @@ describe('OrderDetailPage', () => {
     expect(locations).toEqual(['A0-37', 'A0-74', 'A2-59']);
     expect(screen.queryByText(/^Prev ·/)).toBeNull();
     expect(screen.queryByText(/^Next ·/)).toBeNull();
+  });
+
+  it('polls an accepted fulfillment even when the immediate detail read is stale', async () => {
+    const user = userEvent.setup();
+    const getOrderMock = vi
+      .spyOn(clientModule.apiClient, 'getOrder')
+      .mockResolvedValueOnce(orderDetail())
+      .mockResolvedValueOnce(orderDetail())
+      .mockResolvedValueOnce(orderDetail({ state: 'fulfilled' }));
+    vi.spyOn(clientModule.apiClient, 'confirmOrder').mockResolvedValue({
+      order_id: '83647',
+    });
+
+    renderOrderDetailPage();
+    await screen.findByText('Order 83647');
+    await user.click(screen.getByRole('button', { name: 'Confirm pull' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+
+    expect(await screen.findByText('fulfilling')).toBeDefined();
+    expect(await screen.findByText('Fulfillment started')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Confirm pull' })).toBeNull();
+    expect(getOrderMock).toHaveBeenCalledTimes(2);
+
+    expect(
+      await screen.findByText('fulfilled', {}, { timeout: 4000 }),
+    ).toBeDefined();
+    expect(getOrderMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('shows retry fulfillment after a fulfillment job fails', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(
+      orderDetail({
+        state: 'fulfilling',
+        fulfillment_error: 'unit ownership changed during fulfillment',
+      }),
+    );
+    vi.spyOn(clientModule.apiClient, 'confirmOrder').mockResolvedValue({
+      order_id: '83647',
+    });
+
+    renderOrderDetailPage();
+
+    expect(
+      await screen.findByText('unit ownership changed during fulfillment'),
+    ).toBeDefined();
+    await user.click(screen.getByRole('button', { name: 'Retry fulfillment' }));
+
+    await waitFor(() => {
+      expect(clientModule.apiClient.confirmOrder).toHaveBeenCalledWith('83647');
+    });
+    expect(screen.getByText('fulfilling')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Confirm pull' })).toBeNull();
   });
 
   it('renders neutral external actions in the right column for a fulfilled order', async () => {

@@ -38,11 +38,14 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 
 @Testcontainers
 public class JobsHandlerIntegrationTest {
 
   private FakeClock fakeClock;
+  private TcgInventoryTestFactory factory;
   private FakeQueueClient<JobMessage> fakeJobsQueue;
   private FakeFetchTcgClient fakeFetchTcgClient;
   private ObjectMapper objectMapper;
@@ -72,8 +75,7 @@ public class JobsHandlerIntegrationTest {
 
   @BeforeEach
   void setUp() {
-    var factory =
-        TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
+    factory = TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
 
     fakeClock = factory.fakeClock();
     fakeJobsQueue = factory.fakeJobsQueue();
@@ -93,6 +95,106 @@ public class JobsHandlerIntegrationTest {
     fakeFetchTcgClient.reset();
 
     jobsHandler = new JobsHandler(factory);
+  }
+
+  @Test
+  void confirmImportJobShouldCompleteImportAndWriteUnitAudit() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    var importItem =
+        ImportItem.create(
+            "jordan", "mtg", "import1", "test.csv", 1, null, Instant.ofEpochSecond(1700000000));
+    importItem.setStatus("confirming");
+    importTable.putItem(importItem);
+    var row =
+        ImportRowItem.create(
+            "jordan",
+            "import1",
+            1,
+            "Card 1",
+            "dom",
+            "Dominaria",
+            "168",
+            "normal",
+            "NM",
+            "scryfall",
+            SCRYFALL_ID,
+            "en");
+    row.setDecision("keep");
+    row.setSuggestedPrice("1.50");
+    row.setFetchtcgCardId("mtg_168_c_dom_normal");
+    row.setFetchtcgSetId(2624);
+    importRowTable.putItem(row);
+    var jobId = JobItem.formatResourceJobId("confirm_import", "import1");
+    createJob("jordan", jobId, "confirm_import", "queued", "import1");
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", jobId, "confirm_import"), null);
+
+    // assert
+    assertThat(getJob("jordan", jobId).getStatus()).isEqualTo("succeeded");
+    assertThat(getImport("jordan", "import1").getStatus()).isEqualTo("confirmed");
+    var completedRow = getRow("jordan", "import1", 1);
+    assertThat(completedRow.getConfirmed()).isTrue();
+    assertThat(completedRow.getSequenceNumber()).isZero();
+    var unit = getUnit("jordan", "mtg#scryfall#" + SCRYFALL_ID + "#normal#NM", 0);
+    assertThat(unit.getImportId()).isEqualTo("import1");
+    assertThat(unit.getStatus()).isEqualTo("in_stock");
+    var unitAudit =
+        getAuditEntries("jordan").stream()
+            .filter(audit -> "unit_import".equals(audit.getEventType()))
+            .findFirst()
+            .orElseThrow();
+    assertThat(unitAudit.getImportId()).isEqualTo("import1");
+    assertThat(unitAudit.getSkuId()).isEqualTo("mtg#scryfall#" + SCRYFALL_ID + "#normal#NM");
+    assertThat(unitAudit.getSequenceNumber()).isZero();
+  }
+
+  @Test
+  void fulfillOrderJobShouldCompleteUnitsAndOrder() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    createSkuWithUnits("jordan", skuId, 1001, 2);
+    reserveUnit("jordan", skuId, 1, "83663");
+    reserveUnit("jordan", skuId, 2, "83663");
+    createOrderWithLines(
+        "jordan",
+        "83663",
+        "fulfilling",
+        List.of(new OrderItem.OrderLine(skuId, 1001, 2, "3.00", "1.50", List.of(1, 2))));
+    var completedUnit = getUnit("jordan", skuId, 1);
+    completedUnit.setStatus("sold");
+    unitTable.putItem(completedUnit);
+    var sku = getSku("jordan", skuId);
+    sku.setVersion(1);
+    skuTable.putItem(sku);
+    seedTransitionCompletion(
+        "jordan", "83663", "fulfill", skuId, 1, "reserved", "sold", "83663", "83663");
+    var order = getOrder("jordan", "83663");
+    orderTable.putItem(order);
+    var jobId = JobItem.formatResourceJobId("fulfill_order", "83663");
+    var job =
+        JobItem.create("jordan", jobId, "fulfill_order", null, Instant.ofEpochSecond(1700000000));
+    job.setOrderId("83663");
+    jobTable.putItem(job);
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", jobId, "fulfill_order"), null);
+
+    // assert
+    assertThat(getJob("jordan", jobId).getStatus()).isEqualTo("succeeded");
+    assertThat(getOrder("jordan", "83663").getStatus()).isEqualTo("fulfilled");
+    assertThat(getUnits("jordan", skuId))
+        .allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("sold"));
+    assertThat(getSku("jordan", skuId).getVersion()).isEqualTo(2);
+    var unitAudits =
+        getAuditEntries("jordan").stream()
+            .filter(audit -> "unit_sell".equals(audit.getEventType()))
+            .toList();
+    assertThat(unitAudits).hasSize(2);
+    assertThat(unitAudits).allSatisfy(audit -> assertThat(audit.getOrderId()).isEqualTo("83663"));
+    assertThat(unitAudits).extracting(AuditItem::getSequenceNumber).containsExactlyInAnyOrder(1, 2);
   }
 
   @Test
@@ -573,6 +675,51 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
+  void publishOrderPhaseShouldResumeReservingOrderWhenOfferIsMissing() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    createSkuWithUnits("jordan", skuId, 1001, 2);
+    reserveUnit("jordan", skuId, 1, "83663");
+    var sku = getSku("jordan", skuId);
+    sku.setVersion(1);
+    sku.setDirty(true);
+    sku.setGsi1pk(SkuItem.formatGsi1pk("jordan"));
+    skuTable.putItem(sku);
+    seedTransitionCompletion(
+        "jordan", "83663", "reserve", skuId, 1, "in_stock", "reserved", "none", "83663");
+    createOrderWithLines(
+        "jordan",
+        "83663",
+        "reserving",
+        List.of(new OrderItem.OrderLine(skuId, 1001, 2, "3.00", "1.50", List.of(1, 2))));
+    var order = getOrder("jordan", "83663");
+    order.setReservationTargetStatus("awaiting_payment");
+    orderTable.putItem(order);
+    fakeFetchTcgClient.seedSellerOffers(List.of());
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("succeeded");
+    assertThat(getOrder("jordan", "83663").getStatus()).isEqualTo("awaiting_payment");
+    assertThat(getUnits("jordan", skuId))
+        .allSatisfy(
+            unit -> {
+              assertThat(unit.getStatus()).isEqualTo("reserved");
+              assertThat(unit.getOrderId()).isEqualTo("83663");
+            });
+    assertThat(getAuditEntries("jordan").stream().filter(a -> "reserve".equals(a.getEventType())))
+        .hasSize(1);
+    assertThat(
+            getAuditEntries("jordan").stream().filter(a -> "unit_reserve".equals(a.getEventType())))
+        .extracting(AuditItem::getSequenceNumber)
+        .containsExactlyInAnyOrder(1, 2);
+  }
+
+  @Test
   void publishOrderPhaseShouldAdvanceToPickOnPayment() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
@@ -777,32 +924,79 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldFinishPartiallyAppliedRelease() {
+  void publishOrderPhaseShouldSkipReleasedUnitReservedByAnotherOrder() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 2);
-    createReservedOrder(
-        "jordan", "83663", "awaiting_payment", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1, 2);
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    createSkuWithUnits("jordan", skuId, 1001, 3);
+    reserveUnit("jordan", skuId, 1, "91329");
+    reserveUnit("jordan", skuId, 2, "83663");
+    createOrderWithLines(
+        "jordan",
+        "83663",
+        "releasing",
+        List.of(new OrderItem.OrderLine(skuId, 1001, 2, "3.33", "4.20", List.of(1, 2))));
+    createOrderWithLines(
+        "jordan",
+        "91329",
+        "to_pick",
+        List.of(new OrderItem.OrderLine(skuId, 1001, 1, "1.50", "4.20", List.of(1))));
+    seedTransitionCompletion(
+        "jordan", "83663", "release", skuId, 1, "reserved", "in_stock", "83663", "none");
 
-    // simulate a run that released one unit before dying, leaving the order awaiting_payment
-    releaseUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1);
+    fakeFetchTcgClient.seedSellerOffers(List.of());
 
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("succeeded");
+    assertThat(getOrder("jordan", "83663").getStatus()).isEqualTo("voided");
+
+    var units = getUnits("jordan", skuId);
+    assertThat(units.get(0).getStatus()).isEqualTo("reserved");
+    assertThat(units.get(0).getOrderId()).isEqualTo("91329");
+    assertThat(units.get(1).getStatus()).isEqualTo("in_stock");
+    assertThat(units.get(1).getOrderId()).isNull();
+
+    var releaseAudits =
+        getAuditEntries("jordan").stream().filter(a -> "release".equals(a.getEventType())).toList();
+    assertThat(releaseAudits).hasSize(1);
+    assertThat(
+            getAuditEntries("jordan").stream()
+                .filter(a -> "unit_release".equals(a.getEventType()))
+                .map(AuditItem::getSequenceNumber))
+        .containsExactlyInAnyOrder(1, 2);
+  }
+
+  @Test
+  void publishOrderPhaseShouldFailOnAmbiguousLegacyPartialRelease() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    createSkuWithUnits("jordan", skuId, 1001, 2);
+    reserveUnit("jordan", skuId, 1, "83663");
+    reserveUnit("jordan", skuId, 2, "83663");
+    createOrderWithLines(
+        "jordan",
+        "83663",
+        "awaiting_payment",
+        List.of(new OrderItem.OrderLine(skuId, 1001, 2, "3.33", "4.20", List.of(1, 2))));
+    releaseUnit("jordan", skuId, 1);
     fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
     // assert
-    var order = getOrder("jordan", "83663");
-    assertThat(order.getStatus()).isEqualTo("voided");
-
-    var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("in_stock"));
-
-    var releaseAudits =
-        getAuditEntries("jordan").stream().filter(a -> "release".equals(a.getEventType())).toList();
-    assertThat(releaseAudits).hasSize(1);
+    assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("failed");
+    assertThat(getJob("jordan", "job1").getError()).contains("ambiguous for release");
+    assertThat(getOrder("jordan", "83663").getStatus()).isEqualTo("releasing");
+    assertThat(getUnit("jordan", skuId, 1).getStatus()).isEqualTo("in_stock");
+    assertThat(getUnit("jordan", skuId, 2).getOrderId()).isEqualTo("83663");
+    assertThat(getAuditEntries("jordan")).noneMatch(a -> "release".equals(a.getEventType()));
   }
 
   @Test
@@ -810,15 +1004,17 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-
-    var orderLines = new ArrayList<OrderItem.OrderLine>();
-    for (int i = 1; i <= 60; i++) {
-      var skuId = "mtg#scryfall#scryfall-" + i + "#normal#NM";
-      createSkuWithUnits("jordan", skuId, 1000 + i, 1);
-      reserveUnit("jordan", skuId, 1, "91329");
-      orderLines.add(new OrderItem.OrderLine(skuId, 1000 + i, 1, "0.50", "0.50", List.of(1)));
-    }
-    createOrderWithLines("jordan", "91329", "awaiting_payment", orderLines);
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    createSkuWithUnits("jordan", skuId, 1001, 105);
+    var allocatedSequenceNumbers = IntStream.rangeClosed(1, 105).boxed().toList();
+    allocatedSequenceNumbers.forEach(
+        sequenceNumber -> reserveUnit("jordan", skuId, sequenceNumber, "91329"));
+    createOrderWithLines(
+        "jordan",
+        "91329",
+        "awaiting_payment",
+        List.of(
+            new OrderItem.OrderLine(skuId, 1001, 105, "52.50", "1.50", allocatedSequenceNumbers)));
 
     fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(91329, "CANCELLED_BY_SELLER")));
 
@@ -831,12 +1027,14 @@ public class JobsHandlerIntegrationTest {
     var order = getOrder("jordan", "91329");
     assertThat(order.getStatus()).isEqualTo("voided");
 
-    for (int i = 1; i <= 60; i++) {
-      var units = getUnits("jordan", "mtg#scryfall#scryfall-" + i + "#normal#NM");
-      assertThat(units).hasSize(1);
-      assertThat(units.get(0).getStatus()).isEqualTo("in_stock");
-      assertThat(units.get(0).getOrderId()).isNull();
-    }
+    var units = getUnits("jordan", skuId);
+    assertThat(units).hasSize(105);
+    assertThat(units)
+        .allSatisfy(
+            unit -> {
+              assertThat(unit.getStatus()).isEqualTo("in_stock");
+              assertThat(unit.getOrderId()).isNull();
+            });
 
     var releaseAudits =
         getAuditEntries("jordan").stream().filter(a -> "release".equals(a.getEventType())).toList();
@@ -1186,17 +1384,14 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-
-    var offerItems = new ArrayList<FetchTcgClient.OfferItem>();
-    for (int i = 1; i <= 60; i++) {
-      createSkuWithUnitAtSequence(
-          "jordan", "mtg#scryfall#scryfall-" + i + "#normal#NM", 2000 + i, i);
-      offerItems.add(
-          new FetchTcgClient.OfferItem(
-              new FetchTcgClient.OfferListing(2000 + i, "raw-nm", new BigDecimal("0.50")),
-              1,
-              new BigDecimal("0.50")));
-    }
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    createSkuWithUnits("jordan", skuId, 2001, 105);
+    var offerItems =
+        List.of(
+            new FetchTcgClient.OfferItem(
+                new FetchTcgClient.OfferListing(2001, "raw-nm", new BigDecimal("0.50")),
+                105,
+                new BigDecimal("52.50")));
 
     fakeFetchTcgClient.seedSellerOffers(
         List.of(
@@ -1209,7 +1404,7 @@ public class JobsHandlerIntegrationTest {
                 null,
                 null,
                 null,
-                new BigDecimal("30.00"),
+                new BigDecimal("52.50"),
                 offerItems)));
 
     // act
@@ -1223,18 +1418,19 @@ public class JobsHandlerIntegrationTest {
     assertThat(order).isNotNull();
     assertThat(order.getStatus()).isEqualTo("awaiting_payment");
     var orderLines = order.getLines();
-    assertThat(orderLines).hasSize(60);
+    assertThat(orderLines).hasSize(1);
     var allocated =
         orderLines.stream().flatMap(l -> l.getAllocatedSequenceNumbers().stream()).toList();
-    assertThat(allocated)
-        .containsExactlyInAnyOrderElementsOf(IntStream.rangeClosed(1, 60).boxed().toList());
+    assertThat(allocated).containsExactlyElementsOf(IntStream.rangeClosed(1, 105).boxed().toList());
 
-    for (int i = 1; i <= 60; i++) {
-      var units = getUnits("jordan", "mtg#scryfall#scryfall-" + i + "#normal#NM");
-      assertThat(units).hasSize(1);
-      assertThat(units.get(0).getStatus()).isEqualTo("reserved");
-      assertThat(units.get(0).getOrderId()).isEqualTo("91329");
-    }
+    var units = getUnits("jordan", skuId);
+    assertThat(units).hasSize(105);
+    assertThat(units)
+        .allSatisfy(
+            unit -> {
+              assertThat(unit.getStatus()).isEqualTo("reserved");
+              assertThat(unit.getOrderId()).isEqualTo("91329");
+            });
 
     var reserveAudits =
         getAuditEntries("jordan").stream().filter(a -> "reserve".equals(a.getEventType())).toList();
@@ -1542,41 +1738,6 @@ public class JobsHandlerIntegrationTest {
     }
   }
 
-  private void createSkuWithUnitAtSequence(
-      String user, String skuId, int fetchtcgListingId, int sequenceNumber) {
-    var parts = skuId.split("#");
-    var skuItem =
-        SkuItem.create(
-            user,
-            skuId,
-            parts[0],
-            parts[1],
-            parts[2],
-            parts[3],
-            parts[4],
-            "Test Card",
-            "dom",
-            "Dominaria",
-            "168",
-            "mtg_168_c_dom_normal",
-            "1.50");
-    skuItem.setDirty(false);
-    skuItem.setGsi1pk(SkuItem.USER_PREFIX + user + "#CLEAN");
-    skuItem.setFetchtcgListingId(fetchtcgListingId);
-    skuTable.putItem(skuItem);
-
-    var unit =
-        UnitItem.create(
-            user,
-            "mtg",
-            skuId,
-            sequenceNumber,
-            "in_stock",
-            "import1",
-            Instant.ofEpochSecond(1700000000));
-    unitTable.putItem(unit);
-  }
-
   private void createTrackOrdersAfter(String user, Instant trackOrdersAfter) {
     var settingsItem = new SettingsItem();
     settingsItem.setPk(SkuItem.formatUserPk(user));
@@ -1720,6 +1881,84 @@ public class JobsHandlerIntegrationTest {
             .build();
     auditTable.query(request).items().forEach(results::add);
     return results;
+  }
+
+  private void seedTransitionCompletion(
+      String user,
+      String orderId,
+      String action,
+      String skuId,
+      int sequenceNumber,
+      String beforeStatus,
+      String afterStatus,
+      String beforeOwner,
+      String afterOwner) {
+    var now = fakeClock.now().getEpochSecond();
+    var transitionSk =
+        "ORDER_TRANSITION#"
+            + orderId
+            + "#"
+            + action
+            + "#"
+            + skuId
+            + "#"
+            + String.format("%010d", sequenceNumber);
+    var attributes =
+        Map.ofEntries(
+            Map.entry(OrderItem.PK, AttributeValue.builder().s(OrderItem.formatPk(user)).build()),
+            Map.entry(OrderItem.SK, AttributeValue.builder().s(transitionSk).build()),
+            Map.entry(OrderItem.ORDER_ID, AttributeValue.builder().s(orderId).build()),
+            Map.entry("action", AttributeValue.builder().s(action).build()),
+            Map.entry(SkuItem.SKU_ID, AttributeValue.builder().s(skuId).build()),
+            Map.entry(
+                UnitItem.SEQUENCE_NUMBER,
+                AttributeValue.builder().n(String.valueOf(sequenceNumber)).build()),
+            Map.entry("before_status", AttributeValue.builder().s(beforeStatus).build()),
+            Map.entry("after_status", AttributeValue.builder().s(afterStatus).build()),
+            Map.entry("before_owner", AttributeValue.builder().s(beforeOwner).build()),
+            Map.entry("after_owner", AttributeValue.builder().s(afterOwner).build()),
+            Map.entry("completed_at", AttributeValue.builder().n(String.valueOf(now)).build()));
+    factory
+        .dynamoDbClient()
+        .putItem(
+            PutItemRequest.builder()
+                .tableName(TcgInventoryTable.TABLE_NAME)
+                .item(attributes)
+                .build());
+
+    var eventType = "fulfill".equals(action) ? "unit_sell" : "unit_" + action;
+    var auditSk =
+        "TEST#"
+            + orderId
+            + "#"
+            + action
+            + "#"
+            + skuId
+            + "#"
+            + String.format("%010d", sequenceNumber);
+    var auditAttributes =
+        Map.ofEntries(
+            Map.entry(AuditItem.PK, AttributeValue.builder().s(AuditItem.formatPk(user)).build()),
+            Map.entry(AuditItem.SK, AttributeValue.builder().s(auditSk).build()),
+            Map.entry(AuditItem.EVENT_TYPE, AttributeValue.builder().s(eventType).build()),
+            Map.entry(AuditItem.ORDER_ID, AttributeValue.builder().s(orderId).build()),
+            Map.entry(AuditItem.SKU_ID, AttributeValue.builder().s(skuId).build()),
+            Map.entry(
+                AuditItem.SEQUENCE_NUMBER,
+                AttributeValue.builder().n(String.valueOf(sequenceNumber)).build()),
+            Map.entry("before_status", AttributeValue.builder().s(beforeStatus).build()),
+            Map.entry("after_status", AttributeValue.builder().s(afterStatus).build()),
+            Map.entry("before_owner", AttributeValue.builder().s(beforeOwner).build()),
+            Map.entry("after_owner", AttributeValue.builder().s(afterOwner).build()),
+            Map.entry(
+                AuditItem.CREATED_AT, AttributeValue.builder().n(String.valueOf(now)).build()));
+    factory
+        .dynamoDbClient()
+        .putItem(
+            PutItemRequest.builder()
+                .tableName(TcgInventoryTable.TABLE_NAME)
+                .item(auditAttributes)
+                .build());
   }
 
   private void seedDefaultCardForDom168() {

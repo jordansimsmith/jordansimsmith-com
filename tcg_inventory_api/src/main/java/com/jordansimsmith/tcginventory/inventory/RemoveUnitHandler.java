@@ -73,7 +73,7 @@ public class RemoveUnitHandler
       return httpResponseFactory.conflict(new ErrorResponse("unit is not in stock"));
     }
 
-    inventoryRepository.removeUnit(user, skuId, sequenceNumber, reason);
+    inventoryRepository.removeUnit(user, skuId, unitItem, reason);
 
     return httpResponseFactory.noContent();
   }

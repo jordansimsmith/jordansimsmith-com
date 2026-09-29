@@ -834,6 +834,28 @@ public class ScansHandlerIntegrationTest {
   }
 
   @Test
+  void deleteScanShouldResumeAfterParentWasAlreadyRemoved() throws Exception {
+    // arrange
+    var scanId = createScanWithFiles("jordan", 3);
+    assertThat(factory.scanRepository().deleteScan("jordan", scanId)).isTrue();
+    assertThat(factory.scanRepository().findScanRows("jordan", scanId)).hasSize(3);
+
+    // act
+    var response =
+        deleteScanHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("scan_id", scanId)), null);
+    var retryResponse =
+        deleteScanHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("scan_id", scanId)), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(204);
+    assertThat(retryResponse.getStatusCode()).isEqualTo(204);
+    assertThat(getScanItem("jordan", scanId)).isNull();
+    assertThat(factory.scanRepository().findScanRows("jordan", scanId)).isEmpty();
+  }
+
+  @Test
   void deleteScanShouldFenceConfirmedAndStaleWorkerWrites() throws Exception {
     // arrange
     var confirmedScanId = createScan("jordan", "confirmed.jpg", 5);
@@ -975,6 +997,63 @@ public class ScansHandlerIntegrationTest {
                         .getBody())
                 .has("confirmed_rows"))
         .isFalse();
+  }
+
+  @Test
+  void confirmScanShouldBatchWriteTwoHundredImportRows() throws Exception {
+    // arrange
+    var scanId = createScanWithFiles("jordan", 200);
+    var scan = getScanItem("jordan", scanId);
+    scan.setStatus("reviewing");
+    scanTable.putItem(scan);
+    var rows =
+        IntStream.rangeClosed(1, 200)
+            .mapToObj(
+                position ->
+                    "{\"scan_position\":%d,\"external_source\":\"scryfall\",".formatted(position)
+                        + "\"external_id\":\"card-%d\",\"name\":\"Card %d\","
+                            .formatted(position, position)
+                        + "\"set_code\":\"tst\",\"set_name\":\"Test Set\","
+                        + "\"collector_number\":\"%d\"}".formatted(position))
+            .collect(Collectors.joining(","));
+    var request = "{\"rows\":[" + rows + "]}";
+
+    // act
+    var response =
+        confirmScanHandler.handleRequest(
+            buildEventWithPathAndBody("jordan", Map.of("scan_id", scanId), request), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var responseBody = objectMapper.readTree(response.getBody());
+    assertThat(responseBody.get("status").asText()).isEqualTo("confirmed");
+    var importId = responseBody.get("import_id").asText();
+    var importItem =
+        importTable.getItem(
+            Key.builder()
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(ImportItem.formatSk(importId))
+                .build());
+    assertThat(importItem.getRowCount()).isEqualTo(200);
+    var importRows =
+        importRowTable
+            .query(
+                QueryEnhancedRequest.builder()
+                    .queryConditional(
+                        QueryConditional.sortBeginsWith(
+                            Key.builder()
+                                .partitionValue(ImportRowItem.formatPk("jordan", importId))
+                                .sortValue(ImportRowItem.ROW_PREFIX)
+                                .build()))
+                    .scanIndexForward(true)
+                    .build())
+            .stream()
+            .flatMap(page -> page.items().stream())
+            .toList();
+    assertThat(importRows).hasSize(200);
+    assertThat(importRows.getFirst().getPosition()).isEqualTo(1);
+    assertThat(importRows.getLast().getPosition()).isEqualTo(200);
+    assertThat(getScanItem("jordan", scanId).getStatus()).isEqualTo("confirmed");
   }
 
   @Test
