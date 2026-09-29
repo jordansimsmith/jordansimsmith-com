@@ -126,6 +126,9 @@
     {
       "path": "tcg_inventory_api/infra",
       "artifacts": {
+        "get_catalog_card": "//tcg_inventory_api:get-catalog-card-handler_deploy.jar",
+        "find_catalog_alternatives": "//tcg_inventory_api:find-catalog-alternatives-handler_deploy.jar",
+        "find_catalog_cards": "//tcg_inventory_api:find-catalog-cards-handler_deploy.jar",
         "get_games": "//tcg_inventory_api:get-games-handler_deploy.jar",
         "get_settings": "//tcg_inventory_api:get-settings-handler_deploy.jar",
         "update_settings": "//tcg_inventory_api:update-settings-handler_deploy.jar",

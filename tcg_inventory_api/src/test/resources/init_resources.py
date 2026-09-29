@@ -136,6 +136,21 @@ iam_client.put_role_policy(
 )
 
 lambdas = {
+    "get_catalog_card": {
+        "handler": "com.jordansimsmith.tcginventory.catalog.GetCatalogCardHandler",
+        "zip_file": "get-catalog-card-handler_deploy.jar",
+        "environment": {"SCRYFALL_BASE_URL": os.environ.get("SCRYFALL_BASE_URL", "")},
+    },
+    "find_catalog_alternatives": {
+        "handler": "com.jordansimsmith.tcginventory.catalog.FindCatalogAlternativesHandler",
+        "zip_file": "find-catalog-alternatives-handler_deploy.jar",
+        "environment": {"SCRYFALL_BASE_URL": os.environ.get("SCRYFALL_BASE_URL", "")},
+    },
+    "find_catalog_cards": {
+        "handler": "com.jordansimsmith.tcginventory.catalog.FindCatalogCardsHandler",
+        "zip_file": "find-catalog-cards-handler_deploy.jar",
+        "environment": {"SCRYFALL_BASE_URL": os.environ.get("SCRYFALL_BASE_URL", "")},
+    },
     "get_games": {
         "handler": "com.jordansimsmith.tcginventory.games.GetGamesHandler",
         "zip_file": "get-games-handler_deploy.jar",
@@ -272,6 +287,7 @@ lambdas = {
 }
 
 root_resources = {
+    "catalog": {"path": "catalog"},
     "games": {"path": "games"},
     "settings": {"path": "settings"},
     "imports": {"path": "imports"},
@@ -283,6 +299,12 @@ root_resources = {
 }
 
 child_resources = {
+    "catalog_cards": {"parent": "catalog", "path": "cards"},
+    "catalog_card_detail": {"parent": "catalog_cards", "path": "{external_id}"},
+    "catalog_card_alternatives": {
+        "parent": "catalog_card_detail",
+        "path": "alternatives",
+    },
     "import_detail": {"parent": "imports", "path": "{import_id}"},
     "import_confirm": {"parent": "import_detail", "path": "confirm"},
     "import_rows": {"parent": "import_detail", "path": "rows"},
@@ -302,6 +324,21 @@ child_resources = {
 }
 
 endpoints = {
+    "get_catalog_card": {
+        "resource": "catalog_card_detail",
+        "method": "GET",
+        "lambda": "get_catalog_card",
+    },
+    "find_catalog_alternatives": {
+        "resource": "catalog_card_alternatives",
+        "method": "GET",
+        "lambda": "find_catalog_alternatives",
+    },
+    "find_catalog_cards": {
+        "resource": "catalog_cards",
+        "method": "GET",
+        "lambda": "find_catalog_cards",
+    },
     "get_games": {"resource": "games", "method": "GET", "lambda": "get_games"},
     "get_settings": {"resource": "settings", "method": "GET", "lambda": "get_settings"},
     "update_settings": {

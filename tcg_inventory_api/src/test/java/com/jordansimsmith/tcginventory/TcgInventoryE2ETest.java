@@ -6,6 +6,7 @@ import static org.awaitility.Awaitility.await;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.tcginventory.catalog.ScryfallStubContainer;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgStubContainer;
 import java.io.IOException;
 import java.net.URI;
@@ -54,6 +55,7 @@ public class TcgInventoryE2ETest {
   private static final String STUB_IMAGE_1 = "https://listing-img.fetchtcg.com/stub/listing/1.jpg";
   private static final String STUB_IMAGE_2 = "https://listing-img.fetchtcg.com/stub/listing/2.jpg";
   private static final String STUB_IMAGE_3 = "https://listing-img.fetchtcg.com/stub/listing/3.jpg";
+  private static final String SCRYFALL_ID = "4eaac4fd-95f5-4f38-b593-0101e79a20f9";
 
   private static final Network NETWORK = Network.newNetwork();
 
@@ -63,11 +65,15 @@ public class TcgInventoryE2ETest {
   private static final FirebaseStubContainer firebaseStubContainer =
       new FirebaseStubContainer().withNetwork(NETWORK);
 
+  private static final ScryfallStubContainer scryfallStubContainer =
+      new ScryfallStubContainer().withNetwork(NETWORK);
+
   private static final TcgInventoryContainer tcgInventoryContainer =
       new TcgInventoryContainer()
           .withNetwork(NETWORK)
           .withEnv("FETCHTCG_BASE_URL", fetchTcgStubContainer.getEndpoint().toString())
-          .withEnv("FIREBASE_TOKEN_URL", firebaseStubContainer.getEndpoint() + "/v1/token");
+          .withEnv("FIREBASE_TOKEN_URL", firebaseStubContainer.getEndpoint() + "/v1/token")
+          .withEnv("SCRYFALL_BASE_URL", scryfallStubContainer.getEndpoint().toString());
 
   private HttpClient httpClient;
   private ObjectMapper objectMapper;
@@ -77,12 +83,14 @@ public class TcgInventoryE2ETest {
   static void setUpBeforeClass() {
     fetchTcgStubContainer.start();
     firebaseStubContainer.start();
+    scryfallStubContainer.start();
     tcgInventoryContainer.start();
   }
 
   @AfterAll
   static void tearDownAfterClass() {
     tcgInventoryContainer.stop();
+    scryfallStubContainer.stop();
     firebaseStubContainer.stop();
     fetchTcgStubContainer.stop();
     NETWORK.close();
@@ -112,6 +120,23 @@ public class TcgInventoryE2ETest {
                 """
                 {"games":[{"id":"mtg","display_name":"Magic: The Gathering","scanning_enabled":true,"csv_import_enabled":true,"finishes":[{"id":"normal","display_name":"Normal"},{"id":"foil","display_name":"Foil"},{"id":"etched","display_name":"Etched"}]}]}
                 """));
+
+    var catalogCardResponse = get("/catalog/cards/" + SCRYFALL_ID + "?game=mtg");
+    assertThat(catalogCardResponse.statusCode()).isEqualTo(200);
+    var catalogCard = objectMapper.readTree(catalogCardResponse.body());
+    assertThat(catalogCard.get("external_id").asText()).isEqualTo(SCRYFALL_ID);
+    assertThat(catalogCard.get("available_finishes").toString()).isEqualTo("[\"normal\",\"foil\"]");
+
+    var alternativesResponse =
+        get("/catalog/cards/" + SCRYFALL_ID + "/alternatives?game=mtg&finish=foil");
+    assertThat(alternativesResponse.statusCode()).isEqualTo(200);
+    var alternatives = objectMapper.readTree(alternativesResponse.body()).get("cards");
+    assertThat(alternatives).hasSize(2);
+    assertThat(alternatives.get(0).get("external_id").asText()).isEqualTo(SCRYFALL_ID);
+
+    var searchResponse = get("/catalog/cards?game=mtg&query=Lightning%20Bolt&finish=normal");
+    assertThat(searchResponse.statusCode()).isEqualTo(200);
+    assertThat(objectMapper.readTree(searchResponse.body()).get("cards")).hasSize(2);
 
     // arrange - store fake refresh token
     var settingsResponse = patch("/settings", "{\"refresh_token\":\"fake-token\"}");

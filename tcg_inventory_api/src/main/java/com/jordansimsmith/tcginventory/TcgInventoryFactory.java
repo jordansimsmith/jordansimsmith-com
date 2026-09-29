@@ -10,6 +10,8 @@ import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.s3.S3Module;
 import com.jordansimsmith.secrets.Secrets;
 import com.jordansimsmith.secrets.SecretsModule;
+import com.jordansimsmith.tcginventory.catalog.CatalogModule;
+import com.jordansimsmith.tcginventory.catalog.Catalogs;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgModule;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgTokenMinter;
@@ -36,6 +38,7 @@ import software.amazon.awssdk.services.sqs.SqsClient;
       RequestContextModule.class,
       UlidModule.class,
       S3Module.class,
+      CatalogModule.class,
       TcgInventoryModule.class,
       FetchTcgModule.class
     })
@@ -65,6 +68,8 @@ public interface TcgInventoryFactory {
   UlidGenerator ulidGenerator();
 
   FetchTcgClient fetchTcgClient();
+
+  Catalogs catalogs();
 
   FetchTcgTokenMinter fetchTcgTokenMinter();
 

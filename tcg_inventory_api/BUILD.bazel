@@ -108,6 +108,22 @@ java_library(
 )
 
 java_library(
+    name = "catalog-lib",
+    srcs = glob(
+        ["src/main/java/com/jordansimsmith/tcginventory/catalog/*.java"],
+        exclude = ["src/main/java/com/jordansimsmith/tcginventory/catalog/*Handler.java"],
+    ),
+    deps = [
+        ":games-lib",
+        "//third_party/dagger",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+    ],
+)
+
+java_library(
     name = "lib",
     srcs = glob(
         ["src/main/java/com/jordansimsmith/tcginventory/*.java"],
@@ -117,7 +133,10 @@ java_library(
         ["src/main/resources/**"],
         exclude = ["src/main/resources/fetchtcg/fetchtcg_set_mapping.json"],
     ),
-    deps = [":fetchtcg-lib"] + COMMON_DEPS,
+    deps = [
+        ":catalog-lib",
+        ":fetchtcg-lib",
+    ] + COMMON_DEPS,
 )
 
 java_library(
@@ -221,6 +240,66 @@ java_binary(
         "@maven//:com_google_guava_guava",
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "get-catalog-card-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/catalog/GetCatalogCardHandler.java"],
+    create_executable = False,
+    resources = ["src/main/resources/logback.xml"],
+    deps = [
+        ":catalog-lib",
+        ":games-lib",
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+    ],
+)
+
+java_binary(
+    name = "find-catalog-alternatives-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/catalog/FindCatalogAlternativesHandler.java"],
+    create_executable = False,
+    resources = ["src/main/resources/logback.xml"],
+    deps = [
+        ":catalog-lib",
+        ":games-lib",
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+    ],
+)
+
+java_binary(
+    name = "find-catalog-cards-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/catalog/FindCatalogCardsHandler.java"],
+    create_executable = False,
+    resources = ["src/main/resources/logback.xml"],
+    deps = [
+        ":catalog-lib",
+        ":games-lib",
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
     ],
 )
 
@@ -986,6 +1065,13 @@ java_binary(
     create_executable = False,
 )
 
+java_binary(
+    name = "scryfall-stub-server",
+    testonly = True,
+    srcs = ["src/test/java/com/jordansimsmith/tcginventory/catalog/ScryfallStubServer.java"],
+    create_executable = False,
+)
+
 java_library(
     name = "test-lib",
     testonly = True,
@@ -997,12 +1083,14 @@ java_library(
         ":fetchtcg-stub-load",
         ":firebase-stub-load",
         ":local-load",
+        ":scryfall-stub-load",
     ],
     resources = [
         "src/test/resources/logback-test.xml",
         "src/test/resources/test.properties",
     ],
     deps = [
+        ":catalog-lib",
         ":fetchtcg-lib",
         ":games-lib",
         ":import-lib",
@@ -1047,8 +1135,12 @@ java_test_suite(
     test_suffixes = ["Test.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":catalog-lib",
         ":fetchtcg-lib",
+        ":find-catalog-alternatives-handler",
+        ":find-catalog-cards-handler",
         ":games-lib",
+        ":get-catalog-card-handler",
         ":get-games-handler",
         ":import-lib",
         ":inventory-lib",
@@ -1089,6 +1181,7 @@ java_test_suite(
     test_suffixes = ["IntegrationTest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":catalog-lib",
         ":confirm-import-handler",
         ":confirm-order-handler",
         ":confirm-scan-handler",
@@ -1156,6 +1249,9 @@ java_test_suite(
 localstack_image(
     name = "local",
     handler_jars = [
+        ":get-catalog-card-handler_deploy.jar",
+        ":find-catalog-alternatives-handler_deploy.jar",
+        ":find-catalog-cards-handler_deploy.jar",
         ":confirm-import-handler_deploy.jar",
         ":confirm-order-handler_deploy.jar",
         ":confirm-scan-handler_deploy.jar",
@@ -1202,6 +1298,11 @@ stub_server_image(
     deploy_jar = ":firebase-stub-server_deploy.jar",
 )
 
+stub_server_image(
+    name = "scryfall-stub",
+    deploy_jar = ":scryfall-stub-server_deploy.jar",
+)
+
 java_test_suite(
     name = "e2e-tests",
     size = "large",
@@ -1218,6 +1319,7 @@ java_test_suite(
     test_suffixes = ["E2ETest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":catalog-lib",
         ":fetchtcg-lib",
         ":import-lib",
         ":inventory-lib",
