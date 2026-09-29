@@ -411,7 +411,11 @@ export interface ReportResponse {
 export interface ApiClient {
   getSettings(): Promise<SettingsResponse>;
   updateSettings(update: UpdateSettingsRequest): Promise<SettingsResponse>;
-  createImport(filename: string, csv: string): Promise<ImportSummary>;
+  createImport(
+    game: GameId,
+    filename: string,
+    csv: string,
+  ): Promise<ImportSummary>;
   findImports(params?: FindImportsParams): Promise<FindImportsResponse>;
   getImport(importId: string): Promise<ImportDetail>;
   updateImportRow(

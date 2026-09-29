@@ -32,6 +32,7 @@ The TCG inventory API service is the source of truth for a physical Magic: The G
 
 - Authenticated CRUD for imports: upload a ManaBox CSV, appraise rows asynchronously, review appraisal decisions, confirm keepers into inventory, delete unwanted imports before confirm. Import detail derives `total_suggested_price` from keep-row suggested prices.
 - Scanner intake: create a batch with a registered game, one condition (`NM`, `LP`, `MP`, `HP`, or `DMG`), and a finish allowed for that game; upload one ASCII-named JPEG front per card, identify with the configured offline catalog, explicitly confirm each retained printing, and create one ordinary appraising import. Magic is the only registered game and uses the offline CollectorVision catalog. Ascending filenames are bottom-to-top, and the first scanned row becomes the first import row. Alternate art, double-faced cards, and tokens are supported.
+- Game metadata: authenticated `GET /games` returns registered display names, ordered finish choices, and scanning/CSV-import capabilities. Magic is the only registered game.
 - Durable scan jobs and source images: all-or-abandon batch uploads, background recognition with stored suggestions, manual correction through browser-direct Scryfall calls, irreversible removal of an outlier scan row, deletion of an unfinished job, and read-only confirmed jobs. Confirmed source scans are retained indefinitely and never automatically used as listing photos.
 - Appraisal per row: FetchTCG identity resolution for the submitted ManaBox or scan-confirmed printing (candidates verified against the row's Scryfall ID, cached on the SKU after first sight), keep filter, and suggested policy price.
 - Inventory browse: SKU search and detail with unit lists and derived locations.
@@ -95,7 +96,7 @@ sequenceDiagram
   participant F as FetchTCG
 
   U->>W: upload ManaBox CSV
-  W->>A: POST /imports
+  W->>A: POST /imports?game=mtg&filename=collection.csv
   A->>Q: enqueue appraise job
   A-->>W: import_id + job_id
   J->>F: resolve identity + market appraisal per row
@@ -159,9 +160,9 @@ The shared `infra/modules/container_lambda` module owns the generic image-Lambda
 
 ### Java package layout
 
-The Java API is organized into hard-boundary vertical packages. `scans` owns scan records, recognition messages, scan persistence, and scan handlers; `imports` owns ManaBox parsing, appraisal, import records, photos during intake, and import handlers; `inventory` owns SKUs, units, locations, sequence allocation, and inventory handlers; `orders` owns offers, reservations, fulfillment, order persistence, and order handlers; `reports` owns report records, aggregation, generation, and report handlers; `publish` owns listing projection, publish orchestration, publish jobs, and publish handlers; and `settings` owns settings persistence and settings handlers. Dagger, jobs, FetchTCG clients, audit records, generic photo policy/storage helpers, and table constants remain in the top-level package.
+The Java API is organized into hard-boundary vertical packages. `games` owns the immutable registered game and finish metadata plus `GET /games`; `scans` owns scan records, recognition messages, scan persistence, and scan handlers; `imports` owns ManaBox parsing, appraisal, import records, photos during intake, and import handlers; `inventory` owns SKUs, units, locations, sequence allocation, and inventory handlers; `orders` owns offers, reservations, fulfillment, order persistence, and order handlers; `reports` owns report records, aggregation, generation, and report handlers; `publish` owns listing projection, publish orchestration, publish jobs, and publish handlers; and `settings` owns settings persistence and settings handlers. Dagger, jobs, FetchTCG clients, audit records, generic photo policy/storage helpers, and table constants remain in the top-level package.
 
-Bazel mirrors this layout with `:scan-lib`, `:import-lib`, `:inventory-lib`, `:order-lib`, `:report-lib`, `:publish-lib`, and `:settings-lib`. The libraries depend in one direction: scans, imports, inventory, and settings depend on the top-level `:lib`; orders depend on inventory and settings; publish depends on inventory, orders, settings, and the top-level `:lib`; and reports depend on inventory and orders. Cross-vertical composition is kept on the smallest handler or job target that needs it (for example, import confirmation composes imports and inventory, while scan confirmation composes scans and imports). The jobs handler composes all vertical libraries directly; there is no separate jobs library.
+Bazel mirrors this layout with `:games-lib`, `:scan-lib`, `:import-lib`, `:inventory-lib`, `:order-lib`, `:report-lib`, `:publish-lib`, and `:settings-lib`. The game registry is a shared dependency of the verticals that validate or expose game identity. The remaining libraries depend in one direction: scans, imports, inventory, and settings depend on the top-level `:lib`; orders depend on inventory and settings; publish depends on inventory, orders, settings, and the top-level `:lib`; and reports depend on inventory and orders. Cross-vertical composition is kept on the smallest handler or job target that needs it (for example, import confirmation composes imports and inventory, while scan confirmation composes scans and imports). The jobs handler composes all vertical libraries directly; there is no separate jobs library.
 
 - Inventory is the source of truth; FetchTCG listings are an absolute projection: listing quantity = count of `in_stock` units per SKU. Re-importing already-listed cards converges to a no-op, and FetchTCG's own decrement at offer acceptance converges without a write.
 - Dirty-marker outbox for the projection: every mutation transaction sets a plain boolean `dirty` on affected SKU records. Only mutation transactions can set the flag, which makes every FetchTCG write traceable to an audited inventory event; blind reconciliation never changes quantities. Coalescing is inherent because the projection is absolute.
@@ -243,7 +244,8 @@ Bazel mirrors this layout with `:scan-lib`, `:import-lib`, `:inventory-lib`, `:o
 
 | Method   | Path                                                     | Purpose                                                                                         |
 | -------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `POST`   | `/imports`                                               | upload a ManaBox CSV; starts the appraise job                                                   |
+| `GET`    | `/games`                                                 | list registered game display metadata, finishes, and capabilities                               |
+| `POST`   | `/imports?game=<game>&filename=<filename>`               | upload a ManaBox CSV for a registered CSV-enabled game; starts the appraise job                 |
 | `GET`    | `/imports`                                               | list imports newest-first (continuation paging)                                                 |
 | `GET`    | `/imports/{import_id}`                                   | import status, progress, rows, and keep-row suggested total                                     |
 | `PUT`    | `/imports/{import_id}/rows/{position}`                   | update a row's condition before confirm                                                         |
@@ -272,6 +274,32 @@ Bazel mirrors this layout with `:scan-lib`, `:import-lib`, `:inventory-lib`, `:o
 | `GET`    | `/reports`                                               | latest report snapshot with staleness and generation status; 404 before first run               |
 | `GET`    | `/settings`                                              | settings view: credential presence, last-updated, track orders after                            |
 | `PATCH`  | `/settings`                                              | partial update: optional refresh token + optional track orders after                            |
+
+### `GET /games`
+
+Response `200` returns games in registry order. Only registered games are included. Each game's `finishes` list preserves the display order supplied by the backend; `scanning_enabled` and `csv_import_enabled` advertise whether the corresponding create workflows are available. Provider fields such as `external_source` are not part of this response.
+
+```json
+{
+  "games": [
+    {
+      "id": "mtg",
+      "display_name": "Magic: The Gathering",
+      "scanning_enabled": true,
+      "csv_import_enabled": true,
+      "finishes": [
+        { "id": "normal", "display_name": "Normal" },
+        { "id": "foil", "display_name": "Foil" },
+        { "id": "etched", "display_name": "Etched" }
+      ]
+    }
+  ]
+}
+```
+
+### `POST /imports`
+
+The request requires `game` and `filename` query parameters and a raw ManaBox CSV body with `Content-Type: text/csv`. The API rejects missing, unregistered, or CSV-disabled games before creating an import. The response includes the requested registered game ID. Only Magic currently enables CSV imports.
 
 ### Example request and response
 

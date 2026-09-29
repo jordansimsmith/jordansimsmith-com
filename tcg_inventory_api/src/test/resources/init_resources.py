@@ -136,6 +136,10 @@ iam_client.put_role_policy(
 )
 
 lambdas = {
+    "get_games": {
+        "handler": "com.jordansimsmith.tcginventory.games.GetGamesHandler",
+        "zip_file": "get-games-handler_deploy.jar",
+    },
     "get_settings": {
         "handler": "com.jordansimsmith.tcginventory.settings.GetSettingsHandler",
         "zip_file": "get-settings-handler_deploy.jar",
@@ -268,6 +272,7 @@ lambdas = {
 }
 
 root_resources = {
+    "games": {"path": "games"},
     "settings": {"path": "settings"},
     "imports": {"path": "imports"},
     "scans": {"path": "scans"},
@@ -297,6 +302,7 @@ child_resources = {
 }
 
 endpoints = {
+    "get_games": {"resource": "games", "method": "GET", "lambda": "get_games"},
     "get_settings": {"resource": "settings", "method": "GET", "lambda": "get_settings"},
     "update_settings": {
         "resource": "settings",

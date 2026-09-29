@@ -1,10 +1,10 @@
 package com.jordansimsmith.tcginventory.imports;
 
 import com.jordansimsmith.tcginventory.CardIdentity;
-import com.jordansimsmith.tcginventory.Games;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgCardResolver;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgSetMapping;
+import com.jordansimsmith.tcginventory.games.Games;
 import com.jordansimsmith.tcginventory.imports.AppraisalCatalogs.AppraisalCatalog;
 import java.text.Normalizer;
 import java.util.Map;
@@ -30,7 +30,7 @@ public class MagicTheGatheringAppraisalCatalog implements AppraisalCatalog {
               + ": "
               + identity.externalSource());
     }
-    if (!Games.MAGIC_THE_GATHERING.finishes().contains(rowItem.getFinish())) {
+    if (!Games.MAGIC_THE_GATHERING.supportsFinish(rowItem.getFinish())) {
       throw new IllegalArgumentException("unsupported finish for game: " + rowItem.getFinish());
     }
     if (!"en".equals(rowItem.getLanguage())) {

@@ -9,11 +9,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.queue.QueueClient;
-import com.jordansimsmith.tcginventory.Games;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
+import com.jordansimsmith.tcginventory.games.Games;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
 import java.util.ArrayList;
@@ -78,6 +78,22 @@ public class CreateImportHandler
 
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
     var user = requestContextFactory.createCtx(event).user();
+    var queryParams = event.getQueryStringParameters();
+    var gameId = queryParams != null ? queryParams.get("game") : null;
+    if (gameId == null || gameId.isBlank()) {
+      return httpResponseFactory.badRequest(new ErrorResponse("game query parameter is required"));
+    }
+
+    Games.Game game;
+    try {
+      game = Games.get(gameId);
+    } catch (IllegalArgumentException e) {
+      return httpResponseFactory.badRequest(new ErrorResponse("unsupported import game"));
+    }
+    if (!game.csvImportEnabled()) {
+      return httpResponseFactory.badRequest(
+          new ErrorResponse("CSV import is unavailable for game: " + game.id()));
+    }
 
     var headers = event.getHeaders();
     var contentType = headers != null ? headers.get("content-type") : null;
@@ -85,7 +101,6 @@ public class CreateImportHandler
       return httpResponseFactory.badRequest(new ErrorResponse("Content-Type must be text/csv"));
     }
 
-    var queryParams = event.getQueryStringParameters();
     var filename = queryParams != null ? queryParams.get("filename") : null;
     if (filename == null || filename.isBlank()) {
       return httpResponseFactory.badRequest(
@@ -113,9 +128,7 @@ public class CreateImportHandler
 
     int totalRows = reversed.stream().mapToInt(ManaBoxCsvParser.ParsedRow::quantity).sum();
 
-    var importItem =
-        ImportItem.create(
-            user, Games.MAGIC_THE_GATHERING.id(), importId, filename, totalRows, jobId, now);
+    var importItem = ImportItem.create(user, game.id(), importId, filename, totalRows, jobId, now);
     importTable.putItem(importItem);
 
     int position = 0;
@@ -148,12 +161,6 @@ public class CreateImportHandler
 
     return httpResponseFactory.ok(
         new ImportSummaryResponse(
-            importId,
-            Games.MAGIC_THE_GATHERING.id(),
-            filename,
-            "appraising",
-            totalRows,
-            null,
-            now.getEpochSecond()));
+            importId, game.id(), filename, "appraising", totalRows, null, now.getEpochSecond()));
   }
 }

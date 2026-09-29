@@ -52,6 +52,7 @@ py_test(
 HANDLERS = glob(["src/main/java/**/*Handler.java"])
 
 COMMON_DEPS = [
+    ":games-lib",
     "//lib/dynamodb:lib",
     "//lib/http:lib",
     "//lib/json:lib",
@@ -99,6 +100,11 @@ java_library(
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:org_slf4j_slf4j_api",
     ],
+)
+
+java_library(
+    name = "games-lib",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/games/Games.java"],
 )
 
 java_library(
@@ -196,6 +202,29 @@ java_library(
 )
 
 java_binary(
+    name = "get-games-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/games/GetGamesHandler.java"],
+    create_executable = False,
+    resources = [
+        "src/main/resources/logback.xml",
+    ],
+    deps = [
+        ":games-lib",
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
     name = "get-settings-handler",
     srcs = ["src/main/java/com/jordansimsmith/tcginventory/settings/GetSettingsHandler.java"],
     create_executable = False,
@@ -252,6 +281,7 @@ java_binary(
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":games-lib",
         ":import-lib",
         ":lib",
         "//lib/http:lib",
@@ -328,6 +358,7 @@ java_binary(
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":games-lib",
         ":lib",
         ":scan-lib",
         "//lib/http:lib",
@@ -680,6 +711,7 @@ java_binary(
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":games-lib",
         ":inventory-lib",
         ":lib",
         "//lib/dynamodb:lib",
@@ -826,6 +858,7 @@ java_binary(
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":games-lib",
         ":inventory-lib",
         ":lib",
         ":order-lib",
@@ -971,6 +1004,7 @@ java_library(
     ],
     deps = [
         ":fetchtcg-lib",
+        ":games-lib",
         ":import-lib",
         ":inventory-lib",
         ":lib",
@@ -1014,6 +1048,8 @@ java_test_suite(
     runtime_deps = JUNIT5_DEPS,
     deps = [
         ":fetchtcg-lib",
+        ":games-lib",
+        ":get-games-handler",
         ":import-lib",
         ":inventory-lib",
         ":lib",
@@ -1023,8 +1059,11 @@ java_test_suite(
         ":scan-lib",
         ":settings-lib",
         ":test-lib",
+        "//lib/http:lib",
         "//lib/secrets:lib",
         "//lib/secrets:test-lib",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
@@ -1068,6 +1107,7 @@ java_test_suite(
         ":find-orders-handler",
         ":find-scans-handler",
         ":find-skus-handler",
+        ":games-lib",
         ":get-import-handler",
         ":get-order-handler",
         ":get-publish-handler",
@@ -1129,6 +1169,7 @@ localstack_image(
         ":find-orders-handler_deploy.jar",
         ":find-skus-handler_deploy.jar",
         ":find-scans-handler_deploy.jar",
+        ":get-games-handler_deploy.jar",
         ":get-order-handler_deploy.jar",
         ":get-sku-handler_deploy.jar",
         ":get-scan-handler_deploy.jar",

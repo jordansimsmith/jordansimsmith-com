@@ -6,7 +6,7 @@ import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import com.jordansimsmith.tcginventory.CardIdentity;
 import com.jordansimsmith.tcginventory.Condition;
-import com.jordansimsmith.tcginventory.Games;
+import com.jordansimsmith.tcginventory.games.Games;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -77,7 +77,7 @@ public class ManaBoxCsvParser {
     }
 
     var finish = raw.finish() == null ? "" : raw.finish().toLowerCase();
-    if (!Games.MAGIC_THE_GATHERING.finishes().contains(finish)) {
+    if (!Games.MAGIC_THE_GATHERING.supportsFinish(finish)) {
       throw new IllegalArgumentException(
           "row " + rowNumber + ": Foil must be normal, foil, or etched");
     }

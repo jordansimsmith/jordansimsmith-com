@@ -125,6 +125,7 @@ describe('ImportsPage', () => {
       expect(screen.getByText('Import detail import-3')).toBeDefined();
     });
     expect(clientModule.apiClient.createImport).toHaveBeenCalledWith(
+      'mtg',
       'bulk.csv',
       VALID_CSV,
     );

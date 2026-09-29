@@ -60,6 +60,10 @@ module "java_api" {
   binary_media_types = ["image/jpeg"]
 
   lambdas = {
+    get_games = {
+      handler  = "com.jordansimsmith.tcginventory.games.GetGamesHandler"
+      artifact = var.artifacts["get_games"]
+    }
     get_settings = {
       handler  = "com.jordansimsmith.tcginventory.settings.GetSettingsHandler"
       artifact = var.artifacts["get_settings"]
@@ -184,6 +188,7 @@ module "java_api" {
   }
 
   endpoints = {
+    get_games               = { path = "games", method = "GET", lambda = "get_games" }
     get_settings            = { path = "settings", method = "GET", lambda = "get_settings" }
     update_settings         = { path = "settings", method = "PATCH", lambda = "update_settings" }
     create_import           = { path = "imports", method = "POST", lambda = "create_import" }

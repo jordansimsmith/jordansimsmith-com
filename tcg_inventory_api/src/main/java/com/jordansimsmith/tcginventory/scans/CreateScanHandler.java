@@ -11,9 +11,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.tcginventory.Condition;
-import com.jordansimsmith.tcginventory.Games;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
+import com.jordansimsmith.tcginventory.games.Games;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
 import java.util.ArrayList;
@@ -186,10 +186,13 @@ public class CreateScanHandler
     } catch (IllegalArgumentException e) {
       return "unsupported scan game";
     }
+    if (!game.scanningEnabled()) {
+      return "scanning is unavailable for game";
+    }
     if (request.condition() == null || !isValidCondition(request.condition())) {
       return "invalid scan condition";
     }
-    if (request.finish() == null || !game.finishes().contains(request.finish())) {
+    if (request.finish() == null || !game.supportsFinish(request.finish())) {
       return "invalid scan finish";
     }
     if (request.files() == null

@@ -1,12 +1,14 @@
 package com.jordansimsmith.tcginventory;
 
+import com.jordansimsmith.tcginventory.games.Games;
+
 public class SkuIds {
   public static String format(CardIdentity identity, String finish, Condition condition) {
     if (identity == null) {
       throw new IllegalArgumentException("identity must not be null");
     }
     var game = Games.get(identity.game());
-    if (finish == null || !game.finishes().contains(finish)) {
+    if (finish == null || !game.supportsFinish(finish)) {
       throw new IllegalArgumentException(
           "unsupported finish for game " + game.id() + ": " + finish);
     }

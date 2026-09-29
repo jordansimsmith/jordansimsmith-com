@@ -4,6 +4,38 @@ import { createHttpClient } from './http-client';
 
 const fetchSpy = vi.fn();
 
+describe('http client imports', () => {
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    localStorage.clear();
+    setSession('alice', 'pw');
+  });
+
+  afterEach(() => {
+    clearSession();
+  });
+
+  it('sends the selected game and filename when creating an import', async () => {
+    const json = vi.fn().mockResolvedValue({ import_id: 'import-1' });
+    fetchSpy.mockResolvedValue({ ok: true, json });
+    const client = createHttpClient();
+
+    await client.createImport('mtg', 'bulk.csv', 'csv body');
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/imports?game=mtg&filename=bulk.csv',
+    );
+    expect(init.method).toBe('POST');
+    expect(init.headers['Content-Type']).toBe('text/csv');
+    expect(init.headers.Authorization).toBe(`Basic ${btoa('alice:pw')}`);
+    expect(init.body).toBe('csv body');
+    expect(json).toHaveBeenCalledTimes(1);
+  });
+});
+
 describe('http client row photos', () => {
   beforeEach(() => {
     fetchSpy.mockReset();

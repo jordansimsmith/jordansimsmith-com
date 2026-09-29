@@ -82,14 +82,14 @@ export function ImportsPage() {
   };
 
   const handleUpload = async () => {
-    if (!file || !canUpload) {
+    if (!file || !game || !canUpload) {
       return;
     }
     setUploading(true);
     try {
       const content = await file.text();
       parseManaBoxCsv(content);
-      const created = await apiClient.createImport(file.name, content);
+      const created = await apiClient.createImport(game, file.name, content);
       navigate(`/imports/${encodeURIComponent(created.import_id)}`);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Failed to upload CSV';

@@ -109,6 +109,7 @@ public class ImportsHandlerIntegrationTest {
     assertThat(body.get("import_id").asText()).isNotEmpty();
     assertThat(body.get("filename").asText()).isEqualTo("manabox-export.csv");
     assertThat(body.get("status").asText()).isEqualTo("appraising");
+    assertThat(body.get("game").asText()).isEqualTo("mtg");
     assertThat(body.get("row_count").asInt()).isEqualTo(2);
     assertThat(body.get("appraisal_error").isNull()).isTrue();
     assertThat(body.get("created_at").asLong()).isEqualTo(1700000000);
@@ -141,6 +142,7 @@ public class ImportsHandlerIntegrationTest {
                 .partitionValue(SkuItem.formatUserPk("jordan"))
                 .sortValue(ImportItem.formatSk(importId))
                 .build());
+    assertThat(importItem.getGame()).isEqualTo("mtg");
     assertThat(importItem.getJobId()).isNotEmpty();
 
     var jobItem =
@@ -206,6 +208,39 @@ public class ImportsHandlerIntegrationTest {
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(400);
+  }
+
+  @Test
+  void createImportShouldRequireGameBeforeWritingImport() {
+    // arrange
+    var event =
+        buildCreateEvent("jordan", buildSingleCardCsv(), Map.of("filename", "missing-game.csv"));
+
+    // act
+    var response = createImportHandler.handleRequest(event, null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(400);
+    assertThat(fakeJobsQueue.getSends()).isEmpty();
+    assertNoImports("jordan");
+  }
+
+  @Test
+  void createImportShouldRejectUnregisteredGameBeforeWritingImport() {
+    // arrange
+    var event =
+        buildCreateEvent(
+            "jordan",
+            buildSingleCardCsv(),
+            Map.of("filename", "unsupported-game.csv", "game", "pokemon"));
+
+    // act
+    var response = createImportHandler.handleRequest(event, null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(400);
+    assertThat(fakeJobsQueue.getSends()).isEmpty();
+    assertNoImports("jordan");
   }
 
   @Test
@@ -491,15 +526,36 @@ public class ImportsHandlerIntegrationTest {
   }
 
   private APIGatewayV2HTTPEvent buildCreateEvent(String user, String body, String filename) {
+    return buildCreateEvent(user, body, Map.of("game", "mtg", "filename", filename));
+  }
+
+  private APIGatewayV2HTTPEvent buildCreateEvent(
+      String user, String body, Map<String, String> queryParams) {
     var authHeader =
         "Basic "
             + Base64.getEncoder()
                 .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
     return APIGatewayV2HTTPEvent.builder()
         .withHeaders(Map.of("Authorization", authHeader, "content-type", "text/csv"))
-        .withQueryStringParameters(Map.of("filename", filename))
+        .withQueryStringParameters(queryParams)
         .withBody(body)
         .build();
+  }
+
+  private void assertNoImports(String user) {
+    var importQuery =
+        QueryConditional.sortBeginsWith(
+            Key.builder()
+                .partitionValue(SkuItem.formatUserPk(user))
+                .sortValue(ImportItem.IMPORT_PREFIX)
+                .build());
+    var imports =
+        importTable
+            .query(QueryEnhancedRequest.builder().queryConditional(importQuery).build())
+            .stream()
+            .flatMap(page -> page.items().stream())
+            .toList();
+    assertThat(imports).isEmpty();
   }
 
   private APIGatewayV2HTTPEvent buildEvent(String user) {

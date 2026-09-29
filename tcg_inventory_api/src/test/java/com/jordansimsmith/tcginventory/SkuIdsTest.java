@@ -3,6 +3,7 @@ package com.jordansimsmith.tcginventory;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.jordansimsmith.tcginventory.games.Games;
 import org.junit.jupiter.api.Test;
 
 public class SkuIdsTest {
@@ -76,8 +77,13 @@ public class SkuIdsTest {
 
     // assert
     assertThat(magic).isEqualTo(Games.MAGIC_THE_GATHERING);
-    assertThat(magic.finishes()).containsExactlyInAnyOrder("normal", "foil", "etched");
-    assertThatThrownBy(() -> magic.finishes().add("reverse_holofoil"))
+    assertThat(magic.finishes())
+        .containsExactly(
+            new Games.Finish("normal", "Normal"),
+            new Games.Finish("foil", "Foil"),
+            new Games.Finish("etched", "Etched"));
+    assertThatThrownBy(
+            () -> magic.finishes().add(new Games.Finish("reverse_holofoil", "Reverse Holofoil")))
         .isInstanceOf(UnsupportedOperationException.class);
   }
 }

@@ -1,8 +1,8 @@
 package com.jordansimsmith.tcginventory.imports;
 
 import com.jordansimsmith.tcginventory.CardIdentity;
-import com.jordansimsmith.tcginventory.Games;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
+import com.jordansimsmith.tcginventory.games.Games;
 import java.math.BigDecimal;
 import java.util.Map;
 

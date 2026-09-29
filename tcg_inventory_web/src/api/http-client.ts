@@ -16,6 +16,7 @@ import type {
   FindOrdersResponse,
   FindSkusParams,
   FindSkusResponse,
+  GameId,
   ImportDetail,
   ImportRow,
   ImportSummary,
@@ -80,8 +81,12 @@ export function createHttpClient(): ApiClient {
       return response.json();
     },
 
-    async createImport(filename: string, csv: string): Promise<ImportSummary> {
-      const query = new URLSearchParams({ filename });
+    async createImport(
+      game: GameId,
+      filename: string,
+      csv: string,
+    ): Promise<ImportSummary> {
+      const query = new URLSearchParams({ game, filename });
       const response = await authenticatedFetch(`/imports?${query}`, {
         method: 'POST',
         headers: { 'Content-Type': 'text/csv' },

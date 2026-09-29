@@ -215,7 +215,7 @@ describe('createFakeClient imports', () => {
     vi.useFakeTimers();
     const client = createFakeClient();
 
-    const created = await client.createImport('bulk.csv', SAMPLE_CSV);
+    const created = await client.createImport('mtg', 'bulk.csv', SAMPLE_CSV);
 
     expect(created.status).toBe('appraising');
     expect(created.filename).toBe('bulk.csv');
@@ -238,7 +238,7 @@ describe('createFakeClient imports', () => {
   it('progresses an uploaded import to review over time', async () => {
     vi.useFakeTimers();
     const client = createFakeClient();
-    const created = await client.createImport('bulk.csv', SAMPLE_CSV);
+    const created = await client.createImport('mtg', 'bulk.csv', SAMPLE_CSV);
 
     vi.advanceTimersByTime(1000);
     let detail = await client.getImport(created.import_id);
@@ -273,7 +273,7 @@ describe('createFakeClient imports', () => {
     const client = createFakeClient();
 
     await expect(
-      client.createImport('bad.csv', 'Name,Quantity\nOpt,1'),
+      client.createImport('mtg', 'bad.csv', 'Name,Quantity\nOpt,1'),
     ).rejects.toThrow('CSV is missing columns');
   });
 
@@ -286,7 +286,7 @@ describe('createFakeClient imports', () => {
   it('appraises prices for keep and discard rows', async () => {
     vi.useFakeTimers();
     const client = createFakeClient();
-    const created = await client.createImport('bulk.csv', SAMPLE_CSV);
+    const created = await client.createImport('mtg', 'bulk.csv', SAMPLE_CSV);
 
     let detail = await client.getImport(created.import_id);
     expect(detail.rows[3].market_price).toBeNull();
@@ -313,7 +313,7 @@ describe('createFakeClient imports', () => {
   it('rejects confirm unless the import is in review', async () => {
     vi.useFakeTimers();
     const client = createFakeClient();
-    const created = await client.createImport('bulk.csv', SAMPLE_CSV);
+    const created = await client.createImport('mtg', 'bulk.csv', SAMPLE_CSV);
 
     await expect(client.confirmImport(created.import_id)).rejects.toThrow(
       'import is not in review status',
@@ -329,7 +329,7 @@ describe('createFakeClient imports', () => {
   it('confirms keep rows bottom-up into inventory and skips review rows', async () => {
     vi.useFakeTimers();
     const client = createFakeClient();
-    const created = await client.createImport('bulk.csv', SAMPLE_CSV);
+    const created = await client.createImport('mtg', 'bulk.csv', SAMPLE_CSV);
     vi.advanceTimersByTime(60_000);
 
     const response = await client.confirmImport(created.import_id);
@@ -407,7 +407,7 @@ describe('createFakeClient imports', () => {
       MANABOX_HEADER,
       'Relentless Rats,8ed,Eighth Edition,151,normal,uncommon,130,aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa,false,false,near_mint,en',
     ].join('\n');
-    const created = await client.createImport('rats.csv', csv);
+    const created = await client.createImport('mtg', 'rats.csv', csv);
     vi.advanceTimersByTime(120_000);
 
     const response = await client.confirmImport(created.import_id);
@@ -444,7 +444,7 @@ describe('createFakeClient imports', () => {
       MANABOX_HEADER,
       'Ponder,m12,Magic 2012,73,normal,common,1,81c908ee-e70a-4406-a32d-ab5ab17e67b1,false,false,good,ja',
     ].join('\n');
-    const created = await client.createImport('review-only.csv', csv);
+    const created = await client.createImport('mtg', 'review-only.csv', csv);
     vi.advanceTimersByTime(10_000);
 
     const response = await client.confirmImport(created.import_id);

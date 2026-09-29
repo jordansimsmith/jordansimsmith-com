@@ -3,7 +3,7 @@ package com.jordansimsmith.tcginventory.imports;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.jordansimsmith.tcginventory.Games;
+import com.jordansimsmith.tcginventory.games.Games;
 import org.junit.jupiter.api.Test;
 
 public class ManaBoxCsvParserTest {

@@ -1382,7 +1382,12 @@ export function createFakeClient(): ApiClient {
       return { ...settings };
     },
 
-    async createImport(filename: string, csv: string): Promise<ImportSummary> {
+    async createImport(
+      game: GameId,
+      filename: string,
+      csv: string,
+    ): Promise<ImportSummary> {
+      getGame(game);
       const parsedRows = parseManaBoxCsv(csv);
       // csv row order is physical bottom-up; position 1 is the top of the stack
       const rows: FakeImportRow[] = [];
@@ -1410,7 +1415,7 @@ export function createFakeClient(): ApiClient {
       importCounter += 1;
       const importRecord: FakeImport = {
         import_id: `fake-import-${importCounter}`,
-        game: MAGIC_THE_GATHERING.id,
+        game,
         filename,
         status: 'appraising',
         rows,

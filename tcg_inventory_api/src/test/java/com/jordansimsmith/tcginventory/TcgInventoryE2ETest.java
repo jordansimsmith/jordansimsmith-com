@@ -101,6 +101,18 @@ public class TcgInventoryE2ETest {
 
   @Test
   void fullLoopImportToOrderConfirm() throws IOException, InterruptedException {
+    // arrange / act - fetch registered game metadata through the local API route
+    var gamesResponse = get("/games");
+
+    // assert
+    assertThat(gamesResponse.statusCode()).isEqualTo(200);
+    assertThat(objectMapper.readTree(gamesResponse.body()))
+        .isEqualTo(
+            objectMapper.readTree(
+                """
+                {"games":[{"id":"mtg","display_name":"Magic: The Gathering","scanning_enabled":true,"csv_import_enabled":true,"finishes":[{"id":"normal","display_name":"Normal"},{"id":"foil","display_name":"Foil"},{"id":"etched","display_name":"Etched"}]}]}
+                """));
+
     // arrange - store fake refresh token
     var settingsResponse = patch("/settings", "{\"refresh_token\":\"fake-token\"}");
     assertThat(settingsResponse.statusCode()).isEqualTo(200);
@@ -109,7 +121,7 @@ public class TcgInventoryE2ETest {
     var importResponse =
         httpClient.send(
             HttpRequest.newBuilder()
-                .uri(URI.create(apiUrl + "/imports?filename=test.csv"))
+                .uri(URI.create(apiUrl + "/imports?game=mtg&filename=test.csv"))
                 .header("Authorization", AUTH_HEADER)
                 .header("content-type", "text/csv")
                 .POST(HttpRequest.BodyPublishers.ofString(CSV_BODY))
@@ -385,7 +397,7 @@ public class TcgInventoryE2ETest {
     var importResponse2 =
         httpClient.send(
             HttpRequest.newBuilder()
-                .uri(URI.create(apiUrl + "/imports?filename=test2.csv"))
+                .uri(URI.create(apiUrl + "/imports?game=mtg&filename=test2.csv"))
                 .header("Authorization", AUTH_HEADER)
                 .header("content-type", "text/csv")
                 .POST(HttpRequest.BodyPublishers.ofString(CHEAP_CSV_BODY))
