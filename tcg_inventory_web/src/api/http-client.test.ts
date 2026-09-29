@@ -16,6 +16,36 @@ describe('http client imports', () => {
     clearSession();
   });
 
+  it('gets authenticated game metadata', async () => {
+    const response = {
+      games: [
+        {
+          id: 'mtg',
+          display_name: 'Magic: The Gathering',
+          scanning_enabled: true,
+          csv_import_enabled: true,
+          finishes: [
+            { id: 'normal', display_name: 'Normal' },
+            { id: 'foil', display_name: 'Foil' },
+            { id: 'etched', display_name: 'Etched' },
+          ],
+        },
+      ],
+    };
+    const json = vi.fn().mockResolvedValue(response);
+    fetchSpy.mockResolvedValue({ ok: true, json });
+    const client = createHttpClient();
+
+    await expect(client.getGames()).resolves.toEqual(response);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe('https://api.tcg-inventory.jordansimsmith.com/games');
+    expect(init.method).toBeUndefined();
+    expect(init.headers.Authorization).toBe(`Basic ${btoa('alice:pw')}`);
+    expect(json).toHaveBeenCalledTimes(1);
+  });
+
   it('sends the selected game and filename when creating an import', async () => {
     const json = vi.fn().mockResolvedValue({ import_id: 'import-1' });
     fetchSpy.mockResolvedValue({ ok: true, json });

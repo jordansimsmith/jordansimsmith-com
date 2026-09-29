@@ -6,6 +6,21 @@ import type { ScanConfirmationRow, ScanDetail, ScanRow } from '../api/client';
 import * as scryfallModule from '../api/scryfall-client';
 import type { ScryfallPrinting } from '../api/scryfall-client';
 import { ScanReview } from './ScanReview';
+import { GamesProvider } from '../GamesProvider';
+
+const REGISTERED_GAMES = [
+  {
+    id: 'mtg',
+    display_name: 'Magic: The Gathering',
+    scanning_enabled: true,
+    csv_import_enabled: true,
+    finishes: [
+      { id: 'normal', display_name: 'Normal' },
+      { id: 'foil', display_name: 'Foil' },
+      { id: 'etched', display_name: 'Etched' },
+    ],
+  },
+];
 
 const printings: ScryfallPrinting[] = [
   {
@@ -78,11 +93,13 @@ function renderReview(
     options.onConfirmScan ?? vi.fn().mockResolvedValue(undefined);
   const rendered = render(
     <MantineProvider>
-      <ScanReview
-        scan={detail}
-        onDeleteRow={onDeleteRow}
-        onConfirmScan={async (rows) => onConfirmScan(rows)}
-      />
+      <GamesProvider initialGames={REGISTERED_GAMES}>
+        <ScanReview
+          scan={detail}
+          onDeleteRow={onDeleteRow}
+          onConfirmScan={async (rows) => onConfirmScan(rows)}
+        />
+      </GamesProvider>
     </MantineProvider>,
   );
   return { ...rendered, onDeleteRow, onConfirmScan };
@@ -425,11 +442,13 @@ describe('ScanReview', () => {
     const surviving = scan([initial.rows[1], initial.rows[2]]);
     rendered.rerender(
       <MantineProvider>
-        <ScanReview
-          scan={surviving}
-          onDeleteRow={onDeleteRow}
-          onConfirmScan={vi.fn().mockResolvedValue(undefined)}
-        />
+        <GamesProvider initialGames={REGISTERED_GAMES}>
+          <ScanReview
+            scan={surviving}
+            onDeleteRow={onDeleteRow}
+            onConfirmScan={vi.fn().mockResolvedValue(undefined)}
+          />
+        </GamesProvider>
       </MantineProvider>,
     );
     expect(await screen.findByText('Card 1 of 2')).toBeDefined();

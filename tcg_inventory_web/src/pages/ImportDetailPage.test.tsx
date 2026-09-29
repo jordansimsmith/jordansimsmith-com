@@ -12,10 +12,25 @@ import { Notifications } from '@mantine/notifications';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ImportDetailPage } from './ImportDetailPage';
+import { GamesProvider } from '../GamesProvider';
 import * as clientModule from '../api/client';
 import type { ImportDetail, ImportRow } from '../api/client';
 import { encodeListingPhoto } from '../domain/encode-listing-photo';
 import finishClasses from '../components/CardFinishName.module.css';
+
+const REGISTERED_GAMES = [
+  {
+    id: 'mtg',
+    display_name: 'Magic: The Gathering',
+    scanning_enabled: true,
+    csv_import_enabled: true,
+    finishes: [
+      { id: 'normal', display_name: 'Normal' },
+      { id: 'foil', display_name: 'Foil' },
+      { id: 'etched', display_name: 'Etched' },
+    ],
+  },
+];
 
 vi.mock('../domain/encode-listing-photo', () => ({
   encodeListingPhoto: vi.fn(),
@@ -119,12 +134,14 @@ function renderImportDetailPage() {
   return render(
     <MantineProvider>
       <Notifications />
-      <MemoryRouter initialEntries={['/imports/import-2']}>
-        <Routes>
-          <Route path="/imports/:importId" element={<ImportDetailPage />} />
-          <Route path="/imports" element={<div>Imports list</div>} />
-        </Routes>
-      </MemoryRouter>
+      <GamesProvider initialGames={REGISTERED_GAMES}>
+        <MemoryRouter initialEntries={['/imports/import-2']}>
+          <Routes>
+            <Route path="/imports/:importId" element={<ImportDetailPage />} />
+            <Route path="/imports" element={<div>Imports list</div>} />
+          </Routes>
+        </MemoryRouter>
+      </GamesProvider>
     </MantineProvider>,
   );
 }
@@ -296,14 +313,14 @@ describe('ImportDetailPage', () => {
 
     const normalCells = cellsAfterName('Normal Card');
     expect(normalCells[2].textContent).toBe('DOM#1');
-    expect(normalCells[3].textContent).toBe('normal');
+    expect(normalCells[3].textContent).toBe('Normal');
     expect(normalCells[3].style.fontWeight).toBe('');
 
     const foilCells = cellsAfterName('Foil Card');
     expect(foilCells[2].textContent).toBe('DOM#2');
-    expect(foilCells[3].textContent).toBe('foil');
+    expect(foilCells[3].textContent).toBe('Foil');
     expect(foilCells[3].style.fontWeight).toBe('');
-    expect(foilCells[3].style.textTransform).toBe('capitalize');
+    expect(foilCells[3].style.textTransform).toBe('');
     expect(
       screen.getByText('Foil Card').classList.contains(finishClasses.foil),
     ).toBe(true);
@@ -313,9 +330,9 @@ describe('ImportDetailPage', () => {
 
     const etchedCells = cellsAfterName('Etched Card');
     expect(etchedCells[2].textContent).toBe('DOM#3');
-    expect(etchedCells[3].textContent).toBe('etched');
+    expect(etchedCells[3].textContent).toBe('Etched');
     expect(etchedCells[3].style.fontWeight).toBe('');
-    expect(etchedCells[3].style.textTransform).toBe('capitalize');
+    expect(etchedCells[3].style.textTransform).toBe('');
     expect(
       screen.getByText('Etched Card').classList.contains(finishClasses.etched),
     ).toBe(true);

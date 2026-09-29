@@ -21,9 +21,9 @@ import { PageHeader } from '../components/PageHeader';
 import finishClasses from '../components/CardFinishName.module.css';
 import { apiClient } from '../api/client';
 import { finishNameWeight, formatSetNumber } from '../domain/card-label';
-import { GAMES, gameLabel } from '../domain/games';
 import type {
   ReportAgingBand,
+  GameId,
   ReportGame,
   ReportIntakeVsSales,
   ReportPriceBucket,
@@ -33,7 +33,7 @@ import type {
   ReportTopSet,
   ReportTotals,
 } from '../api/client';
-import type { GameId } from '../domain/games';
+import { useGames } from '../GamesProvider';
 import classes from './ReportsPage.module.css';
 
 dayjs.extend(relativeTime);
@@ -251,7 +251,15 @@ function IntakeVsSalesChart({
   );
 }
 
-function TopHitsTable({ topHits }: { topHits: ReportTopHit[] }) {
+function TopHitsTable({
+  game,
+  topHits,
+}: {
+  game: GameId;
+  topHits: ReportTopHit[];
+}) {
+  const { getFinish } = useGames();
+
   return (
     <Paper p="md" radius="md" withBorder>
       <FigureTitle
@@ -296,12 +304,8 @@ function TopHitsTable({ topHits }: { topHits: ReportTopHit[] }) {
                 <Table.Td data-field="set" data-label="Set / no.">
                   {formatSetNumber(hit.set_code, hit.collector_number)}
                 </Table.Td>
-                <Table.Td
-                  data-field="finish"
-                  data-label="Finish"
-                  tt="capitalize"
-                >
-                  {hit.finish}
+                <Table.Td data-field="finish" data-label="Finish">
+                  {getFinish(game, hit.finish)}
                 </Table.Td>
                 <Table.Td data-field="condition" data-label="Condition">
                   {hit.condition}
@@ -455,12 +459,14 @@ function PriceBucketsChart({
 }
 
 function GameSummary({ gameReport }: { gameReport: ReportGame }) {
+  const { getGame } = useGames();
   const { totals } = gameReport;
+  const gameName = getGame(gameReport.game).display_name;
 
   return (
     <Paper
       component="section"
-      aria-label={`${gameLabel(gameReport.game)} inventory summary`}
+      aria-label={`${gameName} inventory summary`}
       withBorder
       radius="md"
       p={0}
@@ -513,11 +519,16 @@ function GameSummary({ gameReport }: { gameReport: ReportGame }) {
 }
 
 function GameBreakdown({ gameReport }: { gameReport: ReportGame }) {
+  const { getGame } = useGames();
+
   return (
-    <Stack gap="md" aria-label={`${gameLabel(gameReport.game)} report`}>
+    <Stack
+      gap="md"
+      aria-label={`${getGame(gameReport.game).display_name} report`}
+    >
       <GameSummary gameReport={gameReport} />
       <SimpleGrid cols={{ base: 1, xl: 2 }} spacing="md">
-        <TopHitsTable topHits={gameReport.top_hits} />
+        <TopHitsTable game={gameReport.game} topHits={gameReport.top_hits} />
         <TopSetsList topSets={gameReport.top_sets} />
       </SimpleGrid>
       <SimpleGrid cols={{ base: 1, md: 2 }} spacing="md">
@@ -529,8 +540,9 @@ function GameBreakdown({ gameReport }: { gameReport: ReportGame }) {
 }
 
 export function ReportsPage() {
+  const { games } = useGames();
   const [report, setReport] = useState<ReportResponse | null>(null);
-  const [activeGame, setActiveGame] = useState<GameId>(GAMES[0].id);
+  const [activeGame, setActiveGame] = useState<GameId>(games[0].id);
   const [firstVisit, setFirstVisit] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [pollEpoch, setPollEpoch] = useState(0);
@@ -677,13 +689,13 @@ export function ReportsPage() {
                 className={classes.gameTabsList}
                 aria-label="Report game"
               >
-                {GAMES.map((game) => (
+                {games.map((game) => (
                   <Tabs.Tab key={game.id} value={game.id}>
-                    {game.label}
+                    {game.display_name}
                   </Tabs.Tab>
                 ))}
               </Tabs.List>
-              {GAMES.map((game) => {
+              {games.map((game) => {
                 const gameReport = report.report.games.find(
                   (entry) => entry.game === game.id,
                 );

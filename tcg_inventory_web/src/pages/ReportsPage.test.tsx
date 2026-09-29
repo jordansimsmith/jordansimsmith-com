@@ -3,14 +3,30 @@ import { MantineProvider } from '@mantine/core';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ReportsPage } from './ReportsPage';
+import { GamesProvider } from '../GamesProvider';
 import * as clientModule from '../api/client';
 import type {
+  Game,
   ReportGame,
   Report,
   ReportResponse,
   ReportTotals,
 } from '../api/client';
 import finishClasses from '../components/CardFinishName.module.css';
+
+const REGISTERED_GAMES = [
+  {
+    id: 'mtg',
+    display_name: 'Magic: The Gathering',
+    scanning_enabled: true,
+    csv_import_enabled: true,
+    finishes: [
+      { id: 'normal', display_name: 'Normal' },
+      { id: 'foil', display_name: 'Foil' },
+      { id: 'etched', display_name: 'Etched' },
+    ],
+  },
+];
 
 const baseTotals: ReportTotals = {
   inventory_value: '2894.35',
@@ -93,14 +109,16 @@ function reportWithOverrides(
   };
 }
 
-function renderReportsPage() {
+function renderReportsPage(games?: Game[]) {
   return render(
     <MantineProvider>
-      <MemoryRouter initialEntries={['/reports']}>
-        <Routes>
-          <Route path="/reports" element={<ReportsPage />} />
-        </Routes>
-      </MemoryRouter>
+      <GamesProvider initialGames={games ?? REGISTERED_GAMES}>
+        <MemoryRouter initialEntries={['/reports']}>
+          <Routes>
+            <Route path="/reports" element={<ReportsPage />} />
+          </Routes>
+        </MemoryRouter>
+      </GamesProvider>
     </MantineProvider>,
   );
 }
@@ -381,12 +399,12 @@ describe('ReportsPage', () => {
     expect(screen.getByText('MH2#138')).toBeDefined();
     expect(screen.getByText('BBD#195')).toBeDefined();
     expect(screen.getByText('CMR#186')).toBeDefined();
-    expect(screen.getByText('normal')).toBeDefined();
-    expect(screen.getByText('foil')).toBeDefined();
-    expect(screen.getByText('etched')).toBeDefined();
-    expect(screen.getByText('normal').style.fontWeight).toBe('');
-    expect(screen.getByText('foil').style.fontWeight).toBe('');
-    expect(screen.getByText('etched').style.fontWeight).toBe('');
+    expect(screen.getByText('Normal')).toBeDefined();
+    expect(screen.getByText('Foil')).toBeDefined();
+    expect(screen.getByText('Etched')).toBeDefined();
+    expect(screen.getByText('Normal').style.fontWeight).toBe('');
+    expect(screen.getByText('Foil').style.fontWeight).toBe('');
+    expect(screen.getByText('Etched').style.fontWeight).toBe('');
     const headers = screen
       .getAllByRole('columnheader')
       .map((header) => header.textContent);
@@ -414,6 +432,46 @@ describe('ReportsPage', () => {
     expect(screen.getByText('Ragavan, Nimble Pilferer').style.fontWeight).toBe(
       '500',
     );
+  });
+
+  it('uses the registry finish labels in game reports', async () => {
+    vi.spyOn(clientModule.apiClient, 'getReport').mockResolvedValue(
+      reportWithOverrides({
+        top_hits: [
+          {
+            sku_id: 'sku2#foil#LP',
+            name: 'Doubling Season',
+            set_code: 'bbd',
+            collector_number: '195',
+            finish: 'foil',
+            condition: 'LP',
+            price: '48.50',
+            in_stock_units: 2,
+          },
+        ],
+      }),
+    );
+    const games: Game[] = [
+      {
+        id: 'mtg',
+        display_name: 'Renamed Card Game',
+        scanning_enabled: false,
+        csv_import_enabled: false,
+        finishes: [
+          { id: 'foil', display_name: 'Reflective' },
+          { id: 'normal', display_name: 'Standard' },
+          { id: 'etched', display_name: 'Engraved' },
+        ],
+      },
+    ];
+
+    renderReportsPage(games);
+    await act(async () => {});
+
+    expect(
+      screen.getByRole('tab', { name: 'Renamed Card Game' }),
+    ).toBeDefined();
+    expect(screen.getByText('Reflective')).toBeDefined();
   });
 
   it('shouldShowTopHitsEmptyMessageWhenEmpty', async () => {

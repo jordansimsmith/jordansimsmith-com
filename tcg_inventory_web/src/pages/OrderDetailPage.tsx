@@ -19,6 +19,8 @@ import { ConfirmPullModal } from '../components/ConfirmPullModal';
 import { apiClient } from '../api/client';
 import type {
   BuyerAddress,
+  Finish,
+  GameId,
   OrderDetail,
   OrderNeighborCard,
   OrderUnit,
@@ -27,7 +29,7 @@ import { ListPriceBadge } from '../components/ListPriceBadge';
 import { PageHeader } from '../components/PageHeader';
 import { cardImageUrl } from '../domain/card-image';
 import { formatDeliveryMode } from '../domain/deliveryMode';
-import { gameLabel } from '../domain/games';
+import { useGames } from '../GamesProvider';
 import classes from './OrderDetailPage.module.css';
 
 const CARD_IMAGE_FALLBACK =
@@ -35,14 +37,15 @@ const CARD_IMAGE_FALLBACK =
 const TRADEME_COURIER_URL =
   'https://www.trademe.co.nz/a/marketplace/book-courier/select';
 
-function unitDescription(unit: OrderUnit): string {
+function unitDescription(
+  unit: OrderUnit,
+  getFinish: (gameId: GameId, finish: Finish) => string,
+): string {
   const parts = [
     `${unit.set_code.toUpperCase()} #${unit.collector_number}`,
     unit.condition,
+    getFinish(unit.game, unit.finish),
   ];
-  if (unit.finish !== 'normal') {
-    parts.push(unit.finish);
-  }
   return parts.join(' · ');
 }
 
@@ -58,19 +61,22 @@ function addressLines(address: BuyerAddress): string[] {
   );
 }
 
-function neighborDescription(card: OrderNeighborCard): string {
+function neighborDescription(
+  card: OrderNeighborCard,
+  gameId: GameId,
+  getFinish: (gameId: GameId, finish: Finish) => string,
+): string {
   const parts = [
     card.name,
     `${card.set_code.toUpperCase()} #${card.collector_number}`,
     card.condition,
+    getFinish(gameId, card.finish),
   ];
-  if (card.finish !== 'normal') {
-    parts.push(card.finish);
-  }
   return parts.join(' · ');
 }
 
 export function OrderDetailPage() {
+  const { getFinish, getGame } = useGames();
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
   const [order, setOrder] = useState<OrderDetail | null>(null);
@@ -298,11 +304,11 @@ export function OrderDetailPage() {
                   <Box
                     key={game}
                     component="section"
-                    aria-label={gameLabel(game)}
+                    aria-label={getGame(game).display_name}
                   >
                     <Box px="md" py="xs" className={classes.gameHeader}>
                       <Text size="sm" fw={600}>
-                        {gameLabel(game)}
+                        {getGame(game).display_name}
                       </Text>
                     </Box>
                     {units.map((unit) => (
@@ -355,7 +361,7 @@ export function OrderDetailPage() {
                         <Stack gap={2} className={classes.pullCard}>
                           <Text fw={500}>{unit.name}</Text>
                           <Text size="sm" c="dimmed">
-                            {unitDescription(unit)}
+                            {unitDescription(unit, getFinish)}
                           </Text>
                         </Stack>
                         {unit.price != null && (
@@ -373,12 +379,21 @@ export function OrderDetailPage() {
                               {unit.previous_card != null && (
                                 <Text size="xs" c="dimmed">
                                   Prev ·{' '}
-                                  {neighborDescription(unit.previous_card)}
+                                  {neighborDescription(
+                                    unit.previous_card,
+                                    unit.game,
+                                    getFinish,
+                                  )}
                                 </Text>
                               )}
                               {unit.next_card != null && (
                                 <Text size="xs" c="dimmed">
-                                  Next · {neighborDescription(unit.next_card)}
+                                  Next ·{' '}
+                                  {neighborDescription(
+                                    unit.next_card,
+                                    unit.game,
+                                    getFinish,
+                                  )}
                                 </Text>
                               )}
                             </Stack>

@@ -1,8 +1,25 @@
 import { createFakeClient } from './fake-client';
 import { createHttpClient } from './http-client';
-import type { Finish, GameId } from '../domain/games';
 
-export type { Finish, GameId } from '../domain/games';
+export type GameId = string;
+export type Finish = string;
+
+export interface GameFinish {
+  id: Finish;
+  display_name: string;
+}
+
+export interface Game {
+  id: GameId;
+  display_name: string;
+  scanning_enabled: boolean;
+  csv_import_enabled: boolean;
+  finishes: GameFinish[];
+}
+
+export interface GamesResponse {
+  games: Game[];
+}
 
 export interface SettingsResponse {
   credential_set: boolean;
@@ -409,6 +426,7 @@ export interface ReportResponse {
 }
 
 export interface ApiClient {
+  getGames(): Promise<GamesResponse>;
   getSettings(): Promise<SettingsResponse>;
   updateSettings(update: UpdateSettingsRequest): Promise<SettingsResponse>;
   createImport(

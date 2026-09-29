@@ -1,13 +1,34 @@
-import { cleanup, render, screen, within } from '@testing-library/react';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { ScanPage } from './ScanPage';
+import { GamesProvider } from '../GamesProvider';
 import * as clientModule from '../api/client';
 import * as uploaderModule from '../api/scan-uploader';
-import type { ScanDetail, ScanRow, ScanSummary } from '../api/client';
+import type { Game, ScanDetail, ScanRow, ScanSummary } from '../api/client';
+
+const REGISTERED_GAMES = [
+  {
+    id: 'mtg',
+    display_name: 'Magic: The Gathering',
+    scanning_enabled: true,
+    csv_import_enabled: true,
+    finishes: [
+      { id: 'normal', display_name: 'Normal' },
+      { id: 'foil', display_name: 'Foil' },
+      { id: 'etched', display_name: 'Etched' },
+    ],
+  },
+];
 
 const scanFixtures: ScanSummary[] = [
   {
@@ -64,16 +85,21 @@ function scanDetail(overrides: Partial<ScanDetail> = {}): ScanDetail {
   };
 }
 
-function renderScanPage() {
+function renderScanPage(games?: Game[]) {
   return render(
     <MantineProvider>
       <Notifications />
-      <MemoryRouter initialEntries={['/scans']}>
-        <Routes>
-          <Route path="/scans" element={<ScanPage />} />
-          <Route path="/scans/:scanId" element={<div>Scan detail route</div>} />
-        </Routes>
-      </MemoryRouter>
+      <GamesProvider initialGames={games ?? REGISTERED_GAMES}>
+        <MemoryRouter initialEntries={['/scans']}>
+          <Routes>
+            <Route path="/scans" element={<ScanPage />} />
+            <Route
+              path="/scans/:scanId"
+              element={<div>Scan detail route</div>}
+            />
+          </Routes>
+        </MemoryRouter>
+      </GamesProvider>
     </MantineProvider>,
   );
 }
@@ -124,6 +150,64 @@ describe('ScanPage', () => {
     ).toBeNull();
     expect(screen.queryByRole('checkbox')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Identify scan' })).toBeNull();
+  });
+
+  it('uses registry labels, finish ordering, and scan capabilities', async () => {
+    const games: Game[] = [
+      {
+        id: 'mtg',
+        display_name: 'Card Game A',
+        scanning_enabled: false,
+        csv_import_enabled: false,
+        finishes: [
+          { id: 'foil', display_name: 'Gloss A' },
+          { id: 'normal', display_name: 'Base A' },
+        ],
+      },
+      {
+        id: 'other-game',
+        display_name: 'Card Game B',
+        scanning_enabled: true,
+        csv_import_enabled: false,
+        finishes: [
+          { id: 'etched', display_name: 'Etched B' },
+          { id: 'foil', display_name: 'Gloss B' },
+        ],
+      },
+    ];
+    const user = userEvent.setup();
+    renderScanPage(games);
+
+    const jobs = screen.getByRole('region', { name: 'Scan jobs' });
+    const gameInput = within(jobs).getByRole('textbox', { name: 'Game' });
+    const finishInput = within(jobs).getByRole('textbox', { name: 'Finish' });
+    await within(jobs).findByText('review');
+    expect(gameInput).toHaveProperty('value', 'Card Game B');
+    expect(finishInput).toHaveProperty('value', 'Etched B');
+    expect(within(jobs).getAllByText('Card Game A').length).toBeGreaterThan(0);
+    expect(within(jobs).getAllByText('Base A').length).toBeGreaterThan(0);
+
+    await user.click(gameInput);
+    fireEvent.click(
+      screen.getByRole('option', { name: 'Card Game A', hidden: true }),
+    );
+    expect(finishInput).toHaveProperty('value', 'Gloss A');
+    expect(
+      (
+        within(jobs).getByRole('button', {
+          name: 'Create scan',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+    expect(
+      within(jobs).getByText('Scanning is unavailable for Card Game A.'),
+    ).toBeDefined();
+
+    await user.click(gameInput);
+    fireEvent.click(
+      screen.getByRole('option', { name: 'Card Game B', hidden: true }),
+    );
+    expect(finishInput).toHaveProperty('value', 'Gloss B');
   });
 
   it('refreshes the table then uploads, verifies, identifies, and navigates', async () => {

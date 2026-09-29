@@ -17,6 +17,7 @@ import type {
   FindSkusParams,
   FindSkusResponse,
   GameId,
+  GamesResponse,
   ImportDetail,
   ImportRow,
   ImportSummary,
@@ -65,6 +66,11 @@ async function authenticatedFetch(path: string, init?: RequestInit) {
 
 export function createHttpClient(): ApiClient {
   return {
+    async getGames(): Promise<GamesResponse> {
+      const response = await authenticatedFetch('/games');
+      return response.json();
+    },
+
     async getSettings(): Promise<SettingsResponse> {
       const response = await authenticatedFetch('/settings');
       return response.json();

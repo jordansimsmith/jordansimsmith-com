@@ -11,23 +11,29 @@ import {
 import { ImportTable } from '../components/ImportTable';
 import { PageHeader } from '../components/PageHeader';
 import { apiClient } from '../api/client';
-import type { ImportSummary } from '../api/client';
-import { GAMES, MAGIC_THE_GATHERING } from '../domain/games';
-import type { GameId } from '../domain/games';
-import { parseManaBoxCsv } from '../domain/manabox';
+import type { GameId, ImportSummary } from '../api/client';
+import { useGames } from '../GamesProvider';
 import classes from './ImportsPage.module.css';
 
 export function ImportsPage() {
+  const { games } = useGames();
+  const initialGame = games.find(
+    ({ csv_import_enabled }) => csv_import_enabled,
+  );
   const navigate = useNavigate();
   const [imports, setImports] = useState<ImportSummary[]>([]);
   const [nextContinuation, setNextContinuation] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [game, setGame] = useState<GameId | null>(GAMES[0].id);
+  const [game, setGame] = useState<GameId | null>(initialGame?.id ?? null);
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
-  const canUpload = game === MAGIC_THE_GATHERING.id;
+  const selectedGame = games.find(({ id }) => id === game) ?? null;
+  const canUpload = selectedGame?.csv_import_enabled ?? false;
+  const importGames = games.filter(
+    ({ csv_import_enabled }) => csv_import_enabled,
+  );
   const openImport = (importSummary: ImportSummary) => {
     navigate(`/imports/${encodeURIComponent(importSummary.import_id)}`);
   };
@@ -88,7 +94,6 @@ export function ImportsPage() {
     setUploading(true);
     try {
       const content = await file.text();
-      parseManaBoxCsv(content);
       const created = await apiClient.createImport(game, file.name, content);
       navigate(`/imports/${encodeURIComponent(created.import_id)}`);
     } catch (e) {
@@ -104,7 +109,7 @@ export function ImportsPage() {
       <Stack gap="lg">
         <PageHeader
           title="Imports"
-          description="Upload ManaBox exports and track each intake through appraisal and placement."
+          description="Upload collection CSV files and track each intake through appraisal and placement."
         />
         <CollectionSurface
           ariaLabel="Imports"
@@ -122,7 +127,10 @@ export function ImportsPage() {
                     }
                     setGame(nextGame);
                   }}
-                  data={GAMES.map(({ id, label }) => ({ value: id, label }))}
+                  data={games.map(({ id, display_name }) => ({
+                    value: id,
+                    label: display_name,
+                  }))}
                   placeholder="Select game"
                   required
                   disabled={uploading}
@@ -135,7 +143,7 @@ export function ImportsPage() {
                   label="CSV export"
                   placeholder={
                     canUpload
-                      ? 'ManaBox CSV export'
+                      ? 'CSV export'
                       : game === null
                         ? 'Select game first'
                         : 'Unavailable for this game'
@@ -153,7 +161,11 @@ export function ImportsPage() {
                 </Button>
               </div>
               <Text size="xs" c="dimmed">
-                CSV imports are available for Magic: The Gathering.
+                {importGames.length > 0
+                  ? `CSV imports are available for ${importGames
+                      .map(({ display_name }) => display_name)
+                      .join(', ')}.`
+                  : 'CSV imports are unavailable for all registered games.'}
               </Text>
             </Stack>
           }
@@ -182,7 +194,7 @@ export function ImportsPage() {
           {!loading && !error && imports.length === 0 && (
             <CollectionMessage
               title="No imports yet."
-              description="Choose a ManaBox CSV above to start an intake."
+              description="Choose a CSV file above to start an intake."
             />
           )}
           {!loading && !error && imports.length > 0 && (

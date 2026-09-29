@@ -1,5 +1,6 @@
 import { Table } from '@mantine/core';
 import type { SkuSummary } from '../api/client';
+import { useGames } from '../GamesProvider';
 import classes from './CollectionTable.module.css';
 
 interface SkuTableProps {
@@ -8,6 +9,7 @@ interface SkuTableProps {
 }
 
 export function SkuTable({ skus, onOpen }: SkuTableProps) {
+  const { getFinish } = useGames();
   return (
     <Table
       highlightOnHover
@@ -43,7 +45,7 @@ export function SkuTable({ skus, onOpen }: SkuTableProps) {
               {sku.collector_number}
             </Table.Td>
             <Table.Td data-field="finish" data-label="Finish">
-              {sku.finish}
+              {getFinish(sku.game, sku.finish)}
             </Table.Td>
             <Table.Td data-field="condition" data-label="Condition">
               {sku.condition}

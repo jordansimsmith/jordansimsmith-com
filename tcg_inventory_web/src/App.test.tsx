@@ -2,19 +2,38 @@ import { render, screen, waitFor, cleanup } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { MemoryRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { App } from './App';
 import { LoginPage } from './pages/LoginPage';
 import { InventoryPage } from './pages/InventoryPage';
 import { ScanPage } from './pages/ScanPage';
 import { ScanDetailPage } from './pages/ScanDetailPage';
 import { getSession } from './auth/session';
+import { apiClient } from './api/client';
+import { GamesProvider } from './GamesProvider';
+
+const REGISTERED_GAMES = [
+  {
+    id: 'mtg',
+    display_name: 'Magic: The Gathering',
+    scanning_enabled: true,
+    csv_import_enabled: true,
+    finishes: [
+      { id: 'normal', display_name: 'Normal' },
+      { id: 'foil', display_name: 'Foil' },
+      { id: 'etched', display_name: 'Etched' },
+    ],
+  },
+];
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const session = getSession();
   if (!session) {
     return <Navigate to="/" replace />;
   }
-  return <>{children}</>;
+  return (
+    <GamesProvider initialGames={REGISTERED_GAMES}>{children}</GamesProvider>
+  );
 }
 
 function HomeRoute() {
@@ -61,6 +80,15 @@ function renderApp(initialRoute = '/') {
   );
 }
 
+function renderActualApp(initialPath: string) {
+  window.history.pushState({}, '', initialPath);
+  return render(
+    <MantineProvider>
+      <App />
+    </MantineProvider>,
+  );
+}
+
 function setAuth() {
   localStorage.setItem(
     'tcg_inventory_auth',
@@ -78,6 +106,8 @@ describe('App', () => {
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
+    window.history.pushState({}, '', '/');
   });
 
   it('renders login page when not authenticated', () => {
@@ -140,5 +170,30 @@ describe('App', () => {
       expect(screen.getByLabelText(/username/i)).toBeDefined();
     });
     expect(localStorage.getItem('tcg_inventory_auth')).toBeNull();
+  });
+
+  it('loads game metadata once across authenticated routes and after reload', async () => {
+    const user = userEvent.setup();
+    const getGames = vi.spyOn(apiClient, 'getGames');
+    setAuth();
+    const workspace = renderActualApp('/inventory');
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Inventory' }),
+    ).toBeDefined();
+    expect(getGames).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByRole('link', { name: 'Scans' }));
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Scans' }),
+    ).toBeDefined();
+    expect(getGames).toHaveBeenCalledTimes(1);
+
+    workspace.unmount();
+    renderActualApp('/inventory');
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Inventory' }),
+    ).toBeDefined();
+    expect(getGames).toHaveBeenCalledTimes(2);
   });
 });

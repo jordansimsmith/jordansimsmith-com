@@ -2,7 +2,7 @@ import { Table } from '@mantine/core';
 import type { ImportSummary } from '../api/client';
 import { ImportStatusBadge } from './ImportStatusBadge';
 import classes from './CollectionTable.module.css';
-import { gameLabel } from '../domain/games';
+import { useGames } from '../GamesProvider';
 import { importDisplayName } from '../domain/import-display-name';
 
 interface ImportTableProps {
@@ -11,6 +11,7 @@ interface ImportTableProps {
 }
 
 export function ImportTable({ imports, onOpen }: ImportTableProps) {
+  const { getGame } = useGames();
   return (
     <Table
       highlightOnHover
@@ -39,7 +40,7 @@ export function ImportTable({ imports, onOpen }: ImportTableProps) {
               {importDisplayName(importSummary.filename)}
             </Table.Td>
             <Table.Td data-field="game" data-label="Game">
-              {gameLabel(importSummary.game)}
+              {getGame(importSummary.game).display_name}
             </Table.Td>
             <Table.Td data-field="status" data-label="Status">
               <ImportStatusBadge importSummary={importSummary} />

@@ -1,4 +1,5 @@
 import {
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -11,8 +12,23 @@ import { Notifications } from '@mantine/notifications';
 import { MemoryRouter, Routes, Route, useParams } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ImportsPage } from './ImportsPage';
+import { GamesProvider } from '../GamesProvider';
 import * as clientModule from '../api/client';
-import type { ImportSummary } from '../api/client';
+import type { Game, ImportSummary } from '../api/client';
+
+const REGISTERED_GAMES = [
+  {
+    id: 'mtg',
+    display_name: 'Magic: The Gathering',
+    scanning_enabled: true,
+    csv_import_enabled: true,
+    finishes: [
+      { id: 'normal', display_name: 'Normal' },
+      { id: 'foil', display_name: 'Foil' },
+      { id: 'etched', display_name: 'Etched' },
+    ],
+  },
+];
 
 const importFixtures: ImportSummary[] = [
   {
@@ -45,16 +61,18 @@ function ImportDetailStub() {
   return <div>Import detail {importId}</div>;
 }
 
-function renderImportsPage() {
+function renderImportsPage(games?: Game[]) {
   return render(
     <MantineProvider>
       <Notifications />
-      <MemoryRouter initialEntries={['/imports']}>
-        <Routes>
-          <Route path="/imports" element={<ImportsPage />} />
-          <Route path="/imports/:importId" element={<ImportDetailStub />} />
-        </Routes>
-      </MemoryRouter>
+      <GamesProvider initialGames={games ?? REGISTERED_GAMES}>
+        <MemoryRouter initialEntries={['/imports']}>
+          <Routes>
+            <Route path="/imports" element={<ImportsPage />} />
+            <Route path="/imports/:importId" element={<ImportDetailStub />} />
+          </Routes>
+        </MemoryRouter>
+      </GamesProvider>
     </MantineProvider>,
   );
 }
@@ -112,6 +130,47 @@ describe('ImportsPage', () => {
     expect(await screen.findByText('No imports yet.')).toBeDefined();
   });
 
+  it('defaults to an import-enabled game and keeps disabled games in history', async () => {
+    const games: Game[] = [
+      {
+        id: 'mtg',
+        display_name: 'Legacy Cards',
+        scanning_enabled: true,
+        csv_import_enabled: false,
+        finishes: [{ id: 'normal', display_name: 'Base' }],
+      },
+      {
+        id: 'other-game',
+        display_name: 'New Cards',
+        scanning_enabled: false,
+        csv_import_enabled: true,
+        finishes: [{ id: 'plain', display_name: 'Plain' }],
+      },
+    ];
+    const user = userEvent.setup();
+    renderImportsPage(games);
+
+    expect(await screen.findByText('manabox-today.csv')).toBeDefined();
+    const jobs = screen.getByRole('region', { name: 'Imports' });
+    const gameInput = within(jobs).getByRole('textbox', { name: 'Game' });
+    const filePicker = within(jobs).getByRole('button', { name: 'CSV export' });
+    expect(gameInput).toHaveProperty('value', 'New Cards');
+    expect(within(jobs).getAllByText('Legacy Cards').length).toBeGreaterThan(0);
+    expect((filePicker as HTMLButtonElement).disabled).toBe(false);
+
+    await user.click(gameInput);
+    fireEvent.click(
+      screen.getByRole('option', { name: 'Legacy Cards', hidden: true }),
+    );
+
+    expect(gameInput).toHaveProperty('value', 'Legacy Cards');
+    expect((filePicker as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      within(jobs).getByText('CSV imports are available for New Cards.'),
+    ).toBeDefined();
+    expect(screen.getByText('manabox-today.csv')).toBeDefined();
+  });
+
   it('uploads a valid csv and navigates to the import', async () => {
     const user = userEvent.setup();
     renderImportsPage();
@@ -131,12 +190,16 @@ describe('ImportsPage', () => {
     );
   });
 
-  it('rejects an invalid csv client-side without creating an import', async () => {
+  it('shows API CSV parsing errors without parsing the upload in the browser', async () => {
     const user = userEvent.setup();
+    vi.spyOn(clientModule.apiClient, 'createImport').mockRejectedValue(
+      new Error('CSV is missing columns: Name, Quantity'),
+    );
     renderImportsPage();
     await screen.findByText('manabox-today.csv');
 
-    const file = new File(['Name,Quantity\nOpt,1'], 'bad.csv', {
+    const invalidCsv = 'Name,Quantity\nOpt,1';
+    const file = new File([invalidCsv], 'bad.csv', {
       type: 'text/csv',
     });
     await user.upload(getFileInput(), file);
@@ -144,9 +207,13 @@ describe('ImportsPage', () => {
 
     expect(await screen.findByText('Upload failed')).toBeDefined();
     expect(
-      screen.getByText(/CSV is missing columns/, { exact: false }),
+      screen.getByText('CSV is missing columns: Name, Quantity'),
     ).toBeDefined();
-    expect(clientModule.apiClient.createImport).not.toHaveBeenCalled();
+    expect(clientModule.apiClient.createImport).toHaveBeenCalledWith(
+      'mtg',
+      'bad.csv',
+      invalidCsv,
+    );
   });
 
   it('navigates when a row is clicked', async () => {

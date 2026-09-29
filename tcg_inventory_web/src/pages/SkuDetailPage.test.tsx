@@ -11,8 +11,23 @@ import { Notifications } from '@mantine/notifications';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SkuDetailPage } from './SkuDetailPage';
+import { GamesProvider } from '../GamesProvider';
 import * as clientModule from '../api/client';
 import type { SkuDetail } from '../api/client';
+
+const REGISTERED_GAMES = [
+  {
+    id: 'mtg',
+    display_name: 'Magic: The Gathering',
+    scanning_enabled: true,
+    csv_import_enabled: true,
+    finishes: [
+      { id: 'normal', display_name: 'Normal' },
+      { id: 'foil', display_name: 'Foil' },
+      { id: 'etched', display_name: 'Etched' },
+    ],
+  },
+];
 
 const SCRYFALL_ID = 'aaaa1111-2222-4333-8444-555566667777';
 
@@ -78,14 +93,16 @@ function renderSkuDetailPage(skuId = nmDetail.sku_id) {
   return render(
     <MantineProvider env="test">
       <Notifications />
-      <MemoryRouter
-        initialEntries={[`/inventory/${encodeURIComponent(skuId)}`]}
-      >
-        <Routes>
-          <Route path="/inventory" element={<div>Inventory page</div>} />
-          <Route path="/inventory/:skuId" element={<SkuDetailPage />} />
-        </Routes>
-      </MemoryRouter>
+      <GamesProvider initialGames={REGISTERED_GAMES}>
+        <MemoryRouter
+          initialEntries={[`/inventory/${encodeURIComponent(skuId)}`]}
+        >
+          <Routes>
+            <Route path="/inventory" element={<div>Inventory page</div>} />
+            <Route path="/inventory/:skuId" element={<SkuDetailPage />} />
+          </Routes>
+        </MemoryRouter>
+      </GamesProvider>
     </MantineProvider>,
   );
 }

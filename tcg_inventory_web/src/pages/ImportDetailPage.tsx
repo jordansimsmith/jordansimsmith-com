@@ -30,13 +30,14 @@ import type {
   ImportDetail,
 } from '../api/client';
 import { encodeListingPhoto } from '../domain/encode-listing-photo';
-import { gameLabel } from '../domain/games';
+import { useGames } from '../GamesProvider';
 import { importDisplayName } from '../domain/import-display-name';
 import classes from './ImportDetailPage.module.css';
 
 const POLL_INTERVAL_MS = 2000;
 
 export function ImportDetailPage() {
+  const { getGame } = useGames();
   const { importId } = useParams<{ importId: string }>();
   const navigate = useNavigate();
   const [importDetail, setImportDetail] = useState<ImportDetail | null>(null);
@@ -278,7 +279,7 @@ export function ImportDetailPage() {
           <>
             <PageHeader
               title={importDisplayName(importDetail.filename)}
-              description={`${gameLabel(importDetail.game)} · Uploaded ${new Date(importDetail.created_at * 1000).toLocaleString()}`}
+              description={`${getGame(importDetail.game).display_name} · Uploaded ${new Date(importDetail.created_at * 1000).toLocaleString()}`}
               actions={
                 <Button variant="subtle" onClick={() => navigate('/imports')}>
                   Back to imports
@@ -390,6 +391,7 @@ export function ImportDetailPage() {
               >
                 {rows.length > 0 ? (
                   <ImportReviewTable
+                    game={importDetail.game}
                     rows={rows}
                     editable={importDetail.status === 'review'}
                     onConditionChange={handleConditionChange}

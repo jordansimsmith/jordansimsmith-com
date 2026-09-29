@@ -12,15 +12,14 @@ import { PageHeader } from '../components/PageHeader';
 import { PublishWidget } from '../components/PublishWidget';
 import { SkuTable } from '../components/SkuTable';
 import { apiClient } from '../api/client';
-import type { FindSkusParams, SkuSummary } from '../api/client';
-import { GAMES } from '../domain/games';
-import type { GameId } from '../domain/games';
+import type { FindSkusParams, Game, GameId, SkuSummary } from '../api/client';
+import { useGames } from '../GamesProvider';
 
 function InventoryGameSection({
   game,
   active,
 }: {
-  game: (typeof GAMES)[number];
+  game: Game;
   active: boolean;
 }) {
   const navigate = useNavigate();
@@ -138,13 +137,13 @@ function InventoryGameSection({
 
   return (
     <CollectionSurface
-      ariaLabel={`${game.label} inventory`}
+      ariaLabel={`${game.display_name} inventory`}
       toolbar={
         <TextInput
           ref={searchInputRef}
           value={search}
           onChange={(event) => setSearch(event.currentTarget.value)}
-          label={`Search ${game.label} inventory`}
+          label={`Search ${game.display_name} inventory`}
           placeholder="Card name, / to focus"
           maw={400}
         />
@@ -185,7 +184,8 @@ function InventoryGameSection({
 }
 
 export function InventoryPage() {
-  const [activeGame, setActiveGame] = useState<GameId>(GAMES[0].id);
+  const { games } = useGames();
+  const [activeGame, setActiveGame] = useState<GameId>(games[0].id);
 
   return (
     <AppShellLayout>
@@ -204,13 +204,13 @@ export function InventoryPage() {
           }}
         >
           <Tabs.List aria-label="Inventory game">
-            {GAMES.map((game) => (
+            {games.map((game) => (
               <Tabs.Tab key={game.id} value={game.id}>
-                {game.label}
+                {game.display_name}
               </Tabs.Tab>
             ))}
           </Tabs.List>
-          {GAMES.map((game) => (
+          {games.map((game) => (
             <Tabs.Panel key={game.id} value={game.id} pt="sm">
               <InventoryGameSection
                 game={game}

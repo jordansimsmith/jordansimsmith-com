@@ -11,8 +11,23 @@ import { MantineProvider } from '@mantine/core';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ScanDetailPage } from './ScanDetailPage';
+import { GamesProvider } from '../GamesProvider';
 import * as clientModule from '../api/client';
 import type { ScanDetail, ScanRow } from '../api/client';
+
+const REGISTERED_GAMES = [
+  {
+    id: 'mtg',
+    display_name: 'Magic: The Gathering',
+    scanning_enabled: true,
+    csv_import_enabled: true,
+    finishes: [
+      { id: 'normal', display_name: 'Normal' },
+      { id: 'foil', display_name: 'Foil' },
+      { id: 'etched', display_name: 'Etched' },
+    ],
+  },
+];
 
 function row(scanPosition: number, status: ScanRow['status']): ScanRow {
   return {
@@ -54,12 +69,14 @@ function detail(overrides: Partial<ScanDetail> = {}): ScanDetail {
 function renderDetailPage() {
   return render(
     <MantineProvider>
-      <MemoryRouter initialEntries={['/scans/scan-identifying']}>
-        <Routes>
-          <Route path="/scans/:scanId" element={<ScanDetailPage />} />
-          <Route path="/scans" element={<div>Scans list</div>} />
-        </Routes>
-      </MemoryRouter>
+      <GamesProvider initialGames={REGISTERED_GAMES}>
+        <MemoryRouter initialEntries={['/scans/scan-identifying']}>
+          <Routes>
+            <Route path="/scans/:scanId" element={<ScanDetailPage />} />
+            <Route path="/scans" element={<div>Scans list</div>} />
+          </Routes>
+        </MemoryRouter>
+      </GamesProvider>
     </MantineProvider>,
   );
 }

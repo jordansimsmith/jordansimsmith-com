@@ -18,7 +18,7 @@ import {
 import { scryfallClient } from '../api/scryfall-client';
 import type { ScryfallPrinting } from '../api/scryfall-client';
 import type { ScanConfirmationRow, ScanDetail, ScanRow } from '../api/client';
-import { MAGIC_THE_GATHERING } from '../domain/games';
+import { useGames } from '../GamesProvider';
 import classes from './ScanReview.module.css';
 import { ScanReviewPanels, type ReviewSelection } from './ScanReviewPanels';
 
@@ -26,10 +26,6 @@ interface ScanReviewProps {
   scan: ScanDetail;
   onDeleteRow: (scanPosition: number) => Promise<void>;
   onConfirmScan: (rows: ScanConfirmationRow[]) => Promise<void>;
-}
-
-function formatFinish(finish: ScanDetail['finish']): string {
-  return finish.charAt(0).toUpperCase() + finish.slice(1);
 }
 
 function highestSuggestion(row: ScanRow) {
@@ -74,6 +70,7 @@ function ReviewSummary({
   confirmError: string | null;
   onConfirm: () => void;
 }) {
+  const { getFinish } = useGames();
   const progress = rowCount === 0 ? 0 : (confirmedCount / rowCount) * 100;
 
   return (
@@ -100,7 +97,7 @@ function ReviewSummary({
         </Group>
         <Group gap="sm">
           <Badge variant="light">{scan.condition}</Badge>
-          <Badge variant="light">{formatFinish(scan.finish)}</Badge>
+          <Badge variant="light">{getFinish(scan.game, scan.finish)}</Badge>
         </Group>
         <Stack gap="xs">
           <Group justify="space-between" gap="sm" wrap="wrap">
@@ -465,7 +462,7 @@ export function ScanReview({
       }
       confirmationRows.push({
         scan_position: row.scan_position,
-        external_source: MAGIC_THE_GATHERING.externalSource,
+        external_source: 'scryfall',
         external_id: selection.printing.id,
         name: selection.printing.name,
         set_code: selection.printing.set_code,

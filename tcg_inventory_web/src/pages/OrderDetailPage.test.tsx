@@ -12,8 +12,23 @@ import { Notifications } from '@mantine/notifications';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OrderDetailPage } from './OrderDetailPage';
+import { GamesProvider } from '../GamesProvider';
 import * as clientModule from '../api/client';
 import type { OrderDetail } from '../api/client';
+
+const REGISTERED_GAMES = [
+  {
+    id: 'mtg',
+    display_name: 'Magic: The Gathering',
+    scanning_enabled: true,
+    csv_import_enabled: true,
+    finishes: [
+      { id: 'normal', display_name: 'Normal' },
+      { id: 'foil', display_name: 'Foil' },
+      { id: 'etched', display_name: 'Etched' },
+    ],
+  },
+];
 
 function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
   return {
@@ -134,12 +149,14 @@ function renderOrderDetailPage() {
   return render(
     <MantineProvider>
       <Notifications />
-      <MemoryRouter initialEntries={['/orders/83647']}>
-        <Routes>
-          <Route path="/orders/:orderId" element={<OrderDetailPage />} />
-          <Route path="/orders" element={<div>Orders list</div>} />
-        </Routes>
-      </MemoryRouter>
+      <GamesProvider initialGames={REGISTERED_GAMES}>
+        <MemoryRouter initialEntries={['/orders/83647']}>
+          <Routes>
+            <Route path="/orders/:orderId" element={<OrderDetailPage />} />
+            <Route path="/orders" element={<div>Orders list</div>} />
+          </Routes>
+        </MemoryRouter>
+      </GamesProvider>
     </MantineProvider>,
   );
 }
@@ -198,14 +215,18 @@ describe('OrderDetailPage', () => {
     expect(screen.getAllByText('$4.00')).toHaveLength(2);
     expect(screen.getByText('$2.90')).toBeDefined();
     expect(screen.getAllByText('Sol Ring')).toHaveLength(2);
-    expect(screen.getByText('A25 #167 · NM · foil')).toBeDefined();
+    expect(screen.getByText('A25 #167 · NM · Foil')).toBeDefined();
     expect(
-      screen.getByText('Prev · Llanowar Elves · DOM #168 · NM'),
+      screen.getByText('Prev · Llanowar Elves · DOM #168 · NM · Normal'),
     ).toBeDefined();
-    expect(screen.getByText('Next · Sol Ring · CMR #472 · NM')).toBeDefined();
-    expect(screen.getByText('Prev · Brainstorm · EMA #40 · NM')).toBeDefined();
     expect(
-      screen.getByText('Next · Counterspell · MH2 #267 · NM'),
+      screen.getByText('Next · Sol Ring · CMR #472 · NM · Normal'),
+    ).toBeDefined();
+    expect(
+      screen.getByText('Prev · Brainstorm · EMA #40 · NM · Normal'),
+    ).toBeDefined();
+    expect(
+      screen.getByText('Next · Counterspell · MH2 #267 · NM · Normal'),
     ).toBeDefined();
     expect(screen.getByRole('button', { name: 'Confirm pull' })).toBeDefined();
 

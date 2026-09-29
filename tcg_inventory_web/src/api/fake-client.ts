@@ -9,6 +9,8 @@ import type {
   CreateScanRequest,
   CreateScanResponse,
   Finish,
+  Game,
+  GameId,
   FindScansParams,
   FindScansResponse,
   FindImportsResponse,
@@ -49,10 +51,7 @@ import type {
   UpdateSettingsRequest,
   UpdateUnitResponse,
 } from './client';
-import { parseManaBoxCsv } from '../domain/manabox';
-import type { ManaBoxRow } from '../domain/manabox';
-import { GAMES, MAGIC_THE_GATHERING, getGame } from '../domain/games';
-import type { GameId } from '../domain/games';
+import { getGame } from '../domain/games';
 import {
   MAX_SCAN_FILE_BYTES,
   compareScanFilenames,
@@ -60,6 +59,20 @@ import {
 
 const VALID_CONDITIONS: Condition[] = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 const SKU_PAGE_SIZE = 20;
+const MAGIC_THE_GATHERING = { id: 'mtg', externalSource: 'scryfall' };
+const FAKE_GAMES: Game[] = [
+  {
+    id: 'mtg',
+    display_name: 'Magic: The Gathering',
+    scanning_enabled: true,
+    csv_import_enabled: true,
+    finishes: [
+      { id: 'normal', display_name: 'Normal' },
+      { id: 'foil', display_name: 'Foil' },
+      { id: 'etched', display_name: 'Etched' },
+    ],
+  },
+];
 type SeedSku = [
   scryfallId: string,
   name: string,
@@ -288,6 +301,62 @@ interface FakeImportRow {
   photos: RowPhoto[];
 }
 
+type FakeUploadRow = Omit<
+  FakeImportRow,
+  'position' | 'market_price' | 'suggested_price' | 'photos'
+>;
+
+const FAKE_UPLOAD_ROWS: FakeUploadRow[] = [
+  {
+    name: 'Ponder',
+    set_code: 'm12',
+    set_name: 'Magic 2012',
+    collector_number: '73',
+    finish: 'normal',
+    condition: 'MP',
+    external_source: 'scryfall',
+    external_id: '81c908ee-e70a-4406-a32d-ab5ab17e67b1',
+    decision: 'review',
+    decision_reason: 'non-English card',
+  },
+  {
+    name: 'Opt',
+    set_code: 'dom',
+    set_name: 'Dominaria',
+    collector_number: '60',
+    finish: 'normal',
+    condition: 'LP',
+    external_source: 'scryfall',
+    external_id: '25f2e4d0-effd-4e83-b7aa-1a0d8f120951',
+    decision: 'keep',
+    decision_reason: null,
+  },
+  {
+    name: 'Opt',
+    set_code: 'dom',
+    set_name: 'Dominaria',
+    collector_number: '60',
+    finish: 'normal',
+    condition: 'LP',
+    external_source: 'scryfall',
+    external_id: '25f2e4d0-effd-4e83-b7aa-1a0d8f120951',
+    decision: 'keep',
+    decision_reason: null,
+  },
+  {
+    name: 'Llanowar Elves',
+    set_code: 'dom',
+    set_name: 'Dominaria',
+    collector_number: '168',
+    finish: 'normal',
+    condition: 'NM',
+    external_source: 'scryfall',
+    external_id: '581b7327-3215-4a4f-b4ae-d9d4002ba882',
+    decision: 'keep',
+    decision_reason: null,
+  },
+];
+
 function formatPrice(cents: number): string {
   return (cents / 100).toFixed(2);
 }
@@ -320,19 +389,6 @@ interface FakeImport {
   status: ImportStatus;
   rows: FakeImportRow[];
   created_at_ms: number;
-}
-
-function decideRow(
-  row: ManaBoxRow,
-  position: number,
-): Pick<FakeImportRow, 'decision' | 'decision_reason'> {
-  if (row.language !== 'en') {
-    return { decision: 'review', decision_reason: 'non-English card' };
-  }
-  if (position % 5 === 0) {
-    return { decision: 'discard', decision_reason: DISCARD_REASON };
-  }
-  return { decision: 'keep', decision_reason: null };
 }
 
 function createSeedImportRows(count: number): FakeImportRow[] {
@@ -1230,7 +1286,7 @@ export function createFakeClient(): ApiClient {
     [MAGIC_THE_GATHERING.id]: 600,
   };
   const nextSequenceNumberByGame = new Map<GameId, number>(
-    GAMES.map(({ id }) => {
+    FAKE_GAMES.map(({ id }) => {
       const sequences = skus
         .filter((sku) => sku.game === id)
         .flatMap((sku) => sku.units.map((unit) => unit.sequence_number));
@@ -1359,6 +1415,15 @@ export function createFakeClient(): ApiClient {
   };
 
   return {
+    async getGames() {
+      return {
+        games: FAKE_GAMES.map((game) => ({
+          ...game,
+          finishes: game.finishes.map((finish) => ({ ...finish })),
+        })),
+      };
+    },
+
     async getSettings(): Promise<SettingsResponse> {
       return { ...settings };
     },
@@ -1385,33 +1450,21 @@ export function createFakeClient(): ApiClient {
     async createImport(
       game: GameId,
       filename: string,
-      csv: string,
+      _csv: string,
     ): Promise<ImportSummary> {
-      getGame(game);
-      const parsedRows = parseManaBoxCsv(csv);
-      // csv row order is physical bottom-up; position 1 is the top of the stack
-      const rows: FakeImportRow[] = [];
-      let position = 0;
-      for (const parsed of [...parsedRows].reverse()) {
-        for (let copy = 0; copy < parsed.quantity; copy += 1) {
-          position += 1;
-          const decided = decideRow(parsed, position);
-          rows.push({
-            position,
-            name: parsed.name,
-            set_code: parsed.set_code,
-            set_name: parsed.set_name,
-            collector_number: parsed.collector_number,
-            finish: parsed.finish,
-            condition: parsed.condition,
-            external_source: parsed.external_source,
-            external_id: parsed.external_id,
-            ...decided,
-            ...appraisePrices(decided.decision, position),
-            photos: [],
-          });
-        }
+      const gameMetadata = getGame(FAKE_GAMES, game);
+      if (!gameMetadata.csv_import_enabled) {
+        throw new Error(`CSV import is unavailable for game: ${game}`);
       }
+      const rows = FAKE_UPLOAD_ROWS.map((row, index) => {
+        const position = index + 1;
+        return {
+          ...row,
+          position,
+          ...appraisePrices(row.decision, position),
+          photos: [],
+        };
+      });
       importCounter += 1;
       const importRecord: FakeImport = {
         import_id: `fake-import-${importCounter}`,
@@ -1531,7 +1584,7 @@ export function createFakeClient(): ApiClient {
       if (importRecord.status !== 'review') {
         throw new Error('import is not in review status');
       }
-      // sequence numbers are assigned bottom-up (raw csv order), the reverse of review order
+      // sequence numbers are assigned bottom-up, the reverse of review order
       const keepRows = [...importRecord.rows]
         .sort((a, b) => b.position - a.position)
         .filter((row) => row.decision === 'keep');
@@ -1618,11 +1671,14 @@ export function createFakeClient(): ApiClient {
     },
 
     async createScan(request: CreateScanRequest): Promise<CreateScanResponse> {
-      const game = getGame(request.game);
+      const game = getGame(FAKE_GAMES, request.game);
+      if (!game.scanning_enabled) {
+        throw new Error(`Scanning is unavailable for game: ${request.game}`);
+      }
       if (!VALID_CONDITIONS.includes(request.condition)) {
         throw new Error('invalid scan condition');
       }
-      if (!game.finishes.includes(request.finish)) {
+      if (!game.finishes.some((finish) => finish.id === request.finish)) {
         throw new Error('invalid scan finish');
       }
       if (request.files.length < 1 || request.files.length > 200) {

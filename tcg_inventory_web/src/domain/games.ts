@@ -1,23 +1,17 @@
-export const MAGIC_THE_GATHERING = {
-  id: 'mtg',
-  label: 'Magic: The Gathering',
-  externalSource: 'scryfall',
-  finishes: ['normal', 'foil', 'etched'],
-} as const;
+import type { Finish, Game, GameFinish, GameId } from '../api/client';
 
-export const GAMES = [MAGIC_THE_GATHERING] as const;
-
-export type GameId = (typeof GAMES)[number]['id'];
-export type Finish = (typeof GAMES)[number]['finishes'][number];
-
-export function getGame(gameId: string) {
-  const game = GAMES.find(({ id }) => id === gameId);
+export function getGame(games: Game[], gameId: GameId): Game {
+  const game = games.find(({ id }) => id === gameId);
   if (!game) {
     throw new Error(`Unsupported game: ${gameId}`);
   }
   return game;
 }
 
-export function gameLabel(gameId: string): string {
-  return getGame(gameId).label;
+export function getFinish(game: Game, finishId: Finish): GameFinish {
+  const finish = game.finishes.find(({ id }) => id === finishId);
+  if (!finish) {
+    throw new Error(`Unsupported finish for ${game.id}: ${finishId}`);
+  }
+  return finish;
 }

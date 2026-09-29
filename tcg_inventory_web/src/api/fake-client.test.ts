@@ -4,6 +4,26 @@ import { createFakeScanUploader } from './fake-scan-uploader';
 import type { ScanConfirmationRow } from './client';
 
 describe('createFakeClient', () => {
+  it('returns the Magic game registry with ordered finishes and capabilities', async () => {
+    const client = createFakeClient();
+
+    await expect(client.getGames()).resolves.toEqual({
+      games: [
+        {
+          id: 'mtg',
+          display_name: 'Magic: The Gathering',
+          scanning_enabled: true,
+          csv_import_enabled: true,
+          finishes: [
+            { id: 'normal', display_name: 'Normal' },
+            { id: 'foil', display_name: 'Foil' },
+            { id: 'etched', display_name: 'Etched' },
+          ],
+        },
+      ],
+    });
+  });
+
   it('derives detail counts from units', async () => {
     const client = createFakeClient();
     const response = await client.findSkus({ game: 'mtg', search: 'sol ring' });
@@ -181,15 +201,7 @@ describe('createFakeClient', () => {
   });
 });
 
-const MANABOX_HEADER =
-  'Name,Set code,Set name,Collector number,Foil,Rarity,Quantity,Scryfall ID,Misprint,Altered,Condition,Language';
-
-const SAMPLE_CSV = [
-  MANABOX_HEADER,
-  'Llanowar Elves,dom,Dominaria,168,normal,common,1,581b7327-3215-4a4f-b4ae-d9d4002ba882,false,false,near_mint,en',
-  'Opt,dom,Dominaria,60,normal,common,2,25f2e4d0-effd-4e83-b7aa-1a0d8f120951,false,false,excellent,en',
-  'Ponder,m12,Magic 2012,73,normal,common,1,81c908ee-e70a-4406-a32d-ab5ab17e67b1,false,false,good,ja',
-].join('\n');
+const UPLOAD_BODY = 'opaque csv content';
 
 describe('createFakeClient imports', () => {
   afterEach(() => {
@@ -211,11 +223,11 @@ describe('createFakeClient imports', () => {
     expect(confirmed.status).toBe('confirmed');
   });
 
-  it('creates an import with quantity-expanded rows top-of-stack first', async () => {
+  it('creates an import with canned demo rows without parsing uploaded csv', async () => {
     vi.useFakeTimers();
     const client = createFakeClient();
 
-    const created = await client.createImport('mtg', 'bulk.csv', SAMPLE_CSV);
+    const created = await client.createImport('mtg', 'bulk.csv', UPLOAD_BODY);
 
     expect(created.status).toBe('appraising');
     expect(created.filename).toBe('bulk.csv');
@@ -238,7 +250,7 @@ describe('createFakeClient imports', () => {
   it('progresses an uploaded import to review over time', async () => {
     vi.useFakeTimers();
     const client = createFakeClient();
-    const created = await client.createImport('mtg', 'bulk.csv', SAMPLE_CSV);
+    const created = await client.createImport('mtg', 'bulk.csv', UPLOAD_BODY);
 
     vi.advanceTimersByTime(1000);
     let detail = await client.getImport(created.import_id);
@@ -269,12 +281,16 @@ describe('createFakeClient imports', () => {
     expect(response.imports[0].status).toBe('review');
   });
 
-  it('rejects invalid csv content', async () => {
+  it('accepts invalid csv content in fake mode', async () => {
     const client = createFakeClient();
 
-    await expect(
-      client.createImport('mtg', 'bad.csv', 'Name,Quantity\nOpt,1'),
-    ).rejects.toThrow('CSV is missing columns');
+    const created = await client.createImport(
+      'mtg',
+      'bad.csv',
+      'Name,Quantity\nOpt,1',
+    );
+
+    expect(created.row_count).toBe(4);
   });
 
   it('rejects unknown import ids', async () => {
@@ -286,26 +302,13 @@ describe('createFakeClient imports', () => {
   it('appraises prices for keep and discard rows', async () => {
     vi.useFakeTimers();
     const client = createFakeClient();
-    const created = await client.createImport('mtg', 'bulk.csv', SAMPLE_CSV);
-
-    let detail = await client.getImport(created.import_id);
-    expect(detail.rows[3].market_price).toBeNull();
-    expect(detail.total_suggested_price).toBe('0.00');
 
     vi.advanceTimersByTime(60_000);
-    detail = await client.getImport(created.import_id);
-    expect(detail.rows[0].decision).toBe('review');
-    expect(detail.rows[0].market_price).toBeNull();
-    expect(detail.rows[0].suggested_price).toBeNull();
-    expect(detail.rows[3].decision).toBe('keep');
-    expect(detail.rows[3].market_price).toMatch(/^\d+\.\d{2}$/);
-    expect(detail.rows[3].suggested_price).toMatch(/^\d+\.\d{2}$/);
-    expect(detail.total_suggested_price).toBe('9.00');
-
-    const confirmedSeed = await client.getImport('fake-import-1');
-    const discardRow = confirmedSeed.rows.find(
-      (row) => row.decision === 'discard',
-    );
+    const detail = await client.getImport('fake-import-2');
+    const keepRow = detail.rows.find((row) => row.decision === 'keep');
+    const discardRow = detail.rows.find((row) => row.decision === 'discard');
+    expect(keepRow?.market_price).toMatch(/^\d+\.\d{2}$/);
+    expect(keepRow?.suggested_price).toMatch(/^\d+\.\d{2}$/);
     expect(Number(discardRow?.market_price)).toBeLessThan(0.25);
     expect(discardRow?.suggested_price).toBeNull();
   });
@@ -313,7 +316,7 @@ describe('createFakeClient imports', () => {
   it('rejects confirm unless the import is in review', async () => {
     vi.useFakeTimers();
     const client = createFakeClient();
-    const created = await client.createImport('mtg', 'bulk.csv', SAMPLE_CSV);
+    const created = await client.createImport('mtg', 'bulk.csv', UPLOAD_BODY);
 
     await expect(client.confirmImport(created.import_id)).rejects.toThrow(
       'import is not in review status',
@@ -329,7 +332,7 @@ describe('createFakeClient imports', () => {
   it('confirms keep rows bottom-up into inventory and skips review rows', async () => {
     vi.useFakeTimers();
     const client = createFakeClient();
-    const created = await client.createImport('mtg', 'bulk.csv', SAMPLE_CSV);
+    const created = await client.createImport('mtg', 'bulk.csv', UPLOAD_BODY);
     vi.advanceTimersByTime(60_000);
 
     const response = await client.confirmImport(created.import_id);
@@ -351,7 +354,7 @@ describe('createFakeClient imports', () => {
       },
     ]);
 
-    // the stack bottom (llanowar elves, csv row 1) gets the first sequence number
+    // the stack bottom (llanowar elves) gets the first sequence number
     const elvesCandidates = await client.findSkus({
       game: 'mtg',
       search: 'llanowar elves',
@@ -378,7 +381,7 @@ describe('createFakeClient imports', () => {
     expect(opt.in_stock_count).toBe(2);
     expect(opt.units.map((unit) => unit.sequence_number)).toEqual([601, 602]);
 
-    // the review row (non-english ponder) never becomes a unit
+    // the review row never becomes a unit
     const ponderCandidates = await client.findSkus({
       game: 'mtg',
       search: 'ponder',
@@ -403,51 +406,39 @@ describe('createFakeClient imports', () => {
   it('splits placement instructions at block boundaries', async () => {
     vi.useFakeTimers();
     const client = createFakeClient();
-    const csv = [
-      MANABOX_HEADER,
-      'Relentless Rats,8ed,Eighth Edition,151,normal,uncommon,130,aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa,false,false,near_mint,en',
-    ].join('\n');
-    const created = await client.createImport('mtg', 'rats.csv', csv);
-    vi.advanceTimersByTime(120_000);
+    let response: Awaited<ReturnType<typeof client.confirmImport>> | null =
+      null;
+    for (let importNumber = 0; importNumber < 34; importNumber += 1) {
+      const created = await client.createImport(
+        'mtg',
+        `batch-${importNumber}.csv`,
+        UPLOAD_BODY,
+      );
+      vi.advanceTimersByTime(60_000);
+      response = await client.confirmImport(created.import_id);
+    }
 
-    const response = await client.confirmImport(created.import_id);
-
-    // 130 rows with every 5th discarded leaves 104 keeps spanning two blocks
-    expect(response.unit_count).toBe(104);
-    expect(response.total_suggested_price).toBe('291.00');
-    expect(response.first_sequence_number).toBe(600);
-    expect(response.last_sequence_number).toBe(703);
-    expect(response.placement_instructions).toEqual([
-      {
-        block: 'A6',
-        from_location: 'A6-0',
-        to_location: 'A6-99',
-        from_name: 'Relentless Rats',
-        to_name: 'Relentless Rats',
-        unit_count: 100,
-      },
-      {
-        block: 'A7',
-        from_location: 'A7-0',
-        to_location: 'A7-3',
-        from_name: 'Relentless Rats',
-        to_name: 'Relentless Rats',
-        unit_count: 4,
-      },
+    expect(response?.unit_count).toBe(3);
+    expect(response?.first_sequence_number).toBe(699);
+    expect(response?.last_sequence_number).toBe(701);
+    expect(response?.placement_instructions.map(({ block }) => block)).toEqual([
+      'A6',
+      'A7',
     ]);
+    expect(
+      response?.placement_instructions.map(({ unit_count }) => unit_count),
+    ).toEqual([1, 2]);
   });
 
   it('confirms an import with no keep rows without placements', async () => {
-    vi.useFakeTimers();
     const client = createFakeClient();
-    const csv = [
-      MANABOX_HEADER,
-      'Ponder,m12,Magic 2012,73,normal,common,1,81c908ee-e70a-4406-a32d-ab5ab17e67b1,false,false,good,ja',
-    ].join('\n');
-    const created = await client.createImport('mtg', 'review-only.csv', csv);
-    vi.advanceTimersByTime(10_000);
+    const importId = 'fake-import-3';
+    const detail = await client.getImport(importId);
+    for (const row of detail.rows) {
+      await client.deleteImportRow(importId, row.position);
+    }
 
-    const response = await client.confirmImport(created.import_id);
+    const response = await client.confirmImport(importId);
 
     expect(response.unit_count).toBe(0);
     expect(response.total_suggested_price).toBe('0.00');

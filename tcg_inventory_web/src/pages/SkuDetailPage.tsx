@@ -18,6 +18,7 @@ import { PageHeader } from '../components/PageHeader';
 import { RemoveUnitModal } from '../components/RemoveUnitModal';
 import { EditConditionModal } from '../components/EditConditionModal';
 import { apiClient } from '../api/client';
+import { useGames } from '../GamesProvider';
 import type { Condition, SkuDetail, SkuUnit } from '../api/client';
 import { cardImageUrl } from '../domain/card-image';
 import classes from './SkuDetailPage.module.css';
@@ -28,6 +29,7 @@ const CARD_IMAGE_FALLBACK =
 const CARD_IMAGE_ASPECT_RATIO = '488 / 680';
 
 export function SkuDetailPage() {
+  const { getFinish } = useGames();
   const { skuId } = useParams<{ skuId: string }>();
   const navigate = useNavigate();
   const [sku, setSku] = useState<SkuDetail | null>(null);
@@ -189,9 +191,7 @@ export function SkuDetailPage() {
                       <Text size="xs" c="dimmed" fw={600}>
                         Finish
                       </Text>
-                      <Text size="sm" tt="capitalize">
-                        {sku.finish}
-                      </Text>
+                      <Text size="sm">{getFinish(sku.game, sku.finish)}</Text>
                     </div>
                     <div>
                       <Text size="xs" c="dimmed" fw={600}>

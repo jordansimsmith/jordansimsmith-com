@@ -20,10 +20,15 @@ import {
 import { PageHeader } from '../components/PageHeader';
 import { apiClient, CONDITIONS } from '../api/client';
 import { scanUploader } from '../api/scan-uploader';
-import type { Condition, Finish, ScanStatus, ScanSummary } from '../api/client';
+import type {
+  Condition,
+  Finish,
+  GameId,
+  ScanStatus,
+  ScanSummary,
+} from '../api/client';
 import { sortScanFiles, validateScanFiles } from '../domain/scan-files';
-import { GAMES, gameLabel, getGame } from '../domain/games';
-import type { GameId } from '../domain/games';
+import { useGames } from '../GamesProvider';
 import classes from '../components/CollectionTable.module.css';
 import formClasses from './ScanPage.module.css';
 
@@ -41,17 +46,6 @@ function formatStatus(status: ScanStatus): string {
   return status.replace('_', ' ');
 }
 
-function formatFinish(finish: ScanSummary['finish']): string {
-  switch (finish) {
-    case 'normal':
-      return 'Normal';
-    case 'foil':
-      return 'Foil';
-    case 'etched':
-      return 'Etched';
-  }
-}
-
 function ScanStatusBadge({ status }: { status: ScanStatus }) {
   return (
     <Badge variant="light" color={STATUS_COLORS[status]}>
@@ -66,6 +60,8 @@ interface ScanTableProps {
 }
 
 function ScanTable({ scans, onOpen }: ScanTableProps) {
+  const { getGame, getFinish } = useGames();
+
   return (
     <Table
       highlightOnHover
@@ -100,7 +96,7 @@ function ScanTable({ scans, onOpen }: ScanTableProps) {
               {new Date(scan.created_at * 1000).toLocaleString()}
             </Table.Td>
             <Table.Td data-field="game" data-label="Game">
-              {gameLabel(scan.game)}
+              {getGame(scan.game).display_name}
             </Table.Td>
             <Table.Td data-field="status" data-label="Status">
               <ScanStatusBadge status={scan.status} />
@@ -112,7 +108,7 @@ function ScanTable({ scans, onOpen }: ScanTableProps) {
               {scan.condition}
             </Table.Td>
             <Table.Td data-field="finish" data-label="Finish">
-              {formatFinish(scan.finish)}
+              {getFinish(scan.game, scan.finish)}
             </Table.Td>
           </Table.Tr>
         ))}
@@ -122,21 +118,27 @@ function ScanTable({ scans, onOpen }: ScanTableProps) {
 }
 
 export function ScanPage() {
+  const { games, getGame } = useGames();
+  const initialGame = games.find(({ scanning_enabled }) => scanning_enabled);
   const navigate = useNavigate();
   const [scans, setScans] = useState<ScanSummary[]>([]);
   const [nextContinuation, setNextContinuation] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [game, setGame] = useState<GameId | null>(GAMES[0].id);
+  const [game, setGame] = useState<GameId | null>(initialGame?.id ?? null);
   const [condition, setCondition] = useState<Condition>('NM');
-  const [finish, setFinish] = useState<Finish | null>(GAMES[0].finishes[0]);
+  const [finish, setFinish] = useState<Finish | null>(
+    initialGame?.finishes[0]?.id ?? null,
+  );
   const [files, setFiles] = useState<File[]>([]);
   const [creating, setCreating] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const sortedFiles = useMemo(() => sortScanFiles(files), [files]);
   const fileErrors = useMemo(() => validateScanFiles(files), [files]);
+  const selectedGame = game === null ? null : getGame(game);
+  const canScan = selectedGame?.scanning_enabled ?? false;
   const openScan = useCallback(
     (scan: ScanSummary) => {
       navigate(`/scans/${encodeURIComponent(scan.scan_id)}`);
@@ -209,6 +211,7 @@ export function ScanPage() {
     if (
       creating ||
       game === null ||
+      !canScan ||
       finish === null ||
       sortedFiles.length === 0 ||
       fileErrors.length > 0
@@ -291,12 +294,16 @@ export function ScanPage() {
                     const nextGame = getGame(value);
                     setGame(nextGame.id);
                     setFinish((currentFinish) =>
-                      currentFinish && nextGame.finishes.includes(currentFinish)
+                      currentFinish &&
+                      nextGame.finishes.some(({ id }) => id === currentFinish)
                         ? currentFinish
-                        : (nextGame.finishes[0] ?? null),
+                        : (nextGame.finishes[0]?.id ?? null),
                     );
                   }}
-                  data={GAMES.map(({ id, label }) => ({ value: id, label }))}
+                  data={games.map(({ id, display_name }) => ({
+                    value: id,
+                    label: display_name,
+                  }))}
                   placeholder="Select game"
                   required
                   disabled={creating}
@@ -311,7 +318,7 @@ export function ScanPage() {
                     }
                   }}
                   data={CONDITIONS}
-                  disabled={creating}
+                  disabled={creating || !canScan}
                 />
                 <Select
                   className={formClasses.finish}
@@ -323,17 +330,15 @@ export function ScanPage() {
                     }
                   }}
                   data={
-                    game === null
-                      ? []
-                      : [...getGame(game).finishes].map((value) => ({
-                          value,
-                          label: formatFinish(value),
-                        }))
+                    selectedGame?.finishes.map(({ id, display_name }) => ({
+                      value: id,
+                      label: display_name,
+                    })) ?? []
                   }
                   placeholder={
                     game === null ? 'Select game first' : 'Select finish'
                   }
-                  disabled={creating || game === null}
+                  disabled={creating || !canScan}
                   required
                 />
                 <FileInput
@@ -345,7 +350,7 @@ export function ScanPage() {
                   label="Scanner JPEGs"
                   placeholder="Select files"
                   clearable
-                  disabled={creating}
+                  disabled={creating || !canScan}
                   required
                 />
                 <Button
@@ -353,7 +358,7 @@ export function ScanPage() {
                   onClick={handleCreate}
                   disabled={
                     creating ||
-                    game === null ||
+                    !canScan ||
                     finish === null ||
                     sortedFiles.length === 0 ||
                     fileErrors.length > 0
@@ -364,7 +369,11 @@ export function ScanPage() {
                 </Button>
               </div>
               <Text size="xs" c="dimmed">
-                Files are sorted by filename from bottom to top.
+                {canScan
+                  ? 'Files are sorted by filename from bottom to top.'
+                  : game === null
+                    ? 'Select a game with scanning enabled to create a scan.'
+                    : `Scanning is unavailable for ${selectedGame?.display_name}.`}
               </Text>
               {files.length > 0 && fileErrors.length > 0 && (
                 <Stack gap={2} role="alert">

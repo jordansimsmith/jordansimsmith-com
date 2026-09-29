@@ -1,7 +1,8 @@
 import { ActionIcon, Badge, NativeSelect, Table, Text } from '@mantine/core';
 import { IconTrash } from '@tabler/icons-react';
-import type { Condition, ImportRow, RowDecision } from '../api/client';
+import type { Condition, GameId, ImportRow, RowDecision } from '../api/client';
 import { CONDITIONS } from '../api/client';
+import { useGames } from '../GamesProvider';
 import { finishNameWeight, formatSetNumber } from '../domain/card-label';
 import { ImportRowPhotoStrip } from './ImportRowPhotoStrip';
 import finishClasses from './CardFinishName.module.css';
@@ -14,6 +15,7 @@ const DECISION_COLORS: Record<RowDecision, string> = {
 };
 
 interface ImportReviewTableProps {
+  game: GameId;
   rows: ImportRow[];
   editable?: boolean;
   onConditionChange?: (position: number, condition: Condition) => void;
@@ -23,6 +25,7 @@ interface ImportReviewTableProps {
 }
 
 export function ImportReviewTable({
+  game,
   rows,
   editable = false,
   onConditionChange,
@@ -30,6 +33,7 @@ export function ImportReviewTable({
   onAddPhoto,
   onRemovePhoto,
 }: ImportReviewTableProps) {
+  const { getFinish } = useGames();
   return (
     <Table
       highlightOnHover
@@ -75,8 +79,8 @@ export function ImportReviewTable({
               <Table.Td data-field="set" data-label="Set" title={row.set_name}>
                 {formatSetNumber(row.set_code, row.collector_number)}
               </Table.Td>
-              <Table.Td data-field="finish" data-label="Finish" tt="capitalize">
-                {row.finish}
+              <Table.Td data-field="finish" data-label="Finish">
+                {getFinish(game, row.finish)}
               </Table.Td>
               <Table.Td data-field="condition" data-label="Condition">
                 {editable && onConditionChange ? (

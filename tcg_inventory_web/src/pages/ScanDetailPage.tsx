@@ -24,7 +24,7 @@ import type {
   ScanDetail,
   ScanStatus,
 } from '../api/client';
-import { gameLabel } from '../domain/games';
+import { useGames } from '../GamesProvider';
 
 const POLL_INTERVAL_MS = 2000;
 
@@ -42,18 +42,8 @@ function formatStatus(status: ScanStatus): string {
   return status.replace('_', ' ');
 }
 
-function formatFinish(finish: ScanDetail['finish']): string {
-  switch (finish) {
-    case 'normal':
-      return 'Normal';
-    case 'foil':
-      return 'Foil';
-    case 'etched':
-      return 'Etched';
-  }
-}
-
 function ScanSummary({ scan }: { scan: ScanDetail }) {
+  const { getFinish } = useGames();
   const processedCount = scan.rows.filter((row) => row.status !== null).length;
   const progress =
     scan.row_count === 0 ? 0 : (processedCount / scan.row_count) * 100;
@@ -82,7 +72,7 @@ function ScanSummary({ scan }: { scan: ScanDetail }) {
         </Group>
         <Group gap="sm">
           <Badge variant="light">{scan.condition}</Badge>
-          <Badge variant="light">{formatFinish(scan.finish)}</Badge>
+          <Badge variant="light">{getFinish(scan.game, scan.finish)}</Badge>
         </Group>
         {scan.status === 'identifying' && (
           <Stack gap="xs">
@@ -122,6 +112,7 @@ function ScanSummary({ scan }: { scan: ScanDetail }) {
 }
 
 export function ScanDetailPage() {
+  const { getGame } = useGames();
   const { scanId } = useParams<{ scanId: string }>();
   const navigate = useNavigate();
   const [scan, setScan] = useState<ScanDetail | null>(null);
@@ -234,7 +225,7 @@ export function ScanDetailPage() {
           <>
             <PageHeader
               title="Scan"
-              description={`${gameLabel(scan.game)} · Created ${new Date(scan.created_at * 1000).toLocaleString()}`}
+              description={`${getGame(scan.game).display_name} · Created ${new Date(scan.created_at * 1000).toLocaleString()}`}
               actions={
                 <Group gap="xs">
                   {scan.status !== 'confirmed' && (

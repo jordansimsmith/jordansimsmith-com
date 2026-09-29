@@ -11,8 +11,23 @@ import { Notifications } from '@mantine/notifications';
 import { MemoryRouter, Routes, Route, useParams } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { InventoryPage } from './InventoryPage';
+import { GamesProvider } from '../GamesProvider';
 import * as clientModule from '../api/client';
-import type { SkuSummary } from '../api/client';
+import type { Game, SkuSummary } from '../api/client';
+
+const REGISTERED_GAMES = [
+  {
+    id: 'mtg',
+    display_name: 'Magic: The Gathering',
+    scanning_enabled: true,
+    csv_import_enabled: true,
+    finishes: [
+      { id: 'normal', display_name: 'Normal' },
+      { id: 'foil', display_name: 'Foil' },
+      { id: 'etched', display_name: 'Etched' },
+    ],
+  },
+];
 
 const skuFixtures: SkuSummary[] = [
   {
@@ -55,16 +70,18 @@ function SkuDetailStub() {
   return <div>SKU detail {skuId}</div>;
 }
 
-function renderInventoryPage() {
+function renderInventoryPage(games?: Game[]) {
   return render(
     <MantineProvider>
       <Notifications />
-      <MemoryRouter initialEntries={['/inventory']}>
-        <Routes>
-          <Route path="/inventory" element={<InventoryPage />} />
-          <Route path="/inventory/:skuId" element={<SkuDetailStub />} />
-        </Routes>
-      </MemoryRouter>
+      <GamesProvider initialGames={games ?? REGISTERED_GAMES}>
+        <MemoryRouter initialEntries={['/inventory']}>
+          <Routes>
+            <Route path="/inventory" element={<InventoryPage />} />
+            <Route path="/inventory/:skuId" element={<SkuDetailStub />} />
+          </Routes>
+        </MemoryRouter>
+      </GamesProvider>
     </MantineProvider>,
   );
 }
@@ -103,10 +120,34 @@ describe('InventoryPage', () => {
       'Strixhaven Mystical Archive',
     );
     expect(within(row).getByText('42')).toBeDefined();
-    expect(within(row).getByText('normal')).toBeDefined();
+    expect(within(row).getByText('Normal')).toBeDefined();
     expect(within(row).getByText('NM')).toBeDefined();
     expect(screen.getByText('Opt')).toBeDefined();
     expect(screen.getByText('Sol Ring')).toBeDefined();
+  });
+
+  it('uses game names from the registry', async () => {
+    renderInventoryPage([
+      {
+        id: 'mtg',
+        display_name: 'Registry Supplied Name',
+        scanning_enabled: false,
+        csv_import_enabled: false,
+        finishes: [
+          { id: 'normal', display_name: 'Base' },
+          { id: 'foil', display_name: 'Shiny' },
+        ],
+      },
+    ]);
+
+    expect(
+      await screen.findByRole('tab', { name: 'Registry Supplied Name' }),
+    ).toBeDefined();
+    expect(
+      screen.getByRole('textbox', {
+        name: 'Search Registry Supplied Name inventory',
+      }),
+    ).toBeDefined();
   });
 
   it('filters rows with prefix search', async () => {
