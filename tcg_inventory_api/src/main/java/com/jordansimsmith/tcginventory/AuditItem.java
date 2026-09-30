@@ -24,6 +24,7 @@ public class AuditItem {
   public static final String DECISION_REASON = "decision_reason";
   public static final String BEFORE_STATUS = "before_status";
   public static final String AFTER_STATUS = "after_status";
+  public static final String TARGET_SKU_ID = "target_sku_id";
   public static final String CREATED_AT = "created_at";
 
   private String pk;
@@ -36,6 +37,7 @@ public class AuditItem {
   private String decisionReason;
   private String beforeStatus;
   private String afterStatus;
+  private String targetSkuId;
   private Instant createdAt;
 
   @DynamoDbPartitionKey
@@ -128,6 +130,15 @@ public class AuditItem {
 
   public void setAfterStatus(@Nullable String afterStatus) {
     this.afterStatus = afterStatus;
+  }
+
+  @DynamoDbAttribute(TARGET_SKU_ID)
+  public String getTargetSkuId() {
+    return targetSkuId;
+  }
+
+  public void setTargetSkuId(@Nullable String targetSkuId) {
+    this.targetSkuId = targetSkuId;
   }
 
   @DynamoDbConvertedBy(EpochSecondConverter.class)

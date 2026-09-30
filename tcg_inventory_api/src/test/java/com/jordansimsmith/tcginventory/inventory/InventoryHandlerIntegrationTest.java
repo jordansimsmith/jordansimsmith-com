@@ -1,12 +1,14 @@
 package com.jordansimsmith.tcginventory.inventory;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.tcginventory.AuditItem;
+import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.time.FakeClock;
@@ -36,6 +38,8 @@ public class InventoryHandlerIntegrationTest {
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
   private DynamoDbTable<AuditItem> auditTable;
+  private DynamoDbTable<JobItem> jobTable;
+  private InventoryRepository inventoryRepository;
 
   private FindSkusHandler findSkusHandler;
   private GetSkuHandler getSkuHandler;
@@ -65,6 +69,7 @@ public class InventoryHandlerIntegrationTest {
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
     auditTable = factory.auditTable();
+    jobTable = factory.jobTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
@@ -73,6 +78,8 @@ public class InventoryHandlerIntegrationTest {
     getSkuHandler = new GetSkuHandler(factory);
     removeUnitHandler = new RemoveUnitHandler(factory);
     updateUnitHandler = new UpdateUnitHandler(factory);
+    inventoryRepository =
+        new InventoryRepository(unitTable, factory.dynamoDbClient(), fakeClock, fakeUlidGenerator);
   }
 
   @Test
@@ -298,6 +305,51 @@ public class InventoryHandlerIntegrationTest {
     assertThat(auditItems).hasSize(1);
     assertThat(auditItems.get(0).getEventType()).isEqualTo("adjustment");
     assertThat(auditItems.get(0).getSkuId()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
+    assertThat(auditItems.get(0).getSequenceNumber()).isEqualTo(42);
+    assertThat(auditItems.get(0).getBeforeStatus()).isEqualTo("in_stock");
+    assertThat(auditItems.get(0).getAfterStatus()).isEqualTo("removed");
+    assertThat(auditItems.get(0).getDecisionReason()).isEqualTo("damaged");
+  }
+
+  @Test
+  void removeUnitShouldReturn409WhenAJobIsActive() throws Exception {
+    // arrange
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    createSku("jordan", skuId, "Elvish Mystic", "m14", "Magic 2014", "169");
+    createUnit("jordan", skuId, 42, "in_stock", "import1");
+    jobTable.putItem(
+        JobItem.create("jordan", "job1", "publish", null, Instant.ofEpochSecond(1700000000)));
+
+    // act
+    var response =
+        removeUnitHandler.handleRequest(
+            buildEvent("jordan", Map.of("sku_id", skuId, "sequence_number", "42")), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(409);
+    assertThat(objectMapper.readTree(response.getBody()).get("message").asText())
+        .isEqualTo("another job is in progress");
+    assertThat(getUnit("jordan", skuId, 42).getStatus()).isEqualTo("in_stock");
+    assertThat(queryAuditEntries("jordan")).isEmpty();
+  }
+
+  @Test
+  void removeUnitShouldRollBackSkuAndAuditWhenUnitIsNoLongerInStock() {
+    // arrange
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    createSku("jordan", skuId, "Elvish Mystic", "m14", "Magic 2014", "169");
+    createUnit("jordan", skuId, 42, "reserved", "import1");
+
+    // act
+    assertThatThrownBy(() -> inventoryRepository.removeUnit("jordan", skuId, 42, null))
+        .isInstanceOf(RuntimeException.class);
+
+    // assert
+    var sku = getSku("jordan", skuId);
+    assertThat(sku.getDirty()).isFalse();
+    assertThat(sku.getVersion()).isEqualTo(1);
+    assertThat(getUnit("jordan", skuId, 42).getStatus()).isEqualTo("reserved");
+    assertThat(queryAuditEntries("jordan")).isEmpty();
   }
 
   @Test
@@ -396,6 +448,68 @@ public class InventoryHandlerIntegrationTest {
     var auditItems = queryAuditEntries("jordan");
     assertThat(auditItems).hasSize(1);
     assertThat(auditItems.get(0).getEventType()).isEqualTo("adjustment");
+    assertThat(auditItems.get(0).getSkuId()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
+    assertThat(auditItems.get(0).getTargetSkuId()).isEqualTo("mtg#scryfall#scryfall-1#normal#LP");
+    assertThat(auditItems.get(0).getSequenceNumber()).isEqualTo(42);
+    assertThat(auditItems.get(0).getBeforeStatus()).isEqualTo("in_stock");
+    assertThat(auditItems.get(0).getAfterStatus()).isEqualTo("in_stock");
+  }
+
+  @Test
+  void updateUnitShouldReturn409WhenAJobIsActive() throws Exception {
+    // arrange
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    createSku("jordan", skuId, "Elvish Mystic", "m14", "Magic 2014", "169");
+    createUnit("jordan", skuId, 42, "in_stock", "import1");
+    jobTable.putItem(
+        JobItem.create("jordan", "job1", "publish", null, Instant.ofEpochSecond(1700000000)));
+
+    // act
+    var response =
+        updateUnitHandler.handleRequest(
+            buildEventWithBody(
+                "jordan",
+                Map.of("sku_id", skuId, "sequence_number", "42"),
+                "{\"condition\":\"LP\"}"),
+            null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(409);
+    assertThat(objectMapper.readTree(response.getBody()).get("message").asText())
+        .isEqualTo("another job is in progress");
+    assertThat(getUnit("jordan", skuId, 42).getStatus()).isEqualTo("in_stock");
+    assertThat(queryAuditEntries("jordan")).isEmpty();
+  }
+
+  @Test
+  void updateUnitShouldRollBackAllWritesWhenTargetUnitKeyIsOccupied() throws Exception {
+    // arrange
+    var sourceSkuId = "mtg#scryfall#scryfall-1#normal#NM";
+    var targetSkuId = "mtg#scryfall#scryfall-1#normal#LP";
+    createSku("jordan", sourceSkuId, "Elvish Mystic", "m14", "Magic 2014", "169");
+    createSku("jordan", targetSkuId, "Elvish Mystic", "m14", "Magic 2014", "169");
+    createUnit("jordan", sourceSkuId, 42, "in_stock", "import1");
+    createUnit("jordan", targetSkuId, 42, "reserved", "import2");
+
+    // act
+    assertThatThrownBy(
+            () ->
+                updateUnitHandler.handleRequest(
+                    buildEventWithBody(
+                        "jordan",
+                        Map.of("sku_id", sourceSkuId, "sequence_number", "42"),
+                        "{\"condition\":\"LP\"}"),
+                    null))
+        .isInstanceOf(RuntimeException.class);
+
+    // assert
+    assertThat(getUnit("jordan", sourceSkuId, 42).getStatus()).isEqualTo("in_stock");
+    assertThat(getUnit("jordan", targetSkuId, 42).getStatus()).isEqualTo("reserved");
+    assertThat(getSku("jordan", sourceSkuId).getDirty()).isFalse();
+    assertThat(getSku("jordan", sourceSkuId).getVersion()).isEqualTo(1);
+    assertThat(getSku("jordan", targetSkuId).getDirty()).isFalse();
+    assertThat(getSku("jordan", targetSkuId).getVersion()).isEqualTo(1);
+    assertThat(queryAuditEntries("jordan")).isEmpty();
   }
 
   @Test
@@ -652,6 +766,22 @@ public class InventoryHandlerIntegrationTest {
       item.setPhotos(photos);
     }
     unitTable.putItem(item);
+  }
+
+  private SkuItem getSku(String user, String skuId) {
+    return skuTable.getItem(
+        Key.builder()
+            .partitionValue(SkuItem.formatPk(user, skuId))
+            .sortValue(SkuItem.formatSk())
+            .build());
+  }
+
+  private UnitItem getUnit(String user, String skuId, int sequenceNumber) {
+    return unitTable.getItem(
+        Key.builder()
+            .partitionValue(SkuItem.formatPk(user, skuId))
+            .sortValue(UnitItem.formatSk(sequenceNumber))
+            .build());
   }
 
   private List<AuditItem> queryAuditEntries(String user) {

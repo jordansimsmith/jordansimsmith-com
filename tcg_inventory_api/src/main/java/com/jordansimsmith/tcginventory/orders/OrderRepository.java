@@ -1,5 +1,6 @@
 package com.jordansimsmith.tcginventory.orders;
 
+import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
@@ -14,6 +15,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
+import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
 import software.amazon.awssdk.services.dynamodb.model.Update;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
@@ -71,13 +73,22 @@ public class OrderRepository {
 
   public void advanceOrderToPickReady(
       String user, String orderId, String fetchtcgStatus, String fetchtcgCurrentAction) {
-    inventoryRepository.executeChunked(
-        List.of(
-            buildOrderPickReadyUpdate(user, orderId, fetchtcgStatus, fetchtcgCurrentAction),
-            inventoryRepository.buildAuditPut(
-                user,
-                "payment",
-                Map.of(OrderItem.ORDER_ID, AttributeValue.builder().s(orderId).build()))));
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                List.of(
+                    buildOrderPickReadyUpdate(user, orderId, fetchtcgStatus, fetchtcgCurrentAction),
+                    inventoryRepository.buildAuditPut(
+                        user,
+                        "payment",
+                        Map.of(
+                            OrderItem.ORDER_ID,
+                            AttributeValue.builder().s(orderId).build(),
+                            AuditItem.BEFORE_STATUS,
+                            AttributeValue.builder().s("awaiting_payment").build(),
+                            AuditItem.AFTER_STATUS,
+                            AttributeValue.builder().s("to_pick").build()))))
+            .build());
   }
 
   public void updateOrderFulfillment(

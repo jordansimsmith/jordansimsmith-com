@@ -602,6 +602,16 @@ public class JobsHandlerIntegrationTest {
         getAuditEntries("jordan").stream().filter(a -> "payment".equals(a.getEventType())).toList();
     assertThat(paymentAudits).hasSize(1);
     assertThat(paymentAudits.get(0).getOrderId()).isEqualTo("83663");
+    assertThat(paymentAudits.get(0).getBeforeStatus()).isEqualTo("awaiting_payment");
+    assertThat(paymentAudits.get(0).getAfterStatus()).isEqualTo("to_pick");
+
+    createPublishJob("jordan", "job2");
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job2", "publish"), null);
+
+    var replayPaymentAudits =
+        getAuditEntries("jordan").stream().filter(a -> "payment".equals(a.getEventType())).toList();
+    assertThat(replayPaymentAudits).hasSize(1);
+    assertThat(getOrder("jordan", "83663").getStatus()).isEqualTo("to_pick");
   }
 
   @Test

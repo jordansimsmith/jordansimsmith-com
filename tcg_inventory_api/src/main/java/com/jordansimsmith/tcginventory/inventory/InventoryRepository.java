@@ -81,15 +81,20 @@ public class InventoryRepository {
     auditAttributes.put(
         UnitItem.SEQUENCE_NUMBER,
         AttributeValue.builder().n(String.valueOf(sequenceNumber)).build());
+    auditAttributes.put(AuditItem.BEFORE_STATUS, AttributeValue.builder().s("in_stock").build());
+    auditAttributes.put(AuditItem.AFTER_STATUS, AttributeValue.builder().s("removed").build());
     if (reason != null && !reason.isEmpty()) {
-      auditAttributes.put("decision_reason", AttributeValue.builder().s(reason).build());
+      auditAttributes.put(AuditItem.DECISION_REASON, AttributeValue.builder().s(reason).build());
     }
 
-    executeChunked(
-        List.of(
-            buildSkuDirtyUpdate(user, skuId),
-            buildUnitRemoveUpdate(user, skuId, sequenceNumber),
-            buildAuditPut(user, "adjustment", auditAttributes)));
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                List.of(
+                    buildSkuDirtyUpdate(user, skuId),
+                    buildUnitRemoveUpdate(user, skuId, sequenceNumber),
+                    buildAuditPut(user, "adjustment", auditAttributes)))
+            .build());
   }
 
   // one transaction across both SKU partitions: the unit moves keeping its sequence number and
@@ -128,22 +133,31 @@ public class InventoryRepository {
       movedUnit.setPhotos(unitItem.getPhotos());
     }
 
-    executeChunked(
-        List.of(
-            buildUnitDelete(user, skuItem.getSkuId(), unitItem.getSequenceNumber()),
-            buildUnitPut(movedUnit),
-            buildSkuDirtyUpdate(user, skuItem.getSkuId()),
-            buildSkuUpsert(targetSku),
-            buildAuditPut(
-                user,
-                "adjustment",
-                Map.of(
-                    SkuItem.SKU_ID,
-                    AttributeValue.builder().s(skuItem.getSkuId()).build(),
-                    UnitItem.SEQUENCE_NUMBER,
-                    AttributeValue.builder()
-                        .n(String.valueOf(unitItem.getSequenceNumber()))
-                        .build()))));
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                List.of(
+                    buildUnitDelete(user, skuItem.getSkuId(), unitItem.getSequenceNumber()),
+                    buildUnitPut(movedUnit),
+                    buildSkuDirtyUpdate(user, skuItem.getSkuId()),
+                    buildSkuUpsert(targetSku),
+                    buildAuditPut(
+                        user,
+                        "adjustment",
+                        Map.of(
+                            SkuItem.SKU_ID,
+                            AttributeValue.builder().s(skuItem.getSkuId()).build(),
+                            UnitItem.SEQUENCE_NUMBER,
+                            AttributeValue.builder()
+                                .n(String.valueOf(unitItem.getSequenceNumber()))
+                                .build(),
+                            AuditItem.BEFORE_STATUS,
+                            AttributeValue.builder().s("in_stock").build(),
+                            AuditItem.AFTER_STATUS,
+                            AttributeValue.builder().s("in_stock").build(),
+                            AuditItem.TARGET_SKU_ID,
+                            AttributeValue.builder().s(targetSkuId).build()))))
+            .build());
 
     return targetSkuId;
   }
@@ -373,6 +387,8 @@ public class InventoryRepository {
             Put.builder()
                 .tableName(TcgInventoryTable.TABLE_NAME)
                 .item(unitTable.tableSchema().itemToMap(unitItem, true))
+                // preserve the existing unit if data already occupies this destination key.
+                .conditionExpression("attribute_not_exists(pk)")
                 .build())
         .build();
   }

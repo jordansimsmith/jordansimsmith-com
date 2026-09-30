@@ -58,6 +58,11 @@ public class RemoveUnitHandler
 
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
     var user = requestContextFactory.createCtx(event).user();
+    // avoid inventory writes while a background job can change the same units.
+    if (activeJob.exists(user)) {
+      return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
+    }
+
     // api gateway rest proxy integrations pass path parameters still url-encoded
     var skuId = URLDecoder.decode(event.getPathParameters().get("sku_id"), StandardCharsets.UTF_8);
     var sequenceNumber = Integer.parseInt(event.getPathParameters().get("sequence_number"));
@@ -74,11 +79,6 @@ public class RemoveUnitHandler
 
     if (!"in_stock".equals(unitItem.getStatus())) {
       return httpResponseFactory.conflict(new ErrorResponse("unit is not in stock"));
-    }
-
-    // keep inventory consistent while a background job is running.
-    if (activeJob.exists(user)) {
-      return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
     }
 
     inventoryRepository.removeUnit(user, skuId, sequenceNumber, reason);
