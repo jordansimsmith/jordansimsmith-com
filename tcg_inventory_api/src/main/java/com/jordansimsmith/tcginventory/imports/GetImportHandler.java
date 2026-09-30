@@ -11,6 +11,8 @@ import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
+import com.jordansimsmith.tcginventory.inventory.InventoryLocation;
+import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
@@ -54,7 +56,18 @@ public class GetImportHandler
       @JsonProperty("appraisal_error") @Nullable String appraisalError,
       @JsonProperty("created_at") long createdAt,
       @JsonProperty("total_suggested_price") String totalSuggestedPrice,
+      @JsonProperty("unit_count") @Nullable Integer unitCount,
+      @JsonProperty("placement_instructions") @Nullable
+          List<PlacementInstruction> placementInstructions,
       @JsonProperty("rows") List<ImportRowResponse> rows) {}
+
+  record PlacementInstruction(
+      @JsonProperty("block") String block,
+      @JsonProperty("from_location") String fromLocation,
+      @JsonProperty("to_location") String toLocation,
+      @JsonProperty("from_name") String fromName,
+      @JsonProperty("to_name") String toName,
+      @JsonProperty("unit_count") int unitCount) {}
 
   record ErrorResponse(@JsonProperty("message") String message) {}
 
@@ -114,6 +127,7 @@ public class GetImportHandler
         QueryEnhancedRequest.builder()
             .queryConditional(rowQueryConditional)
             .scanIndexForward(true)
+            .consistentRead(true)
             .build();
 
     var rowItems =
@@ -144,6 +158,14 @@ public class GetImportHandler
                             item.getPhotos() == null ? 0 : item.getPhotos().size())))
             .toList();
 
+    List<PlacementInstruction> placementInstructions = null;
+    Integer unitCount = null;
+    if ("confirmed".equals(importItem.getStatus())) {
+      var keepRows = rowItems.stream().filter(row -> "keep".equals(row.getDecision())).toList();
+      unitCount = keepRows.size();
+      placementInstructions = buildPlacementInstructions(keepRows);
+    }
+
     return httpResponseFactory.ok(
         new ImportDetailResponse(
             importItem.getImportId(),
@@ -154,7 +176,47 @@ public class GetImportHandler
             importItem.getError(),
             importItem.getCreatedAt() != null ? importItem.getCreatedAt().getEpochSecond() : 0,
             ImportRows.totalSuggestedPrice(rowItems),
+            unitCount,
+            placementInstructions,
             rows));
+  }
+
+  private List<PlacementInstruction> buildPlacementInstructions(List<ImportRowItem> keepRows) {
+    var instructions = new ArrayList<PlacementInstruction>();
+    if (keepRows.isEmpty()) {
+      return instructions;
+    }
+
+    int currentBlockNumber = keepRows.get(0).getSequenceNumber() / 100;
+    int blockStartIndex = 0;
+    for (int index = 0; index < keepRows.size(); index++) {
+      int blockNumber = keepRows.get(index).getSequenceNumber() / 100;
+      if (blockNumber != currentBlockNumber) {
+        instructions.add(
+            buildPlacementInstruction(keepRows, blockStartIndex, index - 1, currentBlockNumber));
+        currentBlockNumber = blockNumber;
+        blockStartIndex = index;
+      }
+    }
+    instructions.add(
+        buildPlacementInstruction(
+            keepRows, blockStartIndex, keepRows.size() - 1, currentBlockNumber));
+    return List.copyOf(instructions);
+  }
+
+  private PlacementInstruction buildPlacementInstruction(
+      List<ImportRowItem> rows, int startIndex, int endIndex, int blockNumber) {
+    var firstRow = rows.get(startIndex);
+    var lastRow = rows.get(endIndex);
+    int firstSequenceNumber = firstRow.getSequenceNumber();
+    int lastSequenceNumber = lastRow.getSequenceNumber();
+    return new PlacementInstruction(
+        InventoryLocation.formatBlock(blockNumber),
+        InventoryLocation.formatLocation(firstSequenceNumber),
+        InventoryLocation.formatLocation(lastSequenceNumber),
+        firstRow.getName(),
+        lastRow.getName(),
+        endIndex - startIndex + 1);
   }
 
   private List<PhotoResponse> toPhotoResponses(String user, List<ImportRowItem.Photo> photos) {

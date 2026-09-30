@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.tcginventory.imports.AppraiseJobProcessor;
+import com.jordansimsmith.tcginventory.imports.ImportConfirmationJobProcessor;
 import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
 import com.jordansimsmith.tcginventory.reports.ReportJobProcessor;
 import com.jordansimsmith.tcginventory.scans.ScanConfirmationJobProcessor;
@@ -28,6 +29,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
   private final JobProcessor publishJobProcessor;
   private final JobProcessor reportJobProcessor;
   private final JobProcessor scanConfirmationJobProcessor;
+  private final JobProcessor importConfirmationJobProcessor;
 
   public JobsHandler() {
     this(TcgInventoryFactory.create());
@@ -43,6 +45,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     this.publishJobProcessor = new PublishJobProcessor(factory);
     this.reportJobProcessor = new ReportJobProcessor(factory);
     this.scanConfirmationJobProcessor = new ScanConfirmationJobProcessor(factory);
+    this.importConfirmationJobProcessor = new ImportConfirmationJobProcessor(factory);
   }
 
   @Override
@@ -136,6 +139,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
       case "publish" -> publishJobProcessor;
       case "report" -> reportJobProcessor;
       case "scan_confirmation" -> scanConfirmationJobProcessor;
+      case "import_confirmation" -> importConfirmationJobProcessor;
       default -> throw new IllegalArgumentException("unknown job type: " + jobType);
     };
   }

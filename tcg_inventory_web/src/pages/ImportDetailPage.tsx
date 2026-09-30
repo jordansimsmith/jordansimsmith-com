@@ -24,11 +24,7 @@ import { ConfirmImportModal } from '../components/ConfirmImportModal';
 import { DeleteImportModal } from '../components/DeleteImportModal';
 import { PlacementInstructionsView } from '../components/PlacementInstructionsView';
 import { apiClient } from '../api/client';
-import type {
-  Condition,
-  ConfirmImportResponse,
-  ImportDetail,
-} from '../api/client';
+import type { Condition, ImportDetail } from '../api/client';
 import { encodeListingPhoto } from '../domain/encode-listing-photo';
 import { useGames } from '../GamesProvider';
 import { importDisplayName } from '../domain/import-display-name';
@@ -43,10 +39,9 @@ export function ImportDetailPage() {
   const [importDetail, setImportDetail] = useState<ImportDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pollingImport, setPollingImport] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
-  const [confirmResult, setConfirmResult] =
-    useState<ConfirmImportResponse | null>(null);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const importDetailRef = useRef(importDetail);
@@ -56,17 +51,14 @@ export function ImportDetailPage() {
   const showReview =
     importDetail !== null &&
     importDetail.status !== 'appraising' &&
-    !importDetail.appraisal_error &&
-    confirmResult === null;
+    !importDetail.appraisal_error;
 
   useEffect(() => {
     if (!importId) {
       return;
     }
     let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
-    const poll = async () => {
+    const loadImport = async () => {
       try {
         const response = await apiClient.getImport(importId);
         if (cancelled) {
@@ -74,8 +66,11 @@ export function ImportDetailPage() {
         }
         setImportDetail(response);
         setError(null);
-        if (response.status === 'appraising' && !response.appraisal_error) {
-          timer = setTimeout(poll, POLL_INTERVAL_MS);
+        if (
+          (response.status === 'appraising' && !response.appraisal_error) ||
+          response.status === 'confirming'
+        ) {
+          setPollingImport(true);
         }
       } catch (e) {
         if (cancelled) {
@@ -89,19 +84,59 @@ export function ImportDetailPage() {
       }
     };
 
-    poll();
+    void loadImport();
+    return () => {
+      cancelled = true;
+    };
+  }, [importId]);
+
+  useEffect(() => {
+    if (!importId || !pollingImport) {
+      return;
+    }
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+
+    const pollImport = async () => {
+      try {
+        const response = await apiClient.getImport(importId);
+        if (cancelled) {
+          return;
+        }
+        setImportDetail(response);
+        setError(null);
+        if (
+          (response.status === 'appraising' && !response.appraisal_error) ||
+          response.status === 'confirming'
+        ) {
+          timer = setTimeout(pollImport, POLL_INTERVAL_MS);
+        } else {
+          setPollingImport(false);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setError(e instanceof Error ? e.message : 'Failed to load import');
+          timer = setTimeout(pollImport, POLL_INTERVAL_MS);
+        }
+      }
+    };
+
+    timer = setTimeout(pollImport, POLL_INTERVAL_MS);
     return () => {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [importId]);
+  }, [importId, pollingImport]);
 
   useEffect(() => {
     const handleVisibilityChange = async () => {
       if (document.visibilityState !== 'visible' || !importId) {
         return;
       }
-      if (importDetailRef.current?.status !== 'review') {
+      if (
+        importDetailRef.current?.status !== 'review' &&
+        importDetailRef.current?.status !== 'confirming'
+      ) {
         return;
       }
       try {
@@ -206,12 +241,12 @@ export function ImportDetailPage() {
     }
     setConfirming(true);
     try {
-      const response = await apiClient.confirmImport(importId);
-      setConfirmResult(response);
+      await apiClient.confirmImport(importId);
       setConfirmOpen(false);
       setImportDetail((current) =>
-        current ? { ...current, status: response.status } : current,
+        current ? { ...current, status: 'confirming' } : current,
       );
+      setPollingImport(true);
     } catch (e) {
       const message =
         e instanceof Error ? e.message : 'Failed to confirm import';
@@ -247,7 +282,7 @@ export function ImportDetailPage() {
   return (
     <AppShellLayout>
       <Stack gap="lg">
-        {loading && (
+        {loading && !importDetail && (
           <>
             <Stack gap="xs">
               <Skeleton height={29} width={280} />
@@ -267,7 +302,7 @@ export function ImportDetailPage() {
             </Paper>
           </>
         )}
-        {!loading && error && (
+        {!loading && error && !importDetail && (
           <Stack align="flex-start" gap="md">
             <Text c="red">{error}</Text>
             <Button variant="default" onClick={() => navigate('/imports')}>
@@ -275,7 +310,12 @@ export function ImportDetailPage() {
             </Button>
           </Stack>
         )}
-        {!loading && !error && importDetail && (
+        {!loading && error && importDetail && (
+          <Text c="red" role="alert">
+            {error}
+          </Text>
+        )}
+        {!loading && importDetail && (
           <>
             <PageHeader
               title={importDisplayName(importDetail.filename)}
@@ -326,6 +366,17 @@ export function ImportDetailPage() {
                       />
                     </Stack>
                   )}
+                {importDetail.status === 'confirming' && (
+                  <Stack gap="xs">
+                    <Text size="sm">Confirming import</Text>
+                    <Progress
+                      value={100}
+                      animated
+                      striped
+                      aria-label="Import confirmation progress"
+                    />
+                  </Stack>
+                )}
                 <Group gap="sm">
                   <Badge variant="light" color="green">
                     Keep {keepCount}
@@ -336,12 +387,6 @@ export function ImportDetailPage() {
                   <Badge variant="light" color="yellow">
                     Review {reviewCount}
                   </Badge>
-                  {importDetail.status === 'confirmed' &&
-                    confirmResult === null && (
-                      <Text size="sm" c="dimmed" className={classes.numeric}>
-                        {`Total suggested value $${importDetail.total_suggested_price}`}
-                      </Text>
-                    )}
                 </Group>
                 {importDetail.status === 'review' && needsPhotosCount > 0 && (
                   <Text size="sm" c="orange.8">
@@ -404,12 +449,16 @@ export function ImportDetailPage() {
                 )}
               </CollectionSurface>
             )}
-            {confirmResult && (
-              <PlacementInstructionsView
-                result={confirmResult}
-                onDone={() => navigate('/imports')}
-              />
-            )}
+            {importDetail.status === 'confirmed' &&
+              importDetail.unit_count !== null &&
+              importDetail.placement_instructions !== null && (
+                <PlacementInstructionsView
+                  unitCount={importDetail.unit_count}
+                  totalSuggestedPrice={importDetail.total_suggested_price}
+                  placementInstructions={importDetail.placement_instructions}
+                  onDone={() => navigate('/imports')}
+                />
+              )}
             <ConfirmImportModal
               opened={confirmOpen}
               keepCount={keepCount}

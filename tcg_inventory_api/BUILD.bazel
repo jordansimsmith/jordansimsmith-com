@@ -161,6 +161,7 @@ java_library(
     ),
     deps = [
         ":fetchtcg-lib",
+        ":inventory-lib",
         ":lib",
     ] + COMMON_DEPS,
 )
@@ -419,6 +420,7 @@ java_binary(
     ],
     deps = [
         ":import-lib",
+        ":inventory-lib",
         ":lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
@@ -644,7 +646,9 @@ java_binary(
         ":inventory-lib",
         ":lib",
         "//lib/http:lib",
+        "//lib/queue:lib",
         "//lib/time:lib",
+        "//lib/ulid:lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -653,6 +657,7 @@ java_binary(
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
         "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
     ],
 )

@@ -82,6 +82,24 @@ describe('http client imports', () => {
     expect(init.body).toBe('csv body');
     expect(json).toHaveBeenCalledTimes(1);
   });
+
+  it('accepts an import without parsing a confirmation response body', async () => {
+    const json = vi.fn();
+    fetchSpy.mockResolvedValue({ ok: true, status: 202, json });
+
+    await expect(
+      createHttpClient().confirmImport('import-1'),
+    ).resolves.toBeUndefined();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/imports/import-1/confirm',
+    );
+    expect(init.method).toBe('POST');
+    expect(init.headers.Authorization).toBe(`Basic ${btoa('alice:pw')}`);
+    expect(json).not.toHaveBeenCalled();
+  });
 });
 
 describe('http client catalog', () => {

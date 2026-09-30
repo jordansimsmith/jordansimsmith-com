@@ -1,30 +1,31 @@
 import { Button, Group, Paper, Stack, Text, Title } from '@mantine/core';
-import type { ConfirmImportResponse } from '../api/client';
+import type { PlacementInstruction } from '../api/client';
 
 interface PlacementInstructionsViewProps {
-  result: ConfirmImportResponse;
+  unitCount: number;
+  totalSuggestedPrice: string;
+  placementInstructions: PlacementInstruction[];
   onDone: () => void;
 }
 
 export function PlacementInstructionsView({
-  result,
+  unitCount,
+  totalSuggestedPrice,
+  placementInstructions,
   onDone,
 }: PlacementInstructionsViewProps) {
   return (
     <Stack gap="md" maw={480}>
       <Title order={3}>Placement instructions</Title>
-      {result.unit_count === 0 ? (
+      {unitCount === 0 ? (
         <Text>No cards to place — the import had no keep rows.</Text>
       ) : (
         <>
           <Text size="lg">
-            Place {result.unit_count}{' '}
-            {result.unit_count === 1 ? 'card' : 'cards'}:
+            Place {unitCount} {unitCount === 1 ? 'card' : 'cards'}:
           </Text>
-          <Text c="dimmed">
-            Total suggested value ${result.total_suggested_price}
-          </Text>
-          {result.placement_instructions.map((instruction) => (
+          <Text c="dimmed">Total suggested value ${totalSuggestedPrice}</Text>
+          {placementInstructions.map((instruction) => (
             <Paper key={instruction.block} withBorder p="lg" radius="md">
               <Group justify="space-between" align="baseline">
                 <Text fz={36} fw={700}>

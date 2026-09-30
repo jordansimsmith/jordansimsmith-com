@@ -4,7 +4,7 @@ import type { ImportStatus, ImportSummary } from '../api/client';
 const STATUS_COLORS: Record<ImportStatus, string> = {
   appraising: 'blue',
   review: 'yellow',
-  confirming: 'orange',
+  confirming: 'blue',
   confirmed: 'green',
 };
 

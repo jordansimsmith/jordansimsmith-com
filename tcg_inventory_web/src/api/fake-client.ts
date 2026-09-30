@@ -5,7 +5,6 @@ import type {
   CatalogCardsResponse,
   Condition,
   ConfirmScanRequest,
-  ConfirmImportResponse,
   ConfirmOrderResponse,
   CreateScanRequest,
   CreateScanResponse,
@@ -443,6 +442,7 @@ interface FakeImportRow {
   market_price: string | null;
   suggested_price: string | null;
   photos: RowPhoto[];
+  sequence_number?: number;
 }
 
 type FakeUploadRow = Omit<
@@ -533,6 +533,7 @@ interface FakeImport {
   status: ImportStatus;
   rows: FakeImportRow[];
   created_at_ms: number;
+  confirmation_poll_count?: number;
 }
 
 function createSeedImportRows(count: number): FakeImportRow[] {
@@ -737,11 +738,59 @@ function totalSuggestedPrice(importRecord: FakeImport): string {
   return (totalCents / 100).toFixed(2);
 }
 
+function buildPlacementInstructions(
+  importRecord: FakeImport,
+): PlacementInstruction[] {
+  const keepRows = importRecord.rows
+    .filter((row) => row.decision === 'keep')
+    .sort((first, second) => {
+      const firstSequenceNumber = first.sequence_number ?? -first.position;
+      const secondSequenceNumber = second.sequence_number ?? -second.position;
+      return firstSequenceNumber - secondSequenceNumber;
+    });
+  const instructions: PlacementInstruction[] = [];
+  let index = 0;
+  while (index < keepRows.length) {
+    const firstRow = keepRows[index];
+    const firstSequenceNumber = firstRow.sequence_number ?? index;
+    const block = Math.floor(firstSequenceNumber / 100);
+    let endIndex = index;
+    while (endIndex + 1 < keepRows.length) {
+      const nextRow = keepRows[endIndex + 1];
+      const nextSequenceNumber = nextRow.sequence_number ?? endIndex + 1;
+      if (Math.floor(nextSequenceNumber / 100) !== block) {
+        break;
+      }
+      endIndex += 1;
+    }
+    const lastRow = keepRows[endIndex];
+    const lastSequenceNumber = lastRow.sequence_number ?? endIndex;
+    instructions.push({
+      block: deriveBlock(block * 100),
+      from_location: deriveLocation(firstSequenceNumber),
+      to_location: deriveLocation(lastSequenceNumber),
+      from_name: firstRow.name,
+      to_name: lastRow.name,
+      unit_count: endIndex - index + 1,
+    });
+    index = endIndex + 1;
+  }
+  return instructions;
+}
+
 function toImportDetail(importRecord: FakeImport): ImportDetail {
   const appraised = appraisedCount(importRecord);
+  const confirmed = importRecord.status === 'confirmed';
+  const keepCount = importRecord.rows.filter(
+    (row) => row.decision === 'keep',
+  ).length;
   return {
     ...toImportSummary(importRecord),
     total_suggested_price: totalSuggestedPrice(importRecord),
+    unit_count: confirmed ? keepCount : null,
+    placement_instructions: confirmed
+      ? buildPlacementInstructions(importRecord)
+      : null,
     rows: importRecord.rows.map((row, index) =>
       toImportRow(row, index < appraised),
     ),
@@ -1577,6 +1626,61 @@ export function createFakeClient(): ApiClient {
     return importRecord;
   };
 
+  const progressImportConfirmation = (importRecord: FakeImport): void => {
+    if (importRecord.status !== 'confirming') {
+      return;
+    }
+    if ((importRecord.confirmation_poll_count ?? 0) === 0) {
+      importRecord.confirmation_poll_count = 1;
+      return;
+    }
+
+    const keepRows = [...importRecord.rows]
+      .sort((first, second) => second.position - first.position)
+      .filter((row) => row.decision === 'keep');
+    for (const row of keepRows) {
+      const sequenceNumber = nextSequenceNumberByGame.get(importRecord.game);
+      if (sequenceNumber === undefined) {
+        throw new Error(`Unsupported game: ${importRecord.game}`);
+      }
+      nextSequenceNumberByGame.set(importRecord.game, sequenceNumber + 1);
+      row.sequence_number = sequenceNumber;
+      let sku = skus.find(
+        (candidate) =>
+          candidate.game === importRecord.game &&
+          candidate.external_source === row.external_source &&
+          candidate.external_id === row.external_id &&
+          candidate.finish === row.finish &&
+          candidate.condition === row.condition,
+      );
+      if (!sku) {
+        sku = {
+          sku_id: crypto.randomUUID(),
+          game: importRecord.game,
+          external_source: row.external_source,
+          external_id: row.external_id,
+          name: row.name,
+          set_code: row.set_code,
+          set_name: row.set_name,
+          collector_number: row.collector_number,
+          finish: row.finish,
+          condition: row.condition,
+          last_published_price: null,
+          units: [],
+        };
+        skus.push(sku);
+      }
+      sku.units.push({
+        sequence_number: sequenceNumber,
+        status: 'in_stock',
+        photos: row.photos.map((photo) => ({ ...photo })),
+      });
+      dirtySkuIds.add(sku.sku_id);
+    }
+    importRecord.status = 'confirmed';
+    reportStale = true;
+  };
+
   const getScanOrThrow = (scanId: string): FakeScan => {
     const scan = scans.find((candidate) => candidate.scan_id === scanId);
     if (!scan) {
@@ -1667,13 +1771,16 @@ export function createFakeClient(): ApiClient {
         .sort((a, b) => b.created_at_ms - a.created_at_ms)
         .map((importRecord) => {
           progressAppraisal(importRecord);
+          progressImportConfirmation(importRecord);
           return toImportSummary(importRecord);
         });
       return { imports: summaries, next_continuation: null };
     },
 
     async getImport(importId: string): Promise<ImportDetail> {
-      return toImportDetail(getImportOrThrow(importId));
+      const importRecord = getImportOrThrow(importId);
+      progressImportConfirmation(importRecord);
+      return toImportDetail(importRecord);
     },
 
     async updateImportRow(
@@ -1763,95 +1870,23 @@ export function createFakeClient(): ApiClient {
       importRecords.splice(index, 1);
     },
 
-    async confirmImport(importId: string): Promise<ConfirmImportResponse> {
+    async confirmImport(importId: string): Promise<void> {
       const importRecord = getImportOrThrow(importId);
+      if (
+        importRecord.status === 'confirming' ||
+        importRecord.status === 'confirmed'
+      ) {
+        return;
+      }
       if (importRecord.status !== 'review') {
         throw new Error('import is not in review status');
       }
-      // sequence numbers are assigned bottom-up, the reverse of review order
-      const keepRows = [...importRecord.rows]
-        .sort((a, b) => b.position - a.position)
-        .filter((row) => row.decision === 'keep');
-      const sequenceNumbers: number[] = [];
-      for (const row of keepRows) {
-        const sequenceNumber = nextSequenceNumberByGame.get(importRecord.game);
-        if (sequenceNumber === undefined) {
-          throw new Error(`Unsupported game: ${importRecord.game}`);
-        }
-        nextSequenceNumberByGame.set(importRecord.game, sequenceNumber + 1);
-        let sku = skus.find(
-          (candidate) =>
-            candidate.game === importRecord.game &&
-            candidate.external_source === row.external_source &&
-            candidate.external_id === row.external_id &&
-            candidate.finish === row.finish &&
-            candidate.condition === row.condition,
-        );
-        if (!sku) {
-          sku = {
-            sku_id: crypto.randomUUID(),
-            game: importRecord.game,
-            external_source: row.external_source,
-            external_id: row.external_id,
-            name: row.name,
-            set_code: row.set_code,
-            set_name: row.set_name,
-            collector_number: row.collector_number,
-            finish: row.finish,
-            condition: row.condition,
-            last_published_price: null,
-            units: [],
-          };
-          skus.push(sku);
-        }
-        sku.units.push({
-          sequence_number: sequenceNumber,
-          status: 'in_stock',
-          photos: row.photos.map((photo) => ({ ...photo })),
-        });
-        dirtySkuIds.add(sku.sku_id);
-        sequenceNumbers.push(sequenceNumber);
+      const rowsNeedingPhotos = importRecord.rows.filter(needsPhotos).length;
+      if (rowsNeedingPhotos > 0) {
+        throw new Error(`${rowsNeedingPhotos} rows need photos before confirm`);
       }
-      importRecord.status = 'confirmed';
-      reportStale = true;
-
-      const first = sequenceNumbers.length > 0 ? sequenceNumbers[0] : null;
-      const last =
-        sequenceNumbers.length > 0
-          ? sequenceNumbers[sequenceNumbers.length - 1]
-          : null;
-      const placementInstructions: PlacementInstruction[] = [];
-      if (first !== null && last !== null) {
-        let from = first;
-        while (from <= last) {
-          const to = Math.min(Math.floor(from / 100) * 100 + 99, last);
-          placementInstructions.push({
-            block: deriveBlock(from),
-            from_location: deriveLocation(from),
-            to_location: deriveLocation(to),
-            // keepRows[i] received sequence number first + i
-            from_name: keepRows[from - first].name,
-            to_name: keepRows[to - first].name,
-            unit_count: to - from + 1,
-          });
-          from = to + 1;
-        }
-      }
-
-      const totalSuggestedCents = keepRows.reduce(
-        (sum, row) => sum + Math.round(Number(row.suggested_price) * 100),
-        0,
-      );
-
-      return {
-        import_id: importRecord.import_id,
-        status: importRecord.status,
-        unit_count: sequenceNumbers.length,
-        total_suggested_price: (totalSuggestedCents / 100).toFixed(2),
-        first_sequence_number: first,
-        last_sequence_number: last,
-        placement_instructions: placementInstructions,
-      };
+      importRecord.status = 'confirming';
+      importRecord.confirmation_poll_count = 0;
     },
 
     async createScan(request: CreateScanRequest): Promise<CreateScanResponse> {

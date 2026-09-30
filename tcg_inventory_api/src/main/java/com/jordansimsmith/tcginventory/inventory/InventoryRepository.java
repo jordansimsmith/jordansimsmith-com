@@ -180,13 +180,11 @@ public class InventoryRepository {
                 .returnValues("ALL_NEW")
                 .build());
 
-    int newValue =
+    var newValue =
         Integer.parseInt(response.attributes().get(SequenceCounterItem.NEXT_SEQUENCE_NUMBER).n());
     return newValue - count;
   }
 
-  // deliberately a single transaction rather than a chunked sequence: a replayed chunk fails its
-  // unit-exists condition and the whole transaction cancels atomically into a no-op
   public void confirmImportSku(
       String user, String importId, SkuItem skuSeed, List<UnitItem> units) {
     var transactItems = new ArrayList<TransactWriteItem>();
@@ -217,7 +215,22 @@ public class InventoryRepository {
       dynamoDbClient.transactWriteItems(
           TransactWriteItemsRequest.builder().transactItems(transactItems).build());
     } catch (TransactionCanceledException e) {
-      LOGGER.info("transaction cancelled for SKU chunk {} (likely replay)", skuSeed.getSkuId());
+      for (var unit : units) {
+        var existingUnit =
+            unitTable.getItem(
+                request ->
+                    request
+                        .key(
+                            Key.builder()
+                                .partitionValue(unit.getPk())
+                                .sortValue(unit.getSk())
+                                .build())
+                        .consistentRead(true));
+        if (existingUnit == null || !importId.equals(existingUnit.getImportId())) {
+          throw e;
+        }
+      }
+      LOGGER.info("transaction cancelled for SKU chunk {} (replay)", skuSeed.getSkuId());
     }
   }
 

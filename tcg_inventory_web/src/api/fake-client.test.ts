@@ -387,26 +387,38 @@ describe('createFakeClient imports', () => {
 
     vi.advanceTimersByTime(60_000);
     await client.confirmImport(created.import_id);
-    await expect(client.confirmImport(created.import_id)).rejects.toThrow(
-      'import is not in review status',
+    await expect(
+      client.confirmImport(created.import_id),
+    ).resolves.toBeUndefined();
+    expect((await client.getImport(created.import_id)).status).toBe(
+      'confirming',
     );
+    expect((await client.getImport(created.import_id)).status).toBe(
+      'confirmed',
+    );
+    await expect(
+      client.confirmImport(created.import_id),
+    ).resolves.toBeUndefined();
   });
 
-  it('confirms keep rows bottom-up into inventory and skips review rows', async () => {
+  it('confirms keep rows asynchronously into inventory and skips review rows', async () => {
     vi.useFakeTimers();
     const client = createFakeClient();
     const created = await client.createImport('mtg', 'bulk.csv', UPLOAD_BODY);
     vi.advanceTimersByTime(60_000);
 
-    const response = await client.confirmImport(created.import_id);
+    await expect(
+      client.confirmImport(created.import_id),
+    ).resolves.toBeUndefined();
+    const confirming = await client.getImport(created.import_id);
+    expect(confirming.status).toBe('confirming');
+    expect(confirming.placement_instructions).toBeNull();
 
-    expect(response.import_id).toBe(created.import_id);
-    expect(response.status).toBe('confirmed');
-    expect(response.unit_count).toBe(3);
-    expect(response.total_suggested_price).toBe('9.00');
-    expect(response.first_sequence_number).toBe(600);
-    expect(response.last_sequence_number).toBe(602);
-    expect(response.placement_instructions).toEqual([
+    const detail = await client.getImport(created.import_id);
+    expect(detail.status).toBe('confirmed');
+    expect(detail.unit_count).toBe(3);
+    expect(detail.total_suggested_price).toBe('9.00');
+    expect(detail.placement_instructions).toEqual([
       {
         block: 'A6',
         from_location: 'A6-0',
@@ -461,16 +473,15 @@ describe('createFakeClient imports', () => {
       ),
     ).toBe(false);
 
-    const detail = await client.getImport(created.import_id);
-    expect(detail.status).toBe('confirmed');
-    expect(detail.total_suggested_price).toBe('9.00');
+    const refreshedDetail = await client.getImport(created.import_id);
+    expect(refreshedDetail.status).toBe('confirmed');
+    expect(refreshedDetail.total_suggested_price).toBe('9.00');
   });
 
   it('splits placement instructions at block boundaries', async () => {
     vi.useFakeTimers();
     const client = createFakeClient();
-    let response: Awaited<ReturnType<typeof client.confirmImport>> | null =
-      null;
+    let detail: Awaited<ReturnType<typeof client.getImport>> | null = null;
     for (let importNumber = 0; importNumber < 34; importNumber += 1) {
       const created = await client.createImport(
         'mtg',
@@ -478,18 +489,18 @@ describe('createFakeClient imports', () => {
         UPLOAD_BODY,
       );
       vi.advanceTimersByTime(60_000);
-      response = await client.confirmImport(created.import_id);
+      await client.confirmImport(created.import_id);
+      await client.getImport(created.import_id);
+      detail = await client.getImport(created.import_id);
     }
 
-    expect(response?.unit_count).toBe(3);
-    expect(response?.first_sequence_number).toBe(699);
-    expect(response?.last_sequence_number).toBe(701);
-    expect(response?.placement_instructions.map(({ block }) => block)).toEqual([
+    expect(detail?.unit_count).toBe(3);
+    expect(detail?.placement_instructions?.map(({ block }) => block)).toEqual([
       'A6',
       'A7',
     ]);
     expect(
-      response?.placement_instructions.map(({ unit_count }) => unit_count),
+      detail?.placement_instructions?.map(({ unit_count }) => unit_count),
     ).toEqual([1, 2]);
   });
 
@@ -501,13 +512,13 @@ describe('createFakeClient imports', () => {
       await client.deleteImportRow(importId, row.position);
     }
 
-    const response = await client.confirmImport(importId);
+    await client.confirmImport(importId);
+    await client.getImport(importId);
+    const confirmed = await client.getImport(importId);
 
-    expect(response.unit_count).toBe(0);
-    expect(response.total_suggested_price).toBe('0.00');
-    expect(response.first_sequence_number).toBeNull();
-    expect(response.last_sequence_number).toBeNull();
-    expect(response.placement_instructions).toEqual([]);
+    expect(confirmed.unit_count).toBe(0);
+    expect(confirmed.total_suggested_price).toBe('0.00');
+    expect(confirmed.placement_instructions).toEqual([]);
   });
 });
 
@@ -1066,6 +1077,8 @@ describe('createFakeClient publish', () => {
     await drainPublish(client);
 
     await client.confirmImport('fake-import-2');
+    await client.getImport('fake-import-2');
+    await client.getImport('fake-import-2');
 
     const response = await client.getPublish();
     expect(response.pending_sku_count).toBeGreaterThan(0);

@@ -138,11 +138,6 @@ export interface ImportRow {
   needs_photos: boolean;
 }
 
-export interface ImportDetail extends ImportSummary {
-  total_suggested_price: string;
-  rows: ImportRow[];
-}
-
 export interface PlacementInstruction {
   block: string;
   from_location: string;
@@ -152,14 +147,11 @@ export interface PlacementInstruction {
   unit_count: number;
 }
 
-export interface ConfirmImportResponse {
-  import_id: string;
-  status: ImportStatus;
-  unit_count: number;
+export interface ImportDetail extends ImportSummary {
   total_suggested_price: string;
-  first_sequence_number: number | null;
-  last_sequence_number: number | null;
-  placement_instructions: PlacementInstruction[];
+  unit_count: number | null;
+  placement_instructions: PlacementInstruction[] | null;
+  rows: ImportRow[];
 }
 
 export type ScanStatus =
@@ -491,7 +483,7 @@ export interface ApiClient {
     photoId: string,
   ): Promise<void>;
   deleteImport(importId: string): Promise<void>;
-  confirmImport(importId: string): Promise<ConfirmImportResponse>;
+  confirmImport(importId: string): Promise<void>;
   createScan(request: CreateScanRequest): Promise<CreateScanResponse>;
   findScans(params?: FindScansParams): Promise<FindScansResponse>;
   getScan(scanId: string): Promise<ScanDetail>;

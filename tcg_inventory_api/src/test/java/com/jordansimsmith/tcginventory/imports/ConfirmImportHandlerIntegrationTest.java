@@ -1,11 +1,13 @@
 package com.jordansimsmith.tcginventory.imports;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.inventory.SequenceCounterItem;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
@@ -39,8 +41,11 @@ public class ConfirmImportHandlerIntegrationTest {
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
   private DynamoDbTable<SequenceCounterItem> sequenceCounterTable;
+  private DynamoDbTable<JobItem> jobTable;
 
   private ConfirmImportHandler confirmImportHandler;
+  private GetImportHandler getImportHandler;
+  private ImportConfirmationJobProcessor importConfirmationJobProcessor;
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
@@ -67,11 +72,14 @@ public class ConfirmImportHandlerIntegrationTest {
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
     sequenceCounterTable = factory.sequenceCounterTable();
+    jobTable = factory.jobTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
 
     confirmImportHandler = new ConfirmImportHandler(factory);
+    getImportHandler = new GetImportHandler(factory);
+    importConfirmationJobProcessor = new ImportConfirmationJobProcessor(factory);
   }
 
   @Test
@@ -89,13 +97,24 @@ public class ConfirmImportHandlerIntegrationTest {
             buildEvent("jordan", Map.of("import_id", "import1")), null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    assertThat(response.getBody()).isNull();
+    assertThat(getImportItem("import1").getStatus()).isEqualTo("confirming");
+    var confirmingDetail =
+        objectMapper.readTree(
+            getImportHandler
+                .handleRequest(buildEvent("jordan", Map.of("import_id", "import1")), null)
+                .getBody());
+    assertThat(confirmingDetail.get("unit_count").isNull()).isTrue();
+    assertThat(confirmingDetail.get("placement_instructions").isNull()).isTrue();
+    processConfirmation("jordan", "import1");
+    processConfirmation("jordan", "import1");
+    var detailResponse =
+        getImportHandler.handleRequest(buildEvent("jordan", Map.of("import_id", "import1")), null);
+    var body = objectMapper.readTree(detailResponse.getBody());
     assertThat(body.get("status").asText()).isEqualTo("confirmed");
     assertThat(body.get("unit_count").asInt()).isEqualTo(3);
     assertThat(body.get("total_suggested_price").asText()).isEqualTo("4.50");
-    assertThat(body.get("first_sequence_number").asInt()).isEqualTo(0);
-    assertThat(body.get("last_sequence_number").asInt()).isEqualTo(2);
 
     var sku1Pk = SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     var unit0 =
@@ -161,7 +180,7 @@ public class ConfirmImportHandlerIntegrationTest {
   }
 
   @Test
-  void confirmShouldReturn409OnDoubleConfirm() throws Exception {
+  void confirmShouldReturn204WhenAlreadyConfirmed() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     var importItem =
@@ -176,7 +195,29 @@ public class ConfirmImportHandlerIntegrationTest {
             buildEvent("jordan", Map.of("import_id", "import1")), null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(409);
+    assertThat(response.getStatusCode()).isEqualTo(204);
+  }
+
+  @Test
+  void confirmShouldReturn202WithoutCreatingAnotherJobWhenAlreadyConfirming() {
+    // arrange
+    var importItem =
+        ImportItem.create(
+            "jordan", "mtg", "import1", null, 1, null, Instant.ofEpochSecond(1700000000));
+    importItem.setStatus("confirming");
+    importTable.putItem(importItem);
+
+    var jobCount = jobTable.scan().items().stream().count();
+
+    // act
+    var response =
+        confirmImportHandler.handleRequest(
+            buildEvent("jordan", Map.of("import_id", "import1")), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    assertThat(response.getBody()).isNull();
+    assertThat(jobTable.scan().items().stream().count()).isEqualTo(jobCount);
   }
 
   @Test
@@ -193,8 +234,11 @@ public class ConfirmImportHandlerIntegrationTest {
             buildEvent("jordan", Map.of("import_id", "import1")), null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    processConfirmation("jordan", "import1");
+    var detailResponse =
+        getImportHandler.handleRequest(buildEvent("jordan", Map.of("import_id", "import1")), null);
+    var body = objectMapper.readTree(detailResponse.getBody());
     assertThat(body.get("total_suggested_price").asText()).isEqualTo("3.00");
     var instructions = body.get("placement_instructions");
     assertThat(instructions).hasSize(1);
@@ -221,8 +265,13 @@ public class ConfirmImportHandlerIntegrationTest {
             buildEvent("jordan", Map.of("import_id", "import1")), null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    processConfirmation("jordan", "import1");
+    var body =
+        objectMapper.readTree(
+            getImportHandler
+                .handleRequest(buildEvent("jordan", Map.of("import_id", "import1")), null)
+                .getBody());
     assertThat(body.get("unit_count").asInt()).isEqualTo(1);
     assertThat(body.get("total_suggested_price").asText()).isEqualTo("1.50");
   }
@@ -243,8 +292,13 @@ public class ConfirmImportHandlerIntegrationTest {
             buildEvent("jordan", Map.of("import_id", "import1")), null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    processConfirmation("jordan", "import1");
+    var body =
+        objectMapper.readTree(
+            getImportHandler
+                .handleRequest(buildEvent("jordan", Map.of("import_id", "import1")), null)
+                .getBody());
     assertThat(body.get("unit_count").asInt()).isEqualTo(4);
     assertThat(body.get("total_suggested_price").asText()).isEqualTo("6.00");
 
@@ -257,7 +311,100 @@ public class ConfirmImportHandlerIntegrationTest {
   }
 
   @Test
-  void confirmShouldBeIdempotentOnReplay() throws Exception {
+  void confirmShouldChunkMoreThanOneHundredUnitsForOneSku() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createImportInReview("jordan", "import1", 200);
+    for (int position = 1; position <= 200; position++) {
+      createKeepRow(
+          "jordan", "import1", position, "scryfall-1", "normal", "NM", "Card " + position);
+    }
+
+    // act
+    var response =
+        confirmImportHandler.handleRequest(
+            buildEvent("jordan", Map.of("import_id", "import1")), null);
+    processConfirmation("jordan", "import1");
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
+        .isEqualTo(200);
+    assertThat(getImportItem("import1").getStatus()).isEqualTo("confirmed");
+  }
+
+  @Test
+  void confirmShouldReplayChunkWhenAllUnitsAlreadyBelongToImport() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    var importItem =
+        ImportItem.create(
+            "jordan", "mtg", "import1", null, 2, null, Instant.ofEpochSecond(1700000000));
+    importItem.setStatus("confirming");
+    importTable.putItem(importItem);
+    for (int position = 1; position <= 2; position++) {
+      var row =
+          ImportRowItem.create(
+              "jordan",
+              "import1",
+              position,
+              "Card " + position,
+              "dom",
+              "Dominaria",
+              String.valueOf(position),
+              "normal",
+              "NM",
+              "scryfall",
+              "scryfall-1",
+              "en");
+      row.setDecision("keep");
+      row.setSuggestedPrice("1.50");
+      row.setSequenceNumber(position - 1);
+      importRowTable.putItem(row);
+      unitTable.putItem(
+          UnitItem.create(
+              "jordan",
+              "mtg",
+              "mtg#scryfall#scryfall-1#normal#NM",
+              position - 1,
+              "in_stock",
+              "import1",
+              Instant.ofEpochSecond(1700000000)));
+    }
+    skuTable.putItem(
+        SkuItem.create(
+            "jordan",
+            "mtg#scryfall#scryfall-1#normal#NM",
+            "mtg",
+            "scryfall",
+            "scryfall-1",
+            "normal",
+            "NM",
+            "Card 1",
+            "dom",
+            "Dominaria",
+            "1",
+            null,
+            null));
+
+    // act
+    importConfirmationJobProcessor.processBatch(
+        "jordan",
+        JobItem.create(
+            "jordan",
+            "confirm-job",
+            "import_confirmation",
+            "import1",
+            Instant.ofEpochSecond(1700000000)));
+
+    // assert
+    assertThat(getImportItem("import1").getStatus()).isEqualTo("confirmed");
+    assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
+        .isEqualTo(2);
+  }
+
+  @Test
+  void confirmShouldKeepImportConfirmingWhenReplayChunkHasMissingUnit() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
@@ -343,10 +490,18 @@ public class ConfirmImportHandlerIntegrationTest {
             buildEvent("jordan", Map.of("import_id", "import1")), null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
-    assertThat(body.get("status").asText()).isEqualTo("confirmed");
-    assertThat(body.get("total_suggested_price").asText()).isEqualTo("3.00");
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    assertThatThrownBy(
+            () ->
+                importConfirmationJobProcessor.processBatch(
+                    "jordan",
+                    JobItem.create(
+                        "jordan",
+                        "confirm-job",
+                        "import_confirmation",
+                        "import1",
+                        Instant.ofEpochSecond(1700000000))))
+        .isInstanceOf(RuntimeException.class);
 
     var sku =
         skuTable.getItem(
@@ -362,7 +517,7 @@ public class ConfirmImportHandlerIntegrationTest {
                 .partitionValue(SkuItem.formatUserPk("jordan"))
                 .sortValue(ImportItem.formatSk("import1"))
                 .build());
-    assertThat(importResult.getStatus()).isEqualTo("confirmed");
+    assertThat(importResult.getStatus()).isEqualTo("confirming");
   }
 
   @Test
@@ -379,8 +534,13 @@ public class ConfirmImportHandlerIntegrationTest {
             buildEvent("jordan", Map.of("import_id", "import1")), null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    processConfirmation("jordan", "import1");
+    var body =
+        objectMapper.readTree(
+            getImportHandler
+                .handleRequest(buildEvent("jordan", Map.of("import_id", "import1")), null)
+                .getBody());
     assertThat(body.get("status").asText()).isEqualTo("confirmed");
     assertThat(body.get("unit_count").asInt()).isEqualTo(0);
     assertThat(body.get("total_suggested_price").asText()).isEqualTo("0.00");
@@ -473,8 +633,13 @@ public class ConfirmImportHandlerIntegrationTest {
             buildEvent("jordan", Map.of("import_id", "import1")), null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    processConfirmation("jordan", "import1");
+    var body =
+        objectMapper.readTree(
+            getImportHandler
+                .handleRequest(buildEvent("jordan", Map.of("import_id", "import1")), null)
+                .getBody());
     assertThat(body.get("status").asText()).isEqualTo("confirmed");
     assertThat(body.get("unit_count").asInt()).isEqualTo(3);
     assertThat(body.get("total_suggested_price").asText()).isEqualTo("46.50");
@@ -506,6 +671,37 @@ public class ConfirmImportHandlerIntegrationTest {
                 .build());
     assertThat(unitC.getPhotos()).hasSize(1);
     assertThat(unitC.getPhotos().get(0).getPhotoId()).isEqualTo("photo-c1");
+  }
+
+  private ImportItem getImportItem(String importId) {
+    return importTable.getItem(
+        Key.builder()
+            .partitionValue(ImportItem.formatPk("jordan"))
+            .sortValue(ImportItem.formatSk(importId))
+            .build());
+  }
+
+  private void processConfirmation(String user, String importId) {
+    var jobItem =
+        jobTable
+            .query(
+                QueryEnhancedRequest.builder()
+                    .queryConditional(
+                        QueryConditional.sortBeginsWith(
+                            Key.builder()
+                                .partitionValue(JobItem.formatPk(user))
+                                .sortValue(JobItem.JOB_PREFIX)
+                                .build()))
+                    .build())
+            .stream()
+            .flatMap(page -> page.items().stream())
+            .filter(
+                item ->
+                    "import_confirmation".equals(item.getJobType())
+                        && importId.equals(item.getImportId()))
+            .findFirst()
+            .orElseThrow();
+    importConfirmationJobProcessor.processBatch(user, jobItem);
   }
 
   private void createImportInReview(String user, String importId, int rowCount) {

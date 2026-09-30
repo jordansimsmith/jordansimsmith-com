@@ -227,10 +227,20 @@ public class TcgInventoryE2ETest {
 
     // act - confirm import
     var confirmResponse = post("/imports/" + importId + "/confirm");
-    assertThat(confirmResponse.statusCode()).isEqualTo(200);
-    var confirmBody = objectMapper.readTree(confirmResponse.body());
-    assertThat(confirmBody.get("status").asText()).isEqualTo("confirmed");
-    assertThat(confirmBody.get("unit_count").asInt()).isEqualTo(2);
+    assertThat(confirmResponse.statusCode()).isEqualTo(202);
+    await()
+        .atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(
+            () -> {
+              var pollResponse = get("/imports/" + importId);
+              assertThat(pollResponse.statusCode()).isEqualTo(200);
+              assertThat(objectMapper.readTree(pollResponse.body()).get("status").asText())
+                  .isEqualTo("confirmed");
+            });
+    var confirmedImport = objectMapper.readTree(get("/imports/" + importId).body());
+    assertThat(confirmedImport.get("unit_count").asInt()).isEqualTo(2);
+    assertThat(confirmedImport.get("placement_instructions")).hasSize(1);
 
     // assert - one sku with both units carrying photos
     var skusResponse = get("/skus?game=mtg");
@@ -444,7 +454,17 @@ public class TcgInventoryE2ETest {
             });
 
     var confirmResponse2 = post("/imports/" + importId2 + "/confirm");
-    assertThat(confirmResponse2.statusCode()).isEqualTo(200);
+    assertThat(confirmResponse2.statusCode()).isEqualTo(202);
+    await()
+        .atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(
+            () -> {
+              var pollResponse = get("/imports/" + importId2);
+              assertThat(pollResponse.statusCode()).isEqualTo(200);
+              assertThat(objectMapper.readTree(pollResponse.body()).get("status").asText())
+                  .isEqualTo("confirmed");
+            });
 
     // assert - report is now stale after mutation
     var staleReportResponse = get("/reports");

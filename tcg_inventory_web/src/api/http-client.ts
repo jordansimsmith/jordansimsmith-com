@@ -5,7 +5,6 @@ import type {
   ConfirmScanRequest,
   CreateScanRequest,
   CreateScanResponse,
-  ConfirmImportResponse,
   ConfirmOrderResponse,
   CatalogCard,
   CatalogCardsResponse,
@@ -180,12 +179,11 @@ export function createHttpClient(): ApiClient {
       });
     },
 
-    async confirmImport(importId: string): Promise<ConfirmImportResponse> {
-      const response = await authenticatedFetch(
+    async confirmImport(importId: string): Promise<void> {
+      await authenticatedFetch(
         `/imports/${encodeURIComponent(importId)}/confirm`,
         { method: 'POST' },
       );
-      return response.json();
     },
 
     async createScan(request: CreateScanRequest): Promise<CreateScanResponse> {

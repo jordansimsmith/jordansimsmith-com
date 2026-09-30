@@ -36,6 +36,7 @@ public class ScanConfirmationJobProcessor implements JobProcessor {
   private final Catalogs catalogs;
   private final DynamoDbTable<ImportItem> importTable;
   private final DynamoDbTable<ImportRowItem> importRowTable;
+  private final DynamoDbTable<JobItem> jobTable;
   private final QueueClient<JobMessage> jobsQueue;
   private final UlidGenerator ulidGenerator;
 
@@ -51,6 +52,7 @@ public class ScanConfirmationJobProcessor implements JobProcessor {
     this.importTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class);
     this.importRowTable =
         TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
+    this.jobTable = factory.jobTable();
     this.jobsQueue = factory.jobsQueue();
     this.ulidGenerator = factory.ulidGenerator();
   }

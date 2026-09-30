@@ -72,6 +72,8 @@ function importDetail(overrides: Partial<ImportDetail> = {}): ImportDetail {
     appraisal_error: null,
     created_at: 1765420932,
     total_suggested_price: '0.00',
+    unit_count: null,
+    placement_instructions: null,
     rows: appraisingRows(),
     ...overrides,
   };
@@ -128,6 +130,23 @@ function reviewImport(overrides: Partial<ImportDetail> = {}): ImportDetail {
       }),
     ],
     ...overrides,
+  });
+}
+
+function confirmedImport(): ImportDetail {
+  return reviewImport({
+    status: 'confirmed',
+    unit_count: 1,
+    placement_instructions: [
+      {
+        block: 'A42',
+        from_location: 'A42-0',
+        to_location: 'A42-0',
+        from_name: 'Placement boundary',
+        to_name: 'Placement boundary',
+        unit_count: 1,
+      },
+    ],
   });
 }
 
@@ -402,27 +421,27 @@ describe('ImportDetailPage', () => {
 
   it('confirms the import and shows placement instructions', async () => {
     const user = userEvent.setup();
-    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
-      reviewImport(),
+    vi.spyOn(clientModule.apiClient, 'getImport')
+      .mockResolvedValueOnce(reviewImport())
+      .mockResolvedValueOnce({ ...reviewImport(), status: 'confirming' })
+      .mockResolvedValueOnce({
+        ...confirmedImport(),
+        unit_count: 87,
+        total_suggested_price: '342.50',
+        placement_instructions: [
+          {
+            block: 'A42',
+            from_location: 'A42-0',
+            to_location: 'A42-86',
+            from_name: 'Llanowar Elves',
+            to_name: 'Sol Ring',
+            unit_count: 87,
+          },
+        ],
+      });
+    vi.spyOn(clientModule.apiClient, 'confirmImport').mockResolvedValue(
+      undefined,
     );
-    vi.spyOn(clientModule.apiClient, 'confirmImport').mockResolvedValue({
-      import_id: 'import-2',
-      status: 'confirmed',
-      unit_count: 87,
-      total_suggested_price: '342.50',
-      first_sequence_number: 4200,
-      last_sequence_number: 4286,
-      placement_instructions: [
-        {
-          block: 'A42',
-          from_location: 'A42-0',
-          to_location: 'A42-86',
-          from_name: 'Llanowar Elves',
-          to_name: 'Sol Ring',
-          unit_count: 87,
-        },
-      ],
-    });
 
     renderImportDetailPage();
     await screen.findByText('Top Card');
@@ -441,7 +460,11 @@ describe('ImportDetailPage', () => {
         'import-2',
       );
     });
-    expect(await screen.findByText('Placement instructions')).toBeDefined();
+    expect(screen.getByLabelText('Import confirmation progress')).toBeDefined();
+    expect(screen.getByText('Top Card')).toBeDefined();
+    expect(
+      await screen.findByText('Placement instructions', {}, { timeout: 5000 }),
+    ).toBeDefined();
     expect(screen.getByText('Total suggested value $342.50')).toBeDefined();
     expect(screen.getByText('A42')).toBeDefined();
     expect(screen.getByText('87 cards')).toBeDefined();
@@ -453,8 +476,28 @@ describe('ImportDetailPage', () => {
         'confirmed',
       ),
     ).toBeDefined();
-    expect(screen.queryByText('Top Card')).toBeNull();
+    expect(screen.getByText('Top Card')).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Confirm import' })).toBeNull();
+  });
+
+  it('polls a confirming import after reload through a transient read error', async () => {
+    vi.spyOn(clientModule.apiClient, 'getImport')
+      .mockResolvedValueOnce({ ...reviewImport(), status: 'confirming' })
+      .mockRejectedValueOnce(new Error('Temporary read failure'))
+      .mockResolvedValueOnce(confirmedImport());
+
+    renderImportDetailPage();
+
+    expect(
+      await screen.findByLabelText('Import confirmation progress'),
+    ).toBeDefined();
+    expect(
+      await screen.findByText('Temporary read failure', {}, { timeout: 3500 }),
+    ).toBeDefined();
+    expect(
+      await screen.findByText('Placement instructions', {}, { timeout: 7000 }),
+    ).toBeDefined();
+    expect(screen.getByText('Top Card')).toBeDefined();
   });
 
   it('surfaces confirm failures and stays on the review table', async () => {
@@ -535,7 +578,7 @@ describe('ImportDetailPage', () => {
 
   it('does not show delete buttons for a confirmed import', async () => {
     vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
-      reviewImport({ status: 'confirmed' }),
+      confirmedImport(),
     );
 
     renderImportDetailPage();
@@ -546,7 +589,7 @@ describe('ImportDetailPage', () => {
 
   it('does not show condition selects for a confirmed import', async () => {
     vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
-      reviewImport({ status: 'confirmed' }),
+      confirmedImport(),
     );
 
     renderImportDetailPage();
@@ -557,13 +600,14 @@ describe('ImportDetailPage', () => {
 
   it('renders a confirmed import read-only without a confirm button', async () => {
     vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
-      reviewImport({ status: 'confirmed' }),
+      confirmedImport(),
     );
 
     renderImportDetailPage();
 
     expect(await screen.findByText('Top Card')).toBeDefined();
     expect(screen.getByText('Total suggested value $4.50')).toBeDefined();
+    expect(screen.getByText('Placement instructions')).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Confirm import' })).toBeNull();
   });
 
@@ -620,7 +664,7 @@ describe('ImportDetailPage', () => {
 
   it('does not show delete button for a confirmed import', async () => {
     vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
-      reviewImport({ status: 'confirmed' }),
+      confirmedImport(),
     );
 
     renderImportDetailPage();
@@ -967,7 +1011,7 @@ describe('ImportDetailPage', () => {
   it('does not refetch on refocus when the import is confirmed', async () => {
     const getImportMock = vi
       .spyOn(clientModule.apiClient, 'getImport')
-      .mockResolvedValue(reviewImport({ status: 'confirmed' }));
+      .mockResolvedValue(confirmedImport());
 
     renderImportDetailPage();
     await screen.findByText('Top Card');
