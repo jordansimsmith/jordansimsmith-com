@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.collect.Lists;
 import com.jordansimsmith.tcginventory.games.Games;
 import com.jordansimsmith.tcginventory.games.Games.Finish;
 import java.io.IOException;
@@ -22,7 +23,10 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.HashSet;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.regex.Pattern;
 import javax.annotation.Nullable;
 
@@ -33,6 +37,7 @@ public class ScryfallCatalog implements CardCatalog {
       "TcgInventory/1.0 (https://tcg-inventory.jordansimsmith.com)";
   private static final int PAGE_SIZE = 20;
   private static final int PROVIDER_PAGE_SIZE = 175;
+  private static final int COLLECTION_REQUEST_SIZE = 75;
   private static final int MAX_PROVIDER_PAGES_PER_REQUEST = 5;
   private static final int MAX_PROVIDER_PAGE_NUMBER = 10000;
   private static final Pattern EXTERNAL_ID =
@@ -60,6 +65,14 @@ public class ScryfallCatalog implements CardCatalog {
   private record ScryfallPage(
       @JsonProperty("data") List<ScryfallCard> data, @JsonProperty("has_more") Boolean hasMore) {}
 
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record ScryfallIdentifier(@JsonProperty("id") String id) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record ScryfallCollection(
+      @JsonProperty("data") List<ScryfallCard> data,
+      @JsonProperty("not_found") @Nullable List<ScryfallIdentifier> notFound) {}
+
   private record Position(int page, int offset) {}
 
   private final URI baseUri;
@@ -77,13 +90,122 @@ public class ScryfallCatalog implements CardCatalog {
 
   @Override
   public CatalogCard getCard(String externalId) {
+    try {
+      return doGetCard(externalId);
+    } catch (CatalogException e) {
+      throw e;
+    } catch (Exception e) {
+      if (e instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
+      throw new CatalogException.Unavailable("catalog returned invalid card data", e);
+    }
+  }
+
+  private CatalogCard doGetCard(String externalId) throws IOException, InterruptedException {
     validateExternalId(externalId);
     return normalize(readCard(externalId));
   }
 
   @Override
+  public Map<String, CatalogCard> findCards(List<String> externalIds) {
+    try {
+      return doFindCards(externalIds);
+    } catch (CatalogException e) {
+      throw e;
+    } catch (Exception e) {
+      if (e instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
+      throw new CatalogException.Unavailable("catalog returned invalid collection data", e);
+    }
+  }
+
+  private Map<String, CatalogCard> doFindCards(List<String> externalIds)
+      throws IOException, InterruptedException {
+    var requestedIds = new LinkedHashSet<String>();
+    for (var externalId : externalIds) {
+      if (externalId != null && EXTERNAL_ID.matcher(externalId).matches()) {
+        requestedIds.add(externalId);
+      }
+    }
+    if (requestedIds.isEmpty()) {
+      return Map.of();
+    }
+
+    var distinctIds = new ArrayList<>(requestedIds);
+    var cardsById = new LinkedHashMap<String, CatalogCard>();
+    for (var requestedChunk : Lists.partition(distinctIds, COLLECTION_REQUEST_SIZE)) {
+      var requestedChunkIds = new HashSet<>(requestedChunk);
+      var identifiers = requestedChunk.stream().map(id -> Map.of("id", id)).toList();
+      var body = objectMapper.writeValueAsString(Map.of("identifiers", identifiers));
+      var request =
+          HttpRequest.newBuilder()
+              .uri(baseUri.resolve("/cards/collection"))
+              .timeout(Duration.ofSeconds(5))
+              .header("User-Agent", USER_AGENT)
+              .header("Accept", "application/json")
+              .header("Content-Type", "application/json")
+              .POST(HttpRequest.BodyPublishers.ofString(body, UTF_8))
+              .build();
+      var response = objectMapper.readValue(readResponse(request), ScryfallCollection.class);
+      if (response == null || response.data() == null) {
+        throw new CatalogException.Unavailable("catalog returned invalid collection data");
+      }
+
+      var resolvedIds = new HashSet<String>();
+      for (var card : response.data()) {
+        if (card == null || card.id() == null) {
+          throw new CatalogException.Unavailable("catalog returned invalid collection data");
+        }
+        var cardId = card.id();
+        if (!requestedChunkIds.contains(cardId) || !resolvedIds.add(cardId)) {
+          throw new CatalogException.Unavailable("catalog returned inconsistent collection data");
+        }
+        try {
+          cardsById.put(cardId, normalize(card));
+        } catch (CatalogException.NotFound e) {
+          // non-English cards are resolved by the provider but are not selectable.
+        }
+      }
+
+      if (response.notFound() != null) {
+        for (var notFound : response.notFound()) {
+          if (notFound == null || notFound.id() == null) {
+            throw new CatalogException.Unavailable("catalog returned invalid collection data");
+          }
+          var cardId = notFound.id();
+          if (!requestedChunkIds.contains(cardId) || !resolvedIds.add(cardId)) {
+            throw new CatalogException.Unavailable("catalog returned inconsistent collection data");
+          }
+        }
+      }
+
+      if (resolvedIds.size() != requestedChunk.size()) {
+        throw new CatalogException.Unavailable("catalog returned incomplete collection data");
+      }
+    }
+    return Map.copyOf(cardsById);
+  }
+
+  @Override
   public CatalogPage findAlternatives(
       String externalId, String finish, @Nullable String continuation) {
+    try {
+      return doFindAlternatives(externalId, finish, continuation);
+    } catch (CatalogException e) {
+      throw e;
+    } catch (Exception e) {
+      if (e instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
+      throw new CatalogException.Unavailable("catalog returned invalid search data", e);
+    }
+  }
+
+  private CatalogPage doFindAlternatives(
+      String externalId, String finish, @Nullable String continuation)
+      throws IOException, InterruptedException {
     validateExternalId(externalId);
     validateFinish(finish);
     var context = "alternatives:" + GAME + ":" + externalId + ":" + finish;
@@ -103,6 +225,20 @@ public class ScryfallCatalog implements CardCatalog {
 
   @Override
   public CatalogPage search(String rawQuery, String finish, @Nullable String continuation) {
+    try {
+      return doSearch(rawQuery, finish, continuation);
+    } catch (CatalogException e) {
+      throw e;
+    } catch (Exception e) {
+      if (e instanceof InterruptedException) {
+        Thread.currentThread().interrupt();
+      }
+      throw new CatalogException.Unavailable("catalog returned invalid search data", e);
+    }
+  }
+
+  private CatalogPage doSearch(String rawQuery, String finish, @Nullable String continuation)
+      throws IOException, InterruptedException {
     var query = rawQuery != null ? rawQuery.trim() : "";
     validateFinish(finish);
     if (query.length() < 2 || query.length() > 200) {
@@ -136,7 +272,8 @@ public class ScryfallCatalog implements CardCatalog {
       Position start,
       @Nullable CatalogCard first,
       @Nullable String excludedId,
-      String finish) {
+      String finish)
+      throws IOException, InterruptedException {
     var cards = new ArrayList<CatalogCard>();
     var seen = new HashSet<String>();
     if (first != null) {
@@ -197,24 +334,21 @@ public class ScryfallCatalog implements CardCatalog {
     return page.hasMore() ? new Position(pageNumber + 1, 0) : null;
   }
 
-  private ScryfallCard readCard(String externalId) {
+  private ScryfallCard readCard(String externalId) throws IOException, InterruptedException {
     var url = baseUri.resolve("/cards/" + externalId).toString();
     try {
       var card = objectMapper.readValue(readResponse(url), ScryfallCard.class);
-      if (card == null || card.id() == null || !externalId.equalsIgnoreCase(card.id())) {
+      if (card == null || card.id() == null || !externalId.equals(card.id())) {
         throw new CatalogException.Unavailable("catalog returned a different card ID");
       }
       return card;
     } catch (ScryfallNotFoundException e) {
       throw new CatalogException.NotFound("card not found");
-    } catch (CatalogException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new CatalogException.Unavailable("catalog returned invalid card data", e);
     }
   }
 
-  private ScryfallPage readSearchPage(String query, int page) {
+  private ScryfallPage readSearchPage(String query, int page)
+      throws IOException, InterruptedException {
     var url =
         baseUri
             .resolve(
@@ -227,41 +361,32 @@ public class ScryfallCatalog implements CardCatalog {
       return objectMapper.readValue(readResponse(url), ScryfallPage.class);
     } catch (ScryfallNotFoundException e) {
       return new ScryfallPage(List.of(), false);
-    } catch (CatalogException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new CatalogException.Unavailable("catalog returned invalid search data", e);
     }
   }
 
-  private String readResponse(String url) {
-    try {
-      pacer.run();
-      var request =
-          HttpRequest.newBuilder()
-              .uri(URI.create(url))
-              .timeout(Duration.ofSeconds(5))
-              .header("User-Agent", USER_AGENT)
-              .header("Accept", "application/json")
-              .GET()
-              .build();
-      var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(UTF_8));
-      if (response.statusCode() == 404) {
-        throw new ScryfallNotFoundException();
-      }
-      if (response.statusCode() != 200) {
-        throw new CatalogException.Unavailable(
-            "catalog provider returned status " + response.statusCode());
-      }
-      return response.body();
-    } catch (ScryfallNotFoundException | CatalogException e) {
-      throw e;
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new CatalogException.Unavailable("catalog request was interrupted", e);
-    } catch (IOException | IllegalArgumentException e) {
-      throw new CatalogException.Unavailable("catalog provider is unavailable", e);
+  private String readResponse(String url) throws IOException, InterruptedException {
+    var request =
+        HttpRequest.newBuilder()
+            .uri(URI.create(url))
+            .timeout(Duration.ofSeconds(5))
+            .header("User-Agent", USER_AGENT)
+            .header("Accept", "application/json")
+            .GET()
+            .build();
+    return readResponse(request);
+  }
+
+  private String readResponse(HttpRequest request) throws IOException, InterruptedException {
+    pacer.run();
+    var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(UTF_8));
+    if (response.statusCode() == 404) {
+      throw new ScryfallNotFoundException();
     }
+    if (response.statusCode() != 200) {
+      throw new CatalogException.Unavailable(
+          "catalog provider returned status " + response.statusCode());
+    }
+    return response.body();
   }
 
   private CatalogCard normalize(ScryfallCard card) {

@@ -120,6 +120,7 @@ java_library(
         "@maven//:com_fasterxml_jackson_core_jackson_core",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
     ],
 )
 
@@ -535,6 +536,8 @@ java_binary(
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":catalog-lib",
+        ":games-lib",
         ":import-lib",
         ":lib",
         ":scan-lib",

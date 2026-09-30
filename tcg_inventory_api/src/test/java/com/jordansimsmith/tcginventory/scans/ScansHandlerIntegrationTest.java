@@ -14,6 +14,9 @@ import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
+import com.jordansimsmith.tcginventory.catalog.CatalogCard;
+import com.jordansimsmith.tcginventory.catalog.CatalogException;
+import com.jordansimsmith.tcginventory.catalog.FakeCardCatalogs;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
@@ -58,11 +61,14 @@ public class ScansHandlerIntegrationTest {
   private static final byte[] JPEG_BYTES =
       new byte[] {(byte) 0xFF, (byte) 0xD8, 0x01, (byte) 0xFF, (byte) 0xD9};
 
+  private record ConfirmationWriteCounts(int imports, int rows, int jobs, int queueMessages) {}
+
   private TcgInventoryTestFactory factory;
   private FakeClock fakeClock;
   private FakeUlidGenerator fakeUlidGenerator;
   private FakeQueueClient<JobMessage> fakeJobsQueue;
   private FakeQueueClient<ScanMessage> fakeScanQueue;
+  private FakeCardCatalogs fakeCardCatalogs;
   private ObjectMapper objectMapper;
   private DynamoDbTable<ScanItem> scanTable;
   private DynamoDbTable<ScanRowItem> scanRowTable;
@@ -114,6 +120,29 @@ public class ScansHandlerIntegrationTest {
     findScansHandler = new FindScansHandler(factory);
     getScanHandler = new GetScanHandler(factory);
     identifyScanHandler = new IdentifyScanHandler(factory, factory.fakeScanQueue());
+    fakeCardCatalogs = factory.fakeCardCatalogs();
+    fakeCardCatalogs.addCard(
+        new CatalogCard(
+            "mtg",
+            "scryfall",
+            "a9738cda-adb1-47fb-9f4c-ecd930228c4d",
+            "Ragavan, Nimble Pilferer",
+            "mh2",
+            "Modern Horizons 2",
+            "138",
+            new CatalogCard.ImageUrls(null, null),
+            List.of("normal", "foil")));
+    fakeCardCatalogs.addCard(
+        new CatalogCard(
+            "mtg",
+            "scryfall",
+            "4ced112a-e775-4f97-97b3-74877e9dce12",
+            "Dragon's Rage Channeler",
+            "mh2",
+            "Modern Horizons 2",
+            "121",
+            new CatalogCard.ImageUrls(null, null),
+            List.of("normal", "foil")));
     confirmScanHandler = new ConfirmScanHandler(factory);
     deleteScanRowHandler = new DeleteScanRowHandler(factory);
     deleteScanHandler = new DeleteScanHandler(factory);
@@ -890,13 +919,11 @@ public class ScansHandlerIntegrationTest {
     scan.setStatus("reviewing");
     scanTable.putItem(scan);
     var request =
-        "{\"rows\":["
-            + "{\"scan_position\":1,\"external_source\":\"scryfall\",\"external_id\":\"a9738cda-adb1-47fb-9f4c-ecd930228c4d\",\"name\":\"Ragavan,"
-            + " Nimble Pilferer\",\"set_code\":\"mh2\",\"set_name\":\"Modern Horizons"
-            + " 2\",\"collector_number\":\"138\"},"
-            + "{\"scan_position\":2,\"external_source\":\"scryfall\",\"external_id\":\"4ced112a-e775-4f97-97b3-74877e9dce12\",\"name\":\"Dragon's"
-            + " Rage Channeler\",\"set_code\":\"mh2\",\"set_name\":\"Modern Horizons"
-            + " 2\",\"collector_number\":\"121\"}]}";
+        "{\"rows\":[{\"scan_position\":1,\"external_source\":\"scryfall\",\"external_id\":\"a9738cda-adb1-47fb-9f4c-ecd930228c4d\",\"name\":\"Forged"
+            + " name one\",\"set_code\":\"fake\",\"set_name\":\"Forged set"
+            + " one\",\"collector_number\":\"999\"},{\"scan_position\":2,\"external_source\":\"scryfall\",\"external_id\":\"4ced112a-e775-4f97-97b3-74877e9dce12\",\"name\":\"Forged"
+            + " name two\",\"set_code\":\"fake\",\"set_name\":\"Forged set"
+            + " two\",\"collector_number\":\"998\"}]}";
 
     // act
     var response =
@@ -941,6 +968,11 @@ public class ScansHandlerIntegrationTest {
     assertThat(importRows)
         .extracting(ImportRowItem::getName)
         .containsExactly("Ragavan, Nimble Pilferer", "Dragon's Rage Channeler");
+    assertThat(importRows).extracting(ImportRowItem::getSetCode).containsOnly("mh2");
+    assertThat(importRows).extracting(ImportRowItem::getSetName).containsOnly("Modern Horizons 2");
+    assertThat(importRows)
+        .extracting(ImportRowItem::getCollectorNumber)
+        .containsExactly("138", "121");
     assertThat(importRows).extracting(ImportRowItem::getExternalSource).containsOnly("scryfall");
     assertThat(importRows)
         .extracting(ImportRowItem::getExternalId)
@@ -975,6 +1007,153 @@ public class ScansHandlerIntegrationTest {
                         .getBody())
                 .has("confirmed_rows"))
         .isFalse();
+    assertThat(fakeCardCatalogs.lookupRequests()).hasSize(1);
+    assertThat(fakeCardCatalogs.lookupRequests().getFirst())
+        .containsExactly(
+            "a9738cda-adb1-47fb-9f4c-ecd930228c4d", "4ced112a-e775-4f97-97b3-74877e9dce12");
+  }
+
+  @Test
+  void confirmScanShouldResolveDuplicateIdsOnlyOnce() throws Exception {
+    // arrange
+    var user = "confirm-duplicate";
+    var scanId = createScanWithFiles(user, 2);
+    var scan = getScanItem(user, scanId);
+    scan.setStatus("reviewing");
+    scanTable.putItem(scan);
+    var request =
+        confirmationRequest(
+            "scryfall",
+            "a9738cda-adb1-47fb-9f4c-ecd930228c4d",
+            "forged",
+            "fake",
+            "fake",
+            "1",
+            "scryfall",
+            "a9738cda-adb1-47fb-9f4c-ecd930228c4d",
+            "forged",
+            "fake",
+            "fake",
+            "1");
+
+    // act
+    var response =
+        confirmScanHandler.handleRequest(
+            buildEventWithPathAndBody(user, Map.of("scan_id", scanId), request), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    assertThat(fakeCardCatalogs.lookupRequests()).hasSize(1);
+    assertThat(fakeCardCatalogs.lookupRequests().getFirst())
+        .containsExactly("a9738cda-adb1-47fb-9f4c-ecd930228c4d");
+  }
+
+  @Test
+  void confirmScanShouldRejectUnsupportedSourceBeforeCatalogLookup() throws Exception {
+    // arrange
+    var user = "confirm-source";
+    var scanId = createScanWithFiles(user, 1);
+    var scan = getScanItem(user, scanId);
+    scan.setStatus("reviewing");
+    scanTable.putItem(scan);
+    var request =
+        confirmationRequest(
+            "other", "a9738cda-adb1-47fb-9f4c-ecd930228c4d", "Ragavan", "mh2", "Set", "138");
+    var writesBefore = confirmationWriteCounts();
+
+    // act
+    var response =
+        confirmScanHandler.handleRequest(
+            buildEventWithPathAndBody(user, Map.of("scan_id", scanId), request), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(400);
+    assertThat(response.getBody()).contains("scan position 1");
+    assertNoConfirmationWrites(user, scanId, writesBefore);
+    assertThat(fakeCardCatalogs.lookupRequests()).isEmpty();
+  }
+
+  @Test
+  void confirmScanShouldRejectMissingOrNonEnglishCardBeforeCreatingImport() throws Exception {
+    // arrange
+    var user = "confirm-missing";
+    var scanId = createScanWithFiles(user, 1);
+    var scan = getScanItem(user, scanId);
+    scan.setStatus("reviewing");
+    scanTable.putItem(scan);
+    var missingId = "11111111-1111-4111-8111-111111111111";
+    var request = confirmationRequest("scryfall", missingId, "Missing", "set", "Set", "1");
+    var writesBefore = confirmationWriteCounts();
+
+    // act
+    var response =
+        confirmScanHandler.handleRequest(
+            buildEventWithPathAndBody(user, Map.of("scan_id", scanId), request), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(400);
+    assertThat(response.getBody()).contains("scan position 1");
+    assertNoConfirmationWrites(user, scanId, writesBefore);
+    assertThat(fakeCardCatalogs.lookupRequests()).containsExactly(List.of(missingId));
+  }
+
+  @Test
+  void confirmScanShouldRejectCardWithoutScanFinishBeforeCreatingImport() throws Exception {
+    // arrange
+    var user = "confirm-finish";
+    var scanId = createScanWithFiles(user, 1);
+    var scan = getScanItem(user, scanId);
+    scan.setStatus("reviewing");
+    scanTable.putItem(scan);
+    var foilOnlyId = "11111111-1111-4111-8111-111111111111";
+    fakeCardCatalogs.addCard(
+        new CatalogCard(
+            "mtg",
+            "scryfall",
+            foilOnlyId,
+            "Foil only",
+            "test",
+            "Test set",
+            "1",
+            new CatalogCard.ImageUrls(null, null),
+            List.of("foil")));
+    var request = confirmationRequest("scryfall", foilOnlyId, "Foil only", "test", "Test set", "1");
+    var writesBefore = confirmationWriteCounts();
+
+    // act
+    var response =
+        confirmScanHandler.handleRequest(
+            buildEventWithPathAndBody(user, Map.of("scan_id", scanId), request), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(400);
+    assertThat(response.getBody()).contains("scan position 1");
+    assertNoConfirmationWrites(user, scanId, writesBefore);
+  }
+
+  @Test
+  void confirmScanShouldReturnServiceUnavailableBeforeCreatingImportWhenCatalogFails()
+      throws Exception {
+    // arrange
+    var user = "confirm-unavailable";
+    var scanId = createScanWithFiles(user, 1);
+    var scan = getScanItem(user, scanId);
+    scan.setStatus("reviewing");
+    scanTable.putItem(scan);
+    fakeCardCatalogs.setFailure(new CatalogException.Unavailable("stub unavailable"));
+    var request =
+        confirmationRequest(
+            "scryfall", "a9738cda-adb1-47fb-9f4c-ecd930228c4d", "Ragavan", "mh2", "Set", "138");
+    var writesBefore = confirmationWriteCounts();
+
+    // act
+    var response =
+        confirmScanHandler.handleRequest(
+            buildEventWithPathAndBody(user, Map.of("scan_id", scanId), request), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(503);
+    assertNoConfirmationWrites(user, scanId, writesBefore);
   }
 
   @Test
@@ -1017,6 +1196,40 @@ public class ScansHandlerIntegrationTest {
 
   private String createScan(String user, String filename) throws IOException {
     return createScan(user, filename, 1);
+  }
+
+  private ConfirmationWriteCounts confirmationWriteCounts() {
+    return new ConfirmationWriteCounts(
+        (int) importTable.scan().items().stream().count(),
+        (int) importRowTable.scan().items().stream().count(),
+        (int) jobTable.scan().items().stream().count(),
+        fakeJobsQueue.getSends().size());
+  }
+
+  private void assertNoConfirmationWrites(
+      String user, String scanId, ConfirmationWriteCounts writesBefore) {
+    assertThat(getScanItem(user, scanId).getStatus()).isEqualTo("reviewing");
+    assertThat(confirmationWriteCounts()).isEqualTo(writesBefore);
+  }
+
+  private String confirmationRequest(String... rowValues) {
+    var rows =
+        IntStream.range(0, rowValues.length / 6)
+            .mapToObj(
+                index -> {
+                  var offset = index * 6;
+                  return "{\"scan_position\":%d,\"external_source\":\"%s\",\"external_id\":\"%s\",\"name\":\"%s\",\"set_code\":\"%s\",\"set_name\":\"%s\",\"collector_number\":\"%s\"}"
+                      .formatted(
+                          index + 1,
+                          rowValues[offset],
+                          rowValues[offset + 1],
+                          rowValues[offset + 2],
+                          rowValues[offset + 3],
+                          rowValues[offset + 4],
+                          rowValues[offset + 5]);
+                })
+            .collect(Collectors.joining(","));
+    return "{\"rows\":[" + rows + "]}";
   }
 
   private String createScan(String user, String filename, int sizeBytes) throws IOException {

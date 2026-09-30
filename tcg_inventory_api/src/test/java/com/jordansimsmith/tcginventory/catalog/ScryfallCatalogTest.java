@@ -1,6 +1,7 @@
 package com.jordansimsmith.tcginventory.catalog;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -19,7 +20,10 @@ import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,11 +37,14 @@ public class ScryfallCatalogTest {
 
   private final ObjectMapper objectMapper = new ObjectMapper();
   private final List<URI> requests = new ArrayList<>();
+  private final List<String> requestMethods = new ArrayList<>();
+  private final List<JsonNode> collectionRequests = new ArrayList<>();
   private HttpServer server;
   private URI baseUri;
   private int nextStatus;
   private String nextBody;
   private String searchBody;
+  private String collectionBody;
   private long nextDelayMillis;
   private ScryfallCatalog catalog;
   private HttpResponseFactory responseFactory;
@@ -51,6 +58,7 @@ public class ScryfallCatalogTest {
     nextStatus = 200;
     nextBody = null;
     searchBody = null;
+    collectionBody = null;
     nextDelayMillis = 0;
     catalog = new ScryfallCatalog(baseUri, HttpClient.newHttpClient(), objectMapper, () -> {});
     responseFactory = new HttpResponseFactory.Builder(objectMapper).build();
@@ -79,6 +87,95 @@ public class ScryfallCatalogTest {
     assertThat(result.imageUrls().normal())
         .isEqualTo("https://cards.scryfall.io/normal/" + CARD_ID + ".jpg");
     assertThat(requests).extracting(URI::getPath).containsExactly("/cards/" + CARD_ID);
+  }
+
+  @Test
+  void findCardsShouldReturnExactEnglishCardsAndLeaveMissingOrNonEnglishUnresolved()
+      throws Exception {
+    // arrange
+    var response = objectMapper.createObjectNode();
+    response
+        .putArray("data")
+        .add(cardNode(CARD_ID, "Lightning Bolt", "en", List.of("nonfoil", "foil"), true))
+        .add(cardNode(ALT_ID, "Lightning Bolt", "ja", List.of("nonfoil", "foil"), true));
+    response.putArray("not_found").addObject().put("id", TOKEN_ID);
+    collectionBody = response.toString();
+
+    // act
+    var cards = catalog.findCards(List.of(CARD_ID, ALT_ID, TOKEN_ID));
+
+    // assert
+    assertThat(cards.keySet()).containsExactly(CARD_ID);
+    assertThat(cards.get(CARD_ID).externalId()).isEqualTo(CARD_ID);
+    assertThat(cards.get(CARD_ID).availableFinishes()).containsExactly("normal", "foil");
+    assertThat(requestMethods).containsExactly("POST");
+    assertThat(requests).extracting(URI::getPath).containsExactly("/cards/collection");
+    assertThat(lastContentType).isEqualTo("application/json");
+    assertThat(collectionRequests.getFirst().get("identifiers").size()).isEqualTo(3);
+  }
+
+  @Test
+  void findCardsShouldRejectIncompleteOrMismatchedProviderResults() {
+    // arrange
+    collectionBody = "{\"data\":[],\"not_found\":[]}";
+
+    // act / assert
+    assertThatThrownBy(() -> catalog.findCards(List.of(CARD_ID)))
+        .isInstanceOf(CatalogException.Unavailable.class);
+
+    collectionBody = "not json";
+    assertThatThrownBy(() -> catalog.findCards(List.of(CARD_ID)))
+        .isInstanceOf(CatalogException.Unavailable.class);
+
+    var response = objectMapper.createObjectNode();
+    response
+        .putArray("data")
+        .add(cardNode(ALT_ID, "Lightning Bolt", "en", List.of("nonfoil"), true));
+    response.putArray("not_found");
+    collectionBody = response.toString();
+    assertThatThrownBy(() -> catalog.findCards(List.of(CARD_ID)))
+        .isInstanceOf(CatalogException.Unavailable.class);
+  }
+
+  @Test
+  void findCardsShouldSplitTwoHundredIdsIntoScryfallCollectionChunks() {
+    // arrange
+    var ids = IntStream.range(0, 200).mapToObj(index -> UUID.randomUUID().toString()).toList();
+
+    // act
+    var cards = catalog.findCards(ids);
+
+    // assert
+    assertThat(cards).hasSize(200);
+    assertThat(collectionRequests)
+        .extracting(request -> request.get("identifiers").size())
+        .containsExactly(75, 75, 50);
+    assertThat(requestMethods).containsExactly("POST", "POST", "POST");
+  }
+
+  @Test
+  void findCardsShouldDeduplicateOnlyIdenticalIds() {
+    // arrange
+    var uppercaseId = CARD_ID.toUpperCase(Locale.ROOT);
+
+    // act
+    var cards = catalog.findCards(List.of(CARD_ID, uppercaseId, CARD_ID));
+
+    // assert
+    assertThat(cards.keySet()).containsExactlyInAnyOrder(CARD_ID, uppercaseId);
+    assertThat(collectionRequests.getFirst().get("identifiers"))
+        .extracting(identifier -> identifier.get("id").asText())
+        .containsExactly(CARD_ID, uppercaseId);
+  }
+
+  @Test
+  void findCardsShouldSurfaceProviderFailures() {
+    // arrange
+    nextStatus = 429;
+
+    // act / assert
+    assertThatThrownBy(() -> catalog.findCards(List.of(CARD_ID)))
+        .isInstanceOf(CatalogException.Unavailable.class);
   }
 
   @Test
@@ -473,11 +570,14 @@ public class ScryfallCatalogTest {
 
   private String lastUserAgent;
   private String lastAccept;
+  private String lastContentType;
 
   private void handleRequest(HttpExchange exchange) throws IOException {
     requests.add(exchange.getRequestURI());
+    requestMethods.add(exchange.getRequestMethod());
     lastUserAgent = exchange.getRequestHeaders().getFirst("User-Agent");
     lastAccept = exchange.getRequestHeaders().getFirst("Accept");
+    lastContentType = exchange.getRequestHeaders().getFirst("Content-Type");
     var status = nextStatus;
     nextStatus = 200;
     if (nextDelayMillis > 0) {
@@ -490,25 +590,53 @@ public class ScryfallCatalogTest {
       nextDelayMillis = 0;
     }
     var isSearch = "/cards/search".equals(exchange.getRequestURI().getPath());
-    var body = isSearch ? searchBody : nextBody;
-    if (!isSearch) {
+    var isCollection = "/cards/collection".equals(exchange.getRequestURI().getPath());
+    String body;
+    if (isCollection) {
+      var request = objectMapper.readTree(exchange.getRequestBody());
+      collectionRequests.add(request);
+      body = collectionBody != null ? collectionBody : collectionResponse(request);
+      collectionBody = null;
+    } else if (isSearch) {
+      body = searchBody;
+    } else {
+      body = nextBody;
       nextBody = null;
     }
     if (body == null) {
       body =
-          isSearch
-              ? searchPage(
-                  List.of(
-                      cardNode(
-                          CARD_ID,
-                          "Lightning Bolt",
-                          "en",
-                          List.of("nonfoil", "foil", "etched"),
-                          true)),
-                  false)
-              : card(CARD_ID, "Lightning Bolt", "en", List.of("nonfoil", "foil", "etched"), true);
+          isCollection
+              ? "{\"data\":[],\"not_found\":[]}"
+              : isSearch
+                  ? searchPage(
+                      List.of(
+                          cardNode(
+                              CARD_ID,
+                              "Lightning Bolt",
+                              "en",
+                              List.of("nonfoil", "foil", "etched"),
+                              true)),
+                      false)
+                  : card(
+                      CARD_ID, "Lightning Bolt", "en", List.of("nonfoil", "foil", "etched"), true);
     }
     respond(exchange, status, body);
+  }
+
+  private String collectionResponse(JsonNode request) {
+    var response = objectMapper.createObjectNode();
+    var data = response.putArray("data");
+    response.putArray("not_found");
+    for (var identifier : request.get("identifiers")) {
+      data.add(
+          cardNode(
+              identifier.get("id").asText(),
+              "Lightning Bolt",
+              "en",
+              List.of("nonfoil", "foil", "etched"),
+              true));
+    }
+    return response.toString();
   }
 
   private APIGatewayV2HTTPEvent event(Map<String, String> query, Map<String, String> path) {

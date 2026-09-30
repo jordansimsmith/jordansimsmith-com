@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.tcginventory.catalog.Catalogs;
+import com.jordansimsmith.tcginventory.catalog.FakeCardCatalogs;
 import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgTokenMinter;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
@@ -178,5 +180,17 @@ public class TcgInventoryTestModule {
   @Singleton
   FetchTcgTokenMinter fetchTcgTokenMinter() {
     return new FakeFetchTcgTokenMinter();
+  }
+
+  @Provides
+  @Singleton
+  FakeCardCatalogs fakeCardCatalogs() {
+    return new FakeCardCatalogs();
+  }
+
+  @Provides
+  @Singleton
+  Catalogs catalogs(FakeCardCatalogs fakeCardCatalogs) {
+    return fakeCardCatalogs;
   }
 }
