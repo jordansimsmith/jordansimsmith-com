@@ -87,9 +87,12 @@ public class ImportsHandlerIntegrationTest {
   }
 
   @Test
-  void createImportShouldPersistImportAndRows() throws Exception {
+  void createImportShouldPersistImportAndRowsWhenAnotherJobIsActive() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    jobTable.putItem(
+        JobItem.create(
+            "jordan", "publish-job", "publish", null, Instant.ofEpochSecond(1700000000)));
     var csv =
         CSV_HEADER
             + "\n"
@@ -247,12 +250,16 @@ public class ImportsHandlerIntegrationTest {
   void findImportsShouldReturnNewestFirst() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createImportHandler.handleRequest(
-        buildCreateEvent("jordan", buildSingleCardCsv(), "first.csv"), null);
+    var firstResponse =
+        createImportHandler.handleRequest(
+            buildCreateEvent("jordan", buildSingleCardCsv(), "first.csv"), null);
+    completeAppraisal(objectMapper.readTree(firstResponse.getBody()).get("import_id").asText());
 
     fakeClock.setTime(Instant.ofEpochSecond(1700001000));
-    createImportHandler.handleRequest(
-        buildCreateEvent("jordan", buildSingleCardCsv(), "second.csv"), null);
+    var secondResponse =
+        createImportHandler.handleRequest(
+            buildCreateEvent("jordan", buildSingleCardCsv(), "second.csv"), null);
+    completeAppraisal(objectMapper.readTree(secondResponse.getBody()).get("import_id").asText());
 
     // act
     var response = findImportsHandler.handleRequest(buildEvent("jordan"), null);
@@ -271,16 +278,22 @@ public class ImportsHandlerIntegrationTest {
   void findImportsShouldSupportContinuationPaging() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createImportHandler.handleRequest(
-        buildCreateEvent("jordan", buildSingleCardCsv(), "first.csv"), null);
+    var firstResponse =
+        createImportHandler.handleRequest(
+            buildCreateEvent("jordan", buildSingleCardCsv(), "first.csv"), null);
+    completeAppraisal(objectMapper.readTree(firstResponse.getBody()).get("import_id").asText());
 
     fakeClock.setTime(Instant.ofEpochSecond(1700001000));
-    createImportHandler.handleRequest(
-        buildCreateEvent("jordan", buildSingleCardCsv(), "second.csv"), null);
+    var secondResponse =
+        createImportHandler.handleRequest(
+            buildCreateEvent("jordan", buildSingleCardCsv(), "second.csv"), null);
+    completeAppraisal(objectMapper.readTree(secondResponse.getBody()).get("import_id").asText());
 
     fakeClock.setTime(Instant.ofEpochSecond(1700002000));
-    createImportHandler.handleRequest(
-        buildCreateEvent("jordan", buildSingleCardCsv(), "third.csv"), null);
+    var thirdResponse =
+        createImportHandler.handleRequest(
+            buildCreateEvent("jordan", buildSingleCardCsv(), "third.csv"), null);
+    completeAppraisal(objectMapper.readTree(thirdResponse.getBody()).get("import_id").asText());
 
     // act - first page
     var response1 =
@@ -420,6 +433,7 @@ public class ImportsHandlerIntegrationTest {
         createImportHandler.handleRequest(
             buildCreateEvent("jordan", buildSingleCardCsv(), "test.csv"), null);
     var importId = objectMapper.readTree(createResponse.getBody()).get("import_id").asText();
+    completeAppraisal(importId);
 
     // simulate review status (deletion only allowed in review)
     var importItem =
@@ -556,6 +570,23 @@ public class ImportsHandlerIntegrationTest {
             .flatMap(page -> page.items().stream())
             .toList();
     assertThat(imports).isEmpty();
+  }
+
+  private void completeAppraisal(String importId) {
+    var importItem =
+        importTable.getItem(
+            Key.builder()
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(ImportItem.formatSk(importId))
+                .build());
+    var jobItem =
+        jobTable.getItem(
+            Key.builder()
+                .partitionValue(JobItem.formatPk("jordan"))
+                .sortValue(JobItem.formatSk(importItem.getJobId()))
+                .build());
+    jobItem.setStatus("succeeded");
+    jobTable.putItem(jobItem);
   }
 
   private APIGatewayV2HTTPEvent buildEvent(String user) {

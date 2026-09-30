@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
+import com.jordansimsmith.tcginventory.ActiveJob;
 import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
@@ -32,6 +33,7 @@ public class UpdateUnitHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
+  private final ActiveJob activeJob;
   private final DynamoDbTable<SkuItem> skuTable;
   private final DynamoDbTable<UnitItem> unitTable;
   private final InventoryRepository inventoryRepository;
@@ -45,6 +47,7 @@ public class UpdateUnitHandler
   UpdateUnitHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
+    this.activeJob = new ActiveJob(factory.jobTable());
     this.skuTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), SkuItem.class);
     this.unitTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class);
     this.inventoryRepository =
@@ -107,6 +110,11 @@ public class UpdateUnitHandler
 
     if (body.condition().equals(skuItem.getCondition())) {
       return httpResponseFactory.conflict(new ErrorResponse("condition is unchanged"));
+    }
+
+    // keep inventory consistent while a background job is running.
+    if (activeJob.exists(user)) {
+      return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
     }
 
     var targetSkuId =

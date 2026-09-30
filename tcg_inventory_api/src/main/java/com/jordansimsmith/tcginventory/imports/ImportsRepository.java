@@ -13,14 +13,9 @@ import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 import software.amazon.awssdk.services.dynamodb.model.Update;
+import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 public class ImportsRepository {
-  private static final int MAX_TRANSACTION_ITEMS = 100;
-  private static final int SKU_AND_AUDIT_WRITES_PER_TRANSACTION = 2;
-
-  public static final int MAX_IMPORT_UNITS_PER_TRANSACTION =
-      MAX_TRANSACTION_ITEMS - SKU_AND_AUDIT_WRITES_PER_TRANSACTION;
-
   public enum ConfirmationStartResult {
     STARTED,
     CONFIRMING,
@@ -104,5 +99,27 @@ public class ImportsRepository {
       }
       throw e;
     }
+  }
+
+  public void finishConfirmation(String user, String importId, Instant now) {
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(TcgInventoryTable.TABLE_NAME)
+            .key(
+                Map.of(
+                    ImportItem.PK,
+                    AttributeValue.builder().s(ImportItem.formatPk(user)).build(),
+                    ImportItem.SK,
+                    AttributeValue.builder().s(ImportItem.formatSk(importId)).build()))
+            .updateExpression("SET #status = :confirmed, updated_at = :now")
+            .conditionExpression("#status = :confirming")
+            .expressionAttributeNames(Map.of("#status", ImportItem.STATUS))
+            .expressionAttributeValues(
+                Map.of(
+                    ":confirmed", AttributeValue.builder().s("confirmed").build(),
+                    ":confirming", AttributeValue.builder().s("confirming").build(),
+                    ":now",
+                        AttributeValue.builder().n(String.valueOf(now.getEpochSecond())).build()))
+            .build());
   }
 }

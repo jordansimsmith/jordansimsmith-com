@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
+import com.jordansimsmith.tcginventory.ActiveJob;
 import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
@@ -30,6 +31,7 @@ public class DeleteImportRowPhotoHandler
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<ImportItem> importTable;
   private final DynamoDbTable<ImportRowItem> importRowTable;
+  private final ActiveJob activeJob;
   private final S3Client s3Client;
 
   public DeleteImportRowPhotoHandler() {
@@ -43,6 +45,7 @@ public class DeleteImportRowPhotoHandler
     this.importTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class);
     this.importRowTable =
         TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
+    this.activeJob = new ActiveJob(factory.jobTable());
     this.s3Client = factory.s3Client();
   }
 
@@ -102,6 +105,11 @@ public class DeleteImportRowPhotoHandler
     }
     if (!found) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
+    }
+
+    // keep import review data stable while a background job is running.
+    if (activeJob.exists(user)) {
+      return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
     }
 
     s3Client.deleteObject(

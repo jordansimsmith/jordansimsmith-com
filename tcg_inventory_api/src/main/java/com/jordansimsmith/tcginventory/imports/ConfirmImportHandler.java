@@ -9,6 +9,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.tcginventory.ActiveJob;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.Photos;
@@ -35,6 +36,7 @@ public class ConfirmImportHandler
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<ImportItem> importTable;
   private final DynamoDbTable<ImportRowItem> importRowTable;
+  private final ActiveJob activeJob;
   private final ImportsRepository importsRepository;
   private final QueueClient<JobMessage> jobsQueue;
   private final UlidGenerator ulidGenerator;
@@ -51,6 +53,7 @@ public class ConfirmImportHandler
     this.importTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class);
     this.importRowTable =
         TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
+    this.activeJob = new ActiveJob(factory.jobTable());
     this.importsRepository =
         new ImportsRepository(factory.dynamoDbClient(), importTable, factory.jobTable());
     this.jobsQueue = factory.jobsQueue();
@@ -87,6 +90,10 @@ public class ConfirmImportHandler
     }
     if (!"review".equals(importItem.getStatus())) {
       return httpResponseFactory.conflict(new ErrorResponse("import is not in review status"));
+    }
+    // keep import review data stable while a background job is running.
+    if (activeJob.exists(user)) {
+      return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
     }
 
     var keepRows =

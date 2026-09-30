@@ -12,8 +12,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
@@ -22,16 +20,12 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.Delete;
 import software.amazon.awssdk.services.dynamodb.model.Put;
-import software.amazon.awssdk.services.dynamodb.model.ReturnValuesOnConditionCheckFailure;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
-import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 import software.amazon.awssdk.services.dynamodb.model.Update;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 public class InventoryRepository {
-  private static final Logger LOGGER = LoggerFactory.getLogger(InventoryRepository.class);
-
   private static final int MAX_TRANSACT_ITEMS = 100;
 
   private final DynamoDbTable<UnitItem> unitTable;
@@ -185,53 +179,44 @@ public class InventoryRepository {
     return newValue - count;
   }
 
-  public void confirmImportSku(
-      String user, String importId, SkuItem skuSeed, List<UnitItem> units) {
-    var transactItems = new ArrayList<TransactWriteItem>();
-    for (var unit : units) {
-      transactItems.add(
-          TransactWriteItem.builder()
-              .put(
-                  Put.builder()
-                      .tableName(TcgInventoryTable.TABLE_NAME)
-                      .item(unitTable.tableSchema().itemToMap(unit, true))
-                      .conditionExpression("attribute_not_exists(pk)")
-                      .returnValuesOnConditionCheckFailure(ReturnValuesOnConditionCheckFailure.NONE)
-                      .build())
-              .build());
-    }
-    transactItems.add(buildSkuUpsert(skuSeed));
-    transactItems.add(
-        buildAuditPut(
-            user,
-            "import_confirm",
-            Map.of(
-                "import_id",
-                AttributeValue.builder().s(importId).build(),
-                SkuItem.SKU_ID,
-                AttributeValue.builder().s(skuSeed.getSkuId()).build())));
-
-    try {
-      dynamoDbClient.transactWriteItems(
-          TransactWriteItemsRequest.builder().transactItems(transactItems).build());
-    } catch (TransactionCanceledException e) {
-      for (var unit : units) {
-        var existingUnit =
-            unitTable.getItem(
-                request ->
-                    request
-                        .key(
-                            Key.builder()
-                                .partitionValue(unit.getPk())
-                                .sortValue(unit.getSk())
-                                .build())
-                        .consistentRead(true));
-        if (existingUnit == null || !importId.equals(existingUnit.getImportId())) {
-          throw e;
-        }
+  public void confirmImportUnit(String user, String importId, SkuItem skuSeed, UnitItem unit) {
+    var key = Key.builder().partitionValue(unit.getPk()).sortValue(unit.getSk()).build();
+    var existing = unitTable.getItem(request -> request.key(key).consistentRead(true));
+    if (existing != null) {
+      if (importId.equals(existing.getImportId())) {
+        return;
       }
-      LOGGER.info("transaction cancelled for SKU chunk {} (replay)", skuSeed.getSkuId());
+      throw new IllegalStateException("unit key belongs to another import");
     }
+
+    var putUnit =
+        TransactWriteItem.builder()
+            .put(
+                Put.builder()
+                    .tableName(TcgInventoryTable.TABLE_NAME)
+                    .item(unitTable.tableSchema().itemToMap(unit, true))
+                    .conditionExpression("attribute_not_exists(pk)")
+                    .build())
+            .build();
+
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                putUnit,
+                buildSkuUpsert(skuSeed),
+                buildAuditPut(
+                    user,
+                    "import_confirm",
+                    Map.of(
+                        AuditItem.IMPORT_ID, AttributeValue.builder().s(importId).build(),
+                        AuditItem.SKU_ID, AttributeValue.builder().s(skuSeed.getSkuId()).build(),
+                        AuditItem.SEQUENCE_NUMBER,
+                            AttributeValue.builder()
+                                .n(String.valueOf(unit.getSequenceNumber()))
+                                .build(),
+                        AuditItem.BEFORE_STATUS, AttributeValue.builder().s("absent").build(),
+                        AuditItem.AFTER_STATUS, AttributeValue.builder().s("in_stock").build())))
+            .build());
   }
 
   public void executeChunked(List<TransactWriteItem> transactItems) {

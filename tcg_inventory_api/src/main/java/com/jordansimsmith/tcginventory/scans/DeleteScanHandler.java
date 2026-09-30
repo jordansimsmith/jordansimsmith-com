@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
+import com.jordansimsmith.tcginventory.ActiveJob;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import java.util.List;
@@ -27,6 +28,7 @@ public class DeleteScanHandler
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final ScanRepository scanRepository;
+  private final ActiveJob activeJob;
   private final S3Client s3Client;
 
   public DeleteScanHandler() {
@@ -43,6 +45,7 @@ public class DeleteScanHandler
             TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ScanRowItem.class),
             factory.dynamoDbClient(),
             factory.clock());
+    this.activeJob = new ActiveJob(factory.jobTable());
     this.s3Client = factory.s3Client();
   }
 
@@ -68,6 +71,10 @@ public class DeleteScanHandler
     }
 
     var rowItems = scanRepository.findScanRows(user, scanId);
+    // keep scan review data stable while a background job is running.
+    if (activeJob.exists(user)) {
+      return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
+    }
     if (!scanRepository.deleteScan(user, scanId)) {
       var currentScan = scanRepository.getScan(user, scanId);
       if (currentScan == null) {

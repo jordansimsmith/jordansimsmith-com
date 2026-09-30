@@ -135,6 +135,23 @@ public class ReportsHandlerIntegrationTest {
   }
 
   @Test
+  void createReportShouldStartWhileAnotherJobIsActive() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    jobTable.putItem(
+        JobItem.create(
+            "jordan", "publish-job", "publish", null, Instant.ofEpochSecond(1700000000)));
+
+    // act
+    var response = createReportHandler.handleRequest(buildHttpEvent("jordan"), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    assertThat(fakeJobsQueue.getSends()).hasSize(1);
+    assertThat(fakeJobsQueue.getSends().get(0).message().jobType()).isEqualTo("report");
+  }
+
+  @Test
   void createReportShouldBeIdempotentWhileActive() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));

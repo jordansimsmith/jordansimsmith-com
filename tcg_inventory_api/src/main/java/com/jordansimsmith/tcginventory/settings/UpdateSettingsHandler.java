@@ -11,6 +11,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.secrets.Secrets;
+import com.jordansimsmith.tcginventory.ActiveJob;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.time.Clock;
@@ -43,6 +44,7 @@ public class UpdateSettingsHandler
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final Secrets secrets;
+  private final ActiveJob activeJob;
   private final DynamoDbTable<SettingsItem> settingsTable;
 
   public UpdateSettingsHandler() {
@@ -56,6 +58,7 @@ public class UpdateSettingsHandler
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.secrets = factory.secrets();
+    this.activeJob = new ActiveJob(factory.jobTable());
     this.settingsTable =
         TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), SettingsItem.class);
   }
@@ -80,6 +83,11 @@ public class UpdateSettingsHandler
     if (!hasRefreshToken && !hasTrackOrdersAfter) {
       return httpResponseFactory.badRequest(
           new ErrorResponse("at least one of refresh_token or track_orders_after is required"));
+    }
+
+    // keep settings stable while a background job is running.
+    if (activeJob.exists(user)) {
+      return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
     }
 
     var key =

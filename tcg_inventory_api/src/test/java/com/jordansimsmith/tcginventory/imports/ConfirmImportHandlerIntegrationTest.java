@@ -7,6 +7,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.inventory.SequenceCounterItem;
@@ -38,6 +39,7 @@ public class ConfirmImportHandlerIntegrationTest {
   private ObjectMapper objectMapper;
   private DynamoDbTable<ImportItem> importTable;
   private DynamoDbTable<ImportRowItem> importRowTable;
+  private DynamoDbTable<AuditItem> auditTable;
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
   private DynamoDbTable<SequenceCounterItem> sequenceCounterTable;
@@ -69,6 +71,7 @@ public class ConfirmImportHandlerIntegrationTest {
     objectMapper = factory.objectMapper();
     importTable = factory.importTable();
     importRowTable = factory.importRowTable();
+    auditTable = factory.auditTable();
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
     sequenceCounterTable = factory.sequenceCounterTable();
@@ -135,7 +138,7 @@ public class ConfirmImportHandlerIntegrationTest {
         skuTable.getItem(
             Key.builder().partitionValue(sku1Pk).sortValue(SkuItem.formatSk()).build());
     assertThat(countUnits(sku1Pk)).isEqualTo(2);
-    assertThat(sku1.getVersion()).isEqualTo(1);
+    assertThat(sku1.getVersion()).isEqualTo(2);
     assertThat(sku1.getDirty()).isTrue();
     assertThat(sku1.getGsi1pk()).isEqualTo(SkuItem.formatGsi1pk("jordan"));
     assertThat(sku1.getSkuId()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
@@ -159,6 +162,45 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(countUnits(sku2Pk)).isEqualTo(1);
     assertThat(sku2.getVersion()).isEqualTo(1);
     assertThat(sku2.getDirty()).isTrue();
+    var auditEntries = getAuditEntries("jordan");
+    assertThat(auditEntries).hasSize(3);
+    assertThat(auditEntries)
+        .allSatisfy(
+            audit -> {
+              assertThat(audit.getEventType()).isEqualTo("import_confirm");
+              assertThat(audit.getImportId()).isEqualTo("import1");
+              assertThat(audit.getSequenceNumber()).isNotNull();
+              assertThat(audit.getBeforeStatus()).isEqualTo("absent");
+              assertThat(audit.getAfterStatus()).isEqualTo("in_stock");
+            });
+  }
+
+  @Test
+  void confirmShouldReturn409WhenAnotherJobIsActive() throws Exception {
+    // arrange
+    createImportInReview("jordan", "import1", 1);
+    createKeepRow("jordan", "import1", 1, "scryfall-1", "normal", "NM", "Card A");
+    jobTable.putItem(
+        JobItem.create(
+            "jordan", "publish-job", "publish", null, Instant.ofEpochSecond(1700000000)));
+
+    // act
+    var response =
+        confirmImportHandler.handleRequest(
+            buildEvent("jordan", Map.of("import_id", "import1")), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(409);
+    assertThat(objectMapper.readTree(response.getBody()).get("message").asText())
+        .isEqualTo("another job is in progress");
+    assertThat(getImportItem("import1").getStatus()).isEqualTo("review");
+    var jobs = findJobs("jordan");
+    assertThat(jobs).anyMatch(job -> "publish-job".equals(job.getJobId()));
+    assertThat(jobs)
+        .noneMatch(
+            job ->
+                "import_confirmation".equals(job.getJobType())
+                    && "import1".equals(job.getImportId()));
   }
 
   @Test
@@ -188,6 +230,9 @@ public class ConfirmImportHandlerIntegrationTest {
             "jordan", "mtg", "import1", null, 1, null, Instant.ofEpochSecond(1700000000));
     importItem.setStatus("confirmed");
     importTable.putItem(importItem);
+    jobTable.putItem(
+        JobItem.create(
+            "jordan", "publish-job", "publish", null, Instant.ofEpochSecond(1700000000)));
 
     // act
     var response =
@@ -206,6 +251,9 @@ public class ConfirmImportHandlerIntegrationTest {
             "jordan", "mtg", "import1", null, 1, null, Instant.ofEpochSecond(1700000000));
     importItem.setStatus("confirming");
     importTable.putItem(importItem);
+    jobTable.putItem(
+        JobItem.create(
+            "jordan", "publish-job", "publish", null, Instant.ofEpochSecond(1700000000)));
 
     var jobCount = jobTable.scan().items().stream().count();
 
@@ -311,7 +359,7 @@ public class ConfirmImportHandlerIntegrationTest {
   }
 
   @Test
-  void confirmShouldChunkMoreThanOneHundredUnitsForOneSku() {
+  void confirmLargeImportShouldCreateEveryUnit() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createImportInReview("jordan", "import1", 200);
@@ -331,10 +379,11 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
         .isEqualTo(200);
     assertThat(getImportItem("import1").getStatus()).isEqualTo("confirmed");
+    assertThat(getAuditEntries("jordan")).hasSize(200);
   }
 
   @Test
-  void confirmShouldReplayChunkWhenAllUnitsAlreadyBelongToImport() {
+  void confirmShouldSkipUnitsAlreadyPresentForImport() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     var importItem =
@@ -370,6 +419,7 @@ public class ConfirmImportHandlerIntegrationTest {
               "in_stock",
               "import1",
               Instant.ofEpochSecond(1700000000)));
+      createImportAudit("import1", "mtg#scryfall#scryfall-1#normal#NM", position - 1);
     }
     skuTable.putItem(
         SkuItem.create(
@@ -401,10 +451,11 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(getImportItem("import1").getStatus()).isEqualTo("confirmed");
     assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
         .isEqualTo(2);
+    assertThat(getAuditEntries("jordan")).hasSize(2);
   }
 
   @Test
-  void confirmShouldKeepImportConfirmingWhenReplayChunkHasMissingUnit() throws Exception {
+  void confirmShouldResumeAfterACommittedUnitWhenAnotherImportOwnsTheNextKey() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
@@ -456,68 +507,64 @@ public class ConfirmImportHandlerIntegrationTest {
     row2.setSequenceNumber(1);
     importRowTable.putItem(row2);
 
-    var existingUnit =
+    var conflictingUnit =
         UnitItem.create(
             "jordan",
             "mtg",
             "mtg#scryfall#scryfall-1#normal#NM",
-            0,
+            1,
             "in_stock",
+            "other-import",
+            Instant.ofEpochSecond(1700000000));
+    unitTable.putItem(conflictingUnit);
+    var jobItem =
+        JobItem.create(
+            "jordan",
+            "confirm-job",
+            "import_confirmation",
             "import1",
             Instant.ofEpochSecond(1700000000));
-    unitTable.putItem(existingUnit);
-
-    var existingSku =
-        SkuItem.create(
-            "jordan",
-            "mtg#scryfall#scryfall-1#normal#NM",
-            "mtg",
-            "scryfall",
-            "scryfall-1",
-            "normal",
-            "NM",
-            "Card A",
-            "dom",
-            "Dominaria",
-            "168",
-            null,
-            null);
-    skuTable.putItem(existingSku);
+    jobTable.putItem(jobItem);
 
     // act
-    var response =
-        confirmImportHandler.handleRequest(
-            buildEvent("jordan", Map.of("import_id", "import1")), null);
+    assertThatThrownBy(() -> importConfirmationJobProcessor.processBatch("jordan", jobItem))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("unit key belongs to another import");
 
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(202);
-    assertThatThrownBy(
-            () ->
-                importConfirmationJobProcessor.processBatch(
-                    "jordan",
-                    JobItem.create(
-                        "jordan",
-                        "confirm-job",
-                        "import_confirmation",
-                        "import1",
-                        Instant.ofEpochSecond(1700000000))))
-        .isInstanceOf(RuntimeException.class);
-
-    var sku =
-        skuTable.getItem(
+    assertThat(getImportItem("import1").getStatus()).isEqualTo("confirming");
+    var committedUnit =
+        unitTable.getItem(
             Key.builder()
                 .partitionValue(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM"))
-                .sortValue(SkuItem.formatSk())
+                .sortValue(UnitItem.formatSk(0))
                 .build());
-    assertThat(sku.getVersion()).isEqualTo(1);
-
-    var importResult =
-        importTable.getItem(
+    assertThat(committedUnit.getImportId()).isEqualTo("import1");
+    var conflictingUnitResult =
+        unitTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
-                .sortValue(ImportItem.formatSk("import1"))
+                .partitionValue(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM"))
+                .sortValue(UnitItem.formatSk(1))
                 .build());
-    assertThat(importResult.getStatus()).isEqualTo("confirming");
+    assertThat(conflictingUnitResult.getImportId()).isEqualTo("other-import");
+    assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
+        .isEqualTo(2);
+    assertThat(getAuditEntries("jordan")).hasSize(1);
+
+    // arrange retry after the occupied key has been repaired
+    unitTable.deleteItem(
+        Key.builder()
+            .partitionValue(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM"))
+            .sortValue(UnitItem.formatSk(1))
+            .build());
+
+    // act
+    importConfirmationJobProcessor.processBatch("jordan", jobItem);
+
+    // assert
+    assertThat(getImportItem("import1").getStatus()).isEqualTo("confirmed");
+    assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
+        .isEqualTo(2);
+    assertThat(getAuditEntries("jordan")).hasSize(2);
   }
 
   @Test
@@ -545,6 +592,7 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(body.get("unit_count").asInt()).isEqualTo(0);
     assertThat(body.get("total_suggested_price").asText()).isEqualTo("0.00");
     assertThat(body.get("placement_instructions")).isEmpty();
+    assertThat(getAuditEntries("jordan")).isEmpty();
   }
 
   @Test
@@ -679,6 +727,43 @@ public class ConfirmImportHandlerIntegrationTest {
             .partitionValue(ImportItem.formatPk("jordan"))
             .sortValue(ImportItem.formatSk(importId))
             .build());
+  }
+
+  private List<AuditItem> getAuditEntries(String user) {
+    var request =
+        QueryEnhancedRequest.builder()
+            .queryConditional(
+                QueryConditional.keyEqualTo(
+                    Key.builder().partitionValue(AuditItem.formatPk(user)).build()))
+            .build();
+    return auditTable.query(request).stream().flatMap(page -> page.items().stream()).toList();
+  }
+
+  private List<JobItem> findJobs(String user) {
+    var request =
+        QueryEnhancedRequest.builder()
+            .queryConditional(
+                QueryConditional.sortBeginsWith(
+                    Key.builder()
+                        .partitionValue(JobItem.formatPk(user))
+                        .sortValue(JobItem.JOB_PREFIX)
+                        .build()))
+            .build();
+    return jobTable.query(request).stream().flatMap(page -> page.items().stream()).toList();
+  }
+
+  private void createImportAudit(String importId, String skuId, int sequenceNumber) {
+    var audit = new AuditItem();
+    audit.setPk(AuditItem.formatPk("jordan"));
+    audit.setSk("audit-" + importId + "-" + sequenceNumber);
+    audit.setEventType("import_confirm");
+    audit.setImportId(importId);
+    audit.setSkuId(skuId);
+    audit.setSequenceNumber(sequenceNumber);
+    audit.setBeforeStatus("absent");
+    audit.setAfterStatus("in_stock");
+    audit.setCreatedAt(Instant.ofEpochSecond(1700000000));
+    auditTable.putItem(audit);
   }
 
   private void processConfirmation(String user, String importId) {

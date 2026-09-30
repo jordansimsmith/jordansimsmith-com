@@ -11,6 +11,7 @@ import com.google.common.base.Strings;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.tcginventory.ActiveJob;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
@@ -46,6 +47,7 @@ public class ConfirmScanHandler
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final ScanRepository scanRepository;
+  private final ActiveJob activeJob;
   private final QueueClient<JobMessage> jobsQueue;
   private final UlidGenerator ulidGenerator;
 
@@ -65,6 +67,7 @@ public class ConfirmScanHandler
             TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ScanRowItem.class),
             factory.dynamoDbClient(),
             factory.clock());
+    this.activeJob = new ActiveJob(factory.jobTable());
     this.jobsQueue = factory.jobsQueue();
     this.ulidGenerator = factory.ulidGenerator();
   }
@@ -110,6 +113,11 @@ public class ConfirmScanHandler
       validate(orderedRows, scanRows);
     } catch (IllegalArgumentException e) {
       return httpResponseFactory.badRequest(new ErrorResponse(e.getMessage()));
+    }
+
+    // keep scan review data stable while a background job is running.
+    if (activeJob.exists(user)) {
+      return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
     }
 
     for (var row : orderedRows) {

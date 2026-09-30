@@ -4,10 +4,12 @@ import com.amazonaws.services.lambda.runtime.Context;
 import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.tcginventory.ActiveJob;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
@@ -16,19 +18,19 @@ import com.jordansimsmith.ulid.UlidGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
-import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 public class CreatePublishHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(CreatePublishHandler.class);
 
+  record ErrorResponse(@JsonProperty("message") String message) {}
+
   private final Clock clock;
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<JobItem> jobTable;
+  private final ActiveJob activeJob;
   private final QueueClient<JobMessage> jobsQueue;
   private final UlidGenerator ulidGenerator;
 
@@ -42,6 +44,7 @@ public class CreatePublishHandler
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.jobTable = factory.jobTable();
+    this.activeJob = new ActiveJob(jobTable);
     this.jobsQueue = factory.jobsQueue();
     this.ulidGenerator = factory.ulidGenerator();
   }
@@ -59,9 +62,13 @@ public class CreatePublishHandler
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
     var user = requestContextFactory.createCtx(event).user();
 
-    var activeJob = findActivePublishJob(user);
-    if (activeJob != null) {
+    // preserve idempotent responses while the publish job is active.
+    if (activeJob.exists(user, "publish")) {
       return httpResponseFactory.accepted();
+    }
+    // avoid overlapping jobs for the same user.
+    if (activeJob.exists(user)) {
+      return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
     }
 
     var now = clock.now();
@@ -74,27 +81,5 @@ public class CreatePublishHandler
     jobsQueue.send(jobMessage, user, jobMessage.deduplicationId(0));
 
     return httpResponseFactory.accepted();
-  }
-
-  private JobItem findActivePublishJob(String user) {
-    var queryConditional =
-        QueryConditional.sortBeginsWith(
-            Key.builder()
-                .partitionValue(JobItem.formatPk(user))
-                .sortValue(JobItem.JOB_PREFIX)
-                .build());
-
-    var request =
-        QueryEnhancedRequest.builder()
-            .queryConditional(queryConditional)
-            .scanIndexForward(false)
-            .build();
-
-    return jobTable.query(request).stream()
-        .flatMap(page -> page.items().stream())
-        .filter(item -> "publish".equals(item.getJobType()))
-        .filter(item -> "queued".equals(item.getStatus()) || "running".equals(item.getStatus()))
-        .findFirst()
-        .orElse(null);
   }
 }

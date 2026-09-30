@@ -8,6 +8,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
+import com.jordansimsmith.tcginventory.ActiveJob;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
@@ -33,6 +34,7 @@ public class ConfirmOrderHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
+  private final ActiveJob activeJob;
   private final DynamoDbTable<OrderItem> orderTable;
   private final OrderRepository orderRepository;
 
@@ -44,6 +46,7 @@ public class ConfirmOrderHandler
   ConfirmOrderHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
+    this.activeJob = new ActiveJob(factory.jobTable());
     this.orderTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderItem.class);
     var inventoryRepository =
         new InventoryRepository(
@@ -87,6 +90,11 @@ public class ConfirmOrderHandler
 
     if (!"to_pick".equals(orderItem.getStatus())) {
       return httpResponseFactory.conflict(new ErrorResponse("order is not ready to pick"));
+    }
+
+    // keep inventory consistent while a background job is running.
+    if (activeJob.exists(user)) {
+      return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
     }
 
     var orderLines = orderItem.getLines();

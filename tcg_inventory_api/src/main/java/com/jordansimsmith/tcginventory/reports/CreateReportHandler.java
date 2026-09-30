@@ -8,6 +8,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.tcginventory.ActiveJob;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
@@ -16,9 +17,6 @@ import com.jordansimsmith.ulid.UlidGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
-import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 public class CreateReportHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
@@ -29,6 +27,7 @@ public class CreateReportHandler
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<JobItem> jobTable;
+  private final ActiveJob activeJob;
   private final QueueClient<JobMessage> jobsQueue;
   private final UlidGenerator ulidGenerator;
 
@@ -42,6 +41,7 @@ public class CreateReportHandler
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.jobTable = factory.jobTable();
+    this.activeJob = new ActiveJob(jobTable);
     this.jobsQueue = factory.jobsQueue();
     this.ulidGenerator = factory.ulidGenerator();
   }
@@ -59,8 +59,8 @@ public class CreateReportHandler
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
     var user = requestContextFactory.createCtx(event).user();
 
-    var activeJob = findActiveReportJob(user);
-    if (activeJob != null) {
+    // preserve idempotent responses while the report job is active.
+    if (activeJob.exists(user, "report")) {
       return httpResponseFactory.accepted();
     }
 
@@ -74,27 +74,5 @@ public class CreateReportHandler
     jobsQueue.send(jobMessage, user, jobMessage.deduplicationId(0));
 
     return httpResponseFactory.accepted();
-  }
-
-  private JobItem findActiveReportJob(String user) {
-    var queryConditional =
-        QueryConditional.sortBeginsWith(
-            Key.builder()
-                .partitionValue(JobItem.formatPk(user))
-                .sortValue(JobItem.JOB_PREFIX)
-                .build());
-
-    var request =
-        QueryEnhancedRequest.builder()
-            .queryConditional(queryConditional)
-            .scanIndexForward(false)
-            .build();
-
-    return jobTable.query(request).stream()
-        .flatMap(page -> page.items().stream())
-        .filter(item -> "report".equals(item.getJobType()))
-        .filter(item -> "queued".equals(item.getStatus()) || "running".equals(item.getStatus()))
-        .findFirst()
-        .orElse(null);
   }
 }

@@ -22,6 +22,8 @@ public class AuditItem {
   public static final String SEQUENCE_NUMBER = "sequence_number";
   public static final String ORDER_ID = "order_id";
   public static final String DECISION_REASON = "decision_reason";
+  public static final String BEFORE_STATUS = "before_status";
+  public static final String AFTER_STATUS = "after_status";
   public static final String CREATED_AT = "created_at";
 
   private String pk;
@@ -32,6 +34,8 @@ public class AuditItem {
   private Integer sequenceNumber;
   private String orderId;
   private String decisionReason;
+  private String beforeStatus;
+  private String afterStatus;
   private Instant createdAt;
 
   @DynamoDbPartitionKey
@@ -106,6 +110,24 @@ public class AuditItem {
 
   public void setDecisionReason(@Nullable String decisionReason) {
     this.decisionReason = decisionReason;
+  }
+
+  @DynamoDbAttribute(BEFORE_STATUS)
+  public String getBeforeStatus() {
+    return beforeStatus;
+  }
+
+  public void setBeforeStatus(@Nullable String beforeStatus) {
+    this.beforeStatus = beforeStatus;
+  }
+
+  @DynamoDbAttribute(AFTER_STATUS)
+  public String getAfterStatus() {
+    return afterStatus;
+  }
+
+  public void setAfterStatus(@Nullable String afterStatus) {
+    this.afterStatus = afterStatus;
   }
 
   @DynamoDbConvertedBy(EpochSecondConverter.class)
