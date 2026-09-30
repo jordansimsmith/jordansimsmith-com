@@ -23,6 +23,7 @@ import type {
   FindSkusResponse,
   GenerationStatus,
   IdentifyScanResponse,
+  ImageUrls,
   ImportDetail,
   ImportRow,
   ImportStatus,
@@ -397,10 +398,19 @@ function toDetail(sku: FakeSku): SkuDetail {
     ...toSummary(sku),
     external_source: sku.external_source,
     external_id: sku.external_id,
+    image_urls: fakeImageUrls(sku.external_id),
     in_stock_count: countByStatus(sku, 'in_stock'),
     reserved_count: countByStatus(sku, 'reserved'),
     sold_count: countByStatus(sku, 'sold'),
     units,
+  };
+}
+
+function fakeImageUrls(externalId: string): ImageUrls {
+  const baseUrl = `https://img.example/cards/${encodeURIComponent(externalId)}`;
+  return {
+    small: `${baseUrl}/small.jpg`,
+    normal: `${baseUrl}/normal.jpg`,
   };
 }
 
@@ -1368,6 +1378,7 @@ function toOrderDetail(order: FakeOrder, skus: FakeSku[]): OrderDetail {
         name: sku.name,
         external_source: sku.external_source,
         external_id: sku.external_id,
+        image_urls: fakeImageUrls(sku.external_id),
         set_code: sku.set_code,
         collector_number: sku.collector_number,
         finish: sku.finish,

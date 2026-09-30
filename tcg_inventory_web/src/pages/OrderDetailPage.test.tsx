@@ -76,6 +76,12 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
         current_location: 'A0-35',
         external_source: 'scryfall',
         external_id: '58b26011-e103-45c4-a253-900f4e6b2eeb',
+        image_urls: {
+          small:
+            'https://api.scryfall.com/cards/58b26011-e103-45c4-a253-900f4e6b2eeb?format=image&version=small',
+          normal:
+            'https://api.scryfall.com/cards/58b26011-e103-45c4-a253-900f4e6b2eeb?format=image&version=normal',
+        },
         name: 'Sol Ring',
         set_code: 'cmr',
         collector_number: '472',
@@ -104,6 +110,12 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
         current_location: 'A0-70',
         external_source: 'scryfall',
         external_id: '58b26011-e103-45c4-a253-900f4e6b2eeb',
+        image_urls: {
+          small:
+            'https://api.scryfall.com/cards/58b26011-e103-45c4-a253-900f4e6b2eeb?format=image&version=small',
+          normal:
+            'https://api.scryfall.com/cards/58b26011-e103-45c4-a253-900f4e6b2eeb?format=image&version=normal',
+        },
         name: 'Sol Ring',
         set_code: 'cmr',
         collector_number: '472',
@@ -126,6 +138,12 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
         current_location: 'A2-59',
         external_source: 'scryfall',
         external_id: 'f0a51425-d796-48b8-b68c-bc21fb465c81',
+        image_urls: {
+          small:
+            'https://api.scryfall.com/cards/f0a51425-d796-48b8-b68c-bc21fb465c81?format=image&version=small',
+          normal:
+            'https://api.scryfall.com/cards/f0a51425-d796-48b8-b68c-bc21fb465c81?format=image&version=normal',
+        },
         name: 'Elvish Aberration',
         set_code: 'a25',
         collector_number: '167',
@@ -249,6 +267,34 @@ describe('OrderDetailPage', () => {
     expect(
       images.every((image) => image.getAttribute('fetchpriority') === 'low'),
     ).toBe(true);
+  });
+
+  it('shows the image placeholder when the API has no card image', async () => {
+    const detail = orderDetail();
+    detail.units[0].image_urls = { small: null, normal: null };
+    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(detail);
+
+    renderOrderDetailPage();
+
+    await screen.findByText('Order 83647');
+    const image = document.querySelector<HTMLImageElement>('img');
+    expect(image?.getAttribute('src')).toMatch(/^data:image\/svg\+xml/);
+  });
+
+  it('shows the image placeholder when an order image fails to load', async () => {
+    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(
+      orderDetail(),
+    );
+
+    renderOrderDetailPage();
+
+    await screen.findByText('Order 83647');
+    const image = document.querySelector<HTMLImageElement>('img');
+    fireEvent.error(image!);
+
+    await waitFor(() =>
+      expect(image?.getAttribute('src')).toMatch(/^data:image\/svg\+xml/),
+    );
   });
 
   it('renders the buyer, address, and postage option', async () => {
@@ -421,6 +467,12 @@ describe('OrderDetailPage', () => {
             current_location: 'A0-1',
             external_source: 'scryfall',
             external_id: '0bc3401f-935b-45ce-b1e6-300a5d9dfd4f',
+            image_urls: {
+              small:
+                'https://api.scryfall.com/cards/0bc3401f-935b-45ce-b1e6-300a5d9dfd4f?format=image&version=small',
+              normal:
+                'https://api.scryfall.com/cards/0bc3401f-935b-45ce-b1e6-300a5d9dfd4f?format=image&version=normal',
+            },
             name: 'Hellkite Tyrant',
             set_code: 'gtc',
             collector_number: '94',

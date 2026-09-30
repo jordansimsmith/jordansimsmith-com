@@ -27,7 +27,6 @@ import type {
 } from '../api/client';
 import { ListPriceBadge } from '../components/ListPriceBadge';
 import { PageHeader } from '../components/PageHeader';
-import { cardImageUrl } from '../domain/card-image';
 import { formatDeliveryMode } from '../domain/deliveryMode';
 import { useGames } from '../GamesProvider';
 import classes from './OrderDetailPage.module.css';
@@ -318,12 +317,7 @@ export function OrderDetailPage() {
                       >
                         <Box className={classes.pullImage}>
                           <Image
-                            src={cardImageUrl(
-                              unit.game,
-                              unit.external_source,
-                              unit.external_id,
-                              'small',
-                            )}
+                            src={unit.image_urls.small ?? CARD_IMAGE_FALLBACK}
                             fallbackSrc={CARD_IMAGE_FALLBACK}
                             alt=""
                             fit="contain"

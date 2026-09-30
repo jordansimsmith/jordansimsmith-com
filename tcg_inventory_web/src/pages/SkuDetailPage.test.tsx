@@ -3,6 +3,7 @@ import {
   screen,
   waitFor,
   cleanup,
+  fireEvent,
   within,
 } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -37,6 +38,10 @@ const nmDetail: SkuDetail = {
   game: 'mtg',
   external_source: 'scryfall',
   external_id: SCRYFALL_ID,
+  image_urls: {
+    small: `https://api.scryfall.com/cards/${SCRYFALL_ID}?format=image&version=small`,
+    normal: `https://api.scryfall.com/cards/${SCRYFALL_ID}?format=image&version=normal`,
+  },
   name: 'Sol Ring',
   set_code: 'cmr',
   set_name: 'Commander Legends',
@@ -75,6 +80,10 @@ const lpDetail: SkuDetail = {
   game: 'mtg',
   external_source: 'scryfall',
   external_id: SCRYFALL_ID,
+  image_urls: {
+    small: `https://api.scryfall.com/cards/${SCRYFALL_ID}?format=image&version=small`,
+    normal: `https://api.scryfall.com/cards/${SCRYFALL_ID}?format=image&version=normal`,
+  },
   name: 'Sol Ring',
   set_code: 'cmr',
   set_name: 'Commander Legends',
@@ -161,6 +170,31 @@ describe('SkuDetailPage', () => {
       expect(button.textContent).toBe('');
       expect(button.querySelector('svg')).not.toBeNull();
     }
+  });
+
+  it('shows the image placeholder when the API has no card image', async () => {
+    vi.spyOn(clientModule.apiClient, 'getSku').mockResolvedValue({
+      ...nmDetail,
+      image_urls: { small: null, normal: null },
+    });
+
+    renderSkuDetailPage();
+
+    const image = await screen.findByRole('img', { name: 'Sol Ring' });
+    expect(image.getAttribute('src')).toMatch(/^data:image\/svg\+xml/);
+  });
+
+  it('shows the image placeholder when the card image fails to load', async () => {
+    vi.spyOn(clientModule.apiClient, 'getSku').mockResolvedValue(nmDetail);
+
+    renderSkuDetailPage();
+
+    const image = await screen.findByRole('img', { name: 'Sol Ring' });
+    fireEvent.error(image);
+
+    await waitFor(() =>
+      expect(image.getAttribute('src')).toMatch(/^data:image\/svg\+xml/),
+    );
   });
 
   it('removes a unit with a reason and re-renders counts', async () => {

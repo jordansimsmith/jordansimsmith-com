@@ -269,6 +269,10 @@ public class OrdersHandlerIntegrationTest {
     assertThat(units.get(0).get("current_location").asText()).isEqualTo("A0-0");
     assertThat(units.get(0).get("external_source").asText()).isEqualTo("scryfall");
     assertThat(units.get(0).get("external_id").asText()).isEqualTo("scryfall-1");
+    assertThat(units.get(0).get("image_urls").get("small").asText())
+        .isEqualTo("https://img.example/cards/scryfall-1/small.jpg");
+    assertThat(units.get(0).get("image_urls").get("normal").asText())
+        .isEqualTo("https://img.example/cards/scryfall-1/normal.jpg");
     assertThat(units.get(0).has("scryfall_id")).isFalse();
     assertThat(units.get(0).get("name").asText()).isEqualTo("Test Card");
     assertThat(units.get(0).get("set_code").asText()).isEqualTo("dom");
@@ -283,6 +287,8 @@ public class OrdersHandlerIntegrationTest {
     assertThat(units.get(1).get("location").asText()).isEqualTo("A0-3");
     assertThat(units.get(1).get("current_location").asText()).isEqualTo("A0-2");
     assertThat(units.get(1).get("price").asText()).isEqualTo("1.67");
+    assertThat(units.get(1).get("image_urls").get("small").asText())
+        .isEqualTo("https://img.example/cards/scryfall-1/small.jpg");
     assertThat(units.get(1).get("previous_card").get("name").asText()).isEqualTo("Test Card");
     assertThat(units.get(1).get("next_card").isNull()).isTrue();
   }
@@ -337,6 +343,8 @@ public class OrdersHandlerIntegrationTest {
     assertThat(units.get(1).get("name").asText()).isEqualTo("Sol Ring");
     assertThat(units.get(1).get("external_source").asText()).isEqualTo("scryfall");
     assertThat(units.get(1).get("external_id").asText()).isEqualTo("scryfall-2");
+    assertThat(units.get(1).get("image_urls").get("small").asText())
+        .isEqualTo("https://img.example/cards/scryfall-2/small.jpg");
     assertThat(units.get(1).get("price").asText()).isEqualTo("2.00");
 
     var responseLines = body.get("lines");

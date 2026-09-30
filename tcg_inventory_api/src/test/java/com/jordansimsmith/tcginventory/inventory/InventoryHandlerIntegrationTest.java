@@ -210,6 +210,10 @@ public class InventoryHandlerIntegrationTest {
     assertThat(body.get("game").asText()).isEqualTo("mtg");
     assertThat(body.get("external_source").asText()).isEqualTo("scryfall");
     assertThat(body.get("external_id").asText()).isEqualTo("scryfall-1");
+    assertThat(body.get("image_urls").get("small").asText())
+        .isEqualTo("https://img.example/cards/scryfall-1/small.jpg");
+    assertThat(body.get("image_urls").get("normal").asText())
+        .isEqualTo("https://img.example/cards/scryfall-1/normal.jpg");
     assertThat(body.has("scryfall_id")).isFalse();
     assertThat(body.get("name").asText()).isEqualTo("Elvish Mystic");
     assertThat(body.get("in_stock_count").asInt()).isEqualTo(2);

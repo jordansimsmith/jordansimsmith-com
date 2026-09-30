@@ -719,6 +719,7 @@ java_binary(
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":games-lib",
         ":inventory-lib",
         ":lib",
         ":publish-lib",
@@ -820,6 +821,8 @@ java_binary(
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":catalog-lib",
+        ":games-lib",
         ":inventory-lib",
         ":lib",
         "//lib/http:lib",
@@ -940,6 +943,7 @@ java_binary(
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":catalog-lib",
         ":games-lib",
         ":inventory-lib",
         ":lib",

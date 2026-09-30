@@ -11,6 +11,9 @@ import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
+import com.jordansimsmith.tcginventory.catalog.CatalogCard;
+import com.jordansimsmith.tcginventory.catalog.Catalogs;
+import com.jordansimsmith.tcginventory.games.Games;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -41,6 +44,7 @@ public class GetSkuHandler
       @JsonProperty("game") String game,
       @JsonProperty("external_source") String externalSource,
       @JsonProperty("external_id") String externalId,
+      @JsonProperty("image_urls") CatalogCard.ImageUrls imageUrls,
       @JsonProperty("name") String name,
       @JsonProperty("set_code") String setCode,
       @JsonProperty("set_name") String setName,
@@ -60,6 +64,7 @@ public class GetSkuHandler
   private final DynamoDbTable<SkuItem> skuTable;
   private final DynamoDbTable<UnitItem> unitTable;
   private final S3Presigner s3Presigner;
+  private final Catalogs catalogs;
 
   public GetSkuHandler() {
     this(TcgInventoryFactory.create());
@@ -72,6 +77,7 @@ public class GetSkuHandler
     this.skuTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), SkuItem.class);
     this.unitTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class);
     this.s3Presigner = factory.s3Presigner();
+    this.catalogs = factory.catalogs();
   }
 
   @Override
@@ -134,12 +140,16 @@ public class GetSkuHandler
                         toPhotoResponses(user, unit.getPhotos())))
             .toList();
 
+    var game = Games.get(skuItem.getGame());
+    var imageUrls = catalogs.forGame(game).getImageUrls(skuItem.getExternalId());
+
     return httpResponseFactory.ok(
         new SkuDetailResponse(
             skuItem.getSkuId(),
             skuItem.getGame(),
             skuItem.getExternalSource(),
             skuItem.getExternalId(),
+            imageUrls,
             skuItem.getName(),
             skuItem.getSetCode(),
             skuItem.getSetName(),

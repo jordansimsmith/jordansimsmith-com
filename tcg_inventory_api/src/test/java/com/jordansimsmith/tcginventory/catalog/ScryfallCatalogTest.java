@@ -90,6 +90,19 @@ public class ScryfallCatalogTest {
   }
 
   @Test
+  void getImageUrlsShouldBuildRedirectUrlsWithoutRequestingScryfall() {
+    // act
+    var imageUrls = catalog.getImageUrls(CARD_ID);
+
+    // assert
+    assertThat(imageUrls.small())
+        .isEqualTo("https://api.scryfall.com/cards/" + CARD_ID + "?format=image&version=small");
+    assertThat(imageUrls.normal())
+        .isEqualTo("https://api.scryfall.com/cards/" + CARD_ID + "?format=image&version=normal");
+    assertThat(requests).isEmpty();
+  }
+
+  @Test
   void findCardsShouldReturnExactEnglishCardsAndLeaveMissingOrNonEnglishUnresolved()
       throws Exception {
     // arrange

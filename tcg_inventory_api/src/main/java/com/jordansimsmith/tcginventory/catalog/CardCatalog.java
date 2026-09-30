@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Map;
 
 public interface CardCatalog {
+  CatalogCard.ImageUrls getImageUrls(String externalId);
+
   CatalogCard getCard(String externalId);
 
   Map<String, CatalogCard> findCards(List<String> externalIds);

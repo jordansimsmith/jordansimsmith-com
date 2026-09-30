@@ -23,13 +23,6 @@ public class MagicTheGatheringAppraisalCatalog implements AppraisalCatalog {
       throw new IllegalArgumentException(
           "unsupported game for Magic appraisal: " + identity.game());
     }
-    if (!Games.MAGIC_THE_GATHERING.externalSource().equals(identity.externalSource())) {
-      throw new IllegalArgumentException(
-          "unsupported external source for game "
-              + identity.game()
-              + ": "
-              + identity.externalSource());
-    }
     if (!Games.MAGIC_THE_GATHERING.supportsFinish(rowItem.getFinish())) {
       throw new IllegalArgumentException("unsupported finish for game: " + rowItem.getFinish());
     }

@@ -81,6 +81,7 @@ export interface SkuUnit {
 export interface SkuDetail extends SkuSummary {
   external_source: string;
   external_id: string;
+  image_urls: ImageUrls;
   in_stock_count: number;
   reserved_count: number;
   sold_count: number;
@@ -230,11 +231,13 @@ export interface CatalogCard {
   set_code: string;
   set_name: string;
   collector_number: string;
-  image_urls: {
-    small: string | null;
-    normal: string | null;
-  };
+  image_urls: ImageUrls;
   available_finishes: Finish[];
+}
+
+export interface ImageUrls {
+  small: string | null;
+  normal: string | null;
 }
 
 export interface CatalogCardsResponse {
@@ -332,6 +335,7 @@ export interface OrderUnit {
   current_location: string;
   external_source: string;
   external_id: string;
+  image_urls: ImageUrls;
   name: string;
   set_code: string;
   collector_number: string;

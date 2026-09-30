@@ -223,7 +223,7 @@ Bazel mirrors this layout with `:games-lib`, `:catalog-lib`, `:scan-lib`, `:impo
 - **Firebase token exchange**: each job run exchanges the stored refresh token at Firebase's fixed HTTPS token endpoint for a one-hour bearer. A replacement refresh token in the response is persisted back to the secret. The refresh token is never sent to FetchTCG.
 - **Offer state mapping** (from the seller offers list): an offer first seen with `status = ACCEPTED` creates an order and reserves units, provided its `acceptedAt` is strictly after the user's `track_orders_after` setting (when set). Offers accepted at or before that instant are silently skipped on every run and never create order records. If `acceptedAt` is null or unparseable on an `ACCEPTED` offer, the offer is fail-closed skipped with a warning log. `currentAction` past payment confirmation — exactly `SEND_PICKUP_ADDRESS` (pickup), `SEND_TRACKING_CODE` (delivery), `SEND_REVIEW`, or `AWAIT_REVIEW`, the complete post-payment set observed in captured FetchTCG traffic — marks the order `to_pick`; actions at or before payment confirmation (`AWAITING_DELIVERY_MODE`, `AWAITING_SHIPPING_ADDRESS`, `SEND_PAYMENT_INSTRUCTIONS`, `AWAITING_PAYMENT`, and `CONFIRM_PAYMENT_RECEIVED`, where the buyer claims payment the seller has not yet confirmed) leave it `awaiting_payment`. An `awaiting_payment` order whose offer comes back `CANCELLED_BY_SELLER` or `CANCELLED_BY_BUYER` — the two post-acceptance cancellations in FetchTCG's own cancelled filter, whose other members (`REJECTED`, `WITHDRAWN_BY_BUYER`) are pre-acceptance and never produce orders — is voided and its units released; a cancelled offer carries `currentAction: null`, so it can never advance. An order absent from the list is left untouched, so a truncated page never releases stock. When an offer cannot resolve all its listing lines to known SKUs or has insufficient in-stock units, the order is created with status `flagged` (no units are reserved for unmapped lines). Each mapped line persists `items[].price` (offered line total) and `items[].listing.listedPrice` (per-unit asking price at ingest — FetchTCG's current listing price at fetch time, not a snapshot from offer creation). Payment instructions, bank details, proof of payment, and tracking details are never persisted.
 - **Fulfillment details** (from the same seller offers list): every run copies `buyerName`, `buyerRegionAddress` (`line1`, `line2`, `suburb`, `city`, `postCode`, `country` only — latitude, longitude, and profile imagery are dropped), and `shippingOption.title` (the postage product the buyer paid for, for example `Economy Tracked`) onto the order. These fields are absent or incomplete until the buyer supplies them — pickup offers carry no `shippingOption`, and an address whose parts are all null stores as no address — so unlike `listed_price` they are refreshed on every order-phase run rather than frozen at ingest.
-- **Scryfall API**: the set-mapping generator consumes public set/card records. Authenticated catalog routes in this API call Scryfall for English physical Magic printing details, related printings, and name or exact-ID search. These requests use a descriptive User-Agent, `Accept: application/json`, a 5-second request timeout, and 100 ms minimum spacing per warm Lambda. Catalog continuations contain a provider page position bound to the original request; clients never provide a provider URL. Scan confirmation validates distinct selected IDs through `POST /cards/collection` in chunks of at most 75, checks exact identity, English language, and the scan finish, and stores canonical name/set/collector metadata before creating an import. Missing or ineligible selections reject the whole confirmation before writes. Order detail returns each target unit's `game`, `external_source`, and `external_id`; the browser's image resolver still maps only Magic/Scryfall identity to a small card image. Existing FetchTCG appraisal verifies the Scryfall ID against its candidate before a keep decision.
+- **Scryfall API**: the set-mapping generator consumes public set/card records. Authenticated catalog routes in this API call Scryfall for English physical Magic printing details, related printings, and name or exact-ID search. These requests use a descriptive User-Agent, `Accept: application/json`, a 5-second request timeout, and 100 ms minimum spacing per warm Lambda. Catalog continuations contain a provider page position bound to the original request; clients never provide a provider URL. Scan confirmation validates distinct selected IDs through `POST /cards/collection` in chunks of at most 75, checks exact identity, English language, and the scan finish, and stores canonical name/set/collector metadata before creating an import. Missing or ineligible selections reject the whole confirmation before writes. SKU and order detail responses include small and normal image redirect URLs generated from each stored identity without Scryfall requests. Existing FetchTCG appraisal verifies the Scryfall ID against its candidate before a keep decision.
 - **CollectorVision and CollectorVisionCatalog**: a pinned Python library, Scryfall MTG catalog v2 snapshot, and matching Milo ONNX model are installed in the scan worker image before deployment. Runtime opens a fixed catalog version with `offline=True`; it makes no catalog/model downloads. Search returns printing IDs and raw cosine scores; a candidate never bypasses human confirmation.
 
 ## API contracts
@@ -243,41 +243,41 @@ Bazel mirrors this layout with `:games-lib`, `:catalog-lib`, `:scan-lib`, `:impo
 
 ### Endpoint summary
 
-| Method   | Path                                                     | Purpose                                                                                         |
-| -------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| `GET`    | `/games`                                                 | list registered game display metadata, finishes, and capabilities                               |
-| `POST`   | `/imports?game=<game>&filename=<filename>`               | upload a ManaBox CSV for a registered CSV-enabled game; starts the appraise job                 |
-| `GET`    | `/imports`                                               | list imports newest-first (continuation paging)                                                 |
-| `GET`    | `/imports/{import_id}`                                   | import status, progress, rows, and keep-row suggested total                                     |
-| `PUT`    | `/imports/{import_id}/rows/{position}`                   | update a row's condition before confirm                                                         |
-| `DELETE` | `/imports/{import_id}/rows/{position}`                   | delete a misidentified row before confirm                                                       |
-| `POST`   | `/imports/{import_id}/rows/{position}/photos`            | add a photo to a keep row (raw JPEG body)                                                       |
-| `DELETE` | `/imports/{import_id}/rows/{position}/photos/{photo_id}` | remove a row photo before confirm                                                               |
-| `POST`   | `/imports/{import_id}/confirm`                           | append keeper units; returns placement instructions and total suggested price                   |
-| `DELETE` | `/imports/{import_id}`                                   | delete an unconfirmed import and its rows                                                       |
-| `POST`   | `/scans`                                                 | create ordered scan slots with batch condition/finish and presigned upload URLs                 |
-| `GET`    | `/scans`                                                 | list scan jobs newest-first (continuation paging)                                               |
-| `GET`    | `/scans/{scan_id}`                                       | scan rows, progress/suggestions, source GET URLs, and upload-phase verification state           |
-| `POST`   | `/scans/{scan_id}/identify`                              | verify all uploaded JPEGs and queue one recognition pass                                        |
-| `DELETE` | `/scans/{scan_id}/rows/{scan_position}`                  | permanently exclude one scan row while reviewing                                                |
-| `POST`   | `/scans/{scan_id}/confirm`                               | create an ordinary import from explicitly confirmed printings and return its ID                 |
-| `DELETE` | `/scans/{scan_id}`                                       | delete an unfinished scan and its source objects                                                |
-| `GET`    | `/skus`                                                  | browse/search SKUs for required `game` (prefix search, continuation paging)                     |
-| `GET`    | `/skus/{sku_id}`                                         | SKU detail including its units                                                                  |
-| `DELETE` | `/skus/{sku_id}/units/{sequence_number}`                 | remove a unit (optional `reason` query param)                                                   |
-| `PUT`    | `/skus/{sku_id}/units/{sequence_number}`                 | update a unit's condition (moves it to another SKU; response returns the new `sku_id`)          |
-| `GET`    | `/orders`                                                | list orders by descending numeric ID with item and listed subtotals (continuation paging)       |
-| `GET`    | `/orders/{order_id}`                                     | order detail: offer lines (offered vs listed), game-aware units, external identities, locations |
-| `POST`   | `/orders/{order_id}/confirm`                             | confirm the pull; marks allocated units sold                                                    |
-| `POST`   | `/publish`                                               | start a publish run; responds 202 and is idempotent while one is queued/running                 |
-| `GET`    | `/publish`                                               | current-or-latest publish run: status, progress, error, pending dirty count                     |
-| `POST`   | `/reports`                                               | start a report generation; responds 202 and is idempotent while one is queued/running           |
-| `GET`    | `/reports`                                               | latest report snapshot with staleness and generation status; 404 before first run               |
-| `GET`    | `/settings`                                              | settings view: credential presence, last-updated, track orders after                            |
-| `PATCH`  | `/settings`                                              | partial update: optional refresh token + optional track orders after                            |
-| `GET`    | `/catalog/cards/{external_id}`                           | exact Magic printing detail and available finishes                                              |
-| `GET`    | `/catalog/cards/{external_id}/alternatives`              | related Magic printings eligible for a finish, with continuation paging                         |
-| `GET`    | `/catalog/cards`                                         | Magic product search by name or exact Scryfall ID, with continuation paging                     |
+| Method   | Path                                                     | Purpose                                                                                   |
+| -------- | -------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `GET`    | `/games`                                                 | list registered game display metadata, finishes, and capabilities                         |
+| `POST`   | `/imports?game=<game>&filename=<filename>`               | upload a ManaBox CSV for a registered CSV-enabled game; starts the appraise job           |
+| `GET`    | `/imports`                                               | list imports newest-first (continuation paging)                                           |
+| `GET`    | `/imports/{import_id}`                                   | import status, progress, rows, and keep-row suggested total                               |
+| `PUT`    | `/imports/{import_id}/rows/{position}`                   | update a row's condition before confirm                                                   |
+| `DELETE` | `/imports/{import_id}/rows/{position}`                   | delete a misidentified row before confirm                                                 |
+| `POST`   | `/imports/{import_id}/rows/{position}/photos`            | add a photo to a keep row (raw JPEG body)                                                 |
+| `DELETE` | `/imports/{import_id}/rows/{position}/photos/{photo_id}` | remove a row photo before confirm                                                         |
+| `POST`   | `/imports/{import_id}/confirm`                           | append keeper units; returns placement instructions and total suggested price             |
+| `DELETE` | `/imports/{import_id}`                                   | delete an unconfirmed import and its rows                                                 |
+| `POST`   | `/scans`                                                 | create ordered scan slots with batch condition/finish and presigned upload URLs           |
+| `GET`    | `/scans`                                                 | list scan jobs newest-first (continuation paging)                                         |
+| `GET`    | `/scans/{scan_id}`                                       | scan rows, progress/suggestions, source GET URLs, and upload-phase verification state     |
+| `POST`   | `/scans/{scan_id}/identify`                              | verify all uploaded JPEGs and queue one recognition pass                                  |
+| `DELETE` | `/scans/{scan_id}/rows/{scan_position}`                  | permanently exclude one scan row while reviewing                                          |
+| `POST`   | `/scans/{scan_id}/confirm`                               | create an ordinary import from explicitly confirmed printings and return its ID           |
+| `DELETE` | `/scans/{scan_id}`                                       | delete an unfinished scan and its source objects                                          |
+| `GET`    | `/skus`                                                  | browse/search SKUs for required `game` (prefix search, continuation paging)               |
+| `GET`    | `/skus/{sku_id}`                                         | SKU detail, units, and provider image URLs                                                |
+| `DELETE` | `/skus/{sku_id}/units/{sequence_number}`                 | remove a unit (optional `reason` query param)                                             |
+| `PUT`    | `/skus/{sku_id}/units/{sequence_number}`                 | update a unit's condition (moves it to another SKU; response returns the new `sku_id`)    |
+| `GET`    | `/orders`                                                | list orders by descending numeric ID with item and listed subtotals (continuation paging) |
+| `GET`    | `/orders/{order_id}`                                     | order detail: offer lines (offered vs listed), game-aware units, images, and locations    |
+| `POST`   | `/orders/{order_id}/confirm`                             | confirm the pull; marks allocated units sold                                              |
+| `POST`   | `/publish`                                               | start a publish run; responds 202 and is idempotent while one is queued/running           |
+| `GET`    | `/publish`                                               | current-or-latest publish run: status, progress, error, pending dirty count               |
+| `POST`   | `/reports`                                               | start a report generation; responds 202 and is idempotent while one is queued/running     |
+| `GET`    | `/reports`                                               | latest report snapshot with staleness and generation status; 404 before first run         |
+| `GET`    | `/settings`                                              | settings view: credential presence, last-updated, track orders after                      |
+| `PATCH`  | `/settings`                                              | partial update: optional refresh token + optional track orders after                      |
+| `GET`    | `/catalog/cards/{external_id}`                           | exact Magic printing detail and available finishes                                        |
+| `GET`    | `/catalog/cards/{external_id}/alternatives`              | related Magic printings eligible for a finish, with continuation paging                   |
+| `GET`    | `/catalog/cards`                                         | Magic product search by name or exact Scryfall ID, with continuation paging               |
 
 ### `GET /games`
 
@@ -407,6 +407,10 @@ Response `200` (units sorted ascending by sequence number; locations and the `*_
   "game": "mtg",
   "external_source": "scryfall",
   "external_id": "f0a51425-d796-48b8-b68c-bc21fb465c81",
+  "image_urls": {
+    "small": "https://api.scryfall.com/cards/f0a51425-d796-48b8-b68c-bc21fb465c81?format=image&version=small",
+    "normal": "https://api.scryfall.com/cards/f0a51425-d796-48b8-b68c-bc21fb465c81?format=image&version=normal"
+  },
   "name": "Elvish Aberration",
   "set_code": "a25",
   "set_name": "Masters 25",
@@ -446,11 +450,13 @@ Response `200` (units sorted ascending by sequence number; locations and the `*_
 
 `GET /skus` requires `game` and accepts optional `search`, `continuation`, and `limit`. The game must be registered; missing or unsupported games return 400. Each summary includes `game`.
 
+`image_urls` on SKU detail and order units are generated from the stored identity through the registered game's catalog adapter. The current Magic adapter returns Scryfall image redirect URLs without making an upstream request; each size is nullable for adapters without an image URL.
+
 Adjustment responses: `DELETE /skus/{sku_id}/units/{sequence_number}` responds `200` with the updated SKU detail (same shape as `GET /skus/{sku_id}`); `PUT /skus/{sku_id}/units/{sequence_number}` with body `{"condition": "LP"}` responds `200` with `{"sku_id": "mtg#scryfall#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#LP"}`.
 
 `GET /orders/{order_id}`
 
-Response `200` (the `units` list, sorted by game then sequence number, is the pull sheet when the order is `to_pick`; `lines` are offer lines in payload order and include `game`; line `price` is the offered line total and `listed_price` is the per-unit asking price captured at ingest, or `null` on orders ingested before this field existed; `items_total_price` and `listed_total_price` follow the `GET /orders` semantics; unit `price` is the line total divided evenly across its quantity; each unit carries `game`, `external_source`, and `external_id`; `current_location`, `previous_card`, and `next_card` are a snapshot of the same game's block as of the read, with neighbors `null` at block edges):
+Response `200` (the `units` list, sorted by game then sequence number, is the pull sheet when the order is `to_pick`; `lines` are offer lines in payload order and include `game`; line `price` is the offered line total and `listed_price` is the per-unit asking price captured at ingest, or `null` on orders ingested before this field existed; `items_total_price` and `listed_total_price` follow the `GET /orders` semantics; unit `price` is the line total divided evenly across its quantity; each unit carries `game`, `external_source`, `external_id`, and `image_urls`; `current_location`, `previous_card`, and `next_card` are a snapshot of the same game's block as of the read, with neighbors `null` at block edges):
 
 ```json
 {
@@ -493,6 +499,10 @@ Response `200` (the `units` list, sorted by game then sequence number, is the pu
       "current_location": "A12-1",
       "external_source": "scryfall",
       "external_id": "0bc3401f-935b-45ce-b1e6-300a5d9dfd4f",
+      "image_urls": {
+        "small": "https://api.scryfall.com/cards/0bc3401f-935b-45ce-b1e6-300a5d9dfd4f?format=image&version=small",
+        "normal": "https://api.scryfall.com/cards/0bc3401f-935b-45ce-b1e6-300a5d9dfd4f?format=image&version=normal"
+      },
       "name": "Hellkite Tyrant",
       "set_code": "gtc",
       "collector_number": "94",
@@ -809,7 +819,7 @@ Inventory mutations are `TransactWriteItems` including their audit entry; every 
 - Only FetchTCG offers with `acceptedAt` strictly after the user's `track_orders_after` setting create order records and reservations. The cutoff comparison uses epoch-seconds instants; the advance loop for existing orders is unfiltered (orders already tracked cannot be orphaned by a date change).
 - Order fulfillment details (`buyer_name`, `buyer_address`, `postage_option`) mirror the offer on every order-phase run and are rewritten whenever any of them changed, in a single plain update that writes no audit entry: nothing about inventory or revenue moved, so the refresh must not mark the report stale. A run where none of the three changed writes nothing. An address whose parts are all null stores as no address rather than an empty map, and voided or fulfilled orders keep the details they last saw.
 - Order line `listed_price` is captured once at ingest from the offer payload and never rewritten. Orders ingested before this field existed deserialize it as null; `listed_total_price` is then omitted. `items[].price` is a line total; `listedPrice` is per-unit. `total_price` includes shipping and is not compared against listed value.
-- Order detail unit `price` is the line's offered total divided evenly across its quantity (2 dp, half-up) — a display value; stored line totals stay authoritative for sums. Each target unit returns `game`, `external_source`, and `external_id` from its SKU; the API does not fetch or proxy card imagery, and neighbor cards intentionally carry only text identity fields. `current_location`, `previous_card`, and `next_card` are a snapshot of the same game's block at read time: sold and removed units are excluded; in-stock and reserved units, including the order's own, count as boxed. Neighbors never cross game or block boundaries and are `null` at block edges.
+- Order detail unit `price` is the line's offered total divided evenly across its quantity (2 dp, half-up) — a display value; stored line totals stay authoritative for sums. Each target unit returns `game`, `external_source`, `external_id`, and game-adapter `image_urls` from its SKU; URLs are constructed without provider requests, and neighbor cards intentionally carry only text identity fields. `current_location`, `previous_card`, and `next_card` are a snapshot of the same game's block at read time: sold and removed units are excluded; in-stock and reserved units, including the order's own, count as boxed. Neighbors never cross game or block boundaries and are `null` at block edges.
 - Advancing an order `awaiting_payment → to_pick` touches no units and sets no dirty flag, but writes a `payment` audit entry transactionally with the conditional status flip: revenue counts paid orders, so the advance marks the report stale like every other revenue-affecting mutation.
 - Confirming a pull writes nothing to FetchTCG. Voiding an order releases units and dirties SKUs; the restored quantity reaches FetchTCG on the next publish run unless the seller already relisted on FetchTCG, in which case the projection converges as a no-op.
 - Only an `awaiting_payment` order voids, and only when its offer is present in the seller list with a cancelled status: an order missing from the list keeps its reservations, and a cancellation arriving after payment leaves a `to_pick` order alone for manual handling. Release chunks like reserve and sell with the order write last, so a partially applied release leaves the order `awaiting_payment` and the next run finishes it.

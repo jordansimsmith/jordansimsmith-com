@@ -35,6 +35,13 @@ public class FakeCardCatalogs extends Catalogs {
     private CatalogException failure;
 
     @Override
+    public CatalogCard.ImageUrls getImageUrls(String externalId) {
+      return new CatalogCard.ImageUrls(
+          "https://img.example/cards/" + externalId + "/small.jpg",
+          "https://img.example/cards/" + externalId + "/normal.jpg");
+    }
+
+    @Override
     public CatalogCard getCard(String externalId) {
       throw new UnsupportedOperationException();
     }

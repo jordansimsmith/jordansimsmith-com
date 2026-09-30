@@ -89,6 +89,13 @@ public class ScryfallCatalog implements CardCatalog {
   }
 
   @Override
+  public CatalogCard.ImageUrls getImageUrls(String externalId) {
+    var imageUrl =
+        "https://api.scryfall.com/cards/" + encode(externalId) + "?format=image&version=";
+    return new CatalogCard.ImageUrls(imageUrl + "small", imageUrl + "normal");
+  }
+
+  @Override
   public CatalogCard getCard(String externalId) {
     try {
       return doGetCard(externalId);

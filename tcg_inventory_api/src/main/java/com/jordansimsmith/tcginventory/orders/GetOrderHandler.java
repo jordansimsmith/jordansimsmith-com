@@ -10,6 +10,8 @@ import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
+import com.jordansimsmith.tcginventory.catalog.CatalogCard;
+import com.jordansimsmith.tcginventory.catalog.Catalogs;
 import com.jordansimsmith.tcginventory.games.Games;
 import com.jordansimsmith.tcginventory.inventory.InventoryLocation;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
@@ -49,6 +51,7 @@ public class GetOrderHandler
       @JsonProperty("current_location") String currentLocation,
       @JsonProperty("external_source") String externalSource,
       @JsonProperty("external_id") String externalId,
+      @JsonProperty("image_urls") CatalogCard.ImageUrls imageUrls,
       @JsonProperty("name") String name,
       @JsonProperty("set_code") String setCode,
       @JsonProperty("collector_number") String collectorNumber,
@@ -104,6 +107,7 @@ public class GetOrderHandler
   private final DynamoDbTable<OrderItem> orderTable;
   private final DynamoDbTable<UnitItem> unitTable;
   private final DynamoDbTable<SkuItem> skuTable;
+  private final Catalogs catalogs;
 
   public GetOrderHandler() {
     this(TcgInventoryFactory.create());
@@ -116,6 +120,7 @@ public class GetOrderHandler
     this.orderTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderItem.class);
     this.unitTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class);
     this.skuTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), SkuItem.class);
+    this.catalogs = factory.catalogs();
   }
 
   @Override
@@ -168,9 +173,12 @@ public class GetOrderHandler
               line.getPrice(),
               line.getListedPrice()));
 
+      var game = Games.get(skuItem.getGame());
+      var catalog = catalogs.forGame(game);
       var unitPrice = perUnitPrice(line);
       for (var seqNum : line.getAllocatedSequenceNumbers()) {
         var position = computeBlockPosition(blockUnits, skuItem.getGame(), seqNum);
+        var imageUrls = catalog.getImageUrls(skuItem.getExternalId());
         units.add(
             new OrderUnitResponse(
                 skuItem.getGame(),
@@ -179,6 +187,7 @@ public class GetOrderHandler
                 position.currentLocation(),
                 skuItem.getExternalSource(),
                 skuItem.getExternalId(),
+                imageUrls,
                 skuItem.getName(),
                 skuItem.getSetCode(),
                 skuItem.getCollectorNumber(),

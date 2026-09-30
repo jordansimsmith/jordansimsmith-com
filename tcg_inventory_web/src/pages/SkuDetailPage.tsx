@@ -20,7 +20,6 @@ import { EditConditionModal } from '../components/EditConditionModal';
 import { apiClient } from '../api/client';
 import { useGames } from '../GamesProvider';
 import type { Condition, SkuDetail, SkuUnit } from '../api/client';
-import { cardImageUrl } from '../domain/card-image';
 import classes from './SkuDetailPage.module.css';
 
 const CARD_IMAGE_FALLBACK =
@@ -170,12 +169,7 @@ export function SkuDetailPage() {
               <Box className={classes.overview}>
                 <Box className={classes.cardImageFrame}>
                   <Image
-                    src={cardImageUrl(
-                      sku.game,
-                      sku.external_source,
-                      sku.external_id,
-                      'normal',
-                    )}
+                    src={sku.image_urls.normal ?? CARD_IMAGE_FALLBACK}
                     fallbackSrc={CARD_IMAGE_FALLBACK}
                     alt={sku.name}
                     w="100%"
