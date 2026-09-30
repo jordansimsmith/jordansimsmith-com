@@ -33,6 +33,8 @@ public class HttpFetchTcgTokenMinter implements FetchTcgTokenMinter {
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
+    } catch (FetchTcgAuthException e) {
+      throw e;
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -56,6 +58,12 @@ public class HttpFetchTcgTokenMinter implements FetchTcgTokenMinter {
     var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
 
     if (response.statusCode() != 200) {
+      var errorCode = objectMapper.readTree(response.body()).path("error").path("message").asText();
+      if ("TOKEN_EXPIRED".equals(errorCode) || "INVALID_REFRESH_TOKEN".equals(errorCode)) {
+        throw new FetchTcgAuthException(
+            response.statusCode(),
+            "Firebase rejected the stored refresh token with code " + errorCode);
+      }
       throw new IOException(
           "Firebase token exchange failed with status "
               + response.statusCode()

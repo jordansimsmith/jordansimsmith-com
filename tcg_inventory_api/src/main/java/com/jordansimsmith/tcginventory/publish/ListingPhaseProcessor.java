@@ -1,7 +1,7 @@
 package com.jordansimsmith.tcginventory.publish;
 
-import com.jordansimsmith.tcginventory.BatchResult;
 import com.jordansimsmith.tcginventory.Condition;
+import com.jordansimsmith.tcginventory.JobProcessor;
 import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
@@ -55,7 +55,7 @@ public class ListingPhaseProcessor {
     this.s3Client = s3Client;
   }
 
-  public BatchResult process(String user, String bearerToken, int continuation) {
+  public JobProcessor.SuccessJobResult process(String user, String bearerToken, int continuation) {
     var dirtySkus = loadDirtySkus(user);
     int processed = 0;
 
@@ -75,7 +75,8 @@ public class ListingPhaseProcessor {
       processed++;
     }
 
-    return new BatchResult(continuation + processed, dirtySkus.size() < BATCH_SIZE);
+    return new JobProcessor.SuccessJobResult(
+        continuation + processed, dirtySkus.size() < BATCH_SIZE);
   }
 
   private List<SkuItem> loadDirtySkus(String user) {

@@ -54,6 +54,7 @@ public class JobsHandlerIntegrationTest {
   private DynamoDbTable<SettingsItem> settingsTable;
   private DynamoDbTable<OrderItem> orderTable;
   private DynamoDbTable<AuditItem> auditTable;
+  private TcgInventoryTestFactory factory;
 
   private JobsHandler jobsHandler;
 
@@ -72,8 +73,7 @@ public class JobsHandlerIntegrationTest {
 
   @BeforeEach
   void setUp() {
-    var factory =
-        TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
+    factory = TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
 
     fakeClock = factory.fakeClock();
     fakeJobsQueue = factory.fakeJobsQueue();
@@ -362,10 +362,7 @@ public class JobsHandlerIntegrationTest {
     var jobItem = createJob("jordan", "job1", "appraise", "queued", "import1");
 
     // act & assert
-    assertThatThrownBy(
-            () ->
-                new AppraiseJobProcessor(importTable, importRowTable, fakeClock, fakeFetchTcgClient)
-                    .processBatch("jordan", jobItem))
+    assertThatThrownBy(() -> new AppraiseJobProcessor(factory).processBatch("jordan", jobItem))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("external id must contain only ASCII unreserved characters");
     assertThat(fakeFetchTcgClient.getSearchCallCount()).isZero();
@@ -1431,21 +1428,48 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishShouldStoreTruncatedRootCauseErrorWhenMessageIsLong() {
+  void publishShouldPropagateProviderFailureAndLeaveJobRunning() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
     var message = "FetchTCG request failed with status 500 after 3 attempt(s): " + "x".repeat(5000);
     fakeFetchTcgClient.seedSellerOffersFailure(new RuntimeException(new IOException(message)));
 
+    // act & assert
+    assertThatThrownBy(
+            () -> jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null))
+        .hasRootCauseInstanceOf(IOException.class)
+        .hasRootCauseMessage(message);
+
+    var job = getJob("jordan", "job1");
+    assertThat(job.getStatus()).isEqualTo("running");
+    assertThat(job.getError()).isNull();
+
+    // arrange: the provider has recovered before SQS redelivery
+    fakeFetchTcgClient.seedSellerOffersFailure(null);
+
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
     // assert
+    assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("succeeded");
+  }
+
+  @Test
+  void appraiseShouldReturnFailureForCredentialErrorAndUpdateImport() {
+    // arrange
+    createImportWithRow("jordan", "import1", "dom", "168", "normal", "NM", "en");
+    createJob("jordan", "job1", "appraise", "queued", "import1");
+    fakeFetchTcgClient.seedSearchCardsFailure(
+        new FetchTcgAuthException(401, "FetchTCG authentication failed with status 401"));
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
+
+    // assert
     var job = getJob("jordan", "job1");
     assertThat(job.getStatus()).isEqualTo("failed");
-    assertThat(job.getError()).startsWith("FetchTCG request failed with status 500");
-    assertThat(job.getError()).hasSize(301).endsWith("…");
+    assertThat(getImport("jordan", "import1").getError())
+        .isEqualTo("FetchTCG authentication failed. Replace the refresh token in settings.");
   }
 
   private void createDirtySkuWithUnits(

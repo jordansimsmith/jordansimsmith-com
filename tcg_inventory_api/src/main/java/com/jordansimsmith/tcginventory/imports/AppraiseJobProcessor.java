@@ -1,9 +1,12 @@
 package com.jordansimsmith.tcginventory.imports;
 
-import com.jordansimsmith.tcginventory.BatchResult;
 import com.jordansimsmith.tcginventory.CardIdentity;
 import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.JobItem;
+import com.jordansimsmith.tcginventory.JobProcessor;
+import com.jordansimsmith.tcginventory.TcgInventoryFactory;
+import com.jordansimsmith.tcginventory.TcgInventoryTable;
+import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgAuthException;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
 import com.jordansimsmith.tcginventory.imports.AppraisalCatalogs.AppraisalCatalog;
 import com.jordansimsmith.time.Clock;
@@ -18,7 +21,7 @@ import java.util.TreeMap;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 
-public class AppraiseJobProcessor {
+public class AppraiseJobProcessor implements JobProcessor {
   public static final int BATCH_SIZE = 100;
 
   private final DynamoDbTable<ImportItem> importTable;
@@ -27,19 +30,27 @@ public class AppraiseJobProcessor {
   private final FetchTcgClient fetchTcgClient;
   private final PricingPolicy pricingPolicy;
 
-  public AppraiseJobProcessor(
-      DynamoDbTable<ImportItem> importTable,
-      DynamoDbTable<ImportRowItem> importRowTable,
-      Clock clock,
-      FetchTcgClient fetchTcgClient) {
-    this.importTable = importTable;
-    this.importRowTable = importRowTable;
-    this.clock = clock;
-    this.fetchTcgClient = fetchTcgClient;
+  public AppraiseJobProcessor(TcgInventoryFactory factory) {
+    var enhancedClient = factory.dynamoDbEnhancedClient();
+    this.importTable = TcgInventoryTable.table(enhancedClient, ImportItem.class);
+    this.importRowTable = TcgInventoryTable.table(enhancedClient, ImportRowItem.class);
+    this.clock = factory.clock();
+    this.fetchTcgClient = factory.fetchTcgClient();
     this.pricingPolicy = new PricingPolicy();
   }
 
-  public BatchResult processBatch(String user, JobItem jobItem) {
+  @Override
+  public JobProcessor.JobResult processBatch(String user, JobItem jobItem) {
+    try {
+      return doProcessBatch(user, jobItem);
+    } catch (FetchTcgAuthException e) {
+      var error = FetchTcgAuthException.USER_MESSAGE;
+      setImportError(user, jobItem.getImportId(), error);
+      return new JobProcessor.FailureJobResult(error);
+    }
+  }
+
+  private JobProcessor.SuccessJobResult doProcessBatch(String user, JobItem jobItem) {
     var importId = jobItem.getImportId();
     var continuation = jobItem.getContinuation() != null ? jobItem.getContinuation() : 0;
 
@@ -90,7 +101,19 @@ public class AppraiseJobProcessor {
     importItem.setUpdatedAt(clock.now());
     importTable.putItem(importItem);
 
-    return new BatchResult(processed, complete);
+    return new JobProcessor.SuccessJobResult(processed, complete);
+  }
+
+  private void setImportError(String user, String importId, String error) {
+    var importKey =
+        Key.builder()
+            .partitionValue(ImportItem.formatPk(user))
+            .sortValue(ImportItem.formatSk(importId))
+            .build();
+    var importItem = importTable.getItem(importKey);
+    importItem.setError(error);
+    importItem.setUpdatedAt(clock.now());
+    importTable.putItem(importItem);
   }
 
   private RowDecision appraiseRow(

@@ -14,6 +14,7 @@ public class FakeFetchTcgClient implements FetchTcgClient {
   private final List<Integer> deleteCalls = new ArrayList<>();
   private final List<UploadCall> uploadCalls = new ArrayList<>();
   private RuntimeException sellerOffersFailure;
+  private RuntimeException searchCardsFailure;
   private int searchCallCount;
   private int nextListingId = 900000;
   private int nextImageId = 1;
@@ -29,6 +30,9 @@ public class FakeFetchTcgClient implements FetchTcgClient {
 
   @Override
   public SearchCardsResponse searchCards(String gameId, int setId, String cardName, String finish) {
+    if (searchCardsFailure != null) {
+      throw searchCardsFailure;
+    }
     searchCallCount++;
     var key = gameId + "#" + setId + "#" + cardName + "#" + finish;
     var response = searchResults.get(key);
@@ -101,6 +105,10 @@ public class FakeFetchTcgClient implements FetchTcgClient {
     this.sellerOffersFailure = exception;
   }
 
+  public void seedSearchCardsFailure(RuntimeException exception) {
+    this.searchCardsFailure = exception;
+  }
+
   public List<UpsertListingRequest> getUpsertCalls() {
     return upsertCalls;
   }
@@ -126,6 +134,7 @@ public class FakeFetchTcgClient implements FetchTcgClient {
     deleteCalls.clear();
     uploadCalls.clear();
     sellerOffersFailure = null;
+    searchCardsFailure = null;
     searchCallCount = 0;
     nextListingId = 900000;
     nextImageId = 1;

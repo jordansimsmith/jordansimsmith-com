@@ -2,12 +2,14 @@ package com.jordansimsmith.tcginventory.reports;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.tcginventory.AuditItem;
-import com.jordansimsmith.tcginventory.BatchResult;
 import com.jordansimsmith.tcginventory.JobItem;
+import com.jordansimsmith.tcginventory.JobProcessor;
+import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.games.Games;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
+import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.time.Clock;
 import java.math.BigDecimal;
@@ -22,7 +24,7 @@ import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
-public class ReportJobProcessor {
+public class ReportJobProcessor implements JobProcessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReportJobProcessor.class);
 
   private final DynamoDbTable<ReportItem> reportTable;
@@ -33,24 +35,24 @@ public class ReportJobProcessor {
   private final ObjectMapper objectMapper;
   private final Clock clock;
 
-  public ReportJobProcessor(
-      DynamoDbTable<ReportItem> reportTable,
-      InventoryRepository inventoryRepository,
-      DynamoDbTable<AuditItem> auditTable,
-      DynamoDbTable<SkuItem> skuTable,
-      DynamoDbTable<OrderItem> orderTable,
-      ObjectMapper objectMapper,
-      Clock clock) {
-    this.reportTable = reportTable;
-    this.inventoryRepository = inventoryRepository;
-    this.auditTable = auditTable;
+  public ReportJobProcessor(TcgInventoryFactory factory) {
+    var enhancedClient = factory.dynamoDbEnhancedClient();
+    var skuTable = TcgInventoryTable.table(enhancedClient, SkuItem.class);
+    var orderTable = TcgInventoryTable.table(enhancedClient, OrderItem.class);
+    var unitTable = TcgInventoryTable.table(enhancedClient, UnitItem.class);
+    this.reportTable = TcgInventoryTable.table(enhancedClient, ReportItem.class);
+    this.inventoryRepository =
+        new InventoryRepository(
+            unitTable, factory.dynamoDbClient(), factory.clock(), factory.ulidGenerator());
+    this.auditTable = factory.auditTable();
     this.orderTable = orderTable;
     this.gsi2Index = skuTable.index(TcgInventoryTable.GSI2_NAME);
-    this.objectMapper = objectMapper;
-    this.clock = clock;
+    this.objectMapper = factory.objectMapper();
+    this.clock = factory.clock();
   }
 
-  public BatchResult processBatch(String user, JobItem jobItem) {
+  @Override
+  public JobProcessor.SuccessJobResult processBatch(String user, JobItem jobItem) {
     LOGGER.info("starting report job for user {}", user);
 
     var asOfAuditUlid = findLatestAuditUlid(user);
@@ -114,7 +116,7 @@ public class ReportJobProcessor {
     }
 
     LOGGER.info("wrote report snapshot");
-    return new BatchResult(0, true);
+    return new JobProcessor.SuccessJobResult(0, true);
   }
 
   private String findLatestAuditUlid(String user) {

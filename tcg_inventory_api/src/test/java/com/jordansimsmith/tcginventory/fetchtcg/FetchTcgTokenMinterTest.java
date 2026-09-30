@@ -174,7 +174,8 @@ public class FetchTcgTokenMinterTest {
   }
 
   @Test
-  void mintShouldThrowWhenFirebaseReturnsError() throws IOException, InterruptedException {
+  void mintShouldReturnCredentialRejectionForExpiredRefreshToken()
+      throws IOException, InterruptedException {
     // arrange
     fakeSecrets.set(FetchTcgTokenMinter.SECRET_NAME, "{\"jordan\": \"bad-token\"}");
     var response = createMockResponse(400, "{\"error\": {\"message\": \"TOKEN_EXPIRED\"}}");
@@ -183,8 +184,22 @@ public class FetchTcgTokenMinterTest {
 
     // act & assert
     assertThatThrownBy(() -> minter.mint("jordan"))
-        .isInstanceOf(RuntimeException.class)
-        .hasMessageContaining("400");
+        .isInstanceOf(FetchTcgAuthException.class)
+        .hasMessageContaining("TOKEN_EXPIRED");
+  }
+
+  @Test
+  void mintShouldPropagateTransientFirebaseFailure() throws IOException, InterruptedException {
+    // arrange
+    fakeSecrets.set(FetchTcgTokenMinter.SECRET_NAME, "{\"jordan\": \"refresh-token\"}");
+    var response = createMockResponse(500, "{\"error\": {\"message\": \"INTERNAL\"}}");
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response);
+
+    // act & assert
+    assertThatThrownBy(() -> minter.mint("jordan"))
+        .hasCauseInstanceOf(IOException.class)
+        .hasMessageContaining("500");
   }
 
   @SuppressWarnings("unchecked")

@@ -1,6 +1,7 @@
 package com.jordansimsmith.tcginventory.reports;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.SQSEvent;
@@ -495,7 +496,7 @@ public class ReportsHandlerIntegrationTest {
   }
 
   @Test
-  void jobShouldFailWhenOrderLineReferencesMissingSku() {
+  void reportShouldRetryWhenOrderLineReferencesMissingSku() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     orderTable.putItem(
@@ -515,18 +516,20 @@ public class ReportsHandlerIntegrationTest {
     jobTable.putItem(
         JobItem.create("jordan", "report-job", "report", null, Instant.ofEpochSecond(1700000000)));
 
-    // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "report-job", "report"), null);
+    // act & assert
+    assertThatThrownBy(
+            () -> jobsHandler.handleRequest(buildSqsEvent("jordan", "report-job", "report"), null))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("order line references missing SKU: missing-sku");
 
-    // assert
     var job =
         jobTable.getItem(
             Key.builder()
                 .partitionValue(SkuItem.formatUserPk("jordan"))
                 .sortValue(JobItem.formatSk("report-job"))
                 .build());
-    assertThat(job.getStatus()).isEqualTo("failed");
-    assertThat(job.getError()).contains("order line references missing SKU: missing-sku");
+    assertThat(job.getStatus()).isEqualTo("running");
+    assertThat(job.getError()).isNull();
   }
 
   @Test
