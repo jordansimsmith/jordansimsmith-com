@@ -613,14 +613,19 @@ describe('createFakeClient scans', () => {
       collector_number: String(index + 1),
     }));
 
-    const confirmed = await client.confirmScan('fake-scan-reviewing', {
-      rows,
-    });
-    const retry = await client.confirmScan('fake-scan-reviewing', { rows });
-    const imported = await client.getImport(confirmed.import_id);
+    await expect(
+      client.confirmScan('fake-scan-reviewing', { rows }),
+    ).resolves.toBeUndefined();
+    await expect(
+      client.confirmScan('fake-scan-reviewing', { rows }),
+    ).resolves.toBeUndefined();
+    const confirmedScan = await client.getScan('fake-scan-reviewing');
+    await expect(
+      client.confirmScan('fake-scan-reviewing', { rows }),
+    ).resolves.toBeUndefined();
+    const imported = await client.getImport(confirmedScan.import_id!);
 
-    expect(confirmed.status).toBe('confirmed');
-    expect(retry).toEqual(confirmed);
+    expect(confirmedScan.status).toBe('confirmed');
     expect(imported.rows.map((row) => row.name)).toEqual(
       rows.map((row) => row.name),
     );

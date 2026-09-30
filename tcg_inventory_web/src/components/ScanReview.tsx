@@ -29,6 +29,7 @@ import { ScanReviewPanels, type ReviewSelection } from './ScanReviewPanels';
 
 interface ScanReviewProps {
   scan: ScanDetail;
+  confirmationPending: boolean;
   onDeleteRow: (scanPosition: number) => Promise<void>;
   onConfirmScan: (rows: ScanConfirmationRow[]) => Promise<void>;
 }
@@ -149,6 +150,7 @@ function ReviewSummary({
 
 export function ScanReview({
   scan,
+  confirmationPending,
   onDeleteRow,
   onConfirmScan,
 }: ScanReviewProps) {
@@ -227,7 +229,10 @@ export function ScanReview({
     );
   }).length;
   const canConfirm =
-    rows.length > 0 && confirmedCount === rows.length && !deleteLoading;
+    rows.length > 0 &&
+    confirmedCount === rows.length &&
+    !deleteLoading &&
+    !confirmationPending;
 
   useEffect(() => {
     if (selectedPosition === undefined || selectedSuggestionId === undefined) {
@@ -461,7 +466,7 @@ export function ScanReview({
   };
 
   const deleteCurrentRow = async (position: number) => {
-    if (deleteLoading || confirming) {
+    if (deleteLoading || confirming || confirmationPending) {
       return;
     }
     const deletedIndex = rows.findIndex(
@@ -629,7 +634,7 @@ export function ScanReview({
   };
 
   const confirmScan = async () => {
-    if (!canConfirm || confirming) {
+    if (!canConfirm || confirming || confirmationPending) {
       return;
     }
     const confirmationRows: ScanConfirmationRow[] = rows.map((row) => {
@@ -659,6 +664,9 @@ export function ScanReview({
   };
 
   useEffect(() => {
+    if (confirmationPending) {
+      return;
+    }
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
@@ -716,6 +724,38 @@ export function ScanReview({
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   });
+
+  if (confirmationPending) {
+    return (
+      <Paper
+        component="section"
+        aria-label="Scan confirmation"
+        aria-busy="true"
+        withBorder
+        radius="md"
+        p="md"
+      >
+        <Stack gap="sm">
+          <Group justify="space-between" gap="sm">
+            <Text fw={600} size="sm">
+              Confirming scan
+            </Text>
+            <Badge variant="light" color="blue">
+              confirming
+            </Badge>
+          </Group>
+          <Text size="sm" c="dimmed">
+            Creating an import from the selected printings.
+          </Text>
+          <Progress
+            value={100}
+            animated
+            aria-label="Scan confirmation progress"
+          />
+        </Stack>
+      </Paper>
+    );
+  }
 
   if (!selectedRow) {
     return (

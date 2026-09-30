@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Badge,
   Button,
@@ -32,6 +32,7 @@ const STATUS_COLORS: Record<ScanStatus, string> = {
   uploading: 'blue',
   identifying: 'blue',
   reviewing: 'yellow',
+  confirming: 'blue',
   confirmed: 'green',
 };
 
@@ -96,6 +97,11 @@ function ScanSummary({ scan }: { scan: ScanDetail }) {
             Identification is complete. This scan is ready for review.
           </Text>
         )}
+        {scan.status === 'confirming' && (
+          <Text size="sm" c="dimmed">
+            Scan confirmation is in progress.
+          </Text>
+        )}
         {scan.status === 'confirmed' && (
           <Text size="sm" c="dimmed">
             This scan is confirmed and read-only.
@@ -122,6 +128,9 @@ export function ScanDetailPage() {
   const [deleteScanLoading, setDeleteScanLoading] = useState(false);
   const [deleteScanError, setDeleteScanError] = useState<string | null>(null);
   const [reviewMutationLoading, setReviewMutationLoading] = useState(false);
+  const [reviewSession, setReviewSession] = useState(false);
+  const confirmationPending = useRef(false);
+  const pollScan = useRef<(() => void) | null>(null);
 
   const deleteScan = async () => {
     if (!scanId || deleteScanLoading || reviewMutationLoading) {
@@ -148,6 +157,7 @@ export function ScanDetailPage() {
 
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let polling = false;
 
     const poll = async () => {
       try {
@@ -155,28 +165,51 @@ export function ScanDetailPage() {
         if (cancelled) {
           return;
         }
-        setScan(response);
-        setError(null);
-        if (response.status === 'identifying') {
-          timer = setTimeout(poll, POLL_INTERVAL_MS);
+        if (response.status === 'confirming') {
+          confirmationPending.current = true;
         }
+        if (
+          response.status === 'confirmed' &&
+          confirmationPending.current &&
+          response.import_id
+        ) {
+          navigate(`/imports/${response.import_id}`);
+          return;
+        }
+        setScan(response);
+        if (response.status === 'reviewing') {
+          setReviewSession(true);
+        }
+        setError(null);
+        polling =
+          response.status === 'identifying' || response.status === 'confirming';
       } catch (e) {
         if (!cancelled) {
           setError(e instanceof Error ? e.message : 'Failed to load scan');
         }
+        polling = polling || confirmationPending.current;
       } finally {
         if (!cancelled) {
           setLoading(false);
+          if (polling) {
+            timer = setTimeout(poll, POLL_INTERVAL_MS);
+          }
         }
       }
     };
 
-    poll();
+    pollScan.current = () => {
+      clearTimeout(timer);
+      polling = true;
+      void poll();
+    };
+    void poll();
     return () => {
       cancelled = true;
       clearTimeout(timer);
+      pollScan.current = null;
     };
-  }, [scanId]);
+  }, [navigate, scanId]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -212,7 +245,7 @@ export function ScanDetailPage() {
             <Skeleton height={180} />
           </Stack>
         )}
-        {!loading && error && (
+        {!loading && error && !scan && (
           <CollectionSurface>
             <CollectionMessage
               title="Scan could not be loaded"
@@ -221,26 +254,32 @@ export function ScanDetailPage() {
             />
           </CollectionSurface>
         )}
-        {!loading && !error && scan && (
+        {!loading && scan && (
           <>
+            {error && (
+              <Text size="sm" c="red.7" role="alert">
+                Scan status could not be refreshed: {error}
+              </Text>
+            )}
             <PageHeader
               title="Scan"
               description={`${getGame(scan.game).display_name} · Created ${new Date(scan.created_at * 1000).toLocaleString()}`}
               actions={
                 <Group gap="xs">
-                  {scan.status !== 'confirmed' && (
-                    <Button
-                      color="red"
-                      variant="subtle"
-                      disabled={reviewMutationLoading || deleteScanLoading}
-                      onClick={() => {
-                        setDeleteScanError(null);
-                        setDeleteScanOpen(true);
-                      }}
-                    >
-                      Delete scan
-                    </Button>
-                  )}
+                  {scan.status !== 'confirmed' &&
+                    scan.status !== 'confirming' && (
+                      <Button
+                        color="red"
+                        variant="subtle"
+                        disabled={reviewMutationLoading || deleteScanLoading}
+                        onClick={() => {
+                          setDeleteScanError(null);
+                          setDeleteScanOpen(true);
+                        }}
+                      >
+                        Delete scan
+                      </Button>
+                    )}
                   {scan.status === 'confirmed' && scan.import_id && (
                     <Button
                       variant="light"
@@ -259,9 +298,11 @@ export function ScanDetailPage() {
                 </Group>
               }
             />
-            {scan.status === 'reviewing' ? (
+            {scan.status === 'reviewing' ||
+            (scan.status === 'confirming' && reviewSession) ? (
               <ScanReview
                 scan={scan}
+                confirmationPending={scan.status === 'confirming'}
                 onDeleteRow={async (scanPosition) => {
                   setReviewMutationLoading(true);
                   try {
@@ -275,10 +316,15 @@ export function ScanDetailPage() {
                 onConfirmScan={async (rows: ScanConfirmationRow[]) => {
                   setReviewMutationLoading(true);
                   try {
-                    const response = await apiClient.confirmScan(scan.scan_id, {
+                    await apiClient.confirmScan(scan.scan_id, {
                       rows,
                     });
-                    navigate(`/imports/${response.import_id}`);
+                    confirmationPending.current = true;
+                    setScan({ ...scan, status: 'confirming', error: null });
+                    pollScan.current?.();
+                  } catch (e) {
+                    pollScan.current?.();
+                    throw e;
                   } finally {
                     setReviewMutationLoading(false);
                   }

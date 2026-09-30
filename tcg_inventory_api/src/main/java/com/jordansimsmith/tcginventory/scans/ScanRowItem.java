@@ -26,6 +26,8 @@ public class ScanRowItem {
   public static final String NEEDS_REVIEW = "needs_review";
   public static final String SUGGESTIONS = "suggestions";
   public static final String ERROR = "error";
+  public static final String SELECTED_EXTERNAL_SOURCE = "selected_external_source";
+  public static final String SELECTED_EXTERNAL_ID = "selected_external_id";
 
   private String pk;
   private String sk;
@@ -38,6 +40,8 @@ public class ScanRowItem {
   private Boolean needsReview;
   private List<ScanSuggestion> suggestions;
   private String error;
+  private String selectedExternalSource;
+  private String selectedExternalId;
 
   @DynamoDbPartitionKey
   @DynamoDbAttribute(PK)
@@ -138,6 +142,24 @@ public class ScanRowItem {
 
   public void setError(@Nullable String error) {
     this.error = error;
+  }
+
+  @DynamoDbAttribute(SELECTED_EXTERNAL_SOURCE)
+  public String getSelectedExternalSource() {
+    return selectedExternalSource;
+  }
+
+  public void setSelectedExternalSource(@Nullable String selectedExternalSource) {
+    this.selectedExternalSource = selectedExternalSource;
+  }
+
+  @DynamoDbAttribute(SELECTED_EXTERNAL_ID)
+  public String getSelectedExternalId() {
+    return selectedExternalId;
+  }
+
+  public void setSelectedExternalId(@Nullable String selectedExternalId) {
+    this.selectedExternalId = selectedExternalId;
   }
 
   public static String formatPk(String user, String scanId) {

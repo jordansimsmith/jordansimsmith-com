@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
+import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
@@ -12,6 +13,7 @@ import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.s3.S3Container;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
+import com.jordansimsmith.tcginventory.JobsHandler;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.catalog.CatalogCard;
@@ -61,8 +63,6 @@ public class ScansHandlerIntegrationTest {
   private static final byte[] JPEG_BYTES =
       new byte[] {(byte) 0xFF, (byte) 0xD8, 0x01, (byte) 0xFF, (byte) 0xD9};
 
-  private record ConfirmationWriteCounts(int imports, int rows, int jobs, int queueMessages) {}
-
   private TcgInventoryTestFactory factory;
   private FakeClock fakeClock;
   private FakeUlidGenerator fakeUlidGenerator;
@@ -81,6 +81,7 @@ public class ScansHandlerIntegrationTest {
   private GetScanHandler getScanHandler;
   private IdentifyScanHandler identifyScanHandler;
   private ConfirmScanHandler confirmScanHandler;
+  private JobsHandler jobsHandler;
   private DeleteScanRowHandler deleteScanRowHandler;
   private DeleteScanHandler deleteScanHandler;
 
@@ -144,6 +145,7 @@ public class ScansHandlerIntegrationTest {
             new CatalogCard.ImageUrls(null, null),
             List.of("normal", "foil")));
     confirmScanHandler = new ConfirmScanHandler(factory);
+    jobsHandler = new JobsHandler(factory);
     deleteScanRowHandler = new DeleteScanRowHandler(factory);
     deleteScanHandler = new DeleteScanHandler(factory);
   }
@@ -912,10 +914,11 @@ public class ScansHandlerIntegrationTest {
   }
 
   @Test
-  void confirmScanShouldCreateOrdinaryImportAndQueueAppraisal() throws Exception {
+  void confirmScanShouldPersistSelectionsAndCreateImportInJob() throws Exception {
     // arrange
-    var scanId = createScanWithFiles("jordan", 2);
-    var scan = getScanItem("jordan", scanId);
+    var user = "confirm-success";
+    var scanId = createScanWithFiles(user, 2);
+    var scan = getScanItem(user, scanId);
     scan.setStatus("reviewing");
     scanTable.putItem(scan);
     var request =
@@ -928,19 +931,60 @@ public class ScansHandlerIntegrationTest {
     // act
     var response =
         confirmScanHandler.handleRequest(
-            buildEventWithPathAndBody("jordan", Map.of("scan_id", scanId), request), null);
+            buildEventWithPathAndBody(user, Map.of("scan_id", scanId), request), null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
-    assertThat(body.get("scan_id").asText()).isEqualTo(scanId);
-    assertThat(body.get("status").asText()).isEqualTo("confirmed");
-    assertThat(body.has("confirmed")).isFalse();
-    var importId = body.get("import_id").asText();
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    assertThat(response.getBody()).isNull();
+    assertThat(getScanItem(user, scanId).getStatus()).isEqualTo("confirming");
+    assertThat(fakeJobsQueue.getSends()).hasSize(1);
+    var confirmationMessage = fakeJobsQueue.getSends().getFirst().message();
+    assertThat(confirmationMessage.jobType()).isEqualTo("scan_confirmation");
+    var confirmationJob = getJob(user, confirmationMessage.jobId());
+    assertThat(confirmationJob.getScanId()).isEqualTo(scanId);
+    assertThat(confirmationJob.getImportId()).isNull();
+    assertThat(getScanRow(user, scanId, 1).getSelectedExternalId())
+        .isEqualTo("a9738cda-adb1-47fb-9f4c-ecd930228c4d");
+    assertThat(getScanRow(user, scanId, 2).getSelectedExternalId())
+        .isEqualTo("4ced112a-e775-4f97-97b3-74877e9dce12");
+    assertNoCreatedImports(user);
+    var scanDetail =
+        objectMapper.readTree(
+            getScanHandler
+                .handleRequest(buildEventWithPath(user, Map.of("scan_id", scanId)), null)
+                .getBody());
+    assertThat(scanDetail.has("job_id")).isFalse();
+    assertThat(scanDetail.get("rows").get(0).has("selected_external_id")).isFalse();
+    assertThat(scanDetail.get("rows").get(0).has("selected_external_source")).isFalse();
+    assertThat(
+            deleteScanRowHandler
+                .handleRequest(
+                    buildEventWithPath(user, Map.of("scan_id", scanId, "scan_position", "1")), null)
+                .getStatusCode())
+        .isEqualTo(409);
+    assertThat(
+            deleteScanHandler
+                .handleRequest(buildEventWithPath(user, Map.of("scan_id", scanId)), null)
+                .getStatusCode())
+        .isEqualTo(409);
+
+    var repeatedResponse =
+        confirmScanHandler.handleRequest(
+            buildEventWithPathAndBody(user, Map.of("scan_id", scanId), request), null);
+    assertThat(repeatedResponse.getStatusCode()).isEqualTo(202);
+    assertThat(repeatedResponse.getBody()).isNull();
+    assertThat(fakeJobsQueue.getSends()).hasSize(1);
+
+    // act
+    jobsHandler.handleRequest(
+        buildSqsEvent(user, confirmationMessage.jobId(), "scan_confirmation"), null);
+
+    // assert
+    var importId = getScanItem(user, scanId).getImportId();
     var importItem =
         importTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(SkuItem.formatUserPk(user))
                 .sortValue(ImportItem.formatSk(importId))
                 .build());
     assertThat(importItem).isNotNull();
@@ -948,6 +992,8 @@ public class ScansHandlerIntegrationTest {
     assertThat(importItem.getGame()).isEqualTo("mtg");
     assertThat(importItem.getRowCount()).isEqualTo(2);
     assertThat(importItem.getJobId()).isNotBlank();
+    assertThat(importItem.getJobId()).isNotEqualTo(confirmationMessage.jobId());
+    assertThat(getJob(user, importItem.getJobId()).getJobType()).isEqualTo("appraise");
 
     var importRows =
         importRowTable
@@ -956,7 +1002,7 @@ public class ScansHandlerIntegrationTest {
                     .queryConditional(
                         QueryConditional.sortBeginsWith(
                             Key.builder()
-                                .partitionValue(ImportRowItem.formatPk("jordan", importId))
+                                .partitionValue(ImportRowItem.formatPk(user, importId))
                                 .sortValue(ImportRowItem.ROW_PREFIX)
                                 .build()))
                     .scanIndexForward(true)
@@ -983,27 +1029,25 @@ public class ScansHandlerIntegrationTest {
     var jobItem =
         jobTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(SkuItem.formatUserPk(user))
                 .sortValue(JobItem.formatSk(importItem.getJobId()))
                 .build());
     assertThat(jobItem).isNotNull();
     assertThat(jobItem.getStatus()).isEqualTo("queued");
-    assertThat(fakeJobsQueue.getSends()).hasSize(1);
-    assertThat(fakeJobsQueue.getSends().get(0).message().jobId()).isEqualTo(importItem.getJobId());
-    assertThat(getScanItem("jordan", scanId).getStatus()).isEqualTo("confirmed");
+    assertThat(fakeJobsQueue.getSends()).hasSize(2);
+    assertThat(fakeJobsQueue.getSends().get(1).message().jobId()).isEqualTo(importItem.getJobId());
+    assertThat(getScanItem(user, scanId).getStatus()).isEqualTo("confirmed");
     var retryResponse =
         confirmScanHandler.handleRequest(
-            buildEventWithPathAndBody("jordan", Map.of("scan_id", scanId), request), null);
-    assertThat(retryResponse.getStatusCode()).isEqualTo(200);
-    assertThat(objectMapper.readTree(retryResponse.getBody()).get("import_id").asText())
-        .isEqualTo(importId);
-    assertThat(fakeJobsQueue.getSends()).hasSize(1);
+            buildEventWithPathAndBody(user, Map.of("scan_id", scanId), request), null);
+    assertThat(retryResponse.getStatusCode()).isEqualTo(204);
+    assertThat(retryResponse.getBody()).isNull();
+    assertThat(fakeJobsQueue.getSends()).hasSize(2);
     assertThat(
             objectMapper
                 .readTree(
                     getScanHandler
-                        .handleRequest(
-                            buildEventWithPath("jordan", Map.of("scan_id", scanId)), null)
+                        .handleRequest(buildEventWithPath(user, Map.of("scan_id", scanId)), null)
                         .getBody())
                 .has("confirmed_rows"))
         .isFalse();
@@ -1011,6 +1055,9 @@ public class ScansHandlerIntegrationTest {
     assertThat(fakeCardCatalogs.lookupRequests().getFirst())
         .containsExactly(
             "a9738cda-adb1-47fb-9f4c-ecd930228c4d", "4ced112a-e775-4f97-97b3-74877e9dce12");
+    jobsHandler.handleRequest(
+        buildSqsEvent(user, confirmationMessage.jobId(), "scan_confirmation"), null);
+    assertThat(fakeCardCatalogs.lookupRequests()).hasSize(1);
   }
 
   @Test
@@ -1042,14 +1089,16 @@ public class ScansHandlerIntegrationTest {
             buildEventWithPathAndBody(user, Map.of("scan_id", scanId), request), null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    assertThat(fakeCardCatalogs.lookupRequests()).isEmpty();
+    processScanConfirmation(user);
     assertThat(fakeCardCatalogs.lookupRequests()).hasSize(1);
     assertThat(fakeCardCatalogs.lookupRequests().getFirst())
         .containsExactly("a9738cda-adb1-47fb-9f4c-ecd930228c4d");
   }
 
   @Test
-  void confirmScanShouldRejectUnsupportedSourceBeforeCatalogLookup() throws Exception {
+  void confirmationJobShouldRejectUnsupportedSourceBeforeCatalogLookup() throws Exception {
     // arrange
     var user = "confirm-source";
     var scanId = createScanWithFiles(user, 1);
@@ -1059,22 +1108,23 @@ public class ScansHandlerIntegrationTest {
     var request =
         confirmationRequest(
             "other", "a9738cda-adb1-47fb-9f4c-ecd930228c4d", "Ragavan", "mh2", "Set", "138");
-    var writesBefore = confirmationWriteCounts();
-
     // act
     var response =
         confirmScanHandler.handleRequest(
             buildEventWithPathAndBody(user, Map.of("scan_id", scanId), request), null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(400);
-    assertThat(response.getBody()).contains("scan position 1");
-    assertNoConfirmationWrites(user, scanId, writesBefore);
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    assertThat(getScanItem(user, scanId).getStatus()).isEqualTo("confirming");
+    processScanConfirmation(user);
+    assertThat(getScanItem(user, scanId).getStatus()).isEqualTo("reviewing");
+    assertThat(getScanItem(user, scanId).getError()).contains("scan position 1");
+    assertNoCreatedImports(user);
     assertThat(fakeCardCatalogs.lookupRequests()).isEmpty();
   }
 
   @Test
-  void confirmScanShouldRejectMissingOrNonEnglishCardBeforeCreatingImport() throws Exception {
+  void confirmationJobShouldRejectMissingCardBeforeCreatingImport() throws Exception {
     // arrange
     var user = "confirm-missing";
     var scanId = createScanWithFiles(user, 1);
@@ -1083,22 +1133,22 @@ public class ScansHandlerIntegrationTest {
     scanTable.putItem(scan);
     var missingId = "11111111-1111-4111-8111-111111111111";
     var request = confirmationRequest("scryfall", missingId, "Missing", "set", "Set", "1");
-    var writesBefore = confirmationWriteCounts();
-
     // act
     var response =
         confirmScanHandler.handleRequest(
             buildEventWithPathAndBody(user, Map.of("scan_id", scanId), request), null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(400);
-    assertThat(response.getBody()).contains("scan position 1");
-    assertNoConfirmationWrites(user, scanId, writesBefore);
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    processScanConfirmation(user);
+    assertThat(getScanItem(user, scanId).getStatus()).isEqualTo("reviewing");
+    assertThat(getScanItem(user, scanId).getError()).contains("scan position 1");
+    assertNoCreatedImports(user);
     assertThat(fakeCardCatalogs.lookupRequests()).containsExactly(List.of(missingId));
   }
 
   @Test
-  void confirmScanShouldRejectCardWithoutScanFinishBeforeCreatingImport() throws Exception {
+  void confirmationJobShouldRejectCardWithoutScanFinishBeforeCreatingImport() throws Exception {
     // arrange
     var user = "confirm-finish";
     var scanId = createScanWithFiles(user, 1);
@@ -1118,22 +1168,21 @@ public class ScansHandlerIntegrationTest {
             new CatalogCard.ImageUrls(null, null),
             List.of("foil")));
     var request = confirmationRequest("scryfall", foilOnlyId, "Foil only", "test", "Test set", "1");
-    var writesBefore = confirmationWriteCounts();
-
     // act
     var response =
         confirmScanHandler.handleRequest(
             buildEventWithPathAndBody(user, Map.of("scan_id", scanId), request), null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(400);
-    assertThat(response.getBody()).contains("scan position 1");
-    assertNoConfirmationWrites(user, scanId, writesBefore);
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    processScanConfirmation(user);
+    assertThat(getScanItem(user, scanId).getStatus()).isEqualTo("reviewing");
+    assertThat(getScanItem(user, scanId).getError()).contains("scan position 1");
+    assertNoCreatedImports(user);
   }
 
   @Test
-  void confirmScanShouldReturnServiceUnavailableBeforeCreatingImportWhenCatalogFails()
-      throws Exception {
+  void confirmationJobShouldLeaveScanConfirmingWhenCatalogFailsTransiently() throws Exception {
     // arrange
     var user = "confirm-unavailable";
     var scanId = createScanWithFiles(user, 1);
@@ -1144,16 +1193,35 @@ public class ScansHandlerIntegrationTest {
     var request =
         confirmationRequest(
             "scryfall", "a9738cda-adb1-47fb-9f4c-ecd930228c4d", "Ragavan", "mh2", "Set", "138");
-    var writesBefore = confirmationWriteCounts();
-
     // act
     var response =
         confirmScanHandler.handleRequest(
             buildEventWithPathAndBody(user, Map.of("scan_id", scanId), request), null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(503);
-    assertNoConfirmationWrites(user, scanId, writesBefore);
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    var message = fakeJobsQueue.getSends().getFirst().message();
+    assertThatThrownBy(
+            () ->
+                jobsHandler.handleRequest(
+                    buildSqsEvent(user, message.jobId(), message.jobType()), null))
+        .isInstanceOf(CatalogException.Unavailable.class)
+        .hasMessageContaining("stub unavailable");
+    assertThat(getScanItem(user, scanId).getStatus()).isEqualTo("confirming");
+    assertThat(getScanItem(user, scanId).getError()).isNull();
+    assertThat(getJob(user, message.jobId()).getStatus()).isEqualTo("running");
+    assertNoCreatedImports(user);
+
+    // arrange: the catalog has recovered before SQS redelivery
+    fakeCardCatalogs.setFailure(null);
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent(user, message.jobId(), message.jobType()), null);
+
+    // assert
+    assertThat(getScanItem(user, scanId).getStatus()).isEqualTo("confirmed");
+    assertThat(getScanItem(user, scanId).getImportId()).isNotBlank();
+    assertThat(fakeCardCatalogs.lookupRequests()).hasSize(2);
   }
 
   @Test
@@ -1198,18 +1266,30 @@ public class ScansHandlerIntegrationTest {
     return createScan(user, filename, 1);
   }
 
-  private ConfirmationWriteCounts confirmationWriteCounts() {
-    return new ConfirmationWriteCounts(
-        (int) importTable.scan().items().stream().count(),
-        (int) importRowTable.scan().items().stream().count(),
-        (int) jobTable.scan().items().stream().count(),
-        fakeJobsQueue.getSends().size());
+  private void processScanConfirmation(String user) {
+    var message = fakeJobsQueue.getSends().getFirst().message();
+    assertThat(message.jobType()).isEqualTo("scan_confirmation");
+    jobsHandler.handleRequest(buildSqsEvent(user, message.jobId(), message.jobType()), null);
   }
 
-  private void assertNoConfirmationWrites(
-      String user, String scanId, ConfirmationWriteCounts writesBefore) {
-    assertThat(getScanItem(user, scanId).getStatus()).isEqualTo("reviewing");
-    assertThat(confirmationWriteCounts()).isEqualTo(writesBefore);
+  private void assertNoCreatedImports(String user) {
+    var imports =
+        importTable
+            .query(
+                QueryEnhancedRequest.builder()
+                    .queryConditional(
+                        QueryConditional.sortBeginsWith(
+                            Key.builder()
+                                .partitionValue(SkuItem.formatUserPk(user))
+                                .sortValue(ImportItem.IMPORT_PREFIX)
+                                .build()))
+                    .build())
+            .stream()
+            .flatMap(page -> page.items().stream())
+            .toList();
+    assertThat(imports).isEmpty();
+    assertThat(importRowTable.scan().items())
+        .noneMatch(row -> row.getPk().startsWith(SkuItem.formatUserPk(user) + "#IMPORT#"));
   }
 
   private String confirmationRequest(String... rowValues) {
@@ -1270,6 +1350,35 @@ public class ScansHandlerIntegrationTest {
             .partitionValue(SkuItem.formatUserPk(user))
             .sortValue(ScanItem.formatSk(scanId))
             .build());
+  }
+
+  private ScanRowItem getScanRow(String user, String scanId, int scanPosition) {
+    return scanRowTable.getItem(
+        Key.builder()
+            .partitionValue(ScanRowItem.formatPk(user, scanId))
+            .sortValue(ScanRowItem.formatSk(scanPosition))
+            .build());
+  }
+
+  private JobItem getJob(String user, String jobId) {
+    return jobTable.getItem(
+        Key.builder()
+            .partitionValue(JobItem.formatPk(user))
+            .sortValue(JobItem.formatSk(jobId))
+            .build());
+  }
+
+  private SQSEvent buildSqsEvent(String user, String jobId, String jobType) {
+    try {
+      var body = objectMapper.writeValueAsString(new JobMessage(user, jobId, jobType));
+      var message = new SQSEvent.SQSMessage();
+      message.setBody(body);
+      var event = new SQSEvent();
+      event.setRecords(List.of(message));
+      return event;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private APIGatewayV2HTTPResponse identify(String scanId) {

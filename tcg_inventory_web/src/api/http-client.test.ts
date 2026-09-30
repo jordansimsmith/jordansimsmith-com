@@ -306,8 +306,8 @@ describe('http client scans', () => {
     expect(json).not.toHaveBeenCalled();
   });
 
-  it('confirms a scan with the selected printing rows', async () => {
-    const json = vi.fn().mockResolvedValue({ import_id: 'import-1' });
+  it('confirms a scan without expecting a response body', async () => {
+    const json = vi.fn();
     fetchSpy.mockResolvedValue({ ok: true, json });
     const client = createHttpClient();
     const request = {
@@ -324,13 +324,16 @@ describe('http client scans', () => {
       ],
     };
 
-    await client.confirmScan('scan/1', request);
+    await expect(
+      client.confirmScan('scan/1', request),
+    ).resolves.toBeUndefined();
 
     expect(fetchSpy.mock.calls[0][0]).toBe(
       'https://api.tcg-inventory.jordansimsmith.com/scans/scan%2F1/confirm',
     );
     expect(fetchSpy.mock.calls[0][1].method).toBe('POST');
     expect(fetchSpy.mock.calls[0][1].body).toBe(JSON.stringify(request));
+    expect(json).not.toHaveBeenCalled();
   });
 
   it('requires a game when listing SKUs', async () => {

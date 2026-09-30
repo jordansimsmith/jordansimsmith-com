@@ -5,7 +5,6 @@ import type {
   CatalogCardsResponse,
   Condition,
   ConfirmScanRequest,
-  ConfirmScanResponse,
   ConfirmImportResponse,
   ConfirmOrderResponse,
   CreateScanRequest,
@@ -41,6 +40,7 @@ import type {
   RowDecision,
   RowPhoto,
   ScanDetail,
+  ScanConfirmationRow,
   ScanFile,
   ScanRow,
   ScanUploadSlot,
@@ -775,6 +775,7 @@ interface FakeScan {
   created_at_ms: number;
   identifying_started_at_ms: number | null;
   rows: FakeScanRow[];
+  pending_confirmation_rows?: ScanConfirmationRow[];
 }
 
 function fakeScanSourceUrl(scanId: string, scanPosition: number): string {
@@ -1462,6 +1463,41 @@ export function createFakeClient(): ApiClient {
     finished_at: reportGeneratedAt,
   };
 
+  const progressFakeScanConfirmation = (scan: FakeScan): void => {
+    const orderedRows = scan.pending_confirmation_rows;
+    if (scan.status !== 'confirming' || !orderedRows) {
+      return;
+    }
+    importCounter += 1;
+    const importId = `fake-import-${importCounter}`;
+    const importRows: FakeImportRow[] = orderedRows.map((row, index) => ({
+      position: index + 1,
+      name: row.name,
+      set_code: row.set_code,
+      set_name: row.set_name,
+      collector_number: row.collector_number,
+      finish: scan.finish,
+      condition: scan.condition,
+      external_source: row.external_source,
+      external_id: row.external_id,
+      decision: 'keep',
+      decision_reason: null,
+      ...appraisePrices('keep', index + 1),
+      photos: [],
+    }));
+    importRecords.push({
+      import_id: importId,
+      game: scan.game,
+      filename: `${scan.scan_id}.scan`,
+      status: 'appraising',
+      rows: importRows,
+      created_at_ms: Date.now(),
+    });
+    scan.import_id = importId;
+    scan.status = 'confirmed';
+    delete scan.pending_confirmation_rows;
+  };
+
   const progressPublish = (): void => {
     if (!publishRun) {
       return;
@@ -1894,6 +1930,7 @@ export function createFakeClient(): ApiClient {
       const pageSize = 20;
       const page = ordered.slice(offset, offset + pageSize).map((scan) => {
         progressFakeScan(scan);
+        progressFakeScanConfirmation(scan);
         return toScanSummary(scan);
       });
       const nextOffset = offset + page.length;
@@ -1905,7 +1942,9 @@ export function createFakeClient(): ApiClient {
     },
 
     async getScan(scanId: string): Promise<ScanDetail> {
-      return toScanDetail(getScanOrThrow(scanId));
+      const scan = getScanOrThrow(scanId);
+      progressFakeScanConfirmation(scan);
+      return toScanDetail(scan);
     },
 
     async getCatalogCard(
@@ -2007,14 +2046,13 @@ export function createFakeClient(): ApiClient {
     async confirmScan(
       scanId: string,
       request: ConfirmScanRequest,
-    ): Promise<ConfirmScanResponse> {
+    ): Promise<void> {
       const scan = getScanOrThrow(scanId);
       if (scan.status === 'confirmed') {
-        return {
-          scan_id: scan.scan_id,
-          status: 'confirmed',
-          import_id: scan.import_id!,
-        };
+        return;
+      }
+      if (scan.status === 'confirming') {
+        return;
       }
       if (scan.status !== 'reviewing') {
         throw new Error('scan is not in reviewing status');
@@ -2044,38 +2082,9 @@ export function createFakeClient(): ApiClient {
           'every retained scan row must be confirmed exactly once',
         );
       }
-      importCounter += 1;
-      const importId = `fake-import-${importCounter}`;
-      const importRows: FakeImportRow[] = orderedRows.map((row, index) => ({
-        position: index + 1,
-        name: row.name,
-        set_code: row.set_code,
-        set_name: row.set_name,
-        collector_number: row.collector_number,
-        finish: scan.finish,
-        condition: scan.condition,
-        external_source: row.external_source,
-        external_id: row.external_id,
-        decision: 'keep',
-        decision_reason: null,
-        ...appraisePrices('keep', index + 1),
-        photos: [],
-      }));
-      importRecords.push({
-        import_id: importId,
-        game: scan.game,
-        filename: `${scan.scan_id}.scan`,
-        status: 'appraising',
-        rows: importRows,
-        created_at_ms: Date.now(),
-      });
-      scan.import_id = importId;
-      scan.status = 'confirmed';
-      return {
-        scan_id: scan.scan_id,
-        status: 'confirmed',
-        import_id: importId,
-      };
+      scan.pending_confirmation_rows = orderedRows;
+      scan.error = null;
+      scan.status = 'confirming';
     },
 
     async deleteScan(scanId: string): Promise<void> {

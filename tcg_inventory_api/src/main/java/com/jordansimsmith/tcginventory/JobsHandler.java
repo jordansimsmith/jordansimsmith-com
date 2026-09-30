@@ -9,6 +9,7 @@ import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.tcginventory.imports.AppraiseJobProcessor;
 import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
 import com.jordansimsmith.tcginventory.reports.ReportJobProcessor;
+import com.jordansimsmith.tcginventory.scans.ScanConfirmationJobProcessor;
 import com.jordansimsmith.time.Clock;
 import java.io.IOException;
 import org.slf4j.Logger;
@@ -26,6 +27,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
   private final JobProcessor appraiseJobProcessor;
   private final JobProcessor publishJobProcessor;
   private final JobProcessor reportJobProcessor;
+  private final JobProcessor scanConfirmationJobProcessor;
 
   public JobsHandler() {
     this(TcgInventoryFactory.create());
@@ -40,6 +42,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     this.appraiseJobProcessor = new AppraiseJobProcessor(factory);
     this.publishJobProcessor = new PublishJobProcessor(factory);
     this.reportJobProcessor = new ReportJobProcessor(factory);
+    this.scanConfirmationJobProcessor = new ScanConfirmationJobProcessor(factory);
   }
 
   @Override
@@ -132,6 +135,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
       case "appraise" -> appraiseJobProcessor;
       case "publish" -> publishJobProcessor;
       case "report" -> reportJobProcessor;
+      case "scan_confirmation" -> scanConfirmationJobProcessor;
       default -> throw new IllegalArgumentException("unknown job type: " + jobType);
     };
   }

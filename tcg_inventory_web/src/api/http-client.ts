@@ -3,7 +3,6 @@ import type {
   ApiClient,
   Condition,
   ConfirmScanRequest,
-  ConfirmScanResponse,
   CreateScanRequest,
   CreateScanResponse,
   ConfirmImportResponse,
@@ -274,16 +273,12 @@ export function createHttpClient(): ApiClient {
     async confirmScan(
       scanId: string,
       request: ConfirmScanRequest,
-    ): Promise<ConfirmScanResponse> {
-      const response = await authenticatedFetch(
-        `/scans/${encodeURIComponent(scanId)}/confirm`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(request),
-        },
-      );
-      return response.json();
+    ): Promise<void> {
+      await authenticatedFetch(`/scans/${encodeURIComponent(scanId)}/confirm`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
+      });
     },
 
     async deleteScan(scanId: string): Promise<void> {

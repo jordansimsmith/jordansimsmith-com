@@ -36,6 +36,7 @@ const STATUS_COLORS: Record<ScanStatus, string> = {
   uploading: 'blue',
   identifying: 'blue',
   reviewing: 'yellow',
+  confirming: 'blue',
   confirmed: 'green',
 };
 

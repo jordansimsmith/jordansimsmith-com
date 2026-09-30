@@ -1,5 +1,6 @@
 package com.jordansimsmith.tcginventory.scans;
 
+import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.time.Clock;
 import java.util.List;
@@ -7,6 +8,7 @@ import java.util.Map;
 import javax.annotation.Nullable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
@@ -19,10 +21,12 @@ import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
+import software.amazon.awssdk.services.dynamodb.model.Update;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 public class ScanRepository {
   private static final int MAX_TRANSACT_ITEMS = 100;
+  private static final TableSchema<JobItem> JOB_ITEM_SCHEMA = TableSchema.fromBean(JobItem.class);
 
   public record ScanPage(List<ScanItem> items, Map<String, AttributeValue> lastEvaluatedKey) {}
 
@@ -106,6 +110,112 @@ public class ScanRepository {
     }
   }
 
+  public boolean startScanConfirmation(String user, String scanId, JobItem jobItem) {
+    var scanKey =
+        Map.of(
+            ScanItem.PK,
+            AttributeValue.builder().s(ScanItem.formatPk(user)).build(),
+            ScanItem.SK,
+            AttributeValue.builder().s(ScanItem.formatSk(scanId)).build());
+    try {
+      dynamoDbClient.transactWriteItems(
+          TransactWriteItemsRequest.builder()
+              .transactItems(
+                  TransactWriteItem.builder()
+                      .update(
+                          Update.builder()
+                              .tableName(TcgInventoryTable.TABLE_NAME)
+                              .key(scanKey)
+                              .updateExpression(
+                                  "SET #status = :confirming, updated_at = :now REMOVE #error")
+                              .conditionExpression(
+                                  "attribute_exists(" + ScanItem.PK + ") AND #status = :reviewing")
+                              .expressionAttributeNames(
+                                  Map.of("#status", ScanItem.STATUS, "#error", ScanItem.ERROR))
+                              .expressionAttributeValues(
+                                  Map.of(
+                                      ":confirming",
+                                      AttributeValue.builder().s("confirming").build(),
+                                      ":reviewing",
+                                      AttributeValue.builder().s("reviewing").build(),
+                                      ":now",
+                                      AttributeValue.builder()
+                                          .n(String.valueOf(clock.now().getEpochSecond()))
+                                          .build()))
+                              .build())
+                      .build(),
+                  TransactWriteItem.builder()
+                      .put(
+                          Put.builder()
+                              .tableName(TcgInventoryTable.TABLE_NAME)
+                              .item(JOB_ITEM_SCHEMA.itemToMap(jobItem, true))
+                              .conditionExpression("attribute_not_exists(" + JobItem.PK + ")")
+                              .build())
+                      .build())
+              .build());
+      return true;
+    } catch (TransactionCanceledException e) {
+      return false;
+    }
+  }
+
+  public void updateScanRowSelection(
+      String user, String scanId, int scanPosition, String externalSource, String externalId) {
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(TcgInventoryTable.TABLE_NAME)
+            .key(
+                Map.of(
+                    ScanRowItem.PK,
+                    AttributeValue.builder().s(ScanRowItem.formatPk(user, scanId)).build(),
+                    ScanRowItem.SK,
+                    AttributeValue.builder().s(ScanRowItem.formatSk(scanPosition)).build()))
+            .updateExpression(
+                "SET "
+                    + ScanRowItem.SELECTED_EXTERNAL_SOURCE
+                    + " = :externalSource, "
+                    + ScanRowItem.SELECTED_EXTERNAL_ID
+                    + " = :externalId")
+            .conditionExpression("attribute_exists(" + ScanRowItem.PK + ")")
+            .expressionAttributeValues(
+                Map.of(
+                    ":externalSource", AttributeValue.builder().s(externalSource).build(),
+                    ":externalId", AttributeValue.builder().s(externalId).build()))
+            .build());
+  }
+
+  public boolean failScanConfirmation(String user, String scanId, String error) {
+    try {
+      dynamoDbClient.updateItem(
+          UpdateItemRequest.builder()
+              .tableName(TcgInventoryTable.TABLE_NAME)
+              .key(
+                  Map.of(
+                      ScanItem.PK,
+                      AttributeValue.builder().s(ScanItem.formatPk(user)).build(),
+                      ScanItem.SK,
+                      AttributeValue.builder().s(ScanItem.formatSk(scanId)).build()))
+              .updateExpression("SET #status = :reviewing, #error = :error, updated_at = :now")
+              .conditionExpression(
+                  "attribute_exists(" + ScanItem.PK + ") AND #status = :confirming")
+              .expressionAttributeNames(
+                  Map.of("#status", ScanItem.STATUS, "#error", ScanItem.ERROR))
+              .expressionAttributeValues(
+                  Map.of(
+                      ":reviewing", AttributeValue.builder().s("reviewing").build(),
+                      ":confirming", AttributeValue.builder().s("confirming").build(),
+                      ":error", AttributeValue.builder().s(error).build(),
+                      ":now",
+                          AttributeValue.builder()
+                              .n(String.valueOf(clock.now().getEpochSecond()))
+                              .build()))
+              .build());
+      return true;
+    } catch (ConditionalCheckFailedException e) {
+      return false;
+    }
+  }
+
   public boolean transitionScanToConfirmed(String user, String scanId, String importId) {
     try {
       dynamoDbClient.updateItem(
@@ -121,12 +231,13 @@ public class ScanRepository {
                   "SET #status = :confirmed, "
                       + ScanItem.IMPORT_ID
                       + " = :importId, updated_at = :now")
-              .conditionExpression("attribute_exists(" + ScanItem.PK + ") AND #status = :reviewing")
+              .conditionExpression(
+                  "attribute_exists(" + ScanItem.PK + ") AND #status = :confirming")
               .expressionAttributeNames(Map.of("#status", ScanItem.STATUS))
               .expressionAttributeValues(
                   Map.of(
                       ":confirmed", AttributeValue.builder().s("confirmed").build(),
-                      ":reviewing", AttributeValue.builder().s("reviewing").build(),
+                      ":confirming", AttributeValue.builder().s("confirming").build(),
                       ":importId", AttributeValue.builder().s(importId).build(),
                       ":now",
                           AttributeValue.builder()

@@ -166,6 +166,7 @@ export type ScanStatus =
   | 'uploading'
   | 'identifying'
   | 'reviewing'
+  | 'confirming'
   | 'confirmed';
 
 export type ScanRowStatus = 'suggested' | 'needs_review';
@@ -286,12 +287,6 @@ export interface IdentifyScanResponse {
 
 export interface ConfirmScanRequest {
   rows: ScanConfirmationRow[];
-}
-
-export interface ConfirmScanResponse {
-  scan_id: string;
-  status: 'confirmed';
-  import_id: string;
 }
 
 export type OrderState =
@@ -509,10 +504,7 @@ export interface ApiClient {
   ): Promise<CatalogCardsResponse>;
   identifyScan(scanId: string): Promise<IdentifyScanResponse>;
   deleteScanRow(scanId: string, scanPosition: number): Promise<void>;
-  confirmScan(
-    scanId: string,
-    request: ConfirmScanRequest,
-  ): Promise<ConfirmScanResponse>;
+  confirmScan(scanId: string, request: ConfirmScanRequest): Promise<void>;
   deleteScan(scanId: string): Promise<void>;
   findSkus(params: FindSkusParams): Promise<FindSkusResponse>;
   getSku(skuId: string): Promise<SkuDetail>;

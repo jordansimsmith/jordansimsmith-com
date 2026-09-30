@@ -23,6 +23,7 @@ public class JobItem {
   public static final String CONTINUATION = "continuation";
   public static final String PROCESSED_COUNT = "processed_count";
   public static final String ERROR = "error";
+  public static final String SCAN_ID = "scan_id";
   public static final String CREATED_AT = "created_at";
   public static final String UPDATED_AT = "updated_at";
 
@@ -35,6 +36,7 @@ public class JobItem {
   private Integer continuation;
   private Integer processedCount;
   private String error;
+  private String scanId;
   private Instant createdAt;
   private Instant updatedAt;
 
@@ -119,6 +121,15 @@ public class JobItem {
 
   public void setError(@Nullable String error) {
     this.error = error;
+  }
+
+  @DynamoDbAttribute(SCAN_ID)
+  public String getScanId() {
+    return scanId;
+  }
+
+  public void setScanId(@Nullable String scanId) {
+    this.scanId = scanId;
   }
 
   @DynamoDbConvertedBy(EpochSecondConverter.class)

@@ -146,7 +146,11 @@ java_library(
         ["src/main/java/com/jordansimsmith/tcginventory/scans/*.java"],
         exclude = ["src/main/java/com/jordansimsmith/tcginventory/scans/*Handler.java"],
     ),
-    deps = [":lib"] + COMMON_DEPS,
+    deps = [
+        ":catalog-lib",
+        ":import-lib",
+        ":lib",
+    ] + COMMON_DEPS,
 )
 
 java_library(

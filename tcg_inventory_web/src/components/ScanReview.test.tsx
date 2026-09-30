@@ -143,6 +143,7 @@ function renderReview(
       <GamesProvider initialGames={options.games ?? REGISTERED_GAMES}>
         <ScanReview
           scan={detail}
+          confirmationPending={false}
           onDeleteRow={onDeleteRow}
           onConfirmScan={onConfirmScan}
         />

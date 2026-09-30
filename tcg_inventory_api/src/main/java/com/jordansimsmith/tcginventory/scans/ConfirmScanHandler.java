@@ -7,6 +7,7 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
+import com.google.common.base.Strings;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.queue.QueueClient;
@@ -14,25 +15,14 @@ import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.tcginventory.catalog.CatalogCard;
-import com.jordansimsmith.tcginventory.catalog.CatalogException;
-import com.jordansimsmith.tcginventory.catalog.Catalogs;
-import com.jordansimsmith.tcginventory.games.Games;
-import com.jordansimsmith.tcginventory.games.Games.Game;
-import com.jordansimsmith.tcginventory.imports.ImportItem;
-import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.stream.Collectors;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 
 public class ConfirmScanHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
@@ -49,19 +39,6 @@ public class ConfirmScanHandler
 
   record ConfirmScanRequest(@JsonProperty("rows") @Nullable List<ConfirmScanRow> rows) {}
 
-  record ConfirmScanResponse(
-      @JsonProperty("scan_id") String scanId,
-      @JsonProperty("status") String status,
-      @JsonProperty("import_id") String importId) {}
-
-  private record ConfirmedScanRow(
-      String externalSource,
-      String externalId,
-      String name,
-      String setCode,
-      String setName,
-      String collectorNumber) {}
-
   record ErrorResponse(@JsonProperty("message") String message) {}
 
   private final ObjectMapper objectMapper;
@@ -69,10 +46,6 @@ public class ConfirmScanHandler
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final ScanRepository scanRepository;
-  private final Catalogs catalogs;
-  private final DynamoDbTable<ImportItem> importTable;
-  private final DynamoDbTable<ImportRowItem> importRowTable;
-  private final DynamoDbTable<JobItem> jobTable;
   private final QueueClient<JobMessage> jobsQueue;
   private final UlidGenerator ulidGenerator;
 
@@ -92,11 +65,6 @@ public class ConfirmScanHandler
             TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ScanRowItem.class),
             factory.dynamoDbClient(),
             factory.clock());
-    this.catalogs = factory.catalogs();
-    this.importTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class);
-    this.importRowTable =
-        TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
-    this.jobTable = factory.jobTable();
     this.jobsQueue = factory.jobsQueue();
     this.ulidGenerator = factory.ulidGenerator();
   }
@@ -120,14 +88,15 @@ public class ConfirmScanHandler
     }
 
     if ("confirmed".equals(scanItem.getStatus())) {
-      if (scanItem.getImportId() == null) {
-        throw new IllegalStateException("confirmed scan is missing import identifier");
-      }
-      return confirmed(scanItem);
+      return httpResponseFactory.noContent();
+    }
+    if ("confirming".equals(scanItem.getStatus())) {
+      return httpResponseFactory.accepted();
     }
     if (!"reviewing".equals(scanItem.getStatus())) {
       return httpResponseFactory.conflict(new ErrorResponse("scan is not in reviewing status"));
     }
+
     ConfirmScanRequest request;
     try {
       request = objectMapper.readValue(event.getBody(), ConfirmScanRequest.class);
@@ -143,68 +112,32 @@ public class ConfirmScanHandler
       return httpResponseFactory.badRequest(new ErrorResponse(e.getMessage()));
     }
 
-    List<ConfirmedScanRow> confirmedRows;
-    var game = Games.get(scanItem.getGame());
-    try {
-      confirmedRows = validateCatalogRows(game, scanItem.getFinish(), orderedRows);
-    } catch (IllegalArgumentException | CatalogException.BadRequest | CatalogException.NotFound e) {
-      return httpResponseFactory.badRequest(new ErrorResponse(e.getMessage()));
-    } catch (CatalogException.Unavailable e) {
-      LOGGER.warn("catalog provider unavailable during scan confirmation", e);
-      return httpResponseFactory.serviceUnavailable(
-          new ErrorResponse("catalog is temporarily unavailable"));
+    for (var row : orderedRows) {
+      scanRepository.updateScanRowSelection(
+          user, scanId, row.scanPosition(), row.externalSource(), row.externalId());
     }
 
-    var importId = ulidGenerator.generate();
-    var jobId = ulidGenerator.generate();
     var now = clock.now();
-    var importItem =
-        ImportItem.create(
-            user, scanItem.getGame(), importId, scanId + ".scan", confirmedRows.size(), jobId, now);
+    var jobItem = JobItem.create(user, ulidGenerator.generate(), "scan_confirmation", null, now);
+    jobItem.setScanId(scanId);
 
-    importTable.putItem(importItem);
-    for (int index = 0; index < confirmedRows.size(); index++) {
-      var selected = confirmedRows.get(index);
-      importRowTable.putItem(
-          ImportRowItem.create(
-              user,
-              importId,
-              index + 1,
-              selected.name(),
-              selected.setCode(),
-              selected.setName(),
-              selected.collectorNumber(),
-              scanItem.getFinish(),
-              scanItem.getCondition(),
-              selected.externalSource(),
-              selected.externalId(),
-              "en"));
-    }
-
-    var jobItem = JobItem.create(user, jobId, "appraise", importId, now);
-    jobTable.putItem(jobItem);
-    var jobMessage = new JobMessage(user, jobId, "appraise");
-    jobsQueue.send(jobMessage, user, jobMessage.deduplicationId(0));
-
-    if (!scanRepository.transitionScanToConfirmed(user, scanId, importId)) {
+    if (!scanRepository.startScanConfirmation(user, scanId, jobItem)) {
       var currentScan = scanRepository.getScan(user, scanId);
       if (currentScan == null) {
         return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
       }
-      if ("confirmed".equals(currentScan.getStatus()) && currentScan.getImportId() != null) {
-        return confirmed(currentScan);
+      if ("confirmed".equals(currentScan.getStatus())) {
+        return httpResponseFactory.noContent();
+      }
+      if ("confirming".equals(currentScan.getStatus())) {
+        return httpResponseFactory.accepted();
       }
       return httpResponseFactory.conflict(new ErrorResponse("scan changed before confirmation"));
     }
 
-    scanItem.setImportId(importId);
-    scanItem.setStatus("confirmed");
-    return confirmed(scanItem);
-  }
-
-  private APIGatewayV2HTTPResponse confirmed(ScanItem scanItem) {
-    return httpResponseFactory.ok(
-        new ConfirmScanResponse(scanItem.getScanId(), "confirmed", scanItem.getImportId()));
+    var jobMessage = new JobMessage(user, jobItem.getJobId(), "scan_confirmation");
+    jobsQueue.send(jobMessage, user, jobMessage.deduplicationId(0));
+    return httpResponseFactory.accepted();
   }
 
   private static List<ConfirmScanRow> orderRows(@Nullable ConfirmScanRequest request) {
@@ -231,18 +164,18 @@ public class ConfirmScanHandler
           || !positions.add(row.scanPosition())) {
         throw new IllegalArgumentException("every retained scan row must be selected exactly once");
       }
-      if (isBlank(row.externalSource())) {
+      if (Strings.isNullOrEmpty(row.externalSource())) {
         throw new IllegalArgumentException(
             "scan position %d: external_source is required".formatted(row.scanPosition()));
       }
-      if (isBlank(row.externalId())) {
+      if (Strings.isNullOrEmpty(row.externalId())) {
         throw new IllegalArgumentException(
             "scan position %d: external_id is required".formatted(row.scanPosition()));
       }
-      if (isBlank(row.name())
-          || isBlank(row.setCode())
-          || isBlank(row.setName())
-          || isBlank(row.collectorNumber())) {
+      if (Strings.isNullOrEmpty(row.name())
+          || Strings.isNullOrEmpty(row.setCode())
+          || Strings.isNullOrEmpty(row.setName())
+          || Strings.isNullOrEmpty(row.collectorNumber())) {
         throw new IllegalArgumentException(
             "scan position %d: card metadata is required".formatted(row.scanPosition()));
       }
@@ -253,51 +186,5 @@ public class ConfirmScanHandler
         throw new IllegalArgumentException("every retained scan row must be selected exactly once");
       }
     }
-  }
-
-  private List<ConfirmedScanRow> validateCatalogRows(
-      Game game, String finish, List<ConfirmScanRow> orderedRows) {
-    var requestedIds = new LinkedHashSet<String>();
-    for (var row : orderedRows) {
-      if (!game.externalSource().equals(row.externalSource())) {
-        throw new IllegalArgumentException(
-            "scan position %d: external_source is unsupported for game %s"
-                .formatted(row.scanPosition(), game.id()));
-      }
-      requestedIds.add(row.externalId());
-    }
-
-    var resolvedCards =
-        catalogs.forGame(game).findCards(List.copyOf(requestedIds)).values().stream()
-            .collect(Collectors.toMap(CatalogCard::externalId, card -> card));
-    var confirmedRows = new ArrayList<ConfirmedScanRow>();
-    for (var row : orderedRows) {
-      var card = resolvedCards.get(row.externalId());
-      if (card == null) {
-        throw new IllegalArgumentException(
-            "scan position %d: selected card was not found".formatted(row.scanPosition()));
-      }
-      if (!game.id().equals(card.game()) || !game.externalSource().equals(card.externalSource())) {
-        throw new CatalogException.Unavailable("catalog returned an incompatible card identity");
-      }
-      if (!card.availableFinishes().contains(finish)) {
-        throw new IllegalArgumentException(
-            "scan position %d: selected card does not support finish %s"
-                .formatted(row.scanPosition(), finish));
-      }
-      confirmedRows.add(
-          new ConfirmedScanRow(
-              card.externalSource(),
-              card.externalId(),
-              card.name(),
-              card.setCode(),
-              card.setName(),
-              card.collectorNumber()));
-    }
-    return List.copyOf(confirmedRows);
-  }
-
-  private static boolean isBlank(@Nullable String value) {
-    return value == null || value.isBlank();
   }
 }
