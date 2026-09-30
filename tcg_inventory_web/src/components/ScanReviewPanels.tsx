@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
-import type { RefObject } from 'react';
+import { useEffect, useState } from 'react';
+import type { KeyboardEvent, RefObject } from 'react';
 import {
   ActionIcon,
-  Autocomplete,
   Badge,
   Box,
   Button,
@@ -12,6 +11,7 @@ import {
   Skeleton,
   Stack,
   Text,
+  TextInput,
   Title,
 } from '@mantine/core';
 import {
@@ -24,12 +24,17 @@ import {
   IconSearch,
   IconTrash,
 } from '@tabler/icons-react';
-import type { ScanRow, ScanSuggestion } from '../api/client';
-import type { ScryfallPrinting } from '../api/scryfall-client';
+import type {
+  CatalogCard,
+  Finish,
+  ScanReviewImageRegion,
+  ScanRow,
+  ScanSuggestion,
+} from '../api/client';
 import classes from './ScanReview.module.css';
 
 export interface ReviewSelection {
-  printing: ScryfallPrinting;
+  card: CatalogCard;
   confirmed: boolean;
 }
 
@@ -39,33 +44,33 @@ interface ScanReviewPanelsProps {
   rowCount: number;
   suggestion: ScanSuggestion | undefined;
   selection: ReviewSelection | undefined;
-  printings: ScryfallPrinting[];
-  printingIndex: number;
+  products: CatalogCard[];
+  productIndex: number;
+  productContinuation: string | null;
+  loadingMoreProducts: boolean;
   loading: boolean;
   error: string | undefined;
+  finish: Finish;
+  finishName: string;
+  finishAvailable: boolean;
+  imageRegions: ScanReviewImageRegion[];
   searchRef: RefObject<HTMLInputElement | null>;
   search: string;
-  searchSuggestions: string[];
+  searchResults: CatalogCard[];
   searching: boolean;
   searchError: string | null;
   searchSelectionLoading: boolean;
   onMoveRow: (change: number) => void;
-  onMovePrinting: (change: number) => void;
-  onChoosePrinting: (printing: ScryfallPrinting) => void;
+  onMoveProduct: (change: number) => void;
+  onLoadMoreProducts: () => void;
+  onChooseProduct: (card: CatalogCard) => void;
   onSearchChange: (value: string) => void;
-  onSearchResult: (name: string) => void;
+  onSearchResult: (card: CatalogCard) => void;
   onConfirm: () => void;
   onDelete: () => void;
   deleteDisabled: boolean;
   controlsDisabled: boolean;
 }
-
-type CropRegion = 'bottom-left' | 'mid-right';
-
-const CROP_OFFSETS: Record<CropRegion, { left: string; top: string }> = {
-  'bottom-left': { left: '0%', top: '-900%' },
-  'mid-right': { left: '-300%', top: '-535%' },
-};
 
 function Crop({
   image,
@@ -73,10 +78,57 @@ function Crop({
   label,
 }: {
   image: string | null;
-  region: CropRegion;
+  region: ScanReviewImageRegion;
   label: string;
 }) {
   const [failed, setFailed] = useState(false);
+  const [naturalSize, setNaturalSize] = useState({ width: 0, height: 0 });
+
+  useEffect(() => {
+    setFailed(false);
+    setNaturalSize({ width: 0, height: 0 });
+  }, [image]);
+
+  const aspectRatio =
+    naturalSize.width > 0 && naturalSize.height > 0
+      ? (region.width * naturalSize.width) /
+        (region.height * naturalSize.height)
+      : 25 / 14;
+
+  return (
+    <div className={classes.crop}>
+      <div className={classes.cropViewport} style={{ aspectRatio }}>
+        {!image || failed ? (
+          <div className={classes.imageUnavailable}>Image unavailable</div>
+        ) : (
+          <img
+            className={classes.cropImage}
+            src={image}
+            alt=""
+            aria-hidden="true"
+            style={{
+              width: `${100 / region.width}%`,
+              left: `${(-region.x / region.width) * 100}%`,
+              top: `${(-region.y / region.height) * 100}%`,
+            }}
+            onLoad={(event) =>
+              setNaturalSize({
+                width: event.currentTarget.naturalWidth,
+                height: event.currentTarget.naturalHeight,
+              })
+            }
+            onError={() => setFailed(true)}
+          />
+        )}
+      </div>
+      <Text className={classes.cropLabel}>{label}</Text>
+    </div>
+  );
+}
+
+function ProductThumbnail({ card }: { card: CatalogCard }) {
+  const [failed, setFailed] = useState(false);
+  const image = card.image_urls.small ?? card.image_urls.normal;
 
   useEffect(() => {
     setFailed(false);
@@ -84,29 +136,50 @@ function Crop({
 
   if (!image || failed) {
     return (
-      <div className={classes.crop}>
-        <div className={classes.cropViewport}>
-          <div className={classes.imageUnavailable}>Image unavailable</div>
-        </div>
-        <Text className={classes.cropLabel}>{label}</Text>
-      </div>
+      <span className={classes.productThumbnailFallback} aria-hidden="true">
+        <IconPhoto size={16} />
+      </span>
     );
   }
 
   return (
-    <div className={classes.crop}>
-      <div className={classes.cropViewport}>
-        <img
-          className={classes.cropImage}
-          src={image}
-          alt=""
-          aria-hidden="true"
-          style={CROP_OFFSETS[region]}
-          onError={() => setFailed(true)}
-        />
-      </div>
-      <Text className={classes.cropLabel}>{label}</Text>
-    </div>
+    <img
+      className={classes.productThumbnail}
+      src={image}
+      alt=""
+      aria-hidden="true"
+      onError={() => setFailed(true)}
+    />
+  );
+}
+
+function ProductOption({
+  card,
+  finishName,
+  finishAvailable,
+}: {
+  card: CatalogCard;
+  finishName: string;
+  finishAvailable: boolean;
+}) {
+  return (
+    <>
+      <ProductThumbnail card={card} />
+      <span className={classes.productOptionDetails}>
+        <strong className={classes.productOptionName}>{card.name}</strong>
+        <small>
+          {card.set_name} · {card.set_code.toUpperCase()} #
+          {card.collector_number}
+        </small>
+        <small
+          className={
+            finishAvailable ? classes.finishEligible : classes.finishIneligible
+          }
+        >
+          {finishName} {finishAvailable ? 'eligible' : 'not available'}
+        </small>
+      </span>
+    </>
   );
 }
 
@@ -158,19 +231,26 @@ export function ScanReviewPanels({
   rowCount,
   suggestion,
   selection,
-  printings,
-  printingIndex,
+  products,
+  productIndex,
+  productContinuation,
+  loadingMoreProducts,
   loading,
   error,
+  finish,
+  finishName,
+  finishAvailable,
+  imageRegions,
   searchRef,
   search,
-  searchSuggestions,
+  searchResults,
   searching,
   searchError,
   searchSelectionLoading,
   onMoveRow,
-  onMovePrinting,
-  onChoosePrinting,
+  onMoveProduct,
+  onLoadMoreProducts,
+  onChooseProduct,
   onSearchChange,
   onSearchResult,
   onConfirm,
@@ -178,25 +258,24 @@ export function ScanReviewPanels({
   deleteDisabled,
   controlsDisabled,
 }: ScanReviewPanelsProps) {
-  const submittedSuggestion = useRef<string | null>(null);
   const currentName =
-    selection?.printing.name ?? suggestion?.name ?? 'Manual selection required';
+    selection?.card.name ?? suggestion?.name ?? 'Manual selection required';
   const sourceImage = selectedRow.source_url;
-  const candidateImage = selection?.printing.image_url ?? null;
+  const candidateImage = selection?.card.image_urls.normal ?? null;
   const needsReview =
     selectedRow.needs_review ||
     selectedRow.error !== null ||
     suggestion === undefined ||
-    error !== undefined;
+    error !== undefined ||
+    (selection !== undefined && !finishAvailable);
 
-  const handleSearchChange = (value: string) => {
-    if (submittedSuggestion.current === value) {
-      submittedSuggestion.current = null;
-      return;
+  function selectTopSearchResult(event: KeyboardEvent<HTMLInputElement>) {
+    const topResult = searchResults[0];
+    if (event.key === 'Enter' && topResult) {
+      event.preventDefault();
+      onSearchResult(topResult);
     }
-    submittedSuggestion.current = null;
-    onSearchChange(value);
-  };
+  }
 
   return (
     <Stack gap="sm" className={classes.reviewer}>
@@ -208,13 +287,13 @@ export function ScanReviewPanels({
             </Text>
             <Title order={3}>{currentName}</Title>
             <Text size="sm" c="dimmed">
-              {selectedRow.needs_review ||
-              selectedRow.error !== null ||
-              error !== undefined
-                ? 'This card needs a manual printing choice.'
-                : suggestion
-                  ? 'Suggested match · advisory only'
-                  : 'Choose a card with card search.'}
+              {selection
+                ? `${selection.card.set_name} · ${selection.card.set_code.toUpperCase()} #${selection.card.collector_number}`
+                : selectedRow.needs_review || selectedRow.error !== null
+                  ? 'This card needs a manual printing choice.'
+                  : suggestion
+                    ? 'Suggested match · advisory only'
+                    : 'Choose a product with card search.'}
             </Text>
             {selectedRow.error && (
               <Text size="sm" c="red.7" role="alert">
@@ -230,9 +309,20 @@ export function ScanReviewPanels({
                 : 'Suggested match'}
           </Badge>
         </Group>
+        {selection && (
+          <Group gap="xs" mt="xs">
+            <Badge color={finishAvailable ? 'teal' : 'orange'} variant="light">
+              {finishAvailable
+                ? `${finishName} available`
+                : `${finishName} unavailable`}
+            </Badge>
+          </Group>
+        )}
       </Paper>
 
-      <div className={classes.comparison}>
+      <div
+        className={`${classes.comparison} ${imageRegions.length === 0 ? classes.comparisonWithoutRegions : ''}`}
+      >
         <Paper withBorder radius="md" p="sm" className={classes.panel}>
           <Text fw={600} size="sm" mb="xs">
             Your scan
@@ -251,13 +341,13 @@ export function ScanReviewPanels({
         >
           <Group justify="space-between" mb="xs">
             <Text fw={600} size="sm">
-              Identified printing
+              Selected product
             </Text>
             <Badge color="teal" variant="light">
               Reference
             </Badge>
           </Group>
-          {loading ? (
+          {loading && !selection ? (
             <Skeleton height={420} radius="sm" />
           ) : (
             <ScanImage
@@ -266,46 +356,34 @@ export function ScanReviewPanels({
             />
           )}
         </Paper>
-        <Paper
-          withBorder
-          radius="md"
-          p="sm"
-          className={`${classes.panel} ${classes.verificationPanel}`}
-        >
-          <Text fw={600} size="sm" mb="xs">
-            Print details
-          </Text>
-          <div className={classes.cropGroups}>
-            <div className={classes.cropPair}>
-              <Crop
-                image={sourceImage}
-                region="bottom-left"
-                label="Your scan · set code"
-              />
-              <Crop
-                image={candidateImage}
-                region="bottom-left"
-                label={
-                  selection
-                    ? `Reference · ${selection.printing.set_code.toUpperCase()} ${selection.printing.collector_number}`
-                    : 'Reference · set code'
-                }
-              />
+        {imageRegions.length > 0 && (
+          <Paper
+            withBorder
+            radius="md"
+            p="sm"
+            className={`${classes.panel} ${classes.verificationPanel}`}
+          >
+            <Text fw={600} size="sm" mb="xs">
+              Print details
+            </Text>
+            <div className={classes.cropGroups}>
+              {imageRegions.map((region) => (
+                <div className={classes.cropPair} key={region.id}>
+                  <Crop
+                    image={sourceImage}
+                    region={region}
+                    label={`Your scan · ${region.display_name}`}
+                  />
+                  <Crop
+                    image={candidateImage}
+                    region={region}
+                    label={`Reference · ${region.display_name}`}
+                  />
+                </div>
+              ))}
             </div>
-            <div className={classes.cropPair}>
-              <Crop
-                image={sourceImage}
-                region="mid-right"
-                label="Your scan · set symbol"
-              />
-              <Crop
-                image={candidateImage}
-                region="mid-right"
-                label="Reference · set symbol"
-              />
-            </div>
-          </div>
-        </Paper>
+          </Paper>
+        )}
       </div>
 
       <Paper withBorder radius="md" p="sm">
@@ -315,55 +393,73 @@ export function ScanReviewPanels({
               Other printings
             </Text>
             <Text size="xs" c="dimmed">
-              Same card
+              Same card, eligible for {finishName} where available
             </Text>
           </Box>
           <Group gap={3}>
             <ActionIcon
               variant="default"
               aria-label="Previous printing"
-              disabled={controlsDisabled || printingIndex <= 0}
-              onClick={() => onMovePrinting(-1)}
+              disabled={controlsDisabled || productIndex <= 0}
+              onClick={() => onMoveProduct(-1)}
             >
               <IconChevronLeft size={16} />
             </ActionIcon>
             <Text size="sm" miw={38} ta="center">
-              {printingIndex < 0
+              {productIndex < 0
                 ? '—'
-                : `${printingIndex + 1} / ${printings.length}`}
+                : `${productIndex + 1} / ${products.length}`}
             </Text>
             <ActionIcon
               variant="default"
               aria-label="Next printing"
               disabled={
                 controlsDisabled ||
-                printingIndex < 0 ||
-                printingIndex >= printings.length - 1
+                productIndex < 0 ||
+                productIndex >= products.length - 1
               }
-              onClick={() => onMovePrinting(1)}
+              onClick={() => onMoveProduct(1)}
             >
               <IconChevronRight size={16} />
             </ActionIcon>
           </Group>
         </Group>
-        {printings.length > 0 && (
+        {products.length > 0 && (
           <div className={classes.printingTabs} aria-label="Printings">
-            {printings.map((printing) => (
+            {products.map((card) => (
               <button
                 type="button"
-                key={printing.id}
-                aria-pressed={printing.id === selection?.printing.id}
+                key={card.external_id}
+                aria-pressed={card.external_id === selection?.card.external_id}
                 disabled={controlsDisabled}
-                className={`${classes.printingButton} ${printing.id === selection?.printing.id ? classes.printingButtonSelected : ''}`}
-                onClick={() => onChoosePrinting(printing)}
+                className={`${classes.printingButton} ${card.external_id === selection?.card.external_id ? classes.printingButtonSelected : ''}`}
+                onClick={() => onChooseProduct(card)}
               >
-                {printing.set_code.toUpperCase()}
-                <small className={classes.printingButtonMetadata}>
-                  #{printing.collector_number}
-                </small>
+                <ProductOption
+                  card={card}
+                  finishName={finishName}
+                  finishAvailable={card.available_finishes.includes(finish)}
+                />
               </button>
             ))}
           </div>
+        )}
+        {products.length === 0 && !loading && (
+          <Text size="sm" c="dimmed">
+            No eligible alternative printings found.
+          </Text>
+        )}
+        {productContinuation && (
+          <Button
+            variant="default"
+            size="xs"
+            mt="xs"
+            loading={loadingMoreProducts}
+            disabled={controlsDisabled || loadingMoreProducts}
+            onClick={onLoadMoreProducts}
+          >
+            Load more printings
+          </Button>
         )}
         {error && (
           <Text size="sm" c="red.7" role="alert" mt="xs">
@@ -377,34 +473,61 @@ export function ScanReviewPanels({
           Wrong card?
         </Text>
         <Text size="xs" c="dimmed">
-          Search for a card, then compare its printings here.
+          Search the catalog, then compare the product’s other printings. Refine
+          your search to narrow the results.
         </Text>
         <Stack gap={4} mt="sm">
-          <Autocomplete
+          <TextInput
             ref={searchRef}
-            aria-label="Search for a card by name"
+            aria-label="Search catalog cards"
             value={search}
-            onChange={handleSearchChange}
-            onOptionSubmit={(name) => {
-              submittedSuggestion.current = name;
-              onSearchResult(name);
-            }}
-            data={searchSuggestions}
-            filter={({ options }) => options}
-            limit={6}
-            placeholder="Search for a card by name…"
+            onChange={(event) => onSearchChange(event.currentTarget.value)}
+            onKeyDown={selectTopSearchResult}
+            placeholder="Search by card name or ID…"
             leftSection={<IconSearch size={16} />}
             disabled={controlsDisabled || searchSelectionLoading}
           />
           {searching && (
             <Text size="xs" c="dimmed">
-              Searching for cards…
+              Searching catalog…
+            </Text>
+          )}
+          {searchSelectionLoading && (
+            <Text size="xs" c="dimmed">
+              Loading related printings…
             </Text>
           )}
           {searchError && (
             <Text size="xs" c="red.7" role="alert">
               {searchError}
             </Text>
+          )}
+          {search.trim().length >= 2 &&
+            !searching &&
+            searchResults.length === 0 &&
+            !searchError && (
+              <Text size="xs" c="dimmed">
+                No matching products with this finish.
+              </Text>
+            )}
+          {searchResults.length > 0 && (
+            <div className={classes.searchResults} aria-label="Catalog results">
+              {searchResults.map((card) => (
+                <button
+                  type="button"
+                  key={card.external_id}
+                  className={classes.searchResult}
+                  disabled={controlsDisabled || searchSelectionLoading}
+                  onClick={() => onSearchResult(card)}
+                >
+                  <ProductOption
+                    card={card}
+                    finishName={finishName}
+                    finishAvailable={card.available_finishes.includes(finish)}
+                  />
+                </button>
+              ))}
+            </div>
           )}
         </Stack>
       </Paper>
@@ -442,7 +565,12 @@ export function ScanReviewPanels({
           <Button
             color="teal"
             leftSection={<IconCheck size={17} />}
-            disabled={controlsDisabled || !selection || selection.confirmed}
+            disabled={
+              controlsDisabled ||
+              !selection ||
+              !finishAvailable ||
+              selection.confirmed
+            }
             onClick={onConfirm}
           >
             {selection?.confirmed ? 'Match confirmed' : 'Confirm match'}

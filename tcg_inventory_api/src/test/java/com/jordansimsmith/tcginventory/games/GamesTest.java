@@ -23,6 +23,10 @@ public class GamesTest {
             new Games.Finish("normal", "Normal"),
             new Games.Finish("foil", "Foil"),
             new Games.Finish("etched", "Etched"));
+    assertThat(magic.scanReviewImageRegions())
+        .containsExactly(
+            new Games.ScanReviewImageRegion("set_code", "Set code", 0, 0.9, 0.25, 0.1),
+            new Games.ScanReviewImageRegion("set_symbol", "Set symbol", 0.75, 0.535, 0.25, 0.1));
     assertThat(magic.supportsFinish("normal")).isTrue();
     assertThat(magic.supportsFinish("reverse_holofoil")).isFalse();
   }
@@ -35,6 +39,8 @@ public class GamesTest {
     // act / assert
     assertThatThrownBy(() -> Games.all().clear()).isInstanceOf(UnsupportedOperationException.class);
     assertThatThrownBy(() -> magic.finishes().clear())
+        .isInstanceOf(UnsupportedOperationException.class);
+    assertThatThrownBy(() -> magic.scanReviewImageRegions().clear())
         .isInstanceOf(UnsupportedOperationException.class);
   }
 

@@ -8,8 +8,12 @@ import type {
   CreateScanResponse,
   ConfirmImportResponse,
   ConfirmOrderResponse,
+  CatalogCard,
+  CatalogCardsResponse,
   FindScansParams,
   FindScansResponse,
+  FindCatalogAlternativesParams,
+  FindCatalogCardsParams,
   FindImportsParams,
   FindImportsResponse,
   FindOrdersParams,
@@ -210,6 +214,45 @@ export function createHttpClient(): ApiClient {
       const response = await authenticatedFetch(
         `/scans/${encodeURIComponent(scanId)}`,
       );
+      return response.json();
+    },
+
+    async getCatalogCard(
+      game: GameId,
+      externalId: string,
+    ): Promise<CatalogCard> {
+      const query = new URLSearchParams({ game });
+      const response = await authenticatedFetch(
+        `/catalog/cards/${encodeURIComponent(externalId)}?${query}`,
+      );
+      return response.json();
+    },
+
+    async findCatalogAlternatives(
+      params: FindCatalogAlternativesParams,
+    ): Promise<CatalogCardsResponse> {
+      const query = new URLSearchParams({
+        game: params.game,
+        finish: params.finish,
+      });
+      if (params.continuation) {
+        query.set('continuation', params.continuation);
+      }
+      const response = await authenticatedFetch(
+        `/catalog/cards/${encodeURIComponent(params.external_id)}/alternatives?${query}`,
+      );
+      return response.json();
+    },
+
+    async findCatalogCards(
+      params: FindCatalogCardsParams,
+    ): Promise<CatalogCardsResponse> {
+      const query = new URLSearchParams({
+        game: params.game,
+        query: params.query,
+        finish: params.finish,
+      });
+      const response = await authenticatedFetch(`/catalog/cards?${query}`);
       return response.json();
     },
 

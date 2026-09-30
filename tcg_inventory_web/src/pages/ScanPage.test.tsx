@@ -22,6 +22,7 @@ const REGISTERED_GAMES = [
     display_name: 'Magic: The Gathering',
     scanning_enabled: true,
     csv_import_enabled: true,
+    scan_review_image_regions: [],
     finishes: [
       { id: 'normal', display_name: 'Normal' },
       { id: 'foil', display_name: 'Foil' },
@@ -159,6 +160,7 @@ describe('ScanPage', () => {
         display_name: 'Card Game A',
         scanning_enabled: false,
         csv_import_enabled: false,
+        scan_review_image_regions: [],
         finishes: [
           { id: 'foil', display_name: 'Gloss A' },
           { id: 'normal', display_name: 'Base A' },
@@ -169,6 +171,7 @@ describe('ScanPage', () => {
         display_name: 'Card Game B',
         scanning_enabled: true,
         csv_import_enabled: false,
+        scan_review_image_regions: [],
         finishes: [
           { id: 'etched', display_name: 'Etched B' },
           { id: 'foil', display_name: 'Gloss B' },

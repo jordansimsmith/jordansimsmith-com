@@ -8,15 +8,20 @@ import java.util.stream.Collectors;
 public class Games {
   public record Finish(String id, String displayName) {}
 
+  public record ScanReviewImageRegion(
+      String id, String displayName, double x, double y, double width, double height) {}
+
   public record Game(
       String id,
       String displayName,
       String externalSource,
       boolean scanningEnabled,
       boolean csvImportEnabled,
-      List<Finish> finishes) {
+      List<Finish> finishes,
+      List<ScanReviewImageRegion> scanReviewImageRegions) {
     public Game {
       finishes = List.copyOf(finishes);
+      scanReviewImageRegions = List.copyOf(scanReviewImageRegions);
     }
 
     public boolean supportsFinish(String finishId) {
@@ -34,7 +39,10 @@ public class Games {
           List.of(
               new Finish("normal", "Normal"),
               new Finish("foil", "Foil"),
-              new Finish("etched", "Etched")));
+              new Finish("etched", "Etched")),
+          List.of(
+              new ScanReviewImageRegion("set_code", "Set code", 0, 0.9, 0.25, 0.1),
+              new ScanReviewImageRegion("set_symbol", "Set symbol", 0.75, 0.535, 0.25, 0.1)));
 
   private static final List<Game> GAMES = List.of(MAGIC_THE_GATHERING);
 

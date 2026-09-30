@@ -24,6 +24,24 @@ describe('http client imports', () => {
           display_name: 'Magic: The Gathering',
           scanning_enabled: true,
           csv_import_enabled: true,
+          scan_review_image_regions: [
+            {
+              id: 'set_code',
+              display_name: 'Set code',
+              x: 0,
+              y: 0.9,
+              width: 0.25,
+              height: 0.1,
+            },
+            {
+              id: 'set_symbol',
+              display_name: 'Set symbol',
+              x: 0.75,
+              y: 0.535,
+              width: 0.25,
+              height: 0.1,
+            },
+          ],
           finishes: [
             { id: 'normal', display_name: 'Normal' },
             { id: 'foil', display_name: 'Foil' },
@@ -63,6 +81,94 @@ describe('http client imports', () => {
     expect(init.headers.Authorization).toBe(`Basic ${btoa('alice:pw')}`);
     expect(init.body).toBe('csv body');
     expect(json).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('http client catalog', () => {
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    localStorage.clear();
+    setSession('alice', 'pw');
+  });
+
+  afterEach(() => {
+    clearSession();
+  });
+
+  it('gets exact catalog detail through the authenticated API', async () => {
+    const card = {
+      game: 'mtg',
+      external_source: 'provider-id',
+      external_id: 'opaque/id',
+      name: 'Example',
+      set_code: 'set',
+      set_name: 'Set Name',
+      collector_number: '12',
+      image_urls: { small: null, normal: null },
+      available_finishes: ['normal'],
+    };
+    const json = vi.fn().mockResolvedValue(card);
+    fetchSpy.mockResolvedValue({ ok: true, json });
+
+    await expect(
+      createHttpClient().getCatalogCard('mtg', 'opaque/id'),
+    ).resolves.toEqual(card);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/catalog/cards/opaque%2Fid?game=mtg',
+    );
+    expect(fetchSpy.mock.calls[0][1].headers.Authorization).toBe(
+      `Basic ${btoa('alice:pw')}`,
+    );
+  });
+
+  it('encodes catalog alternatives continuations and search queries', async () => {
+    const response = { cards: [], next_continuation: 'next/page' };
+    const json = vi.fn().mockResolvedValue(response);
+    fetchSpy.mockResolvedValue({ ok: true, json });
+    const client = createHttpClient();
+
+    await client.findCatalogAlternatives({
+      game: 'mtg',
+      external_id: 'opaque/id',
+      finish: 'reverse holo',
+      continuation: 'next/page',
+    });
+    await expect(
+      client.findCatalogCards({
+        game: 'mtg',
+        query: 'Bolt & Co',
+        finish: 'normal',
+      }),
+    ).resolves.toEqual(response);
+
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/catalog/cards/opaque%2Fid/alternatives?game=mtg&finish=reverse+holo&continuation=next%2Fpage',
+    );
+    expect(fetchSpy.mock.calls[1][0]).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/catalog/cards?game=mtg&query=Bolt+%26+Co&finish=normal',
+    );
+    expect(json).toHaveBeenCalledTimes(2);
+  });
+
+  it('surfaces catalog API errors', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: false,
+      statusText: 'Service Unavailable',
+      json: vi
+        .fn()
+        .mockResolvedValue({ message: 'catalog is temporarily unavailable' }),
+    });
+
+    await expect(
+      createHttpClient().findCatalogCards({
+        game: 'mtg',
+        query: 'Bolt',
+        finish: 'normal',
+      }),
+    ).rejects.toThrow('catalog is temporarily unavailable');
   });
 });
 

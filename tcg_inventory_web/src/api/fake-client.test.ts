@@ -4,7 +4,7 @@ import { createFakeScanUploader } from './fake-scan-uploader';
 import type { ScanConfirmationRow } from './client';
 
 describe('createFakeClient', () => {
-  it('returns the Magic game registry with ordered finishes and capabilities', async () => {
+  it('returns the Magic game registry with ordered finishes, capabilities, and review regions', async () => {
     const client = createFakeClient();
 
     await expect(client.getGames()).resolves.toEqual({
@@ -14,6 +14,24 @@ describe('createFakeClient', () => {
           display_name: 'Magic: The Gathering',
           scanning_enabled: true,
           csv_import_enabled: true,
+          scan_review_image_regions: [
+            {
+              id: 'set_code',
+              display_name: 'Set code',
+              x: 0,
+              y: 0.9,
+              width: 0.25,
+              height: 0.1,
+            },
+            {
+              id: 'set_symbol',
+              display_name: 'Set symbol',
+              x: 0.75,
+              y: 0.535,
+              width: 0.25,
+              height: 0.1,
+            },
+          ],
           finishes: [
             { id: 'normal', display_name: 'Normal' },
             { id: 'foil', display_name: 'Foil' },
@@ -22,6 +40,50 @@ describe('createFakeClient', () => {
         },
       ],
     });
+  });
+
+  it('returns exact catalog cards, paged alternatives, and search results', async () => {
+    const client = createFakeClient();
+    const firstCard = await client.getCatalogCard(
+      'mtg',
+      'f29ba16f-c8fb-42fe-aabf-87089cb214a7',
+    );
+
+    expect(firstCard.name).toBe('Lightning Bolt');
+    expect(firstCard.external_source).toBe('scryfall');
+    await expect(
+      client.findCatalogAlternatives({
+        game: 'mtg',
+        external_id: firstCard.external_id,
+        finish: 'normal',
+      }),
+    ).resolves.toMatchObject({
+      cards: [firstCard, expect.objectContaining({ set_code: '2xm' })],
+      next_continuation: 'fake:2',
+    });
+    await expect(
+      client.findCatalogAlternatives({
+        game: 'mtg',
+        external_id: firstCard.external_id,
+        finish: 'normal',
+        continuation: 'fake:2',
+      }),
+    ).resolves.toMatchObject({
+      cards: [expect.objectContaining({ set_code: 'sta' })],
+      next_continuation: null,
+    });
+
+    const searchResults = await client.findCatalogCards({
+      game: 'mtg',
+      query: 'Bolt',
+      finish: 'normal',
+    });
+    expect(searchResults.cards.map((card) => card.set_code)).toEqual([
+      'm11',
+      '2xm',
+      'sta',
+    ]);
+    expect(searchResults.next_continuation).toBeNull();
   });
 
   it('derives detail counts from units', async () => {

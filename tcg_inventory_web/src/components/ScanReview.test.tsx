@@ -1,19 +1,50 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import {
+  cleanup,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ScanConfirmationRow, ScanDetail, ScanRow } from '../api/client';
-import * as scryfallModule from '../api/scryfall-client';
-import type { ScryfallPrinting } from '../api/scryfall-client';
-import { ScanReview } from './ScanReview';
 import { GamesProvider } from '../GamesProvider';
+import { apiClient } from '../api/client';
+import type {
+  CatalogCard,
+  Game,
+  ScanConfirmationRow,
+  ScanDetail,
+  ScanRow,
+} from '../api/client';
+import { ScanReview } from './ScanReview';
 
-const REGISTERED_GAMES = [
+const REVIEW_REGIONS = [
+  {
+    id: 'set_code',
+    display_name: 'Set code',
+    x: 0,
+    y: 0.9,
+    width: 0.25,
+    height: 0.1,
+  },
+  {
+    id: 'set_symbol',
+    display_name: 'Set symbol',
+    x: 0.75,
+    y: 0.535,
+    width: 0.25,
+    height: 0.1,
+  },
+];
+
+const REGISTERED_GAMES: Game[] = [
   {
     id: 'mtg',
     display_name: 'Magic: The Gathering',
     scanning_enabled: true,
     csv_import_enabled: true,
+    scan_review_image_regions: REVIEW_REGIONS,
     finishes: [
       { id: 'normal', display_name: 'Normal' },
       { id: 'foil', display_name: 'Foil' },
@@ -22,24 +53,39 @@ const REGISTERED_GAMES = [
   },
 ];
 
-const printings: ScryfallPrinting[] = [
-  {
-    id: 'printing-1',
+function card(
+  externalId: string,
+  overrides: Partial<CatalogCard> = {},
+): CatalogCard {
+  return {
+    game: 'mtg',
+    external_source: 'catalog-provider-id',
+    external_id: externalId,
     name: 'Lightning Bolt',
     set_code: '2x2',
     set_name: 'Double Masters 2022',
     collector_number: '117',
-    image_url: 'https://img.example/lightning-1.jpg',
-  },
-  {
-    id: 'printing-2',
-    name: 'Lightning Bolt',
-    set_code: 'm11',
-    set_name: 'Magic 2011',
-    collector_number: '149',
-    image_url: 'https://img.example/lightning-2.jpg',
-  },
-];
+    image_urls: {
+      small: 'https://image.test/small.jpg',
+      normal: 'https://image.test/normal.jpg',
+    },
+    available_finishes: ['normal', 'foil'],
+    ...overrides,
+  };
+}
+
+const firstCard = card('product-1');
+const secondCard = card('product-2', {
+  set_code: 'm11',
+  set_name: 'Magic 2011',
+  collector_number: '149',
+  image_urls: { small: null, normal: 'https://image.test/second.jpg' },
+});
+const thirdCard = card('product-3', {
+  set_code: 'sta',
+  set_name: 'Strixhaven Mystical Archive',
+  collector_number: '42',
+});
 
 function row(overrides: Partial<ScanRow> = {}): ScanRow {
   return {
@@ -53,9 +99,9 @@ function row(overrides: Partial<ScanRow> = {}): ScanRow {
     needs_review: false,
     suggestions: [
       {
-        external_source: 'scryfall',
-        external_id: 'printing-1',
-        name: 'Lightning Bolt',
+        external_source: 'opaque-recognition-source',
+        external_id: firstCard.external_id,
+        name: firstCard.name,
         score: 0.98,
       },
     ],
@@ -85,6 +131,7 @@ function renderReview(
   options: {
     onDeleteRow?: (scanPosition: number) => Promise<void>;
     onConfirmScan?: (rows: ScanConfirmationRow[]) => Promise<void>;
+    games?: Game[];
   } = {},
 ) {
   const onDeleteRow =
@@ -93,16 +140,37 @@ function renderReview(
     options.onConfirmScan ?? vi.fn().mockResolvedValue(undefined);
   const rendered = render(
     <MantineProvider>
-      <GamesProvider initialGames={REGISTERED_GAMES}>
+      <GamesProvider initialGames={options.games ?? REGISTERED_GAMES}>
         <ScanReview
           scan={detail}
           onDeleteRow={onDeleteRow}
-          onConfirmScan={async (rows) => onConfirmScan(rows)}
+          onConfirmScan={onConfirmScan}
         />
       </GamesProvider>
     </MantineProvider>,
   );
   return { ...rendered, onDeleteRow, onConfirmScan };
+}
+
+function mockSuggestionLookup(
+  selectedCard = firstCard,
+  alternatives: CatalogCard[] = [firstCard, secondCard],
+  nextContinuation: string | null = null,
+) {
+  const detail = vi
+    .spyOn(apiClient, 'getCatalogCard')
+    .mockResolvedValue(selectedCard);
+  const findAlternatives = vi
+    .spyOn(apiClient, 'findCatalogAlternatives')
+    .mockResolvedValue({
+      cards: alternatives,
+      next_continuation: nextContinuation,
+    });
+  vi.spyOn(apiClient, 'findCatalogCards').mockResolvedValue({
+    cards: [],
+    next_continuation: null,
+  });
+  return { detail, findAlternatives };
 }
 
 describe('ScanReview', () => {
@@ -111,396 +179,336 @@ describe('ScanReview', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders the actual source URL and advisory suggestion without a score', async () => {
-    vi.spyOn(
-      scryfallModule.scryfallClient,
-      'getPrintingsForId',
-    ).mockResolvedValue(printings);
+  it('loads the exact suggestion and displays catalog metadata and configured regions', async () => {
+    const { detail, findAlternatives } = mockSuggestionLookup();
 
     renderReview(scan([row()]));
 
-    expect(await screen.findAllByText('Lightning Bolt')).not.toHaveLength(0);
+    expect(
+      await screen.findByRole('heading', { name: 'Lightning Bolt' }),
+    ).toBeDefined();
+    expect(screen.getAllByText('Double Masters 2022 · 2X2 #117')).toHaveLength(
+      2,
+    );
+    expect(screen.getByText('Normal available')).toBeDefined();
     expect(screen.getByAltText('Scanned 001.jpg')).toHaveProperty(
       'src',
       'data:image/svg+xml,source',
     );
-    expect(screen.getAllByText('Suggested match').length).toBeGreaterThan(0);
-    expect(screen.queryByText('98%')).toBeNull();
+    expect(screen.getByAltText('Lightning Bolt reference')).toHaveProperty(
+      'src',
+      'https://image.test/normal.jpg',
+    );
+    expect(screen.getByText('Your scan · Set code')).toBeDefined();
+    expect(screen.getByText('Reference · Set symbol')).toBeDefined();
+    expect(detail).toHaveBeenCalledWith('mtg', firstCard.external_id);
+    expect(findAlternatives).toHaveBeenCalledWith({
+      game: 'mtg',
+      external_id: firstCard.external_id,
+      finish: 'normal',
+    });
     expect(screen.queryByText(/scryfall/i)).toBeNull();
   });
 
-  it('seeds the highest-ranked persisted suggestion without confirming it', async () => {
-    vi.spyOn(
-      scryfallModule.scryfallClient,
-      'getPrintingsForId',
-    ).mockResolvedValue(printings);
-
-    renderReview(
-      scan([
-        row({
-          suggestions: [
-            { ...row().suggestions[0], score: 0.4 },
-            {
-              external_source: 'scryfall',
-              external_id: 'printing-2',
-              name: 'Lightning Bolt',
-              score: 0.99,
-            },
-          ],
-        }),
-      ]),
-    );
-
-    expect(
-      (await screen.findByRole('button', { name: /M11.*#149/ })).getAttribute(
-        'aria-pressed',
-      ),
-    ).toBe('true');
-    expect(
-      screen.getByRole('button', { name: 'Confirm match' }),
-    ).not.toHaveProperty('disabled', true);
-  });
-
-  it('requires explicit confirmation and advances to the next unconfirmed row', async () => {
-    vi.spyOn(
-      scryfallModule.scryfallClient,
-      'getPrintingsForId',
-    ).mockResolvedValue(printings);
+  it('keeps an exact suggestion selected when the scan finish is unavailable', async () => {
     const user = userEvent.setup();
-
-    renderReview(
-      scan([
-        row(),
-        row({
-          scan_position: 2,
-          filename: '002.jpg',
-          suggestions: [
-            {
-              external_source: 'scryfall',
-              external_id: 'printing-1',
-              name: 'Lightning Bolt',
-              score: 0.7,
-            },
-          ],
-        }),
-      ]),
-    );
-
-    const confirm = await screen.findByRole('button', {
-      name: 'Confirm match',
-    });
-    await waitFor(() => expect(confirm).not.toHaveProperty('disabled', true));
-    await user.click(confirm);
-
-    expect(screen.getByText('1 of 2 confirmed')).toBeDefined();
-    expect(screen.getByText('Card 2 of 2')).toBeDefined();
-  });
-
-  it('clears confirmation when the exact printing changes', async () => {
-    vi.spyOn(
-      scryfallModule.scryfallClient,
-      'getPrintingsForId',
-    ).mockResolvedValue(printings);
-    const user = userEvent.setup();
+    const ineligibleCard = card('product-1', { available_finishes: ['foil'] });
+    mockSuggestionLookup(ineligibleCard, [secondCard]);
 
     renderReview(scan([row()]));
 
-    const confirm = await screen.findByRole('button', {
-      name: 'Confirm match',
-    });
-    await waitFor(() => expect(confirm).not.toHaveProperty('disabled', true));
-    await user.click(confirm);
-    expect(
-      screen.getByRole('button', { name: 'Match confirmed' }),
-    ).toHaveProperty('disabled', true);
-
-    await user.click(screen.getByRole('button', { name: /2X2.*#117/ }));
-    expect(
-      screen.getByRole('button', { name: 'Match confirmed' }),
-    ).toHaveProperty('disabled', true);
-
-    await user.click(screen.getByRole('button', { name: 'Next printing' }));
-
+    expect(await screen.findByText('Normal unavailable')).toBeDefined();
+    expect(screen.getAllByText('Double Masters 2022 · 2X2 #117')).toHaveLength(
+      2,
+    );
     expect(
       screen.getByRole('button', { name: 'Confirm match' }),
-    ).not.toHaveProperty('disabled', true);
-    expect(screen.getByText('M11')).toBeDefined();
+    ).toHaveProperty('disabled', true);
+
+    await user.click(screen.getByRole('button', { name: /M11.*#149/ }));
+
+    expect(screen.getByText('Normal available')).toBeDefined();
+    expect(
+      screen.getByRole('button', { name: 'Confirm match' }),
+    ).toHaveProperty('disabled', false);
   });
 
-  it('supports manual search and replaces a wrong suggestion', async () => {
-    const getPrintingsForId = vi
-      .spyOn(scryfallModule.scryfallClient, 'getPrintingsForId')
-      .mockResolvedValue(printings);
-    const autocomplete = vi
-      .spyOn(scryfallModule.scryfallClient, 'autocomplete')
-      .mockResolvedValue(['Counterspell']);
-    vi.spyOn(
-      scryfallModule.scryfallClient,
-      'getPrintingsByName',
-    ).mockResolvedValue([
-      {
-        ...printings[0],
-        id: 'counterspell-1',
-        name: 'Counterspell',
-        set_code: 'fdn',
-        collector_number: '153',
-      },
-    ]);
+  it('searches and selects a product for a row without a recognition suggestion', async () => {
     const user = userEvent.setup();
-
-    renderReview(scan([row()]));
-    await screen.findAllByText('Lightning Bolt');
-    expect(getPrintingsForId).toHaveBeenCalledWith('printing-1');
-
-    const search = screen.getByRole('textbox', {
-      name: 'Search for a card by name',
+    const counterspell = card('counterspell-id', {
+      name: 'Counterspell',
+      set_code: 'fdn',
+      set_name: 'Foundations',
+      collector_number: '153',
     });
-    await user.type(search, 'Counter');
+    const alternateCounterspell = card('counterspell-alternate-id', {
+      name: 'Counterspell',
+      set_code: 'm10',
+      set_name: 'Magic 2010',
+      collector_number: '54',
+    });
+    const search = vi.spyOn(apiClient, 'findCatalogCards').mockResolvedValue({
+      cards: [counterspell, alternateCounterspell],
+      next_continuation: null,
+    });
+    vi.spyOn(apiClient, 'findCatalogAlternatives').mockResolvedValue({
+      cards: [counterspell],
+      next_continuation: null,
+    });
+    const noSuggestion = row({
+      suggestions: [],
+      needs_review: true,
+      status: 'needs_review',
+      error: 'recognition was inconclusive',
+    });
+
+    renderReview(scan([noSuggestion]));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Manual selection required' }),
+    ).toBeDefined();
+    const searchInput = screen.getByRole('textbox', {
+      name: 'Search catalog cards',
+    });
+    await user.type(searchInput, 'Counterspell');
     await waitFor(() =>
-      expect(autocomplete).toHaveBeenCalledWith(
-        'Counter',
-        expect.any(AbortSignal),
-      ),
+      expect(search).toHaveBeenCalledWith({
+        game: 'mtg',
+        query: 'Counterspell',
+        finish: 'normal',
+      }),
     );
-    await user.keyboard('{ArrowDown}{Enter}');
-
-    expect(await screen.findAllByText('Counterspell')).not.toHaveLength(0);
-    expect(
-      screen.getByRole('button', { name: 'Confirm match' }),
-    ).not.toHaveProperty('disabled', true);
-  });
-
-  it('marks rows without a suggestion as needing manual selection', async () => {
-    renderReview(
-      scan([
-        row({
-          suggestions: [],
-          needs_review: true,
-          status: 'needs_review',
-          source_url: null,
-          error: 'recognition was inconclusive',
-        }),
-      ]),
+    const searchResults = screen.getByLabelText('Catalog results');
+    const searchResult = within(searchResults).getByRole('button', {
+      name: /Counterspell.*FDN #153/,
+    });
+    expect(within(searchResult).getByText('Normal eligible')).toBeDefined();
+    expect(searchResult.querySelector('img')?.getAttribute('src')).toBe(
+      'https://image.test/small.jpg',
     );
-
     expect(
-      await screen.findAllByText('Manual selection required'),
-    ).not.toHaveLength(0);
-    expect(screen.getAllByText('Needs review').length).toBeGreaterThan(0);
-    expect(screen.getByText('recognition was inconclusive')).toBeDefined();
-    expect(
-      screen.getByRole('button', { name: 'Confirm match' }),
-    ).toHaveProperty('disabled', true);
-  });
-
-  it('shows card lookup failures and blocks confirmation', async () => {
-    vi.spyOn(
-      scryfallModule.scryfallClient,
-      'getPrintingsForId',
-    ).mockRejectedValue(new Error('Scryfall request failed (503)'));
-
-    renderReview(scan([row()]));
-
-    expect(
-      await screen.findByText('Scryfall request failed (503)'),
-    ).toBeDefined();
-    expect(screen.getAllByText('Needs review').length).toBeGreaterThan(0);
-    expect(
-      screen.getByRole('button', { name: 'Confirm match' }),
-    ).toHaveProperty('disabled', true);
-  });
-
-  it('supports keyboard row, printing, search, and confirmation controls', async () => {
-    vi.spyOn(
-      scryfallModule.scryfallClient,
-      'getPrintingsForId',
-    ).mockResolvedValue(printings);
-    const user = userEvent.setup();
-
-    renderReview(scan([row(), row({ scan_position: 2, filename: '002.jpg' })]));
-    const confirm = await screen.findByRole('button', {
-      name: 'Confirm match',
-    });
-    await waitFor(() => expect(confirm).not.toHaveProperty('disabled', true));
-
-    await user.keyboard('j');
-    expect(screen.getByText('Card 2 of 2')).toBeDefined();
-    await user.keyboard('k');
-    expect(screen.getByText('Card 1 of 2')).toBeDefined();
-    await user.keyboard('l');
-    expect(screen.getByText('M11')).toBeDefined();
-    await user.keyboard('h');
-    expect(screen.getByText('2X2')).toBeDefined();
-    await user.keyboard('/');
-    const search = screen.getByRole('textbox', {
-      name: 'Search for a card by name',
-    });
-    expect(document.activeElement).toBe(search);
-    await user.keyboard('j');
-    expect(screen.getByText('Card 1 of 2')).toBeDefined();
-    await user.keyboard('{Escape}');
-    expect(document.activeElement).not.toBe(search);
-    await user.keyboard('c');
-    expect(screen.getByText('1 of 2 confirmed')).toBeDefined();
-    expect(screen.getByText('Card 2 of 2')).toBeDefined();
-  });
-
-  it('keeps shortcuts active after selecting a queue row with the pointer', async () => {
-    vi.spyOn(
-      scryfallModule.scryfallClient,
-      'getPrintingsForId',
-    ).mockResolvedValue(printings);
-    const user = userEvent.setup();
-
-    renderReview(
-      scan([
-        row(),
-        row({ scan_position: 2, filename: '002.jpg' }),
-        row({ scan_position: 3, filename: '003.jpg' }),
-      ]),
-    );
-    const firstRow = screen
-      .getByRole('region', { name: 'Scan cards' })
-      .querySelector('button');
-    expect(firstRow).not.toBeNull();
-    await user.click(firstRow!);
-    await user.keyboard('j');
-
-    expect(screen.getByText('Card 2 of 3')).toBeDefined();
-  });
-
-  it('resets manual confirmation after a remount', async () => {
-    vi.spyOn(
-      scryfallModule.scryfallClient,
-      'getPrintingsForId',
-    ).mockResolvedValue(printings);
-    const user = userEvent.setup();
-    const rendered = renderReview(scan([row()]));
-    const confirm = await screen.findByRole('button', {
-      name: 'Confirm match',
-    });
-    await waitFor(() => expect(confirm).not.toHaveProperty('disabled', true));
-    await user.click(confirm);
-    expect(
-      screen.getByRole('button', { name: 'Match confirmed' }),
-    ).toBeDefined();
-
-    rendered.unmount();
-    renderReview(scan([row()]));
-    await waitFor(() =>
-      expect(
-        screen.getByRole('button', { name: 'Confirm match' }),
-      ).not.toHaveProperty('disabled', true),
-    );
-  });
-
-  it('does not bind d to deletion', async () => {
-    const user = userEvent.setup();
-    const { onDeleteRow } = renderReview(scan([row()]));
-
-    await screen.findByRole('button', { name: 'Confirm match' });
-    await user.keyboard('d');
-
-    expect(screen.queryByRole('dialog')).toBeNull();
-    expect(onDeleteRow).not.toHaveBeenCalled();
-  });
-
-  it('deletes through the focused button when activated with Enter', async () => {
-    const user = userEvent.setup();
-    const { onDeleteRow } = renderReview(scan([row()]));
-
-    const deleteButton = await screen.findByRole('button', {
-      name: 'Delete card',
-    });
-    expect(
-      screen.getByText(/matching physical card from the stack/),
-    ).toBeDefined();
-    deleteButton.focus();
+      within(searchResults).getAllByRole('button', { name: /Counterspell/ }),
+    ).toHaveLength(2);
     await user.keyboard('{Enter}');
 
-    await waitFor(() => expect(onDeleteRow).toHaveBeenCalledWith(1));
+    expect(
+      await screen.findByRole('heading', { name: 'Counterspell' }),
+    ).toBeDefined();
+    expect(screen.getAllByText('Foundations · FDN #153')).toHaveLength(2);
+    expect(screen.queryByText('Magic 2010 · M10 #54')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Confirm match' }),
+    ).toHaveProperty('disabled', false);
   });
 
-  it('confirms row deletion and keeps surviving scan positions', async () => {
-    vi.spyOn(
-      scryfallModule.scryfallClient,
-      'getPrintingsForId',
-    ).mockResolvedValue(printings);
+  it('clears row confirmation when the selected product changes', async () => {
     const user = userEvent.setup();
-    const initial = scan([
-      row(),
-      row({ scan_position: 2, filename: '002.jpg' }),
-      row({ scan_position: 3, filename: '003.jpg' }),
-    ]);
-    const onDeleteRow = vi.fn().mockResolvedValue(undefined);
-    const rendered = renderReview(initial, { onDeleteRow });
+    mockSuggestionLookup();
+    renderReview(scan([row()]));
 
-    await screen.findByRole('button', { name: 'Confirm match' });
-    await user.click(screen.getByRole('button', { name: 'Delete card' }));
-    await waitFor(() => expect(onDeleteRow).toHaveBeenCalledWith(1));
+    const confirm = await screen.findByRole('button', {
+      name: 'Confirm match',
+    });
+    await user.click(confirm);
+    expect(
+      screen.getByRole('button', { name: 'Match confirmed' }),
+    ).toBeDefined();
 
-    const surviving = scan([initial.rows[1], initial.rows[2]]);
-    rendered.rerender(
-      <MantineProvider>
-        <GamesProvider initialGames={REGISTERED_GAMES}>
-          <ScanReview
-            scan={surviving}
-            onDeleteRow={onDeleteRow}
-            onConfirmScan={vi.fn().mockResolvedValue(undefined)}
-          />
-        </GamesProvider>
-      </MantineProvider>,
+    await user.click(screen.getByRole('button', { name: /M11.*#149/ }));
+
+    expect(
+      screen.getByRole('button', { name: 'Confirm match' }),
+    ).toHaveProperty('disabled', false);
+    expect(screen.getByText('0 of 1 confirmed')).toBeDefined();
+  });
+
+  it('loads more alternatives and keeps search to one page', async () => {
+    const user = userEvent.setup();
+    mockSuggestionLookup(
+      firstCard,
+      [firstCard, secondCard],
+      'alternative-next',
     );
-    expect(await screen.findByText('Card 1 of 2')).toBeDefined();
+    const findAlternatives = vi.spyOn(apiClient, 'findCatalogAlternatives');
+    findAlternatives.mockResolvedValueOnce({
+      cards: [firstCard, secondCard],
+      next_continuation: 'alternative-next',
+    });
+    findAlternatives.mockResolvedValueOnce({
+      cards: [thirdCard],
+      next_continuation: null,
+    });
+    const findCards = vi.spyOn(apiClient, 'findCatalogCards');
+    findCards.mockResolvedValueOnce({
+      cards: [firstCard, secondCard],
+      next_continuation: 'search-next',
+    });
+
+    renderReview(scan([row()]));
+    await screen.findByRole('button', { name: /M11.*#149/ });
+    await user.click(
+      screen.getByRole('button', { name: 'Load more printings' }),
+    );
+    await screen.findByRole('button', { name: /STA.*#42/ });
+    expect(
+      within(screen.getByLabelText('Printings')).getAllByRole('button'),
+    ).toHaveLength(3);
+
+    const searchInput = screen.getByRole('textbox', {
+      name: 'Search catalog cards',
+    });
+    await user.type(searchInput, 'Bolt');
+    await waitFor(() =>
+      expect(findCards).toHaveBeenCalledWith({
+        game: 'mtg',
+        query: 'Bolt',
+        finish: 'normal',
+      }),
+    );
+    await screen.findByLabelText('Catalog results');
+    expect(
+      within(screen.getByLabelText('Catalog results')).getAllByRole('button', {
+        name: /Lightning Bolt/,
+      }),
+    ).toHaveLength(2);
+    expect(findCards).toHaveBeenCalledTimes(1);
+    expect(
+      screen.queryByRole('button', { name: 'Load more results' }),
+    ).toBeNull();
+
+    await user.clear(searchInput);
+    await user.type(searchInput, 'B');
+    await waitFor(() =>
+      expect(screen.queryByLabelText('Catalog results')).toBeNull(),
+    );
   });
 
-  it('keeps the delete action available when row deletion fails', async () => {
+  it('keeps a valid product selectable after related-printing lookup fails', async () => {
     const user = userEvent.setup();
-    const onDeleteRow = vi
-      .fn()
-      .mockRejectedValue(new Error('row deletion unavailable'));
-    renderReview(scan([row()]), { onDeleteRow });
+    vi.spyOn(apiClient, 'getCatalogCard').mockResolvedValue(firstCard);
+    vi.spyOn(apiClient, 'findCatalogAlternatives').mockRejectedValue(
+      new Error('catalog is temporarily unavailable'),
+    );
+    vi.spyOn(apiClient, 'findCatalogCards').mockResolvedValue({
+      cards: [],
+      next_continuation: null,
+    });
 
-    await screen.findByRole('button', { name: 'Confirm match' });
-    await user.click(screen.getByRole('button', { name: 'Delete card' }));
+    renderReview(scan([row()]));
 
-    expect(await screen.findByText('row deletion unavailable')).toBeDefined();
-    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(
+      await screen.findByText('catalog is temporarily unavailable'),
+    ).toBeDefined();
+    expect(screen.getAllByText('Double Masters 2022 · 2X2 #117')).toHaveLength(
+      2,
+    );
+    const confirm = screen.getByRole('button', { name: 'Confirm match' });
+    expect(confirm).toHaveProperty('disabled', false);
+    await user.click(confirm);
+    expect(screen.getByText('1 of 1 confirmed')).toBeDefined();
   });
 
-  it('submits every confirmed printing in scan order', async () => {
-    vi.spyOn(
-      scryfallModule.scryfallClient,
-      'getPrintingsForId',
-    ).mockResolvedValue(printings);
+  it('clears search results when the selected row changes', async () => {
     const user = userEvent.setup();
+    mockSuggestionLookup();
+    vi.spyOn(apiClient, 'findCatalogCards').mockResolvedValue({
+      cards: [thirdCard],
+      next_continuation: null,
+    });
+
+    renderReview(scan([row(), row({ scan_position: 2, filename: '002.jpg' })]));
+
+    const searchInput = screen.getByRole('textbox', {
+      name: 'Search catalog cards',
+    });
+    await user.type(searchInput, 'Archive');
+    await screen.findByLabelText('Catalog results');
+    await user.click(screen.getByRole('button', { name: /^2 Lightning Bolt/ }));
+
+    await waitFor(() => {
+      expect(searchInput).toHaveProperty('value', '');
+      expect(screen.queryByLabelText('Catalog results')).toBeNull();
+    });
+  });
+
+  it('shows a missing-image state and uses game-configured image regions', async () => {
+    const noImage = card('product-1', {
+      image_urls: { small: null, normal: null },
+    });
+    mockSuggestionLookup(noImage, [noImage]);
+    const games: Game[] = [
+      {
+        ...REGISTERED_GAMES[0],
+        scan_review_image_regions: [
+          {
+            id: 'collector_number',
+            display_name: 'Collector number',
+            x: 0.1,
+            y: 0.9,
+            width: 0.3,
+            height: 0.06,
+          },
+        ],
+      },
+    ];
+
+    renderReview(scan([row()]), { games });
+
+    expect(
+      await screen.findByRole('img', {
+        name: 'Lightning Bolt reference unavailable',
+      }),
+    ).toBeDefined();
+    expect(screen.getByText('Your scan · Collector number')).toBeDefined();
+    expect(screen.getByText('Reference · Collector number')).toBeDefined();
+    expect(screen.queryByText('Your scan · Set code')).toBeNull();
+  });
+
+  it('submits the catalog identity and metadata for every confirmed row', async () => {
+    const user = userEvent.setup();
+    const secondRow = row({
+      scan_position: 2,
+      filename: '002.jpg',
+      suggestions: [
+        {
+          external_source: 'another-opaque-source',
+          external_id: secondCard.external_id,
+          name: secondCard.name,
+          score: 0.7,
+        },
+      ],
+    });
+    vi.spyOn(apiClient, 'getCatalogCard').mockImplementation(
+      async (_game, externalId) =>
+        externalId === firstCard.external_id ? firstCard : secondCard,
+    );
+    vi.spyOn(apiClient, 'findCatalogAlternatives').mockImplementation(
+      async ({ external_id }) => ({
+        cards: [external_id === firstCard.external_id ? firstCard : secondCard],
+        next_continuation: null,
+      }),
+    );
+    vi.spyOn(apiClient, 'findCatalogCards').mockResolvedValue({
+      cards: [],
+      next_continuation: null,
+    });
     const onConfirmScan = vi.fn().mockResolvedValue(undefined);
-    renderReview(
-      scan([row(), row({ scan_position: 2, filename: '002.jpg' })]),
-      { onConfirmScan },
-    );
+    renderReview(scan([row(), secondRow]), { onConfirmScan });
 
-    const match = await screen.findByRole('button', { name: 'Confirm match' });
-    await waitFor(() => expect(match).not.toHaveProperty('disabled', true));
-    await user.click(match);
-    const secondMatch = screen.getByRole('button', { name: 'Confirm match' });
-    await waitFor(() =>
-      expect(secondMatch).not.toHaveProperty('disabled', true),
+    await user.click(
+      await screen.findByRole('button', { name: 'Confirm match' }),
     );
-    await user.click(secondMatch);
-
-    const confirmScan = screen.getByRole('button', { name: 'Confirm scan' });
-    await waitFor(() =>
-      expect(confirmScan).not.toHaveProperty('disabled', true),
+    await user.click(
+      await screen.findByRole('button', { name: 'Confirm match' }),
     );
-    await user.click(confirmScan);
+    await user.click(screen.getByRole('button', { name: 'Confirm scan' }));
 
     await waitFor(() => expect(onConfirmScan).toHaveBeenCalledTimes(1));
     expect(onConfirmScan).toHaveBeenCalledWith([
       {
         scan_position: 1,
-        external_source: 'scryfall',
-        external_id: 'printing-1',
+        external_source: 'catalog-provider-id',
+        external_id: 'product-1',
         name: 'Lightning Bolt',
         set_code: '2x2',
         set_name: 'Double Masters 2022',
@@ -508,42 +516,43 @@ describe('ScanReview', () => {
       },
       {
         scan_position: 2,
-        external_source: 'scryfall',
-        external_id: 'printing-1',
+        external_source: 'catalog-provider-id',
+        external_id: 'product-2',
         name: 'Lightning Bolt',
-        set_code: '2x2',
-        set_name: 'Double Masters 2022',
-        collector_number: '117',
+        set_code: 'm11',
+        set_name: 'Magic 2011',
+        collector_number: '149',
       },
     ]);
   });
 
-  it('preserves confirmed choices for a retry after confirm failure', async () => {
-    vi.spyOn(
-      scryfallModule.scryfallClient,
-      'getPrintingsForId',
-    ).mockResolvedValue(printings);
+  it('preserves row navigation, product shortcuts, and explicit deletion', async () => {
     const user = userEvent.setup();
-    const onConfirmScan = vi
-      .fn()
-      .mockRejectedValueOnce(new Error('import handoff unavailable'))
-      .mockResolvedValueOnce(undefined);
-    renderReview(scan([row()]), { onConfirmScan });
-
-    const match = await screen.findByRole('button', { name: 'Confirm match' });
-    await waitFor(() => expect(match).not.toHaveProperty('disabled', true));
-    await user.click(match);
-    const confirmScan = screen.getByRole('button', { name: 'Confirm scan' });
-    await waitFor(() =>
-      expect(confirmScan).not.toHaveProperty('disabled', true),
+    mockSuggestionLookup();
+    const onDeleteRow = vi.fn().mockResolvedValue(undefined);
+    renderReview(
+      scan([row(), row({ scan_position: 2, filename: '002.jpg' })]),
+      {
+        onDeleteRow,
+      },
     );
-    await user.click(confirmScan);
 
-    expect(await screen.findByText('import handoff unavailable')).toBeDefined();
+    await screen.findByRole('button', { name: 'Confirm match' });
+    await user.keyboard('j');
+    expect(screen.getByText('Card 2 of 2')).toBeDefined();
+    await user.keyboard('k');
+    await user.keyboard('l');
     expect(
-      screen.getByRole('button', { name: 'Match confirmed' }),
-    ).toBeDefined();
-    await user.click(screen.getByRole('button', { name: 'Confirm scan' }));
-    await waitFor(() => expect(onConfirmScan).toHaveBeenCalledTimes(2));
+      screen
+        .getByRole('button', { name: /Lightning Bolt.*M11 #149/ })
+        .getAttribute('aria-pressed'),
+    ).toBe('true');
+    await user.keyboard('/');
+    expect(document.activeElement).toBe(
+      screen.getByRole('textbox', { name: 'Search catalog cards' }),
+    );
+    await user.keyboard('{Escape}');
+    await user.click(screen.getByRole('button', { name: 'Delete card' }));
+    await waitFor(() => expect(onDeleteRow).toHaveBeenCalledWith(1));
   });
 });

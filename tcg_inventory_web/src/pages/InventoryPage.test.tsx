@@ -21,6 +21,7 @@ const REGISTERED_GAMES = [
     display_name: 'Magic: The Gathering',
     scanning_enabled: true,
     csv_import_enabled: true,
+    scan_review_image_regions: [],
     finishes: [
       { id: 'normal', display_name: 'Normal' },
       { id: 'foil', display_name: 'Foil' },
@@ -133,6 +134,7 @@ describe('InventoryPage', () => {
         display_name: 'Registry Supplied Name',
         scanning_enabled: false,
         csv_import_enabled: false,
+        scan_review_image_regions: [],
         finishes: [
           { id: 'normal', display_name: 'Base' },
           { id: 'foil', display_name: 'Shiny' },

@@ -22,6 +22,7 @@ const REGISTERED_GAMES = [
     display_name: 'Magic: The Gathering',
     scanning_enabled: true,
     csv_import_enabled: true,
+    scan_review_image_regions: [],
     finishes: [
       { id: 'normal', display_name: 'Normal' },
       { id: 'foil', display_name: 'Foil' },
@@ -137,6 +138,7 @@ describe('ImportsPage', () => {
         display_name: 'Legacy Cards',
         scanning_enabled: true,
         csv_import_enabled: false,
+        scan_review_image_regions: [],
         finishes: [{ id: 'normal', display_name: 'Base' }],
       },
       {
@@ -144,6 +146,7 @@ describe('ImportsPage', () => {
         display_name: 'New Cards',
         scanning_enabled: false,
         csv_import_enabled: true,
+        scan_review_image_regions: [],
         finishes: [{ id: 'plain', display_name: 'Plain' }],
       },
     ];

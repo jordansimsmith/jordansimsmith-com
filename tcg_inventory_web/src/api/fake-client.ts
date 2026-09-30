@@ -1,6 +1,8 @@
 import type {
   ApiClient,
   BuyerAddress,
+  CatalogCard,
+  CatalogCardsResponse,
   Condition,
   ConfirmScanRequest,
   ConfirmScanResponse,
@@ -11,6 +13,8 @@ import type {
   Finish,
   Game,
   GameId,
+  FindCatalogAlternativesParams,
+  FindCatalogCardsParams,
   FindScansParams,
   FindScansResponse,
   FindImportsResponse,
@@ -71,8 +75,138 @@ const FAKE_GAMES: Game[] = [
       { id: 'foil', display_name: 'Foil' },
       { id: 'etched', display_name: 'Etched' },
     ],
+    scan_review_image_regions: [
+      {
+        id: 'set_code',
+        display_name: 'Set code',
+        x: 0,
+        y: 0.9,
+        width: 0.25,
+        height: 0.1,
+      },
+      {
+        id: 'set_symbol',
+        display_name: 'Set symbol',
+        x: 0.75,
+        y: 0.535,
+        width: 0.25,
+        height: 0.1,
+      },
+    ],
   },
 ];
+const FAKE_CATALOG_CARDS: CatalogCard[] = [
+  {
+    game: 'mtg',
+    external_source: 'scryfall',
+    external_id: 'f29ba16f-c8fb-42fe-aabf-87089cb214a7',
+    name: 'Lightning Bolt',
+    set_code: 'm11',
+    set_name: 'Magic 2011',
+    collector_number: '146',
+    image_urls: {
+      small: null,
+      normal: 'https://img.example/lightning-bolt-1.jpg',
+    },
+    available_finishes: ['normal', 'foil'],
+  },
+  {
+    game: 'mtg',
+    external_source: 'scryfall',
+    external_id: 'f29ba16f-c8fb-42fe-aabf-87089cb214a8',
+    name: 'Lightning Bolt',
+    set_code: '2xm',
+    set_name: 'Double Masters',
+    collector_number: '132',
+    image_urls: {
+      small: null,
+      normal: 'https://img.example/lightning-bolt-2.jpg',
+    },
+    available_finishes: ['normal', 'foil', 'etched'],
+  },
+  {
+    game: 'mtg',
+    external_source: 'scryfall',
+    external_id: 'f29ba16f-c8fb-42fe-aabf-87089cb214a9',
+    name: 'Lightning Bolt',
+    set_code: 'sta',
+    set_name: 'Strixhaven Mystical Archive',
+    collector_number: '42',
+    image_urls: {
+      small: null,
+      normal: 'https://img.example/lightning-bolt-3.jpg',
+    },
+    available_finishes: ['normal', 'foil'],
+  },
+  {
+    game: 'mtg',
+    external_source: 'scryfall',
+    external_id: '6a0b230b-d391-4998-a3f7-7b158a0ec2cd',
+    name: 'Llanowar Elves',
+    set_code: 'm19',
+    set_name: 'Core Set 2019',
+    collector_number: '314',
+    image_urls: {
+      small: null,
+      normal: 'https://img.example/llanowar-elves.jpg',
+    },
+    available_finishes: ['normal', 'foil'],
+  },
+  {
+    game: 'mtg',
+    external_source: 'scryfall',
+    external_id: '323db259-d35e-467d-9a46-4adcb2fc107c',
+    name: 'Opt',
+    set_code: 'xln',
+    set_name: 'Ixalan',
+    collector_number: '65',
+    image_urls: { small: null, normal: 'https://img.example/opt.jpg' },
+    available_finishes: ['normal', 'foil'],
+  },
+  {
+    game: 'mtg',
+    external_source: 'scryfall',
+    external_id: '4f616706-ec97-4923-bb1e-11a69fbaa1f8',
+    name: 'Counterspell',
+    set_code: 'mh2',
+    set_name: 'Modern Horizons 2',
+    collector_number: '267',
+    image_urls: { small: null, normal: 'https://img.example/counterspell.jpg' },
+    available_finishes: ['normal', 'foil', 'etched'],
+  },
+];
+const FAKE_CATALOG_PAGE_SIZE = 2;
+
+function copyCatalogCard(card: CatalogCard): CatalogCard {
+  return {
+    ...card,
+    image_urls: { ...card.image_urls },
+    available_finishes: [...card.available_finishes],
+  };
+}
+
+function catalogPage(
+  cards: CatalogCard[],
+  offset: number,
+): CatalogCardsResponse {
+  const page = cards.slice(offset, offset + FAKE_CATALOG_PAGE_SIZE);
+  const nextOffset = offset + page.length;
+  return {
+    cards: page.map(copyCatalogCard),
+    next_continuation: nextOffset < cards.length ? `fake:${nextOffset}` : null,
+  };
+}
+
+function catalogOffset(continuation?: string): number {
+  if (!continuation) {
+    return 0;
+  }
+  const match = /^fake:(\d+)$/.exec(continuation);
+  if (!match) {
+    throw new Error('invalid continuation');
+  }
+  return Number(match[1]);
+}
 type SeedSku = [
   scryfallId: string,
   name: string,
@@ -1420,6 +1554,9 @@ export function createFakeClient(): ApiClient {
         games: FAKE_GAMES.map((game) => ({
           ...game,
           finishes: game.finishes.map((finish) => ({ ...finish })),
+          scan_review_image_regions: game.scan_review_image_regions.map(
+            (region) => ({ ...region }),
+          ),
         })),
       };
     },
@@ -1758,6 +1895,63 @@ export function createFakeClient(): ApiClient {
 
     async getScan(scanId: string): Promise<ScanDetail> {
       return toScanDetail(getScanOrThrow(scanId));
+    },
+
+    async getCatalogCard(
+      game: GameId,
+      externalId: string,
+    ): Promise<CatalogCard> {
+      const card = FAKE_CATALOG_CARDS.find(
+        (candidate) =>
+          candidate.game === game && candidate.external_id === externalId,
+      );
+      if (!card) {
+        throw new Error('card not found');
+      }
+      return copyCatalogCard(card);
+    },
+
+    async findCatalogAlternatives(
+      params: FindCatalogAlternativesParams,
+    ): Promise<CatalogCardsResponse> {
+      const anchor = FAKE_CATALOG_CARDS.find(
+        (candidate) =>
+          candidate.game === params.game &&
+          candidate.external_id === params.external_id,
+      );
+      if (!anchor) {
+        throw new Error('card not found');
+      }
+      const cards = FAKE_CATALOG_CARDS.filter(
+        (candidate) =>
+          candidate.game === params.game &&
+          candidate.name === anchor.name &&
+          candidate.available_finishes.includes(params.finish),
+      );
+      const anchorIndex = cards.findIndex(
+        (candidate) => candidate.external_id === anchor.external_id,
+      );
+      if (anchorIndex > 0) {
+        cards.unshift(cards.splice(anchorIndex, 1)[0]);
+      }
+      return catalogPage(cards, catalogOffset(params.continuation));
+    },
+
+    async findCatalogCards(
+      params: FindCatalogCardsParams,
+    ): Promise<CatalogCardsResponse> {
+      const query = params.query.trim().toLocaleLowerCase();
+      if (query.length < 2) {
+        throw new Error('query must contain at least two characters');
+      }
+      const cards = FAKE_CATALOG_CARDS.filter(
+        (candidate) =>
+          candidate.game === params.game &&
+          candidate.available_finishes.includes(params.finish) &&
+          (candidate.external_id.toLocaleLowerCase() === query ||
+            candidate.name.toLocaleLowerCase().includes(query)),
+      );
+      return { cards: cards.map(copyCatalogCard), next_continuation: null };
     },
 
     async identifyScan(scanId: string): Promise<IdentifyScanResponse> {

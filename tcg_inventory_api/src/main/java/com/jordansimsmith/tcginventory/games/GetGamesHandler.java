@@ -20,12 +20,22 @@ public class GetGamesHandler
   record FinishResponse(
       @JsonProperty("id") String id, @JsonProperty("display_name") String displayName) {}
 
+  record ScanReviewImageRegionResponse(
+      @JsonProperty("id") String id,
+      @JsonProperty("display_name") String displayName,
+      @JsonProperty("x") double x,
+      @JsonProperty("y") double y,
+      @JsonProperty("width") double width,
+      @JsonProperty("height") double height) {}
+
   record GameResponse(
       @JsonProperty("id") String id,
       @JsonProperty("display_name") String displayName,
       @JsonProperty("scanning_enabled") boolean scanningEnabled,
       @JsonProperty("csv_import_enabled") boolean csvImportEnabled,
-      @JsonProperty("finishes") List<FinishResponse> finishes) {}
+      @JsonProperty("finishes") List<FinishResponse> finishes,
+      @JsonProperty("scan_review_image_regions")
+          List<ScanReviewImageRegionResponse> scanReviewImageRegions) {}
 
   record GetGamesResponse(@JsonProperty("games") List<GameResponse> games) {}
 
@@ -72,6 +82,17 @@ public class GetGamesHandler
                         game.csvImportEnabled(),
                         game.finishes().stream()
                             .map(finish -> new FinishResponse(finish.id(), finish.displayName()))
+                            .toList(),
+                        game.scanReviewImageRegions().stream()
+                            .map(
+                                region ->
+                                    new ScanReviewImageRegionResponse(
+                                        region.id(),
+                                        region.displayName(),
+                                        region.x(),
+                                        region.y(),
+                                        region.width(),
+                                        region.height()))
                             .toList()))
             .toList();
     return httpResponseFactory.ok(new GetGamesResponse(games));

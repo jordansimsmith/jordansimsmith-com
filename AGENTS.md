@@ -59,6 +59,8 @@ When performing the code review step, check for:
 - Always prefer failing loudly rather than adding fallbacks or silent handling
 - Do not add defensive null checks, default values, or silent skips to mask broken invariants
 - If data is in an unexpected state, let the error surface so the root cause can be fixed
+- Handle expected operational failures only where the caller can meaningfully recover or show useful feedback
+- Trust backend contracts and established frontend flow for invariants; do not duplicate validation of request state the backend owns or fields the frontend flow guarantees, such as a selected product having an external ID
 
 ## Bazel guidelines
 
@@ -106,6 +108,11 @@ When performing the code review step, check for:
 - When a test factory gains a dependency, pass it at every call site even if the test does not use it (for example `UNUSED_S3_ENDPOINT`)
 - Keep test fixtures and setup self-contained in the test file that uses them. Do not extract shared fixture factories or helpers across test files just to reduce duplication; keep construction inline unless a shared test utility has clear value or is explicitly requested.
 - Maintain a testing pyramid: many unit tests, fewer integration tests, fewest E2E tests
+
+## Asynchronous code guidelines
+
+- In TypeScript and JavaScript, avoid IIFEs. Prefer named functions in the narrowest useful scope, and keep simple derived expressions inline. For async work, use a named async function and call it directly; use `void` only when intentionally starting work without awaiting it.
+- Prefer `async`/`await` over promise chains when it keeps asynchronous control flow clear.
 
 ## Service consistency
 

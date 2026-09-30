@@ -15,9 +15,14 @@ import {
   IconCircleDashed,
   IconSparkles,
 } from '@tabler/icons-react';
-import { scryfallClient } from '../api/scryfall-client';
-import type { ScryfallPrinting } from '../api/scryfall-client';
-import type { ScanConfirmationRow, ScanDetail, ScanRow } from '../api/client';
+import { apiClient } from '../api/client';
+import type {
+  CatalogCard,
+  CatalogCardsResponse,
+  ScanConfirmationRow,
+  ScanDetail,
+  ScanRow,
+} from '../api/client';
 import { useGames } from '../GamesProvider';
 import classes from './ScanReview.module.css';
 import { ScanReviewPanels, type ReviewSelection } from './ScanReviewPanels';
@@ -26,6 +31,10 @@ interface ScanReviewProps {
   scan: ScanDetail;
   onDeleteRow: (scanPosition: number) => Promise<void>;
   onConfirmScan: (rows: ScanConfirmationRow[]) => Promise<void>;
+}
+
+interface AlternativesState extends CatalogCardsResponse {
+  anchorExternalId: string;
 }
 
 function highestSuggestion(row: ScanRow) {
@@ -143,6 +152,9 @@ export function ScanReview({
   onDeleteRow,
   onConfirmScan,
 }: ScanReviewProps) {
+  const { getFinish, getGame } = useGames();
+  const game = getGame(scan.game);
+  const finishName = getFinish(scan.game, scan.finish);
   const rows = [...scan.rows].sort(
     (left, right) => left.scan_position - right.scan_position,
   );
@@ -150,17 +162,20 @@ export function ScanReview({
   const [selections, setSelections] = useState<Map<number, ReviewSelection>>(
     () => new Map(),
   );
-  const [printingsByPosition, setPrintingsByPosition] = useState<
-    Map<number, ScryfallPrinting[]>
+  const [alternativesByPosition, setAlternativesByPosition] = useState<
+    Map<number, AlternativesState>
   >(() => new Map());
   const [loadingPositions, setLoadingPositions] = useState<Set<number>>(
+    () => new Set(),
+  );
+  const [loadingMorePositions, setLoadingMorePositions] = useState<Set<number>>(
     () => new Set(),
   );
   const [rowErrors, setRowErrors] = useState<Map<number, string>>(
     () => new Map(),
   );
   const [search, setSearch] = useState('');
-  const [searchSuggestions, setSearchSuggestions] = useState<string[]>([]);
+  const [searchResults, setSearchResults] = useState<CatalogCard[]>([]);
   const [searching, setSearching] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchSelectionLoading, setSearchSelectionLoading] = useState(false);
@@ -170,7 +185,9 @@ export function ScanReview({
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const rowRefs = useRef<Array<HTMLButtonElement | null>>([]);
-  const suggestionRequestVersions = useRef(new Map<number, number>());
+  const catalogLookupVersions = useRef(new Map<number, number>());
+  const alternativesAnchorVersions = useRef(new Map<number, number>());
+  const searchRequestVersion = useRef(0);
   const selectedRow = rows[selectedIndex];
   const selectedPosition = selectedRow?.scan_position;
   const selectedSuggestion = selectedRow
@@ -181,18 +198,34 @@ export function ScanReview({
     selectedPosition === undefined
       ? undefined
       : selections.get(selectedPosition);
-  const selectedPrintings =
+  const alternativesState =
     selectedPosition === undefined
-      ? []
-      : (printingsByPosition.get(selectedPosition) ?? []);
-  const selectedPrintingIndex = selectedSelection
-    ? selectedPrintings.findIndex(
-        (printing) => printing.id === selectedSelection.printing.id,
+      ? undefined
+      : alternativesByPosition.get(selectedPosition);
+  const products = alternativesState?.cards ?? [];
+  const selectedProductIsListed =
+    selectedSelection &&
+    products.some(
+      (card) => card.external_id === selectedSelection.card.external_id,
+    );
+  const selectedProducts =
+    selectedSelection && !selectedProductIsListed
+      ? [selectedSelection.card, ...products]
+      : products;
+  const selectedProductIndex = selectedSelection
+    ? selectedProducts.findIndex(
+        (card) => card.external_id === selectedSelection.card.external_id,
       )
     : -1;
-  const confirmedCount = rows.filter(
-    (row) => selections.get(row.scan_position)?.confirmed === true,
-  ).length;
+  const selectedFinishAvailable =
+    selectedSelection?.card.available_finishes.includes(scan.finish) ?? false;
+  const confirmedCount = rows.filter((row) => {
+    const selection = selections.get(row.scan_position);
+    return (
+      selection?.confirmed === true &&
+      selection.card.available_finishes.includes(scan.finish)
+    );
+  }).length;
   const canConfirm =
     rows.length > 0 && confirmedCount === rows.length && !deleteLoading;
 
@@ -200,50 +233,61 @@ export function ScanReview({
     if (selectedPosition === undefined || selectedSuggestionId === undefined) {
       return;
     }
-    if (selections.has(selectedPosition) || rowErrors.has(selectedPosition)) {
+    const suggestionId = selectedSuggestionId;
+    if (selections.has(selectedPosition)) {
       return;
     }
     let cancelled = false;
     const requestVersion =
-      (suggestionRequestVersions.current.get(selectedPosition) ?? 0) + 1;
-    suggestionRequestVersions.current.set(selectedPosition, requestVersion);
+      (catalogLookupVersions.current.get(selectedPosition) ?? 0) + 1;
+    const anchorVersion =
+      (alternativesAnchorVersions.current.get(selectedPosition) ?? 0) + 1;
+    catalogLookupVersions.current.set(selectedPosition, requestVersion);
+    alternativesAnchorVersions.current.set(selectedPosition, anchorVersion);
     setLoadingPositions((previous) => new Set(previous).add(selectedPosition));
-    void scryfallClient
-      .getPrintingsForId(selectedSuggestionId)
-      .then((printings) => {
+    setRowErrors((previous) => {
+      const next = new Map(previous);
+      next.delete(selectedPosition);
+      return next;
+    });
+
+    async function loadSuggestedProduct() {
+      try {
+        const card = await apiClient.getCatalogCard(scan.game, suggestionId);
         if (
           cancelled ||
-          suggestionRequestVersions.current.get(selectedPosition) !==
-            requestVersion
+          catalogLookupVersions.current.get(selectedPosition) !== requestVersion
         ) {
           return;
         }
-        const selectedPrinting =
-          printings.find((printing) => printing.id === selectedSuggestionId) ??
-          printings[0];
-        if (!selectedPrinting) {
-          throw new Error('No printings were found for this suggestion');
-        }
-        setPrintingsByPosition((previous) =>
-          new Map(previous).set(selectedPosition, printings),
-        );
         setSelections((previous) =>
+          new Map(previous).set(selectedPosition, { card, confirmed: false }),
+        );
+
+        const response = await apiClient.findCatalogAlternatives({
+          game: scan.game,
+          external_id: suggestionId,
+          finish: scan.finish,
+        });
+        if (
+          cancelled ||
+          catalogLookupVersions.current.get(selectedPosition) !==
+            requestVersion ||
+          alternativesAnchorVersions.current.get(selectedPosition) !==
+            anchorVersion
+        ) {
+          return;
+        }
+        setAlternativesByPosition((previous) =>
           new Map(previous).set(selectedPosition, {
-            printing: selectedPrinting,
-            confirmed: false,
+            ...response,
+            anchorExternalId: suggestionId,
           }),
         );
-        setRowErrors((previous) => {
-          const next = new Map(previous);
-          next.delete(selectedPosition);
-          return next;
-        });
-      })
-      .catch((error: unknown) => {
+      } catch (error: unknown) {
         if (
           !cancelled &&
-          suggestionRequestVersions.current.get(selectedPosition) ===
-            requestVersion
+          catalogLookupVersions.current.get(selectedPosition) === requestVersion
         ) {
           setRowErrors((previous) =>
             new Map(previous).set(
@@ -252,25 +296,25 @@ export function ScanReview({
             ),
           );
         }
-      })
-      .finally(() => {
+      } finally {
         if (
-          suggestionRequestVersions.current.get(selectedPosition) !==
-          requestVersion
+          catalogLookupVersions.current.get(selectedPosition) === requestVersion
         ) {
-          return;
+          setLoadingPositions((previous) => {
+            const next = new Set(previous);
+            next.delete(selectedPosition);
+            return next;
+          });
         }
-        setLoadingPositions((previous) => {
-          const next = new Set(previous);
-          next.delete(selectedPosition);
-          return next;
-        });
-      });
+      }
+    }
+
+    void loadSuggestedProduct();
 
     return () => {
       cancelled = true;
     };
-  }, [selectedPosition, selectedSuggestionId]);
+  }, [scan.finish, scan.game, selectedPosition, selectedSuggestionId]);
 
   useEffect(() => {
     if (selectedIndex >= rows.length) {
@@ -280,49 +324,59 @@ export function ScanReview({
   }, [rows.length, selectedIndex]);
 
   useEffect(() => {
+    searchRequestVersion.current += 1;
     setSearch('');
-    setSearchSuggestions([]);
+    setSearchResults([]);
     setSearchError(null);
+    setSearchSelectionLoading(false);
   }, [selectedPosition]);
 
   useEffect(() => {
-    if (search.trim().length < 2) {
-      setSearchSuggestions([]);
-      setSearchError(null);
-      setSearching(false);
+    const query = search.trim();
+    const requestVersion = ++searchRequestVersion.current;
+    setSearchResults([]);
+    setSearchError(null);
+    setSearching(false);
+    if (query.length < 2) {
       return;
     }
 
-    const controller = new AbortController();
-    const timer = window.setTimeout(() => {
+    async function searchCatalog() {
       setSearching(true);
       setSearchError(null);
-      void scryfallClient
-        .autocomplete(search.trim(), controller.signal)
-        .then((suggestions) => {
-          if (!controller.signal.aborted) {
-            setSearchSuggestions(suggestions);
-          }
-        })
-        .catch((error: unknown) => {
-          if (!controller.signal.aborted) {
-            setSearchError(
-              error instanceof Error ? error.message : 'Card search failed',
-            );
-          }
-        })
-        .finally(() => {
-          if (!controller.signal.aborted) {
-            setSearching(false);
-          }
+      try {
+        const response = await apiClient.findCatalogCards({
+          game: scan.game,
+          query,
+          finish: scan.finish,
         });
+        if (searchRequestVersion.current === requestVersion) {
+          setSearchResults(response.cards);
+        }
+      } catch (error: unknown) {
+        if (searchRequestVersion.current === requestVersion) {
+          setSearchError(
+            error instanceof Error ? error.message : 'Card search failed',
+          );
+        }
+      } finally {
+        if (searchRequestVersion.current === requestVersion) {
+          setSearching(false);
+        }
+      }
+    }
+
+    const timer = window.setTimeout(() => {
+      void searchCatalog();
     }, 250);
 
     return () => {
-      controller.abort();
       window.clearTimeout(timer);
+      if (searchRequestVersion.current === requestVersion) {
+        searchRequestVersion.current += 1;
+      }
     };
-  }, [search, selectedPosition]);
+  }, [scan.finish, scan.game, search]);
 
   const moveRow = (change: number) => {
     setSelectedIndex((index) =>
@@ -330,34 +384,11 @@ export function ScanReview({
     );
   };
 
-  const movePrinting = (change: number) => {
-    if (!selectedSelection || selectedPosition === undefined) {
-      return;
-    }
-    const nextIndex = Math.max(
-      0,
-      Math.min(
-        selectedPrintings.length - 1,
-        Math.max(selectedPrintingIndex, 0) + change,
-      ),
+  const invalidateCatalogLookup = (position: number) => {
+    catalogLookupVersions.current.set(
+      position,
+      (catalogLookupVersions.current.get(position) ?? 0) + 1,
     );
-    const nextPrinting = selectedPrintings[nextIndex];
-    if (!nextPrinting || nextPrinting.id === selectedSelection.printing.id) {
-      return;
-    }
-    invalidateSuggestionRequest(selectedPosition);
-    setSelections((previous) =>
-      new Map(previous).set(selectedPosition, {
-        printing: nextPrinting,
-        confirmed: false,
-      }),
-    );
-  };
-
-  const invalidateSuggestionRequest = (position: number) => {
-    const nextVersion =
-      (suggestionRequestVersions.current.get(position) ?? 0) + 1;
-    suggestionRequestVersions.current.set(position, nextVersion);
     setLoadingPositions((previous) => {
       const next = new Set(previous);
       next.delete(position);
@@ -365,20 +396,17 @@ export function ScanReview({
     });
   };
 
-  const choosePrinting = (printing: ScryfallPrinting) => {
+  const chooseProduct = (card: CatalogCard) => {
     if (selectedPosition === undefined) {
       return;
     }
     const current = selections.get(selectedPosition);
-    if (current?.printing.id === printing.id) {
+    if (current?.card.external_id === card.external_id) {
       return;
     }
-    invalidateSuggestionRequest(selectedPosition);
+    invalidateCatalogLookup(selectedPosition);
     setSelections((previous) =>
-      new Map(previous).set(selectedPosition, {
-        printing,
-        confirmed: false,
-      }),
+      new Map(previous).set(selectedPosition, { card, confirmed: false }),
     );
     setRowErrors((previous) => {
       const next = new Map(previous);
@@ -387,8 +415,33 @@ export function ScanReview({
     });
   };
 
+  const moveProduct = (change: number) => {
+    if (!selectedSelection) {
+      return;
+    }
+    const nextIndex = Math.max(
+      0,
+      Math.min(
+        selectedProducts.length - 1,
+        Math.max(selectedProductIndex, 0) + change,
+      ),
+    );
+    const nextProduct = selectedProducts[nextIndex];
+    if (
+      nextProduct &&
+      nextProduct.external_id !== selectedSelection.card.external_id
+    ) {
+      chooseProduct(nextProduct);
+    }
+  };
+
   const confirmCurrent = () => {
-    if (!selectedRow || !selectedSelection || selectedSelection.confirmed) {
+    if (
+      !selectedRow ||
+      !selectedSelection ||
+      selectedSelection.confirmed ||
+      !selectedFinishAvailable
+    ) {
       return;
     }
     setSelections((previous) =>
@@ -422,13 +475,17 @@ export function ScanReview({
     setDeleteError(null);
     try {
       await onDeleteRow(position);
-      invalidateSuggestionRequest(position);
+      invalidateCatalogLookup(position);
+      alternativesAnchorVersions.current.set(
+        position,
+        (alternativesAnchorVersions.current.get(position) ?? 0) + 1,
+      );
       setSelections((previous) => {
         const next = new Map(previous);
         next.delete(position);
         return next;
       });
-      setPrintingsByPosition((previous) => {
+      setAlternativesByPosition((previous) => {
         const next = new Map(previous);
         next.delete(position);
         return next;
@@ -450,26 +507,143 @@ export function ScanReview({
     }
   };
 
+  const selectSearchResult = async (card: CatalogCard) => {
+    if (selectedPosition === undefined) {
+      return;
+    }
+    const position = selectedPosition;
+    const lookupVersion =
+      (catalogLookupVersions.current.get(position) ?? 0) + 1;
+    const anchorVersion =
+      (alternativesAnchorVersions.current.get(position) ?? 0) + 1;
+    catalogLookupVersions.current.set(position, lookupVersion);
+    alternativesAnchorVersions.current.set(position, anchorVersion);
+    setLoadingPositions((previous) => new Set(previous).add(position));
+    setSearchSelectionLoading(true);
+    setSearchError(null);
+    setSelections((previous) =>
+      new Map(previous).set(position, { card, confirmed: false }),
+    );
+    setAlternativesByPosition((previous) =>
+      new Map(previous).set(position, {
+        anchorExternalId: card.external_id,
+        cards: [],
+        next_continuation: null,
+      }),
+    );
+    setRowErrors((previous) => {
+      const next = new Map(previous);
+      next.delete(position);
+      return next;
+    });
+    searchRequestVersion.current += 1;
+    setSearch('');
+    setSearchResults([]);
+
+    try {
+      const response = await apiClient.findCatalogAlternatives({
+        game: scan.game,
+        external_id: card.external_id,
+        finish: scan.finish,
+      });
+      if (
+        catalogLookupVersions.current.get(position) === lookupVersion &&
+        alternativesAnchorVersions.current.get(position) === anchorVersion
+      ) {
+        setAlternativesByPosition((previous) =>
+          new Map(previous).set(position, {
+            ...response,
+            anchorExternalId: card.external_id,
+          }),
+        );
+      }
+    } catch (error: unknown) {
+      if (catalogLookupVersions.current.get(position) === lookupVersion) {
+        setRowErrors((previous) =>
+          new Map(previous).set(
+            position,
+            error instanceof Error ? error.message : 'Card lookup failed',
+          ),
+        );
+      }
+    } finally {
+      if (catalogLookupVersions.current.get(position) === lookupVersion) {
+        setLoadingPositions((previous) => {
+          const next = new Set(previous);
+          next.delete(position);
+          return next;
+        });
+        setSearchSelectionLoading(false);
+      }
+    }
+  };
+
+  const loadMoreProducts = async () => {
+    if (
+      selectedPosition === undefined ||
+      !alternativesState?.next_continuation ||
+      loadingMorePositions.has(selectedPosition)
+    ) {
+      return;
+    }
+    const position = selectedPosition;
+    const anchorExternalId = alternativesState.anchorExternalId;
+    const anchorVersion = alternativesAnchorVersions.current.get(position);
+    setLoadingMorePositions((previous) => new Set(previous).add(position));
+    try {
+      const response = await apiClient.findCatalogAlternatives({
+        game: scan.game,
+        external_id: anchorExternalId,
+        finish: scan.finish,
+        continuation: alternativesState.next_continuation,
+      });
+      if (alternativesAnchorVersions.current.get(position) === anchorVersion) {
+        setAlternativesByPosition((previous) => {
+          const current = previous.get(position);
+          if (current?.anchorExternalId !== anchorExternalId) {
+            return previous;
+          }
+          return new Map(previous).set(position, {
+            ...current,
+            cards: [...current.cards, ...response.cards],
+            next_continuation: response.next_continuation,
+          });
+        });
+      }
+    } catch (error: unknown) {
+      if (alternativesAnchorVersions.current.get(position) === anchorVersion) {
+        setRowErrors((previous) =>
+          new Map(previous).set(
+            position,
+            error instanceof Error ? error.message : 'Card lookup failed',
+          ),
+        );
+      }
+    } finally {
+      setLoadingMorePositions((previous) => {
+        const next = new Set(previous);
+        next.delete(position);
+        return next;
+      });
+    }
+  };
+
   const confirmScan = async () => {
     if (!canConfirm || confirming) {
       return;
     }
-    const confirmationRows: ScanConfirmationRow[] = [];
-    for (const row of rows) {
-      const selection = selections.get(row.scan_position);
-      if (!selection?.confirmed) {
-        return;
-      }
-      confirmationRows.push({
+    const confirmationRows: ScanConfirmationRow[] = rows.map((row) => {
+      const selection = selections.get(row.scan_position)!;
+      return {
         scan_position: row.scan_position,
-        external_source: 'scryfall',
-        external_id: selection.printing.id,
-        name: selection.printing.name,
-        set_code: selection.printing.set_code,
-        set_name: selection.printing.set_name,
-        collector_number: selection.printing.collector_number,
-      });
-    }
+        external_source: selection.card.external_source,
+        external_id: selection.card.external_id,
+        name: selection.card.name,
+        set_code: selection.card.set_code,
+        set_name: selection.card.set_name,
+        collector_number: selection.card.collector_number,
+      };
+    });
 
     setConfirming(true);
     setConfirmError(null);
@@ -481,33 +655,6 @@ export function ScanReview({
       );
     } finally {
       setConfirming(false);
-    }
-  };
-
-  const selectSearchResult = async (name: string) => {
-    if (selectedPosition === undefined) {
-      return;
-    }
-    invalidateSuggestionRequest(selectedPosition);
-    setSearchSelectionLoading(true);
-    setSearchError(null);
-    try {
-      const printings = await scryfallClient.getPrintingsByName(name);
-      if (printings.length === 0) {
-        throw new Error('No printings were found for that card');
-      }
-      setPrintingsByPosition((previous) =>
-        new Map(previous).set(selectedPosition, printings),
-      );
-      choosePrinting(printings[0]);
-      setSearch('');
-      setSearchSuggestions([]);
-    } catch (error: unknown) {
-      setSearchError(
-        error instanceof Error ? error.message : 'Card search failed',
-      );
-    } finally {
-      setSearchSelectionLoading(false);
     }
   };
 
@@ -553,11 +700,11 @@ export function ScanReview({
           break;
         case 'h':
           event.preventDefault();
-          movePrinting(-1);
+          moveProduct(-1);
           break;
         case 'l':
           event.preventDefault();
-          movePrinting(1);
+          moveProduct(1);
           break;
         case 'c':
           event.preventDefault();
@@ -624,18 +771,22 @@ export function ScanReview({
             {rows.map((row, index) => {
               const rowSelection = selections.get(row.scan_position);
               const rowSuggestion = highestSuggestion(row);
-              const confirmed = rowSelection?.confirmed === true;
+              const rowConfirmed =
+                rowSelection?.confirmed === true &&
+                rowSelection.card.available_finishes.includes(scan.finish);
               const attention =
                 row.needs_review ||
                 row.error !== null ||
                 rowSuggestion === undefined ||
-                rowErrors.has(row.scan_position);
+                rowErrors.has(row.scan_position) ||
+                (rowSelection !== undefined &&
+                  !rowSelection.card.available_finishes.includes(scan.finish));
               const rowName =
-                rowSelection?.printing.name ??
+                rowSelection?.card.name ??
                 rowSuggestion?.name ??
                 'Manual selection required';
               const rowMetadata = rowSelection
-                ? `${rowSelection.printing.set_code.toUpperCase()} · ${rowSelection.printing.collector_number}`
+                ? `${rowSelection.card.set_code.toUpperCase()} · ${rowSelection.card.collector_number}`
                 : row.filename;
               return (
                 <button
@@ -650,10 +801,10 @@ export function ScanReview({
                   onClick={() => setSelectedIndex(index)}
                 >
                   <span
-                    className={`${classes.statusIcon} ${confirmed ? classes.statusIconConfirmed : attention ? classes.statusIconAttention : rowSelection ? classes.statusIconSuggested : ''}`}
+                    className={`${classes.statusIcon} ${rowConfirmed ? classes.statusIconConfirmed : attention ? classes.statusIconAttention : rowSelection ? classes.statusIconSuggested : ''}`}
                   >
                     <QueueStatusIcon
-                      confirmed={confirmed}
+                      confirmed={rowConfirmed}
                       attention={attention}
                       loaded={
                         rowSelection !== undefined ||
@@ -670,7 +821,7 @@ export function ScanReview({
                     </small>
                   </span>
                   <span className={classes.queueItemState}>
-                    {confirmed
+                    {rowConfirmed
                       ? 'Confirmed'
                       : attention
                         ? 'Needs review'
@@ -688,30 +839,39 @@ export function ScanReview({
           rowCount={rows.length}
           suggestion={suggestion}
           selection={selectedSelection}
-          printings={selectedPrintings}
-          printingIndex={selectedPrintingIndex}
+          products={selectedProducts}
+          productIndex={selectedProductIndex}
+          productContinuation={alternativesState?.next_continuation ?? null}
+          loadingMoreProducts={
+            selectedPosition !== undefined &&
+            loadingMorePositions.has(selectedPosition)
+          }
           loading={
             selectedPosition !== undefined &&
             loadingPositions.has(selectedPosition)
           }
           error={selectedError}
+          finish={scan.finish}
+          finishName={finishName}
+          finishAvailable={selectedFinishAvailable}
+          imageRegions={game.scan_review_image_regions}
           searchRef={searchRef}
           search={search}
-          searchSuggestions={searchSuggestions}
+          searchResults={searchResults}
           searching={searching}
           searchError={searchError}
           searchSelectionLoading={searchSelectionLoading}
-          controlsDisabled={confirming || deleteLoading}
           onMoveRow={moveRow}
-          onMovePrinting={movePrinting}
-          onChoosePrinting={choosePrinting}
+          onMoveProduct={moveProduct}
+          onLoadMoreProducts={() => void loadMoreProducts()}
+          onChooseProduct={chooseProduct}
           onSearchChange={(value) => {
             setSearch(value);
-            setSearchSuggestions([]);
+            setSearchResults([]);
             setSearchError(null);
             setSearching(false);
           }}
-          onSearchResult={(name) => void selectSearchResult(name)}
+          onSearchResult={(card) => void selectSearchResult(card)}
           onConfirm={confirmCurrent}
           onDelete={() => {
             setDeleteError(null);
@@ -720,6 +880,7 @@ export function ScanReview({
             }
           }}
           deleteDisabled={confirming || deleteLoading}
+          controlsDisabled={confirming || deleteLoading}
         />
       </div>
       {deleteError && (

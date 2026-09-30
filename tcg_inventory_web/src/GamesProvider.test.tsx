@@ -14,6 +14,7 @@ const TEST_GAMES: Game[] = [
     display_name: 'Magic: The Gathering',
     scanning_enabled: true,
     csv_import_enabled: true,
+    scan_review_image_regions: [],
     finishes: [
       { id: 'normal', display_name: 'Normal' },
       { id: 'foil', display_name: 'Foil' },

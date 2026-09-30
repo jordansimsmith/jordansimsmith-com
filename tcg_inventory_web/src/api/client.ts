@@ -9,12 +9,22 @@ export interface GameFinish {
   display_name: string;
 }
 
+export interface ScanReviewImageRegion {
+  id: string;
+  display_name: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface Game {
   id: GameId;
   display_name: string;
   scanning_enabled: boolean;
   csv_import_enabled: boolean;
   finishes: GameFinish[];
+  scan_review_image_regions: ScanReviewImageRegion[];
 }
 
 export interface GamesResponse {
@@ -210,6 +220,39 @@ export interface ScanSummary {
 
 export interface ScanDetail extends ScanSummary {
   rows: ScanRow[];
+}
+
+export interface CatalogCard {
+  game: GameId;
+  external_source: string;
+  external_id: string;
+  name: string;
+  set_code: string;
+  set_name: string;
+  collector_number: string;
+  image_urls: {
+    small: string | null;
+    normal: string | null;
+  };
+  available_finishes: Finish[];
+}
+
+export interface CatalogCardsResponse {
+  cards: CatalogCard[];
+  next_continuation: string | null;
+}
+
+export interface FindCatalogAlternativesParams {
+  game: GameId;
+  external_id: string;
+  finish: Finish;
+  continuation?: string;
+}
+
+export interface FindCatalogCardsParams {
+  game: GameId;
+  query: string;
+  finish: Finish;
 }
 
 export interface CreateScanRequest {
@@ -453,6 +496,13 @@ export interface ApiClient {
   createScan(request: CreateScanRequest): Promise<CreateScanResponse>;
   findScans(params?: FindScansParams): Promise<FindScansResponse>;
   getScan(scanId: string): Promise<ScanDetail>;
+  getCatalogCard(game: GameId, externalId: string): Promise<CatalogCard>;
+  findCatalogAlternatives(
+    params: FindCatalogAlternativesParams,
+  ): Promise<CatalogCardsResponse>;
+  findCatalogCards(
+    params: FindCatalogCardsParams,
+  ): Promise<CatalogCardsResponse>;
   identifyScan(scanId: string): Promise<IdentifyScanResponse>;
   deleteScanRow(scanId: string, scanPosition: number): Promise<void>;
   confirmScan(
