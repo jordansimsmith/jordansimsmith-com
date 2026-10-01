@@ -3,6 +3,7 @@ import type { OrderState } from '../api/client';
 
 const STATE_COLORS: Record<OrderState, string> = {
   awaiting_payment: 'yellow',
+  voiding: 'blue',
   to_pick: 'blue',
   fulfilled: 'green',
   voided: 'red',

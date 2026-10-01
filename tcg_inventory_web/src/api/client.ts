@@ -283,6 +283,7 @@ export interface ConfirmScanRequest {
 
 export type OrderState =
   | 'awaiting_payment'
+  | 'voiding'
   | 'to_pick'
   | 'fulfilled'
   | 'voided';

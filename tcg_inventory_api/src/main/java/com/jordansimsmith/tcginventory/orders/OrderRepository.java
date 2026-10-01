@@ -22,6 +22,8 @@ import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 public class OrderRepository {
   public record SkuUnits(String skuId, List<Integer> sequenceNumbers) {}
 
+  private record AllocatedUnit(String skuId, int sequenceNumber) {}
+
   private final DynamoDbTable<OrderItem> orderTable;
   private final InventoryRepository inventoryRepository;
   private final DynamoDbClient dynamoDbClient;
@@ -129,23 +131,95 @@ public class OrderRepository {
             .build());
   }
 
-  public void releaseOrder(
-      String user, String orderId, String fetchtcgStatus, List<SkuUnits> releases) {
-    var transactItems = new ArrayList<TransactWriteItem>();
-    for (var release : releases) {
-      transactItems.add(inventoryRepository.buildSkuDirtyUpdate(user, release.skuId()));
-      for (var sequenceNumber : release.sequenceNumbers()) {
-        transactItems.add(
-            inventoryRepository.buildUnitReleaseUpdate(user, release.skuId(), sequenceNumber));
+  public void startVoiding(String user, OrderItem order, String cancelledStatus) {
+    var allocated = allocatedUnits(order);
+    for (var unitKey : allocated) {
+      var unit = inventoryRepository.getUnit(user, unitKey.skuId(), unitKey.sequenceNumber());
+      if (unit == null
+          || !"reserved".equals(unit.getStatus())
+          || !order.getOrderId().equals(unit.getOrderId())) {
+        throw new IllegalStateException("order has an unexpected allocated unit");
       }
     }
-    transactItems.add(buildOrderVoidedUpdate(user, orderId, fetchtcgStatus));
-    transactItems.add(
-        inventoryRepository.buildAuditPut(
-            user,
-            "release",
-            Map.of(OrderItem.ORDER_ID, AttributeValue.builder().s(orderId).build())));
-    inventoryRepository.executeChunked(transactItems);
+
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(TcgInventoryTable.TABLE_NAME)
+            .key(
+                Map.of(
+                    OrderItem.PK,
+                    AttributeValue.builder().s(OrderItem.formatPk(user)).build(),
+                    OrderItem.SK,
+                    AttributeValue.builder().s(OrderItem.formatSk(order.getOrderId())).build()))
+            .updateExpression(
+                "SET #status = :voiding, "
+                    + OrderItem.FETCHTCG_STATUS
+                    + " = :external, "
+                    + OrderItem.UPDATED_AT
+                    + " = :now")
+            .conditionExpression("#status = :awaiting")
+            .expressionAttributeNames(Map.of("#status", OrderItem.STATUS))
+            .expressionAttributeValues(
+                Map.of(
+                    ":voiding", AttributeValue.builder().s("voiding").build(),
+                    ":awaiting", AttributeValue.builder().s("awaiting_payment").build(),
+                    ":external", AttributeValue.builder().s(cancelledStatus).build(),
+                    ":now",
+                        AttributeValue.builder()
+                            .n(String.valueOf(clock.now().getEpochSecond()))
+                            .build()))
+            .build());
+  }
+
+  public void finishVoiding(String user, String orderId) {
+    var finishOrder =
+        TransactWriteItem.builder()
+            .update(
+                Update.builder()
+                    .tableName(TcgInventoryTable.TABLE_NAME)
+                    .key(
+                        Map.of(
+                            OrderItem.PK,
+                            AttributeValue.builder().s(OrderItem.formatPk(user)).build(),
+                            OrderItem.SK,
+                            AttributeValue.builder().s(OrderItem.formatSk(orderId)).build()))
+                    .updateExpression(
+                        "SET #status = :voided, "
+                            + OrderItem.UPDATED_AT
+                            + " = :now REMOVE "
+                            + OrderItem.FETCHTCG_CURRENT_ACTION)
+                    .conditionExpression("#status = :voiding")
+                    .expressionAttributeNames(Map.of("#status", OrderItem.STATUS))
+                    .expressionAttributeValues(
+                        Map.of(
+                            ":voided", AttributeValue.builder().s("voided").build(),
+                            ":voiding", AttributeValue.builder().s("voiding").build(),
+                            ":now",
+                                AttributeValue.builder()
+                                    .n(String.valueOf(clock.now().getEpochSecond()))
+                                    .build()))
+                    .build())
+            .build();
+
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                finishOrder,
+                inventoryRepository.buildAuditPut(
+                    user,
+                    "order_voided",
+                    Map.of(OrderItem.ORDER_ID, AttributeValue.builder().s(orderId).build())))
+            .build());
+  }
+
+  private List<AllocatedUnit> allocatedUnits(OrderItem order) {
+    var result = new ArrayList<AllocatedUnit>();
+    for (var line : order.getLines()) {
+      for (var sequenceNumber : line.getAllocatedSequenceNumbers()) {
+        result.add(new AllocatedUnit(line.getSkuId(), sequenceNumber));
+      }
+    }
+    return result;
   }
 
   public void sellOrder(String user, String orderId, List<SkuUnits> sales) {
@@ -193,40 +267,6 @@ public class OrderRepository {
                         ":fetchtcgStatus", AttributeValue.builder().s(fetchtcgStatus).build(),
                         ":fetchtcgCurrentAction",
                             AttributeValue.builder().s(fetchtcgCurrentAction).build(),
-                        ":now",
-                            AttributeValue.builder()
-                                .n(String.valueOf(clock.now().getEpochSecond()))
-                                .build()))
-                .build())
-        .build();
-  }
-
-  private TransactWriteItem buildOrderVoidedUpdate(
-      String user, String orderId, String fetchtcgStatus) {
-    return TransactWriteItem.builder()
-        .update(
-            Update.builder()
-                .tableName(TcgInventoryTable.TABLE_NAME)
-                .key(
-                    Map.of(
-                        OrderItem.PK,
-                        AttributeValue.builder().s(OrderItem.formatPk(user)).build(),
-                        OrderItem.SK,
-                        AttributeValue.builder().s(OrderItem.formatSk(orderId)).build()))
-                .updateExpression(
-                    "SET #status = :voided, "
-                        + OrderItem.FETCHTCG_STATUS
-                        + " = :fetchtcgStatus, "
-                        + OrderItem.UPDATED_AT
-                        + " = :now REMOVE "
-                        + OrderItem.FETCHTCG_CURRENT_ACTION)
-                .conditionExpression("#status = :awaitingPayment")
-                .expressionAttributeNames(Map.of("#status", OrderItem.STATUS))
-                .expressionAttributeValues(
-                    Map.of(
-                        ":voided", AttributeValue.builder().s("voided").build(),
-                        ":awaitingPayment", AttributeValue.builder().s("awaiting_payment").build(),
-                        ":fetchtcgStatus", AttributeValue.builder().s(fetchtcgStatus).build(),
                         ":now",
                             AttributeValue.builder()
                                 .n(String.valueOf(clock.now().getEpochSecond()))

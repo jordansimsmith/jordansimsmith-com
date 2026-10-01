@@ -3,6 +3,7 @@ package com.jordansimsmith.tcginventory.orders;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
 import com.jordansimsmith.tcginventory.games.Games;
+import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.settings.SettingsItem;
 import com.jordansimsmith.time.Clock;
@@ -57,6 +58,7 @@ public class OrderPhaseProcessor {
   private final DynamoDbTable<SkuItem> skuTable;
   private final DynamoDbTable<SettingsItem> settingsTable;
   private final OrderRepository orderRepository;
+  private final InventoryRepository inventoryRepository;
   private final Clock clock;
   private final FetchTcgClient fetchTcgClient;
 
@@ -65,17 +67,25 @@ public class OrderPhaseProcessor {
       DynamoDbTable<SkuItem> skuTable,
       DynamoDbTable<SettingsItem> settingsTable,
       OrderRepository orderRepository,
+      InventoryRepository inventoryRepository,
       Clock clock,
       FetchTcgClient fetchTcgClient) {
     this.orderTable = orderTable;
     this.skuTable = skuTable;
     this.settingsTable = settingsTable;
     this.orderRepository = orderRepository;
+    this.inventoryRepository = inventoryRepository;
     this.clock = clock;
     this.fetchTcgClient = fetchTcgClient;
   }
 
   public void process(String user, String bearerToken) {
+    for (var order : loadExistingOrders(user)) {
+      if ("voiding".equals(order.getStatus())) {
+        releaseVoidingOrder(user, order);
+      }
+    }
+
     var allOffers = paginateOffers(bearerToken);
     LOGGER.info("fetched {} offers from FetchTCG for user {}", allOffers.size(), user);
 
@@ -115,7 +125,8 @@ public class OrderPhaseProcessor {
           offer.currentAction() != null && PAYMENT_ACTIONS.contains(offer.currentAction());
       if ("awaiting_payment".equals(order.getStatus())) {
         if (cancelled) {
-          releaseCancelledOrder(user, order, offer);
+          orderRepository.startVoiding(user, order, offer.status());
+          releaseVoidingOrder(user, order);
           voidedCount++;
         } else if (paymentReceived) {
           orderRepository.advanceOrderToPickReady(
@@ -216,6 +227,16 @@ public class OrderPhaseProcessor {
     }
   }
 
+  private void releaseVoidingOrder(String user, OrderItem order) {
+    for (var line : order.getLines()) {
+      for (var sequenceNumber : line.getAllocatedSequenceNumbers()) {
+        inventoryRepository.updateUnitForRelease(
+            user, order.getOrderId(), line.getSkuId(), sequenceNumber);
+      }
+    }
+    orderRepository.finishVoiding(user, order.getOrderId());
+  }
+
   private List<OrderItem> loadExistingOrders(String user) {
     var results = new ArrayList<OrderItem>();
     var request =
@@ -226,6 +247,7 @@ public class OrderPhaseProcessor {
                         .partitionValue(SkuItem.formatUserPk(user))
                         .sortValue(OrderItem.ORDER_PREFIX)
                         .build()))
+            .consistentRead(true)
             .build();
 
     orderTable.query(request).items().forEach(results::add);
@@ -322,22 +344,6 @@ public class OrderPhaseProcessor {
             .map(entry -> new OrderRepository.SkuUnits(entry.getKey(), entry.getValue()))
             .toList();
     orderRepository.reserveOrder(user, orderItem, skuUnits);
-  }
-
-  private void releaseCancelledOrder(
-      String user, OrderItem order, FetchTcgClient.SellerOffer offer) {
-    var releasedUnits = new LinkedHashMap<String, List<Integer>>();
-    for (var line : order.getLines()) {
-      releasedUnits
-          .computeIfAbsent(line.getSkuId(), k -> new ArrayList<>())
-          .addAll(line.getAllocatedSequenceNumbers());
-    }
-
-    var skuUnits =
-        releasedUnits.entrySet().stream()
-            .map(entry -> new OrderRepository.SkuUnits(entry.getKey(), entry.getValue()))
-            .toList();
-    orderRepository.releaseOrder(user, order.getOrderId(), offer.status(), skuUnits);
   }
 
   private static Fulfillment toFulfillment(FetchTcgClient.SellerOffer offer) {

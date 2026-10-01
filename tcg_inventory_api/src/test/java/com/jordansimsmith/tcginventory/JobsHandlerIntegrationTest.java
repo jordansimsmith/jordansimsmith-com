@@ -677,8 +677,12 @@ public class JobsHandlerIntegrationTest {
 
     var releaseAudits =
         getAuditEntries("jordan").stream().filter(a -> "release".equals(a.getEventType())).toList();
-    assertThat(releaseAudits).hasSize(1);
-    assertThat(releaseAudits.get(0).getOrderId()).isEqualTo("83663");
+    assertThat(releaseAudits).hasSize(2);
+    assertThat(releaseAudits)
+        .allSatisfy(audit -> assertThat(audit.getOrderId()).isEqualTo("83663"));
+    assertThat(getAuditEntries("jordan"))
+        .filteredOn(audit -> "order_voided".equals(audit.getEventType()))
+        .hasSize(1);
 
     // the released units are dirty stock again, so the listing phase restores the full quantity
     var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
@@ -784,18 +788,18 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldFinishPartiallyAppliedRelease() {
+  void publishOrderPhaseShouldResumePartiallyAppliedVoidingOrder() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 2);
     createReservedOrder(
-        "jordan", "83663", "awaiting_payment", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1, 2);
+        "jordan", "83663", "voiding", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1, 2);
 
-    // simulate a run that released one unit before dying, leaving the order awaiting_payment
+    // simulate a prior delivery that released one unit before stopping
     releaseUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1);
 
-    fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
+    fakeFetchTcgClient.seedSellerOffers(List.of());
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -810,6 +814,10 @@ public class JobsHandlerIntegrationTest {
     var releaseAudits =
         getAuditEntries("jordan").stream().filter(a -> "release".equals(a.getEventType())).toList();
     assertThat(releaseAudits).hasSize(1);
+    assertThat(releaseAudits.get(0).getSequenceNumber()).isEqualTo(2);
+    assertThat(getAuditEntries("jordan"))
+        .filteredOn(audit -> "order_voided".equals(audit.getEventType()))
+        .hasSize(1);
   }
 
   @Test
@@ -847,7 +855,10 @@ public class JobsHandlerIntegrationTest {
 
     var releaseAudits =
         getAuditEntries("jordan").stream().filter(a -> "release".equals(a.getEventType())).toList();
-    assertThat(releaseAudits).hasSize(1);
+    assertThat(releaseAudits).hasSize(60);
+    assertThat(getAuditEntries("jordan"))
+        .filteredOn(audit -> "order_voided".equals(audit.getEventType()))
+        .hasSize(1);
   }
 
   @Test

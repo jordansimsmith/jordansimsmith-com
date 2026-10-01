@@ -42,6 +42,7 @@ public class PublishJobProcessor implements JobProcessor {
             skuTable,
             TcgInventoryTable.table(enhancedClient, SettingsItem.class),
             orderRepository,
+            inventoryRepository,
             clock,
             factory.fetchTcgClient());
     this.listingPhaseProcessor =

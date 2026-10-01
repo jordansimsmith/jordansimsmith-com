@@ -510,6 +510,20 @@ describe('OrderDetailPage', () => {
     expect(document.querySelectorAll('img')).toHaveLength(3);
   });
 
+  it('renders a voiding order without a confirm pull action', async () => {
+    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(
+      orderDetail({ state: 'voiding' }),
+    );
+
+    renderOrderDetailPage();
+
+    expect(await screen.findByText('Order 83647')).toBeDefined();
+    expect(screen.getByText('voiding')).toBeDefined();
+    expect(screen.getByText('Cards')).toBeDefined();
+    expect(screen.queryByText('Pull sheet')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Confirm pull' })).toBeNull();
+  });
+
   it('renders thumbnails for voided orders', async () => {
     vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(
       orderDetail({ state: 'voided' }),
