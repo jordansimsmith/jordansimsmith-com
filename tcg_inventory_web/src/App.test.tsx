@@ -147,6 +147,15 @@ describe('App', () => {
     expect(screen.getByLabelText(/username/i)).toBeDefined();
   });
 
+  it('protects the publish route', () => {
+    renderActualApp('/publish');
+
+    expect(
+      screen.getByRole('heading', { name: /tcg inventory/i }),
+    ).toBeDefined();
+    expect(screen.getByLabelText(/username/i)).toBeDefined();
+  });
+
   it('protects the scan detail route', () => {
     renderApp('/scans/fake-scan-identifying');
 
@@ -196,5 +205,19 @@ describe('App', () => {
       await screen.findByRole('heading', { level: 1, name: 'Inventory' }),
     ).toBeDefined();
     expect(getGames).toHaveBeenCalledTimes(2);
+  });
+
+  it('opens the authenticated publish page from its sidebar route', async () => {
+    setAuth();
+    renderActualApp('/publish');
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Publish' }),
+    ).toBeDefined();
+    expect(
+      screen
+        .getByRole('link', { name: 'Publish' })
+        .getAttribute('aria-current'),
+    ).toBe('page');
   });
 });

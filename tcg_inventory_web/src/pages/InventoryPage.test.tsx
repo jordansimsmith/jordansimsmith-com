@@ -109,6 +109,12 @@ describe('InventoryPage', () => {
     cleanup();
   });
 
+  it('does not show the publish action in the inventory header', () => {
+    renderInventoryPage();
+
+    expect(screen.queryByRole('button', { name: /publish/i })).toBeNull();
+  });
+
   it('renders SKU rows with their fields', async () => {
     renderInventoryPage();
 

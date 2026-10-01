@@ -6,15 +6,18 @@ import {
   IconChartBar,
   IconFileImport,
   IconPackage,
+  IconUpload,
   IconSettings,
 } from '@tabler/icons-react';
 import { Layout } from '@jordansimsmith_com/ui';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { getSession, clearSession } from '../auth/session';
+import { usePublishStatus } from '../PublishStatusProvider';
 import classes from './AppShellLayout.module.css';
 
 const WORKSPACE_LINKS = [
   { label: 'Inventory', to: '/inventory', icon: IconCards },
+  { label: 'Publish', to: '/publish', icon: IconUpload },
   { label: 'Scans', to: '/scans', icon: IconCamera },
   { label: 'Imports', to: '/imports', icon: IconFileImport },
   { label: 'Orders', to: '/orders', icon: IconPackage },
@@ -34,6 +37,7 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const session = getSession();
+  const publishStatus = usePublishStatus();
   const [navbarOpened, setNavbarOpened] = useState(false);
 
   const handleLogout = () => {
@@ -45,6 +49,8 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
     const active =
       location.pathname === link.to ||
       location.pathname.startsWith(`${link.to}/`);
+    const publishNeedsAttention =
+      link.to === '/publish' && publishStatus?.attentionDotVisible === true;
     return (
       <NavLink
         key={link.to}
@@ -52,6 +58,16 @@ export function AppShellLayout({ children }: AppShellLayoutProps) {
         to={link.to}
         label={link.label}
         leftSection={<link.icon size={18} stroke={1.5} />}
+        rightSection={
+          publishNeedsAttention ? (
+            <span className={classes.notificationDot} aria-hidden="true" />
+          ) : undefined
+        }
+        aria-label={
+          publishNeedsAttention
+            ? 'Publish, unpublished inventory changes'
+            : link.label
+        }
         active={active}
         aria-current={active ? 'page' : undefined}
         mih={40}

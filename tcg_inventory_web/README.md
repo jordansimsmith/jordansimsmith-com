@@ -39,7 +39,7 @@ The TCG inventory web service is a single-page app for running a chaos-sorted ca
 - Listing photos during review: keep rows appraised at NZ$20+ carry a "needs photos" badge; a touch-friendly photo strip on keep rows supports add (camera or library) and remove — the first uploaded photo is the listing front image; confirm stays disabled while flagged rows lack photos; desktop picks up phone uploads on window refocus.
 - Inventory: one independently searchable and paginated section per registered game, each with a dense SKU table and counts. SKU detail shows the backend-provided normal card image, units, derived locations, and per-unit photo thumbnails (view-only), with manual adjustments (remove unit, change condition).
 - Orders: one combined order list and detail view with state badges, a Cards column carrying the card-line subtotal (postage excluded), a detail fulfillment panel with the buyer's name, delivery address, and postage option, order-level offered vs listed totals with an above/below-list badge when they differ, and a location-ordered pull sheet optimized for one-handed phone use. Pull sheet rows are grouped by game and show the backend-provided small card image, the accepted per-card price, the current block position with the insertion location struck through beside it when gaps have shifted it, and the previous and next cards still in the block; confirm-pull action; the detail page keeps only Back to orders in the header and places neutral external links in a right-column Order actions panel, including courier booking for fulfilled orders.
-- Publish widget (no dedicated jobs page): trigger a publish run, show the pending publish count (SKUs with unpublished inventory changes), and poll/render the current-or-latest run's progress and outcome. Appraisal progress and errors render on the import pages.
+- Publish page: trigger a publish run, show the pending publish count (SKUs with unpublished inventory changes), and poll/render the current-or-latest run's progress and outcome while the page is open. The workspace sidebar makes a best-effort background status read on page load and shows an attention dot when a publish run exists with pending SKUs and no run is active. The dot clears when Publish is clicked and does not refresh again until the next page load. It stays hidden before the first run because `GET /publish` returns 404 without a dirty count. Appraisal progress and errors render on the import pages.
 - Job failure reporting: failed publish runs, appraisals, and report generations render a compact alert with the failure title and the backend's short actionable error message; full diagnostics stay in backend logs, never in the UI.
 - Reports tab: renders combined inventory value to two decimal places, paid-order revenue, weekly card movement, and monthly revenue, then one tab per registered game. A game summary uses three sections: inventory value; unique in-stock card names with units in stock; and paid revenue with units sold. Supporting sections rank highest-value cards and sets, then show time in stock and stock by price. Regeneration is automatic and background-only: when the response says stale (checked on navigation and window refocus), the page triggers a new generation and polls until fresh figures swap in place; the first-ever visit shows skeletons while the first generation runs.
 - Settings: set or replace the FetchTCG refresh token (display presence and last-updated only); configure the "Track orders after" date to exclude pre-existing FetchTCG orders from tracking.
@@ -93,7 +93,7 @@ sequenceDiagram
   end
   api-->>web: confirmed + placement instructions
   web-->>user: "place 87 cards into A42" screen
-  user->>web: trigger publish
+  user->>web: open Publish and trigger a run
   web->>api: POST /publish
   web->>api: GET /publish (poll)
   api-->>web: run progress to completion
@@ -135,7 +135,7 @@ sequenceDiagram
 - Keep inventory's `/` search shortcut local to its page; scan review owns its workflow-specific keyboard controls.
 - Desktop-first dense layouts: full-width compact Mantine tables, minimal chrome, and no narrow content column. Narrow screens use deliberate mobile compositions rather than squeezed desktop tables; the pull sheet, import review, and placement screens are explicitly designed for one-handed physical use.
 - Store the session in `localStorage` so it survives browser restarts; logout clears it.
-- Poll job and import progress with a short interval while a job is running instead of adding streaming infrastructure.
+- Poll job and import progress with a short interval while the relevant workflow page is open and a job is running instead of adding streaming infrastructure.
 - Keep page data in page-level React state fed by the `ApiClient`; share only the small game registry through the authenticated workspace context, without a general cache library.
 - Photo uploads are processed client-side before the API: a canvas re-encode to JPEG (max edge 2000 px, quality 0.85) normalizes iPhone HEIC and library picks, strips EXIF (including GPS), and keeps raw `image/jpeg` bodies far under Lambda's payload ceiling — no multipart, no presigned upload choreography.
 - Scanner JPEGs are different from listing photos: the browser preserves the original JPEG, creates the scan with `POST /scans`, refreshes the collection from `GET /scans`, uploads the selected files as one batch to private S3 with the initial presigned PUT URLs, and verifies the complete batch before automatic identification. The API owns durable scan/job/suggestion state; a failed/incomplete upload remains an abandoned `uploading` job with no retry or resume path. `GET /scans/{scan_id}` verifies uploads but does not issue replacement URLs.
@@ -153,7 +153,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 
 - **Keep/discard/review row**: an import row's appraisal decision; decisions are final for the import. Review cards are set aside physically, never ingested, and return through a later import once their cause is fixed.
 - **Placement instructions**: the post-confirm screen mapping the confirmed stack to block labels and location ranges, with the card names at each range boundary as physical checkpoints and a total suggested value for the confirmed stack. The same total stays on the import page when a confirmed import is reopened.
-- **Pending publish badge**: count of SKUs with unpublished inventory changes shown on the publish trigger.
+- **Pending publish indicator**: the sidebar attention dot means one or more SKUs have unpublished inventory changes after a publish run has existed; the Publish page shows the exact count.
 - **Needs photos badge**: flag on a keep row appraised at NZ$20+ with no photos yet; confirm is blocked while any such row remains.
 - **Report**: the latest generated dashboard snapshot served by `GET /reports`; stale when inventory changed since generation or the snapshot is older than 24 hours. The "data as of" stamp renders its generation time (relative under 24 h, absolute beyond).
 
@@ -257,7 +257,7 @@ Shared vocabulary is defined by `tcg_inventory_api/README.md`; the UI uses it ve
 - Pull sheets and unit lists render in ascending sequence-number order (forward pass order).
 - Current locations and neighbor cards render only while the order's cards are still boxed (`awaiting_payment`, `to_pick`); fulfilled and voided orders show insertion locations only.
 - Import review is read-only; appraisal decisions are final for the import.
-- Job and import polling stops when the job reaches a terminal status.
+- Job and import polling stops when the job reaches a terminal status or the workflow page unmounts.
 - The reports tab revalidates staleness on navigation and window refocus; regeneration is automatic only, and rendered figures never unmount during a refresh.
 - The import review page refetches on window refocus while the import is in review, picking up cross-device photo uploads; photos are immutable after confirm and the UI offers no unit-level photo management.
 - Dates and times display in the browser locale from epoch values; the API remains the source of truth for all timestamps.
@@ -321,7 +321,7 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
   2. Open inventory, search within a game's section, and open a SKU by clicking its row; verify the card image renders, remove a unit, and change a unit's condition.
   3. Upload a CSV, watch appraisal progress, review the fake appraisal decisions, add photos to the seeded flagged row and watch confirm enable, confirm, and check placement instructions.
   4. Open the seeded `to_pick` order, check the fulfillment panel (buyer, address, postage option), view the pull sheet at phone width (card thumbnails, current positions with struck-through insertion locations, per-card prices, neighbor rows), confirm the pull.
-  5. Trigger publish and watch the fake job drain the pending publish count.
+  5. Open Publish, trigger a run, and watch the fake job drain the pending publish count.
   6. Set a credential in settings and verify only presence metadata renders.
   7. Open reports; verify every figure renders under the "data as of" stamp, then make an inventory change, revisit reports, and watch it regenerate automatically with figures swapping in place.
   8. On `/scans`, choose a finish and condition, add two JPEGs, create the batch, verify the table refreshes from `GET /scans`, wait for the Create button to finish the upload/verification/identify handoff, and watch `/scans/{scan_id}` show identification progress. Later review and confirm the scan; verify polling opens the import once scan detail reports `confirmed`. Reopen the scan and verify it is read-only.
@@ -335,7 +335,7 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 3. A NZ$60 rare carries the needs-photos badge: the user opens the same import on their phone, photographs the card, and the desktop picks the photos up on refocus, enabling confirm.
 4. The user confirms via the confirm dialog; only keep rows become units (photos frozen onto them), and the set-aside review cards return through a later import once fixed.
 5. The placement screen says which block labels to file the stack into; the user boxes it in one motion.
-6. The user triggers publish and watches the job complete; the pending badge drops to zero.
+6. The user opens Publish, triggers the run, and watches it complete; the sidebar attention dot clears.
 
 ### Scenario 2: pulling an order on a phone
 
@@ -346,13 +346,13 @@ Build mode behavior: production (`import.meta.env.PROD`) uses the HTTP client; d
 
 ### Scenario 3: replacing an expired FetchTCG credential
 
-1. A publish run fails with an authentication error visible in the publish widget.
+1. A publish run fails with an authentication error visible on the Publish page.
 2. The user opens settings, pastes a fresh refresh token into the write-only field, and saves.
-3. Settings shows updated presence metadata; re-triggering publish succeeds. The token value itself is never displayed.
+3. Settings shows updated presence metadata; retrying publish succeeds. The token value itself is never displayed.
 
 ### Scenario 4: appreciating the inventory after a big import
 
-1. The user confirms a 300-card import and triggers publish.
+1. The user confirms a 300-card import, opens Publish, and triggers a run.
 2. Opening the reports tab shows the previous snapshot instantly, marked stale, with the refreshing indicator while regeneration runs in the background.
 3. Fresh figures swap in place: total value and in-stock units jump, the intake trend shows this week's spike, and a new card appears in the top hits table.
 4. Glancing away and refocusing the window later re-checks staleness silently; nothing regenerates when nothing changed.

@@ -18,6 +18,8 @@ import { ScanPage } from './pages/ScanPage';
 import { ScanDetailPage } from './pages/ScanDetailPage';
 import { getSession } from './auth/session';
 import { GamesProvider } from './GamesProvider';
+import { PublishStatusProvider } from './PublishStatusProvider';
+import { PublishPage } from './pages/PublishPage';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const session = getSession();
@@ -39,7 +41,9 @@ function AuthenticatedWorkspace() {
   return (
     <RequireAuth>
       <GamesProvider>
-        <Outlet />
+        <PublishStatusProvider>
+          <Outlet />
+        </PublishStatusProvider>
       </GamesProvider>
     </RequireAuth>
   );
@@ -53,6 +57,7 @@ export function App() {
         <Route element={<AuthenticatedWorkspace />}>
           <Route path="/inventory" element={<InventoryPage />} />
           <Route path="/inventory/:skuId" element={<SkuDetailPage />} />
+          <Route path="/publish" element={<PublishPage />} />
           <Route path="/imports" element={<ImportsPage />} />
           <Route path="/imports/:importId" element={<ImportDetailPage />} />
           <Route path="/scans" element={<ScanPage />} />

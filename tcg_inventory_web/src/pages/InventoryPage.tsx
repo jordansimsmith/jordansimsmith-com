@@ -9,7 +9,6 @@ import {
   CollectionSurface,
 } from '../components/CollectionSurface';
 import { PageHeader } from '../components/PageHeader';
-import { PublishWidget } from '../components/PublishWidget';
 import { SkuTable } from '../components/SkuTable';
 import { apiClient } from '../api/client';
 import type { FindSkusParams, Game, GameId, SkuSummary } from '../api/client';
@@ -193,7 +192,6 @@ export function InventoryPage() {
         <PageHeader
           title="Inventory"
           description="Find stock by card name and open a printing to view its units and locations."
-          actions={<PublishWidget />}
         />
         <Tabs
           value={activeGame}
