@@ -66,6 +66,16 @@ const orderFixtures: OrderSummary[] = [
     listed_total_price: '3.00',
     unit_count: 1,
   },
+  {
+    order_id: '83540',
+    state: 'reserving',
+    accepted_at: 1764816132,
+    delivery_mode: 'PICKUP',
+    total_price: '3.00',
+    items_total_price: '3.00',
+    listed_total_price: '3.00',
+    unit_count: 1,
+  },
 ];
 
 function OrderDetailStub() {
@@ -133,6 +143,10 @@ describe('OrdersPage', () => {
       .getByText('83550')
       .closest('tr') as HTMLTableRowElement;
     expect(within(voidingRow).getByText('voiding')).toBeDefined();
+    const reservingRow = screen
+      .getByText('83540')
+      .closest('tr') as HTMLTableRowElement;
+    expect(within(reservingRow).getByText('reserving')).toBeDefined();
   });
 
   it('shows an empty state when there are no orders', async () => {

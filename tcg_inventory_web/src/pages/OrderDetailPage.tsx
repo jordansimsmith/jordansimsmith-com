@@ -113,7 +113,9 @@ export function OrderDetailPage() {
   }, [orderId]);
 
   const showPullContext =
-    order?.state === 'awaiting_payment' || order?.state === 'to_pick';
+    order?.state === 'awaiting_payment' ||
+    order?.state === 'reserving' ||
+    order?.state === 'to_pick';
   const unitsByGame = new Map<string, OrderUnit[]>();
   for (const unit of order?.units ?? []) {
     const gameUnits = unitsByGame.get(unit.game) ?? [];

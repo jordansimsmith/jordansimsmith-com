@@ -7,7 +7,6 @@ import com.jordansimsmith.tcginventory.SkuIds;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -67,21 +66,24 @@ public class InventoryRepository {
     return unitTable.getItem(request -> request.key(key).consistentRead(true));
   }
 
-  public List<UnitItem> findUnitsToAllocate(
-      String user, String skuId, String orderId, int quantity) {
-    var results = new ArrayList<UnitItem>();
-    for (var item : findUnits(user, skuId)) {
-      // units already reserved for this order were allocated by a run that died before
-      // writing the order item; reclaiming them keeps retries convergent
-      var reclaimed = "reserved".equals(item.getStatus()) && orderId.equals(item.getOrderId());
-      if ("in_stock".equals(item.getStatus()) || reclaimed) {
-        results.add(item);
-        if (results.size() >= quantity) {
-          break;
-        }
-      }
-    }
-    return results;
+  public List<UnitItem> findUnitsToAllocate(String user, String skuId, int quantity) {
+    var request =
+        QueryEnhancedRequest.builder()
+            .queryConditional(
+                QueryConditional.sortBeginsWith(
+                    Key.builder()
+                        .partitionValue(UnitItem.formatPk(user, skuId))
+                        .sortValue(UnitItem.UNIT_PREFIX)
+                        .build()))
+            .scanIndexForward(true)
+            .consistentRead(true)
+            .build();
+
+    return unitTable.query(request).stream()
+        .flatMap(page -> page.items().stream())
+        .filter(unit -> "in_stock".equals(unit.getStatus()))
+        .limit(quantity)
+        .toList();
   }
 
   public void removeUnit(String user, String skuId, int sequenceNumber, @Nullable String reason) {
@@ -270,7 +272,8 @@ public class InventoryRepository {
                         + " = :orderId, "
                         + UnitItem.UPDATED_AT
                         + " = :now")
-                .conditionExpression("#status = :inStock")
+                .conditionExpression(
+                    "#status = :inStock AND attribute_not_exists(" + UnitItem.ORDER_ID + ")")
                 .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                 .expressionAttributeValues(
                     Map.of(
@@ -283,6 +286,33 @@ public class InventoryRepository {
                                 .build()))
                 .build())
         .build();
+  }
+
+  public void updateUnitForReservation(
+      String user, String orderId, String skuId, int sequenceNumber) {
+    var unit = getUnit(user, skuId, sequenceNumber);
+    if (unit != null && "reserved".equals(unit.getStatus()) && orderId.equals(unit.getOrderId())) {
+      return;
+    }
+
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                List.of(
+                    buildUnitReserveUpdate(user, skuId, sequenceNumber, orderId),
+                    buildSkuDirtyUpdate(user, skuId),
+                    buildAuditPut(
+                        user,
+                        "reserve",
+                        Map.of(
+                            AuditItem.ORDER_ID, AttributeValue.builder().s(orderId).build(),
+                            AuditItem.SKU_ID, AttributeValue.builder().s(skuId).build(),
+                            AuditItem.SEQUENCE_NUMBER,
+                                AttributeValue.builder().n(String.valueOf(sequenceNumber)).build(),
+                            AuditItem.BEFORE_STATUS, AttributeValue.builder().s("in_stock").build(),
+                            AuditItem.AFTER_STATUS,
+                                AttributeValue.builder().s("reserved").build()))))
+            .build());
   }
 
   public TransactWriteItem buildUnitSellUpdate(String user, String skuId, int sequenceNumber) {

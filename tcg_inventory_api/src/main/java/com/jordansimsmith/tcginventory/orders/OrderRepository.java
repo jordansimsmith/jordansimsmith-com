@@ -3,7 +3,6 @@ package com.jordansimsmith.tcginventory.orders;
 import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,7 +12,7 @@ import javax.annotation.Nullable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import software.amazon.awssdk.services.dynamodb.model.Put;
+import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
 import software.amazon.awssdk.services.dynamodb.model.Update;
@@ -40,37 +39,53 @@ public class OrderRepository {
     this.clock = clock;
   }
 
-  public List<UnitItem> findUnitsToAllocate(
-      String user, String skuId, String orderId, int quantity) {
-    return inventoryRepository.findUnitsToAllocate(user, skuId, orderId, quantity);
+  public void createReservingOrder(OrderItem order) {
+    dynamoDbClient.putItem(
+        PutItemRequest.builder()
+            .tableName(TcgInventoryTable.TABLE_NAME)
+            .item(orderTable.tableSchema().itemToMap(order, true))
+            .conditionExpression("attribute_not_exists(pk)")
+            .build());
   }
 
-  public void reserveOrder(String user, OrderItem orderItem, List<SkuUnits> reservations) {
-    var transactItems = new ArrayList<TransactWriteItem>();
-    for (var reservation : reservations) {
-      transactItems.add(inventoryRepository.buildSkuDirtyUpdate(user, reservation.skuId()));
-      for (var sequenceNumber : reservation.sequenceNumbers()) {
-        transactItems.add(
-            inventoryRepository.buildUnitReserveUpdate(
-                user, reservation.skuId(), sequenceNumber, orderItem.getOrderId()));
-      }
-    }
-    transactItems.add(
+  public void finishReservation(String user, String orderId, String targetState) {
+    var finishOrder =
         TransactWriteItem.builder()
-            .put(
-                Put.builder()
+            .update(
+                Update.builder()
                     .tableName(TcgInventoryTable.TABLE_NAME)
-                    .item(orderTable.tableSchema().itemToMap(orderItem, true))
-                    .conditionExpression("attribute_not_exists(pk)")
+                    .key(
+                        Map.of(
+                            OrderItem.PK,
+                            AttributeValue.builder().s(OrderItem.formatPk(user)).build(),
+                            OrderItem.SK,
+                            AttributeValue.builder().s(OrderItem.formatSk(orderId)).build()))
+                    .updateExpression("SET #status = :target, " + OrderItem.UPDATED_AT + " = :now")
+                    .conditionExpression("#status = :reserving")
+                    .expressionAttributeNames(Map.of("#status", OrderItem.STATUS))
+                    .expressionAttributeValues(
+                        Map.of(
+                            ":target", AttributeValue.builder().s(targetState).build(),
+                            ":reserving", AttributeValue.builder().s("reserving").build(),
+                            ":now",
+                                AttributeValue.builder()
+                                    .n(String.valueOf(clock.now().getEpochSecond()))
+                                    .build()))
                     .build())
+            .build();
+
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                finishOrder,
+                inventoryRepository.buildAuditPut(
+                    user,
+                    "order_reserved",
+                    Map.of(
+                        OrderItem.ORDER_ID, AttributeValue.builder().s(orderId).build(),
+                        AuditItem.BEFORE_STATUS, AttributeValue.builder().s("reserving").build(),
+                        AuditItem.AFTER_STATUS, AttributeValue.builder().s(targetState).build())))
             .build());
-    transactItems.add(
-        inventoryRepository.buildAuditPut(
-            user,
-            "reserve",
-            Map.of(
-                OrderItem.ORDER_ID, AttributeValue.builder().s(orderItem.getOrderId()).build())));
-    inventoryRepository.executeChunked(transactItems);
   }
 
   public void advanceOrderToPickReady(

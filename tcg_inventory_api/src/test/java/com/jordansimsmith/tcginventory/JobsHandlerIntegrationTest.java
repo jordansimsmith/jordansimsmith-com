@@ -38,6 +38,7 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
+import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 
 @Testcontainers
 public class JobsHandlerIntegrationTest {
@@ -1026,7 +1027,7 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldFlagInsufficientStock() {
+  void publishOrderPhaseShouldFailJobForInsufficientStock() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
@@ -1054,9 +1055,17 @@ public class JobsHandlerIntegrationTest {
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
     // assert
-    var order = getOrder("jordan", "83663");
-    assertThat(order).isNotNull();
-    assertThat(order.getStatus()).isEqualTo("flagged");
+    assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("failed");
+    assertThat(getJob("jordan", "job1").getError())
+        .contains("Offer 83663", "listing 1001", "in stock");
+    assertThat(getOrder("jordan", "83663")).isNull();
+    assertThat(getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM"))
+        .singleElement()
+        .extracting(UnitItem::getStatus)
+        .isEqualTo("in_stock");
+    assertThat(getAuditEntries("jordan"))
+        .noneMatch(audit -> "reserve".equals(audit.getEventType()));
+    assertThat(fakeFetchTcgClient.getUpsertCalls()).isEmpty();
   }
 
   @Test
@@ -1200,7 +1209,7 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldReserveLargeOfferAcrossTransactions() {
+  void publishOrderPhaseShouldReserveLargeOfferWithPerUnitTransactions() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
@@ -1256,50 +1265,44 @@ public class JobsHandlerIntegrationTest {
 
     var reserveAudits =
         getAuditEntries("jordan").stream().filter(a -> "reserve".equals(a.getEventType())).toList();
-    assertThat(reserveAudits).hasSize(1);
+    assertThat(reserveAudits).hasSize(60);
+    assertThat(reserveAudits)
+        .allSatisfy(
+            audit -> {
+              assertThat(audit.getOrderId()).isEqualTo("91329");
+              assertThat(audit.getBeforeStatus()).isEqualTo("in_stock");
+              assertThat(audit.getAfterStatus()).isEqualTo("reserved");
+            });
+    assertThat(getAuditEntries("jordan"))
+        .filteredOn(audit -> "order_reserved".equals(audit.getEventType()))
+        .hasSize(1);
   }
 
   @Test
-  void publishOrderPhaseShouldReclaimUnitsReservedByCrashedRun() {
+  void publishOrderPhaseShouldResumeSavedReservationWithoutOffer() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
-    createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
-
-    // simulate a run that crashed after reserving units but before writing the order
-    var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    sku.setDirty(true);
-    sku.setGsi1pk(SkuItem.formatGsi1pk("jordan"));
-    skuTable.putItem(sku);
-    for (int sequenceNumber : new int[] {1, 2}) {
-      var unit =
-          unitTable.getItem(
-              Key.builder()
-                  .partitionValue(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM"))
-                  .sortValue(UnitItem.formatSk(sequenceNumber))
-                  .build());
-      unit.setStatus("reserved");
-      unit.setOrderId("83663");
-      unitTable.putItem(unit);
-    }
-
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(
-            new FetchTcgClient.SellerOffer(
-                83663,
-                "ACCEPTED",
-                null,
-                "2026-08-11T04:42:12.476+0000",
-                "PICKUP",
-                null,
-                null,
-                null,
-                new BigDecimal("3.33"),
-                List.of(
-                    new FetchTcgClient.OfferItem(
-                        new FetchTcgClient.OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
-                        2,
-                        new BigDecimal("1.50"))))));
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    createSkuWithUnits("jordan", skuId, 1001, 3);
+    var firstUnit = getUnits("jordan", skuId).get(0);
+    firstUnit.setStatus("reserved");
+    firstUnit.setOrderId("83663");
+    unitTable.putItem(firstUnit);
+    orderTable.putItem(
+        OrderItem.create(
+            "jordan",
+            "83663",
+            "reserving",
+            "ACCEPTED",
+            null,
+            "PICKUP",
+            null,
+            null,
+            null,
+            "3.33",
+            List.of(new OrderItem.OrderLine(skuId, 1001, 2, "3.00", "2.00", List.of(1, 2))),
+            Instant.ofEpochSecond(1700000000)));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1313,13 +1316,56 @@ public class JobsHandlerIntegrationTest {
     assertThat(orderLines.get(0).getQuantity()).isEqualTo(2);
     assertThat(orderLines.get(0).getAllocatedSequenceNumbers()).containsExactly(1, 2);
 
-    var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
+    var units = getUnits("jordan", skuId);
     var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
     assertThat(reserved).hasSize(2);
     assertThat(reserved).allSatisfy(u -> assertThat(u.getOrderId()).isEqualTo("83663"));
     var inStock = units.stream().filter(u -> "in_stock".equals(u.getStatus())).toList();
     assertThat(inStock).hasSize(1);
     assertThat(inStock.get(0).getSequenceNumber()).isEqualTo(3);
+    assertThat(getAuditEntries("jordan"))
+        .filteredOn(audit -> "reserve".equals(audit.getEventType()))
+        .hasSize(1);
+    assertThat(getAuditEntries("jordan"))
+        .filteredOn(audit -> "order_reserved".equals(audit.getEventType()))
+        .hasSize(1);
+  }
+
+  @Test
+  void publishOrderPhaseShouldPropagateSavedReservationConflictForRetry() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    createSkuWithUnits("jordan", skuId, 1001, 1);
+    var unit = getUnits("jordan", skuId).get(0);
+    unit.setStatus("sold");
+    unit.setOrderId("another-order");
+    unitTable.putItem(unit);
+    orderTable.putItem(
+        OrderItem.create(
+            "jordan",
+            "83663",
+            "reserving",
+            "ACCEPTED",
+            null,
+            "PICKUP",
+            null,
+            null,
+            null,
+            "1.50",
+            List.of(new OrderItem.OrderLine(skuId, 1001, 1, "1.50", "2.00", List.of(1))),
+            Instant.ofEpochSecond(1700000000)));
+
+    // act
+    assertThatThrownBy(
+            () -> jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null))
+        .isInstanceOf(TransactionCanceledException.class);
+
+    // assert
+    assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("running");
+    assertThat(getOrder("jordan", "83663").getStatus()).isEqualTo("reserving");
+    assertThat(fakeFetchTcgClient.getUpsertCalls()).isEmpty();
   }
 
   @Test

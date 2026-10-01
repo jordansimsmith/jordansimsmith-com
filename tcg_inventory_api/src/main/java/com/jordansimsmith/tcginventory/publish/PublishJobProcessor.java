@@ -61,6 +61,8 @@ public class PublishJobProcessor implements JobProcessor {
       return doProcessBatch(user, jobItem);
     } catch (FetchTcgAuthException e) {
       return new JobProcessor.FailureJobResult(FetchTcgAuthException.USER_MESSAGE);
+    } catch (OrderPhaseProcessor.ReservationPreflightException e) {
+      return new JobProcessor.FailureJobResult(e.getMessage());
     }
   }
 

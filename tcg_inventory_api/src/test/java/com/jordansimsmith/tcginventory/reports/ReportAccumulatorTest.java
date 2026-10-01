@@ -800,7 +800,7 @@ public class ReportAccumulatorTest {
     accumulator.addOrder(createOrder("fulfilled", "5.25", nov2023));
     accumulator.addOrder(createOrder("awaiting_payment", "100.00", nov2023));
     accumulator.addOrder(createOrder("voided", "20.00", nov2023));
-    accumulator.addOrder(createOrder("flagged", "30.00", nov2023));
+    accumulator.addOrder(createOrder("reserving", "30.00", nov2023));
 
     // assert
     var result = accumulator.toRevenueByMonth();
