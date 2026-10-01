@@ -50,6 +50,7 @@ public class InventoryRepository {
                         .partitionValue(SkuItem.formatPk(user, skuId))
                         .sortValue(UnitItem.UNIT_PREFIX)
                         .build()))
+            .consistentRead(true)
             .build();
 
     return unitTable.query(request).stream().flatMap(page -> page.items().stream()).toList();

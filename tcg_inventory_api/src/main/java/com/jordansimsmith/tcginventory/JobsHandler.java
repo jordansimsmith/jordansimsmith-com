@@ -67,7 +67,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             .sortValue(JobItem.formatSk(message.jobId()))
             .build();
 
-    var jobItem = jobTable.getItem(jobKey);
+    var jobItem = jobTable.getItem(request -> request.key(jobKey).consistentRead(true));
     if (jobItem == null) {
       throw new IllegalStateException("job item not found: " + message.jobId());
     }
