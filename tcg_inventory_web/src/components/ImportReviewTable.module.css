@@ -122,7 +122,12 @@
 
   .table [data-field='name'] {
     grid-area: name;
+  }
+
+  .table tbody td[data-field='name'] {
     width: auto;
+    min-width: 0;
+    overflow-wrap: break-word;
   }
 
   .table [data-field='decision'] {

@@ -82,17 +82,21 @@ describe('PublishPage', () => {
     expect(publishLink('Publish, unpublished inventory changes')).toBeDefined();
   });
 
-  it('keeps the dot hidden and offers Publish before the first run', async () => {
+  it('keeps the dot hidden and offers publishing before the first run', async () => {
     vi.spyOn(clientModule.apiClient, 'getPublish').mockRejectedValue(
       new Error('Not Found'),
     );
 
     renderPublishPage();
 
-    expect(await screen.findByText('Never')).toBeDefined();
+    expect(await screen.findByText('No previous publish run')).toBeDefined();
+    expect(screen.getByText('Never')).toBeDefined();
     expect(
-      (screen.getByRole('button', { name: 'Publish' }) as HTMLButtonElement)
-        .disabled,
+      (
+        screen.getByRole('button', {
+          name: 'Publish changes',
+        }) as HTMLButtonElement
+      ).disabled,
     ).toBe(false);
     expect(publishLink().getAttribute('aria-current')).toBe('page');
   });
@@ -104,8 +108,8 @@ describe('PublishPage', () => {
 
     renderPublishPage();
 
-    expect(await screen.findByText('Pending SKUs: 0')).toBeDefined();
-    expect(screen.getByText('Last published')).toBeDefined();
+    expect(await screen.findByText('Inventory is up to date')).toBeDefined();
+    expect(screen.getByText('Last successful publish')).toBeDefined();
     expect(publishLink().getAttribute('aria-current')).toBe('page');
     expect(
       screen.queryByRole('link', {
@@ -133,6 +137,7 @@ describe('PublishPage', () => {
 
     await act(async () => {});
     expect(screen.getByText('Publishing 1 of 3 SKUs')).toBeDefined();
+    expect(screen.queryByText('Unavailable')).toBeNull();
     expect(
       (screen.getByRole('button', { name: 'Publishing' }) as HTMLButtonElement)
         .disabled,
@@ -147,9 +152,33 @@ describe('PublishPage', () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
 
-    expect(screen.getByText('Pending SKUs: 0')).toBeDefined();
+    expect(screen.getByText('Inventory is up to date')).toBeDefined();
     expect(getPublishMock).toHaveBeenCalledTimes(2);
     expect(screen.queryByText(/Publishing 1 of 3 SKUs/)).toBeNull();
+  });
+
+  it('shows a queued run without showing a completed progress bar', async () => {
+    vi.spyOn(clientModule.apiClient, 'getPublish').mockResolvedValue(
+      publishResponse({
+        status: 'queued',
+        started_at: null,
+        finished_at: null,
+        pending_sku_count: 3,
+      }),
+    );
+
+    renderPublishPage();
+
+    expect(await screen.findByText('Publish run queued')).toBeDefined();
+    expect(
+      screen.getByText('Waiting for the publish run to start'),
+    ).toBeDefined();
+    expect(screen.getByText('Current run')).toBeDefined();
+    expect(screen.queryByRole('progressbar')).toBeNull();
+    expect(
+      (screen.getByRole('button', { name: 'Publishing' }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
   });
 
   it('stops polling after leaving the Publish page', async () => {
@@ -203,11 +232,14 @@ describe('PublishPage', () => {
 
     renderPublishPage();
 
-    expect(await screen.findByText('Publish failed')).toBeDefined();
+    expect(
+      await screen.findByText('5 SKUs still need publishing'),
+    ).toBeDefined();
+    expect(screen.getByText('Publish failed')).toBeDefined();
     expect(screen.getByText('FetchTCG authentication failed')).toBeDefined();
     expect(publishLink('Publish, unpublished inventory changes')).toBeDefined();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Publish' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Publish changes' }));
     await act(async () => {});
 
     expect(createPublishMock).toHaveBeenCalledTimes(1);
@@ -228,5 +260,36 @@ describe('PublishPage', () => {
     renderPublishPage();
 
     expect(await screen.findByText('an hour ago')).toBeDefined();
+  });
+
+  it('keeps publishing disabled and retries a failed status read', async () => {
+    vi.spyOn(clientModule.apiClient, 'getPublish')
+      .mockRejectedValueOnce(new Error('Service unavailable'))
+      .mockResolvedValueOnce(publishResponse({ pending_sku_count: 2 }));
+
+    renderPublishPage();
+
+    expect(
+      await screen.findByText('Publish status needs attention'),
+    ).toBeDefined();
+    expect(screen.getByText('Service unavailable')).toBeDefined();
+    expect(
+      (
+        screen.getByRole('button', {
+          name: 'Publish changes',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry status' }));
+
+    expect(await screen.findByText('2 SKUs ready to publish')).toBeDefined();
+    expect(
+      (
+        screen.getByRole('button', {
+          name: 'Publish changes',
+        }) as HTMLButtonElement
+      ).disabled,
+    ).toBe(false);
   });
 });

@@ -1,0 +1,56 @@
+.instructionRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 0.8fr);
+  align-items: center;
+  gap: 0.5rem 1rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--mantine-color-gray-3);
+}
+
+.blockSummary {
+  min-width: 0;
+}
+
+.block {
+  min-width: 3rem;
+}
+
+.location,
+.count,
+.numeric {
+  font-variant-numeric: tabular-nums;
+}
+
+.location {
+  overflow-wrap: anywhere;
+}
+
+.cardRange {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.footer {
+  border-top: 1px solid var(--mantine-color-gray-3);
+}
+
+@media (max-width: 48em) {
+  .instructionRow {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.25rem;
+    padding-inline: 1rem;
+  }
+
+  .blockSummary {
+    flex-wrap: wrap;
+  }
+
+  .count {
+    margin-left: auto;
+  }
+
+  .footer button {
+    width: 100%;
+    min-height: 44px;
+  }
+}

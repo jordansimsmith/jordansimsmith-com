@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import {
+  Box,
   Badge,
   Button,
   Group,
@@ -8,7 +9,9 @@ import {
   Skeleton,
   Stack,
   Text,
+  UnstyledButton,
 } from '@mantine/core';
+import { IconChevronDown } from '@tabler/icons-react';
 import { notifications } from '@mantine/notifications';
 import { useNavigate, useParams } from 'react-router-dom';
 import { AppShellLayout } from '../layouts/AppShellLayout';
@@ -44,6 +47,7 @@ export function ImportDetailPage() {
   const [confirming, setConfirming] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [rowsExpanded, setRowsExpanded] = useState(false);
   const importDetailRef = useRef(importDetail);
   importDetailRef.current = importDetail;
 
@@ -333,82 +337,121 @@ export function ImportDetailPage() {
                 maw={480}
               />
             )}
-            <Paper
-              component="section"
-              aria-label="Import summary"
-              withBorder
-              radius="md"
-              p="md"
-            >
-              <Stack gap="md">
-                <Group justify="space-between" gap="sm">
-                  <Group gap="sm">
-                    <Text fw={600} size="sm">
-                      Import summary
-                    </Text>
-                    <ImportStatusBadge importSummary={importDetail} />
-                  </Group>
-                  {importDetail.status === 'appraising' && (
-                    <Text size="sm" c="dimmed" className={classes.numeric}>
-                      {importDetail.row_count} rows
-                    </Text>
-                  )}
-                </Group>
-                {!importDetail.appraisal_error &&
-                  importDetail.status === 'appraising' && (
-                    <Stack gap="xs">
-                      <Text size="sm" className={classes.numeric}>
-                        Appraising {appraised} of {importDetail.row_count}
+            {importDetail.status !== 'confirmed' && (
+              <Paper
+                component="section"
+                aria-label="Import summary"
+                withBorder
+                radius="md"
+                p="md"
+              >
+                <Stack gap="md">
+                  <Group justify="space-between" gap="sm">
+                    <Group gap="sm">
+                      <Text fw={600} size="sm">
+                        Import summary
                       </Text>
+                      <ImportStatusBadge importSummary={importDetail} />
+                    </Group>
+                    {importDetail.status === 'appraising' && (
+                      <Text size="sm" c="dimmed" className={classes.numeric}>
+                        {importDetail.row_count} rows
+                      </Text>
+                    )}
+                  </Group>
+                  {!importDetail.appraisal_error &&
+                    importDetail.status === 'appraising' && (
+                      <Stack gap="xs">
+                        <Text size="sm" className={classes.numeric}>
+                          Appraising {appraised} of {importDetail.row_count}
+                        </Text>
+                        <Progress
+                          value={(appraised / importDetail.row_count) * 100}
+                          animated
+                        />
+                      </Stack>
+                    )}
+                  {importDetail.status === 'confirming' && (
+                    <Stack gap="xs">
+                      <Text size="sm">Confirming import</Text>
                       <Progress
-                        value={(appraised / importDetail.row_count) * 100}
+                        value={100}
                         animated
+                        striped
+                        aria-label="Import confirmation progress"
                       />
                     </Stack>
                   )}
-                {importDetail.status === 'confirming' && (
-                  <Stack gap="xs">
-                    <Text size="sm">Confirming import</Text>
-                    <Progress
-                      value={100}
-                      animated
-                      striped
-                      aria-label="Import confirmation progress"
-                    />
-                  </Stack>
-                )}
-                <Group gap="sm">
-                  <Badge variant="light" color="green">
-                    Keep {keepCount}
-                  </Badge>
-                  <Badge variant="light" color="gray">
-                    Discard {discardCount}
-                  </Badge>
-                  <Badge variant="light" color="yellow">
-                    Review {reviewCount}
-                  </Badge>
-                </Group>
-                {importDetail.status === 'review' && needsPhotosCount > 0 && (
-                  <Text size="sm" c="orange.8">
-                    {needsPhotosCount === 1
-                      ? '1 row needs photos before confirm'
-                      : `${needsPhotosCount} rows need photos before confirm`}
-                  </Text>
-                )}
-              </Stack>
-            </Paper>
+                  <Group gap="sm">
+                    <Badge variant="light" color="green">
+                      Keep {keepCount}
+                    </Badge>
+                    <Badge variant="light" color="gray">
+                      Discard {discardCount}
+                    </Badge>
+                    <Badge variant="light" color="yellow">
+                      Review {reviewCount}
+                    </Badge>
+                  </Group>
+                  {importDetail.status === 'review' && needsPhotosCount > 0 && (
+                    <Text size="sm" c="orange.8">
+                      {needsPhotosCount === 1
+                        ? '1 row needs photos before confirm'
+                        : `${needsPhotosCount} rows need photos before confirm`}
+                    </Text>
+                  )}
+                </Stack>
+              </Paper>
+            )}
+            {importDetail.status === 'confirmed' &&
+              importDetail.unit_count !== null &&
+              importDetail.placement_instructions !== null && (
+                <PlacementInstructionsView
+                  unitCount={importDetail.unit_count}
+                  totalSuggestedPrice={importDetail.total_suggested_price}
+                  placementInstructions={importDetail.placement_instructions}
+                  onBackToImports={() => navigate('/imports')}
+                />
+              )}
             {showReview && (
               <CollectionSurface
                 ariaLabel="Import rows"
                 toolbar={
-                  <Group justify="space-between" gap="sm">
-                    <Text size="sm" fw={600}>
-                      Import rows
-                    </Text>
-                    <Text size="sm" c="dimmed" className={classes.numeric}>
-                      {rows.length} {rows.length === 1 ? 'row' : 'rows'}
-                    </Text>
-                  </Group>
+                  importDetail.status === 'confirmed' ? (
+                    <UnstyledButton
+                      type="button"
+                      aria-expanded={rowsExpanded}
+                      aria-controls="confirmed-import-rows"
+                      onClick={() => setRowsExpanded((expanded) => !expanded)}
+                      w="100%"
+                      className={classes.confirmedRowsToggle}
+                    >
+                      <Group gap="xs" wrap="nowrap">
+                        <IconChevronDown
+                          size={16}
+                          aria-hidden="true"
+                          style={{
+                            transform: rowsExpanded
+                              ? undefined
+                              : 'rotate(-90deg)',
+                          }}
+                        />
+                        <Text size="sm" fw={600}>
+                          {rowsExpanded ? 'Hide' : 'View'} {rows.length} import{' '}
+                          {rows.length === 1 ? 'row' : 'rows'}
+                        </Text>
+                      </Group>
+                    </UnstyledButton>
+                  ) : (
+                    <Group justify="space-between" gap="sm">
+                      <Text size="sm" fw={600}>
+                        Import rows
+                      </Text>
+                      <Text size="sm" c="dimmed" className={classes.numeric}>
+                        {rows.length} {rows.length === 1 ? 'row' : 'rows'}
+                      </Text>
+                    </Group>
+                  )
                 }
                 footer={
                   importDetail.status === 'review' ? (
@@ -434,7 +477,20 @@ export function ImportDetailPage() {
                   ) : undefined
                 }
               >
-                {rows.length > 0 ? (
+                {importDetail.status === 'confirmed' ? (
+                  <Box id="confirmed-import-rows">
+                    {rowsExpanded &&
+                      (rows.length > 0 ? (
+                        <ImportReviewTable
+                          game={importDetail.game}
+                          rows={rows}
+                          editable={false}
+                        />
+                      ) : (
+                        <CollectionMessage title="No rows in this import" />
+                      ))}
+                  </Box>
+                ) : rows.length > 0 ? (
                   <ImportReviewTable
                     game={importDetail.game}
                     rows={rows}
@@ -449,16 +505,6 @@ export function ImportDetailPage() {
                 )}
               </CollectionSurface>
             )}
-            {importDetail.status === 'confirmed' &&
-              importDetail.unit_count !== null &&
-              importDetail.placement_instructions !== null && (
-                <PlacementInstructionsView
-                  unitCount={importDetail.unit_count}
-                  totalSuggestedPrice={importDetail.total_suggested_price}
-                  placementInstructions={importDetail.placement_instructions}
-                  onDone={() => navigate('/imports')}
-                />
-              )}
             <ConfirmImportModal
               opened={confirmOpen}
               keepCount={keepCount}

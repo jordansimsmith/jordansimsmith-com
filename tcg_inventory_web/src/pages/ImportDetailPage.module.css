@@ -2,6 +2,17 @@
   font-variant-numeric: tabular-nums;
 }
 
+.confirmedRowsToggle {
+  display: block;
+  text-align: left;
+}
+
+.confirmedRowsToggle:focus-visible {
+  outline: 2px solid var(--mantine-color-blue-6);
+  outline-offset: 2px;
+  border-radius: var(--mantine-radius-sm);
+}
+
 @media (max-width: 48em) {
   .actions {
     flex-wrap: nowrap;

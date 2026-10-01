@@ -463,19 +463,21 @@ describe('ImportDetailPage', () => {
     expect(screen.getByLabelText('Import confirmation progress')).toBeDefined();
     expect(screen.getByText('Top Card')).toBeDefined();
     expect(
-      await screen.findByText('Placement instructions', {}, { timeout: 5000 }),
+      await screen.findByText('Placement sheet', {}, { timeout: 5000 }),
     ).toBeDefined();
-    expect(screen.getByText('Total suggested value $342.50')).toBeDefined();
+    expect(screen.getByText('$342.50')).toBeDefined();
     expect(screen.getByText('A42')).toBeDefined();
     expect(screen.getByText('87 cards')).toBeDefined();
     expect(screen.getByText('Llanowar Elves through Sol Ring')).toBeDefined();
     expect(screen.getByText('A42-0 through A42-86')).toBeDefined();
-    expect(screen.getByText('confirmed')).toBeDefined();
+    expect(screen.getByText('Confirmed')).toBeDefined();
     expect(
-      within(screen.getByRole('region', { name: 'Import summary' })).getByText(
-        'confirmed',
-      ),
+      screen.getByRole('button', { name: 'View 3 import rows' }),
     ).toBeDefined();
+    expect(screen.queryByText('Top Card')).toBeNull();
+    await user.click(
+      screen.getByRole('button', { name: 'View 3 import rows' }),
+    );
     expect(screen.getByText('Top Card')).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Confirm import' })).toBeNull();
   });
@@ -495,9 +497,11 @@ describe('ImportDetailPage', () => {
       await screen.findByText('Temporary read failure', {}, { timeout: 3500 }),
     ).toBeDefined();
     expect(
-      await screen.findByText('Placement instructions', {}, { timeout: 7000 }),
+      await screen.findByText('Placement sheet', {}, { timeout: 7000 }),
     ).toBeDefined();
-    expect(screen.getByText('Top Card')).toBeDefined();
+    expect(
+      screen.getByRole('button', { name: 'View 3 import rows' }),
+    ).toBeDefined();
   });
 
   it('surfaces confirm failures and stays on the review table', async () => {
@@ -520,7 +524,7 @@ describe('ImportDetailPage', () => {
       await screen.findByText('import is not in review status'),
     ).toBeDefined();
     expect(screen.getByText('Top Card')).toBeDefined();
-    expect(screen.queryByText('Placement instructions')).toBeNull();
+    expect(screen.queryByText('Placement sheet')).toBeNull();
   });
 
   it('allows editing condition via inline select in review status', async () => {
@@ -576,24 +580,110 @@ describe('ImportDetailPage', () => {
     expect(screen.getByText('Keep 0')).toBeDefined();
   });
 
-  it('does not show delete buttons for a confirmed import', async () => {
+  it('keeps confirmed import rows collapsed until requested', async () => {
+    const user = userEvent.setup();
     vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
       confirmedImport(),
     );
 
     renderImportDetailPage();
-    await screen.findByText('Top Card');
+    await screen.findByText('Placement sheet');
 
+    const rowsButton = screen.getByRole('button', {
+      name: 'View 3 import rows',
+    });
+    expect(rowsButton.getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByText('Top Card')).toBeNull();
+
+    await user.click(rowsButton);
+
+    expect(screen.getByText('Top Card')).toBeDefined();
+    expect(
+      screen
+        .getByRole('button', { name: 'Hide 3 import rows' })
+        .getAttribute('aria-expanded'),
+    ).toBe('true');
     expect(screen.queryByLabelText(/Delete row/)).toBeNull();
   });
 
-  it('does not show condition selects for a confirmed import', async () => {
+  it('renders an empty placement sheet when the import has no keep rows', async () => {
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue({
+      ...confirmedImport(),
+      row_count: 0,
+      unit_count: 0,
+      total_suggested_price: '0.00',
+      placement_instructions: [],
+      rows: [],
+    });
+
+    renderImportDetailPage();
+
+    expect(await screen.findByText('No cards to place')).toBeDefined();
+    expect(screen.getByText('$0.00')).toBeDefined();
+    expect(
+      screen.getByRole('region', { name: 'Placement sheet' }),
+    ).toBeDefined();
+  });
+
+  it('renders each placement block in location order', async () => {
+    vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue({
+      ...confirmedImport(),
+      unit_count: 3,
+      rows: confirmedImport().rows.map((row) => ({
+        ...row,
+        decision: 'keep',
+        decision_reason: null,
+      })),
+      placement_instructions: [
+        {
+          block: 'A42',
+          from_location: 'A42-98',
+          to_location: 'A42-99',
+          from_name: 'First Block Card',
+          to_name: 'Second Block Card',
+          unit_count: 2,
+        },
+        {
+          block: 'A43',
+          from_location: 'A43-0',
+          to_location: 'A43-0',
+          from_name: 'Third Block Card',
+          to_name: 'Third Block Card',
+          unit_count: 1,
+        },
+      ],
+    });
+
+    renderImportDetailPage();
+
+    const placementSheet = await screen.findByRole('region', {
+      name: 'Placement sheet',
+    });
+    expect(within(placementSheet).getByText('A42')).toBeDefined();
+    expect(within(placementSheet).getByText('A43')).toBeDefined();
+    expect(
+      within(placementSheet).getByText('A42-98 through A42-99'),
+    ).toBeDefined();
+    expect(within(placementSheet).getByText('A43-0')).toBeDefined();
+    expect(
+      within(placementSheet).getByText(
+        'First Block Card through Second Block Card',
+      ),
+    ).toBeDefined();
+    expect(within(placementSheet).getByText('Third Block Card')).toBeDefined();
+  });
+
+  it('does not show condition selects for confirmed import rows', async () => {
+    const user = userEvent.setup();
     vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
       confirmedImport(),
     );
 
     renderImportDetailPage();
-    await screen.findByText('Top Card');
+    await screen.findByText('Placement sheet');
+    await user.click(
+      screen.getByRole('button', { name: 'View 3 import rows' }),
+    );
 
     expect(screen.queryByLabelText(/Condition for row/)).toBeNull();
   });
@@ -605,9 +695,18 @@ describe('ImportDetailPage', () => {
 
     renderImportDetailPage();
 
-    expect(await screen.findByText('Top Card')).toBeDefined();
-    expect(screen.getByText('Total suggested value $4.50')).toBeDefined();
-    expect(screen.getByText('Placement instructions')).toBeDefined();
+    expect(await screen.findByText('Placement sheet')).toBeDefined();
+    expect(screen.getByText('$4.50')).toBeDefined();
+    const placementSheet = screen.getByRole('region', {
+      name: 'Placement sheet',
+    });
+    expect(
+      within(placementSheet).getByRole('button', { name: 'Back to imports' }),
+    ).toBeDefined();
+    expect(
+      screen.getByRole('button', { name: 'View 3 import rows' }),
+    ).toBeDefined();
+    expect(screen.queryByText('Top Card')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Confirm import' })).toBeNull();
   });
 
@@ -662,13 +761,13 @@ describe('ImportDetailPage', () => {
     expect(screen.getByText('Top Card')).toBeDefined();
   });
 
-  it('does not show delete button for a confirmed import', async () => {
+  it('does not show the import delete action for a confirmed import', async () => {
     vi.spyOn(clientModule.apiClient, 'getImport').mockResolvedValue(
       confirmedImport(),
     );
 
     renderImportDetailPage();
-    await screen.findByText('Top Card');
+    await screen.findByText('Placement sheet');
 
     expect(screen.queryByRole('button', { name: 'Delete import' })).toBeNull();
   });
@@ -1014,7 +1113,7 @@ describe('ImportDetailPage', () => {
       .mockResolvedValue(confirmedImport());
 
     renderImportDetailPage();
-    await screen.findByText('Top Card');
+    await screen.findByText('Placement sheet');
     expect(getImportMock).toHaveBeenCalledTimes(1);
 
     Object.defineProperty(document, 'visibilityState', {
