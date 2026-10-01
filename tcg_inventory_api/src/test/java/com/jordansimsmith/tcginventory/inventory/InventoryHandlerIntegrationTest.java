@@ -318,7 +318,7 @@ public class InventoryHandlerIntegrationTest {
     createSku("jordan", skuId, "Elvish Mystic", "m14", "Magic 2014", "169");
     createUnit("jordan", skuId, 42, "in_stock", "import1");
     jobTable.putItem(
-        JobItem.create("jordan", "job1", "publish", null, Instant.ofEpochSecond(1700000000)));
+        JobItem.create("jordan", "job1", "publish", null, null, Instant.ofEpochSecond(1700000000)));
 
     // act
     var response =
@@ -462,7 +462,7 @@ public class InventoryHandlerIntegrationTest {
     createSku("jordan", skuId, "Elvish Mystic", "m14", "Magic 2014", "169");
     createUnit("jordan", skuId, 42, "in_stock", "import1");
     jobTable.putItem(
-        JobItem.create("jordan", "job1", "publish", null, Instant.ofEpochSecond(1700000000)));
+        JobItem.create("jordan", "job1", "publish", null, null, Instant.ofEpochSecond(1700000000)));
 
     // act
     var response =

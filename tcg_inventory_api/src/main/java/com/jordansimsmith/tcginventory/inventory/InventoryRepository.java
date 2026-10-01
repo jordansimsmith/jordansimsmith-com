@@ -25,8 +25,6 @@ import software.amazon.awssdk.services.dynamodb.model.Update;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 public class InventoryRepository {
-  private static final int MAX_TRANSACT_ITEMS = 100;
-
   private final DynamoDbTable<UnitItem> unitTable;
   private final DynamoDbClient dynamoDbClient;
   private final Clock clock;
@@ -244,15 +242,6 @@ public class InventoryRepository {
             .build());
   }
 
-  public void executeChunked(List<TransactWriteItem> transactItems) {
-    for (int start = 0; start < transactItems.size(); start += MAX_TRANSACT_ITEMS) {
-      var chunk =
-          transactItems.subList(start, Math.min(start + MAX_TRANSACT_ITEMS, transactItems.size()));
-      dynamoDbClient.transactWriteItems(
-          TransactWriteItemsRequest.builder().transactItems(chunk).build());
-    }
-  }
-
   public TransactWriteItem buildUnitReserveUpdate(
       String user, String skuId, int sequenceNumber, String orderId) {
     var skuPk = SkuItem.formatPk(user, skuId);
@@ -315,31 +304,55 @@ public class InventoryRepository {
             .build());
   }
 
-  public TransactWriteItem buildUnitSellUpdate(String user, String skuId, int sequenceNumber) {
-    var skuPk = SkuItem.formatPk(user, skuId);
-    var unitSk = UnitItem.formatSk(sequenceNumber);
+  public void updateUnitForSale(String user, String orderId, String skuId, int sequenceNumber) {
+    var unit = getUnit(user, skuId, sequenceNumber);
+    if (unit != null && "sold".equals(unit.getStatus()) && orderId.equals(unit.getOrderId())) {
+      return;
+    }
 
-    return TransactWriteItem.builder()
-        .update(
-            Update.builder()
-                .tableName(TcgInventoryTable.TABLE_NAME)
-                .key(
+    var sellUnit =
+        TransactWriteItem.builder()
+            .update(
+                Update.builder()
+                    .tableName(TcgInventoryTable.TABLE_NAME)
+                    .key(
+                        Map.of(
+                            UnitItem.PK,
+                            AttributeValue.builder().s(SkuItem.formatPk(user, skuId)).build(),
+                            UnitItem.SK,
+                            AttributeValue.builder().s(UnitItem.formatSk(sequenceNumber)).build()))
+                    .updateExpression("SET #status = :sold, " + UnitItem.UPDATED_AT + " = :now")
+                    .conditionExpression(
+                        "#status = :reserved AND " + UnitItem.ORDER_ID + " = :orderId")
+                    .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
+                    .expressionAttributeValues(
+                        Map.of(
+                            ":sold", AttributeValue.builder().s("sold").build(),
+                            ":reserved", AttributeValue.builder().s("reserved").build(),
+                            ":orderId", AttributeValue.builder().s(orderId).build(),
+                            ":now",
+                                AttributeValue.builder()
+                                    .n(String.valueOf(clock.now().getEpochSecond()))
+                                    .build()))
+                    .build())
+            .build();
+
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                sellUnit,
+                buildSkuVersionBump(user, skuId),
+                buildAuditPut(
+                    user,
+                    "sell",
                     Map.of(
-                        SkuItem.PK, AttributeValue.builder().s(skuPk).build(),
-                        SkuItem.SK, AttributeValue.builder().s(unitSk).build()))
-                .updateExpression("SET #status = :sold, " + UnitItem.UPDATED_AT + " = :now")
-                .conditionExpression("#status IN (:reserved, :sold)")
-                .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
-                .expressionAttributeValues(
-                    Map.of(
-                        ":sold", AttributeValue.builder().s("sold").build(),
-                        ":reserved", AttributeValue.builder().s("reserved").build(),
-                        ":now",
-                            AttributeValue.builder()
-                                .n(String.valueOf(clock.now().getEpochSecond()))
-                                .build()))
-                .build())
-        .build();
+                        AuditItem.ORDER_ID, AttributeValue.builder().s(orderId).build(),
+                        AuditItem.SKU_ID, AttributeValue.builder().s(skuId).build(),
+                        AuditItem.SEQUENCE_NUMBER,
+                            AttributeValue.builder().n(String.valueOf(sequenceNumber)).build(),
+                        AuditItem.BEFORE_STATUS, AttributeValue.builder().s("reserved").build(),
+                        AuditItem.AFTER_STATUS, AttributeValue.builder().s("sold").build())))
+            .build());
   }
 
   public void updateUnitForRelease(String user, String orderId, String skuId, int sequenceNumber) {
@@ -590,6 +603,8 @@ public class InventoryRepository {
                         SkuItem.PK, AttributeValue.builder().s(skuPk).build(),
                         SkuItem.SK, AttributeValue.builder().s(SkuItem.formatSk()).build()))
                 .updateExpression("ADD " + SkuItem.VERSION + " :one")
+                .conditionExpression(
+                    "attribute_exists(" + SkuItem.PK + ") AND attribute_exists(" + SkuItem.SK + ")")
                 .expressionAttributeValues(Map.of(":one", AttributeValue.builder().n("1").build()))
                 .build())
         .build();

@@ -1,17 +1,20 @@
 package com.jordansimsmith.tcginventory.orders;
 
 import com.jordansimsmith.tcginventory.AuditItem;
+import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
@@ -19,21 +22,22 @@ import software.amazon.awssdk.services.dynamodb.model.Update;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 public class OrderRepository {
-  public record SkuUnits(String skuId, List<Integer> sequenceNumbers) {}
-
   private record AllocatedUnit(String skuId, int sequenceNumber) {}
 
   private final DynamoDbTable<OrderItem> orderTable;
+  private final DynamoDbTable<JobItem> jobTable;
   private final InventoryRepository inventoryRepository;
   private final DynamoDbClient dynamoDbClient;
   private final Clock clock;
 
   public OrderRepository(
       DynamoDbTable<OrderItem> orderTable,
+      DynamoDbTable<JobItem> jobTable,
       InventoryRepository inventoryRepository,
       DynamoDbClient dynamoDbClient,
       Clock clock) {
     this.orderTable = orderTable;
+    this.jobTable = jobTable;
     this.inventoryRepository = inventoryRepository;
     this.dynamoDbClient = dynamoDbClient;
     this.clock = clock;
@@ -85,6 +89,99 @@ public class OrderRepository {
                         OrderItem.ORDER_ID, AttributeValue.builder().s(orderId).build(),
                         AuditItem.BEFORE_STATUS, AttributeValue.builder().s("reserving").build(),
                         AuditItem.AFTER_STATUS, AttributeValue.builder().s(targetState).build())))
+            .build());
+  }
+
+  public void startFulfilling(String user, OrderItem order, JobItem job) {
+    if (order.getLines().isEmpty()) {
+      throw new IllegalStateException("order has no lines to fulfill");
+    }
+    for (var line : order.getLines()) {
+      if (line.getQuantity() <= 0
+          || line.getAllocatedSequenceNumbers().size() != line.getQuantity()) {
+        throw new IllegalStateException("order line is not fully allocated");
+      }
+    }
+    var allocated = allocatedUnits(order);
+    if (allocated.size() != new HashSet<>(allocated).size()) {
+      throw new IllegalStateException("order allocation contains a duplicate unit");
+    }
+    for (var key : allocated) {
+      var unit = inventoryRepository.getUnit(user, key.skuId(), key.sequenceNumber());
+      if (unit == null
+          || !"reserved".equals(unit.getStatus())
+          || !order.getOrderId().equals(unit.getOrderId())) {
+        throw new IllegalStateException("order has an unexpected allocated unit");
+      }
+    }
+
+    var startOrder =
+        TransactWriteItem.builder()
+            .update(
+                Update.builder()
+                    .tableName(TcgInventoryTable.TABLE_NAME)
+                    .key(orderKey(user, order.getOrderId()))
+                    .updateExpression(
+                        "SET #status = :fulfilling, " + OrderItem.UPDATED_AT + " = :now")
+                    .conditionExpression("#status = :toPick")
+                    .expressionAttributeNames(Map.of("#status", OrderItem.STATUS))
+                    .expressionAttributeValues(
+                        Map.of(
+                            ":fulfilling", AttributeValue.builder().s("fulfilling").build(),
+                            ":toPick", AttributeValue.builder().s("to_pick").build(),
+                            ":now",
+                                AttributeValue.builder()
+                                    .n(String.valueOf(clock.now().getEpochSecond()))
+                                    .build()))
+                    .build())
+            .build();
+    var createJob =
+        TransactWriteItem.builder()
+            .put(
+                Put.builder()
+                    .tableName(TcgInventoryTable.TABLE_NAME)
+                    .item(jobTable.tableSchema().itemToMap(job, true))
+                    .conditionExpression("attribute_not_exists(" + JobItem.PK + ")")
+                    .build())
+            .build();
+
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder().transactItems(startOrder, createJob).build());
+  }
+
+  public void finishFulfilling(String user, String orderId) {
+    var finishOrder =
+        TransactWriteItem.builder()
+            .update(
+                Update.builder()
+                    .tableName(TcgInventoryTable.TABLE_NAME)
+                    .key(orderKey(user, orderId))
+                    .updateExpression(
+                        "SET #status = :fulfilled, " + OrderItem.UPDATED_AT + " = :now")
+                    .conditionExpression("#status = :fulfilling")
+                    .expressionAttributeNames(Map.of("#status", OrderItem.STATUS))
+                    .expressionAttributeValues(
+                        Map.of(
+                            ":fulfilled", AttributeValue.builder().s("fulfilled").build(),
+                            ":fulfilling", AttributeValue.builder().s("fulfilling").build(),
+                            ":now",
+                                AttributeValue.builder()
+                                    .n(String.valueOf(clock.now().getEpochSecond()))
+                                    .build()))
+                    .build())
+            .build();
+
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                finishOrder,
+                inventoryRepository.buildAuditPut(
+                    user,
+                    "order_fulfilled",
+                    Map.of(
+                        OrderItem.ORDER_ID, AttributeValue.builder().s(orderId).build(),
+                        AuditItem.BEFORE_STATUS, AttributeValue.builder().s("fulfilling").build(),
+                        AuditItem.AFTER_STATUS, AttributeValue.builder().s("fulfilled").build())))
             .build());
   }
 
@@ -237,22 +334,6 @@ public class OrderRepository {
     return result;
   }
 
-  public void sellOrder(String user, String orderId, List<SkuUnits> sales) {
-    var transactItems = new ArrayList<TransactWriteItem>();
-    for (var sale : sales) {
-      transactItems.add(inventoryRepository.buildSkuVersionBump(user, sale.skuId()));
-      for (var sequenceNumber : sale.sequenceNumbers()) {
-        transactItems.add(
-            inventoryRepository.buildUnitSellUpdate(user, sale.skuId(), sequenceNumber));
-      }
-    }
-    transactItems.add(buildOrderFulfilledUpdate(user, orderId));
-    transactItems.add(
-        inventoryRepository.buildAuditPut(
-            user, "sell", Map.of(OrderItem.ORDER_ID, AttributeValue.builder().s(orderId).build())));
-    inventoryRepository.executeChunked(transactItems);
-  }
-
   private TransactWriteItem buildOrderPickReadyUpdate(
       String user, String orderId, String fetchtcgStatus, String fetchtcgCurrentAction) {
     return TransactWriteItem.builder()
@@ -290,30 +371,10 @@ public class OrderRepository {
         .build();
   }
 
-  private TransactWriteItem buildOrderFulfilledUpdate(String user, String orderId) {
-    return TransactWriteItem.builder()
-        .update(
-            Update.builder()
-                .tableName(TcgInventoryTable.TABLE_NAME)
-                .key(
-                    Map.of(
-                        OrderItem.PK,
-                        AttributeValue.builder().s(OrderItem.formatPk(user)).build(),
-                        OrderItem.SK,
-                        AttributeValue.builder().s(OrderItem.formatSk(orderId)).build()))
-                .updateExpression("SET #status = :fulfilled, " + OrderItem.UPDATED_AT + " = :now")
-                .conditionExpression("#status = :toPick")
-                .expressionAttributeNames(Map.of("#status", OrderItem.STATUS))
-                .expressionAttributeValues(
-                    Map.of(
-                        ":fulfilled", AttributeValue.builder().s("fulfilled").build(),
-                        ":toPick", AttributeValue.builder().s("to_pick").build(),
-                        ":now",
-                            AttributeValue.builder()
-                                .n(String.valueOf(clock.now().getEpochSecond()))
-                                .build()))
-                .build())
-        .build();
+  private Map<String, AttributeValue> orderKey(String user, String orderId) {
+    return Map.of(
+        OrderItem.PK, AttributeValue.builder().s(OrderItem.formatPk(user)).build(),
+        OrderItem.SK, AttributeValue.builder().s(OrderItem.formatSk(orderId)).build());
   }
 
   private static AttributeValue toAttributeValue(@Nullable String value) {

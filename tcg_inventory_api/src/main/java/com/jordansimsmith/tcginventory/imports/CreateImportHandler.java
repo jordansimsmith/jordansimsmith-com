@@ -153,7 +153,7 @@ public class CreateImportHandler
       }
     }
 
-    var jobItem = JobItem.create(user, jobId, "appraise", importId, now);
+    var jobItem = JobItem.create(user, jobId, "appraise", importId, null, now);
     jobTable.putItem(jobItem);
 
     var jobMessage = new JobMessage(user, jobId, "appraise");

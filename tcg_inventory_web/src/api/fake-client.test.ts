@@ -790,6 +790,10 @@ describe('createFakeClient row photos', () => {
 });
 
 describe('createFakeClient orders', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('seeds orders newest-first covering every state', async () => {
     const client = createFakeClient();
 
@@ -896,16 +900,21 @@ describe('createFakeClient orders', () => {
     await expect(client.getOrder('missing')).rejects.toThrow('Not Found');
   });
 
-  it('marks units sold and fulfils the order on confirmOrder', async () => {
+  it('starts fulfillment and marks units sold asynchronously on confirmOrder', async () => {
+    vi.useFakeTimers();
     const client = createFakeClient();
 
     const confirmed = await client.confirmOrder('83647');
 
-    expect(confirmed).toEqual({ order_id: '83647', state: 'fulfilled' });
+    expect(confirmed).toEqual({ order_id: '83647', state: 'fulfilling' });
 
+    const fulfilling = await client.getOrder('83647');
+    expect(fulfilling.state).toBe('fulfilling');
+    expect(fulfilling.units).toHaveLength(3);
+
+    await vi.advanceTimersByTimeAsync(500);
     const detail = await client.getOrder('83647');
     expect(detail.state).toBe('fulfilled');
-    expect(detail.units).toHaveLength(3);
 
     const solRingSkus = await client.findSkus({
       game: 'mtg',
@@ -943,10 +952,20 @@ describe('createFakeClient orders', () => {
       'order is not ready to pick',
     );
 
-    await client.confirmOrder('83647');
-    await expect(client.confirmOrder('83647')).rejects.toThrow(
-      'order is not ready to pick',
-    );
+    vi.useFakeTimers();
+    await expect(client.confirmOrder('83647')).resolves.toEqual({
+      order_id: '83647',
+      state: 'fulfilling',
+    });
+    await expect(client.confirmOrder('83647')).resolves.toEqual({
+      order_id: '83647',
+      state: 'fulfilling',
+    });
+    await vi.advanceTimersByTimeAsync(500);
+    await expect(client.confirmOrder('83647')).resolves.toEqual({
+      order_id: '83647',
+      state: 'fulfilled',
+    });
   });
 });
 

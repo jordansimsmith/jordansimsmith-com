@@ -452,7 +452,8 @@ public class JobsHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
     var jobItem =
-        JobItem.create("jordan", "job1", "appraise", "import1", Instant.ofEpochSecond(1700000000));
+        JobItem.create(
+            "jordan", "job1", "appraise", "import1", null, Instant.ofEpochSecond(1700000000));
     jobItem.setStatus("succeeded");
     jobItem.setProcessedCount(5);
     jobItem.setContinuation(5);
@@ -1568,7 +1569,8 @@ public class JobsHandlerIntegrationTest {
   }
 
   private void createPublishJob(String user, String jobId) {
-    var jobItem = JobItem.create(user, jobId, "publish", null, Instant.ofEpochSecond(1700000000));
+    var jobItem =
+        JobItem.create(user, jobId, "publish", null, null, Instant.ofEpochSecond(1700000000));
     jobTable.putItem(jobItem);
   }
 
@@ -1903,7 +1905,8 @@ public class JobsHandlerIntegrationTest {
 
   private JobItem createJob(
       String user, String jobId, String jobType, String status, String importId) {
-    var jobItem = JobItem.create(user, jobId, jobType, importId, Instant.ofEpochSecond(1700000000));
+    var jobItem =
+        JobItem.create(user, jobId, jobType, importId, null, Instant.ofEpochSecond(1700000000));
     if (!"queued".equals(status)) {
       jobItem.setStatus(status);
     }

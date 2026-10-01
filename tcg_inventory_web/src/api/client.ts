@@ -286,6 +286,7 @@ export type OrderState =
   | 'reserving'
   | 'voiding'
   | 'to_pick'
+  | 'fulfilling'
   | 'fulfilled'
   | 'voided';
 

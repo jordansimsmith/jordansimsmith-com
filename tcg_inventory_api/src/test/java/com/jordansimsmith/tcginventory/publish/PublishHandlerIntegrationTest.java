@@ -108,7 +108,7 @@ public class PublishHandlerIntegrationTest {
 
     var jobItem =
         JobItem.create(
-            "jordan", "existing-job", "publish", null, Instant.ofEpochSecond(1700000000));
+            "jordan", "existing-job", "publish", null, null, Instant.ofEpochSecond(1700000000));
     jobItem.setStatus("running");
     jobItem.setProcessedCount(5);
     jobItem.setUpdatedAt(Instant.ofEpochSecond(1700000100));
@@ -129,7 +129,8 @@ public class PublishHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
     var completedJob =
-        JobItem.create("jordan", "old-job", "publish", null, Instant.ofEpochSecond(1699999000));
+        JobItem.create(
+            "jordan", "old-job", "publish", null, null, Instant.ofEpochSecond(1699999000));
     completedJob.setStatus("succeeded");
     completedJob.setProcessedCount(10);
     jobTable.putItem(completedJob);
@@ -150,7 +151,8 @@ public class PublishHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
     var jobItem =
-        JobItem.create("jordan", "pub-job", "publish", null, Instant.ofEpochSecond(1700000000));
+        JobItem.create(
+            "jordan", "pub-job", "publish", null, null, Instant.ofEpochSecond(1700000000));
     jobItem.setStatus("succeeded");
     jobItem.setProcessedCount(3);
     jobItem.setUpdatedAt(Instant.ofEpochSecond(1700000200));

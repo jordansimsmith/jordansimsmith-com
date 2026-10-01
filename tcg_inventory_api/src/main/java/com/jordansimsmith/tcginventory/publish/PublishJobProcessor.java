@@ -33,7 +33,8 @@ public class PublishJobProcessor implements JobProcessor {
     var inventoryRepository =
         new InventoryRepository(unitTable, dynamoDbClient, clock, factory.ulidGenerator());
     var orderRepository =
-        new OrderRepository(orderTable, inventoryRepository, dynamoDbClient, clock);
+        new OrderRepository(
+            orderTable, factory.jobTable(), inventoryRepository, dynamoDbClient, clock);
 
     this.fetchTcgTokenMinter = factory.fetchTcgTokenMinter();
     this.orderPhaseProcessor =

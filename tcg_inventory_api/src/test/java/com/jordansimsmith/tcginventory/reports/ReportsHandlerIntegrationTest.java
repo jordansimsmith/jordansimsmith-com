@@ -140,7 +140,7 @@ public class ReportsHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     jobTable.putItem(
         JobItem.create(
-            "jordan", "publish-job", "publish", null, Instant.ofEpochSecond(1700000000)));
+            "jordan", "publish-job", "publish", null, null, Instant.ofEpochSecond(1700000000)));
 
     // act
     var response = createReportHandler.handleRequest(buildHttpEvent("jordan"), null);
@@ -157,7 +157,8 @@ public class ReportsHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
     var jobItem =
-        JobItem.create("jordan", "existing-job", "report", null, Instant.ofEpochSecond(1700000000));
+        JobItem.create(
+            "jordan", "existing-job", "report", null, null, Instant.ofEpochSecond(1700000000));
     jobItem.setStatus("running");
     jobItem.setProcessedCount(0);
     jobItem.setUpdatedAt(Instant.ofEpochSecond(1700000100));
@@ -183,7 +184,8 @@ public class ReportsHandlerIntegrationTest {
     auditTable.putItem(auditEntry);
 
     var jobItem =
-        JobItem.create("jordan", "report-job", "report", null, Instant.ofEpochSecond(1700000000));
+        JobItem.create(
+            "jordan", "report-job", "report", null, null, Instant.ofEpochSecond(1700000000));
     jobTable.putItem(jobItem);
 
     // act
@@ -381,6 +383,22 @@ public class ReportsHandlerIntegrationTest {
     orderTable.putItem(
         OrderItem.create(
             "jordan",
+            "4",
+            "fulfilling",
+            null,
+            null,
+            "PICKUP",
+            null,
+            null,
+            null,
+            "2.00",
+            List.of(
+                new OrderItem.OrderLine(
+                    "mtg#scryfall#scryfall1#normal#NM", 1, 1, "2.00", null, List.of())),
+            Instant.ofEpochSecond(1699650000)));
+    orderTable.putItem(
+        OrderItem.create(
+            "jordan",
             "3",
             "voided",
             null,
@@ -396,7 +414,8 @@ public class ReportsHandlerIntegrationTest {
             Instant.ofEpochSecond(1699700000)));
 
     var jobItem =
-        JobItem.create("jordan", "report-job", "report", null, Instant.ofEpochSecond(1700000000));
+        JobItem.create(
+            "jordan", "report-job", "report", null, null, Instant.ofEpochSecond(1700000000));
     jobTable.putItem(jobItem);
 
     // act
@@ -421,8 +440,8 @@ public class ReportsHandlerIntegrationTest {
     assertThat(totals.get("sku_count").asInt()).isEqualTo(3);
     assertThat(totals.get("reserved_units").asInt()).isEqualTo(1);
     assertThat(totals.get("sold_units").asInt()).isEqualTo(1);
-    // fulfilled: 10.50, to_pick: 5.25
-    assertThat(totals.get("revenue_to_date").asText()).isEqualTo("15.75");
+    // fulfilled: 10.50, to_pick: 5.25, fulfilling: 2.00
+    assertThat(totals.get("revenue_to_date").asText()).isEqualTo("17.75");
     // sku3 has 1 in_stock unit with no price
     assertThat(totals.get("unpriced_units").asInt()).isEqualTo(1);
 
@@ -431,7 +450,7 @@ public class ReportsHandlerIntegrationTest {
     assertThat(gameReport.get("game").asText()).isEqualTo("mtg");
     assertThat(gameReport.get("unique_card_names").asInt()).isEqualTo(3);
     assertThat(gameReport.get("totals")).isEqualTo(totals);
-    assertThat(gameReport.get("totals").get("revenue_to_date").asText()).isEqualTo("15.75");
+    assertThat(gameReport.get("totals").get("revenue_to_date").asText()).isEqualTo("17.75");
     assertThat(reportJson.has("top_sets")).isFalse();
     assertThat(reportJson.has("top_hits")).isFalse();
     assertThat(reportJson.has("aging_bands")).isFalse();
@@ -495,8 +514,8 @@ public class ReportsHandlerIntegrationTest {
     // orders 1 and 2 were created in November 2023 NZ time
     assertThat(revenueByMonth.size()).isEqualTo(1);
     assertThat(revenueByMonth.get(0).get("month").asText()).isEqualTo("2023-11");
-    assertThat(revenueByMonth.get(0).get("revenue").asText()).isEqualTo("15.75");
-    assertThat(revenueByMonth.get(0).get("order_count").asInt()).isEqualTo(2);
+    assertThat(revenueByMonth.get(0).get("revenue").asText()).isEqualTo("17.75");
+    assertThat(revenueByMonth.get(0).get("order_count").asInt()).isEqualTo(3);
 
     var intakeVsSales = reportJson.get("intake_vs_sales_by_week");
     assertThat(intakeVsSales).isNotNull();
@@ -531,7 +550,8 @@ public class ReportsHandlerIntegrationTest {
             List.of(new OrderItem.OrderLine("missing-sku", 1, 1, "10.00", null, List.of())),
             Instant.ofEpochSecond(1699500000)));
     jobTable.putItem(
-        JobItem.create("jordan", "report-job", "report", null, Instant.ofEpochSecond(1700000000)));
+        JobItem.create(
+            "jordan", "report-job", "report", null, null, Instant.ofEpochSecond(1700000000)));
 
     // act & assert
     assertThatThrownBy(
@@ -566,7 +586,8 @@ public class ReportsHandlerIntegrationTest {
     reportTable.putItem(reportItem);
 
     var jobItem =
-        JobItem.create("jordan", "report-job", "report", null, Instant.ofEpochSecond(1699999900));
+        JobItem.create(
+            "jordan", "report-job", "report", null, null, Instant.ofEpochSecond(1699999900));
     jobItem.setStatus("succeeded");
     jobItem.setProcessedCount(0);
     jobItem.setUpdatedAt(Instant.ofEpochSecond(1700000000));
@@ -663,7 +684,7 @@ public class ReportsHandlerIntegrationTest {
 
     jobTable.putItem(
         JobItem.create(
-            "jordan", "publish-job", "publish", null, Instant.ofEpochSecond(1700000000)));
+            "jordan", "publish-job", "publish", null, null, Instant.ofEpochSecond(1700000000)));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "publish-job", "publish"), null);
@@ -710,7 +731,8 @@ public class ReportsHandlerIntegrationTest {
     reportTable.putItem(reportItem);
 
     var jobItem =
-        JobItem.create("jordan", "failed-job", "report", null, Instant.ofEpochSecond(1699999900));
+        JobItem.create(
+            "jordan", "failed-job", "report", null, null, Instant.ofEpochSecond(1699999900));
     jobItem.setStatus("failed");
     jobItem.setError("out of memory");
     jobItem.setUpdatedAt(Instant.ofEpochSecond(1699999950));

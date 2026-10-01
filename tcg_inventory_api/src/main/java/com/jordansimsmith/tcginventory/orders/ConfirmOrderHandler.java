@@ -8,15 +8,16 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
+import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.tcginventory.ActiveJob;
+import com.jordansimsmith.tcginventory.JobItem;
+import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
+import com.jordansimsmith.time.Clock;
+import com.jordansimsmith.ulid.UlidGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -37,6 +38,9 @@ public class ConfirmOrderHandler
   private final ActiveJob activeJob;
   private final DynamoDbTable<OrderItem> orderTable;
   private final OrderRepository orderRepository;
+  private final QueueClient<JobMessage> jobsQueue;
+  private final Clock clock;
+  private final UlidGenerator ulidGenerator;
 
   public ConfirmOrderHandler() {
     this(TcgInventoryFactory.create());
@@ -48,6 +52,10 @@ public class ConfirmOrderHandler
     this.httpResponseFactory = factory.httpResponseFactory();
     this.activeJob = new ActiveJob(factory.jobTable());
     this.orderTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderItem.class);
+    var jobTable = factory.jobTable();
+    this.jobsQueue = factory.jobsQueue();
+    this.clock = factory.clock();
+    this.ulidGenerator = factory.ulidGenerator();
     var inventoryRepository =
         new InventoryRepository(
             TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class),
@@ -56,7 +64,7 @@ public class ConfirmOrderHandler
             factory.ulidGenerator());
     this.orderRepository =
         new OrderRepository(
-            this.orderTable, inventoryRepository, factory.dynamoDbClient(), factory.clock());
+            this.orderTable, jobTable, inventoryRepository, factory.dynamoDbClient(), this.clock);
   }
 
   @Override
@@ -81,13 +89,19 @@ public class ConfirmOrderHandler
     }
 
     var orderKey =
-        Key.builder().partitionValue(SkuItem.formatUserPk(user)).sortValue(orderSk).build();
+        Key.builder().partitionValue(OrderItem.formatPk(user)).sortValue(orderSk).build();
 
-    var orderItem = orderTable.getItem(orderKey);
+    var orderItem = orderTable.getItem(request -> request.key(orderKey).consistentRead(true));
     if (orderItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
 
+    if ("fulfilled".equals(orderItem.getStatus())) {
+      return httpResponseFactory.ok(new ConfirmOrderResponse(orderId, "fulfilled"));
+    }
+    if ("fulfilling".equals(orderItem.getStatus())) {
+      return httpResponseFactory.accepted(new ConfirmOrderResponse(orderId, "fulfilling"));
+    }
     if (!"to_pick".equals(orderItem.getStatus())) {
       return httpResponseFactory.conflict(new ErrorResponse("order is not ready to pick"));
     }
@@ -97,20 +111,12 @@ public class ConfirmOrderHandler
       return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
     }
 
-    var orderLines = orderItem.getLines();
-    var soldUnits = new LinkedHashMap<String, List<Integer>>();
-    for (var line : orderLines) {
-      soldUnits
-          .computeIfAbsent(line.getSkuId(), k -> new ArrayList<>())
-          .addAll(line.getAllocatedSequenceNumbers());
-    }
-
-    var skuUnits =
-        soldUnits.entrySet().stream()
-            .map(entry -> new OrderRepository.SkuUnits(entry.getKey(), entry.getValue()))
-            .toList();
-    orderRepository.sellOrder(user, orderId, skuUnits);
-
-    return httpResponseFactory.ok(new ConfirmOrderResponse(orderId, "fulfilled"));
+    var job =
+        JobItem.create(
+            user, ulidGenerator.generate(), "order_fulfillment", null, orderId, clock.now());
+    orderRepository.startFulfilling(user, orderItem, job);
+    var message = new JobMessage(user, job.getJobId(), "order_fulfillment");
+    jobsQueue.send(message, user, message.deduplicationId(0));
+    return httpResponseFactory.accepted(new ConfirmOrderResponse(orderId, "fulfilling"));
   }
 }

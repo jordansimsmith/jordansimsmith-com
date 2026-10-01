@@ -129,7 +129,7 @@ public class ReportAccumulator {
 
   public void addOrder(OrderItem order) {
     var status = order.getStatus();
-    if (!"to_pick".equals(status) && !"fulfilled".equals(status)) {
+    if (!"to_pick".equals(status) && !"fulfilling".equals(status) && !"fulfilled".equals(status)) {
       return;
     }
     var price = OrderLines.itemsTotal(order.getLines());

@@ -77,7 +77,12 @@ public class OrderVoidingIntegrationTest {
         new InventoryRepository(
             unitTable, factory.dynamoDbClient(), fakeClock, factory.fakeUlidGenerator());
     var orderRepository =
-        new OrderRepository(orderTable, inventoryRepository, factory.dynamoDbClient(), fakeClock);
+        new OrderRepository(
+            orderTable,
+            factory.jobTable(),
+            inventoryRepository,
+            factory.dynamoDbClient(),
+            fakeClock);
     orderPhaseProcessor =
         new OrderPhaseProcessor(
             orderTable,
@@ -139,7 +144,7 @@ public class OrderVoidingIntegrationTest {
 
     // act
     var publishJobProcessor = new PublishJobProcessor(factory);
-    var jobItem = JobItem.create(USER, "publish-job", "publish", null, NOW);
+    var jobItem = JobItem.create(USER, "publish-job", "publish", null, null, NOW);
     assertThatThrownBy(() -> publishJobProcessor.processBatch(USER, jobItem))
         .isInstanceOf(TransactionCanceledException.class);
 

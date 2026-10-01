@@ -187,6 +187,7 @@ describe('OrderDetailPage', () => {
 
   afterEach(() => {
     cleanup();
+    vi.useRealTimers();
   });
 
   it('renders order meta and the pull sheet in location order', async () => {
@@ -339,14 +340,14 @@ describe('OrderDetailPage', () => {
     expect(screen.queryByText('7315 Marble Comet Drive')).toBeNull();
   });
 
-  it('confirms the pull and renders the fulfilled order', async () => {
+  it('starts pull confirmation and polls until the order is fulfilled', async () => {
     const user = userEvent.setup();
     vi.spyOn(clientModule.apiClient, 'getOrder')
       .mockResolvedValueOnce(orderDetail())
       .mockResolvedValue(orderDetail({ state: 'fulfilled' }));
     vi.spyOn(clientModule.apiClient, 'confirmOrder').mockResolvedValue({
       order_id: '83647',
-      state: 'fulfilled',
+      state: 'fulfilling',
     });
 
     renderOrderDetailPage();
@@ -363,9 +364,14 @@ describe('OrderDetailPage', () => {
     await waitFor(() => {
       expect(clientModule.apiClient.confirmOrder).toHaveBeenCalledWith('83647');
     });
-    expect(await screen.findByText('fulfilled')).toBeDefined();
+    expect(await screen.findByText('Pull confirmation started')).toBeDefined();
+    expect(screen.getByText(/Pull confirmation is processing/)).toBeDefined();
+
+    expect(
+      await screen.findByText('fulfilled', {}, { timeout: 4000 }),
+    ).toBeDefined();
     expect(clientModule.apiClient.getOrder).toHaveBeenCalledTimes(2);
-    expect(screen.getByText('Order fulfilled')).toBeDefined();
+    expect(screen.queryByText('Pull confirmation started')).toBeDefined();
     expect(screen.getByText('Cards')).toBeDefined();
     expect(screen.queryByText('Pull sheet')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Confirm pull' })).toBeNull();
@@ -377,6 +383,19 @@ describe('OrderDetailPage', () => {
     expect(locations).toEqual(['A0-37', 'A0-74', 'A2-59']);
     expect(screen.queryByText(/^Prev ·/)).toBeNull();
     expect(screen.queryByText(/^Next ·/)).toBeNull();
+  });
+
+  it('keeps pull context visible without confirm while fulfilling', async () => {
+    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(
+      orderDetail({ state: 'fulfilling' }),
+    );
+
+    renderOrderDetailPage();
+
+    expect(await screen.findByText('fulfilling')).toBeDefined();
+    expect(screen.getByText(/Pull confirmation is processing/)).toBeDefined();
+    expect(screen.getAllByText(/^Prev ·/).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'Confirm pull' })).toBeNull();
   });
 
   it('renders neutral external actions in the right column for a fulfilled order', async () => {

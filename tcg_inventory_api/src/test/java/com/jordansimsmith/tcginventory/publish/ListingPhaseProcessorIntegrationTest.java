@@ -388,7 +388,8 @@ public class ListingPhaseProcessorIntegrationTest {
   }
 
   private void createPublishJob(String user, String jobId) {
-    var jobItem = JobItem.create(user, jobId, "publish", null, Instant.ofEpochSecond(1700000000));
+    var jobItem =
+        JobItem.create(user, jobId, "publish", null, null, Instant.ofEpochSecond(1700000000));
     jobTable.putItem(jobItem);
   }
 

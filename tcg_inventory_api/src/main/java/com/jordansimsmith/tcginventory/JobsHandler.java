@@ -8,6 +8,7 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.tcginventory.imports.AppraiseJobProcessor;
 import com.jordansimsmith.tcginventory.imports.ImportConfirmationJobProcessor;
+import com.jordansimsmith.tcginventory.orders.OrderFulfillmentJobProcessor;
 import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
 import com.jordansimsmith.tcginventory.reports.ReportJobProcessor;
 import com.jordansimsmith.tcginventory.scans.ScanConfirmationJobProcessor;
@@ -30,6 +31,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
   private final JobProcessor reportJobProcessor;
   private final JobProcessor scanConfirmationJobProcessor;
   private final JobProcessor importConfirmationJobProcessor;
+  private final JobProcessor orderFulfillmentJobProcessor;
 
   public JobsHandler() {
     this(TcgInventoryFactory.create());
@@ -46,6 +48,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     this.reportJobProcessor = new ReportJobProcessor(factory);
     this.scanConfirmationJobProcessor = new ScanConfirmationJobProcessor(factory);
     this.importConfirmationJobProcessor = new ImportConfirmationJobProcessor(factory);
+    this.orderFulfillmentJobProcessor = new OrderFulfillmentJobProcessor(factory);
   }
 
   @Override
@@ -140,6 +143,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
       case "report" -> reportJobProcessor;
       case "scan_confirmation" -> scanConfirmationJobProcessor;
       case "import_confirmation" -> importConfirmationJobProcessor;
+      case "order_fulfillment" -> orderFulfillmentJobProcessor;
       default -> throw new IllegalArgumentException("unknown job type: " + jobType);
     };
   }

@@ -6,6 +6,7 @@ const STATE_COLORS: Record<OrderState, string> = {
   reserving: 'blue',
   voiding: 'blue',
   to_pick: 'blue',
+  fulfilling: 'blue',
   fulfilled: 'green',
   voided: 'red',
 };

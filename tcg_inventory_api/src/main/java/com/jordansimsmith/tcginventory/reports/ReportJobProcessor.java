@@ -76,7 +76,10 @@ public class ReportJobProcessor implements JobProcessor {
 
     for (var order : pageOrders(user)) {
       accumulator.addOrder(order);
-      var paid = "to_pick".equals(order.getStatus()) || "fulfilled".equals(order.getStatus());
+      var paid =
+          "to_pick".equals(order.getStatus())
+              || "fulfilling".equals(order.getStatus())
+              || "fulfilled".equals(order.getStatus());
       for (var line : order.getLines()) {
         var game = skuGames.get(line.getSkuId());
         if (game == null) {

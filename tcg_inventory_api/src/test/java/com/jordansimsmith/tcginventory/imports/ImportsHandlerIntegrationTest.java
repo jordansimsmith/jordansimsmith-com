@@ -92,7 +92,7 @@ public class ImportsHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     jobTable.putItem(
         JobItem.create(
-            "jordan", "publish-job", "publish", null, Instant.ofEpochSecond(1700000000)));
+            "jordan", "publish-job", "publish", null, null, Instant.ofEpochSecond(1700000000)));
     var csv =
         CSV_HEADER
             + "\n"

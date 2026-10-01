@@ -316,11 +316,23 @@ public class TcgInventoryE2ETest {
 
     // act - confirm pull
     var confirmOrderResponse = post("/orders/99001/confirm");
-    assertThat(confirmOrderResponse.statusCode()).isEqualTo(200);
+    assertThat(confirmOrderResponse.statusCode()).isEqualTo(202);
     var confirmOrderBody = objectMapper.readTree(confirmOrderResponse.body());
-    assertThat(confirmOrderBody.get("state").asText()).isEqualTo("fulfilled");
+    assertThat(confirmOrderBody.get("state").asText()).isEqualTo("fulfilling");
 
-    // assert - verify order is fulfilled
+    // assert - wait for the fulfillment job to finish
+    await()
+        .atMost(Duration.ofSeconds(60))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(
+            () -> {
+              var pollResponse = get("/orders/99001");
+              assertThat(pollResponse.statusCode()).isEqualTo(200);
+              assertThat(objectMapper.readTree(pollResponse.body()).get("state").asText())
+                  .isEqualTo("fulfilled");
+            });
+
+    // assert - verify the order is fulfilled
     var finalOrdersResponse = get("/orders");
     assertThat(finalOrdersResponse.statusCode()).isEqualTo(200);
     var finalOrdersBody = objectMapper.readTree(finalOrdersResponse.body());

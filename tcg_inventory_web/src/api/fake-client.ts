@@ -2228,16 +2228,23 @@ export function createFakeClient(): ApiClient {
 
     async confirmOrder(orderId: string): Promise<ConfirmOrderResponse> {
       const order = getOrderOrThrow(orderId);
+      if (order.state === 'fulfilled' || order.state === 'fulfilling') {
+        return { order_id: orderId, state: order.state };
+      }
       if (order.state !== 'to_pick') {
         throw new Error('order is not ready to pick');
       }
-      for (const ref of order.units) {
-        const sku = getSkuOrThrow(ref.sku_id);
-        getUnitOrThrow(sku, ref.sequence_number).status = 'sold';
-      }
-      order.state = 'fulfilled';
-      reportStale = true;
-      // mirror the real API: a transition receipt, not the order detail
+
+      order.state = 'fulfilling';
+      const finishFulfillment = () => {
+        for (const ref of order.units) {
+          const sku = getSkuOrThrow(ref.sku_id);
+          getUnitOrThrow(sku, ref.sequence_number).status = 'sold';
+        }
+        order.state = 'fulfilled';
+        reportStale = true;
+      };
+      window.setTimeout(finishFulfillment, 500);
       return { order_id: orderId, state: order.state };
     },
 

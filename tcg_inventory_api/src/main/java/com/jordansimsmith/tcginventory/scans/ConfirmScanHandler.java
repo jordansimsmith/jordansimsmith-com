@@ -126,7 +126,8 @@ public class ConfirmScanHandler
     }
 
     var now = clock.now();
-    var jobItem = JobItem.create(user, ulidGenerator.generate(), "scan_confirmation", null, now);
+    var jobItem =
+        JobItem.create(user, ulidGenerator.generate(), "scan_confirmation", null, null, now);
     jobItem.setScanId(scanId);
 
     if (!scanRepository.startScanConfirmation(user, scanId, jobItem)) {

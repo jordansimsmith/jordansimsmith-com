@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import {
+  Alert,
   Box,
   Button,
   Group,
@@ -81,6 +82,7 @@ export function OrderDetailPage() {
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [pollError, setPollError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
 
@@ -112,10 +114,38 @@ export function OrderDetailPage() {
     };
   }, [orderId]);
 
+  useEffect(() => {
+    if (!orderId || order?.state !== 'fulfilling') {
+      return;
+    }
+    let cancelled = false;
+    const pollOrder = async () => {
+      try {
+        const latest = await apiClient.getOrder(orderId);
+        if (!cancelled) {
+          setOrder(latest);
+          setPollError(null);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setPollError(e instanceof Error ? e.message : 'Failed to load order');
+        }
+      }
+    };
+    const interval = window.setInterval(() => {
+      void pollOrder();
+    }, 2000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(interval);
+    };
+  }, [orderId, order?.state]);
+
   const showPullContext =
     order?.state === 'awaiting_payment' ||
     order?.state === 'reserving' ||
-    order?.state === 'to_pick';
+    order?.state === 'to_pick' ||
+    order?.state === 'fulfilling';
   const unitsByGame = new Map<string, OrderUnit[]>();
   for (const unit of order?.units ?? []) {
     const gameUnits = unitsByGame.get(unit.game) ?? [];
@@ -129,13 +159,21 @@ export function OrderDetailPage() {
     }
     setConfirming(true);
     try {
-      await apiClient.confirmOrder(orderId);
-      setOrder(await apiClient.getOrder(orderId));
+      const response = await apiClient.confirmOrder(orderId);
+      setOrder((current) =>
+        current == null ? current : { ...current, state: response.state },
+      );
       setConfirmOpen(false);
       notifications.show({
-        title: 'Order fulfilled',
-        message: 'All units are marked sold.',
-        color: 'green',
+        title:
+          response.state === 'fulfilled'
+            ? 'Order fulfilled'
+            : 'Pull confirmation started',
+        message:
+          response.state === 'fulfilled'
+            ? 'All cards are marked sold.'
+            : 'This order will show fulfilled after its cards are marked sold.',
+        color: response.state === 'fulfilled' ? 'green' : 'blue',
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Failed to confirm pull';
@@ -174,6 +212,11 @@ export function OrderDetailPage() {
                 </Button>
               }
             />
+            {pollError != null && (
+              <Alert color="red" title="Order status could not refresh">
+                {pollError}
+              </Alert>
+            )}
             <Box className={classes.detailGrid}>
               <Stack gap="md" className={classes.detailSupport}>
                 <Paper
@@ -284,7 +327,11 @@ export function OrderDetailPage() {
               </Stack>
               <Paper
                 component="section"
-                aria-label={order.state === 'to_pick' ? 'Pull sheet' : 'Cards'}
+                aria-label={
+                  order.state === 'to_pick' || order.state === 'fulfilling'
+                    ? 'Pull sheet'
+                    : 'Cards'
+                }
                 className={classes.pullSurface}
                 withBorder
                 radius="md"
@@ -292,14 +339,24 @@ export function OrderDetailPage() {
                 <Box p="md" className={classes.pullHeader}>
                   <Group justify="space-between" align="baseline" gap="sm">
                     <Title order={3} fz="md">
-                      {order.state === 'to_pick' ? 'Pull sheet' : 'Cards'}
+                      {order.state === 'to_pick' || order.state === 'fulfilling'
+                        ? 'Pull sheet'
+                        : 'Cards'}
                     </Title>
                     <Text size="xs" c="dimmed" className={classes.numeric}>
                       {order.unit_count}{' '}
                       {order.unit_count === 1 ? 'card' : 'cards'}
-                      {order.state === 'to_pick' && ' · location order'}
+                      {(order.state === 'to_pick' ||
+                        order.state === 'fulfilling') &&
+                        ' · location order'}
                     </Text>
                   </Group>
+                  {order.state === 'fulfilling' && (
+                    <Text size="sm" c="dimmed">
+                      Pull confirmation is processing. This page will update
+                      when all cards are marked sold.
+                    </Text>
+                  )}
                 </Box>
                 {[...unitsByGame].map(([game, units]) => (
                   <Box

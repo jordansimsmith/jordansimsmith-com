@@ -74,7 +74,7 @@ public class CreatePublishHandler
     var now = clock.now();
     var jobId = ulidGenerator.generate();
 
-    var jobItem = JobItem.create(user, jobId, "publish", null, now);
+    var jobItem = JobItem.create(user, jobId, "publish", null, null, now);
     jobTable.putItem(jobItem);
 
     var jobMessage = new JobMessage(user, jobId, "publish");

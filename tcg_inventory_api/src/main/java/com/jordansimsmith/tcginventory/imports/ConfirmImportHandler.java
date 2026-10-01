@@ -128,7 +128,7 @@ public class ConfirmImportHandler
 
     var now = clock.now();
     var jobItem =
-        JobItem.create(user, ulidGenerator.generate(), "import_confirmation", importId, now);
+        JobItem.create(user, ulidGenerator.generate(), "import_confirmation", importId, null, now);
     var startResult = importsRepository.startConfirmation(user, importId, jobItem, now);
     if (startResult == ImportsRepository.ConfirmationStartResult.NOT_FOUND) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));

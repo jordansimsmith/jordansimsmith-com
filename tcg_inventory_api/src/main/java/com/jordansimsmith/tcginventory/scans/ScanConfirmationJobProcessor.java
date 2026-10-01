@@ -115,7 +115,7 @@ public class ScanConfirmationJobProcessor implements JobProcessor {
               "en"));
     }
 
-    jobTable.putItem(JobItem.create(user, appraisalJobId, "appraise", importId, now));
+    jobTable.putItem(JobItem.create(user, appraisalJobId, "appraise", importId, null, now));
     var appraisalMessage = new JobMessage(user, appraisalJobId, "appraise");
     jobsQueue.send(appraisalMessage, user, appraisalMessage.deduplicationId(0));
 

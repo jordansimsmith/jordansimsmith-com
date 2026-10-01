@@ -78,7 +78,12 @@ public class OrderReservationIntegrationTest {
         new InventoryRepository(
             unitTable, factory.dynamoDbClient(), fakeClock, factory.fakeUlidGenerator());
     var orderRepository =
-        new OrderRepository(orderTable, inventoryRepository, factory.dynamoDbClient(), fakeClock);
+        new OrderRepository(
+            orderTable,
+            factory.jobTable(),
+            inventoryRepository,
+            factory.dynamoDbClient(),
+            fakeClock);
     orderPhaseProcessor =
         new OrderPhaseProcessor(
             orderTable,
@@ -299,7 +304,7 @@ public class OrderReservationIntegrationTest {
 
   private JobProcessor.JobResult processPublish() {
     return new PublishJobProcessor(factory)
-        .processBatch(USER, JobItem.create(USER, "publish-job", "publish", null, NOW));
+        .processBatch(USER, JobItem.create(USER, "publish-job", "publish", null, null, NOW));
   }
 
   private FetchTcgClient.SellerOffer offer(
