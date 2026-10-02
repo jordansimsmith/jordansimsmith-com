@@ -81,7 +81,7 @@ public class SearchFactoryImplTest {
     assertThat(judged)
         .allSatisfy(
             search -> {
-              assertThat(search.judge().model()).isEqualTo("gpt-5.4-nano");
+              assertThat(search.judge().model()).isEqualTo("gpt-6-luna");
               assertThat(search.judge().reasoningEffort()).isEqualTo("low");
               assertThat(search.judge().criteria())
                   .containsExactly(

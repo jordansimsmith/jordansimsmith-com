@@ -14,7 +14,7 @@ public class SearchFactoryImpl implements SearchFactory {
   private static final Judge RAM_JUDGE =
       new Judge(
           "prompts/ram-judge.md",
-          "gpt-5.4-nano",
+          "gpt-6-luna",
           "low",
           List.of(
               "trident_z_family",

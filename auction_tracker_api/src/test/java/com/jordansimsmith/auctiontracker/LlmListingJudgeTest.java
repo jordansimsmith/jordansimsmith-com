@@ -22,7 +22,7 @@ public class LlmListingJudgeTest {
   private static final SearchFactory.Judge RAM_JUDGE =
       new SearchFactory.Judge(
           "prompts/ram-judge.md",
-          "gpt-5.4-nano",
+          "gpt-6-luna",
           "low",
           List.of(
               "trident_z_family",
@@ -135,7 +135,7 @@ public class LlmListingJudgeTest {
     var requests = fakeLlmClient.findRequests();
     assertThat(requests).hasSize(1);
     var request = requests.get(0);
-    assertThat(request.model()).isEqualTo("gpt-5.4-nano");
+    assertThat(request.model()).isEqualTo("gpt-6-luna");
     assertThat(request.reasoningEffort()).isEqualTo("low");
     assertThat(request.jsonResponse()).isTrue();
     assertThat(request.messages().get(0).content())

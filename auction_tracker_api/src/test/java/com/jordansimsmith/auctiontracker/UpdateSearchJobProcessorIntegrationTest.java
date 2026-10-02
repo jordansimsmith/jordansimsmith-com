@@ -790,7 +790,7 @@ public class UpdateSearchJobProcessorIntegrationTest {
     fakeClock.setTime(Instant.ofEpochMilli(3_000_000));
     var otherJudge =
         new SearchFactory.Judge(
-            "prompts/mtg-bulk-judge.md", "gpt-5.4-nano", "low", List.of("mtg_cards"));
+            "prompts/mtg-bulk-judge.md", "configured-test-model", "low", List.of("mtg_cards"));
     var search1 =
         new SearchFactory.Search(
             "term1",
@@ -841,7 +841,7 @@ public class UpdateSearchJobProcessorIntegrationTest {
     assertThat(requests).hasSize(2);
     assertThat(requests.get(0).model()).isEqualTo("gpt-5.4-mini");
     assertThat(requests.get(0).reasoningEffort()).isEqualTo("none");
-    assertThat(requests.get(1).model()).isEqualTo("gpt-5.4-nano");
+    assertThat(requests.get(1).model()).isEqualTo("configured-test-model");
     assertThat(requests.get(1).reasoningEffort()).isEqualTo("low");
 
     var items = auctionTrackerTable.scan().items().stream().toList();
