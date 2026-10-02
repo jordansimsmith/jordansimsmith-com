@@ -26,7 +26,6 @@ variable "artifacts" {
 
 locals {
   functions = [
-    "price_tracker_api_update_prices",
     "football_calendar_api_update_fixtures",
     "event_calendar_api_update_events",
     "subfootball_tracker_api_update_page_content"
@@ -36,6 +35,7 @@ locals {
     "tcg_inventory_jobs_dlq.fifo",
     "tcg_inventory_scan_jobs_dlq.fifo",
     "auction_tracker_jobs_dlq.fifo",
+    "price_tracker_jobs_dlq.fifo",
   ]
 
   subscriptions = ["jordansimsmith@gmail.com"]

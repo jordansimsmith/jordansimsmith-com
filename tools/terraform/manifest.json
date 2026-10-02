@@ -110,7 +110,7 @@
     {
       "path": "price_tracker_api/infra",
       "artifacts": {
-        "update_prices": "//price_tracker_api:update-prices-handler_deploy.jar"
+        "jobs_handler": "//price_tracker_api:jobs-handler_deploy.jar"
       }
     },
     {

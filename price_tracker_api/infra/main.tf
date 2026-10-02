@@ -32,6 +32,43 @@ variable "artifacts" {
 locals {
   application_id = "price_tracker_api"
   subscriptions  = ["jordansimsmith@gmail.com"]
+  product_ids = {
+    chemist_warehouse_98676     = "chemist-warehouse-98676"
+    chemist_warehouse_74330     = "chemist-warehouse-74330"
+    chemist_warehouse_74329     = "chemist-warehouse-74329"
+    chemist_warehouse_98677     = "chemist-warehouse-98677"
+    chemist_warehouse_79763     = "chemist-warehouse-79763"
+    chemist_warehouse_79762     = "chemist-warehouse-79762"
+    chemist_warehouse_74332     = "chemist-warehouse-74332"
+    chemist_warehouse_74331     = "chemist-warehouse-74331"
+    chemist_warehouse_74350     = "chemist-warehouse-74350"
+    chemist_warehouse_74347     = "chemist-warehouse-74347"
+    chemist_warehouse_74336     = "chemist-warehouse-74336"
+    chemist_warehouse_91351     = "chemist-warehouse-91351"
+    chemist_warehouse_111308    = "chemist-warehouse-111308"
+    chemist_warehouse_111307    = "chemist-warehouse-111307"
+    chemist_warehouse_111309    = "chemist-warehouse-111309"
+    chemist_warehouse_111303    = "chemist-warehouse-111303"
+    chemist_warehouse_111301    = "chemist-warehouse-111301"
+    chemist_warehouse_111305    = "chemist-warehouse-111305"
+    chemist_warehouse_111302    = "chemist-warehouse-111302"
+    chemist_warehouse_111304    = "chemist-warehouse-111304"
+    chemist_warehouse_111306    = "chemist-warehouse-111306"
+    chemist_warehouse_120088    = "chemist-warehouse-120088"
+    chemist_warehouse_101969    = "chemist-warehouse-101969"
+    chemist_warehouse_80063     = "chemist-warehouse-80063"
+    chemist_warehouse_82946     = "chemist-warehouse-82946"
+    chemist_warehouse_136022    = "chemist-warehouse-136022"
+    chemist_warehouse_88817     = "chemist-warehouse-88817"
+    chemist_warehouse_80060     = "chemist-warehouse-80060"
+    chemist_warehouse_82940     = "chemist-warehouse-82940"
+    chemist_warehouse_80061     = "chemist-warehouse-80061"
+    chemist_warehouse_136023    = "chemist-warehouse-136023"
+    chemist_warehouse_63104     = "chemist-warehouse-63104"
+    nz_protein_nz_whey          = "nz-protein-nz-whey"
+    sportsfuel_clean_nutrition  = "sportsfuel-clean-nutrition"
+    vivobarefoot_tracker_forest = "vivo-tracker-forest"
+  }
 }
 
 module "java_lambda" {
@@ -40,16 +77,18 @@ module "java_lambda" {
   application_id = local.application_id
 
   lambdas = {
-    update_prices = {
-      handler  = "com.jordansimsmith.pricetracker.UpdatePricesHandler"
-      artifact = var.artifacts["update_prices"]
-      timeout  = 300
+    jobs_handler = {
+      handler     = "com.jordansimsmith.pricetracker.JobsHandler"
+      artifact    = var.artifacts["jobs_handler"]
+      memory_size = 1024
+      timeout     = 120
     }
   }
 
   role_policy_arns = {
     dynamodb = aws_iam_policy.lambda_dynamodb.arn
     sns      = aws_iam_policy.lambda_sns.arn
+    sqs      = aws_iam_policy.lambda_sqs.arn
   }
 }
 
@@ -78,11 +117,8 @@ resource "aws_dynamodb_table" "price_tracker" {
 
 data "aws_iam_policy_document" "lambda_dynamodb" {
   statement {
-    effect = "Allow"
-
-    resources = [
-      aws_dynamodb_table.price_tracker.arn
-    ]
+    effect    = "Allow"
+    resources = [aws_dynamodb_table.price_tracker.arn]
 
     actions = [
       "dynamodb:PutItem",
@@ -121,28 +157,19 @@ resource "aws_sns_topic_subscription" "price_updates" {
 
 data "aws_iam_policy_document" "lambda_sns" {
   statement {
-    effect = "Allow"
-
-    resources = [
-      aws_sns_topic.price_updates.arn,
-    ]
+    effect    = "Allow"
+    resources = [aws_sns_topic.price_updates.arn]
 
     actions = [
-      "SNS:Publish",
-      "SNS:GetTopicAttributes",
+      "sns:Publish",
+      "sns:GetTopicAttributes",
     ]
   }
 
   statement {
-    effect = "Allow"
-
-    resources = [
-      "*"
-    ]
-
-    actions = [
-      "SNS:ListTopics"
-    ]
+    effect    = "Allow"
+    resources = ["*"]
+    actions   = ["sns:ListTopics"]
   }
 }
 
@@ -151,27 +178,142 @@ resource "aws_iam_policy" "lambda_sns" {
   policy = data.aws_iam_policy_document.lambda_sns.json
 }
 
-resource "aws_cloudwatch_event_rule" "update_prices" {
-  name                = "${local.application_id}_update_prices"
-  description         = "Triggers the UpdatePricesHandler Lambda function"
-  schedule_expression = "rate(1 hour)"
+resource "aws_sqs_queue" "jobs_dlq" {
+  name                        = "price_tracker_jobs_dlq.fifo"
+  fifo_queue                  = true
+  content_based_deduplication = true
+  message_retention_seconds   = 1209600
 }
 
-resource "aws_cloudwatch_event_target" "trigger" {
-  rule      = aws_cloudwatch_event_rule.update_prices.name
-  target_id = "lambda"
-  arn       = module.java_lambda.lambda_functions["update_prices"].qualified_arn
+resource "aws_sqs_queue" "jobs" {
+  name                        = "price_tracker_jobs.fifo"
+  fifo_queue                  = true
+  content_based_deduplication = true
+  message_retention_seconds   = 1209600
+  visibility_timeout_seconds  = 720
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.jobs_dlq.arn
+    maxReceiveCount     = 5
+  })
 }
 
-resource "aws_lambda_permission" "cloudwatch_trigger" {
-  statement_id  = "AllowExecutionFromCloudWatch"
-  action        = "lambda:InvokeFunction"
-  function_name = module.java_lambda.lambda_functions["update_prices"].function_name
-  qualifier     = module.java_lambda.lambda_functions["update_prices"].version
-  principal     = "events.amazonaws.com"
-  source_arn    = aws_cloudwatch_event_rule.update_prices.arn
+data "aws_iam_policy_document" "lambda_sqs" {
+  statement {
+    effect    = "Allow"
+    resources = [aws_sqs_queue.jobs.arn]
 
-  lifecycle {
-    create_before_destroy = true
+    actions = [
+      "sqs:DeleteMessage",
+      "sqs:GetQueueAttributes",
+      "sqs:ReceiveMessage",
+      "sqs:ChangeMessageVisibility",
+    ]
+  }
+}
+
+resource "aws_iam_policy" "lambda_sqs" {
+  name   = "${local.application_id}_lambda_sqs"
+  policy = data.aws_iam_policy_document.lambda_sqs.json
+}
+
+resource "aws_lambda_event_source_mapping" "jobs" {
+  event_source_arn                   = aws_sqs_queue.jobs.arn
+  function_name                      = module.java_lambda.lambda_functions["jobs_handler"].qualified_arn
+  batch_size                         = 1
+  maximum_batching_window_in_seconds = 0
+}
+
+data "aws_iam_policy_document" "jobs_scheduler_assume_role" {
+  statement {
+    effect  = "Allow"
+    actions = ["sts:AssumeRole"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["scheduler.amazonaws.com"]
+    }
+  }
+}
+
+resource "aws_iam_role" "jobs_scheduler" {
+  name               = "${local.application_id}_jobs_scheduler"
+  assume_role_policy = data.aws_iam_policy_document.jobs_scheduler_assume_role.json
+}
+
+data "aws_iam_policy_document" "jobs_scheduler_sqs" {
+  statement {
+    effect    = "Allow"
+    resources = [aws_sqs_queue.jobs.arn]
+    actions   = ["sqs:SendMessage"]
+  }
+}
+
+resource "aws_iam_policy" "jobs_scheduler_sqs" {
+  name   = "${local.application_id}_jobs_scheduler_sqs"
+  policy = data.aws_iam_policy_document.jobs_scheduler_sqs.json
+}
+
+resource "aws_iam_role_policy_attachment" "jobs_scheduler_sqs" {
+  role       = aws_iam_role.jobs_scheduler.name
+  policy_arn = aws_iam_policy.jobs_scheduler_sqs.arn
+}
+
+resource "aws_scheduler_schedule" "update_product" {
+  for_each                     = local.product_ids
+  name                         = "${local.application_id}_update_${each.key}"
+  description                  = "Queues the ${each.value} price update"
+  schedule_expression          = "cron(0 * * * ? *)"
+  schedule_expression_timezone = "UTC"
+  depends_on                   = [aws_iam_role_policy_attachment.jobs_scheduler_sqs]
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = "arn:aws:scheduler:::aws-sdk:sqs:sendMessage"
+    role_arn = aws_iam_role.jobs_scheduler.arn
+    input    = <<-JSON
+      {
+        "QueueUrl": "${aws_sqs_queue.jobs.url}",
+        "MessageBody": "{\"job_type\":\"update_product\",\"product_id\":\"${each.value}\",\"scheduled_at\":\"<aws.scheduler.scheduled-time>\"}",
+        "MessageGroupId": "price-tracker"
+      }
+    JSON
+
+    retry_policy {
+      maximum_event_age_in_seconds = 3600
+      maximum_retry_attempts       = 5
+    }
+  }
+}
+
+resource "aws_scheduler_schedule" "send_digest" {
+  name                         = "${local.application_id}_send_digest"
+  description                  = "Queues the hourly price decrease digest"
+  schedule_expression          = "cron(5 * * * ? *)"
+  schedule_expression_timezone = "UTC"
+  depends_on                   = [aws_iam_role_policy_attachment.jobs_scheduler_sqs]
+
+  flexible_time_window {
+    mode = "OFF"
+  }
+
+  target {
+    arn      = "arn:aws:scheduler:::aws-sdk:sqs:sendMessage"
+    role_arn = aws_iam_role.jobs_scheduler.arn
+    input    = <<-JSON
+      {
+        "QueueUrl": "${aws_sqs_queue.jobs.url}",
+        "MessageBody": "{\"job_type\":\"send_digest\",\"scheduled_at\":\"<aws.scheduler.scheduled-time>\"}",
+        "MessageGroupId": "price-tracker"
+      }
+    JSON
+
+    retry_policy {
+      maximum_event_age_in_seconds = 3600
+      maximum_retry_attempts       = 5
+    }
   }
 }

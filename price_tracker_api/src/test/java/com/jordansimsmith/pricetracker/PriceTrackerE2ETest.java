@@ -5,27 +5,28 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.queue.QueueUtils;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.Optional;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.Network;
-import software.amazon.awssdk.core.SdkBytes;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.lambda.LambdaClient;
-import software.amazon.awssdk.services.lambda.model.InvocationType;
-import software.amazon.awssdk.services.lambda.model.InvokeRequest;
 import software.amazon.awssdk.services.sqs.SqsClient;
+import software.amazon.awssdk.services.sqs.model.Message;
 import software.amazon.awssdk.services.sqs.model.ReceiveMessageRequest;
+import software.amazon.awssdk.services.sqs.model.SendMessageRequest;
 
 public class PriceTrackerE2ETest {
   private static final String CHEMIST_WAREHOUSE_STUB_ALIAS = "chemist-warehouse-stub";
   private static final String NZ_PROTEIN_STUB_ALIAS = "nz-protein-stub";
   private static final String SPORTSFUEL_STUB_ALIAS = "sportsfuel-stub";
   private static final String VIVOBAREFOOT_STUB_ALIAS = "vivobarefoot-stub";
-
   private static final Network NETWORK = Network.newNetwork();
 
   private static final PriceTrackerWebsiteStubContainer priceTrackerWebsiteStubContainer =
@@ -63,239 +64,95 @@ public class PriceTrackerE2ETest {
   }
 
   @BeforeEach
-  void setup() {
+  void setUp() {
     var dynamoDbClient =
         DynamoDbClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
     var sqsClient =
         SqsClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
-
     DynamoDbUtils.reset(dynamoDbClient);
     QueueUtils.reset(sqsClient);
   }
 
   @Test
-  void shouldTrackChemistWarehousePricesAndSendNotifications() throws Exception {
+  void shouldProcessProductJobsBeforePublishingNetDecreaseDigest() {
     // arrange
     var dynamoDbClient =
         DynamoDbClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
     var enhancedClient = DynamoDbEnhancedClient.builder().dynamoDbClient(dynamoDbClient).build();
     var priceTrackerTable =
         enhancedClient.table("price_tracker", TableSchema.fromBean(PriceTrackerItem.class));
-    var lambdaClient =
-        LambdaClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
     var sqsClient =
         SqsClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
-
-    var productUrl =
+    var jobsQueueUrl = queueUrl(sqsClient, "price_tracker_jobs.fifo");
+    var scheduledAt = Instant.now();
+    var chemistProductUrl =
         "http://chemist-warehouse-stub:8080/buy/74329/inc-100-dynamic-whey-chocolate-flavour-2kg";
-    var productName = "Chemist Warehouse - Dynamic Whey 2kg - Chocolate";
-    var productHistory =
-        PriceTrackerItem.create(productUrl, productName, Instant.ofEpochSecond(1_000_000), 1234.56);
-    priceTrackerTable.putItem(productHistory);
+    var chemistProductName = "Chemist Warehouse - Dynamic Whey 2kg - Chocolate";
+    var nzProteinProductUrl = "http://nz-protein-stub:8080/product/nz-whey-1kg-2-2lbs";
+    var nzProteinProductName = "NZ Protein - NZ Whey 1kg (2.2lbs)";
+    priceTrackerTable.putItem(
+        PriceTrackerItem.create(
+            chemistProductUrl, chemistProductName, Instant.ofEpochSecond(1_000_000), 1234.56));
+    priceTrackerTable.putItem(
+        PriceTrackerItem.create(
+            nzProteinProductUrl, nzProteinProductName, Instant.ofEpochSecond(1_000_000), 4567.89));
 
     // act
-    var request =
-        InvokeRequest.builder()
-            .functionName("update_prices_handler")
-            .invocationType(InvocationType.REQUEST_RESPONSE)
-            .payload(SdkBytes.fromUtf8String("{}"))
-            .build();
-    var lambdaResponse = lambdaClient.invoke(request);
-    assertThat(lambdaResponse.statusCode()).isEqualTo(200);
-    assertThat(lambdaResponse.functionError())
-        .withFailMessage(new String(lambdaResponse.payload().asByteArray()))
-        .isNull();
+    sendJob(sqsClient, jobsQueueUrl, "update_product", "chemist-warehouse-74329", scheduledAt);
+    sendJob(sqsClient, jobsQueueUrl, "update_product", "nz-protein-nz-whey", scheduledAt);
+    sendJob(sqsClient, jobsQueueUrl, "send_digest", null, scheduledAt);
 
     // assert
-    var queueName = "price-tracker-test-queue";
-    var queueUrl = sqsClient.getQueueUrl(b -> b.queueName(queueName).build()).queueUrl();
-    var receiveRequest =
-        ReceiveMessageRequest.builder()
-            .queueUrl(queueUrl)
-            .maxNumberOfMessages(10)
-            .waitTimeSeconds(10)
-            .build();
-    var messages = sqsClient.receiveMessage(receiveRequest).messages();
-    assertThat(messages).isNotEmpty();
+    var notification = receiveNotification(sqsClient);
+    assertThat(notification).isPresent();
+    assertThat(notification.orElseThrow().body())
+        .contains("prices decreased")
+        .contains(chemistProductName)
+        .contains(chemistProductUrl)
+        .contains("$1234.56 -> $52.00")
+        .contains(nzProteinProductName)
+        .contains(nzProteinProductUrl)
+        .contains("$4567.89 -> $84.95");
 
-    var hasExpectedMessage =
-        messages.stream()
-            .map(message -> message.body())
-            .anyMatch(
-                messageBody ->
-                    messageBody.contains("price decreased")
-                        && messageBody.contains(productName)
-                        && messageBody.contains(productUrl)
-                        && messageBody.contains("$1234.56 -> $52.00"));
-    assertThat(hasExpectedMessage).isTrue();
+    var digestCheckpointTable =
+        enhancedClient.table("price_tracker", TableSchema.fromBean(DigestCheckpointItem.class));
+    assertThat(
+            digestCheckpointTable.getItem(
+                Key.builder()
+                    .partitionValue(DigestCheckpointItem.PK_VALUE)
+                    .sortValue(DigestCheckpointItem.SK_VALUE)
+                    .build()))
+        .isNotNull();
   }
 
-  @Test
-  void shouldTrackNzProteinPricesAndSendNotifications() throws Exception {
-    // arrange
-    var dynamoDbClient =
-        DynamoDbClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
-    var enhancedClient = DynamoDbEnhancedClient.builder().dynamoDbClient(dynamoDbClient).build();
-    var priceTrackerTable =
-        enhancedClient.table("price_tracker", TableSchema.fromBean(PriceTrackerItem.class));
-    var lambdaClient =
-        LambdaClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
-    var sqsClient =
-        SqsClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
-
-    var productUrl = "http://nz-protein-stub:8080/product/nz-whey-1kg-2-2lbs";
-    var productName = "NZ Protein - NZ Whey 1kg (2.2lbs)";
-    var productHistory =
-        PriceTrackerItem.create(productUrl, productName, Instant.ofEpochSecond(1_000_000), 4567.89);
-    priceTrackerTable.putItem(productHistory);
-
-    // act
-    var request =
-        InvokeRequest.builder()
-            .functionName("update_prices_handler")
-            .invocationType(InvocationType.REQUEST_RESPONSE)
-            .payload(SdkBytes.fromUtf8String("{}"))
-            .build();
-    var lambdaResponse = lambdaClient.invoke(request);
-    assertThat(lambdaResponse.statusCode()).isEqualTo(200);
-    assertThat(lambdaResponse.functionError())
-        .withFailMessage(new String(lambdaResponse.payload().asByteArray()))
-        .isNull();
-
-    // assert
-    var queueName = "price-tracker-test-queue";
-    var queueUrl = sqsClient.getQueueUrl(b -> b.queueName(queueName).build()).queueUrl();
-    var receiveRequest =
-        ReceiveMessageRequest.builder()
-            .queueUrl(queueUrl)
-            .maxNumberOfMessages(10)
-            .waitTimeSeconds(10)
-            .build();
-    var messages = sqsClient.receiveMessage(receiveRequest).messages();
-    assertThat(messages).isNotEmpty();
-
-    var hasExpectedMessage =
-        messages.stream()
-            .map(message -> message.body())
-            .anyMatch(
-                messageBody ->
-                    messageBody.contains("price decreased")
-                        && messageBody.contains(productName)
-                        && messageBody.contains(productUrl)
-                        && messageBody.contains("$4567.89 -> $84.95"));
-    assertThat(hasExpectedMessage).isTrue();
+  private static String queueUrl(SqsClient sqsClient, String queueName) {
+    return sqsClient.getQueueUrl(b -> b.queueName(queueName).build()).queueUrl();
   }
 
-  @Test
-  void shouldTrackSportsfuelPricesAndSendNotifications() throws Exception {
-    // arrange
-    var dynamoDbClient =
-        DynamoDbClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
-    var enhancedClient = DynamoDbEnhancedClient.builder().dynamoDbClient(dynamoDbClient).build();
-    var priceTrackerTable =
-        enhancedClient.table("price_tracker", TableSchema.fromBean(PriceTrackerItem.class));
-    var lambdaClient =
-        LambdaClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
-    var sqsClient =
-        SqsClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
-
-    var productUrl =
-        "http://sportsfuel-stub:8080/products/clean-nutrition-whey-protein-1kg?variant=14788899504195";
-    var productName = "Sportsfuel - Clean Nutrition Whey Protein 1kg - Vanilla";
-    var productHistory =
-        PriceTrackerItem.create(productUrl, productName, Instant.ofEpochSecond(1_000_000), 6789.01);
-    priceTrackerTable.putItem(productHistory);
-
-    // act
-    var request =
-        InvokeRequest.builder()
-            .functionName("update_prices_handler")
-            .invocationType(InvocationType.REQUEST_RESPONSE)
-            .payload(SdkBytes.fromUtf8String("{}"))
-            .build();
-    var lambdaResponse = lambdaClient.invoke(request);
-    assertThat(lambdaResponse.statusCode()).isEqualTo(200);
-    assertThat(lambdaResponse.functionError())
-        .withFailMessage(new String(lambdaResponse.payload().asByteArray()))
-        .isNull();
-
-    // assert
-    var queueName = "price-tracker-test-queue";
-    var queueUrl = sqsClient.getQueueUrl(b -> b.queueName(queueName).build()).queueUrl();
-    var receiveRequest =
-        ReceiveMessageRequest.builder()
+  private static void sendJob(
+      SqsClient sqsClient, String queueUrl, String jobType, String productId, Instant scheduledAt) {
+    var productIdProperty = productId == null ? "" : ",\"product_id\":\"%s\"".formatted(productId);
+    sqsClient.sendMessage(
+        SendMessageRequest.builder()
             .queueUrl(queueUrl)
-            .maxNumberOfMessages(10)
-            .waitTimeSeconds(10)
-            .build();
-    var messages = sqsClient.receiveMessage(receiveRequest).messages();
-    assertThat(messages).isNotEmpty();
-
-    var hasExpectedMessage =
-        messages.stream()
-            .map(message -> message.body())
-            .anyMatch(
-                messageBody ->
-                    messageBody.contains("price decreased")
-                        && messageBody.contains(productName)
-                        && messageBody.contains(productUrl)
-                        && messageBody.contains("$6789.01 -> $61.11"));
-    assertThat(hasExpectedMessage).isTrue();
+            .messageBody(
+                "{\"job_type\":\"%s\"%s,\"scheduled_at\":\"%s\"}"
+                    .formatted(jobType, productIdProperty, scheduledAt))
+            .messageGroupId("price-tracker")
+            .build());
   }
 
-  @Test
-  void shouldTrackVivobarefootPricesAndSendNotifications() throws Exception {
-    // arrange
-    var dynamoDbClient =
-        DynamoDbClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
-    var enhancedClient = DynamoDbEnhancedClient.builder().dynamoDbClient(dynamoDbClient).build();
-    var priceTrackerTable =
-        enhancedClient.table("price_tracker", TableSchema.fromBean(PriceTrackerItem.class));
-    var lambdaClient =
-        LambdaClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
-    var sqsClient =
-        SqsClient.builder().endpointOverride(priceTrackerContainer.getLocalstackUrl()).build();
-
-    var productUrl = "http://vivobarefoot-stub:8080/products/tracker-forest-esc-mens-bracken";
-    var productName = "Vivobarefoot - Tracker Forest ESC Men's - Bracken";
-    var productHistory =
-        PriceTrackerItem.create(productUrl, productName, Instant.ofEpochSecond(1_000_000), 987.65);
-    priceTrackerTable.putItem(productHistory);
-
-    // act
+  private static Optional<Message> receiveNotification(SqsClient sqsClient) {
+    var notificationQueueUrl = queueUrl(sqsClient, "price-tracker-test-queue");
     var request =
-        InvokeRequest.builder()
-            .functionName("update_prices_handler")
-            .invocationType(InvocationType.REQUEST_RESPONSE)
-            .payload(SdkBytes.fromUtf8String("{}"))
-            .build();
-    var lambdaResponse = lambdaClient.invoke(request);
-    assertThat(lambdaResponse.statusCode()).isEqualTo(200);
-    assertThat(lambdaResponse.functionError())
-        .withFailMessage(new String(lambdaResponse.payload().asByteArray()))
-        .isNull();
-
-    // assert
-    var queueName = "price-tracker-test-queue";
-    var queueUrl = sqsClient.getQueueUrl(b -> b.queueName(queueName).build()).queueUrl();
-    var receiveRequest =
         ReceiveMessageRequest.builder()
-            .queueUrl(queueUrl)
+            .queueUrl(notificationQueueUrl)
             .maxNumberOfMessages(10)
             .waitTimeSeconds(10)
             .build();
-    var messages = sqsClient.receiveMessage(receiveRequest).messages();
-    assertThat(messages).isNotEmpty();
-
-    var hasExpectedMessage =
-        messages.stream()
-            .map(message -> message.body())
-            .anyMatch(
-                messageBody ->
-                    messageBody.contains("price decreased")
-                        && messageBody.contains(productName)
-                        && messageBody.contains(productUrl)
-                        && messageBody.contains("$987.65 -> $479.95"));
-    assertThat(hasExpectedMessage).isTrue();
+    return IntStream.range(0, 4)
+        .mapToObj(ignored -> sqsClient.receiveMessage(request).messages())
+        .flatMap(Collection::stream)
+        .findFirst();
   }
 }

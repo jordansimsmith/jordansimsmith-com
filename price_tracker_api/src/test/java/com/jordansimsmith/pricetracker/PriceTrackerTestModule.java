@@ -18,6 +18,14 @@ public class PriceTrackerTestModule {
 
   @Provides
   @Singleton
+  DynamoDbTable<DigestCheckpointItem> digestCheckpointTable(
+      DynamoDbEnhancedClient dynamoDbEnhancedClient) {
+    var schema = TableSchema.fromBean(DigestCheckpointItem.class);
+    return dynamoDbEnhancedClient.table("price_tracker", schema);
+  }
+
+  @Provides
+  @Singleton
   FakePriceClient fakePriceClient() {
     return new FakePriceClient();
   }

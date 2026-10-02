@@ -1,11 +1,11 @@
 # Price tracker service
 
-The price tracker service runs an hourly scheduled workflow that scrapes curated product pages, records price history, and sends notifications when tracked prices decrease.
+The price tracker service checks a curated catalog of retailer product pages every hour, records price history, and emails one hourly digest when products have net price decreases.
 
 ## Overview
 
-- **Service type**: backend scheduled worker (`price_tracker_api`)
-- **Interface**: EventBridge-triggered Lambda invocation (no public HTTP API)
+- **Service type**: backend queued worker (`price_tracker_api`)
+- **Interface**: EventBridge Scheduler -> SQS FIFO -> AWS Lambda (`RequestHandler<SQSEvent, Void>`)
 - **Runtime**: AWS Lambda (Java 21)
 - **Primary storage**: DynamoDB table `price_tracker`
 - **Primary outbound integrations**: retailer websites and Amazon SNS
@@ -13,26 +13,29 @@ The price tracker service runs an hourly scheduled workflow that scrapes curated
 
 ## User stories
 
-- As a shopper, I want hourly checks across tracked product pages, so that I can notice price decreases quickly.
-- As an email subscriber, I want one aggregated notification when prices decrease, so that alerts stay useful without excessive noise.
-- As a maintainer, I want append-only price snapshots for each run, so that historical trends remain auditable.
+- As a shopper, I want each tracked product checked hourly, so that price history is collected on a predictable cadence.
+- As an email subscriber, I want one hourly digest containing net price decreases, so that I can review changes together without receiving an email for every product.
+- As a maintainer, I want failed jobs retained in a passive dead-letter queue, so that persistent failures can be inspected and redriven.
+- As a maintainer, I want hourly snapshots preserved, so that price history remains auditable.
 
 ## Features and scope boundaries
 
 ### In scope
 
-- Run hourly price checks from a curated in-code product catalog.
+- Queue one update job per curated product every hour.
 - Scrape product pages using host-specific extractor implementations.
-- Persist append-only price snapshots for every successfully scraped product.
-- Detect price decreases by comparing the latest stored snapshot to the current scrape.
-- Publish a summary notification when one or more prices decreased in the run.
+- Persist append-only price snapshots for each successfully scraped product.
+- Queue one digest job five minutes after the hourly product schedules.
+- Compare each product's latest price at the previous successful digest checkpoint with its latest price at the current cutoff. Include one line when the net price decreased.
+- Retry failed jobs through SQS and route jobs that fail five receives to a passive worker DLQ.
+- Alert when the worker DLQ contains visible messages.
 
 ### Out of scope
 
 - Public CRUD APIs for managing products, subscriptions, or historical records.
 - Currency conversion, freight/tax normalization, or cross-store ranking analytics.
 - Automatic bypass/remediation for anti-bot protections or breaking retailer HTML changes.
-- Manual operations or deployment runbook documentation.
+- A Scheduler DLQ, exactly-once SNS publication, or a manual operations runbook.
 
 ### Current catalog summary
 
@@ -47,112 +50,149 @@ The price tracker service runs an hourly scheduled workflow that scrapes curated
 
 ```mermaid
 flowchart TD
-  eventBridge[EventBridge rule rate(1 hour)] --> updateHandler[Lambda price_tracker_api_update_prices]
-  updateHandler --> productsFactory[ProductsFactoryImpl]
-  updateHandler --> priceClient[JsoupPriceClient]
+  productSchedules[EventBridge Scheduler: 35 hourly product schedules] --> jobsQueue[SQS FIFO price_tracker_jobs.fifo]
+  digestSchedule[EventBridge Scheduler: hourly digest at minute 05] --> jobsQueue
+  jobsQueue --> jobsHandler[Lambda JobsHandler]
+  jobsHandler --> updateProcessor[UpdateProductJobProcessor]
+  jobsHandler --> digestProcessor[SendDigestJobProcessor]
+  updateProcessor --> productsFactory[ProductsFactoryImpl]
+  updateProcessor --> priceClient[JsoupPriceClient]
   priceClient --> chemistWarehouse[chemistwarehouse.co.nz]
   priceClient --> nzProtein[nzprotein.co.nz]
   priceClient --> sportsfuel[sportsfuel.co.nz]
   priceClient --> vivobarefoot[vivobarefoot.nz]
-  updateHandler --> dynamoDb[(DynamoDB price_tracker)]
-  updateHandler --> snsTopic[SNS price_tracker_api_price_updates]
+  updateProcessor --> table[(DynamoDB price_tracker)]
+  digestProcessor --> table
+  digestProcessor --> snsTopic[SNS price_tracker_api_price_updates]
   snsTopic --> subscribers[Email subscribers]
+  jobsQueue --> jobsDlq[SQS FIFO price_tracker_jobs_dlq.fifo]
+  jobsDlq --> platformAlarm[Platform DLQ depth alarm]
 ```
 
 ### Primary workflow
 
 ```mermaid
 sequenceDiagram
-  participant scheduler as EventBridgeScheduler
-  participant handler as UpdatePricesHandler
-  participant catalog as ProductsFactory
+  participant scheduler as EventBridge Scheduler
+  participant queue as SQS FIFO
+  participant handler as JobsHandler
+  participant update as UpdateProductJobProcessor
+  participant digest as SendDigestJobProcessor
   participant retailers as RetailerSites
   participant table as DynamoDB
   participant sns as SNS
 
-  scheduler->>handler: invoke ScheduledEvent
-  handler->>catalog: findProducts()
-  catalog-->>handler: curated product list
-  loop each product
-    handler->>retailers: getPrice(url)
-    retailers-->>handler: parsed price or null/error
-    handler->>table: query latest snapshot for PRODUCT#url
-    handler->>handler: compare previous vs current
+  loop each product at minute 00 hourly
+    scheduler->>queue: enqueue update_product with product_id and scheduled_at
+    queue->>handler: deliver one SQS record
+    handler->>update: process one product
+    update->>retailers: getPrice(url)
+    retailers-->>update: parsed price or null/error
+    opt price is available
+      update->>table: append price snapshot
+    end
   end
-  handler->>sns: publish summary when any price decreased
-  handler->>table: putItem for collected snapshots
+  scheduler->>queue: enqueue send_digest at minute 05
+  queue->>handler: deliver digest after earlier messages in its FIFO group
+  handler->>digest: process scheduled digest
+  digest->>table: read checkpoint and latest snapshots at both cutoffs
+  alt one or more products have a net decrease
+    digest->>sns: publish one digest
+  end
+  digest->>table: advance checkpoint after successful publish or empty scan
 ```
 
 ## Main technical decisions
 
-- Keep the service as a scheduled Lambda worker (not an HTTP API) because workload is periodic polling, not request/response serving.
-- Store the tracked catalog directly in `ProductsFactoryImpl` so monitored products are explicit and versioned with code changes.
+- Keep the service as a queued Lambda worker because the hourly catalog is split into independent product jobs.
+- Store the tracked catalog and stable product IDs in `ProductsFactoryImpl`; keep the corresponding `product_ids` map in Terraform alongside the Scheduler resources.
 - Route parsing by URL host to dedicated extractors (`Chemist Warehouse`, `NZ Protein`, `Sportsfuel`, `Vivobarefoot`) for deterministic selector behavior per site.
 - Track only the Vanilla Sportsfuel variant using its `?variant=<id>` URL.
-- Persist snapshots as append-only DynamoDB items keyed by product URL + timestamp to preserve full historical price series.
-- Publish one aggregated SNS message per run to reduce notification noise when multiple products decrease together.
+- Keep price snapshots append-only and retain their existing key and attribute format.
+- Use one FIFO group (`price-tracker`) and batch size one. This serializes requests across retailer sites and ensures the digest waits behind earlier messages that have reached the queue. Late product jobs that run after a digest cutoff are picked up by a later digest.
+- A failed message blocks later messages in the FIFO group until it succeeds or moves to the DLQ after five receives. The DLQ alarm surfaces persistent failures for inspection.
+- Include only one net decrease per product. If a price drops and then recovers before the digest runs, that intermediate drop is not included. If it drops more than once and ends lower, the digest shows one line from the price at the previous checkpoint to the current price.
+- Store the last successful digest cutoff as a checkpoint item in the existing DynamoDB table. No historical snapshot migration or table index change is needed.
+- Treat queue processing and SNS publication as at least once. An ambiguous failure after SNS accepts a digest but before the checkpoint write can cause the next attempt to send the same digest again.
+- Schedule product messages at minute 00 and digest messages at minute 05 in UTC. UTC keeps hourly boundaries continuous through New Zealand daylight-saving changes.
+- Keep the existing DynamoDB table name (`price_tracker`) and SNS topic name (`price_tracker_api_price_updates`).
 
 ## Domain glossary
 
-- **Tracked product**: one curated product URL + display name entry from `ProductsFactory`.
+- **Tracked product**: one stable product ID, curated URL, and display name from `ProductsFactory`.
 - **Price snapshot**: one persisted DynamoDB row for a product at a specific scrape timestamp.
-- **Price decrease**: a current scraped price that is lower than the latest stored snapshot price for the same URL.
-- **Scrape run**: one EventBridge-triggered Lambda execution covering the full product catalog.
+- **Digest cutoff**: the last fully elapsed epoch second captured when a digest job begins processing.
+- **Digest checkpoint**: one DynamoDB item recording the cutoff included in the last successful digest scan.
+- **Net price decrease**: the latest price at the current cutoff is lower than the latest price at the previous successful checkpoint.
+- **Worker job**: one `update_product` or `send_digest` message delivered from the FIFO queue to `JobsHandler`.
 
 ## Integration contracts
 
 ### External systems
 
-- **Chemist Warehouse website** (`www.chemistwarehouse.co.nz`): outbound HTTPS `GET` using Jsoup with browser-like headers and `30s` timeout. Required request field is the full product URL in the curated catalog. Auth method is none. Cadence is hourly per product. Failures return `null` when selector/price parsing fails and the product is skipped for that run.
-- **NZ Protein website** (`www.nzprotein.co.nz`): outbound HTTPS `GET` with the same client behavior. Required request field is the full product URL in the curated catalog. Auth method is none. Cadence is hourly. Failures follow the same skip-on-null behavior.
-- **Sportsfuel website** (`www.sportsfuel.co.nz`): one outbound HTTPS `GET` per run for the Vanilla variant, using the same client behavior. Required request field is the full product URL including the `variant` query parameter. Auth method is none. Cadence is hourly. Failures follow the same skip-on-null behavior.
-- **Vivobarefoot website** (`vivobarefoot.nz`): one outbound HTTPS `GET` per run for the Tracker Forest ESC Men's Bracken product, using the same client behavior. Required request field is the full product URL in the curated catalog. Auth method is none. Cadence is hourly. Failures follow the same skip-on-null behavior.
-- **Amazon SNS** (`price_tracker_api_price_updates`): outbound publish integration for price decrease notifications. Required publish fields are topic name, subject, and message body lines containing product name, previous price, current price, and URL. Auth uses Lambda IAM role. When no matching topic ARN exists, publish fails and the invocation fails.
+- **Chemist Warehouse website** (`www.chemistwarehouse.co.nz`): outbound HTTPS `GET` using Jsoup with browser-like headers and `30s` timeout. The request URL comes from the curated catalog. Auth method is none. Cadence is hourly per product. A `null` extracted price is skipped; exhausted request or parsing exceptions fail that product job.
+- **NZ Protein website** (`www.nzprotein.co.nz`): outbound HTTPS `GET` with the same client behavior. Cadence is hourly. A `null` extracted price is skipped; exceptions fail that product job.
+- **Sportsfuel website** (`www.sportsfuel.co.nz`): one outbound HTTPS `GET` per hour for the Vanilla variant, using its `?variant=<id>` URL. A `null` extracted price is skipped; exceptions fail that product job.
+- **Vivobarefoot website** (`vivobarefoot.nz`): one outbound HTTPS `GET` per hour for the Tracker Forest ESC Men's Bracken product. A `null` extracted price is skipped; exceptions fail that product job.
+- **Amazon SNS** (`price_tracker_api_price_updates`): publish one digest when at least one product has a net decrease. The subject contains the decrease count; each body entry contains product name, previous price, current price, and URL. Auth uses the worker Lambda IAM role. Publish failures fail the digest job and leave the checkpoint unchanged.
+- **Amazon SQS**: FIFO queue `price_tracker_jobs.fifo` receives one `update_product` message per product each hour and one `send_digest` message at minute 05. Content-based deduplication is enabled; all messages use group `price-tracker`; retention is 14 days; Lambda event-source batch size is one. Failed worker messages are retried and moved after five receives to passive FIFO DLQ `price_tracker_jobs_dlq.fifo`, which also retains messages for 14 days. A failed head message blocks this group until it succeeds or reaches the DLQ.
+- **Amazon EventBridge Scheduler**: 35 schedules enqueue product updates with `cron(0 * * * ? *)`; one schedule enqueues the digest with `cron(5 * * * ? *)`; both use UTC. Each uses the universal SQS `sendMessage` target, a dedicated role allowed to send only to the jobs queue, and a retry policy of five attempts over one hour. There is no Scheduler DLQ; a terminal failure to enqueue is an accepted missed run.
 
 ## API contracts
 
 ### Conventions
 
 - The service exposes no public REST endpoints.
-- Invocation contract is AWS Lambda `RequestHandler<ScheduledEvent, Void>`.
-- Input follows the standard EventBridge scheduled event envelope.
-- Output is `null`; observable behavior is side effects (DynamoDB writes and optional SNS publish).
-- Unhandled errors are logged and rethrown as runtime exceptions, causing Lambda invocation failure.
+- Invocation contract is one-record Lambda SQS execution with input `SQSEvent` and output `null`. The handler rejects any batch size other than one.
+- Handler exceptions are logged and rethrown as runtime exceptions, leaving the message for SQS retry.
+- `scheduled_at` is required and must be an ISO-8601 instant. Product update messages must contain a known `product_id`.
 
 ### Endpoint summary
 
-- none in current scope.
+| Interface                         | Contract                                                     | Purpose                         |
+| --------------------------------- | ------------------------------------------------------------ | ------------------------------- |
+| EventBridge Scheduler -> SQS FIFO | `update_product` with stable `product_id` and `scheduled_at` | enqueue one product scrape      |
+| EventBridge Scheduler -> SQS FIFO | `send_digest` with `scheduled_at`                            | enqueue the hourly price digest |
+| SQS FIFO -> Lambda                | one-record `SQSEvent` to `JobsHandler`                       | process one product or digest   |
 
 ### Example request and response
 
-Example invocation event:
+Product update message:
 
 ```json
 {
-  "source": "aws.events",
-  "detail-type": "Scheduled Event",
-  "time": "2026-02-11T10:00:00Z",
-  "resources": [
-    "arn:aws:events:ap-southeast-2:123456789012:rule/price_tracker_api_update_prices"
-  ]
+  "job_type": "update_product",
+  "product_id": "chemist-warehouse-74329",
+  "scheduled_at": "2026-09-30T08:00:00Z"
 }
 ```
 
-Invocation outcome:
+Digest message:
 
-- Lambda returns `null`.
-- One snapshot is written per successfully scraped product.
-- SNS notification is published only when at least one price decreased.
+```json
+{
+  "job_type": "send_digest",
+  "scheduled_at": "2026-09-30T08:05:00Z"
+}
+```
+
+Handler result on success:
+
+```json
+null
+```
+
+An update with an unavailable extracted price succeeds without writing a snapshot. Other errors fail the invocation so SQS retries the message.
 
 ## Data and storage contracts
 
 ### DynamoDB model
 
 - **Table name**: `price_tracker`
-- **Primary key**:
+- **Snapshot primary key**:
   - `pk`: `PRODUCT#<url>`
   - `sk`: `TIMESTAMP#<epoch_seconds_padded_to_10_digits>`
-- **Attributes**:
+- **Snapshot attributes**:
   - `pk` (String)
   - `sk` (String)
   - `price` (Number / Double)
@@ -160,10 +200,14 @@ Invocation outcome:
   - `product` (String)
   - `url` (String)
   - `version` (Number, optimistic locking)
-- **Access pattern**: query by `pk` with `scanIndexForward=false` and `limit=1` to read latest snapshot.
-- **Write pattern**: append new snapshot per run (`putItem`), preserving price history over time.
+- **Snapshot access pattern**: strongly consistent query by `pk` and `sk <= cutoff` with `scanIndexForward=false` and `limit=1` to read the latest snapshot at or before a cutoff.
+- **Snapshot write pattern**: append a new item per successful product scrape with `putItem`.
+- **Checkpoint key**:
+  - `pk`: `DIGEST#PRICE_DECREASES`
+  - `sk`: `CHECKPOINT`
+- **Checkpoint attribute**: `processed_through` (Number, epoch seconds). The digest writes the checkpoint after a successful SNS publish or after a scan with no decreases.
 
-Representative item:
+Representative snapshot:
 
 ```json
 {
@@ -177,34 +221,48 @@ Representative item:
 }
 ```
 
+Representative checkpoint:
+
+```json
+{
+  "pk": "DIGEST#PRICE_DECREASES",
+  "sk": "CHECKPOINT",
+  "processed_through": 1760000000
+}
+```
+
 ## Behavioral invariants and time semantics
 
-- Each invocation captures `now` once and uses that same timestamp for all snapshots written in the run.
-- Products are scraped in a random order each run so consecutive requests are less likely to hit the same host's rate limits.
+- Each product job captures `now` once and uses it for that snapshot.
 - Snapshot timestamps are stored as epoch seconds (UTC) via `EpochSecondConverter`.
-- Price comparison detects decreases only (`currentPrice < previousPrice`); price increases are not notified.
-- No notification is sent for a product with no previous snapshot.
-- Products with `null` extracted prices are skipped and not written for that run.
-- Notification publish happens before DynamoDB writes for the new snapshots.
-- If scraping throws after all attempts, the invocation fails and no later writes in that run are executed.
+- Each digest captures its cutoff as the last fully elapsed epoch second before querying. Snapshot and checkpoint reads are strongly consistent. This avoids advancing the checkpoint past a product snapshot written later in the same second or missing an earlier completed write.
+- The prior comparison boundary is the last successful digest checkpoint. On the first digest, the baseline is one hour before that message's `scheduled_at`.
+- For each catalog product, the digest compares the latest snapshot at or before the prior checkpoint with the latest snapshot at or before the current cutoff. It sends a line only when both exist and `currentPrice < previousPrice`.
+- A first-seen product has no prior snapshot and is not included. Price increases and unchanged prices are not notified. Multiple snapshots between checkpoints produce one net comparison per product; intermediate drops that recover are omitted.
+- A product scrape that returns `null` is skipped without a snapshot. Network errors, non-`2xx` responses after retries, and other thrown failures fail that product message.
+- The checkpoint advances after SNS publish succeeds or when there are no decreases. If SNS publish fails, the checkpoint is unchanged and SQS retries the digest.
+- If SNS accepted a digest but the checkpoint write then fails, a retry may publish the same digest again. Delivery is at least once.
+- A late product update processed after a digest cutoff is included by the next digest, because the checkpoint does not advance past its timestamp.
 - Jsoup makes up to `3` attempts with exponential backoff starting at `1s`, doubling per retry, plus up to `50%` jitter.
 - Non-`2xx` responses, including `429`, use the same generic backoff without status-specific handling until attempts are exhausted.
 - Non-`2xx` responses are logged at warn level with status code, response headers, and response body (body truncated to `1000` characters).
 
 ## Source of truth
 
-| Entity                     | Authoritative source                  | Notes                                                  |
-| -------------------------- | ------------------------------------- | ------------------------------------------------------ |
-| Tracked product catalog    | `ProductsFactoryImpl` in service code | Curated list shipped with deployments                  |
-| Product page current price | Retailer HTML page at scrape time     | Parsed through host-specific extractor                 |
-| Historical tracked prices  | DynamoDB `price_tracker` snapshots    | Canonical persisted history for comparisons            |
-| Decrease notifications     | SNS topic messages                    | Derived from comparison against latest stored snapshot |
-| Subscriber endpoints       | Terraform `local.subscriptions`       | Managed in infrastructure, not in application code     |
+| Entity                     | Authoritative source                | Notes                                                    |
+| -------------------------- | ----------------------------------- | -------------------------------------------------------- |
+| Product catalog and IDs    | `ProductsFactoryImpl`               | Curated list shipped with deployments                    |
+| Product schedule IDs       | `infra/main.tf` `local.product_ids` | Must match IDs in `ProductsFactoryImpl`                  |
+| Product page current price | Retailer HTML page at scrape time   | Parsed through host-specific extractor                   |
+| Historical tracked prices  | DynamoDB `price_tracker` snapshots  | Canonical source for digest comparisons and history      |
+| Digest progress            | DynamoDB checkpoint item            | Advances after a successful digest publish or empty scan |
+| Decrease notifications     | SNS topic messages                  | Derived from latest snapshots at the two digest cutoffs  |
+| Subscriber endpoints       | Terraform `local.subscriptions`     | Managed in infrastructure, not in application code       |
 
 ## Security and privacy
 
-- Service has no public HTTP endpoint; it is invoked by EventBridge with explicit Lambda permission.
-- IAM policy grants Lambda access to CloudWatch Logs, `price_tracker` DynamoDB actions, and SNS publish/list operations.
+- The service has no public HTTP endpoint; EventBridge Scheduler sends messages to the FIFO queue using a dedicated IAM role.
+- Worker IAM grants access to CloudWatch Logs, `price_tracker` DynamoDB actions, SNS publish/list operations, and receive/delete operations on the jobs queue.
 - The service does not read from Secrets Manager and has no custom secret payload contract.
 - Stored data is public product metadata (name, URL, price, timestamp), not user PII.
 - Outbound traffic is HTTPS scraping against public retailer pages plus AWS API calls.
@@ -228,49 +286,52 @@ Representative item:
 
 ## Performance envelope
 
-- Execution cadence is fixed at one scheduled run per hour (`rate(1 hour)`).
-- Current catalog size is `35` product URLs processed sequentially in each run.
+- Product schedules enqueue `35` update messages at minute 00 each hour; one digest message is enqueued at minute 05.
+- Current catalog size is `35` product URLs. A single FIFO message group serializes all `36` hourly messages. Average processing time must stay near or below `100s` per message for the queue to drain before the next hour.
 - Each fetch uses up to `3` attempts with a `30s` request timeout and generic exponential backoff starting at `1s`.
-- Lambda timeout is `300s`; catalog size and scrape behavior are tuned for personal-scale workloads.
-- DynamoDB table uses `PAY_PER_REQUEST` billing mode for elastic low-volume operation.
+- Worker Lambda timeout is `120s`; queue visibility timeout is `720s` (six times the worker timeout). The event-source batch size is one.
+- A digest performs up to `70` latest-snapshot queries (two for each product) plus the checkpoint read/write. At current catalog size this is a small `PAY_PER_REQUEST` workload.
+- The DynamoDB table uses `PAY_PER_REQUEST` billing mode.
 
 ## Testing and quality gates
 
-- **Unit tests** (`//price_tracker_api:unit-tests`) validate extractor parsing behavior and unsupported host handling.
-- **Integration tests** (`//price_tracker_api:integration-tests`) validate handler behavior with DynamoDB test container plus fake clock/price/products/notifications.
-- **E2E tests** (`//price_tracker_api:e2e-tests`) validate LocalStack wiring (Lambda, DynamoDB, SNS, SQS) with mock retailer websites on an internal Testcontainers network.
+- **Unit tests** (`//price_tracker_api:unit-tests`) validate product ID lookup, catalog uniqueness, extractor parsing, and unsupported host handling.
+- **Integration tests** (`//price_tracker_api:integration-tests`) validate one-product snapshot writes, null-price skip and unknown product handling, message parsing, checkpoint initialization/advancement, net decreases, recovered intermediate drops, and SNS failure behavior with DynamoDB test containers and fakes.
+- **E2E tests** (`//price_tracker_api:e2e-tests`) validate LocalStack FIFO delivery, representative retailer scraping, and net-decrease digest publication using mock retailer websites on an internal Testcontainers network.
 - E2E runs are CI-safe and do not require outbound internet access to retailer hosts.
-- Recommended pre-merge checks for this service: `bazel build //price_tracker_api:all` and `bazel test //price_tracker_api:all`.
+- Recommended pre-merge checks: `bazel build //price_tracker_api:all` and `bazel test //price_tracker_api:all`.
 
 ## Local development and smoke checks
 
 - Build service targets: `bazel build //price_tracker_api:all`
 - Run all service tests: `bazel test //price_tracker_api:all`
-- Fast E2E smoke check: `bazel test --test_filter=PriceTrackerE2ETest.shouldTrackChemistWarehousePricesAndSendNotifications //price_tracker_api:e2e-tests`
-- Core behavior smoke check: `bazel test --test_filter=UpdatePricesHandlerIntegrationTest.handleRequestShouldUpdatePrices //price_tracker_api:integration-tests`
-- Full E2E validation (mock retailer websites): `bazel test //price_tracker_api:e2e-tests`
-
-### E2E runtime benchmark (2026-02-20)
-
-| Scenario                               | Command                                                                                                      | Result                                                                                                    |
-| -------------------------------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| Pre-migration baseline (origin/master) | `bazel test //price_tracker_api:e2e-tests`                                                                   | Did not complete reliably; run exceeded `400s` and was terminated while waiting on live retailer scraping |
-| Post-migration cold-ish                | `hyperfine --runs 3 --warmup 0 --prepare "bazel clean --expunge" "bazel test //price_tracker_api:e2e-tests"` | Mean `106.204s` (min `100.262s`, max `109.842s`)                                                          |
-| Post-migration warm                    | `hyperfine --runs 3 --warmup 2 "bazel test //price_tracker_api:e2e-tests"`                                   | Mean `261.9ms` (min `229.5ms`, max `324.1ms`)                                                             |
+- Product ID/catalog checks: `bazel test --test_filter=ProductsFactoryImplTest //price_tracker_api:unit-tests`
+- Core product update behavior: `bazel test --test_filter=UpdateProductJobProcessorIntegrationTest //price_tracker_api:integration-tests`
+- Digest comparison behavior: `bazel test --test_filter=SendDigestJobProcessorIntegrationTest //price_tracker_api:integration-tests`
+- Full queue-driven E2E validation: `bazel test //price_tracker_api:e2e-tests`
 
 ## End-to-end scenarios
 
-### Scenario 1: hourly run detects a price decrease
+### Scenario 1: hourly product updates produce a net decrease digest
 
-1. EventBridge invokes `UpdatePricesHandler`.
-2. Handler loads curated products and scrapes current prices.
-3. For a product with existing history, handler compares previous and current values.
-4. If decreased, handler includes the decrease in a single SNS summary message.
-5. Handler writes new snapshots for all successfully scraped products.
+1. EventBridge Scheduler enqueues one `update_product` message per product at minute 00 UTC.
+2. `JobsHandler` dispatches each message to `UpdateProductJobProcessor`, which resolves the stable product ID and scrapes one page.
+3. A numeric price appends a snapshot; a `null` extracted price is skipped. A thrown error fails only that product job and is retried by SQS.
+4. EventBridge Scheduler enqueues `send_digest` at minute 05 in the same FIFO message group.
+5. `SendDigestJobProcessor` compares each product's latest price at the previous successful checkpoint with its latest price at the current processing cutoff.
+6. If any product has a lower net price, one SNS email lists one decrease per product. The checkpoint advances after a successful publish.
 
-### Scenario 2: first-seen product or scrape miss
+### Scenario 2: a digest spans multiple product checks
 
-1. EventBridge invokes `UpdatePricesHandler`.
-2. Handler scrapes a product with no prior snapshot, or scraping returns `null`.
-3. First-seen product is written without notification; `null` scrape result is skipped with no write.
-4. Invocation continues processing remaining products and only publishes when at least one valid price decrease is detected.
+1. The digest message is delayed or retried while product update messages continue through the FIFO queue.
+2. When the digest runs, its cutoff covers snapshots written through that processing time.
+3. For each product, the digest compares only the latest price at the previous checkpoint with the latest price at the new cutoff.
+4. A product that drops and recovers produces no decrease; a product that ends lower produces one line from its previous-checkpoint price to its current price.
+5. The digest advances the checkpoint, so later digests do not reprocess that interval.
+
+### Scenario 3: a product job fails repeatedly
+
+1. A product update throws after its retailer retries are exhausted.
+2. SQS retries the same message up to five receives while the single FIFO group preserves ordering.
+3. If all five receives fail, SQS moves the job to `price_tracker_jobs_dlq.fifo`.
+4. The platform DLQ alarm fires while at least one message is visible. After the cause is fixed, the failed job can be inspected and manually redriven.

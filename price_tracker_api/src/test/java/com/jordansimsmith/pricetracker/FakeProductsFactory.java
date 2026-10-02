@@ -17,6 +17,14 @@ public class FakeProductsFactory implements ProductsFactory {
     return allProducts;
   }
 
+  @Override
+  public Product getProduct(String id) {
+    return findProducts().stream()
+        .filter(product -> product.id().equals(id))
+        .findFirst()
+        .orElseThrow(() -> new IllegalArgumentException("Unknown product ID: " + id));
+  }
+
   public void addChemistWarehouseProducts(List<Product> products) {
     chemistWarehouseProducts.addAll(products);
   }

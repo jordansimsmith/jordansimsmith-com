@@ -1,6 +1,7 @@
 package com.jordansimsmith.pricetracker;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.net.URI;
 import org.junit.jupiter.api.Test;
@@ -100,5 +101,41 @@ public class ProductsFactoryImplTest {
         .isEqualTo("Vivobarefoot - Tracker Forest ESC Men's - Bracken");
     assertThat(vivobarefootProducts.get(0).url().toString())
         .isEqualTo("http://vivobarefoot.example:8080/products/tracker-forest-esc-mens-bracken");
+  }
+
+  @Test
+  void findProductsShouldReturnStableUniqueIDs() {
+    // arrange
+    var productsFactory =
+        new ProductsFactoryImpl(
+            URI.create("http://chemist.example:8080"),
+            URI.create("http://protein.example:8080"),
+            URI.create("http://sportsfuel.example:8080"),
+            URI.create("http://vivobarefoot.example:8080"));
+
+    // act
+    var products = productsFactory.findProducts();
+
+    // assert
+    assertThat(products).hasSize(35);
+    assertThat(products.stream().map(ProductsFactory.Product::id).distinct().toList()).hasSize(35);
+    assertThat(productsFactory.getProduct("chemist-warehouse-74329").name())
+        .isEqualTo("Chemist Warehouse - Dynamic Whey 2kg - Chocolate");
+  }
+
+  @Test
+  void getProductShouldRejectUnknownIDs() {
+    // arrange
+    var productsFactory =
+        new ProductsFactoryImpl(
+            URI.create("http://chemist.example:8080"),
+            URI.create("http://protein.example:8080"),
+            URI.create("http://sportsfuel.example:8080"),
+            URI.create("http://vivobarefoot.example:8080"));
+
+    // act / assert
+    assertThatThrownBy(() -> productsFactory.getProduct("missing-product"))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("Unknown product ID: missing-product");
   }
 }
