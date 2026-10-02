@@ -532,24 +532,35 @@ export function ScanReviewPanels({
         </Stack>
       </Paper>
 
-      <Paper withBorder radius="md" p="xs">
-        <Group justify="space-between" wrap="wrap" gap="xs">
-          <Group gap="xs">
+      <Paper withBorder radius="md" p="xs" className={classes.reviewActions}>
+        <Group
+          justify="space-between"
+          wrap="wrap"
+          gap="xs"
+          className={classes.reviewActionGroup}
+        >
+          <Group gap="xs" className={classes.reviewNavigation}>
             <Button
+              className={classes.mobileIconButton}
               variant="default"
               leftSection={<IconArrowLeft size={16} />}
+              aria-label="Previous scan card"
+              title="Previous scan card"
               disabled={controlsDisabled || selectedIndex === 0}
               onClick={() => onMoveRow(-1)}
             >
-              Previous
+              <span className={classes.buttonLabel}>Previous</span>
             </Button>
             <Button
+              className={classes.mobileIconButton}
               variant="default"
               rightSection={<IconArrowRight size={16} />}
+              aria-label="Next scan card"
+              title="Next scan card"
               disabled={controlsDisabled || selectedIndex >= rowCount - 1}
               onClick={() => onMoveRow(1)}
             >
-              Next
+              <span className={classes.buttonLabel}>Next</span>
             </Button>
             <Button
               color="red"
@@ -563,6 +574,7 @@ export function ScanReviewPanels({
             </Button>
           </Group>
           <Button
+            className={classes.reviewConfirm}
             color="teal"
             leftSection={<IconCheck size={17} />}
             disabled={
@@ -576,10 +588,9 @@ export function ScanReviewPanels({
             {selection?.confirmed ? 'Match confirmed' : 'Confirm match'}
           </Button>
         </Group>
-        <Text size="xs" c="dimmed" mt="xs">
-          Deleting {selectedRow.filename} removes this scan row immediately.
-          Remove the matching physical card from the stack; this cannot be
-          undone.
+        <Text size="xs" c="dimmed" mt="xs" className={classes.deleteGuidance}>
+          Deleting {selectedRow.filename} removes it from the scan. Remove the
+          physical card from your stack immediately; this cannot be undone.
         </Text>
       </Paper>
     </Stack>

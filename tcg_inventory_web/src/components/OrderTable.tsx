@@ -51,7 +51,11 @@ export function OrderTable({ orders, onOpen }: OrderTableProps) {
               {formatDeliveryMode(order.delivery_mode)}
             </Table.Td>
             <Table.Td data-field="accepted" data-label="Accepted">
-              {new Date(order.accepted_at * 1000).toLocaleString()}
+              {new Date(order.accepted_at * 1000).toLocaleString(undefined, {
+                dateStyle: 'short',
+                timeStyle: 'short',
+                hour12: true,
+              })}
             </Table.Td>
           </Table.Tr>
         ))}

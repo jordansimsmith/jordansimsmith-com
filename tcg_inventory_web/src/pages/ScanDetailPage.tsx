@@ -108,7 +108,11 @@ function ScanSummary({ scan }: { scan: ScanDetail }) {
           </Text>
         )}
         {scan.error && (
-          <Text size="sm" c="red.7" role="alert">
+          <Text
+            size="sm"
+            c={scan.status === 'reviewing' ? 'orange.8' : 'red.7'}
+            role="alert"
+          >
             {scan.error}
           </Text>
         )}
@@ -263,7 +267,7 @@ export function ScanDetailPage() {
             )}
             <PageHeader
               title="Scan"
-              description={`${getGame(scan.game).display_name} · Created ${new Date(scan.created_at * 1000).toLocaleString()}`}
+              description={`${getGame(scan.game).display_name} · Created ${new Date(scan.created_at * 1000).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short' })}`}
               actions={
                 <Group gap="xs">
                   {scan.status !== 'confirmed' &&

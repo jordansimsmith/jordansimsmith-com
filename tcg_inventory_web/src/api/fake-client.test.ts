@@ -95,7 +95,7 @@ describe('createFakeClient', () => {
 
     expect(detail.in_stock_count).toBe(6);
     expect(detail.reserved_count).toBe(2);
-    expect(detail.image_urls.normal).toMatch(/^https:\/\/img\.example\//);
+    expect(detail.image_urls.normal).toMatch(/^data:image\/svg\+xml/);
   });
 
   it('returns units ascending with derived locations', async () => {
@@ -837,7 +837,7 @@ describe('createFakeClient orders', () => {
       expect(unit.game).toBe('mtg');
       expect(unit.external_source).toBe('scryfall');
       expect(unit.external_id).toMatch(/^[0-9a-f-]{36}$/);
-      expect(unit.image_urls.small).toMatch(/^https:\/\/img\.example\//);
+      expect(unit.image_urls.small).toMatch(/^data:image\/svg\+xml/);
     }
     for (const unit of detail.units) {
       expect(unit.current_location).toMatch(/^A\d+-\d+$/);

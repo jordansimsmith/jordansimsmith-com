@@ -49,7 +49,14 @@ export function ImportTable({ imports, onOpen }: ImportTableProps) {
               {importSummary.row_count}
             </Table.Td>
             <Table.Td data-field="uploaded" data-label="Uploaded">
-              {new Date(importSummary.created_at * 1000).toLocaleString()}
+              {new Date(importSummary.created_at * 1000).toLocaleString(
+                undefined,
+                {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                  hour12: true,
+                },
+              )}
             </Table.Td>
           </Table.Tr>
         ))}

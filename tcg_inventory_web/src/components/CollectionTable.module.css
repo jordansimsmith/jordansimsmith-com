@@ -143,28 +143,82 @@
 
   .imports tbody tr {
     grid-template-areas:
-      'filename status'
-      'rows uploaded';
+      'filename filename'
+      'game game'
+      'status rows'
+      'uploaded uploaded';
     grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .imports [data-field='filename'] {
     grid-area: filename;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .imports [data-field='status'] {
     grid-area: status;
-    justify-content: flex-end;
+    justify-content: flex-start;
   }
 
   .imports [data-field='rows'] {
     grid-area: rows;
-    justify-content: flex-start;
+    justify-content: flex-end;
   }
 
   .imports [data-field='uploaded'] {
     grid-area: uploaded;
+    justify-content: flex-start;
+    white-space: nowrap;
+  }
+
+  .imports [data-field='game'] {
+    grid-area: game;
+    color: var(--mantine-color-dimmed);
+    font-size: var(--mantine-font-size-xs);
+  }
+
+  .scans tbody tr {
+    grid-template-areas:
+      'created status'
+      'game game'
+      'cards condition'
+      'finish finish';
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .scans [data-field='created'] {
+    grid-area: created;
+    white-space: nowrap;
+  }
+
+  .scans [data-field='game'] {
+    grid-area: game;
+    color: var(--mantine-color-dimmed);
+    font-size: var(--mantine-font-size-xs);
+  }
+
+  .scans [data-field='status'] {
+    grid-area: status;
     justify-content: flex-end;
+  }
+
+  .scans [data-field='cards'] {
+    grid-area: cards;
+    justify-content: flex-start;
+  }
+
+  .scans [data-field='condition'] {
+    grid-area: condition;
+    justify-content: flex-end;
+  }
+
+  .scans [data-field='finish'] {
+    grid-area: finish;
+    color: var(--mantine-color-dimmed);
+    font-size: var(--mantine-font-size-xs);
   }
 
   .orders tbody tr {

@@ -205,7 +205,7 @@ export function OrderDetailPage() {
           <>
             <PageHeader
               title={`Order ${order.order_id}`}
-              description={`Accepted ${new Date(order.accepted_at * 1000).toLocaleString()}`}
+              description={`Accepted ${new Date(order.accepted_at * 1000).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short', hour12: true })}`}
               actions={
                 <Button variant="subtle" onClick={() => navigate('/orders')}>
                   Back to orders

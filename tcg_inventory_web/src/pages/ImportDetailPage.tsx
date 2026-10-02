@@ -323,7 +323,7 @@ export function ImportDetailPage() {
           <>
             <PageHeader
               title={importDisplayName(importDetail.filename)}
-              description={`${getGame(importDetail.game).display_name} · Uploaded ${new Date(importDetail.created_at * 1000).toLocaleString()}`}
+              description={`${getGame(importDetail.game).display_name} · Uploaded ${new Date(importDetail.created_at * 1000).toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'short', hour12: true })}`}
               actions={
                 <Button variant="subtle" onClick={() => navigate('/imports')}>
                   Back to imports

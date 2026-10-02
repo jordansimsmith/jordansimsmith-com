@@ -46,6 +46,8 @@ export function ImportRowPhotoStrip({
                 variant="subtle"
                 size={36}
                 color="gray"
+                aria-label={`Add listing photo for row ${position}`}
+                title={`Add listing photo for row ${position}`}
               >
                 <IconCamera size={16} />
               </ActionIcon>

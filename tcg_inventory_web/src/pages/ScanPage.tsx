@@ -69,7 +69,7 @@ function ScanTable({ scans, onOpen }: ScanTableProps) {
       verticalSpacing={4}
       horizontalSpacing="sm"
       fz="sm"
-      className={classes.table}
+      className={`${classes.table} ${classes.scans}`}
     >
       <Table.Thead>
         <Table.Tr>
@@ -94,7 +94,10 @@ function ScanTable({ scans, onOpen }: ScanTableProps) {
               data-label="Created"
               style={{ whiteSpace: 'nowrap' }}
             >
-              {new Date(scan.created_at * 1000).toLocaleString()}
+              {new Date(scan.created_at * 1000).toLocaleString(undefined, {
+                dateStyle: 'short',
+                timeStyle: 'short',
+              })}
             </Table.Td>
             <Table.Td data-field="game" data-label="Game">
               {getGame(scan.game).display_name}

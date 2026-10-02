@@ -104,10 +104,11 @@ const FAKE_CATALOG_CARDS: CatalogCard[] = [
     set_code: 'm11',
     set_name: 'Magic 2011',
     collector_number: '146',
-    image_urls: {
-      small: null,
-      normal: 'https://img.example/lightning-bolt-1.jpg',
-    },
+    image_urls: fakeImageUrls(
+      'f29ba16f-c8fb-42fe-aabf-87089cb214a7',
+      'Lightning Bolt',
+      'M11',
+    ),
     available_finishes: ['normal', 'foil'],
   },
   {
@@ -118,10 +119,11 @@ const FAKE_CATALOG_CARDS: CatalogCard[] = [
     set_code: '2xm',
     set_name: 'Double Masters',
     collector_number: '132',
-    image_urls: {
-      small: null,
-      normal: 'https://img.example/lightning-bolt-2.jpg',
-    },
+    image_urls: fakeImageUrls(
+      'f29ba16f-c8fb-42fe-aabf-87089cb214a8',
+      'Lightning Bolt',
+      '2XM',
+    ),
     available_finishes: ['normal', 'foil', 'etched'],
   },
   {
@@ -132,10 +134,11 @@ const FAKE_CATALOG_CARDS: CatalogCard[] = [
     set_code: 'sta',
     set_name: 'Strixhaven Mystical Archive',
     collector_number: '42',
-    image_urls: {
-      small: null,
-      normal: 'https://img.example/lightning-bolt-3.jpg',
-    },
+    image_urls: fakeImageUrls(
+      'f29ba16f-c8fb-42fe-aabf-87089cb214a9',
+      'Lightning Bolt',
+      'STA',
+    ),
     available_finishes: ['normal', 'foil'],
   },
   {
@@ -146,10 +149,7 @@ const FAKE_CATALOG_CARDS: CatalogCard[] = [
     set_code: 'm19',
     set_name: 'Core Set 2019',
     collector_number: '314',
-    image_urls: {
-      small: null,
-      normal: 'https://img.example/llanowar-elves.jpg',
-    },
+    image_urls: fakeImageUrls('fake-llanowar-elves', 'Llanowar Elves', 'DOM'),
     available_finishes: ['normal', 'foil'],
   },
   {
@@ -160,7 +160,7 @@ const FAKE_CATALOG_CARDS: CatalogCard[] = [
     set_code: 'xln',
     set_name: 'Ixalan',
     collector_number: '65',
-    image_urls: { small: null, normal: 'https://img.example/opt.jpg' },
+    image_urls: fakeImageUrls('fake-opt', 'Opt', 'DOM'),
     available_finishes: ['normal', 'foil'],
   },
   {
@@ -171,7 +171,7 @@ const FAKE_CATALOG_CARDS: CatalogCard[] = [
     set_code: 'mh2',
     set_name: 'Modern Horizons 2',
     collector_number: '267',
-    image_urls: { small: null, normal: 'https://img.example/counterspell.jpg' },
+    image_urls: fakeImageUrls('fake-counterspell', 'Counterspell', 'MH2'),
     available_finishes: ['normal', 'foil', 'etched'],
   },
 ];
@@ -397,7 +397,7 @@ function toDetail(sku: FakeSku): SkuDetail {
     ...toSummary(sku),
     external_source: sku.external_source,
     external_id: sku.external_id,
-    image_urls: fakeImageUrls(sku.external_id),
+    image_urls: fakeImageUrls(sku.external_id, sku.name, sku.set_code),
     in_stock_count: countByStatus(sku, 'in_stock'),
     reserved_count: countByStatus(sku, 'reserved'),
     sold_count: countByStatus(sku, 'sold'),
@@ -405,12 +405,37 @@ function toDetail(sku: FakeSku): SkuDetail {
   };
 }
 
-function fakeImageUrls(externalId: string): ImageUrls {
-  const baseUrl = `https://img.example/cards/${encodeURIComponent(externalId)}`;
-  return {
-    small: `${baseUrl}/small.jpg`,
-    normal: `${baseUrl}/normal.jpg`,
-  };
+function fakeImageUrls(
+  externalId: string,
+  name = 'Card preview',
+  setCode = 'TCG',
+): ImageUrls {
+  const colors = ['#dbeafe', '#dcfce7', '#fef3c7', '#ede9fe'];
+  const colorIndex =
+    [...externalId].reduce(
+      (total, character) => total + character.charCodeAt(0),
+      0,
+    ) % colors.length;
+  const cardName = name
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="488" height="680" viewBox="0 0 488 680">
+      <rect width="488" height="680" rx="16" fill="#f8f9fa" />
+      <rect x="12" y="12" width="464" height="656" rx="12" fill="white" stroke="#ced4da" stroke-width="2" />
+      <text x="32" y="51" fill="#212529" font-family="sans-serif" font-size="24" font-weight="700">${cardName}</text>
+      <rect x="28" y="72" width="432" height="430" rx="6" fill="${colors[colorIndex]}" />
+      <circle cx="244" cy="264" r="108" fill="none" stroke="#ffffff" stroke-opacity=".7" stroke-width="8" />
+      <path d="M120 374 208 232l55 80 40-52 66 114H120Z" fill="#ffffff" fill-opacity=".55" />
+      <text x="244" y="438" text-anchor="middle" fill="#495057" font-family="sans-serif" font-size="18" font-weight="700" letter-spacing="2">FAKE MODE</text>
+      <rect x="28" y="518" width="432" height="106" rx="6" fill="#f1f3f5" stroke="#dee2e6" />
+      <text x="44" y="552" fill="#495057" font-family="sans-serif" font-size="16" font-weight="600">Card image preview</text>
+      <text x="44" y="586" fill="#868e96" font-family="sans-serif" font-size="14">${setCode.toUpperCase()} · Local fixture</text>
+    </svg>
+  `.trim();
+  const image = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
+  return { small: image, normal: image };
 }
 
 function browseKey(sku: SkuSummary): string {
@@ -1428,7 +1453,7 @@ function toOrderDetail(order: FakeOrder, skus: FakeSku[]): OrderDetail {
         name: sku.name,
         external_source: sku.external_source,
         external_id: sku.external_id,
-        image_urls: fakeImageUrls(sku.external_id),
+        image_urls: fakeImageUrls(sku.external_id, sku.name, sku.set_code),
         set_code: sku.set_code,
         collector_number: sku.collector_number,
         finish: sku.finish,

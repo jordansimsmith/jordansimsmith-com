@@ -135,11 +135,12 @@ function ReviewSummary({
             {confirmError}
           </Text>
         )}
-        <Text size="sm" c="dimmed">
-          Identification is complete. This scan is ready for review.
-        </Text>
         {scan.error && (
-          <Text c="red.7" size="sm" role="alert">
+          <Text
+            c={scan.status === 'reviewing' ? 'orange.8' : 'red.7'}
+            size="sm"
+            role="alert"
+          >
             {scan.error}
           </Text>
         )}
