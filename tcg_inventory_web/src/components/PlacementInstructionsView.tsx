@@ -1,13 +1,4 @@
-import {
-  Badge,
-  Box,
-  Button,
-  Group,
-  Paper,
-  Stack,
-  Text,
-  Title,
-} from '@mantine/core';
+import { Badge, Box, Group, Paper, Stack, Text, Title } from '@mantine/core';
 import type { PlacementInstruction } from '../api/client';
 import classes from './PlacementInstructionsView.module.css';
 
@@ -15,14 +6,12 @@ interface PlacementInstructionsViewProps {
   unitCount: number;
   totalSuggestedPrice: string;
   placementInstructions: PlacementInstruction[];
-  onBackToImports: () => void;
 }
 
 export function PlacementInstructionsView({
   unitCount,
   totalSuggestedPrice,
   placementInstructions,
-  onBackToImports,
 }: PlacementInstructionsViewProps) {
   return (
     <Paper
@@ -93,12 +82,6 @@ export function PlacementInstructionsView({
             </Text>
           </Box>
         ))}
-
-        <Group justify="flex-end" p="md" className={classes.footer}>
-          <Button variant="default" onClick={onBackToImports}>
-            Back to imports
-          </Button>
-        </Group>
       </Stack>
     </Paper>
   );

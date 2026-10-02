@@ -701,7 +701,12 @@ describe('ImportDetailPage', () => {
       name: 'Placement sheet',
     });
     expect(
-      within(placementSheet).getByRole('button', { name: 'Back to imports' }),
+      within(placementSheet).queryByRole('button', {
+        name: 'Back to imports',
+      }),
+    ).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Back to imports' }),
     ).toBeDefined();
     expect(
       screen.getByRole('button', { name: 'View 3 import rows' }),

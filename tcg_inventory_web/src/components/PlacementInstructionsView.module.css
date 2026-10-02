@@ -30,10 +30,6 @@
   overflow-wrap: anywhere;
 }
 
-.footer {
-  border-top: 1px solid var(--mantine-color-gray-3);
-}
-
 @media (max-width: 48em) {
   .instructionRow {
     grid-template-columns: minmax(0, 1fr);
@@ -47,10 +43,5 @@
 
   .count {
     margin-left: auto;
-  }
-
-  .footer button {
-    width: 100%;
-    min-height: 44px;
   }
 }

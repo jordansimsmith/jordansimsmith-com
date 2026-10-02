@@ -410,7 +410,6 @@ export function ImportDetailPage() {
                   unitCount={importDetail.unit_count}
                   totalSuggestedPrice={importDetail.total_suggested_price}
                   placementInstructions={importDetail.placement_instructions}
-                  onBackToImports={() => navigate('/imports')}
                 />
               )}
             {showReview && (
