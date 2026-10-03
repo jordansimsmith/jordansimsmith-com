@@ -4,8 +4,6 @@ import com.google.common.annotations.VisibleForTesting;
 import java.io.IOException;
 import java.net.URI;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.random.RandomGenerator;
 import javax.annotation.Nullable;
 import org.jsoup.Connection;
 import org.jsoup.HttpStatusException;
@@ -16,17 +14,11 @@ import org.slf4j.LoggerFactory;
 public class JsoupPriceClient implements PriceClient {
   private static final Logger LOGGER = LoggerFactory.getLogger(JsoupPriceClient.class);
 
-  private static final int MAX_ATTEMPTS = 3;
-  private static final long INITIAL_BACKOFF_MS = 1000;
-  private static final double BACKOFF_MULTIPLIER = 2.0;
-  private static final double JITTER_FACTOR = 0.5;
   private static final int MAX_LOGGED_BODY_CHARS = 1000;
 
-  private final RandomGenerator random;
   private final Map<String, PriceExtractor> priceExtractors;
 
-  public JsoupPriceClient(RandomGenerator random, Map<String, PriceExtractor> priceExtractors) {
-    this.random = random;
+  public JsoupPriceClient(Map<String, PriceExtractor> priceExtractors) {
     this.priceExtractors = priceExtractors;
   }
 
@@ -38,42 +30,22 @@ public class JsoupPriceClient implements PriceClient {
       throw new IllegalArgumentException("Unsupported website: " + url.getHost());
     }
 
-    var backoffMs = INITIAL_BACKOFF_MS;
-    Exception lastException = null;
-
-    for (var attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
-      try {
-        var response = fetchResponse(url.toString());
-        if (response.statusCode() / 100 != 2) {
-          logErrorResponse(url, response);
-          throw new HttpStatusException(
-              "HTTP error fetching URL", response.statusCode(), url.toString());
-        }
-        var price = extractor.extractPrice(response.parse());
-        if (price != null) {
-          return price;
-        }
-      } catch (Exception e) {
-        lastException = e;
-      }
-
-      if (attempt < MAX_ATTEMPTS - 1) {
-        var jitterMs = (long) (random.nextDouble() * JITTER_FACTOR * backoffMs);
-        try {
-          TimeUnit.MILLISECONDS.sleep(backoffMs + jitterMs);
-        } catch (InterruptedException e) {
-          Thread.currentThread().interrupt();
-          throw new RuntimeException("Thread interrupted during backoff", e);
-        }
-        backoffMs = (long) (backoffMs * BACKOFF_MULTIPLIER);
-      }
+    try {
+      return getPriceImpl(url, extractor);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
+  }
 
-    if (lastException != null) {
-      throw new RuntimeException(lastException);
+  @Nullable
+  private Double getPriceImpl(URI url, PriceExtractor extractor) throws IOException {
+    var response = fetchResponse(url.toString());
+    if (response.statusCode() / 100 != 2) {
+      logErrorResponse(url, response);
+      throw new HttpStatusException(
+          "HTTP error fetching URL", response.statusCode(), url.toString());
     }
-
-    return null;
+    return extractor.extractPrice(response.parse());
   }
 
   private void logErrorResponse(URI url, Connection.Response response) {

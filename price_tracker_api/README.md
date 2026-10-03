@@ -239,12 +239,10 @@ Representative checkpoint:
 - The prior comparison boundary is the last successful digest checkpoint. On the first digest, the baseline is one hour before that message's `scheduled_at`.
 - For each catalog product, the digest compares the latest snapshot at or before the prior checkpoint with the latest snapshot at or before the current cutoff. It sends a line only when both exist and `currentPrice < previousPrice`.
 - A first-seen product has no prior snapshot and is not included. Price increases and unchanged prices are not notified. Multiple snapshots between checkpoints produce one net comparison per product; intermediate drops that recover are omitted.
-- A product scrape that returns `null` is skipped without a snapshot. Network errors, non-`2xx` responses after retries, and other thrown failures fail that product message.
+- A product job makes one fetch attempt. A `null` price is skipped without a snapshot; network errors, non-`2xx` responses, and extraction exceptions fail the invocation so SQS retries the message.
 - The checkpoint advances after SNS publish succeeds or when there are no decreases. If SNS publish fails, the checkpoint is unchanged and SQS retries the digest.
 - If SNS accepted a digest but the checkpoint write then fails, a retry may publish the same digest again. Delivery is at least once.
 - A late product update processed after a digest cutoff is included by the next digest, because the checkpoint does not advance past its timestamp.
-- Jsoup makes up to `3` attempts with exponential backoff starting at `1s`, doubling per retry, plus up to `50%` jitter.
-- Non-`2xx` responses, including `429`, use the same generic backoff without status-specific handling until attempts are exhausted.
 - Non-`2xx` responses are logged at warn level with status code, response headers, and response body (body truncated to `1000` characters).
 
 ## Source of truth
@@ -288,7 +286,7 @@ Representative checkpoint:
 
 - Product schedules enqueue `35` update messages at minute 00 each hour; one digest message is enqueued at minute 05.
 - Current catalog size is `35` product URLs. A single FIFO message group serializes all `36` hourly messages. Average processing time must stay near or below `100s` per message for the queue to drain before the next hour.
-- Each fetch uses up to `3` attempts with a `30s` request timeout and generic exponential backoff starting at `1s`.
+- Each fetch attempt has a `30s` timeout. SQS retries a failed message after the queue's `720s` visibility timeout and moves it to the DLQ after five receives.
 - Worker Lambda timeout is `120s`; queue visibility timeout is `720s` (six times the worker timeout). The event-source batch size is one.
 - A digest performs up to `70` latest-snapshot queries (two for each product) plus the checkpoint read/write. At current catalog size this is a small `PAY_PER_REQUEST` workload.
 - The DynamoDB table uses `PAY_PER_REQUEST` billing mode.

@@ -4,8 +4,6 @@ import dagger.Module;
 import dagger.Provides;
 import java.net.URI;
 import java.util.Map;
-import java.util.Random;
-import java.util.random.RandomGenerator;
 import javax.inject.Named;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
@@ -80,8 +78,6 @@ public class PriceTrackerModule {
       @Named("nzProteinBaseUri") URI nzProteinBaseUri,
       @Named("sportsfuelBaseUri") URI sportsfuelBaseUri,
       @Named("vivobarefootBaseUri") URI vivobarefootBaseUri) {
-    RandomGenerator randomGenerator = new Random();
-
     var extractors =
         Map.of(
             chemistWarehouseBaseUri.getHost(),
@@ -93,7 +89,7 @@ public class PriceTrackerModule {
             vivobarefootBaseUri.getHost(),
             new VivobarefootPriceExtractor());
 
-    return new JsoupPriceClient(randomGenerator, extractors);
+    return new JsoupPriceClient(extractors);
   }
 
   @Provides
