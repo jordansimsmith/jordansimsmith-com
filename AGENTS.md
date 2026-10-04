@@ -77,6 +77,7 @@ When performing the code review step, check for:
 
 - Use Google Java Format (enforced by formatter)
 - Use `var` for variables when type is obvious from assignment
+- Assign `Map.Entry` key and value accessors to explicitly named local variables before using them
 - Explicit type declarations only when not clear from right side of assignment
 - Do not include comments on classes and methods - code should be self-explanatory
 - No Javadoc on classes or methods

@@ -23,9 +23,15 @@ public class MagicTheGatheringAppraisalCatalog implements AppraisalCatalog {
       throw new IllegalArgumentException(
           "unsupported game for Magic appraisal: " + identity.game());
     }
-    if (!Games.MAGIC_THE_GATHERING.supportsFinish(rowItem.getFinish())) {
-      throw new IllegalArgumentException("unsupported finish for game: " + rowItem.getFinish());
-    }
+    var fetchTcgFinish =
+        switch (rowItem.getFinish()) {
+          case "normal" -> "normal";
+          case "foil" -> "foil";
+          case "etched" -> "foil";
+          default ->
+              throw new IllegalArgumentException(
+                  "unsupported finish for game: " + rowItem.getFinish());
+        };
     if (!"en".equals(rowItem.getLanguage())) {
       return Result.review("non-english");
     }
@@ -48,7 +54,7 @@ public class MagicTheGatheringAppraisalCatalog implements AppraisalCatalog {
                 .map(FetchTcgSetMapping.FetchTcgSetEntry::setId)
                 .toList(),
             searchName,
-            rowItem.getFinish(),
+            fetchTcgFinish,
             FETCHTCG_EXTERNAL_REFERENCE_FIELD,
             identity.externalId(),
             fetchTcgClient,

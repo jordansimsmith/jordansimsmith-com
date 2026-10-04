@@ -11,6 +11,7 @@ import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgAuthException;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
+import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgSetMapping;
 import com.jordansimsmith.tcginventory.imports.AppraiseJobProcessor;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
@@ -134,6 +135,125 @@ public class JobsHandlerIntegrationTest {
 
     var importItem = getImport("jordan", "import1");
     assertThat(importItem.getStatus()).isEqualTo("review");
+  }
+
+  @Test
+  void appraiseShouldSearchEtchedFinishAsFoilAndKeepStoredFinish() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createImportWithRow("jordan", "import1", "sta", "13", "etched", "NM", "en");
+    createJob("jordan", "job1", "appraise", "queued", "import1");
+    fakeFetchTcgClient.seedSearchResult(
+        "mtg",
+        3243,
+        "Card 1",
+        "foil",
+        new FetchTcgClient.SearchCardsResponse(
+            List.of(new FetchTcgClient.SearchCard("etched-card"))));
+    fakeFetchTcgClient.seedCard(
+        "etched-card",
+        new FetchTcgClient.GetCardResponse(
+            "etched-card",
+            "Card 1 (Foil Etched)",
+            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
+            Map.of("scryfallId", SCRYFALL_ID)));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
+
+    // assert
+    var row = getRow("jordan", "import1", 1);
+    assertThat(row.getDecision()).isEqualTo("keep");
+    assertThat(row.getFinish()).isEqualTo("etched");
+    assertThat(row.getFetchtcgCardId()).isEqualTo("etched-card");
+    assertThat(fakeFetchTcgClient.getSearchCallCount())
+        .isEqualTo(FetchTcgSetMapping.get("sta").size());
+  }
+
+  @Test
+  void appraiseShouldKeepFoilSearchFinishUnchanged() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createImportWithRow("jordan", "import1", "dom", "168", "foil", "NM", "en");
+    createJob("jordan", "job1", "appraise", "queued", "import1");
+    fakeFetchTcgClient.seedSearchResult(
+        "mtg",
+        2624,
+        "Card 1",
+        "foil",
+        new FetchTcgClient.SearchCardsResponse(
+            List.of(new FetchTcgClient.SearchCard("foil-card"))));
+    fakeFetchTcgClient.seedCard(
+        "foil-card",
+        new FetchTcgClient.GetCardResponse(
+            "foil-card",
+            "Card 1",
+            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
+            Map.of("scryfallId", SCRYFALL_ID)));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
+
+    // assert
+    var row = getRow("jordan", "import1", 1);
+    assertThat(row.getDecision()).isEqualTo("keep");
+    assertThat(row.getFinish()).isEqualTo("foil");
+    assertThat(row.getFetchtcgCardId()).isEqualTo("foil-card");
+  }
+
+  @Test
+  void appraiseShouldRejectUnexpectedFinish() {
+    // arrange
+    createImportWithRow("jordan", "import1", "dom", "168", "foil-etched", "NM", "en");
+    var jobItem = createJob("jordan", "job1", "appraise", "queued", "import1");
+
+    // act/assert
+    assertThatThrownBy(() -> new AppraiseJobProcessor(factory).processBatch("jordan", jobItem))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessage("unsupported finish for game: foil-etched");
+    assertThat(fakeFetchTcgClient.getSearchCallCount()).isZero();
+  }
+
+  @Test
+  void appraiseShouldReviewAmbiguousEtchedCardsWithoutFetchingListings() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createImportWithRow("jordan", "import1", "sta", "13", "etched", "NM", "en");
+    createJob("jordan", "job1", "appraise", "queued", "import1");
+    fakeFetchTcgClient.seedSearchResult(
+        "mtg",
+        3243,
+        "Card 1",
+        "foil",
+        new FetchTcgClient.SearchCardsResponse(
+            List.of(
+                new FetchTcgClient.SearchCard("regular-foil-card"),
+                new FetchTcgClient.SearchCard("etched-card"))));
+    fakeFetchTcgClient.seedCard(
+        "regular-foil-card",
+        new FetchTcgClient.GetCardResponse(
+            "regular-foil-card",
+            "Card 1",
+            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
+            Map.of("scryfallId", SCRYFALL_ID)));
+    fakeFetchTcgClient.seedCard(
+        "etched-card",
+        new FetchTcgClient.GetCardResponse(
+            "etched-card",
+            "Card 1 (Foil Etched)",
+            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("2.50"))),
+            Map.of("scryfallId", SCRYFALL_ID)));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
+
+    // assert
+    var row = getRow("jordan", "import1", 1);
+    assertThat(row.getDecision()).isEqualTo("review");
+    assertThat(row.getDecisionReason()).isEqualTo("unresolvable");
+    assertThat(row.getFetchtcgCardId()).isNull();
+    assertThat(row.getMarketPrice()).isNull();
+    assertThat(row.getSuggestedPrice()).isNull();
   }
 
   @Test
@@ -401,7 +521,8 @@ public class JobsHandlerIntegrationTest {
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
 
     // assert
-    assertThat(fakeFetchTcgClient.getSearchCallCount()).isEqualTo(1);
+    assertThat(fakeFetchTcgClient.getSearchCallCount())
+        .isEqualTo(FetchTcgSetMapping.get("dom").size());
 
     var row1 = getRow("jordan", "import1", 1);
     assertThat(row1.getDecision()).isEqualTo("keep");

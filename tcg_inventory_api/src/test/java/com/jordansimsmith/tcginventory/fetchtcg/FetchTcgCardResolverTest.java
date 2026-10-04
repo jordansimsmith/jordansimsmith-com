@@ -74,4 +74,79 @@ class FetchTcgCardResolverTest {
     // assert
     assertThat(result).isEmpty();
   }
+
+  @Test
+  void resolveShouldReturnEmptyWhenMultipleDistinctCardsMatchExternalReference() {
+    // arrange
+    var fetchTcgClient = new FakeFetchTcgClient();
+    fetchTcgClient.seedSearchResult(
+        "mtg",
+        42,
+        "Lightning Bolt",
+        "foil",
+        new FetchTcgClient.SearchCardsResponse(List.of(new FetchTcgClient.SearchCard("card-1"))));
+    fetchTcgClient.seedSearchResult(
+        "mtg",
+        43,
+        "Lightning Bolt",
+        "foil",
+        new FetchTcgClient.SearchCardsResponse(List.of(new FetchTcgClient.SearchCard("card-2"))));
+    fetchTcgClient.seedCard(
+        "card-1",
+        new FetchTcgClient.GetCardResponse(
+            "card-1", "Lightning Bolt", Map.of(), Map.of("scryfallId", "opaque-id")));
+    fetchTcgClient.seedCard(
+        "card-2",
+        new FetchTcgClient.GetCardResponse(
+            "card-2", "Lightning Bolt (Foil Etched)", Map.of(), Map.of("scryfallId", "opaque-id")));
+
+    // act
+    var result =
+        FetchTcgCardResolver.resolve(
+            "mtg",
+            List.of(42, 43),
+            "Lightning Bolt",
+            "foil",
+            "scryfallId",
+            "opaque-id",
+            fetchTcgClient,
+            new HashMap<>());
+
+    // assert
+    assertThat(result).isEmpty();
+    assertThat(fetchTcgClient.getSearchCallCount()).isEqualTo(2);
+  }
+
+  @Test
+  void resolveShouldTreatSameCardReturnedByMultipleSetsAsOneMatch() {
+    // arrange
+    var fetchTcgClient = new FakeFetchTcgClient();
+    var searchResponse =
+        new FetchTcgClient.SearchCardsResponse(List.of(new FetchTcgClient.SearchCard("card-1")));
+    fetchTcgClient.seedSearchResult("mtg", 42, "Lightning Bolt", "foil", searchResponse);
+    fetchTcgClient.seedSearchResult("mtg", 43, "Lightning Bolt", "foil", searchResponse);
+    fetchTcgClient.seedCard(
+        "card-1",
+        new FetchTcgClient.GetCardResponse(
+            "card-1",
+            "Lightning Bolt",
+            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.236"))),
+            Map.of("scryfallId", "opaque-id")));
+
+    // act
+    var result =
+        FetchTcgCardResolver.resolve(
+            "mtg",
+            List.of(42, 43),
+            "Lightning Bolt",
+            "foil",
+            "scryfallId",
+            "opaque-id",
+            fetchTcgClient,
+            new HashMap<>());
+
+    // assert
+    assertThat(result)
+        .contains(new FetchTcgCardResolver.ResolvedCard("card-1", 42, new BigDecimal("1.24")));
+  }
 }
