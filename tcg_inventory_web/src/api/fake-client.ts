@@ -1601,7 +1601,6 @@ export function createFakeClient(): ApiClient {
       return {
         status: null,
         published_sku_count: 0,
-        total_sku_count: 0,
         error: null,
         started_at: null,
         finished_at: null,
@@ -1611,7 +1610,6 @@ export function createFakeClient(): ApiClient {
     return {
       status: publishRun.status,
       published_sku_count: publishedCount(publishRun),
-      total_sku_count: publishRun.worklist.length,
       error: null,
       started_at: Math.floor(publishRun.started_at_ms / 1000),
       finished_at:

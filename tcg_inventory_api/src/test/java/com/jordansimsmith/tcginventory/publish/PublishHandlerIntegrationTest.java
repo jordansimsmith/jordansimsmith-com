@@ -183,7 +183,7 @@ public class PublishHandlerIntegrationTest {
     var body = objectMapper.readTree(response.getBody());
     assertThat(body.get("status").asText()).isEqualTo("succeeded");
     assertThat(body.get("published_sku_count").asInt()).isEqualTo(3);
-    assertThat(body.get("total_sku_count").asInt()).isEqualTo(4);
+    assertThat(body.has("total_sku_count")).isFalse();
     assertThat(body.get("error").isNull()).isTrue();
     assertThat(body.get("pending_sku_count").asInt()).isEqualTo(1);
     assertThat(body.get("started_at").asLong()).isEqualTo(1700000000);

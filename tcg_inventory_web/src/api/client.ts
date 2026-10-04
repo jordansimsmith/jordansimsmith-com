@@ -375,7 +375,6 @@ export type PublishRunStatus = 'queued' | 'running' | 'succeeded' | 'failed';
 export interface PublishResponse {
   status: PublishRunStatus | null;
   published_sku_count: number;
-  total_sku_count: number;
   error: string | null;
   started_at: number | null;
   finished_at: number | null;

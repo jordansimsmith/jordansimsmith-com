@@ -28,7 +28,6 @@ public class GetPublishHandler
   record PublishResponse(
       @JsonProperty("status") String status,
       @JsonProperty("published_sku_count") int publishedSkuCount,
-      @JsonProperty("total_sku_count") int totalSkuCount,
       @JsonProperty("error") @Nullable String error,
       @JsonProperty("started_at") long startedAt,
       @JsonProperty("finished_at") @Nullable Long finishedAt,
@@ -85,7 +84,6 @@ public class GetPublishHandler
         new PublishResponse(
             status,
             publishedCount,
-            publishedCount + dirtyCount,
             latestPublishJob.getError(),
             latestPublishJob.getCreatedAt() != null
                 ? latestPublishJob.getCreatedAt().getEpochSecond()

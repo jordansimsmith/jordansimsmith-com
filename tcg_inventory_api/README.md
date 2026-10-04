@@ -291,7 +291,7 @@ Bazel mirrors this layout with `:games-lib`, `:catalog-lib`, `:scan-lib`, `:impo
 | `GET`    | `/orders/{order_id}`                                     | order detail: offer lines (offered vs listed), game-aware units, images, and locations    |
 | `POST`   | `/orders/{order_id}/confirm`                             | start async pull confirmation; returns `202` while fulfilling or `200` if fulfilled       |
 | `POST`   | `/publish`                                               | start a publish run; responds 202 and is idempotent while one is queued/running           |
-| `GET`    | `/publish`                                               | current-or-latest publish run: status, progress, error, pending dirty count               |
+| `GET`    | `/publish`                                               | current-or-latest publish run: status, processed count, live pending dirty count, error   |
 | `POST`   | `/reports`                                               | start a report generation; responds 202 and is idempotent while one is queued/running     |
 | `GET`    | `/reports`                                               | latest report snapshot with staleness and generation status; 404 before first run         |
 | `GET`    | `/settings`                                              | settings view: credential presence, last-updated, track orders after                      |
@@ -398,6 +398,21 @@ Representative failures:
 Response `204` (both photo mutations; no body). Updated `photos` and `needs_photos` are observed on `GET /imports/{import_id}`. Photos order by upload and the first is the listing front image — removing one promotes the next, so reordering is delete + re-upload. `url` on GET is a 15-minute presigned S3 GET.
 
 Representative failures: `409` unless the import is in review; `400` for a non-keep row, a non-JPEG body, a body over 4 MB, or a sixth photo. Rows in `GET /imports/{import_id}` carry `photos` (`[{photo_id, url}]`, `[]` when none) and `needs_photos` (keep, appraised at NZ$20+, no photos yet).
+
+### `GET /publish`
+
+Returns the current-or-latest publish job and the current dirty SKU count. A `200` response has `status`, `published_sku_count`, `pending_sku_count`, `error`, `started_at`, and `finished_at`; `404` means no publish run has existed yet. `published_sku_count` is the cumulative count from completed listing batches and is suitable for the completed-run summary. `pending_sku_count` is the live count from the eventually consistent dirty SKU index, so it can lag or change while a run is active. There is no run total; clients use job status to determine completion.
+
+```json
+{
+  "status": "running",
+  "published_sku_count": 100,
+  "pending_sku_count": 23,
+  "error": null,
+  "started_at": 1765420900,
+  "finished_at": null
+}
+```
 
 `GET /skus/{sku_id}`
 
@@ -845,7 +860,7 @@ The large transitions use this pattern: import `confirming`, order `reserving`, 
 - Duplicate SQS deliveries, replayed job slices, and re-processed offers converge: job slices read the job item's continuation fresh, order creation is conditional on the offer id, unit transitions are conditional on current status, publish writes are absolute.
 - Pull confirmation starts only from a strongly read `to_pick` order after validating that its saved allocation has exactly the declared quantities, contains no duplicate unit, and still points to units reserved by that order. One transaction changes the order to `fulfilling` and creates its `order_fulfillment` job; SQS enqueue follows that commit. The worker sells each saved unit in a three-item transaction (unit, SKU version bump, and unit audit), skipping a sale already owned by that order on retry. It conditionally marks the order `fulfilled` and writes one completion audit after all units succeed. An exception leaves the order `fulfilling` and the job running for SQS retry or DLQ inspection. A queue-send exception leaves a durable queued job for manual enqueue. Pull confirmation never sets SKU `dirty` because it does not change the in-stock listing quantity.
 - A re-enqueueing slice must strictly advance the continuation (the deduplication id `<job_id>#<continuation>` only distinguishes slices when it does); a non-advancing result throws and is retried through SQS.
-- At most one publish run is queued or running per user: `POST /publish` creates the job conditionally, responds 202 either way, and starts nothing new while one is already active; progress is observed via `GET /publish`.
+- At most one publish run is queued or running per user: `POST /publish` creates the job conditionally, responds 202 either way, and starts nothing new while one is already active; `GET /publish` returns `published_sku_count` from completed listing batches and `pending_sku_count` from the live dirty index, without a run total. The dirty index is eventually consistent, so the pending count can lag or change as order processing dirties SKUs; job status remains the completion signal.
 - Returned job failures surface on the affected resource: an appraise failure sets `error` on its import; publish and report failures appear in their status responses. Reservation preflight mismatches return a failed publish result with the cause so the operator can repair inventory or the listing mapping and start another publish. Unexpected exceptions, including reservation transactions, propagate for SQS retries and remain in progress if they reach the passive DLQ.
 - Market appraisal deduplicates FetchTCG reads per printing + finish within a job run and caches card detail reads per card id within a batch, so verifying ambiguous names never re-fetches the same candidate.
 - Report generation is a single-slice job of pure reads plus one snapshot overwrite; re-runs and duplicate deliveries converge on the same result. At most one report job is queued or running per user (`POST /reports` responds 202 either way, mirroring publish).

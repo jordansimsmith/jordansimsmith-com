@@ -112,9 +112,9 @@ function getPublishPresentation(
     description:
       publish.pending_sku_count > 0
         ? 'Publish these inventory changes to FetchTCG.'
-        : publish.total_sku_count === 0
+        : publish.published_sku_count === 0
           ? 'No inventory changes needed publishing.'
-          : `Published ${publish.total_sku_count} SKUs${latestRunRelativeTime ? ` ${latestRunRelativeTime}` : ''}.`,
+          : `Published ${publish.published_sku_count} SKUs${latestRunRelativeTime ? ` ${latestRunRelativeTime}` : ''}.`,
     statusLabel: 'Completed',
     statusColor: 'green',
     runContextLabel: 'Last successful publish',
@@ -239,24 +239,16 @@ export function PublishPage() {
             {publish?.status === 'running' && (
               <Stack gap={4}>
                 <Text size="sm" aria-live="polite">
-                  Publishing {publish.published_sku_count} of{' '}
-                  {publish.total_sku_count} SKUs
+                  {publish.pending_sku_count}{' '}
+                  {publish.pending_sku_count === 1 ? 'SKU' : 'SKUs'} remaining{' '}
+                  to publish
                 </Text>
                 <Progress
-                  value={
-                    publish.total_sku_count > 0
-                      ? (publish.published_sku_count /
-                          publish.total_sku_count) *
-                        100
-                      : 100
-                  }
+                  value={100}
                   animated
+                  striped
+                  aria-label="Publishing progress"
                 />
-                {publish.pending_sku_count > 0 && (
-                  <Text size="sm" c="dimmed">
-                    {publish.pending_sku_count} SKUs still pending
-                  </Text>
-                )}
               </Stack>
             )}
 

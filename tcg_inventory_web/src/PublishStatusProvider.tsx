@@ -62,7 +62,6 @@ export function PublishStatusProvider({ children }: { children: ReactNode }) {
           setPublish({
             status: null,
             published_sku_count: 0,
-            total_sku_count: 0,
             error: null,
             started_at: null,
             finished_at: null,

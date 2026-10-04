@@ -20,7 +20,6 @@ function publishResponse(
   return {
     status: 'succeeded',
     published_sku_count: 3,
-    total_sku_count: 3,
     error: null,
     started_at: 1765420900,
     finished_at: 1765420932,
@@ -118,7 +117,20 @@ describe('PublishPage', () => {
     ).toBeNull();
   });
 
-  it('hides the dot while a run is active and polls to completion', async () => {
+  it('shows an empty completed run without a published count', async () => {
+    vi.spyOn(clientModule.apiClient, 'getPublish').mockResolvedValue(
+      publishResponse({ published_sku_count: 0 }),
+    );
+
+    renderPublishPage();
+
+    expect(await screen.findByText('Inventory is up to date')).toBeDefined();
+    expect(
+      screen.getByText('No inventory changes needed publishing.'),
+    ).toBeDefined();
+  });
+
+  it('shows remaining SKUs and polls through zero until the run completes', async () => {
     vi.useFakeTimers();
     const getPublishMock = vi
       .spyOn(clientModule.apiClient, 'getPublish')
@@ -127,8 +139,15 @@ describe('PublishPage', () => {
           status: 'running',
           finished_at: null,
           published_sku_count: 1,
-          total_sku_count: 3,
           pending_sku_count: 2,
+        }),
+      )
+      .mockResolvedValueOnce(
+        publishResponse({
+          status: 'running',
+          finished_at: null,
+          published_sku_count: 3,
+          pending_sku_count: 0,
         }),
       )
       .mockResolvedValueOnce(publishResponse());
@@ -136,7 +155,8 @@ describe('PublishPage', () => {
     renderPublishPage();
 
     await act(async () => {});
-    expect(screen.getByText('Publishing 1 of 3 SKUs')).toBeDefined();
+    expect(screen.getByText('2 SKUs remaining to publish')).toBeDefined();
+    expect(screen.getByRole('progressbar')).toBeDefined();
     expect(screen.queryByText('Unavailable')).toBeNull();
     expect(
       (screen.getByRole('button', { name: 'Publishing' }) as HTMLButtonElement)
@@ -152,9 +172,17 @@ describe('PublishPage', () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
 
-    expect(screen.getByText('Inventory is up to date')).toBeDefined();
+    expect(screen.getByText('0 SKUs remaining to publish')).toBeDefined();
+    expect(screen.getByRole('progressbar')).toBeDefined();
     expect(getPublishMock).toHaveBeenCalledTimes(2);
-    expect(screen.queryByText(/Publishing 1 of 3 SKUs/)).toBeNull();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2000);
+    });
+
+    expect(screen.getByText('Inventory is up to date')).toBeDefined();
+    expect(getPublishMock).toHaveBeenCalledTimes(3);
+    expect(screen.queryByText(/remaining to publish/)).toBeNull();
   });
 
   it('shows a queued run without showing a completed progress bar', async () => {
@@ -204,7 +232,7 @@ describe('PublishPage', () => {
     );
 
     await act(async () => {});
-    expect(screen.getByText('Publishing 3 of 3 SKUs')).toBeDefined();
+    expect(screen.getByText('0 SKUs remaining to publish')).toBeDefined();
     expect(getPublishMock).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByRole('link', { name: 'Inventory' }));

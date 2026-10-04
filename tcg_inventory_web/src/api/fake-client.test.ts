@@ -999,7 +999,7 @@ describe('createFakeClient publish', () => {
     await client.createPublish();
     const started = await client.getPublish();
     expect(started.status).toBe('running');
-    expect(started.total_sku_count).toBe(before.pending_sku_count);
+    expect(started.pending_sku_count).toBe(before.pending_sku_count);
     expect(started.published_sku_count).toBe(0);
 
     vi.advanceTimersByTime(1000);
@@ -1011,7 +1011,7 @@ describe('createFakeClient publish', () => {
     vi.advanceTimersByTime(60_000);
     const done = await client.getPublish();
     expect(done.status).toBe('succeeded');
-    expect(done.published_sku_count).toBe(done.total_sku_count);
+    expect(done.published_sku_count).toBe(before.pending_sku_count);
     expect(done.pending_sku_count).toBe(0);
     expect(done.finished_at).not.toBeNull();
   });
@@ -1028,7 +1028,7 @@ describe('createFakeClient publish', () => {
 
     expect(second.status).toBe('running');
     expect(second.started_at).toBe(first.started_at);
-    expect(second.total_sku_count).toBe(first.total_sku_count);
+    expect(second.pending_sku_count).toBe(first.pending_sku_count - 2);
     expect(second.published_sku_count).toBe(2);
   });
 
@@ -1049,7 +1049,7 @@ describe('createFakeClient publish', () => {
     await client.createPublish();
     const rerun = await client.getPublish();
     expect(rerun.status).toBe('running');
-    expect(rerun.total_sku_count).toBe(1);
+    expect(rerun.pending_sku_count).toBe(1);
     expect(rerun.published_sku_count).toBe(0);
   });
 
@@ -1062,7 +1062,7 @@ describe('createFakeClient publish', () => {
     const response = await client.getPublish();
 
     expect(response.status).toBe('succeeded');
-    expect(response.total_sku_count).toBe(0);
+    expect(response.published_sku_count).toBe(0);
     expect(response.pending_sku_count).toBe(0);
     expect(response.finished_at).toBe(response.started_at);
   });
