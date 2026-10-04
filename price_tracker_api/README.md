@@ -50,8 +50,8 @@ The price tracker service checks a curated catalog of retailer product pages eve
 
 ```mermaid
 flowchart TD
-  productSchedules[EventBridge Scheduler: 35 hourly product schedules] --> jobsQueue[SQS FIFO price_tracker_jobs.fifo]
-  digestSchedule[EventBridge Scheduler: hourly digest at minute 05] --> jobsQueue
+  productSchedules[EventBridge Scheduler: 35 hourly product schedules] -->|MessageGroupId per retailer| jobsQueue[SQS FIFO price_tracker_jobs.fifo]
+  digestSchedule[EventBridge Scheduler: hourly digest at minute 05] -->|MessageGroupId price-tracker-digest| jobsQueue
   jobsQueue --> jobsHandler[Lambda JobsHandler]
   jobsHandler --> updateProcessor[UpdateProductJobProcessor]
   jobsHandler --> digestProcessor[SendDigestJobProcessor]
@@ -83,8 +83,8 @@ sequenceDiagram
   participant sns as SNS
 
   loop each product at minute 00 hourly
-    scheduler->>queue: enqueue update_product with product_id and scheduled_at
-    queue->>handler: deliver one SQS record
+    scheduler->>queue: enqueue update_product with product_id and retailer message group
+    queue->>handler: deliver one SQS record from an available group
     handler->>update: process one product
     update->>retailers: getPrice(url)
     retailers-->>update: parsed price or null/error
@@ -92,8 +92,9 @@ sequenceDiagram
       update->>table: append price snapshot
     end
   end
-  scheduler->>queue: enqueue send_digest at minute 05
-  queue->>handler: deliver digest after earlier messages in its FIFO group
+  Note over queue,digest: the digest has a separate group and may run before a slow retailer group
+  scheduler->>queue: enqueue send_digest at minute 05 in price-tracker-digest group
+  queue->>handler: deliver digest independently of retailer groups
   handler->>digest: process scheduled digest
   digest->>table: read checkpoint and latest snapshots at both cutoffs
   alt one or more products have a net decrease
@@ -109,8 +110,8 @@ sequenceDiagram
 - Route parsing by URL host to dedicated extractors (`Chemist Warehouse`, `NZ Protein`, `Sportsfuel`, `Vivobarefoot`) for deterministic selector behavior per site.
 - Track only the Vanilla Sportsfuel variant using its `?variant=<id>` URL.
 - Keep price snapshots append-only and retain their existing key and attribute format.
-- Use one FIFO group (`price-tracker`) and batch size one. This serializes requests across retailer sites and ensures the digest waits behind earlier messages that have reached the queue. Late product jobs that run after a digest cutoff are picked up by a later digest.
-- A failed message blocks later messages in the FIFO group until it succeeds or moves to the DLQ after five receives. The DLQ alarm surfaces persistent failures for inspection.
+- Use one FIFO message group per retailer and a separate `price-tracker-digest` group, with batch size one. SQS preserves order within each group while Lambda can process different groups concurrently. Requests to one retailer remain serial, and a retailer failure does not block other retailers or the digest.
+- The digest can run before a slow retailer group finishes. Product snapshots written after its cutoff are included by a later digest. A failed message blocks later messages in its retailer group until it succeeds or moves to the DLQ after five receives. The DLQ alarm surfaces persistent failures for inspection.
 - Include only one net decrease per product. If a price drops and then recovers before the digest runs, that intermediate drop is not included. If it drops more than once and ends lower, the digest shows one line from the price at the previous checkpoint to the current price.
 - Store the last successful digest cutoff as a checkpoint item in the existing DynamoDB table. No historical snapshot migration or table index change is needed.
 - Treat queue processing and SNS publication as at least once. An ambiguous failure after SNS accepts a digest but before the checkpoint write can cause the next attempt to send the same digest again.
@@ -135,7 +136,7 @@ sequenceDiagram
 - **Sportsfuel website** (`www.sportsfuel.co.nz`): one outbound HTTPS `GET` per hour for the Vanilla variant, using its `?variant=<id>` URL. A `null` extracted price is skipped; exceptions fail that product job.
 - **Vivobarefoot website** (`vivobarefoot.nz`): one outbound HTTPS `GET` per hour for the Tracker Forest ESC Men's Bracken product. A `null` extracted price is skipped; exceptions fail that product job.
 - **Amazon SNS** (`price_tracker_api_price_updates`): publish one digest when at least one product has a net decrease. The subject contains the decrease count; each body entry contains product name, previous price, current price, and URL. Auth uses the worker Lambda IAM role. Publish failures fail the digest job and leave the checkpoint unchanged.
-- **Amazon SQS**: FIFO queue `price_tracker_jobs.fifo` receives one `update_product` message per product each hour and one `send_digest` message at minute 05. Content-based deduplication is enabled; all messages use group `price-tracker`; retention is 14 days; Lambda event-source batch size is one. Failed worker messages are retried and moved after five receives to passive FIFO DLQ `price_tracker_jobs_dlq.fifo`, which also retains messages for 14 days. A failed head message blocks this group until it succeeds or reaches the DLQ.
+- **Amazon SQS**: FIFO queue `price_tracker_jobs.fifo` receives one `update_product` message per product each hour and one `send_digest` message at minute 05. Content-based deduplication is enabled. Product messages use retailer groups `chemist-warehouse`, `nz-protein`, `sportsfuel`, or `vivobarefoot`; digest messages use `price-tracker-digest`. Retention is 14 days and Lambda event-source batch size is one. Failed worker messages are retried and moved after five receives to passive FIFO DLQ `price_tracker_jobs_dlq.fifo`, which also retains messages for 14 days. A failed product message blocks later messages for its retailer only.
 - **Amazon EventBridge Scheduler**: 35 schedules enqueue product updates with `cron(0 * * * ? *)`; one schedule enqueues the digest with `cron(5 * * * ? *)`; both use UTC. Each uses the universal SQS `sendMessage` target, a dedicated role allowed to send only to the jobs queue, and a retry policy of five attempts over one hour. There is no Scheduler DLQ; a terminal failure to enqueue is an accepted missed run.
 
 ## API contracts
@@ -251,6 +252,7 @@ Representative checkpoint:
 | -------------------------- | ----------------------------------- | -------------------------------------------------------- |
 | Product catalog and IDs    | `ProductsFactoryImpl`               | Curated list shipped with deployments                    |
 | Product schedule IDs       | `infra/main.tf` `local.product_ids` | Must match IDs in `ProductsFactoryImpl`                  |
+| Product message groups     | `infra/main.tf` product ID prefixes | Must map every scheduled product to its retailer group   |
 | Product page current price | Retailer HTML page at scrape time   | Parsed through host-specific extractor                   |
 | Historical tracked prices  | DynamoDB `price_tracker` snapshots  | Canonical source for digest comparisons and history      |
 | Digest progress            | DynamoDB checkpoint item            | Advances after a successful digest publish or empty scan |
@@ -284,9 +286,9 @@ Representative checkpoint:
 
 ## Performance envelope
 
-- Product schedules enqueue `35` update messages at minute 00 each hour; one digest message is enqueued at minute 05.
-- Current catalog size is `35` product URLs. A single FIFO message group serializes all `36` hourly messages. Average processing time must stay near or below `100s` per message for the queue to drain before the next hour.
-- Each fetch attempt has a `30s` timeout. SQS retries a failed message after the queue's `720s` visibility timeout and moves it to the DLQ after five receives.
+- Product schedules enqueue `35` update messages at minute 00 each hour; one digest message is enqueued at minute 05. Product messages use four retailer groups, and the digest uses its own group. Lambda can process up to five groups concurrently, subject to available concurrency, while each retailer remains sequential.
+- The Chemist Warehouse group receives `32` messages per hour. Its average processing time must stay below `112.5s` per message for that group to drain before the next hourly batch.
+- Retailer fetches have a `30s` timeout. SQS retries a failed message after the queue's `720s` visibility timeout and moves it to the DLQ after five receives.
 - Worker Lambda timeout is `120s`; queue visibility timeout is `720s` (six times the worker timeout). The event-source batch size is one.
 - A digest performs up to `70` latest-snapshot queries (two for each product) plus the checkpoint read/write. At current catalog size this is a small `PAY_PER_REQUEST` workload.
 - The DynamoDB table uses `PAY_PER_REQUEST` billing mode.
@@ -312,24 +314,24 @@ Representative checkpoint:
 
 ### Scenario 1: hourly product updates produce a net decrease digest
 
-1. EventBridge Scheduler enqueues one `update_product` message per product at minute 00 UTC.
+1. EventBridge Scheduler enqueues one `update_product` message per product at minute 00 UTC, using the product's retailer message group.
 2. `JobsHandler` dispatches each message to `UpdateProductJobProcessor`, which resolves the stable product ID and scrapes one page.
 3. A numeric price appends a snapshot; a `null` extracted price is skipped. A thrown error fails only that product job and is retried by SQS.
-4. EventBridge Scheduler enqueues `send_digest` at minute 05 in the same FIFO message group.
-5. `SendDigestJobProcessor` compares each product's latest price at the previous successful checkpoint with its latest price at the current processing cutoff.
+4. EventBridge Scheduler enqueues `send_digest` at minute 05 in the independent `price-tracker-digest` group. It can run while product groups are still processing.
+5. `SendDigestJobProcessor` compares each product's latest price at the previous successful checkpoint with its latest price at the current processing cutoff. Product snapshots written after this cutoff are picked up by the next digest.
 6. If any product has a lower net price, one SNS email lists one decrease per product. The checkpoint advances after a successful publish.
 
 ### Scenario 2: a digest spans multiple product checks
 
-1. The digest message is delayed or retried while product update messages continue through the FIFO queue.
-2. When the digest runs, its cutoff covers snapshots written through that processing time.
-3. For each product, the digest compares only the latest price at the previous checkpoint with the latest price at the new cutoff.
+1. Product update messages continue independently in their retailer groups while the digest is delayed or retried in its own group.
+2. When the digest runs, its cutoff covers snapshots written through that processing time, whether or not every retailer group has finished its hourly work.
+3. For each product, the digest compares only the latest price at the previous checkpoint with the latest price at the new cutoff. A product update completed after the cutoff is included by the next digest.
 4. A product that drops and recovers produces no decrease; a product that ends lower produces one line from its previous-checkpoint price to its current price.
 5. The digest advances the checkpoint, so later digests do not reprocess that interval.
 
 ### Scenario 3: a product job fails repeatedly
 
-1. A product update throws after its retailer retries are exhausted.
-2. SQS retries the same message up to five receives while the single FIFO group preserves ordering.
-3. If all five receives fail, SQS moves the job to `price_tracker_jobs_dlq.fifo`.
+1. A product update throws, for example because its retailer rate-limits the request.
+2. SQS retries the same message up to five receives. Later messages for that retailer remain ordered behind it, while other retailer groups and the digest continue.
+3. If all five receives fail, SQS moves the job to `price_tracker_jobs_dlq.fifo` and the next message for that retailer can proceed.
 4. The platform DLQ alarm fires while at least one message is visible. After the cause is fixed, the failed job can be inspected and manually redriven.

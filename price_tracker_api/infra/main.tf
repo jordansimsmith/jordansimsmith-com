@@ -69,6 +69,19 @@ locals {
     sportsfuel_clean_nutrition  = "sportsfuel-clean-nutrition"
     vivobarefoot_tracker_forest = "vivo-tracker-forest"
   }
+  product_message_group_prefixes = {
+    "chemist-warehouse-" = "chemist-warehouse"
+    "nz-protein-"        = "nz-protein"
+    "sportsfuel-"        = "sportsfuel"
+    "vivo-"              = "vivobarefoot"
+  }
+  product_message_group_ids = {
+    for schedule_name, product_id in local.product_ids :
+    schedule_name => one([
+      for prefix, message_group_id in local.product_message_group_prefixes :
+      message_group_id if startswith(product_id, prefix)
+    ])
+  }
 }
 
 module "java_lambda" {
@@ -278,7 +291,7 @@ resource "aws_scheduler_schedule" "update_product" {
       {
         "QueueUrl": "${aws_sqs_queue.jobs.url}",
         "MessageBody": "{\"job_type\":\"update_product\",\"product_id\":\"${each.value}\",\"scheduled_at\":\"<aws.scheduler.scheduled-time>\"}",
-        "MessageGroupId": "price-tracker"
+        "MessageGroupId": "${local.product_message_group_ids[each.key]}"
       }
     JSON
 
@@ -307,7 +320,7 @@ resource "aws_scheduler_schedule" "send_digest" {
       {
         "QueueUrl": "${aws_sqs_queue.jobs.url}",
         "MessageBody": "{\"job_type\":\"send_digest\",\"scheduled_at\":\"<aws.scheduler.scheduled-time>\"}",
-        "MessageGroupId": "price-tracker"
+        "MessageGroupId": "price-tracker-digest"
       }
     JSON
 
