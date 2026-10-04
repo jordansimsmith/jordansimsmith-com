@@ -32,6 +32,10 @@ variable "artifacts" {
 locals {
   application_id = "price_tracker_api"
   subscriptions  = ["jordansimsmith@gmail.com"]
+  paused_product_schedules = toset([
+    "sportsfuel_clean_nutrition",
+    "vivobarefoot_tracker_forest",
+  ])
   product_ids = {
     chemist_warehouse_98676     = "chemist-warehouse-98676"
     chemist_warehouse_74330     = "chemist-warehouse-74330"
@@ -278,6 +282,7 @@ resource "aws_scheduler_schedule" "update_product" {
   description                  = "Queues the ${each.value} price update"
   schedule_expression          = "cron(0 * * * ? *)"
   schedule_expression_timezone = "UTC"
+  state                        = contains(local.paused_product_schedules, each.key) ? "DISABLED" : "ENABLED"
   depends_on                   = [aws_iam_role_policy_attachment.jobs_scheduler_sqs]
 
   flexible_time_window {

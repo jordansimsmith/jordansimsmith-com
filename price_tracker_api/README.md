@@ -1,6 +1,6 @@
 # Price tracker service
 
-The price tracker service checks a curated catalog of retailer product pages every hour, records price history, and emails one hourly digest when products have net price decreases.
+The price tracker service checks enabled products in a curated retailer catalog every hour, records price history, and emails one hourly digest when products have net price decreases.
 
 ## Overview
 
@@ -13,7 +13,7 @@ The price tracker service checks a curated catalog of retailer product pages eve
 
 ## User stories
 
-- As a shopper, I want each tracked product checked hourly, so that price history is collected on a predictable cadence.
+- As a shopper, I want each enabled tracked product checked hourly, so that price history is collected on a predictable cadence.
 - As an email subscriber, I want one hourly digest containing net price decreases, so that I can review changes together without receiving an email for every product.
 - As a maintainer, I want failed jobs retained in a passive dead-letter queue, so that persistent failures can be inspected and redriven.
 - As a maintainer, I want hourly snapshots preserved, so that price history remains auditable.
@@ -22,7 +22,7 @@ The price tracker service checks a curated catalog of retailer product pages eve
 
 ### In scope
 
-- Queue one update job per curated product every hour.
+- Queue one update job per enabled curated product every hour.
 - Scrape product pages using host-specific extractor implementations.
 - Persist append-only price snapshots for each successfully scraped product.
 - Queue one digest job five minutes after the hourly product schedules.
@@ -46,11 +46,13 @@ The price tracker service checks a curated catalog of retailer product pages eve
 | Sportsfuel (`www.sportsfuel.co.nz`)              | `1`           | Clean Nutrition Whey Protein 1kg - Vanilla |
 | Vivobarefoot (`vivobarefoot.nz`)                 | `1`           | Tracker Forest ESC Men's - Bracken         |
 
+The Sportsfuel and Vivobarefoot product schedules are disabled; the other `33` product schedules remain enabled.
+
 ## Architecture
 
 ```mermaid
 flowchart TD
-  productSchedules[EventBridge Scheduler: 35 hourly product schedules] -->|MessageGroupId per retailer| jobsQueue[SQS FIFO price_tracker_jobs.fifo]
+  productSchedules[EventBridge Scheduler: 33 enabled hourly product schedules] -->|MessageGroupId per retailer| jobsQueue[SQS FIFO price_tracker_jobs.fifo]
   digestSchedule[EventBridge Scheduler: hourly digest at minute 05] -->|MessageGroupId price-tracker-digest| jobsQueue
   jobsQueue --> jobsHandler[Lambda JobsHandler]
   jobsHandler --> updateProcessor[UpdateProductJobProcessor]
@@ -82,7 +84,7 @@ sequenceDiagram
   participant table as DynamoDB
   participant sns as SNS
 
-  loop each product at minute 00 hourly
+  loop each enabled product at minute 00 hourly
     scheduler->>queue: enqueue update_product with product_id and retailer message group
     queue->>handler: deliver one SQS record from an available group
     handler->>update: process one product
@@ -107,6 +109,7 @@ sequenceDiagram
 
 - Keep the service as a queued Lambda worker because the hourly catalog is split into independent product jobs.
 - Store the tracked catalog and stable product IDs in `ProductsFactoryImpl`; keep the corresponding `product_ids` map in Terraform alongside the Scheduler resources.
+- Disable the Sportsfuel and Vivobarefoot product schedules while retaining their catalog entries and historical snapshots. Disabling a schedule does not cancel jobs already in SQS.
 - Route parsing by URL host to dedicated extractors (`Chemist Warehouse`, `NZ Protein`, `Sportsfuel`, `Vivobarefoot`) for deterministic selector behavior per site.
 - Track only the Vanilla Sportsfuel variant using its `?variant=<id>` URL.
 - Keep price snapshots append-only and retain their existing key and attribute format.
@@ -133,11 +136,11 @@ sequenceDiagram
 
 - **Chemist Warehouse website** (`www.chemistwarehouse.co.nz`): outbound HTTPS `GET` using Jsoup with browser-like headers and `30s` timeout. The request URL comes from the curated catalog. Auth method is none. Cadence is hourly per product. A `null` extracted price is skipped; exhausted request or parsing exceptions fail that product job.
 - **NZ Protein website** (`www.nzprotein.co.nz`): outbound HTTPS `GET` with the same client behavior. Cadence is hourly. A `null` extracted price is skipped; exceptions fail that product job.
-- **Sportsfuel website** (`www.sportsfuel.co.nz`): one outbound HTTPS `GET` per hour for the Vanilla variant, using its `?variant=<id>` URL. A `null` extracted price is skipped; exceptions fail that product job.
-- **Vivobarefoot website** (`vivobarefoot.nz`): one outbound HTTPS `GET` per hour for the Tracker Forest ESC Men's Bracken product. A `null` extracted price is skipped; exceptions fail that product job.
+- **Sportsfuel website** (`www.sportsfuel.co.nz`): its hourly schedule is disabled. Already queued jobs can still make an outbound HTTPS `GET` for the Vanilla variant using its `?variant=<id>` URL. A `null` extracted price is skipped; exceptions fail that product job.
+- **Vivobarefoot website** (`vivobarefoot.nz`): its hourly schedule is disabled. Already queued jobs can still make an outbound HTTPS `GET` for the Tracker Forest ESC Men's Bracken product. A `null` extracted price is skipped; exceptions fail that product job.
 - **Amazon SNS** (`price_tracker_api_price_updates`): publish one digest when at least one product has a net decrease. The subject contains the decrease count; each body entry contains product name, previous price, current price, and URL. Auth uses the worker Lambda IAM role. Publish failures fail the digest job and leave the checkpoint unchanged.
-- **Amazon SQS**: FIFO queue `price_tracker_jobs.fifo` receives one `update_product` message per product each hour and one `send_digest` message at minute 05. Content-based deduplication is enabled. Product messages use retailer groups `chemist-warehouse`, `nz-protein`, `sportsfuel`, or `vivobarefoot`; digest messages use `price-tracker-digest`. Retention is 14 days and Lambda event-source batch size is one. Failed worker messages are retried and moved after five receives to passive FIFO DLQ `price_tracker_jobs_dlq.fifo`, which also retains messages for 14 days. A failed product message blocks later messages for its retailer only.
-- **Amazon EventBridge Scheduler**: 35 schedules enqueue product updates with `cron(0 * * * ? *)`; one schedule enqueues the digest with `cron(5 * * * ? *)`; both use UTC. Each uses the universal SQS `sendMessage` target, a dedicated role allowed to send only to the jobs queue, and a retry policy of five attempts over one hour. There is no Scheduler DLQ; a terminal failure to enqueue is an accepted missed run.
+- **Amazon SQS**: FIFO queue `price_tracker_jobs.fifo` receives one `update_product` message per enabled product each hour and one `send_digest` message at minute 05. Content-based deduplication is enabled. Product messages use retailer groups `chemist-warehouse`, `nz-protein`, `sportsfuel`, or `vivobarefoot`; digest messages use `price-tracker-digest`. Retention is 14 days and Lambda event-source batch size is one. Failed worker messages are retried and moved after five receives to passive FIFO DLQ `price_tracker_jobs_dlq.fifo`, which also retains messages for 14 days. A failed product message blocks later messages for its retailer only.
+- **Amazon EventBridge Scheduler**: 35 product schedules are defined with `cron(0 * * * ? *)`, of which 33 are enabled and the Sportsfuel and Vivobarefoot schedules are disabled. One digest schedule enqueues at `cron(5 * * * ? *)`. Both use UTC. Each uses the universal SQS `sendMessage` target, a dedicated role allowed to send only to the jobs queue, and a retry policy of five attempts over one hour. There is no Scheduler DLQ; a terminal failure to enqueue is an accepted missed run.
 
 ## API contracts
 
@@ -286,7 +289,7 @@ Representative checkpoint:
 
 ## Performance envelope
 
-- Product schedules enqueue `35` update messages at minute 00 each hour; one digest message is enqueued at minute 05. Product messages use four retailer groups, and the digest uses its own group. Lambda can process up to five groups concurrently, subject to available concurrency, while each retailer remains sequential.
+- Enabled product schedules enqueue `33` update messages at minute 00 each hour; one digest message is enqueued at minute 05. New product messages use the Chemist Warehouse and NZ Protein groups, and the digest uses its own group. Already queued Sportsfuel and Vivobarefoot messages can still be processed. Lambda can process available groups concurrently while each retailer remains sequential.
 - The Chemist Warehouse group receives `32` messages per hour. Its average processing time must stay below `112.5s` per message for that group to drain before the next hourly batch.
 - Retailer fetches have a `30s` timeout. SQS retries a failed message after the queue's `720s` visibility timeout and moves it to the DLQ after five receives.
 - Worker Lambda timeout is `120s`; queue visibility timeout is `720s` (six times the worker timeout). The event-source batch size is one.
@@ -314,7 +317,7 @@ Representative checkpoint:
 
 ### Scenario 1: hourly product updates produce a net decrease digest
 
-1. EventBridge Scheduler enqueues one `update_product` message per product at minute 00 UTC, using the product's retailer message group.
+1. EventBridge Scheduler enqueues one `update_product` message per enabled product at minute 00 UTC, using the product's retailer message group.
 2. `JobsHandler` dispatches each message to `UpdateProductJobProcessor`, which resolves the stable product ID and scrapes one page.
 3. A numeric price appends a snapshot; a `null` extracted price is skipped. A thrown error fails only that product job and is retried by SQS.
 4. EventBridge Scheduler enqueues `send_digest` at minute 05 in the independent `price-tracker-digest` group. It can run while product groups are still processing.
