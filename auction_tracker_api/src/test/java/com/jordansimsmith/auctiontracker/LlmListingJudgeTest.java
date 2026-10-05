@@ -141,7 +141,7 @@ public class LlmListingJudgeTest {
     assertThat(request.messages().get(0).content())
         .startsWith("You judge Trade Me auction listings")
         .contains("G.Skill Trident Z (plain or RGB), DDR4, 2x16GB (32GB total)")
-        .contains("## Examples");
+        .doesNotContain("## Examples");
   }
 
   @Test

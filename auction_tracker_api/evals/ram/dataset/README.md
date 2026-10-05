@@ -8,7 +8,7 @@ Labeled dataset for evaluating an LLM judge that filters Trade Me auction listin
 - `s<nnn>.json`: synthetic fixture (`"synthetic": true`, url `synthetic://<id>`) authored in the same style to fill label gaps, pre-labeled by construction and human-reviewed.
 - `criteria.json`: ordered list of the criterion names below, read by the eval harness.
 - `labels.json`: one entry per fixture with a `pass`/`fail` label per criterion, an `overall` verdict, and optional `notes`.
-- `splits.json`: train/dev/test membership (roughly 20/40/40), stratified so per-criterion fail counts and the synthetic fraction are balanced. Near-duplicate listings from the same seller share a split to avoid few-shot leakage. Train is the source for examples baked into versioned prompt files; dev is for iterating on prompts and models; test is reserved for final candidate comparison.
+- `splits.json`: train/dev/test membership (roughly 20/40/40), stratified so per-criterion fail counts and the synthetic fraction are balanced. Near-duplicate listings from the same seller share a split to avoid few-shot leakage. Train is the source for examples baked into versioned prompt files when needed; production prompt v4 uses the rubric alone.
 
 ## Overall verdict
 

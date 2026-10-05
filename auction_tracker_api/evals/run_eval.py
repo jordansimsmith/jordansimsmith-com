@@ -35,9 +35,9 @@ from openai import OpenAI
 # data deps) and run records are written back to the source tree
 HERE = pathlib.Path(__file__).resolve().parent
 DEFAULT_PROMPTS = {
-    "mtg_bulk": "prompts/v6.md",
-    "pokemon_bulk": "prompts/v5.md",
-    "ram": "prompts/v3.md",
+    "mtg_bulk": "prompts/v7.md",
+    "pokemon_bulk": "prompts/v6.md",
+    "ram": "prompts/v4.md",
 }
 
 
