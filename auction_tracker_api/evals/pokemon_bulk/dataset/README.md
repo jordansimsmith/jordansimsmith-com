@@ -50,5 +50,5 @@ The owner review sheet is `labels.json`: each real listing retains its supplied 
 
 - `criteria.json`: ordered criteria read by the shared harness.
 - `labels.json`: hand-authored per-criterion and overall labels.
-- `splits.json`: fixed seed-42 train/dev/test membership; train examples supply few-shot context.
+- `splits.json`: fixed seed-42 train/dev/test membership; versioned prompts contain their chosen train examples directly. The production v5 preserves the existing Java prompt's 11 condensed train examples, while v1-v4 contain the full 21-example train split used by the earlier eval harness.
 - `<listing_id>.json`: immutable snapshots of production-shaped listing input.

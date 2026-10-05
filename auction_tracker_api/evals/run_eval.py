@@ -15,9 +15,8 @@ Usage:
         [--price-cached-input $/1M] [--price-cache-write $/1M]
         [--price-output $/1M]
 
-Few-shot examples always come from the train split, regardless of the split
-being evaluated. Results are written to
-auction_tracker_api/evals/<judge>/runs/.
+Each prompt file is the complete system prompt, including any examples.
+Results are written to auction_tracker_api/evals/<judge>/runs/.
 """
 
 import argparse
@@ -36,8 +35,8 @@ from openai import OpenAI
 # data deps) and run records are written back to the source tree
 HERE = pathlib.Path(__file__).resolve().parent
 DEFAULT_PROMPTS = {
-    "mtg_bulk": "prompts/v5.md",
-    "pokemon_bulk": "prompts/v4.md",
+    "mtg_bulk": "prompts/v6.md",
+    "pokemon_bulk": "prompts/v5.md",
     "ram": "prompts/v3.md",
 }
 
@@ -52,24 +51,6 @@ def load_dataset(dataset_dir):
             (dataset_dir / f"{listing_id}.json").read_text()
         )
     return criteria, fixtures, labels, splits
-
-
-def build_system_prompt(prompt_path, criteria, fixtures, labels, train_ids):
-    prompt = prompt_path.read_text()
-    lines = ["\n## Examples\n"]
-    for listing_id in train_ids:
-        f, lab = fixtures[listing_id], labels[listing_id]
-        expected = {}
-        for c in criteria:
-            # null labels (inapplicable) are shown as pass per the prompt's rule
-            expected[c] = lab[c] or "pass"
-        lines.append(f"Title: {f['title']}")
-        lines.append(f"Description: {f['description']}")
-        lines.append("Expected judgment: " + json.dumps(expected))
-        if lab.get("notes"):
-            lines.append(f"Note: {lab['notes']}")
-        lines.append("")
-    return prompt + "\n".join(lines)
 
 
 def judge_once(client, model, system_prompt, criteria, fixture, reasoning_effort):
@@ -234,9 +215,7 @@ def main():
 
     prompt_file = args.prompt or DEFAULT_PROMPTS[args.judge]
     prompt_path = judge_dir / prompt_file
-    system_prompt = build_system_prompt(
-        prompt_path, criteria, fixtures, labels, splits["train"]
-    )
+    system_prompt = prompt_path.read_text()
 
     client = OpenAI()
     records, errors = {}, {}

@@ -49,63 +49,115 @@ No other keys, no markdown.
 
 ## Examples
 
+### Example 6020797024
+
+```text
 Title: G Skill F4 3600C16D 32Gtznc 32Gb Trident Z Neo
 Description: Description G SKILL F4 3600C16D 32GTZNC 32GB TRIDENT Z NEO G.SKILL F4-3600C16D-32GTZNC 32GB (2 x 16GB)/ PC4-28800 / DDR4 3600 Mhz/ Timings 16-19-19-39/ Voltage 1.35V/ Trident Z Neo. FEATURES Trident Z Neo DDR4-3600 CL16-19-19-39 1.35V 32GB (2x16GB) Engineered and optimized for full compatibility on the latest AMD Ryzen platforms, Trident Z Neo brings unparalleled DRAM memory performance and vibrant RGB lighting to any gaming PC or workstation with the latest AMD Ryzen CPUs and AMD DDR4 motherboards. Engineered and optimized for full compatibility on the latest AMD Ryzen platforms, Trident Z Neo brings unparalleled DRAM memory performance and vibrant RGB lighting to any gaming PC or workstation with the latest AMD Ryzen CPUs and AMD DDR4 motherboards. Optimized DDR4 Performance for AMD Ryzen Designed for memory performance with the latest AMD Ryzen platforms, Trident Z Neo is optimized to unlock the full potential of the AMD platform to its maximum speed. Light It Up With RGB Software F...
 Expected judgment: {"trident_z_family": "fail", "ddr4": "pass", "kit_2x16gb": "pass", "speed_3200": "fail", "timings_cl16": "fail", "desktop_udimm": "pass"}
 Note: neo, timing c16 but slightly off 16-18-18-38
+```
 
+### Example 6022401837
+
+```text
 Title: 32Gb (2x16GB) DDR4 3466mhz CL17
 Description: Details Condition: Used Description 32Gb (2x16GB) DDR4 CAS latency CL17 3466mhz UDIMM unregistered (desktop memory) Working, spare parts from previous PC Shipping & pick-up options Destination & description Price New Zealand > Urban $15.00 New Zealand > Rural $20.00 Canterbury > Urban $10.00 Learn more about shipping & delivery options. Payment Options Ping Pay instantly by card and Ping balance. What's Ping? Questions & Answers (2) What is the CAS Latency on this p51k1 (487 ) • 11:37 am, Fri, 10 Jul CL17 brandondr (26 ) • 1:39 pm, Fri, 10 Jul Thanks if I had read the add properly I would have seen that p51k1 (487 ) • 2:52 pm, Fri, 10 Jul I updated the ad after your question, thanks for asking brandondr (26 ) • 3:02 pm, Fri, 10 Jul Ask a question
 Expected judgment: {"trident_z_family": "fail", "ddr4": "pass", "kit_2x16gb": "pass", "speed_3200": "fail", "timings_cl16": "pass", "desktop_udimm": "pass"}
+```
 
+### Example 6023701974
+
+```text
 Title: G.SKILL Trident Z RGB 32GB ( 2 X 16GB ) for AMD Ryzen & Threadripper DDR4
 Description: Description Please ensure you include a phone number with your order for courier reasons. G.SKILL Trident Z RGB 32GB ( 2 X 16GB ) for AMD Ryzen & Threadripper DDR4 3200MT/s CL16 1.35v Desktop Memory, 16-18-18-38 , F4-3200C16D-32GTZRX Series Trident Z RGB (For AMD) Memory Type DDR4 Capacity 32GB (16GBx2) Multi-Channel Kit Dual Channel Kit Tested Speed 3200MHz Tested Latency 16-18-18-38 Tested Voltage 1.35v Registered/Unbuffered Unbuffered Error Checking Non-ECC SPD Speed 2133MHz SPD Voltage 1.20v Fan lncluded No Height 44 mm / 1.73 inch Warranty Limited Lifetime Features Intel XMP 2.0 (Extreme Memory Profile) Ready Additional Notes Rated XMP frequency & stability depends on MB & CPU capability. Details Condition: New Brand: G.SKILL ManufacturerCode: F4-3200C16D-32GTZRX Shipping & pick-up options Destination & description Price Nationwide 4-5 days, Economy $5.00 Shipping more than one item No extra charge Estimated delivery times in business days Seller does not allow pick-ups Learn more...
 Expected judgment: {"trident_z_family": "pass", "ddr4": "pass", "kit_2x16gb": "pass", "speed_3200": "pass", "timings_cl16": "pass", "desktop_udimm": "pass"}
 Note: Trident Z RGB (For AMD) / GTZRX is not Neo - regular RGB line, passes (owner ruling)
+```
 
+### Example 6024908813
+
+```text
 Title: 32GB GSKILL Trident Z RGB 3200MHZ (4x 8gb) DDR4 RAM
 Description: Description Excellent condition. Pulled from working system. Boots into bios and ran a quick memory test again. Was used in a Asus Prime Z490-V Motherboard. 4x 8gb (32gb ram total) GSkill Trident Z RGB 3200mhz Ram DDR4. Have lots of other ram. Check my listings. In general sometimes 4 sticks can be a bit fiddly with different motherboards so just make sure you have a good motherboard to suit. Details Condition: Used Brand: G.Skill Shipping & pick-up options Destination & description Price To be arranged N/A Pick-up available from Palmerston North, Manawatu Free Learn more about shipping & delivery options. Payment Options Ping Pay instantly by card and Ping balance. What's Ping? Other options Cash Questions & Answers Ask a question No questions have been asked!
 Expected judgment: {"trident_z_family": "pass", "ddr4": "pass", "kit_2x16gb": "fail", "speed_3200": "pass", "timings_cl16": "pass", "desktop_udimm": "pass"}
 Note: 4x8gb rather than 2x16gb
+```
 
+### Example 6024908887
+
+```text
 Title: GSKILL 16gb (4x 4gb) 1600MHZ DDR3 RAM
 Description: Description Excellent condition. Tested and working. 16gb GSKILL Ram DDR3. Have lots of other ram. Check my listings. Details Condition: Used Brand: Crucial Shipping & pick-up options Destination & description Price To be arranged N/A Pick-up available from Palmerston North, Manawatu Free Learn more about shipping & delivery options. Payment Options Ping Pay instantly by card and Ping balance. What's Ping? Other options Cash Questions & Answers Ask a question No questions have been asked!
 Expected judgment: {"trident_z_family": "fail", "ddr4": "fail", "kit_2x16gb": "fail", "speed_3200": "pass", "timings_cl16": "pass", "desktop_udimm": "pass"}
+```
 
+### Example 6024908906
+
+```text
 Title: 64GB GSKILL Trident Z RGB 3200MHZ (4x 16gb) DDR4 RAM
 Description: Description Excellent condition. Pulled from working system. Boots into bios and ran a quick memory test again. Was used in a Strix Z490-A Motherboard. 4x 16gb (64gb ram total) GSkill Trident Z RGB 3200mhz Ram DDR4. Have lots of other ram. Check my listings. In general sometimes 4 sticks can be a bit fiddly with different motherboards so just make sure you have a good motherboard to suit and make the most of these excellent components. Details Condition: Used Brand: G.Skill Shipping & pick-up options Destination & description Price To be arranged N/A Pick-up available from Palmerston North, Manawatu Free Learn more about shipping & delivery options. Payment Options Ping Pay instantly by card and Ping balance. What's Ping? Other options Cash Questions & Answers Ask a question No questions have been asked!
 Expected judgment: {"trident_z_family": "pass", "ddr4": "pass", "kit_2x16gb": "fail", "speed_3200": "pass", "timings_cl16": "pass", "desktop_udimm": "pass"}
 Note: would be a good listing tbh but 4x16gb would be surplus to requrieemnts given i only need 2x16 and would be much more expensive
+```
 
+### Example 6024908990
+
+```text
 Title: GSKILL Trident Z RGB 3200MHZ 16gb (2x 8gb) DDR4 RAM
 Description: Description Excellent condition. Pulled from working PC. Tested and working. Was used in an Asus Z490 Motherboard. 16gb GSkill Trident Z RGB 3200mhz Ram DDR4. 2 AVAILABLE (4x 8gb (32gb) TOTAL) LISTING PRICE PER 2x 8gb 16GB KIT. Have lots of other ram. Check my listings. Details Condition: Used Brand: G.Skill Shipping & pick-up options Destination & description Price To be arranged N/A Pick-up available from Palmerston North, Manawatu Free Learn more about shipping & delivery options. Payment Options Ping Pay instantly by card and Ping balance. What's Ping? Other options Cash Questions & Answers Ask a question No questions have been asked!
 Expected judgment: {"trident_z_family": "pass", "ddr4": "pass", "kit_2x16gb": "fail", "speed_3200": "pass", "timings_cl16": "pass", "desktop_udimm": "pass"}
+```
 
+### Example 6025521674
+
+```text
 Title: G.Skill Ripjaws S5 DDR5 32GB(16GBx2)
 Description: Details Condition: Used Brand: G.Skill Description G.Skill Ripjaws S5 DDR5-6000 CL36-36-36-96 1.35v AMD EXPO and Intel XMP 3.0 Ready Bought for a system but didn't need it Shipping & pick-up options Destination & description Price New Zealand > Urban / Aramex $5.23 New Zealand > Rural / NZ Post $11.12 Learn more about shipping & delivery options. Payment Options Ping Pay instantly by card and Ping balance. What's Ping? Questions & Answers Ask a question No questions have been asked!
 Expected judgment: {"trident_z_family": "fail", "ddr4": "fail", "kit_2x16gb": "pass", "speed_3200": "fail", "timings_cl16": "fail", "desktop_udimm": "pass"}
+```
 
+### Example 6027923716
+
+```text
 Title: RAM G.Skill DDR4 3200 cl16-18-18 2x8gig
 Description: Details Condition: Used Description In perfect working condition. Pickup Mangawhai or can be carefully posted. Shipping & pick-up options Destination & description Price Pick up from Mangawhai Free Shipping to be arranged with seller N/A Learn more about shipping & delivery options. Payment Options Ping Pay instantly by card and Ping balance. What's Ping? Other options Cash Questions & Answers Ask a question No questions have been asked!
 Expected judgment: {"trident_z_family": "pass", "ddr4": "pass", "kit_2x16gb": "fail", "speed_3200": "pass", "timings_cl16": "pass", "desktop_udimm": "pass"}
 Note: given the benefit of the doubt that this is trident z
+```
 
+### Example 6029096718
+
+```text
 Title: G.Skill FORTIS 32 GB (2 x 16 GB) DDR4-2400 CL16 Memory
 Description: Details Condition: Used Description G.Skill F4-2400C16D-32GFT Fortis DDR4-2400 CL16-16-16-39 1.20V 32GB (2x16GB) Memory Kit It just been remove from my workstation, still working well. Product Detail Link: https://www.gskill.com/product/165/171/1534748155/F4-2400C16D-32GFT Shipping & pick-up options Destination & description Price Pick up from Auckland Free New Zealand $8.00 Learn more about shipping & delivery options. Payment Options Ping Pay instantly by card and Ping balance. What's Ping? Questions & Answers Ask a question No questions have been asked!
 Expected judgment: {"trident_z_family": "fail", "ddr4": "pass", "kit_2x16gb": "pass", "speed_3200": "fail", "timings_cl16": "fail", "desktop_udimm": "pass"}
 Note: timing slightly off, i'm after 16-18-18-38
+```
 
+### Example s001
+
+```text
 Title: G.Skill Trident Z 32GB (2x16GB) DDR4 3200MHz CL16
 Description: Description Selling my G.Skill Trident Z 32GB kit, 2 x 16GB sticks. DDR4 3200MHz, timings 16-18-18-38, 1.35V. The non-RGB version with the silver and black heatspreaders. Pulled from my gaming PC after an upgrade, always ran XMP without issues. Tested working. Details Condition: Used Shipping & pick-up options Destination & description Price Courier - Nationwide $5.23 Courier - Nationwide > Rural $11.12 Pick-up available from Riccarton, Christchurch Free Learn more about shipping & delivery options. Payment Options Ping Pay instantly by card and Ping balance. What's Ping? Other options Cash, NZ Bank Deposit Questions & Answers Ask a question No questions have been asked!
 Expected judgment: {"trident_z_family": "pass", "ddr4": "pass", "kit_2x16gb": "pass", "speed_3200": "pass", "timings_cl16": "pass", "desktop_udimm": "pass"}
 Note: target: clean full-spec pass, plain (non-RGB) Trident Z
+```
 
+### Example s010
+
+```text
 Title: G.Skill Trident Z Neo 32GB (2x16GB) DDR4-3200 CL16-18-18-38
 Description: Description G.Skill Trident Z Neo kit, model F4-3200C16D-32GTZN. 32GB total as 2x16GB, DDR4 3200MHz, timings 16-18-18-38, 1.35V. Optimised for Ryzen but works on Intel too. Selling after moving to a DDR5 platform. Details Condition: Used Shipping & pick-up options Destination & description Price Courier - Nationwide $5.23 Courier - Nationwide > Rural $11.12 Pick-up available from Albany, Auckland Free Learn more about shipping & delivery options. Payment Options Ping Pay instantly by card and Ping balance. What's Ping? Other options Cash, NZ Bank Deposit Questions & Answers Ask a question No questions have been asked!
 Expected judgment: {"trident_z_family": "fail", "ddr4": "pass", "kit_2x16gb": "pass", "speed_3200": "pass", "timings_cl16": "pass", "desktop_udimm": "pass"}
 Note: target: near-miss - Neo with otherwise perfect specs fails family only
+```
 
+### Example s015
+
+```text
 Title: 32GB (2x16GB) Samsung DDR4-3200 ECC Registered server RAM
 Description: Description Matched pair of Samsung 16GB DDR4-3200 ECC Registered RDIMM modules, M393A2K43DB3-CWE, 2Rx8. Pulled from a decommissioned server, fully tested. Note these are Registered ECC modules for servers and workstations - they will NOT work in a normal desktop board. Details Condition: Used Shipping & pick-up options Destination & description Price Free shipping within New Zealand Free Learn more about shipping & delivery options. Payment Options Ping Pay instantly by card and Ping balance. What's Ping? Other options Afterpay, Bank Deposit Questions & Answers Ask a question No questions have been asked!
 Expected judgment: {"trident_z_family": "fail", "ddr4": "pass", "kit_2x16gb": "pass", "speed_3200": "pass", "timings_cl16": "pass", "desktop_udimm": "fail"}
 Note: target: ECC RDIMM fails desktop_udimm
+```

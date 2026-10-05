@@ -65,7 +65,7 @@ Done when: every criterion has enough of both labels to measure TPR and TNR (rou
 
 ### 5. Split train/dev/test
 
-Split roughly 20/40/40 with a fixed seed, committed as `dataset/splits.json`. Train supplies few-shot prompt examples, dev is what prompts and models are iterated against, test is scored once at the end. Stratify so per-criterion fail counts and the synthetic fraction are balanced across splits, and pin near-duplicates (same seller, relisted items) to the same split so few-shot examples cannot leak into evaluation.
+Split roughly 20/40/40 with a fixed seed, committed as `dataset/splits.json`. Train is the source for any examples baked into a prompt variant, dev is what prompts and models are iterated against, and test is scored once at the end. Stratify so per-criterion fail counts and the synthetic fraction are balanced across splits, and pin near-duplicates (same seller, relisted items) to the same split so prompt examples cannot leak into evaluation.
 
 Done when: `splits.json` is committed with the seed and strategy recorded.
 
@@ -75,12 +75,12 @@ A single Python script per service, `evals/run_eval.py`, shared by all of the se
 
 - Dependencies go through the root pip lock: add to `requirements.in`, run `bazel run //:requirements.update`.
 - Dataset and prompt files are `data` deps read from runfiles; run records are written to the source tree via `BUILD_WORKSPACE_DIRECTORY`. Per-judge `runs/` directories are already gitignored repo-wide (`**/evals/**/runs/`).
-- Flags: `--judge` (required, the judge's subdirectory name), `--model` (required), `--split` (default dev), `--prompt` (default `prompts/v1.md`, relative to the judge directory), `--trials` (majority vote), `--limit`, `--reasoning-effort`, `--price-input`/`--price-output` (USD per 1M tokens).
+- Flags: `--judge` (required, the judge's subdirectory name), `--model` (required), `--split` (default dev), `--prompt` (the judge's configured version by default, relative to its directory), `--trials` (majority vote), `--limit`, `--reasoning-effort`, `--price-input`/`--price-output` (USD per 1M tokens).
 - Criteria are read from the judge's `dataset/criteria.json`, never hardcoded.
 - The judge call uses temperature 0 and structured JSON output: per criterion an object with `reasoning` and `result` ("pass"/"fail"). The overall verdict is derived in code as the AND of criteria, never asked of the model.
 - Report per-criterion TPR and TNR (positive = fail/disqualified), never accuracy, with the plain-language framing printed on every run (e.g. "TPR = junk caught, TNR = keepers kept"), plus mean/p95 latency, token counts, and cost when prices are given.
 - Print every disagreement with the judge's reasoning — this is the error-analysis feed.
-- Save each run to a timestamped directory under `runs/` with `config.json` (model, effort, split, trials, prompt file, SHA-256 of the assembled prompt, labels, and splits), `results.json`, and `metrics.json`, so every number is reproducible.
+- Read the selected prompt file verbatim as the complete system prompt. Save each run to a timestamped directory under `runs/` with `config.json` (model, effort, split, trials, prompt file, SHA-256 of its contents, labels, and splits), `results.json`, and `metrics.json`, so every number is reproducible.
 
 Usage shape:
 
@@ -92,7 +92,7 @@ Done when: a small `--limit` smoke run works end-to-end through `bazel run` and 
 
 ### 7. Write the judge prompt
 
-`prompts/v1.md` distills the codebook into judge-facing language: role framing, the input's nature (including boilerplate), the criteria with fail signals and explicit default-pass rules, and the output JSON schema. Few-shot examples from the train split are appended at runtime by the harness, not baked into the file. Prompts are the experiment variable: never edit a version in place once measured — copy to `v2.md` and iterate there.
+`prompts/v1.md` distills the codebook into judge-facing language: role framing, the input's nature (including boilerplate), the criteria with fail signals and explicit default-pass rules, and the output JSON schema. A variant includes any examples it needs directly in the `.md` file, selected from the train split; fence raw listing text so seller formatting cannot look like prompt instructions. The harness never adds examples. Prompts are the experiment variable: never edit a version in place once measured — copy to `v2.md` and iterate there.
 
 Done when: a baseline run on dev is recorded.
 

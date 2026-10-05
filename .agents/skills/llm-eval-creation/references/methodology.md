@@ -50,7 +50,7 @@ A feature that is itself an LLM classifier, evaluated against the owner's hand l
 
 - Binary pass/fail per criterion, with a clear task and criterion in plain language.
 - Structured JSON output with `reasoning` and `result` per criterion; reasoning must cite the input text that drove the judgment.
-- Few-shot pass/fail examples drawn from the train split, assembled at runtime.
+- Few-shot pass/fail examples, when needed, drawn from the train split and baked into the versioned prompt file. Fence raw listing text so its formatting stays distinct from instructions.
 - Temperature 0; judges are still non-deterministic, so majority-vote over 3+ trials when comparing close candidates.
 - Pin everything a result depends on — model version, prompt version, dataset version — in the run record, so any number can be reproduced and drift is detectable.
 
@@ -58,7 +58,7 @@ A feature that is itself an LLM classifier, evaluated against the owner's hand l
 
 Roughly 20/40/40 — different from ML training splits because nothing is trained; the data only informs the prompt:
 
-- **Train (~20%)**: the pool few-shot examples are drawn from. The model sees these labels.
+- **Train (~20%)**: the pool from which any baked-in few-shot examples are drawn. The model sees the labels of examples included in its prompt variant.
 - **Dev (~40%)**: labels hidden from the model, used repeatedly by you to score candidates while iterating.
 - **Test (~40%)**: labels hidden from the model and barely used by you — scored once, on final candidates, so the number is honest.
 
