@@ -14,7 +14,9 @@ The actual items are Pokémon Trading Card Game cards, not another game or acces
 
 ### bulk_scale
 
-Singles, effectively itemized collections, and explicit quantities of 100 or fewer fail. Explicit quantities of 200 or more pass. Unstated quantities and ambiguous 101–199-card lots default to pass when framed as bulk, a large lot, or a collection clear-out. A bundle title with no count and no text establishing a large pile fails: the sparse bundle wording does not establish bulk scale. A bundle with a count above 100 or clear evidence of a large pile passes; the explicit 100-or-fewer rule still applies.
+Singles, effectively itemized collections, and stated whole-lot totals below 500 fail, including exact counts, approximations, and lower bounds such as “200+,” “120+,” “over 340,” and “6x.” A “bulk” label does not override a stated total below 500. A stated total of 500 or more passes the count check, including “500+”; the other bulk-scale rules still apply. Counts for a subset of a larger uncounted pile or for shipping or packaging do not establish the lot total. Unstated quantities default to pass when framed as bulk, a large lot, or a collection clear-out. A bundle title with no count and no text establishing a large pile fails: the sparse bundle wording does not establish bulk scale.
+
+The owner-provided listings `6162600268`, `6162497749`, and `6162761525` fail on their stated 200+, 120+, and 6x card totals. Existing listings `6143687098`, `6147566784`, and `6148917923` also fail on their stated 200, approximately 360, and over 340 card totals. The approximately 360-card binder retains its independent poor-condition failure.
 
 The owner-labeled listings `6153519596` (“Pokemon Camorant bundle”), `6153488007` (“Pokemon Card Bundle $55”), and `6153501092` (“Scarlet & Violet Promo Bundle”) fail because their scraped titles and descriptions provide no card count or evidence of a large pile. Their `fixed_collection` labels pass because the text does not establish a repeatable or assembled product.
 
@@ -42,7 +44,7 @@ The owner-labeled Trade Me listing `6150549502` is a fail: it offers an “X500 
 
 ## Dataset status
 
-The corpus contains 29 owner-labeled live listings and 78 targeted synthetic label-gap fixtures. The real cases include the three sparse bundle listings; other cases cover a linked mixed bundle, per-bundle “no duplicates” and “guaranteed EX” promises, and an exact-pile near miss with the same terms. The owner’s rulings also cover hard cases for Mega-era mixtures, 30th-anniversary exceptions, language ambiguity, Energy bundles, quantity defaults, and damaged collections. Earlier synthetic labels remain marked `owner review pending`; the seed-42 split is 21 train, 43 dev, and 43 test, with relist identities kept together.
+The corpus contains 32 owner-labeled live listings and 78 targeted synthetic label-gap fixtures. The real cases include the three sparse bundle listings and three below-500 count examples; other cases cover a linked mixed bundle, per-bundle “no duplicates” and “guaranteed EX” promises, and an exact-pile near miss with the same terms. The owner’s rulings also cover hard cases for Mega-era mixtures, 30th-anniversary exceptions, language ambiguity, Energy bundles, quantity defaults, and damaged collections. Earlier synthetic labels remain marked `owner review pending`; the seed-42 split is 21 train, 46 dev, and 43 test, with relist identities kept together.
 
 The owner review sheet is `labels.json`: each real listing retains its supplied verdict and reason, while synthetic entries include a note naming the targeted criterion. Keep prompt versions immutable once a measured run has been recorded.
 
@@ -50,5 +52,5 @@ The owner review sheet is `labels.json`: each real listing retains its supplied 
 
 - `criteria.json`: ordered criteria read by the shared harness.
 - `labels.json`: hand-authored per-criterion and overall labels.
-- `splits.json`: fixed seed-42 train/dev/test membership; versioned prompts contain their chosen train examples directly. Production prompt v6 retains five condensed train examples. V5 preserves the previous Java prompt's 11 examples, while v1-v4 contain the full 21-example train split used by the earlier eval harness.
+- `splits.json`: fixed seed-42 train/dev/test membership; versioned prompts contain their chosen train examples directly. Production prompt v7 retains v6's five condensed train examples and adds the 500-card floor. V5 preserves the previous Java prompt's 11 examples, while v1-v4 contain the full 21-example train split used by the earlier eval harness.
 - `<listing_id>.json`: immutable snapshots of production-shaped listing input.

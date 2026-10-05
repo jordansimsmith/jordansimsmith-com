@@ -174,14 +174,14 @@
   },
   "6147566784": {
     "pokemon_cards": "pass",
-    "bulk_scale": "pass",
+    "bulk_scale": "fail",
     "accepted_language": "pass",
     "not_basic_energy": "pass",
     "not_mega_evolution_era": "pass",
     "acceptable_condition": "fail",
     "fixed_collection": "pass",
     "overall": "fail",
-    "notes": "majority explicitly Heavily Played or Damaged"
+    "notes": "majority explicitly Heavily Played or Damaged; stated approximately 360-card lot is below the 500-card bulk floor"
   },
   "6140597749": {
     "pokemon_cards": "pass",
@@ -250,23 +250,25 @@
   },
   "6143687098": {
     "pokemon_cards": "pass",
-    "bulk_scale": "pass",
+    "bulk_scale": "fail",
     "accepted_language": "pass",
     "not_basic_energy": "pass",
     "not_mega_evolution_era": "pass",
     "acceptable_condition": "pass",
     "fixed_collection": "pass",
-    "overall": "pass"
+    "overall": "fail",
+    "notes": "stated 200-card lot is below the 500-card bulk floor"
   },
   "6148917923": {
     "pokemon_cards": "pass",
-    "bulk_scale": "pass",
+    "bulk_scale": "fail",
     "accepted_language": "pass",
     "not_basic_energy": "pass",
     "not_mega_evolution_era": "pass",
     "acceptable_condition": "pass",
     "fixed_collection": "pass",
-    "overall": "pass"
+    "overall": "fail",
+    "notes": "stated over 340-card lot is below the 500-card bulk floor"
   },
   "s001": {
     "pokemon_cards": "fail",
@@ -1169,5 +1171,38 @@
     "fixed_collection": "pass",
     "overall": "pass",
     "notes": "near-miss: no duplicates and an EX card describe one exact photographed physical collection, not a repeatable product"
+  },
+  "6162600268": {
+    "pokemon_cards": "pass",
+    "bulk_scale": "fail",
+    "accepted_language": "pass",
+    "not_basic_energy": "pass",
+    "not_mega_evolution_era": "pass",
+    "acceptable_condition": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "owner-provided listing: 200+ cards is below the 500-card bulk floor; LP-HP range does not establish a poor-condition majority"
+  },
+  "6162497749": {
+    "pokemon_cards": "pass",
+    "bulk_scale": "fail",
+    "accepted_language": "pass",
+    "not_basic_energy": "pass",
+    "not_mega_evolution_era": "pass",
+    "acceptable_condition": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "owner-provided listing: 120+ cards is below the 500-card bulk floor; accessories do not change the card count"
+  },
+  "6162761525": {
+    "pokemon_cards": "pass",
+    "bulk_scale": "fail",
+    "accepted_language": "pass",
+    "not_basic_energy": "pass",
+    "not_mega_evolution_era": "pass",
+    "acceptable_condition": "pass",
+    "fixed_collection": "pass",
+    "overall": "fail",
+    "notes": "owner-provided listing: 6x McDonald’s Pokémon cards is below the 500-card bulk floor; other listings and combined shipping do not establish a repeatable pack"
   }
 }

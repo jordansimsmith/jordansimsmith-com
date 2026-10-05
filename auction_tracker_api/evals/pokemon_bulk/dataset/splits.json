@@ -1,6 +1,6 @@
 {
   "seed": 42,
-  "strategy": "owner-labeled real listings grouped by relist identity plus targeted synthetic label-gap cases; seed 42; the 6150549502 bundle listing and sparse bundles 6153519596 and 6153488007 are held out in dev, while sparse bundle 6153501092, guaranteed-EX pack s077, and exact-pile near-miss s078 are held out in test; no-duplicate/guaranteed-EX pack example s076 is in train",
+  "strategy": "owner-labeled real listings grouped by relist identity plus targeted synthetic label-gap cases; seed 42; the 6150549502 bundle listing and sparse bundles 6153519596 and 6153488007 are held out in dev, while sparse bundle 6153501092, guaranteed-EX pack s077, and exact-pile near-miss s078 are held out in test; no-duplicate/guaranteed-EX pack example s076 is in train; owner-provided 200+, 120+, and 6x count failures added to dev",
   "train": [
     "6139138583",
     "6139617498",
@@ -67,7 +67,10 @@
     "s045",
     "6150549502",
     "6153519596",
-    "6153488007"
+    "6153488007",
+    "6162600268",
+    "6162497749",
+    "6162761525"
   ],
   "test": [
     "6141953620",

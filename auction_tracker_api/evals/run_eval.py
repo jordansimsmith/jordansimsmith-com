@@ -36,7 +36,7 @@ from openai import OpenAI
 HERE = pathlib.Path(__file__).resolve().parent
 DEFAULT_PROMPTS = {
     "mtg_bulk": "prompts/v7.md",
-    "pokemon_bulk": "prompts/v6.md",
+    "pokemon_bulk": "prompts/v7.md",
     "ram": "prompts/v4.md",
 }
 
