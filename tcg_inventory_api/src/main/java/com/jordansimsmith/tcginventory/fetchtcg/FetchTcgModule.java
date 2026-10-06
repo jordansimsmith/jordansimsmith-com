@@ -29,7 +29,7 @@ public class FetchTcgModule {
     Runnable pacer =
         () -> {
           try {
-            Thread.sleep(ThreadLocalRandom.current().nextLong(1000, 2000));
+            Thread.sleep(ThreadLocalRandom.current().nextLong(500, 1000));
           } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new RuntimeException(e);
