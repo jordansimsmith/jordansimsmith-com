@@ -31,7 +31,6 @@ public class ConfirmScanHandler
 
   record ConfirmScanRow(
       @JsonProperty("scan_position") @Nullable Integer scanPosition,
-      @JsonProperty("external_source") @Nullable String externalSource,
       @JsonProperty("external_id") @Nullable String externalId,
       @JsonProperty("name") @Nullable String name,
       @JsonProperty("set_code") @Nullable String setCode,
@@ -121,8 +120,7 @@ public class ConfirmScanHandler
     }
 
     for (var row : orderedRows) {
-      scanRepository.updateScanRowSelection(
-          user, scanId, row.scanPosition(), row.externalSource(), row.externalId());
+      scanRepository.updateScanRowSelection(user, scanId, row.scanPosition(), row.externalId());
     }
 
     var now = clock.now();
@@ -172,10 +170,6 @@ public class ConfirmScanHandler
           || row.scanPosition() <= 0
           || !positions.add(row.scanPosition())) {
         throw new IllegalArgumentException("every retained scan row must be selected exactly once");
-      }
-      if (Strings.isNullOrEmpty(row.externalSource())) {
-        throw new IllegalArgumentException(
-            "scan position %d: external_source is required".formatted(row.scanPosition()));
       }
       if (Strings.isNullOrEmpty(row.externalId())) {
         throw new IllegalArgumentException(

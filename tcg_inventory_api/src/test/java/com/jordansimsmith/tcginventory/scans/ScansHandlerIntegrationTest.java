@@ -125,7 +125,6 @@ public class ScansHandlerIntegrationTest {
     fakeCardCatalogs.addCard(
         new CatalogCard(
             "mtg",
-            "scryfall",
             "a9738cda-adb1-47fb-9f4c-ecd930228c4d",
             "Ragavan, Nimble Pilferer",
             "mh2",
@@ -136,7 +135,6 @@ public class ScansHandlerIntegrationTest {
     fakeCardCatalogs.addCard(
         new CatalogCard(
             "mtg",
-            "scryfall",
             "4ced112a-e775-4f97-97b3-74877e9dce12",
             "Dragon's Rage Channeler",
             "mh2",
@@ -532,10 +530,7 @@ public class ScansHandlerIntegrationTest {
     row.setSuggestions(
         List.of(
             ScanRowItem.ScanSuggestion.create(
-                "scryfall",
-                "a9738cda-adb1-47fb-9f4c-ecd930228c4d",
-                "Ragavan, Nimble Pilferer",
-                0.8300001)));
+                "a9738cda-adb1-47fb-9f4c-ecd930228c4d", "Ragavan, Nimble Pilferer", 0.8300001)));
     row.setNeedsReview(false);
     scanRowTable.putItem(row);
     var reviewRow =
@@ -563,8 +558,7 @@ public class ScansHandlerIntegrationTest {
     assertThat(body.get("rows").get(0).get("suggestions").get(0).get("score").asDouble())
         .isEqualTo(0.8300001);
     assertThat(body.get("game").asText()).isEqualTo("mtg");
-    assertThat(body.get("rows").get(0).get("suggestions").get(0).get("external_source").asText())
-        .isEqualTo("scryfall");
+    assertThat(body.get("rows").get(0).get("suggestions").get(0).has("external_source")).isFalse();
     assertThat(body.get("rows").get(0).get("suggestions").get(0).get("external_id").asText())
         .isEqualTo("a9738cda-adb1-47fb-9f4c-ecd930228c4d");
     assertThat(body.get("rows").get(0).get("suggestions").get(0).has("scryfall_id")).isFalse();
@@ -926,9 +920,9 @@ public class ScansHandlerIntegrationTest {
     scan.setStatus("reviewing");
     scanTable.putItem(scan);
     var request =
-        "{\"rows\":[{\"scan_position\":1,\"external_source\":\"scryfall\",\"external_id\":\"a9738cda-adb1-47fb-9f4c-ecd930228c4d\",\"name\":\"Forged"
+        "{\"rows\":[{\"scan_position\":1,\"external_id\":\"a9738cda-adb1-47fb-9f4c-ecd930228c4d\",\"name\":\"Forged"
             + " name one\",\"set_code\":\"fake\",\"set_name\":\"Forged set"
-            + " one\",\"collector_number\":\"999\"},{\"scan_position\":2,\"external_source\":\"scryfall\",\"external_id\":\"4ced112a-e775-4f97-97b3-74877e9dce12\",\"name\":\"Forged"
+            + " one\",\"collector_number\":\"999\"},{\"scan_position\":2,\"external_id\":\"4ced112a-e775-4f97-97b3-74877e9dce12\",\"name\":\"Forged"
             + " name two\",\"set_code\":\"fake\",\"set_name\":\"Forged set"
             + " two\",\"collector_number\":\"998\"}]}";
 
@@ -1023,7 +1017,6 @@ public class ScansHandlerIntegrationTest {
     assertThat(importRows)
         .extracting(ImportRowItem::getCollectorNumber)
         .containsExactly("138", "121");
-    assertThat(importRows).extracting(ImportRowItem::getExternalSource).containsOnly("scryfall");
     assertThat(importRows)
         .extracting(ImportRowItem::getExternalId)
         .containsExactly(
@@ -1074,13 +1067,11 @@ public class ScansHandlerIntegrationTest {
     scanTable.putItem(scan);
     var request =
         confirmationRequest(
-            "scryfall",
             "a9738cda-adb1-47fb-9f4c-ecd930228c4d",
             "forged",
             "fake",
             "fake",
             "1",
-            "scryfall",
             "a9738cda-adb1-47fb-9f4c-ecd930228c4d",
             "forged",
             "fake",
@@ -1102,16 +1093,15 @@ public class ScansHandlerIntegrationTest {
   }
 
   @Test
-  void confirmationJobShouldRejectUnsupportedSourceBeforeCatalogLookup() throws Exception {
+  void confirmationJobShouldUseGameIdentityWithoutSubmittedSource() throws Exception {
     // arrange
-    var user = "confirm-source";
+    var user = "confirm-game-identity";
     var scanId = createScanWithFiles(user, 1);
     var scan = getScanItem(user, scanId);
     scan.setStatus("reviewing");
     scanTable.putItem(scan);
     var request =
-        confirmationRequest(
-            "other", "a9738cda-adb1-47fb-9f4c-ecd930228c4d", "Ragavan", "mh2", "Set", "138");
+        confirmationRequest("a9738cda-adb1-47fb-9f4c-ecd930228c4d", "Ragavan", "mh2", "Set", "138");
     // act
     var response =
         confirmScanHandler.handleRequest(
@@ -1121,10 +1111,10 @@ public class ScansHandlerIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(202);
     assertThat(getScanItem(user, scanId).getStatus()).isEqualTo("confirming");
     processScanConfirmation(user);
-    assertThat(getScanItem(user, scanId).getStatus()).isEqualTo("reviewing");
-    assertThat(getScanItem(user, scanId).getError()).contains("scan position 1");
-    assertNoCreatedImports(user);
-    assertThat(fakeCardCatalogs.lookupRequests()).isEmpty();
+    assertThat(getScanItem(user, scanId).getStatus()).isEqualTo("confirmed");
+    assertThat(getScanItem(user, scanId).getError()).isNull();
+    assertThat(fakeCardCatalogs.lookupRequests())
+        .containsExactly(List.of("a9738cda-adb1-47fb-9f4c-ecd930228c4d"));
   }
 
   @Test
@@ -1136,7 +1126,7 @@ public class ScansHandlerIntegrationTest {
     scan.setStatus("reviewing");
     scanTable.putItem(scan);
     var missingId = "11111111-1111-4111-8111-111111111111";
-    var request = confirmationRequest("scryfall", missingId, "Missing", "set", "Set", "1");
+    var request = confirmationRequest(missingId, "Missing", "set", "Set", "1");
     // act
     var response =
         confirmScanHandler.handleRequest(
@@ -1163,7 +1153,6 @@ public class ScansHandlerIntegrationTest {
     fakeCardCatalogs.addCard(
         new CatalogCard(
             "mtg",
-            "scryfall",
             foilOnlyId,
             "Foil only",
             "test",
@@ -1171,7 +1160,7 @@ public class ScansHandlerIntegrationTest {
             "1",
             new CatalogCard.ImageUrls(null, null),
             List.of("foil")));
-    var request = confirmationRequest("scryfall", foilOnlyId, "Foil only", "test", "Test set", "1");
+    var request = confirmationRequest(foilOnlyId, "Foil only", "test", "Test set", "1");
     // act
     var response =
         confirmScanHandler.handleRequest(
@@ -1195,8 +1184,7 @@ public class ScansHandlerIntegrationTest {
     scanTable.putItem(scan);
     fakeCardCatalogs.setFailure(new CatalogException.Unavailable("stub unavailable"));
     var request =
-        confirmationRequest(
-            "scryfall", "a9738cda-adb1-47fb-9f4c-ecd930228c4d", "Ragavan", "mh2", "Set", "138");
+        confirmationRequest("a9738cda-adb1-47fb-9f4c-ecd930228c4d", "Ragavan", "mh2", "Set", "138");
     // act
     var response =
         confirmScanHandler.handleRequest(
@@ -1236,8 +1224,7 @@ public class ScansHandlerIntegrationTest {
     scan.setStatus("reviewing");
     scanTable.putItem(scan);
     var request =
-        "{\"rows\":[{\"scan_position\":1,\"external_source\":\"scryfall\","
-            + "\"external_id\":\"\",\"name\":\"Forest\","
+        "{\"rows\":[{\"scan_position\":1,\"external_id\":\"\",\"name\":\"Forest\","
             + "\"set_code\":\"lea\",\"set_name\":\"Limited Edition Alpha\","
             + "\"collector_number\":\"1\"}]}";
 
@@ -1298,19 +1285,18 @@ public class ScansHandlerIntegrationTest {
 
   private String confirmationRequest(String... rowValues) {
     var rows =
-        IntStream.range(0, rowValues.length / 6)
+        IntStream.range(0, rowValues.length / 5)
             .mapToObj(
                 index -> {
-                  var offset = index * 6;
-                  return "{\"scan_position\":%d,\"external_source\":\"%s\",\"external_id\":\"%s\",\"name\":\"%s\",\"set_code\":\"%s\",\"set_name\":\"%s\",\"collector_number\":\"%s\"}"
+                  var offset = index * 5;
+                  return "{\"scan_position\":%d,\"external_id\":\"%s\",\"name\":\"%s\",\"set_code\":\"%s\",\"set_name\":\"%s\",\"collector_number\":\"%s\"}"
                       .formatted(
                           index + 1,
                           rowValues[offset],
                           rowValues[offset + 1],
                           rowValues[offset + 2],
                           rowValues[offset + 3],
-                          rowValues[offset + 4],
-                          rowValues[offset + 5]);
+                          rowValues[offset + 4]);
                 })
             .collect(Collectors.joining(","));
     return "{\"rows\":[" + rows + "]}";

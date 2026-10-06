@@ -42,7 +42,6 @@ public class GetSkuHandler
   record SkuDetailResponse(
       @JsonProperty("sku_id") String skuId,
       @JsonProperty("game") String game,
-      @JsonProperty("external_source") String externalSource,
       @JsonProperty("external_id") String externalId,
       @JsonProperty("image_urls") CatalogCard.ImageUrls imageUrls,
       @JsonProperty("name") String name,
@@ -147,7 +146,6 @@ public class GetSkuHandler
         new SkuDetailResponse(
             skuItem.getSkuId(),
             skuItem.getGame(),
-            skuItem.getExternalSource(),
             skuItem.getExternalId(),
             imageUrls,
             skuItem.getName(),

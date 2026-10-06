@@ -36,7 +36,6 @@ const SCRYFALL_ID = 'aaaa1111-2222-4333-8444-555566667777';
 const nmDetail: SkuDetail = {
   sku_id: `${SCRYFALL_ID}#normal#NM`,
   game: 'mtg',
-  external_source: 'scryfall',
   external_id: SCRYFALL_ID,
   image_urls: {
     small: `https://api.scryfall.com/cards/${SCRYFALL_ID}?format=image&version=small`,
@@ -78,7 +77,6 @@ const nmDetail: SkuDetail = {
 const lpDetail: SkuDetail = {
   sku_id: `${SCRYFALL_ID}#normal#LP`,
   game: 'mtg',
-  external_source: 'scryfall',
   external_id: SCRYFALL_ID,
   image_urls: {
     small: `https://api.scryfall.com/cards/${SCRYFALL_ID}?format=image&version=small`,

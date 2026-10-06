@@ -26,7 +26,6 @@ public class ScanRowItem {
   public static final String NEEDS_REVIEW = "needs_review";
   public static final String SUGGESTIONS = "suggestions";
   public static final String ERROR = "error";
-  public static final String SELECTED_EXTERNAL_SOURCE = "selected_external_source";
   public static final String SELECTED_EXTERNAL_ID = "selected_external_id";
 
   private String pk;
@@ -40,7 +39,6 @@ public class ScanRowItem {
   private Boolean needsReview;
   private List<ScanSuggestion> suggestions;
   private String error;
-  private String selectedExternalSource;
   private String selectedExternalId;
 
   @DynamoDbPartitionKey
@@ -144,15 +142,6 @@ public class ScanRowItem {
     this.error = error;
   }
 
-  @DynamoDbAttribute(SELECTED_EXTERNAL_SOURCE)
-  public String getSelectedExternalSource() {
-    return selectedExternalSource;
-  }
-
-  public void setSelectedExternalSource(@Nullable String selectedExternalSource) {
-    this.selectedExternalSource = selectedExternalSource;
-  }
-
   @DynamoDbAttribute(SELECTED_EXTERNAL_ID)
   public String getSelectedExternalId() {
     return selectedExternalId;
@@ -187,24 +176,13 @@ public class ScanRowItem {
 
   @DynamoDbBean
   public static class ScanSuggestion {
-    public static final String EXTERNAL_SOURCE = "external_source";
     public static final String EXTERNAL_ID = "external_id";
     public static final String NAME = "name";
     public static final String SCORE = "score";
 
-    private String externalSource;
     private String externalId;
     private String name;
     private Double score;
-
-    @DynamoDbAttribute(EXTERNAL_SOURCE)
-    public String getExternalSource() {
-      return externalSource;
-    }
-
-    public void setExternalSource(@Nullable String externalSource) {
-      this.externalSource = externalSource;
-    }
 
     @DynamoDbAttribute(EXTERNAL_ID)
     public String getExternalId() {
@@ -233,10 +211,8 @@ public class ScanRowItem {
       this.score = score;
     }
 
-    public static ScanSuggestion create(
-        String externalSource, String externalId, String name, double score) {
+    public static ScanSuggestion create(String externalId, String name, double score) {
       var suggestion = new ScanSuggestion();
-      suggestion.setExternalSource(externalSource);
       suggestion.setExternalId(externalId);
       suggestion.setName(name);
       suggestion.setScore(score);
@@ -248,15 +224,14 @@ public class ScanRowItem {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
       ScanSuggestion that = (ScanSuggestion) o;
-      return Objects.equals(externalSource, that.externalSource)
-          && Objects.equals(externalId, that.externalId)
+      return Objects.equals(externalId, that.externalId)
           && Objects.equals(name, that.name)
           && Objects.equals(score, that.score);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(externalSource, externalId, name, score);
+      return Objects.hash(externalId, name, score);
     }
   }
 }

@@ -399,7 +399,6 @@ public class JobsHandlerIntegrationTest {
             "111",
             "normal",
             "NM",
-            "scryfall",
             SCRYFALL_ID,
             "en"));
     createJob("jordan", "job1", "appraise", "queued", "import1");
@@ -477,7 +476,6 @@ public class JobsHandlerIntegrationTest {
             "1",
             "normal",
             "NM",
-            "scryfall",
             "not/a-uuid",
             "en"));
     var jobItem = createJob("jordan", "job1", "appraise", "queued", "import1");
@@ -1669,7 +1667,6 @@ public class JobsHandlerIntegrationTest {
             user,
             skuId,
             parts[0],
-            parts[1],
             parts[2],
             parts[3],
             parts[4],
@@ -1702,7 +1699,6 @@ public class JobsHandlerIntegrationTest {
             user,
             skuId,
             parts[0],
-            parts[1],
             parts[2],
             parts[3],
             parts[4],
@@ -1733,7 +1729,6 @@ public class JobsHandlerIntegrationTest {
             user,
             skuId,
             parts[0],
-            parts[1],
             parts[2],
             parts[3],
             parts[4],
@@ -1764,7 +1759,6 @@ public class JobsHandlerIntegrationTest {
             user,
             skuId,
             parts[0],
-            parts[1],
             parts[2],
             parts[3],
             parts[4],
@@ -1992,7 +1986,6 @@ public class JobsHandlerIntegrationTest {
               spec.collectorNumber(),
               spec.finish(),
               spec.condition(),
-              "scryfall",
               spec.scryfallId(),
               spec.language());
       importRowTable.putItem(rowItem);
@@ -2017,7 +2010,6 @@ public class JobsHandlerIntegrationTest {
               "168",
               "normal",
               "NM",
-              "scryfall",
               SCRYFALL_ID,
               "en");
       importRowTable.putItem(rowItem);

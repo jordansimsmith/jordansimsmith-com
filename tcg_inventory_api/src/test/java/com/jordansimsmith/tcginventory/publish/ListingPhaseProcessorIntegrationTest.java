@@ -329,7 +329,6 @@ public class ListingPhaseProcessorIntegrationTest {
             user,
             skuId,
             parts[0],
-            parts[1],
             parts[2],
             parts[3],
             parts[4],

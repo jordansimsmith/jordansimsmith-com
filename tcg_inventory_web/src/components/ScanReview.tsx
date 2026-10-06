@@ -642,7 +642,6 @@ export function ScanReview({
       const selection = selections.get(row.scan_position)!;
       return {
         scan_position: row.scan_position,
-        external_source: selection.card.external_source,
         external_id: selection.card.external_id,
         name: selection.card.name,
         set_code: selection.card.set_code,

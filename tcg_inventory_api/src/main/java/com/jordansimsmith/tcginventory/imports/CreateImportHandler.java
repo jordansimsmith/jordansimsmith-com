@@ -146,7 +146,6 @@ public class CreateImportHandler
                 parsedRow.collectorNumber(),
                 parsedRow.finish(),
                 parsedRow.condition(),
-                parsedRow.externalSource(),
                 parsedRow.externalId(),
                 parsedRow.language());
         importRowTable.putItem(rowItem);

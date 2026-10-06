@@ -40,7 +40,6 @@ public class GetScanHandler
       @JsonProperty("created_at") long createdAt) {}
 
   record ScanSuggestionResponse(
-      @JsonProperty("external_source") String externalSource,
       @JsonProperty("external_id") String externalId,
       @JsonProperty("name") String name,
       @JsonProperty("score") double score) {}
@@ -198,10 +197,7 @@ public class GetScanHandler
 
   private static ScanSuggestionResponse toSuggestion(ScanRowItem.ScanSuggestion suggestion) {
     return new ScanSuggestionResponse(
-        suggestion.getExternalSource(),
-        suggestion.getExternalId(),
-        suggestion.getName(),
-        suggestion.getScore());
+        suggestion.getExternalId(), suggestion.getName(), suggestion.getScore());
   }
 
   @Nullable

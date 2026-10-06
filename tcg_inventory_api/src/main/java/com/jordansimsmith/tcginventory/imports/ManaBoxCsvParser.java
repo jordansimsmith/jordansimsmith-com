@@ -31,7 +31,6 @@ public class ManaBoxCsvParser {
       String collectorNumber,
       String finish,
       String condition,
-      String externalSource,
       String externalId,
       String language,
       int quantity) {}
@@ -83,7 +82,7 @@ public class ManaBoxCsvParser {
     }
 
     var game = Games.MAGIC_THE_GATHERING;
-    var identity = new CardIdentity(game.id(), game.externalSource(), raw.scryfallId());
+    var identity = new CardIdentity(game.id(), raw.scryfallId());
 
     requireNonBlank(raw.condition(), "Condition", rowNumber);
     var conditionValue = raw.condition().toLowerCase();
@@ -100,7 +99,6 @@ public class ManaBoxCsvParser {
         raw.collectorNumber(),
         finish,
         condition.name(),
-        identity.externalSource(),
         identity.externalId(),
         raw.language().toLowerCase(),
         raw.quantity());

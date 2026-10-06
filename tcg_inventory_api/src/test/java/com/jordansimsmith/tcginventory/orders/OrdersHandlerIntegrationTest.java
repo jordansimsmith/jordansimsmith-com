@@ -278,7 +278,7 @@ public class OrdersHandlerIntegrationTest {
     assertThat(units.get(0).get("sequence_number").asInt()).isEqualTo(1);
     assertThat(units.get(0).get("location").asText()).isEqualTo("A0-1");
     assertThat(units.get(0).get("current_location").asText()).isEqualTo("A0-0");
-    assertThat(units.get(0).get("external_source").asText()).isEqualTo("scryfall");
+    assertThat(units.get(0).has("external_source")).isFalse();
     assertThat(units.get(0).get("external_id").asText()).isEqualTo("scryfall-1");
     assertThat(units.get(0).get("image_urls").get("small").asText())
         .isEqualTo("https://img.example/cards/scryfall-1/small.jpg");
@@ -348,11 +348,11 @@ public class OrdersHandlerIntegrationTest {
     var units = body.get("units");
     assertThat(units).hasSize(2);
     assertThat(units.get(0).get("name").asText()).isEqualTo("Lightning Bolt");
-    assertThat(units.get(0).get("external_source").asText()).isEqualTo("scryfall");
+    assertThat(units.get(0).has("external_source")).isFalse();
     assertThat(units.get(0).get("external_id").asText()).isEqualTo("scryfall-1");
     assertThat(units.get(0).get("price").asText()).isEqualTo("1.50");
     assertThat(units.get(1).get("name").asText()).isEqualTo("Sol Ring");
-    assertThat(units.get(1).get("external_source").asText()).isEqualTo("scryfall");
+    assertThat(units.get(1).has("external_source")).isFalse();
     assertThat(units.get(1).get("external_id").asText()).isEqualTo("scryfall-2");
     assertThat(units.get(1).get("image_urls").get("small").asText())
         .isEqualTo("https://img.example/cards/scryfall-2/small.jpg");
@@ -396,7 +396,6 @@ public class OrdersHandlerIntegrationTest {
             "jordan",
             skuId,
             "pokemon",
-            "tcgcsv",
             "123",
             "normal",
             "NM",
@@ -990,7 +989,6 @@ public class OrdersHandlerIntegrationTest {
             user,
             skuId,
             parts[0],
-            parts[1],
             parts[2],
             parts[3],
             parts[4],

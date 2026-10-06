@@ -83,7 +83,6 @@ def _magic_eligible_suggestions(records: list[dict], finish: str) -> list[dict]:
         seen.add(external_id)
         suggestions.append(
             {
-                "external_source": MAGIC_EXTERNAL_SOURCE,
                 "external_id": external_id,
                 "name": name,
                 "score": float(score),
@@ -129,7 +128,6 @@ class DynamoScanStore:
     def _suggestion_attribute(suggestion: dict) -> dict:
         return {
             "M": {
-                "external_source": {"S": suggestion["external_source"]},
                 "external_id": {"S": suggestion["external_id"]},
                 "name": {"S": suggestion["name"]},
                 "score": {"N": str(suggestion["score"])},

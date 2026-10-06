@@ -69,7 +69,6 @@ function detail(overrides: Partial<ScanDetail> = {}): ScanDetail {
 
 const suggestedProduct: CatalogCard = {
   game: 'mtg',
-  external_source: 'catalog-provider',
   external_id: 'product-1',
   name: 'Lightning Bolt',
   set_code: '2x2',
@@ -87,7 +86,6 @@ function reviewableDetail(overrides: Partial<ScanDetail> = {}): ScanDetail {
       ...scanRow,
       suggestions: [
         {
-          external_source: 'recognition-source',
           external_id: suggestedProduct.external_id,
           name: suggestedProduct.name,
           score: 0.9,

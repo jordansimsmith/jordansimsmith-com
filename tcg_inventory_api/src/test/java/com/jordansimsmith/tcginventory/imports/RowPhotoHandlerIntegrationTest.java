@@ -333,7 +333,6 @@ public class RowPhotoHandlerIntegrationTest {
             "1",
             "normal",
             "NM",
-            "scryfall",
             "scryfall-2",
             "en");
     discardRow.setDecision("discard");
@@ -384,7 +383,6 @@ public class RowPhotoHandlerIntegrationTest {
             "168",
             "normal",
             "NM",
-            "scryfall",
             "scryfall-1",
             "en");
     rowItem.setDecision(decision);

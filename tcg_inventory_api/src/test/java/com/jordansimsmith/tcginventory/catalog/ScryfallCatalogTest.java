@@ -79,7 +79,7 @@ public class ScryfallCatalogTest {
 
     // assert
     assertThat(result.externalId()).isEqualTo(CARD_ID);
-    assertThat(result.externalSource()).isEqualTo("scryfall");
+    assertThat(result.game()).isEqualTo("mtg");
     assertThat(result.name()).isEqualTo("Lightning Bolt");
     assertThat(result.availableFinishes()).containsExactly("normal", "foil", "etched");
     assertThat(result.imageUrls().small())

@@ -160,7 +160,7 @@ public class ScanRepository {
   }
 
   public void updateScanRowSelection(
-      String user, String scanId, int scanPosition, String externalSource, String externalId) {
+      String user, String scanId, int scanPosition, String externalId) {
     dynamoDbClient.updateItem(
         UpdateItemRequest.builder()
             .tableName(TcgInventoryTable.TABLE_NAME)
@@ -170,17 +170,10 @@ public class ScanRepository {
                     AttributeValue.builder().s(ScanRowItem.formatPk(user, scanId)).build(),
                     ScanRowItem.SK,
                     AttributeValue.builder().s(ScanRowItem.formatSk(scanPosition)).build()))
-            .updateExpression(
-                "SET "
-                    + ScanRowItem.SELECTED_EXTERNAL_SOURCE
-                    + " = :externalSource, "
-                    + ScanRowItem.SELECTED_EXTERNAL_ID
-                    + " = :externalId")
+            .updateExpression("SET " + ScanRowItem.SELECTED_EXTERNAL_ID + " = :externalId")
             .conditionExpression("attribute_exists(" + ScanRowItem.PK + ")")
             .expressionAttributeValues(
-                Map.of(
-                    ":externalSource", AttributeValue.builder().s(externalSource).build(),
-                    ":externalId", AttributeValue.builder().s(externalId).build()))
+                Map.of(":externalId", AttributeValue.builder().s(externalId).build()))
             .build());
   }
 

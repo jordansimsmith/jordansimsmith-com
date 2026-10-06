@@ -122,11 +122,9 @@ public class AppraiseJobProcessor implements JobProcessor {
       ImportRowItem rowItem,
       Map<String, AppraisalCatalog.ResolvedCard> batchCache,
       Map<String, FetchTcgClient.GetCardResponse> cardCache) {
-    var identity = new CardIdentity(game, rowItem.getExternalSource(), rowItem.getExternalId());
+    var identity = new CardIdentity(game, rowItem.getExternalId());
     var dedupeKey =
         identity.game()
-            + "#"
-            + identity.externalSource()
             + "#"
             + identity.externalId()
             + "#"

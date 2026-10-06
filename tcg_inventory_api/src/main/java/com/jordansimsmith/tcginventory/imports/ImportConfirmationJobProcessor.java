@@ -71,8 +71,7 @@ public class ImportConfirmationJobProcessor implements JobProcessor {
 
       var skuSeeds = new HashMap<String, SkuItem>();
       for (var row : keepRows) {
-        var identity =
-            new CardIdentity(importItem.getGame(), row.getExternalSource(), row.getExternalId());
+        var identity = new CardIdentity(importItem.getGame(), row.getExternalId());
         var skuId = SkuIds.format(identity, row.getFinish(), Condition.valueOf(row.getCondition()));
         var skuSeed =
             skuSeeds.computeIfAbsent(
@@ -83,7 +82,6 @@ public class ImportConfirmationJobProcessor implements JobProcessor {
                           user,
                           skuId,
                           importItem.getGame(),
-                          row.getExternalSource(),
                           row.getExternalId(),
                           row.getFinish(),
                           row.getCondition(),

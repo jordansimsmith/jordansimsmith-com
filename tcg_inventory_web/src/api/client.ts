@@ -79,7 +79,6 @@ export interface SkuUnit {
 }
 
 export interface SkuDetail extends SkuSummary {
-  external_source: string;
   external_id: string;
   image_urls: ImageUrls;
   in_stock_count: number;
@@ -128,7 +127,6 @@ export interface ImportRow {
   collector_number: string;
   finish: Finish;
   condition: Condition;
-  external_source: string;
   external_id: string;
   decision: RowDecision | null;
   decision_reason: string | null;
@@ -164,7 +162,6 @@ export type ScanStatus =
 export type ScanRowStatus = 'suggested' | 'needs_review';
 
 export interface ScanSuggestion {
-  external_source: string;
   external_id: string;
   name: string;
   score: number;
@@ -184,7 +181,6 @@ export interface ScanUploadSlot extends ScanFile {
 
 export interface ScanConfirmationRow {
   scan_position: number;
-  external_source: string;
   external_id: string;
   name: string;
   set_code: string;
@@ -218,7 +214,6 @@ export interface ScanDetail extends ScanSummary {
 
 export interface CatalogCard {
   game: GameId;
-  external_source: string;
   external_id: string;
   name: string;
   set_code: string;
@@ -323,7 +318,6 @@ export interface OrderUnit {
   sequence_number: number;
   location: string;
   current_location: string;
-  external_source: string;
   external_id: string;
   image_urls: ImageUrls;
   name: string;

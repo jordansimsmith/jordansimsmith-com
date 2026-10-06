@@ -74,7 +74,6 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
         sequence_number: 37,
         location: 'A0-37',
         current_location: 'A0-35',
-        external_source: 'scryfall',
         external_id: '58b26011-e103-45c4-a253-900f4e6b2eeb',
         image_urls: {
           small:
@@ -108,7 +107,6 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
         sequence_number: 74,
         location: 'A0-74',
         current_location: 'A0-70',
-        external_source: 'scryfall',
         external_id: '58b26011-e103-45c4-a253-900f4e6b2eeb',
         image_urls: {
           small:
@@ -136,7 +134,6 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
         sequence_number: 259,
         location: 'A2-59',
         current_location: 'A2-59',
-        external_source: 'scryfall',
         external_id: 'f0a51425-d796-48b8-b68c-bc21fb465c81',
         image_urls: {
           small:
@@ -484,7 +481,6 @@ describe('OrderDetailPage', () => {
             sequence_number: 1,
             location: 'A0-1',
             current_location: 'A0-1',
-            external_source: 'scryfall',
             external_id: '0bc3401f-935b-45ce-b1e6-300a5d9dfd4f',
             image_urls: {
               small:

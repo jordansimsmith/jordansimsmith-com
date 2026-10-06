@@ -32,7 +32,6 @@ import javax.annotation.Nullable;
 
 public class ScryfallCatalog implements CardCatalog {
   private static final String GAME = "mtg";
-  private static final String SOURCE = "scryfall";
   private static final String USER_AGENT =
       "TcgInventory/1.0 (https://tcg-inventory.jordansimsmith.com)";
   private static final int PAGE_SIZE = 20;
@@ -422,7 +421,6 @@ public class ScryfallCatalog implements CardCatalog {
             : List.<String>of();
     return new CatalogCard(
         GAME,
-        SOURCE,
         card.id(),
         card.name(),
         card.setCode(),

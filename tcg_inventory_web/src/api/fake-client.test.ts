@@ -50,7 +50,7 @@ describe('createFakeClient', () => {
     );
 
     expect(firstCard.name).toBe('Lightning Bolt');
-    expect(firstCard.external_source).toBe('scryfall');
+    expect(firstCard).not.toHaveProperty('external_source');
     await expect(
       client.findCatalogAlternatives({
         game: 'mtg',
@@ -249,7 +249,7 @@ describe('createFakeClient', () => {
     expect(response.sku_id).not.toBe(source.sku_id);
     const target = await client.getSku(response.sku_id);
     expect(target.game).toBe(source.game);
-    expect(target.external_source).toBe(source.external_source);
+    expect(target).not.toHaveProperty('external_source');
     expect(target.external_id).toBe(source.external_id);
     expect(target.name).toBe('Sylvan Library');
     expect(target.condition).toBe('DMG');
@@ -616,7 +616,6 @@ describe('createFakeClient scans', () => {
     const scan = await client.getScan('fake-scan-reviewing');
     const rows: ScanConfirmationRow[] = scan.rows.map((row, index) => ({
       scan_position: row.scan_position,
-      external_source: row.suggestions[0].external_source,
       external_id: row.suggestions[0].external_id,
       name: row.suggestions[0].name,
       set_code: index === 0 ? 'mh2' : 'dom',
@@ -835,7 +834,7 @@ describe('createFakeClient orders', () => {
       const block = Math.floor(unit.sequence_number / 100);
       expect(unit.location).toBe(`A${block}-${unit.sequence_number % 100}`);
       expect(unit.game).toBe('mtg');
-      expect(unit.external_source).toBe('scryfall');
+      expect(unit).not.toHaveProperty('external_source');
       expect(unit.external_id).toMatch(/^[0-9a-f-]{36}$/);
       expect(unit.image_urls.small).toMatch(/^data:image\/svg\+xml/);
     }

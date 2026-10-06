@@ -10,6 +10,7 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.Photos;
+import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
@@ -28,6 +29,9 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
 
 @Testcontainers
 public class InventoryHandlerIntegrationTest {
@@ -35,6 +39,7 @@ public class InventoryHandlerIntegrationTest {
   private FakeClock fakeClock;
   private FakeUlidGenerator fakeUlidGenerator;
   private ObjectMapper objectMapper;
+  private DynamoDbClient dynamoDbClient;
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
   private DynamoDbTable<AuditItem> auditTable;
@@ -66,6 +71,7 @@ public class InventoryHandlerIntegrationTest {
     fakeClock = factory.fakeClock();
     fakeUlidGenerator = factory.fakeUlidGenerator();
     objectMapper = factory.objectMapper();
+    dynamoDbClient = factory.dynamoDbClient();
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
     auditTable = factory.auditTable();
@@ -199,6 +205,22 @@ public class InventoryHandlerIntegrationTest {
     // arrange
     createSku(
         "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
+    var skuKey =
+        Map.of(
+            SkuItem.PK,
+            AttributeValue.builder()
+                .s(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM"))
+                .build(),
+            SkuItem.SK,
+            AttributeValue.builder().s(SkuItem.formatSk()).build());
+    var newlyCreatedSku =
+        dynamoDbClient.getItem(
+            GetItemRequest.builder()
+                .tableName(TcgInventoryTable.TABLE_NAME)
+                .key(skuKey)
+                .consistentRead(true)
+                .build());
+    assertThat(newlyCreatedSku.item()).doesNotContainKey("external_source");
     createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 4242, "in_stock", "import1");
     createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1204, "reserved", "import1");
     createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 4250, "in_stock", "import1");
@@ -215,7 +237,7 @@ public class InventoryHandlerIntegrationTest {
     var body = objectMapper.readTree(response.getBody());
     assertThat(body.get("sku_id").asText()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
     assertThat(body.get("game").asText()).isEqualTo("mtg");
-    assertThat(body.get("external_source").asText()).isEqualTo("scryfall");
+    assertThat(body.has("external_source")).isFalse();
     assertThat(body.get("external_id").asText()).isEqualTo("scryfall-1");
     assertThat(body.get("image_urls").get("small").asText())
         .isEqualTo("https://img.example/cards/scryfall-1/small.jpg");
@@ -442,7 +464,6 @@ public class InventoryHandlerIntegrationTest {
     assertThat(targetSku.getVersion()).isEqualTo(2);
     assertThat(targetSku.getSkuId()).isEqualTo("mtg#scryfall#scryfall-1#normal#LP");
     assertThat(targetSku.getGame()).isEqualTo("mtg");
-    assertThat(targetSku.getExternalSource()).isEqualTo("scryfall");
     assertThat(targetSku.getExternalId()).isEqualTo("scryfall-1");
 
     var auditItems = queryAuditEntries("jordan");
@@ -726,7 +747,6 @@ public class InventoryHandlerIntegrationTest {
             user,
             skuId,
             parts[0],
-            parts[1],
             externalId,
             finish,
             condition,

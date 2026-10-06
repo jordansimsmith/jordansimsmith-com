@@ -143,7 +143,6 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(sku1.getGsi1pk()).isEqualTo(SkuItem.formatGsi1pk("jordan"));
     assertThat(sku1.getSkuId()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
     assertThat(sku1.getGame()).isEqualTo("mtg");
-    assertThat(sku1.getExternalSource()).isEqualTo("scryfall");
     assertThat(sku1.getExternalId()).isEqualTo("scryfall-1");
 
     var sequenceCounter =
@@ -403,7 +402,6 @@ public class ConfirmImportHandlerIntegrationTest {
               String.valueOf(position),
               "normal",
               "NM",
-              "scryfall",
               "scryfall-1",
               "en");
       row.setDecision("keep");
@@ -426,7 +424,6 @@ public class ConfirmImportHandlerIntegrationTest {
             "jordan",
             "mtg#scryfall#scryfall-1#normal#NM",
             "mtg",
-            "scryfall",
             "scryfall-1",
             "normal",
             "NM",
@@ -477,7 +474,6 @@ public class ConfirmImportHandlerIntegrationTest {
             "168",
             "normal",
             "NM",
-            "scryfall",
             "scryfall-1",
             "en");
     row1.setDecision("keep");
@@ -498,7 +494,6 @@ public class ConfirmImportHandlerIntegrationTest {
             "169",
             "normal",
             "NM",
-            "scryfall",
             "scryfall-1",
             "en");
     row2.setDecision("keep");
@@ -831,7 +826,6 @@ public class ConfirmImportHandlerIntegrationTest {
             String.valueOf(position),
             finish,
             condition,
-            "scryfall",
             scryfallId,
             "en");
     rowItem.setDecision("keep");
@@ -857,7 +851,6 @@ public class ConfirmImportHandlerIntegrationTest {
             String.valueOf(position),
             "normal",
             "NM",
-            "scryfall",
             "scryfall-" + position,
             "en");
     rowItem.setDecision(decision);

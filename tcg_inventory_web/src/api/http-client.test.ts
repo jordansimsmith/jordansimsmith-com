@@ -117,7 +117,6 @@ describe('http client catalog', () => {
   it('gets exact catalog detail through the authenticated API', async () => {
     const card = {
       game: 'mtg',
-      external_source: 'provider-id',
       external_id: 'opaque/id',
       name: 'Example',
       set_code: 'set',
@@ -332,7 +331,6 @@ describe('http client scans', () => {
       rows: [
         {
           scan_position: 1,
-          external_source: 'scryfall',
           external_id: 'card-1',
           name: 'Opt',
           set_code: 'dom',

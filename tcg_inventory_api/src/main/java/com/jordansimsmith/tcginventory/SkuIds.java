@@ -18,7 +18,7 @@ public class SkuIds {
 
     return game.id()
         + "#"
-        + identity.externalSource()
+        + game.externalSource()
         + "#"
         + identity.externalId()
         + "#"

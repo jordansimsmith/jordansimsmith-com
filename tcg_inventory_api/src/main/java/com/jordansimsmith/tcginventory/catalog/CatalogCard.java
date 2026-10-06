@@ -6,7 +6,6 @@ import javax.annotation.Nullable;
 
 public record CatalogCard(
     @JsonProperty("game") String game,
-    @JsonProperty("external_source") String externalSource,
     @JsonProperty("external_id") String externalId,
     @JsonProperty("name") String name,
     @JsonProperty("set_code") String setCode,

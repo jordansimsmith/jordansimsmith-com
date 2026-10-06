@@ -3,7 +3,6 @@ package com.jordansimsmith.tcginventory.imports;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.jordansimsmith.tcginventory.games.Games;
 import org.junit.jupiter.api.Test;
 
 public class ManaBoxCsvParserTest {
@@ -32,7 +31,6 @@ public class ManaBoxCsvParserTest {
     assertThat(row.collectorNumber()).isEqualTo("168");
     assertThat(row.finish()).isEqualTo("normal");
     assertThat(row.condition()).isEqualTo("NM");
-    assertThat(row.externalSource()).isEqualTo(Games.MAGIC_THE_GATHERING.externalSource());
     assertThat(row.externalId()).isEqualTo("581B7327-3215-4A4F-B4AE-D9D4002BA882");
     assertThat(row.language()).isEqualTo("en");
     assertThat(row.quantity()).isEqualTo(1);

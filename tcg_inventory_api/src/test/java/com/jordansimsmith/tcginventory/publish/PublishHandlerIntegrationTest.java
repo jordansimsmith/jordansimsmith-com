@@ -163,7 +163,6 @@ public class PublishHandlerIntegrationTest {
             "jordan",
             "mtg#scryfall#sku1#normal#NM",
             Games.MAGIC_THE_GATHERING.id(),
-            Games.MAGIC_THE_GATHERING.externalSource(),
             "sku1",
             "normal",
             "NM",

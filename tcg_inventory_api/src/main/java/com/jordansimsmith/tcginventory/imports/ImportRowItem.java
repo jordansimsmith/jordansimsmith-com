@@ -23,7 +23,6 @@ public class ImportRowItem {
   public static final String COLLECTOR_NUMBER = "collector_number";
   public static final String FINISH = "finish";
   public static final String CONDITION = "condition";
-  public static final String EXTERNAL_SOURCE = "external_source";
   public static final String EXTERNAL_ID = "external_id";
   public static final String LANGUAGE = "language";
   public static final String DECISION = "decision";
@@ -44,7 +43,6 @@ public class ImportRowItem {
   private String collectorNumber;
   private String finish;
   private String condition;
-  private String externalSource;
   private String externalId;
   private String language;
   private String decision;
@@ -137,15 +135,6 @@ public class ImportRowItem {
 
   public void setCondition(@Nullable String condition) {
     this.condition = condition;
-  }
-
-  @DynamoDbAttribute(EXTERNAL_SOURCE)
-  public String getExternalSource() {
-    return externalSource;
-  }
-
-  public void setExternalSource(@Nullable String externalSource) {
-    this.externalSource = externalSource;
   }
 
   @DynamoDbAttribute(EXTERNAL_ID)
@@ -256,7 +245,6 @@ public class ImportRowItem {
       String collectorNumber,
       String finish,
       String condition,
-      String externalSource,
       String externalId,
       String language) {
     var item = new ImportRowItem();
@@ -269,7 +257,6 @@ public class ImportRowItem {
     item.setCollectorNumber(collectorNumber);
     item.setFinish(finish);
     item.setCondition(condition);
-    item.setExternalSource(externalSource);
     item.setExternalId(externalId);
     item.setLanguage(language);
     return item;

@@ -59,7 +59,6 @@ function card(
 ): CatalogCard {
   return {
     game: 'mtg',
-    external_source: 'catalog-provider-id',
     external_id: externalId,
     name: 'Lightning Bolt',
     set_code: '2x2',
@@ -99,7 +98,6 @@ function row(overrides: Partial<ScanRow> = {}): ScanRow {
     needs_review: false,
     suggestions: [
       {
-        external_source: 'opaque-recognition-source',
         external_id: firstCard.external_id,
         name: firstCard.name,
         score: 0.98,
@@ -472,7 +470,6 @@ describe('ScanReview', () => {
       filename: '002.jpg',
       suggestions: [
         {
-          external_source: 'another-opaque-source',
           external_id: secondCard.external_id,
           name: secondCard.name,
           score: 0.7,
@@ -508,7 +505,6 @@ describe('ScanReview', () => {
     expect(onConfirmScan).toHaveBeenCalledWith([
       {
         scan_position: 1,
-        external_source: 'catalog-provider-id',
         external_id: 'product-1',
         name: 'Lightning Bolt',
         set_code: '2x2',
@@ -517,7 +513,6 @@ describe('ScanReview', () => {
       },
       {
         scan_position: 2,
-        external_source: 'catalog-provider-id',
         external_id: 'product-2',
         name: 'Lightning Bolt',
         set_code: 'm11',

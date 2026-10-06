@@ -29,7 +29,6 @@ public class SkuItem {
   public static final String GSI2SK = "gsi2sk";
   public static final String SKU_ID = "sku_id";
   public static final String GAME = "game";
-  public static final String EXTERNAL_SOURCE = "external_source";
   public static final String EXTERNAL_ID = "external_id";
   public static final String FINISH = "finish";
   public static final String CONDITION = "condition";
@@ -55,7 +54,6 @@ public class SkuItem {
   private String gsi2sk;
   private String skuId;
   private String game;
-  private String externalSource;
   private String externalId;
   private String finish;
   private String condition;
@@ -149,15 +147,6 @@ public class SkuItem {
 
   public void setGame(@Nullable String game) {
     this.game = game;
-  }
-
-  @DynamoDbAttribute(EXTERNAL_SOURCE)
-  public String getExternalSource() {
-    return externalSource;
-  }
-
-  public void setExternalSource(@Nullable String externalSource) {
-    this.externalSource = externalSource;
   }
 
   @DynamoDbAttribute(EXTERNAL_ID)
@@ -341,7 +330,6 @@ public class SkuItem {
       String user,
       String skuId,
       String game,
-      String externalSource,
       String externalId,
       String finish,
       String condition,
@@ -356,7 +344,6 @@ public class SkuItem {
     item.setSk(formatSk());
     item.setSkuId(skuId);
     item.setGame(game);
-    item.setExternalSource(externalSource);
     item.setExternalId(externalId);
     item.setFinish(finish);
     item.setCondition(condition);

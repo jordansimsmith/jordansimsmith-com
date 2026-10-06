@@ -24,12 +24,7 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 
 public class ScanConfirmationJobProcessor implements JobProcessor {
   private record ConfirmedScanRow(
-      String externalSource,
-      String externalId,
-      String name,
-      String setCode,
-      String setName,
-      String collectorNumber) {}
+      String externalId, String name, String setCode, String setName, String collectorNumber) {}
 
   private final Clock clock;
   private final ScanRepository scanRepository;
@@ -110,7 +105,6 @@ public class ScanConfirmationJobProcessor implements JobProcessor {
               selected.collectorNumber(),
               scanItem.getFinish(),
               scanItem.getCondition(),
-              selected.externalSource(),
               selected.externalId(),
               "en"));
     }
@@ -137,16 +131,10 @@ public class ScanConfirmationJobProcessor implements JobProcessor {
     }
     var requestedIds = new LinkedHashSet<String>();
     for (var row : scanRows) {
-      if (Strings.isNullOrEmpty(row.getSelectedExternalSource())
-          || Strings.isNullOrEmpty(row.getSelectedExternalId())) {
+      if (Strings.isNullOrEmpty(row.getSelectedExternalId())) {
         throw new IllegalArgumentException(
             "scan position %d: selected card identity is required"
                 .formatted(row.getScanPosition()));
-      }
-      if (!game.externalSource().equals(row.getSelectedExternalSource())) {
-        throw new IllegalArgumentException(
-            "scan position %d: external_source is unsupported for game %s"
-                .formatted(row.getScanPosition(), game.id()));
       }
       requestedIds.add(row.getSelectedExternalId());
     }
@@ -161,7 +149,7 @@ public class ScanConfirmationJobProcessor implements JobProcessor {
         throw new IllegalArgumentException(
             "scan position %d: selected card was not found".formatted(row.getScanPosition()));
       }
-      if (!game.id().equals(card.game()) || !game.externalSource().equals(card.externalSource())) {
+      if (!game.id().equals(card.game())) {
         throw new CatalogException.Unavailable("catalog returned an incompatible card identity");
       }
       if (!card.availableFinishes().contains(finish)) {
@@ -171,7 +159,6 @@ public class ScanConfirmationJobProcessor implements JobProcessor {
       }
       confirmedRows.add(
           new ConfirmedScanRow(
-              card.externalSource(),
               card.externalId(),
               card.name(),
               card.setCode(),

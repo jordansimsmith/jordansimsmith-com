@@ -380,7 +380,6 @@ def test_filters_language_and_finish_and_deduplicates_faces():
     assert store.rows[0].status == "suggested"
     assert store.suggestions[1] == [
         {
-            "external_source": "scryfall",
             "external_id": "a9738cda-adb1-47fb-9f4c-ecd930228c4d",
             "name": "Forest",
             "score": 0.83,

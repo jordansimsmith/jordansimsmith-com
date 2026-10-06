@@ -358,7 +358,7 @@ public class ImportsHandlerIntegrationTest {
     assertThat(row.get("finish").asText()).isEqualTo("normal");
     assertThat(row.get("condition").asText()).isEqualTo("NM");
     assertThat(row.has("game")).isFalse();
-    assertThat(row.get("external_source").asText()).isEqualTo("scryfall");
+    assertThat(row.has("external_source")).isFalse();
     assertThat(row.get("external_id").asText()).isEqualTo("581b7327-3215-4a4f-b4ae-d9d4002ba882");
     assertThat(row.get("decision").isNull()).isTrue();
     assertThat(row.get("decision_reason").isNull()).isTrue();
@@ -380,7 +380,6 @@ public class ImportsHandlerIntegrationTest {
             "60",
             "normal",
             "NM",
-            "scryfall",
             "scryfall-2",
             "en");
     discard.setDecision("discard");
@@ -396,7 +395,6 @@ public class ImportsHandlerIntegrationTest {
             "472",
             "normal",
             "NM",
-            "scryfall",
             "scryfall-3",
             "en");
     keepB.setDecision("keep");
@@ -654,7 +652,6 @@ public class ImportsHandlerIntegrationTest {
             "168",
             "normal",
             "NM",
-            "scryfall",
             "scryfall-1",
             "en");
     rowItem.setDecision("keep");

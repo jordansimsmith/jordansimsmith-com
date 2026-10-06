@@ -63,7 +63,7 @@ import {
 
 const VALID_CONDITIONS: Condition[] = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 const SKU_PAGE_SIZE = 20;
-const MAGIC_THE_GATHERING = { id: 'mtg', externalSource: 'scryfall' };
+const MAGIC_THE_GATHERING = { id: 'mtg' };
 const FAKE_GAMES: Game[] = [
   {
     id: 'mtg',
@@ -98,7 +98,6 @@ const FAKE_GAMES: Game[] = [
 const FAKE_CATALOG_CARDS: CatalogCard[] = [
   {
     game: 'mtg',
-    external_source: 'scryfall',
     external_id: 'f29ba16f-c8fb-42fe-aabf-87089cb214a7',
     name: 'Lightning Bolt',
     set_code: 'm11',
@@ -113,7 +112,6 @@ const FAKE_CATALOG_CARDS: CatalogCard[] = [
   },
   {
     game: 'mtg',
-    external_source: 'scryfall',
     external_id: 'f29ba16f-c8fb-42fe-aabf-87089cb214a8',
     name: 'Lightning Bolt',
     set_code: '2xm',
@@ -128,7 +126,6 @@ const FAKE_CATALOG_CARDS: CatalogCard[] = [
   },
   {
     game: 'mtg',
-    external_source: 'scryfall',
     external_id: 'f29ba16f-c8fb-42fe-aabf-87089cb214a9',
     name: 'Lightning Bolt',
     set_code: 'sta',
@@ -143,7 +140,6 @@ const FAKE_CATALOG_CARDS: CatalogCard[] = [
   },
   {
     game: 'mtg',
-    external_source: 'scryfall',
     external_id: '6a0b230b-d391-4998-a3f7-7b158a0ec2cd',
     name: 'Llanowar Elves',
     set_code: 'm19',
@@ -154,7 +150,6 @@ const FAKE_CATALOG_CARDS: CatalogCard[] = [
   },
   {
     game: 'mtg',
-    external_source: 'scryfall',
     external_id: '323db259-d35e-467d-9a46-4adcb2fc107c',
     name: 'Opt',
     set_code: 'xln',
@@ -165,7 +160,6 @@ const FAKE_CATALOG_CARDS: CatalogCard[] = [
   },
   {
     game: 'mtg',
-    external_source: 'scryfall',
     external_id: '4f616706-ec97-4923-bb1e-11a69fbaa1f8',
     name: 'Counterspell',
     set_code: 'mh2',
@@ -277,7 +271,6 @@ const SEEDED_UNIT_PHOTO_URL =
 interface FakeSku {
   sku_id: string;
   game: GameId;
-  external_source: string;
   external_id: string;
   name: string;
   set_code: string;
@@ -326,7 +319,6 @@ function createSeedState(): FakeSku[] {
       return {
         sku_id: crypto.randomUUID(),
         game: MAGIC_THE_GATHERING.id,
-        external_source: MAGIC_THE_GATHERING.externalSource,
         external_id: scryfallId,
         name,
         set_code: setCode,
@@ -395,7 +387,6 @@ function toDetail(sku: FakeSku): SkuDetail {
     }));
   return {
     ...toSummary(sku),
-    external_source: sku.external_source,
     external_id: sku.external_id,
     image_urls: fakeImageUrls(sku.external_id, sku.name, sku.set_code),
     in_stock_count: countByStatus(sku, 'in_stock'),
@@ -460,7 +451,6 @@ interface FakeImportRow {
   collector_number: string;
   finish: Finish;
   condition: Condition;
-  external_source: string;
   external_id: string;
   decision: RowDecision;
   decision_reason: string | null;
@@ -483,7 +473,6 @@ const FAKE_UPLOAD_ROWS: FakeUploadRow[] = [
     collector_number: '73',
     finish: 'normal',
     condition: 'MP',
-    external_source: 'scryfall',
     external_id: '81c908ee-e70a-4406-a32d-ab5ab17e67b1',
     decision: 'review',
     decision_reason: 'non-English card',
@@ -495,7 +484,6 @@ const FAKE_UPLOAD_ROWS: FakeUploadRow[] = [
     collector_number: '60',
     finish: 'normal',
     condition: 'LP',
-    external_source: 'scryfall',
     external_id: '25f2e4d0-effd-4e83-b7aa-1a0d8f120951',
     decision: 'keep',
     decision_reason: null,
@@ -507,7 +495,6 @@ const FAKE_UPLOAD_ROWS: FakeUploadRow[] = [
     collector_number: '60',
     finish: 'normal',
     condition: 'LP',
-    external_source: 'scryfall',
     external_id: '25f2e4d0-effd-4e83-b7aa-1a0d8f120951',
     decision: 'keep',
     decision_reason: null,
@@ -519,7 +506,6 @@ const FAKE_UPLOAD_ROWS: FakeUploadRow[] = [
     collector_number: '168',
     finish: 'normal',
     condition: 'NM',
-    external_source: 'scryfall',
     external_id: '581b7327-3215-4a4f-b4ae-d9d4002ba882',
     decision: 'keep',
     decision_reason: null,
@@ -591,7 +577,6 @@ function createSeedImportRows(count: number): FakeImportRow[] {
       collector_number: collectorNumber,
       finish,
       condition,
-      external_source: MAGIC_THE_GATHERING.externalSource,
       external_id: scryfallId,
       decision,
       decision_reason: decisionReason,
@@ -641,7 +626,6 @@ function createSeedImports(): FakeImport[] {
           collector_number: '195',
           finish: 'normal',
           condition: 'NM',
-          external_source: MAGIC_THE_GATHERING.externalSource,
           external_id: '29ba5a2d-d787-4214-8cd7-7f2bcea938f8',
           decision: 'keep',
           decision_reason: null,
@@ -657,7 +641,6 @@ function createSeedImports(): FakeImport[] {
           collector_number: '168',
           finish: 'normal',
           condition: 'NM',
-          external_source: MAGIC_THE_GATHERING.externalSource,
           external_id: '581b7327-3215-4a4f-b4ae-d9d4002ba882',
           decision: 'keep',
           decision_reason: null,
@@ -673,7 +656,6 @@ function createSeedImports(): FakeImport[] {
           collector_number: '60',
           finish: 'normal',
           condition: 'NM',
-          external_source: MAGIC_THE_GATHERING.externalSource,
           external_id: '25f2e4d0-effd-4e83-b7aa-1a0d8f120951',
           decision: 'discard',
           decision_reason: DISCARD_REASON,
@@ -737,7 +719,6 @@ function toImportRow(row: FakeImportRow, revealed: boolean): ImportRow {
     collector_number: row.collector_number,
     finish: row.finish,
     condition: row.condition,
-    external_source: row.external_source,
     external_id: row.external_id,
     decision: revealed ? row.decision : null,
     decision_reason: revealed ? row.decision_reason : null,
@@ -866,7 +847,6 @@ function scanSuggestion(
   score: number,
 ): ScanSuggestion {
   return {
-    external_source: MAGIC_THE_GATHERING.externalSource,
     external_id: externalId,
     name,
     score,
@@ -1451,7 +1431,6 @@ function toOrderDetail(order: FakeOrder, skus: FakeSku[]): OrderDetail {
         sequence_number: ref.sequence_number,
         location: deriveLocation(ref.sequence_number),
         name: sku.name,
-        external_source: sku.external_source,
         external_id: sku.external_id,
         image_urls: fakeImageUrls(sku.external_id, sku.name, sku.set_code),
         set_code: sku.set_code,
@@ -1552,7 +1531,6 @@ export function createFakeClient(): ApiClient {
       collector_number: row.collector_number,
       finish: scan.finish,
       condition: scan.condition,
-      external_source: row.external_source,
       external_id: row.external_id,
       decision: 'keep',
       decision_reason: null,
@@ -1671,7 +1649,6 @@ export function createFakeClient(): ApiClient {
       let sku = skus.find(
         (candidate) =>
           candidate.game === importRecord.game &&
-          candidate.external_source === row.external_source &&
           candidate.external_id === row.external_id &&
           candidate.finish === row.finish &&
           candidate.condition === row.condition,
@@ -1680,7 +1657,6 @@ export function createFakeClient(): ApiClient {
         sku = {
           sku_id: crypto.randomUUID(),
           game: importRecord.game,
-          external_source: row.external_source,
           external_id: row.external_id,
           name: row.name,
           set_code: row.set_code,
@@ -2127,7 +2103,6 @@ export function createFakeClient(): ApiClient {
           return (
             source === undefined ||
             row.scan_position !== source.scan_position ||
-            !row.external_source ||
             !row.external_id ||
             !row.name ||
             !row.set_code ||
@@ -2211,7 +2186,6 @@ export function createFakeClient(): ApiClient {
       let target = skus.find(
         (candidate) =>
           candidate.game === sku.game &&
-          candidate.external_source === sku.external_source &&
           candidate.external_id === sku.external_id &&
           candidate.finish === sku.finish &&
           candidate.condition === condition,

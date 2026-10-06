@@ -261,7 +261,6 @@ public class OrderVoidingIntegrationTest {
             USER,
             SKU_ID,
             "mtg",
-            "scryfall",
             "card-1",
             "normal",
             "NM",

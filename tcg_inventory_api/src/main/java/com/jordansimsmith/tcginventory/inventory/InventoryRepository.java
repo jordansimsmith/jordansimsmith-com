@@ -111,15 +111,13 @@ public class InventoryRepository {
   // photos, the source SKU is dirtied, and the target SKU record is created or refreshed
   public String updateUnitCondition(
       String user, SkuItem skuItem, UnitItem unitItem, String condition) {
-    var identity =
-        new CardIdentity(skuItem.getGame(), skuItem.getExternalSource(), skuItem.getExternalId());
+    var identity = new CardIdentity(skuItem.getGame(), skuItem.getExternalId());
     var targetSkuId = SkuIds.format(identity, skuItem.getFinish(), Condition.valueOf(condition));
     var targetSku =
         SkuItem.create(
             user,
             targetSkuId,
             identity.game(),
-            identity.externalSource(),
             identity.externalId(),
             skuItem.getFinish(),
             condition,
@@ -485,8 +483,6 @@ public class InventoryRepository {
                 + " = :skuId, "
                 + SkuItem.GAME
                 + " = :game, "
-                + SkuItem.EXTERNAL_SOURCE
-                + " = :externalSource, "
                 + SkuItem.EXTERNAL_ID
                 + " = :externalId, "
                 + "#finish = :finish, "
@@ -513,7 +509,6 @@ public class InventoryRepository {
     values.put(":one", AttributeValue.builder().n("1").build());
     values.put(":skuId", AttributeValue.builder().s(skuSeed.getSkuId()).build());
     values.put(":game", AttributeValue.builder().s(skuSeed.getGame()).build());
-    values.put(":externalSource", AttributeValue.builder().s(skuSeed.getExternalSource()).build());
     values.put(":externalId", AttributeValue.builder().s(skuSeed.getExternalId()).build());
     values.put(":finish", AttributeValue.builder().s(skuSeed.getFinish()).build());
     values.put(":condition", AttributeValue.builder().s(skuSeed.getCondition()).build());

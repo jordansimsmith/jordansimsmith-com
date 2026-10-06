@@ -336,7 +336,6 @@ public class OrderReservationIntegrationTest {
             USER,
             SKU_ID,
             "mtg",
-            "scryfall",
             "card-1",
             "normal",
             "NM",

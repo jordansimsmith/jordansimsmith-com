@@ -10,7 +10,7 @@ public class SkuIdsTest {
   @Test
   void formatShouldBuildCanonicalMagicSkuId() {
     // arrange
-    var identity = new CardIdentity("mtg", "scryfall", "29ba5a2d-d787-4214-8cd7-7f2bcea938f8");
+    var identity = new CardIdentity("mtg", "29ba5a2d-d787-4214-8cd7-7f2bcea938f8");
 
     // act
     var skuId = SkuIds.format(identity, "normal", Condition.NM);
@@ -22,7 +22,7 @@ public class SkuIdsTest {
   @Test
   void formatShouldPreserveAsciiUnreservedExternalId() {
     // arrange
-    var identity = new CardIdentity("mtg", "scryfall", "a-._~451396");
+    var identity = new CardIdentity("mtg", "a-._~451396");
 
     // act
     var skuId = SkuIds.format(identity, "foil", Condition.LP);
@@ -32,34 +32,46 @@ public class SkuIdsTest {
   }
 
   @Test
+  void formatShouldDeriveCanonicalSourceAcrossEveryFinishAndCondition() {
+    // arrange
+    var identity = new CardIdentity("mtg", "card-id");
+
+    // act / assert
+    for (var finish : Games.get("mtg").finishes()) {
+      for (var condition : Condition.values()) {
+        assertThat(SkuIds.format(identity, finish.id(), condition))
+            .isEqualTo("mtg#scryfall#card-id#" + finish.id() + "#" + condition.name());
+      }
+    }
+  }
+
+  @Test
   void cardIdentityShouldRejectMalformedTokensAndBlankExternalIds() {
     // arrange / act / assert
-    assertThatThrownBy(() -> new CardIdentity("Magic", "scryfall", "id"))
+    assertThatThrownBy(() -> new CardIdentity("Magic", "id"))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> new CardIdentity("mtg", "scryfall-source", "id"))
-        .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> new CardIdentity("mtg", "scryfall", "  "))
+    assertThatThrownBy(() -> new CardIdentity("mtg", "  "))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void cardIdentityShouldRejectExternalIdsOutsideAsciiUnreservedSet() {
     // arrange / act / assert
-    assertThatThrownBy(() -> new CardIdentity("mtg", "scryfall", "a#b"))
+    assertThatThrownBy(() -> new CardIdentity("mtg", "a#b"))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> new CardIdentity("mtg", "scryfall", "a%b"))
+    assertThatThrownBy(() -> new CardIdentity("mtg", "a%b"))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> new CardIdentity("mtg", "scryfall", "a b"))
+    assertThatThrownBy(() -> new CardIdentity("mtg", "a b"))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> new CardIdentity("mtg", "scryfall", "é"))
+    assertThatThrownBy(() -> new CardIdentity("mtg", "é"))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void formatShouldRejectUnknownGameUnsupportedFinishAndMissingCondition() {
     // arrange
-    var unknownGame = new CardIdentity("pokemon_jp", "scryfall", "id");
-    var identity = new CardIdentity("mtg", "scryfall", "id");
+    var unknownGame = new CardIdentity("pokemon_jp", "id");
+    var identity = new CardIdentity("mtg", "id");
 
     // act / assert
     assertThatThrownBy(() -> SkuIds.format(unknownGame, "normal", Condition.NM))

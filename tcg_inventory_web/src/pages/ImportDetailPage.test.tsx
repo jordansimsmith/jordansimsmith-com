@@ -91,7 +91,6 @@ function importRow(
     collector_number: String(position),
     finish: 'normal',
     condition: 'NM',
-    external_source: 'scryfall',
     external_id: `00000000-0000-4000-8000-${String(position).padStart(12, '0')}`,
     decision: 'keep',
     decision_reason: null,
