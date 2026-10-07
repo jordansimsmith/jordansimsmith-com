@@ -40,7 +40,13 @@ public class GamesTest {
             new Games.Finish("normal", "Normal"),
             new Games.Finish("holofoil", "Holofoil"),
             new Games.Finish("reverse_holofoil", "Reverse Holofoil"));
-    assertThat(pokemon.scanReviewImageRegions()).isEmpty();
+    assertThat(pokemon.scanReviewImageRegions())
+        .containsExactly(
+            new Games.ScanReviewImageRegion("set_and_number", "Set and number", 0, 0.88, 0.5, 0.12),
+            new Games.ScanReviewImageRegion(
+                "artwork_stamps_left", "Left artwork stamps", 0, 0.32, 0.45, 0.22),
+            new Games.ScanReviewImageRegion(
+                "artwork_stamps_right", "Right artwork stamps", 0.55, 0.32, 0.45, 0.22));
     assertThat(pokemon.supportsFinish("reverse_holofoil")).isTrue();
   }
 

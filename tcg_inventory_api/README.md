@@ -32,7 +32,7 @@ The TCG inventory API service is the source of truth for physical Magic: The Gat
 
 - Authenticated CRUD for imports: upload a ManaBox CSV, appraise rows asynchronously, review appraisal decisions, confirm keepers into inventory, delete unwanted imports before confirm. Import detail derives `total_suggested_price` from keep-row suggested prices.
 - Scanner intake: create a batch with a registered game, one condition (`NM`, `LP`, `MP`, `HP`, or `DMG`), and a finish allowed for that game; upload one ASCII-named JPEG front per card, identify with the configured offline catalog, explicitly confirm each retained printing, and create one ordinary appraising import. Magic (`mtg`) is the only game enabled for intake and uses the offline CollectorVision catalog. Pokémon (`pokemon`) is registered with scanning and CSV import disabled. Ascending filenames are bottom-to-top, and the first scanned row becomes the first import row. Alternate art, double-faced cards, and tokens are supported for Magic.
-- Game metadata: authenticated `GET /games` returns Magic and Pokémon English with display names, ordered finish choices, scanning/CSV-import capabilities, and image regions used by scan review. Pokémon advertises no intake capability or scan review regions.
+- Game metadata: authenticated `GET /games` returns Magic and Pokémon English with display names, ordered finish choices, scanning/CSV-import capabilities, and image regions used by scan review. Pokémon advertises disabled intake capabilities and three review regions: set and collector number, left artwork stamps, and right artwork stamps.
 - Review catalog: authenticated catalog endpoints return exact Magic printing details, related printings, and finish-filtered name or ID search from Scryfall. Pokémon has no review catalog in this release. The browser scan review uses the Magic endpoints and receives normalized product metadata and image URLs.
 - Pokémon inventory: `pokemon` uses source `tcgplayer`, TCGplayer product IDs as `external_id`, and the `normal`, `holofoil`, and `reverse_holofoil` finishes. Inventory browse and audited adjustments, publishing, order reservation and fulfillment, and report attribution use the shared game-aware workflows. A Pokémon SKU ID has the same form as Magic: `pokemon#tcgplayer#<tcgplayer_product_id>#<finish>#<condition>`; its exact finish-specific FetchTCG card ID remains stored separately for publishing. No production stock-creation, import, scan, or Pokémon review-catalog route is provided.
 - Durable scan jobs and source images: all-or-abandon batch uploads, background recognition with stored suggestions, manual correction through the authenticated catalog endpoints, irreversible removal of an outlier scan row, deletion of an unfinished job, and read-only confirmed jobs. Confirmed source scans are retained indefinitely and never automatically used as listing photos.
@@ -305,6 +305,8 @@ Bazel mirrors this layout with `:games-lib`, `:catalog-lib`, `:scan-lib`, `:impo
 
 Response `200` returns games in registry order. Only registered games are included. Each game's `finishes` list preserves the display order supplied by the backend; `scanning_enabled` and `csv_import_enabled` advertise whether the corresponding create workflows are available. `scan_review_image_regions` is an ordered list of labeled rectangles normalized to the image bounds, with coordinates measured from the upper-left corner. An empty list means scan review has no crop regions for that game. Provider fields such as `external_source` are not part of this response.
 
+Pokémon's three regions cover the lower-left set and collector number (`x=0`, `y=0.88`, `width=0.5`, `height=0.12`) and the artwork's lower corners: left (`x=0`, `y=0.32`, `width=0.45`, `height=0.22`) and right (`x=0.55`, `y=0.32`, `width=0.45`, `height=0.22`). Their bounds assume an upright card filling the image. The artwork crops target retailer, event, STAFF, and Prize Pack stamps; Pokémon Center stamps above the retreat cost and lower-positioned VMAX stamps have no dedicated region. Crop metadata does not enable Pokémon scanning or CSV imports.
+
 ```json
 {
   "games": [
@@ -334,6 +336,43 @@ Response `200` returns games in registry order. Only registered games are includ
           "y": 0.535,
           "width": 0.25,
           "height": 0.1
+        }
+      ]
+    },
+    {
+      "id": "pokemon",
+      "display_name": "Pokémon (EN)",
+      "scanning_enabled": false,
+      "csv_import_enabled": false,
+      "finishes": [
+        { "id": "normal", "display_name": "Normal" },
+        { "id": "holofoil", "display_name": "Holofoil" },
+        { "id": "reverse_holofoil", "display_name": "Reverse Holofoil" }
+      ],
+      "scan_review_image_regions": [
+        {
+          "id": "set_and_number",
+          "display_name": "Set and number",
+          "x": 0.0,
+          "y": 0.88,
+          "width": 0.5,
+          "height": 0.12
+        },
+        {
+          "id": "artwork_stamps_left",
+          "display_name": "Left artwork stamps",
+          "x": 0.0,
+          "y": 0.32,
+          "width": 0.45,
+          "height": 0.22
+        },
+        {
+          "id": "artwork_stamps_right",
+          "display_name": "Right artwork stamps",
+          "x": 0.55,
+          "y": 0.32,
+          "width": 0.45,
+          "height": 0.22
         }
       ]
     }

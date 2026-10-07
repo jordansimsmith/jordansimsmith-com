@@ -55,7 +55,12 @@ public class Games {
               new Finish("normal", "Normal"),
               new Finish("holofoil", "Holofoil"),
               new Finish("reverse_holofoil", "Reverse Holofoil")),
-          List.of());
+          List.of(
+              new ScanReviewImageRegion("set_and_number", "Set and number", 0, 0.88, 0.5, 0.12),
+              new ScanReviewImageRegion(
+                  "artwork_stamps_left", "Left artwork stamps", 0, 0.32, 0.45, 0.22),
+              new ScanReviewImageRegion(
+                  "artwork_stamps_right", "Right artwork stamps", 0.55, 0.32, 0.45, 0.22)));
 
   private static final List<Game> GAMES = List.of(MAGIC_THE_GATHERING, POKEMON_ENGLISH);
 
