@@ -44,6 +44,33 @@ public class CatalogModule {
 
   @Provides
   @Singleton
+  TcgCsvClient tcgCsvClient(ObjectMapper objectMapper) {
+    var httpClient =
+        HttpClient.newBuilder()
+            .connectTimeout(Duration.ofSeconds(3))
+            .followRedirects(HttpClient.Redirect.NEVER)
+            .build();
+    var lastRequestAt = new long[] {0};
+    Runnable pacer =
+        () -> {
+          synchronized (lastRequestAt) {
+            var waitMillis = 100 - (System.currentTimeMillis() - lastRequestAt[0]);
+            if (waitMillis > 0) {
+              try {
+                Thread.sleep(waitMillis);
+              } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException("TCGCSV request pacing was interrupted", e);
+              }
+            }
+            lastRequestAt[0] = System.currentTimeMillis();
+          }
+        };
+    return new HttpTcgCsvClient(URI.create("https://tcgcsv.com"), httpClient, objectMapper, pacer);
+  }
+
+  @Provides
+  @Singleton
   Catalogs catalogs(ScryfallCatalog scryfallCatalog) {
     return new Catalogs(Map.of("scryfall", scryfallCatalog, "tcgplayer", new TcgPlayerCatalog()));
   }
