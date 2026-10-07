@@ -4,7 +4,7 @@ import { createFakeScanUploader } from './fake-scan-uploader';
 import type { ScanConfirmationRow } from './client';
 
 describe('createFakeClient', () => {
-  it('returns the Magic game registry with ordered finishes, capabilities, and review regions', async () => {
+  it('returns registered games with ordered finishes, capabilities, and review regions', async () => {
     const client = createFakeClient();
 
     await expect(client.getGames()).resolves.toEqual({
@@ -36,6 +36,18 @@ describe('createFakeClient', () => {
             { id: 'normal', display_name: 'Normal' },
             { id: 'foil', display_name: 'Foil' },
             { id: 'etched', display_name: 'Etched' },
+          ],
+        },
+        {
+          id: 'pokemon',
+          display_name: 'Pokémon (EN)',
+          scanning_enabled: false,
+          csv_import_enabled: false,
+          scan_review_image_regions: [],
+          finishes: [
+            { id: 'normal', display_name: 'Normal' },
+            { id: 'holofoil', display_name: 'Holofoil' },
+            { id: 'reverse_holofoil', display_name: 'Reverse Holofoil' },
           ],
         },
       ],
@@ -261,6 +273,70 @@ describe('createFakeClient', () => {
       search: 'sylvan library',
     });
     expect(browse.skus).toHaveLength(2);
+  });
+});
+
+describe('createFakeClient pokemon inventory', () => {
+  it('seeds finish-specific product SKUs with independent game locations', async () => {
+    const client = createFakeClient();
+
+    const { games } = await client.getGames();
+    expect(games.find((game) => game.id === 'pokemon')).toEqual({
+      id: 'pokemon',
+      display_name: 'Pokémon (EN)',
+      scanning_enabled: false,
+      csv_import_enabled: false,
+      finishes: [
+        { id: 'normal', display_name: 'Normal' },
+        { id: 'holofoil', display_name: 'Holofoil' },
+        { id: 'reverse_holofoil', display_name: 'Reverse Holofoil' },
+      ],
+      scan_review_image_regions: [],
+    });
+
+    const inventory = await client.findSkus({ game: 'pokemon' });
+    const abomasnowSkus = inventory.skus.filter(
+      (sku) => sku.name === 'Abomasnow',
+    );
+    expect(abomasnowSkus.map((sku) => sku.finish).sort()).toEqual([
+      'normal',
+      'reverse_holofoil',
+    ]);
+    expect(abomasnowSkus[0].sku_id).not.toBe(abomasnowSkus[1].sku_id);
+    const normalAbomasnowSku = abomasnowSkus.find(
+      (sku) => sku.finish === 'normal',
+    );
+    expect(normalAbomasnowSku).toBeDefined();
+    const detail = await client.getSku(normalAbomasnowSku!.sku_id);
+    expect(detail.external_id).toBe('283917');
+    expect(detail.units.map((unit) => unit.location)).toEqual(['A0-0', 'A0-1']);
+    expect(detail.image_urls.normal).toMatch(/^data:image\/svg\+xml/);
+
+    const magic = await client.findSkus({ game: 'mtg' });
+    const magicDetail = await client.getSku(magic.skus[0].sku_id);
+    expect(magicDetail.units[0].sequence_number).toBe(0);
+    expect(detail.units[0].sequence_number).toBe(0);
+  });
+
+  it('includes Pokémon stock and top hits in its report', async () => {
+    const client = createFakeClient();
+
+    const response = await client.getReport();
+
+    expect(response.report.games.map((game) => game.game)).toEqual([
+      'mtg',
+      'pokemon',
+    ]);
+    const pokemon = response.report.games[1];
+    expect(pokemon.totals).toMatchObject({
+      inventory_value: '29.00',
+      in_stock_units: 4,
+      sku_count: 3,
+    });
+    expect(pokemon.top_hits[0]).toMatchObject({
+      name: 'Charmander',
+      finish: 'holofoil',
+    });
   });
 });
 
@@ -808,10 +884,10 @@ describe('createFakeClient orders', () => {
     expect(acceptedAts).toEqual([...acceptedAts].sort((a, b) => b - a));
     const toPick = response.orders[1];
     expect(toPick.order_id).toBe('83647');
-    expect(toPick.unit_count).toBe(3);
-    expect(toPick.total_price).toBe('10.90');
-    expect(toPick.items_total_price).toBe('10.90');
-    expect(toPick.listed_total_price).toBe('13.00');
+    expect(toPick.unit_count).toBe(4);
+    expect(toPick.total_price).toBe('18.90');
+    expect(toPick.items_total_price).toBe('18.90');
+    expect(toPick.listed_total_price).toBe('20.00');
     expect(toPick.delivery_mode).toBe('PICKUP');
     expect(response.orders[0].items_total_price).toBe('479.90');
     expect(response.orders[0].listed_total_price).toBe('431.50');
@@ -827,16 +903,23 @@ describe('createFakeClient orders', () => {
     const detail = await client.getOrder('83647');
 
     expect(detail.state).toBe('to_pick');
-    expect(detail.units).toHaveLength(3);
-    const sequenceNumbers = detail.units.map((unit) => unit.sequence_number);
-    expect(sequenceNumbers).toEqual([...sequenceNumbers].sort((a, b) => a - b));
+    expect(detail.units).toHaveLength(4);
+    expect(detail.units.map((unit) => unit.game)).toEqual([
+      'mtg',
+      'mtg',
+      'mtg',
+      'pokemon',
+    ]);
     for (const unit of detail.units) {
       const block = Math.floor(unit.sequence_number / 100);
       expect(unit.location).toBe(`A${block}-${unit.sequence_number % 100}`);
-      expect(unit.game).toBe('mtg');
       expect(unit).not.toHaveProperty('external_source');
-      expect(unit.external_id).toMatch(/^[0-9a-f-]{36}$/);
       expect(unit.image_urls.small).toMatch(/^data:image\/svg\+xml/);
+      if (unit.game === 'mtg') {
+        expect(unit.external_id).toMatch(/^[0-9a-f-]{36}$/);
+      } else {
+        expect(unit.external_id).toBe('283917');
+      }
     }
     for (const unit of detail.units) {
       expect(unit.current_location).toMatch(/^A\d+-\d+$/);
@@ -867,6 +950,11 @@ describe('createFakeClient orders', () => {
     expect(aberration?.finish).toBe('normal');
     expect(aberration?.condition).toBe('NM');
     expect(aberration?.price).toBe('2.90');
+    const abomasnow = detail.units.find((unit) => unit.game === 'pokemon');
+    expect(abomasnow?.name).toBe('Abomasnow');
+    expect(abomasnow?.external_id).toBe('283917');
+    expect(abomasnow?.current_location).toBe('A0-0');
+    expect(abomasnow?.next_card?.name).toBe('Abomasnow');
     expect(detail.lines).toEqual([
       {
         game: 'mtg',
@@ -890,6 +978,17 @@ describe('createFakeClient orders', () => {
         price: '2.90',
         listed_price: '3.00',
       },
+      {
+        game: 'pokemon',
+        name: 'Abomasnow',
+        set_code: 'lost-origin',
+        collector_number: '043/196',
+        finish: 'normal',
+        condition: 'NM',
+        quantity: 1,
+        price: '8.00',
+        listed_price: '7.00',
+      },
     ]);
   });
 
@@ -909,7 +1008,7 @@ describe('createFakeClient orders', () => {
 
     const fulfilling = await client.getOrder('83647');
     expect(fulfilling.state).toBe('fulfilling');
-    expect(fulfilling.units).toHaveLength(3);
+    expect(fulfilling.units).toHaveLength(4);
 
     await vi.advanceTimersByTimeAsync(500);
     const detail = await client.getOrder('83647');

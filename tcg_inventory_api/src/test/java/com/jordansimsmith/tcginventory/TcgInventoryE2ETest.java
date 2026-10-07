@@ -118,7 +118,7 @@ public class TcgInventoryE2ETest {
         .isEqualTo(
             objectMapper.readTree(
                 """
-                {"games":[{"id":"mtg","display_name":"Magic: The Gathering","scanning_enabled":true,"csv_import_enabled":true,"finishes":[{"id":"normal","display_name":"Normal"},{"id":"foil","display_name":"Foil"},{"id":"etched","display_name":"Etched"}],"scan_review_image_regions":[{"id":"set_code","display_name":"Set code","x":0.0,"y":0.9,"width":0.25,"height":0.1},{"id":"set_symbol","display_name":"Set symbol","x":0.75,"y":0.535,"width":0.25,"height":0.1}]}]}
+                {"games":[{"id":"mtg","display_name":"Magic: The Gathering","scanning_enabled":true,"csv_import_enabled":true,"finishes":[{"id":"normal","display_name":"Normal"},{"id":"foil","display_name":"Foil"},{"id":"etched","display_name":"Etched"}],"scan_review_image_regions":[{"id":"set_code","display_name":"Set code","x":0.0,"y":0.9,"width":0.25,"height":0.1},{"id":"set_symbol","display_name":"Set symbol","x":0.75,"y":0.535,"width":0.25,"height":0.1}]},{"id":"pokemon","display_name":"Pokémon (EN)","scanning_enabled":false,"csv_import_enabled":false,"finishes":[{"id":"normal","display_name":"Normal"},{"id":"holofoil","display_name":"Holofoil"},{"id":"reverse_holofoil","display_name":"Reverse Holofoil"}],"scan_review_image_regions":[]}]}
                 """));
 
     var catalogCardResponse = get("/catalog/cards/" + SCRYFALL_ID + "?game=mtg");
@@ -372,6 +372,8 @@ public class TcgInventoryE2ETest {
     // assert - magic breakdown
     var magicReport = report.get("games").get(0);
     assertThat(magicReport.get("game").asText()).isEqualTo("mtg");
+    var pokemonReport = report.get("games").get(1);
+    assertThat(pokemonReport.get("game").asText()).isEqualTo("pokemon");
 
     // assert - top sets
     var topSets = magicReport.get("top_sets");

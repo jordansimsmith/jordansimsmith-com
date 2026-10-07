@@ -15,7 +15,7 @@ import { GamesProvider } from '../GamesProvider';
 import * as clientModule from '../api/client';
 import type { Game, SkuSummary } from '../api/client';
 
-const REGISTERED_GAMES = [
+const REGISTERED_GAMES: Game[] = [
   {
     id: 'mtg',
     display_name: 'Magic: The Gathering',
@@ -26,6 +26,18 @@ const REGISTERED_GAMES = [
       { id: 'normal', display_name: 'Normal' },
       { id: 'foil', display_name: 'Foil' },
       { id: 'etched', display_name: 'Etched' },
+    ],
+  },
+  {
+    id: 'pokemon',
+    display_name: 'Pokémon (EN)',
+    scanning_enabled: false,
+    csv_import_enabled: false,
+    scan_review_image_regions: [],
+    finishes: [
+      { id: 'normal', display_name: 'Normal' },
+      { id: 'holofoil', display_name: 'Holofoil' },
+      { id: 'reverse_holofoil', display_name: 'Reverse Holofoil' },
     ],
   },
 ];
@@ -63,6 +75,17 @@ const skuFixtures: SkuSummary[] = [
     finish: 'normal',
     condition: 'MP',
     last_published_price: '0.30',
+  },
+  {
+    sku_id: 'pokemon#tcgplayer#283917#reverse_holofoil#NM',
+    game: 'pokemon',
+    name: 'Abomasnow',
+    set_code: 'lost-origin',
+    set_name: 'Lost Origin',
+    collector_number: '043/196',
+    finish: 'reverse_holofoil',
+    condition: 'NM',
+    last_published_price: '7.50',
   },
 ];
 
@@ -131,6 +154,23 @@ describe('InventoryPage', () => {
     expect(within(row).getByText('NM')).toBeDefined();
     expect(screen.getByText('Opt')).toBeDefined();
     expect(screen.getByText('Sol Ring')).toBeDefined();
+  });
+
+  it('shows Pokémon inventory and its registered finish label', async () => {
+    const user = userEvent.setup();
+    renderInventoryPage();
+
+    await user.click(await screen.findByRole('tab', { name: 'Pokémon (EN)' }));
+
+    const row = (await screen.findByText('Abomasnow')).closest(
+      'tr',
+    ) as HTMLTableRowElement;
+    expect(within(row).getByText('Reverse Holofoil')).toBeDefined();
+    expect(within(row).getByText('043/196')).toBeDefined();
+    expect(clientModule.apiClient.findSkus).toHaveBeenLastCalledWith({
+      game: 'pokemon',
+      search: undefined,
+    });
   });
 
   it('uses game names from the registry', async () => {

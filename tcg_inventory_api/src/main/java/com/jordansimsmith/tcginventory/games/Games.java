@@ -44,7 +44,20 @@ public class Games {
               new ScanReviewImageRegion("set_code", "Set code", 0, 0.9, 0.25, 0.1),
               new ScanReviewImageRegion("set_symbol", "Set symbol", 0.75, 0.535, 0.25, 0.1)));
 
-  private static final List<Game> GAMES = List.of(MAGIC_THE_GATHERING);
+  public static final Game POKEMON_ENGLISH =
+      new Game(
+          "pokemon",
+          "Pokémon (EN)",
+          "tcgplayer",
+          false,
+          false,
+          List.of(
+              new Finish("normal", "Normal"),
+              new Finish("holofoil", "Holofoil"),
+              new Finish("reverse_holofoil", "Reverse Holofoil")),
+          List.of());
+
+  private static final List<Game> GAMES = List.of(MAGIC_THE_GATHERING, POKEMON_ENGLISH);
 
   private static final Map<String, Game> GAMES_BY_ID =
       GAMES.stream().collect(Collectors.toUnmodifiableMap(Game::id, Function.identity()));

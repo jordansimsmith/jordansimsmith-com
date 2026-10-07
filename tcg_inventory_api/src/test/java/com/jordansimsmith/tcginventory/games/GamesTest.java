@@ -7,12 +7,12 @@ import org.junit.jupiter.api.Test;
 
 public class GamesTest {
   @Test
-  void registryShouldExposeMagicAndItsCapabilities() {
+  void registryShouldExposeRegisteredGamesAndTheirCapabilities() {
     // arrange / act
     var games = Games.all();
 
     // assert
-    assertThat(games).containsExactly(Games.MAGIC_THE_GATHERING);
+    assertThat(games).containsExactly(Games.MAGIC_THE_GATHERING, Games.POKEMON_ENGLISH);
     var magic = games.get(0);
     assertThat(magic.id()).isEqualTo("mtg");
     assertThat(magic.displayName()).isEqualTo("Magic: The Gathering");
@@ -29,6 +29,19 @@ public class GamesTest {
             new Games.ScanReviewImageRegion("set_symbol", "Set symbol", 0.75, 0.535, 0.25, 0.1));
     assertThat(magic.supportsFinish("normal")).isTrue();
     assertThat(magic.supportsFinish("reverse_holofoil")).isFalse();
+    var pokemon = games.get(1);
+    assertThat(pokemon.id()).isEqualTo("pokemon");
+    assertThat(pokemon.displayName()).isEqualTo("Pokémon (EN)");
+    assertThat(pokemon.externalSource()).isEqualTo("tcgplayer");
+    assertThat(pokemon.scanningEnabled()).isFalse();
+    assertThat(pokemon.csvImportEnabled()).isFalse();
+    assertThat(pokemon.finishes())
+        .containsExactly(
+            new Games.Finish("normal", "Normal"),
+            new Games.Finish("holofoil", "Holofoil"),
+            new Games.Finish("reverse_holofoil", "Reverse Holofoil"));
+    assertThat(pokemon.scanReviewImageRegions()).isEmpty();
+    assertThat(pokemon.supportsFinish("reverse_holofoil")).isTrue();
   }
 
   @Test
@@ -47,8 +60,8 @@ public class GamesTest {
   @Test
   void getShouldRejectUnregisteredGame() {
     // arrange / act / assert
-    assertThatThrownBy(() -> Games.get("pokemon"))
+    assertThatThrownBy(() -> Games.get("digimon"))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("unsupported game: pokemon");
+        .hasMessage("unsupported game: digimon");
   }
 }

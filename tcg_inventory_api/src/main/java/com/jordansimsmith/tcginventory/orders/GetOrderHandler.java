@@ -172,9 +172,9 @@ public class GetOrderHandler
               line.getPrice(),
               line.getListedPrice()));
 
+      var unitPrice = perUnitPrice(line);
       var game = Games.get(skuItem.getGame());
       var catalog = catalogs.forGame(game);
-      var unitPrice = perUnitPrice(line);
       for (var seqNum : line.getAllocatedSequenceNumbers()) {
         var position = computeBlockPosition(blockUnits, skuItem.getGame(), seqNum);
         var imageUrls = catalog.getImageUrls(skuItem.getExternalId());

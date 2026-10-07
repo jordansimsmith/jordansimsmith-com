@@ -204,7 +204,7 @@ public class ReportsHandlerIntegrationTest {
     assertThat(reportItem.getUpdatedAt()).isEqualTo(Instant.ofEpochSecond(1700000000));
 
     var reportJson = objectMapper.readTree(reportItem.getReport());
-    assertThat(reportJson.get("games")).hasSize(1);
+    assertThat(reportJson.get("games")).hasSize(2);
     var gameReport = reportJson.get("games").get(0);
     assertThat(gameReport.get("game").asText()).isEqualTo("mtg");
     assertThat(gameReport.get("unique_card_names").asInt()).isZero();
@@ -213,6 +213,9 @@ public class ReportsHandlerIntegrationTest {
     assertThat(gameReport.get("top_sets")).isEmpty();
     assertThat(gameReport.get("aging_bands")).hasSize(4);
     assertThat(gameReport.get("price_buckets")).hasSize(6);
+    var pokemonReport = reportJson.get("games").get(1);
+    assertThat(pokemonReport.get("game").asText()).isEqualTo("pokemon");
+    assertThat(pokemonReport.get("totals").get("sku_count").asInt()).isZero();
 
     var updatedJob =
         jobTable.getItem(
@@ -442,12 +445,15 @@ public class ReportsHandlerIntegrationTest {
     // sku3 has 1 in_stock unit with no price
     assertThat(totals.get("unpriced_units").asInt()).isEqualTo(1);
 
-    assertThat(reportJson.get("games").size()).isEqualTo(1);
+    assertThat(reportJson.get("games").size()).isEqualTo(2);
     var gameReport = reportJson.get("games").get(0);
     assertThat(gameReport.get("game").asText()).isEqualTo("mtg");
     assertThat(gameReport.get("unique_card_names").asInt()).isEqualTo(3);
     assertThat(gameReport.get("totals")).isEqualTo(totals);
     assertThat(gameReport.get("totals").get("revenue_to_date").asText()).isEqualTo("17.75");
+    var pokemonReport = reportJson.get("games").get(1);
+    assertThat(pokemonReport.get("game").asText()).isEqualTo("pokemon");
+    assertThat(pokemonReport.get("totals").get("sku_count").asInt()).isZero();
     assertThat(reportJson.has("top_sets")).isFalse();
     assertThat(reportJson.has("top_hits")).isFalse();
     assertThat(reportJson.has("aging_bands")).isFalse();
@@ -526,6 +532,86 @@ public class ReportsHandlerIntegrationTest {
     assertThat(intakeVsSales.get(1).get("week_start").asText()).isEqualTo("2023-11-06");
     assertThat(intakeVsSales.get(1).get("added_units").asInt()).isEqualTo(0);
     assertThat(intakeVsSales.get(1).get("sold_units").asInt()).isEqualTo(1);
+  }
+
+  @Test
+  void jobShouldAttributePokemonStockAndPaidRevenueToPokemon() throws Exception {
+    // arrange
+    var skuId = "pokemon#tcgplayer#283917#normal#NM";
+    skuTable.putItem(
+        SkuItem.create(
+            "jordan",
+            skuId,
+            "pokemon",
+            "283917",
+            "normal",
+            "NM",
+            "Abomasnow",
+            "lost-origin",
+            "Lost Origin",
+            "043/196",
+            "fetch-card-9001",
+            "5.00"));
+    unitTable.putItem(
+        UnitItem.create(
+            "jordan",
+            "pokemon",
+            skuId,
+            1,
+            "in_stock",
+            "pokemon-import",
+            Instant.ofEpochSecond(1699000000)));
+    var soldUnit =
+        UnitItem.create(
+            "jordan",
+            "pokemon",
+            skuId,
+            2,
+            "sold",
+            "pokemon-import",
+            Instant.ofEpochSecond(1699000000));
+    soldUnit.setUpdatedAt(Instant.ofEpochSecond(1699500000));
+    unitTable.putItem(soldUnit);
+    orderTable.putItem(
+        OrderItem.create(
+            "jordan",
+            "83665",
+            "fulfilled",
+            null,
+            null,
+            "SHIPPING",
+            null,
+            null,
+            null,
+            "12.50",
+            List.of(new OrderItem.OrderLine(skuId, 9001, 1, "12.50", null, List.of(2))),
+            Instant.ofEpochSecond(1699500000)));
+    jobTable.putItem(
+        JobItem.create(
+            "jordan",
+            "pokemon-report-job",
+            "report",
+            null,
+            null,
+            Instant.ofEpochSecond(1700000000)));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "pokemon-report-job", "report"), null);
+
+    // assert
+    var reportItem =
+        reportTable.getItem(
+            Key.builder()
+                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .sortValue(ReportItem.formatSk())
+                .build());
+    var pokemonReport = objectMapper.readTree(reportItem.getReport()).get("games").get(1);
+    assertThat(pokemonReport.get("game").asText()).isEqualTo("pokemon");
+    assertThat(pokemonReport.get("totals").get("inventory_value").asText()).isEqualTo("5.00");
+    assertThat(pokemonReport.get("totals").get("in_stock_units").asInt()).isEqualTo(1);
+    assertThat(pokemonReport.get("totals").get("sold_units").asInt()).isEqualTo(1);
+    assertThat(pokemonReport.get("totals").get("revenue_to_date").asText()).isEqualTo("12.50");
+    assertThat(pokemonReport.get("top_hits").get(0).get("sku_id").asText()).isEqualTo(skuId);
   }
 
   @Test

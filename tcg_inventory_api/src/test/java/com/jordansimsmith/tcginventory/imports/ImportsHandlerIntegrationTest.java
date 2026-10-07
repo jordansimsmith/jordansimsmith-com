@@ -229,7 +229,8 @@ public class ImportsHandlerIntegrationTest {
   }
 
   @Test
-  void createImportShouldRejectUnregisteredGameBeforeWritingImport() {
+  void createImportShouldRejectRegisteredGameWithDisabledImportBeforeWritingImport()
+      throws Exception {
     // arrange
     var event =
         buildCreateEvent(
@@ -242,6 +243,8 @@ public class ImportsHandlerIntegrationTest {
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(400);
+    assertThat(objectMapper.readTree(response.getBody()).get("message").asText())
+        .isEqualTo("CSV import is unavailable for game: pokemon");
     assertThat(fakeJobsQueue.getSends()).isEmpty();
     assertNoImports("jordan");
   }

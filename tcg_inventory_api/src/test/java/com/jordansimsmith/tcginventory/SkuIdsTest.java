@@ -46,6 +46,20 @@ public class SkuIdsTest {
   }
 
   @Test
+  void formatShouldUseTcgplayerProductIdAndKeepPokemonFinishesDistinct() {
+    // arrange
+    var identity = new CardIdentity("pokemon", "283917");
+
+    // act / assert
+    assertThat(SkuIds.format(identity, "normal", Condition.NM))
+        .isEqualTo("pokemon#tcgplayer#283917#normal#NM");
+    assertThat(SkuIds.format(identity, "reverse_holofoil", Condition.NM))
+        .isEqualTo("pokemon#tcgplayer#283917#reverse_holofoil#NM");
+    assertThat(SkuIds.format(identity, "holofoil", Condition.NM))
+        .isEqualTo("pokemon#tcgplayer#283917#holofoil#NM");
+  }
+
+  @Test
   void cardIdentityShouldRejectMalformedTokensAndBlankExternalIds() {
     // arrange / act / assert
     assertThatThrownBy(() -> new CardIdentity("Magic", "id"))

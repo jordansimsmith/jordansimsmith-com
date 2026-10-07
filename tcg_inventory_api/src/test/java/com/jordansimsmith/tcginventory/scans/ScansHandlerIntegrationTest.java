@@ -656,6 +656,24 @@ public class ScansHandlerIntegrationTest {
   }
 
   @Test
+  void createScanShouldRejectRegisteredGameWithDisabledScanning() throws Exception {
+    // arrange
+    var body =
+        "{\"game\":\"pokemon\",\"condition\":\"NM\",\"finish\":\"normal\",\"files\":[{\"filename\":\"1.jpg\",\"size_bytes\":1}]}";
+
+    // act
+    var response = createScanHandler.handleRequest(buildEventWithBody("jordan", body), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(400);
+    assertThat(objectMapper.readTree(response.getBody()).get("message").asText())
+        .isEqualTo("scanning is unavailable for game");
+    var scans =
+        objectMapper.readTree(findScansHandler.handleRequest(buildEvent("jordan"), null).getBody());
+    assertThat(scans.get("scans")).isEmpty();
+  }
+
+  @Test
   void findScansShouldReturnNewestFirstAndSupportContinuation() throws Exception {
     // arrange
     createScan("jordan", "first.jpg");

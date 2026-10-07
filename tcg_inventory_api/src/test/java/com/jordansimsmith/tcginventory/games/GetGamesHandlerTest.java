@@ -19,7 +19,7 @@ public class GetGamesHandlerTest {
           new RequestContextFactory(), new HttpResponseFactory.Builder(objectMapper).build());
 
   @Test
-  void handleRequestShouldReturnOrderedMagicMetadataWithoutProviderDetails() throws Exception {
+  void handleRequestShouldReturnRegisteredGameMetadataWithoutProviderDetails() throws Exception {
     // arrange
     var event =
         APIGatewayV2HTTPEvent.builder().withHeaders(Map.of("Authorization", AUTH_HEADER)).build();
@@ -33,7 +33,7 @@ public class GetGamesHandlerTest {
         .isEqualTo(
             objectMapper.readTree(
                 """
-                {"games":[{"id":"mtg","display_name":"Magic: The Gathering","scanning_enabled":true,"csv_import_enabled":true,"finishes":[{"id":"normal","display_name":"Normal"},{"id":"foil","display_name":"Foil"},{"id":"etched","display_name":"Etched"}],"scan_review_image_regions":[{"id":"set_code","display_name":"Set code","x":0.0,"y":0.9,"width":0.25,"height":0.1},{"id":"set_symbol","display_name":"Set symbol","x":0.75,"y":0.535,"width":0.25,"height":0.1}]}]}
+                {"games":[{"id":"mtg","display_name":"Magic: The Gathering","scanning_enabled":true,"csv_import_enabled":true,"finishes":[{"id":"normal","display_name":"Normal"},{"id":"foil","display_name":"Foil"},{"id":"etched","display_name":"Etched"}],"scan_review_image_regions":[{"id":"set_code","display_name":"Set code","x":0.0,"y":0.9,"width":0.25,"height":0.1},{"id":"set_symbol","display_name":"Set symbol","x":0.75,"y":0.535,"width":0.25,"height":0.1}]},{"id":"pokemon","display_name":"Pokémon (EN)","scanning_enabled":false,"csv_import_enabled":false,"finishes":[{"id":"normal","display_name":"Normal"},{"id":"holofoil","display_name":"Holofoil"},{"id":"reverse_holofoil","display_name":"Reverse Holofoil"}],"scan_review_image_regions":[]}]}
                 """));
   }
 

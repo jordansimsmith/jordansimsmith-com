@@ -13,7 +13,7 @@ public class FakeCardCatalogs extends Catalogs {
   }
 
   private FakeCardCatalogs(FakeCardCatalog scryfallCatalog) {
-    super(Map.of("scryfall", scryfallCatalog));
+    super(Map.of("scryfall", scryfallCatalog, "tcgplayer", new TcgPlayerCatalog()));
     this.scryfallCatalog = scryfallCatalog;
   }
 

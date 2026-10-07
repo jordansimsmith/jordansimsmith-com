@@ -45,6 +45,6 @@ public class CatalogModule {
   @Provides
   @Singleton
   Catalogs catalogs(ScryfallCatalog scryfallCatalog) {
-    return new Catalogs(Map.of("scryfall", scryfallCatalog));
+    return new Catalogs(Map.of("scryfall", scryfallCatalog, "tcgplayer", new TcgPlayerCatalog()));
   }
 }

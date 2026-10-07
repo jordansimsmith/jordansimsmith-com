@@ -368,6 +368,60 @@ public class OrdersHandlerIntegrationTest {
   }
 
   @Test
+  void getOrderShouldKeepMixedGameImagesAndLocationsIsolated() throws Exception {
+    // arrange
+    var magicSkuId = "mtg#scryfall#scryfall-1#normal#NM";
+    var pokemonSkuId = "pokemon#tcgplayer#283917#normal#NM";
+    createSku("jordan", magicSkuId, "Magic Card", "dom", "168");
+    createSku("jordan", pokemonSkuId, "Abomasnow", "lost-origin", "043/196");
+    createUnit("jordan", magicSkuId, 10, "reserved", "83664");
+    createUnit("jordan", magicSkuId, 20, "in_stock", null);
+    createUnit("jordan", pokemonSkuId, 10, "reserved", "83664");
+    createUnit("jordan", pokemonSkuId, 20, "in_stock", null);
+    var lines =
+        List.of(
+            new OrderItem.OrderLine(magicSkuId, 1001, 1, "2.00", "2.00", List.of(10)),
+            new OrderItem.OrderLine(pokemonSkuId, 283917, 1, "12.00", "10.00", List.of(10)));
+    orderTable.putItem(
+        OrderItem.create(
+            "jordan",
+            "83664",
+            "to_pick",
+            "ACCEPTED",
+            "SEND_DELIVERY_ADDRESS",
+            "DELIVERY",
+            null,
+            null,
+            null,
+            "14.00",
+            lines,
+            Instant.ofEpochSecond(1700000000)));
+
+    // act
+    var response =
+        getOrderHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("order_id", "83664")), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = objectMapper.readTree(response.getBody());
+    assertThat(body.get("lines").get(0).get("game").asText()).isEqualTo("mtg");
+    assertThat(body.get("lines").get(1).get("game").asText()).isEqualTo("pokemon");
+    var units = body.get("units");
+    assertThat(units).hasSize(2);
+    assertThat(units.get(0).get("game").asText()).isEqualTo("mtg");
+    assertThat(units.get(0).get("current_location").asText()).isEqualTo("A0-0");
+    assertThat(units.get(0).get("next_card").get("name").asText()).isEqualTo("Magic Card");
+    assertThat(units.get(0).get("image_urls").get("small").asText())
+        .isEqualTo("https://img.example/cards/scryfall-1/small.jpg");
+    assertThat(units.get(1).get("game").asText()).isEqualTo("pokemon");
+    assertThat(units.get(1).get("current_location").asText()).isEqualTo("A0-0");
+    assertThat(units.get(1).get("next_card").get("name").asText()).isEqualTo("Abomasnow");
+    assertThat(units.get(1).get("image_urls").get("small").asText())
+        .isEqualTo("https://tcgplayer-cdn.tcgplayer.com/product/283917_200w.jpg");
+  }
+
+  @Test
   void getOrderShouldFailWhenSkuIsMissing() {
     // arrange
     var skuId = "mtg#scryfall#missing#normal#NM";
@@ -390,12 +444,12 @@ public class OrdersHandlerIntegrationTest {
   @Test
   void getOrderShouldFailWhenSkuGameIsNotRegistered() {
     // arrange
-    var skuId = "pokemon#tcgcsv#123#normal#NM";
+    var skuId = "digimon#unknown#123#normal#NM";
     skuTable.putItem(
         SkuItem.create(
             "jordan",
             skuId,
-            "pokemon",
+            "digimon",
             "123",
             "normal",
             "NM",
@@ -418,7 +472,7 @@ public class OrdersHandlerIntegrationTest {
     // assert
     assertion
         .hasCauseInstanceOf(IllegalArgumentException.class)
-        .hasRootCauseMessage("unsupported game: pokemon");
+        .hasRootCauseMessage("unsupported game: digimon");
   }
 
   @Test
@@ -1006,7 +1060,7 @@ public class OrdersHandlerIntegrationTest {
     var unit =
         UnitItem.create(
             user,
-            "mtg",
+            skuId.split("#")[0],
             skuId,
             sequenceNumber,
             status,

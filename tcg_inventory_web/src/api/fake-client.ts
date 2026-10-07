@@ -64,6 +64,7 @@ import {
 const VALID_CONDITIONS: Condition[] = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 const SKU_PAGE_SIZE = 20;
 const MAGIC_THE_GATHERING = { id: 'mtg' };
+const POKEMON_ENGLISH = { id: 'pokemon' };
 const FAKE_GAMES: Game[] = [
   {
     id: 'mtg',
@@ -93,6 +94,18 @@ const FAKE_GAMES: Game[] = [
         height: 0.1,
       },
     ],
+  },
+  {
+    id: 'pokemon',
+    display_name: 'Pokémon (EN)',
+    scanning_enabled: false,
+    csv_import_enabled: false,
+    finishes: [
+      { id: 'normal', display_name: 'Normal' },
+      { id: 'holofoil', display_name: 'Holofoil' },
+      { id: 'reverse_holofoil', display_name: 'Reverse Holofoil' },
+    ],
+    scan_review_image_regions: [],
   },
 ];
 const FAKE_CATALOG_CARDS: CatalogCard[] = [
@@ -202,7 +215,7 @@ function catalogOffset(continuation?: string): number {
   return Number(match[1]);
 }
 type SeedSku = [
-  scryfallId: string,
+  externalId: string,
   name: string,
   setCode: string,
   setName: string,
@@ -259,6 +272,42 @@ const seedSkus: SeedSku[] = [
   ['d5b5d2a7-8185-4df0-a35a-f89c12857f87', 'Sylvan Library', 'ema', 'Eternal Masters', '187', 'normal', 'LP', 1, 0],
 ];
 
+const seedPokemonSkus: SeedSku[] = [
+  [
+    '283917',
+    'Abomasnow',
+    'lost-origin',
+    'Lost Origin',
+    '043/196',
+    'normal',
+    'NM',
+    1,
+    1,
+  ],
+  [
+    '283917',
+    'Abomasnow',
+    'lost-origin',
+    'Lost Origin',
+    '043/196',
+    'reverse_holofoil',
+    'NM',
+    2,
+    0,
+  ],
+  [
+    '512036',
+    'Charmander',
+    'sv-black-star-promos',
+    'SV Black Star Promos',
+    '044',
+    'holofoil',
+    'NM',
+    1,
+    0,
+  ],
+];
+
 interface FakeUnit {
   sequence_number: number;
   status: UnitStatus;
@@ -286,7 +335,7 @@ function createSeedState(): FakeSku[] {
   let unitIndex = 0;
   const skus = seedSkus.map(
     ([
-      scryfallId,
+      externalId,
       name,
       setCode,
       setName,
@@ -319,7 +368,7 @@ function createSeedState(): FakeSku[] {
       return {
         sku_id: crypto.randomUUID(),
         game: MAGIC_THE_GATHERING.id,
-        external_id: scryfallId,
+        external_id: externalId,
         name,
         set_code: setCode,
         set_name: setName,
@@ -343,7 +392,52 @@ function createSeedState(): FakeSku[] {
   photographed.photos = [
     { photo_id: 'fake-unit-photo-1', url: SEEDED_UNIT_PHOTO_URL },
   ];
-  return skus;
+  let pokemonUnitIndex = 0;
+  const pokemonSkus = seedPokemonSkus.map(
+    ([
+      tcgplayerId,
+      name,
+      setCode,
+      setName,
+      collectorNumber,
+      finish,
+      condition,
+      inStockCount,
+      reservedCount,
+      soldCount = 0,
+    ]) => {
+      const units: FakeUnit[] = [];
+      for (let i = 0; i < inStockCount + reservedCount + soldCount; i += 1) {
+        units.push({
+          sequence_number: pokemonUnitIndex,
+          status: 'in_stock',
+          photos: [],
+        });
+        pokemonUnitIndex += 1;
+      }
+      for (let i = 0; i < soldCount; i += 1) {
+        units[i].status = 'sold';
+      }
+      for (let i = soldCount; i < soldCount + reservedCount; i += 1) {
+        units[i].status = 'reserved';
+      }
+      return {
+        sku_id: crypto.randomUUID(),
+        game: POKEMON_ENGLISH.id,
+        external_id: tcgplayerId,
+        name,
+        set_code: setCode,
+        set_name: setName,
+        collector_number: collectorNumber,
+        finish,
+        condition,
+        last_published_price:
+          inStockCount > 0 ? formatPrice(3.5 + pokemonUnitIndex) : null,
+        units,
+      };
+    },
+  );
+  return [...skus, ...pokemonSkus];
 }
 
 function deriveBlock(sequenceNumber: number): string {
@@ -1199,6 +1293,7 @@ function createSeedOrders(skus: FakeSku[]): FakeOrder[] {
   const discountedUnits = {
     solRing: unitsOf('Sol Ring', 'normal', 'NM', 'reserved'),
     aberration: unitsOf('Elvish Aberration', 'normal', 'NM', 'reserved'),
+    abomasnow: unitsOf('Abomasnow', 'normal', 'NM', 'reserved'),
   };
   const atListUnits = unitsOf('Hellkite Tyrant', 'normal', 'NM', 'sold');
   const legacyUnits = unitsOf('Counterspell', 'normal', 'NM', 'in_stock').slice(
@@ -1248,11 +1343,16 @@ function createSeedOrders(skus: FakeSku[]): FakeOrder[] {
       buyer_name: 'Rook Nimbus (copper-fox)',
       buyer_address: null,
       postage_option: null,
-      total_price: '10.90',
-      units: [...discountedUnits.solRing, ...discountedUnits.aberration],
+      total_price: '18.90',
+      units: [
+        ...discountedUnits.solRing,
+        ...discountedUnits.aberration,
+        ...discountedUnits.abomasnow,
+      ],
       lines: [
         lineOf(discountedUnits.solRing, '8.00', '5.00'),
         lineOf(discountedUnits.aberration, '2.90', '3.00'),
+        lineOf(discountedUnits.abomasnow, '8.00', '7.00'),
       ],
     },
     {
@@ -1480,9 +1580,10 @@ export function createFakeClient(): ApiClient {
   let importCounter = importRecords.length;
   let scanCounter = scans.length + 1;
   let photoCounter = 0;
-  // fake Magic intake starts after its seeded A0-A5 stock
+  // fake intake starts after each game's independently seeded stock
   const fakeSeedSequenceNumberByGame: Partial<Record<GameId, number>> = {
     [MAGIC_THE_GATHERING.id]: 600,
+    [POKEMON_ENGLISH.id]: 5,
   };
   const nextSequenceNumberByGame = new Map<GameId, number>(
     FAKE_GAMES.map(({ id }) => {
@@ -2284,15 +2385,19 @@ export function createFakeClient(): ApiClient {
       };
       const uniqueCardNames = new Set(
         skus
-          .filter((sku) => sku.units.some((unit) => unit.status === 'in_stock'))
+          .filter(
+            (sku) =>
+              sku.game === 'mtg' &&
+              sku.units.some((unit) => unit.status === 'in_stock'),
+          )
           .map((sku) => sku.name),
       ).size;
       const report: Report = {
         totals: {
-          inventory_value: '2894.35',
-          in_stock_units: 94,
-          sku_count: 41,
-          reserved_units: 8,
+          inventory_value: '2923.35',
+          in_stock_units: 98,
+          sku_count: 44,
+          reserved_units: 9,
           // consistent with the chart series below: 40 units sold across the
           // visible 12 weeks plus earlier months, revenue equal to the monthly sum
           sold_units: 76,
@@ -2451,6 +2556,67 @@ export function createFakeClient(): ApiClient {
               { label: '31-90 days', in_stock_units: 35 },
               { label: '91-180 days', in_stock_units: 25 },
               { label: '180+ days', in_stock_units: 12 },
+            ],
+          },
+          {
+            game: 'pokemon',
+            unique_card_names: 2,
+            totals: {
+              inventory_value: '29.00',
+              in_stock_units: 4,
+              sku_count: 3,
+              reserved_units: 1,
+              sold_units: 0,
+              revenue_to_date: '0.00',
+              unpriced_units: 0,
+            },
+            top_sets: [
+              {
+                set_code: 'lost-origin',
+                set_name: 'Lost Origin',
+                in_stock_units: 3,
+              },
+              {
+                set_code: 'sv-black-star-promos',
+                set_name: 'SV Black Star Promos',
+                in_stock_units: 1,
+              },
+            ],
+            price_buckets: [
+              { label: '$0.25-$0.50', in_stock_units: 0 },
+              { label: '$0.50-$1', in_stock_units: 0 },
+              { label: '$1-$2', in_stock_units: 0 },
+              { label: '$2-$5', in_stock_units: 0 },
+              { label: '$5-$10', in_stock_units: 4 },
+              { label: '$10+', in_stock_units: 0 },
+            ],
+            top_hits: [
+              {
+                sku_id: reportSkuId('512036', 'holofoil', 'NM'),
+                name: 'Charmander',
+                set_code: 'sv-black-star-promos',
+                collector_number: '044',
+                finish: 'holofoil',
+                condition: 'NM',
+                price: '8.50',
+                in_stock_units: 1,
+              },
+              {
+                sku_id: reportSkuId('283917', 'reverse_holofoil', 'NM'),
+                name: 'Abomasnow',
+                set_code: 'lost-origin',
+                collector_number: '043/196',
+                finish: 'reverse_holofoil',
+                condition: 'NM',
+                price: '7.50',
+                in_stock_units: 2,
+              },
+            ],
+            aging_bands: [
+              { label: '0-30 days', in_stock_units: 1 },
+              { label: '31-90 days', in_stock_units: 1 },
+              { label: '91-180 days', in_stock_units: 1 },
+              { label: '180+ days', in_stock_units: 1 },
             ],
           },
         ],

@@ -1294,6 +1294,89 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
+  void publishOrderPhaseShouldReserveMixedMagicAndPokemonOffer() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    var magicSkuId = "mtg#scryfall#scryfall-1#normal#NM";
+    var pokemonSkuId = "pokemon#tcgplayer#283917#reverse_holofoil#NM";
+    createSkuWithUnits("jordan", magicSkuId, 1001, 1);
+    var pokemonSku =
+        SkuItem.create(
+            "jordan",
+            pokemonSkuId,
+            "pokemon",
+            "283917",
+            "reverse_holofoil",
+            "NM",
+            "Abomasnow",
+            "lost-origin",
+            "Lost Origin",
+            "043/196",
+            "fetch-card-9002",
+            "12.00");
+    pokemonSku.setDirty(false);
+    pokemonSku.setGsi1pk(SkuItem.USER_PREFIX + "jordan#CLEAN");
+    pokemonSku.setFetchtcgListingId(2002);
+    skuTable.putItem(pokemonSku);
+    unitTable.putItem(
+        UnitItem.create(
+            "jordan",
+            "pokemon",
+            pokemonSkuId,
+            1,
+            "in_stock",
+            "pokemon-import",
+            Instant.ofEpochSecond(1700000000)));
+    fakeFetchTcgClient.seedSellerOffers(
+        List.of(
+            new FetchTcgClient.SellerOffer(
+                83663,
+                "ACCEPTED",
+                null,
+                "2026-08-11T04:42:12.476+0000",
+                "PICKUP",
+                null,
+                null,
+                null,
+                new BigDecimal("14.00"),
+                List.of(
+                    new FetchTcgClient.OfferItem(
+                        new FetchTcgClient.OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
+                        1,
+                        new BigDecimal("2.00")),
+                    new FetchTcgClient.OfferItem(
+                        new FetchTcgClient.OfferListing(2002, "raw-nm", new BigDecimal("12.00")),
+                        1,
+                        new BigDecimal("12.00"))))));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var order = getOrder("jordan", "83663");
+    assertThat(order.getStatus()).isEqualTo("awaiting_payment");
+    assertThat(order.getLines())
+        .extracting(OrderItem.OrderLine::getSkuId)
+        .containsExactly(magicSkuId, pokemonSkuId);
+    assertThat(getUnits("jordan", magicSkuId))
+        .singleElement()
+        .satisfies(
+            unit -> {
+              assertThat(unit.getStatus()).isEqualTo("reserved");
+              assertThat(unit.getOrderId()).isEqualTo("83663");
+            });
+    assertThat(getUnits("jordan", pokemonSkuId))
+        .singleElement()
+        .satisfies(
+            unit -> {
+              assertThat(unit.getGame()).isEqualTo("pokemon");
+              assertThat(unit.getStatus()).isEqualTo("reserved");
+              assertThat(unit.getOrderId()).isEqualTo("83663");
+            });
+  }
+
+  @Test
   void publishOrderPhaseShouldCreateOrderAcceptedAfterCutoff() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
@@ -1514,6 +1597,47 @@ public class JobsHandlerIntegrationTest {
     assertThat(upsert.price()).isEqualByComparingTo("1.50");
     assertThat(upsert.frontImage()).isNull();
     assertThat(upsert.additionalImages()).isEmpty();
+  }
+
+  @Test
+  void publishPhaseShouldUseStoredFetchTcgCardIdForPokemonProductSku() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createPublishJob("jordan", "job1");
+    var skuId = "pokemon#tcgplayer#283917#reverse_holofoil#NM";
+    skuTable.putItem(
+        SkuItem.create(
+            "jordan",
+            skuId,
+            "pokemon",
+            "283917",
+            "reverse_holofoil",
+            "NM",
+            "Abomasnow",
+            "lost-origin",
+            "Lost Origin",
+            "043/196",
+            "fetch-card-9002",
+            "12.00"));
+    unitTable.putItem(
+        UnitItem.create(
+            "jordan",
+            "pokemon",
+            skuId,
+            42,
+            "in_stock",
+            "pokemon-import",
+            Instant.ofEpochSecond(1700000000)));
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+
+    // assert
+    var upsert = fakeFetchTcgClient.getUpsertCalls().getFirst();
+    assertThat(upsert.cardId()).isEqualTo("fetch-card-9002");
+    assertThat(upsert.quantity()).isEqualTo(1);
+    assertThat(getSku("jordan", skuId).getExternalId()).isEqualTo("283917");
+    assertThat(getSku("jordan", skuId).getFetchtcgCardId()).isEqualTo("fetch-card-9002");
   }
 
   @Test

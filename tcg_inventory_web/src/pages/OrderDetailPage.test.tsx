@@ -29,6 +29,18 @@ const REGISTERED_GAMES = [
       { id: 'etched', display_name: 'Etched' },
     ],
   },
+  {
+    id: 'pokemon',
+    display_name: 'Pokémon (EN)',
+    scanning_enabled: false,
+    csv_import_enabled: false,
+    scan_review_image_regions: [],
+    finishes: [
+      { id: 'normal', display_name: 'Normal' },
+      { id: 'holofoil', display_name: 'Holofoil' },
+      { id: 'reverse_holofoil', display_name: 'Reverse Holofoil' },
+    ],
+  },
 ];
 
 function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
@@ -265,6 +277,47 @@ describe('OrderDetailPage', () => {
     expect(
       images.every((image) => image.getAttribute('fetchpriority') === 'low'),
     ).toBe(true);
+  });
+
+  it('groups a mixed-game pull sheet under each registered game', async () => {
+    const magicOrder = orderDetail();
+    const pokemonUnit = {
+      ...magicOrder.units[0],
+      game: 'pokemon',
+      sequence_number: 1,
+      location: 'A0-1',
+      current_location: 'A0-0',
+      external_id: '283917',
+      image_urls: {
+        small: 'https://tcgplayer-cdn.tcgplayer.com/product/283917_200w.jpg',
+        normal:
+          'https://tcgplayer-cdn.tcgplayer.com/product/283917_in_1000x1000.jpg',
+      },
+      name: 'Abomasnow',
+      set_code: 'lost-origin',
+      collector_number: '043/196',
+      finish: 'reverse_holofoil',
+      next_card: null,
+    };
+    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue({
+      ...magicOrder,
+      unit_count: magicOrder.unit_count + 1,
+      units: [...magicOrder.units, pokemonUnit],
+    });
+
+    const { container } = renderOrderDetailPage();
+
+    const pullSheet = await screen.findByRole('region', { name: 'Pull sheet' });
+    expect(
+      within(pullSheet).getByRole('region', { name: 'Magic: The Gathering' }),
+    ).toBeDefined();
+    const pokemonSection = within(pullSheet).getByRole('region', {
+      name: 'Pokémon (EN)',
+    });
+    expect(within(pokemonSection).getByText('Abomasnow')).toBeDefined();
+    expect(
+      container.querySelector('img[src*="283917_200w.jpg"]'),
+    ).not.toBeNull();
   });
 
   it('shows the image placeholder when the API has no card image', async () => {

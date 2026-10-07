@@ -118,12 +118,12 @@ public class InventoryHandlerIntegrationTest {
   }
 
   @Test
-  void findSkusShouldRequireSupportedGame() throws Exception {
+  void findSkusShouldRequireRegisteredGame() throws Exception {
     // act
     var missingGame = findSkusHandler.handleRequest(buildEvent("jordan", Map.of()), null);
     var unsupportedGame =
         findSkusHandler.handleRequest(
-            buildEventWithQuery("jordan", Map.of(), Map.of("game", "pokemon")), null);
+            buildEventWithQuery("jordan", Map.of(), Map.of("game", "digimon")), null);
 
     // assert
     assertThat(missingGame.getStatusCode()).isEqualTo(400);
@@ -131,7 +131,7 @@ public class InventoryHandlerIntegrationTest {
         .isEqualTo("game is required");
     assertThat(unsupportedGame.getStatusCode()).isEqualTo(400);
     assertThat(objectMapper.readTree(unsupportedGame.getBody()).get("message").asText())
-        .isEqualTo("unsupported game: pokemon");
+        .isEqualTo("unsupported game: digimon");
   }
 
   @Test
@@ -258,6 +258,35 @@ public class InventoryHandlerIntegrationTest {
     assertThat(units.get(2).get("sequence_number").asInt()).isEqualTo(4242);
     assertThat(units.get(2).get("location").asText()).isEqualTo("A42-42");
     assertThat(units.get(3).get("sequence_number").asInt()).isEqualTo(4250);
+  }
+
+  @Test
+  void getSkuShouldUseTcgplayerImagesAndKeepFinishesInSeparateSkus() throws Exception {
+    // arrange
+    var normalSkuId = "pokemon#tcgplayer#283917#normal#NM";
+    var reverseHoloSkuId = "pokemon#tcgplayer#283917#reverse_holofoil#NM";
+    createSku("jordan", normalSkuId, "Abomasnow", "lost-origin", "Lost Origin", "043/196");
+    createSku("jordan", reverseHoloSkuId, "Abomasnow", "lost-origin", "Lost Origin", "043/196");
+    createUnit("jordan", normalSkuId, 42, "in_stock", "pokemon-import");
+
+    // act
+    var normalResponse =
+        getSkuHandler.handleRequest(buildEvent("jordan", Map.of("sku_id", normalSkuId)), null);
+    var reverseHoloResponse =
+        getSkuHandler.handleRequest(buildEvent("jordan", Map.of("sku_id", reverseHoloSkuId)), null);
+
+    // assert
+    var normal = objectMapper.readTree(normalResponse.getBody());
+    assertThat(normal.get("sku_id").asText()).isEqualTo(normalSkuId);
+    assertThat(normal.get("external_id").asText()).isEqualTo("283917");
+    assertThat(normal.get("finish").asText()).isEqualTo("normal");
+    assertThat(normal.get("image_urls").get("small").asText())
+        .isEqualTo("https://tcgplayer-cdn.tcgplayer.com/product/283917_200w.jpg");
+    assertThat(normal.get("image_urls").get("normal").asText())
+        .isEqualTo("https://tcgplayer-cdn.tcgplayer.com/product/283917_in_1000x1000.jpg");
+    assertThat(normal.get("units").get(0).get("location").asText()).isEqualTo("A0-42");
+    assertThat(objectMapper.readTree(reverseHoloResponse.getBody()).get("sku_id").asText())
+        .isEqualTo(reverseHoloSkuId);
   }
 
   @Test
@@ -474,6 +503,41 @@ public class InventoryHandlerIntegrationTest {
     assertThat(auditItems.get(0).getSequenceNumber()).isEqualTo(42);
     assertThat(auditItems.get(0).getBeforeStatus()).isEqualTo("in_stock");
     assertThat(auditItems.get(0).getAfterStatus()).isEqualTo("in_stock");
+  }
+
+  @Test
+  void pokemonConditionChangeAndRemovalShouldUseTcgplayerSkuIdentity() throws Exception {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    var sourceSkuId = "pokemon#tcgplayer#283917#normal#NM";
+    var targetSkuId = "pokemon#tcgplayer#283917#normal#LP";
+    createSku("jordan", sourceSkuId, "Abomasnow", "lost-origin", "Lost Origin", "043/196");
+    createUnit("jordan", sourceSkuId, 42, "in_stock", "pokemon-import");
+
+    // act
+    var updateResponse =
+        updateUnitHandler.handleRequest(
+            buildEventWithBody(
+                "jordan",
+                Map.of("sku_id", sourceSkuId, "sequence_number", "42"),
+                "{\"condition\":\"LP\"}"),
+            null);
+    var removeResponse =
+        removeUnitHandler.handleRequest(
+            buildEvent("jordan", Map.of("sku_id", targetSkuId, "sequence_number", "42")), null);
+
+    // assert
+    assertThat(updateResponse.getStatusCode()).isEqualTo(200);
+    assertThat(objectMapper.readTree(updateResponse.getBody()).get("sku_id").asText())
+        .isEqualTo(targetSkuId);
+    var targetSku = getSku("jordan", targetSkuId);
+    assertThat(targetSku.getGame()).isEqualTo("pokemon");
+    assertThat(targetSku.getExternalId()).isEqualTo("283917");
+    assertThat(targetSku.getFinish()).isEqualTo("normal");
+    assertThat(targetSku.getCondition()).isEqualTo("LP");
+    assertThat(getUnit("jordan", targetSkuId, 42).getGame()).isEqualTo("pokemon");
+    assertThat(removeResponse.getStatusCode()).isEqualTo(204);
+    assertThat(getUnit("jordan", targetSkuId, 42).getStatus()).isEqualTo("removed");
   }
 
   @Test
@@ -776,7 +840,7 @@ public class InventoryHandlerIntegrationTest {
     var item =
         UnitItem.create(
             user,
-            "mtg",
+            skuId.split("#")[0],
             skuId,
             sequenceNumber,
             status,
