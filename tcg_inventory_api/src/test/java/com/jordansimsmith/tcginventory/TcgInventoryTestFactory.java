@@ -7,6 +7,7 @@ import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.s3.S3TestModule;
 import com.jordansimsmith.secrets.FakeSecrets;
 import com.jordansimsmith.secrets.SecretsTestModule;
+import com.jordansimsmith.tcginventory.catalog.CatalogSnapshotItem;
 import com.jordansimsmith.tcginventory.catalog.FakeCardCatalogs;
 import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
@@ -79,6 +80,8 @@ public interface TcgInventoryTestFactory extends TcgInventoryFactory {
   DynamoDbTable<OrderItem> orderTable();
 
   DynamoDbTable<ReportItem> reportTable();
+
+  DynamoDbTable<CatalogSnapshotItem> catalogSnapshotTable();
 
   DynamoDbTable<SettingsItem> settingsTable();
 

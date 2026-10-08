@@ -11,6 +11,7 @@ import com.jordansimsmith.s3.S3Module;
 import com.jordansimsmith.secrets.Secrets;
 import com.jordansimsmith.secrets.SecretsModule;
 import com.jordansimsmith.tcginventory.catalog.CatalogModule;
+import com.jordansimsmith.tcginventory.catalog.CatalogSnapshotStore;
 import com.jordansimsmith.tcginventory.catalog.Catalogs;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgModule;
@@ -70,6 +71,8 @@ public interface TcgInventoryFactory {
   FetchTcgClient fetchTcgClient();
 
   Catalogs catalogs();
+
+  CatalogSnapshotStore catalogSnapshotStore();
 
   FetchTcgTokenMinter fetchTcgTokenMinter();
 

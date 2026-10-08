@@ -2,8 +2,10 @@ package com.jordansimsmith.tcginventory.catalog;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 public class TcgCsvCatalogArtifactCodec {
@@ -26,5 +28,11 @@ public class TcgCsvCatalogArtifactCodec {
       gzip.write(encodeJson(snapshot));
     }
     return output.toByteArray();
+  }
+
+  public TcgCsvCatalogSnapshot decodeGzip(byte[] gzipBytes) throws IOException {
+    try (var gzip = new GZIPInputStream(new ByteArrayInputStream(gzipBytes))) {
+      return objectMapper.readValue(gzip, TcgCsvCatalogSnapshot.class);
+    }
   }
 }
