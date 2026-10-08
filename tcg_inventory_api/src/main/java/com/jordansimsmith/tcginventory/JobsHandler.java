@@ -6,6 +6,7 @@ import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.tcginventory.catalog.CatalogFactory;
 import com.jordansimsmith.tcginventory.imports.AppraiseJobProcessor;
 import com.jordansimsmith.tcginventory.imports.ImportConfirmationJobProcessor;
 import com.jordansimsmith.tcginventory.orders.OrderFulfillmentJobProcessor;
@@ -34,11 +35,11 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
   private final JobProcessor orderFulfillmentJobProcessor;
 
   public JobsHandler() {
-    this(TcgInventoryFactory.create());
+    this(CatalogFactory.create());
   }
 
   @VisibleForTesting
-  public JobsHandler(TcgInventoryFactory factory) {
+  public JobsHandler(CatalogFactory factory) {
     this.objectMapper = factory.objectMapper();
     this.clock = factory.clock();
     this.jobTable = factory.jobTable();

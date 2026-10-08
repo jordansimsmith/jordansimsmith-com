@@ -115,6 +115,7 @@ java_library(
     ),
     deps = [
         ":games-lib",
+        ":lib",
         "//lib/dynamodb:lib",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_annotations",
@@ -139,10 +140,7 @@ java_library(
         ["src/main/resources/**"],
         exclude = ["src/main/resources/fetchtcg/fetchtcg_set_mapping.json"],
     ),
-    deps = [
-        ":catalog-lib",
-        ":fetchtcg-lib",
-    ] + COMMON_DEPS,
+    deps = [":fetchtcg-lib"] + COMMON_DEPS,
 )
 
 java_library(
@@ -677,6 +675,7 @@ java_binary(
         "src/main/resources/logback.xml",
     ],
     deps = [
+        ":catalog-lib",
         ":fetchtcg-lib",
         ":import-lib",
         ":inventory-lib",
@@ -1178,6 +1177,7 @@ java_test_suite(
         "//lib/http:lib",
         "//lib/secrets:lib",
         "//lib/secrets:test-lib",
+        "//third_party/dagger",
         "@maven//:com_amazonaws_aws_lambda_java_core",
         "@maven//:com_amazonaws_aws_lambda_java_events",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",

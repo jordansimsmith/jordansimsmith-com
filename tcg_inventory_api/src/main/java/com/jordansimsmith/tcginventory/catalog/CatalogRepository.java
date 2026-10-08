@@ -6,7 +6,6 @@ import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 
 public class CatalogRepository {
@@ -54,20 +53,12 @@ public class CatalogRepository {
   }
 
   public CatalogSnapshotItem createSnapshot(CatalogSnapshotItem item) {
-    try {
-      dynamoDbClient.putItem(
-          PutItemRequest.builder()
-              .tableName(catalogSnapshotTable.tableName())
-              .item(catalogSnapshotTable.tableSchema().itemToMap(item, true))
-              .conditionExpression("attribute_not_exists(" + CatalogSnapshotItem.PK + ")")
-              .build());
-      return item;
-    } catch (ConditionalCheckFailedException e) {
-      var existing = getSnapshot(item.getGame(), item.getSnapshotId());
-      if (existing == null) {
-        throw e;
-      }
-      return existing;
-    }
+    dynamoDbClient.putItem(
+        PutItemRequest.builder()
+            .tableName(catalogSnapshotTable.tableName())
+            .item(catalogSnapshotTable.tableSchema().itemToMap(item, true))
+            .conditionExpression("attribute_not_exists(" + CatalogSnapshotItem.PK + ")")
+            .build());
+    return item;
   }
 }

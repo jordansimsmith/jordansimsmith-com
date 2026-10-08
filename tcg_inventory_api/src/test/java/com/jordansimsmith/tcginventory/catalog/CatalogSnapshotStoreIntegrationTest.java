@@ -6,7 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.s3.S3Container;
-import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import java.security.MessageDigest;
@@ -23,8 +22,13 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
+import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
+import software.amazon.awssdk.services.s3.model.PutObjectRequest;
+import software.amazon.awssdk.services.s3.model.PutObjectResponse;
+import software.amazon.awssdk.services.s3.model.S3Exception;
 
 @Testcontainers
 public class CatalogSnapshotStoreIntegrationTest {
@@ -40,7 +44,7 @@ public class CatalogSnapshotStoreIntegrationTest {
     var factory =
         TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), s3Container.getEndpoint());
     DynamoDbUtils.createTable(factory.dynamoDbClient(), factory.tableDefinition());
-    factory.s3Client().createBucket(request -> request.bucket(Photos.BUCKET));
+    factory.s3Client().createBucket(request -> request.bucket(CatalogSnapshotStore.BUCKET));
   }
 
   @BeforeEach
@@ -50,16 +54,18 @@ public class CatalogSnapshotStoreIntegrationTest {
     DynamoDbUtils.reset(factory.dynamoDbClient());
     var s3Client = factory.s3Client();
     s3Client
-        .listObjectsV2(request -> request.bucket(Photos.BUCKET).prefix("catalogs/tcgcsv/"))
+        .listObjectsV2(
+            request -> request.bucket(CatalogSnapshotStore.BUCKET).prefix("catalogs/tcgcsv/"))
         .contents()
         .forEach(
             object ->
-                s3Client.deleteObject(request -> request.bucket(Photos.BUCKET).key(object.key())));
+                s3Client.deleteObject(
+                    request -> request.bucket(CatalogSnapshotStore.BUCKET).key(object.key())));
     repository = new CatalogRepository(factory.catalogSnapshotTable(), factory.dynamoDbClient());
     store =
         new CatalogSnapshotStore(
             factory.s3Client(),
-            Photos.BUCKET,
+            CatalogSnapshotStore.BUCKET,
             repository,
             new TcgCsvCatalogArtifactCodec(factory.objectMapper()));
   }
@@ -78,9 +84,31 @@ public class CatalogSnapshotStoreIntegrationTest {
     assertThat(item.getS3Key())
         .isEqualTo("catalogs/tcgcsv/pokemon/snapshots/2026-10-07T20:06:09Z.json.gz");
     assertThat(item.getChecksumSha256()).hasSize(64);
-    assertThat(item.getGroupCount()).isEqualTo(1);
-    assertThat(item.getProductCount()).isEqualTo(1);
-    assertThat(item.getArtifactSizeBytes()).isPositive();
+    var storedItem =
+        factory
+            .dynamoDbClient()
+            .getItem(
+                request ->
+                    request
+                        .tableName(TcgInventoryTable.TABLE_NAME)
+                        .consistentRead(true)
+                        .key(
+                            Map.of(
+                                CatalogSnapshotItem.PK,
+                                AttributeValue.builder().s(item.getPk()).build(),
+                                CatalogSnapshotItem.SK,
+                                AttributeValue.builder().s(item.getSk()).build())))
+            .item();
+    assertThat(storedItem)
+        .containsOnlyKeys(
+            "pk",
+            "sk",
+            "game",
+            "snapshot_id",
+            "source_updated_at",
+            "created_at",
+            "s3_key",
+            "checksum_sha256");
     assertThat(repository.getSnapshot("pokemon", snapshot.snapshotId())).isNotNull();
     assertThat(store.getSnapshot(item)).isEqualTo(snapshot);
   }
@@ -98,7 +126,9 @@ public class CatalogSnapshotStoreIntegrationTest {
   void getSnapshotShouldPropagateMissingArtifact() throws Exception {
     // arrange
     var item = store.createSnapshot(snapshot("pokemon", "2026-10-07T20:06:09Z", "Pikachu", 25));
-    factory.s3Client().deleteObject(request -> request.bucket(Photos.BUCKET).key(item.getS3Key()));
+    factory
+        .s3Client()
+        .deleteObject(request -> request.bucket(CatalogSnapshotStore.BUCKET).key(item.getS3Key()));
 
     // act/assert
     assertThatThrownBy(() -> store.getSnapshot(item)).isInstanceOf(NoSuchKeyException.class);
@@ -116,7 +146,7 @@ public class CatalogSnapshotStoreIntegrationTest {
         .putObject(
             request ->
                 request
-                    .bucket(Photos.BUCKET)
+                    .bucket(CatalogSnapshotStore.BUCKET)
                     .key(CatalogSnapshotStore.key("pokemon", original.snapshotId()))
                     .contentType("application/gzip"),
             RequestBody.fromBytes(originalBytes));
@@ -127,7 +157,6 @@ public class CatalogSnapshotStoreIntegrationTest {
     // assert
     assertThat(item.getCreatedAt()).isEqualTo(Instant.ofEpochSecond(original.createdAt()));
     assertThat(item.getChecksumSha256()).isEqualTo(checksum(originalBytes));
-    assertThat(item.getArtifactSizeBytes()).isEqualTo((long) originalBytes.length);
     assertThat(store.getSnapshot(item)).isEqualTo(original);
   }
 
@@ -154,6 +183,51 @@ public class CatalogSnapshotStoreIntegrationTest {
   }
 
   @Test
+  void createSnapshotShouldPropagateUploadConflictAndRecoverOnRetry() throws Exception {
+    // arrange
+    var published =
+        store.createSnapshot(snapshot("pokemon", "2026-10-07T20:06:09Z", "Pikachu", 25));
+    var conflictingS3Client =
+        new S3Client() {
+          @Override
+          public PutObjectResponse putObject(PutObjectRequest request, RequestBody requestBody) {
+            throw S3Exception.builder()
+                .statusCode(409)
+                .message("conditional upload conflict")
+                .build();
+          }
+
+          @Override
+          public String serviceName() {
+            return "s3";
+          }
+
+          @Override
+          public void close() {}
+        };
+    var conflictingStore =
+        new CatalogSnapshotStore(
+            conflictingS3Client,
+            CatalogSnapshotStore.BUCKET,
+            repository,
+            new TcgCsvCatalogArtifactCodec(factory.objectMapper()));
+    var candidate = snapshot("pokemon", "2026-10-08T20:06:09Z", "Raichu", 26);
+
+    // act/assert
+    assertThatThrownBy(() -> conflictingStore.createSnapshot(candidate))
+        .isInstanceOfSatisfying(S3Exception.class, e -> assertThat(e.statusCode()).isEqualTo(409));
+    assertThat(repository.getLatestSnapshot("pokemon").getSnapshotId())
+        .isEqualTo(published.getSnapshotId());
+    assertThat(repository.getSnapshot("pokemon", candidate.snapshotId())).isNull();
+
+    // act
+    var retriedItem = store.createSnapshot(candidate);
+
+    // assert
+    assertThat(store.getSnapshot(retriedItem)).isEqualTo(candidate);
+  }
+
+  @Test
   void createSnapshotShouldLeavePreviousLatestWhenRegistryWriteFailsAndRetry() throws Exception {
     // arrange
     var published =
@@ -168,7 +242,7 @@ public class CatalogSnapshotStoreIntegrationTest {
     var failingStore =
         new CatalogSnapshotStore(
             factory.s3Client(),
-            Photos.BUCKET,
+            CatalogSnapshotStore.BUCKET,
             failingRepository,
             new TcgCsvCatalogArtifactCodec(factory.objectMapper()));
     var retry = snapshot("pokemon", "2026-10-08T20:06:09Z", "Raichu", 26);
@@ -207,7 +281,7 @@ public class CatalogSnapshotStoreIntegrationTest {
     var retryingStore =
         new CatalogSnapshotStore(
             factory.s3Client(),
-            Photos.BUCKET,
+            CatalogSnapshotStore.BUCKET,
             lostAcknowledgementRepository,
             new TcgCsvCatalogArtifactCodec(factory.objectMapper()));
     var snapshot = snapshot("pokemon", "2026-10-07T20:06:09Z", "Pikachu", 25);
@@ -224,6 +298,44 @@ public class CatalogSnapshotStoreIntegrationTest {
     assertThat(item.getSnapshotId()).isEqualTo(snapshot.snapshotId());
     assertThat(repository.getLatestSnapshot("pokemon").getSnapshotId())
         .isEqualTo(snapshot.snapshotId());
+  }
+
+  @Test
+  void createSnapshotShouldPropagateRegistryConflictAndRecoverOnRetry() throws Exception {
+    // arrange
+    var snapshot = snapshot("pokemon", "2026-10-07T20:06:09Z", "Pikachu", 25);
+    var published = store.createSnapshot(snapshot);
+    var repositoryWithStaleRead =
+        new CatalogRepository(factory.catalogSnapshotTable(), factory.dynamoDbClient()) {
+          private boolean returnStaleRead = true;
+
+          @Override
+          public CatalogSnapshotItem getSnapshot(String game, String snapshotId) {
+            if (returnStaleRead) {
+              returnStaleRead = false;
+              return null;
+            }
+            return super.getSnapshot(game, snapshotId);
+          }
+        };
+    var retryingStore =
+        new CatalogSnapshotStore(
+            factory.s3Client(),
+            CatalogSnapshotStore.BUCKET,
+            repositoryWithStaleRead,
+            new TcgCsvCatalogArtifactCodec(factory.objectMapper()));
+
+    // act/assert
+    assertThatThrownBy(() -> retryingStore.createSnapshot(snapshot))
+        .isInstanceOf(ConditionalCheckFailedException.class);
+
+    // act
+    var item = retryingStore.createSnapshot(snapshot);
+
+    // assert
+    assertThat(item.getSnapshotId()).isEqualTo(published.getSnapshotId());
+    assertThat(item.getCreatedAt()).isEqualTo(published.getCreatedAt());
+    assertThat(item.getChecksumSha256()).isEqualTo(published.getChecksumSha256());
   }
 
   @Test

@@ -13,60 +13,49 @@ import javax.inject.Singleton;
 public class CatalogModule {
   @Provides
   @Singleton
-  ScryfallCatalog scryfallCatalog(ObjectMapper objectMapper) {
-    var baseUrl = System.getenv("SCRYFALL_BASE_URL");
-    if (baseUrl == null || baseUrl.isBlank()) {
-      baseUrl = "https://api.scryfall.com";
-    }
-    var httpClient =
-        HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .followRedirects(HttpClient.Redirect.NEVER)
-            .build();
+  HttpClient httpClient() {
+    return HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(3))
+        .followRedirects(HttpClient.Redirect.NEVER)
+        .build();
+  }
+
+  @Provides
+  Runnable requestPacer() {
     var lastRequestAt = new long[] {0};
-    Runnable pacer =
-        () -> {
-          synchronized (lastRequestAt) {
-            var waitMillis = 100 - (System.currentTimeMillis() - lastRequestAt[0]);
-            if (waitMillis > 0) {
-              try {
-                Thread.sleep(waitMillis);
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new CatalogException.Unavailable("catalog request was interrupted", e);
-              }
-            }
-            lastRequestAt[0] = System.currentTimeMillis();
+    return () -> {
+      synchronized (lastRequestAt) {
+        var waitMillis = 100 - (System.currentTimeMillis() - lastRequestAt[0]);
+        if (waitMillis > 0) {
+          try {
+            Thread.sleep(waitMillis);
+          } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("HTTP request pacing was interrupted", e);
           }
-        };
-    return new ScryfallCatalog(URI.create(baseUrl), httpClient, objectMapper, pacer);
+        }
+        lastRequestAt[0] = System.currentTimeMillis();
+      }
+    };
   }
 
   @Provides
   @Singleton
-  TcgCsvClient tcgCsvClient(ObjectMapper objectMapper) {
-    var httpClient =
-        HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(3))
-            .followRedirects(HttpClient.Redirect.NEVER)
-            .build();
-    var lastRequestAt = new long[] {0};
-    Runnable pacer =
-        () -> {
-          synchronized (lastRequestAt) {
-            var waitMillis = 100 - (System.currentTimeMillis() - lastRequestAt[0]);
-            if (waitMillis > 0) {
-              try {
-                Thread.sleep(waitMillis);
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new IllegalStateException("TCGCSV request pacing was interrupted", e);
-              }
-            }
-            lastRequestAt[0] = System.currentTimeMillis();
-          }
-        };
-    return new HttpTcgCsvClient(URI.create("https://tcgcsv.com"), httpClient, objectMapper, pacer);
+  ScryfallCatalog scryfallCatalog(
+      ObjectMapper objectMapper, HttpClient httpClient, Runnable requestPacer) {
+    var baseUrl = System.getenv("SCRYFALL_BASE_URL");
+    if (baseUrl == null || baseUrl.isBlank()) {
+      baseUrl = "https://api.scryfall.com";
+    }
+    return new ScryfallCatalog(URI.create(baseUrl), httpClient, objectMapper, requestPacer);
+  }
+
+  @Provides
+  @Singleton
+  TcgCsvClient tcgCsvClient(
+      ObjectMapper objectMapper, HttpClient httpClient, Runnable requestPacer) {
+    return new HttpTcgCsvClient(
+        URI.create("https://tcgcsv.com"), httpClient, objectMapper, requestPacer);
   }
 
   @Provides

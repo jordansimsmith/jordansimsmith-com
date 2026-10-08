@@ -4,12 +4,9 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.queue.QueueClient;
-import com.jordansimsmith.tcginventory.catalog.CatalogRepository;
 import com.jordansimsmith.tcginventory.catalog.CatalogSnapshotItem;
-import com.jordansimsmith.tcginventory.catalog.CatalogSnapshotStore;
 import com.jordansimsmith.tcginventory.catalog.Catalogs;
 import com.jordansimsmith.tcginventory.catalog.FakeCardCatalogs;
-import com.jordansimsmith.tcginventory.catalog.TcgCsvCatalogArtifactCodec;
 import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgTokenMinter;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
@@ -35,7 +32,6 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Module
@@ -127,21 +123,6 @@ public class TcgInventoryTestModule {
   DynamoDbTable<CatalogSnapshotItem> catalogSnapshotTable(DynamoDbEnhancedClient client) {
     return client.table(
         TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(CatalogSnapshotItem.class));
-  }
-
-  @Provides
-  @Singleton
-  CatalogRepository catalogRepository(
-      DynamoDbTable<CatalogSnapshotItem> catalogSnapshotTable, DynamoDbClient dynamoDbClient) {
-    return new CatalogRepository(catalogSnapshotTable, dynamoDbClient);
-  }
-
-  @Provides
-  @Singleton
-  CatalogSnapshotStore catalogSnapshotStore(
-      S3Client s3Client, CatalogRepository catalogRepository, ObjectMapper objectMapper) {
-    return new CatalogSnapshotStore(
-        s3Client, Photos.BUCKET, catalogRepository, new TcgCsvCatalogArtifactCodec(objectMapper));
   }
 
   @Provides

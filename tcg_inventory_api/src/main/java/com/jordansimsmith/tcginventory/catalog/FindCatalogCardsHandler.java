@@ -8,7 +8,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.games.Games;
 import com.jordansimsmith.tcginventory.games.Games.Game;
 import org.slf4j.Logger;
@@ -25,22 +24,14 @@ public class FindCatalogCardsHandler
   private final Catalogs catalogs;
 
   public FindCatalogCardsHandler() {
-    this(TcgInventoryFactory.create());
+    this(CatalogFactory.create());
   }
 
   @VisibleForTesting
-  FindCatalogCardsHandler(TcgInventoryFactory factory) {
-    this(factory.requestContextFactory(), factory.httpResponseFactory(), factory.catalogs());
-  }
-
-  @VisibleForTesting
-  FindCatalogCardsHandler(
-      RequestContextFactory requestContextFactory,
-      HttpResponseFactory httpResponseFactory,
-      Catalogs catalogs) {
-    this.requestContextFactory = requestContextFactory;
-    this.httpResponseFactory = httpResponseFactory;
-    this.catalogs = catalogs;
+  FindCatalogCardsHandler(CatalogFactory factory) {
+    this.requestContextFactory = factory.requestContextFactory();
+    this.httpResponseFactory = factory.httpResponseFactory();
+    this.catalogs = factory.catalogs();
   }
 
   @Override

@@ -12,6 +12,8 @@ import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 import software.amazon.awssdk.services.s3.model.S3Exception;
 
 public class CatalogSnapshotStore {
+  public static final String BUCKET = "api.tcg-inventory.jordansimsmith.com";
+
   private final S3Client s3Client;
   private final String bucket;
   private final CatalogRepository catalogRepository;
@@ -48,7 +50,7 @@ public class CatalogSnapshotStore {
           RequestBody.fromBytes(candidateBytes));
       storedBytes = candidateBytes;
     } catch (S3Exception e) {
-      if (e.statusCode() != 409 && e.statusCode() != 412) {
+      if (e.statusCode() != 412) {
         throw e;
       }
       storedBytes = getObject(s3Key);
@@ -58,19 +60,11 @@ public class CatalogSnapshotStore {
     var item =
         CatalogSnapshotItem.create(
             storedSnapshot.game(),
-            storedSnapshot.externalSource(),
-            storedSnapshot.catalogSource(),
-            storedSnapshot.categoryId(),
             storedSnapshot.snapshotId(),
-            storedSnapshot.sourceMarker(),
             Instant.ofEpochSecond(storedSnapshot.sourceUpdatedAt()),
             Instant.ofEpochSecond(storedSnapshot.createdAt()),
             s3Key,
-            storedSnapshot.schemaVersion(),
-            checksum(storedBytes),
-            storedSnapshot.groups().size(),
-            storedSnapshot.products().size(),
-            storedBytes.length);
+            checksum(storedBytes));
     return catalogRepository.createSnapshot(item);
   }
 

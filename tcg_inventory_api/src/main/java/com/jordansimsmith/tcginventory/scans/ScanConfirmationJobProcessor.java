@@ -5,10 +5,10 @@ import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.JobProcessor;
-import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.catalog.CatalogCard;
 import com.jordansimsmith.tcginventory.catalog.CatalogException;
+import com.jordansimsmith.tcginventory.catalog.CatalogFactory;
 import com.jordansimsmith.tcginventory.catalog.Catalogs;
 import com.jordansimsmith.tcginventory.games.Games;
 import com.jordansimsmith.tcginventory.games.Games.Game;
@@ -35,7 +35,7 @@ public class ScanConfirmationJobProcessor implements JobProcessor {
   private final QueueClient<JobMessage> jobsQueue;
   private final UlidGenerator ulidGenerator;
 
-  public ScanConfirmationJobProcessor(TcgInventoryFactory factory) {
+  public ScanConfirmationJobProcessor(CatalogFactory factory) {
     this.clock = factory.clock();
     this.scanRepository =
         new ScanRepository(

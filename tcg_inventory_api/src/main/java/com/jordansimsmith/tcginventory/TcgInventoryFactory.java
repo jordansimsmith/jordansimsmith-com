@@ -1,25 +1,14 @@
 package com.jordansimsmith.tcginventory;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jordansimsmith.dynamodb.DynamoDbModule;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import com.jordansimsmith.http.RequestContextModule;
-import com.jordansimsmith.json.ObjectMapperModule;
 import com.jordansimsmith.queue.QueueClient;
-import com.jordansimsmith.s3.S3Module;
 import com.jordansimsmith.secrets.Secrets;
-import com.jordansimsmith.secrets.SecretsModule;
-import com.jordansimsmith.tcginventory.catalog.CatalogModule;
-import com.jordansimsmith.tcginventory.catalog.CatalogSnapshotStore;
-import com.jordansimsmith.tcginventory.catalog.Catalogs;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgModule;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgTokenMinter;
 import com.jordansimsmith.time.Clock;
-import com.jordansimsmith.time.ClockModule;
 import com.jordansimsmith.ulid.UlidGenerator;
-import com.jordansimsmith.ulid.UlidModule;
 import dagger.Component;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
@@ -30,19 +19,7 @@ import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Singleton
-@Component(
-    modules = {
-      ObjectMapperModule.class,
-      ClockModule.class,
-      DynamoDbModule.class,
-      SecretsModule.class,
-      RequestContextModule.class,
-      UlidModule.class,
-      S3Module.class,
-      CatalogModule.class,
-      TcgInventoryModule.class,
-      FetchTcgModule.class
-    })
+@Component(modules = TcgInventoryModule.class)
 public interface TcgInventoryFactory {
   ObjectMapper objectMapper();
 
@@ -69,10 +46,6 @@ public interface TcgInventoryFactory {
   UlidGenerator ulidGenerator();
 
   FetchTcgClient fetchTcgClient();
-
-  Catalogs catalogs();
-
-  CatalogSnapshotStore catalogSnapshotStore();
 
   FetchTcgTokenMinter fetchTcgTokenMinter();
 

@@ -9,9 +9,9 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.tcginventory.Photos;
-import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.catalog.CatalogCard;
+import com.jordansimsmith.tcginventory.catalog.CatalogFactory;
 import com.jordansimsmith.tcginventory.catalog.Catalogs;
 import com.jordansimsmith.tcginventory.games.Games;
 import java.net.URLDecoder;
@@ -66,11 +66,11 @@ public class GetSkuHandler
   private final Catalogs catalogs;
 
   public GetSkuHandler() {
-    this(TcgInventoryFactory.create());
+    this(CatalogFactory.create());
   }
 
   @VisibleForTesting
-  GetSkuHandler(TcgInventoryFactory factory) {
+  GetSkuHandler(CatalogFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.skuTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), SkuItem.class);
