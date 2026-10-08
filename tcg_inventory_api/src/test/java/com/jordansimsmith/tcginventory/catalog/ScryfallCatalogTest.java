@@ -210,8 +210,7 @@ public class ScryfallCatalogTest {
   void getCardShouldRejectAProviderResponseForADifferentPrinting() {
     // arrange
     nextBody = card(ALT_ID, "Lightning Bolt", "en", List.of("nonfoil"), true);
-    var handler =
-        new GetCatalogCardHandler(createFactory(new Catalogs(Map.of("scryfall", catalog))));
+    var handler = new GetCatalogCardHandler(createFactory(new Catalogs(Map.of("mtg", catalog))));
 
     // act
     var response =
@@ -323,8 +322,7 @@ public class ScryfallCatalogTest {
     // arrange
     nextStatus = 404;
     var handler =
-        new FindCatalogAlternativesHandler(
-            createFactory(new Catalogs(Map.of("scryfall", catalog))));
+        new FindCatalogAlternativesHandler(createFactory(new Catalogs(Map.of("mtg", catalog))));
 
     // act
     var response =
@@ -347,8 +345,7 @@ public class ScryfallCatalogTest {
     card.put("prints_search_uri", "https://example.com/cards/search?q=oracleid%3A" + ORACLE_ID);
     nextBody = card.toString();
     var handler =
-        new FindCatalogAlternativesHandler(
-            createFactory(new Catalogs(Map.of("scryfall", catalog))));
+        new FindCatalogAlternativesHandler(createFactory(new Catalogs(Map.of("mtg", catalog))));
 
     // act
     var response =
@@ -379,7 +376,7 @@ public class ScryfallCatalogTest {
     var first = catalog.search("Lightning Bolt", "normal", null);
     var second = catalog.search("Lightning Bolt", "normal", first.nextContinuation());
     var mismatched =
-        new FindCatalogCardsHandler(createFactory(new Catalogs(Map.of("scryfall", catalog))))
+        new FindCatalogCardsHandler(createFactory(new Catalogs(Map.of("mtg", catalog))))
             .handleRequest(
                 event(
                     Map.of(
@@ -426,7 +423,7 @@ public class ScryfallCatalogTest {
   @Test
   void handlersShouldReturnBadRequestForInvalidOrMismatchedParameters() throws Exception {
     // arrange
-    var catalogs = new Catalogs(Map.of("scryfall", catalog));
+    var catalogs = new Catalogs(Map.of("mtg", catalog));
     var getCard = new GetCatalogCardHandler(createFactory(catalogs));
     var search = new FindCatalogCardsHandler(createFactory(catalogs));
     var alternatives = new FindCatalogAlternativesHandler(createFactory(catalogs));
@@ -474,8 +471,7 @@ public class ScryfallCatalogTest {
   @Test
   void handlersShouldReturnNotFoundForUnknownAndNonEnglishExactCards() throws Exception {
     // arrange
-    var getCard =
-        new GetCatalogCardHandler(createFactory(new Catalogs(Map.of("scryfall", catalog))));
+    var getCard = new GetCatalogCardHandler(createFactory(new Catalogs(Map.of("mtg", catalog))));
 
     // act
     nextStatus = 404;
@@ -494,8 +490,7 @@ public class ScryfallCatalogTest {
   @Test
   void handlerShouldReturnServiceUnavailableForRateLimitProviderFailureAndMalformedData() {
     // arrange
-    var getCard =
-        new GetCatalogCardHandler(createFactory(new Catalogs(Map.of("scryfall", catalog))));
+    var getCard = new GetCatalogCardHandler(createFactory(new Catalogs(Map.of("mtg", catalog))));
 
     // act
     nextStatus = 429;
@@ -508,8 +503,7 @@ public class ScryfallCatalogTest {
     nextBody = "{not-json";
     var malformed =
         getCard.handleRequest(event(Map.of("game", "mtg"), Map.of("external_id", CARD_ID)), null);
-    var search =
-        new FindCatalogCardsHandler(createFactory(new Catalogs(Map.of("scryfall", catalog))));
+    var search = new FindCatalogCardsHandler(createFactory(new Catalogs(Map.of("mtg", catalog))));
     searchBody = "{\"object\":\"list\",\"data\":[]}";
     var malformedSearch =
         search.handleRequest(
@@ -531,8 +525,7 @@ public class ScryfallCatalogTest {
     var unavailableCatalog =
         new ScryfallCatalog(endpoint, HttpClient.newHttpClient(), objectMapper, () -> {});
     var getCard =
-        new GetCatalogCardHandler(
-            createFactory(new Catalogs(Map.of("scryfall", unavailableCatalog))));
+        new GetCatalogCardHandler(createFactory(new Catalogs(Map.of("mtg", unavailableCatalog))));
 
     // act
     var response =
@@ -546,8 +539,7 @@ public class ScryfallCatalogTest {
   void handlerShouldReturnServiceUnavailableWhenProviderTimesOut() {
     // arrange
     nextDelayMillis = 6000;
-    var getCard =
-        new GetCatalogCardHandler(createFactory(new Catalogs(Map.of("scryfall", catalog))));
+    var getCard = new GetCatalogCardHandler(createFactory(new Catalogs(Map.of("mtg", catalog))));
 
     // act
     var response =

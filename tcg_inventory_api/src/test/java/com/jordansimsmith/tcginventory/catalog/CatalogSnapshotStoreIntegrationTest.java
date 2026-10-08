@@ -3,11 +3,16 @@ package com.jordansimsmith.tcginventory.catalog;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.s3.S3Container;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
+import com.jordansimsmith.tcginventory.games.Games;
+import com.jordansimsmith.tcginventory.games.Games.Game;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -15,6 +20,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.GZIPOutputStream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -120,6 +126,171 @@ public class CatalogSnapshotStoreIntegrationTest {
 
     // assert
     assertThat(latestSnapshot).isNull();
+  }
+
+  @Test
+  void tcgPlayerCatalogShouldLoadPublishedSnapshotFromLocalStorage() throws Exception {
+    // arrange
+    store.createSnapshot(snapshot("pokemon", "2026-10-07T20:06:09Z", "Pikachu", 25));
+    factory.fakeClock().setTime(Instant.parse("2026-10-08T20:06:09Z"));
+    var catalog = new TcgPlayerCatalog("pokemon", repository, store, factory.fakeClock());
+
+    // act
+    var card = catalog.getCard("25");
+
+    // assert
+    assertThat(card.game()).isEqualTo("pokemon");
+    assertThat(card.name()).isEqualTo("Pikachu");
+    assertThat(card.setCode()).isEqualTo("BASE");
+    assertThat(card.collectorNumber()).isEqualTo("58");
+    assertThat(card.availableFinishes()).containsExactly("normal");
+  }
+
+  @Test
+  void tcgPlayerCatalogShouldIsolateGamesSharingSourceAndProductId() throws Exception {
+    // arrange
+    var pokemonSnapshot = snapshot("pokemon", "2026-10-07T20:06:09Z", "Pikachu", 25);
+    var otherSnapshot = snapshot("other", "2026-10-07T20:06:09Z", "Other game card", 25);
+    var pokemonItem = store.createSnapshot(pokemonSnapshot);
+    var otherItem = store.createSnapshot(otherSnapshot);
+    factory.fakeClock().setTime(Instant.parse("2026-10-08T20:06:09Z"));
+    var otherGame =
+        new Game("other", "Other game", "tcgplayer", false, false, List.of(), List.of());
+    var catalogs =
+        new Catalogs(
+            Map.of(
+                "pokemon",
+                new TcgPlayerCatalog("pokemon", repository, store, factory.fakeClock()),
+                "other",
+                new TcgPlayerCatalog("other", repository, store, factory.fakeClock())));
+
+    // act
+    var pokemonCard = catalogs.forGame(Games.POKEMON_ENGLISH).getCard("25");
+    var otherCard = catalogs.forGame(otherGame).getCard("25");
+    store.createSnapshot(snapshot("pokemon", "2026-10-08T20:06:09Z", "Raichu", 25));
+    factory.fakeClock().setTime(Instant.parse("2026-10-08T20:11:09Z"));
+
+    // assert
+    assertThat(pokemonItem.getS3Key()).isNotEqualTo(otherItem.getS3Key());
+    assertThat(pokemonCard.name()).isEqualTo("Pikachu");
+    assertThat(otherCard.name()).isEqualTo("Other game card");
+    assertThat(catalogs.forGame(Games.POKEMON_ENGLISH).getCard("25").name()).isEqualTo("Raichu");
+    assertThat(catalogs.forGame(otherGame).getCard("25").name()).isEqualTo("Other game card");
+  }
+
+  @Test
+  void getCatalogCardHandlerShouldMapPokemonLookupStatuses() {
+    // arrange
+    factory
+        .fakeCardCatalogs()
+        .addCard(
+            new CatalogCard(
+                "pokemon",
+                "25",
+                "Pikachu",
+                "BASE",
+                "Base Set",
+                "58",
+                new CatalogCard.ImageUrls("small.jpg", "normal.jpg"),
+                List.of("normal")));
+    var handler = new GetCatalogCardHandler(factory);
+
+    // act
+    var found = handler.handleRequest(catalogEvent("25"), null);
+    var missingId = handler.handleRequest(catalogEventWithoutId(), null);
+    var absent = handler.handleRequest(catalogEvent("not-numeric"), null);
+    var missing = handler.handleRequest(catalogEvent("999"), null);
+    factory
+        .fakeCardCatalogs()
+        .setFailure("pokemon", new CatalogException.Unavailable("storage unavailable"));
+    var unavailable = handler.handleRequest(catalogEvent("25"), null);
+
+    // assert
+    assertThat(found.getStatusCode()).isEqualTo(200);
+    assertThat(missingId.getStatusCode()).isEqualTo(400);
+    assertThat(absent.getStatusCode()).isEqualTo(404);
+    assertThat(missing.getStatusCode()).isEqualTo(404);
+    assertThat(unavailable.getStatusCode()).isEqualTo(503);
+  }
+
+  @Test
+  void tcgPlayerCatalogShouldReportMissingPublicationAsUnavailable() {
+    // arrange
+    var catalog = new TcgPlayerCatalog("pokemon", repository, store, factory.fakeClock());
+
+    // act/assert
+    assertThatThrownBy(() -> catalog.getCard("25"))
+        .isInstanceOf(CatalogException.Unavailable.class)
+        .hasMessageContaining("not been published");
+  }
+
+  @Test
+  void tcgPlayerCatalogShouldReportMissingArtifactAsUnavailable() {
+    // arrange
+    var snapshotId = "2026-10-07T20:06:09Z";
+    repository.createSnapshot(
+        CatalogSnapshotItem.create(
+            "pokemon",
+            snapshotId,
+            Instant.parse(snapshotId),
+            Instant.parse("2026-10-08T00:00:00Z"),
+            "catalogs/missing.json.gz",
+            "checksum"));
+    var catalog = new TcgPlayerCatalog("pokemon", repository, store, factory.fakeClock());
+
+    // act/assert
+    assertThatThrownBy(() -> catalog.getCard("25"))
+        .isInstanceOf(CatalogException.Unavailable.class);
+  }
+
+  @Test
+  void tcgPlayerCatalogShouldReportMalformedArtifactsAsUnavailable() throws Exception {
+    // arrange
+    var snapshotId = "2026-10-07T20:06:09Z";
+    var s3Key = "catalogs/tcgcsv/pokemon/snapshots/%s.json.gz".formatted(snapshotId);
+    factory
+        .s3Client()
+        .putObject(
+            request -> request.bucket(CatalogSnapshotStore.BUCKET).key(s3Key),
+            RequestBody.fromBytes(gzip("{not json".getBytes(StandardCharsets.UTF_8))));
+    repository.createSnapshot(
+        CatalogSnapshotItem.create(
+            "pokemon",
+            snapshotId,
+            Instant.parse(snapshotId),
+            Instant.parse("2026-10-08T00:00:00Z"),
+            s3Key,
+            "checksum"));
+    var catalog = new TcgPlayerCatalog("pokemon", repository, store, factory.fakeClock());
+
+    // act/assert
+    assertThatThrownBy(() -> catalog.getCard("25"))
+        .isInstanceOf(CatalogException.Unavailable.class);
+  }
+
+  @Test
+  void tcgPlayerCatalogShouldReportInvalidGzipAsUnavailable() throws Exception {
+    // arrange
+    var snapshotId = "2026-10-07T20:06:09Z";
+    var s3Key = "catalogs/tcgcsv/pokemon/snapshots/%s.json.gz".formatted(snapshotId);
+    factory
+        .s3Client()
+        .putObject(
+            request -> request.bucket(CatalogSnapshotStore.BUCKET).key(s3Key),
+            RequestBody.fromBytes(new byte[] {1, 2, 3, 4}));
+    repository.createSnapshot(
+        CatalogSnapshotItem.create(
+            "pokemon",
+            snapshotId,
+            Instant.parse(snapshotId),
+            Instant.parse("2026-10-08T00:00:00Z"),
+            s3Key,
+            "checksum"));
+    var catalog = new TcgPlayerCatalog("pokemon", repository, store, factory.fakeClock());
+
+    // act/assert
+    assertThatThrownBy(() -> catalog.getCard("25"))
+        .isInstanceOf(CatalogException.Unavailable.class);
   }
 
   @Test
@@ -392,5 +563,29 @@ public class CatalogSnapshotStoreIntegrationTest {
 
   private static String checksum(byte[] bytes) throws Exception {
     return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));
+  }
+
+  private static byte[] gzip(byte[] bytes) throws Exception {
+    var output = new ByteArrayOutputStream();
+    try (var gzip = new GZIPOutputStream(output)) {
+      gzip.write(bytes);
+    }
+    return output.toByteArray();
+  }
+
+  private static APIGatewayV2HTTPEvent catalogEvent(String externalId) {
+    return APIGatewayV2HTTPEvent.builder()
+        .withHeaders(Map.of("Authorization", "Basic am9yZGFuOnBhc3N3b3Jk"))
+        .withQueryStringParameters(Map.of("game", "pokemon"))
+        .withPathParameters(Map.of("external_id", externalId))
+        .build();
+  }
+
+  private static APIGatewayV2HTTPEvent catalogEventWithoutId() {
+    return APIGatewayV2HTTPEvent.builder()
+        .withHeaders(Map.of("Authorization", "Basic am9yZGFuOnBhc3N3b3Jk"))
+        .withQueryStringParameters(Map.of("game", "pokemon"))
+        .withPathParameters(Map.of())
+        .build();
   }
 }

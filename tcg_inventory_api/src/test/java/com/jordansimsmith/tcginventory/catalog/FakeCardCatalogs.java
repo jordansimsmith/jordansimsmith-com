@@ -6,36 +6,56 @@ import java.util.List;
 import java.util.Map;
 
 public class FakeCardCatalogs extends Catalogs {
-  private final FakeCardCatalog scryfallCatalog;
+  private final FakeCardCatalog magicCatalog;
+  private final FakeCardCatalog pokemonCatalog;
 
   public FakeCardCatalogs() {
-    this(new FakeCardCatalog());
+    this(new FakeCardCatalog("mtg"), new FakeCardCatalog("pokemon"));
   }
 
-  private FakeCardCatalogs(FakeCardCatalog scryfallCatalog) {
-    super(Map.of("scryfall", scryfallCatalog, "tcgplayer", new TcgPlayerCatalog()));
-    this.scryfallCatalog = scryfallCatalog;
+  private FakeCardCatalogs(FakeCardCatalog magicCatalog, FakeCardCatalog pokemonCatalog) {
+    super(Map.of("mtg", magicCatalog, "pokemon", pokemonCatalog));
+    this.magicCatalog = magicCatalog;
+    this.pokemonCatalog = pokemonCatalog;
   }
 
   public void addCard(CatalogCard card) {
-    scryfallCatalog.addCard(card);
+    catalog(card.game()).addCard(card);
   }
 
   public List<List<String>> lookupRequests() {
-    return scryfallCatalog.lookupRequests();
+    return magicCatalog.lookupRequests();
   }
 
   public void setFailure(CatalogException failure) {
-    scryfallCatalog.setFailure(failure);
+    setFailure("mtg", failure);
+  }
+
+  public void setFailure(String game, CatalogException failure) {
+    catalog(game).setFailure(failure);
+  }
+
+  private FakeCardCatalog catalog(String game) {
+    return "pokemon".equals(game) ? pokemonCatalog : magicCatalog;
   }
 
   private static class FakeCardCatalog implements CardCatalog {
+    private final String game;
     private final Map<String, CatalogCard> cardsById = new LinkedHashMap<>();
     private final List<List<String>> lookupRequests = new ArrayList<>();
     private CatalogException failure;
 
+    private FakeCardCatalog(String game) {
+      this.game = game;
+    }
+
     @Override
     public CatalogCard.ImageUrls getImageUrls(String externalId) {
+      if ("pokemon".equals(game)) {
+        return new CatalogCard.ImageUrls(
+            "https://tcgplayer-cdn.tcgplayer.com/product/" + externalId + "_200w.jpg",
+            "https://tcgplayer-cdn.tcgplayer.com/product/" + externalId + "_in_1000x1000.jpg");
+      }
       return new CatalogCard.ImageUrls(
           "https://img.example/cards/" + externalId + "/small.jpg",
           "https://img.example/cards/" + externalId + "/normal.jpg");
@@ -43,7 +63,14 @@ public class FakeCardCatalogs extends Catalogs {
 
     @Override
     public CatalogCard getCard(String externalId) {
-      throw new UnsupportedOperationException();
+      if (failure != null) {
+        throw failure;
+      }
+      var card = cardsById.get(externalId);
+      if (card == null) {
+        throw new CatalogException.NotFound("card not found");
+      }
+      return card;
     }
 
     @Override
@@ -72,15 +99,15 @@ public class FakeCardCatalogs extends Catalogs {
       throw new UnsupportedOperationException();
     }
 
-    void addCard(CatalogCard card) {
+    private void addCard(CatalogCard card) {
       cardsById.put(card.externalId(), card);
     }
 
-    List<List<String>> lookupRequests() {
+    private List<List<String>> lookupRequests() {
       return lookupRequests.stream().map(List::copyOf).toList();
     }
 
-    void setFailure(CatalogException failure) {
+    private void setFailure(CatalogException failure) {
       this.failure = failure;
     }
   }
