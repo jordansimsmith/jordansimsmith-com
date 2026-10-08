@@ -382,6 +382,59 @@ describe('ScanReview', () => {
     );
   });
 
+  it('preserves the confirmed selection and loaded printings when a continuation is invalid', async () => {
+    // arrange
+    const user = userEvent.setup();
+    mockSuggestionLookup(
+      firstCard,
+      [firstCard, secondCard],
+      'invalid-continuation',
+    );
+    const findAlternatives = vi.spyOn(apiClient, 'findCatalogAlternatives');
+    findAlternatives.mockResolvedValueOnce({
+      cards: [firstCard, secondCard],
+      next_continuation: 'invalid-continuation',
+    });
+    findAlternatives.mockRejectedValueOnce(
+      new Error('continuation is invalid'),
+    );
+    const { onConfirmScan } = renderReview(scan([row()]));
+    await screen.findByRole('button', { name: /M11.*#149/ });
+    await user.click(screen.getByRole('button', { name: 'Confirm match' }));
+
+    // act
+    await user.click(
+      screen.getByRole('button', { name: 'Load more printings' }),
+    );
+
+    // assert
+    expect(await screen.findByText('continuation is invalid')).toBeDefined();
+    expect(
+      within(screen.getByLabelText('Printings')).getAllByRole('button', {
+        name: /#(117|149)/,
+      }),
+    ).toHaveLength(2);
+    expect(screen.getByText('1 of 1 confirmed')).toBeDefined();
+    expect(findAlternatives).toHaveBeenLastCalledWith({
+      game: 'mtg',
+      external_id: firstCard.external_id,
+      finish: 'normal',
+      continuation: 'invalid-continuation',
+    });
+    await user.click(screen.getByRole('button', { name: 'Confirm scan' }));
+    await waitFor(() => expect(onConfirmScan).toHaveBeenCalledTimes(1));
+    expect(onConfirmScan).toHaveBeenCalledWith([
+      {
+        scan_position: 1,
+        external_id: firstCard.external_id,
+        name: firstCard.name,
+        set_code: firstCard.set_code,
+        set_name: firstCard.set_name,
+        collector_number: firstCard.collector_number,
+      },
+    ]);
+  });
+
   it('keeps a valid product selectable after related-printing lookup fails', async () => {
     const user = userEvent.setup();
     vi.spyOn(apiClient, 'getCatalogCard').mockResolvedValue(firstCard);

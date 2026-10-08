@@ -7,12 +7,15 @@ import com.jordansimsmith.tcginventory.games.Games;
 import com.jordansimsmith.tcginventory.games.Games.Game;
 import com.jordansimsmith.time.FakeClock;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 
 public class TcgPlayerCatalogTest {
@@ -111,18 +114,239 @@ public class TcgPlayerCatalogTest {
   }
 
   @Test
-  void searchAndAlternativesShouldRemainUnavailable() {
+  void searchShouldMatchLiteralNamesAndMapProductMetadata() {
+    // arrange
+    var fixture =
+        new Fixture(
+            "pokemon",
+            snapshotWithProducts(
+                "pokemon",
+                "snapshot-1",
+                List.of(
+                    new TcgCsvCatalogSnapshot.Product(1, "Pikachu", 10, "25", List.of("normal")),
+                    new TcgCsvCatalogSnapshot.Product(
+                        2, "Pikachu (Master Ball)", 20, "025/165", List.of("holofoil")),
+                    new TcgCsvCatalogSnapshot.Product(3, "Flabébé", 10, "blue", List.of("normal")),
+                    new TcgCsvCatalogSnapshot.Product(
+                        4, "Pikachu  ex", 10, "26", List.of("normal")))));
+    var catalog = fixture.catalog();
+
+    // act
+    var ordinary = catalog.search("  PIKACHU  ", "normal", null);
+    var treatment = catalog.search("pikachu (master ball)", "holofoil", null);
+
+    // assert
+    assertThat(ordinary.cards()).extracting(CatalogCard::externalId).containsExactly("1", "4");
+    assertThat(treatment.cards())
+        .extracting(CatalogCard::name)
+        .containsExactly("Pikachu (Master Ball)");
+    assertThat(catalog.search("Pikachu", "holofoil", null).cards()).hasSize(1);
+    assertThat(catalog.search("Flabebe", "normal", null).cards()).isEmpty();
+    assertThat(catalog.search("FLABÉBÉ", "normal", null).cards()).hasSize(1);
+    assertThat(catalog.search("Pikachu ex", "normal", null).cards()).isEmpty();
+    assertThat(catalog.search("Pikachu  ex", "normal", null).cards()).hasSize(1);
+    assertThat(catalog.search("Pikachu.*", "normal", null).cards()).isEmpty();
+    assertThat(catalog.search("sv2", "holofoil", null).cards()).isEmpty();
+    assertThat(catalog.search("025/165", "holofoil", null).cards()).isEmpty();
+    assertThat(fixture.repository.latestSnapshotRequests).isEqualTo(1);
+  }
+
+  @Test
+  void searchShouldRejectQueriesOutsideTrimmedLengthLimitsWithoutLoading() {
+    // arrange
+    var fixture = new Fixture("pokemon", null);
+    var catalog = fixture.catalog();
+
+    // act / assert
+    for (var query : List.of("", "  ", " a ", "a".repeat(201))) {
+      assertThatThrownBy(() -> catalog.search(query, "normal", null))
+          .isInstanceOf(CatalogException.BadRequest.class)
+          .hasMessage("query must contain between 2 and 200 characters");
+    }
+    assertThat(fixture.repository.latestSnapshotRequests).isZero();
+  }
+
+  @Test
+  void searchAndAlternativesShouldFilterEverySupportedFinish() {
+    // arrange
+    var products =
+        List.of(
+            new TcgCsvCatalogSnapshot.Product(1, "Pikachu", 10, "1", List.of("normal")),
+            new TcgCsvCatalogSnapshot.Product(2, "Pikachu", 10, "2", List.of("holofoil")),
+            new TcgCsvCatalogSnapshot.Product(3, "Pikachu", 10, "3", List.of("reverse_holofoil")));
+    var catalog =
+        new Fixture("pokemon", snapshotWithProducts("pokemon", "snapshot-1", products)).catalog();
+
+    // act / assert
+    for (var product : products) {
+      var finish = product.availableFinishes().getFirst();
+      var expectedId = Integer.toString(product.productId());
+      assertThat(catalog.search("Pikachu", finish, null).cards())
+          .extracting(CatalogCard::externalId)
+          .containsExactly(expectedId);
+      assertThat(catalog.findAlternatives("1", finish, null).cards())
+          .extracting(CatalogCard::externalId)
+          .containsExactly(expectedId);
+    }
+    assertThat(catalog.getCard("1").availableFinishes()).containsExactly("normal");
+  }
+
+  @Test
+  void alternativesShouldUseExactFullNamesAndPlaceEligibleAnchorFirst() {
+    // arrange
+    var catalog =
+        new Fixture(
+                "pokemon",
+                snapshotWithProducts(
+                    "pokemon",
+                    "snapshot-1",
+                    List.of(
+                        new TcgCsvCatalogSnapshot.Product(1, "Pikachu", 10, "1", List.of("normal")),
+                        new TcgCsvCatalogSnapshot.Product(2, "Pikachu", 20, "2", List.of("normal")),
+                        new TcgCsvCatalogSnapshot.Product(
+                            3, "Pikachu (Master Ball)", 10, "3", List.of("normal")),
+                        new TcgCsvCatalogSnapshot.Product(4, "pikachu", 10, "4", List.of("normal")),
+                        new TcgCsvCatalogSnapshot.Product(
+                            5, "Pikachu ", 10, "5", List.of("normal")))))
+            .catalog();
+
+    // act
+    var ordinary = catalog.findAlternatives("2", "normal", null);
+    var treatment = catalog.findAlternatives("3", "normal", null);
+
+    // assert
+    assertThat(ordinary.cards()).extracting(CatalogCard::externalId).containsExactly("2", "1");
+    assertThat(ordinary.cards()).extracting(CatalogCard::setCode).containsExactly("sv2", "sv1");
+    assertThat(treatment.cards()).extracting(CatalogCard::externalId).containsExactly("3");
+    assertThatThrownBy(() -> catalog.findAlternatives("opaque-missing-id", "normal", null))
+        .isInstanceOf(CatalogException.NotFound.class);
+    assertThat(ordinary.nextContinuation()).isNull();
+  }
+
+  @Test
+  void searchAndAlternativesShouldReturnEmptyPagesWhenNoFinishMatches() {
     // arrange
     var catalog =
         new Fixture("pokemon", snapshot("pokemon", "snapshot-1", "Pikachu", 123)).catalog();
 
+    // act
+    var search = catalog.search("Missing", "normal", null);
+    var alternatives = catalog.findAlternatives("123", "reverse_holofoil", null);
+
+    // assert
+    assertThat(search.cards()).isEmpty();
+    assertThat(search.nextContinuation()).isNull();
+    assertThat(alternatives.cards()).isEmpty();
+    assertThat(alternatives.nextContinuation()).isNull();
+  }
+
+  @Test
+  void searchShouldPageInNumericProductOrderWithoutRepeats() {
+    // arrange
+    var products =
+        IntStream.rangeClosed(1, 41)
+            .mapToObj(
+                id ->
+                    new TcgCsvCatalogSnapshot.Product(
+                        id, "Pikachu", 10, Integer.toString(id), List.of("normal")))
+            .toList();
+    var catalog =
+        new Fixture("pokemon", snapshotWithProducts("pokemon", "snapshot-1", products)).catalog();
+
+    // act
+    var first = catalog.search("Pikachu", "normal", null);
+    var second = catalog.search(" PIKACHU ", "normal", first.nextContinuation());
+    var third = catalog.search("Pikachu", "normal", second.nextContinuation());
+
+    // assert
+    assertThat(first.cards())
+        .extracting(CatalogCard::externalId)
+        .containsExactlyElementsOf(
+            IntStream.rangeClosed(1, 20).mapToObj(Integer::toString).toList());
+    assertThat(second.cards())
+        .extracting(CatalogCard::externalId)
+        .containsExactlyElementsOf(
+            IntStream.rangeClosed(21, 40).mapToObj(Integer::toString).toList());
+    assertThat(third.cards()).extracting(CatalogCard::externalId).containsExactly("41");
+    assertThat(third.nextContinuation()).isNull();
+  }
+
+  @Test
+  void alternativesShouldIncludeAnchorOnceAcrossPages() {
+    // arrange
+    var products =
+        IntStream.rangeClosed(1, 41)
+            .mapToObj(
+                id ->
+                    new TcgCsvCatalogSnapshot.Product(
+                        id, "Pikachu", 10, Integer.toString(id), List.of("normal")))
+            .toList();
+    var catalog =
+        new Fixture("pokemon", snapshotWithProducts("pokemon", "snapshot-1", products)).catalog();
+
+    // act
+    var first = catalog.findAlternatives("41", "normal", null);
+    var second = catalog.findAlternatives("41", "normal", first.nextContinuation());
+    var third = catalog.findAlternatives("41", "normal", second.nextContinuation());
+
+    // assert
+    assertThat(first.cards())
+        .extracting(CatalogCard::externalId)
+        .containsExactlyElementsOf(
+            IntStream.concat(IntStream.of(41), IntStream.rangeClosed(1, 19))
+                .mapToObj(Integer::toString)
+                .toList());
+    assertThat(second.cards())
+        .extracting(CatalogCard::externalId)
+        .containsExactlyElementsOf(
+            IntStream.rangeClosed(20, 39).mapToObj(Integer::toString).toList());
+    assertThat(third.cards()).extracting(CatalogCard::externalId).containsExactly("40");
+    assertThat(third.nextContinuation()).isNull();
+  }
+
+  @Test
+  void searchShouldOmitContinuationWhenExactlyTwentyProductsMatch() {
+    // arrange
+    var products =
+        IntStream.rangeClosed(1, 20)
+            .mapToObj(
+                id -> new TcgCsvCatalogSnapshot.Product(id, "Pikachu", 10, "25", List.of("normal")))
+            .toList();
+    var catalog =
+        new Fixture("pokemon", snapshotWithProducts("pokemon", "snapshot-1", products)).catalog();
+
+    // act
+    var page = catalog.search("Pikachu", "normal", null);
+
+    // assert
+    assertThat(page.cards()).hasSize(20);
+    assertThat(page.nextContinuation()).isNull();
+  }
+
+  @Test
+  void continuationsShouldRejectMalformedTokensAndInvalidOffsets() {
+    // arrange
+    var products =
+        IntStream.rangeClosed(1, 21)
+            .mapToObj(
+                id -> new TcgCsvCatalogSnapshot.Product(id, "Pikachu", 10, "25", List.of("normal")))
+            .toList();
+    var catalog =
+        new Fixture("pokemon", snapshotWithProducts("pokemon", "snapshot-1", products)).catalog();
+
     // act / assert
-    assertThatThrownBy(() -> catalog.search("Pikachu", "normal", null))
-        .isInstanceOf(CatalogException.BadRequest.class)
-        .hasMessage("catalog review is unavailable for game: pokemon");
-    assertThatThrownBy(() -> catalog.findAlternatives("123", "normal", null))
-        .isInstanceOf(CatalogException.BadRequest.class)
-        .hasMessage("catalog review is unavailable for game: pokemon");
+    for (var malformed : List.of("", "!", "YWJj")) {
+      assertThatThrownBy(() -> catalog.search("Pikachu", "normal", malformed))
+          .isInstanceOf(CatalogException.BadRequest.class);
+    }
+    for (var offset : List.of("-1", "0", "21", "2147483647", "2147483648", "invalid")) {
+      var invalidToken =
+          Base64.getUrlEncoder()
+              .withoutPadding()
+              .encodeToString(offset.getBytes(StandardCharsets.UTF_8));
+      assertThatThrownBy(() -> catalog.search("Pikachu", "normal", invalidToken))
+          .isInstanceOf(CatalogException.BadRequest.class);
+    }
   }
 
   @Test
@@ -208,6 +432,13 @@ public class TcgPlayerCatalogTest {
     assertThat(pokemonCard.name()).isEqualTo("Pikachu");
     assertThat(otherCard.game()).isEqualTo("other");
     assertThat(otherCard.name()).isEqualTo("Other game card");
+    assertThat(pokemonCatalog.search("Pikachu", "normal", null).cards())
+        .extracting(CatalogCard::name)
+        .containsExactly("Pikachu");
+    assertThat(otherCatalog.search("Pikachu", "normal", null).cards()).isEmpty();
+    assertThat(otherCatalog.findAlternatives("123", "normal", null).cards())
+        .extracting(CatalogCard::name)
+        .containsExactly("Other game card");
     assertThat(pokemonFixture.repository.requestedGames).containsExactly("pokemon");
     assertThat(otherFixture.repository.requestedGames).containsExactly("other");
   }
@@ -244,6 +475,24 @@ public class TcgPlayerCatalogTest {
   private static CatalogSnapshotItem item(String game, String snapshotId) {
     return CatalogSnapshotItem.create(
         game, snapshotId, START, START, "catalogs/%s.json.gz".formatted(snapshotId), "checksum");
+  }
+
+  private static TcgCsvCatalogSnapshot snapshotWithProducts(
+      String game, String snapshotId, List<TcgCsvCatalogSnapshot.Product> products) {
+    return new TcgCsvCatalogSnapshot(
+        1,
+        game,
+        "tcgplayer",
+        "tcgcsv",
+        3,
+        snapshotId,
+        "source marker",
+        1,
+        2,
+        List.of(
+            new TcgCsvCatalogSnapshot.Group(10, "sv1", "Scarlet & Violet"),
+            new TcgCsvCatalogSnapshot.Group(20, "sv2", "Paldea Evolved")),
+        products);
   }
 
   private static class Fixture {

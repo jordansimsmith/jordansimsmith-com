@@ -137,6 +137,8 @@ public class CatalogSnapshotStoreIntegrationTest {
 
     // act
     var card = catalog.getCard("25");
+    var search = catalog.search("Pikachu", "normal", null);
+    var alternatives = catalog.findAlternatives("25", "normal", null);
 
     // assert
     assertThat(card.game()).isEqualTo("pokemon");
@@ -144,6 +146,70 @@ public class CatalogSnapshotStoreIntegrationTest {
     assertThat(card.setCode()).isEqualTo("BASE");
     assertThat(card.collectorNumber()).isEqualTo("58");
     assertThat(card.availableFinishes()).containsExactly("normal");
+    assertThat(search.cards()).containsExactly(card);
+    assertThat(search.nextContinuation()).isNull();
+    assertThat(alternatives.cards()).containsExactly(card);
+    assertThat(alternatives.nextContinuation()).isNull();
+  }
+
+  @Test
+  void catalogListHandlersShouldMapConfiguredPokemonPagesAndErrors() throws Exception {
+    // arrange
+    var page =
+        new CatalogPage(
+            List.of(
+                new CatalogCard(
+                    "pokemon",
+                    "25",
+                    "Pikachu",
+                    "BASE",
+                    "Base Set",
+                    "58",
+                    new CatalogCard.ImageUrls("small.jpg", "normal.jpg"),
+                    List.of("normal"))),
+            "next");
+    var catalogs = factory.fakeCardCatalogs();
+    catalogs.setSearchPage("pokemon", page);
+    catalogs.setAlternativesPage("pokemon", page);
+    var searchHandler = new FindCatalogCardsHandler(factory);
+    var alternativesHandler = new FindCatalogAlternativesHandler(factory);
+    var searchEvent =
+        APIGatewayV2HTTPEvent.builder()
+            .withHeaders(Map.of("Authorization", "Basic am9yZGFuOnBhc3N3b3Jk"))
+            .withQueryStringParameters(
+                Map.of("game", "pokemon", "query", "Pikachu", "finish", "normal"))
+            .build();
+    var alternativesEvent =
+        APIGatewayV2HTTPEvent.builder()
+            .withHeaders(Map.of("Authorization", "Basic am9yZGFuOnBhc3N3b3Jk"))
+            .withQueryStringParameters(Map.of("game", "pokemon", "finish", "normal"))
+            .withPathParameters(Map.of("external_id", "25"))
+            .build();
+
+    // act
+    var searchResponse = searchHandler.handleRequest(searchEvent, null);
+    var alternativesResponse = alternativesHandler.handleRequest(alternativesEvent, null);
+
+    // assert
+    for (var response : List.of(searchResponse, alternativesResponse)) {
+      assertThat(response.getStatusCode()).isEqualTo(200);
+      assertThat(factory.objectMapper().readValue(response.getBody(), CatalogPage.class))
+          .isEqualTo(page);
+    }
+    var failures =
+        Map.of(
+            400, new CatalogException.BadRequest("continuation is invalid"),
+            404, new CatalogException.NotFound("card not found"),
+            503, new CatalogException.Unavailable("storage unavailable"));
+    for (var entry : failures.entrySet()) {
+      var statusCode = entry.getKey();
+      var failure = entry.getValue();
+      catalogs.setFailure("pokemon", failure);
+      assertThat(searchHandler.handleRequest(searchEvent, null).getStatusCode())
+          .isEqualTo(statusCode);
+      assertThat(alternativesHandler.handleRequest(alternativesEvent, null).getStatusCode())
+          .isEqualTo(statusCode);
+    }
   }
 
   @Test

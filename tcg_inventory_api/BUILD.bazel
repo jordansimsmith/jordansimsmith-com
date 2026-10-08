@@ -1246,6 +1246,8 @@ java_test_suite(
         ":delete-scan-handler",
         ":delete-scan-row-handler",
         ":fetchtcg-lib",
+        ":find-catalog-alternatives-handler",
+        ":find-catalog-cards-handler",
         ":find-imports-handler",
         ":find-orders-handler",
         ":find-scans-handler",

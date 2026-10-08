@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class FakeCardCatalogs extends Catalogs {
   private final FakeCardCatalog magicCatalog;
@@ -35,6 +36,14 @@ public class FakeCardCatalogs extends Catalogs {
     catalog(game).setFailure(failure);
   }
 
+  public void setSearchPage(String game, CatalogPage page) {
+    catalog(game).searchPage = page;
+  }
+
+  public void setAlternativesPage(String game, CatalogPage page) {
+    catalog(game).alternativesPage = page;
+  }
+
   private FakeCardCatalog catalog(String game) {
     return "pokemon".equals(game) ? pokemonCatalog : magicCatalog;
   }
@@ -44,6 +53,8 @@ public class FakeCardCatalogs extends Catalogs {
     private final Map<String, CatalogCard> cardsById = new LinkedHashMap<>();
     private final List<List<String>> lookupRequests = new ArrayList<>();
     private CatalogException failure;
+    private CatalogPage searchPage;
+    private CatalogPage alternativesPage;
 
     private FakeCardCatalog(String game) {
       this.game = game;
@@ -91,12 +102,18 @@ public class FakeCardCatalogs extends Catalogs {
 
     @Override
     public CatalogPage findAlternatives(String externalId, String finish, String continuation) {
-      throw new UnsupportedOperationException();
+      if (failure != null) {
+        throw failure;
+      }
+      return Objects.requireNonNull(alternativesPage);
     }
 
     @Override
     public CatalogPage search(String query, String finish, String continuation) {
-      throw new UnsupportedOperationException();
+      if (failure != null) {
+        throw failure;
+      }
+      return Objects.requireNonNull(searchPage);
     }
 
     private void addCard(CatalogCard card) {
