@@ -36,7 +36,8 @@ public class ScryfallCatalogTest {
   public interface HandlerTestFactory extends CatalogFactory {
     @Component.Factory
     interface Factory {
-      HandlerTestFactory create(@BindsInstance Catalogs catalogs);
+      HandlerTestFactory create(
+          @BindsInstance Catalogs catalogs, @BindsInstance TcgCsvClient tcgCsvClient);
     }
   }
 
@@ -79,7 +80,8 @@ public class ScryfallCatalogTest {
   }
 
   private CatalogFactory createFactory(Catalogs catalogs) {
-    return DaggerScryfallCatalogTest_HandlerTestFactory.factory().create(catalogs);
+    return DaggerScryfallCatalogTest_HandlerTestFactory.factory()
+        .create(catalogs, new FakeTcgCsvClient());
   }
 
   @Test

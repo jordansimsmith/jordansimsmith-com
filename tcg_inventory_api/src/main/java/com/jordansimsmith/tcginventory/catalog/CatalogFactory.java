@@ -10,6 +10,8 @@ import javax.inject.Singleton;
 public interface CatalogFactory extends TcgInventoryFactory {
   Catalogs catalogs();
 
+  TcgCsvClient tcgCsvClient();
+
   static CatalogFactory create() {
     return DaggerCatalogFactory.create();
   }

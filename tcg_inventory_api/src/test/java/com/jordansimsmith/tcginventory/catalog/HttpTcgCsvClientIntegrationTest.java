@@ -27,6 +27,7 @@ public class HttpTcgCsvClientIntegrationTest {
   private AtomicInteger pacedRequests;
   private volatile int nextStatus;
   private volatile String nextBody;
+  private volatile List<Integer> statuses;
 
   @BeforeEach
   void setUp() throws IOException {
@@ -43,6 +44,7 @@ public class HttpTcgCsvClientIntegrationTest {
             pacedRequests::incrementAndGet);
     nextStatus = 200;
     nextBody = null;
+    statuses = List.of();
   }
 
   @AfterEach
@@ -127,6 +129,20 @@ public class HttpTcgCsvClientIntegrationTest {
     assertThatThrownBy(() -> client.findGroups(3))
         .isInstanceOf(IOException.class)
         .hasMessageContaining("status code 429");
+    assertThat(pacedRequests).hasValue(1);
+    assertThat(paths).hasSize(1);
+
+    // arrange
+    nextStatus = 404;
+    paths.clear();
+    pacedRequests.set(0);
+
+    // act / assert
+    assertThatThrownBy(() -> client.findGroups(3))
+        .isInstanceOf(IOException.class)
+        .hasMessageContaining("status code 404");
+    assertThat(pacedRequests).hasValue(1);
+    assertThat(paths).hasSize(1);
 
     // arrange
     nextStatus = 200;
@@ -154,17 +170,51 @@ public class HttpTcgCsvClientIntegrationTest {
 
     // arrange
     nextBody = "{not-json";
+    paths.clear();
+    pacedRequests.set(0);
 
     // act / assert
     assertThatThrownBy(() -> client.findGroups(3)).isInstanceOf(IOException.class);
+    assertThat(pacedRequests).hasValue(1);
+  }
+
+  @Test
+  void requestShouldRetryServerErrorsAndPaceEveryAttempt() throws Exception {
+    // arrange
+    nextBody = collection("groupId", 3, "categoryId", 3, "name", "Silver Tempest");
+    statuses = List.of(503, 500, 200);
+
+    // act
+    var groups = client.findGroups(3);
+
+    // assert
+    assertThat(groups).singleElement().extracting(TcgCsvClient.Group::groupId).isEqualTo(3);
+    assertThat(paths).hasSize(3);
+    assertThat(pacedRequests).hasValue(3);
+  }
+
+  @Test
+  void requestShouldFailAfterFourServerErrors() {
+    // arrange
+    statuses = List.of(500, 502, 503, 500);
+
+    // act / assert
+    assertThatThrownBy(() -> client.findGroups(3))
+        .isInstanceOf(IOException.class)
+        .hasMessageContaining("after 4 attempt(s)")
+        .hasMessageContaining("/tcgplayer/3/groups");
+    assertThat(paths).hasSize(4);
+    assertThat(pacedRequests).hasValue(4);
   }
 
   private void handleRequest(HttpExchange exchange) throws IOException {
     paths.add(exchange.getRequestURI().getPath());
     userAgents.add(exchange.getRequestHeaders().getFirst("User-Agent"));
+    var attempt = paths.size() - 1;
     var body = nextBody == null ? "{}" : nextBody;
     var bytes = body.getBytes(StandardCharsets.UTF_8);
-    exchange.sendResponseHeaders(nextStatus, bytes.length);
+    var status = attempt < statuses.size() ? statuses.get(attempt) : nextStatus;
+    exchange.sendResponseHeaders(status, bytes.length);
     try (var output = exchange.getResponseBody()) {
       output.write(bytes);
     }

@@ -7,6 +7,8 @@ import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.tcginventory.catalog.CatalogSnapshotItem;
 import com.jordansimsmith.tcginventory.catalog.Catalogs;
 import com.jordansimsmith.tcginventory.catalog.FakeCardCatalogs;
+import com.jordansimsmith.tcginventory.catalog.FakeTcgCsvClient;
+import com.jordansimsmith.tcginventory.catalog.TcgCsvClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgTokenMinter;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
@@ -200,5 +202,17 @@ public class TcgInventoryTestModule {
   @Singleton
   Catalogs catalogs(FakeCardCatalogs fakeCardCatalogs) {
     return fakeCardCatalogs;
+  }
+
+  @Provides
+  @Singleton
+  FakeTcgCsvClient fakeTcgCsvClient() {
+    return new FakeTcgCsvClient();
+  }
+
+  @Provides
+  @Singleton
+  TcgCsvClient tcgCsvClient(FakeTcgCsvClient fakeTcgCsvClient) {
+    return fakeTcgCsvClient;
   }
 }

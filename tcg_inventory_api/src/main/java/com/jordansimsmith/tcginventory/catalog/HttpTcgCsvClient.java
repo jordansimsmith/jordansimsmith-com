@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.regex.Pattern;
 
 public class HttpTcgCsvClient implements TcgCsvClient {
+  private static final int MAX_RETRIES = 3;
   private static final String USER_AGENT =
       "TcgInventory/1.0 (https://tcg-inventory.jordansimsmith.com)";
   private static final Pattern COMPACT_OFFSET = Pattern.compile("([+-]\\d{2})(\\d{2})$");
@@ -90,8 +91,6 @@ public class HttpTcgCsvClient implements TcgCsvClient {
   }
 
   private synchronized String getText(String path) throws IOException, InterruptedException {
-    pacer.run();
-
     var request =
         HttpRequest.newBuilder(baseUri.resolve(path))
             .timeout(Duration.ofSeconds(10))
@@ -99,10 +98,34 @@ public class HttpTcgCsvClient implements TcgCsvClient {
             .header("User-Agent", USER_AGENT)
             .GET()
             .build();
-    var response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-    if (response.statusCode() != 200) {
-      throw new IOException("TCGCSV request failed with status code " + response.statusCode());
+
+    for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      pacer.run();
+      HttpResponse<String> response;
+      try {
+        response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+      } catch (IOException e) {
+        if (attempt == MAX_RETRIES) {
+          throw new IOException(
+              "TCGCSV request failed after " + (attempt + 1) + " attempts: " + path, e);
+        }
+        continue;
+      }
+
+      if (response.statusCode() == 200) {
+        return response.body();
+      }
+      if (response.statusCode() < 500 || attempt == MAX_RETRIES) {
+        throw new IOException(
+            "TCGCSV request failed with status code "
+                + response.statusCode()
+                + " after "
+                + (attempt + 1)
+                + " attempt(s): "
+                + path);
+      }
     }
-    return response.body();
+
+    throw new IllegalStateException("TCGCSV request retry loop ended unexpectedly: " + path);
   }
 }

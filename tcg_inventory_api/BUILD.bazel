@@ -117,12 +117,14 @@ java_library(
         ":games-lib",
         ":lib",
         "//lib/dynamodb:lib",
+        "//lib/time:lib",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_annotations",
         "@maven//:com_fasterxml_jackson_core_jackson_core",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
         "@maven//:software_amazon_awssdk_s3",
@@ -269,6 +271,27 @@ java_binary(
         "@maven//:com_fasterxml_jackson_core_jackson_annotations",
         "@maven//:com_google_guava_guava",
         "@maven//:org_slf4j_slf4j_api",
+    ],
+)
+
+java_binary(
+    name = "catalog-jobs-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/catalog/CatalogJobsHandler.java"],
+    create_executable = False,
+    resources = ["src/main/resources/logback.xml"],
+    deps = [
+        ":catalog-lib",
+        ":lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_s3",
     ],
 )
 
@@ -1158,6 +1181,7 @@ java_test_suite(
     test_suffixes = ["Test.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":catalog-jobs-handler",
         ":catalog-lib",
         ":fetchtcg-lib",
         ":find-catalog-alternatives-handler",
@@ -1205,6 +1229,7 @@ java_test_suite(
     test_suffixes = ["IntegrationTest.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        ":catalog-jobs-handler",
         ":catalog-lib",
         ":confirm-import-handler",
         ":confirm-order-handler",
