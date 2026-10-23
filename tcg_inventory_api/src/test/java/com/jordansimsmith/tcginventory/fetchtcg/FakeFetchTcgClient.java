@@ -15,6 +15,7 @@ public class FakeFetchTcgClient implements FetchTcgClient {
   private final List<UploadCall> uploadCalls = new ArrayList<>();
   private RuntimeException sellerOffersFailure;
   private RuntimeException searchCardsFailure;
+  private String profileUsername = "jordan";
   private int searchCallCount;
   private int nextListingId = 900000;
   private int nextImageId = 1;
@@ -49,6 +50,11 @@ public class FakeFetchTcgClient implements FetchTcgClient {
       return new GetCardListingsResponse(List.of());
     }
     return response;
+  }
+
+  @Override
+  public GetProfileResponse getProfile(String bearerToken) {
+    return new GetProfileResponse(profileUsername);
   }
 
   @Override
@@ -91,6 +97,10 @@ public class FakeFetchTcgClient implements FetchTcgClient {
 
   public void seedListings(String cardId, GetCardListingsResponse response) {
     listings.put(cardId, response);
+  }
+
+  public void seedProfile(String username) {
+    profileUsername = username;
   }
 
   public void seedSellerOffers(List<SellerOffer> offers) {
@@ -136,6 +146,7 @@ public class FakeFetchTcgClient implements FetchTcgClient {
     sellerOffersFailure = null;
     searchCardsFailure = null;
     searchCallCount = 0;
+    profileUsername = "jordan";
     nextListingId = 900000;
     nextImageId = 1;
   }

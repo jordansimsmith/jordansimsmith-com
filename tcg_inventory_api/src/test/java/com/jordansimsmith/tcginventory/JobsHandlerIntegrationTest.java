@@ -142,6 +142,80 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
+  void appraiseShouldExcludeTheFetchTcgUsersOwnListingFromCompetitorPrices() {
+    createImportWithRow("jordan", "import1", "dom", "168", "normal", "NM", "en");
+    var jobItem = createJob("jordan", "job1", "appraise", "queued", "import1");
+    pricingRepository.update(PricingItem.create("jordan", "0.00"));
+    seedDefaultCardForDom168();
+    fakeFetchTcgClient.seedCard(
+        "mtg_168_c_dom_normal",
+        new FetchTcgClient.GetCardResponse(
+            "mtg_168_c_dom_normal",
+            "Card 1",
+            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.00"))),
+            Map.of("scryfallId", SCRYFALL_ID)));
+    fakeFetchTcgClient.seedListings(
+        "mtg_168_c_dom_normal",
+        new FetchTcgClient.GetCardListingsResponse(
+            List.of(
+                new FetchTcgClient.CardListing(1, "raw-nm", new BigDecimal("0.40"), "jordan"),
+                new FetchTcgClient.CardListing(2, "raw-nm", new BigDecimal("0.95"), "rival1"))));
+
+    new AppraiseJobProcessor(factory).processBatch("jordan", jobItem);
+
+    assertThat(getRow("jordan", "import1", 1).getSuggestedPrice()).isEqualTo("0.90");
+  }
+
+  @Test
+  void appraiseShouldResolveSellerIdentityIndependentlyForEachUser() {
+    createImportWithRow("jordan", "import1", "dom", "168", "normal", "NM", "en");
+    var jordanJob = createJob("jordan", "jordan-job", "appraise", "queued", "import1");
+    createImportWithRow("other-user", "import2", "dom", "168", "normal", "NM", "en");
+    var otherUserJob = createJob("other-user", "other-user-job", "appraise", "queued", "import2");
+    fakeFetchTcgClient.seedSearchResult(
+        "mtg",
+        2624,
+        "Card 1",
+        "normal",
+        new FetchTcgClient.SearchCardsResponse(
+            List.of(new FetchTcgClient.SearchCard("mtg_168_c_dom_normal"))));
+    fakeFetchTcgClient.seedCard(
+        "mtg_168_c_dom_normal",
+        new FetchTcgClient.GetCardResponse(
+            "mtg_168_c_dom_normal",
+            "Card 1",
+            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.00"))),
+            Map.of("scryfallId", SCRYFALL_ID)));
+    fakeFetchTcgClient.seedListings(
+        "mtg_168_c_dom_normal",
+        new FetchTcgClient.GetCardListingsResponse(
+            List.of(
+                new FetchTcgClient.CardListing(1, "raw-nm", new BigDecimal("0.40"), "jordan"),
+                new FetchTcgClient.CardListing(
+                    2, "raw-nm", new BigDecimal("0.95"), "other-user"))));
+
+    fakeFetchTcgClient.seedProfile("jordan");
+    new AppraiseJobProcessor(factory).processBatch("jordan", jordanJob);
+    fakeFetchTcgClient.seedProfile("other-user");
+    new AppraiseJobProcessor(factory).processBatch("other-user", otherUserJob);
+
+    assertThat(getRow("jordan", "import1", 1).getSuggestedPrice()).isEqualTo("0.90");
+    assertThat(getRow("other-user", "import2", 1).getSuggestedPrice()).isEqualTo("1.00");
+  }
+
+  @Test
+  void appraiseShouldFailWhenFetchTcgProfileHasNoUsername() {
+    createImportWithRow("jordan", "import1", "dom", "168", "normal", "NM", "en");
+    var jobItem = createJob("jordan", "job1", "appraise", "queued", "import1");
+    fakeFetchTcgClient.seedProfile(" ");
+
+    assertThatThrownBy(() -> new AppraiseJobProcessor(factory).processBatch("jordan", jobItem))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("FetchTCG profile did not include a username");
+    assertThat(getRow("jordan", "import1", 1).getDecision()).isNull();
+  }
+
+  @Test
   void appraiseShouldUseDefaultFloorWhenStoredPricingItemHasNoFloor() {
     // arrange
     createImportWithRow("jordan", "import1", "dom", "168", "normal", "NM", "en");
@@ -198,9 +272,9 @@ public class JobsHandlerIntegrationTest {
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
 
     // assert
-    var firstSliceRow = getRow("jordan", "import1", AppraiseJobProcessor.BATCH_SIZE);
-    assertThat(firstSliceRow.getDecision()).isEqualTo("keep");
-    assertThat(firstSliceRow.getSuggestedPrice()).isEqualTo("2.00");
+    var firstBatchRow = getRow("jordan", "import1", AppraiseJobProcessor.BATCH_SIZE);
+    assertThat(firstBatchRow.getDecision()).isEqualTo("keep");
+    assertThat(firstBatchRow.getSuggestedPrice()).isEqualTo("2.00");
     assertThat(getRow("jordan", "import1", AppraiseJobProcessor.BATCH_SIZE + 1).getDecision())
         .isNull();
     var unchangedRow = getRow("jordan", "import1", 1);

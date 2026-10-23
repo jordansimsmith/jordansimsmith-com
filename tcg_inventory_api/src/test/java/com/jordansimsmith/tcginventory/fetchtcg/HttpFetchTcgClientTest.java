@@ -453,6 +453,44 @@ public class HttpFetchTcgClientTest {
   }
 
   @Test
+  void getProfileShouldReadOnlyUsernameAndSendBearerToken()
+      throws IOException, InterruptedException {
+    // arrange
+    var response =
+        createMockResponse(
+            200,
+            """
+            {"username":"seller-name","unrecognizedField":"ignored"}
+            """);
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response);
+
+    // act
+    var result = client.getProfile("profile-token");
+
+    // assert
+    assertThat(result.username()).isEqualTo("seller-name");
+    var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+    verify(httpClient).send(requestCaptor.capture(), eq(HttpResponse.BodyHandlers.ofString()));
+    assertThat(requestCaptor.getValue().uri())
+        .isEqualTo(URI.create("https://api.fetchtcg.com/v1/private/profile"));
+    assertThat(requestCaptor.getValue().headers().firstValue("Authorization"))
+        .contains("Bearer profile-token");
+  }
+
+  @Test
+  void getProfileShouldSurfaceAuthenticationFailures() throws IOException, InterruptedException {
+    var response = createMockResponse(401, "Unauthorized");
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response);
+
+    assertThatThrownBy(() -> client.getProfile("bad-token"))
+        .isInstanceOf(FetchTcgAuthException.class)
+        .hasMessageContaining("401");
+    assertThat(pacerCallCount.get()).isEqualTo(1);
+  }
+
+  @Test
   void upsertListingShouldPostWithCorrectBody() throws IOException, InterruptedException {
     // arrange
     var response = createMockResponse(200, "{\"listingId\": 992552, \"remainingQuantity\": 2}");

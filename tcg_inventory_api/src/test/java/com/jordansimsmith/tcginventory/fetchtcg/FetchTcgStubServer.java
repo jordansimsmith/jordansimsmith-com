@@ -48,6 +48,8 @@ public final class FetchTcgStubServer {
       {"content":[],"totalPages":1}\
       """;
 
+  private static final String PROFILE_RESPONSE = "{\"username\":\"jordan\"}";
+
   private static final String SELLER_OFFERS_WITH_ORDER =
       """
       {"content":[{"id":99001,"status":"ACCEPTED","currentAction":"SEND_TRACKING_CODE",\
@@ -68,6 +70,15 @@ public final class FetchTcgStubServer {
     server.createContext(
         "/health", exchange -> respond(exchange, 200, "text/plain; charset=utf-8", "ok"));
     server.createContext("/v3/cards", exchange -> handleCards(exchange));
+    server.createContext(
+        "/v1/private/profile",
+        exchange -> {
+          if (exchange.getRequestHeaders().getFirst("Authorization") == null) {
+            respond(exchange, 401, "application/json", "{}");
+          } else {
+            respond(exchange, 200, "application/json", PROFILE_RESPONSE);
+          }
+        });
     server.createContext(
         "/v2/private/market/offers/seller",
         exchange -> {

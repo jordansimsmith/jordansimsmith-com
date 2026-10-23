@@ -14,6 +14,8 @@ public interface FetchTcgClient {
 
   GetCardListingsResponse getCardListings(String cardId);
 
+  GetProfileResponse getProfile(String bearerToken);
+
   GetSellerOffersResponse getSellerOffers(String bearerToken, int page);
 
   UpsertListingResponse upsertListing(String bearerToken, UpsertListingRequest request);
@@ -38,6 +40,9 @@ public interface FetchTcgClient {
   record SearchCard(@JsonProperty("id") String id) {}
 
   record GetCardListingsResponse(List<CardListing> content) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  record GetProfileResponse(@JsonProperty("username") String username) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   record CardListing(

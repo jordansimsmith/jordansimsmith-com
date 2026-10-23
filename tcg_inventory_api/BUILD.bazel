@@ -238,7 +238,10 @@ java_library(
         ["src/main/java/com/jordansimsmith/tcginventory/pricing/*.java"],
         exclude = ["src/main/java/com/jordansimsmith/tcginventory/pricing/*Handler.java"],
     ),
-    deps = [":lib"] + COMMON_DEPS,
+    deps = [
+        ":fetchtcg-lib",
+        ":lib",
+    ] + COMMON_DEPS,
 )
 
 java_binary(

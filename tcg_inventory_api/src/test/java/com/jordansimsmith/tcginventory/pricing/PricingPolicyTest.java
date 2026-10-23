@@ -64,10 +64,11 @@ public class PricingPolicyTest {
   @Test
   void appraiseShouldUndercutLowestSaneRival() {
     // arrange
-    var rivals = List.of(new PricingPolicy.RivalTier(new BigDecimal("5.00"), Set.of("alpha")));
+    var competitors =
+        List.of(new CompetitorPricing.CompetitorPriceTier(new BigDecimal("5.00"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("5.00"), rivals, Pricing.DEFAULT_PRICE_FLOOR);
+    var result = policy.appraise(new BigDecimal("5.00"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
@@ -80,10 +81,11 @@ public class PricingPolicyTest {
   void appraiseShouldNotUndercutDeepDiscountRivalWithoutSupport() {
     // arrange
     // rival at 0.40, market 1.00: 0.40 < 80% * 1.00 = 0.80 -> deep discount
-    var rivals = List.of(new PricingPolicy.RivalTier(new BigDecimal("0.40"), Set.of("alpha")));
+    var competitors =
+        List.of(new CompetitorPricing.CompetitorPriceTier(new BigDecimal("0.40"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("1.00"), rivals, Pricing.DEFAULT_PRICE_FLOOR);
+    var result = policy.appraise(new BigDecimal("1.00"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
@@ -93,15 +95,15 @@ public class PricingPolicyTest {
   @Test
   void appraiseShouldUseTwoSellerSupportedFloor() {
     // arrange
-    // market 1.40, rivals: 0.40 (alpha, deep discount), 0.76 (beta)
+    // market 1.40, competitors: 0.40 (alpha, deep discount), 0.76 (beta)
     // supported floor = 0.76 (first price where 2 distinct sellers cumulative)
-    var rivals =
+    var competitors =
         List.of(
-            new PricingPolicy.RivalTier(new BigDecimal("0.40"), Set.of("alpha")),
-            new PricingPolicy.RivalTier(new BigDecimal("0.76"), Set.of("beta")));
+            new CompetitorPricing.CompetitorPriceTier(new BigDecimal("0.40"), Set.of("alpha")),
+            new CompetitorPricing.CompetitorPriceTier(new BigDecimal("0.76"), Set.of("beta")));
 
     // act
-    var result = policy.appraise(new BigDecimal("1.40"), rivals, Pricing.DEFAULT_PRICE_FLOOR);
+    var result = policy.appraise(new BigDecimal("1.40"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
@@ -113,13 +115,13 @@ public class PricingPolicyTest {
   void appraiseShouldNotCountSameSellerAcrossTiersAsSupport() {
     // arrange
     // same seller (alpha) at two price points doesn't constitute two-seller support
-    var rivals =
+    var competitors =
         List.of(
-            new PricingPolicy.RivalTier(new BigDecimal("0.40"), Set.of("alpha")),
-            new PricingPolicy.RivalTier(new BigDecimal("0.50"), Set.of("alpha")));
+            new CompetitorPricing.CompetitorPriceTier(new BigDecimal("0.40"), Set.of("alpha")),
+            new CompetitorPricing.CompetitorPriceTier(new BigDecimal("0.50"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("1.01"), rivals, Pricing.DEFAULT_PRICE_FLOOR);
+    var result = policy.appraise(new BigDecimal("1.01"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
@@ -154,10 +156,11 @@ public class PricingPolicyTest {
     // arrange
     // rival at 0.25 with market 0.30 -> tick = max(0.05, round(0.25*0.025)) = 0.05
     // benchmark = 0.25 - 0.05 = 0.20 -> floored to 0.25
-    var rivals = List.of(new PricingPolicy.RivalTier(new BigDecimal("0.25"), Set.of("alpha")));
+    var competitors =
+        List.of(new CompetitorPricing.CompetitorPriceTier(new BigDecimal("0.25"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("0.30"), rivals, Pricing.DEFAULT_PRICE_FLOOR);
+    var result = policy.appraise(new BigDecimal("0.30"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
@@ -176,10 +179,11 @@ public class PricingPolicyTest {
   @Test
   void appraiseShouldApplyLoweredFloorAfterBenchmarkRounding() {
     // arrange
-    var rivals = List.of(new PricingPolicy.RivalTier(new BigDecimal("0.25"), Set.of("alpha")));
+    var competitors =
+        List.of(new CompetitorPricing.CompetitorPriceTier(new BigDecimal("0.25"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("0.30"), rivals, new BigDecimal("0.10"));
+    var result = policy.appraise(new BigDecimal("0.30"), competitors, new BigDecimal("0.10"));
 
     // assert
     assertThat(result.suggestedPrice()).isEqualByComparingTo("0.20");
@@ -188,10 +192,11 @@ public class PricingPolicyTest {
   @Test
   void appraiseShouldAcceptZeroFloor() {
     // arrange
-    var rivals = List.of(new PricingPolicy.RivalTier(new BigDecimal("0.25"), Set.of("alpha")));
+    var competitors =
+        List.of(new CompetitorPricing.CompetitorPriceTier(new BigDecimal("0.25"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("0.30"), rivals, BigDecimal.ZERO);
+    var result = policy.appraise(new BigDecimal("0.30"), competitors, BigDecimal.ZERO);
 
     // assert
     assertThat(result.suggestedPrice()).isEqualByComparingTo("0.20");
@@ -221,10 +226,11 @@ public class PricingPolicyTest {
     // arrange
     // rival at 1.00: tick = max(0.05, round(1.00 * 0.025, 0.05)) = max(0.05, 0.05) = 0.05
     // benchmark = 1.00 - 0.05 = 0.95
-    var rivals = List.of(new PricingPolicy.RivalTier(new BigDecimal("1.00"), Set.of("alpha")));
+    var competitors =
+        List.of(new CompetitorPricing.CompetitorPriceTier(new BigDecimal("1.00"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("1.00"), rivals, Pricing.DEFAULT_PRICE_FLOOR);
+    var result = policy.appraise(new BigDecimal("1.00"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result.suggestedPrice()).isEqualByComparingTo("0.95");
@@ -235,10 +241,12 @@ public class PricingPolicyTest {
     // arrange
     // rival at 10.00: tick = max(0.05, round(10.00 * 0.025, 0.05)) = max(0.05, 0.25) = 0.25
     // benchmark = 10.00 - 0.25 = 9.75
-    var rivals = List.of(new PricingPolicy.RivalTier(new BigDecimal("10.00"), Set.of("alpha")));
+    var competitors =
+        List.of(
+            new CompetitorPricing.CompetitorPriceTier(new BigDecimal("10.00"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("10.00"), rivals, Pricing.DEFAULT_PRICE_FLOOR);
+    var result = policy.appraise(new BigDecimal("10.00"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result.suggestedPrice()).isEqualByComparingTo("9.75");

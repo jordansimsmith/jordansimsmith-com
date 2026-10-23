@@ -81,6 +81,20 @@ public class HttpFetchTcgClient implements FetchTcgClient {
   }
 
   @Override
+  public GetProfileResponse getProfile(String bearerToken) {
+    try {
+      return doGetProfile(bearerToken);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new RuntimeException(e);
+    } catch (FetchTcgAuthException e) {
+      throw e;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  @Override
   public GetSellerOffersResponse getSellerOffers(String bearerToken, int page) {
     try {
       return doGetSellerOffers(bearerToken, page);
@@ -201,6 +215,20 @@ public class HttpFetchTcgClient implements FetchTcgClient {
             ? wrapper.searchResults().content()
             : List.<CardListing>of();
     return new GetCardListingsResponse(content);
+  }
+
+  private GetProfileResponse doGetProfile(String bearerToken)
+      throws IOException, InterruptedException {
+    var request =
+        HttpRequest.newBuilder()
+            .uri(baseUri.resolve("/v1/private/profile"))
+            .header("User-Agent", USER_AGENT)
+            .header("Accept", "application/json")
+            .header("Authorization", "Bearer " + bearerToken)
+            .GET()
+            .build();
+
+    return objectMapper.readValue(doExecute(request), GetProfileResponse.class);
   }
 
   private GetSellerOffersResponse doGetSellerOffers(String bearerToken, int page)
