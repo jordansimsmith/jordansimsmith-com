@@ -11,6 +11,7 @@ import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
 import com.jordansimsmith.tcginventory.imports.AppraisalCatalogs.AppraisalCatalog;
 import com.jordansimsmith.tcginventory.pricing.Pricing;
 import com.jordansimsmith.tcginventory.pricing.PricingPolicy;
+import com.jordansimsmith.tcginventory.pricing.PricingRepository;
 import com.jordansimsmith.time.Clock;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -31,6 +32,7 @@ public class AppraiseJobProcessor implements JobProcessor {
   private final Clock clock;
   private final FetchTcgClient fetchTcgClient;
   private final PricingPolicy pricingPolicy;
+  private final PricingRepository pricingRepository;
 
   public AppraiseJobProcessor(TcgInventoryFactory factory) {
     var enhancedClient = factory.dynamoDbEnhancedClient();
@@ -39,6 +41,7 @@ public class AppraiseJobProcessor implements JobProcessor {
     this.clock = factory.clock();
     this.fetchTcgClient = factory.fetchTcgClient();
     this.pricingPolicy = new PricingPolicy();
+    this.pricingRepository = new PricingRepository(factory);
   }
 
   @Override
@@ -63,6 +66,11 @@ public class AppraiseJobProcessor implements JobProcessor {
             .build();
     var importItem = importTable.getItem(importKey);
     var totalRows = importItem.getRowCount() != null ? importItem.getRowCount() : 0;
+    var pricingItem = pricingRepository.get(user);
+    var priceFloor =
+        pricingItem == null || pricingItem.getPriceFloor() == null
+            ? Pricing.DEFAULT_PRICE_FLOOR
+            : new BigDecimal(pricingItem.getPriceFloor());
 
     int batchEnd = Math.min(continuation + BATCH_SIZE, totalRows);
     int processed = continuation;
@@ -84,7 +92,8 @@ public class AppraiseJobProcessor implements JobProcessor {
       }
 
       var decision =
-          appraiseRow(importItem.getGame(), appraisalCatalog, rowItem, batchCache, cardCache);
+          appraiseRow(
+              importItem.getGame(), appraisalCatalog, rowItem, priceFloor, batchCache, cardCache);
       rowItem.setDecision(decision.decision());
       rowItem.setDecisionReason(decision.reason());
       rowItem.setMarketPrice(decision.marketPrice());
@@ -122,6 +131,7 @@ public class AppraiseJobProcessor implements JobProcessor {
       String game,
       AppraisalCatalog appraisalCatalog,
       ImportRowItem rowItem,
+      BigDecimal priceFloor,
       Map<String, AppraisalCatalog.ResolvedCard> batchCache,
       Map<String, FetchTcgClient.GetCardResponse> cardCache) {
     var identity = new CardIdentity(game, rowItem.getExternalId());
@@ -146,7 +156,7 @@ public class AppraiseJobProcessor implements JobProcessor {
     }
 
     var rivals = buildRivalTiers(cached.cardId(), rowItem.getCondition());
-    var result = pricingPolicy.appraise(cached.marketPrice(), rivals, Pricing.DEFAULT_PRICE_FLOOR);
+    var result = pricingPolicy.appraise(cached.marketPrice(), rivals, priceFloor);
 
     if (result.decision() == PricingPolicy.Decision.DISCARD) {
       return RowDecision.discard("below threshold", cached.marketPrice().toPlainString());

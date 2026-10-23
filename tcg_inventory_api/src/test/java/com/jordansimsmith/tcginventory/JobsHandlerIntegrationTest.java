@@ -18,6 +18,8 @@ import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
+import com.jordansimsmith.tcginventory.pricing.PricingItem;
+import com.jordansimsmith.tcginventory.pricing.PricingRepository;
 import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
 import com.jordansimsmith.tcginventory.settings.SettingsItem;
 import com.jordansimsmith.time.FakeClock;
@@ -56,6 +58,7 @@ public class JobsHandlerIntegrationTest {
   private DynamoDbTable<SettingsItem> settingsTable;
   private DynamoDbTable<OrderItem> orderTable;
   private DynamoDbTable<AuditItem> auditTable;
+  private PricingRepository pricingRepository;
   private TcgInventoryTestFactory factory;
 
   private JobsHandler jobsHandler;
@@ -89,6 +92,7 @@ public class JobsHandlerIntegrationTest {
     settingsTable = factory.settingsTable();
     orderTable = factory.orderTable();
     auditTable = factory.auditTable();
+    pricingRepository = new PricingRepository(factory);
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeJobsQueue.reset();
@@ -116,13 +120,13 @@ public class JobsHandlerIntegrationTest {
         new FetchTcgClient.GetCardResponse(
             "mtg_168_c_dom_normal",
             "Card 1",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
+            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("0.30"))),
             Map.of("scryfallId", SCRYFALL_ID)));
     fakeFetchTcgClient.seedListings(
         "mtg_168_c_dom_normal",
         new FetchTcgClient.GetCardListingsResponse(
             List.of(
-                new FetchTcgClient.CardListing(1, "raw-nm", new BigDecimal("1.20"), "rival1"))));
+                new FetchTcgClient.CardListing(1, "raw-nm", new BigDecimal("0.25"), "rival1"))));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
@@ -130,11 +134,93 @@ public class JobsHandlerIntegrationTest {
     // assert
     var row = getRow("jordan", "import1", 1);
     assertThat(row.getDecision()).isEqualTo("keep");
-    assertThat(row.getMarketPrice()).isEqualTo("1.50");
-    assertThat(row.getSuggestedPrice()).isNotNull();
+    assertThat(row.getMarketPrice()).isEqualTo("0.30");
+    assertThat(row.getSuggestedPrice()).isEqualTo("0.25");
 
     var importItem = getImport("jordan", "import1");
     assertThat(importItem.getStatus()).isEqualTo("review");
+  }
+
+  @Test
+  void appraiseShouldUseDefaultFloorWhenStoredPricingItemHasNoFloor() {
+    // arrange
+    createImportWithRow("jordan", "import1", "dom", "168", "normal", "NM", "en");
+    var jobItem = createJob("jordan", "job1", "appraise", "queued", "import1");
+    pricingRepository.update(PricingItem.create("jordan", null));
+    fakeFetchTcgClient.seedSearchResult(
+        "mtg",
+        2624,
+        "Card 1",
+        "normal",
+        new FetchTcgClient.SearchCardsResponse(
+            List.of(new FetchTcgClient.SearchCard("mtg_168_c_dom_normal"))));
+    fakeFetchTcgClient.seedCard(
+        "mtg_168_c_dom_normal",
+        new FetchTcgClient.GetCardResponse(
+            "mtg_168_c_dom_normal",
+            "Card 1",
+            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("0.30"))),
+            Map.of("scryfallId", SCRYFALL_ID)));
+    fakeFetchTcgClient.seedListings(
+        "mtg_168_c_dom_normal",
+        new FetchTcgClient.GetCardListingsResponse(
+            List.of(
+                new FetchTcgClient.CardListing(1, "raw-nm", new BigDecimal("0.25"), "rival1"))));
+
+    // act
+    new AppraiseJobProcessor(factory).processBatch("jordan", jobItem);
+
+    // assert
+    assertThat(getRow("jordan", "import1", 1).getSuggestedPrice()).isEqualTo("0.25");
+    assertThat(pricingRepository.get("jordan").getPriceFloor()).isNull();
+  }
+
+  @Test
+  void appraiseShouldApplyConfiguredFloorAcrossContinuationAndPreserveDecidedRows() {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    int totalRows = AppraiseJobProcessor.BATCH_SIZE + 2;
+    createImportWithNRows("jordan", "import1", totalRows);
+    var alreadyDecidedRow = getRow("jordan", "import1", 1);
+    alreadyDecidedRow.setDecision("keep");
+    alreadyDecidedRow.setDecisionReason("already decided");
+    alreadyDecidedRow.setMarketPrice("9.99");
+    alreadyDecidedRow.setSuggestedPrice("8.88");
+    alreadyDecidedRow.setFetchtcgCardId("existing-card");
+    alreadyDecidedRow.setFetchtcgSetId(42);
+    importRowTable.putItem(alreadyDecidedRow);
+    pricingRepository.update(PricingItem.create("jordan", "2.00"));
+    createJob("jordan", "job1", "appraise", "queued", "import1");
+
+    seedDefaultCardForDom168();
+
+    // act
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
+
+    // assert
+    var firstSliceRow = getRow("jordan", "import1", AppraiseJobProcessor.BATCH_SIZE);
+    assertThat(firstSliceRow.getDecision()).isEqualTo("keep");
+    assertThat(firstSliceRow.getSuggestedPrice()).isEqualTo("2.00");
+    assertThat(getRow("jordan", "import1", AppraiseJobProcessor.BATCH_SIZE + 1).getDecision())
+        .isNull();
+    var unchangedRow = getRow("jordan", "import1", 1);
+    assertThat(unchangedRow.getDecision()).isEqualTo("keep");
+    assertThat(unchangedRow.getDecisionReason()).isEqualTo("already decided");
+    assertThat(unchangedRow.getMarketPrice()).isEqualTo("9.99");
+    assertThat(unchangedRow.getSuggestedPrice()).isEqualTo("8.88");
+    assertThat(unchangedRow.getFetchtcgCardId()).isEqualTo("existing-card");
+    assertThat(unchangedRow.getFetchtcgSetId()).isEqualTo(42);
+
+    // act - continuation slice
+    fakeJobsQueue.reset();
+    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
+
+    // assert
+    var continuationRow = getRow("jordan", "import1", AppraiseJobProcessor.BATCH_SIZE + 1);
+    assertThat(continuationRow.getDecision()).isEqualTo("keep");
+    assertThat(continuationRow.getSuggestedPrice()).isEqualTo("2.00");
+    assertThat(getRow("jordan", "import1", totalRows).getSuggestedPrice()).isEqualTo("2.00");
+    assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("succeeded");
   }
 
   @Test
@@ -2128,7 +2214,7 @@ public class JobsHandlerIntegrationTest {
               user,
               importId,
               i,
-              "Card " + i,
+              "Card 1",
               "dom",
               "Dominaria",
               "168",
