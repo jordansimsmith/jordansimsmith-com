@@ -163,6 +163,14 @@ lambdas = {
         "handler": "com.jordansimsmith.tcginventory.settings.UpdateSettingsHandler",
         "zip_file": "update-settings-handler_deploy.jar",
     },
+    "get_pricing": {
+        "handler": "com.jordansimsmith.tcginventory.pricing.GetPricingHandler",
+        "zip_file": "get-pricing-handler_deploy.jar",
+    },
+    "update_pricing": {
+        "handler": "com.jordansimsmith.tcginventory.pricing.UpdatePricingHandler",
+        "zip_file": "update-pricing-handler_deploy.jar",
+    },
     "create_import": {
         "handler": "com.jordansimsmith.tcginventory.imports.CreateImportHandler",
         "zip_file": "create-import-handler_deploy.jar",
@@ -290,6 +298,7 @@ root_resources = {
     "catalog": {"path": "catalog"},
     "games": {"path": "games"},
     "settings": {"path": "settings"},
+    "pricing": {"path": "pricing"},
     "imports": {"path": "imports"},
     "scans": {"path": "scans"},
     "publish": {"path": "publish"},
@@ -345,6 +354,16 @@ endpoints = {
         "resource": "settings",
         "method": "PATCH",
         "lambda": "update_settings",
+    },
+    "get_pricing": {
+        "resource": "pricing",
+        "method": "GET",
+        "lambda": "get_pricing",
+    },
+    "update_pricing": {
+        "resource": "pricing",
+        "method": "PATCH",
+        "lambda": "update_pricing",
     },
     "create_import": {
         "resource": "imports",

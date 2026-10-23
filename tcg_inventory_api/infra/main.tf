@@ -84,6 +84,14 @@ module "java_api" {
       handler  = "com.jordansimsmith.tcginventory.settings.UpdateSettingsHandler"
       artifact = var.artifacts["update_settings"]
     }
+    get_pricing = {
+      handler  = "com.jordansimsmith.tcginventory.pricing.GetPricingHandler"
+      artifact = var.artifacts["get_pricing"]
+    }
+    update_pricing = {
+      handler  = "com.jordansimsmith.tcginventory.pricing.UpdatePricingHandler"
+      artifact = var.artifacts["update_pricing"]
+    }
     create_import = {
       handler  = "com.jordansimsmith.tcginventory.imports.CreateImportHandler"
       artifact = var.artifacts["create_import"]
@@ -206,6 +214,8 @@ module "java_api" {
     get_games                 = { path = "games", method = "GET", lambda = "get_games" }
     get_settings              = { path = "settings", method = "GET", lambda = "get_settings" }
     update_settings           = { path = "settings", method = "PATCH", lambda = "update_settings" }
+    get_pricing               = { path = "pricing", method = "GET", lambda = "get_pricing" }
+    update_pricing            = { path = "pricing", method = "PATCH", lambda = "update_pricing" }
     create_import             = { path = "imports", method = "POST", lambda = "create_import" }
     find_imports              = { path = "imports", method = "GET", lambda = "find_imports" }
     get_import                = { path = "imports/{import_id}", method = "GET", lambda = "get_import" }

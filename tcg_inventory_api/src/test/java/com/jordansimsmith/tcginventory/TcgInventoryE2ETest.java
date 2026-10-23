@@ -17,6 +17,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.stream.StreamSupport;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -109,6 +110,22 @@ public class TcgInventoryE2ETest {
 
   @Test
   void fullLoopImportToOrderConfirm() throws IOException, InterruptedException {
+    // arrange - verify the authenticated pricing configuration round-trip
+    var defaultResponse = get("/pricing");
+    assertThat(defaultResponse.statusCode()).isEqualTo(200);
+    assertThat(objectMapper.readTree(defaultResponse.body()).get("price_floor").asText())
+        .isEqualTo("0.25");
+
+    var updateResponse = patch("/pricing", "{\"price_floor\":\"0.75\"}");
+    assertThat(updateResponse.statusCode()).isEqualTo(200);
+    assertThat(objectMapper.readTree(updateResponse.body()).get("price_floor").asText())
+        .isEqualTo("0.75");
+
+    var savedResponse = get("/pricing");
+    assertThat(savedResponse.statusCode()).isEqualTo(200);
+    assertThat(objectMapper.readTree(savedResponse.body()).get("price_floor").asText())
+        .isEqualTo("0.75");
+
     // arrange / act - fetch registered game metadata through the local API route
     var gamesResponse = get("/games");
 
@@ -142,6 +159,12 @@ public class TcgInventoryE2ETest {
     var settingsResponse = patch("/settings", "{\"refresh_token\":\"fake-token\"}");
     assertThat(settingsResponse.statusCode()).isEqualTo(200);
 
+    // arrange - set a custom floor for this import's appraisal
+    var pricingResponse = patch("/pricing", "{\"price_floor\":5.00}");
+    assertThat(pricingResponse.statusCode()).isEqualTo(200);
+    assertThat(objectMapper.readTree(pricingResponse.body()).get("price_floor").asText())
+        .isEqualTo("5.00");
+
     // act - upload csv (two hit copies + one cheap card)
     var importResponse =
         httpClient.send(
@@ -169,6 +192,15 @@ public class TcgInventoryE2ETest {
               var body = objectMapper.readTree(pollResponse.body());
               assertThat(body.get("status").asText()).isEqualTo("review");
             });
+
+    var appraisedRows = objectMapper.readTree(get("/imports/" + importId).body()).get("rows");
+    var flooredRow =
+        StreamSupport.stream(appraisedRows.spliterator(), false)
+            .filter(row -> row.path("market_price").asText().equals("1.50"))
+            .findFirst()
+            .orElseThrow();
+    assertThat(flooredRow.get("decision").asText()).isEqualTo("keep");
+    assertThat(flooredRow.get("suggested_price").asText()).isEqualTo("5.00");
 
     // act - update cheap row 1 condition from NM to LP, then delete it
     var updateRowResponse = put("/imports/" + importId + "/rows/1", "{\"condition\":\"LP\"}");
