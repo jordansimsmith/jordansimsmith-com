@@ -30,6 +30,7 @@ public class AppraiseJobProcessor implements JobProcessor {
   private final FetchTcgClient fetchTcgClient;
   private final FetchTcgTokenMinter fetchTcgTokenMinter;
   private final CompetitorPricing competitorPricing;
+  private final AppraisalPolicy appraisalPolicy;
   private final PricingPolicy pricingPolicy;
   private final PricingRepository pricingRepository;
 
@@ -41,6 +42,7 @@ public class AppraiseJobProcessor implements JobProcessor {
     this.fetchTcgClient = factory.fetchTcgClient();
     this.fetchTcgTokenMinter = factory.fetchTcgTokenMinter();
     this.competitorPricing = new CompetitorPricing(fetchTcgClient);
+    this.appraisalPolicy = new AppraisalPolicy();
     this.pricingPolicy = new PricingPolicy();
     this.pricingRepository = new PricingRepository(factory);
   }
@@ -171,9 +173,11 @@ public class AppraiseJobProcessor implements JobProcessor {
     var competitors =
         competitorPricing.findCompetitorPriceTiers(
             cached.cardId(), Condition.valueOf(rowItem.getCondition()), sellerUsername);
-    var result = pricingPolicy.appraise(cached.marketPrice(), competitors, priceFloor);
+    var suggestedPrice =
+        pricingPolicy.calculatePrice(cached.marketPrice(), competitors, priceFloor);
+    var result = appraisalPolicy.appraise(cached.marketPrice(), suggestedPrice);
 
-    if (result.decision() == PricingPolicy.Decision.DISCARD) {
+    if (result.decision() == AppraisalPolicy.Decision.DISCARD) {
       return RowDecision.discard("below threshold", cached.marketPrice().toPlainString());
     }
 

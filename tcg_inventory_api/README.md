@@ -583,7 +583,7 @@ Content-Type: application/json
 
 Missing or malformed bodies, a non-object body, wrong JSON types, negative values, and more than two fractional digits return `400 {"message":"..."}` without a write. An empty object or a null `price_floor` is a successful no-op. No arbitrary maximum amount is imposed. A queued or running Java job returns `409 {"message":"another job is in progress"}` when PATCH would write a value; no-op PATCH requests return the current value. This follows the shared best-effort active-job gate and is not an atomic lock. Saving this setting does not enqueue work or modify settings, secrets, inventory, or dirty markers. Only a missing record or floor attribute uses the default; malformed stored values and DynamoDB errors are not hidden. Appraisal reads the effective floor once at the start of each batch, including each continuation.
 
-The configured price floor represents the minimum final suggested price. It is distinct from the fixed NZ$0.25 market-value keep threshold: cards below that market value remain discarded regardless of the configured floor.
+The configured price floor represents the minimum final suggested price. `PricingPolicy` calculates a price from the benchmark, rounding, and floor for any market value, including values below NZ$0.25. The appraisal worker then passes that calculated price to `AppraisalPolicy`, which owns the intake decision and discards market values below its separate fixed NZ$0.25 keep threshold. A calculated price does not affect that eligibility decision.
 
 `GET /skus/{sku_id}`
 

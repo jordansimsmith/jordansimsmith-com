@@ -17,238 +17,147 @@ public class PricingPolicyTest {
   }
 
   @Test
-  void appraiseShouldDiscardWhenMarketPriceBelowThreshold() {
-    // act
-    var result = policy.appraise(new BigDecimal("0.24"), List.of(), Pricing.DEFAULT_PRICE_FLOOR);
-
+  void calculatePriceShouldRoundMarketPriceAndApplySoleSourcePremium() {
     // assert
-    assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.DISCARD);
-    assertThat(result.suggestedPrice()).isNull();
+    assertPrice("0.25", "0.25");
+    assertPrice("0.74", "0.75");
+    assertPrice("0.76", "0.75");
+    assertPrice("0.87", "0.85");
+    assertPrice("0.875", "0.90");
+    assertPrice("0.88", "0.90");
+    assertPrice("1.00", "1.00");
+    assertPrice("1.99", "2.00");
+    assertPrice("2.00", "2.30");
+    assertPrice("3.20", "3.70");
   }
 
   @Test
-  void appraiseShouldKeepWhenMarketPriceAtThreshold() {
-    // act
-    var result = policy.appraise(new BigDecimal("0.25"), List.of(), Pricing.DEFAULT_PRICE_FLOOR);
-
-    // assert
-    assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
-    assertThat(result.suggestedPrice()).isEqualByComparingTo("0.25");
-  }
-
-  @Test
-  void appraiseShouldRoundToNearestFiveCentsNoRivals() {
-    assertPriceWithNoRivals("0.25", "0.25");
-    assertPriceWithNoRivals("0.74", "0.75");
-    assertPriceWithNoRivals("0.76", "0.75");
-    assertPriceWithNoRivals("0.87", "0.85");
-    assertPriceWithNoRivals("0.875", "0.90");
-    assertPriceWithNoRivals("0.88", "0.90");
-    assertPriceWithNoRivals("1.00", "1.00");
-  }
-
-  @Test
-  void appraiseShouldApplySoleSourcePremiumAndRound() {
-    assertPriceWithNoRivals("1.99", "2.00");
-    assertPriceWithNoRivals("2.00", "2.30");
-    assertPriceWithNoRivals("3.20", "3.70");
-  }
-
-  private void assertPriceWithNoRivals(String marketPrice, String expectedPrice) {
-    var result =
-        policy.appraise(new BigDecimal(marketPrice), List.of(), Pricing.DEFAULT_PRICE_FLOOR);
-    assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
-    assertThat(result.suggestedPrice()).isEqualByComparingTo(expectedPrice);
-  }
-
-  @Test
-  void appraiseShouldUndercutLowestSaneRival() {
+  void calculatePriceShouldUndercutLowestSaneCompetitor() {
     // arrange
     var competitors =
         List.of(new CompetitorPricing.CompetitorPriceTier(new BigDecimal("5.00"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("5.00"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
+    var result =
+        policy.calculatePrice(new BigDecimal("5.00"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
-    assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
-    // tick = max(0.05, round(5.00 * 0.025, 0.05)) = max(0.05, 0.15) = 0.15
-    // benchmark = 5.00 - 0.15 = 4.85
-    assertThat(result.suggestedPrice()).isEqualByComparingTo("4.85");
+    assertThat(result).isEqualByComparingTo("4.85");
   }
 
   @Test
-  void appraiseShouldNotUndercutDeepDiscountRivalWithoutSupport() {
+  void calculatePriceShouldIgnoreDeepDiscountCompetitorWithoutSupport() {
     // arrange
-    // rival at 0.40, market 1.00: 0.40 < 80% * 1.00 = 0.80 -> deep discount
     var competitors =
         List.of(new CompetitorPricing.CompetitorPriceTier(new BigDecimal("0.40"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("1.00"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
+    var result =
+        policy.calculatePrice(new BigDecimal("1.00"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
-    assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
-    assertThat(result.suggestedPrice()).isEqualByComparingTo("1.00");
+    assertThat(result).isEqualByComparingTo("1.00");
   }
 
   @Test
-  void appraiseShouldUseTwoSellerSupportedFloor() {
+  void calculatePriceShouldUseTwoSellerSupportedFloor() {
     // arrange
-    // market 1.40, competitors: 0.40 (alpha, deep discount), 0.76 (beta)
-    // supported floor = 0.76 (first price where 2 distinct sellers cumulative)
     var competitors =
         List.of(
             new CompetitorPricing.CompetitorPriceTier(new BigDecimal("0.40"), Set.of("alpha")),
             new CompetitorPricing.CompetitorPriceTier(new BigDecimal("0.76"), Set.of("beta")));
 
     // act
-    var result = policy.appraise(new BigDecimal("1.40"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
+    var result =
+        policy.calculatePrice(new BigDecimal("1.40"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
-    assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
-    // benchmark = supported floor 0.76, rounded to 0.75
-    assertThat(result.suggestedPrice()).isEqualByComparingTo("0.75");
+    assertThat(result).isEqualByComparingTo("0.75");
   }
 
   @Test
-  void appraiseShouldNotCountSameSellerAcrossTiersAsSupport() {
+  void calculatePriceShouldNotCountSameSellerAcrossTiersAsSupport() {
     // arrange
-    // same seller (alpha) at two price points doesn't constitute two-seller support
     var competitors =
         List.of(
             new CompetitorPricing.CompetitorPriceTier(new BigDecimal("0.40"), Set.of("alpha")),
             new CompetitorPricing.CompetitorPriceTier(new BigDecimal("0.50"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("1.01"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
+    var result =
+        policy.calculatePrice(new BigDecimal("1.01"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
-    assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
-    // no support, deep discount -> falls through to market
-    assertThat(result.suggestedPrice()).isEqualByComparingTo("1.00");
+    assertThat(result).isEqualByComparingTo("1.00");
   }
 
   @Test
-  void appraiseShouldApplySoleSourcePremiumWhenNoRivalsAndMarketAboveThreshold() {
-    // act
-    var result = policy.appraise(new BigDecimal("2.00"), List.of(), Pricing.DEFAULT_PRICE_FLOOR);
-
-    // assert
-    assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
-    // 2.00 * 1.15 = 2.30
-    assertThat(result.suggestedPrice()).isEqualByComparingTo("2.30");
-  }
-
-  @Test
-  void appraiseShouldNotApplySoleSourcePremiumWhenMarketBelowThreshold() {
-    // act
-    var result = policy.appraise(new BigDecimal("1.99"), List.of(), Pricing.DEFAULT_PRICE_FLOOR);
-
-    // assert
-    assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
-    // 1.99 rounds to 2.00 (nearest 0.05)
-    assertThat(result.suggestedPrice()).isEqualByComparingTo("2.00");
-  }
-
-  @Test
-  void appraiseShouldEnforceFloorOnLowBenchmark() {
-    // arrange
-    // rival at 0.25 with market 0.30 -> tick = max(0.05, round(0.25*0.025)) = 0.05
-    // benchmark = 0.25 - 0.05 = 0.20 -> floored to 0.25
-    var competitors =
-        List.of(new CompetitorPricing.CompetitorPriceTier(new BigDecimal("0.25"), Set.of("alpha")));
-
-    // act
-    var result = policy.appraise(new BigDecimal("0.30"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
-
-    // assert
-    assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
-    assertThat(result.suggestedPrice()).isEqualByComparingTo("0.25");
-  }
-
-  @Test
-  void appraiseShouldApplyRaisedFloorAfterBenchmarkRounding() {
-    // act
-    var result = policy.appraise(new BigDecimal("1.00"), List.of(), new BigDecimal("1.10"));
-
-    // assert
-    assertThat(result.suggestedPrice()).isEqualByComparingTo("1.10");
-  }
-
-  @Test
-  void appraiseShouldApplyLoweredFloorAfterBenchmarkRounding() {
+  void calculatePriceShouldApplyFloorAfterBenchmarkRounding() {
     // arrange
     var competitors =
         List.of(new CompetitorPricing.CompetitorPriceTier(new BigDecimal("0.25"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("0.30"), competitors, new BigDecimal("0.10"));
+    var defaultFloor =
+        policy.calculatePrice(new BigDecimal("0.30"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
+    var lowerFloor =
+        policy.calculatePrice(new BigDecimal("0.30"), competitors, new BigDecimal("0.10"));
+    var zeroFloor = policy.calculatePrice(new BigDecimal("0.30"), competitors, BigDecimal.ZERO);
+    var raisedFloor =
+        policy.calculatePrice(new BigDecimal("1.00"), List.of(), new BigDecimal("1.10"));
+    var centValuedFloor =
+        policy.calculatePrice(new BigDecimal("0.25"), List.of(), new BigDecimal("0.27"));
 
     // assert
-    assertThat(result.suggestedPrice()).isEqualByComparingTo("0.20");
+    assertThat(defaultFloor).isEqualByComparingTo("0.25");
+    assertThat(lowerFloor).isEqualByComparingTo("0.20");
+    assertThat(zeroFloor).isEqualByComparingTo("0.20");
+    assertThat(raisedFloor).isEqualByComparingTo("1.10");
+    assertThat(centValuedFloor).isEqualByComparingTo("0.27");
   }
 
   @Test
-  void appraiseShouldAcceptZeroFloor() {
+  void calculatePriceShouldApplyFloorsBelowTheIntakeThreshold() {
     // arrange
-    var competitors =
-        List.of(new CompetitorPricing.CompetitorPriceTier(new BigDecimal("0.25"), Set.of("alpha")));
+    var marketPrice = new BigDecimal("0.10");
 
     // act
-    var result = policy.appraise(new BigDecimal("0.30"), competitors, BigDecimal.ZERO);
+    var defaultFloor = policy.calculatePrice(marketPrice, List.of(), Pricing.DEFAULT_PRICE_FLOOR);
+    var lowerFloor = policy.calculatePrice(marketPrice, List.of(), new BigDecimal("0.05"));
+    var zeroFloor = policy.calculatePrice(marketPrice, List.of(), BigDecimal.ZERO);
+    var centValuedFloor = policy.calculatePrice(marketPrice, List.of(), new BigDecimal("0.13"));
 
     // assert
-    assertThat(result.suggestedPrice()).isEqualByComparingTo("0.20");
+    assertThat(defaultFloor).isEqualByComparingTo("0.25");
+    assertThat(lowerFloor).isEqualByComparingTo("0.10");
+    assertThat(zeroFloor).isEqualByComparingTo("0.10");
+    assertThat(centValuedFloor).isEqualByComparingTo("0.13");
   }
 
   @Test
-  void appraiseShouldApplyCentValuedFloorAfterBenchmarkRounding() {
-    // act
-    var result = policy.appraise(new BigDecimal("0.25"), List.of(), new BigDecimal("0.27"));
-
-    // assert
-    assertThat(result.suggestedPrice()).isEqualByComparingTo("0.27");
-  }
-
-  @Test
-  void appraiseShouldKeepDiscardThresholdIndependentFromPriceFloor() {
-    // act
-    var result = policy.appraise(new BigDecimal("0.24"), List.of(), BigDecimal.ZERO);
-
-    // assert
-    assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.DISCARD);
-    assertThat(result.suggestedPrice()).isNull();
-  }
-
-  @Test
-  void appraiseShouldComputeTickCorrectlyForSmallRival() {
+  void calculatePriceShouldComputeCompetitorTicks() {
     // arrange
-    // rival at 1.00: tick = max(0.05, round(1.00 * 0.025, 0.05)) = max(0.05, 0.05) = 0.05
-    // benchmark = 1.00 - 0.05 = 0.95
-    var competitors =
+    var smallCompetitor =
         List.of(new CompetitorPricing.CompetitorPriceTier(new BigDecimal("1.00"), Set.of("alpha")));
-
-    // act
-    var result = policy.appraise(new BigDecimal("1.00"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
-
-    // assert
-    assertThat(result.suggestedPrice()).isEqualByComparingTo("0.95");
-  }
-
-  @Test
-  void appraiseShouldComputeTickCorrectlyForLargeRival() {
-    // arrange
-    // rival at 10.00: tick = max(0.05, round(10.00 * 0.025, 0.05)) = max(0.05, 0.25) = 0.25
-    // benchmark = 10.00 - 0.25 = 9.75
-    var competitors =
+    var largeCompetitor =
         List.of(
             new CompetitorPricing.CompetitorPriceTier(new BigDecimal("10.00"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("10.00"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
+    var smallPrice =
+        policy.calculatePrice(new BigDecimal("1.00"), smallCompetitor, Pricing.DEFAULT_PRICE_FLOOR);
+    var largePrice =
+        policy.calculatePrice(
+            new BigDecimal("10.00"), largeCompetitor, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
-    assertThat(result.suggestedPrice()).isEqualByComparingTo("9.75");
+    assertThat(smallPrice).isEqualByComparingTo("0.95");
+    assertThat(largePrice).isEqualByComparingTo("9.75");
+  }
+
+  private void assertPrice(String marketPrice, String expectedPrice) {
+    var result =
+        policy.calculatePrice(new BigDecimal(marketPrice), List.of(), Pricing.DEFAULT_PRICE_FLOOR);
+    assertThat(result).isEqualByComparingTo(expectedPrice);
   }
 }

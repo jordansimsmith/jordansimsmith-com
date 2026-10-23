@@ -7,7 +7,6 @@ import java.util.List;
 import javax.annotation.Nullable;
 
 public class PricingPolicy {
-  private static final BigDecimal KEEP_THRESHOLD = new BigDecimal("0.25");
   private static final BigDecimal PRICE_INCREMENT = new BigDecimal("0.05");
   private static final BigDecimal TICK_RATE = new BigDecimal("0.025");
   private static final BigDecimal DEEP_DISCOUNT_RATE = new BigDecimal("0.80");
@@ -15,27 +14,14 @@ public class PricingPolicy {
   private static final BigDecimal SOLE_SOURCE_MINIMUM_MARKET = new BigDecimal("2.00");
   private static final int SUPPORTED_FLOOR_SELLER_COUNT = 2;
 
-  public enum Decision {
-    KEEP,
-    DISCARD
-  }
-
-  public record PricingResult(Decision decision, @Nullable BigDecimal suggestedPrice) {}
-
-  public PricingResult appraise(
+  public BigDecimal calculatePrice(
       BigDecimal marketPrice,
       List<CompetitorPricing.CompetitorPriceTier> competitors,
       BigDecimal priceFloor) {
-    if (marketPrice.compareTo(KEEP_THRESHOLD) < 0) {
-      return new PricingResult(Decision.DISCARD, null);
-    }
-
     var lowestCompetitor = competitors.isEmpty() ? null : competitors.get(0).price();
     var supportedFloor = findSupportedFloor(competitors);
     var benchmark = selectBenchmark(marketPrice, lowestCompetitor, supportedFloor);
-    var price = roundToIncrement(benchmark).max(priceFloor);
-
-    return new PricingResult(Decision.KEEP, price);
+    return roundToIncrement(benchmark).max(priceFloor);
   }
 
   @Nullable
