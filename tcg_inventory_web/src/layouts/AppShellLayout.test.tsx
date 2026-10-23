@@ -55,6 +55,16 @@ describe('AppShellLayout', () => {
     ).toBe('page');
   });
 
+  it('highlights the pricing navigation item on the pricing route', () => {
+    renderShell('/pricing');
+
+    expect(
+      screen
+        .getByRole('link', { name: 'Pricing' })
+        .getAttribute('aria-current'),
+    ).toBe('page');
+  });
+
   it('closes the mobile navigation after a destination is selected', async () => {
     const user = userEvent.setup();
     renderShell('/inventory');

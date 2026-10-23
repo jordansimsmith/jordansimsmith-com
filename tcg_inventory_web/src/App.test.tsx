@@ -156,6 +156,15 @@ describe('App', () => {
     expect(screen.getByLabelText(/username/i)).toBeDefined();
   });
 
+  it('protects the pricing route', () => {
+    renderActualApp('/pricing');
+
+    expect(
+      screen.getByRole('heading', { name: /tcg inventory/i }),
+    ).toBeDefined();
+    expect(screen.getByLabelText(/username/i)).toBeDefined();
+  });
+
   it('protects the scan detail route', () => {
     renderApp('/scans/fake-scan-identifying');
 
@@ -219,5 +228,23 @@ describe('App', () => {
         .getByRole('link', { name: 'Publish' })
         .getAttribute('aria-current'),
     ).toBe('page');
+  });
+
+  it('opens the authenticated pricing page from its sidebar route', async () => {
+    setAuth();
+    renderActualApp('/pricing');
+
+    expect(
+      await screen.findByRole('heading', { level: 1, name: 'Pricing' }),
+    ).toBeDefined();
+    expect(
+      screen
+        .getByRole('link', { name: 'Pricing' })
+        .getAttribute('aria-current'),
+    ).toBe('page');
+    expect(await screen.findByLabelText('Price floor (NZD)')).toHaveProperty(
+      'value',
+      '0.25',
+    );
   });
 });

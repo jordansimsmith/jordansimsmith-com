@@ -20,6 +20,7 @@ import { getSession } from './auth/session';
 import { GamesProvider } from './GamesProvider';
 import { PublishStatusProvider } from './PublishStatusProvider';
 import { PublishPage } from './pages/PublishPage';
+import { PricingPage } from './pages/PricingPage';
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const session = getSession();
@@ -58,6 +59,7 @@ export function App() {
           <Route path="/inventory" element={<InventoryPage />} />
           <Route path="/inventory/:skuId" element={<SkuDetailPage />} />
           <Route path="/publish" element={<PublishPage />} />
+          <Route path="/pricing" element={<PricingPage />} />
           <Route path="/imports" element={<ImportsPage />} />
           <Route path="/imports/:importId" element={<ImportDetailPage />} />
           <Route path="/scans" element={<ScanPage />} />

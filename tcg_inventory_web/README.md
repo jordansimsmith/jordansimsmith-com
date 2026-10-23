@@ -25,6 +25,7 @@ The TCG inventory web service is a single-page app for running a chaos-sorted ca
 - As a card seller packing a fulfilled parcel, I want direct links to FetchTCG and Trade Me's courier booking page, so that I can finish the shipment from the order detail.
 - As a card seller scanning the orders list, I want the money column to be what the cards sold for, so that postage the buyer paid never inflates what an order looks like it earned.
 - As a card seller, I want to trigger a publish run and watch its progress, so that FetchTCG listings converge with my inventory on demand.
+- As a card seller, I want to set a minimum suggested price for future appraisals, so that new appraisal decisions reflect my pricing preferences.
 - As a card seller, I want to see when an accepted offer is still reserving its cards, so that I can distinguish background work from an order waiting for payment.
 - As a card seller, I want a reports dashboard of value, movement, and composition figures, so that I can appreciate the overall state of my inventory at a glance.
 - As a returning user, I want a persisted session and a write-only credential form, so that setup is one-time and my FetchTCG token is never displayed.
@@ -43,6 +44,7 @@ The TCG inventory web service is a single-page app for running a chaos-sorted ca
 - Publish page: trigger a publish run, show the live pending SKU count while it runs with an animated activity bar, and poll/render the current-or-latest run's outcome while the page is open. The remaining count can lag or change because it comes from an eventually consistent dirty index; the job status determines completion. A completed run summary uses `published_sku_count`. The workspace sidebar makes a best-effort background status read on page load and shows an attention dot when a publish run exists with pending SKUs and no run is active. The dot clears when Publish is clicked and does not refresh again until the next page load. It stays hidden before the first run because `GET /publish` returns 404 without a dirty count. Appraisal progress and errors render on the import pages.
 - Job failure reporting: failed publish runs, appraisals, and report generations render a compact alert with the failure title and the backend's short actionable error message; full diagnostics stay in backend logs, never in the UI.
 - Reports tab: renders combined inventory value to two decimal places, paid-order revenue, weekly card movement, and monthly revenue, then one tab per registered game. A game summary uses three sections: inventory value; unique in-stock card names with units in stock; and paid revenue with units sold. Supporting sections rank highest-value cards and sets, then show time in stock and stock by price. Regeneration is automatic and background-only: when the response says stale (checked on navigation and window refocus), the page triggers a new generation and polls until fresh figures swap in place; the first-ever visit shows skeletons while the first generation runs.
+- Pricing: configure a per-user minimum suggested price for future appraisals. The effective default is NZ$0.25; this floor does not change the separate NZ$0.25 market-value discard threshold and does not reprice existing inventory.
 - Settings: set or replace the FetchTCG refresh token (display presence and last-updated only); configure the "Track orders after" date to exclude pre-existing FetchTCG orders from tracking.
 - A `/` shortcut focuses the active inventory game's search field; scan review keeps its workflow-specific keyboard controls.
 - Development fake mode: an in-memory `ApiClient` with seeded Magic and Pokémon stock, finish variants, reports, and a mixed-game pull sheet so the whole inventory and order UX runs without a backend. Pokémon intake capabilities remain disabled in fake mode too.
@@ -53,7 +55,7 @@ The TCG inventory web service is a single-page app for running a chaos-sorted ca
 - Camera capture, PNG/TIFF/PDF scans, non-English cards, scan quality grading, automatic per-image recognition retry, saved partial confirmation choices across browser closures, and use of source scans as listing photos.
 - Post-confirm photo management (unit photos render view-only; retakes go through remove + re-import).
 - Offline support, background sync, or push notifications.
-- Multi-marketplace views, repricing controls, and offer negotiation (accept/counter happens on FetchTCG).
+- Multi-marketplace views, repricing existing inventory, and offer negotiation (accept/counter happens on FetchTCG).
 
 ## Architecture
 

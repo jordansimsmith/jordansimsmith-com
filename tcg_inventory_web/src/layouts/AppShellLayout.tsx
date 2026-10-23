@@ -4,10 +4,11 @@ import {
   IconCards,
   IconCamera,
   IconChartBar,
+  IconCoin,
   IconFileImport,
   IconPackage,
-  IconUpload,
   IconSettings,
+  IconUpload,
 } from '@tabler/icons-react';
 import { Layout } from '@jordansimsmith_com/ui';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -18,6 +19,7 @@ import classes from './AppShellLayout.module.css';
 const WORKSPACE_LINKS = [
   { label: 'Inventory', to: '/inventory', icon: IconCards },
   { label: 'Publish', to: '/publish', icon: IconUpload },
+  { label: 'Pricing', to: '/pricing', icon: IconCoin },
   { label: 'Scans', to: '/scans', icon: IconCamera },
   { label: 'Imports', to: '/imports', icon: IconFileImport },
   { label: 'Orders', to: '/orders', icon: IconPackage },
