@@ -231,6 +231,15 @@ java_library(
     deps = [":lib"] + COMMON_DEPS,
 )
 
+java_library(
+    name = "pricing-lib",
+    srcs = glob(
+        ["src/main/java/com/jordansimsmith/tcginventory/pricing/*.java"],
+        exclude = ["src/main/java/com/jordansimsmith/tcginventory/pricing/*Handler.java"],
+    ),
+    deps = [":lib"] + COMMON_DEPS,
+)
+
 java_binary(
     name = "get-games-handler",
     srcs = ["src/main/java/com/jordansimsmith/tcginventory/games/GetGamesHandler.java"],
@@ -1267,6 +1276,7 @@ java_test_suite(
         ":jobs-handler",
         ":lib",
         ":order-lib",
+        ":pricing-lib",
         ":publish-lib",
         ":remove-unit-handler",
         ":report-lib",
