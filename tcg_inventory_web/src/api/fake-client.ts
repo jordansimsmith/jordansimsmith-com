@@ -33,6 +33,7 @@ import type {
   OrderSummary,
   OrderUnit,
   PlacementInstruction,
+  PricingResponse,
   PublishResponse,
   Report,
   ReportResponse,
@@ -53,6 +54,7 @@ import type {
   SkuUnit,
   UnitStatus,
   UpdateSettingsRequest,
+  UpdatePricingRequest,
   UpdateUnitResponse,
 } from './client';
 import { getGame } from '../domain/games';
@@ -608,6 +610,17 @@ const FAKE_UPLOAD_ROWS: FakeUploadRow[] = [
 
 function formatPrice(cents: number): string {
   return (cents / 100).toFixed(2);
+}
+
+function normalizePriceFloor(value: string): string {
+  const match = /^(\d+)(?:\.(\d{1,2}))?$/.exec(value);
+  if (!match) {
+    throw new Error(
+      'price_floor must be a nonnegative decimal with at most two places',
+    );
+  }
+  const whole = match[1].replace(/^0+(?=\d)/, '');
+  return `${whole}.${(match[2] ?? '').padEnd(2, '0')}`;
 }
 
 function appraisePrices(
@@ -1608,6 +1621,7 @@ export function createFakeClient(): ApiClient {
     updated_at: null,
     track_orders_after: null,
   };
+  let pricing: PricingResponse = { price_floor: '0.25' };
   let reportGeneratedAt = Math.floor(Date.now() / 1000) - 3600;
   let reportStale = false;
   let reportGeneration: GenerationStatus | null = {
@@ -1833,6 +1847,17 @@ export function createFakeClient(): ApiClient {
         };
       }
       return { ...settings };
+    },
+
+    async getPricing(): Promise<PricingResponse> {
+      return { ...pricing };
+    },
+
+    async updatePricing(
+      update: UpdatePricingRequest,
+    ): Promise<PricingResponse> {
+      pricing = { price_floor: normalizePriceFloor(update.price_floor) };
+      return { ...pricing };
     },
 
     async createImport(

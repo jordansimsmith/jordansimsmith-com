@@ -4,6 +4,67 @@ import { createHttpClient } from './http-client';
 
 const fetchSpy = vi.fn();
 
+describe('http client pricing', () => {
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    localStorage.clear();
+    setSession('alice', 'pw');
+  });
+
+  afterEach(() => {
+    clearSession();
+  });
+
+  it('gets and updates the authenticated price floor using decimal strings', async () => {
+    const getResponse = { price_floor: '0.25' };
+    const updateResponse = { price_floor: '1.20' };
+    const getJson = vi.fn().mockResolvedValue(getResponse);
+    const updateJson = vi.fn().mockResolvedValue(updateResponse);
+    fetchSpy
+      .mockResolvedValueOnce({ ok: true, json: getJson })
+      .mockResolvedValueOnce({ ok: true, json: updateJson });
+    const client = createHttpClient();
+
+    await expect(client.getPricing()).resolves.toEqual(getResponse);
+    await expect(client.updatePricing({ price_floor: '1.2' })).resolves.toEqual(
+      updateResponse,
+    );
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/pricing',
+    );
+    expect(fetchSpy.mock.calls[0][1].method).toBeUndefined();
+    expect(fetchSpy.mock.calls[0][1].headers.Authorization).toBe(
+      `Basic ${btoa('alice:pw')}`,
+    );
+    const [url, init] = fetchSpy.mock.calls[1];
+    expect(url).toBe('https://api.tcg-inventory.jordansimsmith.com/pricing');
+    expect(init.method).toBe('PATCH');
+    expect(init.headers['Content-Type']).toBe('application/json');
+    expect(init.headers.Authorization).toBe(`Basic ${btoa('alice:pw')}`);
+    expect(init.body).toBe(JSON.stringify({ price_floor: '1.2' }));
+    expect(getJson).toHaveBeenCalledTimes(1);
+    expect(updateJson).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces pricing API errors', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: false,
+      status: 409,
+      statusText: 'Conflict',
+      json: vi
+        .fn()
+        .mockResolvedValue({ message: 'another job is in progress' }),
+    });
+
+    await expect(
+      createHttpClient().updatePricing({ price_floor: '1.20' }),
+    ).rejects.toThrow('another job is in progress');
+  });
+});
+
 describe('http client imports', () => {
   beforeEach(() => {
     fetchSpy.mockReset();

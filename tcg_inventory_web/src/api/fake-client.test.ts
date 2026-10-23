@@ -1253,3 +1253,58 @@ describe('createFakeClient settings', () => {
     expect(response.track_orders_after).toBe(1723363200);
   });
 });
+
+describe('createFakeClient pricing', () => {
+  it('returns the default, normalizes saved floors, and allows zero', async () => {
+    const client = createFakeClient();
+
+    await expect(client.getPricing()).resolves.toEqual({ price_floor: '0.25' });
+    await expect(client.updatePricing({ price_floor: '1.2' })).resolves.toEqual(
+      { price_floor: '1.20' },
+    );
+    await expect(client.getPricing()).resolves.toEqual({
+      price_floor: '1.20',
+    });
+    await expect(client.updatePricing({ price_floor: '0' })).resolves.toEqual({
+      price_floor: '0.00',
+    });
+  });
+
+  it('keeps pricing state local to each client and does not enqueue publish work', async () => {
+    const firstClient = createFakeClient();
+    const secondClient = createFakeClient();
+    const initialPublish = await firstClient.getPublish();
+    const initialSkus = await firstClient.findSkus({ game: 'mtg' });
+
+    await firstClient.updatePricing({ price_floor: '0.50' });
+
+    await expect(firstClient.getPricing()).resolves.toEqual({
+      price_floor: '0.50',
+    });
+    await expect(secondClient.getPricing()).resolves.toEqual({
+      price_floor: '0.25',
+    });
+    await expect(firstClient.getPublish()).resolves.toEqual(initialPublish);
+    await expect(firstClient.findSkus({ game: 'mtg' })).resolves.toEqual(
+      initialSkus,
+    );
+  });
+
+  it('rejects negative amounts and more than two fractional digits', async () => {
+    const client = createFakeClient();
+
+    await expect(
+      client.updatePricing({ price_floor: '-0.01' }),
+    ).rejects.toThrow(
+      'price_floor must be a nonnegative decimal with at most two places',
+    );
+    await expect(
+      client.updatePricing({ price_floor: '0.501' }),
+    ).rejects.toThrow(
+      'price_floor must be a nonnegative decimal with at most two places',
+    );
+    await expect(client.getPricing()).resolves.toEqual({
+      price_floor: '0.25',
+    });
+  });
+});

@@ -42,6 +42,14 @@ export interface UpdateSettingsRequest {
   track_orders_after?: number;
 }
 
+export interface PricingResponse {
+  price_floor: string;
+}
+
+export interface UpdatePricingRequest {
+  price_floor: string;
+}
+
 export type Condition = 'NM' | 'LP' | 'MP' | 'HP' | 'DMG';
 
 export const CONDITIONS: Condition[] = ['NM', 'LP', 'MP', 'HP', 'DMG'];
@@ -459,6 +467,8 @@ export interface ApiClient {
   getGames(): Promise<GamesResponse>;
   getSettings(): Promise<SettingsResponse>;
   updateSettings(update: UpdateSettingsRequest): Promise<SettingsResponse>;
+  getPricing(): Promise<PricingResponse>;
+  updatePricing(update: UpdatePricingRequest): Promise<PricingResponse>;
   createImport(
     game: GameId,
     filename: string,

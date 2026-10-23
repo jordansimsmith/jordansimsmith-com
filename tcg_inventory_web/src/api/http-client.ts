@@ -24,6 +24,7 @@ import type {
   ImportRow,
   ImportSummary,
   OrderDetail,
+  PricingResponse,
   PublishResponse,
   ReportResponse,
   IdentifyScanResponse,
@@ -31,6 +32,7 @@ import type {
   SettingsResponse,
   SkuDetail,
   UpdateSettingsRequest,
+  UpdatePricingRequest,
   UpdateUnitResponse,
 } from './client';
 
@@ -82,6 +84,22 @@ export function createHttpClient(): ApiClient {
       update: UpdateSettingsRequest,
     ): Promise<SettingsResponse> {
       const response = await authenticatedFetch('/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(update),
+      });
+      return response.json();
+    },
+
+    async getPricing(): Promise<PricingResponse> {
+      const response = await authenticatedFetch('/pricing');
+      return response.json();
+    },
+
+    async updatePricing(
+      update: UpdatePricingRequest,
+    ): Promise<PricingResponse> {
+      const response = await authenticatedFetch('/pricing', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(update),
