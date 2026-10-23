@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory.imports;
+package com.jordansimsmith.tcginventory.pricing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -19,7 +19,7 @@ public class PricingPolicyTest {
   @Test
   void appraiseShouldDiscardWhenMarketPriceBelowThreshold() {
     // act
-    var result = policy.appraise(new BigDecimal("0.24"), List.of());
+    var result = policy.appraise(new BigDecimal("0.24"), List.of(), Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.DISCARD);
@@ -29,7 +29,7 @@ public class PricingPolicyTest {
   @Test
   void appraiseShouldKeepWhenMarketPriceAtThreshold() {
     // act
-    var result = policy.appraise(new BigDecimal("0.25"), List.of());
+    var result = policy.appraise(new BigDecimal("0.25"), List.of(), Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
@@ -55,7 +55,8 @@ public class PricingPolicyTest {
   }
 
   private void assertPriceWithNoRivals(String marketPrice, String expectedPrice) {
-    var result = policy.appraise(new BigDecimal(marketPrice), List.of());
+    var result =
+        policy.appraise(new BigDecimal(marketPrice), List.of(), Pricing.DEFAULT_PRICE_FLOOR);
     assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
     assertThat(result.suggestedPrice()).isEqualByComparingTo(expectedPrice);
   }
@@ -66,7 +67,7 @@ public class PricingPolicyTest {
     var rivals = List.of(new PricingPolicy.RivalTier(new BigDecimal("5.00"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("5.00"), rivals);
+    var result = policy.appraise(new BigDecimal("5.00"), rivals, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
@@ -82,7 +83,7 @@ public class PricingPolicyTest {
     var rivals = List.of(new PricingPolicy.RivalTier(new BigDecimal("0.40"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("1.00"), rivals);
+    var result = policy.appraise(new BigDecimal("1.00"), rivals, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
@@ -100,7 +101,7 @@ public class PricingPolicyTest {
             new PricingPolicy.RivalTier(new BigDecimal("0.76"), Set.of("beta")));
 
     // act
-    var result = policy.appraise(new BigDecimal("1.40"), rivals);
+    var result = policy.appraise(new BigDecimal("1.40"), rivals, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
@@ -118,7 +119,7 @@ public class PricingPolicyTest {
             new PricingPolicy.RivalTier(new BigDecimal("0.50"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("1.01"), rivals);
+    var result = policy.appraise(new BigDecimal("1.01"), rivals, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
@@ -129,7 +130,7 @@ public class PricingPolicyTest {
   @Test
   void appraiseShouldApplySoleSourcePremiumWhenNoRivalsAndMarketAboveThreshold() {
     // act
-    var result = policy.appraise(new BigDecimal("2.00"), List.of());
+    var result = policy.appraise(new BigDecimal("2.00"), List.of(), Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
@@ -140,7 +141,7 @@ public class PricingPolicyTest {
   @Test
   void appraiseShouldNotApplySoleSourcePremiumWhenMarketBelowThreshold() {
     // act
-    var result = policy.appraise(new BigDecimal("1.99"), List.of());
+    var result = policy.appraise(new BigDecimal("1.99"), List.of(), Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
@@ -156,11 +157,63 @@ public class PricingPolicyTest {
     var rivals = List.of(new PricingPolicy.RivalTier(new BigDecimal("0.25"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("0.30"), rivals);
+    var result = policy.appraise(new BigDecimal("0.30"), rivals, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.KEEP);
     assertThat(result.suggestedPrice()).isEqualByComparingTo("0.25");
+  }
+
+  @Test
+  void appraiseShouldApplyRaisedFloorAfterBenchmarkRounding() {
+    // act
+    var result = policy.appraise(new BigDecimal("1.00"), List.of(), new BigDecimal("1.10"));
+
+    // assert
+    assertThat(result.suggestedPrice()).isEqualByComparingTo("1.10");
+  }
+
+  @Test
+  void appraiseShouldApplyLoweredFloorAfterBenchmarkRounding() {
+    // arrange
+    var rivals = List.of(new PricingPolicy.RivalTier(new BigDecimal("0.25"), Set.of("alpha")));
+
+    // act
+    var result = policy.appraise(new BigDecimal("0.30"), rivals, new BigDecimal("0.10"));
+
+    // assert
+    assertThat(result.suggestedPrice()).isEqualByComparingTo("0.20");
+  }
+
+  @Test
+  void appraiseShouldAcceptZeroFloor() {
+    // arrange
+    var rivals = List.of(new PricingPolicy.RivalTier(new BigDecimal("0.25"), Set.of("alpha")));
+
+    // act
+    var result = policy.appraise(new BigDecimal("0.30"), rivals, BigDecimal.ZERO);
+
+    // assert
+    assertThat(result.suggestedPrice()).isEqualByComparingTo("0.20");
+  }
+
+  @Test
+  void appraiseShouldApplyCentValuedFloorAfterBenchmarkRounding() {
+    // act
+    var result = policy.appraise(new BigDecimal("0.25"), List.of(), new BigDecimal("0.27"));
+
+    // assert
+    assertThat(result.suggestedPrice()).isEqualByComparingTo("0.27");
+  }
+
+  @Test
+  void appraiseShouldKeepDiscardThresholdIndependentFromPriceFloor() {
+    // act
+    var result = policy.appraise(new BigDecimal("0.24"), List.of(), BigDecimal.ZERO);
+
+    // assert
+    assertThat(result.decision()).isEqualTo(PricingPolicy.Decision.DISCARD);
+    assertThat(result.suggestedPrice()).isNull();
   }
 
   @Test
@@ -171,7 +224,7 @@ public class PricingPolicyTest {
     var rivals = List.of(new PricingPolicy.RivalTier(new BigDecimal("1.00"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("1.00"), rivals);
+    var result = policy.appraise(new BigDecimal("1.00"), rivals, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result.suggestedPrice()).isEqualByComparingTo("0.95");
@@ -185,7 +238,7 @@ public class PricingPolicyTest {
     var rivals = List.of(new PricingPolicy.RivalTier(new BigDecimal("10.00"), Set.of("alpha")));
 
     // act
-    var result = policy.appraise(new BigDecimal("10.00"), rivals);
+    var result = policy.appraise(new BigDecimal("10.00"), rivals, Pricing.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result.suggestedPrice()).isEqualByComparingTo("9.75");

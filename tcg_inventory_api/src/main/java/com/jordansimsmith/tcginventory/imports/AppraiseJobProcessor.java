@@ -9,6 +9,8 @@ import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgAuthException;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
 import com.jordansimsmith.tcginventory.imports.AppraisalCatalogs.AppraisalCatalog;
+import com.jordansimsmith.tcginventory.pricing.Pricing;
+import com.jordansimsmith.tcginventory.pricing.PricingPolicy;
 import com.jordansimsmith.time.Clock;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -144,7 +146,7 @@ public class AppraiseJobProcessor implements JobProcessor {
     }
 
     var rivals = buildRivalTiers(cached.cardId(), rowItem.getCondition());
-    var result = pricingPolicy.appraise(cached.marketPrice(), rivals);
+    var result = pricingPolicy.appraise(cached.marketPrice(), rivals, Pricing.DEFAULT_PRICE_FLOOR);
 
     if (result.decision() == PricingPolicy.Decision.DISCARD) {
       return RowDecision.discard("below threshold", cached.marketPrice().toPlainString());

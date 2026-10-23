@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory.imports;
+package com.jordansimsmith.tcginventory.pricing;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -10,7 +10,6 @@ import javax.annotation.Nullable;
 public class PricingPolicy {
   private static final BigDecimal KEEP_THRESHOLD = new BigDecimal("0.25");
   private static final BigDecimal PRICE_INCREMENT = new BigDecimal("0.05");
-  private static final BigDecimal PRICE_FLOOR = new BigDecimal("0.25");
   private static final BigDecimal TICK_RATE = new BigDecimal("0.025");
   private static final BigDecimal DEEP_DISCOUNT_RATE = new BigDecimal("0.80");
   private static final BigDecimal SOLE_SOURCE_PREMIUM_RATE = new BigDecimal("1.15");
@@ -26,7 +25,8 @@ public class PricingPolicy {
 
   public record PricingResult(Decision decision, @Nullable BigDecimal suggestedPrice) {}
 
-  public PricingResult appraise(BigDecimal marketPrice, List<RivalTier> rivals) {
+  public PricingResult appraise(
+      BigDecimal marketPrice, List<RivalTier> rivals, BigDecimal priceFloor) {
     if (marketPrice.compareTo(KEEP_THRESHOLD) < 0) {
       return new PricingResult(Decision.DISCARD, null);
     }
@@ -34,7 +34,7 @@ public class PricingPolicy {
     var lowestRival = rivals.isEmpty() ? null : rivals.get(0).price();
     var supportedFloor = findSupportedFloor(rivals);
     var benchmark = selectBenchmark(marketPrice, lowestRival, supportedFloor);
-    var price = roundToIncrement(benchmark).max(PRICE_FLOOR);
+    var price = roundToIncrement(benchmark).max(priceFloor);
 
     return new PricingResult(Decision.KEEP, price);
   }

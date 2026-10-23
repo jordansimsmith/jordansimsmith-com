@@ -168,6 +168,7 @@ java_library(
         ":fetchtcg-lib",
         ":inventory-lib",
         ":lib",
+        ":pricing-lib",
     ] + COMMON_DEPS,
 )
 
@@ -756,6 +757,7 @@ java_binary(
         ":inventory-lib",
         ":lib",
         ":order-lib",
+        ":pricing-lib",
         ":publish-lib",
         ":report-lib",
         ":scan-lib",
@@ -1245,6 +1247,7 @@ java_test_suite(
         ":inventory-lib",
         ":lib",
         ":order-lib",
+        ":pricing-lib",
         ":publish-lib",
         ":report-lib",
         ":scan-lib",
