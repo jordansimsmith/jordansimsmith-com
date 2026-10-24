@@ -60,7 +60,8 @@ public class AppraiseJobProcessor implements JobProcessor {
 
   private JobProcessor.SuccessJobResult doProcessBatch(String user, JobItem jobItem) {
     var importId = jobItem.getImportId();
-    var continuation = jobItem.getContinuation() != null ? jobItem.getContinuation() : 0;
+    var continuation =
+        jobItem.getContinuation() != null ? Integer.parseInt(jobItem.getContinuation()) : 0;
 
     var importKey =
         Key.builder()
@@ -126,7 +127,8 @@ public class AppraiseJobProcessor implements JobProcessor {
     importItem.setUpdatedAt(clock.now());
     importTable.putItem(importItem);
 
-    return new JobProcessor.SuccessJobResult(processed, complete);
+    return new JobProcessor.SuccessJobResult(
+        processed, complete ? null : Integer.toString(processed));
   }
 
   private void setImportError(String user, String importId, String error) {

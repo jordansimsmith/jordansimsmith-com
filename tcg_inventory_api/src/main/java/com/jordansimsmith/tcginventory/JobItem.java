@@ -35,7 +35,7 @@ public class JobItem {
   private String status;
   private String importId;
   private String orderId;
-  private Integer continuation;
+  private String continuation;
   private Integer processedCount;
   private String error;
   private String scanId;
@@ -108,11 +108,11 @@ public class JobItem {
   }
 
   @DynamoDbAttribute(CONTINUATION)
-  public Integer getContinuation() {
+  public String getContinuation() {
     return continuation;
   }
 
-  public void setContinuation(@Nullable Integer continuation) {
+  public void setContinuation(@Nullable String continuation) {
     this.continuation = continuation;
   }
 

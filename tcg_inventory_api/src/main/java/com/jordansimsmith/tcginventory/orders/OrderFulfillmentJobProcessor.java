@@ -57,7 +57,7 @@ public class OrderFulfillmentJobProcessor implements JobProcessor {
       throw new IllegalStateException("fulfillment order not found");
     }
     if ("fulfilled".equals(order.getStatus())) {
-      return new SuccessJobResult(0, true);
+      return new SuccessJobResult(0, null);
     }
     if (!"fulfilling".equals(order.getStatus())) {
       throw new IllegalStateException("order is not fulfilling");
@@ -84,6 +84,6 @@ public class OrderFulfillmentJobProcessor implements JobProcessor {
       inventoryRepository.updateUnitForSale(user, orderId, unit.skuId(), unit.sequenceNumber());
     }
     orderRepository.finishFulfilling(user, orderId);
-    return new SuccessJobResult(allocated.size(), true);
+    return new SuccessJobResult(allocated.size(), null);
   }
 }

@@ -76,7 +76,8 @@ public class ListingPhaseProcessor {
     }
 
     return new JobProcessor.SuccessJobResult(
-        continuation + processed, dirtySkus.size() < BATCH_SIZE);
+        continuation + processed,
+        dirtySkus.size() < BATCH_SIZE ? null : Integer.toString(continuation + processed));
   }
 
   private List<SkuItem> loadDirtySkus(String user) {

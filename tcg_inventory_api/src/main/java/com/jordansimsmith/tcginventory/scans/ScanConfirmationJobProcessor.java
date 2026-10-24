@@ -64,7 +64,7 @@ public class ScanConfirmationJobProcessor implements JobProcessor {
       throw new IllegalStateException("scan not found for confirmation job");
     }
     if ("confirmed".equals(scanItem.getStatus())) {
-      return new JobProcessor.SuccessJobResult(0, true);
+      return new JobProcessor.SuccessJobResult(0, null);
     }
     if (!"confirming".equals(scanItem.getStatus())) {
       throw new IllegalStateException("scan is not in confirming status");
@@ -121,7 +121,7 @@ public class ScanConfirmationJobProcessor implements JobProcessor {
         throw new IllegalStateException("scan changed before confirmation completed");
       }
     }
-    return new JobProcessor.SuccessJobResult(0, true);
+    return new JobProcessor.SuccessJobResult(0, null);
   }
 
   private List<ConfirmedScanRow> validateCatalogRows(

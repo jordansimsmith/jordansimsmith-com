@@ -285,7 +285,7 @@ public class JobsHandlerIntegrationTest {
     assertThat(unchangedRow.getFetchtcgCardId()).isEqualTo("existing-card");
     assertThat(unchangedRow.getFetchtcgSetId()).isEqualTo(42);
 
-    // act - continuation slice
+    // act - continuation batch
     fakeJobsQueue.reset();
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
 
@@ -704,7 +704,8 @@ public class JobsHandlerIntegrationTest {
     // assert
     var jobItem = getJob("jordan", "job1");
     assertThat(jobItem.getStatus()).isEqualTo("running");
-    assertThat(jobItem.getContinuation()).isEqualTo(AppraiseJobProcessor.BATCH_SIZE);
+    assertThat(jobItem.getContinuation())
+        .isEqualTo(Integer.toString(AppraiseJobProcessor.BATCH_SIZE));
     assertThat(fakeJobsQueue.getSends()).hasSize(1);
     var continuationSend = fakeJobsQueue.getSends().get(0);
     assertThat(continuationSend.messageGroupId()).isEqualTo("jordan");
@@ -719,6 +720,7 @@ public class JobsHandlerIntegrationTest {
     var completedJob = getJob("jordan", "job1");
     assertThat(completedJob.getStatus()).isEqualTo("succeeded");
     assertThat(completedJob.getProcessedCount()).isEqualTo(totalRows);
+    assertThat(completedJob.getContinuation()).isNull();
     assertThat(fakeJobsQueue.getMessages()).isEmpty();
 
     var importItem = getImport("jordan", "import1");
@@ -735,7 +737,7 @@ public class JobsHandlerIntegrationTest {
             "jordan", "job1", "appraise", "import1", null, Instant.ofEpochSecond(1700000000));
     jobItem.setStatus("succeeded");
     jobItem.setProcessedCount(5);
-    jobItem.setContinuation(5);
+    jobItem.setContinuation("5");
     jobItem.setUpdatedAt(Instant.ofEpochSecond(1700000100));
     jobTable.putItem(jobItem);
 
@@ -745,6 +747,8 @@ public class JobsHandlerIntegrationTest {
     // assert
     var updatedJob = getJob("jordan", "job1");
     assertThat(updatedJob.getStatus()).isEqualTo("succeeded");
+    assertThat(updatedJob.getContinuation()).isEqualTo("5");
+    assertThat(updatedJob.getProcessedCount()).isEqualTo(5);
     assertThat(updatedJob.getUpdatedAt()).isEqualTo(Instant.ofEpochSecond(1700000100));
     assertThat(fakeJobsQueue.getMessages()).isEmpty();
   }
@@ -765,7 +769,8 @@ public class JobsHandlerIntegrationTest {
     // assert
     var jobItem = getJob("jordan", "job1");
     assertThat(jobItem.getStatus()).isEqualTo("running");
-    assertThat(jobItem.getContinuation()).isEqualTo(ListingPhaseProcessor.BATCH_SIZE);
+    assertThat(jobItem.getContinuation())
+        .isEqualTo(Integer.toString(ListingPhaseProcessor.BATCH_SIZE));
     assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(ListingPhaseProcessor.BATCH_SIZE);
     assertThat(fakeJobsQueue.getSends()).hasSize(1);
     var continuationSend = fakeJobsQueue.getSends().get(0);
@@ -773,7 +778,7 @@ public class JobsHandlerIntegrationTest {
     assertThat(continuationSend.messageDeduplicationId())
         .isEqualTo("job1#" + ListingPhaseProcessor.BATCH_SIZE);
 
-    // act - second slice
+    // act - second batch
     fakeJobsQueue.reset();
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
@@ -781,6 +786,7 @@ public class JobsHandlerIntegrationTest {
     var completedJob = getJob("jordan", "job1");
     assertThat(completedJob.getStatus()).isEqualTo("succeeded");
     assertThat(completedJob.getProcessedCount()).isEqualTo(totalSkus);
+    assertThat(completedJob.getContinuation()).isNull();
     assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(totalSkus);
     assertThat(fakeJobsQueue.getMessages()).isEmpty();
   }

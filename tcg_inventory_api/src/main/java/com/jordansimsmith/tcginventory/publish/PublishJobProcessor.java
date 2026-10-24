@@ -72,7 +72,8 @@ public class PublishJobProcessor implements JobProcessor {
     var bearerToken = fetchTcgTokenMinter.mint(user);
     LOGGER.info("minted FetchTCG bearer token");
 
-    var continuation = jobItem.getContinuation() != null ? jobItem.getContinuation() : 0;
+    var continuation =
+        jobItem.getContinuation() != null ? Integer.parseInt(jobItem.getContinuation()) : 0;
 
     if (continuation == 0) {
       LOGGER.info("running order phase (continuation=0)");
@@ -85,9 +86,9 @@ public class PublishJobProcessor implements JobProcessor {
     LOGGER.info("running listing phase");
     var result = listingPhaseProcessor.process(user, bearerToken, continuation);
     LOGGER.info(
-        "listing phase complete: processedUpTo={}, complete={}",
-        result.processedUpTo(),
-        result.complete());
+        "listing phase complete: processedCount={}, complete={}",
+        result.processedCount(),
+        result.continuation() == null);
     return result;
   }
 }

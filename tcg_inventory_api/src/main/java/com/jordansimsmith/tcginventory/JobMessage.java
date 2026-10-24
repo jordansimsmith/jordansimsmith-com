@@ -7,7 +7,7 @@ public record JobMessage(
     @JsonProperty("job_id") String jobId,
     @JsonProperty("job_type") String jobType) {
 
-  public String deduplicationId(int continuation) {
-    return jobId + "#" + continuation;
+  public String deduplicationId(int processedCount) {
+    return jobId + "#" + processedCount;
   }
 }

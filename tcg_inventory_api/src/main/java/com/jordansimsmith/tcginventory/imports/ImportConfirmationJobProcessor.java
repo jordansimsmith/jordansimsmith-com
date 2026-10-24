@@ -57,7 +57,7 @@ public class ImportConfirmationJobProcessor implements JobProcessor {
       throw new IllegalStateException("import not found for confirmation job");
     }
     if ("confirmed".equals(importItem.getStatus())) {
-      return new JobProcessor.SuccessJobResult(0, true);
+      return new JobProcessor.SuccessJobResult(0, null);
     }
     if (!"confirming".equals(importItem.getStatus())) {
       throw new IllegalStateException("import is not in confirming status");
@@ -115,7 +115,7 @@ public class ImportConfirmationJobProcessor implements JobProcessor {
     }
 
     importsRepository.finishConfirmation(user, importId, clock.now());
-    return new JobProcessor.SuccessJobResult(keepRows.size(), true);
+    return new JobProcessor.SuccessJobResult(keepRows.size(), null);
   }
 
   private List<ImportRowItem> queryKeepRows(String user, String importId) {

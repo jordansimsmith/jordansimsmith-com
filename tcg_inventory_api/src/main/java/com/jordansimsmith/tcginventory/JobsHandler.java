@@ -110,30 +110,30 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
 
   private void processBatch(
       JobMessage message, JobItem jobItem, JobProcessor.SuccessJobResult result) {
-    var previousContinuation = jobItem.getContinuation() != null ? jobItem.getContinuation() : 0;
+    var previousProcessedCount = jobItem.getProcessedCount();
 
-    // the continuation deduplication id only distinguishes slices when every
-    // re-enqueueing slice advances; a non-advancing slice would be silently
+    // the processed count deduplication id only distinguishes batches when every
+    // re-enqueueing batch advances; a non-advancing batch would be silently
     // deduplicated into a stalled job, so fail loudly instead
-    if (!result.complete() && result.processedUpTo() <= previousContinuation) {
+    if (result.continuation() != null && result.processedCount() <= previousProcessedCount) {
       throw new IllegalStateException(
-          "job continuation did not advance: "
-              + previousContinuation
+          "job processed count did not advance: "
+              + previousProcessedCount
               + " -> "
-              + result.processedUpTo());
+              + result.processedCount());
     }
 
-    jobItem.setContinuation(result.processedUpTo());
-    jobItem.setProcessedCount(result.processedUpTo());
+    jobItem.setContinuation(result.continuation());
+    jobItem.setProcessedCount(result.processedCount());
     jobItem.setUpdatedAt(clock.now());
 
-    if (result.complete()) {
+    if (result.continuation() == null) {
       jobItem.setStatus("succeeded");
     }
     jobTable.putItem(jobItem);
 
-    if (!result.complete()) {
-      jobsQueue.send(message, message.user(), message.deduplicationId(result.processedUpTo()));
+    if (result.continuation() != null) {
+      jobsQueue.send(message, message.user(), message.deduplicationId(result.processedCount()));
     }
   }
 

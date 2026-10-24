@@ -119,7 +119,7 @@ public class ReportJobProcessor implements JobProcessor {
     }
 
     LOGGER.info("wrote report snapshot");
-    return new JobProcessor.SuccessJobResult(0, true);
+    return new JobProcessor.SuccessJobResult(0, null);
   }
 
   private String findLatestAuditUlid(String user) {
