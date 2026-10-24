@@ -240,6 +240,7 @@ java_library(
     ),
     deps = [
         ":fetchtcg-lib",
+        ":inventory-lib",
         ":lib",
     ] + COMMON_DEPS,
 )
@@ -437,6 +438,49 @@ java_binary(
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_guava_guava",
         "@maven//:org_slf4j_slf4j_api",
+    ],
+)
+
+java_binary(
+    name = "create-reprice-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/pricing/CreateRepriceHandler.java"],
+    create_executable = False,
+    resources = ["src/main/resources/logback.xml"],
+    deps = [
+        ":lib",
+        ":pricing-lib",
+        "//lib/http:lib",
+        "//lib/queue:lib",
+        "//lib/time:lib",
+        "//lib/ulid:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
+)
+
+java_binary(
+    name = "get-reprice-handler",
+    srcs = ["src/main/java/com/jordansimsmith/tcginventory/pricing/GetRepriceHandler.java"],
+    create_executable = False,
+    resources = ["src/main/resources/logback.xml"],
+    deps = [
+        ":lib",
+        "//lib/http:lib",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
     ],
 )
 
@@ -1297,6 +1341,7 @@ java_test_suite(
         ":create-import-row-photo-handler",
         ":create-publish-handler",
         ":create-report-handler",
+        ":create-reprice-handler",
         ":create-scan-handler",
         ":delete-import-handler",
         ":delete-import-row-handler",
@@ -1317,6 +1362,7 @@ java_test_suite(
         ":get-pricing-handler",
         ":get-publish-handler",
         ":get-reports-handler",
+        ":get-reprice-handler",
         ":get-scan-handler",
         ":get-settings-handler",
         ":get-sku-handler",

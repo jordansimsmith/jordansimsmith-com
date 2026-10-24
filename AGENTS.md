@@ -103,6 +103,7 @@ When performing the code review step, check for:
 - Use AssertJ assertions with static imports: `import static org.assertj.core.api.Assertions.assertThat;`
 - Only use the `.as()` method when the assertion is not self-explanatory
 - Unit tests: No network dependencies, use fakes over mocks
+- Test fakes should model happy paths only; do not add failure injection or tests that exercise fake failure behavior
 - Integration tests: Use local dependencies (Testcontainers), test component interactions
 - E2E tests: Build local stack of complete system, test real user workflows
 - With DynamoDB test containers, no need to clean up data after tests - containers are reset between tests

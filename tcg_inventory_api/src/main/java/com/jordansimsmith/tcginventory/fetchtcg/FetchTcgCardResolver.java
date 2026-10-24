@@ -39,13 +39,16 @@ public class FetchTcgCardResolver {
     var match = matchingCardSetIds.entrySet().iterator().next();
     var cardId = match.getKey();
     var matchingSetId = match.getValue();
-    var pricingData = cardCache.get(cardId).pricingData();
+    return Optional.of(new ResolvedCard(cardId, matchingSetId, marketPrice(cardCache.get(cardId))));
+  }
+
+  public static BigDecimal marketPrice(FetchTcgClient.GetCardResponse card) {
+    var pricingData = card.pricingData();
     var nzPricing = pricingData != null ? pricingData.get("NZ") : null;
     var marketPrice =
         nzPricing != null && nzPricing.tcgMarketPrice() != null
             ? nzPricing.tcgMarketPrice()
             : BigDecimal.ZERO;
-    return Optional.of(
-        new ResolvedCard(cardId, matchingSetId, marketPrice.setScale(2, RoundingMode.HALF_UP)));
+    return marketPrice.setScale(2, RoundingMode.HALF_UP);
   }
 }

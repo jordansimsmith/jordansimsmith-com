@@ -10,6 +10,18 @@ import org.junit.jupiter.api.Test;
 
 class FetchTcgCardResolverTest {
   @Test
+  void marketPriceShouldUseZeroWhenNzPriceIsMissing() {
+    // arrange
+    var card = new FetchTcgClient.GetCardResponse("card-1", "Lightning Bolt", Map.of(), Map.of());
+
+    // act
+    var marketPrice = FetchTcgCardResolver.marketPrice(card);
+
+    // assert
+    assertThat(marketPrice).isEqualByComparingTo("0.00");
+  }
+
+  @Test
   void resolveShouldReturnResolvedCardWhenCandidateHasExactExternalReference() {
     // arrange
     var fetchTcgClient = new FakeFetchTcgClient();

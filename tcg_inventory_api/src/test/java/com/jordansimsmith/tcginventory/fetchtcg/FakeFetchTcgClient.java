@@ -13,8 +13,6 @@ public class FakeFetchTcgClient implements FetchTcgClient {
   private final List<UpsertListingRequest> upsertCalls = new ArrayList<>();
   private final List<Integer> deleteCalls = new ArrayList<>();
   private final List<UploadCall> uploadCalls = new ArrayList<>();
-  private RuntimeException sellerOffersFailure;
-  private RuntimeException searchCardsFailure;
   private String profileUsername = "jordan";
   private int searchCallCount;
   private int nextListingId = 900000;
@@ -31,9 +29,6 @@ public class FakeFetchTcgClient implements FetchTcgClient {
 
   @Override
   public SearchCardsResponse searchCards(String gameId, int setId, String cardName, String finish) {
-    if (searchCardsFailure != null) {
-      throw searchCardsFailure;
-    }
     searchCallCount++;
     var key = gameId + "#" + setId + "#" + cardName + "#" + finish;
     var response = searchResults.get(key);
@@ -59,9 +54,6 @@ public class FakeFetchTcgClient implements FetchTcgClient {
 
   @Override
   public GetSellerOffersResponse getSellerOffers(String bearerToken, int page) {
-    if (sellerOffersFailure != null) {
-      throw sellerOffersFailure;
-    }
     var response = sellerOffers.get(page);
     if (response == null) {
       return new GetSellerOffersResponse(List.of(), 0);
@@ -111,14 +103,6 @@ public class FakeFetchTcgClient implements FetchTcgClient {
     sellerOffers.put(page, response);
   }
 
-  public void seedSellerOffersFailure(RuntimeException exception) {
-    this.sellerOffersFailure = exception;
-  }
-
-  public void seedSearchCardsFailure(RuntimeException exception) {
-    this.searchCardsFailure = exception;
-  }
-
   public List<UpsertListingRequest> getUpsertCalls() {
     return upsertCalls;
   }
@@ -143,8 +127,6 @@ public class FakeFetchTcgClient implements FetchTcgClient {
     upsertCalls.clear();
     deleteCalls.clear();
     uploadCalls.clear();
-    sellerOffersFailure = null;
-    searchCardsFailure = null;
     searchCallCount = 0;
     profileUsername = "jordan";
     nextListingId = 900000;

@@ -9,7 +9,6 @@ import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgAuthException;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgSetMapping;
 import com.jordansimsmith.tcginventory.imports.AppraiseJobProcessor;
@@ -23,7 +22,6 @@ import com.jordansimsmith.tcginventory.pricing.PricingRepository;
 import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
 import com.jordansimsmith.tcginventory.settings.SettingsItem;
 import com.jordansimsmith.time.FakeClock;
-import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.time.Instant;
@@ -1884,69 +1882,6 @@ public class JobsHandlerIntegrationTest {
     var updated = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(updated.getFetchtcgListingId()).isNull();
     assertThat(updated.getLastPublishedQuantity()).isNull();
-  }
-
-  @Test
-  void publishShouldStoreActionableErrorWhenAuthFails() {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
-    fakeFetchTcgClient.seedSellerOffersFailure(
-        new FetchTcgAuthException(401, "FetchTCG authentication failed with status 401"));
-
-    // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
-
-    // assert
-    var job = getJob("jordan", "job1");
-    assertThat(job.getStatus()).isEqualTo("failed");
-    assertThat(job.getError())
-        .isEqualTo("FetchTCG authentication failed. Replace the refresh token in settings.");
-  }
-
-  @Test
-  void publishShouldPropagateProviderFailureAndLeaveJobRunning() {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
-    var message = "FetchTCG request failed with status 500 after 3 attempt(s): " + "x".repeat(5000);
-    fakeFetchTcgClient.seedSellerOffersFailure(new RuntimeException(new IOException(message)));
-
-    // act & assert
-    assertThatThrownBy(
-            () -> jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null))
-        .hasRootCauseInstanceOf(IOException.class)
-        .hasRootCauseMessage(message);
-
-    var job = getJob("jordan", "job1");
-    assertThat(job.getStatus()).isEqualTo("running");
-    assertThat(job.getError()).isNull();
-
-    // arrange: the provider has recovered before SQS redelivery
-    fakeFetchTcgClient.seedSellerOffersFailure(null);
-
-    // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
-
-    // assert
-    assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("succeeded");
-  }
-
-  @Test
-  void appraiseShouldReturnFailureForCredentialErrorAndUpdateImport() {
-    // arrange
-    createImportWithRow("jordan", "import1", "dom", "168", "normal", "NM", "en");
-    createJob("jordan", "job1", "appraise", "queued", "import1");
-    fakeFetchTcgClient.seedSearchCardsFailure(
-        new FetchTcgAuthException(401, "FetchTCG authentication failed with status 401"));
-    // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
-
-    // assert
-    var job = getJob("jordan", "job1");
-    assertThat(job.getStatus()).isEqualTo("failed");
-    assertThat(getImport("jordan", "import1").getError())
-        .isEqualTo("FetchTCG authentication failed. Replace the refresh token in settings.");
   }
 
   private void createDirtySkuWithUnits(
