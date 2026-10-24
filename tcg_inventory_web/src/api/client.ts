@@ -383,6 +383,17 @@ export interface PublishResponse {
   pending_sku_count: number;
 }
 
+export type RepriceStatus = 'queued' | 'running' | 'succeeded' | 'failed';
+
+export interface RepriceResponse {
+  job_id: string;
+  status: RepriceStatus;
+  processed_sku_count: number;
+  error: string | null;
+  started_at: number;
+  finished_at: number | null;
+}
+
 export interface GenerationStatus {
   status: 'queued' | 'running' | 'succeeded' | 'failed';
   error: string | null;
@@ -521,6 +532,8 @@ export interface ApiClient {
   confirmOrder(orderId: string): Promise<ConfirmOrderResponse>;
   createPublish(): Promise<void>;
   getPublish(): Promise<PublishResponse>;
+  createReprice(): Promise<void>;
+  getReprice(): Promise<RepriceResponse | null>;
   getReport(): Promise<ReportResponse>;
   createReport(): Promise<void>;
 }

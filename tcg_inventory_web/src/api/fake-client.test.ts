@@ -1202,6 +1202,52 @@ describe('createFakeClient publish', () => {
   });
 });
 
+describe('createFakeClient repricing', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('reports no run before repricing starts', async () => {
+    const client = createFakeClient();
+
+    await expect(client.getReprice()).resolves.toBeNull();
+  });
+
+  it('checks candidates in batches and dirties in-stock SKUs', async () => {
+    vi.useFakeTimers();
+    const client = createFakeClient();
+    await client.updatePricing({ price_floor: '1000.00' });
+
+    await client.createReprice();
+    await expect(client.getReprice()).resolves.toMatchObject({
+      job_id: 'fake-reprice-1',
+      status: 'queued',
+      processed_sku_count: 0,
+    });
+    await client.createReprice();
+    await expect(client.getReprice()).resolves.toMatchObject({
+      job_id: 'fake-reprice-1',
+      status: 'running',
+      processed_sku_count: 0,
+    });
+
+    vi.advanceTimersByTime(1000);
+    const completed = await client.getReprice();
+    expect(completed?.status).toBe('succeeded');
+    expect(completed?.processed_sku_count).toBeGreaterThan(0);
+    expect(completed?.finished_at).not.toBeNull();
+    expect((await client.getPublish()).pending_sku_count).toBeGreaterThan(0);
+
+    await client.createPublish();
+    vi.advanceTimersByTime(60_000);
+    await client.getPublish();
+    const firstPage = await client.findSkus({ game: 'mtg' });
+    expect(firstPage.skus.map((sku) => sku.last_published_price)).toContain(
+      '1000.00',
+    );
+  });
+});
+
 describe('createFakeClient settings', () => {
   it('stores credential presence without exposing the value', async () => {
     const client = createFakeClient();

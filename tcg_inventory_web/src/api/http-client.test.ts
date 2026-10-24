@@ -65,6 +65,91 @@ describe('http client pricing', () => {
   });
 });
 
+describe('http client repricing', () => {
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    localStorage.clear();
+    setSession('alice', 'pw');
+  });
+
+  afterEach(() => {
+    clearSession();
+  });
+
+  it('starts repricing with an authenticated bodyless request', async () => {
+    const json = vi.fn();
+    fetchSpy.mockResolvedValue({ ok: true, status: 202, json });
+
+    await expect(createHttpClient().createReprice()).resolves.toBeUndefined();
+
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/pricing/reprice',
+    );
+    expect(init.method).toBe('POST');
+    expect(init.headers.Authorization).toBe(`Basic ${btoa('alice:pw')}`);
+    expect(init.body).toBeUndefined();
+    expect(json).not.toHaveBeenCalled();
+  });
+
+  it('returns null when no repricing run exists', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      json: vi.fn(),
+    });
+
+    await expect(createHttpClient().getReprice()).resolves.toBeNull();
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/pricing/reprice',
+    );
+  });
+
+  it('returns the latest repricing status and surfaces other errors', async () => {
+    const response = {
+      job_id: 'job-1',
+      status: 'running',
+      processed_sku_count: 100,
+      error: null,
+      started_at: 1723363200,
+      finished_at: null,
+    };
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue(response),
+    });
+    await expect(createHttpClient().getReprice()).resolves.toEqual(response);
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+      json: vi.fn().mockResolvedValue({ message: 'temporarily unavailable' }),
+    });
+    await expect(createHttpClient().getReprice()).rejects.toThrow(
+      'temporarily unavailable',
+    );
+  });
+
+  it('surfaces a conflict when another job is active', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: false,
+      status: 409,
+      statusText: 'Conflict',
+      json: vi
+        .fn()
+        .mockResolvedValue({ message: 'another job is in progress' }),
+    });
+
+    await expect(createHttpClient().createReprice()).rejects.toThrow(
+      'another job is in progress',
+    );
+  });
+});
+
 describe('http client imports', () => {
   beforeEach(() => {
     fetchSpy.mockReset();

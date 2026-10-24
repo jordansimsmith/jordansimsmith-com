@@ -35,6 +35,8 @@ import type {
   PlacementInstruction,
   PricingResponse,
   PublishResponse,
+  RepriceResponse,
+  RepriceStatus,
   Report,
   ReportResponse,
   RowDecision,
@@ -329,6 +331,7 @@ interface FakeSku {
   collector_number: string;
   finish: Finish;
   condition: Condition;
+  suggested_price: string;
   last_published_price: string | null;
   units: FakeUnit[];
 }
@@ -367,6 +370,7 @@ function createSeedState(): FakeSku[] {
         units[i].status = 'reserved';
       }
       const hasStock = inStockCount > 0;
+      const suggestedPrice = formatPrice(30 + ((unitIndex * 37) % 20) * 25);
       return {
         sku_id: crypto.randomUUID(),
         game: MAGIC_THE_GATHERING.id,
@@ -377,9 +381,8 @@ function createSeedState(): FakeSku[] {
         collector_number: collectorNumber,
         finish,
         condition,
-        last_published_price: hasStock
-          ? formatPrice(30 + ((unitIndex * 37) % 20) * 25)
-          : null,
+        suggested_price: suggestedPrice,
+        last_published_price: hasStock ? suggestedPrice : null,
         units,
       };
     },
@@ -423,6 +426,7 @@ function createSeedState(): FakeSku[] {
       for (let i = soldCount; i < soldCount + reservedCount; i += 1) {
         units[i].status = 'reserved';
       }
+      const suggestedPrice = formatPrice(3.5 + pokemonUnitIndex);
       return {
         sku_id: crypto.randomUUID(),
         game: POKEMON_ENGLISH.id,
@@ -433,8 +437,8 @@ function createSeedState(): FakeSku[] {
         collector_number: collectorNumber,
         finish,
         condition,
-        last_published_price:
-          inStockCount > 0 ? formatPrice(3.5 + pokemonUnitIndex) : null,
+        suggested_price: suggestedPrice,
+        last_published_price: inStockCount > 0 ? suggestedPrice : null,
         units,
       };
     },
@@ -1441,6 +1445,9 @@ function toOrderSummary(order: FakeOrder): OrderSummary {
 }
 
 const PUBLISH_SKUS_PER_SECOND = 2;
+const REPRICE_BATCH_SIZE = 100;
+const FAKE_FETCHTCG_USERNAME = 'fake-seller';
+const FAKE_RIVAL_USERNAME = 'fake-rival';
 
 interface FakePublishRun {
   worklist: string[];
@@ -1448,6 +1455,33 @@ interface FakePublishRun {
   started_at_ms: number;
   finished_at_ms: number | null;
   cleared_count: number;
+}
+
+interface FakeRepriceRun {
+  job_id: string;
+  status: RepriceStatus;
+  processed_sku_count: number;
+  worklist: string[];
+  started_at_ms: number;
+  finished_at_ms: number | null;
+}
+
+function fakeRepricedPrice(sku: FakeSku, priceFloor: string): string {
+  let hash = 0;
+  for (const character of sku.sku_id) {
+    hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
+  }
+  const rivalPriceCents = 50 + (hash % 5000);
+  const listings = [
+    { seller: FAKE_FETCHTCG_USERNAME, price: Number(sku.suggested_price) },
+    { seller: FAKE_RIVAL_USERNAME, price: (rivalPriceCents - 5) / 100 },
+  ];
+  const lowestRivalPrice = Math.min(
+    ...listings
+      .filter((listing) => listing.seller !== FAKE_FETCHTCG_USERNAME)
+      .map((listing) => listing.price),
+  );
+  return Math.max(Number(priceFloor), lowestRivalPrice).toFixed(2);
 }
 
 function publishedCount(run: FakePublishRun): number {
@@ -1616,6 +1650,8 @@ export function createFakeClient(): ApiClient {
     skus.filter((_, index) => index % 4 === 0).map((sku) => sku.sku_id),
   );
   let publishRun: FakePublishRun | null = null;
+  let repriceRun: FakeRepriceRun | null = null;
+  let repriceCounter = 0;
   let settings: SettingsResponse = {
     credential_set: false,
     updated_at: null,
@@ -1676,6 +1712,10 @@ export function createFakeClient(): ApiClient {
       published,
     )) {
       dirtySkuIds.delete(skuId);
+      const sku = skus.find((candidate) => candidate.sku_id === skuId);
+      if (sku) {
+        sku.last_published_price = sku.suggested_price;
+      }
     }
     publishRun.cleared_count = Math.max(publishRun.cleared_count, published);
     if (
@@ -1688,6 +1728,50 @@ export function createFakeClient(): ApiClient {
         (publishRun.worklist.length / PUBLISH_SKUS_PER_SECOND) * 1000;
     }
   };
+
+  const progressReprice = (): void => {
+    if (!repriceRun || repriceRun.status !== 'running') {
+      return;
+    }
+    const processedCount = Math.min(
+      repriceRun.worklist.length,
+      Math.floor((Date.now() - repriceRun.started_at_ms) / 1000) *
+        REPRICE_BATCH_SIZE,
+    );
+    for (const skuId of repriceRun.worklist.slice(
+      repriceRun.processed_sku_count,
+      processedCount,
+    )) {
+      const sku = skus.find((candidate) => candidate.sku_id === skuId);
+      if (!sku) {
+        throw new Error(`SKU not found: ${skuId}`);
+      }
+      if (sku.units.some((unit) => unit.status === 'in_stock')) {
+        sku.suggested_price = fakeRepricedPrice(sku, pricing.price_floor);
+        dirtySkuIds.add(skuId);
+        reportStale = true;
+      }
+    }
+    repriceRun.processed_sku_count = processedCount;
+    if (processedCount >= repriceRun.worklist.length) {
+      repriceRun.status = 'succeeded';
+      repriceRun.finished_at_ms =
+        repriceRun.started_at_ms +
+        Math.ceil(repriceRun.worklist.length / REPRICE_BATCH_SIZE) * 1000;
+    }
+  };
+
+  const toRepriceResponse = (run: FakeRepriceRun): RepriceResponse => ({
+    job_id: run.job_id,
+    status: run.status,
+    processed_sku_count: run.processed_sku_count,
+    error: null,
+    started_at: Math.floor(run.started_at_ms / 1000),
+    finished_at:
+      run.finished_at_ms === null
+        ? null
+        : Math.floor(run.finished_at_ms / 1000),
+  });
 
   const toPublishResponse = (): PublishResponse => {
     if (!publishRun) {
@@ -1779,6 +1863,7 @@ export function createFakeClient(): ApiClient {
           collector_number: row.collector_number,
           finish: row.finish,
           condition: row.condition,
+          suggested_price: row.suggested_price ?? formatPrice(25),
           last_published_price: null,
           units: [],
         };
@@ -2389,6 +2474,37 @@ export function createFakeClient(): ApiClient {
     async getPublish(): Promise<PublishResponse> {
       progressPublish();
       return toPublishResponse();
+    },
+
+    async createReprice(): Promise<void> {
+      progressReprice();
+      if (repriceRun?.status === 'queued' || repriceRun?.status === 'running') {
+        return;
+      }
+      repriceCounter += 1;
+      const worklist = skus.map((sku) => sku.sku_id);
+      const now = Date.now();
+      repriceRun = {
+        job_id: `fake-reprice-${repriceCounter}`,
+        status: worklist.length === 0 ? 'succeeded' : 'queued',
+        processed_sku_count: 0,
+        worklist,
+        started_at_ms: now,
+        finished_at_ms: worklist.length === 0 ? now : null,
+      };
+    },
+
+    async getReprice(): Promise<RepriceResponse | null> {
+      if (!repriceRun) {
+        return null;
+      }
+      if (repriceRun.status === 'queued') {
+        const response = toRepriceResponse(repriceRun);
+        repriceRun.status = 'running';
+        return response;
+      }
+      progressReprice();
+      return toRepriceResponse(repriceRun);
     },
 
     async getReport(): Promise<ReportResponse> {

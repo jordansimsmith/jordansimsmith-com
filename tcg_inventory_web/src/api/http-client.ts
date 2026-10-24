@@ -26,6 +26,7 @@ import type {
   OrderDetail,
   PricingResponse,
   PublishResponse,
+  RepriceResponse,
   ReportResponse,
   IdentifyScanResponse,
   ScanDetail,
@@ -40,7 +41,11 @@ const BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   'https://api.tcg-inventory.jordansimsmith.com';
 
-async function authenticatedFetch(path: string, init?: RequestInit) {
+async function authenticatedFetch(
+  path: string,
+  init?: RequestInit,
+  allowNotFound = false,
+) {
   const session = getSession();
   if (!session) {
     throw new Error('Not authenticated');
@@ -54,7 +59,7 @@ async function authenticatedFetch(path: string, init?: RequestInit) {
     },
   });
 
-  if (!response.ok) {
+  if (!response.ok && !(allowNotFound && response.status === 404)) {
     let message = `Request failed: ${response.statusText}`;
     try {
       const error = await response.json();
@@ -386,6 +391,22 @@ export function createHttpClient(): ApiClient {
 
     async getPublish(): Promise<PublishResponse> {
       const response = await authenticatedFetch('/publish');
+      return response.json();
+    },
+
+    async createReprice(): Promise<void> {
+      await authenticatedFetch('/pricing/reprice', { method: 'POST' });
+    },
+
+    async getReprice(): Promise<RepriceResponse | null> {
+      const response = await authenticatedFetch(
+        '/pricing/reprice',
+        undefined,
+        true,
+      );
+      if (response.status === 404) {
+        return null;
+      }
       return response.json();
     },
 
