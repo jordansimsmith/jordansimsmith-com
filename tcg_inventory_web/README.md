@@ -26,6 +26,7 @@ The TCG inventory web service is a single-page app for running a chaos-sorted ca
 - As a card seller scanning the orders list, I want the money column to be what the cards sold for, so that postage the buyer paid never inflates what an order looks like it earned.
 - As a card seller, I want to trigger a publish run and watch its progress, so that FetchTCG listings converge with my inventory on demand.
 - As a card seller, I want to set a minimum suggested price for future appraisals, so that new appraisal decisions reflect my pricing preferences.
+- As a card seller, I want to reprice my in-stock inventory and see when the work completes, so that changed prices are ready for my next publish.
 - As a card seller, I want to see when an accepted offer is still reserving its cards, so that I can distinguish background work from an order waiting for payment.
 - As a card seller, I want a reports dashboard of value, movement, and composition figures, so that I can appreciate the overall state of my inventory at a glance.
 - As a returning user, I want a persisted session and a write-only credential form, so that setup is one-time and my FetchTCG token is never displayed.

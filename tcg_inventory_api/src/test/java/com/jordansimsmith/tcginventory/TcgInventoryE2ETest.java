@@ -5,7 +5,6 @@ import static org.awaitility.Awaitility.await;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.tcginventory.catalog.ScryfallStubContainer;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgStubContainer;
 import java.io.IOException;
@@ -23,7 +22,6 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.Network;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
 public class TcgInventoryE2ETest {
   private static final String AUTH_HEADER =
@@ -99,10 +97,6 @@ public class TcgInventoryE2ETest {
 
   @BeforeEach
   void setUp() {
-    var dynamoDbClient =
-        DynamoDbClient.builder().endpointOverride(tcgInventoryContainer.getLocalstackUrl()).build();
-    DynamoDbUtils.reset(dynamoDbClient);
-
     httpClient = HttpClient.newHttpClient();
     objectMapper = new ObjectMapper();
     apiUrl = tcgInventoryContainer.getApiUrl();
@@ -194,13 +188,19 @@ public class TcgInventoryE2ETest {
             });
 
     var appraisedRows = objectMapper.readTree(get("/imports/" + importId).body()).get("rows");
-    var flooredRow =
+    var ownListingAdjustedRow =
+        StreamSupport.stream(appraisedRows.spliterator(), false)
+            .filter(row -> row.path("market_price").asText().equals("60.00"))
+            .findFirst()
+            .orElseThrow();
+    assertThat(ownListingAdjustedRow.get("decision").asText()).isEqualTo("keep");
+    assertThat(ownListingAdjustedRow.get("suggested_price").asText()).isEqualTo("48.75");
+    var floorClampedRow =
         StreamSupport.stream(appraisedRows.spliterator(), false)
             .filter(row -> row.path("market_price").asText().equals("1.50"))
             .findFirst()
             .orElseThrow();
-    assertThat(flooredRow.get("decision").asText()).isEqualTo("keep");
-    assertThat(flooredRow.get("suggested_price").asText()).isEqualTo("5.00");
+    assertThat(floorClampedRow.get("suggested_price").asText()).isEqualTo("5.00");
 
     // act - update cheap row 1 condition from NM to LP, then delete it
     var updateRowResponse = put("/imports/" + importId + "/rows/1", "{\"condition\":\"LP\"}");
@@ -291,16 +291,67 @@ public class TcgInventoryE2ETest {
     triggerPublishAndWait();
 
     var firstListing = getStubListing();
+    assertThat(firstListing.get("listedPrice").asText()).isEqualTo("48.75");
     assertThat(firstListing.get("frontImage").asText()).isEqualTo(STUB_IMAGE_1);
     assertThat(firstListing.get("additionalImages")).hasSize(1);
     assertThat(firstListing.get("additionalImages").get(0).get("url").asText())
         .isEqualTo(STUB_IMAGE_2);
+    await()
+        .atMost(Duration.ofSeconds(30))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(
+            () -> {
+              var response = get("/publish");
+              assertThat(response.statusCode()).isEqualTo(200);
+              assertThat(objectMapper.readTree(response.body()).get("pending_sku_count").asInt())
+                  .isZero();
+            });
 
-    // act - publish run 2: stub returns offer with listing 900001, order created directly as
+    // Arrange - establish a fresh report baseline before repricing.
+    triggerReportAndWait();
+    var reportBeforeReprice = get("/reports");
+    assertThat(reportBeforeReprice.statusCode()).isEqualTo(200);
+    assertThat(objectMapper.readTree(reportBeforeReprice.body()).get("stale").asBoolean())
+        .isFalse();
+
+    // act - raise the floor and reprice the confirmed, in-stock inventory
+    var updatedFloor = patch("/pricing", "{\"price_floor\":49.00}");
+    assertThat(updatedFloor.statusCode()).isEqualTo(200);
+    var repriceResponse = post("/pricing/reprice");
+    assertThat(repriceResponse.statusCode()).isEqualTo(202);
+    await()
+        .atMost(Duration.ofSeconds(120))
+        .pollInterval(Duration.ofSeconds(1))
+        .untilAsserted(
+            () -> {
+              var response = get("/pricing/reprice");
+              assertThat(response.statusCode()).isEqualTo(200);
+              var body = objectMapper.readTree(response.body());
+              assertThat(body.get("status").asText()).isIn("succeeded", "failed");
+            });
+    var repriceBody = objectMapper.readTree(get("/pricing/reprice").body());
+    assertThat(repriceBody.get("status").asText()).isEqualTo("succeeded");
+    assertThat(repriceBody.get("processed_sku_count").asInt()).isEqualTo(1);
+    var repricedSku =
+        objectMapper.readTree(
+            get("/skus/" + URLEncoder.encode(HIT_SKU_ID, StandardCharsets.UTF_8)).body());
+    assertThat(repricedSku.get("suggested_price").asText()).isEqualTo("49.00");
+
+    var pendingPublish = get("/publish");
+    assertThat(pendingPublish.statusCode()).isEqualTo(200);
+    assertThat(objectMapper.readTree(pendingPublish.body()).get("pending_sku_count").asInt())
+        .isEqualTo(1);
+    var reportAfterReprice = get("/reports");
+    assertThat(reportAfterReprice.statusCode()).isEqualTo(200);
+    assertThat(objectMapper.readTree(reportAfterReprice.body()).get("stale").asBoolean()).isTrue();
+
+    // act - publish run 2: publish the repriced price and stub returns offer with listing 900001,
+    // order created directly as
     // to_pick; reserved first unit so listing swaps to the next unit's photos
     triggerPublishAndWait();
 
     // act - list orders
+    assertThat(getStubListing().get("listedPrice").asText()).isEqualTo("49.00");
     var ordersResponse = get("/orders");
     assertThat(ordersResponse.statusCode()).isEqualTo(200);
     var ordersBody = objectMapper.readTree(ordersResponse.body());

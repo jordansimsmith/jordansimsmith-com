@@ -92,6 +92,14 @@ module "java_api" {
       handler  = "com.jordansimsmith.tcginventory.pricing.UpdatePricingHandler"
       artifact = var.artifacts["update_pricing"]
     }
+    create_reprice = {
+      handler  = "com.jordansimsmith.tcginventory.pricing.CreateRepriceHandler"
+      artifact = var.artifacts["create_reprice"]
+    }
+    get_reprice = {
+      handler  = "com.jordansimsmith.tcginventory.pricing.GetRepriceHandler"
+      artifact = var.artifacts["get_reprice"]
+    }
     create_import = {
       handler  = "com.jordansimsmith.tcginventory.imports.CreateImportHandler"
       artifact = var.artifacts["create_import"]
@@ -216,6 +224,8 @@ module "java_api" {
     update_settings           = { path = "settings", method = "PATCH", lambda = "update_settings" }
     get_pricing               = { path = "pricing", method = "GET", lambda = "get_pricing" }
     update_pricing            = { path = "pricing", method = "PATCH", lambda = "update_pricing" }
+    create_reprice            = { path = "pricing/reprice", method = "POST", lambda = "create_reprice" }
+    get_reprice               = { path = "pricing/reprice", method = "GET", lambda = "get_reprice" }
     create_import             = { path = "imports", method = "POST", lambda = "create_import" }
     find_imports              = { path = "imports", method = "GET", lambda = "find_imports" }
     get_import                = { path = "imports/{import_id}", method = "GET", lambda = "get_import" }

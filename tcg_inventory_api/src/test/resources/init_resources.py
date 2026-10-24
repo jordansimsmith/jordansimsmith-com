@@ -171,6 +171,14 @@ lambdas = {
         "handler": "com.jordansimsmith.tcginventory.pricing.UpdatePricingHandler",
         "zip_file": "update-pricing-handler_deploy.jar",
     },
+    "create_reprice": {
+        "handler": "com.jordansimsmith.tcginventory.pricing.CreateRepriceHandler",
+        "zip_file": "create-reprice-handler_deploy.jar",
+    },
+    "get_reprice": {
+        "handler": "com.jordansimsmith.tcginventory.pricing.GetRepriceHandler",
+        "zip_file": "get-reprice-handler_deploy.jar",
+    },
     "create_import": {
         "handler": "com.jordansimsmith.tcginventory.imports.CreateImportHandler",
         "zip_file": "create-import-handler_deploy.jar",
@@ -314,6 +322,7 @@ child_resources = {
         "parent": "catalog_card_detail",
         "path": "alternatives",
     },
+    "pricing_reprice": {"parent": "pricing", "path": "reprice"},
     "import_detail": {"parent": "imports", "path": "{import_id}"},
     "import_confirm": {"parent": "import_detail", "path": "confirm"},
     "import_rows": {"parent": "import_detail", "path": "rows"},
@@ -364,6 +373,16 @@ endpoints = {
         "resource": "pricing",
         "method": "PATCH",
         "lambda": "update_pricing",
+    },
+    "create_reprice": {
+        "resource": "pricing_reprice",
+        "method": "POST",
+        "lambda": "create_reprice",
+    },
+    "get_reprice": {
+        "resource": "pricing_reprice",
+        "method": "GET",
+        "lambda": "get_reprice",
     },
     "create_import": {
         "resource": "imports",

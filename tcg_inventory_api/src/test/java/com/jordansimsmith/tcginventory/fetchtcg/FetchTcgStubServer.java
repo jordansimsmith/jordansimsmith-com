@@ -15,6 +15,7 @@ public final class FetchTcgStubServer {
   private static volatile boolean listingStored;
   private static volatile String lastFrontImageJson;
   private static volatile String lastAdditionalImagesJson;
+  private static volatile String lastListedPriceJson;
 
   private static final String SEARCH_RESPONSE =
       """
@@ -41,6 +42,11 @@ public final class FetchTcgStubServer {
   private static final String LISTINGS_RESPONSE =
       """
       {"searchResults":{"content":[]}}\
+      """;
+
+  private static final String HIT_LISTINGS_RESPONSE =
+      """
+      {"searchResults":{"content":[{"id":900010,"condition":"raw-nm","listedPrice":40.00,"sellerProfileName":"jordan"},{"id":900011,"condition":"raw-nm","listedPrice":50.00,"sellerProfileName":"rival"}]}}\
       """;
 
   private static final String SELLER_OFFERS_EMPTY =
@@ -103,7 +109,9 @@ public final class FetchTcgStubServer {
     var path = exchange.getRequestURI().getPath();
 
     if (query != null && query.contains("countryCode=")) {
-      respond(exchange, 200, "application/json", LISTINGS_RESPONSE);
+      var listings =
+          path.contains("/mtg_hit_c_dom_normal/") ? HIT_LISTINGS_RESPONSE : LISTINGS_RESPONSE;
+      respond(exchange, 200, "application/json", listings);
     } else if (query != null && query.contains("cardName=")) {
       var searchResponse =
           query.contains("cardName=Test+Hit") || query.contains("cardName=Test%20Hit")
@@ -130,6 +138,7 @@ public final class FetchTcgStubServer {
     var requestBody = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
     lastFrontImageJson = extractJsonField(requestBody, "frontImage");
     lastAdditionalImagesJson = extractJsonField(requestBody, "additionalImages");
+    lastListedPriceJson = extractJsonField(requestBody, "listedPrice");
     listingStored = true;
     respond(exchange, 200, "application/json", listingJson());
   }
@@ -148,6 +157,9 @@ public final class FetchTcgStubServer {
 
   private static String listingJson() {
     var listing = new StringBuilder("{\"listingId\":900001,\"remainingQuantity\":1");
+    if (lastListedPriceJson != null) {
+      listing.append(",\"listedPrice\":").append(lastListedPriceJson);
+    }
     if (lastFrontImageJson != null) {
       listing.append(",\"frontImage\":").append(lastFrontImageJson);
     }
@@ -159,7 +171,10 @@ public final class FetchTcgStubServer {
 
   private static String extractJsonField(String json, String field) {
     var matcher =
-        Pattern.compile("\"" + field + "\"\\s*:\\s*(\"(?:\\\\.|[^\"\\\\])*\"|\\[[^\\]]*\\]|null)")
+        Pattern.compile(
+                "\""
+                    + field
+                    + "\"\\s*:\\s*(\"(?:\\\\.|[^\"\\\\])*\"|\\[[^\\]]*\\]|null|-?\\d+(?:\\.\\d+)?|true|false)")
             .matcher(json);
     return matcher.find() ? matcher.group(1) : null;
   }
