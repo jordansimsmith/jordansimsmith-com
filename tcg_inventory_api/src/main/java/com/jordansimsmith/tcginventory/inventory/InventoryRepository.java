@@ -7,6 +7,7 @@ import com.jordansimsmith.tcginventory.SkuIds;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -557,6 +558,87 @@ public class InventoryRepository {
                 .expressionAttributeValues(values)
                 .build())
         .build();
+  }
+
+  public void updateSkuPrice(
+      String user,
+      String skuId,
+      int expectedVersion,
+      String jobId,
+      String beforePrice,
+      String afterPrice,
+      String auditId,
+      Instant createdAt) {
+    var skuPk = SkuItem.formatPk(user, skuId);
+    var dirtyGsi1pk = SkuItem.formatGsi1pk(user);
+    var dirtyGsi1sk = SkuItem.formatGsi1sk(skuId);
+    var transaction =
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                TransactWriteItem.builder()
+                    .update(
+                        Update.builder()
+                            .tableName(TcgInventoryTable.TABLE_NAME)
+                            .key(
+                                Map.of(
+                                    SkuItem.PK, AttributeValue.builder().s(skuPk).build(),
+                                    SkuItem.SK,
+                                        AttributeValue.builder().s(SkuItem.formatSk()).build()))
+                            .updateExpression(
+                                "SET #suggestedPrice = :afterPrice, #dirty = :dirty, "
+                                    + "#gsi1pk = :gsi1pk, #gsi1sk = :gsi1sk "
+                                    + "ADD #version :one")
+                            .conditionExpression(
+                                "attribute_exists(#pk) AND #version = :expectedVersion")
+                            .expressionAttributeNames(
+                                Map.of(
+                                    "#pk", SkuItem.PK,
+                                    "#suggestedPrice", SkuItem.SUGGESTED_PRICE,
+                                    "#dirty", SkuItem.DIRTY,
+                                    "#gsi1pk", SkuItem.GSI1PK,
+                                    "#gsi1sk", SkuItem.GSI1SK,
+                                    "#version", SkuItem.VERSION))
+                            .expressionAttributeValues(
+                                Map.of(
+                                    ":afterPrice", AttributeValue.builder().s(afterPrice).build(),
+                                    ":dirty", AttributeValue.builder().bool(true).build(),
+                                    ":gsi1pk", AttributeValue.builder().s(dirtyGsi1pk).build(),
+                                    ":gsi1sk", AttributeValue.builder().s(dirtyGsi1sk).build(),
+                                    ":one", AttributeValue.builder().n("1").build(),
+                                    ":expectedVersion",
+                                        AttributeValue.builder()
+                                            .n(String.valueOf(expectedVersion))
+                                            .build()))
+                            .build())
+                    .build(),
+                TransactWriteItem.builder()
+                    .put(
+                        Put.builder()
+                            .tableName(TcgInventoryTable.TABLE_NAME)
+                            .item(
+                                Map.of(
+                                    AuditItem.PK,
+                                        AttributeValue.builder()
+                                            .s(AuditItem.formatPk(user))
+                                            .build(),
+                                    AuditItem.SK, AttributeValue.builder().s(auditId).build(),
+                                    AuditItem.EVENT_TYPE,
+                                        AttributeValue.builder().s("reprice").build(),
+                                    AuditItem.SKU_ID, AttributeValue.builder().s(skuId).build(),
+                                    AuditItem.JOB_ID, AttributeValue.builder().s(jobId).build(),
+                                    AuditItem.BEFORE_PRICE,
+                                        AttributeValue.builder().s(beforePrice).build(),
+                                    AuditItem.AFTER_PRICE,
+                                        AttributeValue.builder().s(afterPrice).build(),
+                                    AuditItem.CREATED_AT,
+                                        AttributeValue.builder()
+                                            .n(String.valueOf(createdAt.getEpochSecond()))
+                                            .build()))
+                            .build())
+                    .build())
+            .build();
+
+    dynamoDbClient.transactWriteItems(transaction);
   }
 
   public TransactWriteItem buildSkuDirtyUpdate(String user, String skuId) {

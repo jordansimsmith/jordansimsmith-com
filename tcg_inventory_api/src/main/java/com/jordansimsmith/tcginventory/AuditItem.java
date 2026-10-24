@@ -25,6 +25,9 @@ public class AuditItem {
   public static final String BEFORE_STATUS = "before_status";
   public static final String AFTER_STATUS = "after_status";
   public static final String TARGET_SKU_ID = "target_sku_id";
+  public static final String JOB_ID = "job_id";
+  public static final String BEFORE_PRICE = "before_price";
+  public static final String AFTER_PRICE = "after_price";
   public static final String CREATED_AT = "created_at";
 
   private String pk;
@@ -38,6 +41,9 @@ public class AuditItem {
   private String beforeStatus;
   private String afterStatus;
   private String targetSkuId;
+  private String jobId;
+  private String beforePrice;
+  private String afterPrice;
   private Instant createdAt;
 
   @DynamoDbPartitionKey
@@ -139,6 +145,33 @@ public class AuditItem {
 
   public void setTargetSkuId(@Nullable String targetSkuId) {
     this.targetSkuId = targetSkuId;
+  }
+
+  @DynamoDbAttribute(JOB_ID)
+  public String getJobId() {
+    return jobId;
+  }
+
+  public void setJobId(@Nullable String jobId) {
+    this.jobId = jobId;
+  }
+
+  @DynamoDbAttribute(BEFORE_PRICE)
+  public String getBeforePrice() {
+    return beforePrice;
+  }
+
+  public void setBeforePrice(@Nullable String beforePrice) {
+    this.beforePrice = beforePrice;
+  }
+
+  @DynamoDbAttribute(AFTER_PRICE)
+  public String getAfterPrice() {
+    return afterPrice;
+  }
+
+  public void setAfterPrice(@Nullable String afterPrice) {
+    this.afterPrice = afterPrice;
   }
 
   @DynamoDbConvertedBy(EpochSecondConverter.class)
