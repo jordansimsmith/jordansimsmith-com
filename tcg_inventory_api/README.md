@@ -64,6 +64,8 @@ The TCG inventory API service is the source of truth for physical Magic: The Gat
 
 ## Architecture
 
+The [modular monolith engineering strategy](docs/modular-monolith-strategy.md) documents the target service boundaries and migration approach. This README describes the current implementation.
+
 ```mermaid
 flowchart TD
   web[tcg_inventory_web SPA] -->|HTTPS Basic| apigw[API Gateway REST]
