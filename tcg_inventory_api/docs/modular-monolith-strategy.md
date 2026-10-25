@@ -105,6 +105,8 @@ The direct implementation and a future RPC client implement the same interface. 
 
 Each service interface method has its own implementation class in the owning server package. For example, `FooService#findBar` delegates to `FindBarService#findBar`. That operation class owns its validation, authorization, orchestration, and persistence calls. Shared server-private repositories and helpers can be dependencies of multiple operation classes.
 
+This one-class-per-method rule applies to service operations. A private provider HTTP adapter may group related endpoints that share transport behavior, such as base URI, headers, pacing, retries, and response parsing.
+
 The object implementing `FooService` is a thin delegate. A named `FooServiceImpl`, if used, contains delegation only; it does not accumulate the operation bodies. Prefer an anonymous implementation inside `FooModule` when that avoids an otherwise empty implementation class.
 
 Each vertical defines a Dagger `FooModule` in `foo.server` with one `@Provides` method returning `FooService`. Construct private repositories, adapters, and operation services inside that provider, using private construction helpers when useful. The provider accepts required infrastructure and other verticals' client interfaces as parameters. It does not expose operation classes, repositories, tokens, or persistence models as public Dagger bindings, and it does not include another vertical's server module.
@@ -171,6 +173,7 @@ The starting ownership model is:
 | Pricing   | Pricing policy, price-floor configuration, and repricing orchestration                     |
 | Publish   | Marketplace projection and publication progress                                            |
 | Reports   | Report generation and report snapshots/projections                                         |
+| Jobs      | Generic job records, lifecycle, dispatch, and per-user background-task admission           |
 | FetchTCG  | Marketplace account, credentials, seller identity, and provider integration                |
 | Settings  | Application settings not assigned to another vertical                                      |
 
@@ -180,7 +183,11 @@ Listing photos cross lifecycle boundaries: imports owns review-time attachments,
 
 Before completing a vertical migration, assign ownership for its audit records, job state, idempotency records, and any shared operational gates. These cannot remain implicit shared database access. Keep an inventory mutation and its authoritative audit entry in inventory's local transaction. A combined audit view can aggregate published records without becoming a synchronous dependency of every mutation.
 
-The existing per-user active-job gate also needs an explicit design. Preserve its externally visible conflict behavior during migration and decide whether a coordinator owns it or vertical-local concurrency rules replace it. A remote gate cannot simply participate in every vertical's local DynamoDB transaction.
+The Jobs vertical owns generic job identity, queued/running/terminal lifecycle, dispatch, and background-task admission. It does not own business rules, domain records, or workflow checkpoints. Job contracts carry generic owner and operation identity; the worker adapter routes these to the owning vertical. Each vertical retains its own durable progress and decides when its workflow is complete.
+
+Allow at most one logical background task per user at a time across application queues, including report generation and scan recognition. Continuations and retries remain part of the admitted task and retain its admission until terminal completion. A handoff to a related follow-up task must transfer admission safely rather than briefly allowing overlapping work. Duplicate requests for an already active equivalent task preserve the endpoint's idempotent response; conflicting work reports the existing conflict behavior. Do not make job admission depend on vertical-specific fields or behavior.
+
+The existing active-job query is a read-before-write check and cannot atomically prevent a competing start. Jobs must own an admission operation that provides the single-task invariant. Existing synchronous mutations that currently reject while background work is active must coordinate through the same owner when migrated; a separate `exists` query alone does not close that race. Until this integration is complete, preserve existing guards and record any deliberately deferred caller check explicitly.
 
 ## Transactions and workflow recovery
 

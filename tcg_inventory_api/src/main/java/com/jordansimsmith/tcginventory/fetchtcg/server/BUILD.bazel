@@ -8,9 +8,12 @@ java_library(
     ],
     deps = [
         "//lib/dynamodb:lib",
+        "//lib/secrets:lib",
         "//lib/service",
+        "//lib/time:lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_core",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_code_findbugs_jsr305",
         "@maven//:software_amazon_awssdk_dynamodb",
