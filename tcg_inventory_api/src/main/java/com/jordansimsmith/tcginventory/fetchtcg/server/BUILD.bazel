@@ -7,9 +7,13 @@ java_library(
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/server:__pkg__",
     ],
     deps = [
+        "//lib/dynamodb:lib",
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "@maven//:com_fasterxml_jackson_core_jackson_annotations",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
     ],
 )
