@@ -1300,6 +1300,49 @@ describe('createFakeClient settings', () => {
   });
 });
 
+describe('createFakeClient FetchTCG account', () => {
+  it('keeps account metadata separate from legacy credential settings', async () => {
+    const client = createFakeClient();
+
+    await expect(client.getFetchTcgAccount()).resolves.toBeNull();
+    await client.updateSettings({ refresh_token: 'legacy-token' });
+    await expect(client.getFetchTcgAccount()).resolves.toBeNull();
+
+    const saved = await client.updateFetchTcgCredentials({
+      refresh_token: 'candidate-token',
+    });
+    expect(saved.seller_username).toBe('demo-seller');
+    expect(typeof saved.credentials_updated_at).toBe('number');
+    await expect(client.getFetchTcgAccount()).resolves.toEqual(saved);
+
+    const replacement = await client.updateFetchTcgCredentials({
+      refresh_token: 'replacement-token',
+    });
+    expect(replacement.seller_username).toBe('demo-seller');
+    await expect(client.getFetchTcgAccount()).resolves.toEqual(replacement);
+
+    await client.updateSettings({ track_orders_after: 1723363200 });
+    await expect(client.getFetchTcgAccount()).resolves.toEqual(replacement);
+    await expect(client.getSettings()).resolves.toMatchObject({
+      credential_set: true,
+      track_orders_after: 1723363200,
+    });
+  });
+
+  it('returns copies of saved account metadata', async () => {
+    const client = createFakeClient();
+    const saved = await client.updateFetchTcgCredentials({
+      refresh_token: 'candidate-token',
+    });
+    saved.seller_username = 'changed';
+
+    await expect(client.getFetchTcgAccount()).resolves.toEqual({
+      seller_username: 'demo-seller',
+      credentials_updated_at: saved.credentials_updated_at,
+    });
+  });
+});
+
 describe('createFakeClient pricing', () => {
   it('returns the default, normalizes saved floors, and allows zero', async () => {
     const client = createFakeClient();

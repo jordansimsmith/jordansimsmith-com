@@ -31,6 +31,7 @@ describe('LoginPage', () => {
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
     notifications.clean();
   });
 
@@ -63,6 +64,7 @@ describe('LoginPage', () => {
       updated_at: null,
       track_orders_after: null,
     });
+    const accountSpy = vi.spyOn(clientModule.apiClient, 'getFetchTcgAccount');
 
     const user = userEvent.setup();
     renderLoginPage();
@@ -75,6 +77,7 @@ describe('LoginPage', () => {
       expect(screen.getByText('Inventory page')).toBeDefined();
     });
     expect(clientModule.apiClient.getSettings).toHaveBeenCalled();
+    expect(accountSpy).not.toHaveBeenCalled();
   });
 
   it('shows error notification and clears session on failed login', async () => {

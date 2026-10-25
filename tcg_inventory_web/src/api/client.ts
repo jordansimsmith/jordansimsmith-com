@@ -37,6 +37,20 @@ export interface SettingsResponse {
   track_orders_after: number | null;
 }
 
+export interface GetFetchTcgAccountResponse {
+  seller_username: string;
+  credentials_updated_at: number;
+}
+
+export interface UpdateFetchTcgCredentialsRequest {
+  refresh_token: string;
+}
+
+export interface UpdateFetchTcgCredentialsResponse {
+  seller_username: string;
+  credentials_updated_at: number;
+}
+
 export interface UpdateSettingsRequest {
   refresh_token?: string;
   track_orders_after?: number;
@@ -478,6 +492,10 @@ export interface ApiClient {
   getGames(): Promise<GamesResponse>;
   getSettings(): Promise<SettingsResponse>;
   updateSettings(update: UpdateSettingsRequest): Promise<SettingsResponse>;
+  getFetchTcgAccount(): Promise<GetFetchTcgAccountResponse | null>;
+  updateFetchTcgCredentials(
+    request: UpdateFetchTcgCredentialsRequest,
+  ): Promise<UpdateFetchTcgCredentialsResponse>;
   getPricing(): Promise<PricingResponse>;
   updatePricing(update: UpdatePricingRequest): Promise<PricingResponse>;
   createImport(

@@ -4,6 +4,87 @@ import { createHttpClient } from './http-client';
 
 const fetchSpy = vi.fn();
 
+describe('http client FetchTCG account', () => {
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    localStorage.clear();
+    setSession('alice', 'pw');
+  });
+
+  afterEach(() => {
+    clearSession();
+  });
+
+  it('gets account metadata and maps only not found to null', async () => {
+    const account = {
+      seller_username: 'verified-seller',
+      credentials_updated_at: 1700000000,
+    };
+    fetchSpy
+      .mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        json: vi.fn().mockResolvedValue(account),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+        json: vi.fn(),
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+        json: vi.fn().mockResolvedValue({ message: 'temporarily unavailable' }),
+      });
+    const client = createHttpClient();
+
+    await expect(client.getFetchTcgAccount()).resolves.toEqual(account);
+    await expect(client.getFetchTcgAccount()).resolves.toBeNull();
+    await expect(client.getFetchTcgAccount()).rejects.toThrow(
+      'temporarily unavailable',
+    );
+
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/fetchtcg/account',
+    );
+    expect(fetchSpy.mock.calls[0][1].method).toBeUndefined();
+    expect(fetchSpy.mock.calls[0][1].body).toBeUndefined();
+    expect(fetchSpy.mock.calls[0][1].headers.Authorization).toBe(
+      `Basic ${btoa('alice:pw')}`,
+    );
+  });
+
+  it('puts credentials without changing the token and returns account metadata', async () => {
+    const token = ' refresh token with spaces ';
+    const response = {
+      seller_username: 'verified-seller',
+      credentials_updated_at: 1700000000,
+    };
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue(response),
+    });
+
+    await expect(
+      createHttpClient().updateFetchTcgCredentials({ refresh_token: token }),
+    ).resolves.toEqual(response);
+
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/fetchtcg/credentials',
+    );
+    expect(init.method).toBe('PUT');
+    expect(init.headers['Content-Type']).toBe('application/json');
+    expect(init.headers.Authorization).toBe(`Basic ${btoa('alice:pw')}`);
+    expect(init.body).toBe(JSON.stringify({ refresh_token: token }));
+  });
+});
+
 describe('http client pricing', () => {
   beforeEach(() => {
     fetchSpy.mockReset();

@@ -7,13 +7,17 @@ import {
   Skeleton,
   Stack,
   Text,
+  TextInput,
   Title,
 } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { notifications } from '@mantine/notifications';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { apiClient } from '../api/client';
-import type { SettingsResponse } from '../api/client';
+import type {
+  GetFetchTcgAccountResponse,
+  SettingsResponse,
+} from '../api/client';
 import { PageHeader } from '../components/PageHeader';
 import classes from './SettingsPage.module.css';
 
@@ -32,8 +36,13 @@ function dateStringToEpoch(dateStr: string): number {
 
 export function SettingsPage() {
   const [settings, setSettings] = useState<SettingsResponse | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [settingsLoading, setSettingsLoading] = useState(true);
+  const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [account, setAccount] = useState<GetFetchTcgAccountResponse | null>(
+    null,
+  );
+  const [accountLoading, setAccountLoading] = useState(true);
+  const [accountError, setAccountError] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState('');
   const [savingToken, setSavingToken] = useState(false);
   const [trackOrdersAfter, setTrackOrdersAfter] = useState<string | null>(null);
@@ -49,20 +58,41 @@ export function SettingsPage() {
           if (response.track_orders_after !== null) {
             setTrackOrdersAfter(epochToDateString(response.track_orders_after));
           }
-          setError(null);
         }
       } catch (e) {
         if (!cancelled) {
-          setError(e instanceof Error ? e.message : 'Failed to load settings');
+          setSettingsError(
+            e instanceof Error ? e.message : 'Failed to load settings',
+          );
         }
       } finally {
         if (!cancelled) {
-          setLoading(false);
+          setSettingsLoading(false);
+        }
+      }
+    };
+
+    const fetchAccount = async () => {
+      try {
+        const response = await apiClient.getFetchTcgAccount();
+        if (!cancelled) {
+          setAccount(response);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setAccountError(
+            e instanceof Error ? e.message : 'Failed to load FetchTCG account',
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setAccountLoading(false);
         }
       }
     };
 
     fetchSettings();
+    fetchAccount();
     return () => {
       cancelled = true;
     };
@@ -71,10 +101,11 @@ export function SettingsPage() {
   const handleSaveToken = async () => {
     setSavingToken(true);
     try {
-      const response = await apiClient.updateSettings({
+      const response = await apiClient.updateFetchTcgCredentials({
         refresh_token: refreshToken,
       });
-      setSettings(response);
+      setAccount(response);
+      setAccountError(null);
       setRefreshToken('');
       notifications.show({
         title: 'Settings saved',
@@ -119,117 +150,124 @@ export function SettingsPage() {
           title="Settings"
           description="Configure marketplace access and order tracking."
         />
-        {loading && (
-          <div className={classes.grid}>
-            {[0, 1].map((item) => (
-              <Paper key={item} withBorder p="md" radius="md">
-                <Stack gap="md">
-                  <Skeleton height={20} width={180} />
-                  <Skeleton height={36} />
-                  <Skeleton height={18} width={160} />
-                  <Skeleton height={36} />
-                  <Skeleton height={36} width={110} />
-                </Stack>
-              </Paper>
-            ))}
-          </div>
-        )}
-        {!loading && error && (
-          <Paper withBorder p="md" radius="md">
-            <Text c="red">{error}</Text>
-          </Paper>
-        )}
-        {!loading && !error && settings && (
-          <div className={classes.grid}>
-            <Paper
-              component="section"
-              aria-label="FetchTCG connection"
-              withBorder
-              p="md"
-              radius="md"
-            >
-              <Stack gap="md" h="100%">
-                <Stack gap={4}>
-                  <Title order={3} fz="md">
-                    FetchTCG connection
-                  </Title>
-                  <Text size="sm" c="dimmed">
-                    Save a token for FetchTCG publishing and order sync.
-                  </Text>
-                </Stack>
-                {settings.credential_set && settings.updated_at !== null && (
+        <div className={classes.grid}>
+          <Paper
+            component="section"
+            aria-label="FetchTCG connection"
+            withBorder
+            p="md"
+            radius="md"
+          >
+            <Stack gap="md" h="100%">
+              <Stack gap={4}>
+                <Title order={3} fz="md">
+                  FetchTCG connection
+                </Title>
+                <Text size="sm" c="dimmed">
+                  Save a token for FetchTCG publishing and order sync.
+                </Text>
+              </Stack>
+              {accountLoading && <Skeleton height={36} />}
+              {!accountLoading && accountError && (
+                <Text c="red">{accountError}</Text>
+              )}
+              {!accountLoading && !accountError && account && (
+                <>
+                  <TextInput
+                    label="FetchTCG seller username"
+                    value={account.seller_username}
+                    description="Verified by FetchTCG; updates when you save a refresh token."
+                    readOnly
+                    disabled
+                    styles={{
+                      input: { color: 'var(--mantine-color-text)', opacity: 1 },
+                    }}
+                  />
                   <Text size="sm" c="dimmed">
                     Last updated{' '}
-                    {new Date(settings.updated_at * 1000).toLocaleString()}
+                    {new Date(
+                      account.credentials_updated_at * 1000,
+                    ).toLocaleString()}
                   </Text>
-                )}
-                <PasswordInput
-                  label="FetchTCG refresh token"
-                  value={refreshToken}
-                  onChange={(event) =>
-                    setRefreshToken(event.currentTarget.value)
-                  }
-                  placeholder={
-                    settings.credential_set
-                      ? '••••••••••••••••'
-                      : 'Enter refresh token'
-                  }
-                />
-                <Group className={classes.sectionActions}>
-                  <Button
-                    onClick={handleSaveToken}
-                    loading={savingToken}
-                    disabled={refreshToken.trim() === ''}
-                  >
-                    Save token
-                  </Button>
-                </Group>
-              </Stack>
-            </Paper>
+                </>
+              )}
+              {!accountLoading && !accountError && !account && (
+                <Text size="sm" c="dimmed">
+                  Save or re-save your FetchTCG refresh token to verify your
+                  seller account.
+                </Text>
+              )}
+              <PasswordInput
+                label="FetchTCG refresh token"
+                value={refreshToken}
+                onChange={(event) => setRefreshToken(event.currentTarget.value)}
+                placeholder={
+                  account ? '••••••••••••••••' : 'Enter refresh token'
+                }
+              />
+              <Group className={classes.sectionActions}>
+                <Button
+                  onClick={handleSaveToken}
+                  loading={savingToken}
+                  disabled={accountLoading || refreshToken.trim() === ''}
+                >
+                  Save token
+                </Button>
+              </Group>
+            </Stack>
+          </Paper>
 
-            <Paper
-              component="section"
-              aria-label="Order tracking"
-              withBorder
-              p="md"
-              radius="md"
-            >
-              <Stack gap="md" h="100%">
-                <Stack gap={4}>
-                  <Title order={3} fz="md">
-                    Order tracking
-                  </Title>
-                  <Text size="sm" c="dimmed">
-                    Orders accepted on or after this date are tracked; earlier
-                    orders are ignored. The cutoff starts at midnight in your
-                    local timezone.
-                  </Text>
-                </Stack>
+          <Paper
+            component="section"
+            aria-label="Order tracking"
+            withBorder
+            p="md"
+            radius="md"
+          >
+            <Stack gap="md" h="100%">
+              <Stack gap={4}>
+                <Title order={3} fz="md">
+                  Order tracking
+                </Title>
+                <Text size="sm" c="dimmed">
+                  Orders accepted on or after this date are tracked; earlier
+                  orders are ignored. The cutoff starts at midnight in your
+                  local timezone.
+                </Text>
+              </Stack>
+              {settingsLoading && <Skeleton height={36} />}
+              {!settingsLoading && settingsError && (
+                <Text c="red">{settingsError}</Text>
+              )}
+              {!settingsLoading && !settingsError && settings && (
                 <DateInput
                   label="Track orders after"
                   value={trackOrdersAfter ?? ''}
                   onChange={(value) => setTrackOrdersAfter(value || null)}
                   placeholder="No cutoff set"
                 />
-                <Group className={classes.sectionActions}>
-                  <Button
-                    onClick={handleSaveDate}
-                    loading={savingDate}
-                    disabled={
-                      !trackOrdersAfter ||
-                      trackOrdersAfter ===
-                        (settings.track_orders_after === null
-                          ? null
-                          : epochToDateString(settings.track_orders_after))
-                    }
-                  >
-                    Save date
-                  </Button>
-                </Group>
-              </Stack>
-            </Paper>
-          </div>
-        )}
+              )}
+              <Group className={classes.sectionActions}>
+                <Button
+                  onClick={handleSaveDate}
+                  loading={savingDate}
+                  disabled={
+                    settingsLoading ||
+                    settingsError !== null ||
+                    settings === null ||
+                    !trackOrdersAfter ||
+                    trackOrdersAfter ===
+                      (settings.track_orders_after === null
+                        ? null
+                        : epochToDateString(settings.track_orders_after))
+                  }
+                >
+                  Save date
+                </Button>
+              </Group>
+            </Stack>
+          </Paper>
+        </div>
       </Stack>
     </AppShellLayout>
   );

@@ -20,6 +20,7 @@ import type {
   FindSkusParams,
   FindSkusResponse,
   GenerationStatus,
+  GetFetchTcgAccountResponse,
   IdentifyScanResponse,
   ImageUrls,
   ImportDetail,
@@ -56,6 +57,8 @@ import type {
   SkuUnit,
   UnitStatus,
   UpdateSettingsRequest,
+  UpdateFetchTcgCredentialsRequest,
+  UpdateFetchTcgCredentialsResponse,
   UpdatePricingRequest,
   UpdateUnitResponse,
 } from './client';
@@ -1657,6 +1660,7 @@ export function createFakeClient(): ApiClient {
     updated_at: null,
     track_orders_after: null,
   };
+  let fetchTcgAccount: GetFetchTcgAccountResponse | null = null;
   let pricing: PricingResponse = { price_floor: '0.25' };
   let reportGeneratedAt = Math.floor(Date.now() / 1000) - 3600;
   let reportStale = false;
@@ -1932,6 +1936,20 @@ export function createFakeClient(): ApiClient {
         };
       }
       return { ...settings };
+    },
+
+    async getFetchTcgAccount(): Promise<GetFetchTcgAccountResponse | null> {
+      return fetchTcgAccount ? { ...fetchTcgAccount } : null;
+    },
+
+    async updateFetchTcgCredentials(
+      _request: UpdateFetchTcgCredentialsRequest,
+    ): Promise<UpdateFetchTcgCredentialsResponse> {
+      fetchTcgAccount = {
+        seller_username: 'demo-seller',
+        credentials_updated_at: Math.floor(Date.now() / 1000),
+      };
+      return { ...fetchTcgAccount };
     },
 
     async getPricing(): Promise<PricingResponse> {

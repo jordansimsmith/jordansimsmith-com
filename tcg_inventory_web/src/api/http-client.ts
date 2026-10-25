@@ -20,6 +20,7 @@ import type {
   FindSkusResponse,
   GameId,
   GamesResponse,
+  GetFetchTcgAccountResponse,
   ImportDetail,
   ImportRow,
   ImportSummary,
@@ -33,6 +34,8 @@ import type {
   SettingsResponse,
   SkuDetail,
   UpdateSettingsRequest,
+  UpdateFetchTcgCredentialsRequest,
+  UpdateFetchTcgCredentialsResponse,
   UpdatePricingRequest,
   UpdateUnitResponse,
 } from './client';
@@ -92,6 +95,29 @@ export function createHttpClient(): ApiClient {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(update),
+      });
+      return response.json();
+    },
+
+    async getFetchTcgAccount(): Promise<GetFetchTcgAccountResponse | null> {
+      const response = await authenticatedFetch(
+        '/fetchtcg/account',
+        undefined,
+        true,
+      );
+      if (response.status === 404) {
+        return null;
+      }
+      return response.json();
+    },
+
+    async updateFetchTcgCredentials(
+      request: UpdateFetchTcgCredentialsRequest,
+    ): Promise<UpdateFetchTcgCredentialsResponse> {
+      const response = await authenticatedFetch('/fetchtcg/credentials', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(request),
       });
       return response.json();
     },
