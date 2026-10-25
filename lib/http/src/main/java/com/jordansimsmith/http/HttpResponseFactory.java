@@ -2,6 +2,13 @@ package com.jordansimsmith.http;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jordansimsmith.service.BadRequestException;
+import com.jordansimsmith.service.ConflictException;
+import com.jordansimsmith.service.ForbiddenException;
+import com.jordansimsmith.service.NotFoundException;
+import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.service.ServiceUnavailableException;
+import com.jordansimsmith.service.UnauthorizedException;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -48,6 +55,20 @@ public class HttpResponseFactory {
 
   public APIGatewayV2HTTPResponse serviceUnavailable(Object body) {
     return buildResponse(503, body);
+  }
+
+  public APIGatewayV2HTTPResponse serviceError(ServiceException exception) {
+    int statusCode =
+        switch (exception) {
+          case BadRequestException ignored -> 400;
+          case UnauthorizedException ignored -> 401;
+          case ForbiddenException ignored -> 403;
+          case NotFoundException ignored -> 404;
+          case ConflictException ignored -> 409;
+          case ServiceUnavailableException ignored -> 503;
+        };
+
+    return buildResponse(statusCode, Map.of("message", exception.getMessage()));
   }
 
   private APIGatewayV2HTTPResponse buildResponse(int statusCode, Object body) {

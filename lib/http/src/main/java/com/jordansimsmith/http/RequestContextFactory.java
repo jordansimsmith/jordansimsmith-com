@@ -1,6 +1,7 @@
 package com.jordansimsmith.http;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
+import com.jordansimsmith.service.RequestContext;
 import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import java.util.Map;
