@@ -21,10 +21,7 @@ public class GetSettingsHandler
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GetSettingsHandler.class);
 
-  record GetSettingsResponse(
-      @JsonProperty("credential_set") boolean credentialSet,
-      @JsonProperty("updated_at") @Nullable Long updatedAt,
-      @JsonProperty("track_orders_after") @Nullable Long trackOrdersAfter) {}
+  record GetSettingsResponse(@JsonProperty("track_orders_after") @Nullable Long trackOrdersAfter) {}
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
@@ -64,17 +61,14 @@ public class GetSettingsHandler
     var settingsItem = settingsTable.getItem(key);
 
     if (settingsItem == null) {
-      return httpResponseFactory.ok(new GetSettingsResponse(false, null, null));
+      return httpResponseFactory.ok(new GetSettingsResponse(null));
     }
 
-    var credentialSet = settingsItem.getUpdatedAt() != null;
-    var updatedAt = credentialSet ? settingsItem.getUpdatedAt().getEpochSecond() : null;
     var trackOrdersAfter =
         settingsItem.getTrackOrdersAfter() != null
             ? settingsItem.getTrackOrdersAfter().getEpochSecond()
             : null;
 
-    return httpResponseFactory.ok(
-        new GetSettingsResponse(credentialSet, updatedAt, trackOrdersAfter));
+    return httpResponseFactory.ok(new GetSettingsResponse(trackOrdersAfter));
   }
 }

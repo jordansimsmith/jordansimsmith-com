@@ -114,21 +114,25 @@ public class TcgInventoryE2ETest {
             "/fetchtcg/credentials",
             "{\"refresh_token\":\"candidate-token\"}",
             fetchTcgUser);
-    var savedAccountResponse = sendAsUser("GET", "/fetchtcg/account", "", fetchTcgUser);
 
     // assert
     assertThat(missingAccountResponse.statusCode()).isEqualTo(404);
     assertThat(invalidCredentialsResponse.statusCode()).isEqualTo(400);
     assertThat(saveCredentialsResponse.statusCode()).isEqualTo(200);
-    assertThat(savedAccountResponse.statusCode()).isEqualTo(200);
     var savedAccount = objectMapper.readTree(saveCredentialsResponse.body());
-    var readAccount = objectMapper.readTree(savedAccountResponse.body());
-    assertThat(savedAccount).isEqualTo(readAccount);
-    assertThat(readAccount.size()).isEqualTo(2);
-    assertThat(readAccount.has("seller_username")).isTrue();
-    assertThat(readAccount.has("credentials_updated_at")).isTrue();
-    assertThat(readAccount.get("seller_username").asText()).isEqualTo("jordan");
-    assertThat(readAccount.get("credentials_updated_at").isIntegralNumber()).isTrue();
+    assertThat(savedAccount.size()).isEqualTo(2);
+    assertThat(savedAccount.has("seller_username")).isTrue();
+    assertThat(savedAccount.has("credentials_updated_at")).isTrue();
+    assertThat(savedAccount.get("seller_username").asText()).isEqualTo("jordan");
+    assertThat(savedAccount.get("credentials_updated_at").isIntegralNumber()).isTrue();
+
+    var trackingUpdateResponse =
+        sendAsUser("PATCH", "/settings", "{\"track_orders_after\":1723363200}", fetchTcgUser);
+    assertThat(trackingUpdateResponse.statusCode()).isEqualTo(200);
+    var settingsResponse = sendAsUser("GET", "/settings", "", fetchTcgUser);
+    assertThat(settingsResponse.statusCode()).isEqualTo(200);
+    assertThat(objectMapper.readTree(settingsResponse.body()))
+        .isEqualTo(objectMapper.readTree("{\"track_orders_after\":1723363200}"));
 
     // arrange - verify the authenticated pricing configuration round-trip
     var defaultResponse = get("/pricing");
@@ -175,9 +179,10 @@ public class TcgInventoryE2ETest {
     assertThat(searchResponse.statusCode()).isEqualTo(200);
     assertThat(objectMapper.readTree(searchResponse.body()).get("cards")).hasSize(2);
 
-    // arrange - store fake refresh token
-    var settingsResponse = patch("/settings", "{\"refresh_token\":\"fake-token\"}");
-    assertThat(settingsResponse.statusCode()).isEqualTo(200);
+    // arrange - save credentials through the FetchTCG endpoint
+    var inventoryCredentialsResponse =
+        put("/fetchtcg/credentials", "{\"refresh_token\":\"fake-token\"}");
+    assertThat(inventoryCredentialsResponse.statusCode()).isEqualTo(200);
 
     // arrange - set a custom floor for this import's appraisal
     var pricingResponse = patch("/pricing", "{\"price_floor\":5.00}");

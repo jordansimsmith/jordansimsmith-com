@@ -5,16 +5,14 @@ import com.amazonaws.services.lambda.runtime.RequestHandler;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPResponse;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import com.jordansimsmith.secrets.Secrets;
 import com.jordansimsmith.tcginventory.ActiveJob;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.time.Clock;
 import java.time.Instant;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
@@ -26,24 +24,19 @@ public class UpdateSettingsHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(UpdateSettingsHandler.class);
-  private static final String SECRET_NAME = "tcg_inventory";
+  private static final String INVALID_REQUEST_BODY = "Invalid request body";
 
   record ErrorResponse(@JsonProperty("message") String message) {}
 
   record UpdateSettingsRequest(
-      @JsonProperty("refresh_token") @Nullable String refreshToken,
       @JsonProperty("track_orders_after") @Nullable Long trackOrdersAfter) {}
 
   record UpdateSettingsResponse(
-      @JsonProperty("credential_set") boolean credentialSet,
-      @JsonProperty("updated_at") @Nullable Long updatedAt,
       @JsonProperty("track_orders_after") @Nullable Long trackOrdersAfter) {}
 
   private final ObjectMapper objectMapper;
-  private final Clock clock;
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final Secrets secrets;
   private final ActiveJob activeJob;
   private final DynamoDbTable<SettingsItem> settingsTable;
 
@@ -54,10 +47,8 @@ public class UpdateSettingsHandler
   @VisibleForTesting
   UpdateSettingsHandler(TcgInventoryFactory factory) {
     this.objectMapper = factory.objectMapper();
-    this.clock = factory.clock();
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.secrets = factory.secrets();
     this.activeJob = new ActiveJob(factory.jobTable());
     this.settingsTable =
         TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), SettingsItem.class);
@@ -67,6 +58,8 @@ public class UpdateSettingsHandler
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     try {
       return doHandleRequest(event);
+    } catch (JsonProcessingException e) {
+      return httpResponseFactory.badRequest(new ErrorResponse(INVALID_REQUEST_BODY));
     } catch (Exception e) {
       LOGGER.error("error processing update settings request", e);
       throw new RuntimeException(e);
@@ -75,14 +68,17 @@ public class UpdateSettingsHandler
 
   private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) throws Exception {
     var user = requestContextFactory.createCtx(event).user();
-    var request = objectMapper.readValue(event.getBody(), UpdateSettingsRequest.class);
+    var body = event.getBody();
+    if (body == null || body.isBlank()) {
+      return httpResponseFactory.badRequest(new ErrorResponse(INVALID_REQUEST_BODY));
+    }
+    var request = objectMapper.readValue(body, UpdateSettingsRequest.class);
+    if (request == null) {
+      return httpResponseFactory.badRequest(new ErrorResponse(INVALID_REQUEST_BODY));
+    }
 
-    var hasRefreshToken = request.refreshToken() != null && !request.refreshToken().isBlank();
-    var hasTrackOrdersAfter = request.trackOrdersAfter() != null;
-
-    if (!hasRefreshToken && !hasTrackOrdersAfter) {
-      return httpResponseFactory.badRequest(
-          new ErrorResponse("at least one of refresh_token or track_orders_after is required"));
+    if (request.trackOrdersAfter() == null) {
+      return httpResponseFactory.badRequest(new ErrorResponse("track_orders_after is required"));
     }
 
     // keep settings stable while a background job is running.
@@ -103,28 +99,15 @@ public class UpdateSettingsHandler
       settingsItem.setSk(SettingsItem.formatSk());
     }
 
-    if (hasRefreshToken) {
-      var currentSecret = secrets.get(SECRET_NAME);
-      var secretNode = (ObjectNode) objectMapper.readTree(currentSecret);
-      secretNode.put(user, request.refreshToken());
-      secrets.put(SECRET_NAME, objectMapper.writeValueAsString(secretNode));
-      settingsItem.setUpdatedAt(clock.now());
-    }
-
-    if (hasTrackOrdersAfter) {
-      settingsItem.setTrackOrdersAfter(Instant.ofEpochSecond(request.trackOrdersAfter()));
-    }
+    settingsItem.setTrackOrdersAfter(Instant.ofEpochSecond(request.trackOrdersAfter()));
 
     settingsTable.putItem(settingsItem);
 
-    var credentialSet = settingsItem.getUpdatedAt() != null;
-    var updatedAt = credentialSet ? settingsItem.getUpdatedAt().getEpochSecond() : null;
     var trackOrdersAfter =
         settingsItem.getTrackOrdersAfter() != null
             ? settingsItem.getTrackOrdersAfter().getEpochSecond()
             : null;
 
-    return httpResponseFactory.ok(
-        new UpdateSettingsResponse(credentialSet, updatedAt, trackOrdersAfter));
+    return httpResponseFactory.ok(new UpdateSettingsResponse(trackOrdersAfter));
   }
 }

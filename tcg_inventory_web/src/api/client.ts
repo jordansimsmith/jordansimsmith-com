@@ -32,8 +32,6 @@ export interface GamesResponse {
 }
 
 export interface SettingsResponse {
-  credential_set: boolean;
-  updated_at: number | null;
   track_orders_after: number | null;
 }
 
@@ -52,7 +50,6 @@ export interface UpdateFetchTcgCredentialsResponse {
 }
 
 export interface UpdateSettingsRequest {
-  refresh_token?: string;
   track_orders_after?: number;
 }
 

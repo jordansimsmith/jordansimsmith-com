@@ -1656,8 +1656,6 @@ export function createFakeClient(): ApiClient {
   let repriceRun: FakeRepriceRun | null = null;
   let repriceCounter = 0;
   let settings: SettingsResponse = {
-    credential_set: false,
-    updated_at: null,
     track_orders_after: null,
   };
   let fetchTcgAccount: GetFetchTcgAccountResponse | null = null;
@@ -1922,13 +1920,6 @@ export function createFakeClient(): ApiClient {
     async updateSettings(
       update: UpdateSettingsRequest,
     ): Promise<SettingsResponse> {
-      if (update.refresh_token) {
-        settings = {
-          ...settings,
-          credential_set: true,
-          updated_at: Math.floor(Date.now() / 1000),
-        };
-      }
       if (update.track_orders_after !== undefined) {
         settings = {
           ...settings,

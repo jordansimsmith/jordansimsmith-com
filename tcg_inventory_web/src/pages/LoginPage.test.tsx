@@ -60,8 +60,6 @@ describe('LoginPage', () => {
 
   it('navigates to inventory page on successful login', async () => {
     vi.spyOn(clientModule.apiClient, 'getSettings').mockResolvedValue({
-      credential_set: false,
-      updated_at: null,
       track_orders_after: null,
     });
     const accountSpy = vi.spyOn(clientModule.apiClient, 'getFetchTcgAccount');

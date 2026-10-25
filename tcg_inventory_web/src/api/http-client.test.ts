@@ -4,6 +4,48 @@ import { createHttpClient } from './http-client';
 
 const fetchSpy = vi.fn();
 
+describe('http client settings', () => {
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    localStorage.clear();
+    setSession('alice', 'pw');
+  });
+
+  afterEach(() => {
+    clearSession();
+  });
+
+  it('gets settings and updates only the order-tracking cutoff', async () => {
+    const settings = { track_orders_after: 1723363200 };
+    fetchSpy
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue(settings),
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue(settings),
+      });
+    const client = createHttpClient();
+
+    await expect(client.getSettings()).resolves.toEqual(settings);
+    await expect(
+      client.updateSettings({ track_orders_after: 1723363200 }),
+    ).resolves.toEqual(settings);
+
+    expect(fetchSpy).toHaveBeenCalledTimes(2);
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/settings',
+    );
+    const [url, init] = fetchSpy.mock.calls[1];
+    expect(url).toBe('https://api.tcg-inventory.jordansimsmith.com/settings');
+    expect(init.method).toBe('PATCH');
+    expect(init.headers['Content-Type']).toBe('application/json');
+    expect(init.body).toBe(JSON.stringify({ track_orders_after: 1723363200 }));
+  });
+});
+
 describe('http client FetchTCG account', () => {
   beforeEach(() => {
     fetchSpy.mockReset();

@@ -14,8 +14,6 @@ import { SettingsPage } from './SettingsPage';
 import * as clientModule from '../api/client';
 
 const defaultSettings = {
-  credential_set: true,
-  updated_at: 1765420800,
   track_orders_after: null,
 };
 const savedAccount = {

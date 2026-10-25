@@ -1249,63 +1249,24 @@ describe('createFakeClient repricing', () => {
 });
 
 describe('createFakeClient settings', () => {
-  it('stores credential presence without exposing the value', async () => {
+  it('stores only track_orders_after', async () => {
     const client = createFakeClient();
 
-    expect(await client.getSettings()).toEqual({
-      credential_set: false,
-      updated_at: null,
-      track_orders_after: null,
-    });
-
-    const response = await client.updateSettings({
-      refresh_token: 'super-secret-refresh-token',
-    });
-
-    expect(response.credential_set).toBe(true);
-    expect(response.updated_at).not.toBeNull();
-    expect(JSON.stringify(response)).not.toContain(
-      'super-secret-refresh-token',
-    );
-
-    const fetched = await client.getSettings();
-    expect(fetched.credential_set).toBe(true);
-    expect(fetched.updated_at).toBe(response.updated_at);
-  });
-
-  it('stores track_orders_after without affecting credential', async () => {
-    const client = createFakeClient();
+    expect(await client.getSettings()).toEqual({ track_orders_after: null });
 
     const response = await client.updateSettings({
       track_orders_after: 1723363200,
     });
 
-    expect(response.credential_set).toBe(false);
-    expect(response.track_orders_after).toBe(1723363200);
-
-    const fetched = await client.getSettings();
-    expect(fetched.track_orders_after).toBe(1723363200);
-  });
-
-  it('preserves track_orders_after when updating credential', async () => {
-    const client = createFakeClient();
-
-    await client.updateSettings({ track_orders_after: 1723363200 });
-    const response = await client.updateSettings({
-      refresh_token: 'token',
-    });
-
-    expect(response.credential_set).toBe(true);
-    expect(response.track_orders_after).toBe(1723363200);
+    expect(response).toEqual({ track_orders_after: 1723363200 });
+    expect(await client.getSettings()).toEqual(response);
   });
 });
 
 describe('createFakeClient FetchTCG account', () => {
-  it('keeps account metadata separate from legacy credential settings', async () => {
+  it('keeps account metadata separate from settings', async () => {
     const client = createFakeClient();
 
-    await expect(client.getFetchTcgAccount()).resolves.toBeNull();
-    await client.updateSettings({ refresh_token: 'legacy-token' });
     await expect(client.getFetchTcgAccount()).resolves.toBeNull();
 
     const saved = await client.updateFetchTcgCredentials({
@@ -1323,8 +1284,7 @@ describe('createFakeClient FetchTCG account', () => {
 
     await client.updateSettings({ track_orders_after: 1723363200 });
     await expect(client.getFetchTcgAccount()).resolves.toEqual(replacement);
-    await expect(client.getSettings()).resolves.toMatchObject({
-      credential_set: true,
+    await expect(client.getSettings()).resolves.toEqual({
       track_orders_after: 1723363200,
     });
   });
