@@ -7,6 +7,7 @@ import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.secrets.Secrets;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgTokenMinter;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
 import dagger.Component;
@@ -48,6 +49,8 @@ public interface TcgInventoryFactory {
   FetchTcgClient fetchTcgClient();
 
   FetchTcgTokenMinter fetchTcgTokenMinter();
+
+  FetchTcgService fetchTcgService();
 
   S3Client s3Client();
 

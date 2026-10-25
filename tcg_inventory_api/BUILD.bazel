@@ -142,7 +142,11 @@ java_library(
         ["src/main/resources/**"],
         exclude = ["src/main/resources/fetchtcg/fetchtcg_set_mapping.json"],
     ),
-    deps = [":fetchtcg-lib"] + COMMON_DEPS,
+    deps = [
+        ":fetchtcg-lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/server",
+    ] + COMMON_DEPS,
 )
 
 java_library(
@@ -1262,6 +1266,8 @@ java_library(
         "//lib/time:test-lib",
         "//lib/ulid:lib",
         "//lib/ulid:test-lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/server",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_guava_guava",

@@ -23,7 +23,6 @@ import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
 import com.jordansimsmith.tcginventory.settings.SettingsItem;
 import com.jordansimsmith.time.FakeClock;
 import java.math.BigDecimal;
-import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -63,20 +62,22 @@ public class JobsHandlerIntegrationTest {
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
-  private static final URI UNUSED_S3_ENDPOINT = URI.create("http://localhost:1");
   private static final String SCRYFALL_ID = "29ba5a2d-d787-4214-8cd7-7f2bcea938f8";
 
   @BeforeAll
   static void setUpBeforeClass() {
     var factory =
-        TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
+        TcgInventoryTestFactory.create(
+            dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
     var table = factory.tableDefinition();
     DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
   }
 
   @BeforeEach
   void setUp() {
-    factory = TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
+    factory =
+        TcgInventoryTestFactory.create(
+            dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
 
     fakeClock = factory.fakeClock();
     fakeJobsQueue = factory.fakeJobsQueue();

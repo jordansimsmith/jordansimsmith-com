@@ -12,6 +12,7 @@ import com.jordansimsmith.tcginventory.catalog.CatalogSnapshotItem;
 import com.jordansimsmith.tcginventory.catalog.FakeCardCatalogs;
 import com.jordansimsmith.tcginventory.catalog.FakeTcgCsvClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
+import com.jordansimsmith.tcginventory.fetchtcg.server.FetchTcgModule;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.tcginventory.inventory.SequenceCounterItem;
@@ -46,9 +47,14 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
       RequestContextModule.class,
       UlidTestModule.class,
       S3TestModule.class,
+      FetchTcgModule.class,
       TcgInventoryTestModule.class
     })
 public interface TcgInventoryTestFactory extends CatalogFactory {
+  URI UNUSED_S3_ENDPOINT = URI.create("http://localhost:1");
+  URI UNUSED_FIREBASE_TOKEN_URI = URI.create("http://localhost:1/token");
+  URI UNUSED_FETCHTCG_BASE_URI = URI.create("http://localhost:1");
+
   FakeClock fakeClock();
 
   FakeSecrets fakeSecrets();
@@ -97,10 +103,13 @@ public interface TcgInventoryTestFactory extends CatalogFactory {
   interface Factory {
     TcgInventoryTestFactory create(
         @BindsInstance @Named("dynamoDbEndpoint") URI dynamoDbEndpoint,
-        @BindsInstance @Named("s3Endpoint") URI s3Endpoint);
+        @BindsInstance @Named("s3Endpoint") URI s3Endpoint,
+        @BindsInstance @Named("firebaseTokenUri") URI firebaseTokenUri,
+        @BindsInstance @Named("fetchTcgBaseUri") URI fetchTcgBaseUri);
   }
 
   static TcgInventoryTestFactory create(URI dynamoDbEndpoint, URI s3Endpoint) {
-    return DaggerTcgInventoryTestFactory.factory().create(dynamoDbEndpoint, s3Endpoint);
+    return DaggerTcgInventoryTestFactory.factory()
+        .create(dynamoDbEndpoint, s3Endpoint, UNUSED_FIREBASE_TOKEN_URI, UNUSED_FETCHTCG_BASE_URI);
   }
 }

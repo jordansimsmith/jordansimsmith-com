@@ -28,6 +28,7 @@ import com.jordansimsmith.tcginventory.settings.SettingsItem;
 import com.jordansimsmith.time.Clock;
 import dagger.Module;
 import dagger.Provides;
+import javax.inject.Named;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -38,6 +39,13 @@ import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Module
 public class TcgInventoryTestModule {
+  @Provides
+  @Singleton
+  @Named("tcgInventoryTableName")
+  String tcgInventoryTableName() {
+    return TcgInventoryTable.TABLE_NAME;
+  }
+
   @Provides
   @Singleton
   HttpResponseFactory httpResponseFactory(ObjectMapper objectMapper) {

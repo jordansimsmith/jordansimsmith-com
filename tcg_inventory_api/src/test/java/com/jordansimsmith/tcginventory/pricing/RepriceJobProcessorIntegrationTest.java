@@ -19,7 +19,6 @@ import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.time.FakeClock;
 import java.math.BigDecimal;
-import java.net.URI;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -38,7 +37,6 @@ import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledExcepti
 
 @Testcontainers
 public class RepriceJobProcessorIntegrationTest {
-  private static final URI UNUSED_S3_ENDPOINT = URI.create("http://localhost:1");
   private static final Instant CREATED_AT = Instant.ofEpochSecond(1700000000);
 
   private FakeClock clock;
@@ -56,13 +54,16 @@ public class RepriceJobProcessorIntegrationTest {
   @BeforeAll
   static void setUpBeforeClass() {
     var factory =
-        TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
+        TcgInventoryTestFactory.create(
+            dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
     DynamoDbUtils.createTable(factory.dynamoDbClient(), factory.tableDefinition());
   }
 
   @BeforeEach
   void setUp() {
-    factory = TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
+    factory =
+        TcgInventoryTestFactory.create(
+            dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
     clock = factory.fakeClock();
     jobsQueue = factory.fakeJobsQueue();
     objectMapper = factory.objectMapper();

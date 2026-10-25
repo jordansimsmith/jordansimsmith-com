@@ -7,7 +7,6 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
-import java.net.URI;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -23,8 +22,6 @@ import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 public class PricingRepositoryIntegrationTest {
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
-  private static final URI UNUSED_S3_ENDPOINT = URI.create("http://localhost:1");
-
   private TcgInventoryFactory factory;
   private DynamoDbTable<PricingItem> pricingTable;
   private PricingRepository pricingRepository;
@@ -32,13 +29,16 @@ public class PricingRepositoryIntegrationTest {
   @BeforeAll
   static void setUpBeforeClass() {
     var factory =
-        TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
+        TcgInventoryTestFactory.create(
+            dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
     DynamoDbUtils.createTable(factory.dynamoDbClient(), factory.tableDefinition());
   }
 
   @BeforeEach
   void setUp() {
-    factory = TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
+    factory =
+        TcgInventoryTestFactory.create(
+            dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
     DynamoDbUtils.reset(factory.dynamoDbClient());
     pricingTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), PricingItem.class);
     pricingRepository = new PricingRepository(factory);

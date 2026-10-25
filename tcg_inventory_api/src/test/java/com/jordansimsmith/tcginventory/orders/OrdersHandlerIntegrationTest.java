@@ -18,7 +18,6 @@ import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -56,19 +55,20 @@ public class OrdersHandlerIntegrationTest {
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
-  private static final URI UNUSED_S3_ENDPOINT = URI.create("http://localhost:1");
-
   @BeforeAll
   static void setUpBeforeClass() {
     var factory =
-        TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
+        TcgInventoryTestFactory.create(
+            dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
     var table = factory.tableDefinition();
     DynamoDbUtils.createTable(factory.dynamoDbClient(), table);
   }
 
   @BeforeEach
   void setUp() {
-    factory = TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
+    factory =
+        TcgInventoryTestFactory.create(
+            dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
 
     fakeClock = factory.fakeClock();
     fakeUlidGenerator = factory.fakeUlidGenerator();

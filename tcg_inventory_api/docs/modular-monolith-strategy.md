@@ -109,7 +109,7 @@ This one-class-per-method rule applies to service operations. A private provider
 
 The object implementing `FooService` is a thin delegate. A named `FooServiceImpl`, if used, contains delegation only; it does not accumulate the operation bodies. Prefer an anonymous implementation inside `FooModule` when that avoids an otherwise empty implementation class.
 
-Each vertical defines a Dagger `FooModule` in `foo.server` with one `@Provides` method returning `FooService`. Construct private repositories, adapters, and operation services inside that provider, using private construction helpers when useful. The provider accepts required infrastructure and other verticals' client interfaces as parameters. It does not expose operation classes, repositories, tokens, or persistence models as public Dagger bindings, and it does not include another vertical's server module.
+Each vertical defines a Dagger `FooModule` in `foo.server` with one `@Provides` method returning `FooService`. Construct private repositories, adapters, and operation services inside that provider, using private construction helpers when useful. The provider accepts required infrastructure, runtime configuration, and other verticals' client interfaces as parameters. Resolve environment-specific values in the application composition root and pass them into the vertical module; server modules should not read environment variables. It does not expose operation classes, repositories, tokens, or persistence models as public Dagger bindings, and it does not include another vertical's server module.
 
 An illustrative module is:
 

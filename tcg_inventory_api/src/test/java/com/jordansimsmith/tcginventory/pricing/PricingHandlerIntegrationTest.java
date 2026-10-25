@@ -11,7 +11,6 @@ import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.settings.SettingsItem;
-import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
@@ -32,8 +31,6 @@ import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 public class PricingHandlerIntegrationTest {
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
-  private static final URI UNUSED_S3_ENDPOINT = URI.create("http://localhost:1");
-
   private TcgInventoryTestFactory factory;
   private ObjectMapper objectMapper;
   private PricingRepository pricingRepository;
@@ -45,13 +42,16 @@ public class PricingHandlerIntegrationTest {
   @BeforeAll
   static void setUpBeforeClass() {
     var factory =
-        TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
+        TcgInventoryTestFactory.create(
+            dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
     DynamoDbUtils.createTable(factory.dynamoDbClient(), factory.tableDefinition());
   }
 
   @BeforeEach
   void setUp() {
-    factory = TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
+    factory =
+        TcgInventoryTestFactory.create(
+            dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
     DynamoDbUtils.reset(factory.dynamoDbClient());
     factory.fakeClock().setTime(Instant.ofEpochSecond(1700000000));
     factory.fakeUlidGenerator().reset();

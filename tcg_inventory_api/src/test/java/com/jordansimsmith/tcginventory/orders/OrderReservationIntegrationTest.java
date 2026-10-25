@@ -17,7 +17,6 @@ import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
 import com.jordansimsmith.time.FakeClock;
 import java.math.BigDecimal;
-import java.net.URI;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -50,18 +49,19 @@ public class OrderReservationIntegrationTest {
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
-  private static final URI UNUSED_S3_ENDPOINT = URI.create("http://localhost:1");
-
   @BeforeAll
   static void setUpBeforeClass() {
     var factory =
-        TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
+        TcgInventoryTestFactory.create(
+            dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
     DynamoDbUtils.createTable(factory.dynamoDbClient(), factory.tableDefinition());
   }
 
   @BeforeEach
   void setUp() {
-    factory = TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), UNUSED_S3_ENDPOINT);
+    factory =
+        TcgInventoryTestFactory.create(
+            dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
     fakeClock = factory.fakeClock();
     fakeFetchTcgClient = factory.fakeFetchTcgClient();
     fakeClock.setTime(NOW);
