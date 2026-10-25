@@ -1,9 +1,14 @@
 package com.jordansimsmith.tcginventory.fetchtcg.server;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.service.NotFoundException;
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountRequest;
 import java.time.Instant;
 import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
@@ -75,9 +80,87 @@ public class FetchTcgAccountRepositoryIntegrationTest {
 
     // act
     var account = accountRepository.get("jordan");
+    var service = new GetAccountService(accountRepository);
 
     // assert
     assertThat(account).isNull();
+    assertThatThrownBy(
+            () -> service.getAccount(new RequestContext("jordan"), new GetAccountRequest()))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("FetchTCG account is not configured");
+  }
+
+  @Test
+  void getAccountServiceShouldReturnStoredMetadataWithoutChangingIt() throws ServiceException {
+    // arrange
+    var updatedAt = Instant.ofEpochSecond(1_800_000_000, 123_456_789);
+    var savedAccount = FetchTcgAccountItem.create("jordan", "  Jordan Seller  ", updatedAt);
+    accountRepository.update(savedAccount);
+    var service = new GetAccountService(accountRepository);
+
+    // act
+    var response = service.getAccount(new RequestContext("jordan"), new GetAccountRequest());
+
+    // assert
+    assertThat(response.sellerUsername()).isEqualTo("  Jordan Seller  ");
+    assertThat(response.credentialsUpdatedAt()).isEqualTo(1_800_000_000L);
+    var storedAccount = accountRepository.get("jordan");
+    assertThat(storedAccount.getSellerUsername()).isEqualTo("  Jordan Seller  ");
+    assertThat(storedAccount.getCredentialsUpdatedAt())
+        .isEqualTo(Instant.ofEpochSecond(1_800_000_000));
+  }
+
+  @Test
+  void getAccountServiceShouldSelectMetadataByContextUser() throws ServiceException {
+    // arrange
+    accountRepository.update(
+        FetchTcgAccountItem.create("alice", "Alice Seller", Instant.ofEpochSecond(1_700_000_000)));
+    accountRepository.update(
+        FetchTcgAccountItem.create("bob", "Bob Seller", Instant.ofEpochSecond(1_800_000_000)));
+    var service = new GetAccountService(accountRepository);
+
+    // act
+    var alice = service.getAccount(new RequestContext("alice"), new GetAccountRequest());
+    var bob = service.getAccount(new RequestContext("bob"), new GetAccountRequest());
+
+    // assert
+    assertThat(alice.sellerUsername()).isEqualTo("Alice Seller");
+    assertThat(bob.sellerUsername()).isEqualTo("Bob Seller");
+    assertThat(alice.credentialsUpdatedAt()).isEqualTo(1_700_000_000L);
+    assertThat(bob.credentialsUpdatedAt()).isEqualTo(1_800_000_000L);
+  }
+
+  @Test
+  void getAccountServiceShouldReturnNotFoundWhenAccountItemIsAbsent() {
+    // arrange
+    var service = new GetAccountService(accountRepository);
+
+    // act & assert
+    assertThatThrownBy(
+            () -> service.getAccount(new RequestContext("jordan"), new GetAccountRequest()))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("FetchTCG account is not configured");
+  }
+
+  @Test
+  void getAccountServiceShouldFailWhenStoredMetadataIsInvalid() {
+    for (var invalidAccount :
+        new FetchTcgAccountItem[] {
+          FetchTcgAccountItem.create("jordan", null, Instant.ofEpochSecond(1_700_000_000)),
+          FetchTcgAccountItem.create("jordan", "", Instant.ofEpochSecond(1_700_000_000)),
+          FetchTcgAccountItem.create("jordan", " \t\n ", Instant.ofEpochSecond(1_700_000_000)),
+          FetchTcgAccountItem.create("jordan", "Jordan Seller", null)
+        }) {
+      // arrange
+      accountRepository.update(invalidAccount);
+      var service = new GetAccountService(accountRepository);
+
+      // act & assert
+      assertThatThrownBy(
+              () -> service.getAccount(new RequestContext("jordan"), new GetAccountRequest()))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessage("FetchTCG account metadata is incomplete");
+    }
   }
 
   @Test
