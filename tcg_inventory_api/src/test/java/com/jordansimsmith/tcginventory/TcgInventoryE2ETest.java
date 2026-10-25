@@ -104,6 +104,32 @@ public class TcgInventoryE2ETest {
 
   @Test
   void fullLoopImportToOrderConfirm() throws IOException, InterruptedException {
+    // arrange / act - verify FetchTCG account and credential routes with an isolated user
+    var fetchTcgUser = "fetchtcg-endpoint-test";
+    var missingAccountResponse = sendAsUser("GET", "/fetchtcg/account", "", fetchTcgUser);
+    var invalidCredentialsResponse = sendAsUser("PUT", "/fetchtcg/credentials", "", fetchTcgUser);
+    var saveCredentialsResponse =
+        sendAsUser(
+            "PUT",
+            "/fetchtcg/credentials",
+            "{\"refresh_token\":\"candidate-token\"}",
+            fetchTcgUser);
+    var savedAccountResponse = sendAsUser("GET", "/fetchtcg/account", "", fetchTcgUser);
+
+    // assert
+    assertThat(missingAccountResponse.statusCode()).isEqualTo(404);
+    assertThat(invalidCredentialsResponse.statusCode()).isEqualTo(400);
+    assertThat(saveCredentialsResponse.statusCode()).isEqualTo(200);
+    assertThat(savedAccountResponse.statusCode()).isEqualTo(200);
+    var savedAccount = objectMapper.readTree(saveCredentialsResponse.body());
+    var readAccount = objectMapper.readTree(savedAccountResponse.body());
+    assertThat(savedAccount).isEqualTo(readAccount);
+    assertThat(readAccount.size()).isEqualTo(2);
+    assertThat(readAccount.has("seller_username")).isTrue();
+    assertThat(readAccount.has("credentials_updated_at")).isTrue();
+    assertThat(readAccount.get("seller_username").asText()).isEqualTo("jordan");
+    assertThat(readAccount.get("credentials_updated_at").isIntegralNumber()).isTrue();
+
     // arrange - verify the authenticated pricing configuration round-trip
     var defaultResponse = get("/pricing");
     assertThat(defaultResponse.statusCode()).isEqualTo(200);
@@ -576,6 +602,22 @@ public class TcgInventoryE2ETest {
             .uri(URI.create(apiUrl + path))
             .header("Authorization", AUTH_HEADER)
             .GET()
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
+  }
+
+  private HttpResponse<String> sendAsUser(String method, String path, String body, String user)
+      throws IOException, InterruptedException {
+    var authorization =
+        "Basic "
+            + Base64.getEncoder()
+                .encodeToString((user + ":password").getBytes(StandardCharsets.UTF_8));
+    return httpClient.send(
+        HttpRequest.newBuilder()
+            .uri(URI.create(apiUrl + path))
+            .header("Authorization", authorization)
+            .header("Content-Type", "application/json")
+            .method(method, HttpRequest.BodyPublishers.ofString(body))
             .build(),
         HttpResponse.BodyHandlers.ofString());
   }

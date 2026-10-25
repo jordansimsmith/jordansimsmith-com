@@ -155,6 +155,18 @@ lambdas = {
         "handler": "com.jordansimsmith.tcginventory.games.GetGamesHandler",
         "zip_file": "get-games-handler_deploy.jar",
     },
+    "get_fetchtcg_account": {
+        "handler": "com.jordansimsmith.tcginventory.fetchtcg.api.GetAccountHandler",
+        "zip_file": "get-fetchtcg-account-handler_deploy.jar",
+    },
+    "update_fetchtcg_credentials": {
+        "handler": "com.jordansimsmith.tcginventory.fetchtcg.api.UpdateCredentialsHandler",
+        "zip_file": "update-fetchtcg-credentials-handler_deploy.jar",
+        "environment": {
+            "FETCHTCG_BASE_URL": os.environ.get("FETCHTCG_BASE_URL", ""),
+            "FIREBASE_TOKEN_URL": os.environ.get("FIREBASE_TOKEN_URL", ""),
+        },
+    },
     "get_settings": {
         "handler": "com.jordansimsmith.tcginventory.settings.GetSettingsHandler",
         "zip_file": "get-settings-handler_deploy.jar",
@@ -305,6 +317,7 @@ lambdas = {
 root_resources = {
     "catalog": {"path": "catalog"},
     "games": {"path": "games"},
+    "fetchtcg": {"path": "fetchtcg"},
     "settings": {"path": "settings"},
     "pricing": {"path": "pricing"},
     "imports": {"path": "imports"},
@@ -317,6 +330,8 @@ root_resources = {
 
 child_resources = {
     "catalog_cards": {"parent": "catalog", "path": "cards"},
+    "fetchtcg_account": {"parent": "fetchtcg", "path": "account"},
+    "fetchtcg_credentials": {"parent": "fetchtcg", "path": "credentials"},
     "catalog_card_detail": {"parent": "catalog_cards", "path": "{external_id}"},
     "catalog_card_alternatives": {
         "parent": "catalog_card_detail",
@@ -358,6 +373,16 @@ endpoints = {
         "lambda": "find_catalog_cards",
     },
     "get_games": {"resource": "games", "method": "GET", "lambda": "get_games"},
+    "get_fetchtcg_account": {
+        "resource": "fetchtcg_account",
+        "method": "GET",
+        "lambda": "get_fetchtcg_account",
+    },
+    "update_fetchtcg_credentials": {
+        "resource": "fetchtcg_credentials",
+        "method": "PUT",
+        "lambda": "update_fetchtcg_credentials",
+    },
     "get_settings": {"resource": "settings", "method": "GET", "lambda": "get_settings"},
     "update_settings": {
         "resource": "settings",

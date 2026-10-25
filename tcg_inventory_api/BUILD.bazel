@@ -51,6 +51,14 @@ py_test(
 
 HANDLERS = glob(["src/main/java/**/*Handler.java"])
 
+filegroup(
+    name = "lambda-logback-resource",
+    srcs = ["src/main/resources/logback.xml"],
+    visibility = [
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:__pkg__",
+    ],
+)
+
 COMMON_DEPS = [
     ":games-lib",
     "//lib/dynamodb:lib",
@@ -89,7 +97,10 @@ UNIT_TESTS = glob(
 
 java_library(
     name = "fetchtcg-lib",
-    srcs = glob(["src/main/java/com/jordansimsmith/tcginventory/fetchtcg/*.java"]),
+    srcs = glob(
+        ["src/main/java/com/jordansimsmith/tcginventory/fetchtcg/*.java"],
+        exclude = ["src/main/java/com/jordansimsmith/tcginventory/fetchtcg/*Handler.java"],
+    ),
     resources = ["src/main/resources/fetchtcg/fetchtcg_set_mapping.json"],
     deps = [
         "//lib/secrets:lib",
@@ -142,6 +153,10 @@ java_library(
         ["src/main/resources/**"],
         exclude = ["src/main/resources/fetchtcg/fetchtcg_set_mapping.json"],
     ),
+    visibility = [
+        "//tcg_inventory_api:__pkg__",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:__pkg__",
+    ],
     deps = [
         ":fetchtcg-lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
@@ -1309,7 +1324,11 @@ java_test_suite(
         "//lib/http:lib",
         "//lib/secrets:lib",
         "//lib/secrets:test-lib",
+        "//lib/service",
         "//lib/time:test-lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:get-fetchtcg-account-handler",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:update-fetchtcg-credentials-handler",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//third_party/dagger",
         "@maven//:com_amazonaws_aws_lambda_java_core",
         "@maven//:com_amazonaws_aws_lambda_java_events",
@@ -1433,6 +1452,7 @@ localstack_image(
         ":find-skus-handler_deploy.jar",
         ":find-scans-handler_deploy.jar",
         ":get-games-handler_deploy.jar",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:get-fetchtcg-account-handler_deploy.jar",
         ":get-order-handler_deploy.jar",
         ":get-sku-handler_deploy.jar",
         ":get-scan-handler_deploy.jar",
@@ -1453,6 +1473,7 @@ localstack_image(
         ":jobs-handler_deploy.jar",
         ":update-pricing-handler_deploy.jar",
         ":update-settings-handler_deploy.jar",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:update-fetchtcg-credentials-handler_deploy.jar",
     ],
     init_resources = "src/test/resources/init_resources.py",
     repo_tag = "bazel/tcg-inventory-local:latest",

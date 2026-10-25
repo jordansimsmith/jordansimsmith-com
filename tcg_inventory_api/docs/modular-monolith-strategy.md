@@ -20,7 +20,7 @@ Existing import confirmation and order processing already use durable progress a
 ## Goals and scope
 
 - Keep vertical slices as the organizing structure, revisiting a boundary when its invariants require a different owner.
-- Give each vertical a public client package and a private server package.
+- Give each vertical a runtime-facing API adapter package, a public client package, and a private server package.
 - Make cross-vertical access go through runtime-independent service contracts.
 - Give each persisted record and business invariant one authoritative owner.
 - Keep direct in-process calls initially and preserve one Lambda per HTTP endpoint.
@@ -31,17 +31,20 @@ Immediate service extraction, an RPC framework, an event bus for every interacti
 
 ## Package and build boundaries
 
-Each vertical has a `client` package containing its service interface and the request, response, and vertical-specific error types needed to use it. Its `server` package contains the implementation, repositories, persistence models, internal policies, operation services, and the vertical's Dagger module. Shared types such as `ServiceException` and `RequestContext` belong in `//lib/service`.
+Each vertical has `api`, `client`, and `server` packages. The `api` package contains HTTP handlers and other runtime-facing adapters; they translate transport input into client requests, call the client interface, and translate service errors into transport responses. The `api` package does not depend directly on the vertical's server implementation. The `client` package contains the service interface and the request, response, and vertical-specific error types needed to use it. The `server` package contains the implementation, repositories, persistence models, internal policies, operation services, and the vertical's Dagger module. Shared types such as `ServiceException` and `RequestContext` belong in `//lib/service`.
 
 The JDK-only `//lib/service:service` target contains `RequestContext`, `ServiceException`, and its shared subclasses. `ServiceException` is sealed to the six final HTTP-named exception categories, keeping the set of service errors closed for exhaustive HTTP mapping. Future service clients depend directly on this target, which has no Lambda, API Gateway, Dagger, or JSON dependencies. The existing `//lib/http:lib` target depends on and re-exports `//lib/service:service` for HTTP adapters and existing consumers.
 
-Each `client` and `server` directory has its own `BUILD.bazel`, making them separate Bazel packages. The client BUILD defines the public contract target and its tests; the server BUILD defines the private implementation target and its tests. HTTP adapter targets remain separate from server implementation targets. A single BUILD at the vertical root does not replace these two build files. Configure visibility to enforce the service boundary.
+Each `api`, `client`, and `server` directory has its own `BUILD.bazel`, making them separate Bazel packages. The API BUILD defines HTTP adapter targets separately from server implementation targets; the client BUILD defines the public contract target and its tests; the server BUILD defines the private implementation target and its tests. A single BUILD at the vertical root does not replace these package build files. Configure visibility to enforce the service boundary.
 
 An illustrative package structure is:
 
 ```text
 tcginventory/
   inventory/
+    api/
+      BUILD.bazel            # HTTP handlers and other runtime adapters
+      ...                    # delegates to InventoryService
     client/
       BUILD.bazel            # public client target and contract tests
       InventoryService.java
@@ -51,6 +54,9 @@ tcginventory/
       InventoryModule.java   # provides InventoryService
       ...                    # one operation service per interface method
   imports/
+    api/
+      BUILD.bazel
+      ...                    # HTTP handlers and other runtime adapters
     client/
       BUILD.bazel
       ImportService.java
@@ -61,13 +67,13 @@ tcginventory/
       ...                    # operation services, repositories, persistence models
 ```
 
-This illustrates responsibilities; exact source paths and target names are chosen during implementation. There is no separate contracts package: vertical contracts live in their client packages, shared service/context types live in `//lib/service`, and HTTP response mapping lives in `//lib/http`. RPC transport packages are deferred until RPC is introduced. Dagger modules live in their owning server packages; no separate wiring package is required. Bazel target names remain kebab-case.
+This illustrates responsibilities; exact target names are chosen during implementation. Once a vertical's migration is complete, its production classes live under `api`, `client`, or `server`; no production classes remain directly in the vertical root. Legacy root-level classes may remain temporarily during migration, but they are an explicit unfinished boundary and must be moved or removed before declaring the vertical complete. There is no separate contracts package: vertical contracts live in their client packages, shared service/context types live in `//lib/service`, and HTTP response mapping lives in `//lib/http`. RPC transport packages are deferred until RPC is introduced. Dagger modules live in their owning server packages; no separate wiring package is required. Bazel target names remain kebab-case.
 
 | Consumer                   | Allowed dependencies                                                            |
 | -------------------------- | ------------------------------------------------------------------------------- |
 | Any target                 | Public client targets and shared service/context types from `//lib/service`     |
 | A vertical's server        | Its own client, other verticals' clients, and required infrastructure libraries |
-| HTTP adapter               | Service clients and HTTP/runtime libraries                                      |
+| HTTP adapter in `api`      | Service clients, HTTP/runtime libraries, and narrow composition-root factories  |
 | Top-level composition root | Server modules needed to construct and expose service interfaces                |
 | Server tests               | The implementation under test and required test setup                           |
 
@@ -265,7 +271,7 @@ Future RPC transports encode the defined error vocabulary and reconstruct client
 
 Apply these steps to any vertical. Choose the next vertical from its ownership boundaries, dependency graph, and coupling rather than following a fixed domain order. Before changing code, identify its authoritative records, invariants, callers, dependencies, and cross-vertical workflows.
 
-1. First establish shared context/error types in `//lib/service`, including `ServiceException` and the required HTTP-named subclasses. Then define the selected vertical's contracts in its client package, with `throws ServiceException` on every operation. Add a `BUILD.bazel` in each of its client and server packages, restrict server visibility, and provide the service through its server-local Dagger module.
+1. First establish shared context/error types in `//lib/service`, including `ServiceException` and the required HTTP-named subclasses. Then define the selected vertical's contracts in its client package, with `throws ServiceException` on every operation. Place runtime-facing HTTP adapters in its `api` package, with a separate `BUILD.bazel` for each of `api`, `client`, and `server`. Restrict server visibility, and provide the service through its server-local Dagger module.
 2. Migrate one complete operation behind the vertical's service interface, with a dedicated operation class and a thin delegate from the provided service. Keep its persistence models and mutations in its server package, replace cross-vertical implementation access with client contracts, and preserve validation, authorization, concurrency, and replay behavior. Define recovery wherever the operation crosses owners.
 3. Enforce the migrated boundary in Bazel and remove the old repository/model dependencies for that path. Mark remaining migration gaps explicitly; do not describe a vertical as isolated while its other callers still bypass the interface.
 4. Move endpoint application logic into services and adopt the shared HTTP error mapper while preserving public responses.
