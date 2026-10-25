@@ -266,7 +266,7 @@ Apply these steps to any vertical. Choose the next vertical from its ownership b
 6. Shrink shared domain state and infrastructure access as ownership becomes explicit. Resolve ownership and recovery for any shared jobs, concurrency gates, audit records, or resource lifecycles used by the selected vertical before declaring isolation complete.
 7. Consider RPC or separate databases only when a deployment need justifies them. No extraction is required to benefit from the boundaries.
 
-Each migration should be small enough to review and leave a working system. Update the README's current architecture, dependency graph, and behavioral contracts in the same implementation change.
+Each migration should be small enough to review and leave a working system. When replacing an existing implementation, build the service implementation to behavioral parity first, switch consumers to the service boundary, then remove the legacy implementation after its final callers move. Temporary duplication is acceptable when it keeps the new implementation independent of legacy callers during parity work. Update the README's current architecture, dependency graph, and behavioral contracts in the same implementation change.
 
 ## Verification and completion criteria
 

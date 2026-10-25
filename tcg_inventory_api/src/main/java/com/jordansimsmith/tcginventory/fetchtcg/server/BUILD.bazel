@@ -2,10 +2,14 @@ load("@rules_java//java:defs.bzl", "java_library")
 
 java_library(
     name = "server",
-    srcs = glob(
-        ["*.java"],
-        allow_empty = True,
-    ),
-    visibility = ["//visibility:private"],
-    runtime_deps = ["//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client"],
+    srcs = glob(["*.java"]),
+    visibility = [
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/server:__pkg__",
+    ],
+    deps = [
+        "//lib/service",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
+        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+    ],
 )
