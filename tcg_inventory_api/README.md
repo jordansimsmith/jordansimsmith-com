@@ -66,6 +66,8 @@ The TCG inventory API service is the source of truth for physical Magic: The Gat
 
 The [modular monolith engineering strategy](docs/modular-monolith-strategy.md) documents the target service boundaries and migration approach. This README describes the current implementation.
 
+FetchTCG now has a public `fetchtcg.client` contract for account reads and credential updates, with request and response records annotated for the frontend JSON shape. The contract is not connected to a server implementation or HTTP endpoints yet; existing handlers and workers continue to use the legacy FetchTCG integration library.
+
 ```mermaid
 flowchart TD
   web[tcg_inventory_web SPA] -->|HTTPS Basic| apigw[API Gateway REST]

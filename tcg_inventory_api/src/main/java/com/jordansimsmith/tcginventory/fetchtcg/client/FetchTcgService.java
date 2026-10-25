@@ -1,0 +1,12 @@
+package com.jordansimsmith.tcginventory.fetchtcg.client;
+
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
+
+public interface FetchTcgService {
+  GetAccountResponse getAccount(RequestContext ctx, GetAccountRequest request)
+      throws ServiceException;
+
+  UpdateCredentialsResponse updateCredentials(RequestContext ctx, UpdateCredentialsRequest request)
+      throws ServiceException;
+}

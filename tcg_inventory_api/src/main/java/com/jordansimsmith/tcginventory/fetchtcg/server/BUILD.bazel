@@ -1,0 +1,11 @@
+load("@rules_java//java:defs.bzl", "java_library")
+
+java_library(
+    name = "server",
+    srcs = glob(
+        ["*.java"],
+        allow_empty = True,
+    ),
+    visibility = ["//visibility:private"],
+    runtime_deps = ["//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client"],
+)

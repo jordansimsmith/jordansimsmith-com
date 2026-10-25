@@ -61,11 +61,11 @@ tcginventory/
       ...                    # operation services, repositories, persistence models
 ```
 
-This illustrates responsibilities; exact source paths and target names are chosen during implementation. There is no separate contracts package: vertical contracts live in their client packages, and shared HTTP/service types live in `//lib/http`. RPC transport packages are deferred until RPC is introduced. Dagger modules live in their owning server packages; no separate wiring package is required. Bazel target names remain kebab-case.
+This illustrates responsibilities; exact source paths and target names are chosen during implementation. There is no separate contracts package: vertical contracts live in their client packages, shared service/context types live in `//lib/service`, and HTTP response mapping lives in `//lib/http`. RPC transport packages are deferred until RPC is introduced. Dagger modules live in their owning server packages; no separate wiring package is required. Bazel target names remain kebab-case.
 
 | Consumer                   | Allowed dependencies                                                            |
 | -------------------------- | ------------------------------------------------------------------------------- |
-| Any target                 | Public client targets and shared types from `//lib/http`                        |
+| Any target                 | Public client targets and shared service/context types from `//lib/service`     |
 | A vertical's server        | Its own client, other verticals' clients, and required infrastructure libraries |
 | HTTP adapter               | Service clients and HTTP/runtime libraries                                      |
 | Top-level composition root | Server modules needed to construct and expose service interfaces                |
@@ -77,7 +77,7 @@ Bazel visibility operates at package granularity, not individual target granular
 
 The dependency graph between verticals should remain acyclic and intentional. A client package being public permits access; it does not make every dependency desirable. Put orchestration in the vertical that owns the workflow. If calls repeatedly go both ways, reconsider ownership or introduce a deliberate workflow boundary.
 
-Shared code should provide infrastructure or common types in `//lib/http`. Vertical-specific contracts remain in the owning client's package. Shared libraries must not become another home for domain logic that avoids vertical ownership.
+Shared code should provide infrastructure in focused libraries. Common service/context types belong in `//lib/service`; HTTP response mapping belongs in `//lib/http`. Vertical-specific contracts remain in the owning client's package. Shared libraries must not become another home for domain logic that avoids vertical ownership.
 
 ## Service contracts
 
@@ -292,6 +292,6 @@ The boundary principles above are the strategy. Before migrating affected paths,
 - The dependency graph and whether any current vertical boundary splits an invariant that must remain atomic.
 - Reporting freshness and consistency across owners.
 - Exact Bazel labels and composition-root package boundaries needed to keep module-construction access narrow.
-- The exact shared error/context types in `//lib/http` and the eventual wire representation if RPC is introduced.
+- The exact shared error/context types in `//lib/service` and the eventual wire representation if RPC is introduced.
 
 Record these decisions alongside the migration that needs them; do not leave a cross-vertical persistence dependency as the permanent solution.
