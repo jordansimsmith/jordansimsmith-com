@@ -84,10 +84,7 @@ When performing the code review step, check for:
 - Code comments should only be used when something is truly non-obvious and needs explaining
 - All comments should be lowercase with rare exceptions for proper nouns
 - Exception handling: Public methods should call private implementation methods that can throw
-- Public methods should catch and wrap exceptions into runtime exceptions
-- If a dependency doesn't need to be shared between providers, inline its creation in the provider method
-- Prefer inline method content rather than many small helper private methods - keeps code readable and avoids unnecessary indirection
-- Don't add private methods when the logic is simple and used only once - inline it
+- Public methods should preserve explicitly declared checked exceptions. Wrap other implementation exceptions in runtime exceptions only when the public contract does not expose them.
 - Let exceptions bubble up naturally when appropriate instead of unnecessarily catching them
 - Always use imports instead of fully qualified names (e.g., `import java.util.ArrayList;` instead of `java.util.ArrayList`)
 - When a signature gains a required parameter, update every call site; do not add an overload, default, or dummy wrapper to avoid touching existing callers
