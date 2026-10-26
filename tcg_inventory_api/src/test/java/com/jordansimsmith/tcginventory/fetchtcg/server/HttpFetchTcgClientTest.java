@@ -189,10 +189,7 @@ public class HttpFetchTcgClientTest {
             URI.create("https://api.fetchtcg.example"),
             httpClient,
             new ObjectMapper(),
-            () -> {
-              Thread.currentThread().interrupt();
-              throw new IllegalStateException("bearer-secret");
-            });
+            () -> Thread.currentThread().interrupt());
 
     // act
     var thrown = catchThrowable(() -> interruptedClient.getProfile("bearer-secret"));

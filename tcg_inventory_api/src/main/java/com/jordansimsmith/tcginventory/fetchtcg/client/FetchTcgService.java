@@ -9,4 +9,9 @@ public interface FetchTcgService {
 
   UpdateCredentialsResponse updateCredentials(RequestContext ctx, UpdateCredentialsRequest request)
       throws ServiceException;
+
+  GetCardResponse getCard(RequestContext ctx, GetCardRequest request) throws ServiceException;
+
+  FindCardListingsResponse findCardListings(RequestContext ctx, FindCardListingsRequest request)
+      throws ServiceException;
 }
