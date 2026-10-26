@@ -1,7 +1,10 @@
 package com.jordansimsmith.tcginventory.pricing;
 
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.Condition;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsRequest;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -12,29 +15,36 @@ import java.util.TreeMap;
 public class CompetitorPricing {
   public record CompetitorPriceTier(BigDecimal price, Set<String> sellerKeys) {}
 
-  private final FetchTcgClient fetchTcgClient;
+  private final FetchTcgService fetchTcgService;
 
-  public CompetitorPricing(FetchTcgClient fetchTcgClient) {
-    this.fetchTcgClient = fetchTcgClient;
+  public CompetitorPricing(FetchTcgService fetchTcgService) {
+    this.fetchTcgService = fetchTcgService;
   }
 
   public List<CompetitorPriceTier> findCompetitorPriceTiers(
-      String cardId, Condition condition, String sellerUsername) {
-    var listingsResponse = fetchTcgClient.getCardListings(cardId);
+      RequestContext ctx, String cardId, Condition condition, String sellerUsername)
+      throws ServiceException {
     var priceToSellers = new TreeMap<BigDecimal, Set<String>>();
-    for (var listing : listingsResponse.content()) {
-      if (sellerUsername.equals(listing.sellerProfileName())) {
-        continue;
-      }
+    String continuation = null;
+    do {
+      var response =
+          fetchTcgService.findCardListings(
+              ctx, new FindCardListingsRequest(cardId, 100, continuation));
+      for (var listing : response.listings()) {
+        if (sellerUsername.equals(listing.sellerUsername())) {
+          continue;
+        }
 
-      var listingCondition = Condition.fromFetchtcg(listing.condition());
-      if (listingCondition == null || !listingCondition.isSameOrBetterThan(condition)) {
-        continue;
+        var listingCondition = Condition.fromFetchtcg(listing.condition());
+        if (listingCondition == null || !listingCondition.isSameOrBetterThan(condition)) {
+          continue;
+        }
+        priceToSellers
+            .computeIfAbsent(listing.listedPrice(), ignored -> new HashSet<>())
+            .add(listing.sellerUsername());
       }
-      priceToSellers
-          .computeIfAbsent(listing.listedPrice(), ignored -> new HashSet<>())
-          .add(listing.sellerProfileName());
-    }
+      continuation = response.nextContinuation();
+    } while (continuation != null);
 
     var tiers = new ArrayList<CompetitorPriceTier>();
     for (var entry : priceToSellers.entrySet()) {

@@ -12,7 +12,7 @@ import com.jordansimsmith.tcginventory.catalog.CatalogSnapshotItem;
 import com.jordansimsmith.tcginventory.catalog.FakeCardCatalogs;
 import com.jordansimsmith.tcginventory.catalog.FakeTcgCsvClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
-import com.jordansimsmith.tcginventory.fetchtcg.server.FetchTcgModule;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.tcginventory.inventory.SequenceCounterItem;
@@ -47,7 +47,6 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
       RequestContextModule.class,
       UlidTestModule.class,
       S3TestModule.class,
-      FetchTcgModule.class,
       TcgInventoryTestModule.class
     })
 public interface TcgInventoryTestFactory extends CatalogFactory {
@@ -66,6 +65,8 @@ public interface TcgInventoryTestFactory extends CatalogFactory {
   FakeQueueClient<ScanMessage> fakeScanQueue();
 
   FakeFetchTcgClient fakeFetchTcgClient();
+
+  FakeFetchTcgService fakeFetchTcgService();
 
   FakeCardCatalogs fakeCardCatalogs();
 

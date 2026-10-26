@@ -2,18 +2,33 @@ package com.jordansimsmith.tcginventory.pricing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.when;
 
 import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.queue.FakeQueueClient;
+import com.jordansimsmith.service.NotFoundException;
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
+import com.jordansimsmith.tcginventory.JobProcessor;
 import com.jordansimsmith.tcginventory.JobsHandler;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
+import com.jordansimsmith.tcginventory.fetchtcg.client.CardListing;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsResponse;
+import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountResponse;
+import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
@@ -73,7 +88,7 @@ public class RepriceJobProcessorIntegrationTest {
     auditTable = factory.auditTable();
     DynamoDbUtils.reset(factory.dynamoDbClient());
     jobsQueue.reset();
-    factory.fakeFetchTcgClient().reset();
+    factory.fakeFetchTcgService().reset();
     clock.setTime(CREATED_AT);
     jobsHandler = new JobsHandler(factory);
   }
@@ -95,15 +110,13 @@ public class RepriceJobProcessorIntegrationTest {
     mtgSku.setLastPublishedAt(CREATED_AT);
     skuTable.putItem(mtgSku);
 
-    var fetchTcgClient = factory.fakeFetchTcgClient();
-    fetchTcgClient.seedCard("fetch-mtg", card("fetch-mtg", "2.50"));
-    fetchTcgClient.seedCard("fetch-pokemon", card("fetch-pokemon", "1.00"));
-    fetchTcgClient.seedCard("fetch-low", card("fetch-low", "0.10"));
-    fetchTcgClient.seedListings(
-        "fetch-mtg",
-        new FetchTcgClient.GetCardListingsResponse(
-            List.of(
-                new FetchTcgClient.CardListing(1, "raw-nm", new BigDecimal("1.00"), "jordan"))));
+    seedCard("fetch-mtg", "2.50");
+    seedCard("fetch-pokemon", "1.00");
+    seedCard("fetch-low", "0.10");
+    factory
+        .fakeFetchTcgService()
+        .seedListings(
+            "fetch-mtg", List.of(new CardListing(1, "raw-nm", new BigDecimal("1.00"), "jordan")));
     createRepriceJob("jordan", "job1", "0.75");
 
     // act
@@ -169,7 +182,7 @@ public class RepriceJobProcessorIntegrationTest {
     // arrange
     var user = "default-floor-user";
     var skuId = createSku(user, "mtg", "low-market", "fetch-low", "0.10", "in_stock");
-    factory.fakeFetchTcgClient().seedCard("fetch-low", card("fetch-low", "0.10"));
+    seedCard("fetch-low", "0.10");
     createRepriceJob(user, "job1", null);
 
     // act
@@ -186,7 +199,7 @@ public class RepriceJobProcessorIntegrationTest {
     // arrange
     var user = "zero-floor-user";
     var skuId = createSku(user, "mtg", "low-market", "fetch-low", "0.10", "in_stock");
-    factory.fakeFetchTcgClient().seedCard("fetch-low", card("fetch-low", "0.10"));
+    seedCard("fetch-low", "0.10");
     createRepriceJob(user, "job1", "0.00");
 
     // act
@@ -198,10 +211,94 @@ public class RepriceJobProcessorIntegrationTest {
   }
 
   @Test
+  void repriceShouldReusePricingReadsAcrossTheBatch() throws Exception {
+    var user = "cache-user";
+    createSku(user, "mtg", "card-one", "shared-card", "1.00", "in_stock");
+    createSku(user, "mtg", "card-two", "shared-card", "1.00", "in_stock");
+    createRepriceJob(user, "job1", null);
+    var fetchTcgService = mock(FetchTcgService.class);
+    var ctx = new RequestContext(user);
+    when(fetchTcgService.getAccount(ctx, new GetAccountRequest()))
+        .thenReturn(new GetAccountResponse("verified-seller", 0));
+    when(fetchTcgService.getCard(ctx, new GetCardRequest("shared-card")))
+        .thenReturn(new GetCardResponse("shared-card", "Card", new BigDecimal("1.00"), Map.of()));
+    when(fetchTcgService.findCardListings(
+            ctx, new FindCardListingsRequest("shared-card", 100, null)))
+        .thenReturn(new FindCardListingsResponse(List.of(), null));
+
+    newRepriceJobProcessor(fetchTcgService).processBatch(user, getJob(user, "job1"));
+
+    verify(fetchTcgService).getAccount(ctx, new GetAccountRequest());
+    verify(fetchTcgService).getCard(ctx, new GetCardRequest("shared-card"));
+    verify(fetchTcgService)
+        .findCardListings(ctx, new FindCardListingsRequest("shared-card", 100, null));
+    verifyNoMoreInteractions(fetchTcgService);
+  }
+
+  @Test
+  void repriceShouldReuseAccountCardAndCompetitorReadsWithinBatch() throws Exception {
+    var user = "cache-user";
+    createSku(user, "mtg", "card-one", "shared-card", "1.00", "in_stock");
+    createSku(user, "mtg", "card-two", "shared-card", "1.00", "in_stock");
+    createRepriceJob(user, "job1", null);
+    var fetchTcgService = mock(FetchTcgService.class);
+    var ctx = new RequestContext(user);
+    when(fetchTcgService.getAccount(ctx, new GetAccountRequest()))
+        .thenReturn(new GetAccountResponse("verified-seller", 0));
+    when(fetchTcgService.getCard(ctx, new GetCardRequest("shared-card")))
+        .thenReturn(new GetCardResponse("shared-card", "Card", new BigDecimal("1.00"), Map.of()));
+    when(fetchTcgService.findCardListings(
+            ctx, new FindCardListingsRequest("shared-card", 100, null)))
+        .thenReturn(new FindCardListingsResponse(List.of(), null));
+
+    newRepriceJobProcessor(fetchTcgService).processBatch(user, getJob(user, "job1"));
+
+    verify(fetchTcgService).getAccount(ctx, new GetAccountRequest());
+    verify(fetchTcgService).getCard(ctx, new GetCardRequest("shared-card"));
+    verify(fetchTcgService)
+        .findCardListings(ctx, new FindCardListingsRequest("shared-card", 100, null));
+    verifyNoMoreInteractions(fetchTcgService);
+  }
+
+  @Test
+  void repriceShouldPreserveFetchTcgAccountNotFoundMessage() throws Exception {
+    // arrange
+    var user = "unconfigured-user";
+    createSku(user, "mtg", "card", "fetch-card", "1.00", "in_stock");
+    createRepriceJob(user, "job1", null);
+    var fetchTcgService = mock(FetchTcgService.class);
+    when(fetchTcgService.getAccount(new RequestContext(user), new GetAccountRequest()))
+        .thenThrow(new NotFoundException("missing"));
+
+    // act
+    var result = newRepriceJobProcessor(fetchTcgService).processBatch(user, getJob(user, "job1"));
+
+    // assert
+    assertThat(result).isEqualTo(new JobProcessor.FailureJobResult("missing"));
+  }
+
+  @Test
+  void repriceShouldPropagateTemporaryFetchTcgFailureForQueueRetry() throws Exception {
+    // arrange
+    var user = "retry-user";
+    createSku(user, "mtg", "card", "fetch-card", "1.00", "in_stock");
+    createRepriceJob(user, "job1", null);
+    var fetchTcgService = mock(FetchTcgService.class);
+    when(fetchTcgService.getAccount(new RequestContext(user), new GetAccountRequest()))
+        .thenThrow(new ServiceUnavailableException("FetchTCG is temporarily unavailable"));
+
+    // act & assert
+    assertThatThrownBy(
+            () -> newRepriceJobProcessor(fetchTcgService).processBatch(user, getJob(user, "job1")))
+        .isInstanceOf(RuntimeException.class)
+        .hasCauseInstanceOf(ServiceUnavailableException.class);
+  }
+
+  @Test
   void repriceShouldCheckpointByCandidateCountAcrossHundredSkuBatches() {
     for (var candidateCount : List.of(0, 1, 99, 100, 101, 201)) {
       jobsQueue.reset();
-      factory.fakeFetchTcgClient().reset();
+      factory.fakeFetchTcgService().reset();
       var user = "batch-user-" + candidateCount;
       var jobId = "batch-job-" + candidateCount;
 
@@ -286,11 +383,8 @@ public class RepriceJobProcessorIntegrationTest {
     // arrange
     var skuId = createSku("jordan", "mtg", "001", "missing-market", "1.00", "in_stock");
     factory
-        .fakeFetchTcgClient()
-        .seedCard(
-            "missing-market",
-            new FetchTcgClient.GetCardResponse(
-                "missing-market", "Reprice test", Map.of(), Map.of()));
+        .fakeFetchTcgService()
+        .seedCard(new GetCardResponse("missing-market", "Reprice test", null, Map.of()));
     createRepriceJob("jordan", "job1", "0.75");
 
     // act
@@ -385,12 +479,23 @@ public class RepriceJobProcessorIntegrationTest {
     jobTable.putItem(item);
   }
 
-  private FetchTcgClient.GetCardResponse card(String cardId, String marketPrice) {
-    return new FetchTcgClient.GetCardResponse(
-        cardId,
-        "Reprice test",
-        Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal(marketPrice))),
-        Map.of());
+  private void seedCard(String cardId, String marketPrice) {
+    factory
+        .fakeFetchTcgService()
+        .seedCard(
+            new GetCardResponse(cardId, "Reprice test", new BigDecimal(marketPrice), Map.of()));
+  }
+
+  private RepriceJobProcessor newRepriceJobProcessor(FetchTcgService fetchTcgService) {
+    var ulidGenerator = factory.ulidGenerator();
+    return new RepriceJobProcessor(
+        skuTable,
+        new InventoryRepository(unitTable, factory.dynamoDbClient(), clock, ulidGenerator),
+        objectMapper,
+        fetchTcgService,
+        new PricingRepository(factory),
+        clock,
+        ulidGenerator);
   }
 
   private SkuItem getSku(String user, String skuId) {

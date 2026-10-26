@@ -9,7 +9,13 @@ import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.tcginventory.catalog.CatalogFactory;
 import com.jordansimsmith.tcginventory.imports.AppraiseJobProcessor;
 import com.jordansimsmith.tcginventory.imports.ImportConfirmationJobProcessor;
+import com.jordansimsmith.tcginventory.imports.ImportItem;
+import com.jordansimsmith.tcginventory.imports.ImportRowItem;
+import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
+import com.jordansimsmith.tcginventory.inventory.SkuItem;
+import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.orders.OrderFulfillmentJobProcessor;
+import com.jordansimsmith.tcginventory.pricing.PricingRepository;
 import com.jordansimsmith.tcginventory.pricing.RepriceJobProcessor;
 import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
 import com.jordansimsmith.tcginventory.reports.ReportJobProcessor;
@@ -46,13 +52,35 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     this.clock = factory.clock();
     this.jobTable = factory.jobTable();
     this.jobsQueue = factory.jobsQueue();
-    this.appraiseJobProcessor = new AppraiseJobProcessor(factory);
+    var enhancedClient = factory.dynamoDbEnhancedClient();
+    var pricingRepository = new PricingRepository(factory);
+    this.appraiseJobProcessor =
+        new AppraiseJobProcessor(
+            TcgInventoryTable.table(enhancedClient, ImportItem.class),
+            TcgInventoryTable.table(enhancedClient, ImportRowItem.class),
+            factory.clock(),
+            factory.fetchTcgService(),
+            factory.fetchTcgClient(),
+            pricingRepository);
     this.publishJobProcessor = new PublishJobProcessor(factory);
     this.reportJobProcessor = new ReportJobProcessor(factory);
     this.scanConfirmationJobProcessor = new ScanConfirmationJobProcessor(factory);
     this.importConfirmationJobProcessor = new ImportConfirmationJobProcessor(factory);
     this.orderFulfillmentJobProcessor = new OrderFulfillmentJobProcessor(factory);
-    this.repriceJobProcessor = new RepriceJobProcessor(factory);
+    var ulidGenerator = factory.ulidGenerator();
+    this.repriceJobProcessor =
+        new RepriceJobProcessor(
+            TcgInventoryTable.table(enhancedClient, SkuItem.class),
+            new InventoryRepository(
+                TcgInventoryTable.table(enhancedClient, UnitItem.class),
+                factory.dynamoDbClient(),
+                factory.clock(),
+                ulidGenerator),
+            factory.objectMapper(),
+            factory.fetchTcgService(),
+            pricingRepository,
+            factory.clock(),
+            ulidGenerator);
   }
 
   @Override

@@ -8,12 +8,10 @@ import java.util.Map;
 public class FakeFetchTcgClient implements FetchTcgClient {
   private final Map<String, GetCardResponse> cards = new HashMap<>();
   private final Map<String, SearchCardsResponse> searchResults = new HashMap<>();
-  private final Map<String, GetCardListingsResponse> listings = new HashMap<>();
   private final Map<Integer, GetSellerOffersResponse> sellerOffers = new HashMap<>();
   private final List<UpsertListingRequest> upsertCalls = new ArrayList<>();
   private final List<Integer> deleteCalls = new ArrayList<>();
   private final List<UploadCall> uploadCalls = new ArrayList<>();
-  private String profileUsername = "jordan";
   private int searchCallCount;
   private int nextListingId = 900000;
   private int nextImageId = 1;
@@ -36,20 +34,6 @@ public class FakeFetchTcgClient implements FetchTcgClient {
       return new SearchCardsResponse(List.of());
     }
     return response;
-  }
-
-  @Override
-  public GetCardListingsResponse getCardListings(String cardId) {
-    var response = listings.get(cardId);
-    if (response == null) {
-      return new GetCardListingsResponse(List.of());
-    }
-    return response;
-  }
-
-  @Override
-  public GetProfileResponse getProfile(String bearerToken) {
-    return new GetProfileResponse(profileUsername);
   }
 
   @Override
@@ -87,14 +71,6 @@ public class FakeFetchTcgClient implements FetchTcgClient {
     searchResults.put(gameId + "#" + setId + "#" + cardName + "#" + finish, response);
   }
 
-  public void seedListings(String cardId, GetCardListingsResponse response) {
-    listings.put(cardId, response);
-  }
-
-  public void seedProfile(String username) {
-    profileUsername = username;
-  }
-
   public void seedSellerOffers(List<SellerOffer> offers) {
     sellerOffers.put(0, new GetSellerOffersResponse(offers, 1));
   }
@@ -122,13 +98,11 @@ public class FakeFetchTcgClient implements FetchTcgClient {
   public void reset() {
     cards.clear();
     searchResults.clear();
-    listings.clear();
     sellerOffers.clear();
     upsertCalls.clear();
     deleteCalls.clear();
     uploadCalls.clear();
     searchCallCount = 0;
-    profileUsername = "jordan";
     nextListingId = 900000;
     nextImageId = 1;
   }

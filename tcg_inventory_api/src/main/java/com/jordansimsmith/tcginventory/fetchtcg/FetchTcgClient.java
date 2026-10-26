@@ -12,10 +12,6 @@ public interface FetchTcgClient {
 
   SearchCardsResponse searchCards(String fetchTcgGameId, int setId, String cardName, String finish);
 
-  GetCardListingsResponse getCardListings(String cardId);
-
-  GetProfileResponse getProfile(String bearerToken);
-
   GetSellerOffersResponse getSellerOffers(String bearerToken, int page);
 
   UpsertListingResponse upsertListing(String bearerToken, UpsertListingRequest request);
@@ -38,18 +34,6 @@ public interface FetchTcgClient {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   record SearchCard(@JsonProperty("id") String id) {}
-
-  record GetCardListingsResponse(List<CardListing> content) {}
-
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  record GetProfileResponse(@JsonProperty("username") String username) {}
-
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  record CardListing(
-      @JsonProperty("id") int id,
-      @JsonProperty("condition") String condition,
-      @JsonProperty("listedPrice") BigDecimal listedPrice,
-      @JsonProperty("sellerProfileName") String sellerProfileName) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   record GetSellerOffersResponse(

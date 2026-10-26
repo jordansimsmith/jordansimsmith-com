@@ -2,19 +2,20 @@ package com.jordansimsmith.tcginventory.pricing;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.Continuations;
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobProcessor;
-import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgAuthException;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgCardResolver;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgTokenMinter;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
+import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
 import com.jordansimsmith.tcginventory.games.Games;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
 import java.math.BigDecimal;
@@ -31,45 +32,46 @@ public class RepriceJobProcessor implements JobProcessor {
   private final DynamoDbTable<SkuItem> skuTable;
   private final InventoryRepository inventoryRepository;
   private final ObjectMapper objectMapper;
-  private final FetchTcgClient fetchTcgClient;
-  private final FetchTcgTokenMinter fetchTcgTokenMinter;
+  private final FetchTcgService fetchTcgService;
   private final CompetitorPricing competitorPricing;
   private final PricingPolicy pricingPolicy;
   private final PricingRepository pricingRepository;
   private final Clock clock;
   private final UlidGenerator ulidGenerator;
 
-  public RepriceJobProcessor(TcgInventoryFactory factory) {
-    var enhancedClient = factory.dynamoDbEnhancedClient();
-    this.clock = factory.clock();
-    this.ulidGenerator = factory.ulidGenerator();
-    this.skuTable = TcgInventoryTable.table(enhancedClient, SkuItem.class);
-    this.inventoryRepository =
-        new InventoryRepository(
-            TcgInventoryTable.table(enhancedClient, UnitItem.class),
-            factory.dynamoDbClient(),
-            clock,
-            ulidGenerator);
-    this.objectMapper = factory.objectMapper();
-    this.fetchTcgClient = factory.fetchTcgClient();
-    this.fetchTcgTokenMinter = factory.fetchTcgTokenMinter();
-    this.competitorPricing = new CompetitorPricing(fetchTcgClient);
+  public RepriceJobProcessor(
+      DynamoDbTable<SkuItem> skuTable,
+      InventoryRepository inventoryRepository,
+      ObjectMapper objectMapper,
+      FetchTcgService fetchTcgService,
+      PricingRepository pricingRepository,
+      Clock clock,
+      UlidGenerator ulidGenerator) {
+    this.clock = clock;
+    this.ulidGenerator = ulidGenerator;
+    this.skuTable = skuTable;
+    this.inventoryRepository = inventoryRepository;
+    this.objectMapper = objectMapper;
+    this.fetchTcgService = fetchTcgService;
+    this.competitorPricing = new CompetitorPricing(fetchTcgService);
     this.pricingPolicy = new PricingPolicy();
-    this.pricingRepository = new PricingRepository(factory);
+    this.pricingRepository = pricingRepository;
   }
 
   @Override
   public JobResult processBatch(String user, JobItem jobItem) {
     try {
       return doProcessBatch(user, jobItem);
-    } catch (FetchTcgAuthException e) {
-      return new FailureJobResult(FetchTcgAuthException.USER_MESSAGE);
+    } catch (ServiceUnavailableException e) {
+      throw new RuntimeException("FetchTCG pricing lookup failed", e);
+    } catch (ServiceException e) {
+      return new FailureJobResult(e.getMessage());
     } catch (UnpriceableSkuException e) {
       return new FailureJobResult(e.getMessage());
     }
   }
 
-  private SuccessJobResult doProcessBatch(String user, JobItem jobItem) {
+  private SuccessJobResult doProcessBatch(String user, JobItem jobItem) throws ServiceException {
     var jobId = requiredValue(jobItem.getJobId(), "job_id");
     var previousProcessedCount = requiredCount(jobItem.getProcessedCount(), "processed_count");
     var requestBuilder =
@@ -93,13 +95,10 @@ public class RepriceJobProcessor implements JobProcessor {
     var candidates = page.items();
     var priceFloor = currentPriceFloor(user);
 
-    var profile = fetchTcgClient.getProfile(fetchTcgTokenMinter.mint(user));
-    var sellerUsername = profile == null ? null : profile.username();
-    if (sellerUsername == null || sellerUsername.isBlank()) {
-      throw new UnpriceableSkuException("FetchTCG profile did not include a username");
-    }
-
-    var cardCache = new HashMap<String, FetchTcgClient.GetCardResponse>();
+    var ctx = new RequestContext(user);
+    var sellerUsername =
+        fetchTcgService.getAccount(ctx, new GetAccountRequest()).sellerUsername();
+    var cardCache = new HashMap<String, GetCardResponse>();
     var competitorCache = new HashMap<CompetitorKey, List<CompetitorPricing.CompetitorPriceTier>>();
     for (var candidate : candidates) {
       var skuId = candidate.getSkuId();
@@ -136,17 +135,22 @@ public class RepriceJobProcessor implements JobProcessor {
       if (cardId == null || cardId.isBlank()) {
         throw new UnpriceableSkuException("SKU has no FetchTCG card ID: " + skuId);
       }
-      var card = cardCache.computeIfAbsent(cardId, fetchTcgClient::getCard);
+      var card = cardCache.get(cardId);
+      if (card == null) {
+        card = fetchTcgService.getCard(ctx, new GetCardRequest(cardId));
+        cardCache.put(cardId, card);
+      }
       if (card == null || !cardId.equals(card.id())) {
         throw new UnpriceableSkuException("FetchTCG card identity did not match SKU " + skuId);
       }
-      var marketPrice = FetchTcgCardResolver.marketPrice(card);
+      var marketPrice = Pricing.marketPrice(card.marketPrice());
       var key = new CompetitorKey(cardId, condition);
-      var competitors =
-          competitorCache.computeIfAbsent(
-              key,
-              ignored ->
-                  competitorPricing.findCompetitorPriceTiers(cardId, condition, sellerUsername));
+      var competitors = competitorCache.get(key);
+      if (competitors == null) {
+        competitors =
+            competitorPricing.findCompetitorPriceTiers(ctx, cardId, condition, sellerUsername);
+        competitorCache.put(key, competitors);
+      }
       var afterPrice = pricingPolicy.calculatePrice(marketPrice, competitors, priceFloor);
 
       inventoryRepository.updateSkuPrice(
