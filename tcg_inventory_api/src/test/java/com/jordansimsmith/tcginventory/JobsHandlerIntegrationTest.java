@@ -17,6 +17,7 @@ import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgSetMapping;
+import com.jordansimsmith.tcginventory.fetchtcg.client.BuyerAddress;
 import com.jordansimsmith.tcginventory.fetchtcg.client.CardListing;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsRequest;
@@ -25,6 +26,10 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
+import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
+import com.jordansimsmith.tcginventory.fetchtcg.client.OfferItem;
+import com.jordansimsmith.tcginventory.fetchtcg.client.OfferListing;
+import com.jordansimsmith.tcginventory.fetchtcg.client.ShippingOption;
 import com.jordansimsmith.tcginventory.imports.AppraiseJobProcessor;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
@@ -228,8 +233,7 @@ public class JobsHandlerIntegrationTest {
 
     var result = newAppraiseJobProcessor(fetchTcgService).processBatch("jordan", jobItem);
 
-    assertThat(result)
-        .isEqualTo(new JobProcessor.FailureJobResult("missing"));
+    assertThat(result).isEqualTo(new JobProcessor.FailureJobResult("missing"));
     assertThat(getRow("jordan", "import1", 1).getDecision()).isNull();
     assertThat(getImport("jordan", "import1").getError()).isEqualTo("missing");
   }
@@ -868,24 +872,27 @@ public class JobsHandlerIntegrationTest {
     createPublishJob("jordan", "job1");
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
 
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(
-            new FetchTcgClient.SellerOffer(
-                83663,
-                "ACCEPTED",
-                null,
-                "2026-08-11T04:42:12.476+0000",
-                "DELIVERY",
-                "Chris Andrew (generic)",
-                new FetchTcgClient.BuyerRegionAddress(
-                    "32 Abercrombie Street", "", "Howick", "Auckland", "2014", "NZ"),
-                new FetchTcgClient.ShippingOption("Economy Tracked"),
-                new BigDecimal("3.33"),
-                List.of(
-                    new FetchTcgClient.OfferItem(
-                        new FetchTcgClient.OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
-                        2,
-                        new BigDecimal("1.50"))))));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers(
+            "jordan",
+            List.of(
+                new Offer(
+                    83663,
+                    "ACCEPTED",
+                    null,
+                    "2026-08-11T04:42:12.476+0000",
+                    "DELIVERY",
+                    "Chris Andrew (generic)",
+                    new BuyerAddress(
+                        "32 Abercrombie Street", "", "Howick", "Auckland", "2014", "NZ"),
+                    new ShippingOption("Economy Tracked"),
+                    new BigDecimal("3.33"),
+                    List.of(
+                        new OfferItem(
+                            new OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
+                            2,
+                            new BigDecimal("1.50"))))));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -933,19 +940,22 @@ public class JobsHandlerIntegrationTest {
     createPublishJob("jordan", "job1");
     createExistingOrder("jordan", "83663", "awaiting_payment");
 
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(
-            new FetchTcgClient.SellerOffer(
-                83663,
-                "ACCEPTED",
-                "SEND_PICKUP_ADDRESS",
-                "2026-08-11T04:42:12.476+0000",
-                "PICKUP",
-                null,
-                null,
-                null,
-                new BigDecimal("3.33"),
-                List.of())));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers(
+            "jordan",
+            List.of(
+                new Offer(
+                    83663,
+                    "ACCEPTED",
+                    "SEND_PICKUP_ADDRESS",
+                    "2026-08-11T04:42:12.476+0000",
+                    "PICKUP",
+                    null,
+                    null,
+                    null,
+                    new BigDecimal("3.33"),
+                    List.of())));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -978,19 +988,22 @@ public class JobsHandlerIntegrationTest {
     createPublishJob("jordan", "job1");
     createExistingOrder("jordan", "91329", "awaiting_payment");
 
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(
-            new FetchTcgClient.SellerOffer(
-                91329,
-                "ACCEPTED",
-                "SEND_TRACKING_CODE",
-                "2026-08-29T03:03:55.019+0000",
-                "DELIVERY",
-                null,
-                null,
-                null,
-                new BigDecimal("61.50"),
-                List.of())));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers(
+            "jordan",
+            List.of(
+                new Offer(
+                    91329,
+                    "ACCEPTED",
+                    "SEND_TRACKING_CODE",
+                    "2026-08-29T03:03:55.019+0000",
+                    "DELIVERY",
+                    null,
+                    null,
+                    null,
+                    new BigDecimal("61.50"),
+                    List.of())));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1015,7 +1028,9 @@ public class JobsHandlerIntegrationTest {
     createReservedOrder(
         "jordan", "83663", "awaiting_payment", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1, 2);
 
-    fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers("jordan", List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1056,7 +1071,9 @@ public class JobsHandlerIntegrationTest {
     createReservedOrder(
         "jordan", "83663", "awaiting_payment", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1);
 
-    fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(83663, "CANCELLED_BY_BUYER")));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers("jordan", List.of(cancelledOffer(83663, "CANCELLED_BY_BUYER")));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1079,7 +1096,7 @@ public class JobsHandlerIntegrationTest {
     createReservedOrder(
         "jordan", "83663", "awaiting_payment", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1);
 
-    fakeFetchTcgClient.seedSellerOffers(List.of());
+    factory.fakeFetchTcgService().seedOffers("jordan", List.of());
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1104,7 +1121,9 @@ public class JobsHandlerIntegrationTest {
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 2);
     createReservedOrder("jordan", "83663", "to_pick", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1);
 
-    fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers("jordan", List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1129,7 +1148,9 @@ public class JobsHandlerIntegrationTest {
     createReservedOrder("jordan", "83663", "voided", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1);
     releaseUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1);
 
-    fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers("jordan", List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1156,7 +1177,7 @@ public class JobsHandlerIntegrationTest {
     // simulate a prior delivery that released one unit before stopping
     releaseUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1);
 
-    fakeFetchTcgClient.seedSellerOffers(List.of());
+    factory.fakeFetchTcgService().seedOffers("jordan", List.of());
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1192,7 +1213,9 @@ public class JobsHandlerIntegrationTest {
     }
     createOrderWithLines("jordan", "91329", "awaiting_payment", orderLines);
 
-    fakeFetchTcgClient.seedSellerOffers(List.of(cancelledOffer(91329, "CANCELLED_BY_SELLER")));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers("jordan", List.of(cancelledOffer(91329, "CANCELLED_BY_SELLER")));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1225,20 +1248,23 @@ public class JobsHandlerIntegrationTest {
     createPublishJob("jordan", "job1");
     createExistingOrder("jordan", "91329", "awaiting_payment");
 
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(
-            new FetchTcgClient.SellerOffer(
-                91329,
-                "ACCEPTED",
-                "SEND_TRACKING_CODE",
-                "2026-08-29T03:03:55.019+0000",
-                "DELIVERY",
-                "Chris Andrew (generic)",
-                new FetchTcgClient.BuyerRegionAddress(
-                    "32 Abercrombie Street", null, "Howick", "Auckland", "2014", "NZ"),
-                new FetchTcgClient.ShippingOption("Economy Tracked"),
-                new BigDecimal("61.50"),
-                List.of())));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers(
+            "jordan",
+            List.of(
+                new Offer(
+                    91329,
+                    "ACCEPTED",
+                    "SEND_TRACKING_CODE",
+                    "2026-08-29T03:03:55.019+0000",
+                    "DELIVERY",
+                    "Chris Andrew (generic)",
+                    new BuyerAddress(
+                        "32 Abercrombie Street", null, "Howick", "Auckland", "2014", "NZ"),
+                    new ShippingOption("Economy Tracked"),
+                    new BigDecimal("61.50"),
+                    List.of())));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1264,19 +1290,22 @@ public class JobsHandlerIntegrationTest {
     createPublishJob("jordan", "job1");
     createExistingOrder("jordan", "83663", "awaiting_payment");
 
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(
-            new FetchTcgClient.SellerOffer(
-                83663,
-                "ACCEPTED",
-                "AWAITING_PAYMENT",
-                "2026-08-11T04:42:12.476+0000",
-                "PICKUP",
-                "Ben Creagh (sideswipe)",
-                new FetchTcgClient.BuyerRegionAddress(null, "", null, null, null, null),
-                null,
-                new BigDecimal("3.33"),
-                List.of())));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers(
+            "jordan",
+            List.of(
+                new Offer(
+                    83663,
+                    "ACCEPTED",
+                    "AWAITING_PAYMENT",
+                    "2026-08-11T04:42:12.476+0000",
+                    "PICKUP",
+                    "Ben Creagh (sideswipe)",
+                    new BuyerAddress(null, "", null, null, null, null),
+                    null,
+                    new BigDecimal("3.33"),
+                    List.of())));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1293,19 +1322,22 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createExistingOrder("jordan", "83663", "to_pick");
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(
-            new FetchTcgClient.SellerOffer(
-                83663,
-                "ACCEPTED",
-                "SEND_REVIEW",
-                "2026-08-11T04:42:12.476+0000",
-                "PICKUP",
-                "Ben Creagh (sideswipe)",
-                null,
-                null,
-                new BigDecimal("3.33"),
-                List.of())));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers(
+            "jordan",
+            List.of(
+                new Offer(
+                    83663,
+                    "ACCEPTED",
+                    "SEND_REVIEW",
+                    "2026-08-11T04:42:12.476+0000",
+                    "PICKUP",
+                    "Ben Creagh (sideswipe)",
+                    null,
+                    null,
+                    new BigDecimal("3.33"),
+                    List.of())));
 
     fakeClock.setTime(Instant.ofEpochSecond(1700005000));
     createPublishJob("jordan", "job1");
@@ -1331,19 +1363,22 @@ public class JobsHandlerIntegrationTest {
     createPublishJob("jordan", "job1");
     createExistingOrder("jordan", "91101", "awaiting_payment");
 
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(
-            new FetchTcgClient.SellerOffer(
-                91101,
-                "ACCEPTED",
-                "AWAITING_PAYMENT",
-                "2026-08-28T10:50:05.986+0000",
-                "DELIVERY",
-                null,
-                null,
-                null,
-                new BigDecimal("5.00"),
-                List.of())));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers(
+            "jordan",
+            List.of(
+                new Offer(
+                    91101,
+                    "ACCEPTED",
+                    "AWAITING_PAYMENT",
+                    "2026-08-28T10:50:05.986+0000",
+                    "DELIVERY",
+                    null,
+                    null,
+                    null,
+                    new BigDecimal("5.00"),
+                    List.of())));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1360,19 +1395,22 @@ public class JobsHandlerIntegrationTest {
     createPublishJob("jordan", "job1");
     createExistingOrder("jordan", "83663", "awaiting_payment");
 
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(
-            new FetchTcgClient.SellerOffer(
-                83663,
-                "ACCEPTED",
-                null,
-                "2026-08-11T04:42:12.476+0000",
-                "PICKUP",
-                null,
-                null,
-                null,
-                new BigDecimal("3.33"),
-                List.of())));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers(
+            "jordan",
+            List.of(
+                new Offer(
+                    83663,
+                    "ACCEPTED",
+                    null,
+                    "2026-08-11T04:42:12.476+0000",
+                    "PICKUP",
+                    null,
+                    null,
+                    null,
+                    new BigDecimal("3.33"),
+                    List.of())));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1389,23 +1427,26 @@ public class JobsHandlerIntegrationTest {
     createPublishJob("jordan", "job1");
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1);
 
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(
-            new FetchTcgClient.SellerOffer(
-                83663,
-                "ACCEPTED",
-                null,
-                "2026-08-11T04:42:12.476+0000",
-                "PICKUP",
-                null,
-                null,
-                null,
-                new BigDecimal("3.33"),
-                List.of(
-                    new FetchTcgClient.OfferItem(
-                        new FetchTcgClient.OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
-                        3,
-                        new BigDecimal("1.50"))))));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers(
+            "jordan",
+            List.of(
+                new Offer(
+                    83663,
+                    "ACCEPTED",
+                    null,
+                    "2026-08-11T04:42:12.476+0000",
+                    "PICKUP",
+                    null,
+                    null,
+                    null,
+                    new BigDecimal("3.33"),
+                    List.of(
+                        new OfferItem(
+                            new OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
+                            3,
+                            new BigDecimal("1.50"))))));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1432,23 +1473,26 @@ public class JobsHandlerIntegrationTest {
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
     createTrackOrdersAfter("jordan", Instant.parse("2026-08-15T00:00:00Z"));
 
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(
-            new FetchTcgClient.SellerOffer(
-                83663,
-                "ACCEPTED",
-                null,
-                "2026-08-11T04:42:12.476+0000",
-                "PICKUP",
-                null,
-                null,
-                null,
-                new BigDecimal("3.33"),
-                List.of(
-                    new FetchTcgClient.OfferItem(
-                        new FetchTcgClient.OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
-                        2,
-                        new BigDecimal("1.50"))))));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers(
+            "jordan",
+            List.of(
+                new Offer(
+                    83663,
+                    "ACCEPTED",
+                    null,
+                    "2026-08-11T04:42:12.476+0000",
+                    "PICKUP",
+                    null,
+                    null,
+                    null,
+                    new BigDecimal("3.33"),
+                    List.of(
+                        new OfferItem(
+                            new OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
+                            2,
+                            new BigDecimal("1.50"))))));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1469,23 +1513,26 @@ public class JobsHandlerIntegrationTest {
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
     createTrackOrdersAfter("jordan", Instant.parse("2026-08-01T00:00:00Z"));
 
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(
-            new FetchTcgClient.SellerOffer(
-                83663,
-                "ACCEPTED",
-                null,
-                null,
-                "PICKUP",
-                null,
-                null,
-                null,
-                new BigDecimal("3.33"),
-                List.of(
-                    new FetchTcgClient.OfferItem(
-                        new FetchTcgClient.OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
-                        2,
-                        new BigDecimal("1.50"))))));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers(
+            "jordan",
+            List.of(
+                new Offer(
+                    83663,
+                    "ACCEPTED",
+                    null,
+                    null,
+                    "PICKUP",
+                    null,
+                    null,
+                    null,
+                    new BigDecimal("3.33"),
+                    List.of(
+                        new OfferItem(
+                            new OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
+                            2,
+                            new BigDecimal("1.50"))))));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1502,23 +1549,26 @@ public class JobsHandlerIntegrationTest {
     createPublishJob("jordan", "job1");
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
 
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(
-            new FetchTcgClient.SellerOffer(
-                83663,
-                "ACCEPTED",
-                null,
-                "2026-08-11T04:42:12.476+0000",
-                "PICKUP",
-                null,
-                null,
-                null,
-                new BigDecimal("3.33"),
-                List.of(
-                    new FetchTcgClient.OfferItem(
-                        new FetchTcgClient.OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
-                        2,
-                        new BigDecimal("1.50"))))));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers(
+            "jordan",
+            List.of(
+                new Offer(
+                    83663,
+                    "ACCEPTED",
+                    null,
+                    "2026-08-11T04:42:12.476+0000",
+                    "PICKUP",
+                    null,
+                    null,
+                    null,
+                    new BigDecimal("3.33"),
+                    List.of(
+                        new OfferItem(
+                            new OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
+                            2,
+                            new BigDecimal("1.50"))))));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1564,27 +1614,30 @@ public class JobsHandlerIntegrationTest {
             "in_stock",
             "pokemon-import",
             Instant.ofEpochSecond(1700000000)));
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(
-            new FetchTcgClient.SellerOffer(
-                83663,
-                "ACCEPTED",
-                null,
-                "2026-08-11T04:42:12.476+0000",
-                "PICKUP",
-                null,
-                null,
-                null,
-                new BigDecimal("14.00"),
-                List.of(
-                    new FetchTcgClient.OfferItem(
-                        new FetchTcgClient.OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
-                        1,
-                        new BigDecimal("2.00")),
-                    new FetchTcgClient.OfferItem(
-                        new FetchTcgClient.OfferListing(2002, "raw-nm", new BigDecimal("12.00")),
-                        1,
-                        new BigDecimal("12.00"))))));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers(
+            "jordan",
+            List.of(
+                new Offer(
+                    83663,
+                    "ACCEPTED",
+                    null,
+                    "2026-08-11T04:42:12.476+0000",
+                    "PICKUP",
+                    null,
+                    null,
+                    null,
+                    new BigDecimal("14.00"),
+                    List.of(
+                        new OfferItem(
+                            new OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
+                            1,
+                            new BigDecimal("2.00")),
+                        new OfferItem(
+                            new OfferListing(2002, "raw-nm", new BigDecimal("12.00")),
+                            1,
+                            new BigDecimal("12.00"))))));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1620,23 +1673,26 @@ public class JobsHandlerIntegrationTest {
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
     createTrackOrdersAfter("jordan", Instant.parse("2026-08-10T00:00:00Z"));
 
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(
-            new FetchTcgClient.SellerOffer(
-                83663,
-                "ACCEPTED",
-                null,
-                "2026-08-11T04:42:12.476+0000",
-                "PICKUP",
-                null,
-                null,
-                null,
-                new BigDecimal("3.33"),
-                List.of(
-                    new FetchTcgClient.OfferItem(
-                        new FetchTcgClient.OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
-                        2,
-                        new BigDecimal("1.50"))))));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers(
+            "jordan",
+            List.of(
+                new Offer(
+                    83663,
+                    "ACCEPTED",
+                    null,
+                    "2026-08-11T04:42:12.476+0000",
+                    "PICKUP",
+                    null,
+                    null,
+                    null,
+                    new BigDecimal("3.33"),
+                    List.of(
+                        new OfferItem(
+                            new OfferListing(1001, "raw-nm", new BigDecimal("2.00")),
+                            2,
+                            new BigDecimal("1.50"))))));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -1653,30 +1709,33 @@ public class JobsHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
 
-    var offerItems = new ArrayList<FetchTcgClient.OfferItem>();
+    var offerItems = new ArrayList<OfferItem>();
     for (int i = 1; i <= 60; i++) {
       createSkuWithUnitAtSequence(
           "jordan", "mtg#scryfall#scryfall-" + i + "#normal#NM", 2000 + i, i);
       offerItems.add(
-          new FetchTcgClient.OfferItem(
-              new FetchTcgClient.OfferListing(2000 + i, "raw-nm", new BigDecimal("0.50")),
+          new OfferItem(
+              new OfferListing(2000 + i, "raw-nm", new BigDecimal("0.50")),
               1,
               new BigDecimal("0.50")));
     }
 
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(
-            new FetchTcgClient.SellerOffer(
-                91329,
-                "ACCEPTED",
-                null,
-                "2026-08-11T04:42:12.476+0000",
-                "DELIVERY",
-                null,
-                null,
-                null,
-                new BigDecimal("30.00"),
-                offerItems)));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers(
+            "jordan",
+            List.of(
+                new Offer(
+                    91329,
+                    "ACCEPTED",
+                    null,
+                    "2026-08-11T04:42:12.476+0000",
+                    "DELIVERY",
+                    null,
+                    null,
+                    null,
+                    new BigDecimal("30.00"),
+                    offerItems)));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
@@ -2170,8 +2229,8 @@ public class JobsHandlerIntegrationTest {
             .build());
   }
 
-  private static FetchTcgClient.SellerOffer cancelledOffer(int offerId, String status) {
-    return new FetchTcgClient.SellerOffer(
+  private static Offer cancelledOffer(int offerId, String status) {
+    return new Offer(
         offerId,
         status,
         null,

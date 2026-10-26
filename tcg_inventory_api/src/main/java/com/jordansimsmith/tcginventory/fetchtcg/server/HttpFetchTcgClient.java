@@ -134,6 +134,31 @@ public class HttpFetchTcgClient {
     return new ListingsPage(page.number(), page.size(), page.last(), page.content());
   }
 
+  public OffersPage findOffers(String bearerToken, int limit, int page) throws ServiceException {
+    var request =
+        HttpRequest.newBuilder()
+            .uri(
+                baseUri.resolve(
+                    "/v2/private/market/offers/seller?sort=NEWEST&size=" + limit + "&page=" + page))
+            .header("User-Agent", USER_AGENT)
+            .header("Accept", "application/json")
+            .header("Authorization", "Bearer " + bearerToken)
+            .GET()
+            .build();
+    var body = sendRequest(request, "seller offers lookup");
+
+    ProviderOffersPage response;
+    try {
+      response = objectMapper.readValue(body, ProviderOffersPage.class);
+    } catch (IOException e) {
+      throw new IllegalStateException("FetchTCG returned malformed seller offers");
+    }
+    if (response == null) {
+      throw new IllegalStateException("FetchTCG seller offers response did not include a page");
+    }
+    return new OffersPage(response.number(), response.size(), response.last(), response.content());
+  }
+
   private String sendRequest(HttpRequest request, String operation) throws ServiceException {
     for (var attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       pacer.run();
@@ -182,6 +207,9 @@ public class HttpFetchTcgClient {
   public record ListingsPage(
       Integer number, Integer size, Boolean last, List<ProviderCardListing> content) {}
 
+  public record OffersPage(
+      Integer number, Integer size, Boolean last, List<ProviderOffer> content) {}
+
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record ProviderCardResponse(
       @JsonProperty("id") String id,
@@ -210,6 +238,50 @@ public class HttpFetchTcgClient {
       @JsonProperty("listedPriceInRequestedCurrency") @Nullable
           BigDecimal listedPriceInRequestedCurrency,
       @JsonProperty("sellerProfileName") @Nullable String sellerProfileName) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record ProviderOffer(
+      @JsonProperty("id") @Nullable Long id,
+      @JsonProperty("status") @Nullable String status,
+      @JsonProperty("currentAction") @Nullable String currentAction,
+      @JsonProperty("acceptedAt") @Nullable String acceptedAt,
+      @JsonProperty("deliveryMode") @Nullable String deliveryMode,
+      @JsonProperty("buyerName") @Nullable String buyerName,
+      @JsonProperty("buyerRegionAddress") @Nullable ProviderBuyerAddress buyerRegionAddress,
+      @JsonProperty("shippingOption") @Nullable ProviderShippingOption shippingOption,
+      @JsonProperty("totalOfferPrice") @Nullable BigDecimal totalOfferPrice,
+      @JsonProperty("items") @Nullable List<ProviderOfferItem> items) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record ProviderBuyerAddress(
+      @JsonProperty("line1") @Nullable String line1,
+      @JsonProperty("line2") @Nullable String line2,
+      @JsonProperty("suburb") @Nullable String suburb,
+      @JsonProperty("city") @Nullable String city,
+      @JsonProperty("postCode") @Nullable String postCode,
+      @JsonProperty("country") @Nullable String country) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record ProviderShippingOption(@JsonProperty("title") @Nullable String title) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record ProviderOfferItem(
+      @JsonProperty("listing") @Nullable ProviderOfferListing listing,
+      @JsonProperty("quantity") int quantity,
+      @JsonProperty("price") @Nullable BigDecimal price) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record ProviderOfferListing(
+      @JsonProperty("id") @Nullable Integer id,
+      @JsonProperty("condition") @Nullable String condition,
+      @JsonProperty("listedPrice") @Nullable BigDecimal listedPrice) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record ProviderOffersPage(
+      @JsonProperty("number") @Nullable Integer number,
+      @JsonProperty("size") @Nullable Integer size,
+      @JsonProperty("last") @Nullable Boolean last,
+      @JsonProperty("content") @Nullable List<ProviderOffer> content) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   public record GetProfileResponse(@JsonProperty("username") String username) {}

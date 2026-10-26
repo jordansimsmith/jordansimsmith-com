@@ -51,7 +51,7 @@ public final class FetchTcgStubServer {
 
   private static final String SELLER_OFFERS_EMPTY =
       """
-      {"content":[],"totalPages":1}\
+      {"content":[],"number":0,"size":100,"last":true,"number":0,"size":100,"last":true,"totalPages":1}\
       """;
 
   private static final String PROFILE_RESPONSE = "{\"username\":\"jordan\"}";
@@ -65,7 +65,7 @@ public final class FetchTcgStubServer {
       "city":"Auckland","postCode":"2014","country":"NZ","latitude":-36.892998},\
       "shippingOption":{"id":18271,"title":"Economy Tracked","total":7.50},\
       "items":[{"listing":{"id":900001,"condition":"raw-lp","listedPrice":2.00},"quantity":1,"price":1.50}]}],\
-      "totalPages":1}\
+      "number":0,"size":100,"last":true,"totalPages":1}\
       """;
 
   private FetchTcgStubServer() {}

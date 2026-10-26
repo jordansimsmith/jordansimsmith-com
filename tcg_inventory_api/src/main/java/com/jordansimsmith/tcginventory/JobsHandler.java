@@ -15,11 +15,16 @@ import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.orders.OrderFulfillmentJobProcessor;
+import com.jordansimsmith.tcginventory.orders.OrderItem;
+import com.jordansimsmith.tcginventory.orders.OrderPhaseProcessor;
+import com.jordansimsmith.tcginventory.orders.OrderRepository;
 import com.jordansimsmith.tcginventory.pricing.PricingRepository;
 import com.jordansimsmith.tcginventory.pricing.RepriceJobProcessor;
+import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
 import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
 import com.jordansimsmith.tcginventory.reports.ReportJobProcessor;
 import com.jordansimsmith.tcginventory.scans.ScanConfirmationJobProcessor;
+import com.jordansimsmith.tcginventory.settings.SettingsItem;
 import com.jordansimsmith.time.Clock;
 import java.io.IOException;
 import org.slf4j.Logger;
@@ -62,7 +67,44 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             factory.fetchTcgService(),
             factory.fetchTcgClient(),
             pricingRepository);
-    this.publishJobProcessor = new PublishJobProcessor(factory);
+    var publishDynamoDbClient = factory.dynamoDbClient();
+    var publishClock = factory.clock();
+    var publishUlidGenerator = factory.ulidGenerator();
+    var orderTable = TcgInventoryTable.table(enhancedClient, OrderItem.class);
+    var skuTable = TcgInventoryTable.table(enhancedClient, SkuItem.class);
+    var inventoryRepository =
+        new InventoryRepository(
+            TcgInventoryTable.table(enhancedClient, UnitItem.class),
+            publishDynamoDbClient,
+            publishClock,
+            publishUlidGenerator);
+    var orderRepository =
+        new OrderRepository(
+            orderTable,
+            factory.jobTable(),
+            inventoryRepository,
+            publishDynamoDbClient,
+            publishClock);
+    var orderPhaseProcessor =
+        new OrderPhaseProcessor(
+            orderTable,
+            skuTable,
+            TcgInventoryTable.table(enhancedClient, SettingsItem.class),
+            orderRepository,
+            inventoryRepository,
+            publishClock,
+            factory.fetchTcgService());
+    var listingPhaseProcessor =
+        new ListingPhaseProcessor(
+            skuTable,
+            inventoryRepository,
+            publishDynamoDbClient,
+            publishClock,
+            factory.fetchTcgClient(),
+            factory.s3Client());
+    this.publishJobProcessor =
+        new PublishJobProcessor(
+            factory.fetchTcgTokenMinter(), orderPhaseProcessor, listingPhaseProcessor);
     this.reportJobProcessor = new ReportJobProcessor(factory);
     this.scanConfirmationJobProcessor = new ScanConfirmationJobProcessor(factory);
     this.importConfirmationJobProcessor = new ImportConfirmationJobProcessor(factory);

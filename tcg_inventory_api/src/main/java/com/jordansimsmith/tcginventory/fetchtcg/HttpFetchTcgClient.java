@@ -67,20 +67,6 @@ public class HttpFetchTcgClient implements FetchTcgClient {
   }
 
   @Override
-  public GetSellerOffersResponse getSellerOffers(String bearerToken, int page) {
-    try {
-      return doGetSellerOffers(bearerToken, page);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new RuntimeException(e);
-    } catch (FetchTcgAuthException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  @Override
   public UpsertListingResponse upsertListing(String bearerToken, UpsertListingRequest request) {
     try {
       return doUpsertListing(bearerToken, request);
@@ -166,23 +152,6 @@ public class HttpFetchTcgClient implements FetchTcgClient {
     var content =
         wrapper.searchResults() != null ? wrapper.searchResults().content() : List.<SearchCard>of();
     return new SearchCardsResponse(content);
-  }
-
-  private GetSellerOffersResponse doGetSellerOffers(String bearerToken, int page)
-      throws IOException, InterruptedException {
-    var request =
-        HttpRequest.newBuilder()
-            .uri(
-                baseUri.resolve(
-                    "/v2/private/market/offers/seller?sort=NEWEST&size=20&page=" + page))
-            .header("User-Agent", USER_AGENT)
-            .header("Accept", "application/json")
-            .header("Authorization", "Bearer " + bearerToken)
-            .GET()
-            .build();
-
-    var body = doExecute(request);
-    return objectMapper.readValue(body, GetSellerOffersResponse.class);
   }
 
   private UpsertListingResponse doUpsertListing(String bearerToken, UpsertListingRequest req)

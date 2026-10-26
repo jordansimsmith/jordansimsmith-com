@@ -110,103 +110,6 @@ public class HttpFetchTcgClientTest {
   }
 
   @Test
-  void getSellerOffersShouldAttachBearerToken() throws IOException, InterruptedException {
-    // arrange
-    var response = createMockResponse(200, "{\"content\": [], \"totalPages\": 1}");
-    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
-        .thenReturn(response);
-
-    // act
-    client.getSellerOffers("my-bearer-token", 1);
-
-    // assert
-    var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
-    verify(httpClient).send(requestCaptor.capture(), eq(HttpResponse.BodyHandlers.ofString()));
-    assertThat(requestCaptor.getValue().headers().firstValue("Authorization"))
-        .contains("Bearer my-bearer-token");
-    assertThat(requestCaptor.getValue().uri())
-        .isEqualTo(
-            URI.create(
-                "https://api.fetchtcg.com/v2/private/market/offers/seller?sort=NEWEST&size=20&page=1"));
-  }
-
-  @Test
-  void getSellerOffersShouldReturnParsedResponse() throws IOException, InterruptedException {
-    // arrange
-    var response =
-        createMockResponse(
-            200,
-            """
-            {
-              "content": [
-                {
-                  "id": 100,
-                  "status": "ACCEPTED",
-                  "currentAction": "AWAITING_PAYMENT",
-                  "deliveryMode": "DELIVERY",
-                  "totalOfferPrice": 3.33,
-                  "buyerName": "Chris Andrew (generic)",
-                  "buyerProfileName": "generic",
-                  "buyerRegionAddress": {
-                    "suburb": "Howick",
-                    "city": "Auckland",
-                    "country": "NZ",
-                    "postCode": "2014",
-                    "latitude": -36.892998,
-                    "longitude": 174.9243368,
-                    "allowPickups": false,
-                    "line1": "32 Abercrombie Street",
-                    "line2": null
-                  },
-                  "shippingOption": {
-                    "id": 18271,
-                    "title": "Economy Tracked",
-                    "total": 7.5,
-                    "currencyCode": "NZD"
-                  },
-                  "paymentInstructions": "pay me at 00-0000-0000000-00",
-                  "items": [
-                    {
-                      "quantity": 1,
-                      "price": 3.33,
-                      "listing": {"id": 975737, "condition": "raw-nm", "listedPrice": 3.50}
-                    }
-                  ]
-                },
-                {"id": 101, "status": "COMPLETED", "currentAction": null}
-              ],
-              "totalPages": 3
-            }
-            """);
-    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
-        .thenReturn(response);
-
-    // act
-    var result = client.getSellerOffers("token", 1);
-
-    // assert
-    assertThat(result.totalPages()).isEqualTo(3);
-    assertThat(result.content()).hasSize(2);
-    assertThat(result.content().get(0).id()).isEqualTo(100);
-    assertThat(result.content().get(0).status()).isEqualTo("ACCEPTED");
-    assertThat(result.content().get(0).currentAction()).isEqualTo("AWAITING_PAYMENT");
-    assertThat(result.content().get(0).items()).hasSize(1);
-    assertThat(result.content().get(0).items().get(0).listing().listedPrice())
-        .isEqualByComparingTo("3.50");
-    assertThat(result.content().get(0).buyerName()).isEqualTo("Chris Andrew (generic)");
-    assertThat(result.content().get(0).shippingOption().title()).isEqualTo("Economy Tracked");
-    var address = result.content().get(0).buyerRegionAddress();
-    assertThat(address.line1()).isEqualTo("32 Abercrombie Street");
-    assertThat(address.line2()).isNull();
-    assertThat(address.suburb()).isEqualTo("Howick");
-    assertThat(address.city()).isEqualTo("Auckland");
-    assertThat(address.postCode()).isEqualTo("2014");
-    assertThat(address.country()).isEqualTo("NZ");
-    assertThat(result.content().get(1).currentAction()).isNull();
-    assertThat(result.content().get(1).buyerRegionAddress()).isNull();
-  }
-
-  @Test
   void shouldCallPacerBeforeEachRequest() throws IOException, InterruptedException {
     // arrange
     var response = createMockResponse(200, "{\"id\": \"mtg_1_c_dom_normal\", \"name\": \"x\"}");
@@ -265,7 +168,7 @@ public class HttpFetchTcgClientTest {
         .thenReturn(response);
 
     // act & assert
-    assertThatThrownBy(() -> client.getSellerOffers("bad-token", 1))
+    assertThatThrownBy(() -> client.getCard("mtg_1_c_dom_normal"))
         .isInstanceOf(FetchTcgAuthException.class)
         .hasMessageContaining("401");
 
@@ -297,7 +200,7 @@ public class HttpFetchTcgClientTest {
         .thenReturn(response);
 
     // act & assert
-    assertThatThrownBy(() -> client.getSellerOffers("expired", 1))
+    assertThatThrownBy(() -> client.getCard("mtg_1_c_dom_normal"))
         .isInstanceOf(FetchTcgAuthException.class);
 
     assertThat(pacerCallCount.get()).isEqualTo(1);

@@ -7,6 +7,8 @@ import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsResponse;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FindOffersRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FindOffersResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardRequest;
@@ -52,9 +54,11 @@ public class FetchTcgModule {
     var tokenExchange = new HttpFetchTcgTokenExchange(firebaseTokenUri, httpClient, objectMapper);
     var fetchTcgClient = new HttpFetchTcgClient(fetchTcgBaseUri, httpClient, objectMapper, pacer);
     var credentialStore = new FetchTcgCredentialStore(secrets, objectMapper);
+    var tokenProvider = new FetchTcgTokenProvider(tokenExchange, credentialStore, clock);
     var getAccountService = new GetAccountService(accountRepository);
     var getCardService = new GetCardService(fetchTcgClient);
     var findCardListingsService = new FindCardListingsService(fetchTcgClient);
+    var findOffersService = new FindOffersService(tokenProvider, fetchTcgClient);
     var updateCredentialsService =
         new UpdateCredentialsService(
             accountRepository, tokenExchange, fetchTcgClient, credentialStore, clock);
@@ -82,6 +86,12 @@ public class FetchTcgModule {
       public FindCardListingsResponse findCardListings(
           RequestContext ctx, FindCardListingsRequest request) throws ServiceException {
         return findCardListingsService.findCardListings(ctx, request);
+      }
+
+      @Override
+      public FindOffersResponse findOffers(RequestContext ctx, FindOffersRequest request)
+          throws ServiceException {
+        return findOffersService.findOffers(ctx, request);
       }
     };
   }

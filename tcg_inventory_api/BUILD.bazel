@@ -209,10 +209,11 @@ java_library(
         exclude = ["src/main/java/com/jordansimsmith/tcginventory/orders/*Handler.java"],
     ),
     deps = [
-        ":fetchtcg-lib",
         ":inventory-lib",
         ":lib",
         ":settings-lib",
+        "//lib/service",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
     ] + COMMON_DEPS,
 )
 

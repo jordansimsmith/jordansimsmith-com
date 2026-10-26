@@ -1,7 +1,12 @@
 package com.jordansimsmith.tcginventory.orders;
 
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
+import com.jordansimsmith.tcginventory.fetchtcg.client.BuyerAddress;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FindOffersRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
 import com.jordansimsmith.tcginventory.games.Games;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
@@ -58,8 +63,7 @@ public class OrderPhaseProcessor {
 
   private record AllocatedUnit(String skuId, int sequenceNumber) {}
 
-  private record PlannedReservation(
-      FetchTcgClient.SellerOffer offer, List<OrderItem.OrderLine> lines) {}
+  private record PlannedReservation(Offer offer, List<OrderItem.OrderLine> lines) {}
 
   public static class ReservationPreflightException extends RuntimeException {
     public ReservationPreflightException(String message) {
@@ -73,7 +77,7 @@ public class OrderPhaseProcessor {
   private final OrderRepository orderRepository;
   private final InventoryRepository inventoryRepository;
   private final Clock clock;
-  private final FetchTcgClient fetchTcgClient;
+  private final FetchTcgService fetchTcgService;
 
   public OrderPhaseProcessor(
       DynamoDbTable<OrderItem> orderTable,
@@ -82,17 +86,17 @@ public class OrderPhaseProcessor {
       OrderRepository orderRepository,
       InventoryRepository inventoryRepository,
       Clock clock,
-      FetchTcgClient fetchTcgClient) {
+      FetchTcgService fetchTcgService) {
     this.orderTable = orderTable;
     this.skuTable = skuTable;
     this.settingsTable = settingsTable;
     this.orderRepository = orderRepository;
     this.inventoryRepository = inventoryRepository;
     this.clock = clock;
-    this.fetchTcgClient = fetchTcgClient;
+    this.fetchTcgService = fetchTcgService;
   }
 
-  public void process(String user, String bearerToken) {
+  public void process(String user) throws ServiceException {
     for (var order : loadExistingOrders(user)) {
       if ("reserving".equals(order.getStatus())) {
         resumeReservingOrder(user, order);
@@ -101,7 +105,7 @@ public class OrderPhaseProcessor {
       }
     }
 
-    var allOffers = paginateOffers(bearerToken);
+    var allOffers = paginateOffers(new RequestContext(user));
     LOGGER.info("fetched {} offers from FetchTCG for user {}", allOffers.size(), user);
 
     if (!allOffers.isEmpty()) {
@@ -205,17 +209,14 @@ public class OrderPhaseProcessor {
     LOGGER.info("created {} new orders", plans.size());
   }
 
-  private List<FetchTcgClient.SellerOffer> paginateOffers(String bearerToken) {
-    var allOffers = new ArrayList<FetchTcgClient.SellerOffer>();
-    int page = 0;
-    while (true) {
-      var response = fetchTcgClient.getSellerOffers(bearerToken, page);
-      allOffers.addAll(response.content());
-      page++;
-      if (page >= response.totalPages()) {
-        break;
-      }
-    }
+  private List<Offer> paginateOffers(RequestContext ctx) throws ServiceException {
+    var allOffers = new ArrayList<Offer>();
+    String continuation = null;
+    do {
+      var response = fetchTcgService.findOffers(ctx, new FindOffersRequest(100, continuation));
+      allOffers.addAll(response.offers());
+      continuation = response.nextContinuation();
+    } while (continuation != null);
     return allOffers;
   }
 
@@ -232,7 +233,7 @@ public class OrderPhaseProcessor {
     return settingsItem.getTrackOrdersAfter();
   }
 
-  private boolean isAfterCutoff(FetchTcgClient.SellerOffer offer, Instant cutoff) {
+  private boolean isAfterCutoff(Offer offer, Instant cutoff) {
     if (offer.acceptedAt() == null) {
       LOGGER.warn("offer {} has null acceptedAt, skipping (fail-closed)", offer.id());
       return false;
@@ -295,9 +296,7 @@ public class OrderPhaseProcessor {
   }
 
   private List<PlannedReservation> planReservations(
-      String user,
-      List<FetchTcgClient.SellerOffer> newOffers,
-      Map<Integer, String> listingToSkuId) {
+      String user, List<Offer> newOffers, Map<Integer, String> listingToSkuId) {
     var requestedBySku = new LinkedHashMap<String, Integer>();
     for (var offer : newOffers) {
       if (offer.items() == null || offer.items().isEmpty()) {
@@ -402,16 +401,15 @@ public class OrderPhaseProcessor {
     return result;
   }
 
-  private static Fulfillment toFulfillment(FetchTcgClient.SellerOffer offer) {
+  private static Fulfillment toFulfillment(Offer offer) {
     return new Fulfillment(
         blankToNull(offer.buyerName()),
-        toBuyerAddress(offer.buyerRegionAddress()),
+        toBuyerAddress(offer.buyerAddress()),
         offer.shippingOption() != null ? blankToNull(offer.shippingOption().title()) : null);
   }
 
   @Nullable
-  private static OrderItem.BuyerAddress toBuyerAddress(
-      @Nullable FetchTcgClient.BuyerRegionAddress address) {
+  private static OrderItem.BuyerAddress toBuyerAddress(@Nullable BuyerAddress address) {
     if (address == null) {
       return null;
     }

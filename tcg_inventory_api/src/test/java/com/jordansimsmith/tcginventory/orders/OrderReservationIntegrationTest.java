@@ -2,18 +2,29 @@ package com.jordansimsmith.tcginventory.orders;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobProcessor;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FindOffersRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FindOffersResponse;
+import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
+import com.jordansimsmith.tcginventory.fetchtcg.client.OfferItem;
+import com.jordansimsmith.tcginventory.fetchtcg.client.OfferListing;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
 import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
 import com.jordansimsmith.time.FakeClock;
 import java.math.BigDecimal;
@@ -39,6 +50,7 @@ public class OrderReservationIntegrationTest {
   private static final Instant NOW = Instant.ofEpochSecond(1700000000);
 
   private FakeClock fakeClock;
+  private FakeFetchTcgService fakeFetchTcgService;
   private FakeFetchTcgClient fakeFetchTcgClient;
   private TcgInventoryTestFactory factory;
   private DynamoDbTable<SkuItem> skuTable;
@@ -46,6 +58,8 @@ public class OrderReservationIntegrationTest {
   private DynamoDbTable<OrderItem> orderTable;
   private DynamoDbTable<AuditItem> auditTable;
   private OrderPhaseProcessor orderPhaseProcessor;
+  private InventoryRepository inventoryRepository;
+  private OrderRepository orderRepository;
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
@@ -63,6 +77,7 @@ public class OrderReservationIntegrationTest {
         TcgInventoryTestFactory.create(
             dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
     fakeClock = factory.fakeClock();
+    fakeFetchTcgService = factory.fakeFetchTcgService();
     fakeFetchTcgClient = factory.fakeFetchTcgClient();
     fakeClock.setTime(NOW);
     skuTable = factory.skuTable();
@@ -71,13 +86,14 @@ public class OrderReservationIntegrationTest {
     auditTable = factory.auditTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
+    fakeFetchTcgService.reset();
     fakeFetchTcgClient.reset();
     factory.fakeUlidGenerator().reset();
 
-    var inventoryRepository =
+    inventoryRepository =
         new InventoryRepository(
             unitTable, factory.dynamoDbClient(), fakeClock, factory.fakeUlidGenerator());
-    var orderRepository =
+    orderRepository =
         new OrderRepository(
             orderTable,
             factory.jobTable(),
@@ -92,29 +108,35 @@ public class OrderReservationIntegrationTest {
             orderRepository,
             inventoryRepository,
             fakeClock,
-            fakeFetchTcgClient);
+            fakeFetchTcgService);
   }
 
   @Test
-  void processShouldAllocateDistinctUnitsAcrossOffersAndLines() {
+  void processShouldAllocateDistinctUnitsAcrossOffersAndLines() throws Exception {
     // arrange
     createSku();
     createUnit(1, "in_stock", null);
     createUnit(2, "in_stock", null);
     createUnit(3, "in_stock", null);
     createUnit(4, "in_stock", null);
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(
-            offer(
-                83663,
-                "AWAITING_PAYMENT",
-                List.of(
-                    offerItem(LISTING_ID, 1, "1.10", "2.00"),
-                    offerItem(LISTING_ID, 1, "1.20", "2.00"))),
-            offer(83664, "SEND_TRACKING_CODE", List.of(offerItem(LISTING_ID, 2, "2.50", "2.00")))));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers(
+            USER,
+            List.of(
+                offer(
+                    83663,
+                    "AWAITING_PAYMENT",
+                    List.of(
+                        offerItem(LISTING_ID, 1, "1.10", "2.00"),
+                        offerItem(LISTING_ID, 1, "1.20", "2.00"))),
+                offer(
+                    83664,
+                    "SEND_TRACKING_CODE",
+                    List.of(offerItem(LISTING_ID, 2, "2.50", "2.00")))));
 
     // act
-    orderPhaseProcessor.process(USER, "token");
+    orderPhaseProcessor.process(USER);
 
     // assert
     var firstOrder = getOrder("83663");
@@ -146,12 +168,67 @@ public class OrderReservationIntegrationTest {
   }
 
   @Test
-  void processShouldFailPublishForUnmappedListingBeforeWritingOrders() {
+  void processShouldPreflightAcceptedOffersAcrossPagesBeforeReservingAnyUnits() {
     // arrange
     createSku();
     createUnit(1, "in_stock", null);
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(offer(83663, null, List.of(offerItem(999, 1, "1.00", "2.00")))));
+    var offers = new ArrayList<Offer>();
+    for (int i = 0; i < 99; i++) {
+      offers.add(
+          new Offer(
+              90000 + i, "COMPLETED", null, null, "PICKUP", null, null, null, null, List.of()));
+    }
+    offers.add(offer(83663, null, List.of(offerItem(LISTING_ID, 1, "1.00", "2.00"))));
+    offers.add(offer(83664, null, List.of(offerItem(LISTING_ID, 1, "1.00", "2.00"))));
+    factory.fakeFetchTcgService().seedOffers(USER, offers);
+
+    // act & assert
+    assertThatThrownBy(() -> orderPhaseProcessor.process(USER))
+        .isInstanceOf(OrderPhaseProcessor.ReservationPreflightException.class)
+        .hasMessageContaining("Offer 83664 needs 1 units");
+    assertThat(getOrders()).isEmpty();
+    assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
+  }
+
+  @Test
+  void processShouldNotApplyFirstPageOffersWhenLaterPageFails() throws Exception {
+    // arrange
+    createSku();
+    createUnit(1, "in_stock", null);
+    var fetchTcgService = mock(FetchTcgService.class);
+    var context = new RequestContext(USER);
+    var firstPage =
+        new FindOffersResponse(
+            List.of(offer(83663, null, List.of(offerItem(LISTING_ID, 1, "1.00", "2.00")))), "1");
+    var failure =
+        new ServiceUnavailableException("FetchTCG seller offers are temporarily unavailable");
+    when(fetchTcgService.findOffers(context, new FindOffersRequest(100, null)))
+        .thenReturn(firstPage);
+    when(fetchTcgService.findOffers(context, new FindOffersRequest(100, "1"))).thenThrow(failure);
+    var processor =
+        new OrderPhaseProcessor(
+            orderTable,
+            skuTable,
+            factory.settingsTable(),
+            orderRepository,
+            inventoryRepository,
+            fakeClock,
+            fetchTcgService);
+
+    // act & assert
+    assertThatThrownBy(() -> processor.process(USER)).isSameAs(failure);
+    assertThat(getOrders()).isEmpty();
+    assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
+  }
+
+  @Test
+  void processShouldFailPublishForUnmappedListingBeforeWritingOrders() throws Exception {
+    // arrange
+    createSku();
+    createUnit(1, "in_stock", null);
+    factory
+        .fakeFetchTcgService()
+        .seedOffers(USER, List.of(offer(83663, null, List.of(offerItem(999, 1, "1.00", "2.00")))));
 
     // act
     var result = processPublish();
@@ -168,11 +245,11 @@ public class OrderReservationIntegrationTest {
   }
 
   @Test
-  void processShouldFailPublishForEmptyOfferBeforeWritingOrders() {
+  void processShouldFailPublishForEmptyOfferBeforeWritingOrders() throws Exception {
     // arrange
     createSku();
     createUnit(1, "in_stock", null);
-    fakeFetchTcgClient.seedSellerOffers(List.of(offer(83663, null, List.of())));
+    factory.fakeFetchTcgService().seedOffers(USER, List.of(offer(83663, null, List.of())));
 
     // act
     var result = processPublish();
@@ -188,15 +265,18 @@ public class OrderReservationIntegrationTest {
   }
 
   @Test
-  void processShouldPreflightStockAcrossAllOffersBeforeWritingAnyOrder() {
+  void processShouldPreflightStockAcrossAllOffersBeforeWritingAnyOrder() throws Exception {
     // arrange
     createSku();
     createUnit(1, "in_stock", null);
     createUnit(2, "in_stock", null);
-    fakeFetchTcgClient.seedSellerOffers(
-        List.of(
-            offer(83663, null, List.of(offerItem(LISTING_ID, 2, "2.00", "2.00"))),
-            offer(83664, null, List.of(offerItem(LISTING_ID, 2, "2.00", "2.00")))));
+    factory
+        .fakeFetchTcgService()
+        .seedOffers(
+            USER,
+            List.of(
+                offer(83663, null, List.of(offerItem(LISTING_ID, 2, "2.00", "2.00"))),
+                offer(83664, null, List.of(offerItem(LISTING_ID, 2, "2.00", "2.00")))));
 
     // act
     var result = processPublish();
@@ -216,7 +296,7 @@ public class OrderReservationIntegrationTest {
   }
 
   @Test
-  void processShouldResumeSavedReservationBeforeFetchingOffers() {
+  void processShouldResumeSavedReservationBeforeFetchingOffers() throws Exception {
     // arrange
     createSku();
     createUnit(1, "in_stock", null);
@@ -237,7 +317,7 @@ public class OrderReservationIntegrationTest {
             NOW));
 
     // act
-    assertThatThrownBy(() -> orderPhaseProcessor.process(USER, "token"))
+    assertThatThrownBy(() -> orderPhaseProcessor.process(USER))
         .isInstanceOf(TransactionCanceledException.class);
 
     // assert
@@ -256,7 +336,7 @@ public class OrderReservationIntegrationTest {
     unitTable.putItem(repairedUnit);
 
     // act
-    orderPhaseProcessor.process(USER, "token");
+    orderPhaseProcessor.process(USER);
 
     // assert
     assertThat(getOrder("83663").getStatus()).isEqualTo("to_pick");
@@ -270,7 +350,7 @@ public class OrderReservationIntegrationTest {
   }
 
   @Test
-  void processShouldRejectDuplicateUnitsInSavedReservation() {
+  void processShouldRejectDuplicateUnitsInSavedReservation() throws Exception {
     // arrange
     createSku();
     createUnit(1, "in_stock", null);
@@ -292,7 +372,7 @@ public class OrderReservationIntegrationTest {
             NOW));
 
     // act
-    assertThatThrownBy(() -> orderPhaseProcessor.process(USER, "token"))
+    assertThatThrownBy(() -> orderPhaseProcessor.process(USER))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("order allocation contains a duplicate unit");
 
@@ -303,13 +383,40 @@ public class OrderReservationIntegrationTest {
   }
 
   private JobProcessor.JobResult processPublish() {
-    return new PublishJobProcessor(factory)
+    return newPublishJobProcessor()
         .processBatch(USER, JobItem.create(USER, "publish-job", "publish", null, null, NOW));
   }
 
-  private FetchTcgClient.SellerOffer offer(
-      int orderId, String currentAction, List<FetchTcgClient.OfferItem> items) {
-    return new FetchTcgClient.SellerOffer(
+  private PublishJobProcessor newPublishJobProcessor() {
+    var dynamoDbClient = factory.dynamoDbClient();
+    var inventoryRepository =
+        new InventoryRepository(unitTable, dynamoDbClient, fakeClock, factory.fakeUlidGenerator());
+    var orderRepository =
+        new OrderRepository(
+            orderTable, factory.jobTable(), inventoryRepository, dynamoDbClient, fakeClock);
+    var orderPhaseProcessor =
+        new OrderPhaseProcessor(
+            orderTable,
+            skuTable,
+            factory.settingsTable(),
+            orderRepository,
+            inventoryRepository,
+            fakeClock,
+            fakeFetchTcgService);
+    var listingPhaseProcessor =
+        new ListingPhaseProcessor(
+            skuTable,
+            inventoryRepository,
+            dynamoDbClient,
+            fakeClock,
+            factory.fetchTcgClient(),
+            factory.s3Client());
+    return new PublishJobProcessor(
+        factory.fetchTcgTokenMinter(), orderPhaseProcessor, listingPhaseProcessor);
+  }
+
+  private Offer offer(int orderId, String currentAction, List<OfferItem> items) {
+    return new Offer(
         orderId,
         "ACCEPTED",
         currentAction,
@@ -322,10 +429,9 @@ public class OrderReservationIntegrationTest {
         items);
   }
 
-  private FetchTcgClient.OfferItem offerItem(
-      int listingId, int quantity, String price, String listedPrice) {
-    return new FetchTcgClient.OfferItem(
-        new FetchTcgClient.OfferListing(listingId, "NM", new BigDecimal(listedPrice)),
+  private OfferItem offerItem(int listingId, int quantity, String price, String listedPrice) {
+    return new OfferItem(
+        new OfferListing(listingId, "NM", new BigDecimal(listedPrice)),
         quantity,
         new BigDecimal(price));
   }

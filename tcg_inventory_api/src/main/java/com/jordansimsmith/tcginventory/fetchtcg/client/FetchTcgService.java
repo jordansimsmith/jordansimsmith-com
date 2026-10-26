@@ -14,4 +14,7 @@ public interface FetchTcgService {
 
   FindCardListingsResponse findCardListings(RequestContext ctx, FindCardListingsRequest request)
       throws ServiceException;
+
+  FindOffersResponse findOffers(RequestContext ctx, FindOffersRequest request)
+      throws ServiceException;
 }

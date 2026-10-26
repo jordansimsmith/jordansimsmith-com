@@ -15,7 +15,8 @@ import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.JobsHandler;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
+import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
 import com.jordansimsmith.tcginventory.games.Games;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
@@ -44,6 +45,7 @@ public class ReportsHandlerIntegrationTest {
   private FakeUlidGenerator fakeUlidGenerator;
   private FakeQueueClient<JobMessage> fakeJobsQueue;
   private FakeFetchTcgClient fakeFetchTcgClient;
+  private FakeFetchTcgService fakeFetchTcgService;
   private ObjectMapper objectMapper;
   private DynamoDbTable<JobItem> jobTable;
   private DynamoDbTable<ReportItem> reportTable;
@@ -77,6 +79,7 @@ public class ReportsHandlerIntegrationTest {
     fakeUlidGenerator = factory.fakeUlidGenerator();
     fakeJobsQueue = factory.fakeJobsQueue();
     fakeFetchTcgClient = factory.fakeFetchTcgClient();
+    fakeFetchTcgService = factory.fakeFetchTcgService();
     objectMapper = factory.objectMapper();
     jobTable = factory.jobTable();
     reportTable = factory.reportTable();
@@ -89,6 +92,7 @@ public class ReportsHandlerIntegrationTest {
     fakeUlidGenerator.reset();
     fakeJobsQueue.reset();
     fakeFetchTcgClient.reset();
+    fakeFetchTcgService.reset();
 
     createReportHandler = new CreateReportHandler(factory);
     getReportsHandler = new GetReportsHandler(factory);
@@ -750,9 +754,10 @@ public class ReportsHandlerIntegrationTest {
             Instant.ofEpochSecond(1699000000));
     orderTable.putItem(order);
 
-    fakeFetchTcgClient.seedSellerOffers(
+    fakeFetchTcgService.seedOffers(
+        "jordan",
         List.of(
-            new FetchTcgClient.SellerOffer(
+            new Offer(
                 83663,
                 "ACCEPTED",
                 "SEND_PICKUP_ADDRESS",

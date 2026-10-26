@@ -12,8 +12,6 @@ public interface FetchTcgClient {
 
   SearchCardsResponse searchCards(String fetchTcgGameId, int setId, String cardName, String finish);
 
-  GetSellerOffersResponse getSellerOffers(String bearerToken, int page);
-
   UpsertListingResponse upsertListing(String bearerToken, UpsertListingRequest request);
 
   void deleteListing(String bearerToken, int listingId);
@@ -34,50 +32,6 @@ public interface FetchTcgClient {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   record SearchCard(@JsonProperty("id") String id) {}
-
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  record GetSellerOffersResponse(
-      @JsonProperty("content") List<SellerOffer> content,
-      @JsonProperty("totalPages") int totalPages) {}
-
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  record SellerOffer(
-      @JsonProperty("id") int id,
-      @JsonProperty("status") String status,
-      @JsonProperty("currentAction") String currentAction,
-      @JsonProperty("acceptedAt") String acceptedAt,
-      @JsonProperty("deliveryMode") String deliveryMode,
-      @JsonProperty("buyerName") @Nullable String buyerName,
-      @JsonProperty("buyerRegionAddress") @Nullable BuyerRegionAddress buyerRegionAddress,
-      @JsonProperty("shippingOption") @Nullable ShippingOption shippingOption,
-      @JsonProperty("totalOfferPrice") BigDecimal totalOfferPrice,
-      @JsonProperty("items") List<OfferItem> items) {}
-
-  // deliberately narrow: the offer payload also carries geocoordinates and pickup flags that the
-  // service must not persist
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  record BuyerRegionAddress(
-      @JsonProperty("line1") @Nullable String line1,
-      @JsonProperty("line2") @Nullable String line2,
-      @JsonProperty("suburb") @Nullable String suburb,
-      @JsonProperty("city") @Nullable String city,
-      @JsonProperty("postCode") @Nullable String postCode,
-      @JsonProperty("country") @Nullable String country) {}
-
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  record ShippingOption(@JsonProperty("title") @Nullable String title) {}
-
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  record OfferItem(
-      @JsonProperty("listing") OfferListing listing,
-      @JsonProperty("quantity") int quantity,
-      @JsonProperty("price") BigDecimal price) {}
-
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  record OfferListing(
-      @JsonProperty("id") int id,
-      @JsonProperty("condition") String condition,
-      @JsonProperty("listedPrice") @Nullable BigDecimal listedPrice) {}
 
   record UpsertListingRequest(
       String cardId,

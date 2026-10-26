@@ -9,10 +9,12 @@ import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
+import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
 import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
 import com.jordansimsmith.time.FakeClock;
 import java.math.BigDecimal;
@@ -38,6 +40,7 @@ public class OrderVoidingIntegrationTest {
   private static final Instant NOW = Instant.ofEpochSecond(1700000000);
 
   private FakeClock fakeClock;
+  private FakeFetchTcgService fakeFetchTcgService;
   private FakeFetchTcgClient fakeFetchTcgClient;
   private TcgInventoryTestFactory factory;
   private DynamoDbTable<SkuItem> skuTable;
@@ -62,6 +65,7 @@ public class OrderVoidingIntegrationTest {
         TcgInventoryTestFactory.create(
             dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
     fakeClock = factory.fakeClock();
+    fakeFetchTcgService = factory.fakeFetchTcgService();
     fakeFetchTcgClient = factory.fakeFetchTcgClient();
     fakeClock.setTime(NOW);
     skuTable = factory.skuTable();
@@ -70,6 +74,7 @@ public class OrderVoidingIntegrationTest {
     auditTable = factory.auditTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
+    fakeFetchTcgService.reset();
     fakeFetchTcgClient.reset();
     factory.fakeUlidGenerator().reset();
 
@@ -91,11 +96,11 @@ public class OrderVoidingIntegrationTest {
             orderRepository,
             inventoryRepository,
             fakeClock,
-            fakeFetchTcgClient);
+            fakeFetchTcgService);
   }
 
   @Test
-  void processShouldRecordAndReleaseCancelledOrder() {
+  void processShouldRecordAndReleaseCancelledOrder() throws Exception {
     // arrange
     createSku();
     createUnit(1, "reserved", ORDER_ID);
@@ -103,7 +108,7 @@ public class OrderVoidingIntegrationTest {
     seedCancellation(ORDER_ID);
 
     // act
-    orderPhaseProcessor.process(USER, "token");
+    orderPhaseProcessor.process(USER);
 
     // assert
     var order = getOrder(ORDER_ID);
@@ -135,7 +140,7 @@ public class OrderVoidingIntegrationTest {
   }
 
   @Test
-  void processShouldResumePartialReleaseBeforeOfferRead() {
+  void processShouldResumePartialReleaseBeforeOfferRead() throws Exception {
     // arrange
     createSku();
     createUnit(1, "reserved", ORDER_ID);
@@ -143,7 +148,7 @@ public class OrderVoidingIntegrationTest {
     createOrder(ORDER_ID, "voiding", List.of(line(List.of(1, 2))));
 
     // act
-    var publishJobProcessor = new PublishJobProcessor(factory);
+    var publishJobProcessor = newPublishJobProcessor();
     var jobItem = JobItem.create(USER, "publish-job", "publish", null, null, NOW);
     assertThatThrownBy(() -> publishJobProcessor.processBatch(USER, jobItem))
         .isInstanceOf(TransactionCanceledException.class);
@@ -165,7 +170,7 @@ public class OrderVoidingIntegrationTest {
     unitTable.putItem(repairedUnit);
 
     // act
-    orderPhaseProcessor.process(USER, "token");
+    orderPhaseProcessor.process(USER);
 
     // assert
     assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voided");
@@ -179,7 +184,7 @@ public class OrderVoidingIntegrationTest {
   }
 
   @Test
-  void processShouldReleaseDuplicateAllocationsOnlyOnce() {
+  void processShouldReleaseDuplicateAllocationsOnlyOnce() throws Exception {
     // arrange
     createSku();
     createUnit(1, "reserved", ORDER_ID);
@@ -187,7 +192,7 @@ public class OrderVoidingIntegrationTest {
     seedCancellation(ORDER_ID);
 
     // act
-    orderPhaseProcessor.process(USER, "token");
+    orderPhaseProcessor.process(USER);
 
     // assert
     assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voided");
@@ -201,7 +206,7 @@ public class OrderVoidingIntegrationTest {
   }
 
   @Test
-  void processShouldRejectForeignAllocationBeforeVoiding() {
+  void processShouldRejectForeignAllocationBeforeVoiding() throws Exception {
     // arrange
     createSku();
     createUnit(1, "reserved", ORDER_ID);
@@ -210,7 +215,7 @@ public class OrderVoidingIntegrationTest {
     seedCancellation(secondOrderId);
 
     // act
-    assertThatThrownBy(() -> orderPhaseProcessor.process(USER, "token"))
+    assertThatThrownBy(() -> orderPhaseProcessor.process(USER))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("order has an unexpected allocated unit");
 
@@ -221,15 +226,15 @@ public class OrderVoidingIntegrationTest {
   }
 
   @Test
-  void processShouldFinalizeAlreadyReleasedAndEmptyVoidingOrdersOnce() {
+  void processShouldFinalizeAlreadyReleasedAndEmptyVoidingOrdersOnce() throws Exception {
     // arrange
     createSku();
     createUnit(1, "in_stock", null);
     createOrder(ORDER_ID, "voiding", List.of(line(List.of(1))));
 
     // act
-    orderPhaseProcessor.process(USER, "token");
-    orderPhaseProcessor.process(USER, "token");
+    orderPhaseProcessor.process(USER);
+    orderPhaseProcessor.process(USER);
 
     // assert
     assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voided");
@@ -245,8 +250,8 @@ public class OrderVoidingIntegrationTest {
     seedCancellation(emptyOrderId);
 
     // act
-    orderPhaseProcessor.process(USER, "token");
-    orderPhaseProcessor.process(USER, "token");
+    orderPhaseProcessor.process(USER);
+    orderPhaseProcessor.process(USER);
 
     // assert
     assertThat(getOrder(emptyOrderId).getStatus()).isEqualTo("voided");
@@ -302,7 +307,7 @@ public class OrderVoidingIntegrationTest {
 
   private void seedCancellation(String orderId) {
     var offer =
-        new FetchTcgClient.SellerOffer(
+        new Offer(
             Integer.parseInt(orderId),
             "CANCELLED_BY_SELLER",
             null,
@@ -314,7 +319,35 @@ public class OrderVoidingIntegrationTest {
             new BigDecimal("2.00"),
             List.of());
     // replace the fake page so each test controls which local order sees a cancellation
-    fakeFetchTcgClient.seedSellerOffers(List.of(offer));
+    factory.fakeFetchTcgService().seedOffers(USER, List.of(offer));
+  }
+
+  private PublishJobProcessor newPublishJobProcessor() {
+    var dynamoDbClient = factory.dynamoDbClient();
+    var inventoryRepository =
+        new InventoryRepository(unitTable, dynamoDbClient, fakeClock, factory.fakeUlidGenerator());
+    var orderRepository =
+        new OrderRepository(
+            orderTable, factory.jobTable(), inventoryRepository, dynamoDbClient, fakeClock);
+    var orderPhaseProcessor =
+        new OrderPhaseProcessor(
+            orderTable,
+            skuTable,
+            factory.settingsTable(),
+            orderRepository,
+            inventoryRepository,
+            fakeClock,
+            fakeFetchTcgService);
+    var listingPhaseProcessor =
+        new ListingPhaseProcessor(
+            skuTable,
+            inventoryRepository,
+            dynamoDbClient,
+            fakeClock,
+            factory.fetchTcgClient(),
+            factory.s3Client());
+    return new PublishJobProcessor(
+        factory.fetchTcgTokenMinter(), orderPhaseProcessor, listingPhaseProcessor);
   }
 
   private OrderItem getOrder(String orderId) {

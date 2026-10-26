@@ -9,6 +9,7 @@ public final class FakeFetchTcgService implements FetchTcgService {
   private final Map<String, String> sellerUsernames = new HashMap<>();
   private final Map<String, GetCardResponse> cards = new HashMap<>();
   private final Map<String, List<CardListing>> listings = new HashMap<>();
+  private final Map<String, List<Offer>> offers = new HashMap<>();
 
   @Override
   public GetAccountResponse getAccount(RequestContext ctx, GetAccountRequest request) {
@@ -42,6 +43,18 @@ public final class FakeFetchTcgService implements FetchTcgService {
     return new FindCardListingsResponse(pageListings, nextContinuation);
   }
 
+  @Override
+  public FindOffersResponse findOffers(RequestContext ctx, FindOffersRequest request) {
+    var page = request.continuation() == null ? 0 : Integer.parseInt(request.continuation());
+    var limit = request.limit() == null ? 100 : request.limit();
+    var allOffers = offers.getOrDefault(ctx.user(), List.of());
+    var start = page * limit;
+    var end = Math.min(start + limit, allOffers.size());
+    var pageOffers = start >= allOffers.size() ? List.<Offer>of() : allOffers.subList(start, end);
+    var nextContinuation = end < allOffers.size() ? Integer.toString(page + 1) : null;
+    return new FindOffersResponse(pageOffers, nextContinuation);
+  }
+
   public void seedSellerUsername(String user, String username) {
     sellerUsernames.put(user, username);
   }
@@ -54,9 +67,14 @@ public final class FakeFetchTcgService implements FetchTcgService {
     listings.put(cardId, response);
   }
 
+  public void seedOffers(String user, List<Offer> response) {
+    offers.put(user, response);
+  }
+
   public void reset() {
     sellerUsernames.clear();
     cards.clear();
     listings.clear();
+    offers.clear();
   }
 }

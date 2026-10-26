@@ -8,7 +8,6 @@ import java.util.Map;
 public class FakeFetchTcgClient implements FetchTcgClient {
   private final Map<String, GetCardResponse> cards = new HashMap<>();
   private final Map<String, SearchCardsResponse> searchResults = new HashMap<>();
-  private final Map<Integer, GetSellerOffersResponse> sellerOffers = new HashMap<>();
   private final List<UpsertListingRequest> upsertCalls = new ArrayList<>();
   private final List<Integer> deleteCalls = new ArrayList<>();
   private final List<UploadCall> uploadCalls = new ArrayList<>();
@@ -32,15 +31,6 @@ public class FakeFetchTcgClient implements FetchTcgClient {
     var response = searchResults.get(key);
     if (response == null) {
       return new SearchCardsResponse(List.of());
-    }
-    return response;
-  }
-
-  @Override
-  public GetSellerOffersResponse getSellerOffers(String bearerToken, int page) {
-    var response = sellerOffers.get(page);
-    if (response == null) {
-      return new GetSellerOffersResponse(List.of(), 0);
     }
     return response;
   }
@@ -71,14 +61,6 @@ public class FakeFetchTcgClient implements FetchTcgClient {
     searchResults.put(gameId + "#" + setId + "#" + cardName + "#" + finish, response);
   }
 
-  public void seedSellerOffers(List<SellerOffer> offers) {
-    sellerOffers.put(0, new GetSellerOffersResponse(offers, 1));
-  }
-
-  public void seedSellerOffers(int page, GetSellerOffersResponse response) {
-    sellerOffers.put(page, response);
-  }
-
   public List<UpsertListingRequest> getUpsertCalls() {
     return upsertCalls;
   }
@@ -98,7 +80,6 @@ public class FakeFetchTcgClient implements FetchTcgClient {
   public void reset() {
     cards.clear();
     searchResults.clear();
-    sellerOffers.clear();
     upsertCalls.clear();
     deleteCalls.clear();
     uploadCalls.clear();
