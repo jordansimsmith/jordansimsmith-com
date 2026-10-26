@@ -51,12 +51,13 @@ public class FetchTcgModule {
         };
     var tokenExchange = new HttpFetchTcgTokenExchange(firebaseTokenUri, httpClient, objectMapper);
     var fetchTcgClient = new HttpFetchTcgClient(fetchTcgBaseUri, httpClient, objectMapper, pacer);
+    var credentialStore = new FetchTcgCredentialStore(secrets, objectMapper);
     var getAccountService = new GetAccountService(accountRepository);
     var getCardService = new GetCardService(fetchTcgClient);
     var findCardListingsService = new FindCardListingsService(fetchTcgClient);
     var updateCredentialsService =
         new UpdateCredentialsService(
-            accountRepository, tokenExchange, fetchTcgClient, secrets, objectMapper, clock);
+            accountRepository, tokenExchange, fetchTcgClient, credentialStore, clock);
 
     return new FetchTcgService() {
       @Override

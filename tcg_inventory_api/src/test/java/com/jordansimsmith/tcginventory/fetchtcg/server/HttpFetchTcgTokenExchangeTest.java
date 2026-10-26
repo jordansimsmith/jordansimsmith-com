@@ -65,7 +65,7 @@ public class HttpFetchTcgTokenExchangeTest {
         createMockResponse(
             200,
             """
-            {"id_token":"bearer-value","refresh_token":"rotated-value","other":"ignored"}
+            {"id_token":"bearer-value","refresh_token":"rotated-value","expires_in":"3600","other":"ignored"}
             """);
     when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
         .thenReturn(response);
@@ -85,13 +85,14 @@ public class HttpFetchTcgTokenExchangeTest {
     assertThat(formValue(readBody(request), "refresh_token")).isEqualTo("candidate +/?&=");
     assertThat(result.bearerToken()).isEqualTo("bearer-value");
     assertThat(result.refreshToken()).isEqualTo("rotated-value");
+    assertThat(result.expiresIn()).isEqualTo(3600);
   }
 
   @Test
   void exchangeShouldRetainCandidateWhenFirebaseDoesNotRotateIt()
       throws IOException, InterruptedException, ServiceException {
     // arrange
-    var response = createMockResponse(200, "{\"id_token\":\"bearer\"}");
+    var response = createMockResponse(200, "{\"id_token\":\"bearer\",\"expires_in\":\"3600\"}");
     when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
         .thenReturn(response);
 
@@ -180,7 +181,10 @@ public class HttpFetchTcgTokenExchangeTest {
         new String[] {
           "response-body-secret",
           "{\"id_token\":\" \"}",
-          "{\"id_token\":\"bearer\",\"refresh_token\":\" \"}"
+          "{\"id_token\":\"bearer\",\"refresh_token\":\" \"}",
+          "{\"id_token\":\"bearer\"}",
+          "{\"id_token\":\"bearer\",\"expires_in\":\"zero\"}",
+          "{\"id_token\":\"bearer\",\"expires_in\":\"0\"}"
         }) {
       // arrange
       var response = createMockResponse(200, body);
@@ -202,7 +206,7 @@ public class HttpFetchTcgTokenExchangeTest {
   void exchangeResultShouldRedactBothTokensFromString() {
     // arrange
     var result =
-        new HttpFetchTcgTokenExchange.TokenExchangeResult("bearer-secret", "refresh-secret");
+        new HttpFetchTcgTokenExchange.TokenExchangeResult("bearer-secret", "refresh-secret", 3600);
 
     // act
     var diagnostic = result.toString();

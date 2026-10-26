@@ -61,13 +61,22 @@ public class HttpFetchTcgTokenExchange {
         || tokenResponse.idToken().isBlank()) {
       throw new IllegalStateException("Firebase returned a malformed token response");
     }
+    long expiresIn;
+    try {
+      expiresIn = Long.parseLong(tokenResponse.expiresIn());
+    } catch (NumberFormatException | NullPointerException e) {
+      throw new IllegalStateException("Firebase returned a malformed token response");
+    }
+    if (expiresIn <= 0) {
+      throw new IllegalStateException("Firebase returned a malformed token response");
+    }
     if (tokenResponse.refreshToken() != null && tokenResponse.refreshToken().isBlank()) {
       throw new IllegalStateException("Firebase returned a malformed token response");
     }
 
     var effectiveRefreshToken =
         tokenResponse.refreshToken() == null ? refreshToken : tokenResponse.refreshToken();
-    return new TokenExchangeResult(tokenResponse.idToken(), effectiveRefreshToken);
+    return new TokenExchangeResult(tokenResponse.idToken(), effectiveRefreshToken, expiresIn);
   }
 
   private String readFirebaseErrorCode(String responseBody) {
@@ -87,17 +96,20 @@ public class HttpFetchTcgTokenExchange {
     }
   }
 
-  public record TokenExchangeResult(String bearerToken, String refreshToken) {
+  public record TokenExchangeResult(String bearerToken, String refreshToken, long expiresIn) {
     @Override
     public String toString() {
-      return "TokenExchangeResult[bearerToken=<redacted>, refreshToken=<redacted>]";
+      return "TokenExchangeResult[bearerToken=<redacted>, refreshToken=<redacted>, expiresIn="
+          + expiresIn
+          + "]";
     }
   }
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record FirebaseTokenResponse(
       @JsonProperty("id_token") String idToken,
-      @JsonProperty("refresh_token") String refreshToken) {
+      @JsonProperty("refresh_token") String refreshToken,
+      @JsonProperty("expires_in") String expiresIn) {
     @Override
     public String toString() {
       return "FirebaseTokenResponse[idToken=<redacted>, refreshToken=<redacted>]";

@@ -13,7 +13,9 @@ java_test_suite(
     test_suffixes = ["Test.java"],
     runtime_deps = JUNIT5_DEPS,
     deps = [
+        "//lib/secrets:test-lib",
         "//lib/service",
+        "//lib/time:test-lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/server",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",

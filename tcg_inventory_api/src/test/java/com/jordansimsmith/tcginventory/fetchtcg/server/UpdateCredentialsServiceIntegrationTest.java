@@ -61,7 +61,8 @@ public class UpdateCredentialsServiceIntegrationTest {
   private final AtomicInteger firebaseRequestCount = new AtomicInteger();
   private final AtomicInteger profileRequestCount = new AtomicInteger();
   private final AtomicReference<String> firebaseResponse =
-      new AtomicReference<>("{\"id_token\":\"bearer\",\"refresh_token\":\"rotated-token\"}");
+      new AtomicReference<>(
+          "{\"id_token\":\"bearer\",\"refresh_token\":\"rotated-token\",\"expires_in\":\"3600\"}");
   private final AtomicReference<String> profileResponse =
       new AtomicReference<>("{\"username\":\"Verified Seller\"}");
   private final AtomicInteger firebaseStatus = new AtomicInteger(200);
@@ -102,7 +103,8 @@ public class UpdateCredentialsServiceIntegrationTest {
     accountRepository = new FetchTcgAccountRepository(accountTable);
     firebaseRequestCount.set(0);
     profileRequestCount.set(0);
-    firebaseResponse.set("{\"id_token\":\"bearer\",\"refresh_token\":\"rotated-token\"}");
+    firebaseResponse.set(
+        "{\"id_token\":\"bearer\",\"refresh_token\":\"rotated-token\",\"expires_in\":\"3600\"}");
     profileResponse.set("{\"username\":\"Verified Seller\"}");
     firebaseStatus.set(200);
     profileStatus.set(200);
@@ -172,7 +174,7 @@ public class UpdateCredentialsServiceIntegrationTest {
   @Test
   void updateCredentialsShouldRetainCandidateWhenProviderDoesNotRotateIt() throws Exception {
     // arrange
-    firebaseResponse.set("{\"id_token\":\"bearer\"}");
+    firebaseResponse.set("{\"id_token\":\"bearer\",\"expires_in\":\"3600\"}");
     var service = createService(accountRepository, secrets);
 
     // act
@@ -323,7 +325,7 @@ public class UpdateCredentialsServiceIntegrationTest {
                 service.updateCredentials(
                     new RequestContext("alice"), new UpdateCredentialsRequest(CANDIDATE_TOKEN)))
         .isInstanceOf(IllegalStateException.class)
-        .hasMessage("Failed to save FetchTCG credentials")
+        .hasMessage("Failed to read FetchTCG credentials")
         .hasMessageNotContaining(CANDIDATE_TOKEN);
     assertThat(accountRepository.get("alice")).isNull();
   }
@@ -411,8 +413,7 @@ public class UpdateCredentialsServiceIntegrationTest {
         new HttpFetchTcgTokenExchange(
             baseUri.resolve("/token"), HttpClient.newHttpClient(), objectMapper),
         new HttpFetchTcgClient(baseUri, HttpClient.newHttpClient(), objectMapper, () -> {}),
-        credentialStore,
-        objectMapper,
+        new FetchTcgCredentialStore(credentialStore, objectMapper),
         clock);
   }
 
