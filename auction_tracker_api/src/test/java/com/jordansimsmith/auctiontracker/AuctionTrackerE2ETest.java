@@ -59,6 +59,9 @@ public class AuctionTrackerE2ETest {
           .withEnv(
               "AUCTION_TRACKER_TRADEME_BASE_URL",
               tradeMeWebsiteStubContainer.getEndpoint().toString())
+          .withEnv(
+              "AUCTION_TRACKER_TRADEME_API_BASE_URL",
+              tradeMeWebsiteStubContainer.getEndpoint().toString())
           .withEnv("AUCTION_TRACKER_OPENAI_BASE_URL", openAiStubContainer.getEndpoint().toString());
 
   @BeforeAll

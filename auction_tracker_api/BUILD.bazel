@@ -82,6 +82,7 @@ java_binary(
     testonly = True,
     srcs = ["src/test/java/com/jordansimsmith/auctiontracker/TradeMeWebsiteStubServer.java"],
     create_executable = False,
+    deps = ["@maven//:com_fasterxml_jackson_core_jackson_databind"],
 )
 
 java_library(
@@ -148,6 +149,7 @@ java_test_suite(
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_jsoup_jsoup",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_mockito_mockito_core",
         "@maven//:org_slf4j_slf4j_api",
     ],
 )

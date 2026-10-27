@@ -9,6 +9,8 @@ import dagger.Module;
 import dagger.Provides;
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.time.Duration;
+import java.util.concurrent.ThreadLocalRandom;
 import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -42,8 +44,36 @@ public class AuctionTrackerModule {
 
   @Provides
   @Singleton
-  TradeMeClient tradeMeClient(ObjectMapper objectMapper) {
-    return new JsoupTradeMeClient(objectMapper);
+  HttpClient tradeMeHttpClient() {
+    return HttpClient.newBuilder()
+        .connectTimeout(Duration.ofSeconds(10))
+        .followRedirects(HttpClient.Redirect.NORMAL)
+        .build();
+  }
+
+  @Provides
+  @Singleton
+  Runnable tradeMeRequestPacer() {
+    return () -> {
+      try {
+        Thread.sleep(ThreadLocalRandom.current().nextLong(100, 201));
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+        throw new IllegalStateException("Trade Me request pacing was interrupted", e);
+      }
+    };
+  }
+
+  @Provides
+  @Singleton
+  TradeMeClient tradeMeClient(
+      ObjectMapper objectMapper, HttpClient tradeMeHttpClient, Runnable tradeMeRequestPacer) {
+    var apiBaseUrl = System.getenv("AUCTION_TRACKER_TRADEME_API_BASE_URL");
+    if (apiBaseUrl == null || apiBaseUrl.isBlank()) {
+      apiBaseUrl = "https://api.trademe.co.nz";
+    }
+    return new HttpTradeMeClient(
+        URI.create(apiBaseUrl), objectMapper, tradeMeHttpClient, tradeMeRequestPacer);
   }
 
   @Provides

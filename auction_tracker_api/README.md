@@ -29,8 +29,8 @@ The auction tracker API service runs scheduled queued workflows that scrape Trad
 - Queue one `update_search` job per configured Trade Me search every hour. Each job invokes the worker for exactly one search.
 - Identify the seventeen code-defined searches with stable IDs: `ram-g-skill`, `ram-gskill`, `ram-trident-z`, the seven MTG IDs (`mtg-bulk`, `mtg-collection`, `mtg-assorted`, `mtg-clear-out`, `mtg-clearout`, `mtg-lot`, `mtg-one-dollar-reserve`), and the seven Pokémon IDs (`pokemon-bulk`, `pokemon-collection`, `pokemon-assorted`, `pokemon-clear-out`, `pokemon-clearout`, `pokemon-lot`, `pokemon-one-dollar-reserve`).
 - Build search URLs with term, optional price filters, condition filter, and `sort_order=expirydesc`.
-- Fetch listing pages, normalize listing URLs, extract original start and Buy Now prices from the embedded Trade Me page state, exclude current bids from relist identity, and skip listings marked as reserve not met.
-- Extract seller usernames from embedded Trade Me page state and skip listings from the injected code-defined exclusion set, initially `roseshade`, after URL duplicate checks and before fingerprint checks, judging, or persistence.
+- Fetch search results and listing details from Trade Me's JSON API, normalize canonical listing URLs, extract original start and Buy Now prices, exclude current bids from relist identity, and skip listings marked as reserve not met.
+- Extract seller usernames from API listing details and skip listings from the injected code-defined exclusion set, initially `roseshade`, after URL duplicate checks and before fingerprint checks, judging, or persistence.
 - Judge new listings on searches with a configured judge (all seventeen searches: seven MTG searches, seven Pokémon searches, and three RAM searches) using an OpenAI LLM against the judge's configured binary criteria, and persist the overall verdict.
 - Carry judge configuration (prompt resource, model, reasoning effort, criteria) per search: the seven MTG searches share one config, the seven Pokémon searches share one config, and the three RAM searches share one config.
 - Store newly discovered items in DynamoDB with deterministic key prefixes and 30-day TTL.
@@ -40,7 +40,7 @@ The auction tracker API service runs scheduled queued workflows that scrape Trad
 - Deduplicate digest entries by price-aware content fingerprint, falling back to listing URL for records created before content fingerprinting.
 - Retry failed worker messages through the FIFO queue and route messages that fail five receives to the passive worker DLQ. The DLQ is inspected and redriven by a human after the cause is fixed.
 - Accept at-least-once processing: duplicate deliveries can repeat scraping, judging, DynamoDB writes, or SNS publication. Existing GSI and digest deduplication limits user-visible duplicates.
-- Alert only on a non-zero worker DLQ depth; the worker Lambda is excluded from the platform Lambda failure-rate alarms.
+- Alert on non-zero worker DLQ depth through the existing platform DLQ alarm.
 
 ### Out of scope
 
@@ -94,7 +94,7 @@ sequenceDiagram
   JobsHandler->>SearchProcessor: resolve and process search ID
   SearchProcessor->>TradeMe: fetch one search page
   SearchProcessor->>DynamoDB: query gsi1 for each canonical listing URL
-  SearchProcessor->>TradeMe: fetch only new listing pages
+  SearchProcessor->>TradeMe: fetch only new listing details
   SearchProcessor->>SearchProcessor: skip configured seller usernames
   SearchProcessor->>SearchProcessor: hash title, description, start price, and Buy Now price
   SearchProcessor->>DynamoDB: query gsi2 for global relist fingerprint
@@ -122,18 +122,23 @@ sequenceDiagram
 - Keep `JobsHandler` limited to SQS message parsing and dispatch; `UpdateSearchJobProcessor` owns one-search scraping and persistence, while `SendDigestJobProcessor` owns digest selection and SNS publication.
 - Use content-based deduplication, a 14-day retention period, a 720-second visibility timeout, and a five-receive redrive policy to one FIFO worker DLQ. The visibility timeout is six times the worker's 120-second Lambda timeout, as required for the SQS event source. Do not add claim records, transactions, a message ledger, or a Scheduler DLQ.
 - Treat worker processing as at least once. Duplicate scraping, judging, persistence, and SNS publication are acceptable; GSI URL/fingerprint checks and digest grouping remain the suppression mechanisms.
-- Use Jsoup scraping against Trade Me server-rendered pages instead of a browser automation stack.
+- Use the read-only Trade Me JSON search and listing endpoints through `HttpTradeMeClient`. Keep the legacy `JsoupTradeMeClient` out of production dependency wiring; do not silently fall back to HTML parsing.
+- Build listing results from API `List` entries and canonical paths. Validate response status, JSON content type, result metadata, listing identity, and required seller fields so an HTTP-200 shell or error response fails the job instead of looking like an empty search.
+- Treat `TotalCount: 0`, `Page: 1`, `PageSize: 0`, and an empty `List` as a valid empty result. Warn and process only the requested first page when more listings exist.
 - Use DynamoDB `pk`/`sk` prefixes with `gsi1` and `gsi2` so URL duplicate and relist checks are direct key lookups, not scans.
 - Keep table and topic names code-defined (`auction_tracker`, `auction_tracker_api_digest`) to reduce configuration complexity.
 - Keep search definitions in code (`SearchFactoryImpl`) for deterministic behavior and easy testability.
 - Inject excluded seller usernames through `ExcludedSellerUsernameFactory`; keep the production set in `ExcludedSellerUsernameFactoryImpl` and use a fake in integration tests.
 - Run the digest at 8:55pm New Zealand local time using `cron(55 20 * * ? *)` with the `Pacific/Auckland` schedule timezone. Use the message's `scheduled_at` as the upper boundary and the preceding local 8:55pm boundary as the lower boundary, including across daylight-saving transitions.
-- Use browser-like headers and cookies in scrape requests to improve compatibility with Trade Me page delivery.
+- Send `Accept: application/json`, a Referer derived from the configured Trade Me website origin, and an ordinary browser user agent. Configure 10-second connect and 30-second request timeouts, normal redirects, and standard TLS verification.
+- Keep the Trade Me API origin independently configurable with `AUCTION_TRACKER_TRADEME_API_BASE_URL`, defaulting to `https://api.trademe.co.nz`; keep `AUCTION_TRACKER_TRADEME_BASE_URL` for website URL identity and the Referer origin.
 - Judge listings at scrape time (the only moment descriptions exist in memory) and persist the verdict, so matching fingerprinted relists are skipped before judging and the digest filters purely from storage.
 - Define relist identity through the injected `ListingFingerprinter`; `Sha256ListingFingerprinter` hashes the exact scraped title, description, normalized original start price, and normalized Buy Now price separated by null characters. Current bids are excluded because they are bidder-driven rather than seller-set; any content or seller-price change produces a new fingerprint.
-- Read seller-set prices from the server-rendered `#frend-state` JSON at `NGRX_STATE.listing.cachedDetails.entities.<listing_id>.item`, where `startPrice` remains distinct from `maxBidAmount` after bidding begins. Missing or malformed required page data fails the invocation rather than storing an unsafe fingerprint.
-- Read the required seller username from the same embedded listing item at `member.nickname`. A missing or blank username fails the invocation so upstream contract drift is detected instead of bypassing exclusions.
-- Existing title-and-description fingerprints are not backfilled. They do not match price-aware fingerprints, so the first relist after deployment can produce one notification even when its price is unchanged; subsequent relists use price-aware suppression.
+- Read `Title`, seller-authored plain-text `Body`, `Member.Nickname`, `StartPrice`, and optional `BuyNowPrice` from the listing API response. Current bids are excluded from identity. Missing or malformed required data fails the invocation rather than storing an unsafe fingerprint.
+- Normalize seller body CRLF/CR line endings to LF, trim outer whitespace, preserve internal paragraphs and literal text, and truncate after 1,000 characters with `...` only when longer. Presentation labels such as condition, shipping, and payment instructions are not added to the seller body.
+- Read `ReserveState` from the listing API. Omitted or null state is treated as no reserve; state `1` is reserve met, `2` is reserve not met and is skipped, and `3` is Buy Now. Unsupported numeric states fail the invocation.
+
+- API seller-body descriptions can differ from legacy HTML-derived descriptions. Fingerprints are not backfilled; an unchanged relist can therefore be judged and notified once after migration, then suppressed by its new fingerprint on later relists.
 - Carry judge configuration as a nullable nested `Judge` record (`prompt`, `model`, `reasoningEffort`, `criteria`) on each `SearchFactory.Search`, with one shared constant per judge in `SearchFactoryImpl`; criteria ride with the config because verdict validation is per-judge.
 - MTG judge: `gpt-5.4-mini` with reasoning effort `none` via the shared `lib/llm` client; use prompt v7 with eight train examples and the four current criteria.
 - Pokémon judge: `gpt-6-luna` with reasoning effort `none` via the shared `lib/llm` client. Prompt v7 retains five selected train examples as one self-contained file. Its bulk-scale criterion fails stated whole-lot totals below 500 cards, including exact, approximate, and lower-bound counts such as “200+”; a “bulk” label does not override that total. A stated total of at least 500 passes the count check, while uncounted bulk lots and collection clear-outs pass by default unless the sparse-bundle rule applies. Counts for a subset of a larger uncounted pile or for shipping do not establish the lot total. Its fixed-collection criterion fails consumer bundle formats that promise a count, mix, or rarity (including per-bundle “no duplicates” or “guaranteed EX”) without identifying the exact physical pile; an exact photographed pile passes even when it has no duplicates or includes an EX. The judge applies seven independent criteria: Pokémon cards, bulk scale, accepted English/Japanese language, not primarily Basic Energy, not primarily the current Mega Evolution era, acceptable condition, and one fixed collection. The current-era exclusion is Mega Evolution, Phantasmal Flames, Ascended Heroes, Perfect Order, Chaos Rising, Pitch Black, and non-30th Mega Evolution promos; 30th-anniversary cards, including 30th Celebration and 30th Classic Collection, are explicit exceptions. Old XY-era Mega EX and XY Evolutions are not excluded.
@@ -152,7 +157,7 @@ sequenceDiagram
 - **Excluded seller username**: a normalized Trade Me member nickname in the injected global exclusion set; matching listings are discarded before any storage lookup, LLM call, or persistence.
 - **URL duplicate**: an item where the same search URL and listing URL already exists in `gsi1`.
 - **Content fingerprint**: a deterministic SHA-256 identity derived from the exact scraped listing title, description, normalized original start price, and normalized Buy Now price, persisted as `fingerprint`, and used to derive `gsi2pk`.
-- **Seller-set price terms**: the original auction start price and optional Buy Now price embedded in Trade Me's server-rendered page state; current bids are excluded.
+- **Seller-set price terms**: the original auction start price and optional Buy Now price returned by the Trade Me listing API; current bids are excluded.
 - **Relisted item**: a listing with a new URL whose price-aware content fingerprint matches a record retained in `gsi2`.
 - **Judged search**: a search definition with a judge configuration (currently all seventeen searches: seven MTG sharing `prompts/mtg-bulk-judge.md`, seven Pokémon sharing `prompts/pokemon-bulk-judge.md`, and three RAM sharing `prompts/ram-judge.md`).
 - **Judgment**: the LLM verdict for a listing, `pass` or `fail`; overall pass requires all configured criteria to pass. MTG uses `mtg_cards`, `bulk_scale`, `not_basic_lands`, and `fixed_collection`; Pokémon uses `pokemon_cards`, `bulk_scale`, `accepted_language`, `not_basic_energy`, `not_mega_evolution_era`, `acceptable_condition`, and `fixed_collection`; RAM uses `trident_z_family`, `ddr4`, `kit_2x16gb`, `speed_3200`, `timings_cl16`, and `desktop_udimm`. MTG set origin and crossover branding, including Universes Within and Universes Beyond, do not affect eligibility. Pokémon border color is ignored; a stated whole-lot total below 500 fails bulk scale, while uncounted lots, ambiguous language, era share, and condition default to pass unless positive text proves failure (subject to the sparse-bundle rule).
@@ -165,7 +170,7 @@ sequenceDiagram
 
 ### External systems
 
-- **Trade Me website**: outbound `GET` requests to search and listing pages derived from configured searches. The base origin defaults to `https://www.trademe.co.nz` and can be overridden with `AUCTION_TRACKER_TRADEME_BASE_URL` (used in E2E tests). Requests include browser-like headers/cookies and a 30-second timeout. Individual item-page fetch failures are logged and skipped; missing or malformed required title, description, seller username, or seller-price data and unrecoverable search errors fail the invocation. Seller usernames are read from `item.member.nickname`.
+- **Trade Me API**: outbound `GET /v1/search/general.json` and `GET /v1/listings/{listing_id}.json` requests. The API origin defaults to `https://api.trademe.co.nz` and can be overridden with `AUCTION_TRACKER_TRADEME_API_BASE_URL`; the website origin defaults to `https://www.trademe.co.nz` and is configured separately with `AUCTION_TRACKER_TRADEME_BASE_URL`. Requests use JSON Accept, a website Referer, an ordinary user agent, a 10-second connect timeout, a 30-second request timeout, normal redirects, and standard TLS verification. HTTP, transport, malformed JSON, API error, schema, and required-field failures fail the invocation. A valid empty search is logged as zero discovered results.
 - **Amazon DynamoDB**: outbound reads/writes against table `auction_tracker`. Update flow performs per-search URL checks, global content-fingerprint checks, and inserts; digest flow queries per-search partitions for recent items.
 - **Amazon SNS**: outbound publish to topic `auction_tracker_api_digest` when at least one new item exists in the digest window. Topic ARN is resolved by listing topics and matching by topic-name suffix.
 - **Amazon SQS**: FIFO queue `auction_tracker_jobs.fifo` receives one message per configured search every hour and one digest message at 8:55pm. Content-based deduplication is enabled, all messages use group `auction-tracker`, retention is 14 days, and the worker event source uses batch size one. Failed messages are retried and routed after five receives to FIFO DLQ `auction_tracker_jobs_dlq.fifo`, which also retains messages for 14 days.
@@ -299,8 +304,8 @@ Representative record:
 - SNS publication errors fail the digest invocation; the message is not acknowledged and a later retry can publish the same digest again after an ambiguous post-publication failure.
 - Digest output deduplicates fingerprinted records by the standalone `fingerprint` attribute across all configured searches and falls back to listing URL for legacy records.
 - Listing URLs are canonicalized by stripping query parameters before persistence and digesting.
-- Listings marked `Reserve not met` are filtered out and never persisted.
-- An individual item-page network fetch failure is logged and skipped. Missing or malformed title, description, seller username, embedded page state, original start price, or Buy Now price fails the invocation.
+- API listings marked reserve not met (`ReserveState` 2) are filtered out and never persisted. Omitted or null reserve state is treated as no reserve; states 1 and 3 are accepted, and unsupported numeric states fail the invocation.
+- API transport, HTTP, JSON, API error, and required-field failures fail the job so SQS retries it. A valid zero-result API response remains successful. HTML/JavaScript shells and inconsistent result metadata never produce a successful empty search.
 - Search-result pagination beyond the first page is not processed; the search processor logs a warning when pagination is detected.
 - `sk` includes zero-padded epoch seconds, preserving deterministic lexicographic time ordering.
 - TTL is always computed as `timestamp + 30 days`.
@@ -311,7 +316,7 @@ Representative record:
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
 | Search definitions         | `SearchFactoryImpl` in service code                                                                                                           | current definitions are static and code-controlled                                                                  |
 | Excluded seller usernames  | `ExcludedSellerUsernameFactoryImpl` in service code                                                                                           | global normalized set, initially `roseshade`; injected behind `ExcludedSellerUsernameFactory`                       |
-| Listing content snapshot   | Trade Me listing pages at scrape time                                                                                                         | title/url/fingerprint are persisted; description, seller username, and seller-set prices are transient              |
+| Listing content snapshot   | Trade Me listing API at scrape time                                                                                                           | title/url/fingerprint are persisted; description, seller username, and seller-set prices are transient              |
 | Judge prompts              | `src/main/resources/prompts/mtg-bulk-judge.md`, `src/main/resources/prompts/pokemon-bulk-judge.md`, `src/main/resources/prompts/ram-judge.md` | frozen system prompts validated by the eval harnesses in `evals/mtg_bulk/`, `evals/pokemon_bulk/`, and `evals/ram/` |
 | Judge model and effort     | `Judge` constants in `SearchFactoryImpl`                                                                                                      | MTG `gpt-5.4-mini`/`none`, Pokémon `gpt-6-luna`/`none`, RAM `gpt-6-luna`/`low`                                      |
 | Persisted discovered items | DynamoDB `auction_tracker` table                                                                                                              | canonical history used for duplicate checks, verdicts, and digests                                                  |
@@ -355,11 +360,11 @@ Secrets Manager secret `auction_tracker_api` (value set manually after Terraform
 - Seventeen search schedules run hourly; the digest schedule runs daily at 8:55pm in `Pacific/Auckland`, including across daylight-saving transitions.
 - The worker Lambda uses `memory_size = 1024` MB and a `120` second timeout. The FIFO queue visibility timeout is `720` seconds (six times the Lambda timeout), leaving room for Lambda retries while bounding how long an unacknowledged message stays hidden.
 - The event-source mapping uses batch size one and one constant message group, so upstream Trade Me/OpenAI load is serialized even if Lambda capacity increases.
-- Jsoup HTTP requests use a `30` second timeout per request.
+- Trade Me API requests use a `10` second connect timeout and a `30` second request timeout.
 - Each search-result URL performs one per-search `gsi1` query before its listing page is fetched; a new URL also performs one global `gsi2` query before any optional LLM call.
 - Excluded sellers are rejected after the URL duplicate check and before fingerprint queries or LLM calls.
 - Steady-state runs judge only newly discovered listings. The eval harness records input and output token counts for each prompt and reports cost when pricing flags are supplied. The selected MTG v7, Pokémon v7, and RAM v4 prompt runs did not include pricing flags, so their run records do not contain a current cost estimate.
-- Per-item network fetch failures are non-fatal for a run (warn and continue), while required-field parsing failures, processor-level failures, and judge errors bubble as invocation errors.
+- Trade Me API failures bubble as invocation errors and enter SQS retry/DLQ handling. Worker logs report eligible, seller-excluded, fingerprint-suppressed, and stored item counts.
 
 ## Testing and quality gates
 
@@ -371,7 +376,7 @@ The selected self-contained prompts were evaluated with three trials per listing
 | Pokémon v7       | `4b4f1028584d`        | 100%/100%             | 100%/100%            | All seven criteria scored 100%/100% on both splits                              |
 | RAM v4           | `c67aa5a5d552`        | 100%/100% in two runs | 100%/100%            | `desktop_udimm` scored 100%/95% on dev; all test criteria scored 100%/100%      |
 
-- Unit tests (`JsoupTradeMeClientTest`, `Sha256ListingFingerprinterTest`) cover URL generation, listing parsing, query-parameter stripping, reserve filtering, required seller-username extraction, fail-closed seller and price parsing, current-bid exclusion, decimal normalization, and exact content-and-price fingerprint semantics.
+- Unit tests (`HttpTradeMeClientTest`, `Sha256ListingFingerprinterTest`) cover API queries and headers, stable website search identity, canonical URL normalization, empty responses, HTML-shell and API errors, inconsistent metadata, required seller data, paragraph normalization, reserve captures, optional Buy Now, current-bid exclusion, duplicate checks before detail fetches, and exact content-and-price fingerprint semantics. The retained `JsoupTradeMeClientTest` covers the unused legacy client.
 - Unit tests (`ExcludedSellerUsernameFactoryImplTest`) lock down the production exclusion set.
 - Unit tests (`LlmListingJudgeTest`) cover verdict parsing, criterion failure, malformed responses, and the exact LLM request shape (per-judge model, effort, and criteria) against both real checked-in prompt resources.
 - Unit tests (`SearchFactoryImplTest`) cover all seventeen search definitions, stable IDs, their filters, and judge config wiring, including the seven Pokémon terms and category path.
@@ -403,9 +408,9 @@ Inspect the failed message in `auction_tracker_jobs_dlq.fifo` and the correspond
 
 1. EventBridge Scheduler enqueues one `update_search` message for each stable search ID every hour.
 2. The FIFO event source invokes `JobsHandler` with one message; it delegates the stable ID to `UpdateSearchJobProcessor`, which resolves it from `SearchFactoryImpl`, loads excluded seller usernames, and scrapes only that search.
-3. For each canonical listing URL in the search results, the search processor checks `gsi1` for an existing `(search_url, item_url)` record and fetches only new listing pages.
+3. For each canonical listing URL in the search API response, the search processor checks `gsi1` for an existing `(search_url, item_url)` record and fetches details only for new listings.
 4. For each fetched listing, the search processor skips a case-insensitive seller username match before fingerprinting, judging, or persistence.
-5. For a new URL, the search processor reads the original start and Buy Now prices from the embedded page state, computes the price-aware content fingerprint, and checks global `gsi2`.
+5. For a new URL, the search processor reads seller details and original start and Buy Now prices from the listing API, computes the price-aware content fingerprint, and checks global `gsi2`.
 6. The search processor writes only new URLs and fingerprints to DynamoDB with timestamp, TTL, and prefixed primary/GSI keys.
 
 ### Scenario 2: new listing on a judged search is judged before persistence

@@ -60,6 +60,9 @@ public class UpdateSearchJobProcessor {
             itemUrl -> !itemExists(searchUrl, itemUrl));
 
     var currentTime = clock.now();
+    var excludedSellerCount = 0;
+    var fingerprintSuppressedCount = 0;
+    var storedCount = 0;
 
     for (var tradeMeItem : tradeMeItems) {
       if (excludedSellerUsernames.contains(
@@ -68,11 +71,13 @@ public class UpdateSearchJobProcessor {
             "Skipping listing from excluded seller {}: {}",
             tradeMeItem.sellerUsername(),
             tradeMeItem.url());
+        excludedSellerCount++;
         continue;
       }
 
       var contentFingerprint = listingFingerprinter.create(tradeMeItem);
       if (contentFingerprintExists(contentFingerprint)) {
+        fingerprintSuppressedCount++;
         continue;
       }
 
@@ -92,7 +97,16 @@ public class UpdateSearchJobProcessor {
               currentTime,
               judgment);
       auctionTrackerTable.putItem(auctionTrackerItem);
+      storedCount++;
     }
+    LOGGER.info(
+        "Completed search {}: eligible_items={}, seller_excluded={},"
+            + " fingerprint_suppressed={}, stored={}",
+        searchId,
+        tradeMeItems.size(),
+        excludedSellerCount,
+        fingerprintSuppressedCount,
+        storedCount);
   }
 
   private boolean itemExists(String searchUrl, String itemUrl) {
