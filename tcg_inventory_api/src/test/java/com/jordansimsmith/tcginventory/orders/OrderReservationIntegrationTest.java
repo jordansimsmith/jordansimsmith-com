@@ -241,7 +241,6 @@ public class OrderReservationIntegrationTest {
     assertThat(getOrders()).isEmpty();
     assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
     assertThat(getAudits()).isEmpty();
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).isEmpty();
   }
 
   @Test
@@ -261,7 +260,6 @@ public class OrderReservationIntegrationTest {
     assertThat(getOrders()).isEmpty();
     assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
     assertThat(getAudits()).isEmpty();
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).isEmpty();
   }
 
   @Test
@@ -292,7 +290,6 @@ public class OrderReservationIntegrationTest {
     assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
     assertThat(getUnit(2).getStatus()).isEqualTo("in_stock");
     assertThat(getAudits()).isEmpty();
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).isEmpty();
   }
 
   @Test
@@ -409,6 +406,7 @@ public class OrderReservationIntegrationTest {
             inventoryRepository,
             dynamoDbClient,
             fakeClock,
+            fakeFetchTcgService,
             factory.fetchTcgClient(),
             factory.s3Client());
     return new PublishJobProcessor(

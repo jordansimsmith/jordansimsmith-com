@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.secrets.Secrets;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.tcginventory.fetchtcg.client.DeleteListingRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.DeleteListingResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsResponse;
@@ -15,6 +17,8 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.UpdateCredentialsRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.UpdateCredentialsResponse;
+import com.jordansimsmith.tcginventory.fetchtcg.client.UpdateListingRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.UpdateListingResponse;
 import com.jordansimsmith.time.Clock;
 import dagger.Module;
 import dagger.Provides;
@@ -59,6 +63,8 @@ public class FetchTcgModule {
     var getCardService = new GetCardService(fetchTcgClient);
     var findCardListingsService = new FindCardListingsService(fetchTcgClient);
     var findOffersService = new FindOffersService(tokenProvider, fetchTcgClient);
+    var updateListingService = new UpdateListingService(tokenProvider, fetchTcgClient);
+    var deleteListingService = new DeleteListingService(tokenProvider, fetchTcgClient);
     var updateCredentialsService =
         new UpdateCredentialsService(
             accountRepository, tokenExchange, fetchTcgClient, credentialStore, clock);
@@ -92,6 +98,18 @@ public class FetchTcgModule {
       public FindOffersResponse findOffers(RequestContext ctx, FindOffersRequest request)
           throws ServiceException {
         return findOffersService.findOffers(ctx, request);
+      }
+
+      @Override
+      public UpdateListingResponse updateListing(RequestContext ctx, UpdateListingRequest request)
+          throws ServiceException {
+        return updateListingService.updateListing(ctx, request);
+      }
+
+      @Override
+      public DeleteListingResponse deleteListing(RequestContext ctx, DeleteListingRequest request)
+          throws ServiceException {
+        return deleteListingService.deleteListing(ctx, request);
       }
     };
   }

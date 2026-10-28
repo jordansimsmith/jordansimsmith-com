@@ -10,10 +10,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.MockitoAnnotations.openMocks;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.IOException;
-import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -305,112 +303,6 @@ public class HttpFetchTcgClientTest {
   }
 
   @Test
-  void upsertListingShouldPostWithCorrectBody() throws IOException, InterruptedException {
-    // arrange
-    var response = createMockResponse(200, "{\"listingId\": 992552, \"remainingQuantity\": 2}");
-    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
-        .thenReturn(response);
-
-    var request =
-        new FetchTcgClient.UpsertListingRequest(
-            "mtg_218_c_kld_normal", "raw-nm", 2, new BigDecimal("1.50"), null, null);
-
-    // act
-    var result = client.upsertListing("my-token", request);
-
-    // assert
-    assertThat(result.listingId()).isEqualTo(992552);
-    assertThat(result.remainingQuantity()).isEqualTo(2);
-
-    var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
-    verify(httpClient).send(requestCaptor.capture(), eq(HttpResponse.BodyHandlers.ofString()));
-    assertThat(requestCaptor.getValue().uri())
-        .isEqualTo(URI.create("https://api.fetchtcg.com/v2/private/manage-listings"));
-    assertThat(requestCaptor.getValue().headers().firstValue("Authorization"))
-        .contains("Bearer my-token");
-    assertThat(requestCaptor.getValue().method()).isEqualTo("POST");
-
-    var body = objectMapper.readTree(requestBodyString(requestCaptor.getValue()));
-    assertThat(body.get("cardId").asText()).isEqualTo("mtg_218_c_kld_normal");
-    assertThat(body.get("condition").asText()).isEqualTo("raw-nm");
-    assertThat(body.get("listedPrice").decimalValue()).isEqualByComparingTo("1.50");
-    assertThat(body.get("listedCurrency").asText()).isEqualTo("NZD");
-    assertThat(body.get("matchPriceEnabled").asBoolean()).isFalse();
-    assertThat(body.get("quantity").asInt()).isEqualTo(2);
-    assertThat(body.get("details").asText()).isEmpty();
-    assertThat(body.has("frontImage")).isFalse();
-    assertThat(body.has("additionalImages")).isFalse();
-  }
-
-  @Test
-  void upsertListingShouldOmitImageFieldsWhenNull() throws IOException, InterruptedException {
-    // arrange
-    var response = createMockResponse(200, "{\"listingId\": 1, \"remainingQuantity\": 1}");
-    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
-        .thenReturn(response);
-    var request =
-        new FetchTcgClient.UpsertListingRequest(
-            "mtg_218_c_kld_normal", "raw-nm", 1, new BigDecimal("1.50"), null, null);
-
-    // act
-    client.upsertListing("my-token", request);
-
-    // assert
-    var body = capturedJsonBody();
-    assertThat(body.has("frontImage")).isFalse();
-    assertThat(body.has("additionalImages")).isFalse();
-  }
-
-  @Test
-  void upsertListingShouldSendEmptyAdditionalImagesAsEmptyArray()
-      throws IOException, InterruptedException {
-    // arrange
-    var response = createMockResponse(200, "{\"listingId\": 1, \"remainingQuantity\": 1}");
-    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
-        .thenReturn(response);
-    var request =
-        new FetchTcgClient.UpsertListingRequest(
-            "mtg_218_c_kld_normal", "raw-nm", 1, new BigDecimal("1.50"), null, List.of());
-
-    // act
-    client.upsertListing("my-token", request);
-
-    // assert
-    var body = capturedJsonBody();
-    assertThat(body.has("frontImage")).isFalse();
-    assertThat(body.has("additionalImages")).isTrue();
-    assertThat(body.get("additionalImages").isArray()).isTrue();
-    assertThat(body.get("additionalImages")).isEmpty();
-  }
-
-  @Test
-  void upsertListingShouldSerializeAdditionalImagesAsLabeledObjects()
-      throws IOException, InterruptedException {
-    // arrange
-    var response = createMockResponse(200, "{\"listingId\": 1, \"remainingQuantity\": 1}");
-    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
-        .thenReturn(response);
-    var front = "https://listing-img.fetchtcg.com/acct/listing/front.jpg";
-    var extra = "https://listing-img.fetchtcg.com/acct/listing/extra.jpg";
-    var request =
-        new FetchTcgClient.UpsertListingRequest(
-            "mtg_218_c_kld_normal", "raw-nm", 1, new BigDecimal("1.50"), front, List.of(extra));
-
-    // act
-    client.upsertListing("my-token", request);
-
-    // assert
-    var body = capturedJsonBody();
-    assertThat(body.get("frontImage").asText()).isEqualTo(front);
-    assertThat(body.get("additionalImages")).hasSize(1);
-    var image = body.get("additionalImages").get(0);
-    assertThat(image.isObject()).isTrue();
-    assertThat(image.get("label").isNull()).isTrue();
-    assertThat(image.get("url").asText()).isEqualTo(extra);
-    assertThat(image.get("url").isTextual()).isTrue();
-  }
-
-  @Test
   void uploadListingImageShouldPostMultipartFileAndReturnImageUrl()
       throws IOException, InterruptedException {
     // arrange
@@ -451,58 +343,12 @@ public class HttpFetchTcgClientTest {
     assertThat(bodyText).endsWith("--" + boundary + "--\r\n");
   }
 
-  @Test
-  void deleteListingShouldSendDeleteRequest() throws IOException, InterruptedException {
-    // arrange
-    var response = createMockResponse(200, "");
-    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
-        .thenReturn(response);
-
-    // act
-    client.deleteListing("my-token", 975737);
-
-    // assert
-    var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
-    verify(httpClient).send(requestCaptor.capture(), eq(HttpResponse.BodyHandlers.ofString()));
-    assertThat(requestCaptor.getValue().uri())
-        .isEqualTo(URI.create("https://api.fetchtcg.com/v1/manage-listings/975737"));
-    assertThat(requestCaptor.getValue().headers().firstValue("Authorization"))
-        .contains("Bearer my-token");
-    assertThat(requestCaptor.getValue().method()).isEqualTo("DELETE");
-  }
-
-  @Test
-  void deleteListingShouldSucceedWhenListingNotFound() throws IOException, InterruptedException {
-    // arrange
-    var response = createMockResponse(404, "");
-    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
-        .thenReturn(response);
-
-    // act
-    client.deleteListing("my-token", 975737);
-
-    // assert
-    verify(httpClient, times(1))
-        .send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString()));
-    assertThat(pacerCallCount.get()).isEqualTo(1);
-  }
-
   @SuppressWarnings("unchecked")
   private HttpResponse<String> createMockResponse(int statusCode, String body) {
     HttpResponse<String> mockResponse = mock(HttpResponse.class);
     when(mockResponse.statusCode()).thenReturn(statusCode);
     when(mockResponse.body()).thenReturn(body);
     return mockResponse;
-  }
-
-  private JsonNode capturedJsonBody() throws IOException, InterruptedException {
-    var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
-    verify(httpClient).send(requestCaptor.capture(), eq(HttpResponse.BodyHandlers.ofString()));
-    return objectMapper.readTree(requestBodyString(requestCaptor.getValue()));
-  }
-
-  private String requestBodyString(HttpRequest request) {
-    return new String(requestBodyBytes(request), StandardCharsets.UTF_8);
   }
 
   private byte[] requestBodyBytes(HttpRequest request) {

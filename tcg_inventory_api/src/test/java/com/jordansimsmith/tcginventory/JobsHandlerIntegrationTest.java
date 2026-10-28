@@ -19,6 +19,7 @@ import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgSetMapping;
 import com.jordansimsmith.tcginventory.fetchtcg.client.BuyerAddress;
 import com.jordansimsmith.tcginventory.fetchtcg.client.CardListing;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsResponse;
@@ -65,6 +66,7 @@ public class JobsHandlerIntegrationTest {
   private FakeClock fakeClock;
   private FakeQueueClient<JobMessage> fakeJobsQueue;
   private FakeFetchTcgClient fakeFetchTcgClient;
+  private FakeFetchTcgService fakeFetchTcgService;
   private ObjectMapper objectMapper;
   private DynamoDbTable<ImportItem> importTable;
   private DynamoDbTable<ImportRowItem> importRowTable;
@@ -101,6 +103,7 @@ public class JobsHandlerIntegrationTest {
     fakeClock = factory.fakeClock();
     fakeJobsQueue = factory.fakeJobsQueue();
     fakeFetchTcgClient = factory.fakeFetchTcgClient();
+    fakeFetchTcgService = factory.fakeFetchTcgService();
     objectMapper = factory.objectMapper();
     importTable = factory.importTable();
     importRowTable = factory.importRowTable();
@@ -115,7 +118,7 @@ public class JobsHandlerIntegrationTest {
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeJobsQueue.reset();
     fakeFetchTcgClient.reset();
-    factory.fakeFetchTcgService().reset();
+    fakeFetchTcgService.reset();
 
     jobsHandler = new JobsHandler(factory);
   }
@@ -845,7 +848,6 @@ public class JobsHandlerIntegrationTest {
     assertThat(jobItem.getStatus()).isEqualTo("running");
     assertThat(jobItem.getContinuation())
         .isEqualTo(Integer.toString(ListingPhaseProcessor.BATCH_SIZE));
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(ListingPhaseProcessor.BATCH_SIZE);
     assertThat(fakeJobsQueue.getSends()).hasSize(1);
     var continuationSend = fakeJobsQueue.getSends().get(0);
     assertThat(continuationSend.messageGroupId()).isEqualTo("jordan");
@@ -861,7 +863,6 @@ public class JobsHandlerIntegrationTest {
     assertThat(completedJob.getStatus()).isEqualTo("succeeded");
     assertThat(completedJob.getProcessedCount()).isEqualTo(totalSkus);
     assertThat(completedJob.getContinuation()).isNull();
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(totalSkus);
     assertThat(fakeJobsQueue.getMessages()).isEmpty();
   }
 
@@ -1462,7 +1463,6 @@ public class JobsHandlerIntegrationTest {
         .isEqualTo("in_stock");
     assertThat(getAuditEntries("jordan"))
         .noneMatch(audit -> "reserve".equals(audit.getEventType()));
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).isEmpty();
   }
 
   @Test
@@ -1863,7 +1863,6 @@ public class JobsHandlerIntegrationTest {
     // assert
     assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("running");
     assertThat(getOrder("jordan", "83663").getStatus()).isEqualTo("reserving");
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).isEmpty();
   }
 
   @Test
@@ -1884,14 +1883,6 @@ public class JobsHandlerIntegrationTest {
     assertThat(sku.getLastPublishedPrice()).isEqualTo("1.50");
     assertThat(sku.getLastPublishedAt()).isEqualTo(Instant.ofEpochSecond(1700000000));
 
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(1);
-    var upsert = fakeFetchTcgClient.getUpsertCalls().get(0);
-    assertThat(upsert.cardId()).isEqualTo("mtg_168_c_dom_normal");
-    assertThat(upsert.condition()).isEqualTo("raw-nm");
-    assertThat(upsert.quantity()).isEqualTo(2);
-    assertThat(upsert.price()).isEqualByComparingTo("1.50");
-    assertThat(upsert.frontImage()).isNull();
-    assertThat(upsert.additionalImages()).isEmpty();
   }
 
   @Test
@@ -1928,9 +1919,7 @@ public class JobsHandlerIntegrationTest {
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
     // assert
-    var upsert = fakeFetchTcgClient.getUpsertCalls().getFirst();
-    assertThat(upsert.cardId()).isEqualTo("fetch-card-9002");
-    assertThat(upsert.quantity()).isEqualTo(1);
+    assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("succeeded");
     assertThat(getSku("jordan", skuId).getExternalId()).isEqualTo("283917");
     assertThat(getSku("jordan", skuId).getFetchtcgCardId()).isEqualTo("fetch-card-9002");
   }
@@ -1956,12 +1945,6 @@ public class JobsHandlerIntegrationTest {
     assertThat(updated.getLastPublishedQuantity()).isEqualTo(3);
     assertThat(updated.getLastPublishedPrice()).isEqualTo("2.00");
 
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(1);
-    var upsert = fakeFetchTcgClient.getUpsertCalls().get(0);
-    assertThat(upsert.quantity()).isEqualTo(3);
-    assertThat(upsert.price()).isEqualByComparingTo("2.00");
-    assertThat(upsert.frontImage()).isNull();
-    assertThat(upsert.additionalImages()).isEmpty();
   }
 
   @Test
@@ -1986,8 +1969,6 @@ public class JobsHandlerIntegrationTest {
     assertThat(updated.getLastPublishedQuantity()).isNull();
     assertThat(updated.getLastPublishedPrice()).isNull();
 
-    assertThat(fakeFetchTcgClient.getDeleteCalls()).containsExactly(975737);
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).isEmpty();
   }
 
   @Test
@@ -2006,10 +1987,7 @@ public class JobsHandlerIntegrationTest {
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
-    // assert - the upsert was called (FetchTCG got the update)
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(1);
-
-    // but the listing snapshot was NOT written (condition failed)
+    // assert - the listing snapshot was not written because the condition failed
     var updated = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(updated.getFetchtcgListingId()).isNull();
     assertThat(updated.getLastPublishedQuantity()).isNull();

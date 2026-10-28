@@ -33,7 +33,7 @@ public class PublishJobProcessor implements JobProcessor {
     } catch (FetchTcgAuthException e) {
       return new JobProcessor.FailureJobResult(FetchTcgAuthException.USER_MESSAGE);
     } catch (ServiceUnavailableException e) {
-      throw new RuntimeException("FetchTCG offers lookup failed", e);
+      throw new RuntimeException("FetchTCG request failed", e);
     } catch (ServiceException e) {
       return new JobProcessor.FailureJobResult(e.getMessage());
     } catch (OrderPhaseProcessor.ReservationPreflightException e) {

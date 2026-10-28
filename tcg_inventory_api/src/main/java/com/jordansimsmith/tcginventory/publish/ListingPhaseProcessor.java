@@ -1,10 +1,15 @@
 package com.jordansimsmith.tcginventory.publish;
 
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.JobProcessor;
 import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
+import com.jordansimsmith.tcginventory.fetchtcg.client.DeleteListingRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
+import com.jordansimsmith.tcginventory.fetchtcg.client.UpdateListingRequest;
 import com.jordansimsmith.tcginventory.games.Games;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
@@ -37,6 +42,7 @@ public class ListingPhaseProcessor {
   private final InventoryRepository inventoryRepository;
   private final DynamoDbClient dynamoDbClient;
   private final Clock clock;
+  private final FetchTcgService fetchTcgService;
   private final FetchTcgClient fetchTcgClient;
   private final S3Client s3Client;
 
@@ -45,17 +51,20 @@ public class ListingPhaseProcessor {
       InventoryRepository inventoryRepository,
       DynamoDbClient dynamoDbClient,
       Clock clock,
+      FetchTcgService fetchTcgService,
       FetchTcgClient fetchTcgClient,
       S3Client s3Client) {
     this.skuTable = skuTable;
     this.inventoryRepository = inventoryRepository;
     this.dynamoDbClient = dynamoDbClient;
     this.clock = clock;
+    this.fetchTcgService = fetchTcgService;
     this.fetchTcgClient = fetchTcgClient;
     this.s3Client = s3Client;
   }
 
-  public JobProcessor.SuccessJobResult process(String user, String bearerToken, int continuation) {
+  public JobProcessor.SuccessJobResult process(String user, String bearerToken, int continuation)
+      throws ServiceException {
     var dirtySkus = loadDirtySkus(user);
     int processed = 0;
 
@@ -68,7 +77,7 @@ public class ListingPhaseProcessor {
       if (inStock.count() > 0) {
         publishSku(user, bearerToken, sku, inStock, capturedVersion);
       } else if (sku.getFetchtcgListingId() != null) {
-        delistSku(user, bearerToken, sku, capturedVersion);
+        delistSku(user, sku, capturedVersion);
       } else {
         clearDirty(user, skuId, capturedVersion);
       }
@@ -114,7 +123,8 @@ public class ListingPhaseProcessor {
   }
 
   private void publishSku(
-      String user, String bearerToken, SkuItem sku, InStock inStock, int capturedVersion) {
+      String user, String bearerToken, SkuItem sku, InStock inStock, int capturedVersion)
+      throws ServiceException {
     var photos =
         inStock.first().getPhotos() == null
             ? new ArrayList<UnitItem.Photo>()
@@ -161,8 +171,8 @@ public class ListingPhaseProcessor {
     var frontImage = imageUrls.isEmpty() ? null : imageUrls.get(0);
     List<String> additionalImages =
         imageUrls.size() <= 1 ? List.of() : imageUrls.subList(1, imageUrls.size());
-    var upsertRequest =
-        new FetchTcgClient.UpsertListingRequest(
+    var updateRequest =
+        new UpdateListingRequest(
             sku.getFetchtcgCardId(),
             condition,
             inStock.count(),
@@ -170,7 +180,7 @@ public class ListingPhaseProcessor {
             frontImage,
             additionalImages);
 
-    var response = fetchTcgClient.upsertListing(bearerToken, upsertRequest);
+    var response = fetchTcgService.updateListing(new RequestContext(user), updateRequest);
 
     clearDirtyWithSnapshot(
         user,
@@ -198,8 +208,9 @@ public class ListingPhaseProcessor {
     return AttributeValue.builder().l(photoValues).build();
   }
 
-  private void delistSku(String user, String bearerToken, SkuItem sku, int capturedVersion) {
-    fetchTcgClient.deleteListing(bearerToken, sku.getFetchtcgListingId());
+  private void delistSku(String user, SkuItem sku, int capturedVersion) throws ServiceException {
+    fetchTcgService.deleteListing(
+        new RequestContext(user), new DeleteListingRequest(sku.getFetchtcgListingId()));
     clearDirtyRemoveSnapshot(user, sku.getSkuId(), capturedVersion);
   }
 

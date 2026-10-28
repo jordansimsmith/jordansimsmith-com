@@ -100,6 +100,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             inventoryRepository,
             publishDynamoDbClient,
             publishClock,
+            factory.fetchTcgService(),
             factory.fetchTcgClient(),
             factory.s3Client());
     this.publishJobProcessor =

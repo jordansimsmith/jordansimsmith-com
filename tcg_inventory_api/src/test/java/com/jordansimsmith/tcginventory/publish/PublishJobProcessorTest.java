@@ -50,7 +50,7 @@ public class PublishJobProcessorTest {
 
     assertThatThrownBy(() -> processor.processBatch(USER, jobItem(null)))
         .isInstanceOf(RuntimeException.class)
-        .hasMessage("FetchTCG offers lookup failed")
+        .hasMessage("FetchTCG request failed")
         .hasCause(serviceFailure);
     verifyNoInteractions(tokenMinter, listingPhaseProcessor);
   }

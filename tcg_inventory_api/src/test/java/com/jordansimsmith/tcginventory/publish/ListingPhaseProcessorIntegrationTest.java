@@ -17,7 +17,6 @@ import com.jordansimsmith.tcginventory.JobsHandler;
 import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.time.FakeClock;
@@ -84,6 +83,7 @@ public class ListingPhaseProcessorIntegrationTest {
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeFetchTcgClient.reset();
+    factory.fakeFetchTcgService().reset();
 
     jobsHandler = new JobsHandler(factory);
 
@@ -127,11 +127,6 @@ public class ListingPhaseProcessorIntegrationTest {
 
     var frontUrl = "https://listing-img.fetchtcg.com/fake/listing/1.jpg";
     var backUrl = "https://listing-img.fetchtcg.com/fake/listing/2.jpg";
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(1);
-    var upsert = fakeFetchTcgClient.getUpsertCalls().get(0);
-    assertThat(upsert.frontImage()).isEqualTo(frontUrl);
-    assertThat(upsert.additionalImages()).containsExactly(backUrl);
-
     var unit = getUnit("jordan", SKU_ID, 1);
     assertThat(unit.getPhotos().get(0).getFetchtcgUrl()).isEqualTo(frontUrl);
     assertThat(unit.getPhotos().get(1).getFetchtcgUrl()).isEqualTo(backUrl);
@@ -159,12 +154,11 @@ public class ListingPhaseProcessorIntegrationTest {
 
     // assert
     assertThat(fakeFetchTcgClient.getUploadCalls()).hasSize(2);
-    var upsert = fakeFetchTcgClient.getUpsertCalls().get(0);
-    assertThat(upsert.frontImage())
+    var unit = getUnit("jordan", SKU_ID, 1);
+    assertThat(unit.getPhotos().get(0).getFetchtcgUrl())
         .isEqualTo("https://listing-img.fetchtcg.com/fake/listing/1.jpg");
-    assertThat(upsert.additionalImages())
-        .containsExactly("https://listing-img.fetchtcg.com/fake/listing/2.jpg");
-    assertThat(upsert.quantity()).isEqualTo(1);
+    assertThat(unit.getPhotos().get(1).getFetchtcgUrl())
+        .isEqualTo("https://listing-img.fetchtcg.com/fake/listing/2.jpg");
   }
 
   @Test
@@ -181,17 +175,17 @@ public class ListingPhaseProcessorIntegrationTest {
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    var firstUnit = getUnit("jordan", SKU_ID, 1);
+    var firstUrls =
+        List.of(
+            firstUnit.getPhotos().get(0).getFetchtcgUrl(),
+            firstUnit.getPhotos().get(1).getFetchtcgUrl());
     redirtySku("jordan", SKU_ID);
     createPublishJob("jordan", "job2");
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job2", "publish"), null);
 
     // assert
     assertThat(fakeFetchTcgClient.getUploadCalls()).hasSize(2);
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(2);
-    var firstUrls = imageUrls(fakeFetchTcgClient.getUpsertCalls().get(0));
-    var secondUrls = imageUrls(fakeFetchTcgClient.getUpsertCalls().get(1));
-    assertThat(secondUrls).isEqualTo(firstUrls);
-
     var unit = getUnit("jordan", SKU_ID, 1);
     assertThat(unit.getPhotos().get(0).getFetchtcgUrl()).isEqualTo(firstUrls.get(0));
     assertThat(unit.getPhotos().get(1).getFetchtcgUrl()).isEqualTo(firstUrls.get(1));
@@ -209,10 +203,7 @@ public class ListingPhaseProcessorIntegrationTest {
 
     // assert
     assertThat(fakeFetchTcgClient.getUploadCalls()).isEmpty();
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(1);
-    var upsert = fakeFetchTcgClient.getUpsertCalls().get(0);
-    assertThat(upsert.frontImage()).isNull();
-    assertThat(upsert.additionalImages()).isEmpty();
+    assertThat(getSku("jordan", SKU_ID).getDirty()).isFalse();
   }
 
   @Test
@@ -226,7 +217,6 @@ public class ListingPhaseProcessorIntegrationTest {
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
     // assert
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(1);
     assertThat(warnMessages())
         .anySatisfy(message -> assertThat(message).contains(SKU_ID).contains("50"));
   }
@@ -242,7 +232,6 @@ public class ListingPhaseProcessorIntegrationTest {
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
     // assert
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(1);
     assertThat(warnMessages())
         .anySatisfy(message -> assertThat(message).contains(SKU_ID).contains("50.01"));
   }
@@ -258,7 +247,6 @@ public class ListingPhaseProcessorIntegrationTest {
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
     // assert
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(1);
     assertThat(warnMessages()).isEmpty();
   }
 
@@ -273,7 +261,6 @@ public class ListingPhaseProcessorIntegrationTest {
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
     // assert
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(1);
     assertThat(warnMessages()).isEmpty();
   }
 
@@ -293,12 +280,6 @@ public class ListingPhaseProcessorIntegrationTest {
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
-    var firstUpsert = fakeFetchTcgClient.getUpsertCalls().get(0);
-    assertThat(firstUpsert.frontImage())
-        .isEqualTo("https://listing-img.fetchtcg.com/fake/listing/1.jpg");
-    assertThat(firstUpsert.additionalImages())
-        .containsExactly("https://listing-img.fetchtcg.com/fake/listing/2.jpg");
-
     var sold = getUnit("jordan", SKU_ID, 1);
     sold.setStatus("sold");
     unitTable.putItem(sold);
@@ -308,12 +289,6 @@ public class ListingPhaseProcessorIntegrationTest {
 
     // assert
     assertThat(fakeFetchTcgClient.getUploadCalls()).hasSize(3);
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).hasSize(2);
-    var secondUpsert = fakeFetchTcgClient.getUpsertCalls().get(1);
-    assertThat(secondUpsert.frontImage())
-        .isEqualTo("https://listing-img.fetchtcg.com/fake/listing/3.jpg");
-    assertThat(secondUpsert.additionalImages()).isEmpty();
-
     var unitOne = getUnit("jordan", SKU_ID, 1);
     assertThat(unitOne.getPhotos().get(0).getFetchtcgUrl())
         .isEqualTo("https://listing-img.fetchtcg.com/fake/listing/1.jpg");
@@ -420,13 +395,6 @@ public class ListingPhaseProcessorIntegrationTest {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
-  }
-
-  private static List<String> imageUrls(FetchTcgClient.UpsertListingRequest upsert) {
-    var urls = new ArrayList<String>();
-    urls.add(upsert.frontImage());
-    urls.addAll(upsert.additionalImages());
-    return urls;
   }
 
   private List<String> warnMessages() {

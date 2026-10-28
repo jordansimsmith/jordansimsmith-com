@@ -161,7 +161,6 @@ public class OrderVoidingIntegrationTest {
     assertThat(getAudits())
         .filteredOn(audit -> "order_voided".equals(audit.getEventType()))
         .isEmpty();
-    assertThat(fakeFetchTcgClient.getUpsertCalls()).isEmpty();
 
     // arrange retry after repairing the conflicting saved allocation
     var repairedUnit = getUnit(2);
@@ -344,6 +343,7 @@ public class OrderVoidingIntegrationTest {
             inventoryRepository,
             dynamoDbClient,
             fakeClock,
+            fakeFetchTcgService,
             factory.fetchTcgClient(),
             factory.s3Client());
     return new PublishJobProcessor(

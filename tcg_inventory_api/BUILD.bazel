@@ -229,6 +229,8 @@ java_library(
         ":lib",
         ":order-lib",
         ":settings-lib",
+        "//lib/service",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
     ] + COMMON_DEPS,
 )
 

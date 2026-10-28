@@ -17,4 +17,10 @@ public interface FetchTcgService {
 
   FindOffersResponse findOffers(RequestContext ctx, FindOffersRequest request)
       throws ServiceException;
+
+  UpdateListingResponse updateListing(RequestContext ctx, UpdateListingRequest request)
+      throws ServiceException;
+
+  DeleteListingResponse deleteListing(RequestContext ctx, DeleteListingRequest request)
+      throws ServiceException;
 }

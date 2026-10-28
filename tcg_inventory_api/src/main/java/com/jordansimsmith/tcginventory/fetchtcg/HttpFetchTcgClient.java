@@ -10,15 +10,10 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.UUID;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 public class HttpFetchTcgClient implements FetchTcgClient {
-  private static final Logger LOGGER = LoggerFactory.getLogger(HttpFetchTcgClient.class);
-
   static final String USER_AGENT =
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
           + " (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
@@ -56,38 +51,6 @@ public class HttpFetchTcgClient implements FetchTcgClient {
       String fetchTcgGameId, int setId, String cardName, String finish) {
     try {
       return doSearchCards(fetchTcgGameId, setId, cardName, finish);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new RuntimeException(e);
-    } catch (FetchTcgAuthException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  @Override
-  public UpsertListingResponse upsertListing(String bearerToken, UpsertListingRequest request) {
-    try {
-      return doUpsertListing(bearerToken, request);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new RuntimeException(e);
-    } catch (FetchTcgAuthException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  @Override
-  public void deleteListing(String bearerToken, int listingId) {
-    try {
-      doDeleteListing(bearerToken, listingId);
-    } catch (FetchTcgNotFoundException e) {
-      // the listing is already gone on fetchtcg (for example its last copy
-      // sold through an untracked offer), so the delete converged
-      LOGGER.info("listing {} not found on FetchTCG, treating as already deleted", listingId);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
@@ -154,41 +117,6 @@ public class HttpFetchTcgClient implements FetchTcgClient {
     return new SearchCardsResponse(content);
   }
 
-  private UpsertListingResponse doUpsertListing(String bearerToken, UpsertListingRequest req)
-      throws IOException, InterruptedException {
-    var payload = new LinkedHashMap<String, Object>();
-    payload.put("cardId", req.cardId());
-    payload.put("condition", req.condition());
-    payload.put("listedPrice", req.price());
-    payload.put("listedCurrency", "NZD");
-    payload.put("matchPriceEnabled", false);
-    payload.put("quantity", req.quantity());
-    payload.put("details", "");
-    if (req.frontImage() != null) {
-      payload.put("frontImage", req.frontImage());
-    }
-    if (req.additionalImages() != null) {
-      payload.put(
-          "additionalImages",
-          req.additionalImages().stream().map(url -> new AdditionalImage(null, url)).toList());
-    }
-
-    var jsonBody = objectMapper.writeValueAsString(payload);
-
-    var request =
-        HttpRequest.newBuilder()
-            .uri(baseUri.resolve("/v2/private/manage-listings"))
-            .header("User-Agent", USER_AGENT)
-            .header("Accept", "application/json")
-            .header("Content-Type", "application/json")
-            .header("Authorization", "Bearer " + bearerToken)
-            .POST(HttpRequest.BodyPublishers.ofString(jsonBody))
-            .build();
-
-    var body = doExecute(request);
-    return objectMapper.readValue(body, UpsertListingResponse.class);
-  }
-
   private String doUploadListingImage(String bearerToken, byte[] bytes, String filename)
       throws IOException, InterruptedException {
     var boundary = UUID.randomUUID().toString();
@@ -205,19 +133,6 @@ public class HttpFetchTcgClient implements FetchTcgClient {
 
     var body = doExecute(request);
     return objectMapper.readValue(body, UploadListingImageResponse.class).imageUrl();
-  }
-
-  private void doDeleteListing(String bearerToken, int listingId)
-      throws IOException, InterruptedException {
-    var request =
-        HttpRequest.newBuilder()
-            .uri(baseUri.resolve("/v1/manage-listings/" + listingId))
-            .header("User-Agent", USER_AGENT)
-            .header("Authorization", "Bearer " + bearerToken)
-            .DELETE()
-            .build();
-
-    doExecute(request);
   }
 
   private static byte[] encodeMultipart(byte[] fileBytes, String filename, String boundary) {
@@ -287,6 +202,4 @@ public class HttpFetchTcgClient implements FetchTcgClient {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   record UploadListingImageResponse(@JsonProperty("imageUrl") String imageUrl) {}
-
-  record AdditionalImage(String label, String url) {}
 }

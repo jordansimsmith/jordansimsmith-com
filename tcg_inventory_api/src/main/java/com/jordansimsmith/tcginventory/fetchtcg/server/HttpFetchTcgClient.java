@@ -6,6 +6,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.service.ServiceUnavailableException;
+import com.jordansimsmith.tcginventory.fetchtcg.client.UpdateListingRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.UpdateListingResponse;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
@@ -14,6 +16,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
@@ -159,6 +162,71 @@ public class HttpFetchTcgClient {
     return new OffersPage(response.number(), response.size(), response.last(), response.content());
   }
 
+  public UpdateListingResponse updateListing(String bearerToken, UpdateListingRequest request)
+      throws ServiceException {
+    var requestBody = new LinkedHashMap<String, Object>();
+    requestBody.put("cardId", request.cardId());
+    requestBody.put("condition", request.condition());
+    requestBody.put("listedPrice", request.price());
+    requestBody.put("listedCurrency", "NZD");
+    requestBody.put("matchPriceEnabled", false);
+    requestBody.put("quantity", request.quantity());
+    requestBody.put("details", "");
+    if (request.frontImage() != null) {
+      requestBody.put("frontImage", request.frontImage());
+    }
+    if (request.additionalImages() != null) {
+      requestBody.put(
+          "additionalImages",
+          request.additionalImages().stream()
+              .map(url -> new ProviderAdditionalImage(null, url))
+              .toList());
+    }
+
+    String payload;
+    try {
+      payload = objectMapper.writeValueAsString(requestBody);
+    } catch (IOException e) {
+      throw new IllegalStateException("FetchTCG listing update request could not be serialized");
+    }
+    var httpRequest =
+        HttpRequest.newBuilder()
+            .uri(baseUri.resolve("/v2/private/manage-listings"))
+            .header("User-Agent", USER_AGENT)
+            .header("Accept", "application/json")
+            .header("Content-Type", "application/json")
+            .header("Authorization", "Bearer " + bearerToken)
+            .POST(HttpRequest.BodyPublishers.ofString(payload))
+            .build();
+    var body = sendRequest(httpRequest, "listing update");
+
+    ProviderUpdateListingResponse response;
+    try {
+      response = objectMapper.readValue(body, ProviderUpdateListingResponse.class);
+    } catch (IOException e) {
+      throw new IllegalStateException("FetchTCG returned a malformed listing update response");
+    }
+    if (response == null || response.listingId() == null || response.remainingQuantity() == null) {
+      throw new IllegalStateException("FetchTCG listing update response was incomplete");
+    }
+    return new UpdateListingResponse(response.listingId(), response.remainingQuantity());
+  }
+
+  public void deleteListing(String bearerToken, int listingId) throws ServiceException {
+    var request =
+        HttpRequest.newBuilder()
+            .uri(baseUri.resolve("/v1/manage-listings/" + listingId))
+            .header("User-Agent", USER_AGENT)
+            .header("Authorization", "Bearer " + bearerToken)
+            .DELETE()
+            .build();
+    try {
+      sendRequest(request, "listing deletion");
+    } catch (NotFoundException e) {
+      // deletion is complete when the listing is already absent
+    }
+  }
+
   private String sendRequest(HttpRequest request, String operation) throws ServiceException {
     for (var attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       pacer.run();
@@ -209,6 +277,15 @@ public class HttpFetchTcgClient {
 
   public record OffersPage(
       Integer number, Integer size, Boolean last, List<ProviderOffer> content) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record ProviderAdditionalImage(
+      @JsonProperty("label") @Nullable String label, @JsonProperty("url") String url) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record ProviderUpdateListingResponse(
+      @JsonProperty("listingId") @Nullable Integer listingId,
+      @JsonProperty("remainingQuantity") @Nullable Integer remainingQuantity) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record ProviderCardResponse(

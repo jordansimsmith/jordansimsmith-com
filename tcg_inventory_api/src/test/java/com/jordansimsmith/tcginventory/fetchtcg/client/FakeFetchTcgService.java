@@ -10,6 +10,8 @@ public final class FakeFetchTcgService implements FetchTcgService {
   private final Map<String, GetCardResponse> cards = new HashMap<>();
   private final Map<String, List<CardListing>> listings = new HashMap<>();
   private final Map<String, List<Offer>> offers = new HashMap<>();
+  private final Map<String, Integer> listingIds = new HashMap<>();
+  private int nextListingId = 900000;
 
   @Override
   public GetAccountResponse getAccount(RequestContext ctx, GetAccountRequest request) {
@@ -55,6 +57,22 @@ public final class FakeFetchTcgService implements FetchTcgService {
     return new FindOffersResponse(pageOffers, nextContinuation);
   }
 
+  @Override
+  public UpdateListingResponse updateListing(RequestContext ctx, UpdateListingRequest request) {
+    var listingKey = ctx.user() + "#" + request.cardId() + "#" + request.condition();
+    var listingId = listingIds.computeIfAbsent(listingKey, key -> nextListingId++);
+    return new UpdateListingResponse(listingId, request.quantity());
+  }
+
+  @Override
+  public DeleteListingResponse deleteListing(RequestContext ctx, DeleteListingRequest request) {
+    listingIds.entrySet().removeIf(
+        entry ->
+            entry.getKey().startsWith(ctx.user() + "#")
+                && entry.getValue() == request.listingId());
+    return new DeleteListingResponse();
+  }
+
   public void seedSellerUsername(String user, String username) {
     sellerUsernames.put(user, username);
   }
@@ -76,5 +94,7 @@ public final class FakeFetchTcgService implements FetchTcgService {
     cards.clear();
     listings.clear();
     offers.clear();
+    listingIds.clear();
+    nextListingId = 900000;
   }
 }
