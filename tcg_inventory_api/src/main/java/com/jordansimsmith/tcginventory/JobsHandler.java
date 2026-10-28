@@ -101,11 +101,8 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             publishDynamoDbClient,
             publishClock,
             factory.fetchTcgService(),
-            factory.fetchTcgClient(),
             factory.s3Client());
-    this.publishJobProcessor =
-        new PublishJobProcessor(
-            factory.fetchTcgTokenMinter(), orderPhaseProcessor, listingPhaseProcessor);
+    this.publishJobProcessor = new PublishJobProcessor(orderPhaseProcessor, listingPhaseProcessor);
     this.reportJobProcessor = new ReportJobProcessor(factory);
     this.scanConfirmationJobProcessor = new ScanConfirmationJobProcessor(factory);
     this.importConfirmationJobProcessor = new ImportConfirmationJobProcessor(factory);

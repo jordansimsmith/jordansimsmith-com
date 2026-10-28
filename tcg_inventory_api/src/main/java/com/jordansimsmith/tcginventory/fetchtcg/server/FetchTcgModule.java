@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.secrets.Secrets;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.tcginventory.fetchtcg.client.CreateListingImageRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.CreateListingImageResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.DeleteListingRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.DeleteListingResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
@@ -65,6 +67,7 @@ public class FetchTcgModule {
     var findOffersService = new FindOffersService(tokenProvider, fetchTcgClient);
     var updateListingService = new UpdateListingService(tokenProvider, fetchTcgClient);
     var deleteListingService = new DeleteListingService(tokenProvider, fetchTcgClient);
+    var createListingImageService = new CreateListingImageService(tokenProvider, fetchTcgClient);
     var updateCredentialsService =
         new UpdateCredentialsService(
             accountRepository, tokenExchange, fetchTcgClient, credentialStore, clock);
@@ -110,6 +113,12 @@ public class FetchTcgModule {
       public DeleteListingResponse deleteListing(RequestContext ctx, DeleteListingRequest request)
           throws ServiceException {
         return deleteListingService.deleteListing(ctx, request);
+      }
+
+      @Override
+      public CreateListingImageResponse createListingImage(
+          RequestContext ctx, CreateListingImageRequest request) throws ServiceException {
+        return createListingImageService.createListingImage(ctx, request);
       }
     };
   }

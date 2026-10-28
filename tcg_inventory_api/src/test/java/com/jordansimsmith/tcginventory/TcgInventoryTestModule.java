@@ -10,9 +10,7 @@ import com.jordansimsmith.tcginventory.catalog.FakeCardCatalogs;
 import com.jordansimsmith.tcginventory.catalog.FakeTcgCsvClient;
 import com.jordansimsmith.tcginventory.catalog.TcgCsvClient;
 import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
-import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgTokenMinter;
 import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgTokenMinter;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
@@ -206,12 +204,6 @@ public class TcgInventoryTestModule {
   @Singleton
   FetchTcgService fetchTcgService(FakeFetchTcgService fakeFetchTcgService) {
     return fakeFetchTcgService;
-  }
-
-  @Provides
-  @Singleton
-  FetchTcgTokenMinter fetchTcgTokenMinter() {
-    return new FakeFetchTcgTokenMinter();
   }
 
   @Provides

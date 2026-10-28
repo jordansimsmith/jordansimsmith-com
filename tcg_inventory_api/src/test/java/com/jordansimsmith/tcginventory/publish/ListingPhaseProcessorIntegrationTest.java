@@ -1,6 +1,13 @@
 package com.jordansimsmith.tcginventory.publish;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
@@ -11,12 +18,19 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.s3.S3Container;
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.JobsHandler;
 import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
-import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
+import com.jordansimsmith.tcginventory.fetchtcg.client.CreateListingImageResponse;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
+import com.jordansimsmith.tcginventory.fetchtcg.client.UpdateListingRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.UpdateListingResponse;
+import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.time.FakeClock;
@@ -48,7 +62,8 @@ public class ListingPhaseProcessorIntegrationTest {
   private static final String SKU_ID = "mtg#scryfall#scryfall-1#normal#NM";
 
   private FakeClock fakeClock;
-  private FakeFetchTcgClient fakeFetchTcgClient;
+  private TcgInventoryTestFactory factory;
+  private FakeFetchTcgService fakeFetchTcgService;
   private ObjectMapper objectMapper;
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
@@ -70,11 +85,11 @@ public class ListingPhaseProcessorIntegrationTest {
 
   @BeforeEach
   void setUp() {
-    var factory =
+    factory =
         TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), s3Container.getEndpoint());
 
     fakeClock = factory.fakeClock();
-    fakeFetchTcgClient = factory.fakeFetchTcgClient();
+    fakeFetchTcgService = factory.fakeFetchTcgService();
     objectMapper = factory.objectMapper();
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
@@ -82,8 +97,7 @@ public class ListingPhaseProcessorIntegrationTest {
     s3Client = factory.s3Client();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
-    fakeFetchTcgClient.reset();
-    factory.fakeFetchTcgService().reset();
+    fakeFetchTcgService.reset();
 
     jobsHandler = new JobsHandler(factory);
 
@@ -117,14 +131,6 @@ public class ListingPhaseProcessorIntegrationTest {
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
     // assert
-    assertThat(fakeFetchTcgClient.getUploadCalls()).hasSize(2);
-    assertThat(fakeFetchTcgClient.getUploadCalls().get(0).bytes()).isEqualTo(FRONT_JPEG);
-    assertThat(fakeFetchTcgClient.getUploadCalls().get(0).filename())
-        .isEqualTo(FRONT_PHOTO_ID + ".jpg");
-    assertThat(fakeFetchTcgClient.getUploadCalls().get(1).bytes()).isEqualTo(BACK_JPEG);
-    assertThat(fakeFetchTcgClient.getUploadCalls().get(1).filename())
-        .isEqualTo(BACK_PHOTO_ID + ".jpg");
-
     var frontUrl = "https://listing-img.fetchtcg.com/fake/listing/1.jpg";
     var backUrl = "https://listing-img.fetchtcg.com/fake/listing/2.jpg";
     var unit = getUnit("jordan", SKU_ID, 1);
@@ -153,7 +159,6 @@ public class ListingPhaseProcessorIntegrationTest {
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
     // assert
-    assertThat(fakeFetchTcgClient.getUploadCalls()).hasSize(2);
     var unit = getUnit("jordan", SKU_ID, 1);
     assertThat(unit.getPhotos().get(0).getFetchtcgUrl())
         .isEqualTo("https://listing-img.fetchtcg.com/fake/listing/1.jpg");
@@ -185,10 +190,59 @@ public class ListingPhaseProcessorIntegrationTest {
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job2", "publish"), null);
 
     // assert
-    assertThat(fakeFetchTcgClient.getUploadCalls()).hasSize(2);
     var unit = getUnit("jordan", SKU_ID, 1);
     assertThat(unit.getPhotos().get(0).getFetchtcgUrl()).isEqualTo(firstUrls.get(0));
     assertThat(unit.getPhotos().get(1).getFetchtcgUrl()).isEqualTo(firstUrls.get(1));
+  }
+
+  @Test
+  void uploadFailureShouldLeavePhotoUrlUnpersistedAndSkipListingUpdate() throws Exception {
+    // arrange
+    createDirtySku("jordan", SKU_ID, "1.50");
+    createPhotographedUnit("jordan", SKU_ID, 1, List.of(FRONT_PHOTO_ID), List.of(FRONT_JPEG));
+    var fetchTcgService = mock(FetchTcgService.class);
+    var uploadFailure = new ServiceUnavailableException("image upload unavailable");
+    when(fetchTcgService.createListingImage(any(RequestContext.class), any()))
+        .thenThrow(uploadFailure);
+    var processor = listingPhaseProcessor(fetchTcgService);
+
+    // act / assert
+    assertThatThrownBy(() -> processor.process("jordan", 0)).isSameAs(uploadFailure);
+
+    // assert persisted outcome
+    assertThat(getUnit("jordan", SKU_ID, 1).getPhotos().get(0).getFetchtcgUrl()).isNull();
+    verify(fetchTcgService, never()).updateListing(any(RequestContext.class), any());
+  }
+
+  @Test
+  void retryShouldReuseImageUrlPersistedBeforeListingFailure() throws Exception {
+    // arrange
+    createDirtySku("jordan", SKU_ID, "1.50");
+    createPhotographedUnit("jordan", SKU_ID, 1, List.of(FRONT_PHOTO_ID), List.of(FRONT_JPEG));
+    var fetchTcgService = mock(FetchTcgService.class);
+    var imageUrl = "https://listing-img.fetchtcg.example/persisted.jpg";
+    when(fetchTcgService.createListingImage(any(RequestContext.class), any()))
+        .thenReturn(new CreateListingImageResponse(imageUrl));
+    when(fetchTcgService.updateListing(any(RequestContext.class), any(UpdateListingRequest.class)))
+        .thenThrow(new ServiceUnavailableException("listing update unavailable"))
+        .thenReturn(new UpdateListingResponse(975737, 1));
+    var processor = listingPhaseProcessor(fetchTcgService);
+
+    // act
+    assertThatThrownBy(() -> processor.process("jordan", 0))
+        .isInstanceOf(ServiceUnavailableException.class)
+        .hasMessage("listing update unavailable");
+    assertThat(getUnit("jordan", SKU_ID, 1).getPhotos().get(0).getFetchtcgUrl())
+        .isEqualTo(imageUrl);
+    processor.process("jordan", 0);
+
+    // assert
+    verify(fetchTcgService, times(1)).createListingImage(any(RequestContext.class), any());
+    verify(fetchTcgService, times(2))
+        .updateListing(any(RequestContext.class), any(UpdateListingRequest.class));
+    assertThat(getUnit("jordan", SKU_ID, 1).getPhotos().get(0).getFetchtcgUrl())
+        .isEqualTo(imageUrl);
+    assertThat(getSku("jordan", SKU_ID).getDirty()).isFalse();
   }
 
   @Test
@@ -202,7 +256,6 @@ public class ListingPhaseProcessorIntegrationTest {
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
     // assert
-    assertThat(fakeFetchTcgClient.getUploadCalls()).isEmpty();
     assertThat(getSku("jordan", SKU_ID).getDirty()).isFalse();
   }
 
@@ -288,7 +341,6 @@ public class ListingPhaseProcessorIntegrationTest {
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job2", "publish"), null);
 
     // assert
-    assertThat(fakeFetchTcgClient.getUploadCalls()).hasSize(3);
     var unitOne = getUnit("jordan", SKU_ID, 1);
     assertThat(unitOne.getPhotos().get(0).getFetchtcgUrl())
         .isEqualTo("https://listing-img.fetchtcg.com/fake/listing/1.jpg");
@@ -373,6 +425,17 @@ public class ListingPhaseProcessorIntegrationTest {
             .partitionValue(SkuItem.formatPk(user, skuId))
             .sortValue(SkuItem.formatSk())
             .build());
+  }
+
+  private ListingPhaseProcessor listingPhaseProcessor(FetchTcgService fetchTcgService) {
+    var dynamoDbClient = factory.dynamoDbClient();
+    return new ListingPhaseProcessor(
+        skuTable,
+        new InventoryRepository(unitTable, dynamoDbClient, fakeClock, factory.ulidGenerator()),
+        dynamoDbClient,
+        fakeClock,
+        fetchTcgService,
+        s3Client);
   }
 
   private UnitItem getUnit(String user, String skuId, int sequenceNumber) {

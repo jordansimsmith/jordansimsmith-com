@@ -16,10 +16,6 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
-import java.util.List;
-import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -302,80 +298,11 @@ public class HttpFetchTcgClientTest {
                 "https://api.fetchtcg.com/v3/cards?gameIds=provider-game&sets=3268&cardName=Troll+of+Khazad-d%C3%BBm&finishes=normal"));
   }
 
-  @Test
-  void uploadListingImageShouldPostMultipartFileAndReturnImageUrl()
-      throws IOException, InterruptedException {
-    // arrange
-    var imageUrl = "https://listing-img.fetchtcg.com/acct/listing/5314d615.jpg";
-    var response = createMockResponse(200, "{\"imageUrl\": \"" + imageUrl + "\"}");
-    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
-        .thenReturn(response);
-    var bytes = new byte[] {(byte) 0xff, (byte) 0xd8, 0x00, 0x01, 0x02};
-
-    // act
-    var result = client.uploadListingImage("my-token", bytes, "photo.jpg");
-
-    // assert
-    assertThat(result).isEqualTo(imageUrl);
-
-    var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
-    verify(httpClient).send(requestCaptor.capture(), eq(HttpResponse.BodyHandlers.ofString()));
-    var request = requestCaptor.getValue();
-    assertThat(request.uri())
-        .isEqualTo(
-            URI.create("https://api.fetchtcg.com/v2/private/manage-listings/uploadListingImage"));
-    assertThat(request.method()).isEqualTo("POST");
-    assertThat(request.headers().firstValue("Authorization")).contains("Bearer my-token");
-    assertThat(request.headers().firstValue("User-Agent")).contains(HttpFetchTcgClient.USER_AGENT);
-
-    var contentType = request.headers().firstValue("Content-Type").orElseThrow();
-    assertThat(contentType).startsWith("multipart/form-data; boundary=");
-    var boundary = contentType.substring("multipart/form-data; boundary=".length());
-    assertThat(boundary).isNotBlank();
-
-    var body = requestBodyBytes(request);
-    var bodyText = new String(body, StandardCharsets.ISO_8859_1);
-    assertThat(bodyText).contains("--" + boundary);
-    assertThat(bodyText)
-        .contains("Content-Disposition: form-data; name=\"file\"; filename=\"photo.jpg\"");
-    assertThat(bodyText).contains("Content-Type: image/jpeg");
-    assertThat(body).contains(bytes);
-    assertThat(bodyText).endsWith("--" + boundary + "--\r\n");
-  }
-
   @SuppressWarnings("unchecked")
   private HttpResponse<String> createMockResponse(int statusCode, String body) {
     HttpResponse<String> mockResponse = mock(HttpResponse.class);
     when(mockResponse.statusCode()).thenReturn(statusCode);
     when(mockResponse.body()).thenReturn(body);
     return mockResponse;
-  }
-
-  private byte[] requestBodyBytes(HttpRequest request) {
-    var publisher = request.bodyPublisher().orElseThrow();
-    var subscriber = HttpResponse.BodySubscribers.ofByteArray();
-    publisher.subscribe(
-        new Flow.Subscriber<>() {
-          @Override
-          public void onSubscribe(Flow.Subscription subscription) {
-            subscriber.onSubscribe(subscription);
-          }
-
-          @Override
-          public void onNext(ByteBuffer item) {
-            subscriber.onNext(List.of(item));
-          }
-
-          @Override
-          public void onError(Throwable throwable) {
-            subscriber.onError(throwable);
-          }
-
-          @Override
-          public void onComplete() {
-            subscriber.onComplete();
-          }
-        });
-    return subscriber.getBody().toCompletableFuture().join();
   }
 }

@@ -19,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import javax.annotation.Nullable;
 
 public class HttpFetchTcgClient {
@@ -227,6 +228,56 @@ public class HttpFetchTcgClient {
     }
   }
 
+  public String createListingImage(String bearerToken, byte[] imageBytes, String filename)
+      throws ServiceException {
+    var boundary = UUID.randomUUID().toString();
+    var request =
+        HttpRequest.newBuilder()
+            .uri(baseUri.resolve("/v2/private/manage-listings/uploadListingImage"))
+            .header("User-Agent", USER_AGENT)
+            .header("Accept", "application/json")
+            .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+            .header("Authorization", "Bearer " + bearerToken)
+            .POST(
+                HttpRequest.BodyPublishers.ofByteArray(
+                    encodeMultipart(imageBytes, filename, boundary)))
+            .build();
+    var body = sendRequest(request, "image upload");
+
+    ProviderImageUploadResponse response;
+    try {
+      response = objectMapper.readValue(body, ProviderImageUploadResponse.class);
+    } catch (IOException e) {
+      throw new IllegalStateException("FetchTCG returned a malformed image upload response");
+    }
+    if (response == null || response.imageUrl() == null || response.imageUrl().isBlank()) {
+      throw new IllegalStateException(
+          "FetchTCG image upload response did not include an image URL");
+    }
+    return response.imageUrl();
+  }
+
+  private static byte[] encodeMultipart(byte[] fileBytes, String filename, String boundary) {
+    var header =
+        "--"
+            + boundary
+            + "\r\n"
+            + "Content-Disposition: form-data; name=\"file\"; filename=\""
+            + filename
+            + "\"\r\n"
+            + "Content-Type: image/jpeg\r\n"
+            + "\r\n";
+    var footer = "\r\n--" + boundary + "--\r\n";
+    var headerBytes = header.getBytes(StandardCharsets.UTF_8);
+    var footerBytes = footer.getBytes(StandardCharsets.UTF_8);
+    var body = new byte[headerBytes.length + fileBytes.length + footerBytes.length];
+    System.arraycopy(headerBytes, 0, body, 0, headerBytes.length);
+    System.arraycopy(fileBytes, 0, body, headerBytes.length, fileBytes.length);
+    System.arraycopy(
+        footerBytes, 0, body, headerBytes.length + fileBytes.length, footerBytes.length);
+    return body;
+  }
+
   private String sendRequest(HttpRequest request, String operation) throws ServiceException {
     for (var attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       pacer.run();
@@ -286,6 +337,9 @@ public class HttpFetchTcgClient {
   private record ProviderUpdateListingResponse(
       @JsonProperty("listingId") @Nullable Integer listingId,
       @JsonProperty("remainingQuantity") @Nullable Integer remainingQuantity) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record ProviderImageUploadResponse(@JsonProperty("imageUrl") String imageUrl) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record ProviderCardResponse(

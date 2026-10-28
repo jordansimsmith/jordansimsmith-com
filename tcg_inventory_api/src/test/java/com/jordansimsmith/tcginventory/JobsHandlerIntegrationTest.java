@@ -1882,7 +1882,6 @@ public class JobsHandlerIntegrationTest {
     assertThat(sku.getLastPublishedQuantity()).isEqualTo(2);
     assertThat(sku.getLastPublishedPrice()).isEqualTo("1.50");
     assertThat(sku.getLastPublishedAt()).isEqualTo(Instant.ofEpochSecond(1700000000));
-
   }
 
   @Test
@@ -1944,7 +1943,6 @@ public class JobsHandlerIntegrationTest {
     assertThat(updated.getDirty()).isFalse();
     assertThat(updated.getLastPublishedQuantity()).isEqualTo(3);
     assertThat(updated.getLastPublishedPrice()).isEqualTo("2.00");
-
   }
 
   @Test
@@ -1968,7 +1966,6 @@ public class JobsHandlerIntegrationTest {
     assertThat(updated.getFetchtcgListingId()).isNull();
     assertThat(updated.getLastPublishedQuantity()).isNull();
     assertThat(updated.getLastPublishedPrice()).isNull();
-
   }
 
   @Test

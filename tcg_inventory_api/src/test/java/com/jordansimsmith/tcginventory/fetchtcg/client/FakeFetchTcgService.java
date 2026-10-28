@@ -12,6 +12,7 @@ public final class FakeFetchTcgService implements FetchTcgService {
   private final Map<String, List<Offer>> offers = new HashMap<>();
   private final Map<String, Integer> listingIds = new HashMap<>();
   private int nextListingId = 900000;
+  private int nextImageId = 1;
 
   @Override
   public GetAccountResponse getAccount(RequestContext ctx, GetAccountRequest request) {
@@ -66,11 +67,20 @@ public final class FakeFetchTcgService implements FetchTcgService {
 
   @Override
   public DeleteListingResponse deleteListing(RequestContext ctx, DeleteListingRequest request) {
-    listingIds.entrySet().removeIf(
-        entry ->
-            entry.getKey().startsWith(ctx.user() + "#")
-                && entry.getValue() == request.listingId());
+    listingIds
+        .entrySet()
+        .removeIf(
+            entry ->
+                entry.getKey().startsWith(ctx.user() + "#")
+                    && entry.getValue() == request.listingId());
     return new DeleteListingResponse();
+  }
+
+  @Override
+  public CreateListingImageResponse createListingImage(
+      RequestContext ctx, CreateListingImageRequest request) {
+    return new CreateListingImageResponse(
+        "https://listing-img.fetchtcg.com/fake/listing/" + nextImageId++ + ".jpg");
   }
 
   public void seedSellerUsername(String user, String username) {
@@ -96,5 +106,6 @@ public final class FakeFetchTcgService implements FetchTcgService {
     offers.clear();
     listingIds.clear();
     nextListingId = 900000;
+    nextImageId = 1;
   }
 }

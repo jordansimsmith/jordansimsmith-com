@@ -6,7 +6,7 @@ import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.JobProcessor;
 import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
+import com.jordansimsmith.tcginventory.fetchtcg.client.CreateListingImageRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.DeleteListingRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.UpdateListingRequest;
@@ -43,7 +43,6 @@ public class ListingPhaseProcessor {
   private final DynamoDbClient dynamoDbClient;
   private final Clock clock;
   private final FetchTcgService fetchTcgService;
-  private final FetchTcgClient fetchTcgClient;
   private final S3Client s3Client;
 
   public ListingPhaseProcessor(
@@ -52,18 +51,16 @@ public class ListingPhaseProcessor {
       DynamoDbClient dynamoDbClient,
       Clock clock,
       FetchTcgService fetchTcgService,
-      FetchTcgClient fetchTcgClient,
       S3Client s3Client) {
     this.skuTable = skuTable;
     this.inventoryRepository = inventoryRepository;
     this.dynamoDbClient = dynamoDbClient;
     this.clock = clock;
     this.fetchTcgService = fetchTcgService;
-    this.fetchTcgClient = fetchTcgClient;
     this.s3Client = s3Client;
   }
 
-  public JobProcessor.SuccessJobResult process(String user, String bearerToken, int continuation)
+  public JobProcessor.SuccessJobResult process(String user, int continuation)
       throws ServiceException {
     var dirtySkus = loadDirtySkus(user);
     int processed = 0;
@@ -75,7 +72,7 @@ public class ListingPhaseProcessor {
       var inStock = loadInStock(user, skuId);
 
       if (inStock.count() > 0) {
-        publishSku(user, bearerToken, sku, inStock, capturedVersion);
+        publishSku(user, sku, inStock, capturedVersion);
       } else if (sku.getFetchtcgListingId() != null) {
         delistSku(user, sku, capturedVersion);
       } else {
@@ -122,8 +119,7 @@ public class ListingPhaseProcessor {
     return new InStock(count, first);
   }
 
-  private void publishSku(
-      String user, String bearerToken, SkuItem sku, InStock inStock, int capturedVersion)
+  private void publishSku(String user, SkuItem sku, InStock inStock, int capturedVersion)
       throws ServiceException {
     var photos =
         inStock.first().getPhotos() == null
@@ -140,8 +136,11 @@ public class ListingPhaseProcessor {
                         .key(Photos.key(user, photo.getPhotoId()))
                         .build())
                 .asByteArray();
-        photo.setFetchtcgUrl(
-            fetchTcgClient.uploadListingImage(bearerToken, bytes, photo.getPhotoId() + ".jpg"));
+        var imageResponse =
+            fetchTcgService.createListingImage(
+                new RequestContext(user),
+                new CreateListingImageRequest(bytes, photo.getPhotoId() + ".jpg"));
+        photo.setFetchtcgUrl(imageResponse.imageUrl());
         dynamoDbClient.updateItem(
             UpdateItemRequest.builder()
                 .tableName(TcgInventoryTable.TABLE_NAME)

@@ -4,8 +4,6 @@ import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobProcessor;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgAuthException;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgTokenMinter;
 import com.jordansimsmith.tcginventory.orders.OrderPhaseProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,15 +11,11 @@ import org.slf4j.LoggerFactory;
 public class PublishJobProcessor implements JobProcessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(PublishJobProcessor.class);
 
-  private final FetchTcgTokenMinter fetchTcgTokenMinter;
   private final OrderPhaseProcessor orderPhaseProcessor;
   private final ListingPhaseProcessor listingPhaseProcessor;
 
   public PublishJobProcessor(
-      FetchTcgTokenMinter fetchTcgTokenMinter,
-      OrderPhaseProcessor orderPhaseProcessor,
-      ListingPhaseProcessor listingPhaseProcessor) {
-    this.fetchTcgTokenMinter = fetchTcgTokenMinter;
+      OrderPhaseProcessor orderPhaseProcessor, ListingPhaseProcessor listingPhaseProcessor) {
     this.orderPhaseProcessor = orderPhaseProcessor;
     this.listingPhaseProcessor = listingPhaseProcessor;
   }
@@ -30,8 +24,6 @@ public class PublishJobProcessor implements JobProcessor {
   public JobProcessor.JobResult processBatch(String user, JobItem jobItem) {
     try {
       return doProcessBatch(user, jobItem);
-    } catch (FetchTcgAuthException e) {
-      return new JobProcessor.FailureJobResult(FetchTcgAuthException.USER_MESSAGE);
     } catch (ServiceUnavailableException e) {
       throw new RuntimeException("FetchTCG request failed", e);
     } catch (ServiceException e) {
@@ -56,10 +48,8 @@ public class PublishJobProcessor implements JobProcessor {
       LOGGER.info("skipping order phase (continuation={})", continuation);
     }
 
-    var bearerToken = fetchTcgTokenMinter.mint(user);
-    LOGGER.info("minted FetchTCG bearer token");
     LOGGER.info("running listing phase");
-    var result = listingPhaseProcessor.process(user, bearerToken, continuation);
+    var result = listingPhaseProcessor.process(user, continuation);
     LOGGER.info(
         "listing phase complete: processedCount={}, complete={}",
         result.processedCount(),

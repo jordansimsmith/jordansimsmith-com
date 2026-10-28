@@ -11,24 +11,31 @@ import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.service.NotFoundException;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.fetchtcg.client.UpdateListingRequest;
 import java.io.IOException;
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
+import java.net.http.HttpHeaders;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.concurrent.Flow;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.net.ssl.SSLSession;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 
 public class HttpFetchTcgListingMutationTest {
   @Test
-  void updateListingShouldSendProviderPayloadAndReturnListingState() throws Exception {
+  void updateListingShouldSendProviderPayloadAndReturnListingState()
+      throws IOException, InterruptedException, ServiceException {
     // arrange
     var httpClient = mock(HttpClient.class);
     var response = response(200, "{\"listingId\":975737,\"remainingQuantity\":2}");
@@ -79,7 +86,126 @@ public class HttpFetchTcgListingMutationTest {
   }
 
   @Test
-  void updateListingShouldRetryServerFailuresAndPaceEveryAttempt() throws Exception {
+  void createListingImageShouldSendExactMultipartFileAndReturnImageUrl()
+      throws IOException, InterruptedException, ServiceException {
+    // arrange
+    var httpClient = mock(HttpClient.class);
+    var imageUrl = "https://listing-img.fetchtcg.example/acct/image.jpg";
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response(200, "{\"imageUrl\":\"" + imageUrl + "\",\"ignored\":true}"));
+    var pacerCalls = new AtomicInteger();
+    var client =
+        new HttpFetchTcgClient(
+            URI.create("https://api.fetchtcg.example"),
+            httpClient,
+            new ObjectMapper(),
+            pacerCalls::incrementAndGet);
+    var imageBytes = new byte[] {(byte) 0xff, 0x00, 0x41, (byte) 0xd9};
+
+    // act
+    var result = client.createListingImage("private-bearer", imageBytes, "photo-front.jpg");
+
+    // assert
+    assertThat(result).isEqualTo(imageUrl);
+    assertThat(pacerCalls.get()).isEqualTo(1);
+    var requestCaptor = ArgumentCaptor.forClass(HttpRequest.class);
+    verify(httpClient).send(requestCaptor.capture(), eq(HttpResponse.BodyHandlers.ofString()));
+    var request = requestCaptor.getValue();
+    assertThat(request.uri())
+        .isEqualTo(
+            URI.create(
+                "https://api.fetchtcg.example/v2/private/manage-listings/uploadListingImage"));
+    assertThat(request.method()).isEqualTo("POST");
+    assertThat(request.headers().firstValue("Authorization")).hasValue("Bearer private-bearer");
+    assertThat(request.headers().firstValue("Accept")).hasValue("application/json");
+    assertThat(request.headers().firstValue("User-Agent"))
+        .hasValueSatisfying(value -> assertThat(value).startsWith("Mozilla/5.0"));
+    var contentType = request.headers().firstValue("Content-Type").orElseThrow();
+    assertThat(contentType).startsWith("multipart/form-data; boundary=");
+    var boundary = contentType.substring("multipart/form-data; boundary=".length());
+    assertThat(boundary).isNotBlank();
+    var body = requestBodyBytes(request);
+    var bodyText = new String(body, StandardCharsets.ISO_8859_1);
+    var fileHeader =
+        ("--"
+                + boundary
+                + "\r\n"
+                + "Content-Disposition: form-data; name=\"file\"; filename=\"photo-front.jpg\"\r\n"
+                + "Content-Type: image/jpeg\r\n\r\n")
+            .getBytes(StandardCharsets.ISO_8859_1);
+    assertThat(bodyText)
+        .contains("Content-Disposition: form-data; name=\"file\"; filename=\"photo-front.jpg\"");
+    assertThat(Arrays.copyOfRange(body, fileHeader.length, fileHeader.length + imageBytes.length))
+        .containsExactly(imageBytes);
+    assertThat(bodyText).endsWith("\r\n--" + boundary + "--\r\n");
+  }
+
+  @Test
+  void createListingImageShouldRetryServerFailuresAndPaceEachAttempt()
+      throws IOException, InterruptedException, ServiceException {
+    // arrange
+    var httpClient = mock(HttpClient.class);
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(
+            response(503, "private response"),
+            response(502, "private response"),
+            response(500, "private response"),
+            response(200, "{\"imageUrl\":\"url\"}"));
+    var pacerCalls = new AtomicInteger();
+    var client =
+        new HttpFetchTcgClient(
+            URI.create("https://api.fetchtcg.example"),
+            httpClient,
+            new ObjectMapper(),
+            pacerCalls::incrementAndGet);
+
+    // act
+    client.createListingImage("bearer", new byte[] {1}, "photo.jpg");
+
+    // assert
+    verify(httpClient, times(4))
+        .send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString()));
+    assertThat(pacerCalls.get()).isEqualTo(4);
+  }
+
+  @Test
+  void createListingImageShouldHideMalformedResponseBody()
+      throws IOException, InterruptedException {
+    // arrange
+    var httpClient = mock(HttpClient.class);
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response(200, "private-image-response"));
+    var client =
+        new HttpFetchTcgClient(
+            URI.create("https://api.fetchtcg.example"), httpClient, new ObjectMapper(), () -> {});
+
+    // act / assert
+    assertThatThrownBy(() -> client.createListingImage("bearer", new byte[] {1}, "photo.jpg"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("FetchTCG returned a malformed image upload response")
+        .hasNoCause()
+        .hasMessageNotContaining("private-image-response");
+  }
+
+  @Test
+  void createListingImageShouldRequireProviderUrl() throws IOException, InterruptedException {
+    // arrange
+    var httpClient = mock(HttpClient.class);
+    when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
+        .thenReturn(response(200, "{\"imageUrl\":\" \"}"));
+    var client =
+        new HttpFetchTcgClient(
+            URI.create("https://api.fetchtcg.example"), httpClient, new ObjectMapper(), () -> {});
+
+    // act / assert
+    assertThatThrownBy(() -> client.createListingImage("bearer", new byte[] {1}, "photo.jpg"))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("FetchTCG image upload response did not include an image URL");
+  }
+
+  @Test
+  void updateListingShouldRetryServerFailuresAndPaceEveryAttempt()
+      throws IOException, InterruptedException, ServiceException {
     // arrange
     var httpClient = mock(HttpClient.class);
     when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
@@ -129,7 +255,8 @@ public class HttpFetchTcgListingMutationTest {
   }
 
   @Test
-  void deleteListingShouldTreatMissingListingAsSuccess() throws Exception {
+  void deleteListingShouldTreatMissingListingAsSuccess()
+      throws IOException, InterruptedException, ServiceException {
     // arrange
     var httpClient = mock(HttpClient.class);
     when(httpClient.send(any(HttpRequest.class), eq(HttpResponse.BodyHandlers.ofString())))
@@ -171,15 +298,55 @@ public class HttpFetchTcgListingMutationTest {
         .hasMessage("FetchTCG card was not found");
   }
 
-  @SuppressWarnings("unchecked")
   private static HttpResponse<String> response(int statusCode, String body) {
-    var response = mock(HttpResponse.class);
-    when(response.statusCode()).thenReturn(statusCode);
-    when(response.body()).thenReturn(body);
-    return response;
+    return new HttpResponse<>() {
+      @Override
+      public int statusCode() {
+        return statusCode;
+      }
+
+      @Override
+      public HttpRequest request() {
+        return HttpRequest.newBuilder().uri(URI.create("https://api.fetchtcg.example")).build();
+      }
+
+      @Override
+      public Optional<HttpResponse<String>> previousResponse() {
+        return Optional.empty();
+      }
+
+      @Override
+      public HttpHeaders headers() {
+        return HttpHeaders.of(Map.of(), (name, value) -> true);
+      }
+
+      @Override
+      public String body() {
+        return body;
+      }
+
+      @Override
+      public Optional<SSLSession> sslSession() {
+        return Optional.empty();
+      }
+
+      @Override
+      public URI uri() {
+        return URI.create("https://api.fetchtcg.example");
+      }
+
+      @Override
+      public HttpClient.Version version() {
+        return HttpClient.Version.HTTP_1_1;
+      }
+    };
   }
 
   private static String requestBody(HttpRequest request) {
+    return new String(requestBodyBytes(request), StandardCharsets.UTF_8);
+  }
+
+  private static byte[] requestBodyBytes(HttpRequest request) {
     var publisher = request.bodyPublisher().orElseThrow();
     var subscriber = HttpResponse.BodySubscribers.ofByteArray();
     publisher.subscribe(
@@ -204,6 +371,6 @@ public class HttpFetchTcgListingMutationTest {
             subscriber.onComplete();
           }
         });
-    return new String(subscriber.getBody().toCompletableFuture().join(), StandardCharsets.UTF_8);
+    return subscriber.getBody().toCompletableFuture().join();
   }
 }

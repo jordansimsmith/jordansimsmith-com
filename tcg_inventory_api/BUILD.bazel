@@ -103,7 +103,6 @@ java_library(
     ),
     resources = ["src/main/resources/fetchtcg/fetchtcg_set_mapping.json"],
     deps = [
-        "//lib/secrets:lib",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_annotations",
         "@maven//:com_fasterxml_jackson_core_jackson_core",
@@ -224,7 +223,6 @@ java_library(
         exclude = ["src/main/java/com/jordansimsmith/tcginventory/publish/*Handler.java"],
     ),
     deps = [
-        ":fetchtcg-lib",
         ":inventory-lib",
         ":lib",
         ":order-lib",

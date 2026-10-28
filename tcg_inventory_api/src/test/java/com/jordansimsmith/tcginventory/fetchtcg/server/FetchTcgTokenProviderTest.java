@@ -139,8 +139,7 @@ public class FetchTcgTokenProviderTest {
     // arrange
     var secrets = createSecrets("alice", "refresh-one");
     var httpClient = mock(HttpClient.class);
-    var response =
-        createResponse(400, "{\"error\":{\"message\":\"TOKEN_EXPIRED\"}}");
+    var response = createResponse(400, "{\"error\":{\"message\":\"TOKEN_EXPIRED\"}}");
     when(httpClient.send(any(), eq(HttpResponse.BodyHandlers.ofString()))).thenReturn(response);
     var provider = createProvider(httpClient, secrets);
 

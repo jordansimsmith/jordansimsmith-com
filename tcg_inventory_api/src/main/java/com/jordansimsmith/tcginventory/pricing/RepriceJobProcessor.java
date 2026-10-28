@@ -96,8 +96,7 @@ public class RepriceJobProcessor implements JobProcessor {
     var priceFloor = currentPriceFloor(user);
 
     var ctx = new RequestContext(user);
-    var sellerUsername =
-        fetchTcgService.getAccount(ctx, new GetAccountRequest()).sellerUsername();
+    var sellerUsername = fetchTcgService.getAccount(ctx, new GetAccountRequest()).sellerUsername();
     var cardCache = new HashMap<String, GetCardResponse>();
     var competitorCache = new HashMap<CompetitorKey, List<CompetitorPricing.CompetitorPriceTier>>();
     for (var candidate : candidates) {

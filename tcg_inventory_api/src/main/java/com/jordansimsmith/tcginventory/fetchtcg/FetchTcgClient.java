@@ -11,8 +11,6 @@ public interface FetchTcgClient {
 
   SearchCardsResponse searchCards(String fetchTcgGameId, int setId, String cardName, String finish);
 
-  String uploadListingImage(String bearerToken, byte[] bytes, String filename);
-
   @JsonIgnoreProperties(ignoreUnknown = true)
   record GetCardResponse(
       @JsonProperty("id") String id,

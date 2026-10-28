@@ -407,10 +407,8 @@ public class OrderReservationIntegrationTest {
             dynamoDbClient,
             fakeClock,
             fakeFetchTcgService,
-            factory.fetchTcgClient(),
             factory.s3Client());
-    return new PublishJobProcessor(
-        factory.fetchTcgTokenMinter(), orderPhaseProcessor, listingPhaseProcessor);
+    return new PublishJobProcessor(orderPhaseProcessor, listingPhaseProcessor);
   }
 
   private Offer offer(int orderId, String currentAction, List<OfferItem> items) {

@@ -23,4 +23,7 @@ public interface FetchTcgService {
 
   DeleteListingResponse deleteListing(RequestContext ctx, DeleteListingRequest request)
       throws ServiceException;
+
+  CreateListingImageResponse createListingImage(
+      RequestContext ctx, CreateListingImageRequest request) throws ServiceException;
 }

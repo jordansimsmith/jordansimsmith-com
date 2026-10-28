@@ -98,8 +98,7 @@ public class AppraiseJobProcessor implements JobProcessor {
     Map<String, FetchTcgClient.GetCardResponse> cardCache = new HashMap<>();
     Map<String, BigDecimal> marketPriceCache = new HashMap<>();
     var ctx = new RequestContext(user);
-    var sellerUsername =
-        fetchTcgService.getAccount(ctx, new GetAccountRequest()).sellerUsername();
+    var sellerUsername = fetchTcgService.getAccount(ctx, new GetAccountRequest()).sellerUsername();
 
     for (int i = continuation + 1; i <= batchEnd; i++) {
       var rowKey =

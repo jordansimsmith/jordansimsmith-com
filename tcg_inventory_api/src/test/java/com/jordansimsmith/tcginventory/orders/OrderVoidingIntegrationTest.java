@@ -344,10 +344,8 @@ public class OrderVoidingIntegrationTest {
             dynamoDbClient,
             fakeClock,
             fakeFetchTcgService,
-            factory.fetchTcgClient(),
             factory.s3Client());
-    return new PublishJobProcessor(
-        factory.fetchTcgTokenMinter(), orderPhaseProcessor, listingPhaseProcessor);
+    return new PublishJobProcessor(orderPhaseProcessor, listingPhaseProcessor);
   }
 
   private OrderItem getOrder(String orderId) {

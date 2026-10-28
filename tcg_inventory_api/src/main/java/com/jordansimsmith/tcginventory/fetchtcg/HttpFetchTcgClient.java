@@ -11,7 +11,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
-import java.util.UUID;
 
 public class HttpFetchTcgClient implements FetchTcgClient {
   static final String USER_AGENT =
@@ -51,20 +50,6 @@ public class HttpFetchTcgClient implements FetchTcgClient {
       String fetchTcgGameId, int setId, String cardName, String finish) {
     try {
       return doSearchCards(fetchTcgGameId, setId, cardName, finish);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt();
-      throw new RuntimeException(e);
-    } catch (FetchTcgAuthException e) {
-      throw e;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  @Override
-  public String uploadListingImage(String bearerToken, byte[] bytes, String filename) {
-    try {
-      return doUploadListingImage(bearerToken, bytes, filename);
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       throw new RuntimeException(e);
@@ -117,45 +102,6 @@ public class HttpFetchTcgClient implements FetchTcgClient {
     return new SearchCardsResponse(content);
   }
 
-  private String doUploadListingImage(String bearerToken, byte[] bytes, String filename)
-      throws IOException, InterruptedException {
-    var boundary = UUID.randomUUID().toString();
-    var request =
-        HttpRequest.newBuilder()
-            .uri(baseUri.resolve("/v2/private/manage-listings/uploadListingImage"))
-            .header("User-Agent", USER_AGENT)
-            .header("Accept", "application/json")
-            .header("Content-Type", "multipart/form-data; boundary=" + boundary)
-            .header("Authorization", "Bearer " + bearerToken)
-            .POST(
-                HttpRequest.BodyPublishers.ofByteArray(encodeMultipart(bytes, filename, boundary)))
-            .build();
-
-    var body = doExecute(request);
-    return objectMapper.readValue(body, UploadListingImageResponse.class).imageUrl();
-  }
-
-  private static byte[] encodeMultipart(byte[] fileBytes, String filename, String boundary) {
-    var header =
-        "--"
-            + boundary
-            + "\r\n"
-            + "Content-Disposition: form-data; name=\"file\"; filename=\""
-            + filename
-            + "\"\r\n"
-            + "Content-Type: image/jpeg\r\n"
-            + "\r\n";
-    var footer = "\r\n--" + boundary + "--\r\n";
-    var headerBytes = header.getBytes(StandardCharsets.UTF_8);
-    var footerBytes = footer.getBytes(StandardCharsets.UTF_8);
-    var body = new byte[headerBytes.length + fileBytes.length + footerBytes.length];
-    System.arraycopy(headerBytes, 0, body, 0, headerBytes.length);
-    System.arraycopy(fileBytes, 0, body, headerBytes.length, fileBytes.length);
-    System.arraycopy(
-        footerBytes, 0, body, headerBytes.length + fileBytes.length, footerBytes.length);
-    return body;
-  }
-
   private String doExecute(HttpRequest request) throws IOException, InterruptedException {
     for (int attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       pacer.run();
@@ -199,7 +145,4 @@ public class HttpFetchTcgClient implements FetchTcgClient {
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   record PagedContent<T>(@JsonProperty("content") List<T> content) {}
-
-  @JsonIgnoreProperties(ignoreUnknown = true)
-  record UploadListingImageResponse(@JsonProperty("imageUrl") String imageUrl) {}
 }
