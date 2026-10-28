@@ -57,6 +57,7 @@ filegroup(
     visibility = [
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:__pkg__",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/api:__pkg__",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:__pkg__",
     ],
 )
 
@@ -142,6 +143,7 @@ java_library(
         "//tcg_inventory_api:__pkg__",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:__pkg__",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/api:__pkg__",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:__pkg__",
     ],
     deps = [
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
@@ -393,49 +395,6 @@ java_binary(
         "@maven//:com_google_guava_guava",
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-    ],
-)
-
-java_binary(
-    name = "get-pricing-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/pricing/GetPricingHandler.java"],
-    create_executable = False,
-    resources = [
-        "src/main/resources/logback.xml",
-    ],
-    deps = [
-        ":lib",
-        ":pricing-lib",
-        "//lib/http:lib",
-        "@maven//:ch_qos_logback_logback_classic",
-        "@maven//:ch_qos_logback_logback_core",
-        "@maven//:com_amazonaws_aws_lambda_java_core",
-        "@maven//:com_amazonaws_aws_lambda_java_events",
-        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
-        "@maven//:com_google_guava_guava",
-        "@maven//:org_slf4j_slf4j_api",
-    ],
-)
-
-java_binary(
-    name = "update-pricing-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/pricing/UpdatePricingHandler.java"],
-    create_executable = False,
-    resources = [
-        "src/main/resources/logback.xml",
-    ],
-    deps = [
-        ":lib",
-        ":pricing-lib",
-        "//lib/http:lib",
-        "@maven//:ch_qos_logback_logback_classic",
-        "@maven//:ch_qos_logback_logback_core",
-        "@maven//:com_amazonaws_aws_lambda_java_core",
-        "@maven//:com_amazonaws_aws_lambda_java_events",
-        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
-        "@maven//:com_fasterxml_jackson_core_jackson_databind",
-        "@maven//:com_google_guava_guava",
-        "@maven//:org_slf4j_slf4j_api",
     ],
 )
 
@@ -1309,6 +1268,9 @@ java_test_suite(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/api:find-games-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:get-pricing-handler",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:update-pricing-handler",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/client:test-lib",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/games/client:test-lib",
         "//third_party/dagger",
@@ -1364,7 +1326,6 @@ java_test_suite(
         ":get-catalog-card-handler",
         ":get-import-handler",
         ":get-order-handler",
-        ":get-pricing-handler",
         ":get-publish-handler",
         ":get-reports-handler",
         ":get-reprice-handler",
@@ -1385,7 +1346,6 @@ java_test_suite(
         ":settings-lib",
         ":test-lib",
         ":update-import-row-handler",
-        ":update-pricing-handler",
         ":update-settings-handler",
         ":update-unit-handler",
         "//lib/dynamodb:test-lib",
@@ -1398,6 +1358,8 @@ java_test_suite(
         "//lib/ulid:test-lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:get-pricing-handler",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:update-pricing-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/client:test-lib",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/games/client:test-lib",
@@ -1455,10 +1417,10 @@ localstack_image(
         ":get-publish-handler_deploy.jar",
         ":get-reports-handler_deploy.jar",
         ":get-settings-handler_deploy.jar",
-        ":get-pricing-handler_deploy.jar",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:get-pricing-handler_deploy.jar",
         ":get-reprice-handler_deploy.jar",
         ":jobs-handler_deploy.jar",
-        ":update-pricing-handler_deploy.jar",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:update-pricing-handler_deploy.jar",
         ":update-settings-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:update-fetchtcg-credentials-handler_deploy.jar",
     ],

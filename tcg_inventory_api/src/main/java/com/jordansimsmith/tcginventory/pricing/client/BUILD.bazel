@@ -7,5 +7,6 @@ java_library(
     deps = [
         "//lib/service",
         "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_google_code_findbugs_jsr305",
     ],
 )

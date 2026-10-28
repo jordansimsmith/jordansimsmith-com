@@ -176,11 +176,11 @@ lambdas = {
         "zip_file": "update-settings-handler_deploy.jar",
     },
     "get_pricing": {
-        "handler": "com.jordansimsmith.tcginventory.pricing.GetPricingHandler",
+        "handler": "com.jordansimsmith.tcginventory.pricing.api.GetPricingHandler",
         "zip_file": "get-pricing-handler_deploy.jar",
     },
     "update_pricing": {
-        "handler": "com.jordansimsmith.tcginventory.pricing.UpdatePricingHandler",
+        "handler": "com.jordansimsmith.tcginventory.pricing.api.UpdatePricingHandler",
         "zip_file": "update-pricing-handler_deploy.jar",
     },
     "create_reprice": {

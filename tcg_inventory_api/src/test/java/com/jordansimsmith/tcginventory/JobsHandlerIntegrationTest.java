@@ -32,12 +32,12 @@ import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
-import com.jordansimsmith.tcginventory.pricing.PricingItem;
-import com.jordansimsmith.tcginventory.pricing.PricingRepository;
 import com.jordansimsmith.tcginventory.pricing.client.Condition;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceRequest;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceResponse;
+import com.jordansimsmith.tcginventory.pricing.client.GetPricingRequest;
 import com.jordansimsmith.tcginventory.pricing.client.PricingService;
+import com.jordansimsmith.tcginventory.pricing.client.UpdatePricingRequest;
 import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
 import com.jordansimsmith.tcginventory.settings.SettingsItem;
 import com.jordansimsmith.time.FakeClock;
@@ -57,6 +57,8 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 
 @Testcontainers
@@ -74,7 +76,6 @@ public class JobsHandlerIntegrationTest {
   private DynamoDbTable<SettingsItem> settingsTable;
   private DynamoDbTable<OrderItem> orderTable;
   private DynamoDbTable<AuditItem> auditTable;
-  private PricingRepository pricingRepository;
   private TcgInventoryTestFactory factory;
 
   private JobsHandler jobsHandler;
@@ -110,7 +111,6 @@ public class JobsHandlerIntegrationTest {
     settingsTable = factory.settingsTable();
     orderTable = factory.orderTable();
     auditTable = factory.auditTable();
-    pricingRepository = new PricingRepository(factory);
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeJobsQueue.reset();
@@ -155,10 +155,12 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void appraiseShouldExcludeTheFetchTcgUsersOwnListingFromCompetitorPrices() {
+  void appraiseShouldExcludeTheFetchTcgUsersOwnListingFromCompetitorPrices() throws Exception {
     createImportWithRow("jordan", "import1", "dom", "168", "normal", "NM", "en");
     var jobItem = createJob("jordan", "job1", "appraise", "queued", "import1");
-    pricingRepository.update(PricingItem.create("jordan", "0.00"));
+    factory
+        .pricingService()
+        .updatePricing(new RequestContext("jordan"), new UpdatePricingRequest(new BigDecimal("0")));
     seedDefaultCardForDom168();
     seedCard(
         "mtg_168_c_dom_normal",
@@ -291,11 +293,21 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void appraiseShouldUseDefaultFloorWhenStoredPricingItemHasNoFloor() {
+  void appraiseShouldUseDefaultFloorWhenStoredPricingItemHasNoFloor() throws Exception {
     // arrange
     createImportWithRow("jordan", "import1", "dom", "168", "normal", "NM", "en");
     var jobItem = createJob("jordan", "job1", "appraise", "queued", "import1");
-    pricingRepository.update(PricingItem.create("jordan", null));
+    factory
+        .dynamoDbClient()
+        .putItem(
+            PutItemRequest.builder()
+                .tableName(TcgInventoryTable.TABLE_NAME)
+                .item(
+                    Map.of(
+                        "pk", AttributeValue.fromS("USER#jordan"),
+                        "sk", AttributeValue.fromS("PRICING"),
+                        "user", AttributeValue.fromS("jordan")))
+                .build());
     fakeFetchTcgService.seedSearchResult(
         "mtg", 2624, "Card 1", "normal", List.of(new CardSearchResult("mtg_168_c_dom_normal")));
     seedCard(
@@ -316,11 +328,17 @@ public class JobsHandlerIntegrationTest {
 
     // assert
     assertThat(getRow("jordan", "import1", 1).getSuggestedPrice()).isEqualTo("0.25");
-    assertThat(pricingRepository.get("jordan").getPriceFloor()).isNull();
+    assertThat(
+            factory
+                .pricingService()
+                .getPricing(new RequestContext("jordan"), new GetPricingRequest())
+                .priceFloor())
+        .isEqualTo("0.25");
   }
 
   @Test
-  void appraiseShouldApplyConfiguredFloorAcrossContinuationAndPreserveDecidedRows() {
+  void appraiseShouldApplyConfiguredFloorAcrossContinuationAndPreserveDecidedRows()
+      throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     int totalRows = AppraiseJobProcessor.BATCH_SIZE + 2;
@@ -333,7 +351,10 @@ public class JobsHandlerIntegrationTest {
     alreadyDecidedRow.setFetchtcgCardId("existing-card");
     alreadyDecidedRow.setFetchtcgSetId(42);
     importRowTable.putItem(alreadyDecidedRow);
-    pricingRepository.update(PricingItem.create("jordan", "2.00"));
+    factory
+        .pricingService()
+        .updatePricing(
+            new RequestContext("jordan"), new UpdatePricingRequest(new BigDecimal("2.00")));
     createJob("jordan", "job1", "appraise", "queued", "import1");
 
     seedDefaultCardForDom168();

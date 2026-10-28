@@ -5,6 +5,7 @@ java_library(
     srcs = glob(["*.java"]),
     visibility = [
         "//tcg_inventory_api:__pkg__",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/pricing/server:__pkg__",
     ],
     deps = [

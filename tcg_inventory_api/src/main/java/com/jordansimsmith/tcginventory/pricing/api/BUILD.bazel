@@ -1,0 +1,43 @@
+load("@rules_java//java:defs.bzl", "java_binary")
+
+java_binary(
+    name = "get-pricing-handler",
+    srcs = ["GetPricingHandler.java"],
+    create_executable = False,
+    resources = ["//tcg_inventory_api:lambda-logback-resource"],
+    visibility = ["//tcg_inventory_api:__pkg__"],
+    deps = [
+        "//lib/http:lib",
+        "//lib/service",
+        "//tcg_inventory_api:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+    ],
+)
+
+java_binary(
+    name = "update-pricing-handler",
+    srcs = ["UpdatePricingHandler.java"],
+    create_executable = False,
+    resources = ["//tcg_inventory_api:lambda-logback-resource"],
+    visibility = ["//tcg_inventory_api:__pkg__"],
+    deps = [
+        "//lib/http:lib",
+        "//lib/service",
+        "//tcg_inventory_api:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_fasterxml_jackson_core_jackson_core",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+    ],
+)

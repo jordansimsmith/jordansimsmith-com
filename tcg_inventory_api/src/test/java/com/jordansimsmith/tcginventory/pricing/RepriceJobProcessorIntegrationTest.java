@@ -21,6 +21,7 @@ import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.JobProcessor;
 import com.jordansimsmith.tcginventory.JobsHandler;
+import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.client.CardListing;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
@@ -47,6 +48,8 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 
 @Testcontainers
@@ -464,7 +467,18 @@ public class RepriceJobProcessorIntegrationTest {
 
   private void createRepriceJob(String user, String jobId, String priceFloor) {
     if (priceFloor != null) {
-      new PricingRepository(factory).update(PricingItem.create(user, priceFloor));
+      factory
+          .dynamoDbClient()
+          .putItem(
+              PutItemRequest.builder()
+                  .tableName(TcgInventoryTable.TABLE_NAME)
+                  .item(
+                      Map.of(
+                          "pk", AttributeValue.fromS("USER#" + user),
+                          "sk", AttributeValue.fromS("PRICING"),
+                          "user", AttributeValue.fromS(user),
+                          "price_floor", AttributeValue.fromS(priceFloor)))
+                  .build());
     }
     var item = JobItem.create(user, jobId, "reprice", null, null, CREATED_AT);
     item.setProcessedCount(0);

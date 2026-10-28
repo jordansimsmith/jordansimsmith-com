@@ -20,4 +20,8 @@ public class PricingRepository {
             .build();
     return pricingTable.getItem(request -> request.key(key).consistentRead(true));
   }
+
+  public void update(PricingItem item) {
+    pricingTable.updateItem(item);
+  }
 }

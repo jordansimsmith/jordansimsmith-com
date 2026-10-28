@@ -7,6 +7,21 @@ import java.util.Map;
 
 public class FakePricingService implements PricingService {
   private final Map<Key, GetPriceResponse> prices = new HashMap<>();
+  private final Map<String, String> priceFloors = new HashMap<>();
+
+  @Override
+  public GetPricingResponse getPricing(RequestContext ctx, GetPricingRequest request) {
+    return new GetPricingResponse(priceFloors.getOrDefault(ctx.user(), "0.25"));
+  }
+
+  @Override
+  public UpdatePricingResponse updatePricing(RequestContext ctx, UpdatePricingRequest request) {
+    var priceFloor = request.priceFloor();
+    if (priceFloor != null) {
+      priceFloors.put(ctx.user(), priceFloor.setScale(2).toPlainString());
+    }
+    return new UpdatePricingResponse(priceFloors.getOrDefault(ctx.user(), "0.25"));
+  }
 
   @Override
   public GetPriceResponse getPrice(RequestContext ctx, GetPriceRequest request)

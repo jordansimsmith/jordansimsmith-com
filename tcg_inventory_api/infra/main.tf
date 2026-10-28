@@ -93,11 +93,11 @@ module "java_api" {
       artifact = var.artifacts["update_settings"]
     }
     get_pricing = {
-      handler  = "com.jordansimsmith.tcginventory.pricing.GetPricingHandler"
+      handler  = "com.jordansimsmith.tcginventory.pricing.api.GetPricingHandler"
       artifact = var.artifacts["get_pricing"]
     }
     update_pricing = {
-      handler  = "com.jordansimsmith.tcginventory.pricing.UpdatePricingHandler"
+      handler  = "com.jordansimsmith.tcginventory.pricing.api.UpdatePricingHandler"
       artifact = var.artifacts["update_pricing"]
     }
     create_reprice = {
