@@ -6,6 +6,7 @@ import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
+import com.jordansimsmith.tcginventory.pricing.client.PricingService;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
 import dagger.Component;
@@ -45,6 +46,8 @@ public interface TcgInventoryFactory {
   FetchTcgService fetchTcgService();
 
   GamesService gamesService();
+
+  PricingService pricingService();
 
   S3Client s3Client();
 

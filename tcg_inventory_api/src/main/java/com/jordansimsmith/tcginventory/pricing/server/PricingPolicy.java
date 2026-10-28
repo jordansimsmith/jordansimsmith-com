@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory.pricing;
+package com.jordansimsmith.tcginventory.pricing.server;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;

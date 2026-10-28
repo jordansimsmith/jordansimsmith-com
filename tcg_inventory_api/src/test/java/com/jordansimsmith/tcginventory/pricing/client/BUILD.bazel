@@ -1,0 +1,12 @@
+load("@rules_java//java:defs.bzl", "java_library")
+
+java_library(
+    name = "test-lib",
+    testonly = True,
+    srcs = ["FakePricingService.java"],
+    visibility = ["//tcg_inventory_api:__pkg__"],
+    deps = [
+        "//lib/service",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
+    ],
+)

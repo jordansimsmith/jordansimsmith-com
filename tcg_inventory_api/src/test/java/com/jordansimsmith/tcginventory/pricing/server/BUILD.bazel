@@ -1,0 +1,52 @@
+load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
+
+java_test_suite(
+    name = "server-unit-tests",
+    size = "small",
+    srcs = glob(
+        ["*Test.java"],
+        exclude = ["*IntegrationTest.java"],
+    ),
+    runner = "junit5",
+    test_suffixes = ["Test.java"],
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        "//lib/service",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/server",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/client:test-lib",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_mockito_mockito_core",
+    ],
+)
+
+java_test_suite(
+    name = "server-integration-tests",
+    size = "medium",
+    srcs = glob(["*IntegrationTest.java"]),
+    env = {
+        "AWS_ACCESS_KEY_ID": "fake",
+        "AWS_SECRET_ACCESS_KEY": "fake",
+        "AWS_REGION": "ap-southeast-2",
+    },
+    runner = "junit5",
+    test_suffixes = ["IntegrationTest.java"],
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        "//lib/dynamodb:test-lib",
+        "//lib/service",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/server",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/client:test-lib",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_regions",
+    ],
+)

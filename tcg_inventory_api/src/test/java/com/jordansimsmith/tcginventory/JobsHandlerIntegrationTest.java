@@ -3,8 +3,9 @@ package com.jordansimsmith.tcginventory;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoMoreInteractions;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.amazonaws.services.lambda.runtime.events.SQSEvent;
@@ -20,15 +21,6 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.CardSearchResult;
 import com.jordansimsmith.tcginventory.fetchtcg.client.CardSet;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
-import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsRequest;
-import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsResponse;
-import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardsRequest;
-import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardsResponse;
-import com.jordansimsmith.tcginventory.fetchtcg.client.FindSetsRequest;
-import com.jordansimsmith.tcginventory.fetchtcg.client.FindSetsResponse;
-import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountRequest;
-import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountResponse;
-import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
 import com.jordansimsmith.tcginventory.fetchtcg.client.OfferItem;
@@ -42,6 +34,10 @@ import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.tcginventory.pricing.PricingItem;
 import com.jordansimsmith.tcginventory.pricing.PricingRepository;
+import com.jordansimsmith.tcginventory.pricing.client.Condition;
+import com.jordansimsmith.tcginventory.pricing.client.GetPriceRequest;
+import com.jordansimsmith.tcginventory.pricing.client.GetPriceResponse;
+import com.jordansimsmith.tcginventory.pricing.client.PricingService;
 import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
 import com.jordansimsmith.tcginventory.settings.SettingsItem;
 import com.jordansimsmith.time.FakeClock;
@@ -179,7 +175,7 @@ public class JobsHandlerIntegrationTest {
                 new CardListing(1, "raw-nm", new BigDecimal("0.40"), "jordan"),
                 new CardListing(2, "raw-nm", new BigDecimal("0.95"), "rival1")));
 
-    newAppraiseJobProcessor(factory.fakeFetchTcgService()).processBatch("jordan", jobItem);
+    newAppraiseJobProcessor().processBatch("jordan", jobItem);
 
     assertThat(getRow("jordan", "import1", 1).getSuggestedPrice()).isEqualTo("0.90");
   }
@@ -208,9 +204,9 @@ public class JobsHandlerIntegrationTest {
                 new CardListing(2, "raw-nm", new BigDecimal("0.95"), "other-user")));
 
     factory.fakeFetchTcgService().seedSellerUsername("jordan", "jordan");
-    newAppraiseJobProcessor(factory.fakeFetchTcgService()).processBatch("jordan", jordanJob);
+    newAppraiseJobProcessor().processBatch("jordan", jordanJob);
     factory.fakeFetchTcgService().seedSellerUsername("other-user", "other-user");
-    newAppraiseJobProcessor(factory.fakeFetchTcgService()).processBatch("other-user", otherUserJob);
+    newAppraiseJobProcessor().processBatch("other-user", otherUserJob);
 
     assertThat(getRow("jordan", "import1", 1).getSuggestedPrice()).isEqualTo("0.90");
     assertThat(getRow("other-user", "import2", 1).getSuggestedPrice()).isEqualTo("1.00");
@@ -220,11 +216,16 @@ public class JobsHandlerIntegrationTest {
   void appraiseShouldPreserveFetchTcgAccountNotFoundMessage() throws Exception {
     createImportWithRow("jordan", "import1", "dom", "168", "normal", "NM", "en");
     var jobItem = createJob("jordan", "job1", "appraise", "queued", "import1");
-    var fetchTcgService = mock(FetchTcgService.class);
-    when(fetchTcgService.getAccount(new RequestContext("jordan"), new GetAccountRequest()))
+    seedDefaultCardForDom168();
+    var pricingService = mock(PricingService.class);
+    when(pricingService.getPrice(
+            new RequestContext("jordan"),
+            new GetPriceRequest("mtg_168_c_dom_normal", Condition.NM)))
         .thenThrow(new NotFoundException("missing"));
 
-    var result = newAppraiseJobProcessor(fetchTcgService).processBatch("jordan", jobItem);
+    var result =
+        newAppraiseJobProcessor(factory.fakeFetchTcgService(), pricingService)
+            .processBatch("jordan", jobItem);
 
     assertThat(result).isEqualTo(new JobProcessor.FailureJobResult("missing"));
     assertThat(getRow("jordan", "import1", 1).getDecision()).isNull();
@@ -245,42 +246,48 @@ public class JobsHandlerIntegrationTest {
             "Card 1",
             new BigDecimal("0.30"),
             Map.of("scryfallId", SCRYFALL_ID)));
-    var fetchTcgService = mock(FetchTcgService.class);
+    var fetchTcgService = factory.fakeFetchTcgService();
     var ctx = new RequestContext("jordan");
-    when(fetchTcgService.getAccount(ctx, new GetAccountRequest()))
-        .thenReturn(new GetAccountResponse("jordan", 0));
-    when(fetchTcgService.findSets(ctx, new FindSetsRequest("mtg", "dom")))
-        .thenReturn(new FindSetsResponse(List.of(new CardSet(2624, "Dominaria"))));
-    when(fetchTcgService.findCards(
-            ctx, new FindCardsRequest("mtg", 2624, "Card 1", "normal", 100, null)))
-        .thenReturn(
-            new FindCardsResponse(List.of(new CardSearchResult("mtg_168_c_dom_normal")), null));
-    when(fetchTcgService.getCard(ctx, new GetCardRequest("mtg_168_c_dom_normal")))
-        .thenReturn(
-            new GetCardResponse(
-                "mtg_168_c_dom_normal",
-                "Card 1",
-                new BigDecimal("1.20"),
-                Map.of("scryfallId", SCRYFALL_ID)));
-    when(fetchTcgService.findCardListings(
-            ctx, new FindCardListingsRequest("mtg_168_c_dom_normal", 100, null)))
-        .thenReturn(new FindCardListingsResponse(List.of(), null));
+    var pricingService = mock(PricingService.class);
+    when(pricingService.getPrice(ctx, new GetPriceRequest("mtg_168_c_dom_normal", Condition.NM)))
+        .thenReturn(new GetPriceResponse(new BigDecimal("1.20"), new BigDecimal("1.20")));
 
     // act
-    newAppraiseJobProcessor(fetchTcgService).processBatch("jordan", jobItem);
+    newAppraiseJobProcessor(fetchTcgService, pricingService).processBatch("jordan", jobItem);
 
     // assert
-    verify(fetchTcgService).getAccount(ctx, new GetAccountRequest());
-    verify(fetchTcgService).findSets(ctx, new FindSetsRequest("mtg", "dom"));
-    verify(fetchTcgService)
-        .findCards(ctx, new FindCardsRequest("mtg", 2624, "Card 1", "normal", 100, null));
-    verify(fetchTcgService).getCard(ctx, new GetCardRequest("mtg_168_c_dom_normal"));
-    verify(fetchTcgService)
-        .findCardListings(ctx, new FindCardListingsRequest("mtg_168_c_dom_normal", 100, null));
-    verifyNoMoreInteractions(fetchTcgService);
+    verify(pricingService).getPrice(ctx, new GetPriceRequest("mtg_168_c_dom_normal", Condition.NM));
     var row = getRow("jordan", "import1", 1);
     assertThat(row.getMarketPrice()).isEqualTo("1.20");
     assertThat(row.getSuggestedPrice()).isEqualTo("1.20");
+  }
+
+  @Test
+  void appraiseShouldRequestFreshPricingForRepeatedResolvedRows() throws Exception {
+    // arrange
+    createImportWithNRows("jordan", "import1", 2);
+    var jobItem = createJob("jordan", "job1", "appraise", "queued", "import1");
+    fakeFetchTcgService.seedSearchResult(
+        "mtg", 2624, "Card 1", "normal", List.of(new CardSearchResult("shared-card")));
+    fakeFetchTcgService.seedSearchResult(
+        "mtg", 2624, "Card 2", "normal", List.of(new CardSearchResult("shared-card")));
+    seedCard(
+        "shared-card",
+        new GetCardResponse(
+            "shared-card", "Card", BigDecimal.ONE, Map.of("scryfallId", SCRYFALL_ID)));
+    var pricingService = mock(PricingService.class);
+    var ctx = new RequestContext("jordan");
+    var request = new GetPriceRequest("shared-card", Condition.NM);
+    when(pricingService.getPrice(ctx, request))
+        .thenReturn(new GetPriceResponse(new BigDecimal("1.00"), new BigDecimal("0.95")));
+
+    // act
+    newAppraiseJobProcessor(fakeFetchTcgService, pricingService).processBatch("jordan", jobItem);
+
+    // assert
+    verify(pricingService, times(2)).getPrice(ctx, request);
+    assertThat(getRow("jordan", "import1", 1).getSuggestedPrice()).isEqualTo("0.95");
+    assertThat(getRow("jordan", "import1", 2).getSuggestedPrice()).isEqualTo("0.95");
   }
 
   @Test
@@ -305,7 +312,7 @@ public class JobsHandlerIntegrationTest {
             List.of(new CardListing(1, "raw-nm", new BigDecimal("0.25"), "rival1")));
 
     // act
-    newAppraiseJobProcessor(factory.fakeFetchTcgService()).processBatch("jordan", jobItem);
+    newAppraiseJobProcessor().processBatch("jordan", jobItem);
 
     // assert
     assertThat(getRow("jordan", "import1", 1).getSuggestedPrice()).isEqualTo("0.25");
@@ -416,10 +423,7 @@ public class JobsHandlerIntegrationTest {
     var jobItem = createJob("jordan", "job1", "appraise", "queued", "import1");
 
     // act/assert
-    assertThatThrownBy(
-            () ->
-                newAppraiseJobProcessor(factory.fakeFetchTcgService())
-                    .processBatch("jordan", jobItem))
+    assertThatThrownBy(() -> newAppraiseJobProcessor().processBatch("jordan", jobItem))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("unsupported finish for game: foil-etched");
   }
@@ -498,12 +502,15 @@ public class JobsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createImportWithRow("jordan", "import1", "dom", "168", "normal", "NM", "ja");
-    createJob("jordan", "job1", "appraise", "queued", "import1");
+    var jobItem = createJob("jordan", "job1", "appraise", "queued", "import1");
+    var pricingService = mock(PricingService.class);
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
+    newAppraiseJobProcessor(factory.fakeFetchTcgService(), pricingService)
+        .processBatch("jordan", jobItem);
 
     // assert
+    verifyNoInteractions(pricingService);
     var row = getRow("jordan", "import1", 1);
     assertThat(row.getDecision()).isEqualTo("review");
     assertThat(row.getDecisionReason()).isEqualTo("non-english");
@@ -678,10 +685,7 @@ public class JobsHandlerIntegrationTest {
     var jobItem = createJob("jordan", "job1", "appraise", "queued", "import1");
 
     // act & assert
-    assertThatThrownBy(
-            () ->
-                newAppraiseJobProcessor(factory.fakeFetchTcgService())
-                    .processBatch("jordan", jobItem))
+    assertThatThrownBy(() -> newAppraiseJobProcessor().processBatch("jordan", jobItem))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("external id must contain only ASCII unreserved characters");
     assertThat(getRow("jordan", "import1", 1).getDecision()).isNull();
@@ -2232,9 +2236,19 @@ public class JobsHandlerIntegrationTest {
     factory.fakeFetchTcgService().seedCard(cardId, response);
   }
 
-  private AppraiseJobProcessor newAppraiseJobProcessor(FetchTcgService fetchTcgService) {
+  private AppraiseJobProcessor newAppraiseJobProcessor() {
     return new AppraiseJobProcessor(
-        importTable, importRowTable, fakeClock, fetchTcgService, pricingRepository);
+        importTable,
+        importRowTable,
+        fakeClock,
+        factory.fakeFetchTcgService(),
+        factory.pricingService());
+  }
+
+  private AppraiseJobProcessor newAppraiseJobProcessor(
+      FetchTcgService fetchTcgService, PricingService pricingService) {
+    return new AppraiseJobProcessor(
+        importTable, importRowTable, fakeClock, fetchTcgService, pricingService);
   }
 
   private void createImportWithRow(

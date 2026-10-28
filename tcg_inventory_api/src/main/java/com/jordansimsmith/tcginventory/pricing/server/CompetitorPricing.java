@@ -1,10 +1,10 @@
-package com.jordansimsmith.tcginventory.pricing;
+package com.jordansimsmith.tcginventory.pricing.server;
 
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
-import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsRequest;
+import com.jordansimsmith.tcginventory.pricing.client.Condition;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -35,8 +35,8 @@ public class CompetitorPricing {
           continue;
         }
 
-        var listingCondition = Condition.fromFetchtcg(listing.condition());
-        if (listingCondition == null || !listingCondition.isSameOrBetterThan(condition)) {
+        var listingCondition = fromFetchTcg(listing.condition());
+        if (listingCondition == null || listingCondition.ordinal() > condition.ordinal()) {
           continue;
         }
         priceToSellers
@@ -51,5 +51,19 @@ public class CompetitorPricing {
       tiers.add(new CompetitorPriceTier(entry.getKey(), entry.getValue()));
     }
     return tiers;
+  }
+
+  private Condition fromFetchTcg(String condition) {
+    if (condition == null) {
+      return null;
+    }
+    return switch (condition) {
+      case "raw-nm" -> Condition.NM;
+      case "raw-lp" -> Condition.LP;
+      case "raw-mp" -> Condition.MP;
+      case "raw-hp" -> Condition.HP;
+      case "raw-d" -> Condition.DMG;
+      default -> null;
+    };
   }
 }

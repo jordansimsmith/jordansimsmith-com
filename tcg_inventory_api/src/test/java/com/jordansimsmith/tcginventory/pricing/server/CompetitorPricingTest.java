@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory.pricing;
+package com.jordansimsmith.tcginventory.pricing.server;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.catchThrowable;
@@ -8,12 +8,12 @@ import static org.mockito.Mockito.when;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.service.ServiceUnavailableException;
-import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.fetchtcg.client.CardListing;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsResponse;
+import com.jordansimsmith.tcginventory.pricing.client.Condition;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;

@@ -18,6 +18,7 @@ import com.jordansimsmith.tcginventory.inventory.SequenceCounterItem;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
+import com.jordansimsmith.tcginventory.pricing.client.PricingService;
 import com.jordansimsmith.tcginventory.reports.ReportItem;
 import com.jordansimsmith.tcginventory.scans.ScanItem;
 import com.jordansimsmith.tcginventory.scans.ScanMessage;
@@ -96,6 +97,8 @@ public interface TcgInventoryTestFactory extends CatalogFactory {
   DynamoDbTable<SequenceCounterItem> sequenceCounterTable();
 
   ScanRepository scanRepository();
+
+  PricingService pricingService();
 
   @Component.Factory
   interface Factory {

@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory.pricing;
+package com.jordansimsmith.tcginventory.pricing.server;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -39,7 +39,8 @@ public class PricingPolicyTest {
 
     // act
     var result =
-        policy.calculatePrice(new BigDecimal("5.00"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
+        policy.calculatePrice(
+            new BigDecimal("5.00"), competitors, GetPriceService.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result).isEqualByComparingTo("4.85");
@@ -53,7 +54,8 @@ public class PricingPolicyTest {
 
     // act
     var result =
-        policy.calculatePrice(new BigDecimal("1.00"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
+        policy.calculatePrice(
+            new BigDecimal("1.00"), competitors, GetPriceService.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result).isEqualByComparingTo("1.00");
@@ -69,7 +71,8 @@ public class PricingPolicyTest {
 
     // act
     var result =
-        policy.calculatePrice(new BigDecimal("1.40"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
+        policy.calculatePrice(
+            new BigDecimal("1.40"), competitors, GetPriceService.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result).isEqualByComparingTo("0.75");
@@ -85,7 +88,8 @@ public class PricingPolicyTest {
 
     // act
     var result =
-        policy.calculatePrice(new BigDecimal("1.01"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
+        policy.calculatePrice(
+            new BigDecimal("1.01"), competitors, GetPriceService.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(result).isEqualByComparingTo("1.00");
@@ -99,7 +103,8 @@ public class PricingPolicyTest {
 
     // act
     var defaultFloor =
-        policy.calculatePrice(new BigDecimal("0.30"), competitors, Pricing.DEFAULT_PRICE_FLOOR);
+        policy.calculatePrice(
+            new BigDecimal("0.30"), competitors, GetPriceService.DEFAULT_PRICE_FLOOR);
     var lowerFloor =
         policy.calculatePrice(new BigDecimal("0.30"), competitors, new BigDecimal("0.10"));
     var zeroFloor = policy.calculatePrice(new BigDecimal("0.30"), competitors, BigDecimal.ZERO);
@@ -122,7 +127,8 @@ public class PricingPolicyTest {
     var marketPrice = new BigDecimal("0.10");
 
     // act
-    var defaultFloor = policy.calculatePrice(marketPrice, List.of(), Pricing.DEFAULT_PRICE_FLOOR);
+    var defaultFloor =
+        policy.calculatePrice(marketPrice, List.of(), GetPriceService.DEFAULT_PRICE_FLOOR);
     var lowerFloor = policy.calculatePrice(marketPrice, List.of(), new BigDecimal("0.05"));
     var zeroFloor = policy.calculatePrice(marketPrice, List.of(), BigDecimal.ZERO);
     var centValuedFloor = policy.calculatePrice(marketPrice, List.of(), new BigDecimal("0.13"));
@@ -145,10 +151,11 @@ public class PricingPolicyTest {
 
     // act
     var smallPrice =
-        policy.calculatePrice(new BigDecimal("1.00"), smallCompetitor, Pricing.DEFAULT_PRICE_FLOOR);
+        policy.calculatePrice(
+            new BigDecimal("1.00"), smallCompetitor, GetPriceService.DEFAULT_PRICE_FLOOR);
     var largePrice =
         policy.calculatePrice(
-            new BigDecimal("10.00"), largeCompetitor, Pricing.DEFAULT_PRICE_FLOOR);
+            new BigDecimal("10.00"), largeCompetitor, GetPriceService.DEFAULT_PRICE_FLOOR);
 
     // assert
     assertThat(smallPrice).isEqualByComparingTo("0.95");
@@ -157,7 +164,8 @@ public class PricingPolicyTest {
 
   private void assertPrice(String marketPrice, String expectedPrice) {
     var result =
-        policy.calculatePrice(new BigDecimal(marketPrice), List.of(), Pricing.DEFAULT_PRICE_FLOOR);
+        policy.calculatePrice(
+            new BigDecimal(marketPrice), List.of(), GetPriceService.DEFAULT_PRICE_FLOOR);
     assertThat(result).isEqualByComparingTo(expectedPrice);
   }
 }

@@ -5,24 +5,21 @@ import com.jordansimsmith.dynamodb.Continuations;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.service.ServiceUnavailableException;
-import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobProcessor;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
-import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountRequest;
-import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardRequest;
-import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
 import com.jordansimsmith.tcginventory.games.client.Game;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
+import com.jordansimsmith.tcginventory.pricing.client.Condition;
+import com.jordansimsmith.tcginventory.pricing.client.GetPriceRequest;
+import com.jordansimsmith.tcginventory.pricing.client.PricingService;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
 import java.math.BigDecimal;
 import java.util.HashMap;
-import java.util.List;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
@@ -34,10 +31,7 @@ public class RepriceJobProcessor implements JobProcessor {
   private final DynamoDbTable<SkuItem> skuTable;
   private final InventoryRepository inventoryRepository;
   private final ObjectMapper objectMapper;
-  private final FetchTcgService fetchTcgService;
-  private final CompetitorPricing competitorPricing;
-  private final PricingPolicy pricingPolicy;
-  private final PricingRepository pricingRepository;
+  private final PricingService pricingService;
   private final Clock clock;
   private final UlidGenerator ulidGenerator;
   private final GamesService gamesService;
@@ -46,8 +40,7 @@ public class RepriceJobProcessor implements JobProcessor {
       DynamoDbTable<SkuItem> skuTable,
       InventoryRepository inventoryRepository,
       ObjectMapper objectMapper,
-      FetchTcgService fetchTcgService,
-      PricingRepository pricingRepository,
+      PricingService pricingService,
       Clock clock,
       UlidGenerator ulidGenerator,
       GamesService gamesService) {
@@ -57,10 +50,7 @@ public class RepriceJobProcessor implements JobProcessor {
     this.skuTable = skuTable;
     this.inventoryRepository = inventoryRepository;
     this.objectMapper = objectMapper;
-    this.fetchTcgService = fetchTcgService;
-    this.competitorPricing = new CompetitorPricing(fetchTcgService);
-    this.pricingPolicy = new PricingPolicy();
-    this.pricingRepository = pricingRepository;
+    this.pricingService = pricingService;
   }
 
   @Override
@@ -68,7 +58,7 @@ public class RepriceJobProcessor implements JobProcessor {
     try {
       return doProcessBatch(user, jobItem);
     } catch (ServiceUnavailableException e) {
-      throw new RuntimeException("FetchTCG pricing lookup failed", e);
+      throw new RuntimeException("pricing lookup failed", e);
     } catch (ServiceException e) {
       return new FailureJobResult(e.getMessage());
     } catch (UnpriceableSkuException e) {
@@ -98,13 +88,8 @@ public class RepriceJobProcessor implements JobProcessor {
       return new SuccessJobResult(previousProcessedCount, null);
     }
     var candidates = page.items();
-    var priceFloor = currentPriceFloor(user);
-
     var ctx = new RequestContext(user);
-    var sellerUsername = fetchTcgService.getAccount(ctx, new GetAccountRequest()).sellerUsername();
     var gamesById = new HashMap<String, Game>();
-    var cardCache = new HashMap<String, GetCardResponse>();
-    var competitorCache = new HashMap<CompetitorKey, List<CompetitorPricing.CompetitorPriceTier>>();
     for (var candidate : candidates) {
       var skuId = candidate.getSkuId();
       if (skuId == null || skuId.isBlank()) {
@@ -144,23 +129,7 @@ public class RepriceJobProcessor implements JobProcessor {
       if (cardId == null || cardId.isBlank()) {
         throw new UnpriceableSkuException("SKU has no FetchTCG card ID: " + skuId);
       }
-      var card = cardCache.get(cardId);
-      if (card == null) {
-        card = fetchTcgService.getCard(ctx, new GetCardRequest(cardId));
-        cardCache.put(cardId, card);
-      }
-      if (card == null || !cardId.equals(card.id())) {
-        throw new UnpriceableSkuException("FetchTCG card identity did not match SKU " + skuId);
-      }
-      var marketPrice = Pricing.marketPrice(card.marketPrice());
-      var key = new CompetitorKey(cardId, condition);
-      var competitors = competitorCache.get(key);
-      if (competitors == null) {
-        competitors =
-            competitorPricing.findCompetitorPriceTiers(ctx, cardId, condition, sellerUsername);
-        competitorCache.put(key, competitors);
-      }
-      var afterPrice = pricingPolicy.calculatePrice(marketPrice, competitors, priceFloor);
+      var price = pricingService.getPrice(ctx, new GetPriceRequest(cardId, condition));
 
       inventoryRepository.updateSkuPrice(
           user,
@@ -168,29 +137,13 @@ public class RepriceJobProcessor implements JobProcessor {
           version,
           jobId,
           beforePrice,
-          afterPrice.toPlainString(),
+          price.suggestedPrice().toPlainString(),
           ulidGenerator.generate(),
           clock.now());
     }
 
     var continuation = Continuations.encode(page.lastEvaluatedKey(), objectMapper);
     return new SuccessJobResult(previousProcessedCount + candidates.size(), continuation);
-  }
-
-  private BigDecimal currentPriceFloor(String user) {
-    var pricingItem = pricingRepository.get(user);
-    if (pricingItem == null || pricingItem.getPriceFloor() == null) {
-      return Pricing.DEFAULT_PRICE_FLOOR;
-    }
-    try {
-      var priceFloor = new BigDecimal(pricingItem.getPriceFloor());
-      if (priceFloor.signum() < 0) {
-        throw new UnpriceableSkuException("saved price floor is invalid");
-      }
-      return priceFloor.setScale(2);
-    } catch (NumberFormatException | ArithmeticException e) {
-      throw new UnpriceableSkuException("saved price floor is invalid");
-    }
   }
 
   private SkuItem getSku(String user, String skuId) {
@@ -233,8 +186,6 @@ public class RepriceJobProcessor implements JobProcessor {
     }
     return value;
   }
-
-  private record CompetitorKey(String cardId, Condition condition) {}
 
   private static class UnpriceableSkuException extends RuntimeException {
     UnpriceableSkuException(String message) {

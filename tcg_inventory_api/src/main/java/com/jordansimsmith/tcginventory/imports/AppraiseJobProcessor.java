@@ -4,20 +4,15 @@ import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.CardIdentity;
-import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobProcessor;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
-import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountRequest;
-import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
 import com.jordansimsmith.tcginventory.imports.AppraisalCatalogs.AppraisalCatalog;
-import com.jordansimsmith.tcginventory.pricing.CompetitorPricing;
-import com.jordansimsmith.tcginventory.pricing.Pricing;
-import com.jordansimsmith.tcginventory.pricing.PricingPolicy;
-import com.jordansimsmith.tcginventory.pricing.PricingRepository;
+import com.jordansimsmith.tcginventory.pricing.client.Condition;
+import com.jordansimsmith.tcginventory.pricing.client.GetPriceRequest;
+import com.jordansimsmith.tcginventory.pricing.client.PricingService;
 import com.jordansimsmith.time.Clock;
-import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.Map;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -30,25 +25,21 @@ public class AppraiseJobProcessor implements JobProcessor {
   private final DynamoDbTable<ImportRowItem> importRowTable;
   private final Clock clock;
   private final FetchTcgService fetchTcgService;
-  private final CompetitorPricing competitorPricing;
+  private final PricingService pricingService;
   private final AppraisalPolicy appraisalPolicy;
-  private final PricingPolicy pricingPolicy;
-  private final PricingRepository pricingRepository;
 
   public AppraiseJobProcessor(
       DynamoDbTable<ImportItem> importTable,
       DynamoDbTable<ImportRowItem> importRowTable,
       Clock clock,
       FetchTcgService fetchTcgService,
-      PricingRepository pricingRepository) {
+      PricingService pricingService) {
     this.importTable = importTable;
     this.importRowTable = importRowTable;
     this.clock = clock;
     this.fetchTcgService = fetchTcgService;
-    this.competitorPricing = new CompetitorPricing(fetchTcgService);
+    this.pricingService = pricingService;
     this.appraisalPolicy = new AppraisalPolicy();
-    this.pricingPolicy = new PricingPolicy();
-    this.pricingRepository = pricingRepository;
   }
 
   @Override
@@ -56,7 +47,7 @@ public class AppraiseJobProcessor implements JobProcessor {
     try {
       return doProcessBatch(user, jobItem);
     } catch (ServiceUnavailableException e) {
-      throw new RuntimeException("FetchTCG pricing lookup failed", e);
+      throw new RuntimeException("pricing lookup failed", e);
     } catch (ServiceException e) {
       setImportError(user, jobItem.getImportId(), e.getMessage());
       return new JobProcessor.FailureJobResult(e.getMessage());
@@ -76,12 +67,6 @@ public class AppraiseJobProcessor implements JobProcessor {
             .build();
     var importItem = importTable.getItem(importKey);
     var totalRows = importItem.getRowCount() != null ? importItem.getRowCount() : 0;
-    var pricingItem = pricingRepository.get(user);
-    var priceFloor =
-        pricingItem == null || pricingItem.getPriceFloor() == null
-            ? Pricing.DEFAULT_PRICE_FLOOR
-            : new BigDecimal(pricingItem.getPriceFloor());
-
     int batchEnd = Math.min(continuation + BATCH_SIZE, totalRows);
     int processed = continuation;
 
@@ -89,8 +74,6 @@ public class AppraiseJobProcessor implements JobProcessor {
     var appraisalCatalog = AppraisalCatalogs.get(importItem.getGame());
     Map<String, AppraisalCatalog.ResolvedCard> batchCache = new HashMap<>();
     Map<String, GetCardResponse> cardCache = new HashMap<>();
-    Map<String, BigDecimal> marketPriceCache = new HashMap<>();
-    var sellerUsername = fetchTcgService.getAccount(ctx, new GetAccountRequest()).sellerUsername();
 
     for (int i = continuation + 1; i <= batchEnd; i++) {
       var rowKey =
@@ -105,16 +88,7 @@ public class AppraiseJobProcessor implements JobProcessor {
       }
 
       var decision =
-          appraiseRow(
-              importItem.getGame(),
-              appraisalCatalog,
-              rowItem,
-              priceFloor,
-              sellerUsername,
-              batchCache,
-              cardCache,
-              marketPriceCache,
-              ctx);
+          appraiseRow(importItem.getGame(), appraisalCatalog, rowItem, batchCache, cardCache, ctx);
       rowItem.setDecision(decision.decision());
       rowItem.setDecisionReason(decision.reason());
       rowItem.setMarketPrice(decision.marketPrice());
@@ -153,11 +127,8 @@ public class AppraiseJobProcessor implements JobProcessor {
       String game,
       AppraisalCatalog appraisalCatalog,
       ImportRowItem rowItem,
-      BigDecimal priceFloor,
-      String sellerUsername,
       Map<String, AppraisalCatalog.ResolvedCard> batchCache,
       Map<String, GetCardResponse> cardCache,
-      Map<String, BigDecimal> marketPriceCache,
       RequestContext ctx)
       throws ServiceException {
     var identity = new CardIdentity(game, rowItem.getExternalId());
@@ -181,32 +152,17 @@ public class AppraiseJobProcessor implements JobProcessor {
       batchCache.put(dedupeKey, cached);
     }
 
-    var marketPrice = marketPriceCache.get(cached.cardId());
-    if (marketPrice == null) {
-      var card = cardCache.get(cached.cardId());
-      if (card == null) {
-        card = fetchTcgService.getCard(ctx, new GetCardRequest(cached.cardId()));
-        cardCache.put(cached.cardId(), card);
-      }
-      if (!cached.cardId().equals(card.id())) {
-        throw new IllegalStateException("FetchTCG card identity did not match resolved card");
-      }
-      marketPrice = Pricing.marketPrice(card.marketPrice());
-      marketPriceCache.put(cached.cardId(), marketPrice);
-    }
-
-    var competitors =
-        competitorPricing.findCompetitorPriceTiers(
-            ctx, cached.cardId(), Condition.valueOf(rowItem.getCondition()), sellerUsername);
-    var suggestedPrice = pricingPolicy.calculatePrice(marketPrice, competitors, priceFloor);
-    var result = appraisalPolicy.appraise(marketPrice, suggestedPrice);
+    var price =
+        pricingService.getPrice(
+            ctx, new GetPriceRequest(cached.cardId(), Condition.valueOf(rowItem.getCondition())));
+    var result = appraisalPolicy.appraise(price.marketPrice(), price.suggestedPrice());
 
     if (result.decision() == AppraisalPolicy.Decision.DISCARD) {
-      return RowDecision.discard("below threshold", marketPrice.toPlainString());
+      return RowDecision.discard("below threshold", price.marketPrice().toPlainString());
     }
 
     return RowDecision.keep(
-        marketPrice.toPlainString(),
+        price.marketPrice().toPlainString(),
         result.suggestedPrice().toPlainString(),
         cached.cardId(),
         cached.setId());

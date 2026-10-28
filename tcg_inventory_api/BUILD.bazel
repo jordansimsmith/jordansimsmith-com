@@ -148,6 +148,8 @@ java_library(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/server",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/server",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/server",
     ] + COMMON_DEPS,
 )
 
@@ -174,10 +176,10 @@ java_library(
     deps = [
         ":inventory-lib",
         ":lib",
-        ":pricing-lib",
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
     ] + COMMON_DEPS,
 )
 
@@ -261,6 +263,7 @@ java_library(
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
     ] + COMMON_DEPS,
 )
 
@@ -1257,6 +1260,8 @@ java_library(
         "//lib/ulid:test-lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/server",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/client:test-lib",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/games/client:test-lib",
         "//third_party/dagger",
@@ -1393,6 +1398,7 @@ java_test_suite(
         "//lib/ulid:test-lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/client:test-lib",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/games/client:test-lib",
         "@maven//:ch_qos_logback_logback_classic",
