@@ -13,7 +13,9 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
-import com.jordansimsmith.tcginventory.games.Games;
+import com.jordansimsmith.tcginventory.games.client.Game;
+import com.jordansimsmith.tcginventory.games.client.GamesService;
+import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.time.Clock;
@@ -38,6 +40,7 @@ public class RepriceJobProcessor implements JobProcessor {
   private final PricingRepository pricingRepository;
   private final Clock clock;
   private final UlidGenerator ulidGenerator;
+  private final GamesService gamesService;
 
   public RepriceJobProcessor(
       DynamoDbTable<SkuItem> skuTable,
@@ -46,9 +49,11 @@ public class RepriceJobProcessor implements JobProcessor {
       FetchTcgService fetchTcgService,
       PricingRepository pricingRepository,
       Clock clock,
-      UlidGenerator ulidGenerator) {
+      UlidGenerator ulidGenerator,
+      GamesService gamesService) {
     this.clock = clock;
     this.ulidGenerator = ulidGenerator;
+    this.gamesService = gamesService;
     this.skuTable = skuTable;
     this.inventoryRepository = inventoryRepository;
     this.objectMapper = objectMapper;
@@ -97,6 +102,7 @@ public class RepriceJobProcessor implements JobProcessor {
 
     var ctx = new RequestContext(user);
     var sellerUsername = fetchTcgService.getAccount(ctx, new GetAccountRequest()).sellerUsername();
+    var gamesById = new HashMap<String, Game>();
     var cardCache = new HashMap<String, GetCardResponse>();
     var competitorCache = new HashMap<CompetitorKey, List<CompetitorPricing.CompetitorPriceTier>>();
     for (var candidate : candidates) {
@@ -108,9 +114,13 @@ public class RepriceJobProcessor implements JobProcessor {
       if (sku == null) {
         throw new UnpriceableSkuException("SKU not found: " + skuId);
       }
-      var game = requireGame(sku);
+      var game = gamesById.get(sku.getGame());
+      if (game == null) {
+        game = gamesService.getGame(ctx, new GetGameRequest(sku.getGame())).game();
+        gamesById.put(sku.getGame(), game);
+      }
       var condition = requireCondition(sku);
-      if (!game.supportsFinish(sku.getFinish())) {
+      if (game.finishes().stream().noneMatch(finish -> finish.id().equals(sku.getFinish()))) {
         throw new UnpriceableSkuException("unsupported finish for SKU " + skuId);
       }
       var version = sku.getVersion();
@@ -190,14 +200,6 @@ public class RepriceJobProcessor implements JobProcessor {
             .sortValue(SkuItem.formatSk())
             .build();
     return skuTable.getItem(request -> request.key(key).consistentRead(true));
-  }
-
-  private Games.Game requireGame(SkuItem sku) {
-    try {
-      return Games.get(sku.getGame());
-    } catch (IllegalArgumentException e) {
-      throw new UnpriceableSkuException("unsupported game for SKU " + sku.getSkuId());
-    }
   }
 
   private Condition requireCondition(SkuItem sku) {

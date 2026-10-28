@@ -3,8 +3,8 @@ package com.jordansimsmith.tcginventory.catalog;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.jordansimsmith.tcginventory.games.Games;
-import com.jordansimsmith.tcginventory.games.Games.Game;
+import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
+import com.jordansimsmith.tcginventory.games.client.Game;
 import com.jordansimsmith.time.FakeClock;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -58,7 +58,7 @@ public class TcgPlayerCatalogTest {
     var fixture = new Fixture("pokemon", snapshot("pokemon", "snapshot-1", "Pikachu", 123));
 
     // act
-    var card = fixture.catalog().getCard("123");
+    var card = fixture.catalog().getCard(FakeGamesService.POKEMON_ENGLISH, "123");
 
     // assert
     assertThat(card.game()).isEqualTo("pokemon");
@@ -80,9 +80,10 @@ public class TcgPlayerCatalogTest {
     var catalog = fixture.catalog();
 
     // act / assert
-    assertThatThrownBy(() -> catalog.getCard("pokemon-123"))
+    assertThatThrownBy(() -> catalog.getCard(FakeGamesService.POKEMON_ENGLISH, "pokemon-123"))
         .isInstanceOf(CatalogException.NotFound.class);
-    assertThatThrownBy(() -> catalog.getCard("999")).isInstanceOf(CatalogException.NotFound.class);
+    assertThatThrownBy(() -> catalog.getCard(FakeGamesService.POKEMON_ENGLISH, "999"))
+        .isInstanceOf(CatalogException.NotFound.class);
     assertThat(fixture.repository.latestSnapshotRequests).isEqualTo(1);
   }
 
@@ -93,7 +94,9 @@ public class TcgPlayerCatalogTest {
     var catalog = fixture.catalog();
 
     // act
-    var cards = catalog.findCards(List.of("product-alpha", "123", "123", "999"));
+    var cards =
+        catalog.findCards(
+            FakeGamesService.POKEMON_ENGLISH, List.of("product-alpha", "123", "123", "999"));
 
     // assert
     assertThat(cards).containsOnlyKeys("123");
@@ -106,7 +109,7 @@ public class TcgPlayerCatalogTest {
     var fixture = new Fixture("pokemon", snapshot("pokemon", "snapshot-1", "Pikachu", 123));
 
     // act
-    var cards = fixture.catalog().findCards(List.of());
+    var cards = fixture.catalog().findCards(FakeGamesService.POKEMON_ENGLISH, List.of());
 
     // assert
     assertThat(cards).isEmpty();
@@ -132,22 +135,36 @@ public class TcgPlayerCatalogTest {
     var catalog = fixture.catalog();
 
     // act
-    var ordinary = catalog.search("  PIKACHU  ", "normal", null);
-    var treatment = catalog.search("pikachu (master ball)", "holofoil", null);
+    var ordinary = catalog.search(FakeGamesService.POKEMON_ENGLISH, "  PIKACHU  ", "normal", null);
+    var treatment =
+        catalog.search(FakeGamesService.POKEMON_ENGLISH, "pikachu (master ball)", "holofoil", null);
 
     // assert
     assertThat(ordinary.cards()).extracting(CatalogCard::externalId).containsExactly("1", "4");
     assertThat(treatment.cards())
         .extracting(CatalogCard::name)
         .containsExactly("Pikachu (Master Ball)");
-    assertThat(catalog.search("Pikachu", "holofoil", null).cards()).hasSize(1);
-    assertThat(catalog.search("Flabebe", "normal", null).cards()).isEmpty();
-    assertThat(catalog.search("FLABÉBÉ", "normal", null).cards()).hasSize(1);
-    assertThat(catalog.search("Pikachu ex", "normal", null).cards()).isEmpty();
-    assertThat(catalog.search("Pikachu  ex", "normal", null).cards()).hasSize(1);
-    assertThat(catalog.search("Pikachu.*", "normal", null).cards()).isEmpty();
-    assertThat(catalog.search("sv2", "holofoil", null).cards()).isEmpty();
-    assertThat(catalog.search("025/165", "holofoil", null).cards()).isEmpty();
+    assertThat(
+            catalog.search(FakeGamesService.POKEMON_ENGLISH, "Pikachu", "holofoil", null).cards())
+        .hasSize(1);
+    assertThat(catalog.search(FakeGamesService.POKEMON_ENGLISH, "Flabebe", "normal", null).cards())
+        .isEmpty();
+    assertThat(catalog.search(FakeGamesService.POKEMON_ENGLISH, "FLABÉBÉ", "normal", null).cards())
+        .hasSize(1);
+    assertThat(
+            catalog.search(FakeGamesService.POKEMON_ENGLISH, "Pikachu ex", "normal", null).cards())
+        .isEmpty();
+    assertThat(
+            catalog.search(FakeGamesService.POKEMON_ENGLISH, "Pikachu  ex", "normal", null).cards())
+        .hasSize(1);
+    assertThat(
+            catalog.search(FakeGamesService.POKEMON_ENGLISH, "Pikachu.*", "normal", null).cards())
+        .isEmpty();
+    assertThat(catalog.search(FakeGamesService.POKEMON_ENGLISH, "sv2", "holofoil", null).cards())
+        .isEmpty();
+    assertThat(
+            catalog.search(FakeGamesService.POKEMON_ENGLISH, "025/165", "holofoil", null).cards())
+        .isEmpty();
     assertThat(fixture.repository.latestSnapshotRequests).isEqualTo(1);
   }
 
@@ -159,7 +176,8 @@ public class TcgPlayerCatalogTest {
 
     // act / assert
     for (var query : List.of("", "  ", " a ", "a".repeat(201))) {
-      assertThatThrownBy(() -> catalog.search(query, "normal", null))
+      assertThatThrownBy(
+              () -> catalog.search(FakeGamesService.POKEMON_ENGLISH, query, "normal", null))
           .isInstanceOf(CatalogException.BadRequest.class)
           .hasMessage("query must contain between 2 and 200 characters");
     }
@@ -181,14 +199,16 @@ public class TcgPlayerCatalogTest {
     for (var product : products) {
       var finish = product.availableFinishes().getFirst();
       var expectedId = Integer.toString(product.productId());
-      assertThat(catalog.search("Pikachu", finish, null).cards())
+      assertThat(catalog.search(FakeGamesService.POKEMON_ENGLISH, "Pikachu", finish, null).cards())
           .extracting(CatalogCard::externalId)
           .containsExactly(expectedId);
-      assertThat(catalog.findAlternatives("1", finish, null).cards())
+      assertThat(
+              catalog.findAlternatives(FakeGamesService.POKEMON_ENGLISH, "1", finish, null).cards())
           .extracting(CatalogCard::externalId)
           .containsExactly(expectedId);
     }
-    assertThat(catalog.getCard("1").availableFinishes()).containsExactly("normal");
+    assertThat(catalog.getCard(FakeGamesService.POKEMON_ENGLISH, "1").availableFinishes())
+        .containsExactly("normal");
   }
 
   @Test
@@ -211,14 +231,17 @@ public class TcgPlayerCatalogTest {
             .catalog();
 
     // act
-    var ordinary = catalog.findAlternatives("2", "normal", null);
-    var treatment = catalog.findAlternatives("3", "normal", null);
+    var ordinary = catalog.findAlternatives(FakeGamesService.POKEMON_ENGLISH, "2", "normal", null);
+    var treatment = catalog.findAlternatives(FakeGamesService.POKEMON_ENGLISH, "3", "normal", null);
 
     // assert
     assertThat(ordinary.cards()).extracting(CatalogCard::externalId).containsExactly("2", "1");
     assertThat(ordinary.cards()).extracting(CatalogCard::setCode).containsExactly("sv2", "sv1");
     assertThat(treatment.cards()).extracting(CatalogCard::externalId).containsExactly("3");
-    assertThatThrownBy(() -> catalog.findAlternatives("opaque-missing-id", "normal", null))
+    assertThatThrownBy(
+            () ->
+                catalog.findAlternatives(
+                    FakeGamesService.POKEMON_ENGLISH, "opaque-missing-id", "normal", null))
         .isInstanceOf(CatalogException.NotFound.class);
     assertThat(ordinary.nextContinuation()).isNull();
   }
@@ -230,8 +253,9 @@ public class TcgPlayerCatalogTest {
         new Fixture("pokemon", snapshot("pokemon", "snapshot-1", "Pikachu", 123)).catalog();
 
     // act
-    var search = catalog.search("Missing", "normal", null);
-    var alternatives = catalog.findAlternatives("123", "reverse_holofoil", null);
+    var search = catalog.search(FakeGamesService.POKEMON_ENGLISH, "Missing", "normal", null);
+    var alternatives =
+        catalog.findAlternatives(FakeGamesService.POKEMON_ENGLISH, "123", "reverse_holofoil", null);
 
     // assert
     assertThat(search.cards()).isEmpty();
@@ -254,9 +278,13 @@ public class TcgPlayerCatalogTest {
         new Fixture("pokemon", snapshotWithProducts("pokemon", "snapshot-1", products)).catalog();
 
     // act
-    var first = catalog.search("Pikachu", "normal", null);
-    var second = catalog.search(" PIKACHU ", "normal", first.nextContinuation());
-    var third = catalog.search("Pikachu", "normal", second.nextContinuation());
+    var first = catalog.search(FakeGamesService.POKEMON_ENGLISH, "Pikachu", "normal", null);
+    var second =
+        catalog.search(
+            FakeGamesService.POKEMON_ENGLISH, " PIKACHU ", "normal", first.nextContinuation());
+    var third =
+        catalog.search(
+            FakeGamesService.POKEMON_ENGLISH, "Pikachu", "normal", second.nextContinuation());
 
     // assert
     assertThat(first.cards())
@@ -285,9 +313,13 @@ public class TcgPlayerCatalogTest {
         new Fixture("pokemon", snapshotWithProducts("pokemon", "snapshot-1", products)).catalog();
 
     // act
-    var first = catalog.findAlternatives("41", "normal", null);
-    var second = catalog.findAlternatives("41", "normal", first.nextContinuation());
-    var third = catalog.findAlternatives("41", "normal", second.nextContinuation());
+    var first = catalog.findAlternatives(FakeGamesService.POKEMON_ENGLISH, "41", "normal", null);
+    var second =
+        catalog.findAlternatives(
+            FakeGamesService.POKEMON_ENGLISH, "41", "normal", first.nextContinuation());
+    var third =
+        catalog.findAlternatives(
+            FakeGamesService.POKEMON_ENGLISH, "41", "normal", second.nextContinuation());
 
     // assert
     assertThat(first.cards())
@@ -316,7 +348,7 @@ public class TcgPlayerCatalogTest {
         new Fixture("pokemon", snapshotWithProducts("pokemon", "snapshot-1", products)).catalog();
 
     // act
-    var page = catalog.search("Pikachu", "normal", null);
+    var page = catalog.search(FakeGamesService.POKEMON_ENGLISH, "Pikachu", "normal", null);
 
     // assert
     assertThat(page.cards()).hasSize(20);
@@ -336,7 +368,9 @@ public class TcgPlayerCatalogTest {
 
     // act / assert
     for (var malformed : List.of("", "!", "YWJj")) {
-      assertThatThrownBy(() -> catalog.search("Pikachu", "normal", malformed))
+      assertThatThrownBy(
+              () ->
+                  catalog.search(FakeGamesService.POKEMON_ENGLISH, "Pikachu", "normal", malformed))
           .isInstanceOf(CatalogException.BadRequest.class);
     }
     for (var offset : List.of("-1", "0", "21", "2147483647", "2147483648", "invalid")) {
@@ -344,7 +378,10 @@ public class TcgPlayerCatalogTest {
           Base64.getUrlEncoder()
               .withoutPadding()
               .encodeToString(offset.getBytes(StandardCharsets.UTF_8));
-      assertThatThrownBy(() -> catalog.search("Pikachu", "normal", invalidToken))
+      assertThatThrownBy(
+              () ->
+                  catalog.search(
+                      FakeGamesService.POKEMON_ENGLISH, "Pikachu", "normal", invalidToken))
           .isInstanceOf(CatalogException.BadRequest.class);
     }
   }
@@ -354,13 +391,13 @@ public class TcgPlayerCatalogTest {
     // arrange
     var fixture = new Fixture("pokemon", snapshot("pokemon", "snapshot-1", "Pikachu", 123));
     var catalog = fixture.catalog();
-    catalog.getCard("123");
+    catalog.getCard(FakeGamesService.POKEMON_ENGLISH, "123");
 
     // act
     fixture.clock.setTime(START.plus(Duration.ofMinutes(4)).plusSeconds(59));
-    catalog.getCard("123");
+    catalog.getCard(FakeGamesService.POKEMON_ENGLISH, "123");
     fixture.clock.setTime(START.plus(Duration.ofMinutes(5)));
-    catalog.getCard("123");
+    catalog.getCard(FakeGamesService.POKEMON_ENGLISH, "123");
 
     // assert
     assertThat(fixture.repository.latestSnapshotRequests).isEqualTo(2);
@@ -374,13 +411,14 @@ public class TcgPlayerCatalogTest {
     var second = snapshot("pokemon", "snapshot-2", "Pikachu (Master Ball)", 123);
     var fixture = new Fixture("pokemon", first);
     var catalog = fixture.catalog();
-    assertThat(catalog.getCard("123").name()).isEqualTo("Pikachu");
+    assertThat(catalog.getCard(FakeGamesService.POKEMON_ENGLISH, "123").name())
+        .isEqualTo("Pikachu");
     fixture.repository.latestSnapshot = item("pokemon", "snapshot-2");
     fixture.store.snapshotsById.put("snapshot-2", second);
     fixture.clock.setTime(START.plus(Duration.ofMinutes(5)));
 
     // act
-    var replacement = catalog.getCard("123");
+    var replacement = catalog.getCard(FakeGamesService.POKEMON_ENGLISH, "123");
 
     // assert
     assertThat(replacement.name()).isEqualTo("Pikachu (Master Ball)");
@@ -392,22 +430,23 @@ public class TcgPlayerCatalogTest {
     // arrange
     var fixture = new Fixture("pokemon", snapshot("pokemon", "snapshot-1", "Pikachu", 123));
     var catalog = fixture.catalog();
-    var original = catalog.getCard("123");
+    var original = catalog.getCard(FakeGamesService.POKEMON_ENGLISH, "123");
     fixture.repository.latestSnapshot = item("pokemon", "snapshot-2");
     fixture.store.failure = new IOException("broken artifact");
     fixture.clock.setTime(START.plus(Duration.ofMinutes(5)));
 
     // act / assert
-    assertThatThrownBy(() -> catalog.getCard("123"))
+    assertThatThrownBy(() -> catalog.getCard(FakeGamesService.POKEMON_ENGLISH, "123"))
         .isInstanceOf(CatalogException.Unavailable.class);
     fixture.store.failure = null;
     fixture.repository.latestSnapshot = item("pokemon", "snapshot-1");
-    assertThat(catalog.getCard("123")).isEqualTo(original);
+    assertThat(catalog.getCard(FakeGamesService.POKEMON_ENGLISH, "123")).isEqualTo(original);
     fixture.repository.latestSnapshot = item("pokemon", "snapshot-2");
     fixture.store.snapshotsById.put(
         "snapshot-2", snapshot("pokemon", "snapshot-2", "New Pikachu", 123));
     fixture.clock.setTime(START.plus(Duration.ofMinutes(10)));
-    assertThat(catalog.getCard("123").name()).isEqualTo("New Pikachu");
+    assertThat(catalog.getCard(FakeGamesService.POKEMON_ENGLISH, "123").name())
+        .isEqualTo("New Pikachu");
     assertThat(fixture.repository.latestSnapshotRequests).isEqualTo(4);
   }
 
@@ -424,19 +463,25 @@ public class TcgPlayerCatalogTest {
         new Game("other", "Other game", "tcgplayer", false, false, List.of(), List.of());
 
     // act
-    var pokemonCard = catalogs.forGame(Games.POKEMON_ENGLISH).getCard("123");
-    var otherCard = catalogs.forGame(otherGame).getCard("123");
+    var pokemonCard =
+        catalogs
+            .forGame(FakeGamesService.POKEMON_ENGLISH)
+            .getCard(FakeGamesService.POKEMON_ENGLISH, "123");
+    var otherCard = catalogs.forGame(otherGame).getCard(otherGame, "123");
 
     // assert
     assertThat(pokemonCard.game()).isEqualTo("pokemon");
     assertThat(pokemonCard.name()).isEqualTo("Pikachu");
     assertThat(otherCard.game()).isEqualTo("other");
     assertThat(otherCard.name()).isEqualTo("Other game card");
-    assertThat(pokemonCatalog.search("Pikachu", "normal", null).cards())
+    assertThat(
+            pokemonCatalog
+                .search(FakeGamesService.POKEMON_ENGLISH, "Pikachu", "normal", null)
+                .cards())
         .extracting(CatalogCard::name)
         .containsExactly("Pikachu");
-    assertThat(otherCatalog.search("Pikachu", "normal", null).cards()).isEmpty();
-    assertThat(otherCatalog.findAlternatives("123", "normal", null).cards())
+    assertThat(otherCatalog.search(otherGame, "Pikachu", "normal", null).cards()).isEmpty();
+    assertThat(otherCatalog.findAlternatives(otherGame, "123", "normal", null).cards())
         .extracting(CatalogCard::name)
         .containsExactly("Other game card");
     assertThat(pokemonFixture.repository.requestedGames).containsExactly("pokemon");
@@ -449,7 +494,7 @@ public class TcgPlayerCatalogTest {
     var fixture = new Fixture("pokemon", null);
 
     // act / assert
-    assertThatThrownBy(() -> fixture.catalog().getCard("123"))
+    assertThatThrownBy(() -> fixture.catalog().getCard(FakeGamesService.POKEMON_ENGLISH, "123"))
         .isInstanceOf(CatalogException.Unavailable.class)
         .hasMessageContaining("not been published");
   }

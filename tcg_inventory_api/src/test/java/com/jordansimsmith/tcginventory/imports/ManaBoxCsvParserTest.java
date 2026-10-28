@@ -3,6 +3,7 @@ package com.jordansimsmith.tcginventory.imports;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import org.junit.jupiter.api.Test;
 
 public class ManaBoxCsvParserTest {
@@ -20,7 +21,7 @@ public class ManaBoxCsvParserTest {
             + " Elves,DOM,Dominaria,168,Normal,Common,1,581B7327-3215-4A4F-B4AE-D9D4002BA882,false,false,near_mint,en";
 
     // act
-    var rows = ManaBoxCsvParser.parse(csv);
+    var rows = ManaBoxCsvParser.parse(csv, FakeGamesService.MAGIC_THE_GATHERING);
 
     // assert
     assertThat(rows).hasSize(1);
@@ -41,7 +42,7 @@ public class ManaBoxCsvParserTest {
     var csv =
         HEADER + "\n" + "Card,SET,Set Name,1,Normal,Common,1,not-a-uuid,false,false,near_mint,en";
 
-    var row = ManaBoxCsvParser.parse(csv).get(0);
+    var row = ManaBoxCsvParser.parse(csv, FakeGamesService.MAGIC_THE_GATHERING).get(0);
 
     assertThat(row.externalId()).isEqualTo("not-a-uuid");
   }
@@ -56,7 +57,7 @@ public class ManaBoxCsvParserTest {
             + " Rare,3,58b26011-e103-45c4-a253-900f4e6b2eeb,false,false,mint,en";
 
     // act
-    var rows = ManaBoxCsvParser.parse(csv);
+    var rows = ManaBoxCsvParser.parse(csv, FakeGamesService.MAGIC_THE_GATHERING);
 
     // assert
     assertThat(rows).hasSize(1);
@@ -83,7 +84,7 @@ public class ManaBoxCsvParserTest {
             + " Name,1,Normal,Common,1,581b7327-3215-4a4f-b4ae-d9d4002ba882,false,false,"
             + condition
             + ",en";
-    return ManaBoxCsvParser.parse(csv).get(0).condition();
+    return ManaBoxCsvParser.parse(csv, FakeGamesService.MAGIC_THE_GATHERING).get(0).condition();
   }
 
   @Test
@@ -96,7 +97,7 @@ public class ManaBoxCsvParserTest {
             + " Name,1,Normal,Common,1,581b7327-3215-4a4f-b4ae-d9d4002ba882,false,false,,en";
 
     // act & assert
-    assertThatThrownBy(() -> ManaBoxCsvParser.parse(csv))
+    assertThatThrownBy(() -> ManaBoxCsvParser.parse(csv, FakeGamesService.MAGIC_THE_GATHERING))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("Condition");
   }
@@ -113,7 +114,7 @@ public class ManaBoxCsvParserTest {
             + " Name,2,Etched,Rare,1,581b7327-3215-4a4f-b4ae-d9d4002ba882,false,false,near_mint,en";
 
     // act
-    var rows = ManaBoxCsvParser.parse(csv);
+    var rows = ManaBoxCsvParser.parse(csv, FakeGamesService.MAGIC_THE_GATHERING);
 
     // assert
     assertThat(rows.get(0).finish()).isEqualTo("foil");
@@ -130,7 +131,7 @@ public class ManaBoxCsvParserTest {
             + " Rare,1,581b7327-3215-4a4f-b4ae-d9d4002ba882,true,true,near_mint,en";
 
     // act
-    var rows = ManaBoxCsvParser.parse(csv);
+    var rows = ManaBoxCsvParser.parse(csv, FakeGamesService.MAGIC_THE_GATHERING);
 
     // assert
     assertThat(rows).hasSize(1);
@@ -138,14 +139,14 @@ public class ManaBoxCsvParserTest {
 
   @Test
   void parseShouldRejectEmptyCsv() {
-    assertThatThrownBy(() -> ManaBoxCsvParser.parse(""))
+    assertThatThrownBy(() -> ManaBoxCsvParser.parse("", FakeGamesService.MAGIC_THE_GATHERING))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("empty");
   }
 
   @Test
   void parseShouldRejectCsvWithHeaderOnly() {
-    assertThatThrownBy(() -> ManaBoxCsvParser.parse(HEADER))
+    assertThatThrownBy(() -> ManaBoxCsvParser.parse(HEADER, FakeGamesService.MAGIC_THE_GATHERING))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("no cards");
   }
@@ -156,7 +157,7 @@ public class ManaBoxCsvParserTest {
     var csv = HEADER + "\nCard,SET,Set Name,1,Normal,Common,1,bad/id,false,false,near_mint,en";
 
     // act & assert
-    assertThatThrownBy(() -> ManaBoxCsvParser.parse(csv))
+    assertThatThrownBy(() -> ManaBoxCsvParser.parse(csv, FakeGamesService.MAGIC_THE_GATHERING))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("external id must contain only ASCII unreserved characters");
   }
@@ -171,7 +172,7 @@ public class ManaBoxCsvParserTest {
             + " Name,1,Unknown,Common,1,581b7327-3215-4a4f-b4ae-d9d4002ba882,false,false,near_mint,en";
 
     // act & assert
-    assertThatThrownBy(() -> ManaBoxCsvParser.parse(csv))
+    assertThatThrownBy(() -> ManaBoxCsvParser.parse(csv, FakeGamesService.MAGIC_THE_GATHERING))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("Foil must be normal, foil, or etched");
   }
@@ -186,7 +187,7 @@ public class ManaBoxCsvParserTest {
             + " Name,1,Normal,Common,1,581b7327-3215-4a4f-b4ae-d9d4002ba882,false,false,terrible,en";
 
     // act & assert
-    assertThatThrownBy(() -> ManaBoxCsvParser.parse(csv))
+    assertThatThrownBy(() -> ManaBoxCsvParser.parse(csv, FakeGamesService.MAGIC_THE_GATHERING))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("unknown Condition");
   }
@@ -202,7 +203,7 @@ public class ManaBoxCsvParserTest {
             + " Name,1,Normal,Common,1,581b7327-3215-4a4f-b4ae-d9d4002ba882,false,false,near_mint,en";
 
     // act
-    var rows = ManaBoxCsvParser.parse(csv);
+    var rows = ManaBoxCsvParser.parse(csv, FakeGamesService.MAGIC_THE_GATHERING);
 
     // assert
     assertThat(rows).hasSize(1);

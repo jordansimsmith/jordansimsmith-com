@@ -11,6 +11,8 @@ import com.jordansimsmith.tcginventory.catalog.FakeTcgCsvClient;
 import com.jordansimsmith.tcginventory.catalog.TcgCsvClient;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
+import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
+import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.tcginventory.inventory.SequenceCounterItem;
@@ -190,6 +192,18 @@ public class TcgInventoryTestModule {
   @Singleton
   FetchTcgService fetchTcgService(FakeFetchTcgService fakeFetchTcgService) {
     return fakeFetchTcgService;
+  }
+
+  @Provides
+  @Singleton
+  GamesService gamesService(FakeGamesService fakeGamesService) {
+    return fakeGamesService;
+  }
+
+  @Provides
+  @Singleton
+  FakeGamesService fakeGamesService() {
+    return new FakeGamesService();
   }
 
   @Provides

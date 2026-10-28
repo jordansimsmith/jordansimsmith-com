@@ -1,6 +1,6 @@
 package com.jordansimsmith.tcginventory.catalog;
 
-import com.jordansimsmith.tcginventory.games.Games.Game;
+import com.jordansimsmith.tcginventory.games.client.Game;
 import java.util.Map;
 
 public class Catalogs {

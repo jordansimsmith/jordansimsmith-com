@@ -5,6 +5,7 @@ import com.jordansimsmith.tcginventory.CardIdentity;
 import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.SkuIds;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
+import com.jordansimsmith.tcginventory.games.client.Game;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
 import java.time.Instant;
@@ -111,9 +112,10 @@ public class InventoryRepository {
   // one transaction across both SKU partitions: the unit moves keeping its sequence number and
   // photos, the source SKU is dirtied, and the target SKU record is created or refreshed
   public String updateUnitCondition(
-      String user, SkuItem skuItem, UnitItem unitItem, String condition) {
+      String user, SkuItem skuItem, UnitItem unitItem, String condition, Game game) {
     var identity = new CardIdentity(skuItem.getGame(), skuItem.getExternalId());
-    var targetSkuId = SkuIds.format(identity, skuItem.getFinish(), Condition.valueOf(condition));
+    var targetSkuId =
+        SkuIds.format(game, identity, skuItem.getFinish(), Condition.valueOf(condition));
     var targetSku =
         SkuItem.create(
             user,

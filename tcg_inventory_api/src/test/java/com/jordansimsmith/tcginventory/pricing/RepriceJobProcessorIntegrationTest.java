@@ -498,7 +498,8 @@ public class RepriceJobProcessorIntegrationTest {
         fetchTcgService,
         new PricingRepository(factory),
         clock,
-        ulidGenerator);
+        ulidGenerator,
+        factory.gamesService());
   }
 
   private SkuItem getSku(String user, String skuId) {

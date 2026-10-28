@@ -152,8 +152,8 @@ lambdas = {
         "environment": {"SCRYFALL_BASE_URL": os.environ.get("SCRYFALL_BASE_URL", "")},
     },
     "get_games": {
-        "handler": "com.jordansimsmith.tcginventory.games.GetGamesHandler",
-        "zip_file": "get-games-handler_deploy.jar",
+        "handler": "com.jordansimsmith.tcginventory.games.api.FindGamesHandler",
+        "zip_file": "find-games-handler_deploy.jar",
     },
     "get_fetchtcg_account": {
         "handler": "com.jordansimsmith.tcginventory.fetchtcg.api.GetAccountHandler",

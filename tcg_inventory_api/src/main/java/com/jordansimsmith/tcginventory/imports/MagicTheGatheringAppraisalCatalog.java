@@ -6,7 +6,6 @@ import com.jordansimsmith.tcginventory.CardIdentity;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindSetsRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
-import com.jordansimsmith.tcginventory.games.Games;
 import com.jordansimsmith.tcginventory.imports.AppraisalCatalogs.AppraisalCatalog;
 import java.text.Normalizer;
 import java.util.Map;
@@ -23,7 +22,7 @@ public class MagicTheGatheringAppraisalCatalog implements AppraisalCatalog {
       FetchTcgService fetchTcgService,
       Map<String, GetCardResponse> cardCache)
       throws ServiceException {
-    if (!Games.MAGIC_THE_GATHERING.id().equals(identity.game())) {
+    if (!FETCHTCG_GAME_ID.equals(identity.game())) {
       throw new IllegalArgumentException(
           "unsupported game for Magic appraisal: " + identity.game());
     }

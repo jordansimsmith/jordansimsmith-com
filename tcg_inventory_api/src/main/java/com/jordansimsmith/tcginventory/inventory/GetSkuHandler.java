@@ -8,12 +8,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.catalog.CatalogCard;
 import com.jordansimsmith.tcginventory.catalog.CatalogFactory;
 import com.jordansimsmith.tcginventory.catalog.Catalogs;
-import com.jordansimsmith.tcginventory.games.Games;
+import com.jordansimsmith.tcginventory.games.client.GamesService;
+import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -64,6 +66,7 @@ public class GetSkuHandler
   private final DynamoDbTable<UnitItem> unitTable;
   private final S3Presigner s3Presigner;
   private final Catalogs catalogs;
+  private final GamesService gamesService;
 
   public GetSkuHandler() {
     this(CatalogFactory.create());
@@ -77,20 +80,25 @@ public class GetSkuHandler
     this.unitTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class);
     this.s3Presigner = factory.s3Presigner();
     this.catalogs = factory.catalogs();
+    this.gamesService = factory.gamesService();
   }
 
   @Override
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     try {
       return doHandleRequest(event);
+    } catch (ServiceException e) {
+      return httpResponseFactory.serviceError(e);
     } catch (Exception e) {
       LOGGER.error("error processing get sku request", e);
       throw new RuntimeException(e);
     }
   }
 
-  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
-    var user = requestContextFactory.createCtx(event).user();
+  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event)
+      throws ServiceException {
+    var ctx = requestContextFactory.createCtx(event);
+    var user = ctx.user();
     // api gateway rest proxy integrations pass path parameters still url-encoded
     var skuId = URLDecoder.decode(event.getPathParameters().get("sku_id"), StandardCharsets.UTF_8);
 
@@ -139,7 +147,7 @@ public class GetSkuHandler
                         toPhotoResponses(user, unit.getPhotos())))
             .toList();
 
-    var game = Games.get(skuItem.getGame());
+    var game = gamesService.getGame(ctx, new GetGameRequest(skuItem.getGame())).game();
     var imageUrls = catalogs.forGame(game).getImageUrls(skuItem.getExternalId());
 
     return httpResponseFactory.ok(

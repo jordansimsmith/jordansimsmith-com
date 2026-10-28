@@ -61,6 +61,8 @@ When performing the code review step, check for:
 - If data is in an unexpected state, let the error surface so the root cause can be fixed
 - Handle expected operational failures only where the caller can meaningfully recover or show useful feedback
 - Trust backend contracts and established frontend flow for invariants; do not duplicate validation of request state the backend owns or fields the frontend flow guarantees, such as a selected product having an external ID
+- Treat identifiers owned by another vertical as opaque. Do not call that vertical only to pre-validate an identifier; call its service when an operation actually needs its metadata or behavior and let it validate then. If a local operation requires membership in a list already fetched from that service, fail clearly when the identifier is absent instead of making a second lookup as a fallback
+- Avoid null guards around request values when the next owning service already validates them or the established caller contract guarantees them. Keep validation at the boundary that owns the contract, and let unexpected nulls fail visibly
 
 ## Bazel guidelines
 

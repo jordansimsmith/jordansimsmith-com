@@ -9,8 +9,8 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.s3.S3Container;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
-import com.jordansimsmith.tcginventory.games.Games;
-import com.jordansimsmith.tcginventory.games.Games.Game;
+import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
+import com.jordansimsmith.tcginventory.games.client.Game;
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -136,9 +136,10 @@ public class CatalogSnapshotStoreIntegrationTest {
     var catalog = new TcgPlayerCatalog("pokemon", repository, store, factory.fakeClock());
 
     // act
-    var card = catalog.getCard("25");
-    var search = catalog.search("Pikachu", "normal", null);
-    var alternatives = catalog.findAlternatives("25", "normal", null);
+    var card = catalog.getCard(FakeGamesService.POKEMON_ENGLISH, "25");
+    var search = catalog.search(FakeGamesService.POKEMON_ENGLISH, "Pikachu", "normal", null);
+    var alternatives =
+        catalog.findAlternatives(FakeGamesService.POKEMON_ENGLISH, "25", "normal", null);
 
     // assert
     assertThat(card.game()).isEqualTo("pokemon");
@@ -231,8 +232,11 @@ public class CatalogSnapshotStoreIntegrationTest {
                 new TcgPlayerCatalog("other", repository, store, factory.fakeClock())));
 
     // act
-    var pokemonCard = catalogs.forGame(Games.POKEMON_ENGLISH).getCard("25");
-    var otherCard = catalogs.forGame(otherGame).getCard("25");
+    var pokemonCard =
+        catalogs
+            .forGame(FakeGamesService.POKEMON_ENGLISH)
+            .getCard(FakeGamesService.POKEMON_ENGLISH, "25");
+    var otherCard = catalogs.forGame(otherGame).getCard(otherGame, "25");
     store.createSnapshot(snapshot("pokemon", "2026-10-08T20:06:09Z", "Raichu", 25));
     factory.fakeClock().setTime(Instant.parse("2026-10-08T20:11:09Z"));
 
@@ -240,8 +244,14 @@ public class CatalogSnapshotStoreIntegrationTest {
     assertThat(pokemonItem.getS3Key()).isNotEqualTo(otherItem.getS3Key());
     assertThat(pokemonCard.name()).isEqualTo("Pikachu");
     assertThat(otherCard.name()).isEqualTo("Other game card");
-    assertThat(catalogs.forGame(Games.POKEMON_ENGLISH).getCard("25").name()).isEqualTo("Raichu");
-    assertThat(catalogs.forGame(otherGame).getCard("25").name()).isEqualTo("Other game card");
+    assertThat(
+            catalogs
+                .forGame(FakeGamesService.POKEMON_ENGLISH)
+                .getCard(FakeGamesService.POKEMON_ENGLISH, "25")
+                .name())
+        .isEqualTo("Raichu");
+    assertThat(catalogs.forGame(otherGame).getCard(otherGame, "25").name())
+        .isEqualTo("Other game card");
   }
 
   @Test
@@ -285,7 +295,7 @@ public class CatalogSnapshotStoreIntegrationTest {
     var catalog = new TcgPlayerCatalog("pokemon", repository, store, factory.fakeClock());
 
     // act/assert
-    assertThatThrownBy(() -> catalog.getCard("25"))
+    assertThatThrownBy(() -> catalog.getCard(FakeGamesService.POKEMON_ENGLISH, "25"))
         .isInstanceOf(CatalogException.Unavailable.class)
         .hasMessageContaining("not been published");
   }
@@ -305,7 +315,7 @@ public class CatalogSnapshotStoreIntegrationTest {
     var catalog = new TcgPlayerCatalog("pokemon", repository, store, factory.fakeClock());
 
     // act/assert
-    assertThatThrownBy(() -> catalog.getCard("25"))
+    assertThatThrownBy(() -> catalog.getCard(FakeGamesService.POKEMON_ENGLISH, "25"))
         .isInstanceOf(CatalogException.Unavailable.class);
   }
 
@@ -330,7 +340,7 @@ public class CatalogSnapshotStoreIntegrationTest {
     var catalog = new TcgPlayerCatalog("pokemon", repository, store, factory.fakeClock());
 
     // act/assert
-    assertThatThrownBy(() -> catalog.getCard("25"))
+    assertThatThrownBy(() -> catalog.getCard(FakeGamesService.POKEMON_ENGLISH, "25"))
         .isInstanceOf(CatalogException.Unavailable.class);
   }
 
@@ -355,7 +365,7 @@ public class CatalogSnapshotStoreIntegrationTest {
     var catalog = new TcgPlayerCatalog("pokemon", repository, store, factory.fakeClock());
 
     // act/assert
-    assertThatThrownBy(() -> catalog.getCard("25"))
+    assertThatThrownBy(() -> catalog.getCard(FakeGamesService.POKEMON_ENGLISH, "25"))
         .isInstanceOf(CatalogException.Unavailable.class);
   }
 

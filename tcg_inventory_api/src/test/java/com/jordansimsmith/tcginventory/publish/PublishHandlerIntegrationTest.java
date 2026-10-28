@@ -10,7 +10,7 @@ import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
-import com.jordansimsmith.tcginventory.games.Games;
+import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
@@ -161,7 +161,7 @@ public class PublishHandlerIntegrationTest {
         SkuItem.create(
             "jordan",
             "mtg#scryfall#sku1#normal#NM",
-            Games.MAGIC_THE_GATHERING.id(),
+            FakeGamesService.MAGIC_THE_GATHERING.id(),
             "sku1",
             "normal",
             "NM",

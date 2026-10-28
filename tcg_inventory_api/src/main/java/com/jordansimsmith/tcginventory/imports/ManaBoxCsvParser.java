@@ -6,7 +6,7 @@ import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
 import com.jordansimsmith.tcginventory.CardIdentity;
 import com.jordansimsmith.tcginventory.Condition;
-import com.jordansimsmith.tcginventory.games.Games;
+import com.jordansimsmith.tcginventory.games.client.Game;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -35,7 +35,7 @@ public class ManaBoxCsvParser {
       String language,
       int quantity) {}
 
-  public static List<ParsedRow> parse(String csv) {
+  public static List<ParsedRow> parse(String csv, Game game) {
     var content = csv.startsWith("\ufeff") ? csv.substring(1) : csv;
     if (content.isBlank()) {
       throw new IllegalArgumentException("CSV is empty");
@@ -58,12 +58,12 @@ public class ManaBoxCsvParser {
 
     var result = new ArrayList<ParsedRow>();
     for (int i = 0; i < rawRows.size(); i++) {
-      result.add(validate(rawRows.get(i), i + 2));
+      result.add(validate(rawRows.get(i), i + 2, game));
     }
     return result;
   }
 
-  private static ParsedRow validate(ManaBoxRow raw, int rowNumber) {
+  private static ParsedRow validate(ManaBoxRow raw, int rowNumber, Game game) {
     requireNonBlank(raw.name(), "Name", rowNumber);
     requireNonBlank(raw.setCode(), "Set code", rowNumber);
     requireNonBlank(raw.setName(), "Set name", rowNumber);
@@ -76,12 +76,11 @@ public class ManaBoxCsvParser {
     }
 
     var finish = raw.finish() == null ? "" : raw.finish().toLowerCase();
-    if (!Games.MAGIC_THE_GATHERING.supportsFinish(finish)) {
+    if (game.finishes().stream().noneMatch(candidate -> candidate.id().equals(finish))) {
       throw new IllegalArgumentException(
           "row " + rowNumber + ": Foil must be normal, foil, or etched");
     }
 
-    var game = Games.MAGIC_THE_GATHERING;
     var identity = new CardIdentity(game.id(), raw.scryfallId());
 
     requireNonBlank(raw.condition(), "Condition", rowNumber);

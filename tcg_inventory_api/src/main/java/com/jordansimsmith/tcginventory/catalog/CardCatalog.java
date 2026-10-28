@@ -1,16 +1,17 @@
 package com.jordansimsmith.tcginventory.catalog;
 
+import com.jordansimsmith.tcginventory.games.client.Game;
 import java.util.List;
 import java.util.Map;
 
 public interface CardCatalog {
   CatalogCard.ImageUrls getImageUrls(String externalId);
 
-  CatalogCard getCard(String externalId);
+  CatalogCard getCard(Game game, String externalId);
 
-  Map<String, CatalogCard> findCards(List<String> externalIds);
+  Map<String, CatalogCard> findCards(Game game, List<String> externalIds);
 
-  CatalogPage findAlternatives(String externalId, String finish, String continuation);
+  CatalogPage findAlternatives(Game game, String externalId, String finish, String continuation);
 
-  CatalogPage search(String query, String finish, String continuation);
+  CatalogPage search(Game game, String query, String finish, String continuation);
 }

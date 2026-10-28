@@ -7,7 +7,6 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.BuyerAddress;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindOffersRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
-import com.jordansimsmith.tcginventory.games.Games;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
@@ -282,16 +281,13 @@ public class OrderPhaseProcessor {
                 QueryConditional.keyEqualTo(
                     Key.builder().partitionValue(SkuItem.formatGsi2pk(user)).build()))
             .build();
-
-    skuTable.index(TcgInventoryTable.GSI2_NAME).query(request).stream()
-        .flatMap(page -> page.items().stream())
-        .forEach(
-            item -> {
-              Games.get(item.getGame());
-              if (item.getFetchtcgListingId() != null) {
-                map.put(item.getFetchtcgListingId(), item.getSkuId());
-              }
-            });
+    for (var page : skuTable.index(TcgInventoryTable.GSI2_NAME).query(request)) {
+      for (var item : page.items()) {
+        if (item.getFetchtcgListingId() != null) {
+          map.put(item.getFetchtcgListingId(), item.getSkuId());
+        }
+      }
+    }
     return map;
   }
 

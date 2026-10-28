@@ -9,6 +9,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import com.jordansimsmith.tcginventory.TcgInventoryModule;
+import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import dagger.BindsInstance;
@@ -90,7 +91,7 @@ public class ScryfallCatalogTest {
     nextBody = card(CARD_ID, "Lightning Bolt", "en", List.of("etched", "foil", "nonfoil"), true);
 
     // act
-    var result = catalog.getCard(CARD_ID);
+    var result = catalog.getCard(FakeGamesService.MAGIC_THE_GATHERING, CARD_ID);
 
     // assert
     assertThat(result.externalId()).isEqualTo(CARD_ID);
@@ -130,7 +131,8 @@ public class ScryfallCatalogTest {
     collectionBody = response.toString();
 
     // act
-    var cards = catalog.findCards(List.of(CARD_ID, ALT_ID, TOKEN_ID));
+    var cards =
+        catalog.findCards(FakeGamesService.MAGIC_THE_GATHERING, List.of(CARD_ID, ALT_ID, TOKEN_ID));
 
     // assert
     assertThat(cards.keySet()).containsExactly(CARD_ID);
@@ -148,11 +150,13 @@ public class ScryfallCatalogTest {
     collectionBody = "{\"data\":[],\"not_found\":[]}";
 
     // act / assert
-    assertThatThrownBy(() -> catalog.findCards(List.of(CARD_ID)))
+    assertThatThrownBy(
+            () -> catalog.findCards(FakeGamesService.MAGIC_THE_GATHERING, List.of(CARD_ID)))
         .isInstanceOf(CatalogException.Unavailable.class);
 
     collectionBody = "not json";
-    assertThatThrownBy(() -> catalog.findCards(List.of(CARD_ID)))
+    assertThatThrownBy(
+            () -> catalog.findCards(FakeGamesService.MAGIC_THE_GATHERING, List.of(CARD_ID)))
         .isInstanceOf(CatalogException.Unavailable.class);
 
     var response = objectMapper.createObjectNode();
@@ -161,7 +165,8 @@ public class ScryfallCatalogTest {
         .add(cardNode(ALT_ID, "Lightning Bolt", "en", List.of("nonfoil"), true));
     response.putArray("not_found");
     collectionBody = response.toString();
-    assertThatThrownBy(() -> catalog.findCards(List.of(CARD_ID)))
+    assertThatThrownBy(
+            () -> catalog.findCards(FakeGamesService.MAGIC_THE_GATHERING, List.of(CARD_ID)))
         .isInstanceOf(CatalogException.Unavailable.class);
   }
 
@@ -171,7 +176,7 @@ public class ScryfallCatalogTest {
     var ids = IntStream.range(0, 200).mapToObj(index -> UUID.randomUUID().toString()).toList();
 
     // act
-    var cards = catalog.findCards(ids);
+    var cards = catalog.findCards(FakeGamesService.MAGIC_THE_GATHERING, ids);
 
     // assert
     assertThat(cards).hasSize(200);
@@ -187,7 +192,9 @@ public class ScryfallCatalogTest {
     var uppercaseId = CARD_ID.toUpperCase(Locale.ROOT);
 
     // act
-    var cards = catalog.findCards(List.of(CARD_ID, uppercaseId, CARD_ID));
+    var cards =
+        catalog.findCards(
+            FakeGamesService.MAGIC_THE_GATHERING, List.of(CARD_ID, uppercaseId, CARD_ID));
 
     // assert
     assertThat(cards.keySet()).containsExactlyInAnyOrder(CARD_ID, uppercaseId);
@@ -202,7 +209,8 @@ public class ScryfallCatalogTest {
     nextStatus = 429;
 
     // act / assert
-    assertThatThrownBy(() -> catalog.findCards(List.of(CARD_ID)))
+    assertThatThrownBy(
+            () -> catalog.findCards(FakeGamesService.MAGIC_THE_GATHERING, List.of(CARD_ID)))
         .isInstanceOf(CatalogException.Unavailable.class);
   }
 
@@ -248,7 +256,7 @@ public class ScryfallCatalogTest {
     nextBody = objectMapper.writeValueAsString(card);
 
     // act
-    var result = catalog.getCard(CARD_ID);
+    var result = catalog.getCard(FakeGamesService.MAGIC_THE_GATHERING, CARD_ID);
 
     // assert
     assertThat(result.imageUrls().small()).isEqualTo("https://cards.scryfall.io/small/front.jpg");
@@ -265,7 +273,7 @@ public class ScryfallCatalogTest {
     nextBody = objectMapper.writeValueAsString(card);
 
     // act
-    var result = catalog.getCard(CARD_ID);
+    var result = catalog.getCard(FakeGamesService.MAGIC_THE_GATHERING, CARD_ID);
 
     // assert
     assertThat(result.imageUrls().small()).isNull();
@@ -291,7 +299,8 @@ public class ScryfallCatalogTest {
             false);
 
     // act
-    var result = catalog.findAlternatives(CARD_ID, "foil", null);
+    var result =
+        catalog.findAlternatives(FakeGamesService.MAGIC_THE_GATHERING, CARD_ID, "foil", null);
 
     // assert
     assertThat(result.cards())
@@ -310,7 +319,8 @@ public class ScryfallCatalogTest {
         searchPage(List.of(cardNode(ALT_ID, "Lightning Bolt", "en", List.of("foil"), true)), false);
 
     // act
-    var result = catalog.findAlternatives(CARD_ID, "etched", null);
+    var result =
+        catalog.findAlternatives(FakeGamesService.MAGIC_THE_GATHERING, CARD_ID, "etched", null);
 
     // assert
     assertThat(result.cards()).isEmpty();
@@ -373,8 +383,14 @@ public class ScryfallCatalogTest {
     searchBody = searchPage(cards, false);
 
     // act
-    var first = catalog.search("Lightning Bolt", "normal", null);
-    var second = catalog.search("Lightning Bolt", "normal", first.nextContinuation());
+    var first =
+        catalog.search(FakeGamesService.MAGIC_THE_GATHERING, "Lightning Bolt", "normal", null);
+    var second =
+        catalog.search(
+            FakeGamesService.MAGIC_THE_GATHERING,
+            "Lightning Bolt",
+            "normal",
+            first.nextContinuation());
     var mismatched =
         new FindCatalogCardsHandler(createFactory(new Catalogs(Map.of("mtg", catalog))))
             .handleRequest(
@@ -410,9 +426,9 @@ public class ScryfallCatalogTest {
     nextBody = card(CARD_ID, "Lightning Bolt", "en", List.of("nonfoil"), true);
 
     // act
-    var found = catalog.search(CARD_ID, "normal", null);
+    var found = catalog.search(FakeGamesService.MAGIC_THE_GATHERING, CARD_ID, "normal", null);
     nextStatus = 404;
-    var missing = catalog.search(ALT_ID, "normal", null);
+    var missing = catalog.search(FakeGamesService.MAGIC_THE_GATHERING, ALT_ID, "normal", null);
 
     // assert
     assertThat(found.cards()).extracting(CatalogCard::externalId).containsExactly(CARD_ID);
@@ -555,7 +571,7 @@ public class ScryfallCatalogTest {
     nextBody = card(CARD_ID, "Lightning Bolt", "en", List.of("nonfoil"), true);
 
     // act
-    catalog.getCard(CARD_ID);
+    catalog.getCard(FakeGamesService.MAGIC_THE_GATHERING, CARD_ID);
 
     // assert
     assertThat(lastUserAgent).startsWith("TcgInventory/");

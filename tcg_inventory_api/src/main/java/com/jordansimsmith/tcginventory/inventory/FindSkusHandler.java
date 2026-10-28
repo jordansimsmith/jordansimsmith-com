@@ -12,7 +12,6 @@ import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.tcginventory.games.Games;
 import java.util.List;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
@@ -76,26 +75,20 @@ public class FindSkusHandler
     var user = requestContextFactory.createCtx(event).user();
 
     var queryParams = event.getQueryStringParameters();
-    var game = queryParams != null ? queryParams.get("game") : null;
+    var gameId = queryParams != null ? queryParams.get("game") : null;
     var search = queryParams != null ? queryParams.get("search") : null;
     var continuation = queryParams != null ? queryParams.get("continuation") : null;
     var limitParam = queryParams != null ? queryParams.get("limit") : null;
     int limit = limitParam != null ? Integer.parseInt(limitParam) : DEFAULT_LIMIT;
 
-    if (game == null || game.isBlank()) {
+    if (gameId == null || gameId.isBlank()) {
       return httpResponseFactory.badRequest(new ErrorResponse("game is required"));
     }
-    try {
-      Games.get(game);
-    } catch (IllegalArgumentException e) {
-      return httpResponseFactory.badRequest(new ErrorResponse(e.getMessage()));
-    }
-
     var gsi2pk = SkuItem.formatGsi2pk(user);
     var sortPrefix =
         search != null && !search.isEmpty()
-            ? SkuItem.formatGsi2skPrefix(game, search.toLowerCase())
-            : SkuItem.formatGsi2skPrefix(game, "");
+            ? SkuItem.formatGsi2skPrefix(gameId, search.toLowerCase())
+            : SkuItem.formatGsi2skPrefix(gameId, "");
 
     var queryConditional =
         QueryConditional.sortBeginsWith(

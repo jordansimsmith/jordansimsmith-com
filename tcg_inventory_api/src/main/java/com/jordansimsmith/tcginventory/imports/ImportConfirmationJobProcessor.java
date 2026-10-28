@@ -1,5 +1,7 @@
 package com.jordansimsmith.tcginventory.imports;
 
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.CardIdentity;
 import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.JobItem;
@@ -7,6 +9,8 @@ import com.jordansimsmith.tcginventory.JobProcessor;
 import com.jordansimsmith.tcginventory.SkuIds;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
+import com.jordansimsmith.tcginventory.games.client.GamesService;
+import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
@@ -24,6 +28,7 @@ public class ImportConfirmationJobProcessor implements JobProcessor {
   private final DynamoDbTable<ImportRowItem> importRowTable;
   private final ImportsRepository importsRepository;
   private final InventoryRepository inventoryRepository;
+  private final GamesService gamesService;
 
   public ImportConfirmationJobProcessor(TcgInventoryFactory factory) {
     this.clock = factory.clock();
@@ -38,10 +43,11 @@ public class ImportConfirmationJobProcessor implements JobProcessor {
             factory.dynamoDbClient(),
             factory.clock(),
             factory.ulidGenerator());
+    this.gamesService = factory.gamesService();
   }
 
   @Override
-  public JobProcessor.JobResult processBatch(String user, JobItem jobItem) {
+  public JobProcessor.JobResult processBatch(String user, JobItem jobItem) throws ServiceException {
     var importId = jobItem.getImportId();
     if (importId == null) {
       throw new IllegalStateException("import confirmation job is missing required identity");
@@ -65,6 +71,10 @@ public class ImportConfirmationJobProcessor implements JobProcessor {
 
     var keepRows = queryKeepRows(user, importId);
     if (!keepRows.isEmpty()) {
+      var game =
+          gamesService
+              .getGame(new RequestContext(user), new GetGameRequest(importItem.getGame()))
+              .game();
       var firstSequenceNumber =
           allocateSequenceRange(user, importItem.getGame(), keepRows.size(), keepRows);
       assignSequenceNumbers(keepRows, firstSequenceNumber);
@@ -72,7 +82,8 @@ public class ImportConfirmationJobProcessor implements JobProcessor {
       var skuSeeds = new HashMap<String, SkuItem>();
       for (var row : keepRows) {
         var identity = new CardIdentity(importItem.getGame(), row.getExternalId());
-        var skuId = SkuIds.format(identity, row.getFinish(), Condition.valueOf(row.getCondition()));
+        var skuId =
+            SkuIds.format(game, identity, row.getFinish(), Condition.valueOf(row.getCondition()));
         var skuSeed =
             skuSeeds.computeIfAbsent(
                 skuId,

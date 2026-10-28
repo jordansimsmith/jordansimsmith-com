@@ -1,5 +1,6 @@
 package com.jordansimsmith.tcginventory.catalog;
 
+import com.jordansimsmith.tcginventory.games.client.Game;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -73,7 +74,7 @@ public class FakeCardCatalogs extends Catalogs {
     }
 
     @Override
-    public CatalogCard getCard(String externalId) {
+    public CatalogCard getCard(Game ignoredGame, String externalId) {
       if (failure != null) {
         throw failure;
       }
@@ -85,7 +86,7 @@ public class FakeCardCatalogs extends Catalogs {
     }
 
     @Override
-    public Map<String, CatalogCard> findCards(List<String> externalIds) {
+    public Map<String, CatalogCard> findCards(Game ignoredGame, List<String> externalIds) {
       lookupRequests.add(List.copyOf(externalIds));
       if (failure != null) {
         throw failure;
@@ -101,7 +102,8 @@ public class FakeCardCatalogs extends Catalogs {
     }
 
     @Override
-    public CatalogPage findAlternatives(String externalId, String finish, String continuation) {
+    public CatalogPage findAlternatives(
+        Game ignoredGame, String externalId, String finish, String continuation) {
       if (failure != null) {
         throw failure;
       }
@@ -109,7 +111,7 @@ public class FakeCardCatalogs extends Catalogs {
     }
 
     @Override
-    public CatalogPage search(String query, String finish, String continuation) {
+    public CatalogPage search(Game ignoredGame, String query, String finish, String continuation) {
       if (failure != null) {
         throw failure;
       }

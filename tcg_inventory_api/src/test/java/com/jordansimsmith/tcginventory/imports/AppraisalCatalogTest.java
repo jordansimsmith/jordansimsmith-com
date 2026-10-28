@@ -13,6 +13,6 @@ class AppraisalCatalogTest {
     // act/assert
     assertThatThrownBy(() -> AppraisalCatalogs.get(game))
         .isInstanceOf(IllegalArgumentException.class)
-        .hasMessage("unsupported game: " + game);
+        .hasMessage("no appraisal catalog configured for game: " + game);
   }
 }

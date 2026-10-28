@@ -56,6 +56,7 @@ filegroup(
     srcs = ["src/main/resources/logback.xml"],
     visibility = [
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:__pkg__",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/api:__pkg__",
     ],
 )
 
@@ -68,7 +69,6 @@ filegroup(
 )
 
 COMMON_DEPS = [
-    ":games-lib",
     "//lib/dynamodb:lib",
     "//lib/http:lib",
     "//lib/json:lib",
@@ -104,21 +104,16 @@ UNIT_TESTS = glob(
 )
 
 java_library(
-    name = "games-lib",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/games/Games.java"],
-)
-
-java_library(
     name = "catalog-lib",
     srcs = glob(
         ["src/main/java/com/jordansimsmith/tcginventory/catalog/*.java"],
         exclude = ["src/main/java/com/jordansimsmith/tcginventory/catalog/*Handler.java"],
     ),
     deps = [
-        ":games-lib",
         ":lib",
         "//lib/dynamodb:lib",
         "//lib/time:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_annotations",
         "@maven//:com_fasterxml_jackson_core_jackson_core",
@@ -146,10 +141,13 @@ java_library(
     visibility = [
         "//tcg_inventory_api:__pkg__",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:__pkg__",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/api:__pkg__",
     ],
     deps = [
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/server",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/server",
     ] + COMMON_DEPS,
 )
 
@@ -163,6 +161,7 @@ java_library(
         ":catalog-lib",
         ":import-lib",
         ":lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
     ] + COMMON_DEPS,
 )
 
@@ -178,6 +177,7 @@ java_library(
         ":pricing-lib",
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
     ] + COMMON_DEPS,
 )
 
@@ -187,7 +187,10 @@ java_library(
         ["src/main/java/com/jordansimsmith/tcginventory/inventory/*.java"],
         exclude = ["src/main/java/com/jordansimsmith/tcginventory/inventory/*Handler.java"],
     ),
-    deps = [":lib"] + COMMON_DEPS,
+    deps = [
+        ":lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+    ] + COMMON_DEPS,
 )
 
 java_library(
@@ -202,6 +205,7 @@ java_library(
         ":settings-lib",
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
     ] + COMMON_DEPS,
 )
 
@@ -218,6 +222,7 @@ java_library(
         ":settings-lib",
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
     ] + COMMON_DEPS,
 )
 
@@ -231,6 +236,7 @@ java_library(
         ":inventory-lib",
         ":lib",
         ":order-lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
     ] + COMMON_DEPS,
 )
 
@@ -254,30 +260,8 @@ java_library(
         ":lib",
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
     ] + COMMON_DEPS,
-)
-
-java_binary(
-    name = "get-games-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/games/GetGamesHandler.java"],
-    create_executable = False,
-    resources = [
-        "src/main/resources/logback.xml",
-    ],
-    deps = [
-        ":games-lib",
-        ":lib",
-        "//lib/http:lib",
-        "@maven//:ch_qos_logback_logback_classic",
-        "@maven//:ch_qos_logback_logback_core",
-        "@maven//:com_amazonaws_aws_lambda_java_core",
-        "@maven//:com_amazonaws_aws_lambda_java_events",
-        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
-        "@maven//:com_google_code_findbugs_jsr305",
-        "@maven//:com_google_guava_guava",
-        "@maven//:org_slf4j_slf4j_api",
-        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-    ],
 )
 
 java_binary(
@@ -287,9 +271,9 @@ java_binary(
     resources = ["src/main/resources/logback.xml"],
     deps = [
         ":catalog-lib",
-        ":games-lib",
         ":lib",
         "//lib/http:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -328,9 +312,9 @@ java_binary(
     resources = ["src/main/resources/logback.xml"],
     deps = [
         ":catalog-lib",
-        ":games-lib",
         ":lib",
         "//lib/http:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -348,9 +332,9 @@ java_binary(
     resources = ["src/main/resources/logback.xml"],
     deps = [
         ":catalog-lib",
-        ":games-lib",
         ":lib",
         "//lib/http:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -503,13 +487,13 @@ java_binary(
         "src/main/resources/logback.xml",
     ],
     deps = [
-        ":games-lib",
         ":import-lib",
         ":lib",
         "//lib/http:lib",
         "//lib/queue:lib",
         "//lib/time:lib",
         "//lib/ulid:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -581,12 +565,12 @@ java_binary(
         "src/main/resources/logback.xml",
     ],
     deps = [
-        ":games-lib",
         ":lib",
         ":scan-lib",
         "//lib/http:lib",
         "//lib/time:lib",
         "//lib/ulid:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -680,7 +664,6 @@ java_binary(
     ],
     deps = [
         ":catalog-lib",
-        ":games-lib",
         ":import-lib",
         ":lib",
         ":scan-lib",
@@ -820,6 +803,7 @@ java_binary(
         ":scan-lib",
         ":settings-lib",
         "//lib/queue:lib",
+        "//lib/service",
         "//lib/time:lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
@@ -866,7 +850,6 @@ java_binary(
         "src/main/resources/logback.xml",
     ],
     deps = [
-        ":games-lib",
         ":inventory-lib",
         ":lib",
         ":publish-lib",
@@ -941,11 +924,11 @@ java_binary(
         "src/main/resources/logback.xml",
     ],
     deps = [
-        ":games-lib",
         ":inventory-lib",
         ":lib",
         "//lib/dynamodb:lib",
         "//lib/http:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -969,10 +952,10 @@ java_binary(
     ],
     deps = [
         ":catalog-lib",
-        ":games-lib",
         ":inventory-lib",
         ":lib",
         "//lib/http:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -1019,6 +1002,7 @@ java_binary(
         ":inventory-lib",
         ":lib",
         "//lib/http:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -1091,11 +1075,11 @@ java_binary(
     ],
     deps = [
         ":catalog-lib",
-        ":games-lib",
         ":inventory-lib",
         ":lib",
         ":order-lib",
         "//lib/http:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -1248,7 +1232,6 @@ java_library(
     ],
     deps = [
         ":catalog-lib",
-        ":games-lib",
         ":import-lib",
         ":inventory-lib",
         ":lib",
@@ -1273,7 +1256,9 @@ java_library(
         "//lib/ulid:lib",
         "//lib/ulid:test-lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/client:test-lib",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/games/client:test-lib",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_guava_guava",
@@ -1298,9 +1283,7 @@ java_test_suite(
         ":catalog-lib",
         ":find-catalog-alternatives-handler",
         ":find-catalog-cards-handler",
-        ":games-lib",
         ":get-catalog-card-handler",
-        ":get-games-handler",
         ":import-lib",
         ":inventory-lib",
         ":lib",
@@ -1319,7 +1302,10 @@ java_test_suite(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:get-fetchtcg-account-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:update-fetchtcg-credentials-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/api:find-games-handler",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/client:test-lib",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/games/client:test-lib",
         "//third_party/dagger",
         "@maven//:com_amazonaws_aws_lambda_java_core",
         "@maven//:com_amazonaws_aws_lambda_java_events",
@@ -1370,7 +1356,6 @@ java_test_suite(
         ":find-orders-handler",
         ":find-scans-handler",
         ":find-skus-handler",
-        ":games-lib",
         ":get-catalog-card-handler",
         ":get-import-handler",
         ":get-order-handler",
@@ -1407,7 +1392,9 @@ java_test_suite(
         "//lib/time:test-lib",
         "//lib/ulid:test-lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/client:test-lib",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/games/client:test-lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -1445,7 +1432,7 @@ localstack_image(
         ":find-orders-handler_deploy.jar",
         ":find-skus-handler_deploy.jar",
         ":find-scans-handler_deploy.jar",
-        ":get-games-handler_deploy.jar",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/api:find-games-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:get-fetchtcg-account-handler_deploy.jar",
         ":get-order-handler_deploy.jar",
         ":get-sku-handler_deploy.jar",

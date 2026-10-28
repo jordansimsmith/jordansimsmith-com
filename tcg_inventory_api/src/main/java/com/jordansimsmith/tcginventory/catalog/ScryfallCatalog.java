@@ -7,8 +7,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
-import com.jordansimsmith.tcginventory.games.Games;
-import com.jordansimsmith.tcginventory.games.Games.Finish;
+import com.jordansimsmith.tcginventory.games.client.Finish;
+import com.jordansimsmith.tcginventory.games.client.Game;
 import java.io.IOException;
 import java.net.URI;
 import java.net.URLDecoder;
@@ -95,9 +95,9 @@ public class ScryfallCatalog implements CardCatalog {
   }
 
   @Override
-  public CatalogCard getCard(String externalId) {
+  public CatalogCard getCard(Game game, String externalId) {
     try {
-      return doGetCard(externalId);
+      return doGetCard(game, externalId);
     } catch (CatalogException e) {
       throw e;
     } catch (Exception e) {
@@ -108,15 +108,16 @@ public class ScryfallCatalog implements CardCatalog {
     }
   }
 
-  private CatalogCard doGetCard(String externalId) throws IOException, InterruptedException {
+  private CatalogCard doGetCard(Game game, String externalId)
+      throws IOException, InterruptedException {
     validateExternalId(externalId);
-    return normalize(readCard(externalId));
+    return normalize(game, readCard(externalId));
   }
 
   @Override
-  public Map<String, CatalogCard> findCards(List<String> externalIds) {
+  public Map<String, CatalogCard> findCards(Game game, List<String> externalIds) {
     try {
-      return doFindCards(externalIds);
+      return doFindCards(game, externalIds);
     } catch (CatalogException e) {
       throw e;
     } catch (Exception e) {
@@ -127,7 +128,7 @@ public class ScryfallCatalog implements CardCatalog {
     }
   }
 
-  private Map<String, CatalogCard> doFindCards(List<String> externalIds)
+  private Map<String, CatalogCard> doFindCards(Game game, List<String> externalIds)
       throws IOException, InterruptedException {
     var requestedIds = new LinkedHashSet<String>();
     for (var externalId : externalIds) {
@@ -169,7 +170,7 @@ public class ScryfallCatalog implements CardCatalog {
           throw new CatalogException.Unavailable("catalog returned inconsistent collection data");
         }
         try {
-          cardsById.put(cardId, normalize(card));
+          cardsById.put(cardId, normalize(game, card));
         } catch (CatalogException.NotFound e) {
           // non-English cards are resolved by the provider but are not selectable.
         }
@@ -196,9 +197,9 @@ public class ScryfallCatalog implements CardCatalog {
 
   @Override
   public CatalogPage findAlternatives(
-      String externalId, String finish, @Nullable String continuation) {
+      Game game, String externalId, String finish, @Nullable String continuation) {
     try {
-      return doFindAlternatives(externalId, finish, continuation);
+      return doFindAlternatives(game, externalId, finish, continuation);
     } catch (CatalogException e) {
       throw e;
     } catch (Exception e) {
@@ -210,17 +211,18 @@ public class ScryfallCatalog implements CardCatalog {
   }
 
   private CatalogPage doFindAlternatives(
-      String externalId, String finish, @Nullable String continuation)
+      Game game, String externalId, String finish, @Nullable String continuation)
       throws IOException, InterruptedException {
     validateExternalId(externalId);
-    validateFinish(finish);
+    validateFinish(game, finish);
     var context = "alternatives:" + GAME + ":" + externalId + ":" + finish;
     var anchor = readCard(externalId);
-    var anchorCard = normalize(anchor);
+    var anchorCard = normalize(game, anchor);
     var position = decodePosition(continuation, context);
     var providerQuery = queryFromPrintsUri(anchor.printsSearchUri());
     var query = "%s lang:en game:paper is:%s".formatted(providerQuery, scryfallFinish(finish));
     return readPage(
+        game,
         query,
         context,
         position,
@@ -230,9 +232,10 @@ public class ScryfallCatalog implements CardCatalog {
   }
 
   @Override
-  public CatalogPage search(String rawQuery, String finish, @Nullable String continuation) {
+  public CatalogPage search(
+      Game game, String rawQuery, String finish, @Nullable String continuation) {
     try {
-      return doSearch(rawQuery, finish, continuation);
+      return doSearch(game, rawQuery, finish, continuation);
     } catch (CatalogException e) {
       throw e;
     } catch (Exception e) {
@@ -243,10 +246,11 @@ public class ScryfallCatalog implements CardCatalog {
     }
   }
 
-  private CatalogPage doSearch(String rawQuery, String finish, @Nullable String continuation)
+  private CatalogPage doSearch(
+      Game game, String rawQuery, String finish, @Nullable String continuation)
       throws IOException, InterruptedException {
     var query = rawQuery != null ? rawQuery.trim() : "";
-    validateFinish(finish);
+    validateFinish(game, finish);
     if (query.length() < 2 || query.length() > 200) {
       throw new CatalogException.BadRequest("query must contain between 2 and 200 characters");
     }
@@ -257,7 +261,7 @@ public class ScryfallCatalog implements CardCatalog {
         throw new CatalogException.BadRequest("continuation is invalid for an exact ID search");
       }
       try {
-        var card = normalize(readCard(query));
+        var card = normalize(game, readCard(query));
         if (!eligible(card, finish)) {
           return emptyPage();
         }
@@ -269,10 +273,11 @@ public class ScryfallCatalog implements CardCatalog {
     var queryString =
         "name:\"%s\" lang:en game:paper is:%s"
             .formatted(escapeSearchPhrase(query), scryfallFinish(finish));
-    return readPage(queryString, context, position, null, null, finish);
+    return readPage(game, queryString, context, position, null, null, finish);
   }
 
   private CatalogPage readPage(
+      Game game,
       String query,
       String context,
       Position start,
@@ -311,7 +316,7 @@ public class ScryfallCatalog implements CardCatalog {
         if (candidate == null || candidate.language() == null) {
           throw new CatalogException.Unavailable("catalog returned invalid card data");
         }
-        var card = "en".equals(candidate.language()) ? normalize(candidate) : null;
+        var card = "en".equals(candidate.language()) ? normalize(game, candidate) : null;
         if (card == null
             || (excludedId != null && excludedId.equals(card.externalId()))
             || !eligible(card, finish)
@@ -395,7 +400,7 @@ public class ScryfallCatalog implements CardCatalog {
     return response.body();
   }
 
-  private CatalogCard normalize(ScryfallCard card) {
+  private CatalogCard normalize(Game game, ScryfallCard card) {
     if (card == null
         || card.id() == null
         || card.name() == null
@@ -411,7 +416,6 @@ public class ScryfallCatalog implements CardCatalog {
     if (!"en".equals(card.language())) {
       throw new CatalogException.NotFound("card not found");
     }
-    var game = Games.get(GAME);
     var finishes =
         card.games().contains("paper")
             ? game.finishes().stream()
@@ -518,8 +522,9 @@ public class ScryfallCatalog implements CardCatalog {
     }
   }
 
-  private void validateFinish(String finish) {
-    if (finish == null || !Games.get(GAME).supportsFinish(finish)) {
+  private void validateFinish(Game game, String finish) {
+    if (finish == null
+        || game.finishes().stream().noneMatch(candidate -> candidate.id().equals(finish))) {
       throw new CatalogException.BadRequest("finish is unsupported for game " + GAME);
     }
   }

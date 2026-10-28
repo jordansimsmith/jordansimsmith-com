@@ -8,11 +8,14 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.catalog.CatalogCard;
 import com.jordansimsmith.tcginventory.catalog.CatalogFactory;
 import com.jordansimsmith.tcginventory.catalog.Catalogs;
-import com.jordansimsmith.tcginventory.games.Games;
+import com.jordansimsmith.tcginventory.games.client.Game;
+import com.jordansimsmith.tcginventory.games.client.GamesService;
+import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
 import com.jordansimsmith.tcginventory.inventory.InventoryLocation;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
@@ -107,6 +110,7 @@ public class GetOrderHandler
   private final DynamoDbTable<UnitItem> unitTable;
   private final DynamoDbTable<SkuItem> skuTable;
   private final Catalogs catalogs;
+  private final GamesService gamesService;
 
   public GetOrderHandler() {
     this(CatalogFactory.create());
@@ -120,20 +124,25 @@ public class GetOrderHandler
     this.unitTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class);
     this.skuTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), SkuItem.class);
     this.catalogs = factory.catalogs();
+    this.gamesService = factory.gamesService();
   }
 
   @Override
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     try {
       return doHandleRequest(event);
+    } catch (ServiceException e) {
+      return httpResponseFactory.serviceError(e);
     } catch (Exception e) {
       LOGGER.error("error processing get order request", e);
       throw new RuntimeException(e);
     }
   }
 
-  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
-    var user = requestContextFactory.createCtx(event).user();
+  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event)
+      throws ServiceException {
+    var ctx = requestContextFactory.createCtx(event);
+    var user = ctx.user();
     var orderId = event.getPathParameters().get("order_id");
 
     String orderSk;
@@ -156,6 +165,7 @@ public class GetOrderHandler
     var blockUnits = findBlockUnits(user, orderLines, skuCache);
     var units = new ArrayList<OrderUnitResponse>();
     var lines = new ArrayList<OrderLineResponse>();
+    var gamesById = new HashMap<String, Game>();
 
     for (var line : orderLines) {
       var skuItem = getSku(SkuItem.formatPk(user, line.getSkuId()), skuCache);
@@ -173,7 +183,11 @@ public class GetOrderHandler
               line.getListedPrice()));
 
       var unitPrice = perUnitPrice(line);
-      var game = Games.get(skuItem.getGame());
+      var game = gamesById.get(skuItem.getGame());
+      if (game == null) {
+        game = gamesService.getGame(ctx, new GetGameRequest(skuItem.getGame())).game();
+        gamesById.put(skuItem.getGame(), game);
+      }
       var catalog = catalogs.forGame(game);
       for (var seqNum : line.getAllocatedSequenceNumbers()) {
         var position = computeBlockPosition(blockUnits, skuItem.getGame(), seqNum);
@@ -303,7 +317,6 @@ public class GetOrderHandler
     if (skuItem == null) {
       throw new IllegalStateException("sku record missing: " + skuPk);
     }
-    Games.get(skuItem.getGame());
     return skuItem;
   }
 

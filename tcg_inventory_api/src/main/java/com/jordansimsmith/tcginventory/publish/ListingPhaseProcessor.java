@@ -10,7 +10,6 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.CreateListingImageRequest
 import com.jordansimsmith.tcginventory.fetchtcg.client.DeleteListingRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.UpdateListingRequest;
-import com.jordansimsmith.tcginventory.games.Games;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
@@ -66,7 +65,6 @@ public class ListingPhaseProcessor {
     int processed = 0;
 
     for (var sku : dirtySkus) {
-      Games.get(sku.getGame());
       var skuId = sku.getSkuId();
       var capturedVersion = sku.getVersion();
       var inStock = loadInStock(user, skuId);

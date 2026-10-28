@@ -129,7 +129,7 @@
         "get_catalog_card": "//tcg_inventory_api:get-catalog-card-handler_deploy.jar",
         "find_catalog_alternatives": "//tcg_inventory_api:find-catalog-alternatives-handler_deploy.jar",
         "find_catalog_cards": "//tcg_inventory_api:find-catalog-cards-handler_deploy.jar",
-        "get_games": "//tcg_inventory_api:get-games-handler_deploy.jar",
+        "get_games": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/api:find-games-handler_deploy.jar",
         "get_fetchtcg_account": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:get-fetchtcg-account-handler_deploy.jar",
         "update_fetchtcg_credentials": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:update-fetchtcg-credentials-handler_deploy.jar",
         "get_settings": "//tcg_inventory_api:get-settings-handler_deploy.jar",

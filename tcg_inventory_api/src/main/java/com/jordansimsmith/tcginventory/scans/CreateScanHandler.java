@@ -10,10 +10,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.tcginventory.games.Games;
+import com.jordansimsmith.tcginventory.games.client.Game;
+import com.jordansimsmith.tcginventory.games.client.GamesService;
+import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
 import java.util.ArrayList;
@@ -67,6 +70,7 @@ public class CreateScanHandler
   private final ScanRepository scanRepository;
   private final UlidGenerator ulidGenerator;
   private final S3Presigner s3Presigner;
+  private final GamesService gamesService;
 
   public CreateScanHandler() {
     this(TcgInventoryFactory.create());
@@ -86,20 +90,25 @@ public class CreateScanHandler
             factory.clock());
     this.ulidGenerator = factory.ulidGenerator();
     this.s3Presigner = factory.s3Presigner();
+    this.gamesService = factory.gamesService();
   }
 
   @Override
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     try {
       return doHandleRequest(event);
+    } catch (ServiceException e) {
+      return httpResponseFactory.serviceError(e);
     } catch (Exception e) {
       LOGGER.error("error processing create scan request", e);
       throw new RuntimeException(e);
     }
   }
 
-  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
-    var user = requestContextFactory.createCtx(event).user();
+  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event)
+      throws ServiceException {
+    var ctx = requestContextFactory.createCtx(event);
+    var user = ctx.user();
 
     CreateScanRequest request;
     JsonNode requestNode;
@@ -110,7 +119,8 @@ public class CreateScanHandler
       return httpResponseFactory.badRequest(new ErrorResponse("invalid request body"));
     }
 
-    var validationError = validate(request);
+    Game game = gamesService.getGame(ctx, new GetGameRequest(request.game())).game();
+    var validationError = validate(request, game);
     if (validationError != null) {
       return httpResponseFactory.badRequest(new ErrorResponse(validationError));
     }
@@ -173,26 +183,15 @@ public class CreateScanHandler
   }
 
   @Nullable
-  private static String validate(@Nullable CreateScanRequest request) {
-    if (request == null) {
-      return "invalid request body";
-    }
-    if (request.game() == null) {
-      return "scan game is required";
-    }
-    Games.Game game;
-    try {
-      game = Games.get(request.game());
-    } catch (IllegalArgumentException e) {
-      return "unsupported scan game";
-    }
+  private static String validate(CreateScanRequest request, Game game) {
     if (!game.scanningEnabled()) {
       return "scanning is unavailable for game";
     }
     if (request.condition() == null || !isValidCondition(request.condition())) {
       return "invalid scan condition";
     }
-    if (request.finish() == null || !game.supportsFinish(request.finish())) {
+    if (request.finish() == null
+        || game.finishes().stream().noneMatch(finish -> finish.id().equals(request.finish()))) {
       return "invalid scan finish";
     }
     if (request.files() == null

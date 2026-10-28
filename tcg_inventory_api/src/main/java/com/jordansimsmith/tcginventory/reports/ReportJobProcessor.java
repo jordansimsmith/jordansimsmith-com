@@ -1,12 +1,16 @@
 package com.jordansimsmith.tcginventory.reports;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobProcessor;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.tcginventory.games.Games;
+import com.jordansimsmith.tcginventory.games.client.FindGamesRequest;
+import com.jordansimsmith.tcginventory.games.client.Game;
+import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
@@ -16,6 +20,7 @@ import java.math.BigDecimal;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbIndex;
@@ -34,6 +39,7 @@ public class ReportJobProcessor implements JobProcessor {
   private final DynamoDbIndex<SkuItem> gsi2Index;
   private final ObjectMapper objectMapper;
   private final Clock clock;
+  private final GamesService gamesService;
 
   public ReportJobProcessor(TcgInventoryFactory factory) {
     var enhancedClient = factory.dynamoDbEnhancedClient();
@@ -49,25 +55,34 @@ public class ReportJobProcessor implements JobProcessor {
     this.gsi2Index = skuTable.index(TcgInventoryTable.GSI2_NAME);
     this.objectMapper = factory.objectMapper();
     this.clock = factory.clock();
+    this.gamesService = factory.gamesService();
   }
 
   @Override
-  public JobProcessor.SuccessJobResult processBatch(String user, JobItem jobItem) {
+  public JobProcessor.SuccessJobResult processBatch(String user, JobItem jobItem)
+      throws ServiceException {
     LOGGER.info("starting report job for user {}", user);
 
     var asOfAuditUlid = findLatestAuditUlid(user);
     LOGGER.info("captured as-of audit ULID: {}", asOfAuditUlid);
 
     var now = clock.now();
+    var ctx = new RequestContext(user);
+    var games = gamesService.findGames(ctx, new FindGamesRequest()).games();
+    var gamesById = games.stream().collect(Collectors.toMap(Game::id, game -> game));
     var accumulator = new ReportAccumulator(now);
     var gameAccumulators = new LinkedHashMap<String, ReportAccumulator>();
-    for (var game : Games.all()) {
+    for (var game : games) {
       gameAccumulators.put(game.id(), new ReportAccumulator(now));
     }
     var skuGames = new HashMap<String, String>();
 
     for (var sku : pageGsi2Skus(user)) {
-      var game = Games.get(sku.getGame());
+      var game = gamesById.get(sku.getGame());
+      if (game == null) {
+        throw new IllegalStateException(
+            "Inventory SKU references a game not returned by Games: " + sku.getGame());
+      }
       skuGames.put(sku.getSkuId(), game.id());
       var units = inventoryRepository.findUnits(user, sku.getSkuId());
       accumulator.addSku(sku, units);
@@ -97,7 +112,7 @@ public class ReportJobProcessor implements JobProcessor {
               accumulator.toTotals(),
               accumulator.toRevenueByMonth(),
               accumulator.toIntakeVsSalesByWeek(),
-              Games.all().stream()
+              games.stream()
                   .map(
                       game -> {
                         var gameAccumulator = gameAccumulators.get(game.id());

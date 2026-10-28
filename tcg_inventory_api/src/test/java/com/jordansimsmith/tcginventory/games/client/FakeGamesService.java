@@ -1,34 +1,15 @@
-package com.jordansimsmith.tcginventory.games;
+package com.jordansimsmith.tcginventory.games.client;
 
+import com.jordansimsmith.service.BadRequestException;
+import com.jordansimsmith.service.NotFoundException;
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
-public class Games {
-  public record Finish(String id, String displayName) {}
-
-  public record ScanReviewImageRegion(
-      String id, String displayName, double x, double y, double width, double height) {}
-
-  public record Game(
-      String id,
-      String displayName,
-      String externalSource,
-      boolean scanningEnabled,
-      boolean csvImportEnabled,
-      List<Finish> finishes,
-      List<ScanReviewImageRegion> scanReviewImageRegions) {
-    public Game {
-      finishes = List.copyOf(finishes);
-      scanReviewImageRegions = List.copyOf(scanReviewImageRegions);
-    }
-
-    public boolean supportsFinish(String finishId) {
-      return finishes.stream().anyMatch(finish -> finish.id().equals(finishId));
-    }
-  }
-
+public class FakeGamesService implements GamesService {
   public static final Game MAGIC_THE_GATHERING =
       new Game(
           "mtg",
@@ -43,7 +24,6 @@ public class Games {
           List.of(
               new ScanReviewImageRegion("set_code", "Set code", 0, 0.9, 0.25, 0.1),
               new ScanReviewImageRegion("set_symbol", "Set symbol", 0.75, 0.535, 0.25, 0.1)));
-
   public static final Game POKEMON_ENGLISH =
       new Game(
           "pokemon",
@@ -62,20 +42,32 @@ public class Games {
               new ScanReviewImageRegion(
                   "artwork_stamps_right", "Right artwork stamps", 0.55, 0.32, 0.45, 0.22)));
 
-  private static final List<Game> GAMES = List.of(MAGIC_THE_GATHERING, POKEMON_ENGLISH);
+  private final Map<String, Game> gamesById = new LinkedHashMap<>();
 
-  private static final Map<String, Game> GAMES_BY_ID =
-      GAMES.stream().collect(Collectors.toUnmodifiableMap(Game::id, Function.identity()));
-
-  public static List<Game> all() {
-    return GAMES;
+  public FakeGamesService() {
+    seed(MAGIC_THE_GATHERING);
+    seed(POKEMON_ENGLISH);
   }
 
-  public static Game get(String id) {
-    var game = GAMES_BY_ID.get(id);
-    if (game == null) {
-      throw new IllegalArgumentException("unsupported game: " + id);
+  public void seed(Game game) {
+    gamesById.put(game.id(), game);
+  }
+
+  @Override
+  public GetGameResponse getGame(RequestContext ctx, GetGameRequest request)
+      throws ServiceException {
+    if (request.gameId() == null || request.gameId().isBlank()) {
+      throw new BadRequestException("game_id is required");
     }
-    return game;
+    var game = gamesById.get(request.gameId());
+    if (game == null) {
+      throw new NotFoundException("unsupported game: " + request.gameId());
+    }
+    return new GetGameResponse(game);
+  }
+
+  @Override
+  public FindGamesResponse findGames(RequestContext ctx, FindGamesRequest request) {
+    return new FindGamesResponse(new ArrayList<>(gamesById.values()));
   }
 }

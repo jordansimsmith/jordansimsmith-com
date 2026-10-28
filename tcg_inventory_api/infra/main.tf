@@ -73,7 +73,7 @@ module "java_api" {
       artifact = var.artifacts["find_catalog_cards"]
     }
     get_games = {
-      handler  = "com.jordansimsmith.tcginventory.games.GetGamesHandler"
+      handler  = "com.jordansimsmith.tcginventory.games.api.FindGamesHandler"
       artifact = var.artifacts["get_games"]
     }
     get_fetchtcg_account = {

@@ -1,9 +1,10 @@
 package com.jordansimsmith.tcginventory;
 
+import com.jordansimsmith.service.ServiceException;
 import javax.annotation.Nullable;
 
 public interface JobProcessor {
-  JobResult processBatch(String user, JobItem jobItem);
+  JobResult processBatch(String user, JobItem jobItem) throws ServiceException;
 
   sealed interface JobResult permits SuccessJobResult, FailureJobResult {}
 

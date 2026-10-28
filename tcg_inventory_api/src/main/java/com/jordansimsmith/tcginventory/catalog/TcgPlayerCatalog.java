@@ -2,6 +2,7 @@ package com.jordansimsmith.tcginventory.catalog;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import com.jordansimsmith.tcginventory.games.client.Game;
 import com.jordansimsmith.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -44,7 +45,7 @@ public class TcgPlayerCatalog implements CardCatalog {
   }
 
   @Override
-  public CatalogCard getCard(String externalId) {
+  public CatalogCard getCard(Game ignoredGame, String externalId) {
     var snapshot = load();
     var product =
         snapshot.products().stream()
@@ -55,7 +56,7 @@ public class TcgPlayerCatalog implements CardCatalog {
   }
 
   @Override
-  public Map<String, CatalogCard> findCards(List<String> externalIds) {
+  public Map<String, CatalogCard> findCards(Game ignoredGame, List<String> externalIds) {
     var requestedIds = new LinkedHashSet<>(externalIds);
     if (requestedIds.isEmpty()) {
       return Map.of();
@@ -73,7 +74,8 @@ public class TcgPlayerCatalog implements CardCatalog {
   }
 
   @Override
-  public CatalogPage findAlternatives(String externalId, String finish, String continuation) {
+  public CatalogPage findAlternatives(
+      Game ignoredGame, String externalId, String finish, String continuation) {
     var snapshot = load();
     var offset = decodeContinuation(continuation);
     var anchor =
@@ -94,7 +96,7 @@ public class TcgPlayerCatalog implements CardCatalog {
   }
 
   @Override
-  public CatalogPage search(String rawQuery, String finish, String continuation) {
+  public CatalogPage search(Game ignoredGame, String rawQuery, String finish, String continuation) {
     var query = rawQuery.trim();
     if (query.length() < 2 || query.length() > 200) {
       throw new CatalogException.BadRequest("query must contain between 2 and 200 characters");

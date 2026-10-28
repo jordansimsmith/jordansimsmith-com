@@ -16,7 +16,7 @@ import com.jordansimsmith.tcginventory.JobsHandler;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
-import com.jordansimsmith.tcginventory.games.Games;
+import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
@@ -234,7 +234,7 @@ public class ReportsHandlerIntegrationTest {
         SkuItem.create(
             "jordan",
             "mtg#scryfall#scryfall1#normal#NM",
-            Games.MAGIC_THE_GATHERING.id(),
+            FakeGamesService.MAGIC_THE_GATHERING.id(),
             "scryfall1",
             "normal",
             "NM",
@@ -251,7 +251,7 @@ public class ReportsHandlerIntegrationTest {
         SkuItem.create(
             "jordan",
             "mtg#scryfall#scryfall2#normal#NM",
-            Games.MAGIC_THE_GATHERING.id(),
+            FakeGamesService.MAGIC_THE_GATHERING.id(),
             "scryfall2",
             "normal",
             "NM",
@@ -267,7 +267,7 @@ public class ReportsHandlerIntegrationTest {
         SkuItem.create(
             "jordan",
             "mtg#scryfall#scryfall3#normal#NM",
-            Games.MAGIC_THE_GATHERING.id(),
+            FakeGamesService.MAGIC_THE_GATHERING.id(),
             "scryfall3",
             "normal",
             "NM",

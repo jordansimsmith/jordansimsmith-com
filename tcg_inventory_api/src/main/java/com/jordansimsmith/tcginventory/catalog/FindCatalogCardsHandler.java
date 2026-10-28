@@ -8,8 +8,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import com.jordansimsmith.tcginventory.games.Games;
-import com.jordansimsmith.tcginventory.games.Games.Game;
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.tcginventory.games.client.Game;
+import com.jordansimsmith.tcginventory.games.client.GamesService;
+import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,6 +25,7 @@ public class FindCatalogCardsHandler
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final Catalogs catalogs;
+  private final GamesService gamesService;
 
   public FindCatalogCardsHandler() {
     this(CatalogFactory.create());
@@ -32,22 +36,25 @@ public class FindCatalogCardsHandler
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.catalogs = factory.catalogs();
+    this.gamesService = factory.gamesService();
   }
 
   @Override
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     try {
-      requestContextFactory.createCtx(event);
-      var game = requiredGame(event);
+      var ctx = requestContextFactory.createCtx(event);
+      var game = requiredGame(event, ctx);
       var finish = requiredQueryParameter(event, "finish");
-      if (!game.supportsFinish(finish)) {
+      if (game.finishes().stream().noneMatch(candidate -> candidate.id().equals(finish))) {
         throw new CatalogException.BadRequest("finish is unsupported for game " + game.id());
       }
       var query = requiredQueryParameter(event, "query");
       var queryParameters = event.getQueryStringParameters();
       var continuation = queryParameters != null ? queryParameters.get("continuation") : null;
-      var page = catalogs.forGame(game).search(query, finish, continuation);
+      var page = catalogs.forGame(game).search(game, query, finish, continuation);
       return httpResponseFactory.ok(page);
+    } catch (ServiceException e) {
+      return httpResponseFactory.serviceError(e);
     } catch (CatalogException.BadRequest e) {
       return httpResponseFactory.badRequest(new ErrorResponse(e.getMessage()));
     } catch (CatalogException.NotFound e) {
@@ -62,13 +69,10 @@ public class FindCatalogCardsHandler
     }
   }
 
-  private Game requiredGame(APIGatewayV2HTTPEvent event) {
+  private Game requiredGame(APIGatewayV2HTTPEvent event, RequestContext ctx)
+      throws ServiceException {
     var gameId = requiredQueryParameter(event, "game");
-    try {
-      return Games.get(gameId);
-    } catch (IllegalArgumentException e) {
-      throw new CatalogException.BadRequest(e.getMessage());
-    }
+    return gamesService.getGame(ctx, new GetGameRequest(gameId)).game();
   }
 
   private String requiredQueryParameter(APIGatewayV2HTTPEvent event, String key) {

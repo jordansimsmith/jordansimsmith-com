@@ -85,11 +85,11 @@ public class AppraiseJobProcessor implements JobProcessor {
     int batchEnd = Math.min(continuation + BATCH_SIZE, totalRows);
     int processed = continuation;
 
+    var ctx = new RequestContext(user);
     var appraisalCatalog = AppraisalCatalogs.get(importItem.getGame());
     Map<String, AppraisalCatalog.ResolvedCard> batchCache = new HashMap<>();
     Map<String, GetCardResponse> cardCache = new HashMap<>();
     Map<String, BigDecimal> marketPriceCache = new HashMap<>();
-    var ctx = new RequestContext(user);
     var sellerUsername = fetchTcgService.getAccount(ctx, new GetAccountRequest()).sellerUsername();
 
     for (int i = continuation + 1; i <= batchEnd; i++) {

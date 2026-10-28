@@ -117,10 +117,10 @@ public class InventoryHandlerIntegrationTest {
   }
 
   @Test
-  void findSkusShouldRequireRegisteredGame() throws Exception {
+  void findSkusShouldRequireGameAndTreatUnknownGameAsFilter() throws Exception {
     // act
     var missingGame = findSkusHandler.handleRequest(buildEvent("jordan", Map.of()), null);
-    var unsupportedGame =
+    var unknownGame =
         findSkusHandler.handleRequest(
             buildEventWithQuery("jordan", Map.of(), Map.of("game", "digimon")), null);
 
@@ -128,9 +128,8 @@ public class InventoryHandlerIntegrationTest {
     assertThat(missingGame.getStatusCode()).isEqualTo(400);
     assertThat(objectMapper.readTree(missingGame.getBody()).get("message").asText())
         .isEqualTo("game is required");
-    assertThat(unsupportedGame.getStatusCode()).isEqualTo(400);
-    assertThat(objectMapper.readTree(unsupportedGame.getBody()).get("message").asText())
-        .isEqualTo("unsupported game: digimon");
+    assertThat(unknownGame.getStatusCode()).isEqualTo(200);
+    assertThat(objectMapper.readTree(unknownGame.getBody()).get("skus")).isEmpty();
   }
 
   @Test

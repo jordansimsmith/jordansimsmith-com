@@ -3,7 +3,8 @@ package com.jordansimsmith.tcginventory;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.jordansimsmith.tcginventory.games.Games;
+import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
+import com.jordansimsmith.tcginventory.games.client.Finish;
 import org.junit.jupiter.api.Test;
 
 public class SkuIdsTest {
@@ -13,7 +14,8 @@ public class SkuIdsTest {
     var identity = new CardIdentity("mtg", "29ba5a2d-d787-4214-8cd7-7f2bcea938f8");
 
     // act
-    var skuId = SkuIds.format(identity, "normal", Condition.NM);
+    var skuId =
+        SkuIds.format(FakeGamesService.MAGIC_THE_GATHERING, identity, "normal", Condition.NM);
 
     // assert
     assertThat(skuId).isEqualTo("mtg#scryfall#29ba5a2d-d787-4214-8cd7-7f2bcea938f8#normal#NM");
@@ -25,7 +27,7 @@ public class SkuIdsTest {
     var identity = new CardIdentity("mtg", "a-._~451396");
 
     // act
-    var skuId = SkuIds.format(identity, "foil", Condition.LP);
+    var skuId = SkuIds.format(FakeGamesService.MAGIC_THE_GATHERING, identity, "foil", Condition.LP);
 
     // assert
     assertThat(skuId).isEqualTo("mtg#scryfall#a-._~451396#foil#LP");
@@ -37,9 +39,11 @@ public class SkuIdsTest {
     var identity = new CardIdentity("mtg", "card-id");
 
     // act / assert
-    for (var finish : Games.get("mtg").finishes()) {
+    for (var finish : FakeGamesService.MAGIC_THE_GATHERING.finishes()) {
       for (var condition : Condition.values()) {
-        assertThat(SkuIds.format(identity, finish.id(), condition))
+        assertThat(
+                SkuIds.format(
+                    FakeGamesService.MAGIC_THE_GATHERING, identity, finish.id(), condition))
             .isEqualTo("mtg#scryfall#card-id#" + finish.id() + "#" + condition.name());
       }
     }
@@ -51,11 +55,13 @@ public class SkuIdsTest {
     var identity = new CardIdentity("pokemon", "283917");
 
     // act / assert
-    assertThat(SkuIds.format(identity, "normal", Condition.NM))
+    assertThat(SkuIds.format(FakeGamesService.POKEMON_ENGLISH, identity, "normal", Condition.NM))
         .isEqualTo("pokemon#tcgplayer#283917#normal#NM");
-    assertThat(SkuIds.format(identity, "reverse_holofoil", Condition.NM))
+    assertThat(
+            SkuIds.format(
+                FakeGamesService.POKEMON_ENGLISH, identity, "reverse_holofoil", Condition.NM))
         .isEqualTo("pokemon#tcgplayer#283917#reverse_holofoil#NM");
-    assertThat(SkuIds.format(identity, "holofoil", Condition.NM))
+    assertThat(SkuIds.format(FakeGamesService.POKEMON_ENGLISH, identity, "holofoil", Condition.NM))
         .isEqualTo("pokemon#tcgplayer#283917#holofoil#NM");
   }
 
@@ -88,28 +94,38 @@ public class SkuIdsTest {
     var identity = new CardIdentity("mtg", "id");
 
     // act / assert
-    assertThatThrownBy(() -> SkuIds.format(unknownGame, "normal", Condition.NM))
+    assertThatThrownBy(
+            () ->
+                SkuIds.format(
+                    FakeGamesService.POKEMON_ENGLISH, unknownGame, "normal", Condition.NM))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> SkuIds.format(identity, "reverse_holofoil", Condition.NM))
+    assertThatThrownBy(
+            () ->
+                SkuIds.format(
+                    FakeGamesService.MAGIC_THE_GATHERING,
+                    identity,
+                    "reverse_holofoil",
+                    Condition.NM))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> SkuIds.format(identity, "normal", null))
+    assertThatThrownBy(
+            () -> SkuIds.format(FakeGamesService.MAGIC_THE_GATHERING, identity, "normal", null))
         .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
   void gameRegistryShouldExposeImmutableFinishConfiguration() {
     // arrange / act
-    var magic = Games.get("mtg");
+    var magic = FakeGamesService.MAGIC_THE_GATHERING;
 
     // assert
-    assertThat(magic).isEqualTo(Games.MAGIC_THE_GATHERING);
+    assertThat(magic).isEqualTo(FakeGamesService.MAGIC_THE_GATHERING);
     assertThat(magic.finishes())
         .containsExactly(
-            new Games.Finish("normal", "Normal"),
-            new Games.Finish("foil", "Foil"),
-            new Games.Finish("etched", "Etched"));
+            new Finish("normal", "Normal"),
+            new Finish("foil", "Foil"),
+            new Finish("etched", "Etched"));
     assertThatThrownBy(
-            () -> magic.finishes().add(new Games.Finish("reverse_holofoil", "Reverse Holofoil")))
+            () -> magic.finishes().add(new Finish("reverse_holofoil", "Reverse Holofoil")))
         .isInstanceOf(UnsupportedOperationException.class);
   }
 }

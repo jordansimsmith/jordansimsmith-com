@@ -357,7 +357,7 @@ public class ConfirmImportHandlerIntegrationTest {
   }
 
   @Test
-  void confirmLargeImportShouldCreateEveryUnit() {
+  void confirmLargeImportShouldCreateEveryUnit() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createImportInReview("jordan", "import1", 200);
@@ -381,7 +381,7 @@ public class ConfirmImportHandlerIntegrationTest {
   }
 
   @Test
-  void confirmShouldSkipUnitsAlreadyPresentForImport() {
+  void confirmShouldSkipUnitsAlreadyPresentForImport() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     var importItem =
@@ -452,7 +452,7 @@ public class ConfirmImportHandlerIntegrationTest {
   }
 
   @Test
-  void confirmShouldResumeAfterACommittedUnitWhenAnotherImportOwnsTheNextKey() {
+  void confirmShouldResumeAfterACommittedUnitWhenAnotherImportOwnsTheNextKey() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
@@ -762,7 +762,7 @@ public class ConfirmImportHandlerIntegrationTest {
     auditTable.putItem(audit);
   }
 
-  private void processConfirmation(String user, String importId) {
+  private void processConfirmation(String user, String importId) throws Exception {
     var jobItem =
         jobTable
             .query(

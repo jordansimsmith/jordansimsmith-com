@@ -2,6 +2,8 @@ package com.jordansimsmith.tcginventory.scans;
 
 import com.google.common.base.Strings;
 import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.JobProcessor;
@@ -10,8 +12,9 @@ import com.jordansimsmith.tcginventory.catalog.CatalogCard;
 import com.jordansimsmith.tcginventory.catalog.CatalogException;
 import com.jordansimsmith.tcginventory.catalog.CatalogFactory;
 import com.jordansimsmith.tcginventory.catalog.Catalogs;
-import com.jordansimsmith.tcginventory.games.Games;
-import com.jordansimsmith.tcginventory.games.Games.Game;
+import com.jordansimsmith.tcginventory.games.client.Game;
+import com.jordansimsmith.tcginventory.games.client.GamesService;
+import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.time.Clock;
@@ -34,6 +37,7 @@ public class ScanConfirmationJobProcessor implements JobProcessor {
   private final DynamoDbTable<JobItem> jobTable;
   private final QueueClient<JobMessage> jobsQueue;
   private final UlidGenerator ulidGenerator;
+  private final GamesService gamesService;
 
   public ScanConfirmationJobProcessor(CatalogFactory factory) {
     this.clock = factory.clock();
@@ -50,10 +54,11 @@ public class ScanConfirmationJobProcessor implements JobProcessor {
     this.jobTable = factory.jobTable();
     this.jobsQueue = factory.jobsQueue();
     this.ulidGenerator = factory.ulidGenerator();
+    this.gamesService = factory.gamesService();
   }
 
   @Override
-  public JobProcessor.JobResult processBatch(String user, JobItem jobItem) {
+  public JobProcessor.JobResult processBatch(String user, JobItem jobItem) throws ServiceException {
     var scanId = jobItem.getScanId();
     if (scanId == null) {
       throw new IllegalStateException("scan confirmation job is missing required identity");
@@ -71,7 +76,10 @@ public class ScanConfirmationJobProcessor implements JobProcessor {
     }
 
     var scanRows = scanRepository.findScanRows(user, scanId);
-    var game = Games.get(scanItem.getGame());
+    var game =
+        gamesService
+            .getGame(new RequestContext(user), new GetGameRequest(scanItem.getGame()))
+            .game();
     List<ConfirmedScanRow> confirmedRows;
     try {
       confirmedRows = validateCatalogRows(game, scanItem.getFinish(), scanRows);
@@ -140,7 +148,7 @@ public class ScanConfirmationJobProcessor implements JobProcessor {
     }
 
     var resolvedCards =
-        catalogs.forGame(game).findCards(List.copyOf(requestedIds)).values().stream()
+        catalogs.forGame(game).findCards(game, List.copyOf(requestedIds)).values().stream()
             .collect(Collectors.toMap(CatalogCard::externalId, card -> card));
     var confirmedRows = new ArrayList<ConfirmedScanRow>();
     for (var row : scanRows) {

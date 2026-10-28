@@ -6,6 +6,8 @@ import com.amazonaws.services.lambda.runtime.events.SQSEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.catalog.CatalogFactory;
 import com.jordansimsmith.tcginventory.imports.AppraiseJobProcessor;
 import com.jordansimsmith.tcginventory.imports.ImportConfirmationJobProcessor;
@@ -119,7 +121,8 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             factory.fetchTcgService(),
             pricingRepository,
             factory.clock(),
-            ulidGenerator);
+            ulidGenerator,
+            factory.gamesService());
   }
 
   @Override
@@ -157,7 +160,18 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     }
 
     var processor = jobProcessor(message.jobType());
-    var result = processor.processBatch(message.user(), jobItem);
+    JobProcessor.JobResult result;
+    try {
+      result = processor.processBatch(message.user(), jobItem);
+    } catch (ServiceUnavailableException e) {
+      throw new RuntimeException("service is temporarily unavailable", e);
+    } catch (ServiceException e) {
+      jobItem.setStatus("failed");
+      jobItem.setError(e.getMessage());
+      jobItem.setUpdatedAt(clock.now());
+      jobTable.putItem(jobItem);
+      return;
+    }
     if (result instanceof JobProcessor.FailureJobResult failure) {
       jobItem.setStatus("failed");
       jobItem.setError(failure.error());

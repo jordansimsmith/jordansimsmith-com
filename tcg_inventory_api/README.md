@@ -96,7 +96,7 @@ flowchart TD
   scanworker --> catalog[Bundled Scryfall MTG catalog + Milo model]
 ```
 
-The catalog library depends on the shared service `:lib`, which has no dependency on catalog. `CatalogFactory` extends `TcgInventoryFactory` and builds one Dagger component with the shared `TcgInventoryModule` and the vertical's `CatalogModule`. Catalog HTTP clients, request pacers, provider adapters, game registrations, snapshot repositories, and snapshot stores belong to `CatalogModule`. Catalog handlers have a public no-argument constructor that delegates to one `@VisibleForTesting` constructor accepting `CatalogFactory`. Integration tests supply a factory that binds `FakeCardCatalogs`; focused adapter tests bind a catalog using a loopback HTTP server. The catalog storage bucket constant is independent of photo storage configuration.
+The catalog library depends on the shared service `:lib`, which has no dependency on catalog. `CatalogFactory` extends `TcgInventoryFactory` and builds one Dagger component with the shared `TcgInventoryModule` and the vertical's `CatalogModule`. Catalog HTTP clients, request pacers, provider adapters, snapshot repositories, and snapshot stores belong to `CatalogModule`. The Games registry and its client service are composed separately by `GamesModule`. Catalog handlers have a public no-argument constructor that delegates to one `@VisibleForTesting` constructor accepting `CatalogFactory`. Integration tests supply a factory that binds `FakeCardCatalogs`; focused adapter tests bind a catalog using a loopback HTTP server. The catalog storage bucket constant is independent of photo storage configuration.
 
 ### Primary workflow
 
@@ -190,9 +190,9 @@ The shared `infra/modules/container_lambda` module owns the generic image-Lambda
 
 ### Java package layout
 
-The Java API is organized into hard-boundary vertical packages. `games` owns the immutable registered game and finish metadata plus `GET /games`; `catalog` owns normalized catalog models, provider adapters, catalog dependency injection, and card detail, alternatives, and search handlers; `scans` owns scan records, recognition messages, scan persistence, and scan handlers; `imports` owns ManaBox parsing, appraisal, import records, photos during intake, and import handlers; `inventory` owns SKUs, units, locations, sequence allocation, and inventory handlers; `orders` owns offers, reservations, fulfillment, order persistence, and order handlers; `reports` owns report records, aggregation, generation, and report handlers; `publish` owns listing projection, publish orchestration, publish jobs, and publish handlers; `settings` owns marketplace settings persistence and handlers; and `pricing` owns the pure pricing policy, per-user price-floor configuration, and repricing worker. Shared Dagger configuration, jobs, audit records, generic photo policy/storage helpers, and table constants remain in the top-level package.
+The Java API is organized into hard-boundary vertical packages. `games` owns the immutable registered game and finish metadata, its client contract, and the `GET /games` HTTP adapter; `catalog` owns normalized catalog models, provider adapters, catalog dependency injection, and card detail, alternatives, and search handlers; `scans` owns scan records, recognition messages, scan persistence, and scan handlers; `imports` owns ManaBox parsing, appraisal, import records, photos during intake, and import handlers; `inventory` owns SKUs, units, locations, sequence allocation, and inventory handlers; `orders` owns offers, reservations, fulfillment, order persistence, and order handlers; `reports` owns report records, aggregation, generation, and report handlers; `publish` owns listing projection, publish orchestration, publish jobs, and publish handlers; `settings` owns marketplace settings persistence and handlers; and `pricing` owns the pure pricing policy, per-user price-floor configuration, and repricing worker. Shared Dagger configuration, jobs, audit records, generic photo policy/storage helpers, and table constants remain in the top-level package.
 
-Bazel mirrors this layout with `:games-lib`, `:catalog-lib`, `:scan-lib`, `:import-lib`, `:inventory-lib`, `:order-lib`, `:report-lib`, `:publish-lib`, `:settings-lib`, and `:pricing-lib`, plus separate FetchTCG `client` and `server` packages. The legacy FetchTCG implementation library has been removed. The top-level `:lib` still depends on the FetchTCG server to compose its client; this is a temporary visibility gap while business targets remain in the same Bazel package as application wiring. Future vertical migrations move those targets into their own packages, and shared libraries into `//lib`. The game registry is a shared dependency of the verticals that validate or expose game identity. The remaining libraries depend in one direction: catalog, scans, imports, inventory, and settings depend on the top-level `:lib`; pricing depends on `:inventory-lib` and `:lib`; imports also depends on `:pricing-lib` for its appraisal policy; orders depend on inventory and settings; publish depends on inventory, orders, settings, and the top-level `:lib`; and reports depend on inventory and orders. Cross-vertical composition is kept on the smallest handler or job target that needs it (for example, import confirmation composes imports and inventory, while scan confirmation composes scans, catalog, games, and imports). The jobs handler composes all vertical libraries directly; there is no separate jobs library.
+Bazel gives each Games `api`, `client`, and `server` directory its own package and BUILD target. Vertical consumers depend on the public Games client; only the root composition package may depend on the Games server to include `GamesModule`. The root package still contains business targets, so that server visibility is a temporary enforcement gap until those targets move into their own packages. Other vertical libraries depend in one direction: catalog, scans, imports, inventory, and settings depend on the top-level `:lib`; pricing depends on `:inventory-lib` and `:lib`; imports also depends on `:pricing-lib` for its appraisal policy; orders depend on inventory and settings; publish depends on inventory, orders, settings, and the top-level `:lib`; and reports depend on inventory and orders. Cross-vertical composition is kept on the smallest handler or job target that needs it (for example, import confirmation composes imports and inventory, while scan confirmation composes scans, catalog, games, and imports). The jobs handler composes all vertical libraries directly; there is no separate jobs library.
 
 ### Pokémon catalog preparation
 
@@ -405,7 +405,7 @@ Credential saves verify the candidate through Firebase token exchange and FetchT
 
 ### `GET /games`
 
-Response `200` returns games in registry order. Only registered games are included. Each game's `finishes` list preserves the display order supplied by the backend; `scanning_enabled` and `csv_import_enabled` advertise whether the corresponding create workflows are available. `scan_review_image_regions` is an ordered list of labeled rectangles normalized to the image bounds, with coordinates measured from the upper-left corner. An empty list means scan review has no crop regions for that game. Provider fields such as `external_source` are not part of this response.
+Response `200` returns the `FindGamesResponse` from `GamesService` directly, in registry order. Only registered games are included. Each game includes its `external_source`, ordered `finishes`, `scanning_enabled`, and `csv_import_enabled`. `scan_review_image_regions` is an ordered list of labeled rectangles normalized to the image bounds, with coordinates measured from the upper-left corner. An empty list means scan review has no crop regions for that game. The response models are the Games client contract, so the handler does not define a parallel HTTP model.
 
 Pokémon's three regions cover the lower-left set and collector number (`x=0`, `y=0.88`, `width=0.5`, `height=0.12`) and the artwork's lower corners: left (`x=0`, `y=0.32`, `width=0.45`, `height=0.22`) and right (`x=0.55`, `y=0.32`, `width=0.45`, `height=0.22`). Their bounds assume an upright card filling the image. The artwork crops target retailer, event, STAFF, and Prize Pack stamps; Pokémon Center stamps above the retreat cost and lower-positioned VMAX stamps have no dedicated region. Crop metadata does not enable Pokémon scanning or CSV imports.
 
@@ -415,6 +415,7 @@ Pokémon's three regions cover the lower-left set and collector number (`x=0`, `
     {
       "id": "mtg",
       "display_name": "Magic: The Gathering",
+      "external_source": "scryfall",
       "scanning_enabled": true,
       "csv_import_enabled": true,
       "finishes": [
@@ -444,6 +445,7 @@ Pokémon's three regions cover the lower-left set and collector number (`x=0`, `
     {
       "id": "pokemon",
       "display_name": "Pokémon (EN)",
+      "external_source": "tcgplayer",
       "scanning_enabled": false,
       "csv_import_enabled": false,
       "finishes": [
@@ -697,7 +699,7 @@ Response `200` (units sorted ascending by sequence number; locations and the `*_
 }
 ```
 
-`GET /skus` requires `game` and accepts optional `search`, `continuation`, and `limit`. The game must be registered; missing or unsupported games return 400. Each summary includes `game`.
+`GET /skus` requires `game` and accepts optional `search`, `continuation`, and `limit`. The game value is used as an opaque inventory filter and is not checked against Games; a filter with no matches returns an empty list. Each summary includes `game`.
 
 `image_urls` on SKU detail and order units are generated by the registered game's catalog adapter from the stored `external_id`, without a provider request. Magic keeps Scryfall image redirect URLs; Pokémon uses TCGplayer CDN thumbnails (`<product_id>_200w.jpg`) and large images (`<product_id>_in_1000x1000.jpg`). Pokémon's snapshot stores a numeric TCGplayer product ID, whose string form is passed through opaquely by catalog lookups and image URL generation; `fetchtcg_card_id` stores the exact finish-specific FetchTCG card ID used by publishing.
 

@@ -9,11 +9,13 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.tcginventory.games.Games;
+import com.jordansimsmith.tcginventory.games.client.GamesService;
+import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
 import java.util.ArrayList;
@@ -47,6 +49,7 @@ public class CreateImportHandler
   private final DynamoDbTable<ImportRowItem> importRowTable;
   private final DynamoDbTable<JobItem> jobTable;
   private final QueueClient<JobMessage> jobsQueue;
+  private final GamesService gamesService;
   private final UlidGenerator ulidGenerator;
 
   public CreateImportHandler() {
@@ -63,6 +66,7 @@ public class CreateImportHandler
         TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
     this.jobTable = factory.jobTable();
     this.jobsQueue = factory.jobsQueue();
+    this.gamesService = factory.gamesService();
     this.ulidGenerator = factory.ulidGenerator();
   }
 
@@ -70,26 +74,25 @@ public class CreateImportHandler
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     try {
       return doHandleRequest(event);
+    } catch (ServiceException e) {
+      return httpResponseFactory.serviceError(e);
     } catch (Exception e) {
       LOGGER.error("error processing create import request", e);
       throw new RuntimeException(e);
     }
   }
 
-  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
-    var user = requestContextFactory.createCtx(event).user();
+  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event)
+      throws ServiceException {
+    var ctx = requestContextFactory.createCtx(event);
+    var user = ctx.user();
     var queryParams = event.getQueryStringParameters();
     var gameId = queryParams != null ? queryParams.get("game") : null;
     if (gameId == null || gameId.isBlank()) {
       return httpResponseFactory.badRequest(new ErrorResponse("game query parameter is required"));
     }
 
-    Games.Game game;
-    try {
-      game = Games.get(gameId);
-    } catch (IllegalArgumentException e) {
-      return httpResponseFactory.badRequest(new ErrorResponse("unsupported import game"));
-    }
+    var game = gamesService.getGame(ctx, new GetGameRequest(gameId)).game();
     if (!game.csvImportEnabled()) {
       return httpResponseFactory.badRequest(
           new ErrorResponse("CSV import is unavailable for game: " + game.id()));
@@ -114,7 +117,7 @@ public class CreateImportHandler
 
     List<ManaBoxCsvParser.ParsedRow> parsedRows;
     try {
-      parsedRows = ManaBoxCsvParser.parse(csv);
+      parsedRows = ManaBoxCsvParser.parse(csv, game);
     } catch (IllegalArgumentException e) {
       return httpResponseFactory.badRequest(new ErrorResponse(e.getMessage()));
     }

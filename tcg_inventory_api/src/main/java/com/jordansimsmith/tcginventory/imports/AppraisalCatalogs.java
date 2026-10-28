@@ -5,7 +5,6 @@ import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.CardIdentity;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
-import com.jordansimsmith.tcginventory.games.Games;
 import java.util.Map;
 
 public class AppraisalCatalogs {
@@ -32,10 +31,9 @@ public class AppraisalCatalogs {
   }
 
   private static final Map<String, AppraisalCatalog> CATALOGS =
-      Map.of(Games.MAGIC_THE_GATHERING.id(), new MagicTheGatheringAppraisalCatalog());
+      Map.of("mtg", new MagicTheGatheringAppraisalCatalog());
 
   public static AppraisalCatalog get(String gameId) {
-    Games.get(gameId);
     var catalog = CATALOGS.get(gameId);
     if (catalog == null) {
       throw new IllegalArgumentException("no appraisal catalog configured for game: " + gameId);

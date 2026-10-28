@@ -9,10 +9,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.ActiveJob;
 import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
+import com.jordansimsmith.tcginventory.games.client.GamesService;
+import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import org.slf4j.Logger;
@@ -38,6 +41,7 @@ public class UpdateUnitHandler
   private final DynamoDbTable<UnitItem> unitTable;
   private final InventoryRepository inventoryRepository;
   private final ObjectMapper objectMapper;
+  private final GamesService gamesService;
 
   public UpdateUnitHandler() {
     this(TcgInventoryFactory.create());
@@ -54,20 +58,25 @@ public class UpdateUnitHandler
         new InventoryRepository(
             this.unitTable, factory.dynamoDbClient(), factory.clock(), factory.ulidGenerator());
     this.objectMapper = factory.objectMapper();
+    this.gamesService = factory.gamesService();
   }
 
   @Override
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     try {
       return doHandleRequest(event);
+    } catch (ServiceException e) {
+      return httpResponseFactory.serviceError(e);
     } catch (Exception e) {
       LOGGER.error("error processing update unit request", e);
       throw new RuntimeException(e);
     }
   }
 
-  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
-    var user = requestContextFactory.createCtx(event).user();
+  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event)
+      throws ServiceException {
+    var ctx = requestContextFactory.createCtx(event);
+    var user = ctx.user();
     // avoid moving inventory while a background job can change the same units.
     if (activeJob.exists(user)) {
       return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
@@ -117,8 +126,9 @@ public class UpdateUnitHandler
       return httpResponseFactory.conflict(new ErrorResponse("condition is unchanged"));
     }
 
+    var game = gamesService.getGame(ctx, new GetGameRequest(skuItem.getGame())).game();
     var targetSkuId =
-        inventoryRepository.updateUnitCondition(user, skuItem, unitItem, body.condition());
+        inventoryRepository.updateUnitCondition(user, skuItem, unitItem, body.condition(), game);
 
     return httpResponseFactory.ok(new UpdateUnitResponse(targetSkuId));
   }
