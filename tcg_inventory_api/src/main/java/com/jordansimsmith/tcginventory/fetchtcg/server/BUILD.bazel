@@ -3,7 +3,7 @@ load("@rules_java//java:defs.bzl", "java_library")
 java_library(
     name = "server",
     srcs = glob(["*.java"]),
-    resources = ["fetchtcg_set_mapping.json"],
+    resources = ["//tcg_inventory_api:fetchtcg-set-mapping-resource"],
     visibility = [
         "//tcg_inventory_api:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/server:__pkg__",

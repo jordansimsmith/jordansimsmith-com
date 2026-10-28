@@ -4,7 +4,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.queue.QueueClient;
-import com.jordansimsmith.secrets.Secrets;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
@@ -27,8 +26,6 @@ public interface TcgInventoryFactory {
   RequestContextFactory requestContextFactory();
 
   HttpResponseFactory httpResponseFactory();
-
-  Secrets secrets();
 
   DynamoDbEnhancedClient dynamoDbEnhancedClient();
 

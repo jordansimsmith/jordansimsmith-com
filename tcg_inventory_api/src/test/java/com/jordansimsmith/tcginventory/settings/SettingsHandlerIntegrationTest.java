@@ -10,7 +10,6 @@ import com.jordansimsmith.secrets.FakeSecrets;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
-import com.jordansimsmith.tcginventory.fetchtcg.server.FetchTcgAccountItem;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
@@ -22,6 +21,10 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 
 @Testcontainers
 public class SettingsHandlerIntegrationTest {
@@ -32,7 +35,7 @@ public class SettingsHandlerIntegrationTest {
   private GetSettingsHandler getSettingsHandler;
   private DynamoDbTable<SettingsItem> settingsTable;
   private DynamoDbTable<JobItem> jobTable;
-  private DynamoDbTable<FetchTcgAccountItem> accountTable;
+  private DynamoDbClient dynamoDbClient;
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
@@ -55,8 +58,7 @@ public class SettingsHandlerIntegrationTest {
     fakeSecrets.set("tcg_inventory", "{\"jordan\":\"existing-token\"}");
     settingsTable = factory.settingsTable();
     jobTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), JobItem.class);
-    accountTable =
-        TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), FetchTcgAccountItem.class);
+    dynamoDbClient = factory.dynamoDbClient();
     updateSettingsHandler = new UpdateSettingsHandler(factory);
     getSettingsHandler = new GetSettingsHandler(factory);
   }
@@ -97,8 +99,7 @@ public class SettingsHandlerIntegrationTest {
     var originalTimestamp = Instant.ofEpochSecond(1700000000);
     settingsTable.putItem(SettingsItem.create("jordan", originalTimestamp));
     settingsTable.putItem(SettingsItem.create("alice", Instant.ofEpochSecond(1700000100)));
-    accountTable.putItem(
-        FetchTcgAccountItem.create("jordan", "verified-seller", originalTimestamp));
+    putAccountRecord("jordan", "verified-seller", originalTimestamp.getEpochSecond());
 
     updateSettingsHandler.handleRequest(
         buildEvent("jordan", "{\"track_orders_after\":1723363200}"), null);
@@ -108,15 +109,13 @@ public class SettingsHandlerIntegrationTest {
     assertThat(jordanSettings.getUpdatedAt()).isEqualTo(originalTimestamp);
     assertThat(jordanSettings.getTrackOrdersAfter()).isEqualTo(Instant.ofEpochSecond(1723363200));
     assertThat(aliceSettings.getUpdatedAt()).isEqualTo(Instant.ofEpochSecond(1700000100));
-    assertThat(accountTable.getItem(r -> r.key(accountKey("jordan"))).getSellerUsername())
-        .isEqualTo("verified-seller");
+    assertThat(getAccountRecord("jordan").get("seller_username").s()).isEqualTo("verified-seller");
   }
 
   @Test
   void updateSettingsShouldRejectUnknownFieldsWithoutWriting() throws Exception {
     settingsTable.putItem(SettingsItem.create("jordan", Instant.ofEpochSecond(1700000000)));
-    accountTable.putItem(
-        FetchTcgAccountItem.create("jordan", "verified-seller", Instant.ofEpochSecond(1700000000)));
+    putAccountRecord("jordan", "verified-seller", 1700000000);
     var originalSecret = fakeSecrets.get("tcg_inventory");
     var bodies =
         new String[] {
@@ -132,7 +131,7 @@ public class SettingsHandlerIntegrationTest {
           .isEqualTo("Invalid request body");
       assertThat(fakeSecrets.get("tcg_inventory")).isEqualTo(originalSecret);
       assertThat(settingsTable.getItem(r -> r.key(key("jordan"))).getTrackOrdersAfter()).isNull();
-      assertThat(accountTable.getItem(r -> r.key(accountKey("jordan"))).getSellerUsername())
+      assertThat(getAccountRecord("jordan").get("seller_username").s())
           .isEqualTo("verified-seller");
     }
   }
@@ -216,11 +215,32 @@ public class SettingsHandlerIntegrationTest {
         .build();
   }
 
-  private Key accountKey(String user) {
-    return Key.builder()
-        .partitionValue(FetchTcgAccountItem.formatPk(user))
-        .sortValue(FetchTcgAccountItem.formatSk())
-        .build();
+  private void putAccountRecord(String user, String sellerUsername, long credentialsUpdatedAt) {
+    dynamoDbClient.putItem(
+        PutItemRequest.builder()
+            .tableName(TcgInventoryTable.TABLE_NAME)
+            .item(
+                Map.of(
+                    "pk", AttributeValue.fromS("USER#" + user),
+                    "sk", AttributeValue.fromS("FETCHTCG_ACCOUNT"),
+                    "user", AttributeValue.fromS(user),
+                    "seller_username", AttributeValue.fromS(sellerUsername),
+                    "credentials_updated_at",
+                        AttributeValue.fromN(Long.toString(credentialsUpdatedAt))))
+            .build());
+  }
+
+  private Map<String, AttributeValue> getAccountRecord(String user) {
+    return dynamoDbClient
+        .getItem(
+            GetItemRequest.builder()
+                .tableName(TcgInventoryTable.TABLE_NAME)
+                .key(
+                    Map.of(
+                        "pk", AttributeValue.fromS("USER#" + user),
+                        "sk", AttributeValue.fromS("FETCHTCG_ACCOUNT")))
+                .build())
+        .item();
   }
 
   private Key jobKey(String jobId) {

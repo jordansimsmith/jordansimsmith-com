@@ -59,6 +59,14 @@ filegroup(
     ],
 )
 
+filegroup(
+    name = "fetchtcg-set-mapping-resource",
+    srcs = ["src/main/resources/com/jordansimsmith/tcginventory/fetchtcg/server/fetchtcg_set_mapping.json"],
+    visibility = [
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/server:__pkg__",
+    ],
+)
+
 COMMON_DEPS = [
     ":games-lib",
     "//lib/dynamodb:lib",
@@ -133,6 +141,7 @@ java_library(
     ),
     resources = glob(
         ["src/main/resources/**"],
+        exclude = ["src/main/resources/com/jordansimsmith/tcginventory/fetchtcg/server/fetchtcg_set_mapping.json"],
     ),
     visibility = [
         "//tcg_inventory_api:__pkg__",
@@ -1264,7 +1273,6 @@ java_library(
         "//lib/ulid:lib",
         "//lib/ulid:test-lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/server",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/client:test-lib",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
@@ -1311,7 +1319,6 @@ java_test_suite(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:get-fetchtcg-account-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:update-fetchtcg-credentials-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/server",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/client:test-lib",
         "//third_party/dagger",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -1400,7 +1407,6 @@ java_test_suite(
         "//lib/time:test-lib",
         "//lib/ulid:test-lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/server",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/client:test-lib",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",

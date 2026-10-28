@@ -22,6 +22,10 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsResponse;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardsRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardsResponse;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FindSetsRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FindSetsResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardRequest;
@@ -30,7 +34,6 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
 import com.jordansimsmith.tcginventory.fetchtcg.client.OfferItem;
 import com.jordansimsmith.tcginventory.fetchtcg.client.OfferListing;
 import com.jordansimsmith.tcginventory.fetchtcg.client.ShippingOption;
-import com.jordansimsmith.tcginventory.fetchtcg.server.FetchTcgSetMapping;
 import com.jordansimsmith.tcginventory.imports.AppraiseJobProcessor;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
@@ -246,10 +249,19 @@ public class JobsHandlerIntegrationTest {
     var ctx = new RequestContext("jordan");
     when(fetchTcgService.getAccount(ctx, new GetAccountRequest()))
         .thenReturn(new GetAccountResponse("jordan", 0));
+    when(fetchTcgService.findSets(ctx, new FindSetsRequest("mtg", "dom")))
+        .thenReturn(new FindSetsResponse(List.of(new CardSet(2624, "Dominaria"))));
+    when(fetchTcgService.findCards(
+            ctx, new FindCardsRequest("mtg", 2624, "Card 1", "normal", 100, null)))
+        .thenReturn(
+            new FindCardsResponse(List.of(new CardSearchResult("mtg_168_c_dom_normal")), null));
     when(fetchTcgService.getCard(ctx, new GetCardRequest("mtg_168_c_dom_normal")))
         .thenReturn(
             new GetCardResponse(
-                "mtg_168_c_dom_normal", "Card 1", new BigDecimal("1.20"), Map.of()));
+                "mtg_168_c_dom_normal",
+                "Card 1",
+                new BigDecimal("1.20"),
+                Map.of("scryfallId", SCRYFALL_ID)));
     when(fetchTcgService.findCardListings(
             ctx, new FindCardListingsRequest("mtg_168_c_dom_normal", 100, null)))
         .thenReturn(new FindCardListingsResponse(List.of(), null));
@@ -259,6 +271,9 @@ public class JobsHandlerIntegrationTest {
 
     // assert
     verify(fetchTcgService).getAccount(ctx, new GetAccountRequest());
+    verify(fetchTcgService).findSets(ctx, new FindSetsRequest("mtg", "dom"));
+    verify(fetchTcgService)
+        .findCards(ctx, new FindCardsRequest("mtg", 2624, "Card 1", "normal", 100, null));
     verify(fetchTcgService).getCard(ctx, new GetCardRequest("mtg_168_c_dom_normal"));
     verify(fetchTcgService)
         .findCardListings(ctx, new FindCardListingsRequest("mtg_168_c_dom_normal", 100, null));
@@ -595,6 +610,8 @@ public class JobsHandlerIntegrationTest {
         "Troll of Khazad-dum",
         "normal",
         List.of(new CardSearchResult("mtg_111_c_ltr_normal")));
+    fakeFetchTcgService.seedSets(
+        "mtg", "ltr", List.of(new CardSet(3268, "The Lord of the Rings: Tales of Middle-earth")));
     seedCard(
         "mtg_111_c_ltr_normal",
         new GetCardResponse(
@@ -2237,9 +2254,13 @@ public class JobsHandlerIntegrationTest {
   private void createImportWithRows(String user, String importId, List<RowSpec> rows) {
     for (var row : rows) {
       var sets =
-          FetchTcgSetMapping.get(row.setCode()).stream()
-              .map(set -> new CardSet(set.setId(), set.setName()))
-              .toList();
+          switch (row.setCode()) {
+            case "dom" -> List.of(new CardSet(2624, "Dominaria"));
+            case "sta" -> List.of(new CardSet(3243, "Strixhaven Mystical Archive"));
+            case "ltr" ->
+                List.of(new CardSet(3268, "The Lord of the Rings: Tales of Middle-earth"));
+            default -> List.<CardSet>of();
+          };
       factory.fakeFetchTcgService().seedSets("mtg", row.setCode(), sets);
     }
     var importItem =
@@ -2273,6 +2294,7 @@ public class JobsHandlerIntegrationTest {
   }
 
   private void createImportWithNRows(String user, String importId, int rowCount) {
+    factory.fakeFetchTcgService().seedSets("mtg", "dom", List.of(new CardSet(2624, "Dominaria")));
     var importItem =
         ImportItem.create(
             user, "mtg", importId, "test.csv", rowCount, null, Instant.ofEpochSecond(1700000000));
