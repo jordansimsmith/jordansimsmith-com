@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory.fetchtcg;
+package com.jordansimsmith.tcginventory.fetchtcg.server;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -36,23 +36,17 @@ public class FetchTcgSetMappingTest {
   }
 
   @Test
-  void containsShouldReturnTrueForMappedCode() {
+  void getShouldReturnEntriesForMappedCode() {
     // act & assert
-    assertThat(FetchTcgSetMapping.contains("a25")).isTrue();
-  }
-
-  @Test
-  void containsShouldReturnFalseForUnmappedCode() {
-    // act & assert
-    assertThat(FetchTcgSetMapping.contains("zzz_nonexistent_set")).isFalse();
+    assertThat(FetchTcgSetMapping.get("a25")).isNotEmpty();
   }
 
   @Test
   void mappingShouldCoverManySetCodes() {
     // the mapping should have at least 500 entries
     // (verifies the JSON resource loaded successfully with substantial data)
-    assertThat(FetchTcgSetMapping.contains("fdn")).isTrue();
-    assertThat(FetchTcgSetMapping.contains("blb")).isTrue();
-    assertThat(FetchTcgSetMapping.contains("dsk")).isTrue();
+    assertThat(FetchTcgSetMapping.get("fdn")).isNotEmpty();
+    assertThat(FetchTcgSetMapping.get("blb")).isNotEmpty();
+    assertThat(FetchTcgSetMapping.get("dsk")).isNotEmpty();
   }
 }

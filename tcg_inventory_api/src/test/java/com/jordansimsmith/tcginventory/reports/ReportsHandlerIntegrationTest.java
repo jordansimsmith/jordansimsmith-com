@@ -14,7 +14,6 @@ import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.JobsHandler;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
-import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
 import com.jordansimsmith.tcginventory.games.Games;
@@ -44,7 +43,6 @@ public class ReportsHandlerIntegrationTest {
   private FakeClock fakeClock;
   private FakeUlidGenerator fakeUlidGenerator;
   private FakeQueueClient<JobMessage> fakeJobsQueue;
-  private FakeFetchTcgClient fakeFetchTcgClient;
   private FakeFetchTcgService fakeFetchTcgService;
   private ObjectMapper objectMapper;
   private DynamoDbTable<JobItem> jobTable;
@@ -78,7 +76,6 @@ public class ReportsHandlerIntegrationTest {
     fakeClock = factory.fakeClock();
     fakeUlidGenerator = factory.fakeUlidGenerator();
     fakeJobsQueue = factory.fakeJobsQueue();
-    fakeFetchTcgClient = factory.fakeFetchTcgClient();
     fakeFetchTcgService = factory.fakeFetchTcgService();
     objectMapper = factory.objectMapper();
     jobTable = factory.jobTable();
@@ -91,7 +88,6 @@ public class ReportsHandlerIntegrationTest {
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
     fakeJobsQueue.reset();
-    fakeFetchTcgClient.reset();
     fakeFetchTcgService.reset();
 
     createReportHandler = new CreateReportHandler(factory);

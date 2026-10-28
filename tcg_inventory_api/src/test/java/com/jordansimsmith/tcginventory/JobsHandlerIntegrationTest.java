@@ -14,11 +14,10 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
-import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgSetMapping;
 import com.jordansimsmith.tcginventory.fetchtcg.client.BuyerAddress;
 import com.jordansimsmith.tcginventory.fetchtcg.client.CardListing;
+import com.jordansimsmith.tcginventory.fetchtcg.client.CardSearchResult;
+import com.jordansimsmith.tcginventory.fetchtcg.client.CardSet;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsRequest;
@@ -31,6 +30,7 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
 import com.jordansimsmith.tcginventory.fetchtcg.client.OfferItem;
 import com.jordansimsmith.tcginventory.fetchtcg.client.OfferListing;
 import com.jordansimsmith.tcginventory.fetchtcg.client.ShippingOption;
+import com.jordansimsmith.tcginventory.fetchtcg.server.FetchTcgSetMapping;
 import com.jordansimsmith.tcginventory.imports.AppraiseJobProcessor;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
@@ -65,7 +65,6 @@ public class JobsHandlerIntegrationTest {
 
   private FakeClock fakeClock;
   private FakeQueueClient<JobMessage> fakeJobsQueue;
-  private FakeFetchTcgClient fakeFetchTcgClient;
   private FakeFetchTcgService fakeFetchTcgService;
   private ObjectMapper objectMapper;
   private DynamoDbTable<ImportItem> importTable;
@@ -102,7 +101,6 @@ public class JobsHandlerIntegrationTest {
 
     fakeClock = factory.fakeClock();
     fakeJobsQueue = factory.fakeJobsQueue();
-    fakeFetchTcgClient = factory.fakeFetchTcgClient();
     fakeFetchTcgService = factory.fakeFetchTcgService();
     objectMapper = factory.objectMapper();
     importTable = factory.importTable();
@@ -117,7 +115,6 @@ public class JobsHandlerIntegrationTest {
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeJobsQueue.reset();
-    fakeFetchTcgClient.reset();
     fakeFetchTcgService.reset();
 
     jobsHandler = new JobsHandler(factory);
@@ -130,19 +127,14 @@ public class JobsHandlerIntegrationTest {
     createImportWithRow("jordan", "import1", "dom", "168", "normal", "NM", "en");
     createJob("jordan", "job1", "appraise", "queued", "import1");
 
-    fakeFetchTcgClient.seedSearchResult(
-        "mtg",
-        2624,
-        "Card 1",
-        "normal",
-        new FetchTcgClient.SearchCardsResponse(
-            List.of(new FetchTcgClient.SearchCard("mtg_168_c_dom_normal"))));
+    fakeFetchTcgService.seedSearchResult(
+        "mtg", 2624, "Card 1", "normal", List.of(new CardSearchResult("mtg_168_c_dom_normal")));
     seedCard(
         "mtg_168_c_dom_normal",
-        new FetchTcgClient.GetCardResponse(
+        new GetCardResponse(
             "mtg_168_c_dom_normal",
             "Card 1",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("0.30"))),
+            new BigDecimal("0.30"),
             Map.of("scryfallId", SCRYFALL_ID)));
     factory
         .fakeFetchTcgService()
@@ -171,10 +163,10 @@ public class JobsHandlerIntegrationTest {
     seedDefaultCardForDom168();
     seedCard(
         "mtg_168_c_dom_normal",
-        new FetchTcgClient.GetCardResponse(
+        new GetCardResponse(
             "mtg_168_c_dom_normal",
             "Card 1",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.00"))),
+            new BigDecimal("1.00"),
             Map.of("scryfallId", SCRYFALL_ID)));
     factory
         .fakeFetchTcgService()
@@ -195,19 +187,14 @@ public class JobsHandlerIntegrationTest {
     var jordanJob = createJob("jordan", "jordan-job", "appraise", "queued", "import1");
     createImportWithRow("other-user", "import2", "dom", "168", "normal", "NM", "en");
     var otherUserJob = createJob("other-user", "other-user-job", "appraise", "queued", "import2");
-    fakeFetchTcgClient.seedSearchResult(
-        "mtg",
-        2624,
-        "Card 1",
-        "normal",
-        new FetchTcgClient.SearchCardsResponse(
-            List.of(new FetchTcgClient.SearchCard("mtg_168_c_dom_normal"))));
+    fakeFetchTcgService.seedSearchResult(
+        "mtg", 2624, "Card 1", "normal", List.of(new CardSearchResult("mtg_168_c_dom_normal")));
     seedCard(
         "mtg_168_c_dom_normal",
-        new FetchTcgClient.GetCardResponse(
+        new GetCardResponse(
             "mtg_168_c_dom_normal",
             "Card 1",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.00"))),
+            new BigDecimal("1.00"),
             Map.of("scryfallId", SCRYFALL_ID)));
     factory
         .fakeFetchTcgService()
@@ -246,19 +233,14 @@ public class JobsHandlerIntegrationTest {
     // arrange
     createImportWithRow("jordan", "import1", "dom", "168", "normal", "NM", "en");
     var jobItem = createJob("jordan", "job1", "appraise", "queued", "import1");
-    fakeFetchTcgClient.seedSearchResult(
-        "mtg",
-        2624,
-        "Card 1",
-        "normal",
-        new FetchTcgClient.SearchCardsResponse(
-            List.of(new FetchTcgClient.SearchCard("mtg_168_c_dom_normal"))));
+    fakeFetchTcgService.seedSearchResult(
+        "mtg", 2624, "Card 1", "normal", List.of(new CardSearchResult("mtg_168_c_dom_normal")));
     seedCard(
         "mtg_168_c_dom_normal",
-        new FetchTcgClient.GetCardResponse(
+        new GetCardResponse(
             "mtg_168_c_dom_normal",
             "Card 1",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("0.30"))),
+            new BigDecimal("0.30"),
             Map.of("scryfallId", SCRYFALL_ID)));
     var fetchTcgService = mock(FetchTcgService.class);
     var ctx = new RequestContext("jordan");
@@ -292,19 +274,14 @@ public class JobsHandlerIntegrationTest {
     createImportWithRow("jordan", "import1", "dom", "168", "normal", "NM", "en");
     var jobItem = createJob("jordan", "job1", "appraise", "queued", "import1");
     pricingRepository.update(PricingItem.create("jordan", null));
-    fakeFetchTcgClient.seedSearchResult(
-        "mtg",
-        2624,
-        "Card 1",
-        "normal",
-        new FetchTcgClient.SearchCardsResponse(
-            List.of(new FetchTcgClient.SearchCard("mtg_168_c_dom_normal"))));
+    fakeFetchTcgService.seedSearchResult(
+        "mtg", 2624, "Card 1", "normal", List.of(new CardSearchResult("mtg_168_c_dom_normal")));
     seedCard(
         "mtg_168_c_dom_normal",
-        new FetchTcgClient.GetCardResponse(
+        new GetCardResponse(
             "mtg_168_c_dom_normal",
             "Card 1",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("0.30"))),
+            new BigDecimal("0.30"),
             Map.of("scryfallId", SCRYFALL_ID)));
     factory
         .fakeFetchTcgService()
@@ -374,19 +351,14 @@ public class JobsHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createImportWithRow("jordan", "import1", "sta", "13", "etched", "NM", "en");
     createJob("jordan", "job1", "appraise", "queued", "import1");
-    fakeFetchTcgClient.seedSearchResult(
-        "mtg",
-        3243,
-        "Card 1",
-        "foil",
-        new FetchTcgClient.SearchCardsResponse(
-            List.of(new FetchTcgClient.SearchCard("etched-card"))));
+    fakeFetchTcgService.seedSearchResult(
+        "mtg", 3243, "Card 1", "foil", List.of(new CardSearchResult("etched-card")));
     seedCard(
         "etched-card",
-        new FetchTcgClient.GetCardResponse(
+        new GetCardResponse(
             "etched-card",
             "Card 1 (Foil Etched)",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
+            new BigDecimal("1.50"),
             Map.of("scryfallId", SCRYFALL_ID)));
 
     // act
@@ -397,8 +369,6 @@ public class JobsHandlerIntegrationTest {
     assertThat(row.getDecision()).isEqualTo("keep");
     assertThat(row.getFinish()).isEqualTo("etched");
     assertThat(row.getFetchtcgCardId()).isEqualTo("etched-card");
-    assertThat(fakeFetchTcgClient.getSearchCallCount())
-        .isEqualTo(FetchTcgSetMapping.get("sta").size());
   }
 
   @Test
@@ -407,20 +377,12 @@ public class JobsHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createImportWithRow("jordan", "import1", "dom", "168", "foil", "NM", "en");
     createJob("jordan", "job1", "appraise", "queued", "import1");
-    fakeFetchTcgClient.seedSearchResult(
-        "mtg",
-        2624,
-        "Card 1",
-        "foil",
-        new FetchTcgClient.SearchCardsResponse(
-            List.of(new FetchTcgClient.SearchCard("foil-card"))));
+    fakeFetchTcgService.seedSearchResult(
+        "mtg", 2624, "Card 1", "foil", List.of(new CardSearchResult("foil-card")));
     seedCard(
         "foil-card",
-        new FetchTcgClient.GetCardResponse(
-            "foil-card",
-            "Card 1",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
-            Map.of("scryfallId", SCRYFALL_ID)));
+        new GetCardResponse(
+            "foil-card", "Card 1", new BigDecimal("1.50"), Map.of("scryfallId", SCRYFALL_ID)));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
@@ -445,7 +407,6 @@ public class JobsHandlerIntegrationTest {
                     .processBatch("jordan", jobItem))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessage("unsupported finish for game: foil-etched");
-    assertThat(fakeFetchTcgClient.getSearchCallCount()).isZero();
   }
 
   @Test
@@ -454,28 +415,25 @@ public class JobsHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createImportWithRow("jordan", "import1", "sta", "13", "etched", "NM", "en");
     createJob("jordan", "job1", "appraise", "queued", "import1");
-    fakeFetchTcgClient.seedSearchResult(
+    fakeFetchTcgService.seedSearchResult(
         "mtg",
         3243,
         "Card 1",
         "foil",
-        new FetchTcgClient.SearchCardsResponse(
-            List.of(
-                new FetchTcgClient.SearchCard("regular-foil-card"),
-                new FetchTcgClient.SearchCard("etched-card"))));
+        List.of(new CardSearchResult("regular-foil-card"), new CardSearchResult("etched-card")));
     seedCard(
         "regular-foil-card",
-        new FetchTcgClient.GetCardResponse(
+        new GetCardResponse(
             "regular-foil-card",
             "Card 1",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
+            new BigDecimal("1.50"),
             Map.of("scryfallId", SCRYFALL_ID)));
     seedCard(
         "etched-card",
-        new FetchTcgClient.GetCardResponse(
+        new GetCardResponse(
             "etched-card",
             "Card 1 (Foil Etched)",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("2.50"))),
+            new BigDecimal("2.50"),
             Map.of("scryfallId", SCRYFALL_ID)));
 
     // act
@@ -497,19 +455,14 @@ public class JobsHandlerIntegrationTest {
     createImportWithRow("jordan", "import1", "dom", "168", "normal", "NM", "en");
     createJob("jordan", "job1", "appraise", "queued", "import1");
 
-    fakeFetchTcgClient.seedSearchResult(
-        "mtg",
-        2624,
-        "Card 1",
-        "normal",
-        new FetchTcgClient.SearchCardsResponse(
-            List.of(new FetchTcgClient.SearchCard("mtg_168_c_dom_normal"))));
+    fakeFetchTcgService.seedSearchResult(
+        "mtg", 2624, "Card 1", "normal", List.of(new CardSearchResult("mtg_168_c_dom_normal")));
     seedCard(
         "mtg_168_c_dom_normal",
-        new FetchTcgClient.GetCardResponse(
+        new GetCardResponse(
             "mtg_168_c_dom_normal",
             "Card 1",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("0.10"))),
+            new BigDecimal("0.10"),
             Map.of("scryfallId", SCRYFALL_ID)));
 
     // act
@@ -580,28 +533,27 @@ public class JobsHandlerIntegrationTest {
     createImportWithRow("jordan", "import1", "dom", "410", "normal", "NM", "en");
     createJob("jordan", "job1", "appraise", "queued", "import1");
 
-    fakeFetchTcgClient.seedSearchResult(
+    fakeFetchTcgService.seedSearchResult(
         "mtg",
         2624,
         "Card 1",
         "normal",
-        new FetchTcgClient.SearchCardsResponse(
-            List.of(
-                new FetchTcgClient.SearchCard("mtg_168_c_dom_normal"),
-                new FetchTcgClient.SearchCard("mtg_410_c_dom_B_normal"))));
+        List.of(
+            new CardSearchResult("mtg_168_c_dom_normal"),
+            new CardSearchResult("mtg_410_c_dom_B_normal")));
     seedCard(
         "mtg_168_c_dom_normal",
-        new FetchTcgClient.GetCardResponse(
+        new GetCardResponse(
             "mtg_168_c_dom_normal",
             "Card 1",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
+            new BigDecimal("1.50"),
             Map.of("scryfallId", "scryfall-other")));
     seedCard(
         "mtg_410_c_dom_B_normal",
-        new FetchTcgClient.GetCardResponse(
+        new GetCardResponse(
             "mtg_410_c_dom_B_normal",
             "Card 1 (Borderless)",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("27.43"))),
+            new BigDecimal("27.43"),
             Map.of("scryfallId", SCRYFALL_ID)));
 
     // act
@@ -637,19 +589,18 @@ public class JobsHandlerIntegrationTest {
             "en"));
     createJob("jordan", "job1", "appraise", "queued", "import1");
 
-    fakeFetchTcgClient.seedSearchResult(
+    fakeFetchTcgService.seedSearchResult(
         "mtg",
         3268,
         "Troll of Khazad-dum",
         "normal",
-        new FetchTcgClient.SearchCardsResponse(
-            List.of(new FetchTcgClient.SearchCard("mtg_111_c_ltr_normal"))));
+        List.of(new CardSearchResult("mtg_111_c_ltr_normal")));
     seedCard(
         "mtg_111_c_ltr_normal",
-        new FetchTcgClient.GetCardResponse(
+        new GetCardResponse(
             "mtg_111_c_ltr_normal",
             "Troll of Khazad-dum",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
+            new BigDecimal("1.50"),
             Map.of("scryfallId", SCRYFALL_ID)));
 
     // act
@@ -668,19 +619,14 @@ public class JobsHandlerIntegrationTest {
     createImportWithRow("jordan", "import1", "dom", "168", "normal", "NM", "en");
     createJob("jordan", "job1", "appraise", "queued", "import1");
 
-    fakeFetchTcgClient.seedSearchResult(
-        "mtg",
-        2624,
-        "Card 1",
-        "normal",
-        new FetchTcgClient.SearchCardsResponse(
-            List.of(new FetchTcgClient.SearchCard("mtg_168_c_dom_normal"))));
+    fakeFetchTcgService.seedSearchResult(
+        "mtg", 2624, "Card 1", "normal", List.of(new CardSearchResult("mtg_168_c_dom_normal")));
     seedCard(
         "mtg_168_c_dom_normal",
-        new FetchTcgClient.GetCardResponse(
+        new GetCardResponse(
             "mtg_168_c_dom_normal",
             "Card 1",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
+            new BigDecimal("1.50"),
             Map.of("scryfallId", "scryfall-other")));
 
     // act
@@ -721,7 +667,6 @@ public class JobsHandlerIntegrationTest {
                     .processBatch("jordan", jobItem))
         .isInstanceOf(IllegalArgumentException.class)
         .hasMessageContaining("external id must contain only ASCII unreserved characters");
-    assertThat(fakeFetchTcgClient.getSearchCallCount()).isZero();
     assertThat(getRow("jordan", "import1", 1).getDecision()).isNull();
   }
 
@@ -737,27 +682,20 @@ public class JobsHandlerIntegrationTest {
             new RowSpec("dom", "168", "normal", "LP", "en", SCRYFALL_ID)));
     createJob("jordan", "job1", "appraise", "queued", "import1");
 
-    fakeFetchTcgClient.seedSearchResult(
-        "mtg",
-        2624,
-        "Card 1",
-        "normal",
-        new FetchTcgClient.SearchCardsResponse(
-            List.of(new FetchTcgClient.SearchCard("mtg_168_c_dom_normal"))));
+    fakeFetchTcgService.seedSearchResult(
+        "mtg", 2624, "Card 1", "normal", List.of(new CardSearchResult("mtg_168_c_dom_normal")));
     seedCard(
         "mtg_168_c_dom_normal",
-        new FetchTcgClient.GetCardResponse(
+        new GetCardResponse(
             "mtg_168_c_dom_normal",
             "Card 1",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
+            new BigDecimal("1.50"),
             Map.of("scryfallId", SCRYFALL_ID)));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "appraise"), null);
 
     // assert
-    assertThat(fakeFetchTcgClient.getSearchCallCount())
-        .isEqualTo(FetchTcgSetMapping.get("dom").size());
 
     var row1 = getRow("jordan", "import1", 1);
     assertThat(row1.getDecision()).isEqualTo("keep");
@@ -2262,43 +2200,24 @@ public class JobsHandlerIntegrationTest {
   }
 
   private void seedDefaultCardForDom168() {
-    fakeFetchTcgClient.seedSearchResult(
-        "mtg",
-        2624,
-        "Card 1",
-        "normal",
-        new FetchTcgClient.SearchCardsResponse(
-            List.of(new FetchTcgClient.SearchCard("mtg_168_c_dom_normal"))));
+    fakeFetchTcgService.seedSearchResult(
+        "mtg", 2624, "Card 1", "normal", List.of(new CardSearchResult("mtg_168_c_dom_normal")));
     seedCard(
         "mtg_168_c_dom_normal",
-        new FetchTcgClient.GetCardResponse(
+        new GetCardResponse(
             "mtg_168_c_dom_normal",
             "Card 1",
-            Map.of("NZ", new FetchTcgClient.PricingData(new BigDecimal("1.50"))),
+            new BigDecimal("1.50"),
             Map.of("scryfallId", SCRYFALL_ID)));
   }
 
-  private void seedCard(String cardId, FetchTcgClient.GetCardResponse response) {
-    fakeFetchTcgClient.seedCard(cardId, response);
-    var nzPricing = response.pricingData() == null ? null : response.pricingData().get("NZ");
-    factory
-        .fakeFetchTcgService()
-        .seedCard(
-            new GetCardResponse(
-                response.id(),
-                response.name(),
-                nzPricing == null ? null : nzPricing.tcgMarketPrice(),
-                response.externalReferences() == null ? Map.of() : response.externalReferences()));
+  private void seedCard(String cardId, GetCardResponse response) {
+    factory.fakeFetchTcgService().seedCard(cardId, response);
   }
 
   private AppraiseJobProcessor newAppraiseJobProcessor(FetchTcgService fetchTcgService) {
     return new AppraiseJobProcessor(
-        importTable,
-        importRowTable,
-        fakeClock,
-        fetchTcgService,
-        fakeFetchTcgClient,
-        pricingRepository);
+        importTable, importRowTable, fakeClock, fetchTcgService, pricingRepository);
   }
 
   private void createImportWithRow(
@@ -2316,6 +2235,13 @@ public class JobsHandlerIntegrationTest {
   }
 
   private void createImportWithRows(String user, String importId, List<RowSpec> rows) {
+    for (var row : rows) {
+      var sets =
+          FetchTcgSetMapping.get(row.setCode()).stream()
+              .map(set -> new CardSet(set.setId(), set.setName()))
+              .toList();
+      factory.fakeFetchTcgService().seedSets("mtg", row.setCode(), sets);
+    }
     var importItem =
         ImportItem.create(
             user,

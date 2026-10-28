@@ -96,23 +96,6 @@ UNIT_TESTS = glob(
 )
 
 java_library(
-    name = "fetchtcg-lib",
-    srcs = glob(
-        ["src/main/java/com/jordansimsmith/tcginventory/fetchtcg/*.java"],
-        exclude = ["src/main/java/com/jordansimsmith/tcginventory/fetchtcg/*Handler.java"],
-    ),
-    resources = ["src/main/resources/fetchtcg/fetchtcg_set_mapping.json"],
-    deps = [
-        "//third_party/dagger",
-        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
-        "@maven//:com_fasterxml_jackson_core_jackson_core",
-        "@maven//:com_fasterxml_jackson_core_jackson_databind",
-        "@maven//:com_google_code_findbugs_jsr305",
-        "@maven//:org_slf4j_slf4j_api",
-    ],
-)
-
-java_library(
     name = "games-lib",
     srcs = ["src/main/java/com/jordansimsmith/tcginventory/games/Games.java"],
 )
@@ -150,14 +133,12 @@ java_library(
     ),
     resources = glob(
         ["src/main/resources/**"],
-        exclude = ["src/main/resources/fetchtcg/fetchtcg_set_mapping.json"],
     ),
     visibility = [
         "//tcg_inventory_api:__pkg__",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:__pkg__",
     ],
     deps = [
-        ":fetchtcg-lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/server",
     ] + COMMON_DEPS,
@@ -183,7 +164,6 @@ java_library(
         exclude = ["src/main/java/com/jordansimsmith/tcginventory/imports/*Handler.java"],
     ),
     deps = [
-        ":fetchtcg-lib",
         ":inventory-lib",
         ":lib",
         ":pricing-lib",
@@ -261,7 +241,6 @@ java_library(
         exclude = ["src/main/java/com/jordansimsmith/tcginventory/pricing/*Handler.java"],
     ),
     deps = [
-        ":fetchtcg-lib",
         ":inventory-lib",
         ":lib",
         "//lib/service",
@@ -822,7 +801,6 @@ java_binary(
     ],
     deps = [
         ":catalog-lib",
-        ":fetchtcg-lib",
         ":import-lib",
         ":inventory-lib",
         ":lib",
@@ -1261,7 +1239,6 @@ java_library(
     ],
     deps = [
         ":catalog-lib",
-        ":fetchtcg-lib",
         ":games-lib",
         ":import-lib",
         ":inventory-lib",
@@ -1311,7 +1288,6 @@ java_test_suite(
     deps = [
         ":catalog-jobs-handler",
         ":catalog-lib",
-        ":fetchtcg-lib",
         ":find-catalog-alternatives-handler",
         ":find-catalog-cards-handler",
         ":games-lib",
@@ -1335,6 +1311,7 @@ java_test_suite(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:get-fetchtcg-account-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:update-fetchtcg-credentials-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/server",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/client:test-lib",
         "//third_party/dagger",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -1380,7 +1357,6 @@ java_test_suite(
         ":delete-import-row-photo-handler",
         ":delete-scan-handler",
         ":delete-scan-row-handler",
-        ":fetchtcg-lib",
         ":find-catalog-alternatives-handler",
         ":find-catalog-cards-handler",
         ":find-imports-handler",
@@ -1523,7 +1499,6 @@ java_test_suite(
     runtime_deps = JUNIT5_DEPS,
     deps = [
         ":catalog-lib",
-        ":fetchtcg-lib",
         ":import-lib",
         ":inventory-lib",
         ":lib",

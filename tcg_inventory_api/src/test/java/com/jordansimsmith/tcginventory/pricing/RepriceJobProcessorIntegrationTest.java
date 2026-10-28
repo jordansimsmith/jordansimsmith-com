@@ -384,7 +384,9 @@ public class RepriceJobProcessorIntegrationTest {
     var skuId = createSku("jordan", "mtg", "001", "missing-market", "1.00", "in_stock");
     factory
         .fakeFetchTcgService()
-        .seedCard(new GetCardResponse("missing-market", "Reprice test", null, Map.of()));
+        .seedCard(
+            "missing-market",
+            new GetCardResponse("missing-market", "Reprice test", null, Map.of()));
     createRepriceJob("jordan", "job1", "0.75");
 
     // act
@@ -483,6 +485,7 @@ public class RepriceJobProcessorIntegrationTest {
     factory
         .fakeFetchTcgService()
         .seedCard(
+            cardId,
             new GetCardResponse(cardId, "Reprice test", new BigDecimal(marketPrice), Map.of()));
   }
 

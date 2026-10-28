@@ -13,7 +13,6 @@ import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobProcessor;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
-import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindOffersRequest;
@@ -51,7 +50,6 @@ public class OrderReservationIntegrationTest {
 
   private FakeClock fakeClock;
   private FakeFetchTcgService fakeFetchTcgService;
-  private FakeFetchTcgClient fakeFetchTcgClient;
   private TcgInventoryTestFactory factory;
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
@@ -78,7 +76,6 @@ public class OrderReservationIntegrationTest {
             dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
     fakeClock = factory.fakeClock();
     fakeFetchTcgService = factory.fakeFetchTcgService();
-    fakeFetchTcgClient = factory.fakeFetchTcgClient();
     fakeClock.setTime(NOW);
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
@@ -87,7 +84,6 @@ public class OrderReservationIntegrationTest {
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeFetchTcgService.reset();
-    fakeFetchTcgClient.reset();
     factory.fakeUlidGenerator().reset();
 
     inventoryRepository =

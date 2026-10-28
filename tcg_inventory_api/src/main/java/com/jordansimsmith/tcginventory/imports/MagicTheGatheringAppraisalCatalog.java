@@ -1,9 +1,11 @@
 package com.jordansimsmith.tcginventory.imports;
 
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.CardIdentity;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgCardResolver;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgSetMapping;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FindSetsRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
 import com.jordansimsmith.tcginventory.games.Games;
 import com.jordansimsmith.tcginventory.imports.AppraisalCatalogs.AppraisalCatalog;
 import java.text.Normalizer;
@@ -17,8 +19,10 @@ public class MagicTheGatheringAppraisalCatalog implements AppraisalCatalog {
   public Result resolve(
       CardIdentity identity,
       ImportRowItem rowItem,
-      FetchTcgClient fetchTcgClient,
-      Map<String, FetchTcgClient.GetCardResponse> cardCache) {
+      RequestContext ctx,
+      FetchTcgService fetchTcgService,
+      Map<String, GetCardResponse> cardCache)
+      throws ServiceException {
     if (!Games.MAGIC_THE_GATHERING.id().equals(identity.game())) {
       throw new IllegalArgumentException(
           "unsupported game for Magic appraisal: " + identity.game());
@@ -37,7 +41,8 @@ public class MagicTheGatheringAppraisalCatalog implements AppraisalCatalog {
     }
 
     var setCode = rowItem.getSetCode();
-    if (!FetchTcgSetMapping.contains(setCode)) {
+    var sets = fetchTcgService.findSets(ctx, new FindSetsRequest("mtg", setCode)).sets();
+    if (sets.isEmpty()) {
       return Result.review("unmapped set");
     }
 
@@ -48,21 +53,18 @@ public class MagicTheGatheringAppraisalCatalog implements AppraisalCatalog {
     // fetchtcg catalog names are ascii, so fold accents before matching.
     searchName = Normalizer.normalize(searchName, Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
     var resolvedCard =
-        FetchTcgCardResolver.resolve(
+        AppraisalCardResolver.resolve(
             FETCHTCG_GAME_ID,
-            FetchTcgSetMapping.get(setCode).stream()
-                .map(FetchTcgSetMapping.FetchTcgSetEntry::setId)
-                .toList(),
+            sets.stream().map(set -> set.id()).toList(),
             searchName,
             fetchTcgFinish,
             FETCHTCG_EXTERNAL_REFERENCE_FIELD,
             identity.externalId(),
-            fetchTcgClient,
+            ctx,
+            fetchTcgService,
             cardCache);
     return resolvedCard
-        .map(
-            card ->
-                Result.resolved(new ResolvedCard(card.cardId(), card.setId(), card.marketPrice())))
+        .map(card -> Result.resolved(new ResolvedCard(card.cardId(), card.setId())))
         .orElseGet(() -> Result.review("unresolvable"));
   }
 }

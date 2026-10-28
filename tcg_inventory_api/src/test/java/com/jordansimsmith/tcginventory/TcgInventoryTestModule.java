@@ -9,8 +9,6 @@ import com.jordansimsmith.tcginventory.catalog.Catalogs;
 import com.jordansimsmith.tcginventory.catalog.FakeCardCatalogs;
 import com.jordansimsmith.tcginventory.catalog.FakeTcgCsvClient;
 import com.jordansimsmith.tcginventory.catalog.TcgCsvClient;
-import com.jordansimsmith.tcginventory.fetchtcg.FakeFetchTcgClient;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
@@ -180,18 +178,6 @@ public class TcgInventoryTestModule {
   @Singleton
   QueueClient<ScanMessage> scanQueue(FakeQueueClient<ScanMessage> fakeScanQueue) {
     return fakeScanQueue;
-  }
-
-  @Provides
-  @Singleton
-  FakeFetchTcgClient fakeFetchTcgClient() {
-    return new FakeFetchTcgClient();
-  }
-
-  @Provides
-  @Singleton
-  FetchTcgClient fetchTcgClient(FakeFetchTcgClient fakeFetchTcgClient) {
-    return fakeFetchTcgClient;
   }
 
   @Provides

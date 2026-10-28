@@ -9,7 +9,6 @@ import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.queue.SqsQueueClient;
 import com.jordansimsmith.s3.S3Module;
 import com.jordansimsmith.secrets.SecretsModule;
-import com.jordansimsmith.tcginventory.fetchtcg.LegacyFetchTcgModule;
 import com.jordansimsmith.tcginventory.fetchtcg.server.FetchTcgModule;
 import com.jordansimsmith.time.ClockModule;
 import com.jordansimsmith.ulid.UlidModule;
@@ -34,7 +33,6 @@ import software.amazon.awssdk.services.sqs.SqsClient;
       RequestContextModule.class,
       UlidModule.class,
       S3Module.class,
-      LegacyFetchTcgModule.class,
       FetchTcgModule.class
     })
 public class TcgInventoryModule {

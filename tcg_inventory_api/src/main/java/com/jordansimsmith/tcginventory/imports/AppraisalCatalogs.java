@@ -1,9 +1,11 @@
 package com.jordansimsmith.tcginventory.imports;
 
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.CardIdentity;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
+import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
 import com.jordansimsmith.tcginventory.games.Games;
-import java.math.BigDecimal;
 import java.util.Map;
 
 public class AppraisalCatalogs {
@@ -11,10 +13,12 @@ public class AppraisalCatalogs {
     Result resolve(
         CardIdentity identity,
         ImportRowItem rowItem,
-        FetchTcgClient fetchTcgClient,
-        Map<String, FetchTcgClient.GetCardResponse> cardCache);
+        RequestContext ctx,
+        FetchTcgService fetchTcgService,
+        Map<String, GetCardResponse> cardCache)
+        throws ServiceException;
 
-    record ResolvedCard(String cardId, int setId, BigDecimal marketPrice) {}
+    record ResolvedCard(String cardId, int setId) {}
 
     record Result(ResolvedCard card, String reviewReason) {
       public static Result resolved(ResolvedCard card) {

@@ -65,7 +65,6 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             TcgInventoryTable.table(enhancedClient, ImportRowItem.class),
             factory.clock(),
             factory.fetchTcgService(),
-            factory.fetchTcgClient(),
             pricingRepository);
     var publishDynamoDbClient = factory.dynamoDbClient();
     var publishClock = factory.clock();

@@ -10,6 +10,8 @@ public final class FakeFetchTcgService implements FetchTcgService {
   private final Map<String, GetCardResponse> cards = new HashMap<>();
   private final Map<String, List<CardListing>> listings = new HashMap<>();
   private final Map<String, List<Offer>> offers = new HashMap<>();
+  private final Map<String, List<CardSet>> sets = new HashMap<>();
+  private final Map<String, List<CardSearchResult>> searchResults = new HashMap<>();
   private final Map<String, Integer> listingIds = new HashMap<>();
   private int nextListingId = 900000;
   private int nextImageId = 1;
@@ -30,6 +32,34 @@ public final class FakeFetchTcgService implements FetchTcgService {
   public GetCardResponse getCard(RequestContext ctx, GetCardRequest request) {
     return cards.getOrDefault(
         request.cardId(), new GetCardResponse(request.cardId(), "Unknown", null, Map.of()));
+  }
+
+  @Override
+  public FindCardsResponse findCards(RequestContext ctx, FindCardsRequest request) {
+    var page = request.continuation() == null ? 0 : Integer.parseInt(request.continuation());
+    var limit = request.limit() == null ? 100 : request.limit();
+    var allCards =
+        searchResults.getOrDefault(
+            request.gameId()
+                + "#"
+                + request.setId()
+                + "#"
+                + request.cardName()
+                + "#"
+                + request.finish(),
+            List.of());
+    var start = page * limit;
+    var end = Math.min(start + limit, allCards.size());
+    var cards =
+        start >= allCards.size() ? List.<CardSearchResult>of() : allCards.subList(start, end);
+    var nextContinuation = end < allCards.size() ? Integer.toString(page + 1) : null;
+    return new FindCardsResponse(cards, nextContinuation);
+  }
+
+  @Override
+  public FindSetsResponse findSets(RequestContext ctx, FindSetsRequest request) {
+    return new FindSetsResponse(
+        sets.getOrDefault(request.gameId() + "#" + request.externalSetId(), List.of()));
   }
 
   @Override
@@ -87,8 +117,17 @@ public final class FakeFetchTcgService implements FetchTcgService {
     sellerUsernames.put(user, username);
   }
 
-  public void seedCard(GetCardResponse response) {
-    cards.put(response.id(), response);
+  public void seedCard(String cardId, GetCardResponse response) {
+    cards.put(cardId, response);
+  }
+
+  public void seedSets(String gameId, String externalSetId, List<CardSet> response) {
+    sets.put(gameId + "#" + externalSetId, List.copyOf(response));
+  }
+
+  public void seedSearchResult(
+      String gameId, int setId, String cardName, String finish, List<CardSearchResult> response) {
+    searchResults.put(gameId + "#" + setId + "#" + cardName + "#" + finish, List.copyOf(response));
   }
 
   public void seedListings(String cardId, List<CardListing> response) {
@@ -104,6 +143,8 @@ public final class FakeFetchTcgService implements FetchTcgService {
     cards.clear();
     listings.clear();
     offers.clear();
+    sets.clear();
+    searchResults.clear();
     listingIds.clear();
     nextListingId = 900000;
     nextImageId = 1;

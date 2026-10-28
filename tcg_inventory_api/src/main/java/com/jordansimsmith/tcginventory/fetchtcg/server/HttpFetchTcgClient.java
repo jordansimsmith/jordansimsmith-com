@@ -93,6 +93,44 @@ public class HttpFetchTcgClient {
         response.id(), response.name(), marketPrice, response.externalReferences());
   }
 
+  public CardsPage findCards(
+      String gameId, int setId, String cardName, String finish, int limit, int pageOffset)
+      throws ServiceException {
+    var request =
+        HttpRequest.newBuilder()
+            .uri(
+                baseUri.resolve(
+                    "/v3/cards?gameIds="
+                        + encodeQueryParameter(gameId)
+                        + "&sets="
+                        + setId
+                        + "&cardName="
+                        + encodeQueryParameter(cardName)
+                        + "&finishes="
+                        + encodeQueryParameter(finish)
+                        + "&pageSize="
+                        + limit
+                        + "&pageOffset="
+                        + pageOffset))
+            .header("User-Agent", USER_AGENT)
+            .header("Accept", "application/json")
+            .GET()
+            .build();
+    var body = sendRequest(request, "card search");
+
+    ProviderCardsWrapper response;
+    try {
+      response = objectMapper.readValue(body, ProviderCardsWrapper.class);
+    } catch (IOException e) {
+      throw new IllegalStateException("FetchTCG returned malformed card search results");
+    }
+    if (response == null || response.searchResults() == null) {
+      throw new IllegalStateException("FetchTCG card search did not include a page");
+    }
+    var page = response.searchResults();
+    return new CardsPage(page.number(), page.size(), page.last(), page.content());
+  }
+
   public ListingsPage findCardListings(String cardId, int limit, int pageOffset)
       throws ServiceException {
     var encodedCardId = encodePathSegment(cardId);
@@ -320,11 +358,18 @@ public class HttpFetchTcgClient {
     return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
   }
 
+  private static String encodeQueryParameter(String value) {
+    return URLEncoder.encode(value, StandardCharsets.UTF_8);
+  }
+
   public record GetCardResponse(
       String id, String name, BigDecimal marketPrice, Map<String, String> externalReferences) {}
 
   public record ListingsPage(
       Integer number, Integer size, Boolean last, List<ProviderCardListing> content) {}
+
+  public record CardsPage(
+      Integer number, Integer size, Boolean last, List<ProviderCardSummary> content) {}
 
   public record OffersPage(
       Integer number, Integer size, Boolean last, List<ProviderOffer> content) {}
@@ -354,6 +399,20 @@ public class HttpFetchTcgClient {
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record ProviderListingsWrapper(
       @JsonProperty("searchResults") @Nullable ProviderListingsPage searchResults) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record ProviderCardsWrapper(
+      @JsonProperty("searchResults") @Nullable ProviderCardsPage searchResults) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  private record ProviderCardsPage(
+      @JsonProperty("number") @Nullable Integer number,
+      @JsonProperty("size") @Nullable Integer size,
+      @JsonProperty("last") @Nullable Boolean last,
+      @JsonProperty("content") @Nullable List<ProviderCardSummary> content) {}
+
+  @JsonIgnoreProperties(ignoreUnknown = true)
+  public record ProviderCardSummary(@JsonProperty("id") @Nullable String id) {}
 
   @JsonIgnoreProperties(ignoreUnknown = true)
   private record ProviderListingsPage(

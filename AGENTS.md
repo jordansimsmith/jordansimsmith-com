@@ -85,6 +85,7 @@ When performing the code review step, check for:
 - All comments should be lowercase with rare exceptions for proper nouns
 - Exception handling: Public methods should call private implementation methods that can throw
 - Public methods should preserve explicitly declared checked exceptions. Wrap other implementation exceptions in runtime exceptions only when the public contract does not expose them.
+- Do not catch and rethrow `ServiceException` just to pass it through. Let it propagate unless the current boundary must translate its meaning or handle it.
 - Let exceptions bubble up naturally when appropriate instead of unnecessarily catching them
 - Always use imports instead of fully qualified names (e.g., `import java.util.ArrayList;` instead of `java.util.ArrayList`)
 - When a signature gains a required parameter, update every call site; do not add an overload, default, or dummy wrapper to avoid touching existing callers

@@ -7,11 +7,10 @@ import com.jordansimsmith.tcginventory.CardIdentity;
 import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobProcessor;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgAuthException;
-import com.jordansimsmith.tcginventory.fetchtcg.FetchTcgClient;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
 import com.jordansimsmith.tcginventory.imports.AppraisalCatalogs.AppraisalCatalog;
 import com.jordansimsmith.tcginventory.pricing.CompetitorPricing;
 import com.jordansimsmith.tcginventory.pricing.Pricing;
@@ -31,7 +30,6 @@ public class AppraiseJobProcessor implements JobProcessor {
   private final DynamoDbTable<ImportRowItem> importRowTable;
   private final Clock clock;
   private final FetchTcgService fetchTcgService;
-  private final FetchTcgClient fetchTcgClient;
   private final CompetitorPricing competitorPricing;
   private final AppraisalPolicy appraisalPolicy;
   private final PricingPolicy pricingPolicy;
@@ -42,13 +40,11 @@ public class AppraiseJobProcessor implements JobProcessor {
       DynamoDbTable<ImportRowItem> importRowTable,
       Clock clock,
       FetchTcgService fetchTcgService,
-      FetchTcgClient fetchTcgClient,
       PricingRepository pricingRepository) {
     this.importTable = importTable;
     this.importRowTable = importRowTable;
     this.clock = clock;
     this.fetchTcgService = fetchTcgService;
-    this.fetchTcgClient = fetchTcgClient;
     this.competitorPricing = new CompetitorPricing(fetchTcgService);
     this.appraisalPolicy = new AppraisalPolicy();
     this.pricingPolicy = new PricingPolicy();
@@ -59,10 +55,6 @@ public class AppraiseJobProcessor implements JobProcessor {
   public JobProcessor.JobResult processBatch(String user, JobItem jobItem) {
     try {
       return doProcessBatch(user, jobItem);
-    } catch (FetchTcgAuthException e) {
-      var error = FetchTcgAuthException.USER_MESSAGE;
-      setImportError(user, jobItem.getImportId(), error);
-      return new JobProcessor.FailureJobResult(error);
     } catch (ServiceUnavailableException e) {
       throw new RuntimeException("FetchTCG pricing lookup failed", e);
     } catch (ServiceException e) {
@@ -95,7 +87,7 @@ public class AppraiseJobProcessor implements JobProcessor {
 
     var appraisalCatalog = AppraisalCatalogs.get(importItem.getGame());
     Map<String, AppraisalCatalog.ResolvedCard> batchCache = new HashMap<>();
-    Map<String, FetchTcgClient.GetCardResponse> cardCache = new HashMap<>();
+    Map<String, GetCardResponse> cardCache = new HashMap<>();
     Map<String, BigDecimal> marketPriceCache = new HashMap<>();
     var ctx = new RequestContext(user);
     var sellerUsername = fetchTcgService.getAccount(ctx, new GetAccountRequest()).sellerUsername();
@@ -164,7 +156,7 @@ public class AppraiseJobProcessor implements JobProcessor {
       BigDecimal priceFloor,
       String sellerUsername,
       Map<String, AppraisalCatalog.ResolvedCard> batchCache,
-      Map<String, FetchTcgClient.GetCardResponse> cardCache,
+      Map<String, GetCardResponse> cardCache,
       Map<String, BigDecimal> marketPriceCache,
       RequestContext ctx)
       throws ServiceException {
@@ -181,7 +173,7 @@ public class AppraiseJobProcessor implements JobProcessor {
             + rowItem.getLanguage();
     var cached = batchCache.get(dedupeKey);
     if (cached == null) {
-      var resolution = appraisalCatalog.resolve(identity, rowItem, fetchTcgClient, cardCache);
+      var resolution = appraisalCatalog.resolve(identity, rowItem, ctx, fetchTcgService, cardCache);
       if (resolution.reviewReason() != null) {
         return RowDecision.review(resolution.reviewReason());
       }
@@ -191,7 +183,11 @@ public class AppraiseJobProcessor implements JobProcessor {
 
     var marketPrice = marketPriceCache.get(cached.cardId());
     if (marketPrice == null) {
-      var card = fetchTcgService.getCard(ctx, new GetCardRequest(cached.cardId()));
+      var card = cardCache.get(cached.cardId());
+      if (card == null) {
+        card = fetchTcgService.getCard(ctx, new GetCardRequest(cached.cardId()));
+        cardCache.put(cached.cardId(), card);
+      }
       if (!cached.cardId().equals(card.id())) {
         throw new IllegalStateException("FetchTCG card identity did not match resolved card");
       }

@@ -11,8 +11,12 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.DeleteListingResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsResponse;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardsRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardsResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindOffersRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindOffersResponse;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FindSetsRequest;
+import com.jordansimsmith.tcginventory.fetchtcg.client.FindSetsResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardRequest;
@@ -63,6 +67,8 @@ public class FetchTcgModule {
     var tokenProvider = new FetchTcgTokenProvider(tokenExchange, credentialStore, clock);
     var getAccountService = new GetAccountService(accountRepository);
     var getCardService = new GetCardService(fetchTcgClient);
+    var findCardsService = new FindCardsService(fetchTcgClient);
+    var findSetsService = new FindSetsService();
     var findCardListingsService = new FindCardListingsService(fetchTcgClient);
     var findOffersService = new FindOffersService(tokenProvider, fetchTcgClient);
     var updateListingService = new UpdateListingService(tokenProvider, fetchTcgClient);
@@ -89,6 +95,18 @@ public class FetchTcgModule {
       public GetCardResponse getCard(RequestContext ctx, GetCardRequest request)
           throws ServiceException {
         return getCardService.getCard(ctx, request);
+      }
+
+      @Override
+      public FindCardsResponse findCards(RequestContext ctx, FindCardsRequest request)
+          throws ServiceException {
+        return findCardsService.findCards(ctx, request);
+      }
+
+      @Override
+      public FindSetsResponse findSets(RequestContext ctx, FindSetsRequest request)
+          throws ServiceException {
+        return findSetsService.findSets(ctx, request);
       }
 
       @Override
