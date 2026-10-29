@@ -29,7 +29,6 @@ public class UpdatePricingService {
     }
 
     var effectivePriceFloor = requestedPriceFloor.setScale(2);
-    // TODO: reject floor updates while the user's background job is active through the Jobs client.
     pricingRepository.update(PricingItem.create(ctx.user(), effectivePriceFloor.toPlainString()));
     return new UpdatePricingResponse(effectivePriceFloor.toPlainString());
   }

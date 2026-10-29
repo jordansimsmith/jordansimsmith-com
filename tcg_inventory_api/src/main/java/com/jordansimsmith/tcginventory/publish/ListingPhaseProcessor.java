@@ -16,7 +16,6 @@ import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.time.Clock;
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -139,22 +138,8 @@ public class ListingPhaseProcessor {
                 new RequestContext(user),
                 new CreateListingImageRequest(bytes, photo.getPhotoId() + ".jpg"));
         photo.setFetchtcgUrl(imageResponse.imageUrl());
-        dynamoDbClient.updateItem(
-            UpdateItemRequest.builder()
-                .tableName(TcgInventoryTable.TABLE_NAME)
-                .key(
-                    Map.of(
-                        SkuItem.PK,
-                            AttributeValue.builder()
-                                .s(SkuItem.formatPk(user, sku.getSkuId()))
-                                .build(),
-                        SkuItem.SK,
-                            AttributeValue.builder()
-                                .s(UnitItem.formatSk(inStock.first().getSequenceNumber()))
-                                .build()))
-                .updateExpression("SET " + UnitItem.PHOTOS + " = :photos")
-                .expressionAttributeValues(Map.of(":photos", toAttributeValue(photos)))
-                .build());
+        inStock.first().setPhotos(photos);
+        inventoryRepository.updateUnitPhotos(inStock.first());
       }
       imageUrls.add(photo.getFetchtcgUrl());
     }
@@ -189,21 +174,6 @@ public class ListingPhaseProcessor {
   }
 
   private record InStock(int count, UnitItem first) {}
-
-  private static AttributeValue toAttributeValue(List<UnitItem.Photo> photos) {
-    var photoValues = new ArrayList<AttributeValue>();
-    for (var photo : photos) {
-      var values = new HashMap<String, AttributeValue>();
-      values.put(UnitItem.Photo.PHOTO_ID, AttributeValue.builder().s(photo.getPhotoId()).build());
-      if (photo.getFetchtcgUrl() != null) {
-        values.put(
-            UnitItem.Photo.FETCHTCG_URL,
-            AttributeValue.builder().s(photo.getFetchtcgUrl()).build());
-      }
-      photoValues.add(AttributeValue.builder().m(values).build());
-    }
-    return AttributeValue.builder().l(photoValues).build();
-  }
 
   private void delistSku(String user, SkuItem sku, int capturedVersion) throws ServiceException {
     fetchTcgService.deleteListing(

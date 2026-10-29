@@ -54,8 +54,7 @@ public class ConfirmImportHandler
     this.importRowTable =
         TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
     this.activeJob = new ActiveJob(factory.jobTable());
-    this.importsRepository =
-        new ImportsRepository(factory.dynamoDbClient(), importTable, factory.jobTable());
+    this.importsRepository = new ImportsRepository(factory.dynamoDbClient(), factory.jobTable());
     this.jobsQueue = factory.jobsQueue();
     this.ulidGenerator = factory.ulidGenerator();
   }
@@ -106,6 +105,7 @@ public class ConfirmImportHandler
                                 .partitionValue(ImportRowItem.formatPk(user, importId))
                                 .sortValue(ImportRowItem.ROW_PREFIX)
                                 .build()))
+                    .consistentRead(true)
                     .scanIndexForward(true)
                     .build())
             .stream()
@@ -129,16 +129,7 @@ public class ConfirmImportHandler
     var now = clock.now();
     var jobItem =
         JobItem.create(user, ulidGenerator.generate(), "import_confirmation", importId, null, now);
-    var startResult = importsRepository.startConfirmation(user, importId, jobItem, now);
-    if (startResult == ImportsRepository.ConfirmationStartResult.NOT_FOUND) {
-      return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
-    }
-    if (startResult == ImportsRepository.ConfirmationStartResult.CONFIRMED) {
-      return httpResponseFactory.noContent();
-    }
-    if (startResult == ImportsRepository.ConfirmationStartResult.CONFIRMING) {
-      return httpResponseFactory.accepted();
-    }
+    importsRepository.startConfirmation(user, importId, jobItem, now);
 
     var message = new JobMessage(user, jobItem.getJobId(), "import_confirmation");
     jobsQueue.send(message, user, message.deduplicationId(0));

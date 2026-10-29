@@ -7,7 +7,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.secrets.FakeSecrets;
-import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import java.nio.charset.StandardCharsets;
@@ -34,7 +33,6 @@ public class SettingsHandlerIntegrationTest {
   private UpdateSettingsHandler updateSettingsHandler;
   private GetSettingsHandler getSettingsHandler;
   private DynamoDbTable<SettingsItem> settingsTable;
-  private DynamoDbTable<JobItem> jobTable;
   private DynamoDbClient dynamoDbClient;
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
@@ -57,7 +55,6 @@ public class SettingsHandlerIntegrationTest {
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeSecrets.set("tcg_inventory", "{\"jordan\":\"existing-token\"}");
     settingsTable = factory.settingsTable();
-    jobTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), JobItem.class);
     dynamoDbClient = factory.dynamoDbClient();
     updateSettingsHandler = new UpdateSettingsHandler(factory);
     getSettingsHandler = new GetSettingsHandler(factory);
@@ -158,33 +155,6 @@ public class SettingsHandlerIntegrationTest {
   }
 
   @Test
-  void updateSettingsShouldPreserveActiveJobGuardAndAllowTerminalJobs() throws Exception {
-    jobTable.putItem(JobItem.create("jordan", "queued-job", "publish", null, null, Instant.now()));
-    var queuedResponse =
-        updateSettingsHandler.handleRequest(
-            buildEvent("jordan", "{\"track_orders_after\":1723363200}"), null);
-    assertThat(queuedResponse.getStatusCode()).isEqualTo(409);
-
-    var queuedJob = jobTable.getItem(r -> r.key(jobKey("queued-job")));
-    queuedJob.setStatus("succeeded");
-    jobTable.putItem(queuedJob);
-
-    jobTable.putItem(JobItem.create("jordan", "running-job", "publish", null, null, Instant.now()));
-    var runningResponse =
-        updateSettingsHandler.handleRequest(
-            buildEvent("jordan", "{\"track_orders_after\":1723363200}"), null);
-    assertThat(runningResponse.getStatusCode()).isEqualTo(409);
-
-    var runningJob = jobTable.getItem(r -> r.key(jobKey("running-job")));
-    runningJob.setStatus("failed");
-    jobTable.putItem(runningJob);
-    var terminalResponse =
-        updateSettingsHandler.handleRequest(
-            buildEvent("jordan", "{\"track_orders_after\":1723363200}"), null);
-    assertThat(terminalResponse.getStatusCode()).isEqualTo(200);
-  }
-
-  @Test
   void settingsShouldRemainIsolatedByUser() throws Exception {
     updateSettingsHandler.handleRequest(
         buildEvent("jordan", "{\"track_orders_after\":1723363200}"), null);
@@ -241,12 +211,5 @@ public class SettingsHandlerIntegrationTest {
                         "sk", AttributeValue.fromS("FETCHTCG_ACCOUNT")))
                 .build())
         .item();
-  }
-
-  private Key jobKey(String jobId) {
-    return Key.builder()
-        .partitionValue(JobItem.formatPk("jordan"))
-        .sortValue(JobItem.formatSk(jobId))
-        .build();
   }
 }

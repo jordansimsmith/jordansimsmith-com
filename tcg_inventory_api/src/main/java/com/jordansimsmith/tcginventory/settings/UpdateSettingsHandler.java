@@ -10,7 +10,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import com.jordansimsmith.tcginventory.ActiveJob;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import java.time.Instant;
@@ -37,7 +36,6 @@ public class UpdateSettingsHandler
   private final ObjectMapper objectMapper;
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final ActiveJob activeJob;
   private final DynamoDbTable<SettingsItem> settingsTable;
 
   public UpdateSettingsHandler() {
@@ -49,7 +47,6 @@ public class UpdateSettingsHandler
     this.objectMapper = factory.objectMapper();
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.activeJob = new ActiveJob(factory.jobTable());
     this.settingsTable =
         TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), SettingsItem.class);
   }
@@ -79,11 +76,6 @@ public class UpdateSettingsHandler
 
     if (request.trackOrdersAfter() == null) {
       return httpResponseFactory.badRequest(new ErrorResponse("track_orders_after is required"));
-    }
-
-    // keep settings stable while a background job is running.
-    if (activeJob.exists(user)) {
-      return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
     }
 
     var key =

@@ -110,7 +110,7 @@ public class GetImportHandler
             .sortValue(ImportItem.formatSk(importId))
             .build();
 
-    var importItem = importTable.getItem(importKey);
+    var importItem = importTable.getItem(request -> request.key(importKey).consistentRead(true));
     if (importItem == null) {
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }

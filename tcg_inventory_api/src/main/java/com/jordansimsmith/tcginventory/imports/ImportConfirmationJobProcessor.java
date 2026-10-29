@@ -35,8 +35,7 @@ public class ImportConfirmationJobProcessor implements JobProcessor {
     this.importTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class);
     this.importRowTable =
         TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
-    this.importsRepository =
-        new ImportsRepository(factory.dynamoDbClient(), importTable, factory.jobTable());
+    this.importsRepository = new ImportsRepository(factory.dynamoDbClient(), factory.jobTable());
     this.inventoryRepository =
         new InventoryRepository(
             TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class),

@@ -9,7 +9,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import com.jordansimsmith.tcginventory.ActiveJob;
 import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
@@ -42,12 +41,12 @@ public class UpdateImportRowHandler
 
   record ErrorResponse(@JsonProperty("message") String message) {}
 
+  private final ImportsRepository importsRepository;
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<ImportItem> importTable;
   private final DynamoDbTable<ImportRowItem> importRowTable;
   private final ObjectMapper objectMapper;
-  private final ActiveJob activeJob;
 
   public UpdateImportRowHandler() {
     this(TcgInventoryFactory.create());
@@ -56,12 +55,12 @@ public class UpdateImportRowHandler
   @VisibleForTesting
   UpdateImportRowHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
+    this.importsRepository = new ImportsRepository(factory.dynamoDbClient(), factory.jobTable());
     this.httpResponseFactory = factory.httpResponseFactory();
     this.importTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class);
     this.importRowTable =
         TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
     this.objectMapper = factory.objectMapper();
-    this.activeJob = new ActiveJob(factory.jobTable());
   }
 
   @Override
@@ -119,13 +118,8 @@ public class UpdateImportRowHandler
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
 
-    // keep import review data stable while a background job is running.
-    if (activeJob.exists(user)) {
-      return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
-    }
-
     rowItem.setCondition(body.condition());
-    importRowTable.putItem(rowItem);
+    importsRepository.updateRowCondition(user, importId, position, body.condition());
 
     return httpResponseFactory.ok(
         new ImportRowResponse(

@@ -10,7 +10,6 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.service.ServiceException;
-import com.jordansimsmith.tcginventory.ActiveJob;
 import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
@@ -36,7 +35,6 @@ public class UpdateUnitHandler
 
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
-  private final ActiveJob activeJob;
   private final DynamoDbTable<SkuItem> skuTable;
   private final DynamoDbTable<UnitItem> unitTable;
   private final InventoryRepository inventoryRepository;
@@ -51,7 +49,6 @@ public class UpdateUnitHandler
   UpdateUnitHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
-    this.activeJob = new ActiveJob(factory.jobTable());
     this.skuTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), SkuItem.class);
     this.unitTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class);
     this.inventoryRepository =
@@ -77,10 +74,6 @@ public class UpdateUnitHandler
       throws ServiceException {
     var ctx = requestContextFactory.createCtx(event);
     var user = ctx.user();
-    // avoid moving inventory while a background job can change the same units.
-    if (activeJob.exists(user)) {
-      return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
-    }
 
     // api gateway rest proxy integrations pass path parameters still url-encoded
     var skuId = URLDecoder.decode(event.getPathParameters().get("sku_id"), StandardCharsets.UTF_8);

@@ -47,6 +47,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
@@ -193,6 +194,30 @@ public class ListingPhaseProcessorIntegrationTest {
     var unit = getUnit("jordan", SKU_ID, 1);
     assertThat(unit.getPhotos().get(0).getFetchtcgUrl()).isEqualTo(firstUrls.get(0));
     assertThat(unit.getPhotos().get(1).getFetchtcgUrl()).isEqualTo(firstUrls.get(1));
+  }
+
+  @Test
+  void uploadShouldNotRecreateMovedUnitOrPublishStaleListing() throws Exception {
+    // arrange
+    createDirtySku("jordan", SKU_ID, "1.50");
+    createPhotographedUnit("jordan", SKU_ID, 1, List.of(FRONT_PHOTO_ID), List.of(FRONT_JPEG));
+    var fetchTcgService = mock(FetchTcgService.class);
+    when(fetchTcgService.createListingImage(any(RequestContext.class), any()))
+        .thenAnswer(
+            invocation -> {
+              var unit = getUnit("jordan", SKU_ID, 1);
+              unitTable.deleteItem(unit);
+              return new CreateListingImageResponse("https://example.com/uploaded.jpg");
+            });
+
+    // act
+    assertThatThrownBy(() -> listingPhaseProcessor(fetchTcgService).process("jordan", 0))
+        .isInstanceOf(ConditionalCheckFailedException.class);
+
+    // assert
+    assertThat(getUnit("jordan", SKU_ID, 1)).isNull();
+    assertThat(getSku("jordan", SKU_ID).getDirty()).isTrue();
+    verify(fetchTcgService, never()).updateListing(any(RequestContext.class), any());
   }
 
   @Test

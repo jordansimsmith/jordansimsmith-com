@@ -8,7 +8,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import com.jordansimsmith.tcginventory.ActiveJob;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import org.slf4j.Logger;
@@ -26,11 +25,11 @@ public class DeleteImportHandler
 
   record ErrorResponse(@JsonProperty("message") String message) {}
 
+  private final ImportsRepository importsRepository;
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<ImportItem> importTable;
   private final DynamoDbTable<ImportRowItem> importRowTable;
-  private final ActiveJob activeJob;
 
   public DeleteImportHandler() {
     this(TcgInventoryFactory.create());
@@ -39,11 +38,11 @@ public class DeleteImportHandler
   @VisibleForTesting
   DeleteImportHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
+    this.importsRepository = new ImportsRepository(factory.dynamoDbClient(), factory.jobTable());
     this.httpResponseFactory = factory.httpResponseFactory();
     this.importTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class);
     this.importRowTable =
         TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
-    this.activeJob = new ActiveJob(factory.jobTable());
   }
 
   @Override
@@ -74,11 +73,8 @@ public class DeleteImportHandler
     if (!DELETABLE_STATUS.equals(importItem.getStatus())) {
       return httpResponseFactory.conflict(new ErrorResponse("import is not in a deletable status"));
     }
-    // keep import review data stable while a background job is running.
-    if (activeJob.exists(user)) {
-      return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
-    }
 
+    importsRepository.deleteReviewImport(user, importId);
     // delete all rows
     var rowQueryConditional =
         QueryConditional.sortBeginsWith(
@@ -102,9 +98,6 @@ public class DeleteImportHandler
                         .partitionValue(rowItem.getPk())
                         .sortValue(rowItem.getSk())
                         .build()));
-
-    // delete import item
-    importTable.deleteItem(importKey);
 
     return httpResponseFactory.noContent();
   }

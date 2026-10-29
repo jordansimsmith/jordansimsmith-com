@@ -86,12 +86,9 @@ public class ImportsHandlerIntegrationTest {
   }
 
   @Test
-  void createImportShouldPersistImportAndRowsWhenAnotherJobIsActive() throws Exception {
+  void createImportShouldPersistImportAndRows() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    jobTable.putItem(
-        JobItem.create(
-            "jordan", "publish-job", "publish", null, null, Instant.ofEpochSecond(1700000000)));
     var csv =
         CSV_HEADER
             + "\n"
@@ -474,6 +471,34 @@ public class ImportsHandlerIntegrationTest {
             .flatMap(page -> page.items().stream())
             .toList();
     assertThat(rows).isEmpty();
+  }
+
+  @Test
+  void orphanedRowsShouldNotExposeDeletedImport() {
+    // arrange
+    var importId = createReviewImportWithRow("jordan");
+    var factory =
+        TcgInventoryTestFactory.create(
+            dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
+    var repository = new ImportsRepository(factory.dynamoDbClient(), jobTable);
+
+    // act
+    repository.deleteReviewImport("jordan", importId);
+
+    // assert
+    assertThat(
+            importRowTable.getItem(
+                Key.builder()
+                    .partitionValue(ImportRowItem.formatPk("jordan", importId))
+                    .sortValue(ImportRowItem.formatSk(1))
+                    .build()))
+        .isNotNull();
+    assertThat(
+            getImportHandler
+                .handleRequest(
+                    buildEventWithPathParam("jordan", Map.of("import_id", importId)), null)
+                .getStatusCode())
+        .isEqualTo(404);
   }
 
   @Test

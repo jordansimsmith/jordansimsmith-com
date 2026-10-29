@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.tcginventory.AuditItem;
-import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
@@ -42,7 +41,6 @@ public class InventoryHandlerIntegrationTest {
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
   private DynamoDbTable<AuditItem> auditTable;
-  private DynamoDbTable<JobItem> jobTable;
   private InventoryRepository inventoryRepository;
 
   private FindSkusHandler findSkusHandler;
@@ -74,7 +72,6 @@ public class InventoryHandlerIntegrationTest {
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
     auditTable = factory.auditTable();
-    jobTable = factory.jobTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
@@ -361,28 +358,6 @@ public class InventoryHandlerIntegrationTest {
   }
 
   @Test
-  void removeUnitShouldReturn409WhenAJobIsActive() throws Exception {
-    // arrange
-    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
-    createSku("jordan", skuId, "Elvish Mystic", "m14", "Magic 2014", "169");
-    createUnit("jordan", skuId, 42, "in_stock", "import1");
-    jobTable.putItem(
-        JobItem.create("jordan", "job1", "publish", null, null, Instant.ofEpochSecond(1700000000)));
-
-    // act
-    var response =
-        removeUnitHandler.handleRequest(
-            buildEvent("jordan", Map.of("sku_id", skuId, "sequence_number", "42")), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(409);
-    assertThat(objectMapper.readTree(response.getBody()).get("message").asText())
-        .isEqualTo("another job is in progress");
-    assertThat(getUnit("jordan", skuId, 42).getStatus()).isEqualTo("in_stock");
-    assertThat(queryAuditEntries("jordan")).isEmpty();
-  }
-
-  @Test
   void removeUnitShouldRollBackSkuAndAuditWhenUnitIsNoLongerInStock() {
     // arrange
     var skuId = "mtg#scryfall#scryfall-1#normal#NM";
@@ -536,32 +511,6 @@ public class InventoryHandlerIntegrationTest {
     assertThat(getUnit("jordan", targetSkuId, 42).getGame()).isEqualTo("pokemon");
     assertThat(removeResponse.getStatusCode()).isEqualTo(204);
     assertThat(getUnit("jordan", targetSkuId, 42).getStatus()).isEqualTo("removed");
-  }
-
-  @Test
-  void updateUnitShouldReturn409WhenAJobIsActive() throws Exception {
-    // arrange
-    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
-    createSku("jordan", skuId, "Elvish Mystic", "m14", "Magic 2014", "169");
-    createUnit("jordan", skuId, 42, "in_stock", "import1");
-    jobTable.putItem(
-        JobItem.create("jordan", "job1", "publish", null, null, Instant.ofEpochSecond(1700000000)));
-
-    // act
-    var response =
-        updateUnitHandler.handleRequest(
-            buildEventWithBody(
-                "jordan",
-                Map.of("sku_id", skuId, "sequence_number", "42"),
-                "{\"condition\":\"LP\"}"),
-            null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(409);
-    assertThat(objectMapper.readTree(response.getBody()).get("message").asText())
-        .isEqualTo("another job is in progress");
-    assertThat(getUnit("jordan", skuId, 42).getStatus()).isEqualTo("in_stock");
-    assertThat(queryAuditEntries("jordan")).isEmpty();
   }
 
   @Test

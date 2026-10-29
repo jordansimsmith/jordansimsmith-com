@@ -149,13 +149,9 @@ public class ScansHandlerIntegrationTest {
   }
 
   @Test
-  void createScanShouldSortAsciiFilenamesLexicallyAndPersistRowsWhenAnotherJobIsActive()
-      throws Exception {
+  void createScanShouldSortAsciiFilenamesLexicallyAndPersistRows() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    jobTable.putItem(
-        JobItem.create(
-            "jordan", "publish-job", "publish", null, null, Instant.ofEpochSecond(1700000000)));
     var request =
         "{\"game\":\"mtg\",\"condition\":\"LP\",\"finish\":\"foil\",\"files\":["
             + "{\"filename\":\"2.jpg\",\"size_bytes\":100},"

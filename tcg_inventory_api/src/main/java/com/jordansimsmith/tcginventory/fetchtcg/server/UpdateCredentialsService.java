@@ -34,7 +34,6 @@ public class UpdateCredentialsService {
       throw new BadRequestException("refresh_token is required");
     }
 
-    // todo: reject credential updates during an active background task through the jobs client.
     var tokenExchangeResult = tokenExchange.exchange(request.refreshToken());
 
     HttpFetchTcgClient.GetProfileResponse profile;
