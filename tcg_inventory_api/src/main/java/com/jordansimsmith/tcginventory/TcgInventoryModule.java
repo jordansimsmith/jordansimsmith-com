@@ -12,6 +12,7 @@ import com.jordansimsmith.secrets.SecretsModule;
 import com.jordansimsmith.tcginventory.catalog.server.CatalogModule;
 import com.jordansimsmith.tcginventory.fetchtcg.server.FetchTcgModule;
 import com.jordansimsmith.tcginventory.games.server.GamesModule;
+import com.jordansimsmith.tcginventory.inventory.server.InventoryModule;
 import com.jordansimsmith.tcginventory.pricing.server.PricingModule;
 import com.jordansimsmith.time.ClockModule;
 import com.jordansimsmith.ulid.UlidModule;
@@ -38,6 +39,7 @@ import software.amazon.awssdk.services.sqs.SqsClient;
       S3Module.class,
       FetchTcgModule.class,
       GamesModule.class,
+      InventoryModule.class,
       CatalogModule.class,
       PricingModule.class
     })
@@ -49,6 +51,13 @@ public class TcgInventoryModule {
   @Named("tcgInventoryTableName")
   String tcgInventoryTableName() {
     return TcgInventoryTable.TABLE_NAME;
+  }
+
+  @Provides
+  @Singleton
+  @Named("inventoryPhotoBucket")
+  String inventoryPhotoBucket() {
+    return Photos.BUCKET;
   }
 
   @Provides

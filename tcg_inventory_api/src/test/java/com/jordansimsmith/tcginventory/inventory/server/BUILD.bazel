@@ -1,0 +1,30 @@
+load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
+
+java_test_suite(
+    name = "server-integration-tests",
+    srcs = ["FindUnitsServiceIntegrationTest.java"],
+    env = {
+        "AWS_ACCESS_KEY_ID": "fake",
+        "AWS_SECRET_ACCESS_KEY": "fake",
+        "AWS_REGION": "ap-southeast-2",
+    },
+    runner = "junit5",
+    test_suffixes = ["IntegrationTest.java"],
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        "//lib/dynamodb:test-lib",
+        "//lib/service",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/server",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+        "@maven//:org_mockito_mockito_core",
+        "@maven//:org_testcontainers_junit_jupiter",
+        "@maven//:software_amazon_awssdk_auth",
+        "@maven//:software_amazon_awssdk_dynamodb",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_regions",
+        "@maven//:software_amazon_awssdk_s3",
+    ],
+)

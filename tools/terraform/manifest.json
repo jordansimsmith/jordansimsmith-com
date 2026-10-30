@@ -161,6 +161,7 @@
         "get_reports": "//tcg_inventory_api:get-reports-handler_deploy.jar",
         "find_skus": "//tcg_inventory_api:find-skus-handler_deploy.jar",
         "get_sku": "//tcg_inventory_api:get-sku-handler_deploy.jar",
+        "find_units": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/api:find-units-handler_deploy.jar",
         "remove_unit": "//tcg_inventory_api:remove-unit-handler_deploy.jar",
         "update_unit": "//tcg_inventory_api:update-unit-handler_deploy.jar",
         "find_orders": "//tcg_inventory_api:find-orders-handler_deploy.jar",

@@ -17,6 +17,7 @@ import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.tcginventory.inventory.SequenceCounterItem;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.tcginventory.pricing.client.PricingService;
 import com.jordansimsmith.tcginventory.reports.ReportItem;
@@ -99,6 +100,8 @@ public interface TcgInventoryTestFactory extends CatalogFactory {
   ScanRepository scanRepository();
 
   PricingService pricingService();
+
+  InventoryService inventoryService();
 
   @Component.Factory
   interface Factory {

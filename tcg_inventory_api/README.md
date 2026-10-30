@@ -41,7 +41,8 @@ The TCG inventory API service is the source of truth for physical Magic: The Gat
 - Durable scan jobs and source images: all-or-abandon batch uploads, background recognition with stored suggestions, manual correction through the authenticated catalog endpoints, irreversible removal of an outlier scan row, deletion of an unfinished job, and read-only confirmed jobs. Confirmed source scans are retained indefinitely and never automatically used as listing photos.
 - Per-user pricing configuration: authenticated `GET /pricing` returns the effective price floor, and `PATCH /pricing` saves a per-user override through PricingService. An unset override reads as `0.25`; once configured, it cannot be cleared through the API. Invalid values return 400. Floor writes do not yet exclude active jobs; that guard is deferred until Pricing can call the Jobs service. Each `PricingService#getPrice` call reads the current floor, so repeated items in one job batch can observe a changed override.
 - Appraisal per row: FetchTCG identity resolution for the submitted ManaBox or scan-confirmed printing (candidates verified against the row's Scryfall ID, cached on the SKU after first sight), followed by a Pricing service lookup for market and suggested prices. Imports applies its fixed keep filter to the returned market value. CSV and scan-confirmed imports use the same appraisal worker.
-- Inventory browse: SKU search and detail with unit lists and derived locations.
+- Inventory browse: SKU search and detail; the separate unit endpoint returns physical units, derived locations, and short-lived photo URLs.
+- Inventory unit listing: a separate paginated read returns physical units, derived locations, and short-lived photo URLs for one SKU.
 - Listing photos: up to 5 JPEG photos per keep row, captured during import review (raw-body upload, stored durably in S3, served via short-lived presigned URLs); confirm is blocked while any keep row appraised at NZ$20+ has no photos; photos freeze onto units at confirm and are immutable afterwards.
 - Manual audited adjustments: remove a unit; change a unit's condition (moving it between SKUs).
 - Publish job (single two-phase job): the order phase resumes local work, processes existing offers, preflights every new accepted offer together, and saves each valid order before reserving its units; the publish phase then drains dirty SKUs to FetchTCG as absolute listing quantities, projecting the first in-stock unit's photos and deleting listings at zero.
@@ -366,6 +367,7 @@ The worker publishes through CatalogSnapshotStore. A failed upload or registry w
 | `DELETE` | `/scans/{scan_id}`                                       | delete an unfinished scan and its source objects                                          |
 | `GET`    | `/skus`                                                  | browse/search SKUs for required `game` (prefix search, continuation paging)               |
 | `GET`    | `/skus/{sku_id}`                                         | SKU detail, units, and provider image URLs                                                |
+| `GET`    | `/skus/{sku_id}/units`                                   | list one page of physical units, locations, and presigned photo URLs                      |
 | `DELETE` | `/skus/{sku_id}/units/{sequence_number}`                 | remove a unit (optional `reason` query param)                                             |
 | `PUT`    | `/skus/{sku_id}/units/{sequence_number}`                 | update a unit's condition (moves it to another SKU; response returns the new `sku_id`)    |
 | `GET`    | `/orders`                                                | list orders by descending numeric ID with item and listed subtotals (continuation paging) |
@@ -662,6 +664,31 @@ The configured price floor represents the minimum final suggested price. Pricing
   "finished_at": null
 }
 ```
+
+`GET /skus/{sku_id}/units` returns one page of physical units for the authenticated user's SKU. It accepts optional `limit` (default 100, range 1–100) and opaque `continuation` query parameters. Each response contains `units` and nullable `next_continuation`; callers follow the continuation until it is null. The query is strongly consistent within a page, ordered by sequence number, and filters `removed` units after reading the page. A page can therefore be empty while still returning a continuation. Pages are live reads and do not form a snapshot across requests.
+
+```json
+{
+  "units": [
+    {
+      "sequence_number": 1204,
+      "location": "A12-4",
+      "status": "in_stock",
+      "photos": [
+        {
+          "photo_id": "01JEXAMPLEPHOTOULID00000",
+          "url": "https://s3.ap-southeast-2.amazonaws.com/api.tcg-inventory.jordansimsmith.com/users/jordan/photos/01JEXAMPLEPHOTOULID00000.jpg?X-Amz-Expires=900&..."
+        }
+      ]
+    }
+  ],
+  "next_continuation": null
+}
+```
+
+The service reads one DynamoDB query page per request. Physical-photo URLs are presigned for 15 minutes without reading the S3 objects. Continuation tokens are opaque; the server decodes the DynamoDB key and does not bind it to the supplied SKU, user, or page size. The query itself remains scoped to the authenticated user and requested SKU. Invalid limits, missing SKU IDs, and malformed token encodings return `400`; storage failures remain server errors.
+
+The existing `GET /skus/{sku_id}` continues to include its unit projection for current clients while the separate unit endpoint is available.
 
 `GET /skus/{sku_id}`
 

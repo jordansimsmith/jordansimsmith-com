@@ -269,6 +269,10 @@ lambdas = {
         "handler": "com.jordansimsmith.tcginventory.inventory.GetSkuHandler",
         "zip_file": "get-sku-handler_deploy.jar",
     },
+    "find_units": {
+        "handler": "com.jordansimsmith.tcginventory.inventory.api.FindUnitsHandler",
+        "zip_file": "find-units-handler_deploy.jar",
+    },
     "remove_unit": {
         "handler": "com.jordansimsmith.tcginventory.inventory.RemoveUnitHandler",
         "zip_file": "remove-unit-handler_deploy.jar",
@@ -485,6 +489,7 @@ endpoints = {
     },
     "find_skus": {"resource": "skus", "method": "GET", "lambda": "find_skus"},
     "get_sku": {"resource": "sku_detail", "method": "GET", "lambda": "get_sku"},
+    "find_units": {"resource": "sku_units", "method": "GET", "lambda": "find_units"},
     "remove_unit": {
         "resource": "sku_unit_detail",
         "method": "DELETE",

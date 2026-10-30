@@ -200,6 +200,10 @@ module "java_api" {
       handler  = "com.jordansimsmith.tcginventory.inventory.GetSkuHandler"
       artifact = var.artifacts["get_sku"]
     }
+    find_units = {
+      handler  = "com.jordansimsmith.tcginventory.inventory.api.FindUnitsHandler"
+      artifact = var.artifacts["find_units"]
+    }
     remove_unit = {
       handler  = "com.jordansimsmith.tcginventory.inventory.RemoveUnitHandler"
       artifact = var.artifacts["remove_unit"]
@@ -263,6 +267,7 @@ module "java_api" {
     get_reports                 = { path = "reports", method = "GET", lambda = "get_reports" }
     find_skus                   = { path = "skus", method = "GET", lambda = "find_skus" }
     get_sku                     = { path = "skus/{sku_id}", method = "GET", lambda = "get_sku" }
+    find_units                  = { path = "skus/{sku_id}/units", method = "GET", lambda = "find_units" }
     remove_unit                 = { path = "skus/{sku_id}/units/{sequence_number}", method = "DELETE", lambda = "remove_unit" }
     update_unit                 = { path = "skus/{sku_id}/units/{sequence_number}", method = "PUT", lambda = "update_unit" }
     find_orders                 = { path = "orders", method = "GET", lambda = "find_orders" }

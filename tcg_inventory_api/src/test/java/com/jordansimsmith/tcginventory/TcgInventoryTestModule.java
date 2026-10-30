@@ -19,6 +19,7 @@ import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.tcginventory.inventory.SequenceCounterItem;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.server.InventoryModule;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.tcginventory.pricing.server.PricingModule;
 import com.jordansimsmith.tcginventory.reports.ReportItem;
@@ -39,13 +40,20 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
-@Module(includes = {PricingModule.class, CatalogModule.class})
+@Module(includes = {PricingModule.class, CatalogModule.class, InventoryModule.class})
 public class TcgInventoryTestModule {
   @Provides
   @Singleton
   @Named("tcgInventoryTableName")
   String tcgInventoryTableName() {
     return TcgInventoryTable.TABLE_NAME;
+  }
+
+  @Provides
+  @Singleton
+  @Named("inventoryPhotoBucket")
+  String inventoryPhotoBucket() {
+    return Photos.BUCKET;
   }
 
   @Provides
