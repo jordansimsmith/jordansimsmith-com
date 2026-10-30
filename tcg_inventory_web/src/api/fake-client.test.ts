@@ -955,7 +955,8 @@ describe('createFakeClient orders', () => {
       const block = Math.floor(unit.sequence_number / 100);
       expect(unit.location).toBe(`A${block}-${unit.sequence_number % 100}`);
       expect(unit).not.toHaveProperty('external_source');
-      expect(unit.image_urls.small).toMatch(/^data:image\/svg\+xml/);
+      expect(unit).not.toHaveProperty('image_urls');
+      expect(unit.external_id).toBeTruthy();
       if (unit.game === 'mtg') {
         expect(unit.external_id).toMatch(/^[0-9a-f-]{36}$/);
       } else {

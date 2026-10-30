@@ -1576,7 +1576,6 @@ function toOrderDetail(order: FakeOrder, skus: FakeSku[]): OrderDetail {
         location: deriveLocation(ref.sequence_number),
         name: sku.name,
         external_id: sku.external_id,
-        image_urls: fakeImageUrls(sku.external_id, sku.name, sku.set_code),
         set_code: sku.set_code,
         collector_number: sku.collector_number,
         finish: sku.finish,

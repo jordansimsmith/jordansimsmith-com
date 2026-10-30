@@ -1,6 +1,7 @@
 import {
   render,
   screen,
+  act,
   cleanup,
   fireEvent,
   waitFor,
@@ -9,12 +10,12 @@ import {
 import userEvent from '@testing-library/user-event';
 import { MantineProvider } from '@mantine/core';
 import { Notifications } from '@mantine/notifications';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { Link, MemoryRouter, Routes, Route } from 'react-router-dom';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { OrderDetailPage } from './OrderDetailPage';
 import { GamesProvider } from '../GamesProvider';
 import * as clientModule from '../api/client';
-import type { OrderDetail } from '../api/client';
+import type { FindCardImagesResponse, OrderDetail } from '../api/client';
 
 const REGISTERED_GAMES = [
   {
@@ -87,12 +88,6 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
         location: 'A0-37',
         current_location: 'A0-35',
         external_id: '58b26011-e103-45c4-a253-900f4e6b2eeb',
-        image_urls: {
-          small:
-            'https://api.scryfall.com/cards/58b26011-e103-45c4-a253-900f4e6b2eeb?format=image&version=small',
-          normal:
-            'https://api.scryfall.com/cards/58b26011-e103-45c4-a253-900f4e6b2eeb?format=image&version=normal',
-        },
         name: 'Sol Ring',
         set_code: 'cmr',
         collector_number: '472',
@@ -120,12 +115,6 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
         location: 'A0-74',
         current_location: 'A0-70',
         external_id: '58b26011-e103-45c4-a253-900f4e6b2eeb',
-        image_urls: {
-          small:
-            'https://api.scryfall.com/cards/58b26011-e103-45c4-a253-900f4e6b2eeb?format=image&version=small',
-          normal:
-            'https://api.scryfall.com/cards/58b26011-e103-45c4-a253-900f4e6b2eeb?format=image&version=normal',
-        },
         name: 'Sol Ring',
         set_code: 'cmr',
         collector_number: '472',
@@ -147,12 +136,6 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
         location: 'A2-59',
         current_location: 'A2-59',
         external_id: 'f0a51425-d796-48b8-b68c-bc21fb465c81',
-        image_urls: {
-          small:
-            'https://api.scryfall.com/cards/f0a51425-d796-48b8-b68c-bc21fb465c81?format=image&version=small',
-          normal:
-            'https://api.scryfall.com/cards/f0a51425-d796-48b8-b68c-bc21fb465c81?format=image&version=normal',
-        },
         name: 'Elvish Aberration',
         set_code: 'a25',
         collector_number: '167',
@@ -180,7 +163,15 @@ function renderOrderDetailPage() {
       <GamesProvider initialGames={REGISTERED_GAMES}>
         <MemoryRouter initialEntries={['/orders/83647']}>
           <Routes>
-            <Route path="/orders/:orderId" element={<OrderDetailPage />} />
+            <Route
+              path="/orders/:orderId"
+              element={
+                <>
+                  <Link to="/orders/other">Next order</Link>
+                  <OrderDetailPage />
+                </>
+              }
+            />
             <Route path="/orders" element={<div>Orders list</div>} />
           </Routes>
         </MemoryRouter>
@@ -192,6 +183,17 @@ function renderOrderDetailPage() {
 describe('OrderDetailPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.spyOn(clientModule.apiClient, 'findCardImages').mockImplementation(
+      async ({ external_ids }) => ({
+        images: external_ids.map((external_id) => ({
+          external_id,
+          image_urls: {
+            small: `https://images.test/${external_id}-small`,
+            normal: `https://images.test/${external_id}-normal`,
+          },
+        })),
+      }),
+    );
   });
 
   afterEach(() => {
@@ -262,12 +264,25 @@ describe('OrderDetailPage', () => {
     const images = Array.from(
       document.querySelectorAll<HTMLImageElement>('img'),
     );
+    await waitFor(() =>
+      expect(images[0].src).toContain(
+        '58b26011-e103-45c4-a253-900f4e6b2eeb-small',
+      ),
+    );
     expect(images).toHaveLength(3);
     expect(images.map((image) => image.src)).toEqual([
-      'https://api.scryfall.com/cards/58b26011-e103-45c4-a253-900f4e6b2eeb?format=image&version=small',
-      'https://api.scryfall.com/cards/58b26011-e103-45c4-a253-900f4e6b2eeb?format=image&version=small',
-      'https://api.scryfall.com/cards/f0a51425-d796-48b8-b68c-bc21fb465c81?format=image&version=small',
+      'https://images.test/58b26011-e103-45c4-a253-900f4e6b2eeb-small',
+      'https://images.test/58b26011-e103-45c4-a253-900f4e6b2eeb-small',
+      'https://images.test/f0a51425-d796-48b8-b68c-bc21fb465c81-small',
     ]);
+    expect(clientModule.apiClient.findCardImages).toHaveBeenCalledTimes(1);
+    expect(clientModule.apiClient.findCardImages).toHaveBeenCalledWith({
+      game: 'mtg',
+      external_ids: [
+        '58b26011-e103-45c4-a253-900f4e6b2eeb',
+        'f0a51425-d796-48b8-b68c-bc21fb465c81',
+      ],
+    });
     expect(
       images.every((image) => image.getAttribute('loading') === 'lazy'),
     ).toBe(true);
@@ -288,11 +303,6 @@ describe('OrderDetailPage', () => {
       location: 'A0-1',
       current_location: 'A0-0',
       external_id: '283917',
-      image_urls: {
-        small: 'https://tcgplayer-cdn.tcgplayer.com/product/283917_200w.jpg',
-        normal:
-          'https://tcgplayer-cdn.tcgplayer.com/product/283917_in_1000x1000.jpg',
-      },
       name: 'Abomasnow',
       set_code: 'lost-origin',
       collector_number: '043/196',
@@ -316,20 +326,127 @@ describe('OrderDetailPage', () => {
     });
     expect(within(pokemonSection).getByText('Abomasnow')).toBeDefined();
     expect(
-      container.querySelector('img[src*="283917_200w.jpg"]'),
+      container.querySelector('img[src="https://images.test/283917-small"]'),
     ).not.toBeNull();
+    expect(clientModule.apiClient.findCardImages).toHaveBeenCalledTimes(2);
+    expect(clientModule.apiClient.findCardImages).toHaveBeenCalledWith({
+      game: 'pokemon',
+      external_ids: ['283917'],
+    });
   });
 
-  it('shows the image placeholder when the API has no card image', async () => {
+  it('splits image lookups into batches of 100 identifiers', async () => {
     const detail = orderDetail();
-    detail.units[0].image_urls = { small: null, normal: null };
-    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(detail);
+    const units = Array.from({ length: 101 }, (_, index) => ({
+      ...detail.units[0],
+      sequence_number: index + 1,
+      external_id: `card-${index}`,
+    }));
+    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue({
+      ...detail,
+      units,
+    });
+    renderOrderDetailPage();
+    await screen.findByText('Order 83647');
+    await waitFor(() =>
+      expect(clientModule.apiClient.findCardImages).toHaveBeenCalledTimes(2),
+    );
+    const calls = vi
+      .mocked(clientModule.apiClient.findCardImages)
+      .mock.calls.map(([request]) => request.external_ids);
+    expect(calls.map((batch) => batch.length)).toEqual([100, 1]);
+  });
+
+  it('ignores image responses after navigating to another order', async () => {
+    const user = userEvent.setup();
+    let resolveFirstImages:
+      | ((response: FindCardImagesResponse) => void)
+      | undefined;
+    const firstImages = new Promise<FindCardImagesResponse>((resolve) => {
+      resolveFirstImages = resolve;
+    });
+    vi.spyOn(clientModule.apiClient, 'getOrder').mockImplementation(
+      async (orderId) => ({
+        ...orderDetail(),
+        order_id: orderId,
+        units: [{ ...orderDetail().units[0], external_id: `${orderId}-card` }],
+      }),
+    );
+    vi.spyOn(clientModule.apiClient, 'findCardImages').mockImplementation(
+      async ({ external_ids }) =>
+        external_ids[0] === '83647-card'
+          ? firstImages
+          : {
+              images: [
+                {
+                  external_id: 'other-card',
+                  image_urls: {
+                    small: 'https://images.test/other',
+                    normal: 'https://images.test/other',
+                  },
+                },
+              ],
+            },
+    );
+
+    renderOrderDetailPage();
+    await waitFor(() =>
+      expect(clientModule.apiClient.findCardImages).toHaveBeenCalled(),
+    );
+    expect(screen.queryByText('Order 83647')).toBeNull();
+    await user.click(screen.getByRole('link', { name: 'Next order' }));
+    expect(await screen.findByText('Order other')).toBeDefined();
+    await waitFor(() =>
+      expect(document.querySelector('img')?.getAttribute('src')).toBe(
+        'https://images.test/other',
+      ),
+    );
+    await act(async () => {
+      resolveFirstImages?.({
+        images: [
+          {
+            external_id: '83647-card',
+            image_urls: {
+              small: 'https://images.test/stale',
+              normal: 'https://images.test/stale',
+            },
+          },
+        ],
+      });
+    });
+    expect(document.querySelector('img')?.getAttribute('src')).toBe(
+      'https://images.test/other',
+    );
+  });
+
+  it('shows the image placeholder when Catalog returns no image', async () => {
+    vi.spyOn(clientModule.apiClient, 'findCardImages').mockResolvedValue({
+      images: [],
+    });
+    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(
+      orderDetail(),
+    );
 
     renderOrderDetailPage();
 
     await screen.findByText('Order 83647');
     const image = document.querySelector<HTMLImageElement>('img');
     expect(image?.getAttribute('src')).toMatch(/^data:image\/svg\+xml/);
+  });
+
+  it('fails the order load when an image lookup fails', async () => {
+    vi.spyOn(clientModule.apiClient, 'findCardImages').mockRejectedValue(
+      new Error('Catalog unavailable'),
+    );
+    vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(
+      orderDetail(),
+    );
+    renderOrderDetailPage();
+    expect(await screen.findByText('Catalog unavailable')).toBeDefined();
+    expect(screen.queryByText('Order 83647')).toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Back to orders' }),
+    ).toBeDefined();
   });
 
   it('shows the image placeholder when an order image fails to load', async () => {
@@ -340,6 +457,11 @@ describe('OrderDetailPage', () => {
     renderOrderDetailPage();
 
     await screen.findByText('Order 83647');
+    await waitFor(() =>
+      expect(document.querySelector('img')?.getAttribute('src')).toContain(
+        'https://images.test/',
+      ),
+    );
     const image = document.querySelector<HTMLImageElement>('img');
     fireEvent.error(image!);
 
@@ -421,6 +543,7 @@ describe('OrderDetailPage', () => {
       await screen.findByText('fulfilled', {}, { timeout: 4000 }),
     ).toBeDefined();
     expect(clientModule.apiClient.getOrder).toHaveBeenCalledTimes(2);
+    expect(clientModule.apiClient.findCardImages).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('Pull confirmation started')).toBeDefined();
     expect(screen.getByText('Cards')).toBeDefined();
     expect(screen.queryByText('Pull sheet')).toBeNull();
@@ -535,12 +658,6 @@ describe('OrderDetailPage', () => {
             location: 'A0-1',
             current_location: 'A0-1',
             external_id: '0bc3401f-935b-45ce-b1e6-300a5d9dfd4f',
-            image_urls: {
-              small:
-                'https://api.scryfall.com/cards/0bc3401f-935b-45ce-b1e6-300a5d9dfd4f?format=image&version=small',
-              normal:
-                'https://api.scryfall.com/cards/0bc3401f-935b-45ce-b1e6-300a5d9dfd4f?format=image&version=normal',
-            },
             name: 'Hellkite Tyrant',
             set_code: 'gtc',
             collector_number: '94',
@@ -626,6 +743,11 @@ describe('OrderDetailPage', () => {
     renderOrderDetailPage();
 
     await screen.findByText('Order 83647');
+    await waitFor(() =>
+      expect(document.querySelector('img')?.getAttribute('src')).toContain(
+        'https://images.test/',
+      ),
+    );
     fireEvent.error(document.querySelector('img')!);
 
     await waitFor(() => {

@@ -346,7 +346,6 @@ export interface OrderUnit {
   location: string;
   current_location: string;
   external_id: string;
-  image_urls: ImageUrls;
   name: string;
   set_code: string;
   collector_number: string;

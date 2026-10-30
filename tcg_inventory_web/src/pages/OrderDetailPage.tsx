@@ -25,6 +25,7 @@ import type {
   OrderDetail,
   OrderNeighborCard,
   OrderUnit,
+  ImageUrls,
 } from '../api/client';
 import { ListPriceBadge } from '../components/ListPriceBadge';
 import { PageHeader } from '../components/PageHeader';
@@ -36,6 +37,45 @@ const CARD_IMAGE_FALLBACK =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='146' height='204' viewBox='0 0 146 204'%3E%3Crect width='146' height='204' rx='8' fill='%23e9ecef' stroke='%23ced4da'/%3E%3C/svg%3E";
 const TRADEME_COURIER_URL =
   'https://www.trademe.co.nz/a/marketplace/book-courier/select';
+
+async function loadOrderImages(
+  units: OrderUnit[],
+): Promise<Map<string, Map<string, ImageUrls>>> {
+  const idsByGame = new Map<string, Set<string>>();
+  for (const unit of units) {
+    const ids = idsByGame.get(unit.game) ?? new Set<string>();
+    ids.add(unit.external_id);
+    idsByGame.set(unit.game, ids);
+  }
+
+  const requests = [...idsByGame].flatMap(([game, ids]) => {
+    const externalIds = [...ids];
+    const batches: string[][] = [];
+    for (let offset = 0; offset < externalIds.length; offset += 100) {
+      batches.push(externalIds.slice(offset, offset + 100));
+    }
+    return batches.map((external_ids) => ({
+      game,
+      request: apiClient.findCardImages({ game: game as GameId, external_ids }),
+    }));
+  });
+
+  const responses = await Promise.all(
+    requests.map(async ({ game, request }) => ({
+      game,
+      response: await request,
+    })),
+  );
+  const imagesByGame = new Map<string, Map<string, ImageUrls>>();
+  for (const { game, response } of responses) {
+    for (const image of response.images) {
+      const gameImages = imagesByGame.get(game) ?? new Map<string, ImageUrls>();
+      gameImages.set(image.external_id, image.image_urls);
+      imagesByGame.set(game, gameImages);
+    }
+  }
+  return imagesByGame;
+}
 
 function unitDescription(
   unit: OrderUnit,
@@ -85,8 +125,15 @@ export function OrderDetailPage() {
   const [pollError, setPollError] = useState<string | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirming, setConfirming] = useState(false);
+  const [imagesByGame, setImagesByGame] = useState<
+    Map<string, Map<string, ImageUrls>>
+  >(new Map());
 
   useEffect(() => {
+    setImagesByGame(new Map());
+    setOrder(null);
+    setError(null);
+    setLoading(true);
     if (!orderId) {
       return;
     }
@@ -94,8 +141,10 @@ export function OrderDetailPage() {
     const fetchOrder = async () => {
       try {
         const response = await apiClient.getOrder(orderId);
+        const images = await loadOrderImages(response.units);
         if (!cancelled) {
           setOrder(response);
+          setImagesByGame(images);
         }
       } catch (e) {
         if (!cancelled) {
@@ -376,7 +425,10 @@ export function OrderDetailPage() {
                       >
                         <Box className={classes.pullImage}>
                           <Image
-                            src={unit.image_urls.small ?? CARD_IMAGE_FALLBACK}
+                            src={
+                              imagesByGame.get(unit.game)?.get(unit.external_id)
+                                ?.small ?? CARD_IMAGE_FALLBACK
+                            }
                             fallbackSrc={CARD_IMAGE_FALLBACK}
                             alt=""
                             fit="contain"

@@ -280,10 +280,7 @@ public class OrdersHandlerIntegrationTest {
     assertThat(units.get(0).get("current_location").asText()).isEqualTo("A0-0");
     assertThat(units.get(0).has("external_source")).isFalse();
     assertThat(units.get(0).get("external_id").asText()).isEqualTo("scryfall-1");
-    assertThat(units.get(0).get("image_urls").get("small").asText())
-        .isEqualTo("https://img.example/cards/scryfall-1/small.jpg");
-    assertThat(units.get(0).get("image_urls").get("normal").asText())
-        .isEqualTo("https://img.example/cards/scryfall-1/normal.jpg");
+    assertThat(units.get(0).has("image_urls")).isFalse();
     assertThat(units.get(0).has("scryfall_id")).isFalse();
     assertThat(units.get(0).get("name").asText()).isEqualTo("Test Card");
     assertThat(units.get(0).get("set_code").asText()).isEqualTo("dom");
@@ -298,8 +295,6 @@ public class OrdersHandlerIntegrationTest {
     assertThat(units.get(1).get("location").asText()).isEqualTo("A0-3");
     assertThat(units.get(1).get("current_location").asText()).isEqualTo("A0-2");
     assertThat(units.get(1).get("price").asText()).isEqualTo("1.67");
-    assertThat(units.get(1).get("image_urls").get("small").asText())
-        .isEqualTo("https://img.example/cards/scryfall-1/small.jpg");
     assertThat(units.get(1).get("previous_card").get("name").asText()).isEqualTo("Test Card");
     assertThat(units.get(1).get("next_card").isNull()).isTrue();
   }
@@ -350,12 +345,12 @@ public class OrdersHandlerIntegrationTest {
     assertThat(units.get(0).get("name").asText()).isEqualTo("Lightning Bolt");
     assertThat(units.get(0).has("external_source")).isFalse();
     assertThat(units.get(0).get("external_id").asText()).isEqualTo("scryfall-1");
+    assertThat(units.get(0).has("image_urls")).isFalse();
     assertThat(units.get(0).get("price").asText()).isEqualTo("1.50");
     assertThat(units.get(1).get("name").asText()).isEqualTo("Sol Ring");
     assertThat(units.get(1).has("external_source")).isFalse();
     assertThat(units.get(1).get("external_id").asText()).isEqualTo("scryfall-2");
-    assertThat(units.get(1).get("image_urls").get("small").asText())
-        .isEqualTo("https://img.example/cards/scryfall-2/small.jpg");
+    assertThat(units.get(1).has("image_urls")).isFalse();
     assertThat(units.get(1).get("price").asText()).isEqualTo("2.00");
 
     var responseLines = body.get("lines");
@@ -412,13 +407,11 @@ public class OrdersHandlerIntegrationTest {
     assertThat(units.get(0).get("game").asText()).isEqualTo("mtg");
     assertThat(units.get(0).get("current_location").asText()).isEqualTo("A0-0");
     assertThat(units.get(0).get("next_card").get("name").asText()).isEqualTo("Magic Card");
-    assertThat(units.get(0).get("image_urls").get("small").asText())
-        .isEqualTo("https://img.example/cards/scryfall-1/small.jpg");
     assertThat(units.get(1).get("game").asText()).isEqualTo("pokemon");
+    assertThat(units.get(0).has("image_urls")).isFalse();
+    assertThat(units.get(1).has("image_urls")).isFalse();
     assertThat(units.get(1).get("current_location").asText()).isEqualTo("A0-0");
     assertThat(units.get(1).get("next_card").get("name").asText()).isEqualTo("Abomasnow");
-    assertThat(units.get(1).get("image_urls").get("small").asText())
-        .isEqualTo("https://tcgplayer-cdn.tcgplayer.com/product/283917_200w.jpg");
   }
 
   @Test
@@ -442,7 +435,7 @@ public class OrdersHandlerIntegrationTest {
   }
 
   @Test
-  void getOrderShouldFailWhenSkuGameIsNotRegistered() {
+  void getOrderShouldReturnCatalogReferenceWithoutResolvingGameMetadata() throws Exception {
     // arrange
     var skuId = "digimon#unknown#123#normal#NM";
     skuTable.putItem(
@@ -463,16 +456,16 @@ public class OrdersHandlerIntegrationTest {
         "jordan", "83663", "to_pick", skuId, List.of(1), "PICKUP", "1.50", "1.50", null);
 
     // act
-    var assertion =
-        assertThatThrownBy(
-            () ->
-                getOrderHandler.handleRequest(
-                    buildEventWithPath("jordan", Map.of("order_id", "83663")), null));
+    var response =
+        getOrderHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("order_id", "83663")), null);
 
     // assert
-    assertion
-        .hasCauseInstanceOf(IllegalArgumentException.class)
-        .hasRootCauseMessage("unsupported game: digimon");
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    var body = objectMapper.readTree(response.getBody());
+    assertThat(body.get("units").get(0).get("game").asText()).isEqualTo("digimon");
+    assertThat(body.get("units").get(0).get("external_id").asText()).isEqualTo("123");
+    assertThat(body.get("units").get(0).has("image_urls")).isFalse();
   }
 
   @Test

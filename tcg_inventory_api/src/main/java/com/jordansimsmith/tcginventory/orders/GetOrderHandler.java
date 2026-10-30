@@ -8,14 +8,8 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.tcginventory.catalog.CatalogCard;
-import com.jordansimsmith.tcginventory.catalog.CatalogFactory;
-import com.jordansimsmith.tcginventory.catalog.Catalogs;
-import com.jordansimsmith.tcginventory.games.client.Game;
-import com.jordansimsmith.tcginventory.games.client.GamesService;
-import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
 import com.jordansimsmith.tcginventory.inventory.InventoryLocation;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
@@ -53,7 +47,6 @@ public class GetOrderHandler
       @JsonProperty("location") String location,
       @JsonProperty("current_location") String currentLocation,
       @JsonProperty("external_id") String externalId,
-      @JsonProperty("image_urls") CatalogCard.ImageUrls imageUrls,
       @JsonProperty("name") String name,
       @JsonProperty("set_code") String setCode,
       @JsonProperty("collector_number") String collectorNumber,
@@ -109,38 +102,31 @@ public class GetOrderHandler
   private final DynamoDbTable<OrderItem> orderTable;
   private final DynamoDbTable<UnitItem> unitTable;
   private final DynamoDbTable<SkuItem> skuTable;
-  private final Catalogs catalogs;
-  private final GamesService gamesService;
 
   public GetOrderHandler() {
-    this(CatalogFactory.create());
+    this(TcgInventoryFactory.create());
   }
 
   @VisibleForTesting
-  GetOrderHandler(CatalogFactory factory) {
+  GetOrderHandler(TcgInventoryFactory factory) {
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.orderTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderItem.class);
     this.unitTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class);
     this.skuTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), SkuItem.class);
-    this.catalogs = factory.catalogs();
-    this.gamesService = factory.gamesService();
   }
 
   @Override
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     try {
       return doHandleRequest(event);
-    } catch (ServiceException e) {
-      return httpResponseFactory.serviceError(e);
     } catch (Exception e) {
       LOGGER.error("error processing get order request", e);
       throw new RuntimeException(e);
     }
   }
 
-  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event)
-      throws ServiceException {
+  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
     var ctx = requestContextFactory.createCtx(event);
     var user = ctx.user();
     var orderId = event.getPathParameters().get("order_id");
@@ -165,7 +151,6 @@ public class GetOrderHandler
     var blockUnits = findBlockUnits(user, orderLines, skuCache);
     var units = new ArrayList<OrderUnitResponse>();
     var lines = new ArrayList<OrderLineResponse>();
-    var gamesById = new HashMap<String, Game>();
 
     for (var line : orderLines) {
       var skuItem = getSku(SkuItem.formatPk(user, line.getSkuId()), skuCache);
@@ -183,15 +168,8 @@ public class GetOrderHandler
               line.getListedPrice()));
 
       var unitPrice = perUnitPrice(line);
-      var game = gamesById.get(skuItem.getGame());
-      if (game == null) {
-        game = gamesService.getGame(ctx, new GetGameRequest(skuItem.getGame())).game();
-        gamesById.put(skuItem.getGame(), game);
-      }
-      var catalog = catalogs.forGame(game);
       for (var seqNum : line.getAllocatedSequenceNumbers()) {
         var position = computeBlockPosition(blockUnits, skuItem.getGame(), seqNum);
-        var imageUrls = catalog.getImageUrls(skuItem.getExternalId());
         units.add(
             new OrderUnitResponse(
                 skuItem.getGame(),
@@ -199,7 +177,6 @@ public class GetOrderHandler
                 InventoryLocation.formatLocation(seqNum),
                 position.currentLocation(),
                 skuItem.getExternalId(),
-                imageUrls,
                 skuItem.getName(),
                 skuItem.getSetCode(),
                 skuItem.getCollectorNumber(),
