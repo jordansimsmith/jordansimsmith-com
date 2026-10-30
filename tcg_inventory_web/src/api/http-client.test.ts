@@ -410,6 +410,33 @@ describe('http client catalog', () => {
     );
   });
 
+  it('finds card images with repeated encoded IDs through the authenticated API', async () => {
+    const result = {
+      images: [
+        {
+          external_id: 'opaque/id & 2',
+          image_urls: { small: null, normal: 'https://image.test/card' },
+        },
+      ],
+    };
+    const json = vi.fn().mockResolvedValue(result);
+    fetchSpy.mockResolvedValue({ ok: true, json });
+
+    await expect(
+      createHttpClient().findCardImages({
+        game: 'mtg',
+        external_ids: ['opaque/id', 'opaque/id & 2'],
+      }),
+    ).resolves.toEqual(result);
+
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/catalog/cardimages?game=mtg&external_ids=opaque%2Fid&external_ids=opaque%2Fid+%26+2',
+    );
+    expect(fetchSpy.mock.calls[0][1].headers.Authorization).toBe(
+      `Basic ${btoa('alice:pw')}`,
+    );
+  });
+
   it('encodes catalog alternatives continuations and search queries', async () => {
     const response = { cards: [], next_continuation: 'next/page' };
     const json = vi.fn().mockResolvedValue(response);

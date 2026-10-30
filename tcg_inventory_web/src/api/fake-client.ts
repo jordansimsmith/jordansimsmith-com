@@ -13,6 +13,8 @@ import type {
   GameId,
   FindCatalogAlternativesParams,
   FindCatalogCardsParams,
+  FindCardImagesRequest,
+  FindCardImagesResponse,
   FindScansParams,
   FindScansResponse,
   FindImportsResponse,
@@ -461,10 +463,6 @@ function deriveLocation(sequenceNumber: number): string {
   return `${deriveBlock(sequenceNumber)}-${sequenceNumber % 100}`;
 }
 
-function countByStatus(sku: FakeSku, status: UnitStatus): number {
-  return sku.units.filter((unit) => unit.status === status).length;
-}
-
 function toSummary(sku: FakeSku): SkuSummary {
   return {
     sku_id: sku.sku_id,
@@ -491,10 +489,6 @@ function toDetail(sku: FakeSku): SkuDetail {
   return {
     ...toSummary(sku),
     external_id: sku.external_id,
-    image_urls: fakeImageUrls(sku.external_id, sku.name, sku.set_code),
-    in_stock_count: countByStatus(sku, 'in_stock'),
-    reserved_count: countByStatus(sku, 'reserved'),
-    sold_count: countByStatus(sku, 'sold'),
     units,
   };
 }
@@ -2213,6 +2207,17 @@ export function createFakeClient(): ApiClient {
         throw new Error('card not found');
       }
       return copyCatalogCard(card);
+    },
+
+    async findCardImages(
+      request: FindCardImagesRequest,
+    ): Promise<FindCardImagesResponse> {
+      return {
+        images: [...new Set(request.external_ids)].map((external_id) => ({
+          external_id,
+          image_urls: fakeImageUrls(external_id),
+        })),
+      };
     },
 
     async findCatalogAlternatives(

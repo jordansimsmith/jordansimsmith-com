@@ -12,6 +12,8 @@ import type {
   FindScansResponse,
   FindCatalogAlternativesParams,
   FindCatalogCardsParams,
+  FindCardImagesRequest,
+  FindCardImagesResponse,
   FindImportsParams,
   FindImportsResponse,
   FindOrdersParams,
@@ -271,6 +273,17 @@ export function createHttpClient(): ApiClient {
       const response = await authenticatedFetch(
         `/catalog/cards/${encodeURIComponent(externalId)}?${query}`,
       );
+      return response.json();
+    },
+
+    async findCardImages(
+      request: FindCardImagesRequest,
+    ): Promise<FindCardImagesResponse> {
+      const query = new URLSearchParams({ game: request.game });
+      for (const externalId of request.external_ids) {
+        query.append('external_ids', externalId);
+      }
+      const response = await authenticatedFetch(`/catalog/cardimages?${query}`);
       return response.json();
     },
 

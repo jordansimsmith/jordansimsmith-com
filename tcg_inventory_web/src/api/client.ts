@@ -99,10 +99,6 @@ export interface SkuUnit {
 
 export interface SkuDetail extends SkuSummary {
   external_id: string;
-  image_urls: ImageUrls;
-  in_stock_count: number;
-  reserved_count: number;
-  sold_count: number;
   units: SkuUnit[];
 }
 
@@ -245,6 +241,18 @@ export interface CatalogCard {
 export interface ImageUrls {
   small: string | null;
   normal: string | null;
+}
+
+export interface FindCardImagesRequest {
+  game: GameId;
+  external_ids: string[];
+}
+
+export interface FindCardImagesResponse {
+  images: Array<{
+    external_id: string;
+    image_urls: ImageUrls;
+  }>;
 }
 
 export interface CatalogCardsResponse {
@@ -520,6 +528,9 @@ export interface ApiClient {
   findScans(params?: FindScansParams): Promise<FindScansResponse>;
   getScan(scanId: string): Promise<ScanDetail>;
   getCatalogCard(game: GameId, externalId: string): Promise<CatalogCard>;
+  findCardImages(
+    request: FindCardImagesRequest,
+  ): Promise<FindCardImagesResponse>;
   findCatalogAlternatives(
     params: FindCatalogAlternativesParams,
   ): Promise<CatalogCardsResponse>;

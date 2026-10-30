@@ -37,10 +37,6 @@ const nmDetail: SkuDetail = {
   sku_id: `${SCRYFALL_ID}#normal#NM`,
   game: 'mtg',
   external_id: SCRYFALL_ID,
-  image_urls: {
-    small: `https://api.scryfall.com/cards/${SCRYFALL_ID}?format=image&version=small`,
-    normal: `https://api.scryfall.com/cards/${SCRYFALL_ID}?format=image&version=normal`,
-  },
   name: 'Sol Ring',
   set_code: 'cmr',
   set_name: 'Commander Legends',
@@ -48,9 +44,6 @@ const nmDetail: SkuDetail = {
   finish: 'normal',
   condition: 'NM',
   last_published_price: '2.50',
-  in_stock_count: 2,
-  reserved_count: 1,
-  sold_count: 1,
   units: [
     {
       sequence_number: 3,
@@ -78,10 +71,6 @@ const lpDetail: SkuDetail = {
   sku_id: `${SCRYFALL_ID}#normal#LP`,
   game: 'mtg',
   external_id: SCRYFALL_ID,
-  image_urls: {
-    small: `https://api.scryfall.com/cards/${SCRYFALL_ID}?format=image&version=small`,
-    normal: `https://api.scryfall.com/cards/${SCRYFALL_ID}?format=image&version=normal`,
-  },
   name: 'Sol Ring',
   set_code: 'cmr',
   set_name: 'Commander Legends',
@@ -89,9 +78,6 @@ const lpDetail: SkuDetail = {
   finish: 'normal',
   condition: 'LP',
   last_published_price: null,
-  in_stock_count: 5,
-  reserved_count: 0,
-  sold_count: 0,
   units: [
     { sequence_number: 40, location: 'A0-40', status: 'in_stock', photos: [] },
   ],
@@ -129,30 +115,37 @@ describe('SkuDetailPage', () => {
         throw new Error('Not Found');
       },
     );
+    vi.spyOn(clientModule.apiClient, 'findCardImages').mockResolvedValue({
+      images: [
+        {
+          external_id: SCRYFALL_ID,
+          image_urls: {
+            small: null,
+            normal: 'https://images.test/catalog-image',
+          },
+        },
+      ],
+    });
   });
 
   afterEach(() => {
     cleanup();
   });
 
-  it('renders the SKU header, counts, card image, and units', async () => {
+  it('renders the SKU header, catalog image, and units', async () => {
     renderSkuDetailPage();
 
     expect(
       await screen.findByRole('heading', { name: 'Sol Ring' }),
     ).toBeDefined();
     expect(screen.getByText(/Commander Legends \(CMR\)/)).toBeDefined();
-    expect(screen.getByText('In stock: 2')).toBeDefined();
-    expect(screen.getByText('Reserved: 1')).toBeDefined();
-    expect(screen.getByText('Sold: 1')).toBeDefined();
+    expect(screen.queryByText(/In stock:|Reserved:|Sold:/)).toBeNull();
     expect(screen.getByRole('region', { name: 'Card overview' })).toBeDefined();
     expect(screen.getByRole('region', { name: 'Units' })).toBeDefined();
     expect(screen.getByRole('heading', { name: 'Units' })).toBeDefined();
 
     const image = screen.getByRole('img', { name: 'Sol Ring' });
-    expect(image.getAttribute('src')).toBe(
-      `https://api.scryfall.com/cards/${SCRYFALL_ID}?format=image&version=normal`,
-    );
+    expect(image.getAttribute('src')).toBe('https://images.test/catalog-image');
 
     for (const location of ['A0-3', 'A0-40', 'A1-52', 'A4-80']) {
       expect(screen.getByText(location)).toBeDefined();
@@ -170,10 +163,11 @@ describe('SkuDetailPage', () => {
     }
   });
 
-  it('shows the image placeholder when the API has no card image', async () => {
-    vi.spyOn(clientModule.apiClient, 'getSku').mockResolvedValue({
-      ...nmDetail,
-      image_urls: { small: null, normal: null },
+  it('shows the image placeholder when Catalog has no card image', async () => {
+    vi.spyOn(clientModule.apiClient, 'findCardImages').mockResolvedValue({
+      images: [
+        { external_id: SCRYFALL_ID, image_urls: { small: null, normal: null } },
+      ],
     });
 
     renderSkuDetailPage();
@@ -195,10 +189,26 @@ describe('SkuDetailPage', () => {
     );
   });
 
+  it('keeps inventory controls usable when Catalog image lookup fails', async () => {
+    vi.spyOn(clientModule.apiClient, 'findCardImages').mockRejectedValue(
+      new Error('catalog is temporarily unavailable'),
+    );
+
+    renderSkuDetailPage();
+
+    expect(
+      await screen.findByText('catalog is temporarily unavailable'),
+    ).toBeDefined();
+    expect(screen.getAllByRole('button', { name: 'Remove' })).toHaveLength(2);
+    expect(screen.getByRole('region', { name: 'Units' })).toBeDefined();
+    expect(
+      screen.getByRole('img', { name: 'Sol Ring' }).getAttribute('src'),
+    ).toMatch(/^data:image\/svg\+xml/);
+  });
+
   it('removes a unit with a reason and re-renders counts', async () => {
     const updated: SkuDetail = {
       ...structuredClone(nmDetail),
-      in_stock_count: 1,
       units: nmDetail.units.map((unit) =>
         unit.sequence_number === 40
           ? { ...unit, status: 'removed' as const }
@@ -225,7 +235,7 @@ describe('SkuDetailPage', () => {
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
     await waitFor(() => {
-      expect(screen.getByText('In stock: 1')).toBeDefined();
+      expect(screen.getByText('removed')).toBeDefined();
     });
     expect(clientModule.apiClient.deleteUnit).toHaveBeenCalledWith(
       nmDetail.sku_id,
@@ -289,7 +299,7 @@ describe('SkuDetailPage', () => {
         lpDetail.sku_id,
       );
     });
-    expect(await screen.findByText('In stock: 5')).toBeDefined();
+    expect(await screen.findByText('LP')).toBeDefined();
   });
 
   it('renders view-only photo thumbnails on photographed units of any status', async () => {

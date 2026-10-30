@@ -12,6 +12,10 @@
   overflow: hidden;
 }
 
+.cardImage {
+  min-width: 0;
+}
+
 .overviewDetails {
   min-width: 0;
 }
@@ -22,17 +26,8 @@
   gap: 1rem;
 }
 
-.numeric,
-.stockSummary {
+.numeric {
   font-variant-numeric: tabular-nums;
-}
-
-.stockSummary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.5rem;
-  padding-top: 1rem;
-  border-top: 1px solid var(--mantine-color-gray-2);
 }
 
 .unitsHeader {
@@ -41,14 +36,12 @@
 
 @media (max-width: 48em) {
   .overview {
-    grid-template-areas:
-      'image details'
-      'stock stock';
+    grid-template-areas: 'image details';
     grid-template-columns: 104px minmax(0, 1fr);
     gap: 1rem;
   }
 
-  .cardImageFrame {
+  .cardImage {
     grid-area: image;
   }
 
@@ -62,9 +55,4 @@
     gap: 0.5rem;
   }
 
-  .stockSummary {
-    grid-area: stock;
-    justify-content: space-between;
-    gap: 0.5rem;
-  }
 }

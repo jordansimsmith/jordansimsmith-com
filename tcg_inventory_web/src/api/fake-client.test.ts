@@ -98,16 +98,42 @@ describe('createFakeClient', () => {
     expect(searchResults.next_continuation).toBeNull();
   });
 
-  it('derives detail counts from units', async () => {
+  it('returns SKU units and resolves images independently for opaque catalog IDs', async () => {
     const client = createFakeClient();
     const response = await client.findSkus({ game: 'mtg', search: 'sol ring' });
     const nmSku = response.skus.find((sku) => sku.condition === 'NM');
 
     const detail = await client.getSku(nmSku!.sku_id);
 
-    expect(detail.in_stock_count).toBe(6);
-    expect(detail.reserved_count).toBe(2);
-    expect(detail.image_urls.normal).toMatch(/^data:image\/svg\+xml/);
+    expect(
+      detail.units.filter((unit) => unit.status === 'in_stock'),
+    ).toHaveLength(6);
+    expect(
+      detail.units.filter((unit) => unit.status === 'reserved'),
+    ).toHaveLength(2);
+    await expect(
+      client.findCardImages({ game: 'mtg', external_ids: ['unknown/id'] }),
+    ).resolves.toMatchObject({
+      images: [
+        {
+          external_id: 'unknown/id',
+          image_urls: {
+            normal: expect.stringMatching(/^data:image\/svg\+xml/),
+          },
+        },
+      ],
+    });
+  });
+
+  it('generates fake card images for Magic and Pokémon IDs', async () => {
+    const client = createFakeClient();
+
+    await expect(
+      client.findCardImages({ game: 'mtg', external_ids: ['missing'] }),
+    ).resolves.toMatchObject({ images: [{ external_id: 'missing' }] });
+    await expect(
+      client.findCardImages({ game: 'pokemon', external_ids: ['283917'] }),
+    ).resolves.toMatchObject({ images: [{ external_id: '283917' }] });
   });
 
   it('returns units ascending with derived locations', async () => {
@@ -170,7 +196,7 @@ describe('createFakeClient', () => {
     );
   });
 
-  it('marks a unit removed and updates counts on deleteUnit', async () => {
+  it('marks a unit removed on deleteUnit', async () => {
     const client = createFakeClient();
     const brainstormSkus = await client.findSkus({
       game: 'mtg',
@@ -183,7 +209,11 @@ describe('createFakeClient', () => {
     await client.deleteUnit(skuId, unit!.sequence_number, 'damaged in storage');
 
     const updated = await client.getSku(skuId);
-    expect(updated.in_stock_count).toBe(detail.in_stock_count - 1);
+    expect(
+      updated.units.filter((entry) => entry.status === 'in_stock'),
+    ).toHaveLength(
+      detail.units.filter((entry) => entry.status === 'in_stock').length - 1,
+    );
     expect(
       updated.units.find(
         (entry) => entry.sequence_number === unit!.sequence_number,
@@ -231,7 +261,9 @@ describe('createFakeClient', () => {
     expect(response.sku_id).toBe(targetId);
     const target = await client.getSku(targetId);
     expect(target.condition).toBe('LP');
-    expect(target.in_stock_count).toBe(3);
+    expect(
+      target.units.filter((entry) => entry.status === 'in_stock'),
+    ).toHaveLength(3);
     expect(
       target.units.find(
         (entry) => entry.sequence_number === unit!.sequence_number,
@@ -239,7 +271,11 @@ describe('createFakeClient', () => {
     ).toBe('in_stock');
 
     const updatedSource = await client.getSku(sourceId);
-    expect(updatedSource.in_stock_count).toBe(source.in_stock_count - 1);
+    expect(
+      updatedSource.units.filter((entry) => entry.status === 'in_stock'),
+    ).toHaveLength(
+      source.units.filter((entry) => entry.status === 'in_stock').length - 1,
+    );
   });
 
   it('creates the target SKU on updateUnit when it does not exist', async () => {
@@ -265,7 +301,9 @@ describe('createFakeClient', () => {
     expect(target.external_id).toBe(source.external_id);
     expect(target.name).toBe('Sylvan Library');
     expect(target.condition).toBe('DMG');
-    expect(target.in_stock_count).toBe(1);
+    expect(
+      target.units.filter((entry) => entry.status === 'in_stock'),
+    ).toHaveLength(1);
     expect(target.units[0].sequence_number).toBe(unit.sequence_number);
 
     const browse = await client.findSkus({
@@ -310,7 +348,6 @@ describe('createFakeClient pokemon inventory', () => {
     const detail = await client.getSku(normalAbomasnowSku!.sku_id);
     expect(detail.external_id).toBe('283917');
     expect(detail.units.map((unit) => unit.location)).toEqual(['A0-0', 'A0-1']);
-    expect(detail.image_urls.normal).toMatch(/^data:image\/svg\+xml/);
 
     const magic = await client.findSkus({ game: 'mtg' });
     const magicDetail = await client.getSku(magic.skus[0].sku_id);
@@ -516,7 +553,9 @@ describe('createFakeClient imports', () => {
     const elves = elvesDetails.find(
       (sku) => sku.external_id === '581b7327-3215-4a4f-b4ae-d9d4002ba882',
     )!;
-    expect(elves.in_stock_count).toBe(7);
+    expect(
+      elves.units.filter((unit) => unit.status === 'in_stock'),
+    ).toHaveLength(7);
     expect(elves.units.map((unit) => unit.sequence_number)).toContain(600);
 
     // the lp opt sku did not exist and is created by the confirm
@@ -529,7 +568,9 @@ describe('createFakeClient imports', () => {
         sku.external_id === '25f2e4d0-effd-4e83-b7aa-1a0d8f120951' &&
         sku.condition === 'LP',
     )!;
-    expect(opt.in_stock_count).toBe(2);
+    expect(opt.units.filter((unit) => unit.status === 'in_stock')).toHaveLength(
+      2,
+    );
     expect(opt.units.map((unit) => unit.sequence_number)).toEqual([601, 602]);
 
     // the review row never becomes a unit
@@ -1022,9 +1063,15 @@ describe('createFakeClient orders', () => {
       (sku) => sku.condition === 'NM',
     )!;
     const solRing = await client.getSku(solRingSummary.sku_id);
-    expect(solRing.reserved_count).toBe(0);
-    expect(solRing.sold_count).toBe(2);
-    expect(solRing.in_stock_count).toBe(6);
+    expect(
+      solRing.units.filter((unit) => unit.status === 'reserved'),
+    ).toHaveLength(0);
+    expect(solRing.units.filter((unit) => unit.status === 'sold')).toHaveLength(
+      2,
+    );
+    expect(
+      solRing.units.filter((unit) => unit.status === 'in_stock'),
+    ).toHaveLength(6);
 
     const aberrationSkus = await client.findSkus({
       game: 'mtg',
@@ -1034,8 +1081,12 @@ describe('createFakeClient orders', () => {
       (sku) => sku.condition === 'NM',
     )!;
     const aberration = await client.getSku(aberrationSummary.sku_id);
-    expect(aberration.reserved_count).toBe(0);
-    expect(aberration.sold_count).toBe(1);
+    expect(
+      aberration.units.filter((unit) => unit.status === 'reserved'),
+    ).toHaveLength(0);
+    expect(
+      aberration.units.filter((unit) => unit.status === 'sold'),
+    ).toHaveLength(1);
 
     const list = await client.findOrders();
     expect(list.orders.find((order) => order.order_id === '83647')?.state).toBe(

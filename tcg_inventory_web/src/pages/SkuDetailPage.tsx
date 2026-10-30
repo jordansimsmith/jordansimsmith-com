@@ -32,6 +32,9 @@ export function SkuDetailPage() {
   const { skuId } = useParams<{ skuId: string }>();
   const navigate = useNavigate();
   const [sku, setSku] = useState<SkuDetail | null>(null);
+  const [cardImage, setCardImage] = useState<string | null>(null);
+  const [cardImageLoading, setCardImageLoading] = useState(false);
+  const [cardImageError, setCardImageError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [removingUnit, setRemovingUnit] = useState<SkuUnit | null>(null);
@@ -67,6 +70,41 @@ export function SkuDetailPage() {
       cancelled = true;
     };
   }, [skuId]);
+
+  useEffect(() => {
+    if (!sku) {
+      return;
+    }
+    let cancelled = false;
+    setCardImage(null);
+    setCardImageError(null);
+    setCardImageLoading(true);
+    const fetchCardImage = async () => {
+      try {
+        const response = await apiClient.findCardImages({
+          game: sku.game,
+          external_ids: [sku.external_id],
+        });
+        if (!cancelled) {
+          setCardImage(response.images[0].image_urls.normal);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setCardImageError(
+            e instanceof Error ? e.message : 'Failed to load card image',
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setCardImageLoading(false);
+        }
+      }
+    };
+    fetchCardImage();
+    return () => {
+      cancelled = true;
+    };
+  }, [sku?.game, sku?.external_id]);
 
   const handleRemoveConfirm = async (reason: string) => {
     if (!sku || !removingUnit) {
@@ -167,18 +205,29 @@ export function SkuDetailPage() {
               p="md"
             >
               <Box className={classes.overview}>
-                <Box className={classes.cardImageFrame}>
-                  <Image
-                    src={sku.image_urls.normal ?? CARD_IMAGE_FALLBACK}
-                    fallbackSrc={CARD_IMAGE_FALLBACK}
-                    alt={sku.name}
-                    w="100%"
-                    h="100%"
-                    fit="contain"
-                    style={{ aspectRatio: CARD_IMAGE_ASPECT_RATIO }}
-                    radius="sm"
-                  />
-                </Box>
+                <Stack className={classes.cardImage} gap="xs">
+                  <Box className={classes.cardImageFrame}>
+                    {cardImageLoading ? (
+                      <Skeleton w="100%" h="100%" />
+                    ) : (
+                      <Image
+                        src={cardImage ?? CARD_IMAGE_FALLBACK}
+                        fallbackSrc={CARD_IMAGE_FALLBACK}
+                        alt={sku.name}
+                        w="100%"
+                        h="100%"
+                        fit="contain"
+                        style={{ aspectRatio: CARD_IMAGE_ASPECT_RATIO }}
+                        radius="sm"
+                      />
+                    )}
+                  </Box>
+                  {cardImageError && (
+                    <Text size="xs" c="red">
+                      {cardImageError}
+                    </Text>
+                  )}
+                </Stack>
                 <Stack gap="md" className={classes.overviewDetails}>
                   <div className={classes.attributes}>
                     <div>
@@ -203,11 +252,6 @@ export function SkuDetailPage() {
                           : 'Not listed'}
                       </Text>
                     </div>
-                  </div>
-                  <div className={classes.stockSummary}>
-                    <Text size="sm">In stock: {sku.in_stock_count}</Text>
-                    <Text size="sm">Reserved: {sku.reserved_count}</Text>
-                    <Text size="sm">Sold: {sku.sold_count}</Text>
                   </div>
                 </Stack>
               </Box>
