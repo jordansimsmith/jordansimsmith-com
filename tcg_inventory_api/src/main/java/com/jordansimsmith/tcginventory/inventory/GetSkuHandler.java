@@ -8,7 +8,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.catalog.CatalogCard;
@@ -16,15 +15,9 @@ import com.jordansimsmith.tcginventory.catalog.CatalogFactory;
 import com.jordansimsmith.tcginventory.catalog.Catalogs;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
-import com.jordansimsmith.tcginventory.photos.client.FindPhotosRequest;
-import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,13 +31,11 @@ public class GetSkuHandler
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GetSkuHandler.class);
 
-  record PhotoResponse(@JsonProperty("photo_id") String photoId, @JsonProperty("url") String url) {}
-
   record UnitResponse(
       @JsonProperty("sequence_number") int sequenceNumber,
       @JsonProperty("location") String location,
       @JsonProperty("status") String status,
-      @JsonProperty("photos") List<PhotoResponse> photos) {}
+      @JsonProperty("photos") List<String> photos) {}
 
   record SkuDetailResponse(
       @JsonProperty("sku_id") String skuId,
@@ -71,7 +62,6 @@ public class GetSkuHandler
   private final DynamoDbTable<UnitItem> unitTable;
   private final Catalogs catalogs;
   private final GamesService gamesService;
-  private final PhotosService photosService;
 
   public GetSkuHandler() {
     this(CatalogFactory.create());
@@ -85,7 +75,6 @@ public class GetSkuHandler
     this.unitTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class);
     this.catalogs = factory.catalogs();
     this.gamesService = factory.gamesService();
-    this.photosService = factory.photosService();
   }
 
   @Override
@@ -128,8 +117,6 @@ public class GetSkuHandler
             .flatMap(page -> page.items().stream())
             .filter(item -> item.getSk() != null && item.getSk().startsWith(UnitItem.UNIT_PREFIX))
             .toList();
-    var photoUrls = findPhotoUrls(ctx, unitItems);
-
     int inStockCount = 0;
     int reservedCount = 0;
     int soldCount = 0;
@@ -150,7 +137,9 @@ public class GetSkuHandler
                         unit.getSequenceNumber(),
                         InventoryLocation.formatLocation(unit.getSequenceNumber()),
                         unit.getStatus(),
-                        toPhotoResponses(unit.getPhotos(), photoUrls)))
+                        unit.getPhotos() == null
+                            ? List.of()
+                            : unit.getPhotos().stream().map(UnitItem.Photo::getPhotoId).toList()))
             .toList();
 
     var game = gamesService.getGame(ctx, new GetGameRequest(skuItem.getGame())).game();
@@ -173,36 +162,5 @@ public class GetSkuHandler
             reservedCount,
             soldCount,
             units));
-  }
-
-  private List<PhotoResponse> toPhotoResponses(
-      List<UnitItem.Photo> photos, Map<String, String> photoUrls) {
-    if (photos == null) {
-      return List.of();
-    }
-    return photos.stream()
-        .map(photo -> new PhotoResponse(photo.getPhotoId(), photoUrls.get(photo.getPhotoId())))
-        .toList();
-  }
-
-  private Map<String, String> findPhotoUrls(RequestContext ctx, List<UnitItem> units)
-      throws ServiceException {
-    var photoIds = new LinkedHashSet<String>();
-    for (var unit : units) {
-      if (unit.getPhotos() != null) {
-        unit.getPhotos().forEach(photo -> photoIds.add(photo.getPhotoId()));
-      }
-    }
-
-    var urls = new LinkedHashMap<String, String>();
-    var orderedPhotoIds = new ArrayList<>(photoIds);
-    for (int offset = 0; offset < orderedPhotoIds.size(); offset += 100) {
-      var end = Math.min(offset + 100, orderedPhotoIds.size());
-      var response =
-          photosService.findPhotos(
-              ctx, new FindPhotosRequest(orderedPhotoIds.subList(offset, end)));
-      response.photos().forEach(photo -> urls.put(photo.photoId(), photo.url()));
-    }
-    return urls;
   }
 }

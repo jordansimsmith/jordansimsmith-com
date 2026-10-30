@@ -34,12 +34,44 @@ import { importDisplayName } from '../domain/import-display-name';
 import classes from './ImportDetailPage.module.css';
 
 const POLL_INTERVAL_MS = 2000;
+const MAX_PHOTOS_PER_REQUEST = 100;
+
+async function findPhotoUrls(photoIds: string[]): Promise<Map<string, string>> {
+  const distinctPhotoIds = [...new Set(photoIds)];
+  const urls = new Map<string, string>();
+
+  for (
+    let offset = 0;
+    offset < distinctPhotoIds.length;
+    offset += MAX_PHOTOS_PER_REQUEST
+  ) {
+    const response = await apiClient.findPhotos({
+      photo_ids: distinctPhotoIds.slice(
+        offset,
+        offset + MAX_PHOTOS_PER_REQUEST,
+      ),
+    });
+    for (const photo of response.photos) {
+      urls.set(photo.photo_id, photo.url);
+    }
+  }
+
+  return urls;
+}
+
+async function loadImportWithPhotos(importId: string) {
+  const importDetail = await apiClient.getImport(importId);
+  const photoIds = importDetail.rows.flatMap((row) => row.photos);
+  const photoUrls = await findPhotoUrls(photoIds);
+  return { importDetail, photoUrls };
+}
 
 export function ImportDetailPage() {
   const { getGame } = useGames();
   const { importId } = useParams<{ importId: string }>();
   const navigate = useNavigate();
   const [importDetail, setImportDetail] = useState<ImportDetail | null>(null);
+  const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [pollingImport, setPollingImport] = useState(false);
@@ -64,15 +96,17 @@ export function ImportDetailPage() {
     let cancelled = false;
     const loadImport = async () => {
       try {
-        const response = await apiClient.getImport(importId);
+        const response = await loadImportWithPhotos(importId);
         if (cancelled) {
           return;
         }
-        setImportDetail(response);
+        setImportDetail(response.importDetail);
+        setPhotoUrls(response.photoUrls);
         setError(null);
         if (
-          (response.status === 'appraising' && !response.appraisal_error) ||
-          response.status === 'confirming'
+          (response.importDetail.status === 'appraising' &&
+            !response.importDetail.appraisal_error) ||
+          response.importDetail.status === 'confirming'
         ) {
           setPollingImport(true);
         }
@@ -103,15 +137,17 @@ export function ImportDetailPage() {
 
     const pollImport = async () => {
       try {
-        const response = await apiClient.getImport(importId);
+        const response = await loadImportWithPhotos(importId);
         if (cancelled) {
           return;
         }
-        setImportDetail(response);
+        setImportDetail(response.importDetail);
+        setPhotoUrls(response.photoUrls);
         setError(null);
         if (
-          (response.status === 'appraising' && !response.appraisal_error) ||
-          response.status === 'confirming'
+          (response.importDetail.status === 'appraising' &&
+            !response.importDetail.appraisal_error) ||
+          response.importDetail.status === 'confirming'
         ) {
           timer = setTimeout(pollImport, POLL_INTERVAL_MS);
         } else {
@@ -144,8 +180,9 @@ export function ImportDetailPage() {
         return;
       }
       try {
-        const response = await apiClient.getImport(importId);
-        setImportDetail(response);
+        const response = await loadImportWithPhotos(importId);
+        setImportDetail(response.importDetail);
+        setPhotoUrls(response.photoUrls);
       } catch (e) {
         const message =
           e instanceof Error ? e.message : 'Failed to load import';
@@ -217,8 +254,9 @@ export function ImportDetailPage() {
     try {
       const jpeg = await encodeListingPhoto(file);
       await apiClient.addRowPhoto(importId, position, jpeg);
-      const updated = await apiClient.getImport(importId);
-      setImportDetail(updated);
+      const updated = await loadImportWithPhotos(importId);
+      setImportDetail(updated.importDetail);
+      setPhotoUrls(updated.photoUrls);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Failed to add photo';
       notifications.show({ title: 'Error', message, color: 'red' });
@@ -231,8 +269,9 @@ export function ImportDetailPage() {
     }
     try {
       await apiClient.deleteRowPhoto(importId, position, photoId);
-      const updated = await apiClient.getImport(importId);
-      setImportDetail(updated);
+      const updated = await loadImportWithPhotos(importId);
+      setImportDetail(updated.importDetail);
+      setPhotoUrls(updated.photoUrls);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Failed to remove photo';
       notifications.show({ title: 'Error', message, color: 'red' });
@@ -483,6 +522,7 @@ export function ImportDetailPage() {
                         <ImportReviewTable
                           game={importDetail.game}
                           rows={rows}
+                          photoUrls={photoUrls}
                           editable={false}
                         />
                       ) : (
@@ -493,6 +533,7 @@ export function ImportDetailPage() {
                   <ImportReviewTable
                     game={importDetail.game}
                     rows={rows}
+                    photoUrls={photoUrls}
                     editable={importDetail.status === 'review'}
                     onConditionChange={handleConditionChange}
                     onDeleteRow={handleDeleteRow}

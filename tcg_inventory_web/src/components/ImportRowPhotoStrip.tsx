@@ -1,7 +1,6 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { ActionIcon, Badge, Group, Image } from '@mantine/core';
 import { IconCamera, IconX } from '@tabler/icons-react';
-import type { RowPhoto } from '../api/client';
 import classes from './ImportRowPhotoStrip.module.css';
 
 const MAX_PHOTOS = 5;
@@ -17,7 +16,8 @@ const hiddenFileInputStyle: CSSProperties = {
 
 interface ImportRowPhotoStripProps {
   position: number;
-  photos: RowPhoto[];
+  photos: string[];
+  photoUrls: ReadonlyMap<string, string>;
   needsPhotos: boolean;
   editable: boolean;
   onAdd?: (file: File) => void;
@@ -27,6 +27,7 @@ interface ImportRowPhotoStripProps {
 export function ImportRowPhotoStrip({
   position,
   photos,
+  photoUrls,
   needsPhotos,
   editable,
   onAdd,
@@ -60,9 +61,9 @@ export function ImportRowPhotoStrip({
           )}
         </Group>
       )}
-      {photos.map((photo) => (
+      {photos.map((photoId) => (
         <div
-          key={photo.photo_id}
+          key={photoId}
           style={{
             position: 'relative',
             width: THUMB_SIZE,
@@ -71,8 +72,8 @@ export function ImportRowPhotoStrip({
           }}
         >
           <Image
-            src={photo.url}
-            alt={`Listing photo ${photo.photo_id}`}
+            src={photoUrls.get(photoId)}
+            alt={`Listing photo ${photoId}`}
             w={THUMB_SIZE}
             h={THUMB_SIZE}
             radius="sm"
@@ -84,8 +85,8 @@ export function ImportRowPhotoStrip({
               color="dark"
               size="xs"
               radius="xl"
-              aria-label={`Remove photo ${photo.photo_id}`}
-              onClick={() => onRemove(photo.photo_id)}
+              aria-label={`Remove photo ${photoId}`}
+              onClick={() => onRemove(photoId)}
               style={{ position: 'absolute', top: 2, right: 2 }}
             >
               <IconX size={10} />

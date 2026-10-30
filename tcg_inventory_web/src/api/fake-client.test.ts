@@ -170,12 +170,11 @@ describe('createFakeClient', () => {
     const detail = await client.getSku(skuId);
 
     expect(detail.units).toHaveLength(1);
-    expect(detail.units[0].photos).toEqual([
-      {
-        photo_id: 'fake-unit-photo-1',
-        url: expect.stringMatching(/^data:image\/svg\+xml,/),
-      },
-    ]);
+    expect(detail.units[0].photos).toEqual(['fake-unit-photo-1']);
+    const photos = await client.findPhotos({
+      photo_ids: detail.units[0].photos,
+    });
+    expect(photos.photos[0].url).toMatch(/^data:image\/svg\+xml,/);
 
     const solRingSkus = await client.findSkus({
       game: 'mtg',
@@ -830,11 +829,11 @@ describe('createFakeClient row photos', () => {
     const row = detail.rows[0];
 
     expect(row.photos).toHaveLength(2);
-    expect(row.photos[0].photo_id).toBe('fake-photo-1');
-    expect(row.photos[1].photo_id).toBe('fake-photo-2');
-    expect(row.photos[0].url).toMatch(/^blob:/);
-    expect(row.photos[1].url).toMatch(/^blob:/);
-    expect(row.photos[0].url).not.toBe(row.photos[1].url);
+    expect(row.photos).toEqual(['fake-photo-1', 'fake-photo-2']);
+    const photos = await client.findPhotos({ photo_ids: row.photos });
+    expect(photos.photos[0].url).toMatch(/^blob:/);
+    expect(photos.photos[1].url).toMatch(/^blob:/);
+    expect(photos.photos[0].url).not.toBe(photos.photos[1].url);
     expect(row.needs_photos).toBe(false);
   });
 
@@ -844,20 +843,17 @@ describe('createFakeClient row photos', () => {
     await client.addRowPhoto('fake-import-3', 1, jpeg());
     const before = (await client.getImport('fake-import-3')).rows[0];
 
-    await client.deleteRowPhoto('fake-import-3', 1, before.photos[0].photo_id);
+    await client.deleteRowPhoto('fake-import-3', 1, before.photos[0]);
     const after = (await client.getImport('fake-import-3')).rows[0];
 
-    expect(after.photos.map((photo) => photo.photo_id)).toEqual([
-      before.photos[1].photo_id,
-    ]);
+    expect(after.photos).toEqual([before.photos[1]]);
     expect(after.needs_photos).toBe(false);
   });
 
   it('sets needs_photos again when the last photo is removed', async () => {
     const client = createFakeClient();
     await client.addRowPhoto('fake-import-3', 1, jpeg());
-    const photoId = (await client.getImport('fake-import-3')).rows[0].photos[0]
-      .photo_id;
+    const photoId = (await client.getImport('fake-import-3')).rows[0].photos[0];
 
     await client.deleteRowPhoto('fake-import-3', 1, photoId);
 

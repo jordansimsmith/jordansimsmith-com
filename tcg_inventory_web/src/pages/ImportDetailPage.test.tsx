@@ -853,10 +853,7 @@ describe('ImportDetailPage', () => {
         rows: [
           importRow(1, {
             name: 'Top Card',
-            photos: [
-              { photo_id: 'photo-1', url: 'https://example.com/p1.jpg' },
-              { photo_id: 'photo-2', url: 'https://example.com/p2.jpg' },
-            ],
+            photos: ['photo-1', 'photo-2'],
           }),
         ],
       }),
@@ -900,7 +897,7 @@ describe('ImportDetailPage', () => {
           name: 'Top Card',
           suggested_price: '60.00',
           needs_photos: false,
-          photos: [{ photo_id: 'photo-1', url: 'https://example.com/p1.jpg' }],
+          photos: ['photo-1'],
         }),
         importRow(2, {
           name: 'Middle Card',
@@ -949,7 +946,7 @@ describe('ImportDetailPage', () => {
           name: 'Top Card',
           suggested_price: '60.00',
           needs_photos: false,
-          photos: [{ photo_id: 'photo-1', url: 'https://example.com/p1.jpg' }],
+          photos: ['photo-1'],
         }),
       ],
     });
@@ -1024,7 +1021,7 @@ describe('ImportDetailPage', () => {
           name: 'Top Card',
           suggested_price: '60.00',
           needs_photos: false,
-          photos: [{ photo_id: 'photo-1', url: 'https://example.com/p1.jpg' }],
+          photos: ['photo-1'],
         }),
       ],
     });

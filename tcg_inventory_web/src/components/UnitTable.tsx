@@ -14,12 +14,14 @@ const THUMB_SIZE = 40;
 
 interface UnitTableProps {
   units: SkuUnit[];
+  photoUrls: ReadonlyMap<string, string>;
   onRemove: (unit: SkuUnit) => void;
   onEditCondition: (unit: SkuUnit) => void;
 }
 
 export function UnitTable({
   units,
+  photoUrls,
   onRemove,
   onEditCondition,
 }: UnitTableProps) {
@@ -61,11 +63,11 @@ export function UnitTable({
             <Table.Td data-field="photos" data-label="Photos">
               {unit.photos.length > 0 ? (
                 <Group gap={6} wrap="wrap">
-                  {unit.photos.map((photo) => (
+                  {unit.photos.map((photoId) => (
                     <Image
-                      key={photo.photo_id}
-                      src={photo.url}
-                      alt={`Listing photo ${photo.photo_id}`}
+                      key={photoId}
+                      src={photoUrls.get(photoId)}
+                      alt={`Listing photo ${photoId}`}
                       w={THUMB_SIZE}
                       h={THUMB_SIZE}
                       radius="sm"

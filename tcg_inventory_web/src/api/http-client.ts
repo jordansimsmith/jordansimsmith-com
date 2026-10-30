@@ -14,6 +14,8 @@ import type {
   FindCatalogCardsParams,
   FindCardImagesRequest,
   FindCardImagesResponse,
+  FindPhotosResponse,
+  FindPhotosRequest,
   FindImportsParams,
   FindImportsResponse,
   FindOrdersParams,
@@ -172,6 +174,15 @@ export function createHttpClient(): ApiClient {
       const response = await authenticatedFetch(
         `/imports/${encodeURIComponent(importId)}`,
       );
+      return response.json();
+    },
+
+    async findPhotos(request: FindPhotosRequest): Promise<FindPhotosResponse> {
+      const query = new URLSearchParams();
+      for (const photoId of request.photo_ids) {
+        query.append('photo_ids', photoId);
+      }
+      const response = await authenticatedFetch(`/photos?${query}`);
       return response.json();
     },
 

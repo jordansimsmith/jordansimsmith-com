@@ -17,6 +17,7 @@ const DECISION_COLORS: Record<RowDecision, string> = {
 interface ImportReviewTableProps {
   game: GameId;
   rows: ImportRow[];
+  photoUrls: ReadonlyMap<string, string>;
   editable?: boolean;
   onConditionChange?: (position: number, condition: Condition) => void;
   onDeleteRow?: (position: number) => void;
@@ -27,6 +28,7 @@ interface ImportReviewTableProps {
 export function ImportReviewTable({
   game,
   rows,
+  photoUrls,
   editable = false,
   onConditionChange,
   onDeleteRow,
@@ -129,6 +131,7 @@ export function ImportReviewTable({
                   <ImportRowPhotoStrip
                     position={row.position}
                     photos={row.photos}
+                    photoUrls={photoUrls}
                     needsPhotos={row.needs_photos}
                     editable={editable}
                     onAdd={

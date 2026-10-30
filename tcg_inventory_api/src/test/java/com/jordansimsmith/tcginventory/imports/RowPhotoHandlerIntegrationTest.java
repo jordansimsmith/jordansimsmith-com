@@ -202,9 +202,7 @@ public class RowPhotoHandlerIntegrationTest {
     assertThat(getResponse.getStatusCode()).isEqualTo(200);
     var photos = objectMapper.readTree(getResponse.getBody()).get("rows").get(0).get("photos");
     assertThat(photos).hasSize(1);
-    assertThat(photos.get(0).get("photo_id").asText()).isEqualTo("FAKE_PHOTO_0000000002");
-    assertThat(photos.get(0).get("url").asText())
-        .isEqualTo("https://photos.test/users/jordan/photos/FAKE_PHOTO_0000000002.jpg");
+    assertThat(photos.get(0).asText()).isEqualTo("FAKE_PHOTO_0000000002");
   }
 
   @Test
@@ -262,7 +260,7 @@ public class RowPhotoHandlerIntegrationTest {
   }
 
   @Test
-  void getImportShouldClearNeedsPhotosAfterAdd() throws Exception {
+  void getImportShouldReturnPhotoIdsAndClearNeedsPhotosAfterAdd() throws Exception {
     // arrange
     var importId = seedImport("jordan", "review", "keep", "20.00");
     createImportRowPhotoHandler.handleRequest(
@@ -277,10 +275,7 @@ public class RowPhotoHandlerIntegrationTest {
     var row = objectMapper.readTree(response.getBody()).get("rows").get(0);
     assertThat(row.get("needs_photos").asBoolean()).isFalse();
     assertThat(row.get("photos")).hasSize(1);
-    assertThat(row.get("photos").get(0).get("photo_id").asText())
-        .isEqualTo("FAKE_PHOTO_0000000001");
-    assertThat(row.get("photos").get(0).get("url").asText())
-        .isEqualTo("https://photos.test/users/jordan/photos/FAKE_PHOTO_0000000001.jpg");
+    assertThat(row.get("photos").get(0).asText()).isEqualTo("FAKE_PHOTO_0000000001");
   }
 
   @Test

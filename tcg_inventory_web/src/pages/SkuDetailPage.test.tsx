@@ -49,18 +49,13 @@ const nmDetail: SkuDetail = {
       sequence_number: 3,
       location: 'A0-3',
       status: 'reserved',
-      photos: [
-        { photo_id: 'photo-reserved', url: 'https://example.com/reserved.jpg' },
-      ],
+      photos: ['photo-reserved'],
     },
     {
       sequence_number: 40,
       location: 'A0-40',
       status: 'in_stock',
-      photos: [
-        { photo_id: 'photo-front', url: 'https://example.com/front.jpg' },
-        { photo_id: 'photo-back', url: 'https://example.com/back.jpg' },
-      ],
+      photos: ['photo-front', 'photo-back'],
     },
     { sequence_number: 152, location: 'A1-52', status: 'in_stock', photos: [] },
     { sequence_number: 480, location: 'A4-80', status: 'sold', photos: [] },
@@ -126,6 +121,14 @@ describe('SkuDetailPage', () => {
         },
       ],
     });
+    vi.spyOn(clientModule.apiClient, 'findPhotos').mockImplementation(
+      async ({ photo_ids }) => ({
+        photos: photo_ids.map((photo_id) => ({
+          photo_id,
+          url: `https://example.com/${photo_id}.jpg`,
+        })),
+      }),
+    );
   });
 
   afterEach(() => {
@@ -313,14 +316,16 @@ describe('SkuDetailPage', () => {
 
     const front = within(inStockRow).getByAltText('Listing photo photo-front');
     const back = within(inStockRow).getByAltText('Listing photo photo-back');
-    expect(front.getAttribute('src')).toBe('https://example.com/front.jpg');
-    expect(back.getAttribute('src')).toBe('https://example.com/back.jpg');
+    expect(front.getAttribute('src')).toBe(
+      'https://example.com/photo-front.jpg',
+    );
+    expect(back.getAttribute('src')).toBe('https://example.com/photo-back.jpg');
 
     const reserved = within(reservedRow).getByAltText(
       'Listing photo photo-reserved',
     );
     expect(reserved.getAttribute('src')).toBe(
-      'https://example.com/reserved.jpg',
+      'https://example.com/photo-reserved.jpg',
     );
 
     expect(within(photoLessRow).queryByAltText(/Listing photo/)).toBeNull();

@@ -26,12 +26,44 @@ const CARD_IMAGE_FALLBACK =
   "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='488' height='680'%3E%3Crect width='100%25' height='100%25' fill='%23e9ecef' rx='24'/%3E%3C/svg%3E";
 
 const CARD_IMAGE_ASPECT_RATIO = '488 / 680';
+const MAX_PHOTOS_PER_REQUEST = 100;
+
+async function findPhotoUrls(photoIds: string[]): Promise<Map<string, string>> {
+  const distinctPhotoIds = [...new Set(photoIds)];
+  const urls = new Map<string, string>();
+
+  for (
+    let offset = 0;
+    offset < distinctPhotoIds.length;
+    offset += MAX_PHOTOS_PER_REQUEST
+  ) {
+    const response = await apiClient.findPhotos({
+      photo_ids: distinctPhotoIds.slice(
+        offset,
+        offset + MAX_PHOTOS_PER_REQUEST,
+      ),
+    });
+    for (const photo of response.photos) {
+      urls.set(photo.photo_id, photo.url);
+    }
+  }
+
+  return urls;
+}
+
+async function loadSkuWithPhotos(skuId: string) {
+  const sku = await apiClient.getSku(skuId);
+  const photoIds = sku.units.flatMap((unit) => unit.photos);
+  const photoUrls = await findPhotoUrls(photoIds);
+  return { sku, photoUrls };
+}
 
 export function SkuDetailPage() {
   const { getFinish } = useGames();
   const { skuId } = useParams<{ skuId: string }>();
   const navigate = useNavigate();
   const [sku, setSku] = useState<SkuDetail | null>(null);
+  const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map());
   const [cardImage, setCardImage] = useState<string | null>(null);
   const [cardImageLoading, setCardImageLoading] = useState(false);
   const [cardImageError, setCardImageError] = useState<string | null>(null);
@@ -50,9 +82,10 @@ export function SkuDetailPage() {
       setLoading(true);
       setError(null);
       try {
-        const response = await apiClient.getSku(skuId);
+        const response = await loadSkuWithPhotos(skuId);
         if (!cancelled) {
-          setSku(response);
+          setSku(response.sku);
+          setPhotoUrls(response.photoUrls);
         }
       } catch (e) {
         if (!cancelled) {
@@ -117,8 +150,9 @@ export function SkuDetailPage() {
         removingUnit.sequence_number,
         reason || undefined,
       );
-      const updated = await apiClient.getSku(sku.sku_id);
-      setSku(updated);
+      const updated = await loadSkuWithPhotos(sku.sku_id);
+      setSku(updated.sku);
+      setPhotoUrls(updated.photoUrls);
       setRemovingUnit(null);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Failed to remove unit';
@@ -279,6 +313,7 @@ export function SkuDetailPage() {
               <Box style={{ overflowX: 'auto' }}>
                 <UnitTable
                   units={sku.units}
+                  photoUrls={photoUrls}
                   onRemove={setRemovingUnit}
                   onEditCondition={setEditingUnit}
                 />

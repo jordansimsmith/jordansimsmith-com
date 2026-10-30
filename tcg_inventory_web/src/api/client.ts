@@ -94,7 +94,7 @@ export interface SkuUnit {
   sequence_number: number;
   location: string;
   status: UnitStatus;
-  photos: RowPhoto[];
+  photos: string[];
 }
 
 export interface SkuDetail extends SkuSummary {
@@ -129,9 +129,17 @@ export interface FindImportsParams {
   continuation?: string;
 }
 
-export interface RowPhoto {
+export interface Photo {
   photo_id: string;
   url: string;
+}
+
+export interface FindPhotosRequest {
+  photo_ids: string[];
+}
+
+export interface FindPhotosResponse {
+  photos: Photo[];
 }
 
 export interface ImportRow {
@@ -147,7 +155,7 @@ export interface ImportRow {
   decision_reason: string | null;
   market_price: string | null;
   suggested_price: string | null;
-  photos: RowPhoto[];
+  photos: string[];
   needs_photos: boolean;
 }
 
@@ -515,6 +523,7 @@ export interface ApiClient {
     condition: Condition,
   ): Promise<ImportRow>;
   deleteImportRow(importId: string, position: number): Promise<void>;
+  findPhotos(request: FindPhotosRequest): Promise<FindPhotosResponse>;
   addRowPhoto(importId: string, position: number, jpeg: Blob): Promise<void>;
   deleteRowPhoto(
     importId: string,

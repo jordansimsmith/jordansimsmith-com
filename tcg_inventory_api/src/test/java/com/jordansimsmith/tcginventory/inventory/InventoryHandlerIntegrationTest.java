@@ -579,7 +579,7 @@ public class InventoryHandlerIntegrationTest {
   }
 
   @Test
-  void getSkuShouldResolveUnitPhotoIdsThroughPhotos() throws Exception {
+  void getSkuShouldReturnOrderedUnitPhotoIds() throws Exception {
     // arrange
     createSku(
         "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
@@ -613,17 +613,11 @@ public class InventoryHandlerIntegrationTest {
     assertThat(units.get(0).get("sequence_number").asInt()).isEqualTo(1204);
     assertThat(units.get(0).get("status").asText()).isEqualTo("reserved");
     assertThat(units.get(0).get("photos")).hasSize(1);
-    assertThat(units.get(0).get("photos").get(0).get("photo_id").asText())
-        .isEqualTo("photo-reserved");
-    assertThat(units.get(0).get("photos").get(0).get("url").asText())
-        .isEqualTo("https://photos.test/users/jordan/photos/photo-reserved.jpg");
+    assertThat(units.get(0).get("photos").get(0).asText()).isEqualTo("photo-reserved");
 
     assertThat(units.get(1).get("sequence_number").asInt()).isEqualTo(4242);
     assertThat(units.get(1).get("photos")).hasSize(1);
-    assertThat(units.get(1).get("photos").get(0).get("photo_id").asText())
-        .isEqualTo("photo-in-stock");
-    assertThat(units.get(1).get("photos").get(0).get("url").asText())
-        .isEqualTo("https://photos.test/users/jordan/photos/photo-in-stock.jpg");
+    assertThat(units.get(1).get("photos").get(0).asText()).isEqualTo("photo-in-stock");
 
     assertThat(units.get(2).get("sequence_number").asInt()).isEqualTo(4250);
     assertThat(units.get(2).get("photos")).isEmpty();

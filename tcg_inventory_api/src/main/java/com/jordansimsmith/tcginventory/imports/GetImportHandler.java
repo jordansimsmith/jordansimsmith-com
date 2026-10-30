@@ -8,18 +8,11 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import com.jordansimsmith.service.RequestContext;
-import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.inventory.InventoryLocation;
-import com.jordansimsmith.tcginventory.photos.client.FindPhotosRequest;
-import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -32,8 +25,6 @@ public class GetImportHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
 
   private static final Logger LOGGER = LoggerFactory.getLogger(GetImportHandler.class);
-
-  record PhotoResponse(@JsonProperty("photo_id") String photoId, @JsonProperty("url") String url) {}
 
   record ImportRowResponse(
       @JsonProperty("position") int position,
@@ -48,7 +39,7 @@ public class GetImportHandler
       @JsonProperty("decision_reason") @Nullable String decisionReason,
       @JsonProperty("market_price") @Nullable String marketPrice,
       @JsonProperty("suggested_price") @Nullable String suggestedPrice,
-      @JsonProperty("photos") List<PhotoResponse> photos,
+      @JsonProperty("photos") List<String> photos,
       @JsonProperty("needs_photos") boolean needsPhotos) {}
 
   record ImportDetailResponse(
@@ -79,7 +70,6 @@ public class GetImportHandler
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<ImportItem> importTable;
   private final DynamoDbTable<ImportRowItem> importRowTable;
-  private final PhotosService photosService;
 
   public GetImportHandler() {
     this(TcgInventoryFactory.create());
@@ -92,23 +82,19 @@ public class GetImportHandler
     this.importTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class);
     this.importRowTable =
         TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
-    this.photosService = factory.photosService();
   }
 
   @Override
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     try {
       return doHandleRequest(event);
-    } catch (ServiceException e) {
-      return httpResponseFactory.serviceError(e);
     } catch (Exception e) {
       LOGGER.error("error processing get import request", e);
       throw new RuntimeException(e);
     }
   }
 
-  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event)
-      throws ServiceException {
+  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
     var ctx = requestContextFactory.createCtx(event);
     var user = ctx.user();
     var importId = event.getPathParameters().get("import_id");
@@ -140,8 +126,6 @@ public class GetImportHandler
 
     var rowItems =
         importRowTable.query(rowRequest).stream().flatMap(page -> page.items().stream()).toList();
-    var photoUrls = findPhotoUrls(ctx, rowItems);
-
     var rows =
         rowItems.stream()
             .map(
@@ -159,7 +143,11 @@ public class GetImportHandler
                         item.getDecisionReason(),
                         item.getMarketPrice(),
                         item.getSuggestedPrice(),
-                        toPhotoResponses(item.getPhotos(), photoUrls),
+                        item.getPhotos() == null
+                            ? List.of()
+                            : item.getPhotos().stream()
+                                .map(ImportRowItem.Photo::getPhotoId)
+                                .toList(),
                         ImportPhotos.needsPhotos(
                             item.getDecision(),
                             item.getSuggestedPrice(),
@@ -225,36 +213,5 @@ public class GetImportHandler
         firstRow.getName(),
         lastRow.getName(),
         endIndex - startIndex + 1);
-  }
-
-  private List<PhotoResponse> toPhotoResponses(
-      List<ImportRowItem.Photo> photos, Map<String, String> photoUrls) {
-    if (photos == null) {
-      return List.of();
-    }
-    return photos.stream()
-        .map(photo -> new PhotoResponse(photo.getPhotoId(), photoUrls.get(photo.getPhotoId())))
-        .toList();
-  }
-
-  private Map<String, String> findPhotoUrls(RequestContext ctx, List<ImportRowItem> rows)
-      throws ServiceException {
-    var photoIds = new LinkedHashSet<String>();
-    for (var row : rows) {
-      if (row.getPhotos() != null) {
-        row.getPhotos().forEach(photo -> photoIds.add(photo.getPhotoId()));
-      }
-    }
-
-    var urls = new LinkedHashMap<String, String>();
-    var orderedPhotoIds = new ArrayList<>(photoIds);
-    for (int offset = 0; offset < orderedPhotoIds.size(); offset += 100) {
-      var end = Math.min(offset + 100, orderedPhotoIds.size());
-      var response =
-          photosService.findPhotos(
-              ctx, new FindPhotosRequest(orderedPhotoIds.subList(offset, end)));
-      response.photos().forEach(photo -> urls.put(photo.photoId(), photo.url()));
-    }
-    return urls;
   }
 }

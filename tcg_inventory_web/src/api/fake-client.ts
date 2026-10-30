@@ -15,6 +15,7 @@ import type {
   FindCatalogCardsParams,
   FindCardImagesRequest,
   FindCardImagesResponse,
+  FindPhotosResponse,
   FindScansParams,
   FindScansResponse,
   FindImportsResponse,
@@ -43,7 +44,6 @@ import type {
   Report,
   ReportResponse,
   RowDecision,
-  RowPhoto,
   ScanDetail,
   ScanConfirmationRow,
   ScanFile,
@@ -320,7 +320,7 @@ const seedPokemonSkus: SeedSku[] = [
 interface FakeUnit {
   sequence_number: number;
   status: UnitStatus;
-  photos: RowPhoto[];
+  photos: string[];
 }
 
 const SEEDED_UNIT_PHOTO_URL =
@@ -399,9 +399,7 @@ function createSeedState(): FakeSku[] {
   if (!photographed) {
     throw new Error('expected a seeded in-stock Doubling Season unit');
   }
-  photographed.photos = [
-    { photo_id: 'fake-unit-photo-1', url: SEEDED_UNIT_PHOTO_URL },
-  ];
+  photographed.photos = ['fake-unit-photo-1'];
   let pokemonUnitIndex = 0;
   const pokemonSkus = seedPokemonSkus.map(
     ([
@@ -484,7 +482,7 @@ function toDetail(sku: FakeSku): SkuDetail {
       sequence_number: unit.sequence_number,
       location: deriveLocation(unit.sequence_number),
       status: unit.status,
-      photos: unit.photos.map((photo) => ({ ...photo })),
+      photos: [...unit.photos],
     }));
   return {
     ...toSummary(sku),
@@ -553,7 +551,7 @@ interface FakeImportRow {
   decision_reason: string | null;
   market_price: string | null;
   suggested_price: string | null;
-  photos: RowPhoto[];
+  photos: string[];
   sequence_number?: number;
 }
 
@@ -832,7 +830,7 @@ function toImportRow(row: FakeImportRow, revealed: boolean): ImportRow {
     decision_reason: revealed ? row.decision_reason : null,
     market_price: revealed ? row.market_price : null,
     suggested_price: revealed ? row.suggested_price : null,
-    photos: row.photos.map((photo) => ({ ...photo })),
+    photos: [...row.photos],
     needs_photos: revealed && needsPhotos(row),
   };
 }
@@ -1618,6 +1616,9 @@ function toOrderDetail(order: FakeOrder, skus: FakeSku[]): OrderDetail {
 export function createFakeClient(): ApiClient {
   const skus = createSeedState();
   const importRecords = createSeedImports();
+  const photoUrls = new Map<string, string>([
+    ['fake-unit-photo-1', SEEDED_UNIT_PHOTO_URL],
+  ]);
   const scans = createSeedScans();
   const orders = createSeedOrders(skus);
   let importCounter = importRecords.length;
@@ -1867,7 +1868,7 @@ export function createFakeClient(): ApiClient {
       sku.units.push({
         sequence_number: sequenceNumber,
         status: 'in_stock',
-        photos: row.photos.map((photo) => ({ ...photo })),
+        photos: [...row.photos],
       });
       dirtySkuIds.add(sku.sku_id);
     }
@@ -1995,6 +1996,15 @@ export function createFakeClient(): ApiClient {
       return toImportDetail(importRecord);
     },
 
+    async findPhotos(request): Promise<FindPhotosResponse> {
+      return {
+        photos: [...new Set(request.photo_ids)].map((photoId) => ({
+          photo_id: photoId,
+          url: photoUrls.get(photoId) ?? SEEDED_UNIT_PHOTO_URL,
+        })),
+      };
+    },
+
     async updateImportRow(
       importId: string,
       position: number,
@@ -2044,10 +2054,9 @@ export function createFakeClient(): ApiClient {
         throw new Error('a row may have at most 5 photos');
       }
       photoCounter += 1;
-      row.photos.push({
-        photo_id: `fake-photo-${photoCounter}`,
-        url: URL.createObjectURL(jpeg),
-      });
+      const photoId = `fake-photo-${photoCounter}`;
+      photoUrls.set(photoId, URL.createObjectURL(jpeg));
+      row.photos.push(photoId);
     },
 
     async deleteRowPhoto(
@@ -2063,14 +2072,16 @@ export function createFakeClient(): ApiClient {
       if (!row) {
         throw new Error('Not Found');
       }
-      const photoIndex = row.photos.findIndex(
-        (photo) => photo.photo_id === photoId,
-      );
+      const photoIndex = row.photos.findIndex((id) => id === photoId);
       if (photoIndex === -1) {
         throw new Error('Not Found');
       }
-      const [removed] = row.photos.splice(photoIndex, 1);
-      URL.revokeObjectURL(removed.url);
+      row.photos.splice(photoIndex, 1);
+      const url = photoUrls.get(photoId);
+      if (url?.startsWith('blob:')) {
+        URL.revokeObjectURL(url);
+      }
+      photoUrls.delete(photoId);
     },
 
     async deleteImport(importId: string): Promise<void> {
@@ -2428,7 +2439,7 @@ export function createFakeClient(): ApiClient {
       target.units.push({
         sequence_number: unit.sequence_number,
         status: 'in_stock',
-        photos: unit.photos.map((photo) => ({ ...photo })),
+        photos: [...unit.photos],
       });
       dirtySkuIds.add(sku.sku_id);
       dirtySkuIds.add(target.sku_id);
