@@ -265,10 +265,8 @@ public class ImportRowItem {
   @DynamoDbBean
   public static class Photo {
     public static final String PHOTO_ID = "photo_id";
-    public static final String FETCHTCG_URL = "fetchtcg_url";
 
     private String photoId;
-    private String fetchtcgUrl;
 
     @DynamoDbAttribute(PHOTO_ID)
     public String getPhotoId() {
@@ -279,19 +277,9 @@ public class ImportRowItem {
       this.photoId = photoId;
     }
 
-    @DynamoDbAttribute(FETCHTCG_URL)
-    public String getFetchtcgUrl() {
-      return fetchtcgUrl;
-    }
-
-    public void setFetchtcgUrl(@Nullable String fetchtcgUrl) {
-      this.fetchtcgUrl = fetchtcgUrl;
-    }
-
-    public static Photo create(String photoId, @Nullable String fetchtcgUrl) {
+    public static Photo create(String photoId) {
       var photo = new Photo();
       photo.setPhotoId(photoId);
-      photo.setFetchtcgUrl(fetchtcgUrl);
       return photo;
     }
 
@@ -300,12 +288,12 @@ public class ImportRowItem {
       if (this == o) return true;
       if (o == null || getClass() != o.getClass()) return false;
       Photo that = (Photo) o;
-      return Objects.equals(photoId, that.photoId) && Objects.equals(fetchtcgUrl, that.fetchtcgUrl);
+      return Objects.equals(photoId, that.photoId);
     }
 
     @Override
     public int hashCode() {
-      return Objects.hash(photoId, fetchtcgUrl);
+      return Objects.hash(photoId);
     }
   }
 }

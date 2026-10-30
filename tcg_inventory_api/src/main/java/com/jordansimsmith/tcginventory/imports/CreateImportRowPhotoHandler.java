@@ -8,19 +8,17 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import com.jordansimsmith.tcginventory.Photos;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.ulid.UlidGenerator;
+import com.jordansimsmith.tcginventory.photos.client.CreatePhotoRequest;
+import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import java.util.ArrayList;
 import java.util.Base64;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 public class CreateImportRowPhotoHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
@@ -34,8 +32,7 @@ public class CreateImportRowPhotoHandler
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<ImportItem> importTable;
   private final DynamoDbTable<ImportRowItem> importRowTable;
-  private final S3Client s3Client;
-  private final UlidGenerator ulidGenerator;
+  private final PhotosService photosService;
 
   public CreateImportRowPhotoHandler() {
     this(TcgInventoryFactory.create());
@@ -49,22 +46,25 @@ public class CreateImportRowPhotoHandler
     this.importTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class);
     this.importRowTable =
         TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
-    this.s3Client = factory.s3Client();
-    this.ulidGenerator = factory.ulidGenerator();
+    this.photosService = factory.photosService();
   }
 
   @Override
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     try {
       return doHandleRequest(event);
+    } catch (ServiceException e) {
+      return httpResponseFactory.serviceError(e);
     } catch (Exception e) {
       LOGGER.error("error processing create import row photo request", e);
       throw new RuntimeException(e);
     }
   }
 
-  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
-    var user = requestContextFactory.createCtx(event).user();
+  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event)
+      throws ServiceException {
+    var ctx = requestContextFactory.createCtx(event);
+    var user = ctx.user();
 
     var headers = event.getHeaders();
     var contentType = headers != null ? headers.get("content-type") : null;
@@ -82,10 +82,6 @@ public class CreateImportRowPhotoHandler
       bytes = Base64.getDecoder().decode(body);
     } catch (IllegalArgumentException e) {
       return httpResponseFactory.badRequest(new ErrorResponse("JPEG body is required"));
-    }
-
-    if (bytes.length > Photos.MAX_UPLOAD_BYTES) {
-      return httpResponseFactory.badRequest(new ErrorResponse("body exceeds 4 MB"));
     }
 
     var importId = event.getPathParameters().get("import_id");
@@ -124,20 +120,13 @@ public class CreateImportRowPhotoHandler
         rowItem.getPhotos() == null
             ? new ArrayList<ImportRowItem.Photo>()
             : new ArrayList<>(rowItem.getPhotos());
-    if (photos.size() >= Photos.MAX_PHOTOS) {
+    if (photos.size() >= ImportPhotos.MAX_PHOTOS) {
       return httpResponseFactory.badRequest(new ErrorResponse("a row may have at most 5 photos"));
     }
 
-    var photoId = ulidGenerator.generate();
-    s3Client.putObject(
-        PutObjectRequest.builder()
-            .bucket(Photos.BUCKET)
-            .key(Photos.key(user, photoId))
-            .contentType("image/jpeg")
-            .build(),
-        RequestBody.fromBytes(bytes));
+    var photoId = photosService.createPhoto(ctx, new CreatePhotoRequest(bytes)).photoId();
 
-    photos.add(ImportRowItem.Photo.create(photoId, null));
+    photos.add(ImportRowItem.Photo.create(photoId));
     importsRepository.updateRowPhotos(user, importId, position, photos);
 
     return httpResponseFactory.noContent();

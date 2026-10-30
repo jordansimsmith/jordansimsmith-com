@@ -23,7 +23,6 @@ import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.JobsHandler;
-import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.client.CreateListingImageResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
@@ -44,12 +43,8 @@ import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.PutObjectRequest;
 
 @Testcontainers
 public class ListingPhaseProcessorIntegrationTest {
@@ -69,7 +64,6 @@ public class ListingPhaseProcessorIntegrationTest {
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
   private DynamoDbTable<JobItem> jobTable;
-  private S3Client s3Client;
   private JobsHandler jobsHandler;
   private ListAppender<ILoggingEvent> logAppender;
 
@@ -81,7 +75,6 @@ public class ListingPhaseProcessorIntegrationTest {
     var factory =
         TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), s3Container.getEndpoint());
     DynamoDbUtils.createTable(factory.dynamoDbClient(), factory.tableDefinition());
-    factory.s3Client().createBucket(b -> b.bucket(Photos.BUCKET));
   }
 
   @BeforeEach
@@ -95,7 +88,6 @@ public class ListingPhaseProcessorIntegrationTest {
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
     jobTable = factory.jobTable();
-    s3Client = factory.s3Client();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeFetchTcgService.reset();
@@ -132,11 +124,10 @@ public class ListingPhaseProcessorIntegrationTest {
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
     // assert
-    var frontUrl = "https://listing-img.fetchtcg.com/fake/listing/1.jpg";
-    var backUrl = "https://listing-img.fetchtcg.com/fake/listing/2.jpg";
     var unit = getUnit("jordan", SKU_ID, 1);
-    assertThat(unit.getPhotos().get(0).getFetchtcgUrl()).isEqualTo(frontUrl);
-    assertThat(unit.getPhotos().get(1).getFetchtcgUrl()).isEqualTo(backUrl);
+    assertThat(unit.getPhotos())
+        .extracting(UnitItem.Photo::getPhotoId)
+        .containsExactly(FRONT_PHOTO_ID, BACK_PHOTO_ID);
   }
 
   @Test
@@ -161,67 +152,13 @@ public class ListingPhaseProcessorIntegrationTest {
 
     // assert
     var unit = getUnit("jordan", SKU_ID, 1);
-    assertThat(unit.getPhotos().get(0).getFetchtcgUrl())
-        .isEqualTo("https://listing-img.fetchtcg.com/fake/listing/1.jpg");
-    assertThat(unit.getPhotos().get(1).getFetchtcgUrl())
-        .isEqualTo("https://listing-img.fetchtcg.com/fake/listing/2.jpg");
+    assertThat(unit.getPhotos())
+        .extracting(UnitItem.Photo::getPhotoId)
+        .containsExactly(FRONT_PHOTO_ID, BACK_PHOTO_ID);
   }
 
   @Test
-  void publishPhaseShouldReusePersistedFetchtcgUrlsOnSecondPublish() {
-    // arrange
-    createPublishJob("jordan", "job1");
-    createDirtySku("jordan", SKU_ID, "1.50");
-    createPhotographedUnit(
-        "jordan",
-        SKU_ID,
-        1,
-        List.of(FRONT_PHOTO_ID, BACK_PHOTO_ID),
-        List.of(FRONT_JPEG, BACK_JPEG));
-
-    // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
-    var firstUnit = getUnit("jordan", SKU_ID, 1);
-    var firstUrls =
-        List.of(
-            firstUnit.getPhotos().get(0).getFetchtcgUrl(),
-            firstUnit.getPhotos().get(1).getFetchtcgUrl());
-    redirtySku("jordan", SKU_ID);
-    createPublishJob("jordan", "job2");
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job2", "publish"), null);
-
-    // assert
-    var unit = getUnit("jordan", SKU_ID, 1);
-    assertThat(unit.getPhotos().get(0).getFetchtcgUrl()).isEqualTo(firstUrls.get(0));
-    assertThat(unit.getPhotos().get(1).getFetchtcgUrl()).isEqualTo(firstUrls.get(1));
-  }
-
-  @Test
-  void uploadShouldNotRecreateMovedUnitOrPublishStaleListing() throws Exception {
-    // arrange
-    createDirtySku("jordan", SKU_ID, "1.50");
-    createPhotographedUnit("jordan", SKU_ID, 1, List.of(FRONT_PHOTO_ID), List.of(FRONT_JPEG));
-    var fetchTcgService = mock(FetchTcgService.class);
-    when(fetchTcgService.createListingImage(any(RequestContext.class), any()))
-        .thenAnswer(
-            invocation -> {
-              var unit = getUnit("jordan", SKU_ID, 1);
-              unitTable.deleteItem(unit);
-              return new CreateListingImageResponse("https://example.com/uploaded.jpg");
-            });
-
-    // act
-    assertThatThrownBy(() -> listingPhaseProcessor(fetchTcgService).process("jordan", 0))
-        .isInstanceOf(ConditionalCheckFailedException.class);
-
-    // assert
-    assertThat(getUnit("jordan", SKU_ID, 1)).isNull();
-    assertThat(getSku("jordan", SKU_ID).getDirty()).isTrue();
-    verify(fetchTcgService, never()).updateListing(any(RequestContext.class), any());
-  }
-
-  @Test
-  void uploadFailureShouldLeavePhotoUrlUnpersistedAndSkipListingUpdate() throws Exception {
+  void uploadFailureShouldLeavePhotoIdsUnchangedAndSkipListingUpdate() throws Exception {
     // arrange
     createDirtySku("jordan", SKU_ID, "1.50");
     createPhotographedUnit("jordan", SKU_ID, 1, List.of(FRONT_PHOTO_ID), List.of(FRONT_JPEG));
@@ -235,12 +172,14 @@ public class ListingPhaseProcessorIntegrationTest {
     assertThatThrownBy(() -> processor.process("jordan", 0)).isSameAs(uploadFailure);
 
     // assert persisted outcome
-    assertThat(getUnit("jordan", SKU_ID, 1).getPhotos().get(0).getFetchtcgUrl()).isNull();
+    assertThat(getUnit("jordan", SKU_ID, 1).getPhotos())
+        .extracting(UnitItem.Photo::getPhotoId)
+        .containsExactly(FRONT_PHOTO_ID);
     verify(fetchTcgService, never()).updateListing(any(RequestContext.class), any());
   }
 
   @Test
-  void retryShouldReuseImageUrlPersistedBeforeListingFailure() throws Exception {
+  void retryShouldUploadPhotoAgainAfterListingFailure() throws Exception {
     // arrange
     createDirtySku("jordan", SKU_ID, "1.50");
     createPhotographedUnit("jordan", SKU_ID, 1, List.of(FRONT_PHOTO_ID), List.of(FRONT_JPEG));
@@ -257,16 +196,15 @@ public class ListingPhaseProcessorIntegrationTest {
     assertThatThrownBy(() -> processor.process("jordan", 0))
         .isInstanceOf(ServiceUnavailableException.class)
         .hasMessage("listing update unavailable");
-    assertThat(getUnit("jordan", SKU_ID, 1).getPhotos().get(0).getFetchtcgUrl())
-        .isEqualTo(imageUrl);
     processor.process("jordan", 0);
 
     // assert
-    verify(fetchTcgService, times(1)).createListingImage(any(RequestContext.class), any());
+    verify(fetchTcgService, times(2)).createListingImage(any(RequestContext.class), any());
     verify(fetchTcgService, times(2))
         .updateListing(any(RequestContext.class), any(UpdateListingRequest.class));
-    assertThat(getUnit("jordan", SKU_ID, 1).getPhotos().get(0).getFetchtcgUrl())
-        .isEqualTo(imageUrl);
+    assertThat(getUnit("jordan", SKU_ID, 1).getPhotos())
+        .extracting(UnitItem.Photo::getPhotoId)
+        .containsExactly(FRONT_PHOTO_ID);
     assertThat(getSku("jordan", SKU_ID).getDirty()).isFalse();
   }
 
@@ -367,11 +305,13 @@ public class ListingPhaseProcessorIntegrationTest {
 
     // assert
     var unitOne = getUnit("jordan", SKU_ID, 1);
-    assertThat(unitOne.getPhotos().get(0).getFetchtcgUrl())
-        .isEqualTo("https://listing-img.fetchtcg.com/fake/listing/1.jpg");
+    assertThat(unitOne.getPhotos())
+        .extracting(UnitItem.Photo::getPhotoId)
+        .containsExactly(FRONT_PHOTO_ID, BACK_PHOTO_ID);
     var unitTwo = getUnit("jordan", SKU_ID, 2);
-    assertThat(unitTwo.getPhotos().get(0).getFetchtcgUrl())
-        .isEqualTo("https://listing-img.fetchtcg.com/fake/listing/3.jpg");
+    assertThat(unitTwo.getPhotos())
+        .extracting(UnitItem.Photo::getPhotoId)
+        .containsExactly(UNIT_TWO_FRONT_ID);
   }
 
   private void createDirtySku(String user, String skuId, String suggestedPrice) {
@@ -402,14 +342,8 @@ public class ListingPhaseProcessorIntegrationTest {
     var photos = new ArrayList<UnitItem.Photo>();
     for (int i = 0; i < photoIds.size(); i++) {
       var photoId = photoIds.get(i);
-      photos.add(UnitItem.Photo.create(photoId, null));
-      s3Client.putObject(
-          PutObjectRequest.builder()
-              .bucket(Photos.BUCKET)
-              .key(Photos.key(user, photoId))
-              .contentType("image/jpeg")
-              .build(),
-          RequestBody.fromBytes(jpegBytes.get(i)));
+      photos.add(UnitItem.Photo.create(photoId));
+      factory.fakePhotosService().seedPhoto(user, photoId, jpegBytes.get(i));
     }
     createUnit(user, skuId, sequenceNumber, "in_stock", photos);
   }
@@ -460,7 +394,7 @@ public class ListingPhaseProcessorIntegrationTest {
         dynamoDbClient,
         fakeClock,
         fetchTcgService,
-        s3Client);
+        factory.photosService());
   }
 
   private UnitItem getUnit(String user, String skuId, int sequenceNumber) {

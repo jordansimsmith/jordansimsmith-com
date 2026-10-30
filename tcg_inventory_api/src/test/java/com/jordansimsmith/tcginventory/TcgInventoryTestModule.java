@@ -53,16 +53,9 @@ public class TcgInventoryTestModule {
 
   @Provides
   @Singleton
-  @Named("inventoryPhotoBucket")
-  String inventoryPhotoBucket() {
-    return Photos.BUCKET;
-  }
-
-  @Provides
-  @Singleton
   @Named("photosBucket")
   String photosBucket() {
-    return Photos.BUCKET;
+    return "api.tcg-inventory.jordansimsmith.com";
   }
 
   @Provides

@@ -8,7 +8,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.tcginventory.AuditItem;
-import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.time.FakeClock;
@@ -550,11 +549,7 @@ public class InventoryHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createSku(
         "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
-    var photos =
-        List.of(
-            UnitItem.Photo.create("photo-front", null),
-            UnitItem.Photo.create(
-                "photo-back", "https://listing-img.fetchtcg.com/example/listing/photo.jpg"));
+    var photos = List.of(UnitItem.Photo.create("photo-front"), UnitItem.Photo.create("photo-back"));
     createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 42, "in_stock", "import1", photos);
 
     // act
@@ -584,7 +579,7 @@ public class InventoryHandlerIntegrationTest {
   }
 
   @Test
-  void getSkuShouldReturnUnitPhotosWithPresignedUrls() throws Exception {
+  void getSkuShouldResolveUnitPhotoIdsThroughPhotos() throws Exception {
     // arrange
     createSku(
         "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
@@ -594,14 +589,14 @@ public class InventoryHandlerIntegrationTest {
         4242,
         "in_stock",
         "import1",
-        List.of(UnitItem.Photo.create("photo-in-stock", null)));
+        List.of(UnitItem.Photo.create("photo-in-stock")));
     createUnit(
         "jordan",
         "mtg#scryfall#scryfall-1#normal#NM",
         1204,
         "reserved",
         "import1",
-        List.of(UnitItem.Photo.create("photo-reserved", null)));
+        List.of(UnitItem.Photo.create("photo-reserved")));
     createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 4250, "in_stock", "import1");
     createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 300, "removed", "import1");
 
@@ -621,14 +616,14 @@ public class InventoryHandlerIntegrationTest {
     assertThat(units.get(0).get("photos").get(0).get("photo_id").asText())
         .isEqualTo("photo-reserved");
     assertThat(units.get(0).get("photos").get(0).get("url").asText())
-        .contains(Photos.key("jordan", "photo-reserved"));
+        .isEqualTo("https://photos.test/users/jordan/photos/photo-reserved.jpg");
 
     assertThat(units.get(1).get("sequence_number").asInt()).isEqualTo(4242);
     assertThat(units.get(1).get("photos")).hasSize(1);
     assertThat(units.get(1).get("photos").get(0).get("photo_id").asText())
         .isEqualTo("photo-in-stock");
     assertThat(units.get(1).get("photos").get(0).get("url").asText())
-        .contains(Photos.key("jordan", "photo-in-stock"));
+        .isEqualTo("https://photos.test/users/jordan/photos/photo-in-stock.jpg");
 
     assertThat(units.get(2).get("sequence_number").asInt()).isEqualTo(4250);
     assertThat(units.get(2).get("photos")).isEmpty();

@@ -7,36 +7,20 @@ import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsResponse;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
-import com.jordansimsmith.tcginventory.inventory.client.UnitPhoto;
-import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
-import javax.inject.Named;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
-import software.amazon.awssdk.services.s3.presigner.S3Presigner;
-import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 public class FindUnitsService {
   private static final int DEFAULT_LIMIT = 100;
   private static final int MAX_LIMIT = 100;
-  private static final Duration PHOTO_URL_TTL = Duration.ofMinutes(15);
-
   private final InventoryReadRepository inventoryRepository;
   private final ObjectMapper objectMapper;
-  private final S3Presigner s3Presigner;
-  private final String photoBucket;
 
-  public FindUnitsService(
-      InventoryReadRepository inventoryRepository,
-      ObjectMapper objectMapper,
-      S3Presigner s3Presigner,
-      @Named("inventoryPhotoBucket") String photoBucket) {
+  public FindUnitsService(InventoryReadRepository inventoryRepository, ObjectMapper objectMapper) {
     this.inventoryRepository = inventoryRepository;
     this.objectMapper = objectMapper;
-    this.s3Presigner = s3Presigner;
-    this.photoBucket = photoBucket;
   }
 
   public FindUnitsResponse findUnits(RequestContext ctx, FindUnitsRequest request)
@@ -64,7 +48,11 @@ public class FindUnitsService {
                         item.getSequenceNumber(),
                         formatLocation(item.getSequenceNumber()),
                         item.getStatus(),
-                        toPhotoResponses(ctx.user(), item.getPhotos())))
+                        item.getPhotos() == null
+                            ? List.of()
+                            : item.getPhotos().stream()
+                                .map(InventoryUnitItem.PhotoItem::getPhotoId)
+                                .toList()))
             .toList();
     var nextContinuation = Continuations.encode(page.lastEvaluatedKey(), objectMapper);
     return new FindUnitsResponse(units, nextContinuation);
@@ -81,31 +69,6 @@ public class FindUnitsService {
     } catch (RuntimeException e) {
       throw new BadRequestException("Invalid continuation");
     }
-  }
-
-  private List<UnitPhoto> toPhotoResponses(
-      String user, @Nullable List<InventoryUnitItem.PhotoItem> photos) {
-    if (photos == null) {
-      return List.of();
-    }
-    return photos.stream()
-        .map(photo -> new UnitPhoto(photo.getPhotoId(), presignedGetUrl(user, photo.getPhotoId())))
-        .toList();
-  }
-
-  private String presignedGetUrl(String user, String photoId) {
-    return s3Presigner
-        .presignGetObject(
-            GetObjectPresignRequest.builder()
-                .signatureDuration(PHOTO_URL_TTL)
-                .getObjectRequest(
-                    GetObjectRequest.builder()
-                        .bucket(photoBucket)
-                        .key("users/" + user + "/photos/" + photoId + ".jpg")
-                        .build())
-                .build())
-        .url()
-        .toString();
   }
 
   private static String formatLocation(int sequenceNumber) {

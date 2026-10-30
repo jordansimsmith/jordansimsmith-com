@@ -117,7 +117,7 @@ public class ImportConfirmationJobProcessor implements JobProcessor {
         if (row.getPhotos() != null && !row.getPhotos().isEmpty()) {
           unit.setPhotos(
               row.getPhotos().stream()
-                  .map(photo -> UnitItem.Photo.create(photo.getPhotoId(), photo.getFetchtcgUrl()))
+                  .map(photo -> UnitItem.Photo.create(photo.getPhotoId()))
                   .toList());
         }
         inventoryRepository.confirmImportUnit(user, importId, skuSeed, unit);

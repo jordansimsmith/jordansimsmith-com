@@ -12,7 +12,6 @@ import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.tcginventory.ActiveJob;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
-import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.time.Clock;
@@ -116,7 +115,7 @@ public class ConfirmImportHandler
         keepRows.stream()
             .filter(
                 row ->
-                    Photos.needsPhotos(
+                    ImportPhotos.needsPhotos(
                         row.getDecision(),
                         row.getSuggestedPrice(),
                         row.getPhotos() == null ? 0 : row.getPhotos().size()))

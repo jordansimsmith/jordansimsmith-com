@@ -403,7 +403,7 @@ public class OrderReservationIntegrationTest {
             dynamoDbClient,
             fakeClock,
             fakeFetchTcgService,
-            factory.s3Client());
+            factory.photosService());
     return new PublishJobProcessor(orderPhaseProcessor, listingPhaseProcessor);
   }
 

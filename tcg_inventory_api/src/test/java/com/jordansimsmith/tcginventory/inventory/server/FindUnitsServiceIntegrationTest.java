@@ -15,7 +15,6 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.service.BadRequestException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
-import java.net.URI;
 import java.util.List;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -30,19 +29,15 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.s3.S3Configuration;
-import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 @Testcontainers
 class FindUnitsServiceIntegrationTest {
   private static final String TABLE_NAME = "inventory_units_test";
-  private static final String PHOTO_BUCKET = "inventory-photos";
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
   private static DynamoDbClient dynamoDbClient;
   private static DynamoDbTable<InventoryUnitItem> unitTable;
-  private static S3Presigner s3Presigner;
 
   private FindUnitsService service;
 
@@ -58,32 +53,21 @@ class FindUnitsServiceIntegrationTest {
     var enhancedClient = DynamoDbEnhancedClient.builder().dynamoDbClient(dynamoDbClient).build();
     unitTable = enhancedClient.table(TABLE_NAME, TableSchema.fromBean(InventoryUnitItem.class));
     DynamoDbUtils.createTable(dynamoDbClient, unitTable);
-    s3Presigner =
-        S3Presigner.builder()
-            .endpointOverride(URI.create("http://localhost:9000"))
-            .region(Region.US_EAST_1)
-            .credentialsProvider(
-                StaticCredentialsProvider.create(AwsBasicCredentials.create("fake", "fake")))
-            .serviceConfiguration(S3Configuration.builder().pathStyleAccessEnabled(true).build())
-            .build();
   }
 
   @AfterAll
   static void tearDownAfterClass() {
-    s3Presigner.close();
     dynamoDbClient.close();
   }
 
   @BeforeEach
   void setUp() {
     DynamoDbUtils.reset(dynamoDbClient);
-    service =
-        new FindUnitsService(
-            new InventoryReadRepository(unitTable), new ObjectMapper(), s3Presigner, PHOTO_BUCKET);
+    service = new FindUnitsService(new InventoryReadRepository(unitTable), new ObjectMapper());
   }
 
   @Test
-  void findUnitsShouldPageInSequenceAndPresignOrderedPhotos() throws Exception {
+  void findUnitsShouldPageInSequenceAndReturnOrderedPhotoIds() throws Exception {
     // arrange
     unitTable.putItem(unit("alice", "sku", 1, "removed"));
     unitTable.putItem(unit("alice", "sku", 2, "reserved", List.of(photo("front"), photo("back"))));
@@ -109,13 +93,7 @@ class FindUnitsServiceIntegrationTest {
     assertThat(secondPage.units().getFirst().sequenceNumber()).isEqualTo(2);
     assertThat(secondPage.units().getFirst().location()).isEqualTo("A0-2");
     assertThat(secondPage.units().getFirst().status()).isEqualTo("reserved");
-    assertThat(secondPage.units().getFirst().photos())
-        .extracting("photoId")
-        .containsExactly("front", "back");
-    var photoUrl = URI.create(secondPage.units().getFirst().photos().getFirst().url());
-    assertThat(photoUrl.getRawPath())
-        .contains("/" + PHOTO_BUCKET + "/users/alice/photos/front.jpg");
-    assertThat(photoUrl.getRawQuery()).contains("X-Amz-Expires=900");
+    assertThat(secondPage.units().getFirst().photos()).containsExactly("front", "back");
     assertThat(secondPage.nextContinuation()).isNotNull();
     assertThat(allAliceUnits.units()).extracting("status").containsExactly("reserved", "sold");
     assertThat(bobPage.units()).extracting("sequenceNumber").containsExactly(2);
@@ -125,12 +103,9 @@ class FindUnitsServiceIntegrationTest {
         .isEqualTo(
             objectMapper.readTree(
                 """
-                {"units":[{"sequence_number":2,"location":"A0-2","status":"reserved","photos":[{"photo_id":"front","url":"%s"},{"photo_id":"back","url":"%s"}]}],"next_continuation":"%s"}
+                {"units":[{"sequence_number":2,"location":"A0-2","status":"reserved","photos":["front","back"]}],"next_continuation":"%s"}
                 """
-                    .formatted(
-                        secondPage.units().getFirst().photos().getFirst().url(),
-                        secondPage.units().getFirst().photos().get(1).url(),
-                        secondPage.nextContinuation())));
+                    .formatted(secondPage.nextContinuation())));
   }
 
   @Test
@@ -171,9 +146,7 @@ class FindUnitsServiceIntegrationTest {
   void findUnitsShouldRejectInvalidLimitBeforeStorageAccess() {
     // arrange
     var inventoryRepository = mock(InventoryReadRepository.class);
-    var invalidLimitService =
-        new FindUnitsService(
-            inventoryRepository, new ObjectMapper(), mock(S3Presigner.class), PHOTO_BUCKET);
+    var invalidLimitService = new FindUnitsService(inventoryRepository, new ObjectMapper());
 
     // act / assert
     assertThatThrownBy(
@@ -192,9 +165,7 @@ class FindUnitsServiceIntegrationTest {
     var failure = new IllegalStateException("storage failed");
     when(inventoryRepository.findUnits(eq("alice"), eq("sku"), eq(100), isNull()))
         .thenThrow(failure);
-    var failingService =
-        new FindUnitsService(
-            inventoryRepository, new ObjectMapper(), mock(S3Presigner.class), PHOTO_BUCKET);
+    var failingService = new FindUnitsService(inventoryRepository, new ObjectMapper());
 
     // act / assert
     assertThatThrownBy(

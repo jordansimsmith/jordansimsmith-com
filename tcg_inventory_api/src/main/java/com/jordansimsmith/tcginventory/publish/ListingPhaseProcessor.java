@@ -4,7 +4,6 @@ import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.JobProcessor;
-import com.jordansimsmith.tcginventory.Photos;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.fetchtcg.client.CreateListingImageRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.DeleteListingRequest;
@@ -13,6 +12,8 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.UpdateListingRequest;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.photos.client.GetPhotoBytesRequest;
+import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import com.jordansimsmith.time.Clock;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -28,8 +29,6 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.GetObjectRequest;
 
 public class ListingPhaseProcessor {
   public static final int BATCH_SIZE = 100;
@@ -41,7 +40,7 @@ public class ListingPhaseProcessor {
   private final DynamoDbClient dynamoDbClient;
   private final Clock clock;
   private final FetchTcgService fetchTcgService;
-  private final S3Client s3Client;
+  private final PhotosService photosService;
 
   public ListingPhaseProcessor(
       DynamoDbTable<SkuItem> skuTable,
@@ -49,13 +48,13 @@ public class ListingPhaseProcessor {
       DynamoDbClient dynamoDbClient,
       Clock clock,
       FetchTcgService fetchTcgService,
-      S3Client s3Client) {
+      PhotosService photosService) {
     this.skuTable = skuTable;
     this.inventoryRepository = inventoryRepository;
     this.dynamoDbClient = dynamoDbClient;
     this.clock = clock;
     this.fetchTcgService = fetchTcgService;
-    this.s3Client = s3Client;
+    this.photosService = photosService;
   }
 
   public JobProcessor.SuccessJobResult process(String user, int continuation)
@@ -123,30 +122,18 @@ public class ListingPhaseProcessor {
             ? new ArrayList<UnitItem.Photo>()
             : new ArrayList<>(inStock.first().getPhotos());
     var imageUrls = new ArrayList<String>();
+    var ctx = new RequestContext(user);
     for (var photo : photos) {
-      if (photo.getFetchtcgUrl() == null) {
-        var bytes =
-            s3Client
-                .getObjectAsBytes(
-                    GetObjectRequest.builder()
-                        .bucket(Photos.BUCKET)
-                        .key(Photos.key(user, photo.getPhotoId()))
-                        .build())
-                .asByteArray();
-        var imageResponse =
-            fetchTcgService.createListingImage(
-                new RequestContext(user),
-                new CreateListingImageRequest(bytes, photo.getPhotoId() + ".jpg"));
-        photo.setFetchtcgUrl(imageResponse.imageUrl());
-        inStock.first().setPhotos(photos);
-        inventoryRepository.updateUnitPhotos(inStock.first());
-      }
-      imageUrls.add(photo.getFetchtcgUrl());
+      var bytes = photosService.getPhotoBytes(ctx, new GetPhotoBytesRequest(photo.getPhotoId()));
+      var imageResponse =
+          fetchTcgService.createListingImage(
+              ctx, new CreateListingImageRequest(bytes.photoBytes(), photo.getPhotoId() + ".jpg"));
+      imageUrls.add(imageResponse.imageUrl());
     }
 
     var condition = Condition.valueOf(sku.getCondition()).toFetchtcg();
     var price = new BigDecimal(sku.getSuggestedPrice());
-    if (Photos.needsPublishWarning(price, photos.size())) {
+    if (price.compareTo(new BigDecimal("50")) >= 0 && photos.isEmpty()) {
       LOGGER.warn("upserting photo-less sku {} at price {} (>= NZ$50)", sku.getSkuId(), price);
     }
 

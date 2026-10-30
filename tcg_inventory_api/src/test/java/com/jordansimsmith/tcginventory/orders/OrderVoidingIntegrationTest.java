@@ -340,7 +340,7 @@ public class OrderVoidingIntegrationTest {
             dynamoDbClient,
             fakeClock,
             fakeFetchTcgService,
-            factory.s3Client());
+            factory.photosService());
     return new PublishJobProcessor(orderPhaseProcessor, listingPhaseProcessor);
   }
 

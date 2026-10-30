@@ -13,7 +13,6 @@ import javax.inject.Singleton;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
-import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 @Module
 public class InventoryModule {
@@ -22,14 +21,11 @@ public class InventoryModule {
   InventoryService inventoryService(
       DynamoDbEnhancedClient dynamoDb,
       @Named("tcgInventoryTableName") String tableName,
-      ObjectMapper objectMapper,
-      S3Presigner s3Presigner,
-      @Named("inventoryPhotoBucket") String photoBucket) {
+      ObjectMapper objectMapper) {
     DynamoDbTable<InventoryUnitItem> unitTable =
         dynamoDb.table(tableName, TableSchema.fromBean(InventoryUnitItem.class));
     var inventoryRepository = new InventoryReadRepository(unitTable);
-    var findUnitsService =
-        new FindUnitsService(inventoryRepository, objectMapper, s3Presigner, photoBucket);
+    var findUnitsService = new FindUnitsService(inventoryRepository, objectMapper);
     return new InventoryService() {
       @Override
       public FindUnitsResponse findUnits(RequestContext ctx, FindUnitsRequest request)

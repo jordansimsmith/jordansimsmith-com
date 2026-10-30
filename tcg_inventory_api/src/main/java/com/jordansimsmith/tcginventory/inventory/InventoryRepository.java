@@ -43,24 +43,6 @@ public class InventoryRepository {
     this.ulidGenerator = ulidGenerator;
   }
 
-  public void updateUnitPhotos(UnitItem unit) {
-    dynamoDbClient.updateItem(
-        UpdateItemRequest.builder()
-            .tableName(TcgInventoryTable.TABLE_NAME)
-            .key(
-                Map.of(
-                    "pk",
-                    AttributeValue.builder().s(unit.getPk()).build(),
-                    "sk",
-                    AttributeValue.builder().s(unit.getSk()).build()))
-            .updateExpression("SET photos = :photos")
-            .conditionExpression("attribute_exists(pk)")
-            .expressionAttributeValues(
-                Map.of(
-                    ":photos", unitTable.tableSchema().itemToMap(unit, true).get(UnitItem.PHOTOS)))
-            .build());
-  }
-
   public List<UnitItem> findUnits(String user, String skuId) {
     var request =
         QueryEnhancedRequest.builder()

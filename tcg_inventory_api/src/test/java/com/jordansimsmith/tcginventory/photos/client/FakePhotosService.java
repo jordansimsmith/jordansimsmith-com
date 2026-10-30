@@ -47,4 +47,10 @@ public class FakePhotosService implements PhotosService {
     }
     return new DeletePhotoResponse();
   }
+
+  public void seedPhoto(String user, String photoId, byte[] photoBytes) {
+    photosByUser
+        .computeIfAbsent(user, ignored -> new LinkedHashMap<>())
+        .put(photoId, photoBytes.clone());
+  }
 }

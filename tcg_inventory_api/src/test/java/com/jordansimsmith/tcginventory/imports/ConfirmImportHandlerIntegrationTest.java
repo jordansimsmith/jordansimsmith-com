@@ -647,9 +647,7 @@ public class ConfirmImportHandlerIntegrationTest {
         "NM",
         "Hit A",
         "20.00",
-        List.of(
-            ImportRowItem.Photo.create("photo-a1", null),
-            ImportRowItem.Photo.create("photo-a2", null)));
+        List.of(ImportRowItem.Photo.create("photo-a1"), ImportRowItem.Photo.create("photo-a2")));
     createKeepRow(
         "jordan",
         "import1",
@@ -659,7 +657,7 @@ public class ConfirmImportHandlerIntegrationTest {
         "NM",
         "Hit B",
         "25.00",
-        List.of(ImportRowItem.Photo.create("photo-b1", null)));
+        List.of(ImportRowItem.Photo.create("photo-b1")));
     createKeepRow(
         "jordan",
         "import1",
@@ -669,7 +667,7 @@ public class ConfirmImportHandlerIntegrationTest {
         "NM",
         "Bulk",
         "1.50",
-        List.of(ImportRowItem.Photo.create("photo-c1", null)));
+        List.of(ImportRowItem.Photo.create("photo-c1")));
 
     // act
     var response =

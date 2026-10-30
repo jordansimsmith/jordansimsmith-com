@@ -244,6 +244,7 @@ java_library(
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/client",
     ] + COMMON_DEPS,
 )
 
@@ -523,6 +524,7 @@ java_binary(
         ":inventory-lib",
         ":lib",
         "//lib/http:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/client",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -532,7 +534,6 @@ java_binary(
         "@maven//:com_google_guava_guava",
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-        "@maven//:software_amazon_awssdk_s3",
     ],
 )
 
@@ -935,6 +936,7 @@ java_binary(
         ":lib",
         "//lib/http:lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/client",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -944,7 +946,6 @@ java_binary(
         "@maven//:com_google_guava_guava",
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-        "@maven//:software_amazon_awssdk_s3",
     ],
 )
 
@@ -1132,7 +1133,7 @@ java_binary(
         ":import-lib",
         ":lib",
         "//lib/http:lib",
-        "//lib/ulid:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/client",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -1141,8 +1142,6 @@ java_binary(
         "@maven//:com_google_guava_guava",
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-        "@maven//:software_amazon_awssdk_s3",
-        "@maven//:software_amazon_awssdk_sdk_core",
     ],
 )
 
@@ -1157,6 +1156,7 @@ java_binary(
         ":import-lib",
         ":lib",
         "//lib/http:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/client",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -1165,7 +1165,6 @@ java_binary(
         "@maven//:com_google_guava_guava",
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-        "@maven//:software_amazon_awssdk_s3",
     ],
 )
 
@@ -1386,6 +1385,7 @@ java_test_suite(
         "//lib/ulid:test-lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:get-pricing-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:update-pricing-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",

@@ -1,17 +1,16 @@
 package com.jordansimsmith.tcginventory.imports;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.s3.S3Container;
-import com.jordansimsmith.tcginventory.Photos;
+import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
-import com.jordansimsmith.ulid.FakeUlidGenerator;
+import com.jordansimsmith.tcginventory.photos.client.GetPhotoBytesRequest;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
@@ -23,19 +22,16 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.services.s3.S3Client;
-import software.amazon.awssdk.services.s3.model.NoSuchKeyException;
 
 @Testcontainers
 public class RowPhotoHandlerIntegrationTest {
   private static final byte[] JPEG_BYTES =
       new byte[] {(byte) 0xFF, (byte) 0xD8, (byte) 0xFF, (byte) 0xD9};
 
-  private FakeUlidGenerator fakeUlidGenerator;
   private ObjectMapper objectMapper;
   private DynamoDbTable<ImportItem> importTable;
   private DynamoDbTable<ImportRowItem> importRowTable;
-  private S3Client s3Client;
+  private TcgInventoryTestFactory factory;
 
   private CreateImportRowPhotoHandler createImportRowPhotoHandler;
   private DeleteImportRowPhotoHandler deleteImportRowPhotoHandler;
@@ -49,22 +45,18 @@ public class RowPhotoHandlerIntegrationTest {
     var factory =
         TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), s3Container.getEndpoint());
     DynamoDbUtils.createTable(factory.dynamoDbClient(), factory.tableDefinition());
-    factory.s3Client().createBucket(b -> b.bucket(Photos.BUCKET));
   }
 
   @BeforeEach
   void setUp() {
-    var factory =
+    factory =
         TcgInventoryTestFactory.create(dynamoDbContainer.getEndpoint(), s3Container.getEndpoint());
 
-    fakeUlidGenerator = factory.fakeUlidGenerator();
     objectMapper = factory.objectMapper();
     importTable = factory.importTable();
     importRowTable = factory.importRowTable();
-    s3Client = factory.s3Client();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
-    fakeUlidGenerator.reset();
 
     createImportRowPhotoHandler = new CreateImportRowPhotoHandler(factory);
     deleteImportRowPhotoHandler = new DeleteImportRowPhotoHandler(factory);
@@ -72,7 +64,7 @@ public class RowPhotoHandlerIntegrationTest {
   }
 
   @Test
-  void createPhotoShouldStoreObjectAndReturnNoContent() {
+  void createPhotoShouldStoreThroughPhotosAndReturnNoContent() throws Exception {
     // arrange
     var importId = seedImport("jordan", "review", "keep", "25.00");
 
@@ -84,17 +76,16 @@ public class RowPhotoHandlerIntegrationTest {
     // assert
     assertThat(response.getStatusCode()).isEqualTo(204);
 
-    var stored =
-        s3Client
-            .getObjectAsBytes(
-                r -> r.bucket(Photos.BUCKET).key(Photos.key("jordan", "FAKE_ULID_0000000001")))
-            .asByteArray();
-    assertThat(stored).isEqualTo(JPEG_BYTES);
-
     var rowItem = getRow("jordan", importId, 1);
     assertThat(rowItem.getPhotos()).hasSize(1);
-    assertThat(rowItem.getPhotos().get(0).getPhotoId()).isEqualTo("FAKE_ULID_0000000001");
-    assertThat(rowItem.getPhotos().get(0).getFetchtcgUrl()).isNull();
+    var photoId = rowItem.getPhotos().get(0).getPhotoId();
+    assertThat(photoId).isEqualTo("FAKE_PHOTO_0000000001");
+    assertThat(
+            factory
+                .photosService()
+                .getPhotoBytes(new RequestContext("jordan"), new GetPhotoBytesRequest(photoId))
+                .photoBytes())
+        .isEqualTo(JPEG_BYTES);
   }
 
   @Test
@@ -112,25 +103,10 @@ public class RowPhotoHandlerIntegrationTest {
   }
 
   @Test
-  void createPhotoShouldRejectOversizedBody() {
-    // arrange
-    var importId = seedImport("jordan", "review", "keep", "25.00");
-    var oversized = new byte[Photos.MAX_UPLOAD_BYTES + 1];
-
-    // act
-    var response =
-        createImportRowPhotoHandler.handleRequest(
-            buildCreateEvent("jordan", importId, 1, oversized), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(400);
-  }
-
-  @Test
   void createPhotoShouldRejectSixthPhoto() {
     // arrange
     var importId = seedImport("jordan", "review", "keep", "25.00");
-    for (int i = 0; i < Photos.MAX_PHOTOS; i++) {
+    for (int i = 0; i < ImportPhotos.MAX_PHOTOS; i++) {
       var response =
           createImportRowPhotoHandler.handleRequest(
               buildCreateEvent("jordan", importId, 1, JPEG_BYTES), null);
@@ -212,29 +188,23 @@ public class RowPhotoHandlerIntegrationTest {
     // act
     var response =
         deleteImportRowPhotoHandler.handleRequest(
-            buildDeleteEvent("jordan", importId, 1, "FAKE_ULID_0000000001"), null);
+            buildDeleteEvent("jordan", importId, 1, "FAKE_PHOTO_0000000001"), null);
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(204);
 
     var rowItem = getRow("jordan", importId, 1);
     assertThat(rowItem.getPhotos()).hasSize(1);
-    assertThat(rowItem.getPhotos().get(0).getPhotoId()).isEqualTo("FAKE_ULID_0000000002");
+    assertThat(rowItem.getPhotos().get(0).getPhotoId()).isEqualTo("FAKE_PHOTO_0000000002");
 
     var getResponse =
         getImportHandler.handleRequest(buildEvent("jordan", Map.of("import_id", importId)), null);
     assertThat(getResponse.getStatusCode()).isEqualTo(200);
     var photos = objectMapper.readTree(getResponse.getBody()).get("rows").get(0).get("photos");
     assertThat(photos).hasSize(1);
-    assertThat(photos.get(0).get("photo_id").asText()).isEqualTo("FAKE_ULID_0000000002");
+    assertThat(photos.get(0).get("photo_id").asText()).isEqualTo("FAKE_PHOTO_0000000002");
     assertThat(photos.get(0).get("url").asText())
-        .contains(Photos.key("jordan", "FAKE_ULID_0000000002"));
-
-    assertThatThrownBy(
-            () ->
-                s3Client.headObject(
-                    r -> r.bucket(Photos.BUCKET).key(Photos.key("jordan", "FAKE_ULID_0000000001"))))
-        .isInstanceOf(NoSuchKeyException.class);
+        .isEqualTo("https://photos.test/users/jordan/photos/FAKE_PHOTO_0000000002.jpg");
   }
 
   @Test
@@ -255,7 +225,7 @@ public class RowPhotoHandlerIntegrationTest {
     // act
     var response =
         deleteImportRowPhotoHandler.handleRequest(
-            buildDeleteEvent("jordan", importId, 1, "FAKE_ULID_0000000001"), null);
+            buildDeleteEvent("jordan", importId, 1, "FAKE_PHOTO_0000000001"), null);
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(409);
@@ -307,9 +277,10 @@ public class RowPhotoHandlerIntegrationTest {
     var row = objectMapper.readTree(response.getBody()).get("rows").get(0);
     assertThat(row.get("needs_photos").asBoolean()).isFalse();
     assertThat(row.get("photos")).hasSize(1);
-    assertThat(row.get("photos").get(0).get("photo_id").asText()).isEqualTo("FAKE_ULID_0000000001");
+    assertThat(row.get("photos").get(0).get("photo_id").asText())
+        .isEqualTo("FAKE_PHOTO_0000000001");
     assertThat(row.get("photos").get(0).get("url").asText())
-        .contains(Photos.key("jordan", "FAKE_ULID_0000000001"));
+        .isEqualTo("https://photos.test/users/jordan/photos/FAKE_PHOTO_0000000001.jpg");
   }
 
   @Test

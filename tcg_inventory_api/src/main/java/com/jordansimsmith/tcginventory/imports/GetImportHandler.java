@@ -8,12 +8,18 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import com.jordansimsmith.tcginventory.Photos;
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.inventory.InventoryLocation;
+import com.jordansimsmith.tcginventory.photos.client.FindPhotosRequest;
+import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,7 +27,6 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
-import software.amazon.awssdk.services.s3.presigner.S3Presigner;
 
 public class GetImportHandler
     implements RequestHandler<APIGatewayV2HTTPEvent, APIGatewayV2HTTPResponse> {
@@ -74,7 +79,7 @@ public class GetImportHandler
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<ImportItem> importTable;
   private final DynamoDbTable<ImportRowItem> importRowTable;
-  private final S3Presigner s3Presigner;
+  private final PhotosService photosService;
 
   public GetImportHandler() {
     this(TcgInventoryFactory.create());
@@ -87,21 +92,25 @@ public class GetImportHandler
     this.importTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class);
     this.importRowTable =
         TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
-    this.s3Presigner = factory.s3Presigner();
+    this.photosService = factory.photosService();
   }
 
   @Override
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     try {
       return doHandleRequest(event);
+    } catch (ServiceException e) {
+      return httpResponseFactory.serviceError(e);
     } catch (Exception e) {
       LOGGER.error("error processing get import request", e);
       throw new RuntimeException(e);
     }
   }
 
-  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
-    var user = requestContextFactory.createCtx(event).user();
+  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event)
+      throws ServiceException {
+    var ctx = requestContextFactory.createCtx(event);
+    var user = ctx.user();
     var importId = event.getPathParameters().get("import_id");
 
     var importKey =
@@ -131,6 +140,7 @@ public class GetImportHandler
 
     var rowItems =
         importRowTable.query(rowRequest).stream().flatMap(page -> page.items().stream()).toList();
+    var photoUrls = findPhotoUrls(ctx, rowItems);
 
     var rows =
         rowItems.stream()
@@ -149,8 +159,8 @@ public class GetImportHandler
                         item.getDecisionReason(),
                         item.getMarketPrice(),
                         item.getSuggestedPrice(),
-                        toPhotoResponses(user, item.getPhotos()),
-                        Photos.needsPhotos(
+                        toPhotoResponses(item.getPhotos(), photoUrls),
+                        ImportPhotos.needsPhotos(
                             item.getDecision(),
                             item.getSuggestedPrice(),
                             item.getPhotos() == null ? 0 : item.getPhotos().size())))
@@ -217,16 +227,34 @@ public class GetImportHandler
         endIndex - startIndex + 1);
   }
 
-  private List<PhotoResponse> toPhotoResponses(String user, List<ImportRowItem.Photo> photos) {
+  private List<PhotoResponse> toPhotoResponses(
+      List<ImportRowItem.Photo> photos, Map<String, String> photoUrls) {
     if (photos == null) {
       return List.of();
     }
     return photos.stream()
-        .map(
-            photo ->
-                new PhotoResponse(
-                    photo.getPhotoId(),
-                    Photos.presignedGetUrl(s3Presigner, user, photo.getPhotoId())))
+        .map(photo -> new PhotoResponse(photo.getPhotoId(), photoUrls.get(photo.getPhotoId())))
         .toList();
+  }
+
+  private Map<String, String> findPhotoUrls(RequestContext ctx, List<ImportRowItem> rows)
+      throws ServiceException {
+    var photoIds = new LinkedHashSet<String>();
+    for (var row : rows) {
+      if (row.getPhotos() != null) {
+        row.getPhotos().forEach(photo -> photoIds.add(photo.getPhotoId()));
+      }
+    }
+
+    var urls = new LinkedHashMap<String, String>();
+    var orderedPhotoIds = new ArrayList<>(photoIds);
+    for (int offset = 0; offset < orderedPhotoIds.size(); offset += 100) {
+      var end = Math.min(offset + 100, orderedPhotoIds.size());
+      var response =
+          photosService.findPhotos(
+              ctx, new FindPhotosRequest(orderedPhotoIds.subList(offset, end)));
+      response.photos().forEach(photo -> urls.put(photo.photoId(), photo.url()));
+    }
+    return urls;
   }
 }
