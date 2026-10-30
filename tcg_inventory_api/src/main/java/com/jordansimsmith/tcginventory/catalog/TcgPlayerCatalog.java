@@ -2,6 +2,7 @@ package com.jordansimsmith.tcginventory.catalog;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import com.jordansimsmith.tcginventory.catalog.server.CardImageUrls;
 import com.jordansimsmith.tcginventory.games.client.Game;
 import com.jordansimsmith.time.Clock;
 import java.time.Duration;
@@ -39,9 +40,8 @@ public class TcgPlayerCatalog implements CardCatalog {
 
   @Override
   public CatalogCard.ImageUrls getImageUrls(String externalId) {
-    return new CatalogCard.ImageUrls(
-        "https://tcgplayer-cdn.tcgplayer.com/product/" + externalId + "_200w.jpg",
-        "https://tcgplayer-cdn.tcgplayer.com/product/" + externalId + "_in_1000x1000.jpg");
+    var imageUrls = CardImageUrls.forSource("tcgplayer", externalId);
+    return new CatalogCard.ImageUrls(imageUrls.small(), imageUrls.normal());
   }
 
   @Override

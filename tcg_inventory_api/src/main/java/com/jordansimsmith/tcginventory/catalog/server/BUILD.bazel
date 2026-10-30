@@ -1,0 +1,16 @@
+load("@rules_java//java:defs.bzl", "java_library")
+
+java_library(
+    name = "server",
+    srcs = glob(["*.java"]),
+    visibility = [
+        "//tcg_inventory_api:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/catalog/server:__pkg__",
+    ],
+    deps = [
+        "//lib/service",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//third_party/dagger",
+    ],
+)

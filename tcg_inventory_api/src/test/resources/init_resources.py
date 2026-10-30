@@ -151,6 +151,10 @@ lambdas = {
         "zip_file": "find-catalog-cards-handler_deploy.jar",
         "environment": {"SCRYFALL_BASE_URL": os.environ.get("SCRYFALL_BASE_URL", "")},
     },
+    "find_card_images": {
+        "handler": "com.jordansimsmith.tcginventory.catalog.api.FindCardImagesHandler",
+        "zip_file": "find-card-images-handler_deploy.jar",
+    },
     "get_games": {
         "handler": "com.jordansimsmith.tcginventory.games.api.FindGamesHandler",
         "zip_file": "find-games-handler_deploy.jar",
@@ -330,6 +334,7 @@ root_resources = {
 
 child_resources = {
     "catalog_cards": {"parent": "catalog", "path": "cards"},
+    "catalog_cardimages": {"parent": "catalog", "path": "cardimages"},
     "fetchtcg_account": {"parent": "fetchtcg", "path": "account"},
     "fetchtcg_credentials": {"parent": "fetchtcg", "path": "credentials"},
     "catalog_card_detail": {"parent": "catalog_cards", "path": "{external_id}"},
@@ -371,6 +376,11 @@ endpoints = {
         "resource": "catalog_cards",
         "method": "GET",
         "lambda": "find_catalog_cards",
+    },
+    "find_card_images": {
+        "resource": "catalog_cardimages",
+        "method": "GET",
+        "lambda": "find_card_images",
     },
     "get_games": {"resource": "games", "method": "GET", "lambda": "get_games"},
     "get_fetchtcg_account": {

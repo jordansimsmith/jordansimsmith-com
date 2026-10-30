@@ -4,7 +4,10 @@ java_library(
     name = "test-lib",
     testonly = True,
     srcs = ["FakeGamesService.java"],
-    visibility = ["//tcg_inventory_api:__pkg__"],
+    visibility = [
+        "//tcg_inventory_api:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/catalog/server:__pkg__",
+    ],
     deps = [
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
