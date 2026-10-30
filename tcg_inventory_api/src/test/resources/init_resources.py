@@ -155,6 +155,10 @@ lambdas = {
         "handler": "com.jordansimsmith.tcginventory.catalog.api.FindCardImagesHandler",
         "zip_file": "find-card-images-handler_deploy.jar",
     },
+    "find_photos": {
+        "handler": "com.jordansimsmith.tcginventory.photos.api.FindPhotosHandler",
+        "zip_file": "find-photos-handler_deploy.jar",
+    },
     "get_games": {
         "handler": "com.jordansimsmith.tcginventory.games.api.FindGamesHandler",
         "zip_file": "find-games-handler_deploy.jar",
@@ -324,6 +328,7 @@ lambdas = {
 
 root_resources = {
     "catalog": {"path": "catalog"},
+    "photos": {"path": "photos"},
     "games": {"path": "games"},
     "fetchtcg": {"path": "fetchtcg"},
     "settings": {"path": "settings"},
@@ -386,6 +391,7 @@ endpoints = {
         "method": "GET",
         "lambda": "find_card_images",
     },
+    "find_photos": {"resource": "photos", "method": "GET", "lambda": "find_photos"},
     "get_games": {"resource": "games", "method": "GET", "lambda": "get_games"},
     "get_fetchtcg_account": {
         "resource": "fetchtcg_account",

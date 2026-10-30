@@ -8,6 +8,7 @@ import com.jordansimsmith.tcginventory.catalog.client.CatalogService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import com.jordansimsmith.tcginventory.pricing.client.PricingService;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
@@ -54,6 +55,8 @@ public interface TcgInventoryFactory {
   PricingService pricingService();
 
   InventoryService inventoryService();
+
+  PhotosService photosService();
 
   S3Client s3Client();
 

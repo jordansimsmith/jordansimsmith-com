@@ -21,6 +21,8 @@ import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.inventory.server.InventoryModule;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
+import com.jordansimsmith.tcginventory.photos.client.FakePhotosService;
+import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import com.jordansimsmith.tcginventory.pricing.server.PricingModule;
 import com.jordansimsmith.tcginventory.reports.ReportItem;
 import com.jordansimsmith.tcginventory.scans.ScanItem;
@@ -53,6 +55,13 @@ public class TcgInventoryTestModule {
   @Singleton
   @Named("inventoryPhotoBucket")
   String inventoryPhotoBucket() {
+    return Photos.BUCKET;
+  }
+
+  @Provides
+  @Singleton
+  @Named("photosBucket")
+  String photosBucket() {
     return Photos.BUCKET;
   }
 
@@ -202,6 +211,18 @@ public class TcgInventoryTestModule {
   @Singleton
   FetchTcgService fetchTcgService(FakeFetchTcgService fakeFetchTcgService) {
     return fakeFetchTcgService;
+  }
+
+  @Provides
+  @Singleton
+  FakePhotosService fakePhotosService() {
+    return new FakePhotosService();
+  }
+
+  @Provides
+  @Singleton
+  PhotosService photosService(FakePhotosService fakePhotosService) {
+    return fakePhotosService;
   }
 
   @Provides

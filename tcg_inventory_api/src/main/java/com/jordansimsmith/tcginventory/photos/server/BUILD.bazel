@@ -1,0 +1,18 @@
+load("@rules_java//java:defs.bzl", "java_library")
+
+java_library(
+    name = "server",
+    srcs = glob(["*.java"]),
+    visibility = [
+        "//tcg_inventory_api:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/photos/server:__pkg__",
+    ],
+    deps = [
+        "//lib/service",
+        "//lib/ulid:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/client",
+        "//third_party/dagger",
+        "@maven//:software_amazon_awssdk_s3",
+        "@maven//:software_amazon_awssdk_sdk_core",
+    ],
+)

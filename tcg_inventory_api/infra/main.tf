@@ -76,6 +76,10 @@ module "java_api" {
       handler  = "com.jordansimsmith.tcginventory.catalog.api.FindCardImagesHandler"
       artifact = var.artifacts["find_card_images"]
     }
+    find_photos = {
+      handler  = "com.jordansimsmith.tcginventory.photos.api.FindPhotosHandler"
+      artifact = var.artifacts["find_photos"]
+    }
     get_games = {
       handler  = "com.jordansimsmith.tcginventory.games.api.FindGamesHandler"
       artifact = var.artifacts["get_games"]
@@ -236,6 +240,7 @@ module "java_api" {
     find_catalog_alternatives   = { path = "catalog/cards/{external_id}/alternatives", method = "GET", lambda = "find_catalog_alternatives" }
     find_catalog_cards          = { path = "catalog/cards", method = "GET", lambda = "find_catalog_cards" }
     find_card_images            = { path = "catalog/cardimages", method = "GET", lambda = "find_card_images" }
+    find_photos                 = { path = "photos", method = "GET", lambda = "find_photos" }
     get_games                   = { path = "games", method = "GET", lambda = "get_games" }
     get_fetchtcg_account        = { path = "fetchtcg/account", method = "GET", lambda = "get_fetchtcg_account" }
     update_fetchtcg_credentials = { path = "fetchtcg/credentials", method = "PUT", lambda = "update_fetchtcg_credentials" }

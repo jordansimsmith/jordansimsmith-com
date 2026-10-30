@@ -13,6 +13,7 @@ import com.jordansimsmith.tcginventory.catalog.server.CatalogModule;
 import com.jordansimsmith.tcginventory.fetchtcg.server.FetchTcgModule;
 import com.jordansimsmith.tcginventory.games.server.GamesModule;
 import com.jordansimsmith.tcginventory.inventory.server.InventoryModule;
+import com.jordansimsmith.tcginventory.photos.server.PhotosModule;
 import com.jordansimsmith.tcginventory.pricing.server.PricingModule;
 import com.jordansimsmith.time.ClockModule;
 import com.jordansimsmith.ulid.UlidModule;
@@ -41,7 +42,8 @@ import software.amazon.awssdk.services.sqs.SqsClient;
       GamesModule.class,
       InventoryModule.class,
       CatalogModule.class,
-      PricingModule.class
+      PricingModule.class,
+      PhotosModule.class
     })
 public class TcgInventoryModule {
   static final String JOBS_QUEUE_NAME = "tcg_inventory_jobs.fifo";
@@ -57,6 +59,13 @@ public class TcgInventoryModule {
   @Singleton
   @Named("inventoryPhotoBucket")
   String inventoryPhotoBucket() {
+    return Photos.BUCKET;
+  }
+
+  @Provides
+  @Singleton
+  @Named("photosBucket")
+  String photosBucket() {
     return Photos.BUCKET;
   }
 

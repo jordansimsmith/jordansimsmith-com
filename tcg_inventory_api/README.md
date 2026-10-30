@@ -7,7 +7,7 @@ The TCG inventory API service is the source of truth for physical Magic: The Gat
 - **Service type**: backend API (`tcg_inventory_api`)
 - **Interface**: REST over HTTPS plus an SQS-driven job consumer
 - **Runtime**: AWS Lambda (Java 21) behind API Gateway REST; Java job Lambda consuming SQS; Python CollectorVision Lambda image consuming a separate scan queue
-- **Primary storage**: DynamoDB table `tcg_inventory` with `gsi1`, `gsi2`, and `gsi3`; S3 bucket `api.tcg-inventory.jordansimsmith.com` (listing photos under `users/<user>/photos/`, source scans under `users/<user>/scans/`)
+- **Primary storage**: DynamoDB table `tcg_inventory` with `gsi1`, `gsi2`, and `gsi3`; S3 bucket `api.tcg-inventory.jordansimsmith.com` (physical photos under `users/<user>/photos/`, source scans under `users/<user>/scans/`)
 - **Auth model**: API Gateway custom REQUEST authorizer provided by the shared `auth_api` service (see `auth_api/README.md`)
 - **External integration**: FetchTCG website API (unofficial), Firebase token exchange, offline CollectorVision Scryfall MTG catalog, live Scryfall catalog lookup for Magic card review, TCGCSV Pokémon catalog source, and TCGplayer card images for Pokémon inventory
 - **Primary consumer**: `tcg_inventory_web`
@@ -52,6 +52,7 @@ The TCG inventory API service is the source of truth for physical Magic: The Gat
 - Fulfillment details on orders: the buyer's display name, delivery address, and selected postage option are captured from the offer and refreshed on every order-phase run, so `GET /orders/{order_id}` carries what packing a parcel needs.
 - Reports: an async report job aggregates the entire inventory into a stored dashboard snapshot with combined headline totals and activity trends, plus a stock breakdown for every registered game; `GET /reports` serves the latest snapshot with staleness metadata and generation status.
 - Per-user FetchTCG refresh-token storage with masked reads; seller-offer reads, listing updates/deletions, and image uploads use the private token provider, which reuses a bearer while valid and persists rotated refresh tokens. Appraisal and repricing use saved seller metadata and do not exchange tokens.
+- The Photos client/server/API packages expose creation, lookup, byte reads, and deletion through a runtime-independent client. Authenticated `GET /photos?photo_ids=...&photo_ids=...` resolves IDs into 15-minute signed URLs; JPEG bytes stay in the existing user-scoped S3 key layout. Existing import and Inventory callers continue using their current storage path until task 2.0.2, with frontend composition planned for task 2.0.3.
 - Append-only audit log written transactionally with each inventory unit mutation and audited order lifecycle transition.
 
 ### Out of scope
@@ -367,6 +368,7 @@ The worker publishes through CatalogSnapshotStore. A failed upload or registry w
 | `DELETE` | `/scans/{scan_id}`                                       | delete an unfinished scan and its source objects                                          |
 | `GET`    | `/skus`                                                  | browse/search SKUs for required `game` (prefix search, continuation paging)               |
 | `GET`    | `/skus/{sku_id}`                                         | SKU detail, units, and provider image URLs                                                |
+| `GET`    | `/photos?photo_ids=...`                                  | resolve repeated physical-photo IDs to signed download URLs                               |
 | `GET`    | `/skus/{sku_id}/units`                                   | list one page of physical units, locations, and presigned photo URLs                      |
 | `DELETE` | `/skus/{sku_id}/units/{sequence_number}`                 | remove a unit (optional `reason` query param)                                             |
 | `PUT`    | `/skus/{sku_id}/units/{sequence_number}`                 | update a unit's condition (moves it to another SKU; response returns the new `sku_id`)    |
@@ -664,6 +666,8 @@ The configured price floor represents the minimum final suggested price. Pricing
   "finished_at": null
 }
 ```
+
+`GET /photos?photo_ids=<id>&photo_ids=<id>` resolves 1–100 repeated photo IDs in request order and deduplicates repeated IDs. It returns `photos: [{photo_id, url}]`; each URL is a 15-minute signed GET for the authenticated user's existing `users/<user>/photos/<photo_id>.jpg` object. Lookup signs URLs without reading or checking for an S3 object, so an unknown ID still receives a URL. Photos operations use the authenticated user and expose no storage keys.
 
 `GET /skus/{sku_id}/units` returns one page of physical units for the authenticated user's SKU. It accepts optional `limit` (default 100, range 1–100) and opaque `continuation` query parameters. Each response contains `units` and nullable `next_continuation`; callers follow the continuation until it is null. The query is strongly consistent within a page, ordered by sequence number, and filters `removed` units after reading the page. A page can therefore be empty while still returning a continuation. Pages are live reads and do not form a snapshot across requests.
 
