@@ -19,6 +19,7 @@ import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsResponse;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
+import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,7 +51,9 @@ class FindUnitsHandlerTest {
     // arrange
     var event = event("SKU%23opaque", "100", "next-page");
     var responseBody =
-        new FindUnitsResponse(List.of(new Unit(102, "A1-2", "in_stock", List.of())), null);
+        new FindUnitsResponse(
+            List.of(new Unit(102, "A1-2", UnitStatus.IN_STOCK, List.of(), 1700000000L, null)),
+            null);
     when(inventoryService.findUnits(any(), any())).thenReturn(responseBody);
 
     // act
@@ -66,7 +69,7 @@ class FindUnitsHandlerTest {
         .isEqualTo(
             objectMapper.readTree(
                 """
-                {"units":[{"sequence_number":102,"location":"A1-2","status":"in_stock","photos":[]}],"next_continuation":null}
+                {"units":[{"sequence_number":102,"location":"A1-2","status":"in_stock","photos":[],"created_at":1700000000,"updated_at":null}],"next_continuation":null}
                 """));
     verify(inventoryService)
         .findUnits(

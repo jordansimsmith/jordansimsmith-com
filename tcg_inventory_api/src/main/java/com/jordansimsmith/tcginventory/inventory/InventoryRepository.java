@@ -43,21 +43,6 @@ public class InventoryRepository {
     this.ulidGenerator = ulidGenerator;
   }
 
-  public List<UnitItem> findUnits(String user, String skuId) {
-    var request =
-        QueryEnhancedRequest.builder()
-            .queryConditional(
-                QueryConditional.sortBeginsWith(
-                    Key.builder()
-                        .partitionValue(SkuItem.formatPk(user, skuId))
-                        .sortValue(UnitItem.UNIT_PREFIX)
-                        .build()))
-            .consistentRead(true)
-            .build();
-
-    return unitTable.query(request).stream().flatMap(page -> page.items().stream()).toList();
-  }
-
   public UnitItem getUnit(String user, String skuId, int sequenceNumber) {
     var key =
         Key.builder()

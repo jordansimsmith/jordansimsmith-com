@@ -3,7 +3,8 @@ package com.jordansimsmith.tcginventory.reports;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.Unit;
+import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -215,26 +216,22 @@ public class ReportAccumulatorTest {
     return item;
   }
 
-  private static UnitItem createUnit(String status) {
-    var item = new UnitItem();
-    item.setStatus(status);
-    item.setCreatedAt(Instant.ofEpochSecond(1700000000));
-    return item;
+  private static Unit createUnit(String status) {
+    return createUnit(status, Instant.ofEpochSecond(1700000000), null);
   }
 
-  private static UnitItem createUnit(String status, Instant createdAt) {
-    var item = new UnitItem();
-    item.setStatus(status);
-    item.setCreatedAt(createdAt);
-    return item;
+  private static Unit createUnit(String status, Instant createdAt) {
+    return createUnit(status, createdAt, null);
   }
 
-  private static UnitItem createUnit(String status, Instant createdAt, Instant updatedAt) {
-    var item = new UnitItem();
-    item.setStatus(status);
-    item.setCreatedAt(createdAt);
-    item.setUpdatedAt(updatedAt);
-    return item;
+  private static Unit createUnit(String status, Instant createdAt, Instant updatedAt) {
+    return new Unit(
+        1,
+        "A0-1",
+        UnitStatus.valueOf(status.toUpperCase()),
+        List.of(),
+        createdAt.getEpochSecond(),
+        updatedAt == null ? null : updatedAt.getEpochSecond());
   }
 
   @Test

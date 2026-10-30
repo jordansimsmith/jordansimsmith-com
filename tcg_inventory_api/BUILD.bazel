@@ -244,6 +244,7 @@ java_library(
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/client",
     ] + COMMON_DEPS,
 )
@@ -259,6 +260,7 @@ java_library(
         ":lib",
         ":order-lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
     ] + COMMON_DEPS,
 )
 
@@ -283,6 +285,7 @@ java_library(
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
     ] + COMMON_DEPS,
 )
@@ -784,6 +787,7 @@ java_binary(
         "//lib/queue:lib",
         "//lib/service",
         "//lib/time:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "@maven//:ch_qos_logback_logback_classic",
         "@maven//:ch_qos_logback_logback_core",
         "@maven//:com_amazonaws_aws_lambda_java_core",
@@ -1192,7 +1196,9 @@ java_library(
     testonly = True,
     srcs = glob(
         ["src/test/java/**/*.java"],
-        exclude = INTEGRATION_TESTS + E2E_TESTS + UNIT_TESTS,
+        exclude = INTEGRATION_TESTS + E2E_TESTS + UNIT_TESTS + [
+            "src/test/java/com/jordansimsmith/tcginventory/inventory/client/FakeInventoryService.java",
+        ],
     ),
     data = [
         ":fetchtcg-stub-load",
@@ -1289,6 +1295,7 @@ java_test_suite(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/api:find-games-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/api:find-photos-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/server",
@@ -1383,6 +1390,7 @@ java_test_suite(
         "//lib/ulid:test-lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:get-pricing-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:update-pricing-handler",

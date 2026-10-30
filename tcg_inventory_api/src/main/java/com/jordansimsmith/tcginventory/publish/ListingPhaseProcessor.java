@@ -9,9 +9,11 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.CreateListingImageRequest
 import com.jordansimsmith.tcginventory.fetchtcg.client.DeleteListingRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.UpdateListingRequest;
-import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
+import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.Unit;
+import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.photos.client.GetPhotoBytesRequest;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import com.jordansimsmith.time.Clock;
@@ -36,7 +38,7 @@ public class ListingPhaseProcessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ListingPhaseProcessor.class);
 
   private final DynamoDbTable<SkuItem> skuTable;
-  private final InventoryRepository inventoryRepository;
+  private final InventoryService inventoryService;
   private final DynamoDbClient dynamoDbClient;
   private final Clock clock;
   private final FetchTcgService fetchTcgService;
@@ -44,13 +46,13 @@ public class ListingPhaseProcessor {
 
   public ListingPhaseProcessor(
       DynamoDbTable<SkuItem> skuTable,
-      InventoryRepository inventoryRepository,
+      InventoryService inventoryService,
       DynamoDbClient dynamoDbClient,
       Clock clock,
       FetchTcgService fetchTcgService,
       PhotosService photosService) {
     this.skuTable = skuTable;
-    this.inventoryRepository = inventoryRepository;
+    this.inventoryService = inventoryService;
     this.dynamoDbClient = dynamoDbClient;
     this.clock = clock;
     this.fetchTcgService = fetchTcgService;
@@ -101,33 +103,32 @@ public class ListingPhaseProcessor {
     return results;
   }
 
-  private InStock loadInStock(String user, String skuId) {
-    int count = 0;
-    UnitItem first = null;
-    for (var item : inventoryRepository.findUnits(user, skuId)) {
-      if ("in_stock".equals(item.getStatus())) {
-        if (first == null) {
-          first = item;
-        }
-        count++;
-      }
-    }
-    return new InStock(count, first);
+  private InStock loadInStock(String user, String skuId) throws ServiceException {
+    var ctx = new RequestContext(user);
+    var units = new ArrayList<Unit>();
+    String continuation = null;
+    do {
+      var response =
+          inventoryService.findUnits(ctx, new FindUnitsRequest(skuId, 100, continuation));
+      units.addAll(response.units());
+      continuation = response.nextContinuation();
+    } while (continuation != null);
+
+    var inStockUnits = units.stream().filter(unit -> unit.status() == UnitStatus.IN_STOCK).toList();
+    return new InStock(
+        inStockUnits.size(), inStockUnits.isEmpty() ? null : inStockUnits.getFirst());
   }
 
   private void publishSku(String user, SkuItem sku, InStock inStock, int capturedVersion)
       throws ServiceException {
-    var photos =
-        inStock.first().getPhotos() == null
-            ? new ArrayList<UnitItem.Photo>()
-            : new ArrayList<>(inStock.first().getPhotos());
+    var photos = inStock.first().photos();
     var imageUrls = new ArrayList<String>();
     var ctx = new RequestContext(user);
-    for (var photo : photos) {
-      var bytes = photosService.getPhotoBytes(ctx, new GetPhotoBytesRequest(photo.getPhotoId()));
+    for (var photoId : photos) {
+      var bytes = photosService.getPhotoBytes(ctx, new GetPhotoBytesRequest(photoId));
       var imageResponse =
           fetchTcgService.createListingImage(
-              ctx, new CreateListingImageRequest(bytes.photoBytes(), photo.getPhotoId() + ".jpg"));
+              ctx, new CreateListingImageRequest(bytes.photoBytes(), photoId + ".jpg"));
       imageUrls.add(imageResponse.imageUrl());
     }
 
@@ -160,7 +161,7 @@ public class ListingPhaseProcessor {
         price.toPlainString());
   }
 
-  private record InStock(int count, UnitItem first) {}
+  private record InStock(int count, Unit first) {}
 
   private void delistSku(String user, SkuItem sku, int capturedVersion) throws ServiceException {
     fetchTcgService.deleteListing(

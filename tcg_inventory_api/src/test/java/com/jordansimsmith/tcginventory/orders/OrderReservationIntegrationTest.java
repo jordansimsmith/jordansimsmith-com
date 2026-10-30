@@ -399,7 +399,7 @@ public class OrderReservationIntegrationTest {
     var listingPhaseProcessor =
         new ListingPhaseProcessor(
             skuTable,
-            inventoryRepository,
+            factory.inventoryService(),
             dynamoDbClient,
             fakeClock,
             fakeFetchTcgService,

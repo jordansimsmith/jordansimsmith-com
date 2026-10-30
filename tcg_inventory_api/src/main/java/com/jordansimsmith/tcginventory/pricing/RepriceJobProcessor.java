@@ -13,12 +13,17 @@ import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
+import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
+import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.Unit;
+import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.pricing.client.Condition;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceRequest;
 import com.jordansimsmith.tcginventory.pricing.client.PricingService;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
@@ -30,6 +35,7 @@ public class RepriceJobProcessor implements JobProcessor {
 
   private final DynamoDbTable<SkuItem> skuTable;
   private final InventoryRepository inventoryRepository;
+  private final InventoryService inventoryService;
   private final ObjectMapper objectMapper;
   private final PricingService pricingService;
   private final Clock clock;
@@ -39,6 +45,7 @@ public class RepriceJobProcessor implements JobProcessor {
   public RepriceJobProcessor(
       DynamoDbTable<SkuItem> skuTable,
       InventoryRepository inventoryRepository,
+      InventoryService inventoryService,
       ObjectMapper objectMapper,
       PricingService pricingService,
       Clock clock,
@@ -49,6 +56,7 @@ public class RepriceJobProcessor implements JobProcessor {
     this.gamesService = gamesService;
     this.skuTable = skuTable;
     this.inventoryRepository = inventoryRepository;
+    this.inventoryService = inventoryService;
     this.objectMapper = objectMapper;
     this.pricingService = pricingService;
   }
@@ -113,9 +121,15 @@ public class RepriceJobProcessor implements JobProcessor {
         throw new UnpriceableSkuException("SKU has no version: " + skuId);
       }
 
-      var inStock =
-          inventoryRepository.findUnits(user, skuId).stream()
-              .anyMatch(unit -> "in_stock".equals(unit.getStatus()));
+      var units = new ArrayList<Unit>();
+      String unitContinuation = null;
+      do {
+        var response =
+            inventoryService.findUnits(ctx, new FindUnitsRequest(skuId, 100, unitContinuation));
+        units.addAll(response.units());
+        unitContinuation = response.nextContinuation();
+      } while (unitContinuation != null);
+      var inStock = units.stream().anyMatch(unit -> unit.status() == UnitStatus.IN_STOCK);
       if (!inStock) {
         continue;
       }

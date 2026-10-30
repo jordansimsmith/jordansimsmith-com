@@ -23,6 +23,7 @@ import com.jordansimsmith.tcginventory.orders.OrderRepository;
 import com.jordansimsmith.tcginventory.pricing.RepriceJobProcessor;
 import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
 import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
+import com.jordansimsmith.tcginventory.reports.ReportItem;
 import com.jordansimsmith.tcginventory.reports.ReportJobProcessor;
 import com.jordansimsmith.tcginventory.scans.ScanConfirmationJobProcessor;
 import com.jordansimsmith.tcginventory.settings.SettingsItem;
@@ -96,13 +97,22 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     var listingPhaseProcessor =
         new ListingPhaseProcessor(
             skuTable,
-            inventoryRepository,
+            factory.inventoryService(),
             publishDynamoDbClient,
             publishClock,
             factory.fetchTcgService(),
             factory.photosService());
     this.publishJobProcessor = new PublishJobProcessor(orderPhaseProcessor, listingPhaseProcessor);
-    this.reportJobProcessor = new ReportJobProcessor(factory);
+    this.reportJobProcessor =
+        new ReportJobProcessor(
+            TcgInventoryTable.table(enhancedClient, ReportItem.class),
+            factory.auditTable(),
+            orderTable,
+            skuTable,
+            factory.objectMapper(),
+            factory.clock(),
+            factory.gamesService(),
+            factory.inventoryService());
     this.scanConfirmationJobProcessor = new ScanConfirmationJobProcessor(factory);
     this.importConfirmationJobProcessor = new ImportConfirmationJobProcessor(factory);
     this.orderFulfillmentJobProcessor = new OrderFulfillmentJobProcessor(factory);
@@ -115,6 +125,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
                 factory.dynamoDbClient(),
                 factory.clock(),
                 ulidGenerator),
+            factory.inventoryService(),
             factory.objectMapper(),
             factory.pricingService(),
             factory.clock(),

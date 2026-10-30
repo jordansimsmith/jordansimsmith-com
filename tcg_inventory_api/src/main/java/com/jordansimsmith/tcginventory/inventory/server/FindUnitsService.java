@@ -7,8 +7,11 @@ import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsResponse;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
+import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
@@ -47,12 +50,16 @@ public class FindUnitsService {
                     new Unit(
                         item.getSequenceNumber(),
                         formatLocation(item.getSequenceNumber()),
-                        item.getStatus(),
+                        UnitStatus.valueOf(item.getStatus().toUpperCase(Locale.ROOT)),
                         item.getPhotos() == null
                             ? List.of()
                             : item.getPhotos().stream()
                                 .map(InventoryUnitItem.PhotoItem::getPhotoId)
-                                .toList()))
+                                .toList(),
+                        Objects.requireNonNull(
+                                item.getCreatedAt(), "Inventory unit has no created_at")
+                            .getEpochSecond(),
+                        item.getUpdatedAt() == null ? null : item.getUpdatedAt().getEpochSecond()))
             .toList();
     var nextContinuation = Continuations.encode(page.lastEvaluatedKey(), objectMapper);
     return new FindUnitsResponse(units, nextContinuation);

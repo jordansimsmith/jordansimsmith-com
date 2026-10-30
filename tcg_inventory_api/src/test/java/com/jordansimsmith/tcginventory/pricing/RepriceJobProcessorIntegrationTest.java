@@ -2,6 +2,7 @@ package com.jordansimsmith.tcginventory.pricing;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -13,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.queue.FakeQueueClient;
+import com.jordansimsmith.service.BadRequestException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceUnavailableException;
@@ -28,6 +30,11 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
+import com.jordansimsmith.tcginventory.inventory.client.FindUnitsResponse;
+import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.Unit;
+import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.pricing.client.Condition;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceRequest;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceResponse;
@@ -232,6 +239,76 @@ public class RepriceJobProcessorIntegrationTest {
         .getPrice(new RequestContext(user), new GetPriceRequest("shared-card", Condition.NM));
     assertThat(getSku(user, firstSkuId).getSuggestedPrice()).isEqualTo("0.95");
     assertThat(getSku(user, secondSkuId).getSuggestedPrice()).isEqualTo("0.95");
+  }
+
+  @Test
+  void repriceShouldContinueAfterEmptyUnitPage() throws Exception {
+    // arrange
+    var user = "empty-unit-page-user";
+    var skuId = createSku(user, "mtg", "card", "fetch-card", "1.00", "in_stock");
+    createRepriceJob(user, "job1", null);
+    var inventoryService = mock(InventoryService.class);
+    when(inventoryService.findUnits(any(), any()))
+        .thenReturn(new FindUnitsResponse(List.of(), "removed-page"))
+        .thenReturn(
+            new FindUnitsResponse(
+                List.of(
+                    new Unit(
+                        1,
+                        "A0-1",
+                        UnitStatus.IN_STOCK,
+                        List.of(),
+                        CREATED_AT.getEpochSecond(),
+                        null)),
+                null));
+    var pricingService = mock(PricingService.class);
+    when(pricingService.getPrice(any(), any()))
+        .thenReturn(new GetPriceResponse(new BigDecimal("1.00"), new BigDecimal("1.05")));
+
+    // act
+    newRepriceJobProcessor(pricingService, inventoryService)
+        .processBatch(user, getJob(user, "job1"));
+
+    // assert
+    verify(inventoryService)
+        .findUnits(new RequestContext(user), new FindUnitsRequest(skuId, 100, null));
+    verify(inventoryService)
+        .findUnits(new RequestContext(user), new FindUnitsRequest(skuId, 100, "removed-page"));
+    assertThat(getSku(user, skuId).getSuggestedPrice()).isEqualTo("1.05");
+  }
+
+  @Test
+  void repriceShouldNotWriteSkuWhenLaterUnitPageFails() throws Exception {
+    // arrange
+    var user = "later-unit-page-failure-user";
+    var skuId = createSku(user, "mtg", "card", "fetch-card", "1.00", "in_stock");
+    createRepriceJob(user, "job1", null);
+    var inventoryService = mock(InventoryService.class);
+    when(inventoryService.findUnits(any(), any()))
+        .thenReturn(
+            new FindUnitsResponse(
+                List.of(
+                    new Unit(
+                        1,
+                        "A0-1",
+                        UnitStatus.IN_STOCK,
+                        List.of(),
+                        CREATED_AT.getEpochSecond(),
+                        null)),
+                "next"))
+        .thenThrow(new BadRequestException("unit page failed"));
+    var pricingService = mock(PricingService.class);
+
+    // act
+    var result =
+        newRepriceJobProcessor(pricingService, inventoryService)
+            .processBatch(user, getJob(user, "job1"));
+
+    // assert
+    assertThat(result).isEqualTo(new JobProcessor.FailureJobResult("unit page failed"));
+    assertThat(getSku(user, skuId).getSuggestedPrice()).isEqualTo("1.00");
+    assertThat(repriceAudits(user)).isEmpty();
+    verifyNoInteractions(pricingService);
   }
 
   @Test
@@ -494,10 +571,16 @@ public class RepriceJobProcessorIntegrationTest {
   }
 
   private RepriceJobProcessor newRepriceJobProcessor(PricingService pricingService) {
+    return newRepriceJobProcessor(pricingService, factory.inventoryService());
+  }
+
+  private RepriceJobProcessor newRepriceJobProcessor(
+      PricingService pricingService, InventoryService inventoryService) {
     var ulidGenerator = factory.ulidGenerator();
     return new RepriceJobProcessor(
         skuTable,
         new InventoryRepository(unitTable, factory.dynamoDbClient(), clock, ulidGenerator),
+        inventoryService,
         objectMapper,
         pricingService,
         clock,

@@ -29,7 +29,6 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.UpdateListingRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.UpdateListingResponse;
-import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.time.FakeClock;
@@ -390,7 +389,7 @@ public class ListingPhaseProcessorIntegrationTest {
     var dynamoDbClient = factory.dynamoDbClient();
     return new ListingPhaseProcessor(
         skuTable,
-        new InventoryRepository(unitTable, dynamoDbClient, fakeClock, factory.ulidGenerator()),
+        factory.inventoryService(),
         dynamoDbClient,
         fakeClock,
         fetchTcgService,

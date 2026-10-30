@@ -336,7 +336,7 @@ public class OrderVoidingIntegrationTest {
     var listingPhaseProcessor =
         new ListingPhaseProcessor(
             skuTable,
-            inventoryRepository,
+            factory.inventoryService(),
             dynamoDbClient,
             fakeClock,
             fakeFetchTcgService,

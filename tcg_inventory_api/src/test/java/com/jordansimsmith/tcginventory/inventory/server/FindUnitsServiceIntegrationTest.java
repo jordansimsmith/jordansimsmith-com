@@ -15,6 +15,8 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.service.BadRequestException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
+import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -70,7 +72,10 @@ class FindUnitsServiceIntegrationTest {
   void findUnitsShouldPageInSequenceAndReturnOrderedPhotoIds() throws Exception {
     // arrange
     unitTable.putItem(unit("alice", "sku", 1, "removed"));
-    unitTable.putItem(unit("alice", "sku", 2, "reserved", List.of(photo("front"), photo("back"))));
+    var reserved = unit("alice", "sku", 2, "reserved", List.of(photo("front"), photo("back")));
+    reserved.setCreatedAt(Instant.ofEpochSecond(1700000000));
+    reserved.setUpdatedAt(Instant.ofEpochSecond(1700000001));
+    unitTable.putItem(reserved);
     unitTable.putItem(unit("alice", "sku", 3, "sold"));
     unitTable.putItem(unit("bob", "sku", 2, "in_stock"));
 
@@ -92,20 +97,39 @@ class FindUnitsServiceIntegrationTest {
     assertThat(secondPage.units()).hasSize(1);
     assertThat(secondPage.units().getFirst().sequenceNumber()).isEqualTo(2);
     assertThat(secondPage.units().getFirst().location()).isEqualTo("A0-2");
-    assertThat(secondPage.units().getFirst().status()).isEqualTo("reserved");
+    assertThat(secondPage.units().getFirst().status()).isEqualTo(UnitStatus.RESERVED);
     assertThat(secondPage.units().getFirst().photos()).containsExactly("front", "back");
+    assertThat(secondPage.units().getFirst().createdAt()).isEqualTo(1700000000L);
+    assertThat(secondPage.units().getFirst().updatedAt()).isEqualTo(1700000001L);
     assertThat(secondPage.nextContinuation()).isNotNull();
-    assertThat(allAliceUnits.units()).extracting("status").containsExactly("reserved", "sold");
+    assertThat(allAliceUnits.units())
+        .extracting("status")
+        .containsExactly(UnitStatus.RESERVED, UnitStatus.SOLD);
     assertThat(bobPage.units()).extracting("sequenceNumber").containsExactly(2);
     assertThat(bobPage.units().getFirst().photos()).isEmpty();
+    assertThat(bobPage.units().getFirst().createdAt()).isEqualTo(1700000000L);
+    assertThat(bobPage.units().getFirst().updatedAt()).isNull();
     var objectMapper = new ObjectMapper();
     assertThat(objectMapper.readTree(objectMapper.writeValueAsBytes(secondPage)))
         .isEqualTo(
             objectMapper.readTree(
                 """
-                {"units":[{"sequence_number":2,"location":"A0-2","status":"reserved","photos":["front","back"]}],"next_continuation":"%s"}
+                {"units":[{"sequence_number":2,"location":"A0-2","status":"reserved","photos":["front","back"],"created_at":1700000000,"updated_at":1700000001}],"next_continuation":"%s"}
                 """
                     .formatted(secondPage.nextContinuation())));
+  }
+
+  @Test
+  void findUnitsShouldFailOnUnknownStoredStatus() {
+    // arrange
+    unitTable.putItem(unit("alice", "sku", 1, "unexpected"));
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                service.findUnits(
+                    new RequestContext("alice"), new FindUnitsRequest("sku", 100, null)))
+        .isInstanceOf(IllegalArgumentException.class);
   }
 
   @Test
@@ -192,6 +216,7 @@ class FindUnitsServiceIntegrationTest {
     item.setSk(InventoryUnitItem.UNIT_PREFIX + "%010d".formatted(sequenceNumber));
     item.setSequenceNumber(sequenceNumber);
     item.setStatus(status);
+    item.setCreatedAt(Instant.ofEpochSecond(1700000000));
     item.setPhotos(photos);
     return item;
   }

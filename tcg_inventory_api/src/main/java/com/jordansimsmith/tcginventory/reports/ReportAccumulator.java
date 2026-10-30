@@ -1,7 +1,8 @@
 package com.jordansimsmith.tcginventory.reports;
 
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.Unit;
+import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.tcginventory.orders.OrderLines;
 import java.math.BigDecimal;
@@ -65,28 +66,27 @@ public class ReportAccumulator {
     this.generationDate = generationTime.atZone(AUCKLAND).toLocalDate();
   }
 
-  public void addSku(SkuItem sku, List<UnitItem> units) {
+  public void addSku(SkuItem sku, List<Unit> units) {
     skuCount++;
 
     var price = resolvePrice(sku);
 
     int skuInStockCount = 0;
     for (var unit : units) {
-      var status = unit.getStatus();
-      if ("removed".equals(status)) {
+      var status = unit.status();
+      if (status == UnitStatus.REMOVED) {
         continue;
       }
 
-      if (unit.getCreatedAt() != null) {
-        var weekStart = weekStartOf(unit.getCreatedAt());
-        addedByWeek.merge(weekStart, 1, Integer::sum);
-      }
+      var createdAt = Instant.ofEpochSecond(unit.createdAt());
+      var weekStart = weekStartOf(createdAt);
+      addedByWeek.merge(weekStart, 1, Integer::sum);
 
       switch (status) {
-        case "in_stock" -> {
+        case IN_STOCK -> {
           inStockUnits++;
           skuInStockCount++;
-          agingBandCounts[agingBandIndex(unit.getCreatedAt())]++;
+          agingBandCounts[agingBandIndex(createdAt)]++;
           if (price != null) {
             inventoryValue = inventoryValue.add(price);
             priceBucketCounts[bucketIndex(price)]++;
@@ -94,15 +94,15 @@ public class ReportAccumulator {
             unpricedUnits++;
           }
         }
-        case "reserved" -> reservedUnits++;
-        case "sold" -> {
+        case RESERVED -> reservedUnits++;
+        case SOLD -> {
           soldUnits++;
-          if (unit.getUpdatedAt() != null) {
-            var weekStart = weekStartOf(unit.getUpdatedAt());
-            soldByWeek.merge(weekStart, 1, Integer::sum);
+          if (unit.updatedAt() != null) {
+            var soldWeekStart = weekStartOf(Instant.ofEpochSecond(unit.updatedAt()));
+            soldByWeek.merge(soldWeekStart, 1, Integer::sum);
           }
         }
-        default -> {}
+        case REMOVED -> {}
       }
     }
 

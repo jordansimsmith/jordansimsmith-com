@@ -6,17 +6,18 @@ import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobProcessor;
-import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.games.client.FindGamesRequest;
 import com.jordansimsmith.tcginventory.games.client.Game;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
-import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
+import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.Unit;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.time.Clock;
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -33,7 +34,7 @@ public class ReportJobProcessor implements JobProcessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReportJobProcessor.class);
 
   private final DynamoDbTable<ReportItem> reportTable;
-  private final InventoryRepository inventoryRepository;
+  private final InventoryService inventoryService;
   private final DynamoDbTable<AuditItem> auditTable;
   private final DynamoDbTable<OrderItem> orderTable;
   private final DynamoDbIndex<SkuItem> gsi2Index;
@@ -41,21 +42,23 @@ public class ReportJobProcessor implements JobProcessor {
   private final Clock clock;
   private final GamesService gamesService;
 
-  public ReportJobProcessor(TcgInventoryFactory factory) {
-    var enhancedClient = factory.dynamoDbEnhancedClient();
-    var skuTable = TcgInventoryTable.table(enhancedClient, SkuItem.class);
-    var orderTable = TcgInventoryTable.table(enhancedClient, OrderItem.class);
-    var unitTable = TcgInventoryTable.table(enhancedClient, UnitItem.class);
-    this.reportTable = TcgInventoryTable.table(enhancedClient, ReportItem.class);
-    this.inventoryRepository =
-        new InventoryRepository(
-            unitTable, factory.dynamoDbClient(), factory.clock(), factory.ulidGenerator());
-    this.auditTable = factory.auditTable();
+  public ReportJobProcessor(
+      DynamoDbTable<ReportItem> reportTable,
+      DynamoDbTable<AuditItem> auditTable,
+      DynamoDbTable<OrderItem> orderTable,
+      DynamoDbTable<SkuItem> skuTable,
+      ObjectMapper objectMapper,
+      Clock clock,
+      GamesService gamesService,
+      InventoryService inventoryService) {
+    this.reportTable = reportTable;
+    this.auditTable = auditTable;
     this.orderTable = orderTable;
     this.gsi2Index = skuTable.index(TcgInventoryTable.GSI2_NAME);
-    this.objectMapper = factory.objectMapper();
-    this.clock = factory.clock();
-    this.gamesService = factory.gamesService();
+    this.objectMapper = objectMapper;
+    this.clock = clock;
+    this.gamesService = gamesService;
+    this.inventoryService = inventoryService;
   }
 
   @Override
@@ -84,7 +87,15 @@ public class ReportJobProcessor implements JobProcessor {
             "Inventory SKU references a game not returned by Games: " + sku.getGame());
       }
       skuGames.put(sku.getSkuId(), game.id());
-      var units = inventoryRepository.findUnits(user, sku.getSkuId());
+      var units = new ArrayList<Unit>();
+      String continuation = null;
+      do {
+        var response =
+            inventoryService.findUnits(
+                ctx, new FindUnitsRequest(sku.getSkuId(), 100, continuation));
+        units.addAll(response.units());
+        continuation = response.nextContinuation();
+      } while (continuation != null);
       accumulator.addSku(sku, units);
       gameAccumulators.get(game.id()).addSku(sku, units);
     }
