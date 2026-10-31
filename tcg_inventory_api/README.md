@@ -39,9 +39,9 @@ The TCG inventory API service is the source of truth for physical Magic: The Gat
 - Pokémon inventory: `pokemon` uses source `tcgplayer`, TCGplayer product IDs as `external_id`, and the `normal`, `holofoil`, and `reverse_holofoil` finishes. Inventory browse and audited adjustments, publishing, order reservation and fulfillment, and report attribution use the shared game-aware workflows. A Pokémon SKU ID has the same form as Magic: `pokemon#tcgplayer#<tcgplayer_product_id>#<finish>#<condition>`; its exact finish-specific FetchTCG card ID remains stored separately for publishing. Pokémon stock creation, imports, and scanning remain disabled.
 - Pokémon catalog: the catalog library fetches and normalizes TCGplayer Pokémon category `3` records from TCGCSV into deterministic schema-version-1 snapshots, publishes them to S3 with DynamoDB registry entries, and loads the latest snapshot lazily for exact detail, batch lookup, finish-filtered name search, and exact-full-name alternatives. This read-only catalog does not enable Pokémon intake.
 - Durable scan jobs and source images: all-or-abandon batch uploads, background recognition with stored suggestions, manual correction through the authenticated catalog endpoints, irreversible removal of an outlier scan row, deletion of an unfinished job, and read-only confirmed jobs. Confirmed source scans are retained indefinitely and never automatically used as listing photos.
-- Per-user pricing configuration: authenticated `GET /pricing` returns the effective price floor, and `PATCH /pricing` saves a per-user override through PricingService. An unset override reads as `0.25`; once configured, it cannot be cleared through the API. Invalid values return 400. Floor writes do not yet exclude active jobs; that guard is deferred until Pricing can call the Jobs service. Each `PricingService#getPrice` call reads the current floor, so repeated items in one job batch can observe a changed override.
+- Per-user pricing configuration: authenticated `GET /pricing` returns the effective price floor, and `PATCH /pricing` saves a per-user override through PricingService. An unset override reads as `0.25`; once configured, it cannot be cleared through the API. Invalid values return 400. Floor writes are allowed during background jobs; each `PricingService#getPrice` call reads the current floor, so repeated items in one job batch can observe a changed override.
 - Appraisal per row: FetchTCG identity resolution for the submitted ManaBox or scan-confirmed printing (candidates verified against the row's Scryfall ID, cached on the SKU after first sight), followed by a Pricing service lookup for market and suggested prices. Imports applies its fixed keep filter to the returned market value. CSV and scan-confirmed imports use the same appraisal worker.
-- Inventory browse: SKU search and detail; the separate unit endpoint returns physical units, derived locations, and ordered physical-photo IDs.
+- Inventory reads: `InventoryService#findSkus` and `getSku` return the common SKU contract through the public client; `GET /skus` pages browse results and `GET /skus/{sku_id}` returns `{ "sku": ... }`. `GET /skus/{sku_id}/units` separately returns physical units, derived locations, and ordered photo IDs. The new reads do not call Catalog or query units from the detail operation.
 - Inventory unit listing: `InventoryService#findUnits` returns one strongly consistent page of physical units, derived locations, typed statuses, creation epoch seconds and nullable update epoch seconds, and ordered physical-photo IDs for one SKU. Limits are 1–100 and default to 100. Callers follow `next_continuation` to read all pages; results are live and do not form a snapshot. Photos resolves the IDs into short-lived URLs.
 - Listing photos: up to 5 JPEG photos per keep row, captured during import review (raw-body upload, stored durably in S3, served via short-lived presigned URLs); confirm is blocked while any keep row appraised at NZ$20+ has no photos; photos freeze onto units at confirm and are immutable afterwards.
 - Manual audited adjustments: remove a unit; change a unit's condition (moving it between SKUs).
@@ -52,7 +52,7 @@ The TCG inventory API service is the source of truth for physical Magic: The Gat
 - Fulfillment details on orders: the buyer's display name, delivery address, and selected postage option are captured from the offer and refreshed on every order-phase run, so `GET /orders/{order_id}` carries what packing a parcel needs.
 - Reports: an async report job aggregates the entire inventory into a stored dashboard snapshot with combined headline totals and activity trends, plus a stock breakdown for every registered game; `GET /reports` serves the latest snapshot with staleness metadata and generation status.
 - Per-user FetchTCG refresh-token storage with masked reads; seller-offer reads, listing updates/deletions, and image uploads use the private token provider, which reuses a bearer while valid and persists rotated refresh tokens. Appraisal and repricing use saved seller metadata and do not exchange tokens.
-- The Photos client/server/API packages own JPEG object creation, byte reads, deletion, and 15-minute download URLs in the existing user-scoped S3 key layout. Imports and Inventory store ordered photo IDs only. Repricing, Reports, and Publishing read unit pages through InventoryService; repricing still uses legacy persistence for SKU writes, Reports still reads SKU/order/audit records, and Publishing still uses legacy persistence for SKU state and dirty clearing. The legacy SKU handler also retains its own unit projection until the SKU read migration. Import and SKU responses return those IDs; the frontend calls Photos to resolve URLs.
+- The Photos client/server/API packages own JPEG object creation, byte reads, deletion, and 15-minute download URLs in the existing user-scoped S3 key layout. Imports and Inventory store ordered photo IDs only. `InventoryService#findSkus`, `getSku`, and `findUnits` expose SKU metadata and unit facts to their callers. Repricing still uses legacy persistence for SKU writes, Reports still reads SKU/order/audit records, and Publishing still uses legacy persistence for SKU state and dirty clearing. Legacy mutation and job code continues to use the root Inventory model; SKU read handlers no longer do so.
 - Append-only audit log written transactionally with each inventory unit mutation and audited order lifecycle transition.
 
 ### Out of scope
@@ -262,7 +262,7 @@ The worker publishes through CatalogSnapshotStore. A failed upload or registry w
 
 - Inventory is the source of truth; FetchTCG listings are an absolute projection: listing quantity = count of `in_stock` units per SKU. Re-importing already-listed cards converges to a no-op, and FetchTCG's own decrement at offer acceptance converges without a write.
 - Dirty-marker outbox for the projection: every mutation transaction sets a plain boolean `dirty` on affected SKU records. Only mutation transactions can set the flag, which makes every FetchTCG write traceable to an audited inventory event; blind reconciliation never changes quantities. Coalescing is inherent because the projection is absolute. The publish phase discovers dirty SKUs through an eventually consistent GSI; a recent dirty SKU missed by one run remains dirty and is picked up by a later publish.
-- Stock counts are never stored: SKU detail derives `in_stock`/`reserved`/`sold` counts from the unit items in its own partition query. SKU browse returns only identity fields (no counts, no unit fan-out) — users click through to the detail page for counts. With no denormalized aggregate there is nothing to drift or verify. Every mutation transaction bumps a plain `version` number on the affected SKU (`ADD version :1`); the publish phase recounts unit items with a strongly consistent partition query for its absolute write and clears `dirty` conditionally on the version being unchanged since the recount, so a mutation landing mid-publish fails the clear and the SKU stays dirty for the next run.
+- Stock counts are neither stored nor included in SKU reads. Unit counts and statuses are read through the separate unit operation where needed. Every mutation transaction bumps a plain `version` number on the affected SKU (`ADD version :1`); the publish phase recounts unit items with a strongly consistent partition query for its absolute write and clears `dirty` conditionally on the version being unchanged since the recount, so a mutation landing mid-publish fails the clear and the SKU stays dirty for the next run.
 - The `tcg_inventory` table remains a single physical-table storage contract, while each persisted record type has its own independent `@DynamoDbBean` schema (`SkuItem`, `UnitItem`, `ImportItem`, `ImportRowItem`, `ScanItem`, `ScanRowItem`, `OrderItem`, `JobItem`, `SettingsItem`, `ReportItem`, `AuditItem`, `SequenceCounterItem`, and `CatalogSnapshotItem`). Each bean owns its `pk`, `sk`, attributes, and applicable GSI keys. Object values used by only one record schema stay nested in that bean, including separate `Photo` value types for units and import rows even though their shapes currently match. Cross-record atomic operations continue to use low-level DynamoDB requests with the concrete table schema for each serialized item.
 - SQS FIFO work queue with continuation messages: messages carry only `{user, job_id, job_type}`; the job item's `continuation` is authoritative. The queue is FIFO with one message group per user because the group is what serializes the consumer to concurrency 1 (Lambda event source mappings cannot set maximum concurrency below 2 on standard queues), serializing all FetchTCG traffic and all inventory-mutating jobs (no job lease needed). Each batch does bounded work, checkpoints, and re-enqueues.
 - Synchronous inventory, import review, scan deletion, and settings mutations remain available during unrelated background work. Resource lifecycle checks still apply. Existing background-start admission checks and per-user FIFO execution remain unchanged; admission is best effort, and a rare duplicate publish is accepted.
@@ -370,7 +370,7 @@ The worker publishes through CatalogSnapshotStore. A failed upload or registry w
 | `POST`   | `/scans/{scan_id}/confirm`                               | accept selected rows and queue catalog validation; return `202` while confirming          |
 | `DELETE` | `/scans/{scan_id}`                                       | delete an unfinished scan and its source objects                                          |
 | `GET`    | `/skus`                                                  | browse/search SKUs for required `game` (prefix search, continuation paging)               |
-| `GET`    | `/skus/{sku_id}`                                         | SKU detail, units, provider image URLs, and ordered physical-photo IDs                    |
+| `GET`    | `/skus/{sku_id}`                                         | SKU metadata in the shared Inventory client shape                                         |
 | `GET`    | `/photos?photo_ids=...`                                  | resolve repeated physical-photo IDs to signed download URLs                               |
 | `GET`    | `/skus/{sku_id}/units`                                   | list one page of physical units, locations, and ordered photo IDs                         |
 | `DELETE` | `/skus/{sku_id}/units/{sequence_number}`                 | remove a unit (optional `reason` query param)                                             |
@@ -670,7 +670,7 @@ The configured price floor represents the minimum final suggested price. Pricing
 }
 ```
 
-`GET /photos?photo_ids=<id>&photo_ids=<id>` resolves 1–100 repeated photo IDs in request order and deduplicates repeated IDs. It returns `photos: [{photo_id, url}]`; each URL is a 15-minute signed GET for the authenticated user's existing `users/<user>/photos/<photo_id>.jpg` object. Lookup signs URLs without reading or checking for an S3 object, so an unknown ID still receives a URL. `GET /imports/{import_id}` and `GET /skus/{sku_id}` return ordered `photos: ["<photo_id>"]` references. The browser resolves them with this endpoint. Photos operations use the authenticated user and expose no storage keys.
+`GET /photos?photo_ids=<id>&photo_ids=<id>` resolves 1–100 repeated photo IDs in request order and deduplicates repeated IDs. It returns `photos: [{photo_id, url}]`; each URL is a 15-minute signed GET for the authenticated user's existing `users/<user>/photos/<photo_id>.jpg` object. Lookup signs URLs without reading or checking for an S3 object, so an unknown ID still receives a URL. `GET /imports/{import_id}` and `GET /skus/{sku_id}/units` return ordered `photos: ["<photo_id>"]` references. The browser resolves them with this endpoint. Photos operations use the authenticated user and expose no storage keys.
 
 `GET /skus/{sku_id}/units` returns one page of physical units for the authenticated user's SKU. It accepts optional `limit` (default 100, range 1–100) and opaque `continuation` query parameters. Each response contains `units` and nullable `next_continuation`; callers follow the continuation until it is null. The query is strongly consistent within a page, ordered by sequence number, and filters `removed` units after reading the page. A page can therefore be empty while still returning a continuation. Pages are live reads and do not form a snapshot across requests.
 
@@ -690,58 +690,32 @@ The configured price floor represents the minimum final suggested price. Pricing
 
 The service reads one DynamoDB query page per request and returns the unit's ordered photo IDs. Physical-photo URLs are presigned by Photos for 15 minutes without reading the S3 objects. Continuation tokens are opaque; the server decodes the DynamoDB key and does not bind it to the supplied SKU, user, or page size. The query itself remains scoped to the authenticated user and requested SKU. Invalid limits, missing SKU IDs, and malformed token encodings return `400`; storage failures remain server errors.
 
-The existing `GET /skus/{sku_id}` continues to include its unit projection for current clients while the separate unit endpoint is available. Unit `photos` are ordered photo-ID arrays; legacy SKU detail still resolves signed URLs through Photos for browser compatibility.
-
-`GET /skus/{sku_id}`
-
-Response `200` (units sorted ascending by sequence number; locations and the `*_count` fields are derived server-side from unit items, never stored; unit `photos` are read-only — photo management exists only on review rows):
+`GET /skus/{sku_id}` returns the shared SKU shape in a `sku` wrapper. `last_published_price` is a JSON number or null; storage retains its existing string attribute and the API converts it to `BigDecimal` without rounding. The endpoint reads only the SKU record and performs no Catalog, Games, or unit lookup. Missing SKUs return 404.
 
 ```json
 {
-  "sku_id": "mtg#scryfall#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
-  "game": "mtg",
-  "external_id": "f0a51425-d796-48b8-b68c-bc21fb465c81",
-  "image_urls": {
-    "small": "https://api.scryfall.com/cards/f0a51425-d796-48b8-b68c-bc21fb465c81?format=image&version=small",
-    "normal": "https://api.scryfall.com/cards/f0a51425-d796-48b8-b68c-bc21fb465c81?format=image&version=normal"
-  },
-  "name": "Elvish Aberration",
-  "set_code": "a25",
-  "set_name": "Masters 25",
-  "collector_number": "167",
-  "finish": "normal",
-  "condition": "NM",
-  "in_stock_count": 2,
-  "reserved_count": 1,
-  "sold_count": 0,
-  "units": [
-    {
-      "sequence_number": 1204,
-      "location": "A12-4",
-      "status": "reserved",
-      "photos": []
-    },
-    {
-      "sequence_number": 4242,
-      "location": "A42-42",
-      "status": "in_stock",
-      "photos": ["01JEXAMPLEPHOTOULID00000"]
-    },
-    {
-      "sequence_number": 4250,
-      "location": "A42-50",
-      "status": "in_stock",
-      "photos": []
-    }
-  ]
+  "sku": {
+    "sku_id": "mtg#scryfall#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#NM",
+    "game": "mtg",
+    "external_id": "f0a51425-d796-48b8-b68c-bc21fb465c81",
+    "name": "Elvish Aberration",
+    "set_code": "a25",
+    "set_name": "Masters 25",
+    "collector_number": "167",
+    "finish": "normal",
+    "condition": "NM",
+    "last_published_price": 0.3
+  }
 }
 ```
 
-`GET /skus` requires `game` and accepts optional `search`, `continuation`, and `limit`. The game value is used as an opaque inventory filter and is not checked against Games; a filter with no matches returns an empty list. Each summary includes `game`.
+`GET /skus` requires `game` and accepts optional `search`, `continuation`, and `limit`. The game value is an opaque inventory filter and is not checked against Games. Search remains a case-insensitive name-prefix filter, ordered by the SKU name index. It defaults to one page of 20 and accepts limits from 1 through 100. Each page reads the eventually consistent GSI2 once; continuation tokens carry the DynamoDB key and are not bound to request parameters. Results are live across pages, not a snapshot. Invalid filters, limits, and continuation encodings return 400.
 
-`image_urls` on SKU detail and order units are generated by the registered game's catalog adapter from the stored `external_id`, without a provider request. Magic keeps Scryfall image redirect URLs; Pokémon uses TCGplayer CDN thumbnails (`<product_id>_200w.jpg`) and large images (`<product_id>_in_1000x1000.jpg`). Pokémon's snapshot stores a numeric TCGplayer product ID, whose string form is passed through opaquely by catalog lookups and image URL generation; `fetchtcg_card_id` stores the exact finish-specific FetchTCG card ID used by publishing.
+Both SKU operations return the same `Sku` fields: `sku_id`, `game`, `external_id`, `name`, `set_code`, `set_name`, `collector_number`, `finish`, `condition`, and nullable numeric `last_published_price`. The list operation wraps its array as `skus` with `next_continuation`; detail wraps one value as `sku`. Catalog images are requested separately through Catalog, and units/photos through the Inventory unit and Photos APIs.
 
-Adjustment responses: `DELETE /skus/{sku_id}/units/{sequence_number}` responds `200` with the updated SKU detail (same shape as `GET /skus/{sku_id}`); `PUT /skus/{sku_id}/units/{sequence_number}` with body `{"condition": "LP"}` responds `200` with `{"sku_id": "mtg#scryfall#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#LP"}`.
+`image_urls` on order units are generated by Orders' remaining legacy catalog path. The SKU read handlers no longer generate catalog images. Magic and Pokémon Catalog responses retain their image URLs for Catalog's own callers.
+
+Adjustment responses: `DELETE /skus/{sku_id}/units/{sequence_number}` returns 204 after removal; `PUT /skus/{sku_id}/units/{sequence_number}` with body `{"condition": "LP"}` responds 200 with `{"sku_id": "mtg#scryfall#f0a51425-d796-48b8-b68c-bc21fb465c81#normal#LP"}`.
 
 `GET /orders/{order_id}`
 

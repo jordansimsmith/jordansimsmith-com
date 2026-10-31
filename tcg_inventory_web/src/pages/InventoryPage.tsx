@@ -11,7 +11,7 @@ import {
 import { PageHeader } from '../components/PageHeader';
 import { SkuTable } from '../components/SkuTable';
 import { apiClient } from '../api/client';
-import type { FindSkusParams, Game, GameId, SkuSummary } from '../api/client';
+import type { FindSkusParams, Game, GameId, Sku } from '../api/client';
 import { useGames } from '../GamesProvider';
 
 function InventoryGameSection({
@@ -22,7 +22,7 @@ function InventoryGameSection({
   active: boolean;
 }) {
   const navigate = useNavigate();
-  const [skus, setSkus] = useState<SkuSummary[]>([]);
+  const [skus, setSkus] = useState<Sku[]>([]);
   const [nextContinuation, setNextContinuation] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
@@ -32,7 +32,7 @@ function InventoryGameSection({
   const searchInputRef = useRef<HTMLInputElement>(null);
   const requestIdRef = useRef(0);
 
-  const openSku = (sku: SkuSummary) => {
+  const openSku = (sku: Sku) => {
     navigate(`/inventory/${encodeURIComponent(sku.sku_id)}`);
   };
 

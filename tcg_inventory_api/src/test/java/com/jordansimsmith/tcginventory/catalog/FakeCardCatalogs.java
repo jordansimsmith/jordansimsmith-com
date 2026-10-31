@@ -12,7 +12,7 @@ public class FakeCardCatalogs extends Catalogs {
   private final FakeCardCatalog pokemonCatalog;
 
   public FakeCardCatalogs() {
-    this(new FakeCardCatalog("mtg"), new FakeCardCatalog("pokemon"));
+    this(new FakeCardCatalog(), new FakeCardCatalog());
   }
 
   private FakeCardCatalogs(FakeCardCatalog magicCatalog, FakeCardCatalog pokemonCatalog) {
@@ -50,28 +50,11 @@ public class FakeCardCatalogs extends Catalogs {
   }
 
   private static class FakeCardCatalog implements CardCatalog {
-    private final String game;
     private final Map<String, CatalogCard> cardsById = new LinkedHashMap<>();
     private final List<List<String>> lookupRequests = new ArrayList<>();
     private CatalogException failure;
     private CatalogPage searchPage;
     private CatalogPage alternativesPage;
-
-    private FakeCardCatalog(String game) {
-      this.game = game;
-    }
-
-    @Override
-    public CatalogCard.ImageUrls getImageUrls(String externalId) {
-      if ("pokemon".equals(game)) {
-        return new CatalogCard.ImageUrls(
-            "https://tcgplayer-cdn.tcgplayer.com/product/" + externalId + "_200w.jpg",
-            "https://tcgplayer-cdn.tcgplayer.com/product/" + externalId + "_in_1000x1000.jpg");
-      }
-      return new CatalogCard.ImageUrls(
-          "https://img.example/cards/" + externalId + "/small.jpg",
-          "https://img.example/cards/" + externalId + "/normal.jpg");
-    }
 
     @Override
     public CatalogCard getCard(Game ignoredGame, String externalId) {

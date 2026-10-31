@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SkuDetailPage } from './SkuDetailPage';
 import { GamesProvider } from '../GamesProvider';
 import * as clientModule from '../api/client';
-import type { SkuDetail, SkuUnit } from '../api/client';
+import type { Sku, SkuUnit } from '../api/client';
 
 const REGISTERED_GAMES = [
   {
@@ -79,7 +79,7 @@ const lpUnits: SkuUnit[] = [
   },
 ];
 
-const nmDetail: SkuDetail = {
+const nmDetail: Sku = {
   sku_id: `${SCRYFALL_ID}#normal#NM`,
   game: 'mtg',
   external_id: SCRYFALL_ID,
@@ -89,10 +89,10 @@ const nmDetail: SkuDetail = {
   collector_number: '472',
   finish: 'normal',
   condition: 'NM',
-  last_published_price: '2.50',
+  last_published_price: 2.5,
 };
 
-const lpDetail: SkuDetail = {
+const lpDetail: Sku = {
   sku_id: `${SCRYFALL_ID}#normal#LP`,
   game: 'mtg',
   external_id: SCRYFALL_ID,
@@ -129,10 +129,10 @@ describe('SkuDetailPage', () => {
     vi.spyOn(clientModule.apiClient, 'getSku').mockImplementation(
       async (skuId) => {
         if (skuId === nmDetail.sku_id) {
-          return structuredClone(nmDetail);
+          return { sku: structuredClone(nmDetail) };
         }
         if (skuId === lpDetail.sku_id) {
-          return structuredClone(lpDetail);
+          return { sku: structuredClone(lpDetail) };
         }
         throw new Error('Not Found');
       },
@@ -181,6 +181,7 @@ describe('SkuDetailPage', () => {
       await screen.findByRole('heading', { name: 'Sol Ring' }),
     ).toBeDefined();
     expect(screen.getByText(/Commander Legends \(CMR\)/)).toBeDefined();
+    expect(screen.getByText('$2.50')).toBeDefined();
     expect(screen.queryByText(/In stock:|Reserved:|Sold:/)).toBeNull();
     expect(screen.getByRole('region', { name: 'Card overview' })).toBeDefined();
     expect(screen.getByRole('region', { name: 'Units' })).toBeDefined();
@@ -270,7 +271,9 @@ describe('SkuDetailPage', () => {
   });
 
   it('shows the image placeholder when the card image fails to load', async () => {
-    vi.spyOn(clientModule.apiClient, 'getSku').mockResolvedValue(nmDetail);
+    vi.spyOn(clientModule.apiClient, 'getSku').mockResolvedValue({
+      sku: nmDetail,
+    });
 
     renderSkuDetailPage();
 

@@ -10,10 +10,44 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 public class InventoryReadRepository {
+  private final DynamoDbTable<InventorySkuItem> skuTable;
   private final DynamoDbTable<InventoryUnitItem> unitTable;
 
-  public InventoryReadRepository(DynamoDbTable<InventoryUnitItem> unitTable) {
+  public InventoryReadRepository(
+      DynamoDbTable<InventorySkuItem> skuTable, DynamoDbTable<InventoryUnitItem> unitTable) {
+    this.skuTable = skuTable;
     this.unitTable = unitTable;
+  }
+
+  @Nullable
+  public Page<InventorySkuItem> findSkus(
+      String user,
+      String game,
+      String search,
+      int limit,
+      @Nullable Map<String, AttributeValue> continuation) {
+    var request =
+        QueryEnhancedRequest.builder()
+            .queryConditional(
+                QueryConditional.sortBeginsWith(
+                    Key.builder()
+                        .partitionValue(InventorySkuItem.formatGsi2pk(user))
+                        .sortValue(InventorySkuItem.formatGsi2skPrefix(game, search))
+                        .build()))
+            .scanIndexForward(true)
+            .limit(limit)
+            .exclusiveStartKey(continuation)
+            .build();
+    return skuTable.index("gsi2").query(request).stream().findFirst().orElse(null);
+  }
+
+  @Nullable
+  public InventorySkuItem getSku(String user, String skuId) {
+    return skuTable.getItem(
+        Key.builder()
+            .partitionValue(InventorySkuItem.formatPk(user, skuId))
+            .sortValue("SKU")
+            .build());
   }
 
   public Page<InventoryUnitItem> findUnits(

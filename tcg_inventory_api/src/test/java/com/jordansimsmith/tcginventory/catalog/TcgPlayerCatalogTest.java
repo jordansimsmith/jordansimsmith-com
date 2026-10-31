@@ -22,37 +22,6 @@ public class TcgPlayerCatalogTest {
   private static final Instant START = Instant.parse("2026-10-08T00:00:00Z");
 
   @Test
-  void constructionAndImageLookupShouldNotLoadCatalog() {
-    // arrange
-    var fixture = new Fixture("pokemon", snapshot("pokemon", "snapshot-1", "Pikachu", 123));
-
-    // act
-    var catalog = fixture.catalog();
-    var imageUrls = catalog.getImageUrls("123");
-
-    // assert
-    assertThat(fixture.repository.latestSnapshotRequests).isZero();
-    assertThat(imageUrls.small())
-        .isEqualTo("https://tcgplayer-cdn.tcgplayer.com/product/123_200w.jpg");
-    assertThat(imageUrls.normal())
-        .isEqualTo("https://tcgplayer-cdn.tcgplayer.com/product/123_in_1000x1000.jpg");
-  }
-
-  @Test
-  void imageLookupShouldPassThroughOpaqueIds() {
-    // arrange
-    var catalog =
-        new Fixture("pokemon", snapshot("pokemon", "snapshot-1", "Pikachu", 123)).catalog();
-
-    // act
-    var imageUrls = catalog.getImageUrls("product-alpha");
-
-    // assert
-    assertThat(imageUrls.small())
-        .isEqualTo("https://tcgplayer-cdn.tcgplayer.com/product/product-alpha_200w.jpg");
-  }
-
-  @Test
   void getCardShouldLoadAndMapSnapshotProduct() {
     // arrange
     var fixture = new Fixture("pokemon", snapshot("pokemon", "snapshot-1", "Pikachu", 123));

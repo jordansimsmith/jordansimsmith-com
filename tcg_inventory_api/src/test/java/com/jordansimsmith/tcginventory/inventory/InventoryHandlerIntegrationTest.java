@@ -10,6 +10,8 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
+import com.jordansimsmith.tcginventory.inventory.api.FindSkusHandler;
+import com.jordansimsmith.tcginventory.inventory.api.GetSkuHandler;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.nio.charset.StandardCharsets;
@@ -195,7 +197,7 @@ public class InventoryHandlerIntegrationTest {
   }
 
   @Test
-  void getSkuShouldReturnDetailWithUnitsSortedBySequenceNumber() throws Exception {
+  void getSkuShouldReturnSkuWithoutImagesCountsOrUnits() throws Exception {
     // arrange
     createSku(
         "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
@@ -229,33 +231,18 @@ public class InventoryHandlerIntegrationTest {
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
-    assertThat(body.get("sku_id").asText()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(body.get("game").asText()).isEqualTo("mtg");
-    assertThat(body.has("external_source")).isFalse();
-    assertThat(body.get("external_id").asText()).isEqualTo("scryfall-1");
-    assertThat(body.get("image_urls").get("small").asText())
-        .isEqualTo("https://img.example/cards/scryfall-1/small.jpg");
-    assertThat(body.get("image_urls").get("normal").asText())
-        .isEqualTo("https://img.example/cards/scryfall-1/normal.jpg");
-    assertThat(body.has("scryfall_id")).isFalse();
-    assertThat(body.get("name").asText()).isEqualTo("Elvish Mystic");
-    assertThat(body.get("in_stock_count").asInt()).isEqualTo(2);
-    assertThat(body.get("reserved_count").asInt()).isEqualTo(1);
-    assertThat(body.get("sold_count").asInt()).isEqualTo(1);
-
-    var units = body.get("units");
-    assertThat(units).hasSize(4);
-    assertThat(units.get(0).get("sequence_number").asInt()).isEqualTo(500);
-    assertThat(units.get(0).get("status").asText()).isEqualTo("sold");
-    assertThat(units.get(1).get("sequence_number").asInt()).isEqualTo(1204);
-    assertThat(units.get(1).get("location").asText()).isEqualTo("A12-4");
-    assertThat(units.get(2).get("sequence_number").asInt()).isEqualTo(4242);
-    assertThat(units.get(2).get("location").asText()).isEqualTo("A42-42");
-    assertThat(units.get(3).get("sequence_number").asInt()).isEqualTo(4250);
+    var sku = body.get("sku");
+    assertThat(sku.get("sku_id").asText()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
+    assertThat(sku.get("game").asText()).isEqualTo("mtg");
+    assertThat(sku.get("external_id").asText()).isEqualTo("scryfall-1");
+    assertThat(sku.get("name").asText()).isEqualTo("Elvish Mystic");
+    assertThat(sku.has("image_urls")).isFalse();
+    assertThat(sku.has("in_stock_count")).isFalse();
+    assertThat(sku.has("units")).isFalse();
   }
 
   @Test
-  void getSkuShouldUseTcgplayerImagesAndKeepFinishesInSeparateSkus() throws Exception {
+  void getSkuShouldKeepFinishesInSeparateSkus() throws Exception {
     // arrange
     var normalSkuId = "pokemon#tcgplayer#283917#normal#NM";
     var reverseHoloSkuId = "pokemon#tcgplayer#283917#reverse_holofoil#NM";
@@ -271,15 +258,12 @@ public class InventoryHandlerIntegrationTest {
 
     // assert
     var normal = objectMapper.readTree(normalResponse.getBody());
-    assertThat(normal.get("sku_id").asText()).isEqualTo(normalSkuId);
-    assertThat(normal.get("external_id").asText()).isEqualTo("283917");
-    assertThat(normal.get("finish").asText()).isEqualTo("normal");
-    assertThat(normal.get("image_urls").get("small").asText())
-        .isEqualTo("https://tcgplayer-cdn.tcgplayer.com/product/283917_200w.jpg");
-    assertThat(normal.get("image_urls").get("normal").asText())
-        .isEqualTo("https://tcgplayer-cdn.tcgplayer.com/product/283917_in_1000x1000.jpg");
-    assertThat(normal.get("units").get(0).get("location").asText()).isEqualTo("A0-42");
-    assertThat(objectMapper.readTree(reverseHoloResponse.getBody()).get("sku_id").asText())
+    assertThat(normal.get("sku").get("sku_id").asText()).isEqualTo(normalSkuId);
+    assertThat(normal.get("sku").get("external_id").asText()).isEqualTo("283917");
+    assertThat(normal.get("sku").get("finish").asText()).isEqualTo("normal");
+    assertThat(normal.get("sku").has("units")).isFalse();
+    assertThat(
+            objectMapper.readTree(reverseHoloResponse.getBody()).get("sku").get("sku_id").asText())
         .isEqualTo(reverseHoloSkuId);
   }
 
@@ -299,7 +283,8 @@ public class InventoryHandlerIntegrationTest {
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
-    assertThat(body.get("sku_id").asText()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
+    assertThat(body.get("sku").get("sku_id").asText())
+        .isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
   }
 
   @Test
@@ -579,51 +564,6 @@ public class InventoryHandlerIntegrationTest {
   }
 
   @Test
-  void getSkuShouldReturnOrderedUnitPhotoIds() throws Exception {
-    // arrange
-    createSku(
-        "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
-    createUnit(
-        "jordan",
-        "mtg#scryfall#scryfall-1#normal#NM",
-        4242,
-        "in_stock",
-        "import1",
-        List.of(UnitItem.Photo.create("photo-in-stock")));
-    createUnit(
-        "jordan",
-        "mtg#scryfall#scryfall-1#normal#NM",
-        1204,
-        "reserved",
-        "import1",
-        List.of(UnitItem.Photo.create("photo-reserved")));
-    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 4250, "in_stock", "import1");
-    createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 300, "removed", "import1");
-
-    // act
-    var response =
-        getSkuHandler.handleRequest(
-            buildEvent("jordan", Map.of("sku_id", "mtg#scryfall#scryfall-1#normal#NM")), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var units = objectMapper.readTree(response.getBody()).get("units");
-    assertThat(units).hasSize(3);
-
-    assertThat(units.get(0).get("sequence_number").asInt()).isEqualTo(1204);
-    assertThat(units.get(0).get("status").asText()).isEqualTo("reserved");
-    assertThat(units.get(0).get("photos")).hasSize(1);
-    assertThat(units.get(0).get("photos").get(0).asText()).isEqualTo("photo-reserved");
-
-    assertThat(units.get(1).get("sequence_number").asInt()).isEqualTo(4242);
-    assertThat(units.get(1).get("photos")).hasSize(1);
-    assertThat(units.get(1).get("photos").get(0).asText()).isEqualTo("photo-in-stock");
-
-    assertThat(units.get(2).get("sequence_number").asInt()).isEqualTo(4250);
-    assertThat(units.get(2).get("photos")).isEmpty();
-  }
-
-  @Test
   void updateUnitShouldCreateTargetSkuWhenNotExists() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
@@ -726,8 +666,7 @@ public class InventoryHandlerIntegrationTest {
         getSkuHandler.handleRequest(
             buildEvent("jordan", Map.of("sku_id", "mtg#scryfall#scryfall-1#normal#NM")), null);
     var body = objectMapper.readTree(getResponse.getBody());
-    assertThat(body.get("in_stock_count").asInt()).isEqualTo(0);
-    assertThat(body.get("units")).isEmpty();
+    assertThat(body.get("sku").has("units")).isFalse();
   }
 
   private void createSku(

@@ -266,11 +266,11 @@ lambdas = {
         },
     },
     "find_skus": {
-        "handler": "com.jordansimsmith.tcginventory.inventory.FindSkusHandler",
+        "handler": "com.jordansimsmith.tcginventory.inventory.api.FindSkusHandler",
         "zip_file": "find-skus-handler_deploy.jar",
     },
     "get_sku": {
-        "handler": "com.jordansimsmith.tcginventory.inventory.GetSkuHandler",
+        "handler": "com.jordansimsmith.tcginventory.inventory.api.GetSkuHandler",
         "zip_file": "get-sku-handler_deploy.jar",
     },
     "find_units": {

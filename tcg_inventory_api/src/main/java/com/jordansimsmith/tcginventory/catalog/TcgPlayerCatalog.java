@@ -39,12 +39,6 @@ public class TcgPlayerCatalog implements CardCatalog {
   }
 
   @Override
-  public CatalogCard.ImageUrls getImageUrls(String externalId) {
-    var imageUrls = CardImageUrls.forSource("tcgplayer", externalId);
-    return new CatalogCard.ImageUrls(imageUrls.small(), imageUrls.normal());
-  }
-
-  @Override
   public CatalogCard getCard(Game ignoredGame, String externalId) {
     var snapshot = load();
     var product =
@@ -183,6 +177,7 @@ public class TcgPlayerCatalog implements CardCatalog {
             .findFirst()
             .orElseThrow();
     var productId = Integer.toString(product.productId());
+    var imageUrls = CardImageUrls.forSource("tcgplayer", productId);
     return new CatalogCard(
         game,
         productId,
@@ -190,7 +185,7 @@ public class TcgPlayerCatalog implements CardCatalog {
         group.setCode(),
         group.setName(),
         product.collectorNumber(),
-        getImageUrls(productId),
+        new CatalogCard.ImageUrls(imageUrls.small(), imageUrls.normal()),
         product.availableFinishes());
   }
 }

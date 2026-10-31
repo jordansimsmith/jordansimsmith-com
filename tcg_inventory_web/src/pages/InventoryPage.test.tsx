@@ -13,7 +13,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { InventoryPage } from './InventoryPage';
 import { GamesProvider } from '../GamesProvider';
 import * as clientModule from '../api/client';
-import type { Game, SkuSummary } from '../api/client';
+import type { Game, Sku } from '../api/client';
 
 const REGISTERED_GAMES: Game[] = [
   {
@@ -42,50 +42,54 @@ const REGISTERED_GAMES: Game[] = [
   },
 ];
 
-const skuFixtures: SkuSummary[] = [
+const skuFixtures: Sku[] = [
   {
     sku_id: '11111111-1111-4111-8111-111111111111#normal#NM',
     game: 'mtg',
+    external_id: 'lightning-bolt',
     name: 'Lightning Bolt',
     set_code: 'sta',
     set_name: 'Strixhaven Mystical Archive',
     collector_number: '42',
     finish: 'normal',
     condition: 'NM',
-    last_published_price: '1.50',
+    last_published_price: 1.5,
   },
   {
     sku_id: '22222222-2222-4222-8222-222222222222#foil#LP',
     game: 'mtg',
+    external_id: 'opt',
     name: 'Opt',
     set_code: 'dom',
     set_name: 'Dominaria',
     collector_number: '60',
     finish: 'foil',
     condition: 'LP',
-    last_published_price: null,
+    last_published_price: 0,
   },
   {
     sku_id: '33333333-3333-4333-8333-333333333333#normal#MP',
     game: 'mtg',
+    external_id: 'sol-ring',
     name: 'Sol Ring',
     set_code: 'cmr',
     set_name: 'Commander Legends',
     collector_number: '331',
     finish: 'normal',
     condition: 'MP',
-    last_published_price: '0.30',
+    last_published_price: 0.3,
   },
   {
     sku_id: 'pokemon#tcgplayer#283917#reverse_holofoil#NM',
     game: 'pokemon',
+    external_id: '283917',
     name: 'Abomasnow',
     set_code: 'lost-origin',
     set_name: 'Lost Origin',
     collector_number: '043/196',
     finish: 'reverse_holofoil',
     condition: 'NM',
-    last_published_price: '7.50',
+    last_published_price: 7.5,
   },
 ];
 
@@ -152,7 +156,9 @@ describe('InventoryPage', () => {
     expect(within(row).getByText('42')).toBeDefined();
     expect(within(row).getByText('Normal')).toBeDefined();
     expect(within(row).getByText('NM')).toBeDefined();
+    expect(within(row).getByText('$1.50')).toBeDefined();
     expect(screen.getByText('Opt')).toBeDefined();
+    expect(screen.getByText('$0.00')).toBeDefined();
     expect(screen.getByText('Sol Ring')).toBeDefined();
   });
 

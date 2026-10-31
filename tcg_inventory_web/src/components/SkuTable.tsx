@@ -1,11 +1,11 @@
 import { Table } from '@mantine/core';
-import type { SkuSummary } from '../api/client';
+import type { Sku } from '../api/client';
 import { useGames } from '../GamesProvider';
 import classes from './CollectionTable.module.css';
 
 interface SkuTableProps {
-  skus: SkuSummary[];
-  onOpen: (sku: SkuSummary) => void;
+  skus: Sku[];
+  onOpen: (sku: Sku) => void;
 }
 
 export function SkuTable({ skus, onOpen }: SkuTableProps) {
@@ -52,7 +52,7 @@ export function SkuTable({ skus, onOpen }: SkuTableProps) {
             </Table.Td>
             <Table.Td ta="right" data-field="price" data-label="Price">
               {sku.last_published_price != null
-                ? `$${sku.last_published_price}`
+                ? `$${sku.last_published_price.toFixed(2)}`
                 : ''}
             </Table.Td>
           </Table.Tr>

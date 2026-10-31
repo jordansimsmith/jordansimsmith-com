@@ -121,7 +121,7 @@ describe('createFakeClient', () => {
     const response = await client.findSkus({ game: 'mtg', search: 'sol ring' });
     const nmSku = response.skus.find((sku) => sku.condition === 'NM');
 
-    const detail = await client.getSku(nmSku!.sku_id);
+    const detail = (await client.getSku(nmSku!.sku_id)).sku;
     const units = await findAllUnits(client, detail.sku_id);
 
     expect(units.filter((unit) => unit.status === 'in_stock')).toHaveLength(6);
@@ -161,7 +161,7 @@ describe('createFakeClient', () => {
       (sku) => sku.condition === 'NM',
     )!.sku_id;
 
-    const detail = await client.getSku(skuId);
+    const detail = (await client.getSku(skuId)).sku;
     const units = await findAllUnits(client, skuId);
 
     expect(detail.condition).toBe('NM');
@@ -283,7 +283,7 @@ describe('createFakeClient', () => {
     const sourceId = lightningBoltSkus.skus.find(
       (sku) => sku.condition === 'NM',
     )!.sku_id;
-    const source = await client.getSku(sourceId);
+    const source = (await client.getSku(sourceId)).sku;
     const sourceUnits = await findAllUnits(client, sourceId);
     expect(source.condition).toBe('NM');
     const unit = sourceUnits.find((entry) => entry.status === 'in_stock');
@@ -298,7 +298,7 @@ describe('createFakeClient', () => {
       (sku) => sku.condition === 'LP',
     )!.sku_id;
     expect(response.sku_id).toBe(targetId);
-    const target = await client.getSku(targetId);
+    const target = (await client.getSku(targetId)).sku;
     const targetUnits = await findAllUnits(client, targetId);
     expect(target.condition).toBe('LP');
     expect(
@@ -330,7 +330,7 @@ describe('createFakeClient', () => {
       search: 'sylvan library',
     });
     const sourceId = sylvanLibrarySkus.skus[0].sku_id;
-    const source = await client.getSku(sourceId);
+    const source = (await client.getSku(sourceId)).sku;
     const sourceUnits = await findAllUnits(client, sourceId);
     const unit = sourceUnits[0];
 
@@ -341,7 +341,7 @@ describe('createFakeClient', () => {
     );
 
     expect(response.sku_id).not.toBe(source.sku_id);
-    const target = await client.getSku(response.sku_id);
+    const target = (await client.getSku(response.sku_id)).sku;
     expect(target.game).toBe(source.game);
     expect(target).not.toHaveProperty('external_source');
     expect(target.external_id).toBe(source.external_id);
@@ -392,13 +392,13 @@ describe('createFakeClient pokemon inventory', () => {
       (sku) => sku.finish === 'normal',
     );
     expect(normalAbomasnowSku).toBeDefined();
-    const detail = await client.getSku(normalAbomasnowSku!.sku_id);
+    const detail = (await client.getSku(normalAbomasnowSku!.sku_id)).sku;
     const detailUnits = await findAllUnits(client, detail.sku_id);
     expect(detail.external_id).toBe('283917');
     expect(detailUnits.map((unit) => unit.location)).toEqual(['A0-0', 'A0-1']);
 
     const magic = await client.findSkus({ game: 'mtg' });
-    const magicDetail = await client.getSku(magic.skus[0].sku_id);
+    const magicDetail = (await client.getSku(magic.skus[0].sku_id)).sku;
     const magicUnits = await findAllUnits(client, magicDetail.sku_id);
     expect(magicUnits[0].sequence_number).toBe(0);
     expect(detailUnits[0].sequence_number).toBe(0);
@@ -597,7 +597,9 @@ describe('createFakeClient imports', () => {
       search: 'llanowar elves',
     });
     const elvesDetails = await Promise.all(
-      elvesCandidates.skus.map((sku) => client.getSku(sku.sku_id)),
+      elvesCandidates.skus.map(
+        async (sku) => (await client.getSku(sku.sku_id)).sku,
+      ),
     );
     const elves = elvesDetails.find(
       (sku) => sku.external_id === '581b7327-3215-4a4f-b4ae-d9d4002ba882',
@@ -611,7 +613,9 @@ describe('createFakeClient imports', () => {
     // the lp opt sku did not exist and is created by the confirm
     const optCandidates = await client.findSkus({ game: 'mtg', search: 'opt' });
     const optDetails = await Promise.all(
-      optCandidates.skus.map((sku) => client.getSku(sku.sku_id)),
+      optCandidates.skus.map(
+        async (sku) => (await client.getSku(sku.sku_id)).sku,
+      ),
     );
     const opt = optDetails.find(
       (sku) =>
@@ -630,7 +634,9 @@ describe('createFakeClient imports', () => {
       search: 'ponder',
     });
     const ponderDetails = await Promise.all(
-      ponderCandidates.skus.map((sku) => client.getSku(sku.sku_id)),
+      ponderCandidates.skus.map(
+        async (sku) => (await client.getSku(sku.sku_id)).sku,
+      ),
     );
     expect(
       ponderDetails.some(
@@ -1340,7 +1346,7 @@ describe('createFakeClient repricing', () => {
     await client.getPublish();
     const firstPage = await client.findSkus({ game: 'mtg' });
     expect(firstPage.skus.map((sku) => sku.last_published_price)).toContain(
-      '1000.00',
+      1000,
     );
   });
 });

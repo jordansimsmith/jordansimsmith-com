@@ -2,7 +2,7 @@ load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 
 java_test_suite(
     name = "server-integration-tests",
-    srcs = ["FindUnitsServiceIntegrationTest.java"],
+    srcs = ["InventoryReadServiceIntegrationTest.java"],
     env = {
         "AWS_ACCESS_KEY_ID": "fake",
         "AWS_SECRET_ACCESS_KEY": "fake",

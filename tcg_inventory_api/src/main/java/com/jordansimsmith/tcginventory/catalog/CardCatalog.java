@@ -5,8 +5,6 @@ import java.util.List;
 import java.util.Map;
 
 public interface CardCatalog {
-  CatalogCard.ImageUrls getImageUrls(String externalId);
-
   CatalogCard getCard(Game game, String externalId);
 
   Map<String, CatalogCard> findCards(Game game, List<String> externalIds);

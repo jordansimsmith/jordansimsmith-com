@@ -197,11 +197,11 @@ module "java_api" {
       artifact = var.artifacts["get_reports"]
     }
     find_skus = {
-      handler  = "com.jordansimsmith.tcginventory.inventory.FindSkusHandler"
+      handler  = "com.jordansimsmith.tcginventory.inventory.api.FindSkusHandler"
       artifact = var.artifacts["find_skus"]
     }
     get_sku = {
-      handler  = "com.jordansimsmith.tcginventory.inventory.GetSkuHandler"
+      handler  = "com.jordansimsmith.tcginventory.inventory.api.GetSkuHandler"
       artifact = var.artifacts["get_sku"]
     }
     find_units = {

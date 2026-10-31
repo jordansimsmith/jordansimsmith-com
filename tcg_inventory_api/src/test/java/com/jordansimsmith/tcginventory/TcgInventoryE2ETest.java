@@ -314,9 +314,13 @@ public class TcgInventoryE2ETest {
     var skuResponse = get("/skus/" + URLEncoder.encode(HIT_SKU_ID, StandardCharsets.UTF_8));
     assertThat(skuResponse.statusCode()).isEqualTo(200);
     var skuBody = objectMapper.readTree(skuResponse.body());
-    assertThat(skuBody.get("units")).hasSize(2);
-    assertThat(skuBody.get("units").get(0).get("photos")).hasSize(2);
-    assertThat(skuBody.get("units").get(1).get("photos")).hasSize(1);
+    assertThat(skuBody.get("sku").get("sku_id").asText()).isEqualTo(HIT_SKU_ID);
+    var unitResponse =
+        get("/skus/" + URLEncoder.encode(HIT_SKU_ID, StandardCharsets.UTF_8) + "/units");
+    var unitBody = objectMapper.readTree(unitResponse.body());
+    assertThat(unitBody.get("units")).hasSize(2);
+    assertThat(unitBody.get("units").get(0).get("photos")).hasSize(2);
+    assertThat(unitBody.get("units").get(1).get("photos")).hasSize(1);
 
     // act - publish run 1: stub returns empty offers, listing phase creates listings
     triggerPublishAndWait();
@@ -366,7 +370,7 @@ public class TcgInventoryE2ETest {
     var repricedSku =
         objectMapper.readTree(
             get("/skus/" + URLEncoder.encode(HIT_SKU_ID, StandardCharsets.UTF_8)).body());
-    assertThat(repricedSku.get("suggested_price").asText()).isEqualTo("49.00");
+    assertThat(repricedSku.get("sku").get("sku_id").asText()).isEqualTo(HIT_SKU_ID);
 
     var pendingPublish = get("/publish");
     assertThat(pendingPublish.statusCode()).isEqualTo(200);

@@ -715,10 +715,39 @@ describe('http client scans', () => {
     fetchSpy.mockResolvedValue({ ok: true, json });
     const client = createHttpClient();
 
-    await client.findSkus({ game: 'mtg', search: 'sol ring' });
+    await client.findSkus({ game: 'mtg', search: 'sol ring', limit: 12 });
 
     expect(fetchSpy.mock.calls[0][0]).toBe(
-      'https://api.tcg-inventory.jordansimsmith.com/skus?game=mtg&search=sol+ring',
+      'https://api.tcg-inventory.jordansimsmith.com/skus?game=mtg&search=sol+ring&limit=12',
+    );
+  });
+
+  it('gets a wrapped SKU with numeric price from the encoded detail path', async () => {
+    const responseBody = {
+      sku: {
+        sku_id: 'sku#opaque',
+        game: 'mtg',
+        external_id: 'opaque/id',
+        name: 'Card',
+        set_code: 'set',
+        set_name: 'Set',
+        collector_number: '1',
+        finish: 'normal',
+        condition: 'NM',
+        last_published_price: 0.3,
+      },
+    };
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(responseBody),
+    });
+
+    await expect(createHttpClient().getSku('sku#opaque')).resolves.toEqual(
+      responseBody,
+    );
+
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/skus/sku%23opaque',
     );
   });
 

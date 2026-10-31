@@ -67,26 +67,28 @@ export const CONDITIONS: Condition[] = ['NM', 'LP', 'MP', 'HP', 'DMG'];
 
 export type UnitStatus = 'in_stock' | 'reserved' | 'sold' | 'removed';
 
-export interface SkuSummary {
+export interface Sku {
   sku_id: string;
   game: GameId;
+  external_id: string;
   name: string;
   set_code: string;
   set_name: string;
   collector_number: string;
   finish: Finish;
   condition: Condition;
-  last_published_price: string | null;
+  last_published_price: number | null;
 }
 
 export interface FindSkusResponse {
-  skus: SkuSummary[];
+  skus: Sku[];
   next_continuation: string | null;
 }
 
 export interface FindSkusParams {
   game: GameId;
   search?: string;
+  limit?: number;
   continuation?: string;
 }
 
@@ -99,8 +101,8 @@ export interface SkuUnit {
   updated_at: number | null;
 }
 
-export interface SkuDetail extends SkuSummary {
-  external_id: string;
+export interface GetSkuResponse {
+  sku: Sku;
 }
 
 export interface FindUnitsRequest {
@@ -562,7 +564,7 @@ export interface ApiClient {
   confirmScan(scanId: string, request: ConfirmScanRequest): Promise<void>;
   deleteScan(scanId: string): Promise<void>;
   findSkus(params: FindSkusParams): Promise<FindSkusResponse>;
-  getSku(skuId: string): Promise<SkuDetail>;
+  getSku(skuId: string): Promise<GetSkuResponse>;
   findUnits(request: FindUnitsRequest): Promise<FindUnitsResponse>;
   deleteUnit(
     skuId: string,

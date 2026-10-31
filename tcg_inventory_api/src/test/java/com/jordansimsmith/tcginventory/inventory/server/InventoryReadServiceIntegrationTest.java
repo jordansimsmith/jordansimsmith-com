@@ -13,9 +13,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.service.BadRequestException;
+import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
+import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.AfterAll;
@@ -33,15 +37,18 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 
 @Testcontainers
-class FindUnitsServiceIntegrationTest {
+class InventoryReadServiceIntegrationTest {
   private static final String TABLE_NAME = "inventory_units_test";
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
   private static DynamoDbClient dynamoDbClient;
   private static DynamoDbTable<InventoryUnitItem> unitTable;
+  private static DynamoDbTable<InventorySkuItem> skuTable;
 
   private FindUnitsService service;
+  private FindSkusService findSkusService;
+  private GetSkuService getSkuService;
 
   @BeforeAll
   static void setUpBeforeClass() {
@@ -53,8 +60,9 @@ class FindUnitsServiceIntegrationTest {
                 StaticCredentialsProvider.create(AwsBasicCredentials.create("fake", "fake")))
             .build();
     var enhancedClient = DynamoDbEnhancedClient.builder().dynamoDbClient(dynamoDbClient).build();
+    skuTable = enhancedClient.table(TABLE_NAME, TableSchema.fromBean(InventorySkuItem.class));
     unitTable = enhancedClient.table(TABLE_NAME, TableSchema.fromBean(InventoryUnitItem.class));
-    DynamoDbUtils.createTable(dynamoDbClient, unitTable);
+    DynamoDbUtils.createTable(dynamoDbClient, skuTable);
   }
 
   @AfterAll
@@ -65,7 +73,135 @@ class FindUnitsServiceIntegrationTest {
   @BeforeEach
   void setUp() {
     DynamoDbUtils.reset(dynamoDbClient);
-    service = new FindUnitsService(new InventoryReadRepository(unitTable), new ObjectMapper());
+    service =
+        new FindUnitsService(new InventoryReadRepository(skuTable, unitTable), new ObjectMapper());
+    var repository = new InventoryReadRepository(skuTable, unitTable);
+    findSkusService = new FindSkusService(repository, new ObjectMapper());
+    getSkuService = new GetSkuService(repository);
+  }
+
+  @Test
+  void findSkusShouldFilterSortAndPaginateByAuthenticatedUser() throws Exception {
+    // arrange
+    skuTable.putItem(sku("alice", "alpha", "Alpha Card", "1.25"));
+    skuTable.putItem(sku("alice", "beta", "Beta Card", null));
+    skuTable.putItem(sku("alice", "else", "Other Card", "2"));
+    skuTable.putItem(sku("bob", "alpha", "Alpha Card", "9"));
+
+    // act
+    var firstPage =
+        findSkusService.findSkus(
+            new RequestContext("alice"), new FindSkusRequest("mtg", null, 1, null));
+    var nextPage =
+        findSkusService.findSkus(
+            new RequestContext("alice"),
+            new FindSkusRequest("mtg", null, 1, firstPage.nextContinuation()));
+    var finalPage =
+        findSkusService.findSkus(
+            new RequestContext("alice"),
+            new FindSkusRequest("mtg", null, 1, nextPage.nextContinuation()));
+    var emptyPage =
+        findSkusService.findSkus(
+            new RequestContext("alice"),
+            new FindSkusRequest("mtg", null, 1, finalPage.nextContinuation()));
+    var bobPage =
+        findSkusService.findSkus(
+            new RequestContext("bob"), new FindSkusRequest("mtg", null, 20, null));
+
+    // assert
+    assertThat(firstPage.skus()).hasSize(1);
+    assertThat(firstPage.skus().get(0).name()).isEqualTo("Alpha Card");
+    assertThat(firstPage.skus().get(0).externalId()).isEqualTo("alpha");
+    assertThat(firstPage.skus().get(0).lastPublishedPrice()).isEqualByComparingTo("1.25");
+    assertThat(nextPage.skus()).extracting(sku -> sku.name()).containsExactly("Beta Card");
+    assertThat(finalPage.skus()).extracting(sku -> sku.name()).containsExactly("Other Card");
+    assertThat(emptyPage.skus()).isEmpty();
+    assertThat(emptyPage.nextContinuation()).isNull();
+    assertThat(bobPage.skus()).extracting(sku -> sku.name()).containsExactly("Alpha Card");
+  }
+
+  @Test
+  void findSkusShouldUseCaseInsensitiveNamePrefix() throws Exception {
+    // arrange
+    skuTable.putItem(sku("alice", "alpha", "Alpha Card", null));
+    skuTable.putItem(sku("alice", "alpine", "Alpine Card", null));
+    skuTable.putItem(sku("alice", "beta", "Beta Card", null));
+
+    // act
+    var response =
+        findSkusService.findSkus(
+            new RequestContext("alice"), new FindSkusRequest("mtg", "aLp", null, null));
+
+    // assert
+    assertThat(response.skus())
+        .extracting(sku -> sku.name())
+        .containsExactly("Alpha Card", "Alpine Card");
+  }
+
+  @Test
+  void skuReadServicesShouldRejectInvalidInputsBeforeStorageAccess() {
+    // arrange
+    var inventoryRepository = mock(InventoryReadRepository.class);
+    var findService = new FindSkusService(inventoryRepository, new ObjectMapper());
+    var getService = new GetSkuService(inventoryRepository);
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                findService.findSkus(
+                    new RequestContext("alice"), new FindSkusRequest(" ", null, null, null)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("game is required");
+    assertThatThrownBy(
+            () ->
+                findService.findSkus(
+                    new RequestContext("alice"), new FindSkusRequest("mtg", null, 101, null)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("limit must be between 1 and 100");
+    assertThatThrownBy(
+            () ->
+                findService.findSkus(
+                    new RequestContext("alice"), new FindSkusRequest("mtg", null, null, "%")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("Invalid continuation");
+    assertThatThrownBy(() -> getService.getSku(new RequestContext("alice"), new GetSkuRequest(" ")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("sku_id is required");
+    verifyNoInteractions(inventoryRepository);
+  }
+
+  @Test
+  void getSkuShouldReturnNumericZeroAndMissingPricesAndRejectUnknownSku() throws Exception {
+    // arrange
+    skuTable.putItem(sku("alice", "zero", "Zero Price", "0.00"));
+    skuTable.putItem(sku("alice", "missing", "Missing Price", null));
+
+    // act
+    var zero = getSkuService.getSku(new RequestContext("alice"), new GetSkuRequest("zero")).sku();
+    var missing =
+        getSkuService.getSku(new RequestContext("alice"), new GetSkuRequest("missing")).sku();
+
+    // assert
+    assertThat(zero.lastPublishedPrice()).isEqualByComparingTo(BigDecimal.ZERO);
+    assertThat(missing.lastPublishedPrice()).isNull();
+    assertThatThrownBy(
+            () -> getSkuService.getSku(new RequestContext("bob"), new GetSkuRequest("zero")))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+    assertThatThrownBy(
+            () -> getSkuService.getSku(new RequestContext("alice"), new GetSkuRequest("bad")))
+        .isInstanceOf(NotFoundException.class);
+  }
+
+  @Test
+  void malformedStoredPriceShouldFailVisibly() {
+    // arrange
+    skuTable.putItem(sku("alice", "bad-price", "Bad Price", "not-a-number"));
+
+    // act / assert
+    assertThatThrownBy(
+            () -> getSkuService.getSku(new RequestContext("alice"), new GetSkuRequest("bad-price")))
+        .isInstanceOf(NumberFormatException.class);
   }
 
   @Test
@@ -224,6 +360,26 @@ class FindUnitsServiceIntegrationTest {
   private static InventoryUnitItem.PhotoItem photo(String photoId) {
     var item = new InventoryUnitItem.PhotoItem();
     item.setPhotoId(photoId);
+    return item;
+  }
+
+  private static InventorySkuItem sku(
+      String user, String skuId, String name, String lastPublishedPrice) {
+    var item = new InventorySkuItem();
+    item.setPk(InventorySkuItem.formatPk(user, skuId));
+    item.setSk("SKU");
+    item.setSkuId(skuId);
+    item.setGame("mtg");
+    item.setExternalId(skuId);
+    item.setName(name);
+    item.setSetCode("set");
+    item.setSetName("Set");
+    item.setCollectorNumber("1");
+    item.setFinish("normal");
+    item.setCondition("NM");
+    item.setLastPublishedPrice(lastPublishedPrice);
+    item.setGsi2pk(InventorySkuItem.formatGsi2pk(user));
+    item.setGsi2sk(InventorySkuItem.formatGsi2skPrefix("mtg", name.toLowerCase()) + "#" + skuId);
     return item;
   }
 }

@@ -55,8 +55,8 @@ import type {
   ScanSuggestion,
   ScanSummary,
   SettingsResponse,
-  SkuDetail,
-  SkuSummary,
+  GetSkuResponse,
+  Sku,
   SkuUnit,
   UnitStatus,
   UpdateSettingsRequest,
@@ -469,24 +469,21 @@ function deriveLocation(sequenceNumber: number): string {
   return `${deriveBlock(sequenceNumber)}-${sequenceNumber % 100}`;
 }
 
-function toSummary(sku: FakeSku): SkuSummary {
+function toSummary(sku: FakeSku): Sku {
   return {
     sku_id: sku.sku_id,
     game: sku.game,
+    external_id: sku.external_id,
     name: sku.name,
     set_code: sku.set_code,
     set_name: sku.set_name,
     collector_number: sku.collector_number,
     finish: sku.finish,
     condition: sku.condition,
-    last_published_price: sku.last_published_price,
-  };
-}
-
-function toDetail(sku: FakeSku): SkuDetail {
-  return {
-    ...toSummary(sku),
-    external_id: sku.external_id,
+    last_published_price:
+      sku.last_published_price == null
+        ? null
+        : Number(sku.last_published_price),
   };
 }
 
@@ -534,7 +531,7 @@ function fakeImageUrls(
   return { small: image, normal: image };
 }
 
-function browseKey(sku: SkuSummary): string {
+function browseKey(sku: Sku): string {
   return `${sku.name.toLowerCase()}#${sku.sku_id}`;
 }
 
@@ -2393,7 +2390,8 @@ export function createFakeClient(): ApiClient {
             sku.name.toLowerCase().startsWith(search),
         )
         .sort((a, b) => (browseKey(a) < browseKey(b) ? -1 : 1));
-      const page = matches.slice(offset, offset + SKU_PAGE_SIZE);
+      const limit = params.limit ?? SKU_PAGE_SIZE;
+      const page = matches.slice(offset, offset + limit);
       const nextOffset = offset + page.length;
       return {
         skus: page,
@@ -2402,8 +2400,8 @@ export function createFakeClient(): ApiClient {
       };
     },
 
-    async getSku(skuId: string): Promise<SkuDetail> {
-      return toDetail(getSkuOrThrow(skuId));
+    async getSku(skuId: string): Promise<GetSkuResponse> {
+      return { sku: toSummary(getSkuOrThrow(skuId)) };
     },
 
     async findUnits({

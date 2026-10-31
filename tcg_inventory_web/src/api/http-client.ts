@@ -38,7 +38,7 @@ import type {
   IdentifyScanResponse,
   ScanDetail,
   SettingsResponse,
-  SkuDetail,
+  GetSkuResponse,
   UpdateSettingsRequest,
   UpdateFetchTcgCredentialsRequest,
   UpdateFetchTcgCredentialsResponse,
@@ -365,6 +365,9 @@ export function createHttpClient(): ApiClient {
       if (params?.search) {
         query.set('search', params.search);
       }
+      if (params.limit != null) {
+        query.set('limit', String(params.limit));
+      }
       if (params?.continuation) {
         query.set('continuation', params.continuation);
       }
@@ -375,7 +378,7 @@ export function createHttpClient(): ApiClient {
       return response.json();
     },
 
-    async getSku(skuId: string): Promise<SkuDetail> {
+    async getSku(skuId: string): Promise<GetSkuResponse> {
       const response = await authenticatedFetch(
         `/skus/${encodeURIComponent(skuId)}`,
       );

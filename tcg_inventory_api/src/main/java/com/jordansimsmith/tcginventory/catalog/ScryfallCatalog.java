@@ -7,7 +7,6 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.Lists;
-import com.jordansimsmith.tcginventory.catalog.server.CardImageUrls;
 import com.jordansimsmith.tcginventory.games.client.Finish;
 import com.jordansimsmith.tcginventory.games.client.Game;
 import java.io.IOException;
@@ -86,12 +85,6 @@ public class ScryfallCatalog implements CardCatalog {
     this.httpClient = httpClient;
     this.objectMapper = objectMapper;
     this.pacer = pacer;
-  }
-
-  @Override
-  public CatalogCard.ImageUrls getImageUrls(String externalId) {
-    var imageUrls = CardImageUrls.forSource("scryfall", externalId);
-    return new CatalogCard.ImageUrls(imageUrls.small(), imageUrls.normal());
   }
 
   @Override

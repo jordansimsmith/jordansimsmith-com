@@ -19,7 +19,7 @@ import { RemoveUnitModal } from '../components/RemoveUnitModal';
 import { EditConditionModal } from '../components/EditConditionModal';
 import { apiClient } from '../api/client';
 import { useGames } from '../GamesProvider';
-import type { Condition, SkuDetail, SkuUnit } from '../api/client';
+import type { Condition, Sku, SkuUnit } from '../api/client';
 import classes from './SkuDetailPage.module.css';
 
 const CARD_IMAGE_FALLBACK =
@@ -73,7 +73,7 @@ export function SkuDetailPage() {
   const { getFinish } = useGames();
   const { skuId } = useParams<{ skuId: string }>();
   const navigate = useNavigate();
-  const [sku, setSku] = useState<SkuDetail | null>(null);
+  const [sku, setSku] = useState<Sku | null>(null);
   const [units, setUnits] = useState<SkuUnit[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map());
   const [cardImage, setCardImage] = useState<string | null>(null);
@@ -99,7 +99,7 @@ export function SkuDetailPage() {
       try {
         const response = await apiClient.getSku(skuId);
         if (!cancelled) {
-          setSku(response);
+          setSku(response.sku);
         }
       } catch (e) {
         if (!cancelled) {
@@ -339,7 +339,7 @@ export function SkuDetailPage() {
                       </Text>
                       <Text size="sm" className={classes.numeric}>
                         {sku.last_published_price != null
-                          ? `$${sku.last_published_price}`
+                          ? `$${sku.last_published_price.toFixed(2)}`
                           : 'Not listed'}
                       </Text>
                     </div>
