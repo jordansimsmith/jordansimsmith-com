@@ -8,5 +8,7 @@ public interface InventoryService {
 
   GetSkuResponse getSku(RequestContext ctx, GetSkuRequest request) throws ServiceException;
 
+  GetUnitResponse getUnit(RequestContext ctx, GetUnitRequest request) throws ServiceException;
+
   FindUnitsResponse findUnits(RequestContext ctx, FindUnitsRequest request) throws ServiceException;
 }

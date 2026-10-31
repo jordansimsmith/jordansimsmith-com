@@ -44,6 +44,18 @@ public class FakeInventoryService implements InventoryService {
   }
 
   @Override
+  public GetUnitResponse getUnit(RequestContext ctx, GetUnitRequest request)
+      throws ServiceException {
+    var unit =
+        units.getOrDefault(new Key(ctx.user(), request.skuId()), List.of()).stream()
+            .filter(candidate -> candidate.sequenceNumber() == request.sequenceNumber())
+            .filter(candidate -> candidate.status() != UnitStatus.REMOVED)
+            .findFirst()
+            .orElseThrow(() -> new NotFoundException("Not Found"));
+    return new GetUnitResponse(unit);
+  }
+
+  @Override
   public FindUnitsResponse findUnits(RequestContext ctx, FindUnitsRequest request)
       throws ServiceException {
     var allUnits = units.getOrDefault(new Key(ctx.user(), request.skuId()), List.of());

@@ -9,6 +9,8 @@ import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsResponse;
 import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
 import com.jordansimsmith.tcginventory.inventory.client.GetSkuResponse;
+import com.jordansimsmith.tcginventory.inventory.client.GetUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.GetUnitResponse;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import dagger.Module;
 import dagger.Provides;
@@ -33,6 +35,7 @@ public class InventoryModule {
     var inventoryRepository = new InventoryReadRepository(skuTable, unitTable);
     var findSkusService = new FindSkusService(inventoryRepository, objectMapper);
     var getSkuService = new GetSkuService(inventoryRepository);
+    var getUnitService = new GetUnitService(inventoryRepository);
     var findUnitsService = new FindUnitsService(inventoryRepository, objectMapper);
     return new InventoryService() {
       @Override
@@ -45,6 +48,12 @@ public class InventoryModule {
       public GetSkuResponse getSku(RequestContext ctx, GetSkuRequest request)
           throws ServiceException {
         return getSkuService.getSku(ctx, request);
+      }
+
+      @Override
+      public GetUnitResponse getUnit(RequestContext ctx, GetUnitRequest request)
+          throws ServiceException {
+        return getUnitService.getUnit(ctx, request);
       }
 
       @Override

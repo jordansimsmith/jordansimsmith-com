@@ -49,7 +49,7 @@ public class FindUnitsService {
                 item ->
                     new Unit(
                         item.getSequenceNumber(),
-                        formatLocation(item.getSequenceNumber()),
+                        Locations.format(item.getSequenceNumber()),
                         UnitStatus.valueOf(item.getStatus().toUpperCase(Locale.ROOT)),
                         item.getPhotos() == null
                             ? List.of()
@@ -76,12 +76,5 @@ public class FindUnitsService {
     } catch (RuntimeException e) {
       throw new BadRequestException("Invalid continuation");
     }
-  }
-
-  private static String formatLocation(int sequenceNumber) {
-    var blockNumber = sequenceNumber / 100;
-    var offset = sequenceNumber % 100;
-    var letter = (char) ('A' + blockNumber / 100);
-    return "" + letter + blockNumber % 100 + "-" + offset;
   }
 }

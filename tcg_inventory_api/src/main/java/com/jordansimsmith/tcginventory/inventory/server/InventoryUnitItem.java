@@ -100,6 +100,10 @@ public class InventoryUnitItem {
     return "USER#" + user + "#SKU#" + skuId;
   }
 
+  public static String formatSk(int sequenceNumber) {
+    return UNIT_PREFIX + "%010d".formatted(sequenceNumber);
+  }
+
   @DynamoDbBean
   public static class PhotoItem {
     public static final String PHOTO_ID = "photo_id";

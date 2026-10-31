@@ -50,6 +50,16 @@ public class InventoryReadRepository {
             .build());
   }
 
+  @Nullable
+  public InventoryUnitItem getUnit(String user, String skuId, int sequenceNumber) {
+    var key =
+        Key.builder()
+            .partitionValue(InventoryUnitItem.formatPk(user, skuId))
+            .sortValue(InventoryUnitItem.formatSk(sequenceNumber))
+            .build();
+    return unitTable.getItem(request -> request.key(key).consistentRead(true));
+  }
+
   public Page<InventoryUnitItem> findUnits(
       String user, String skuId, int limit, @Nullable Map<String, AttributeValue> continuation) {
     var request =
