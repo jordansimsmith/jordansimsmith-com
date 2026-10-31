@@ -3,6 +3,24 @@ import { createFakeClient } from './fake-client';
 import { createFakeScanUploader } from './fake-scan-uploader';
 import type { ScanConfirmationRow } from './client';
 
+async function findAllUnits(
+  client: ReturnType<typeof createFakeClient>,
+  skuId: string,
+) {
+  const units = [];
+  let continuation: string | undefined;
+  do {
+    const page = await client.findUnits({
+      sku_id: skuId,
+      limit: 100,
+      continuation,
+    });
+    units.push(...page.units);
+    continuation = page.next_continuation ?? undefined;
+  } while (continuation !== undefined);
+  return units;
+}
+
 describe('createFakeClient', () => {
   it('returns registered games with ordered finishes, capabilities, and review regions', async () => {
     const client = createFakeClient();
@@ -98,19 +116,16 @@ describe('createFakeClient', () => {
     expect(searchResults.next_continuation).toBeNull();
   });
 
-  it('returns SKU units and resolves images independently for opaque catalog IDs', async () => {
+  it('returns units and resolves images independently for opaque catalog IDs', async () => {
     const client = createFakeClient();
     const response = await client.findSkus({ game: 'mtg', search: 'sol ring' });
     const nmSku = response.skus.find((sku) => sku.condition === 'NM');
 
     const detail = await client.getSku(nmSku!.sku_id);
+    const units = await findAllUnits(client, detail.sku_id);
 
-    expect(
-      detail.units.filter((unit) => unit.status === 'in_stock'),
-    ).toHaveLength(6);
-    expect(
-      detail.units.filter((unit) => unit.status === 'reserved'),
-    ).toHaveLength(2);
+    expect(units.filter((unit) => unit.status === 'in_stock')).toHaveLength(6);
+    expect(units.filter((unit) => unit.status === 'reserved')).toHaveLength(2);
     await expect(
       client.findCardImages({ game: 'mtg', external_ids: ['unknown/id'] }),
     ).resolves.toMatchObject({
@@ -147,17 +162,45 @@ describe('createFakeClient', () => {
     )!.sku_id;
 
     const detail = await client.getSku(skuId);
+    const units = await findAllUnits(client, skuId);
 
     expect(detail.condition).toBe('NM');
-    expect(detail.units).toHaveLength(8);
-    const sequenceNumbers = detail.units.map((unit) => unit.sequence_number);
+    expect(units).toHaveLength(8);
+    const sequenceNumbers = units.map((unit) => unit.sequence_number);
     expect(sequenceNumbers).toEqual([...sequenceNumbers].sort((a, b) => a - b));
-    for (const unit of detail.units) {
+    for (const unit of units) {
       const block = Math.floor(unit.sequence_number / 100);
       expect(unit.location).toBe(`A${block}-${unit.sequence_number % 100}`);
+      expect(unit.created_at).toEqual(expect.any(Number));
+      expect(unit.updated_at).toBeNull();
     }
-    expect(detail.units[0].status).toBe('reserved');
-    expect(detail.units[1].status).toBe('reserved');
+    expect(units[0].status).toBe('reserved');
+    expect(units[1].status).toBe('reserved');
+  });
+
+  it('paginates before filtering removed units and returns empty for unknown SKUs', async () => {
+    const client = createFakeClient();
+    const brainstorm = await client.findSkus({
+      game: 'mtg',
+      search: 'brainstorm',
+    });
+    const skuId = brainstorm.skus[0].sku_id;
+    const firstPage = await client.findUnits({ sku_id: skuId, limit: 1 });
+    await client.deleteUnit(skuId, firstPage.units[0].sequence_number);
+
+    const removedPage = await client.findUnits({ sku_id: skuId, limit: 1 });
+    expect(removedPage.units).toEqual([]);
+    expect(removedPage.next_continuation).toBe('1');
+    const nextPage = await client.findUnits({
+      sku_id: skuId,
+      limit: 1,
+      continuation: removedPage.next_continuation!,
+    });
+    expect(nextPage.units).toHaveLength(1);
+
+    await expect(
+      client.findUnits({ sku_id: 'missing#normal#NM' }),
+    ).resolves.toEqual({ units: [], next_continuation: null });
   });
 
   it('seeds a photographed Doubling Season unit', async () => {
@@ -167,12 +210,12 @@ describe('createFakeClient', () => {
       search: 'doubling season',
     });
     const skuId = doublingSeasonSkus.skus[0].sku_id;
-    const detail = await client.getSku(skuId);
+    const units = await findAllUnits(client, skuId);
 
-    expect(detail.units).toHaveLength(1);
-    expect(detail.units[0].photos).toEqual(['fake-unit-photo-1']);
+    expect(units).toHaveLength(1);
+    expect(units[0].photos).toEqual(['fake-unit-photo-1']);
     const photos = await client.findPhotos({
-      photo_ids: detail.units[0].photos,
+      photo_ids: units[0].photos,
     });
     expect(photos.photos[0].url).toMatch(/^data:image\/svg\+xml,/);
 
@@ -183,8 +226,8 @@ describe('createFakeClient', () => {
     const solRingId = solRingSkus.skus.find(
       (sku) => sku.condition === 'NM',
     )!.sku_id;
-    const solRing = await client.getSku(solRingId);
-    expect(solRing.units.every((unit) => unit.photos.length === 0)).toBe(true);
+    const solRing = await findAllUnits(client, solRingId);
+    expect(solRing.every((unit) => unit.photos.length === 0)).toBe(true);
   });
 
   it('rejects unknown SKUs', async () => {
@@ -202,22 +245,18 @@ describe('createFakeClient', () => {
       search: 'brainstorm',
     });
     const skuId = brainstormSkus.skus[0].sku_id;
-    const detail = await client.getSku(skuId);
-    const unit = detail.units.find((entry) => entry.status === 'in_stock');
+    const units = await findAllUnits(client, skuId);
+    const unit = units.find((entry) => entry.status === 'in_stock');
 
     await client.deleteUnit(skuId, unit!.sequence_number, 'damaged in storage');
 
-    const updated = await client.getSku(skuId);
-    expect(
-      updated.units.filter((entry) => entry.status === 'in_stock'),
-    ).toHaveLength(
-      detail.units.filter((entry) => entry.status === 'in_stock').length - 1,
+    const updated = await findAllUnits(client, skuId);
+    expect(updated.filter((entry) => entry.status === 'in_stock')).toHaveLength(
+      units.filter((entry) => entry.status === 'in_stock').length - 1,
     );
     expect(
-      updated.units.find(
-        (entry) => entry.sequence_number === unit!.sequence_number,
-      )?.status,
-    ).toBe('removed');
+      updated.some((entry) => entry.sequence_number === unit!.sequence_number),
+    ).toBe(false);
   });
 
   it('rejects deleteUnit for units that are not in stock', async () => {
@@ -227,11 +266,11 @@ describe('createFakeClient', () => {
       search: 'mana crypt',
     });
     const skuId = manaCryptSkus.skus[0].sku_id;
-    const detail = await client.getSku(skuId);
+    const units = await findAllUnits(client, skuId);
 
-    expect(detail.units[0].status).toBe('reserved');
+    expect(units[0].status).toBe('reserved');
     await expect(
-      client.deleteUnit(skuId, detail.units[0].sequence_number),
+      client.deleteUnit(skuId, units[0].sequence_number),
     ).rejects.toThrow('unit is not in stock');
   });
 
@@ -245,8 +284,9 @@ describe('createFakeClient', () => {
       (sku) => sku.condition === 'NM',
     )!.sku_id;
     const source = await client.getSku(sourceId);
+    const sourceUnits = await findAllUnits(client, sourceId);
     expect(source.condition).toBe('NM');
-    const unit = source.units.find((entry) => entry.status === 'in_stock');
+    const unit = sourceUnits.find((entry) => entry.status === 'in_stock');
 
     const response = await client.updateUnit(
       sourceId,
@@ -259,21 +299,27 @@ describe('createFakeClient', () => {
     )!.sku_id;
     expect(response.sku_id).toBe(targetId);
     const target = await client.getSku(targetId);
+    const targetUnits = await findAllUnits(client, targetId);
     expect(target.condition).toBe('LP');
     expect(
-      target.units.filter((entry) => entry.status === 'in_stock'),
+      targetUnits.filter((entry) => entry.status === 'in_stock'),
     ).toHaveLength(3);
     expect(
-      target.units.find(
+      targetUnits.find(
         (entry) => entry.sequence_number === unit!.sequence_number,
       )?.status,
     ).toBe('in_stock');
+    const movedUnit = targetUnits.find(
+      (entry) => entry.sequence_number === unit!.sequence_number,
+    )!;
+    expect(movedUnit.created_at).toBe(unit!.created_at);
+    expect(movedUnit.updated_at).toEqual(expect.any(Number));
 
-    const updatedSource = await client.getSku(sourceId);
+    const updatedSource = await findAllUnits(client, sourceId);
     expect(
-      updatedSource.units.filter((entry) => entry.status === 'in_stock'),
+      updatedSource.filter((entry) => entry.status === 'in_stock'),
     ).toHaveLength(
-      source.units.filter((entry) => entry.status === 'in_stock').length - 1,
+      sourceUnits.filter((entry) => entry.status === 'in_stock').length - 1,
     );
   });
 
@@ -285,7 +331,8 @@ describe('createFakeClient', () => {
     });
     const sourceId = sylvanLibrarySkus.skus[0].sku_id;
     const source = await client.getSku(sourceId);
-    const unit = source.units[0];
+    const sourceUnits = await findAllUnits(client, sourceId);
+    const unit = sourceUnits[0];
 
     const response = await client.updateUnit(
       sourceId,
@@ -300,10 +347,11 @@ describe('createFakeClient', () => {
     expect(target.external_id).toBe(source.external_id);
     expect(target.name).toBe('Sylvan Library');
     expect(target.condition).toBe('DMG');
+    const targetUnits = await findAllUnits(client, response.sku_id);
     expect(
-      target.units.filter((entry) => entry.status === 'in_stock'),
+      targetUnits.filter((entry) => entry.status === 'in_stock'),
     ).toHaveLength(1);
-    expect(target.units[0].sequence_number).toBe(unit.sequence_number);
+    expect(targetUnits[0].sequence_number).toBe(unit.sequence_number);
 
     const browse = await client.findSkus({
       game: 'mtg',
@@ -345,13 +393,15 @@ describe('createFakeClient pokemon inventory', () => {
     );
     expect(normalAbomasnowSku).toBeDefined();
     const detail = await client.getSku(normalAbomasnowSku!.sku_id);
+    const detailUnits = await findAllUnits(client, detail.sku_id);
     expect(detail.external_id).toBe('283917');
-    expect(detail.units.map((unit) => unit.location)).toEqual(['A0-0', 'A0-1']);
+    expect(detailUnits.map((unit) => unit.location)).toEqual(['A0-0', 'A0-1']);
 
     const magic = await client.findSkus({ game: 'mtg' });
     const magicDetail = await client.getSku(magic.skus[0].sku_id);
-    expect(magicDetail.units[0].sequence_number).toBe(0);
-    expect(detail.units[0].sequence_number).toBe(0);
+    const magicUnits = await findAllUnits(client, magicDetail.sku_id);
+    expect(magicUnits[0].sequence_number).toBe(0);
+    expect(detailUnits[0].sequence_number).toBe(0);
   });
 
   it('includes Pokémon stock and top hits in its report', async () => {
@@ -552,10 +602,11 @@ describe('createFakeClient imports', () => {
     const elves = elvesDetails.find(
       (sku) => sku.external_id === '581b7327-3215-4a4f-b4ae-d9d4002ba882',
     )!;
+    const elvesUnits = await findAllUnits(client, elves.sku_id);
     expect(
-      elves.units.filter((unit) => unit.status === 'in_stock'),
+      elvesUnits.filter((unit) => unit.status === 'in_stock'),
     ).toHaveLength(7);
-    expect(elves.units.map((unit) => unit.sequence_number)).toContain(600);
+    expect(elvesUnits.map((unit) => unit.sequence_number)).toContain(600);
 
     // the lp opt sku did not exist and is created by the confirm
     const optCandidates = await client.findSkus({ game: 'mtg', search: 'opt' });
@@ -567,10 +618,11 @@ describe('createFakeClient imports', () => {
         sku.external_id === '25f2e4d0-effd-4e83-b7aa-1a0d8f120951' &&
         sku.condition === 'LP',
     )!;
-    expect(opt.units.filter((unit) => unit.status === 'in_stock')).toHaveLength(
+    const optUnits = await findAllUnits(client, opt.sku_id);
+    expect(optUnits.filter((unit) => unit.status === 'in_stock')).toHaveLength(
       2,
     );
-    expect(opt.units.map((unit) => unit.sequence_number)).toEqual([601, 602]);
+    expect(optUnits.map((unit) => unit.sequence_number)).toEqual([601, 602]);
 
     // the review row never becomes a unit
     const ponderCandidates = await client.findSkus({
@@ -1059,16 +1111,14 @@ describe('createFakeClient orders', () => {
     const solRingSummary = solRingSkus.skus.find(
       (sku) => sku.condition === 'NM',
     )!;
-    const solRing = await client.getSku(solRingSummary.sku_id);
-    expect(
-      solRing.units.filter((unit) => unit.status === 'reserved'),
-    ).toHaveLength(0);
-    expect(solRing.units.filter((unit) => unit.status === 'sold')).toHaveLength(
-      2,
+    const solRing = await findAllUnits(client, solRingSummary.sku_id);
+    expect(solRing.filter((unit) => unit.status === 'reserved')).toHaveLength(
+      0,
     );
-    expect(
-      solRing.units.filter((unit) => unit.status === 'in_stock'),
-    ).toHaveLength(6);
+    expect(solRing.filter((unit) => unit.status === 'sold')).toHaveLength(2);
+    expect(solRing.filter((unit) => unit.status === 'in_stock')).toHaveLength(
+      6,
+    );
 
     const aberrationSkus = await client.findSkus({
       game: 'mtg',
@@ -1077,13 +1127,11 @@ describe('createFakeClient orders', () => {
     const aberrationSummary = aberrationSkus.skus.find(
       (sku) => sku.condition === 'NM',
     )!;
-    const aberration = await client.getSku(aberrationSummary.sku_id);
+    const aberration = await findAllUnits(client, aberrationSummary.sku_id);
     expect(
-      aberration.units.filter((unit) => unit.status === 'reserved'),
+      aberration.filter((unit) => unit.status === 'reserved'),
     ).toHaveLength(0);
-    expect(
-      aberration.units.filter((unit) => unit.status === 'sold'),
-    ).toHaveLength(1);
+    expect(aberration.filter((unit) => unit.status === 'sold')).toHaveLength(1);
 
     const list = await client.findOrders();
     expect(list.orders.find((order) => order.order_id === '83647')?.state).toBe(
@@ -1188,8 +1236,8 @@ describe('createFakeClient publish', () => {
       search: 'brainstorm',
     });
     const skuId = brainstormSkus.skus[0].sku_id;
-    const detail = await client.getSku(skuId);
-    const unit = detail.units.find((entry) => entry.status === 'in_stock');
+    const units = await findAllUnits(client, skuId);
+    const unit = units.find((entry) => entry.status === 'in_stock');
     await client.deleteUnit(skuId, unit!.sequence_number);
 
     await client.createPublish();
@@ -1227,8 +1275,9 @@ describe('createFakeClient publish', () => {
       search: 'brainstorm',
     });
     const skuId = brainstormSkus.skus[0].sku_id;
-    const detail = await client.getSku(skuId);
-    const units = detail.units.filter((entry) => entry.status === 'in_stock');
+    const units = (await findAllUnits(client, skuId)).filter(
+      (entry) => entry.status === 'in_stock',
+    );
     await client.deleteUnit(skuId, units[0].sequence_number);
     expect((await client.getPublish()).pending_sku_count).toBe(1);
 

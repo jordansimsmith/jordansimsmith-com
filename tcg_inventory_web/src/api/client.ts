@@ -95,11 +95,23 @@ export interface SkuUnit {
   location: string;
   status: UnitStatus;
   photos: string[];
+  created_at: number;
+  updated_at: number | null;
 }
 
 export interface SkuDetail extends SkuSummary {
   external_id: string;
+}
+
+export interface FindUnitsRequest {
+  sku_id: string;
+  limit?: number;
+  continuation?: string;
+}
+
+export interface FindUnitsResponse {
   units: SkuUnit[];
+  next_continuation: string | null;
 }
 
 export interface UpdateUnitResponse {
@@ -551,6 +563,7 @@ export interface ApiClient {
   deleteScan(scanId: string): Promise<void>;
   findSkus(params: FindSkusParams): Promise<FindSkusResponse>;
   getSku(skuId: string): Promise<SkuDetail>;
+  findUnits(request: FindUnitsRequest): Promise<FindUnitsResponse>;
   deleteUnit(
     skuId: string,
     sequenceNumber: number,

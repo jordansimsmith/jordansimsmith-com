@@ -22,6 +22,8 @@ import type {
   FindOrdersResponse,
   FindSkusParams,
   FindSkusResponse,
+  FindUnitsRequest,
+  FindUnitsResponse,
   GameId,
   GamesResponse,
   GetFetchTcgAccountResponse,
@@ -376,6 +378,21 @@ export function createHttpClient(): ApiClient {
     async getSku(skuId: string): Promise<SkuDetail> {
       const response = await authenticatedFetch(
         `/skus/${encodeURIComponent(skuId)}`,
+      );
+      return response.json();
+    },
+
+    async findUnits(request: FindUnitsRequest): Promise<FindUnitsResponse> {
+      const query = new URLSearchParams();
+      if (request.limit != null) {
+        query.set('limit', String(request.limit));
+      }
+      if (request.continuation != null) {
+        query.set('continuation', request.continuation);
+      }
+      const queryString = query.toString();
+      const response = await authenticatedFetch(
+        `/skus/${encodeURIComponent(request.sku_id)}/units${queryString ? `?${queryString}` : ''}`,
       );
       return response.json();
     },

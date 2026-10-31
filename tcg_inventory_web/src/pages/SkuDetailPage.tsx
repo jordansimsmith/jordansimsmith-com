@@ -51,11 +51,22 @@ async function findPhotoUrls(photoIds: string[]): Promise<Map<string, string>> {
   return urls;
 }
 
-async function loadSkuWithPhotos(skuId: string) {
-  const sku = await apiClient.getSku(skuId);
-  const photoIds = sku.units.flatMap((unit) => unit.photos);
+async function loadUnitsWithPhotos(skuId: string) {
+  const units: SkuUnit[] = [];
+  let continuation: string | undefined;
+  do {
+    const page = await apiClient.findUnits({
+      sku_id: skuId,
+      limit: 100,
+      continuation,
+    });
+    units.push(...page.units);
+    continuation = page.next_continuation ?? undefined;
+  } while (continuation !== undefined);
+
+  const photoIds = units.flatMap((unit) => unit.photos);
   const photoUrls = await findPhotoUrls(photoIds);
-  return { sku, photoUrls };
+  return { units, photoUrls };
 }
 
 export function SkuDetailPage() {
@@ -63,12 +74,15 @@ export function SkuDetailPage() {
   const { skuId } = useParams<{ skuId: string }>();
   const navigate = useNavigate();
   const [sku, setSku] = useState<SkuDetail | null>(null);
+  const [units, setUnits] = useState<SkuUnit[]>([]);
   const [photoUrls, setPhotoUrls] = useState<Map<string, string>>(new Map());
   const [cardImage, setCardImage] = useState<string | null>(null);
   const [cardImageLoading, setCardImageLoading] = useState(false);
   const [cardImageError, setCardImageError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [unitsLoading, setUnitsLoading] = useState(true);
+  const [unitsError, setUnitsError] = useState<string | null>(null);
   const [removingUnit, setRemovingUnit] = useState<SkuUnit | null>(null);
   const [editingUnit, setEditingUnit] = useState<SkuUnit | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
@@ -81,11 +95,11 @@ export function SkuDetailPage() {
     const fetchSku = async () => {
       setLoading(true);
       setError(null);
+      setSku(null);
       try {
-        const response = await loadSkuWithPhotos(skuId);
+        const response = await apiClient.getSku(skuId);
         if (!cancelled) {
-          setSku(response.sku);
-          setPhotoUrls(response.photoUrls);
+          setSku(response);
         }
       } catch (e) {
         if (!cancelled) {
@@ -99,6 +113,41 @@ export function SkuDetailPage() {
     };
 
     fetchSku();
+    return () => {
+      cancelled = true;
+    };
+  }, [skuId]);
+
+  useEffect(() => {
+    if (!skuId) {
+      return;
+    }
+    let cancelled = false;
+    const fetchUnits = async () => {
+      setUnitsLoading(true);
+      setUnitsError(null);
+      setUnits([]);
+      setPhotoUrls(new Map());
+      try {
+        const response = await loadUnitsWithPhotos(skuId);
+        if (!cancelled) {
+          setUnits(response.units);
+          setPhotoUrls(response.photoUrls);
+        }
+      } catch (e) {
+        if (!cancelled) {
+          setUnitsError(
+            e instanceof Error ? e.message : 'Failed to load units',
+          );
+        }
+      } finally {
+        if (!cancelled) {
+          setUnitsLoading(false);
+        }
+      }
+    };
+
+    fetchUnits();
     return () => {
       cancelled = true;
     };
@@ -150,14 +199,22 @@ export function SkuDetailPage() {
         removingUnit.sequence_number,
         reason || undefined,
       );
-      const updated = await loadSkuWithPhotos(sku.sku_id);
-      setSku(updated.sku);
-      setPhotoUrls(updated.photoUrls);
+      setUnitsLoading(true);
+      setUnitsError(null);
+      try {
+        const updated = await loadUnitsWithPhotos(sku.sku_id);
+        setUnits(updated.units);
+        setPhotoUrls(updated.photoUrls);
+      } catch (e) {
+        setUnitsError(e instanceof Error ? e.message : 'Failed to load units');
+        throw e;
+      }
       setRemovingUnit(null);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Failed to remove unit';
       notifications.show({ title: 'Error', message, color: 'red' });
     } finally {
+      setUnitsLoading(false);
       setActionLoading(false);
     }
   };
@@ -307,17 +364,33 @@ export function SkuDetailPage() {
                   Units
                 </Title>
                 <Text size="sm" c="dimmed" className={classes.numeric}>
-                  {sku.units.length} {sku.units.length === 1 ? 'unit' : 'units'}
+                  {!unitsLoading &&
+                    !unitsError &&
+                    `${units.length} ${units.length === 1 ? 'unit' : 'units'}`}
                 </Text>
               </Group>
-              <Box style={{ overflowX: 'auto' }}>
-                <UnitTable
-                  units={sku.units}
-                  photoUrls={photoUrls}
-                  onRemove={setRemovingUnit}
-                  onEditCondition={setEditingUnit}
-                />
-              </Box>
+              {unitsLoading ? (
+                <Box p="md">
+                  <Stack gap="xs">
+                    <Skeleton height={36} />
+                    <Skeleton height={36} />
+                    <Skeleton height={36} />
+                  </Stack>
+                </Box>
+              ) : unitsError ? (
+                <Text c="red" size="sm" p="md">
+                  {unitsError}
+                </Text>
+              ) : (
+                <Box style={{ overflowX: 'auto' }}>
+                  <UnitTable
+                    units={units}
+                    photoUrls={photoUrls}
+                    onRemove={setRemovingUnit}
+                    onEditCondition={setEditingUnit}
+                  />
+                </Box>
+              )}
             </Paper>
             <RemoveUnitModal
               unit={removingUnit}

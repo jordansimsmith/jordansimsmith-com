@@ -273,6 +273,66 @@ describe('http client repricing', () => {
   });
 });
 
+describe('http client inventory units', () => {
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    localStorage.clear();
+    setSession('alice', 'pw');
+  });
+
+  afterEach(() => {
+    clearSession();
+  });
+
+  it('finds authenticated unit pages with encoded SKU and pagination parameters', async () => {
+    const responseBody = {
+      units: [
+        {
+          sequence_number: 3,
+          location: 'A0-3',
+          status: 'in_stock',
+          photos: ['photo-1'],
+          created_at: 1700000000,
+          updated_at: null,
+        },
+      ],
+      next_continuation: 'opaque-next',
+    };
+    fetchSpy.mockResolvedValue({
+      ok: true,
+      json: vi.fn().mockResolvedValue(responseBody),
+    });
+
+    await expect(
+      createHttpClient().findUnits({
+        sku_id: 'set/id #NM',
+        limit: 25,
+        continuation: 'opaque+/=',
+      }),
+    ).resolves.toEqual(responseBody);
+
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/skus/set%2Fid%20%23NM/units?limit=25&continuation=opaque%2B%2F%3D',
+    );
+    expect(init.headers.Authorization).toBe(`Basic ${btoa('alice:pw')}`);
+  });
+
+  it('surfaces unit listing API errors', async () => {
+    fetchSpy.mockResolvedValue({
+      ok: false,
+      status: 503,
+      statusText: 'Unavailable',
+      json: vi.fn().mockResolvedValue({ message: 'inventory is unavailable' }),
+    });
+
+    await expect(
+      createHttpClient().findUnits({ sku_id: 'sku-1' }),
+    ).rejects.toThrow('inventory is unavailable');
+  });
+});
+
 describe('http client imports', () => {
   beforeEach(() => {
     fetchSpy.mockReset();

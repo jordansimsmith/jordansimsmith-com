@@ -14,7 +14,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { SkuDetailPage } from './SkuDetailPage';
 import { GamesProvider } from '../GamesProvider';
 import * as clientModule from '../api/client';
-import type { SkuDetail } from '../api/client';
+import type { SkuDetail, SkuUnit } from '../api/client';
 
 const REGISTERED_GAMES = [
   {
@@ -33,6 +33,52 @@ const REGISTERED_GAMES = [
 
 const SCRYFALL_ID = 'aaaa1111-2222-4333-8444-555566667777';
 
+const nmUnits: SkuUnit[] = [
+  {
+    sequence_number: 3,
+    location: 'A0-3',
+    status: 'reserved',
+    photos: ['photo-reserved'],
+    created_at: 1700000000,
+    updated_at: null,
+  },
+  {
+    sequence_number: 40,
+    location: 'A0-40',
+    status: 'in_stock',
+    photos: ['photo-front', 'photo-back'],
+    created_at: 1700000000,
+    updated_at: null,
+  },
+  {
+    sequence_number: 152,
+    location: 'A1-52',
+    status: 'in_stock',
+    photos: [],
+    created_at: 1700000000,
+    updated_at: null,
+  },
+  {
+    sequence_number: 480,
+    location: 'A4-80',
+    status: 'sold',
+    photos: [],
+    created_at: 1700000000,
+    updated_at: null,
+  },
+];
+
+const lpUnits: SkuUnit[] = [
+  {
+    sequence_number: 40,
+    location: 'A0-40',
+    status: 'in_stock',
+    photos: [],
+    created_at: 1700000000,
+    updated_at: null,
+  },
+];
+
 const nmDetail: SkuDetail = {
   sku_id: `${SCRYFALL_ID}#normal#NM`,
   game: 'mtg',
@@ -44,22 +90,6 @@ const nmDetail: SkuDetail = {
   finish: 'normal',
   condition: 'NM',
   last_published_price: '2.50',
-  units: [
-    {
-      sequence_number: 3,
-      location: 'A0-3',
-      status: 'reserved',
-      photos: ['photo-reserved'],
-    },
-    {
-      sequence_number: 40,
-      location: 'A0-40',
-      status: 'in_stock',
-      photos: ['photo-front', 'photo-back'],
-    },
-    { sequence_number: 152, location: 'A1-52', status: 'in_stock', photos: [] },
-    { sequence_number: 480, location: 'A4-80', status: 'sold', photos: [] },
-  ],
 };
 
 const lpDetail: SkuDetail = {
@@ -73,9 +103,6 @@ const lpDetail: SkuDetail = {
   finish: 'normal',
   condition: 'LP',
   last_published_price: null,
-  units: [
-    { sequence_number: 40, location: 'A0-40', status: 'in_stock', photos: [] },
-  ],
 };
 
 function renderSkuDetailPage(skuId = nmDetail.sku_id) {
@@ -109,6 +136,18 @@ describe('SkuDetailPage', () => {
         }
         throw new Error('Not Found');
       },
+    );
+    vi.spyOn(clientModule.apiClient, 'findUnits').mockImplementation(
+      async ({ sku_id }) => ({
+        units: structuredClone(
+          sku_id === nmDetail.sku_id
+            ? nmUnits
+            : sku_id === lpDetail.sku_id
+              ? lpUnits
+              : [],
+        ),
+        next_continuation: null,
+      }),
     );
     vi.spyOn(clientModule.apiClient, 'findCardImages').mockResolvedValue({
       images: [
@@ -147,7 +186,7 @@ describe('SkuDetailPage', () => {
     expect(screen.getByRole('region', { name: 'Units' })).toBeDefined();
     expect(screen.getByRole('heading', { name: 'Units' })).toBeDefined();
 
-    const image = screen.getByRole('img', { name: 'Sol Ring' });
+    const image = await screen.findByRole('img', { name: 'Sol Ring' });
     expect(image.getAttribute('src')).toBe('https://images.test/catalog-image');
 
     for (const location of ['A0-3', 'A0-40', 'A1-52', 'A4-80']) {
@@ -164,6 +203,57 @@ describe('SkuDetailPage', () => {
       expect(button.textContent).toBe('');
       expect(button.querySelector('svg')).not.toBeNull();
     }
+  });
+
+  it('loads every unit page, including empty intermediate pages, before rendering', async () => {
+    vi.spyOn(clientModule.apiClient, 'findUnits')
+      .mockResolvedValueOnce({
+        units: [nmUnits[0]],
+        next_continuation: 'opaque-1',
+      })
+      .mockResolvedValueOnce({ units: [], next_continuation: 'opaque-2' })
+      .mockResolvedValueOnce({
+        units: nmUnits.slice(1),
+        next_continuation: null,
+      });
+
+    renderSkuDetailPage();
+
+    expect(await screen.findByText('A4-80')).toBeDefined();
+    expect(clientModule.apiClient.findUnits).toHaveBeenNthCalledWith(1, {
+      sku_id: nmDetail.sku_id,
+      limit: 100,
+      continuation: undefined,
+    });
+    expect(clientModule.apiClient.findUnits).toHaveBeenNthCalledWith(2, {
+      sku_id: nmDetail.sku_id,
+      limit: 100,
+      continuation: 'opaque-1',
+    });
+    expect(clientModule.apiClient.findUnits).toHaveBeenNthCalledWith(3, {
+      sku_id: nmDetail.sku_id,
+      limit: 100,
+      continuation: 'opaque-2',
+    });
+    expect(
+      screen.getByAltText('Listing photo photo-front').getAttribute('src'),
+    ).toBe('https://example.com/photo-front.jpg');
+  });
+
+  it('does not render partial units when a later page fails', async () => {
+    vi.spyOn(clientModule.apiClient, 'findUnits')
+      .mockResolvedValueOnce({
+        units: [nmUnits[0]],
+        next_continuation: 'opaque-next',
+      })
+      .mockRejectedValueOnce(new Error('later unit page failed'));
+
+    renderSkuDetailPage();
+
+    expect(await screen.findByText('Sol Ring')).toBeDefined();
+    expect(await screen.findByText('later unit page failed')).toBeDefined();
+    expect(screen.queryByText('A0-3')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Remove' })).toBeNull();
   });
 
   it('shows the image placeholder when Catalog has no card image', async () => {
@@ -209,19 +299,17 @@ describe('SkuDetailPage', () => {
     ).toMatch(/^data:image\/svg\+xml/);
   });
 
-  it('removes a unit with a reason and re-renders counts', async () => {
-    const updated: SkuDetail = {
-      ...structuredClone(nmDetail),
-      units: nmDetail.units.map((unit) =>
-        unit.sequence_number === 40
-          ? { ...unit, status: 'removed' as const }
-          : unit,
-      ),
-    };
+  it('removes a unit with a reason and refreshes the unit list', async () => {
     vi.spyOn(clientModule.apiClient, 'deleteUnit').mockResolvedValue(undefined);
-    vi.spyOn(clientModule.apiClient, 'getSku')
-      .mockResolvedValueOnce(structuredClone(nmDetail))
-      .mockResolvedValue(updated);
+    vi.spyOn(clientModule.apiClient, 'findUnits')
+      .mockResolvedValueOnce({
+        units: structuredClone(nmUnits),
+        next_continuation: null,
+      })
+      .mockResolvedValueOnce({
+        units: nmUnits.filter((unit) => unit.sequence_number !== 40),
+        next_continuation: null,
+      });
 
     const user = userEvent.setup();
     renderSkuDetailPage();
@@ -237,22 +325,17 @@ describe('SkuDetailPage', () => {
     );
     await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
 
-    await waitFor(() => {
-      expect(screen.getByText('removed')).toBeDefined();
-    });
+    await waitFor(() => expect(screen.queryByText('A0-40')).toBeNull());
     expect(clientModule.apiClient.deleteUnit).toHaveBeenCalledWith(
       nmDetail.sku_id,
       40,
       'damaged',
     );
-    expect(screen.getByText('removed')).toBeDefined();
+    expect(screen.getByText('3 units')).toBeDefined();
   });
 
   it('removes a unit without a reason', async () => {
     vi.spyOn(clientModule.apiClient, 'deleteUnit').mockResolvedValue(undefined);
-    vi.spyOn(clientModule.apiClient, 'getSku')
-      .mockResolvedValueOnce(structuredClone(nmDetail))
-      .mockResolvedValue(structuredClone(nmDetail));
 
     const user = userEvent.setup();
     renderSkuDetailPage();

@@ -22,6 +22,7 @@ import type {
   FindOrdersResponse,
   FindSkusParams,
   FindSkusResponse,
+  FindUnitsResponse,
   GenerationStatus,
   GetFetchTcgAccountResponse,
   IdentifyScanResponse,
@@ -321,6 +322,8 @@ interface FakeUnit {
   sequence_number: number;
   status: UnitStatus;
   photos: string[];
+  created_at: number;
+  updated_at: number | null;
 }
 
 const SEEDED_UNIT_PHOTO_URL =
@@ -343,6 +346,7 @@ interface FakeSku {
 
 function createSeedState(): FakeSku[] {
   let unitIndex = 0;
+  const createdAt = Math.floor(Date.now() / 1000);
   const skus = seedSkus.map(
     ([
       externalId,
@@ -363,6 +367,8 @@ function createSeedState(): FakeSku[] {
           sequence_number: (unitIndex * 37) % 600,
           status: 'in_stock',
           photos: [],
+          created_at: createdAt,
+          updated_at: null,
         });
         unitIndex += 1;
       }
@@ -420,6 +426,8 @@ function createSeedState(): FakeSku[] {
           sequence_number: pokemonUnitIndex,
           status: 'in_stock',
           photos: [],
+          created_at: createdAt,
+          updated_at: null,
         });
         pokemonUnitIndex += 1;
       }
@@ -476,18 +484,20 @@ function toSummary(sku: FakeSku): SkuSummary {
 }
 
 function toDetail(sku: FakeSku): SkuDetail {
-  const units: SkuUnit[] = [...sku.units]
-    .sort((a, b) => a.sequence_number - b.sequence_number)
-    .map((unit) => ({
-      sequence_number: unit.sequence_number,
-      location: deriveLocation(unit.sequence_number),
-      status: unit.status,
-      photos: [...unit.photos],
-    }));
   return {
     ...toSummary(sku),
     external_id: sku.external_id,
-    units,
+  };
+}
+
+function toUnit(unit: FakeUnit): SkuUnit {
+  return {
+    sequence_number: unit.sequence_number,
+    location: deriveLocation(unit.sequence_number),
+    status: unit.status,
+    photos: [...unit.photos],
+    created_at: unit.created_at,
+    updated_at: unit.updated_at,
   };
 }
 
@@ -1869,6 +1879,8 @@ export function createFakeClient(): ApiClient {
         sequence_number: sequenceNumber,
         status: 'in_stock',
         photos: [...row.photos],
+        created_at: Math.floor(Date.now() / 1000),
+        updated_at: null,
       });
       dirtySkuIds.add(sku.sku_id);
     }
@@ -2394,6 +2406,28 @@ export function createFakeClient(): ApiClient {
       return toDetail(getSkuOrThrow(skuId));
     },
 
+    async findUnits({
+      sku_id,
+      limit = 100,
+      continuation,
+    }): Promise<FindUnitsResponse> {
+      const sku = skus.find((candidate) => candidate.sku_id === sku_id);
+      if (!sku) {
+        return { units: [], next_continuation: null };
+      }
+      const offset = continuation == null ? 0 : Number(continuation);
+      const allUnits = [...sku.units].sort(
+        (first, second) => first.sequence_number - second.sequence_number,
+      );
+      const page = allUnits.slice(offset, offset + limit);
+      const nextOffset = offset + page.length;
+      return {
+        units: page.filter((unit) => unit.status !== 'removed').map(toUnit),
+        next_continuation:
+          nextOffset < allUnits.length ? String(nextOffset) : null,
+      };
+    },
+
     async deleteUnit(skuId: string, sequenceNumber: number): Promise<void> {
       const sku = getSkuOrThrow(skuId);
       const unit = getUnitOrThrow(sku, sequenceNumber);
@@ -2401,6 +2435,7 @@ export function createFakeClient(): ApiClient {
         throw new Error('unit is not in stock');
       }
       unit.status = 'removed';
+      unit.updated_at = Math.floor(Date.now() / 1000);
       dirtySkuIds.add(sku.sku_id);
       reportStale = true;
     },
@@ -2440,6 +2475,8 @@ export function createFakeClient(): ApiClient {
         sequence_number: unit.sequence_number,
         status: 'in_stock',
         photos: [...unit.photos],
+        created_at: unit.created_at,
+        updated_at: Math.floor(Date.now() / 1000),
       });
       dirtySkuIds.add(sku.sku_id);
       dirtySkuIds.add(target.sku_id);
@@ -2471,7 +2508,9 @@ export function createFakeClient(): ApiClient {
       const finishFulfillment = () => {
         for (const ref of order.units) {
           const sku = getSkuOrThrow(ref.sku_id);
-          getUnitOrThrow(sku, ref.sequence_number).status = 'sold';
+          const unit = getUnitOrThrow(sku, ref.sequence_number);
+          unit.status = 'sold';
+          unit.updated_at = Math.floor(Date.now() / 1000);
         }
         order.state = 'fulfilled';
         reportStale = true;
