@@ -12,7 +12,6 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import javax.annotation.Nullable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
@@ -70,28 +69,6 @@ public class InventoryRepository {
         .filter(unit -> "in_stock".equals(unit.getStatus()))
         .limit(quantity)
         .toList();
-  }
-
-  public void removeUnit(String user, String skuId, int sequenceNumber, @Nullable String reason) {
-    var auditAttributes = new HashMap<String, AttributeValue>();
-    auditAttributes.put(SkuItem.SKU_ID, AttributeValue.builder().s(skuId).build());
-    auditAttributes.put(
-        UnitItem.SEQUENCE_NUMBER,
-        AttributeValue.builder().n(String.valueOf(sequenceNumber)).build());
-    auditAttributes.put(AuditItem.BEFORE_STATUS, AttributeValue.builder().s("in_stock").build());
-    auditAttributes.put(AuditItem.AFTER_STATUS, AttributeValue.builder().s("removed").build());
-    if (reason != null && !reason.isEmpty()) {
-      auditAttributes.put(AuditItem.DECISION_REASON, AttributeValue.builder().s(reason).build());
-    }
-
-    dynamoDbClient.transactWriteItems(
-        TransactWriteItemsRequest.builder()
-            .transactItems(
-                List.of(
-                    buildSkuDirtyUpdate(user, skuId),
-                    buildUnitRemoveUpdate(user, skuId, sequenceNumber),
-                    buildAuditPut(user, "adjustment", auditAttributes)))
-            .build());
   }
 
   // one transaction across both SKU partitions: the unit moves keeping its sequence number and
@@ -400,33 +377,6 @@ public class InventoryRepository {
                         AuditItem.BEFORE_STATUS, AttributeValue.builder().s("reserved").build(),
                         AuditItem.AFTER_STATUS, AttributeValue.builder().s("in_stock").build())))
             .build());
-  }
-
-  public TransactWriteItem buildUnitRemoveUpdate(String user, String skuId, int sequenceNumber) {
-    var skuPk = SkuItem.formatPk(user, skuId);
-    var unitSk = UnitItem.formatSk(sequenceNumber);
-
-    return TransactWriteItem.builder()
-        .update(
-            Update.builder()
-                .tableName(TcgInventoryTable.TABLE_NAME)
-                .key(
-                    Map.of(
-                        SkuItem.PK, AttributeValue.builder().s(skuPk).build(),
-                        SkuItem.SK, AttributeValue.builder().s(unitSk).build()))
-                .updateExpression("SET #status = :removed, " + UnitItem.UPDATED_AT + " = :now")
-                .conditionExpression("#status = :inStock")
-                .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
-                .expressionAttributeValues(
-                    Map.of(
-                        ":removed", AttributeValue.builder().s("removed").build(),
-                        ":inStock", AttributeValue.builder().s("in_stock").build(),
-                        ":now",
-                            AttributeValue.builder()
-                                .n(String.valueOf(clock.now().getEpochSecond()))
-                                .build()))
-                .build())
-        .build();
   }
 
   public TransactWriteItem buildUnitDelete(String user, String skuId, int sequenceNumber) {

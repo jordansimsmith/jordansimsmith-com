@@ -10,6 +10,7 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
+import com.jordansimsmith.tcginventory.inventory.api.DeleteUnitHandler;
 import com.jordansimsmith.tcginventory.inventory.api.FindSkusHandler;
 import com.jordansimsmith.tcginventory.inventory.api.GetSkuHandler;
 import com.jordansimsmith.time.FakeClock;
@@ -42,11 +43,10 @@ public class InventoryHandlerIntegrationTest {
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
   private DynamoDbTable<AuditItem> auditTable;
-  private InventoryRepository inventoryRepository;
 
   private FindSkusHandler findSkusHandler;
   private GetSkuHandler getSkuHandler;
-  private RemoveUnitHandler removeUnitHandler;
+  private DeleteUnitHandler deleteUnitHandler;
   private UpdateUnitHandler updateUnitHandler;
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
@@ -79,10 +79,8 @@ public class InventoryHandlerIntegrationTest {
 
     findSkusHandler = new FindSkusHandler(factory);
     getSkuHandler = new GetSkuHandler(factory);
-    removeUnitHandler = new RemoveUnitHandler(factory);
+    deleteUnitHandler = new DeleteUnitHandler(factory);
     updateUnitHandler = new UpdateUnitHandler(factory);
-    inventoryRepository =
-        new InventoryRepository(unitTable, factory.dynamoDbClient(), fakeClock, fakeUlidGenerator);
   }
 
   @Test
@@ -309,7 +307,7 @@ public class InventoryHandlerIntegrationTest {
 
     // act
     var response =
-        removeUnitHandler.handleRequest(
+        deleteUnitHandler.handleRequest(
             buildEventWithQuery(
                 "jordan",
                 Map.of("sku_id", "mtg#scryfall#scryfall-1#normal#NM", "sequence_number", "42"),
@@ -342,25 +340,6 @@ public class InventoryHandlerIntegrationTest {
   }
 
   @Test
-  void removeUnitShouldRollBackSkuAndAuditWhenUnitIsNoLongerInStock() {
-    // arrange
-    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
-    createSku("jordan", skuId, "Elvish Mystic", "m14", "Magic 2014", "169");
-    createUnit("jordan", skuId, 42, "reserved", "import1");
-
-    // act
-    assertThatThrownBy(() -> inventoryRepository.removeUnit("jordan", skuId, 42, null))
-        .isInstanceOf(RuntimeException.class);
-
-    // assert
-    var sku = getSku("jordan", skuId);
-    assertThat(sku.getDirty()).isFalse();
-    assertThat(sku.getVersion()).isEqualTo(1);
-    assertThat(getUnit("jordan", skuId, 42).getStatus()).isEqualTo("reserved");
-    assertThat(queryAuditEntries("jordan")).isEmpty();
-  }
-
-  @Test
   void removeUnitShouldReturn404ForMissingUnit() {
     // arrange
     createSku(
@@ -368,7 +347,7 @@ public class InventoryHandlerIntegrationTest {
 
     // act
     var response =
-        removeUnitHandler.handleRequest(
+        deleteUnitHandler.handleRequest(
             buildEvent(
                 "jordan",
                 Map.of("sku_id", "mtg#scryfall#scryfall-1#normal#NM", "sequence_number", "99")),
@@ -387,7 +366,7 @@ public class InventoryHandlerIntegrationTest {
 
     // act
     var response =
-        removeUnitHandler.handleRequest(
+        deleteUnitHandler.handleRequest(
             buildEvent(
                 "jordan",
                 Map.of("sku_id", "mtg#scryfall#scryfall-1#normal#NM", "sequence_number", "42")),
@@ -480,7 +459,7 @@ public class InventoryHandlerIntegrationTest {
                 "{\"condition\":\"LP\"}"),
             null);
     var removeResponse =
-        removeUnitHandler.handleRequest(
+        deleteUnitHandler.handleRequest(
             buildEvent("jordan", Map.of("sku_id", targetSkuId, "sequence_number", "42")), null);
 
     // assert
@@ -649,7 +628,7 @@ public class InventoryHandlerIntegrationTest {
     createUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 42, "in_stock", "import1");
 
     // act
-    removeUnitHandler.handleRequest(
+    deleteUnitHandler.handleRequest(
         buildEvent(
             "jordan",
             Map.of("sku_id", "mtg#scryfall#scryfall-1#normal#NM", "sequence_number", "42")),

@@ -1,8 +1,10 @@
 package com.jordansimsmith.tcginventory.inventory.client;
 
+import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
+import java.time.Instant;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -64,6 +66,40 @@ public class FakeInventoryService implements InventoryService {
     var end = Math.min(offset + limit, allUnits.size());
     var page = allUnits.subList(offset, end);
     return new FindUnitsResponse(page, end < allUnits.size() ? Integer.toString(end) : null);
+  }
+
+  @Override
+  public DeleteUnitResponse deleteUnit(RequestContext ctx, DeleteUnitRequest request)
+      throws ServiceException {
+    var key = new Key(ctx.user(), request.skuId());
+    var allUnits = units.getOrDefault(key, List.of());
+    var unit =
+        allUnits.stream()
+            .filter(candidate -> candidate.sequenceNumber() == request.sequenceNumber())
+            .findFirst()
+            .orElseThrow(() -> new NotFoundException("Not Found"));
+    if (unit.status() == UnitStatus.REMOVED) {
+      return new DeleteUnitResponse();
+    }
+    if (unit.status() != UnitStatus.IN_STOCK) {
+      throw new ConflictException("unit is not in stock");
+    }
+    var removed =
+        new Unit(
+            unit.sequenceNumber(),
+            unit.location(),
+            UnitStatus.REMOVED,
+            unit.photos(),
+            unit.createdAt(),
+            Instant.now().getEpochSecond());
+    units.put(
+        key,
+        allUnits.stream()
+            .map(
+                candidate ->
+                    candidate.sequenceNumber() == request.sequenceNumber() ? removed : candidate)
+            .toList());
+    return new DeleteUnitResponse();
   }
 
   public void seedUnits(String user, String skuId, List<Unit> units) {

@@ -278,8 +278,8 @@ lambdas = {
         "zip_file": "find-units-handler_deploy.jar",
     },
     "remove_unit": {
-        "handler": "com.jordansimsmith.tcginventory.inventory.RemoveUnitHandler",
-        "zip_file": "remove-unit-handler_deploy.jar",
+        "handler": "com.jordansimsmith.tcginventory.inventory.api.DeleteUnitHandler",
+        "zip_file": "delete-unit-handler_deploy.jar",
     },
     "update_unit": {
         "handler": "com.jordansimsmith.tcginventory.inventory.UpdateUnitHandler",
