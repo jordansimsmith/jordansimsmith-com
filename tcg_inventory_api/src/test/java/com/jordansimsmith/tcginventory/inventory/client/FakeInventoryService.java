@@ -102,6 +102,60 @@ public class FakeInventoryService implements InventoryService {
     return new DeleteUnitResponse();
   }
 
+  @Override
+  public UpdateUnitResponse updateUnit(RequestContext ctx, UpdateUnitRequest request)
+      throws ServiceException {
+    var sourceKey = new SkuKey(ctx.user(), request.skuId());
+    var sourceSku = skus.get(sourceKey);
+    if (sourceSku == null) {
+      throw new NotFoundException("Not Found");
+    }
+    var sourceUnitsKey = new Key(ctx.user(), request.skuId());
+    var sourceUnits = units.getOrDefault(sourceUnitsKey, List.of());
+    var unit =
+        sourceUnits.stream()
+            .filter(candidate -> candidate.sequenceNumber() == request.sequenceNumber())
+            .findFirst()
+            .orElseThrow(() -> new NotFoundException("Not Found"));
+    if (unit.status() != UnitStatus.IN_STOCK) {
+      throw new ConflictException("unit is not in stock");
+    }
+    if (request.condition() == null || sourceSku.condition() == request.condition()) {
+      return new UpdateUnitResponse(request.skuId());
+    }
+    var parts = request.skuId().split("#");
+    var destinationSkuId =
+        String.join("#", java.util.Arrays.copyOf(parts, parts.length - 1))
+            + "#"
+            + request.condition();
+    var destinationKey = new SkuKey(ctx.user(), destinationSkuId);
+    skus.putIfAbsent(
+        destinationKey,
+        new Sku(
+            destinationSkuId,
+            sourceSku.game(),
+            sourceSku.externalId(),
+            sourceSku.name(),
+            sourceSku.setCode(),
+            sourceSku.setName(),
+            sourceSku.collectorNumber(),
+            sourceSku.finish(),
+            request.condition(),
+            sourceSku.lastPublishedPrice()));
+    units.put(
+        sourceUnitsKey,
+        sourceUnits.stream()
+            .filter(candidate -> candidate.sequenceNumber() != request.sequenceNumber())
+            .toList());
+    var destinationUnitsKey = new Key(ctx.user(), destinationSkuId);
+    var destinationUnits =
+        new java.util.ArrayList<>(units.getOrDefault(destinationUnitsKey, List.of()));
+    destinationUnits.add(unit);
+    destinationUnits.sort(Comparator.comparingInt(Unit::sequenceNumber));
+    units.put(destinationUnitsKey, List.copyOf(destinationUnits));
+    return new UpdateUnitResponse(destinationSkuId);
+  }
+
   public void seedUnits(String user, String skuId, List<Unit> units) {
     this.units.put(
         new Key(user, skuId),

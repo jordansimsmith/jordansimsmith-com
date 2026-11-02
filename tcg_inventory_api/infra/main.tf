@@ -213,7 +213,7 @@ module "java_api" {
       artifact = var.artifacts["remove_unit"]
     }
     update_unit = {
-      handler  = "com.jordansimsmith.tcginventory.inventory.UpdateUnitHandler"
+      handler  = "com.jordansimsmith.tcginventory.inventory.api.UpdateUnitHandler"
       artifact = var.artifacts["update_unit"]
     }
     find_orders = {

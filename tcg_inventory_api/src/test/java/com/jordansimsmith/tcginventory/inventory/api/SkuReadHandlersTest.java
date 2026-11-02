@@ -13,6 +13,7 @@ import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusResponse;
 import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
@@ -113,7 +114,7 @@ class SkuReadHandlersTest {
         "Set",
         "1",
         "normal",
-        "NM",
+        Condition.NM,
         new BigDecimal("0.00"));
   }
 

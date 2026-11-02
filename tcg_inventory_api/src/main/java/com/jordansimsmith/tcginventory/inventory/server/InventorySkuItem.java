@@ -20,6 +20,9 @@ public class InventorySkuItem {
   public static final String FINISH = "finish";
   public static final String CONDITION = "condition";
   public static final String LAST_PUBLISHED_PRICE = "last_published_price";
+  public static final String SUGGESTED_PRICE = "suggested_price";
+  public static final String FETCHTCG_CARD_ID = "fetchtcg_card_id";
+  public static final String FETCHTCG_SET_ID = "fetchtcg_set_id";
   public static final String GSI2PK = "gsi2pk";
   public static final String GSI2SK = "gsi2sk";
   private String pk;
@@ -34,6 +37,9 @@ public class InventorySkuItem {
   private String finish;
   private String condition;
   private String lastPublishedPrice;
+  private String suggestedPrice;
+  private String fetchtcgCardId;
+  private int fetchtcgSetId;
   private String gsi2pk;
   private String gsi2sk;
 
@@ -145,6 +151,33 @@ public class InventorySkuItem {
 
   public void setLastPublishedPrice(@Nullable String lastPublishedPrice) {
     this.lastPublishedPrice = lastPublishedPrice;
+  }
+
+  @DynamoDbAttribute(SUGGESTED_PRICE)
+  public String getSuggestedPrice() {
+    return suggestedPrice;
+  }
+
+  public void setSuggestedPrice(@Nullable String suggestedPrice) {
+    this.suggestedPrice = suggestedPrice;
+  }
+
+  @DynamoDbAttribute(FETCHTCG_CARD_ID)
+  public String getFetchtcgCardId() {
+    return fetchtcgCardId;
+  }
+
+  public void setFetchtcgCardId(@Nullable String fetchtcgCardId) {
+    this.fetchtcgCardId = fetchtcgCardId;
+  }
+
+  @DynamoDbAttribute(FETCHTCG_SET_ID)
+  public int getFetchtcgSetId() {
+    return fetchtcgSetId;
+  }
+
+  public void setFetchtcgSetId(int fetchtcgSetId) {
+    this.fetchtcgSetId = fetchtcgSetId;
   }
 
   @DynamoDbSecondaryPartitionKey(indexNames = "gsi2")

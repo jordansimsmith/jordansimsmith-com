@@ -1,11 +1,7 @@
 package com.jordansimsmith.tcginventory.inventory;
 
 import com.jordansimsmith.tcginventory.AuditItem;
-import com.jordansimsmith.tcginventory.CardIdentity;
-import com.jordansimsmith.tcginventory.Condition;
-import com.jordansimsmith.tcginventory.SkuIds;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.tcginventory.games.client.Game;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
 import java.time.Instant;
@@ -69,70 +65,6 @@ public class InventoryRepository {
         .filter(unit -> "in_stock".equals(unit.getStatus()))
         .limit(quantity)
         .toList();
-  }
-
-  // one transaction across both SKU partitions: the unit moves keeping its sequence number and
-  // photos, the source SKU is dirtied, and the target SKU record is created or refreshed
-  public String updateUnitCondition(
-      String user, SkuItem skuItem, UnitItem unitItem, String condition, Game game) {
-    var identity = new CardIdentity(skuItem.getGame(), skuItem.getExternalId());
-    var targetSkuId =
-        SkuIds.format(game, identity, skuItem.getFinish(), Condition.valueOf(condition));
-    var targetSku =
-        SkuItem.create(
-            user,
-            targetSkuId,
-            identity.game(),
-            identity.externalId(),
-            skuItem.getFinish(),
-            condition,
-            skuItem.getName(),
-            skuItem.getSetCode(),
-            skuItem.getSetName(),
-            skuItem.getCollectorNumber(),
-            skuItem.getFetchtcgCardId(),
-            skuItem.getSuggestedPrice());
-
-    var movedUnit =
-        UnitItem.create(
-            user,
-            identity.game(),
-            targetSkuId,
-            unitItem.getSequenceNumber(),
-            "in_stock",
-            unitItem.getImportId(),
-            unitItem.getCreatedAt());
-    if (unitItem.getPhotos() != null && !unitItem.getPhotos().isEmpty()) {
-      movedUnit.setPhotos(unitItem.getPhotos());
-    }
-
-    dynamoDbClient.transactWriteItems(
-        TransactWriteItemsRequest.builder()
-            .transactItems(
-                List.of(
-                    buildUnitDelete(user, skuItem.getSkuId(), unitItem.getSequenceNumber()),
-                    buildUnitPut(movedUnit),
-                    buildSkuDirtyUpdate(user, skuItem.getSkuId()),
-                    buildSkuUpsert(targetSku),
-                    buildAuditPut(
-                        user,
-                        "adjustment",
-                        Map.of(
-                            SkuItem.SKU_ID,
-                            AttributeValue.builder().s(skuItem.getSkuId()).build(),
-                            UnitItem.SEQUENCE_NUMBER,
-                            AttributeValue.builder()
-                                .n(String.valueOf(unitItem.getSequenceNumber()))
-                                .build(),
-                            AuditItem.BEFORE_STATUS,
-                            AttributeValue.builder().s("in_stock").build(),
-                            AuditItem.AFTER_STATUS,
-                            AttributeValue.builder().s("in_stock").build(),
-                            AuditItem.TARGET_SKU_ID,
-                            AttributeValue.builder().s(targetSkuId).build()))))
-            .build());
-
-    return targetSkuId;
   }
 
   public int allocateSequenceRange(String user, String game, int count) {

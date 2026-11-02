@@ -14,4 +14,7 @@ public interface InventoryService {
 
   DeleteUnitResponse deleteUnit(RequestContext ctx, DeleteUnitRequest request)
       throws ServiceException;
+
+  UpdateUnitResponse updateUnit(RequestContext ctx, UpdateUnitRequest request)
+      throws ServiceException;
 }

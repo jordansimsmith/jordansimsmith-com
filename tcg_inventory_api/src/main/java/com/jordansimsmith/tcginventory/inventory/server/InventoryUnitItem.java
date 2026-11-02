@@ -8,6 +8,7 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttri
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbConvertedBy;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondaryPartitionKey;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
 
 @DynamoDbBean
@@ -16,6 +17,8 @@ public class InventoryUnitItem {
   public static final String SK = "sk";
   public static final String SEQUENCE_NUMBER = "sequence_number";
   public static final String STATUS = "status";
+  public static final String GAME = "game";
+  public static final String GSI3PK = "gsi3pk";
   public static final String PHOTOS = "photos";
   public static final String CREATED_AT = "created_at";
   public static final String UPDATED_AT = "updated_at";
@@ -25,6 +28,8 @@ public class InventoryUnitItem {
   private String sk;
   private Integer sequenceNumber;
   private String status;
+  private String game;
+  private String gsi3pk;
   private List<PhotoItem> photos;
   private Instant createdAt;
   private Instant updatedAt;
@@ -65,6 +70,25 @@ public class InventoryUnitItem {
 
   public void setStatus(String status) {
     this.status = status;
+  }
+
+  @DynamoDbAttribute(GAME)
+  public String getGame() {
+    return game;
+  }
+
+  public void setGame(@Nullable String game) {
+    this.game = game;
+  }
+
+  @DynamoDbSecondaryPartitionKey(indexNames = "gsi3")
+  @DynamoDbAttribute(GSI3PK)
+  public String getGsi3pk() {
+    return gsi3pk;
+  }
+
+  public void setGsi3pk(@Nullable String gsi3pk) {
+    this.gsi3pk = gsi3pk;
   }
 
   @DynamoDbConvertedBy(EpochSecondConverter.class)

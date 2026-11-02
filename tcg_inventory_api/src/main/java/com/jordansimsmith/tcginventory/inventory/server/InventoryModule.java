@@ -3,6 +3,7 @@ package com.jordansimsmith.tcginventory.inventory.server;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.inventory.client.DeleteUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.DeleteUnitResponse;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
@@ -14,6 +15,8 @@ import com.jordansimsmith.tcginventory.inventory.client.GetSkuResponse;
 import com.jordansimsmith.tcginventory.inventory.client.GetUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.GetUnitResponse;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.UpdateUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.UpdateUnitResponse;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
 import dagger.Module;
@@ -35,7 +38,8 @@ public class InventoryModule {
       @Named("tcgInventoryTableName") String tableName,
       ObjectMapper objectMapper,
       Clock clock,
-      UlidGenerator ulidGenerator) {
+      UlidGenerator ulidGenerator,
+      GamesService gamesService) {
     DynamoDbTable<InventorySkuItem> skuTable =
         dynamoDb.table(tableName, TableSchema.fromBean(InventorySkuItem.class));
     DynamoDbTable<InventoryUnitItem> unitTable =
@@ -45,10 +49,11 @@ public class InventoryModule {
     var getSkuService = new GetSkuService(inventoryRepository);
     var getUnitService = new GetUnitService(inventoryRepository);
     var findUnitsService = new FindUnitsService(inventoryRepository, objectMapper);
-    var deleteUnitService =
-        new DeleteUnitService(
-            inventoryRepository,
-            new InventoryMutationRepository(dynamoDbClient, tableName, clock, ulidGenerator));
+    var mutationRepository =
+        new InventoryMutationRepository(dynamoDbClient, tableName, clock, ulidGenerator);
+    var deleteUnitService = new DeleteUnitService(inventoryRepository, mutationRepository);
+    var updateUnitService =
+        new UpdateUnitService(inventoryRepository, mutationRepository, gamesService);
     return new InventoryService() {
       @Override
       public FindSkusResponse findSkus(RequestContext ctx, FindSkusRequest request)
@@ -78,6 +83,12 @@ public class InventoryModule {
       public DeleteUnitResponse deleteUnit(RequestContext ctx, DeleteUnitRequest request)
           throws ServiceException {
         return deleteUnitService.deleteUnit(ctx, request);
+      }
+
+      @Override
+      public UpdateUnitResponse updateUnit(RequestContext ctx, UpdateUnitRequest request)
+          throws ServiceException {
+        return updateUnitService.updateUnit(ctx, request);
       }
     };
   }

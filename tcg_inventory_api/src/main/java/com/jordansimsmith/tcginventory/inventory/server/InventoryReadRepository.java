@@ -43,11 +43,12 @@ public class InventoryReadRepository {
 
   @Nullable
   public InventorySkuItem getSku(String user, String skuId) {
-    return skuTable.getItem(
+    var key =
         Key.builder()
             .partitionValue(InventorySkuItem.formatPk(user, skuId))
             .sortValue("SKU")
-            .build());
+            .build();
+    return skuTable.getItem(request -> request.key(key).consistentRead(true));
   }
 
   @Nullable

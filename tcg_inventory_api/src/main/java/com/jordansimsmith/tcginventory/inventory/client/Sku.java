@@ -13,5 +13,5 @@ public record Sku(
     @JsonProperty("set_name") String setName,
     @JsonProperty("collector_number") String collectorNumber,
     @JsonProperty("finish") String finish,
-    @JsonProperty("condition") String condition,
+    @JsonProperty("condition") Condition condition,
     @JsonProperty("last_published_price") @Nullable BigDecimal lastPublishedPrice) {}

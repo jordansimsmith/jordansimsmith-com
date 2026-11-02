@@ -13,6 +13,7 @@ import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.inventory.api.DeleteUnitHandler;
 import com.jordansimsmith.tcginventory.inventory.api.FindSkusHandler;
 import com.jordansimsmith.tcginventory.inventory.api.GetSkuHandler;
+import com.jordansimsmith.tcginventory.inventory.api.UpdateUnitHandler;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.nio.charset.StandardCharsets;
@@ -600,7 +601,7 @@ public class InventoryHandlerIntegrationTest {
   }
 
   @Test
-  void updateUnitShouldReturn409ForSameCondition() {
+  void updateUnitShouldSucceedWithoutChangesForSameCondition() {
     // arrange
     createSku(
         "jordan", "mtg#scryfall#scryfall-1#normal#NM", "Elvish Mystic", "m14", "Magic 2014", "169");
@@ -616,7 +617,8 @@ public class InventoryHandlerIntegrationTest {
             null);
 
     // assert
-    assertThat(response.getStatusCode()).isEqualTo(409);
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    assertThat(queryAuditEntries("jordan")).isEmpty();
   }
 
   @Test

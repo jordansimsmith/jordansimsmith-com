@@ -5,6 +5,7 @@ import com.jordansimsmith.dynamodb.Continuations;
 import com.jordansimsmith.service.BadRequestException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusResponse;
 import com.jordansimsmith.tcginventory.inventory.client.Sku;
@@ -56,7 +57,7 @@ public class FindSkusService {
         item.getSetName(),
         item.getCollectorNumber(),
         item.getFinish(),
-        item.getCondition(),
+        Condition.valueOf(item.getCondition()),
         item.getLastPublishedPrice() == null ? null : new BigDecimal(item.getLastPublishedPrice()));
   }
 

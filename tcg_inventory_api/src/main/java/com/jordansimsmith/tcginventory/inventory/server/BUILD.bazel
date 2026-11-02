@@ -13,6 +13,7 @@ java_library(
         "//lib/service",
         "//lib/time:lib",
         "//lib/ulid:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",

@@ -4,6 +4,7 @@ import com.jordansimsmith.service.BadRequestException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
 import com.jordansimsmith.tcginventory.inventory.client.GetSkuResponse;
 import com.jordansimsmith.tcginventory.inventory.client.Sku;
@@ -38,7 +39,7 @@ public class GetSkuService {
         item.getSetName(),
         item.getCollectorNumber(),
         item.getFinish(),
-        item.getCondition(),
+        Condition.valueOf(item.getCondition()),
         parsePrice(item.getLastPublishedPrice()));
   }
 
