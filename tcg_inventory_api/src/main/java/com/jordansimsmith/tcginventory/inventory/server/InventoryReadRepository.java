@@ -22,7 +22,7 @@ public class InventoryReadRepository {
   @Nullable
   public Page<InventorySkuItem> findSkus(
       String user,
-      String game,
+      @Nullable String game,
       String search,
       int limit,
       @Nullable Map<String, AttributeValue> continuation) {
@@ -39,6 +39,24 @@ public class InventoryReadRepository {
             .exclusiveStartKey(continuation)
             .build();
     return skuTable.index("gsi2").query(request).stream().findFirst().orElse(null);
+  }
+
+  @Nullable
+  public Page<InventorySkuItem> findDirtySkus(
+      String user, boolean dirty, int limit, @Nullable Map<String, AttributeValue> continuation) {
+    var request =
+        QueryEnhancedRequest.builder()
+            .queryConditional(
+                QueryConditional.sortBeginsWith(
+                    Key.builder()
+                        .partitionValue(InventorySkuItem.formatGsi1pk(user, dirty))
+                        .sortValue(InventorySkuItem.formatGsi1skPrefix())
+                        .build()))
+            .scanIndexForward(true)
+            .limit(limit)
+            .exclusiveStartKey(continuation)
+            .build();
+    return skuTable.index("gsi1").query(request).stream().findFirst().orElse(null);
   }
 
   @Nullable

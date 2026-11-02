@@ -340,7 +340,6 @@ interface FakeSku {
   finish: Finish;
   condition: Condition;
   suggested_price: string;
-  last_published_price: string | null;
   units: FakeUnit[];
 }
 
@@ -380,7 +379,6 @@ function createSeedState(): FakeSku[] {
       for (let i = soldCount; i < soldCount + reservedCount; i += 1) {
         units[i].status = 'reserved';
       }
-      const hasStock = inStockCount > 0;
       const suggestedPrice = formatPrice(30 + ((unitIndex * 37) % 20) * 25);
       return {
         sku_id: crypto.randomUUID(),
@@ -393,7 +391,6 @@ function createSeedState(): FakeSku[] {
         finish,
         condition,
         suggested_price: suggestedPrice,
-        last_published_price: hasStock ? suggestedPrice : null,
         units,
       };
     },
@@ -449,7 +446,6 @@ function createSeedState(): FakeSku[] {
         finish,
         condition,
         suggested_price: suggestedPrice,
-        last_published_price: inStockCount > 0 ? suggestedPrice : null,
         units,
       };
     },
@@ -480,10 +476,7 @@ function toSummary(sku: FakeSku): Sku {
     collector_number: sku.collector_number,
     finish: sku.finish,
     condition: sku.condition,
-    last_published_price:
-      sku.last_published_price == null
-        ? null
-        : Number(sku.last_published_price),
+    price: Number(sku.suggested_price),
   };
 }
 
@@ -1715,10 +1708,6 @@ export function createFakeClient(): ApiClient {
       published,
     )) {
       dirtySkuIds.delete(skuId);
-      const sku = skus.find((candidate) => candidate.sku_id === skuId);
-      if (sku) {
-        sku.last_published_price = sku.suggested_price;
-      }
     }
     publishRun.cleared_count = Math.max(publishRun.cleared_count, published);
     if (
@@ -1867,7 +1856,6 @@ export function createFakeClient(): ApiClient {
           finish: row.finish,
           condition: row.condition,
           suggested_price: row.suggested_price ?? formatPrice(25),
-          last_published_price: null,
           units: [],
         };
         skus.push(sku);
@@ -2463,7 +2451,6 @@ export function createFakeClient(): ApiClient {
           ...sku,
           sku_id: crypto.randomUUID(),
           condition,
-          last_published_price: null,
           units: [],
         };
         skus.push(target);

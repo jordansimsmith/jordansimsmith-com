@@ -59,11 +59,15 @@ public class FindSkusHandler
     var continuation = value(queryParams, "continuation");
     var limitParam = value(queryParams, "limit");
     Integer limit = parseLimit(limitParam);
+    if (game == null || game.isBlank()) {
+      return httpResponseFactory.badRequest(new ErrorResponse("game is required"));
+    }
     if (limitParam != null && limit == null) {
       return httpResponseFactory.badRequest(new ErrorResponse("Invalid limit"));
     }
     return httpResponseFactory.ok(
-        inventoryService.findSkus(ctx, new FindSkusRequest(game, search, limit, continuation)));
+        inventoryService.findSkus(
+            ctx, new FindSkusRequest(game, search, null, limit, continuation)));
   }
 
   @Nullable

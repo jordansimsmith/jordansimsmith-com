@@ -335,12 +335,12 @@ export function SkuDetailPage() {
                     </div>
                     <div>
                       <Text size="xs" c="dimmed" fw={600}>
-                        Listed price
+                        Price
                       </Text>
                       <Text size="sm" className={classes.numeric}>
-                        {sku.last_published_price != null
-                          ? `$${sku.last_published_price.toFixed(2)}`
-                          : 'Not listed'}
+                        {sku.price != null
+                          ? `$${sku.price.toFixed(2)}`
+                          : 'Not set'}
                       </Text>
                     </div>
                   </div>

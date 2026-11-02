@@ -734,7 +734,7 @@ describe('http client scans', () => {
         collector_number: '1',
         finish: 'normal',
         condition: 'NM',
-        last_published_price: 0.3,
+        price: 0.3,
       },
     };
     fetchSpy.mockResolvedValue({

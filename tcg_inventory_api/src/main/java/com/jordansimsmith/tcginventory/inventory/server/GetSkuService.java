@@ -40,7 +40,11 @@ public class GetSkuService {
         item.getCollectorNumber(),
         item.getFinish(),
         Condition.valueOf(item.getCondition()),
-        parsePrice(item.getLastPublishedPrice()));
+        parsePrice(item.getSuggestedPrice()),
+        item.getFetchtcgCardId(),
+        item.getFetchtcgSetId(),
+        item.getFetchtcgListingId(),
+        item.getVersion() == null ? 0 : item.getVersion());
   }
 
   @Nullable

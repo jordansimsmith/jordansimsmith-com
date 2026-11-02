@@ -259,6 +259,7 @@ public class RepriceJobProcessorIntegrationTest {
                         UnitStatus.IN_STOCK,
                         List.of(),
                         CREATED_AT.getEpochSecond(),
+                        null,
                         null)),
                 null));
     var pricingService = mock(PricingService.class);
@@ -294,6 +295,7 @@ public class RepriceJobProcessorIntegrationTest {
                         UnitStatus.IN_STOCK,
                         List.of(),
                         CREATED_AT.getEpochSecond(),
+                        null,
                         null)),
                 "next"))
         .thenThrow(new BadRequestException("unit page failed"));

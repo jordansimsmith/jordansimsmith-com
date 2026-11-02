@@ -37,6 +37,7 @@ public class GetUnitService {
                 : item.getPhotos().stream().map(InventoryUnitItem.PhotoItem::getPhotoId).toList(),
             Objects.requireNonNull(item.getCreatedAt(), "Inventory unit has no created_at")
                 .getEpochSecond(),
-            item.getUpdatedAt() == null ? null : item.getUpdatedAt().getEpochSecond()));
+            item.getUpdatedAt() == null ? null : item.getUpdatedAt().getEpochSecond(),
+            item.getOrderId()));
   }
 }

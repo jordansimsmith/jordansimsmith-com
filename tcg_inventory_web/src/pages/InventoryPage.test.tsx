@@ -53,7 +53,7 @@ const skuFixtures: Sku[] = [
     collector_number: '42',
     finish: 'normal',
     condition: 'NM',
-    last_published_price: 1.5,
+    price: 1.5,
   },
   {
     sku_id: '22222222-2222-4222-8222-222222222222#foil#LP',
@@ -65,7 +65,7 @@ const skuFixtures: Sku[] = [
     collector_number: '60',
     finish: 'foil',
     condition: 'LP',
-    last_published_price: 0,
+    price: 0,
   },
   {
     sku_id: '33333333-3333-4333-8333-333333333333#normal#MP',
@@ -77,7 +77,7 @@ const skuFixtures: Sku[] = [
     collector_number: '331',
     finish: 'normal',
     condition: 'MP',
-    last_published_price: 0.3,
+    price: 0.3,
   },
   {
     sku_id: 'pokemon#tcgplayer#283917#reverse_holofoil#NM',
@@ -89,7 +89,7 @@ const skuFixtures: Sku[] = [
     collector_number: '043/196',
     finish: 'reverse_holofoil',
     condition: 'NM',
-    last_published_price: 7.5,
+    price: 7.5,
   },
 ];
 

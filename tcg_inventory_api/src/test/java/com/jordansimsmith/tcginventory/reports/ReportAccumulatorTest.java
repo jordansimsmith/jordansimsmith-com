@@ -231,7 +231,8 @@ public class ReportAccumulatorTest {
         UnitStatus.valueOf(status.toUpperCase()),
         List.of(),
         createdAt.getEpochSecond(),
-        updatedAt == null ? null : updatedAt.getEpochSecond());
+        updatedAt == null ? null : updatedAt.getEpochSecond(),
+        null);
   }
 
   @Test

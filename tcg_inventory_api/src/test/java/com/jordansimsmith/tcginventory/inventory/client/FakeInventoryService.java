@@ -1,33 +1,68 @@
 package com.jordansimsmith.tcginventory.inventory.client;
 
+import com.jordansimsmith.service.BadRequestException;
 import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 public class FakeInventoryService implements InventoryService {
   private final Map<Key, List<Unit>> units = new HashMap<>();
   private final Map<SkuKey, Sku> skus = new HashMap<>();
+  private final Set<SkuKey> dirtySkus = new HashSet<>();
 
   @Override
-  public FindSkusResponse findSkus(RequestContext ctx, FindSkusRequest request) {
+  public FindSkusResponse findSkus(RequestContext ctx, FindSkusRequest request)
+      throws ServiceException {
+    if (request.dirty() == null) {
+      if (request.game() != null && request.game().isBlank()) {
+        throw new BadRequestException("game is required");
+      }
+      if (request.game() == null && request.search() != null && !request.search().isBlank()) {
+        throw new BadRequestException("search requires game");
+      }
+    } else if (request.game() != null || request.search() != null) {
+      throw new BadRequestException("dirty cannot be combined with game or search");
+    }
     var search = request.search() == null ? "" : request.search().toLowerCase(Locale.ROOT);
     var matches =
         skus.entrySet().stream()
             .filter(entry -> entry.getKey().user().equals(ctx.user()))
             .map(Map.Entry::getValue)
-            .filter(sku -> sku.game().equals(request.game()))
-            .filter(sku -> sku.name().toLowerCase(Locale.ROOT).startsWith(search))
+            .filter(
+                sku ->
+                    request.dirty() == null
+                        || dirtySkus.contains(new SkuKey(ctx.user(), sku.skuId()))
+                            == request.dirty())
+            .filter(
+                sku ->
+                    request.dirty() != null
+                        || request.game() == null
+                        || sku.game().equals(request.game()))
+            .filter(
+                sku ->
+                    request.dirty() != null
+                        || sku.name().toLowerCase(Locale.ROOT).startsWith(search))
             .sorted(
-                Comparator.comparing(
-                    sku ->
-                        sku.game() + "#" + sku.name().toLowerCase(Locale.ROOT) + "#" + sku.skuId()))
+                request.dirty() == null
+                    ? Comparator.comparing(
+                        sku ->
+                            sku.game()
+                                + "#"
+                                + sku.name().toLowerCase(Locale.ROOT)
+                                + "#"
+                                + sku.skuId())
+                    : Comparator.comparing(Sku::skuId))
             .toList();
     var limit = request.limit() == null ? 20 : request.limit();
     var offset = request.continuation() == null ? 0 : Integer.parseInt(request.continuation());
@@ -91,7 +126,8 @@ public class FakeInventoryService implements InventoryService {
             UnitStatus.REMOVED,
             unit.photos(),
             unit.createdAt(),
-            Instant.now().getEpochSecond());
+            Instant.now().getEpochSecond(),
+            unit.reservationId());
     units.put(
         key,
         allUnits.stream()
@@ -99,6 +135,7 @@ public class FakeInventoryService implements InventoryService {
                 candidate ->
                     candidate.sequenceNumber() == request.sequenceNumber() ? removed : candidate)
             .toList());
+    dirtySkus.add(new SkuKey(ctx.user(), request.skuId()));
     return new DeleteUnitResponse();
   }
 
@@ -125,9 +162,7 @@ public class FakeInventoryService implements InventoryService {
     }
     var parts = request.skuId().split("#");
     var destinationSkuId =
-        String.join("#", java.util.Arrays.copyOf(parts, parts.length - 1))
-            + "#"
-            + request.condition();
+        String.join("#", Arrays.copyOf(parts, parts.length - 1)) + "#" + request.condition();
     var destinationKey = new SkuKey(ctx.user(), destinationSkuId);
     skus.putIfAbsent(
         destinationKey,
@@ -141,18 +176,23 @@ public class FakeInventoryService implements InventoryService {
             sourceSku.collectorNumber(),
             sourceSku.finish(),
             request.condition(),
-            sourceSku.lastPublishedPrice()));
+            sourceSku.price(),
+            sourceSku.fetchtcgCardId(),
+            sourceSku.fetchtcgSetId(),
+            sourceSku.fetchtcgListingId(),
+            sourceSku.version()));
     units.put(
         sourceUnitsKey,
         sourceUnits.stream()
             .filter(candidate -> candidate.sequenceNumber() != request.sequenceNumber())
             .toList());
     var destinationUnitsKey = new Key(ctx.user(), destinationSkuId);
-    var destinationUnits =
-        new java.util.ArrayList<>(units.getOrDefault(destinationUnitsKey, List.of()));
+    var destinationUnits = new ArrayList<>(units.getOrDefault(destinationUnitsKey, List.of()));
     destinationUnits.add(unit);
     destinationUnits.sort(Comparator.comparingInt(Unit::sequenceNumber));
     units.put(destinationUnitsKey, List.copyOf(destinationUnits));
+    dirtySkus.add(sourceKey);
+    dirtySkus.add(destinationKey);
     return new UpdateUnitResponse(destinationSkuId);
   }
 
@@ -162,8 +202,14 @@ public class FakeInventoryService implements InventoryService {
         units.stream().sorted(Comparator.comparingInt(Unit::sequenceNumber)).toList());
   }
 
-  public void seedSku(String user, Sku sku) {
-    skus.put(new SkuKey(user, sku.skuId()), sku);
+  public void seedSku(String user, Sku sku, boolean dirty) {
+    var key = new SkuKey(user, sku.skuId());
+    skus.put(key, sku);
+    if (dirty) {
+      dirtySkus.add(key);
+    } else {
+      dirtySkus.remove(key);
+    }
   }
 
   private record Key(String user, String skuId) {}

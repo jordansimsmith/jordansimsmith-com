@@ -19,10 +19,13 @@ public class InventorySkuItem {
   public static final String COLLECTOR_NUMBER = "collector_number";
   public static final String FINISH = "finish";
   public static final String CONDITION = "condition";
-  public static final String LAST_PUBLISHED_PRICE = "last_published_price";
   public static final String SUGGESTED_PRICE = "suggested_price";
   public static final String FETCHTCG_CARD_ID = "fetchtcg_card_id";
   public static final String FETCHTCG_SET_ID = "fetchtcg_set_id";
+  public static final String FETCHTCG_LISTING_ID = "fetchtcg_listing_id";
+  public static final String VERSION = "version";
+  public static final String GSI1PK = "gsi1pk";
+  public static final String GSI1SK = "gsi1sk";
   public static final String GSI2PK = "gsi2pk";
   public static final String GSI2SK = "gsi2sk";
   private String pk;
@@ -36,10 +39,13 @@ public class InventorySkuItem {
   private String collectorNumber;
   private String finish;
   private String condition;
-  private String lastPublishedPrice;
   private String suggestedPrice;
   private String fetchtcgCardId;
   private int fetchtcgSetId;
+  private Integer fetchtcgListingId;
+  private Integer version;
+  private String gsi1pk;
+  private String gsi1sk;
   private String gsi2pk;
   private String gsi2sk;
 
@@ -144,15 +150,6 @@ public class InventorySkuItem {
     this.condition = condition;
   }
 
-  @DynamoDbAttribute(LAST_PUBLISHED_PRICE)
-  public String getLastPublishedPrice() {
-    return lastPublishedPrice;
-  }
-
-  public void setLastPublishedPrice(@Nullable String lastPublishedPrice) {
-    this.lastPublishedPrice = lastPublishedPrice;
-  }
-
   @DynamoDbAttribute(SUGGESTED_PRICE)
   public String getSuggestedPrice() {
     return suggestedPrice;
@@ -178,6 +175,44 @@ public class InventorySkuItem {
 
   public void setFetchtcgSetId(int fetchtcgSetId) {
     this.fetchtcgSetId = fetchtcgSetId;
+  }
+
+  @DynamoDbAttribute(FETCHTCG_LISTING_ID)
+  public Integer getFetchtcgListingId() {
+    return fetchtcgListingId;
+  }
+
+  public void setFetchtcgListingId(@Nullable Integer fetchtcgListingId) {
+    this.fetchtcgListingId = fetchtcgListingId;
+  }
+
+  @DynamoDbAttribute(VERSION)
+  public Integer getVersion() {
+    return version;
+  }
+
+  public void setVersion(@Nullable Integer version) {
+    this.version = version;
+  }
+
+  @DynamoDbSecondaryPartitionKey(indexNames = "gsi1")
+  @DynamoDbAttribute(GSI1PK)
+  public String getGsi1pk() {
+    return gsi1pk;
+  }
+
+  public void setGsi1pk(@Nullable String gsi1pk) {
+    this.gsi1pk = gsi1pk;
+  }
+
+  @DynamoDbSecondarySortKey(indexNames = "gsi1")
+  @DynamoDbAttribute(GSI1SK)
+  public String getGsi1sk() {
+    return gsi1sk;
+  }
+
+  public void setGsi1sk(@Nullable String gsi1sk) {
+    this.gsi1sk = gsi1sk;
   }
 
   @DynamoDbSecondaryPartitionKey(indexNames = "gsi2")
@@ -208,7 +243,18 @@ public class InventorySkuItem {
     return "USER#" + user + "#SKUS";
   }
 
-  public static String formatGsi2skPrefix(String game, String search) {
+  public static String formatGsi1pk(String user, boolean dirty) {
+    return "USER#" + user + (dirty ? "#DIRTY" : "#CLEAN");
+  }
+
+  public static String formatGsi1skPrefix() {
+    return "SKU#";
+  }
+
+  public static String formatGsi2skPrefix(@Nullable String game, String search) {
+    if (game == null) {
+      return "GAME#";
+    }
     return "GAME#" + game + "#NAME#" + search;
   }
 }

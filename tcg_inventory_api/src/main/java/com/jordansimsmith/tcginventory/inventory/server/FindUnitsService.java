@@ -59,7 +59,8 @@ public class FindUnitsService {
                         Objects.requireNonNull(
                                 item.getCreatedAt(), "Inventory unit has no created_at")
                             .getEpochSecond(),
-                        item.getUpdatedAt() == null ? null : item.getUpdatedAt().getEpochSecond()))
+                        item.getUpdatedAt() == null ? null : item.getUpdatedAt().getEpochSecond(),
+                        item.getOrderId()))
             .toList();
     var nextContinuation = Continuations.encode(page.lastEvaluatedKey(), objectMapper);
     return new FindUnitsResponse(units, nextContinuation);

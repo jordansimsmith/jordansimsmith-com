@@ -1345,9 +1345,7 @@ describe('createFakeClient repricing', () => {
     vi.advanceTimersByTime(60_000);
     await client.getPublish();
     const firstPage = await client.findSkus({ game: 'mtg' });
-    expect(firstPage.skus.map((sku) => sku.last_published_price)).toContain(
-      1000,
-    );
+    expect(firstPage.skus.map((sku) => sku.price)).toContain(1000);
   });
 });
 

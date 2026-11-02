@@ -83,7 +83,7 @@ class InventoryReadServiceIntegrationTest {
   @Test
   void findSkusShouldFilterSortAndPaginateByAuthenticatedUser() throws Exception {
     // arrange
-    skuTable.putItem(sku("alice", "alpha", "Alpha Card", "1.25"));
+    skuTable.putItem(sku("alice", "alpha", "Alpha Card", "2.50"));
     skuTable.putItem(sku("alice", "beta", "Beta Card", null));
     skuTable.putItem(sku("alice", "else", "Other Card", "2"));
     skuTable.putItem(sku("bob", "alpha", "Alpha Card", "9"));
@@ -91,28 +91,28 @@ class InventoryReadServiceIntegrationTest {
     // act
     var firstPage =
         findSkusService.findSkus(
-            new RequestContext("alice"), new FindSkusRequest("mtg", null, 1, null));
+            new RequestContext("alice"), new FindSkusRequest("mtg", null, null, 1, null));
     var nextPage =
         findSkusService.findSkus(
             new RequestContext("alice"),
-            new FindSkusRequest("mtg", null, 1, firstPage.nextContinuation()));
+            new FindSkusRequest("mtg", null, null, 1, firstPage.nextContinuation()));
     var finalPage =
         findSkusService.findSkus(
             new RequestContext("alice"),
-            new FindSkusRequest("mtg", null, 1, nextPage.nextContinuation()));
+            new FindSkusRequest("mtg", null, null, 1, nextPage.nextContinuation()));
     var emptyPage =
         findSkusService.findSkus(
             new RequestContext("alice"),
-            new FindSkusRequest("mtg", null, 1, finalPage.nextContinuation()));
+            new FindSkusRequest("mtg", null, null, 1, finalPage.nextContinuation()));
     var bobPage =
         findSkusService.findSkus(
-            new RequestContext("bob"), new FindSkusRequest("mtg", null, 20, null));
+            new RequestContext("bob"), new FindSkusRequest("mtg", null, null, 20, null));
 
     // assert
     assertThat(firstPage.skus()).hasSize(1);
     assertThat(firstPage.skus().get(0).name()).isEqualTo("Alpha Card");
     assertThat(firstPage.skus().get(0).externalId()).isEqualTo("alpha");
-    assertThat(firstPage.skus().get(0).lastPublishedPrice()).isEqualByComparingTo("1.25");
+    assertThat(firstPage.skus().get(0).price()).isEqualByComparingTo("2.50");
     assertThat(nextPage.skus()).extracting(sku -> sku.name()).containsExactly("Beta Card");
     assertThat(finalPage.skus()).extracting(sku -> sku.name()).containsExactly("Other Card");
     assertThat(emptyPage.skus()).isEmpty();
@@ -130,12 +130,80 @@ class InventoryReadServiceIntegrationTest {
     // act
     var response =
         findSkusService.findSkus(
-            new RequestContext("alice"), new FindSkusRequest("mtg", "aLp", null, null));
+            new RequestContext("alice"), new FindSkusRequest("mtg", "aLp", null, null, null));
 
     // assert
     assertThat(response.skus())
         .extracting(sku -> sku.name())
         .containsExactly("Alpha Card", "Alpine Card");
+  }
+
+  @Test
+  void findSkusShouldSupportUserWideBrowseAndExclusiveDirtyMode() throws Exception {
+    // arrange
+    skuTable.putItem(sku("alice", "mtg", "alpha", "Alpha Card", true));
+    skuTable.putItem(sku("alice", "pokemon", "beta", "Beta Card", true));
+    skuTable.putItem(sku("alice", "mtg", "clean", "Clean Card", false));
+    skuTable.putItem(sku("bob", "mtg", "other", "Other Card", true));
+
+    // act
+    var allSkus =
+        findSkusService.findSkus(
+            new RequestContext("alice"), new FindSkusRequest(null, null, null, 100, null));
+    var dirtyPage =
+        findSkusService.findSkus(
+            new RequestContext("alice"), new FindSkusRequest(null, null, true, 1, null));
+    var nextDirtyPage =
+        findSkusService.findSkus(
+            new RequestContext("alice"),
+            new FindSkusRequest(null, null, true, 1, dirtyPage.nextContinuation()));
+    var cleanPage =
+        findSkusService.findSkus(
+            new RequestContext("alice"), new FindSkusRequest(null, null, false, 100, null));
+
+    // assert
+    assertThat(allSkus.skus())
+        .extracting(sku -> sku.game())
+        .containsExactly("mtg", "mtg", "pokemon");
+    assertThat(dirtyPage.skus()).extracting(sku -> sku.skuId()).containsExactly("alpha");
+    assertThat(dirtyPage.nextContinuation()).isNotNull();
+    assertThat(nextDirtyPage.skus()).extracting(sku -> sku.skuId()).containsExactly("beta");
+    assertThat(cleanPage.skus()).extracting(sku -> sku.skuId()).containsExactly("clean");
+  }
+
+  @Test
+  void findSkusShouldReturnWorkerFactsFromStorage() throws Exception {
+    // arrange
+    var item = sku("alice", "mtg", "alpha", "Alpha Card", true);
+    item.setSuggestedPrice("2.50");
+    item.setFetchtcgCardId("fetch-card");
+    item.setFetchtcgSetId(123);
+    item.setFetchtcgListingId(456);
+    item.setVersion(7);
+    skuTable.putItem(item);
+    var versionless = sku("alice", "mtg", "versionless", "Versionless Card", false);
+    versionless.setVersion(null);
+    versionless.setSuggestedPrice("0.00");
+    skuTable.putItem(versionless);
+
+    // act
+    var listed =
+        findSkusService.findSkus(
+            new RequestContext("alice"), new FindSkusRequest("mtg", null, null, null, null));
+    var fetched =
+        getSkuService.getSku(new RequestContext("alice"), new GetSkuRequest("alpha")).sku();
+    var oldSku =
+        getSkuService.getSku(new RequestContext("alice"), new GetSkuRequest("versionless")).sku();
+
+    // assert
+    assertThat(listed.skus().getFirst().price()).isEqualByComparingTo("2.50");
+    assertThat(listed.skus().getFirst().fetchtcgCardId()).isEqualTo("fetch-card");
+    assertThat(listed.skus().getFirst().fetchtcgSetId()).isEqualTo(123);
+    assertThat(listed.skus().getFirst().fetchtcgListingId()).isEqualTo(456);
+    assertThat(listed.skus().getFirst().version()).isEqualTo(7);
+    assertThat(fetched).isEqualTo(listed.skus().getFirst());
+    assertThat(oldSku.version()).isZero();
+    assertThat(oldSku.price()).isEqualByComparingTo(BigDecimal.ZERO);
   }
 
   @Test
@@ -149,24 +217,54 @@ class InventoryReadServiceIntegrationTest {
     assertThatThrownBy(
             () ->
                 findService.findSkus(
-                    new RequestContext("alice"), new FindSkusRequest(" ", null, null, null)))
+                    new RequestContext("alice"), new FindSkusRequest(" ", null, null, null, null)))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("game is required");
     assertThatThrownBy(
             () ->
                 findService.findSkus(
-                    new RequestContext("alice"), new FindSkusRequest("mtg", null, 101, null)))
+                    new RequestContext("alice"), new FindSkusRequest("mtg", null, null, 101, null)))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("limit must be between 1 and 100");
     assertThatThrownBy(
             () ->
                 findService.findSkus(
-                    new RequestContext("alice"), new FindSkusRequest("mtg", null, null, "%")))
+                    new RequestContext("alice"), new FindSkusRequest("mtg", null, null, null, "%")))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("Invalid continuation");
     assertThatThrownBy(() -> getService.getSku(new RequestContext("alice"), new GetSkuRequest(" ")))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("sku_id is required");
+    verifyNoInteractions(inventoryRepository);
+  }
+
+  @Test
+  void findSkusShouldRejectCombinedSearchModesBeforeStorageAccess() {
+    // arrange
+    var inventoryRepository = mock(InventoryReadRepository.class);
+    var findService = new FindSkusService(inventoryRepository, new ObjectMapper());
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                findService.findSkus(
+                    new RequestContext("alice"),
+                    new FindSkusRequest("mtg", null, true, null, null)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("dirty cannot be combined with game or search");
+    assertThatThrownBy(
+            () ->
+                findService.findSkus(
+                    new RequestContext("alice"), new FindSkusRequest(null, "", false, null, null)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("dirty cannot be combined with game or search");
+    assertThatThrownBy(
+            () ->
+                findService.findSkus(
+                    new RequestContext("alice"),
+                    new FindSkusRequest(null, "alpha", null, null, null)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("search requires game");
     verifyNoInteractions(inventoryRepository);
   }
 
@@ -182,8 +280,8 @@ class InventoryReadServiceIntegrationTest {
         getSkuService.getSku(new RequestContext("alice"), new GetSkuRequest("missing")).sku();
 
     // assert
-    assertThat(zero.lastPublishedPrice()).isEqualByComparingTo(BigDecimal.ZERO);
-    assertThat(missing.lastPublishedPrice()).isNull();
+    assertThat(zero.price()).isEqualByComparingTo(BigDecimal.ZERO);
+    assertThat(missing.price()).isNull();
     assertThatThrownBy(
             () -> getSkuService.getSku(new RequestContext("bob"), new GetSkuRequest("zero")))
         .isInstanceOf(NotFoundException.class)
@@ -211,8 +309,11 @@ class InventoryReadServiceIntegrationTest {
     var reserved = unit("alice", "sku", 2, "reserved", List.of(photo("front"), photo("back")));
     reserved.setCreatedAt(Instant.ofEpochSecond(1700000000));
     reserved.setUpdatedAt(Instant.ofEpochSecond(1700000001));
+    reserved.setOrderId("order-1");
     unitTable.putItem(reserved);
-    unitTable.putItem(unit("alice", "sku", 3, "sold"));
+    var sold = unit("alice", "sku", 3, "sold");
+    sold.setOrderId("order-2");
+    unitTable.putItem(sold);
     unitTable.putItem(unit("bob", "sku", 2, "in_stock"));
 
     // act
@@ -237,10 +338,14 @@ class InventoryReadServiceIntegrationTest {
     assertThat(secondPage.units().getFirst().photos()).containsExactly("front", "back");
     assertThat(secondPage.units().getFirst().createdAt()).isEqualTo(1700000000L);
     assertThat(secondPage.units().getFirst().updatedAt()).isEqualTo(1700000001L);
+    assertThat(secondPage.units().getFirst().reservationId()).isEqualTo("order-1");
     assertThat(secondPage.nextContinuation()).isNotNull();
     assertThat(allAliceUnits.units())
         .extracting("status")
         .containsExactly(UnitStatus.RESERVED, UnitStatus.SOLD);
+    assertThat(allAliceUnits.units())
+        .extracting("reservationId")
+        .containsExactly("order-1", "order-2");
     assertThat(bobPage.units()).extracting("sequenceNumber").containsExactly(2);
     assertThat(bobPage.units().getFirst().photos()).isEmpty();
     assertThat(bobPage.units().getFirst().createdAt()).isEqualTo(1700000000L);
@@ -250,7 +355,7 @@ class InventoryReadServiceIntegrationTest {
         .isEqualTo(
             objectMapper.readTree(
                 """
-                {"units":[{"sequence_number":2,"location":"A0-2","status":"reserved","photos":["front","back"],"created_at":1700000000,"updated_at":1700000001}],"next_continuation":"%s"}
+                {"units":[{"sequence_number":2,"location":"A0-2","status":"reserved","photos":["front","back"],"created_at":1700000000,"updated_at":1700000001,"reservation_id":"order-1"}],"next_continuation":"%s"}
                 """
                     .formatted(secondPage.nextContinuation())));
   }
@@ -363,13 +468,22 @@ class InventoryReadServiceIntegrationTest {
     return item;
   }
 
+  private static InventorySkuItem sku(String user, String skuId, String name, String price) {
+    return sku(user, "mtg", skuId, name, true, price);
+  }
+
   private static InventorySkuItem sku(
-      String user, String skuId, String name, String lastPublishedPrice) {
+      String user, String game, String skuId, String name, boolean dirty) {
+    return sku(user, game, skuId, name, dirty, null);
+  }
+
+  private static InventorySkuItem sku(
+      String user, String game, String skuId, String name, boolean dirty, String price) {
     var item = new InventorySkuItem();
     item.setPk(InventorySkuItem.formatPk(user, skuId));
     item.setSk("SKU");
     item.setSkuId(skuId);
-    item.setGame("mtg");
+    item.setGame(game);
     item.setExternalId(skuId);
     item.setName(name);
     item.setSetCode("set");
@@ -377,9 +491,15 @@ class InventoryReadServiceIntegrationTest {
     item.setCollectorNumber("1");
     item.setFinish("normal");
     item.setCondition("NM");
-    item.setLastPublishedPrice(lastPublishedPrice);
+    item.setSuggestedPrice(price);
+    item.setFetchtcgCardId("fetch-" + skuId);
+    item.setFetchtcgSetId(1);
+    item.setVersion(1);
+    item.setFetchtcgListingId(dirty ? null : 100);
+    item.setGsi1pk(InventorySkuItem.formatGsi1pk(user, dirty));
+    item.setGsi1sk(InventorySkuItem.formatGsi1skPrefix() + skuId);
     item.setGsi2pk(InventorySkuItem.formatGsi2pk(user));
-    item.setGsi2sk(InventorySkuItem.formatGsi2skPrefix("mtg", name.toLowerCase()) + "#" + skuId);
+    item.setGsi2sk(InventorySkuItem.formatGsi2skPrefix(game, name.toLowerCase()) + "#" + skuId);
     return item;
   }
 }

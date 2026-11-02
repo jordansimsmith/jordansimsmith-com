@@ -14,4 +14,8 @@ public record Sku(
     @JsonProperty("collector_number") String collectorNumber,
     @JsonProperty("finish") String finish,
     @JsonProperty("condition") Condition condition,
-    @JsonProperty("last_published_price") @Nullable BigDecimal lastPublishedPrice) {}
+    @JsonProperty("price") @Nullable BigDecimal price,
+    @JsonProperty("fetchtcg_card_id") @Nullable String fetchtcgCardId,
+    @JsonProperty("fetchtcg_set_id") int fetchtcgSetId,
+    @JsonProperty("fetchtcg_listing_id") @Nullable Integer fetchtcgListingId,
+    @JsonProperty("version") int version) {}

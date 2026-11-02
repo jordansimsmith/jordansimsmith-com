@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
@@ -65,9 +66,15 @@ class SkuReadHandlersTest {
         .isEqualTo("https://tcg-inventory.jordansimsmith.com");
     var body = objectMapper.readTree(response.getBody());
     assertThat(body.get("skus").get(0).get("external_id").asText()).isEqualTo("card-id");
-    assertThat(body.get("skus").get(0).get("last_published_price").isNumber()).isTrue();
+    assertThat(body.get("skus").get(0).get("price").isNumber()).isTrue();
+    assertThat(body.get("skus").get(0).has("last_published_price")).isFalse();
+    assertThat(body.get("skus").get(0).has("suggested_price")).isFalse();
+    assertThat(body.get("skus").get(0).get("fetchtcg_set_id").asInt()).isEqualTo(1);
+    assertThat(body.get("skus").get(0).get("version").asInt()).isEqualTo(4);
+    assertThat(body.get("skus").get(0).has("last_published_quantity")).isFalse();
+    assertThat(body.get("skus").get(0).has("last_published_at")).isFalse();
     verify(inventoryService)
-        .findSkus(new RequestContext("jordan"), new FindSkusRequest("mtg", null, 10, null));
+        .findSkus(new RequestContext("jordan"), new FindSkusRequest("mtg", null, null, 10, null));
   }
 
   @Test
@@ -84,7 +91,7 @@ class SkuReadHandlersTest {
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
     assertThat(body.get("sku").get("sku_id").asText()).isEqualTo("sku#opaque");
-    assertThat(body.get("sku").get("last_published_price").isNumber()).isTrue();
+    assertThat(body.get("sku").get("price").isNumber()).isTrue();
     verify(inventoryService).getSku(new RequestContext("jordan"), new GetSkuRequest("sku#opaque"));
 
     when(inventoryService.getSku(any(), any())).thenThrow(new NotFoundException("Not Found"));
@@ -104,6 +111,16 @@ class SkuReadHandlersTest {
     assertThat(response.getStatusCode()).isEqualTo(400);
   }
 
+  @Test
+  void findSkusShouldRequireGameBeforeCallingService() {
+    // act
+    var response = findSkusHandler.handleRequest(event(), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(400);
+    verifyNoInteractions(inventoryService);
+  }
+
   private static Sku sku() {
     return new Sku(
         "sku#opaque",
@@ -115,7 +132,11 @@ class SkuReadHandlersTest {
         "1",
         "normal",
         Condition.NM,
-        new BigDecimal("0.00"));
+        new BigDecimal("1.25"),
+        "card-id",
+        1,
+        null,
+        4);
   }
 
   private static APIGatewayV2HTTPEvent event() {

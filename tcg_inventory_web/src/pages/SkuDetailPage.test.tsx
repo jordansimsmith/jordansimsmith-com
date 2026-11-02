@@ -89,7 +89,7 @@ const nmDetail: Sku = {
   collector_number: '472',
   finish: 'normal',
   condition: 'NM',
-  last_published_price: 2.5,
+  price: 2.5,
 };
 
 const lpDetail: Sku = {
@@ -102,7 +102,7 @@ const lpDetail: Sku = {
   collector_number: '472',
   finish: 'normal',
   condition: 'LP',
-  last_published_price: null,
+  price: null,
 };
 
 function renderSkuDetailPage(skuId = nmDetail.sku_id) {

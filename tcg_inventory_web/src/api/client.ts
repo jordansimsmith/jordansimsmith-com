@@ -77,7 +77,7 @@ export interface Sku {
   collector_number: string;
   finish: Finish;
   condition: Condition;
-  last_published_price: number | null;
+  price: number | null;
 }
 
 export interface FindSkusResponse {

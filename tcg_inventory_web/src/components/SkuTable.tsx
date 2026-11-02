@@ -51,9 +51,7 @@ export function SkuTable({ skus, onOpen }: SkuTableProps) {
               {sku.condition}
             </Table.Td>
             <Table.Td ta="right" data-field="price" data-label="Price">
-              {sku.last_published_price != null
-                ? `$${sku.last_published_price.toFixed(2)}`
-                : ''}
+              {sku.price != null ? `$${sku.price.toFixed(2)}` : ''}
             </Table.Td>
           </Table.Tr>
         ))}

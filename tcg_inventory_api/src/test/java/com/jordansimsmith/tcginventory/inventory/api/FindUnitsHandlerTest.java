@@ -52,7 +52,7 @@ class FindUnitsHandlerTest {
     var event = event("SKU%23opaque", "100", "next-page");
     var responseBody =
         new FindUnitsResponse(
-            List.of(new Unit(102, "A1-2", UnitStatus.IN_STOCK, List.of(), 1700000000L, null)),
+            List.of(new Unit(102, "A1-2", UnitStatus.IN_STOCK, List.of(), 1700000000L, null, null)),
             null);
     when(inventoryService.findUnits(any(), any())).thenReturn(responseBody);
 
@@ -69,7 +69,7 @@ class FindUnitsHandlerTest {
         .isEqualTo(
             objectMapper.readTree(
                 """
-                {"units":[{"sequence_number":102,"location":"A1-2","status":"in_stock","photos":[],"created_at":1700000000,"updated_at":null}],"next_continuation":null}
+                {"units":[{"sequence_number":102,"location":"A1-2","status":"in_stock","photos":[],"created_at":1700000000,"updated_at":null,"reservation_id":null}],"next_continuation":null}
                 """));
     verify(inventoryService)
         .findUnits(

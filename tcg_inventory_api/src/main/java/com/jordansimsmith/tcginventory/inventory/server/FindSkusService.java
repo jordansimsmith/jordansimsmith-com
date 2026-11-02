@@ -14,6 +14,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
+import software.amazon.awssdk.enhanced.dynamodb.model.Page;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 public class FindSkusService {
@@ -29,17 +30,30 @@ public class FindSkusService {
 
   public FindSkusResponse findSkus(RequestContext ctx, FindSkusRequest request)
       throws ServiceException {
-    if (request.game() == null || request.game().isBlank()) {
+    if (request.dirty() != null && (request.game() != null || request.search() != null)) {
+      throw new BadRequestException("dirty cannot be combined with game or search");
+    }
+    if (request.dirty() == null && request.game() != null && request.game().isBlank()) {
       throw new BadRequestException("game is required");
+    }
+    if (request.dirty() == null
+        && request.game() == null
+        && request.search() != null
+        && !request.search().isBlank()) {
+      throw new BadRequestException("search requires game");
     }
     var limit = request.limit() == null ? DEFAULT_LIMIT : request.limit();
     if (limit < 1 || limit > MAX_LIMIT) {
       throw new BadRequestException("limit must be between 1 and 100");
     }
     var continuation = decodeContinuation(request.continuation());
-    var search = request.search() == null ? "" : request.search().toLowerCase(Locale.ROOT);
-    var page =
-        inventoryRepository.findSkus(ctx.user(), request.game(), search, limit, continuation);
+    Page<InventorySkuItem> page;
+    if (request.dirty() != null) {
+      page = inventoryRepository.findDirtySkus(ctx.user(), request.dirty(), limit, continuation);
+    } else {
+      var search = request.search() == null ? "" : request.search().toLowerCase(Locale.ROOT);
+      page = inventoryRepository.findSkus(ctx.user(), request.game(), search, limit, continuation);
+    }
     if (page == null) {
       return new FindSkusResponse(List.of(), null);
     }
@@ -58,7 +72,16 @@ public class FindSkusService {
         item.getCollectorNumber(),
         item.getFinish(),
         Condition.valueOf(item.getCondition()),
-        item.getLastPublishedPrice() == null ? null : new BigDecimal(item.getLastPublishedPrice()));
+        parsePrice(item.getSuggestedPrice()),
+        item.getFetchtcgCardId(),
+        item.getFetchtcgSetId(),
+        item.getFetchtcgListingId(),
+        item.getVersion() == null ? 0 : item.getVersion());
+  }
+
+  @Nullable
+  private static BigDecimal parsePrice(@Nullable String value) {
+    return value == null ? null : new BigDecimal(value);
   }
 
   @Nullable

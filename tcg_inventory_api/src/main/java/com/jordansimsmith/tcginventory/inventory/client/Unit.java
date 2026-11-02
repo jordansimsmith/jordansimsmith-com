@@ -10,4 +10,5 @@ public record Unit(
     @JsonProperty("status") UnitStatus status,
     @JsonProperty("photos") List<String> photos,
     @JsonProperty("created_at") long createdAt,
-    @JsonProperty("updated_at") @Nullable Long updatedAt) {}
+    @JsonProperty("updated_at") @Nullable Long updatedAt,
+    @JsonProperty("reservation_id") @Nullable String reservationId) {}

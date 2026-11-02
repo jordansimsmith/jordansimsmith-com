@@ -18,6 +18,7 @@ public class InventoryUnitItem {
   public static final String SEQUENCE_NUMBER = "sequence_number";
   public static final String STATUS = "status";
   public static final String GAME = "game";
+  public static final String ORDER_ID = "order_id";
   public static final String GSI3PK = "gsi3pk";
   public static final String PHOTOS = "photos";
   public static final String CREATED_AT = "created_at";
@@ -29,6 +30,7 @@ public class InventoryUnitItem {
   private Integer sequenceNumber;
   private String status;
   private String game;
+  private String orderId;
   private String gsi3pk;
   private List<PhotoItem> photos;
   private Instant createdAt;
@@ -79,6 +81,15 @@ public class InventoryUnitItem {
 
   public void setGame(@Nullable String game) {
     this.game = game;
+  }
+
+  @DynamoDbAttribute(ORDER_ID)
+  public String getOrderId() {
+    return orderId;
+  }
+
+  public void setOrderId(@Nullable String orderId) {
+    this.orderId = orderId;
   }
 
   @DynamoDbSecondaryPartitionKey(indexNames = "gsi3")
