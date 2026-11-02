@@ -103,6 +103,50 @@ public class InventoryMutationRepository {
             .build());
   }
 
+  public void updateSkuPrice(
+      String user, String skuId, @Nullable String beforePrice, String price) {
+    var skuPk = InventorySkuItem.formatPk(user, skuId);
+    var dirtyGsi1pk = InventorySkuItem.formatGsi1pk(user, true);
+    var dirtyGsi1sk = InventorySkuItem.formatGsi1skPrefix() + skuId;
+    var now = clock.now();
+    var audit =
+        TableSchema.fromBean(InventoryAuditItem.class)
+            .itemToMap(
+                InventoryAuditItem.createPriceUpdate(
+                    user, ulidGenerator.generate(), skuId, beforePrice, price, now),
+                true);
+
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                TransactWriteItem.builder()
+                    .update(
+                        Update.builder()
+                            .tableName(tableName)
+                            .key(
+                                Map.of(
+                                    "pk", AttributeValue.builder().s(skuPk).build(),
+                                    "sk", AttributeValue.builder().s("SKU").build()))
+                            .updateExpression(
+                                "SET suggested_price = :price, dirty = :dirty, "
+                                    + "gsi1pk = :gsi1pk, gsi1sk = :gsi1sk ADD #version :one")
+                            .conditionExpression("attribute_exists(pk)")
+                            .expressionAttributeNames(Map.of("#version", "version"))
+                            .expressionAttributeValues(
+                                Map.of(
+                                    ":price", AttributeValue.builder().s(price).build(),
+                                    ":dirty", AttributeValue.builder().bool(true).build(),
+                                    ":gsi1pk", AttributeValue.builder().s(dirtyGsi1pk).build(),
+                                    ":gsi1sk", AttributeValue.builder().s(dirtyGsi1sk).build(),
+                                    ":one", AttributeValue.builder().n("1").build()))
+                            .build())
+                    .build(),
+                TransactWriteItem.builder()
+                    .put(Put.builder().tableName(tableName).item(audit).build())
+                    .build())
+            .build());
+  }
+
   public void updateUnitCondition(
       String user,
       InventorySkuItem sourceSku,

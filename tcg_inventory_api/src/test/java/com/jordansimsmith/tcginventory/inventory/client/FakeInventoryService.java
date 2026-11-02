@@ -5,6 +5,8 @@ import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -194,6 +196,49 @@ public class FakeInventoryService implements InventoryService {
     dirtySkus.add(sourceKey);
     dirtySkus.add(destinationKey);
     return new UpdateUnitResponse(destinationSkuId);
+  }
+
+  @Override
+  public UpdateSkuResponse updateSku(RequestContext ctx, UpdateSkuRequest request)
+      throws ServiceException {
+    if (request.skuId() == null || request.skuId().isBlank()) {
+      throw new BadRequestException("sku_id is required");
+    }
+    var key = new SkuKey(ctx.user(), request.skuId());
+    var sku = skus.get(key);
+    if (sku == null) {
+      throw new NotFoundException("Not Found");
+    }
+    if (request.price() != null) {
+      if (request.price().signum() < 0) {
+        throw new BadRequestException("price must be nonnegative");
+      }
+      BigDecimal price;
+      try {
+        price = request.price().setScale(2, RoundingMode.UNNECESSARY);
+      } catch (ArithmeticException e) {
+        throw new BadRequestException("price must have at most two decimal places");
+      }
+      skus.put(
+          key,
+          new Sku(
+              sku.skuId(),
+              sku.game(),
+              sku.externalId(),
+              sku.name(),
+              sku.setCode(),
+              sku.setName(),
+              sku.collectorNumber(),
+              sku.finish(),
+              sku.condition(),
+              price,
+              sku.fetchtcgCardId(),
+              sku.fetchtcgSetId(),
+              sku.fetchtcgListingId(),
+              sku.version() + 1));
+      dirtySkus.add(key);
+    }
+    return new UpdateSkuResponse();
   }
 
   public void seedUnits(String user, String skuId, List<Unit> units) {

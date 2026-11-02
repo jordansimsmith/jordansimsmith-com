@@ -15,6 +15,8 @@ import com.jordansimsmith.tcginventory.inventory.client.GetSkuResponse;
 import com.jordansimsmith.tcginventory.inventory.client.GetUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.GetUnitResponse;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuRequest;
+import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuResponse;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateUnitResponse;
 import com.jordansimsmith.time.Clock;
@@ -54,6 +56,7 @@ public class InventoryModule {
     var deleteUnitService = new DeleteUnitService(inventoryRepository, mutationRepository);
     var updateUnitService =
         new UpdateUnitService(inventoryRepository, mutationRepository, gamesService);
+    var updateSkuService = new UpdateSkuService(inventoryRepository, mutationRepository);
     return new InventoryService() {
       @Override
       public FindSkusResponse findSkus(RequestContext ctx, FindSkusRequest request)
@@ -89,6 +92,12 @@ public class InventoryModule {
       public UpdateUnitResponse updateUnit(RequestContext ctx, UpdateUnitRequest request)
           throws ServiceException {
         return updateUnitService.updateUnit(ctx, request);
+      }
+
+      @Override
+      public UpdateSkuResponse updateSku(RequestContext ctx, UpdateSkuRequest request)
+          throws ServiceException {
+        return updateSkuService.updateSku(ctx, request);
       }
     };
   }

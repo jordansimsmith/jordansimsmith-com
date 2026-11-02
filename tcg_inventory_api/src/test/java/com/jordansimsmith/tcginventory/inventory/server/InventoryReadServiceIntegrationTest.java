@@ -19,9 +19,12 @@ import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
 import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
+import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuRequest;
+import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuResponse;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,9 +35,11 @@ import software.amazon.awssdk.auth.credentials.AwsBasicCredentials;
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 @Testcontainers
 class InventoryReadServiceIntegrationTest {
@@ -45,10 +50,13 @@ class InventoryReadServiceIntegrationTest {
   private static DynamoDbClient dynamoDbClient;
   private static DynamoDbTable<InventoryUnitItem> unitTable;
   private static DynamoDbTable<InventorySkuItem> skuTable;
+  private static DynamoDbTable<InventoryAuditItem> auditTable;
 
   private FindUnitsService service;
   private FindSkusService findSkusService;
   private GetSkuService getSkuService;
+  private UpdateSkuService updateSkuService;
+  private int nextAuditId;
 
   @BeforeAll
   static void setUpBeforeClass() {
@@ -62,6 +70,7 @@ class InventoryReadServiceIntegrationTest {
     var enhancedClient = DynamoDbEnhancedClient.builder().dynamoDbClient(dynamoDbClient).build();
     skuTable = enhancedClient.table(TABLE_NAME, TableSchema.fromBean(InventorySkuItem.class));
     unitTable = enhancedClient.table(TABLE_NAME, TableSchema.fromBean(InventoryUnitItem.class));
+    auditTable = enhancedClient.table(TABLE_NAME, TableSchema.fromBean(InventoryAuditItem.class));
     DynamoDbUtils.createTable(dynamoDbClient, skuTable);
   }
 
@@ -78,6 +87,198 @@ class InventoryReadServiceIntegrationTest {
     var repository = new InventoryReadRepository(skuTable, unitTable);
     findSkusService = new FindSkusService(repository, new ObjectMapper());
     getSkuService = new GetSkuService(repository);
+    nextAuditId = 0;
+    var mutationRepository =
+        new InventoryMutationRepository(
+            dynamoDbClient,
+            TABLE_NAME,
+            () -> Instant.ofEpochSecond(1700000000),
+            () -> "audit-" + ++nextAuditId);
+    updateSkuService = new UpdateSkuService(repository, mutationRepository);
+  }
+
+  @Test
+  void updateSkuShouldNormalizePriceAndWriteDirtyVersionAndAuditTogether() throws Exception {
+    // arrange
+    var item = sku("price-user", "mtg", "priced", "Priced Card", false, "1.00");
+    item.setFetchtcgListingId(456);
+    skuTable.putItem(item);
+    var skuKey =
+        Map.of(
+            "pk", AttributeValue.builder().s(item.getPk()).build(),
+            "sk", AttributeValue.builder().s("SKU").build());
+    dynamoDbClient.updateItem(
+        request ->
+            request
+                .tableName(TABLE_NAME)
+                .key(skuKey)
+                .updateExpression(
+                    "SET last_published_price = :publishedPrice, "
+                        + "last_published_quantity = :publishedQuantity")
+                .expressionAttributeValues(
+                    Map.of(
+                        ":publishedPrice",
+                        AttributeValue.builder().s("2.90").build(),
+                        ":publishedQuantity",
+                        AttributeValue.builder().n("1").build())));
+
+    // act
+    var response =
+        updateSkuService.updateSku(
+            new RequestContext("price-user"),
+            new UpdateSkuRequest("priced", new BigDecimal("2.5")));
+    var updated =
+        getSkuService.getSku(new RequestContext("price-user"), new GetSkuRequest("priced"));
+    var audit =
+        auditTable.getItem(
+            request ->
+                request
+                    .key(
+                        Key.builder()
+                            .partitionValue("USER#price-user#AUDIT")
+                            .sortValue("audit-1")
+                            .build())
+                    .consistentRead(true));
+
+    // assert
+    assertThat(response).isEqualTo(new UpdateSkuResponse());
+    assertThat(updated.sku().price()).isEqualByComparingTo("2.50");
+    assertThat(updated.sku().version()).isEqualTo(2);
+    assertThat(updated.sku().fetchtcgListingId()).isEqualTo(456);
+    assertThat(
+            skuTable
+                .getItem(
+                    request ->
+                        request
+                            .key(
+                                Key.builder().partitionValue(item.getPk()).sortValue("SKU").build())
+                            .consistentRead(true))
+                .getGsi1pk())
+        .isEqualTo("USER#price-user#DIRTY");
+    assertThat(audit.getEventType()).isEqualTo("price_update");
+    assertThat(audit.getSkuId()).isEqualTo("priced");
+    assertThat(audit.getBeforePrice()).isEqualTo("1.00");
+    assertThat(audit.getAfterPrice()).isEqualTo("2.50");
+    var rawSku =
+        dynamoDbClient
+            .getItem(request -> request.tableName(TABLE_NAME).key(skuKey).consistentRead(true))
+            .item();
+    assertThat(rawSku.get("last_published_price").s()).isEqualTo("2.90");
+    assertThat(rawSku.get("last_published_quantity").n()).isEqualTo("1");
+
+    // act
+    updateSkuService.updateSku(
+        new RequestContext("price-user"), new UpdateSkuRequest("priced", new BigDecimal("2.50")));
+
+    // assert
+    assertThat(
+            getSkuService
+                .getSku(new RequestContext("price-user"), new GetSkuRequest("priced"))
+                .sku()
+                .version())
+        .isEqualTo(3);
+    assertThat(
+            auditTable
+                .getItem(
+                    request ->
+                        request
+                            .key(
+                                Key.builder()
+                                    .partitionValue("USER#price-user#AUDIT")
+                                    .sortValue("audit-2")
+                                    .build())
+                            .consistentRead(true))
+                .getBeforePrice())
+        .isEqualTo("2.50");
+  }
+
+  @Test
+  void updateSkuShouldAllowZeroAndRejectNegativeOrOverPrecisionPrices() throws Exception {
+    // arrange
+    skuTable.putItem(sku("zero-user", "mtg", "priced", "Priced Card", false, "1.00"));
+
+    // act
+    updateSkuService.updateSku(
+        new RequestContext("zero-user"), new UpdateSkuRequest("priced", BigDecimal.ZERO));
+
+    // assert
+    assertThat(
+            getSkuService
+                .getSku(new RequestContext("zero-user"), new GetSkuRequest("priced"))
+                .sku()
+                .price())
+        .isEqualByComparingTo("0.00");
+    assertThatThrownBy(
+            () ->
+                updateSkuService.updateSku(
+                    new RequestContext("zero-user"),
+                    new UpdateSkuRequest("priced", new BigDecimal("-0.01"))))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("price must be nonnegative");
+    assertThatThrownBy(
+            () ->
+                updateSkuService.updateSku(
+                    new RequestContext("zero-user"),
+                    new UpdateSkuRequest("priced", new BigDecimal("1.001"))))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("price must have at most two decimal places");
+    assertThatThrownBy(
+            () ->
+                updateSkuService.updateSku(
+                    new RequestContext("other-user"),
+                    new UpdateSkuRequest("priced", BigDecimal.ONE)))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+    assertThatThrownBy(
+            () ->
+                updateSkuService.updateSku(
+                    new RequestContext("zero-user"), new UpdateSkuRequest(" ", BigDecimal.ONE)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("sku_id is required");
+    assertThat(
+            auditTable.getItem(
+                request ->
+                    request
+                        .key(
+                            Key.builder()
+                                .partitionValue("USER#zero-user#AUDIT")
+                                .sortValue("audit-1")
+                                .build())
+                        .consistentRead(true)))
+        .isNotNull();
+  }
+
+  @Test
+  void updateSkuShouldTreatNullPriceAsAnEmptyPatch() throws Exception {
+    // arrange
+    skuTable.putItem(sku("empty-user", "mtg", "priced", "Priced Card", false, "1.00"));
+
+    // act
+    updateSkuService.updateSku(
+        new RequestContext("empty-user"), new UpdateSkuRequest("priced", null));
+
+    // assert
+    var updated =
+        getSkuService.getSku(new RequestContext("empty-user"), new GetSkuRequest("priced"));
+    assertThat(updated.sku().price()).isEqualByComparingTo("1.00");
+    assertThat(updated.sku().version()).isEqualTo(1);
+    assertThat(updated.sku().fetchtcgListingId()).isEqualTo(100);
+    assertThat(
+            auditTable.getItem(
+                request ->
+                    request
+                        .key(
+                            Key.builder()
+                                .partitionValue("USER#empty-user#AUDIT")
+                                .sortValue("audit-1")
+                                .build())
+                        .consistentRead(true)))
+        .isNull();
+    assertThatThrownBy(
+            () ->
+                updateSkuService.updateSku(
+                    new RequestContext("empty-user"), new UpdateSkuRequest("missing", null)))
+        .isInstanceOf(NotFoundException.class);
   }
 
   @Test

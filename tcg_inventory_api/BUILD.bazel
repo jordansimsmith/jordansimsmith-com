@@ -280,7 +280,6 @@ java_library(
         exclude = ["src/main/java/com/jordansimsmith/tcginventory/pricing/*Handler.java"],
     ),
     deps = [
-        ":inventory-lib",
         ":lib",
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",

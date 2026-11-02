@@ -20,6 +20,8 @@ public class InventoryAuditItem {
   private String beforeStatus;
   private String afterStatus;
   private String targetSkuId;
+  private String beforePrice;
+  private String afterPrice;
   private Instant createdAt;
 
   @DynamoDbPartitionKey
@@ -105,6 +107,24 @@ public class InventoryAuditItem {
     this.targetSkuId = targetSkuId;
   }
 
+  @DynamoDbAttribute("before_price")
+  public String getBeforePrice() {
+    return beforePrice;
+  }
+
+  public void setBeforePrice(@Nullable String beforePrice) {
+    this.beforePrice = beforePrice;
+  }
+
+  @DynamoDbAttribute("after_price")
+  public String getAfterPrice() {
+    return afterPrice;
+  }
+
+  public void setAfterPrice(@Nullable String afterPrice) {
+    this.afterPrice = afterPrice;
+  }
+
   @DynamoDbConvertedBy(EpochSecondConverter.class)
   @DynamoDbAttribute("created_at")
   public Instant getCreatedAt() {
@@ -136,6 +156,24 @@ public class InventoryAuditItem {
     item.setBeforeStatus(beforeStatus);
     item.setAfterStatus(afterStatus);
     item.setTargetSkuId(targetSkuId);
+    item.setCreatedAt(createdAt);
+    return item;
+  }
+
+  public static InventoryAuditItem createPriceUpdate(
+      String user,
+      String id,
+      String skuId,
+      @Nullable String beforePrice,
+      String afterPrice,
+      Instant createdAt) {
+    var item = new InventoryAuditItem();
+    item.setPk("USER#" + user + "#AUDIT");
+    item.setSk(id);
+    item.setEventType("price_update");
+    item.setSkuId(skuId);
+    item.setBeforePrice(beforePrice);
+    item.setAfterPrice(afterPrice);
     item.setCreatedAt(createdAt);
     return item;
   }

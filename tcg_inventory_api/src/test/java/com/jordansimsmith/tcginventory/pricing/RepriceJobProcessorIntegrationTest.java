@@ -1,5 +1,6 @@
 package com.jordansimsmith.tcginventory.pricing;
 
+import static com.jordansimsmith.tcginventory.pricing.client.Condition.NM;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
@@ -27,15 +28,20 @@ import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.client.CardListing;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
-import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
+import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
+import com.jordansimsmith.tcginventory.inventory.client.FindSkusResponse;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsResponse;
+import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
+import com.jordansimsmith.tcginventory.inventory.client.GetSkuResponse;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.Sku;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
-import com.jordansimsmith.tcginventory.pricing.client.Condition;
+import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuRequest;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceRequest;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceResponse;
 import com.jordansimsmith.tcginventory.pricing.client.PricingService;
@@ -57,7 +63,6 @@ import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
-import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 
 @Testcontainers
 public class RepriceJobProcessorIntegrationTest {
@@ -160,7 +165,8 @@ public class RepriceJobProcessorIntegrationTest {
     assertThat(auditItems)
         .anySatisfy(
             audit -> {
-              assertThat(audit.getJobId()).isEqualTo("job1");
+              assertThat(audit.getEventType()).isEqualTo("price_update");
+              assertThat(audit.getJobId()).isNull();
               assertThat(audit.getSkuId()).isEqualTo(mtgSkuId);
               assertThat(audit.getBeforePrice()).isEqualTo("2.90");
               assertThat(audit.getAfterPrice()).isEqualTo("2.90");
@@ -220,6 +226,25 @@ public class RepriceJobProcessorIntegrationTest {
   }
 
   @Test
+  void repriceShouldReturnEmptySkuPageContinuationWithoutChangingCount() throws Exception {
+    // arrange
+    var user = "empty-sku-page-user";
+    createRepriceJob(user, "job1", null);
+    var inventoryService = mock(InventoryService.class);
+    when(inventoryService.findSkus(any(), any()))
+        .thenReturn(new FindSkusResponse(List.of(), "unexpected-continuation"));
+    var processor = newRepriceJobProcessor(mock(PricingService.class), inventoryService);
+
+    // act
+    var result = processor.processBatch(user, getJob(user, "job1"));
+
+    // assert
+    assertThat(result).isEqualTo(new JobProcessor.SuccessJobResult(0, "unexpected-continuation"));
+    verify(inventoryService)
+        .findSkus(new RequestContext(user), new FindSkusRequest(null, null, null, 100, null));
+  }
+
+  @Test
   void repriceShouldPriceEveryEligibleSkuThroughTheService() throws Exception {
     // arrange
     var user = "cache-user";
@@ -227,8 +252,7 @@ public class RepriceJobProcessorIntegrationTest {
     var secondSkuId = createSku(user, "mtg", "card-two", "shared-card", "1.00", "in_stock");
     createRepriceJob(user, "job1", null);
     var pricingService = mock(PricingService.class);
-    when(pricingService.getPrice(
-            new RequestContext(user), new GetPriceRequest("shared-card", Condition.NM)))
+    when(pricingService.getPrice(new RequestContext(user), new GetPriceRequest("shared-card", NM)))
         .thenReturn(new GetPriceResponse(new BigDecimal("1.00"), new BigDecimal("0.95")));
 
     // act
@@ -236,7 +260,7 @@ public class RepriceJobProcessorIntegrationTest {
 
     // assert
     verify(pricingService, times(2))
-        .getPrice(new RequestContext(user), new GetPriceRequest("shared-card", Condition.NM));
+        .getPrice(new RequestContext(user), new GetPriceRequest("shared-card", NM));
     assertThat(getSku(user, firstSkuId).getSuggestedPrice()).isEqualTo("0.95");
     assertThat(getSku(user, secondSkuId).getSuggestedPrice()).isEqualTo("0.95");
   }
@@ -248,6 +272,7 @@ public class RepriceJobProcessorIntegrationTest {
     var skuId = createSku(user, "mtg", "card", "fetch-card", "1.00", "in_stock");
     createRepriceJob(user, "job1", null);
     var inventoryService = mock(InventoryService.class);
+    stubInventorySku(inventoryService, user, skuId);
     when(inventoryService.findUnits(any(), any()))
         .thenReturn(new FindUnitsResponse(List.of(), "removed-page"))
         .thenReturn(
@@ -275,7 +300,8 @@ public class RepriceJobProcessorIntegrationTest {
         .findUnits(new RequestContext(user), new FindUnitsRequest(skuId, 100, null));
     verify(inventoryService)
         .findUnits(new RequestContext(user), new FindUnitsRequest(skuId, 100, "removed-page"));
-    assertThat(getSku(user, skuId).getSuggestedPrice()).isEqualTo("1.05");
+    verify(inventoryService)
+        .updateSku(new RequestContext(user), new UpdateSkuRequest(skuId, new BigDecimal("1.05")));
   }
 
   @Test
@@ -285,6 +311,7 @@ public class RepriceJobProcessorIntegrationTest {
     var skuId = createSku(user, "mtg", "card", "fetch-card", "1.00", "in_stock");
     createRepriceJob(user, "job1", null);
     var inventoryService = mock(InventoryService.class);
+    stubInventorySku(inventoryService, user, skuId);
     when(inventoryService.findUnits(any(), any()))
         .thenReturn(
             new FindUnitsResponse(
@@ -310,6 +337,7 @@ public class RepriceJobProcessorIntegrationTest {
     assertThat(result).isEqualTo(new JobProcessor.FailureJobResult("unit page failed"));
     assertThat(getSku(user, skuId).getSuggestedPrice()).isEqualTo("1.00");
     assertThat(repriceAudits(user)).isEmpty();
+    verify(inventoryService, times(0)).updateSku(any(), any());
     verifyNoInteractions(pricingService);
   }
 
@@ -335,8 +363,7 @@ public class RepriceJobProcessorIntegrationTest {
     createSku(user, "mtg", "card", "fetch-card", "1.00", "in_stock");
     createRepriceJob(user, "job1", null);
     var pricingService = mock(PricingService.class);
-    when(pricingService.getPrice(
-            new RequestContext(user), new GetPriceRequest("fetch-card", Condition.NM)))
+    when(pricingService.getPrice(new RequestContext(user), new GetPriceRequest("fetch-card", NM)))
         .thenThrow(new NotFoundException("FetchTCG account is not configured"));
 
     // act
@@ -355,8 +382,7 @@ public class RepriceJobProcessorIntegrationTest {
     createSku(user, "mtg", "card", "fetch-card", "1.00", "in_stock");
     createRepriceJob(user, "job1", null);
     var pricingService = mock(PricingService.class);
-    when(pricingService.getPrice(
-            new RequestContext(user), new GetPriceRequest("fetch-card", Condition.NM)))
+    when(pricingService.getPrice(new RequestContext(user), new GetPriceRequest("fetch-card", NM)))
         .thenThrow(new ServiceUnavailableException("FetchTCG is temporarily unavailable"));
 
     // act & assert
@@ -473,33 +499,6 @@ public class RepriceJobProcessorIntegrationTest {
     assertThat(repriceAudits("jordan")).hasSize(1);
   }
 
-  @Test
-  void auditedPriceWriteShouldRequireTheCapturedSkuVersionAndExistingSku() {
-    // arrange
-    var skuId = createSku("jordan", "mtg", "001", "fetch-001", "1.00", "in_stock");
-    var repository =
-        new InventoryRepository(
-            unitTable, factory.dynamoDbClient(), clock, factory.ulidGenerator());
-
-    // act
-    assertThatThrownBy(
-            () ->
-                repository.updateSkuPrice(
-                    "jordan", "missing-sku", 1, "job1", "1.00", "2.00", "audit1", CREATED_AT))
-        .isInstanceOf(TransactionCanceledException.class);
-    assertThatThrownBy(
-            () ->
-                repository.updateSkuPrice(
-                    "jordan", skuId, 99, "job1", "1.00", "2.00", "audit2", CREATED_AT))
-        .isInstanceOf(TransactionCanceledException.class);
-
-    // assert
-    assertThat(getSku("jordan", skuId).getSuggestedPrice()).isEqualTo("1.00");
-    assertThat(getSku("jordan", skuId).getVersion()).isEqualTo(1);
-    assertThat(getSku("jordan", skuId).getDirty()).isFalse();
-    assertThat(repriceAudits("jordan")).isEmpty();
-  }
-
   private String createSku(
       String user,
       String game,
@@ -534,6 +533,7 @@ public class RepriceJobProcessorIntegrationTest {
             "1",
             fetchTcgCardId,
             price);
+    sku.setFetchtcgSetId(1);
     sku.setDirty(false);
     sku.setGsi1pk(SkuItem.formatUserPk(user) + "#CLEAN");
     sku.setGsi1sk(SkuItem.formatGsi1sk(skuId));
@@ -573,21 +573,39 @@ public class RepriceJobProcessorIntegrationTest {
   }
 
   private RepriceJobProcessor newRepriceJobProcessor(PricingService pricingService) {
-    return newRepriceJobProcessor(pricingService, factory.inventoryService());
+    return new RepriceJobProcessor(
+        factory.inventoryService(), pricingService, factory.gamesService());
   }
 
   private RepriceJobProcessor newRepriceJobProcessor(
       PricingService pricingService, InventoryService inventoryService) {
-    var ulidGenerator = factory.ulidGenerator();
-    return new RepriceJobProcessor(
-        skuTable,
-        new InventoryRepository(unitTable, factory.dynamoDbClient(), clock, ulidGenerator),
-        inventoryService,
-        objectMapper,
-        pricingService,
-        clock,
-        ulidGenerator,
-        factory.gamesService());
+    return new RepriceJobProcessor(inventoryService, pricingService, factory.gamesService());
+  }
+
+  private void stubInventorySku(InventoryService inventoryService, String user, String skuId)
+      throws Exception {
+    var item = getSku(user, skuId);
+    var sku =
+        new Sku(
+            item.getSkuId(),
+            item.getGame(),
+            item.getExternalId(),
+            item.getName(),
+            item.getSetCode(),
+            item.getSetName(),
+            item.getCollectorNumber(),
+            item.getFinish(),
+            Condition.valueOf(item.getCondition()),
+            item.getSuggestedPrice() == null ? null : new BigDecimal(item.getSuggestedPrice()),
+            item.getFetchtcgCardId(),
+            item.getFetchtcgSetId(),
+            item.getFetchtcgListingId(),
+            item.getVersion());
+    var ctx = new RequestContext(user);
+    when(inventoryService.findSkus(any(), any()))
+        .thenReturn(new FindSkusResponse(List.of(sku), null));
+    when(inventoryService.getSku(ctx, new GetSkuRequest(skuId)))
+        .thenReturn(new GetSkuResponse(sku));
   }
 
   private SkuItem getSku(String user, String skuId) {
@@ -628,7 +646,7 @@ public class RepriceJobProcessorIntegrationTest {
                 .build())
         .stream()
         .flatMap(page -> page.items().stream())
-        .filter(item -> "reprice".equals(item.getEventType()))
+        .filter(item -> "price_update".equals(item.getEventType()))
         .toList();
   }
 

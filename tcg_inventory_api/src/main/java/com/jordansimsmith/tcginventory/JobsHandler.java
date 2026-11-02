@@ -116,21 +116,9 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     this.scanConfirmationJobProcessor = new ScanConfirmationJobProcessor(factory);
     this.importConfirmationJobProcessor = new ImportConfirmationJobProcessor(factory);
     this.orderFulfillmentJobProcessor = new OrderFulfillmentJobProcessor(factory);
-    var ulidGenerator = factory.ulidGenerator();
     this.repriceJobProcessor =
         new RepriceJobProcessor(
-            TcgInventoryTable.table(enhancedClient, SkuItem.class),
-            new InventoryRepository(
-                TcgInventoryTable.table(enhancedClient, UnitItem.class),
-                factory.dynamoDbClient(),
-                factory.clock(),
-                ulidGenerator),
-            factory.inventoryService(),
-            factory.objectMapper(),
-            factory.pricingService(),
-            factory.clock(),
-            ulidGenerator,
-            factory.gamesService());
+            factory.inventoryService(), factory.pricingService(), factory.gamesService());
   }
 
   @Override

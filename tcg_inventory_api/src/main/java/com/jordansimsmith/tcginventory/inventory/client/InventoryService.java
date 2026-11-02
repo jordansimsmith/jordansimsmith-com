@@ -17,4 +17,6 @@ public interface InventoryService {
 
   UpdateUnitResponse updateUnit(RequestContext ctx, UpdateUnitRequest request)
       throws ServiceException;
+
+  UpdateSkuResponse updateSku(RequestContext ctx, UpdateSkuRequest request) throws ServiceException;
 }
