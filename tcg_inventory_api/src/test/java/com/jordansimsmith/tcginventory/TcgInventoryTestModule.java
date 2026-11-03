@@ -20,6 +20,7 @@ import com.jordansimsmith.tcginventory.inventory.SequenceCounterItem;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.inventory.server.InventoryModule;
+import com.jordansimsmith.tcginventory.listings.server.ListingsModule;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.tcginventory.photos.client.FakePhotosService;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
@@ -42,7 +43,13 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
-@Module(includes = {PricingModule.class, CatalogModule.class, InventoryModule.class})
+@Module(
+    includes = {
+      PricingModule.class,
+      CatalogModule.class,
+      InventoryModule.class,
+      ListingsModule.class
+    })
 public class TcgInventoryTestModule {
   @Provides
   @Singleton

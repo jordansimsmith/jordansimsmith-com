@@ -18,6 +18,7 @@ import com.jordansimsmith.tcginventory.inventory.SequenceCounterItem;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.listings.client.ListingService;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.tcginventory.photos.client.FakePhotosService;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
@@ -108,6 +109,8 @@ public interface TcgInventoryTestFactory extends CatalogFactory {
   PricingService pricingService();
 
   InventoryService inventoryService();
+
+  ListingService listingService();
 
   @Component.Factory
   interface Factory {
