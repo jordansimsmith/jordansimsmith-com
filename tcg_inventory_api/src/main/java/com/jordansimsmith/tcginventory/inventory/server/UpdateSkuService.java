@@ -24,6 +24,15 @@ public class UpdateSkuService {
     if (request.skuId() == null || request.skuId().isBlank()) {
       throw new BadRequestException("sku_id is required");
     }
+    if (request.price() != null && request.dirty() != null) {
+      throw new BadRequestException("price and dirty cannot be updated together");
+    }
+    if (request.dirty() != null && request.version() == null) {
+      throw new BadRequestException("version is required when updating dirty state");
+    }
+    if (request.dirty() == null && request.version() != null) {
+      throw new BadRequestException("version requires a dirty update");
+    }
     var price = request.price();
     if (price != null && price.signum() < 0) {
       throw new BadRequestException("price must be nonnegative");
@@ -43,6 +52,10 @@ public class UpdateSkuService {
     if (price != null) {
       inventoryMutationRepository.updateSkuPrice(
           ctx.user(), request.skuId(), sku.getSuggestedPrice(), price.toPlainString());
+    } else if (request.dirty() != null && request.dirty()) {
+      inventoryMutationRepository.markSkuDirty(ctx.user(), request.skuId(), request.version());
+    } else if (request.dirty() != null) {
+      inventoryMutationRepository.clearSkuDirty(ctx.user(), request.skuId(), request.version());
     }
     return new UpdateSkuResponse();
   }

@@ -204,10 +204,47 @@ public class FakeInventoryService implements InventoryService {
     if (request.skuId() == null || request.skuId().isBlank()) {
       throw new BadRequestException("sku_id is required");
     }
+    if (request.price() != null && request.dirty() != null) {
+      throw new BadRequestException("price and dirty cannot be updated together");
+    }
+    if (request.dirty() != null && request.version() == null) {
+      throw new BadRequestException("version is required when updating dirty state");
+    }
+    if (request.dirty() == null && request.version() != null) {
+      throw new BadRequestException("version requires a dirty update");
+    }
     var key = new SkuKey(ctx.user(), request.skuId());
     var sku = skus.get(key);
     if (sku == null) {
       throw new NotFoundException("Not Found");
+    }
+    if (request.dirty() != null) {
+      if (request.version() != sku.version()) {
+        return new UpdateSkuResponse();
+      }
+      if (request.dirty()) {
+        skus.put(
+            key,
+            new Sku(
+                sku.skuId(),
+                sku.game(),
+                sku.externalId(),
+                sku.name(),
+                sku.setCode(),
+                sku.setName(),
+                sku.collectorNumber(),
+                sku.finish(),
+                sku.condition(),
+                sku.price(),
+                sku.fetchtcgCardId(),
+                sku.fetchtcgSetId(),
+                sku.fetchtcgListingId(),
+                sku.version() + 1));
+        dirtySkus.add(key);
+      } else {
+        dirtySkus.remove(key);
+      }
+      return new UpdateSkuResponse();
     }
     if (request.price() != null) {
       if (request.price().signum() < 0) {

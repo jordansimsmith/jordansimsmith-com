@@ -91,7 +91,8 @@ public class RepriceJobProcessor implements JobProcessor {
         throw new UnpriceableSkuException("SKU has no FetchTCG card ID: " + skuId);
       }
       var price = pricingService.getPrice(ctx, new GetPriceRequest(cardId, condition));
-      inventoryService.updateSku(ctx, new UpdateSkuRequest(skuId, price.suggestedPrice()));
+      inventoryService.updateSku(
+          ctx, new UpdateSkuRequest(skuId, price.suggestedPrice(), null, null));
     }
 
     return new SuccessJobResult(

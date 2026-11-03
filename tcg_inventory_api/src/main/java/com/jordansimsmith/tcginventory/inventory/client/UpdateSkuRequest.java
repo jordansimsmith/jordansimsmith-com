@@ -5,4 +5,7 @@ import java.math.BigDecimal;
 import javax.annotation.Nullable;
 
 public record UpdateSkuRequest(
-    @JsonProperty("sku_id") String skuId, @JsonProperty("price") @Nullable BigDecimal price) {}
+    @JsonProperty("sku_id") String skuId,
+    @JsonProperty("price") @Nullable BigDecimal price,
+    @JsonProperty("dirty") @Nullable Boolean dirty,
+    @JsonProperty("version") @Nullable Integer version) {}

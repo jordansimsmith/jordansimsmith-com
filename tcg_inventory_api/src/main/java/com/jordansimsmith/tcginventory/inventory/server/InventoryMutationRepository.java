@@ -147,6 +147,67 @@ public class InventoryMutationRepository {
             .build());
   }
 
+  public void clearSkuDirty(String user, String skuId, int version) {
+    var skuPk = InventorySkuItem.formatPk(user, skuId);
+    dynamoDbClient.updateItem(
+        request ->
+            request
+                .tableName(tableName)
+                .key(
+                    Map.of(
+                        "pk", AttributeValue.builder().s(skuPk).build(),
+                        "sk", AttributeValue.builder().s("SKU").build()))
+                .updateExpression("SET dirty = :clean, gsi1pk = :gsi1pk")
+                .conditionExpression(
+                    "attribute_exists(pk) AND dirty = :dirty AND "
+                        + "(#version = :version OR (attribute_not_exists(#version) "
+                        + "AND :version = :zero))")
+                .expressionAttributeNames(Map.of("#version", InventorySkuItem.VERSION))
+                .expressionAttributeValues(
+                    Map.of(
+                        ":clean", AttributeValue.builder().bool(false).build(),
+                        ":dirty", AttributeValue.builder().bool(true).build(),
+                        ":gsi1pk",
+                            AttributeValue.builder()
+                                .s(InventorySkuItem.formatGsi1pk(user, false))
+                                .build(),
+                        ":version", AttributeValue.builder().n(Integer.toString(version)).build(),
+                        ":zero", AttributeValue.builder().n("0").build())));
+  }
+
+  public void markSkuDirty(String user, String skuId, int version) {
+    var skuPk = InventorySkuItem.formatPk(user, skuId);
+    dynamoDbClient.updateItem(
+        request ->
+            request
+                .tableName(tableName)
+                .key(
+                    Map.of(
+                        "pk", AttributeValue.builder().s(skuPk).build(),
+                        "sk", AttributeValue.builder().s("SKU").build()))
+                .updateExpression(
+                    "SET dirty = :dirty, gsi1pk = :gsi1pk, gsi1sk = :gsi1sk " + "ADD #version :one")
+                .conditionExpression(
+                    "attribute_exists(pk) AND "
+                        + "(#version = :version OR (attribute_not_exists(#version) "
+                        + "AND :version = :zero))")
+                .expressionAttributeNames(Map.of("#version", InventorySkuItem.VERSION))
+                .expressionAttributeValues(
+                    Map.of(
+                        ":dirty", AttributeValue.builder().bool(true).build(),
+                        ":gsi1pk",
+                            AttributeValue.builder()
+                                .s(InventorySkuItem.formatGsi1pk(user, true))
+                                .build(),
+                        ":gsi1sk",
+                            AttributeValue.builder()
+                                .s(InventorySkuItem.formatGsi1skPrefix() + skuId)
+                                .build(),
+                        ":version", AttributeValue.builder().n(Integer.toString(version)).build(),
+                        ":zero", AttributeValue.builder().n("0").build(),
+                        ":one", AttributeValue.builder().n("1").build())));
+  }
+
   public void updateUnitCondition(
       String user,
       InventorySkuItem sourceSku,

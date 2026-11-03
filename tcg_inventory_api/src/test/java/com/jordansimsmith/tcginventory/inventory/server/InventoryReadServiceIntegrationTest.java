@@ -3,6 +3,7 @@ package com.jordansimsmith.tcginventory.inventory.server;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.isNull;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -40,6 +41,7 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 
 @Testcontainers
 class InventoryReadServiceIntegrationTest {
@@ -126,7 +128,7 @@ class InventoryReadServiceIntegrationTest {
     var response =
         updateSkuService.updateSku(
             new RequestContext("price-user"),
-            new UpdateSkuRequest("priced", new BigDecimal("2.5")));
+            new UpdateSkuRequest("priced", new BigDecimal("2.5"), null, null));
     var updated =
         getSkuService.getSku(new RequestContext("price-user"), new GetSkuRequest("priced"));
     var audit =
@@ -168,7 +170,8 @@ class InventoryReadServiceIntegrationTest {
 
     // act
     updateSkuService.updateSku(
-        new RequestContext("price-user"), new UpdateSkuRequest("priced", new BigDecimal("2.50")));
+        new RequestContext("price-user"),
+        new UpdateSkuRequest("priced", new BigDecimal("2.50"), null, null));
 
     // assert
     assertThat(
@@ -199,7 +202,8 @@ class InventoryReadServiceIntegrationTest {
 
     // act
     updateSkuService.updateSku(
-        new RequestContext("zero-user"), new UpdateSkuRequest("priced", BigDecimal.ZERO));
+        new RequestContext("zero-user"),
+        new UpdateSkuRequest("priced", BigDecimal.ZERO, null, null));
 
     // assert
     assertThat(
@@ -212,27 +216,28 @@ class InventoryReadServiceIntegrationTest {
             () ->
                 updateSkuService.updateSku(
                     new RequestContext("zero-user"),
-                    new UpdateSkuRequest("priced", new BigDecimal("-0.01"))))
+                    new UpdateSkuRequest("priced", new BigDecimal("-0.01"), null, null)))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("price must be nonnegative");
     assertThatThrownBy(
             () ->
                 updateSkuService.updateSku(
                     new RequestContext("zero-user"),
-                    new UpdateSkuRequest("priced", new BigDecimal("1.001"))))
+                    new UpdateSkuRequest("priced", new BigDecimal("1.001"), null, null)))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("price must have at most two decimal places");
     assertThatThrownBy(
             () ->
                 updateSkuService.updateSku(
                     new RequestContext("other-user"),
-                    new UpdateSkuRequest("priced", BigDecimal.ONE)))
+                    new UpdateSkuRequest("priced", BigDecimal.ONE, null, null)))
         .isInstanceOf(NotFoundException.class)
         .hasMessage("Not Found");
     assertThatThrownBy(
             () ->
                 updateSkuService.updateSku(
-                    new RequestContext("zero-user"), new UpdateSkuRequest(" ", BigDecimal.ONE)))
+                    new RequestContext("zero-user"),
+                    new UpdateSkuRequest(" ", BigDecimal.ONE, null, null)))
         .isInstanceOf(BadRequestException.class)
         .hasMessage("sku_id is required");
     assertThat(
@@ -255,7 +260,7 @@ class InventoryReadServiceIntegrationTest {
 
     // act
     updateSkuService.updateSku(
-        new RequestContext("empty-user"), new UpdateSkuRequest("priced", null));
+        new RequestContext("empty-user"), new UpdateSkuRequest("priced", null, null, null));
 
     // assert
     var updated =
@@ -277,8 +282,197 @@ class InventoryReadServiceIntegrationTest {
     assertThatThrownBy(
             () ->
                 updateSkuService.updateSku(
-                    new RequestContext("empty-user"), new UpdateSkuRequest("missing", null)))
+                    new RequestContext("empty-user"),
+                    new UpdateSkuRequest("missing", null, null, null)))
         .isInstanceOf(NotFoundException.class);
+  }
+
+  @Test
+  void updateSkuShouldClearDirtyWhenVersionMatchesWithoutChangingVersionOrAudit() throws Exception {
+    // arrange
+    var item = sku("clear-user", "mtg", "priced", "Priced Card", true, "2.50");
+    item.setVersion(5);
+    skuTable.putItem(item);
+    var key = rawSkuKey("clear-user", "priced");
+    dynamoDbClient.updateItem(
+        request ->
+            request
+                .tableName(TABLE_NAME)
+                .key(key)
+                .updateExpression("SET dirty = :dirty, custom_attribute = :custom")
+                .expressionAttributeValues(
+                    Map.of(
+                        ":dirty", AttributeValue.builder().bool(true).build(),
+                        ":custom", AttributeValue.builder().s("preserve").build())));
+
+    // act
+    updateSkuService.updateSku(
+        new RequestContext("clear-user"), new UpdateSkuRequest("priced", null, false, 5));
+    var raw =
+        dynamoDbClient.getItem(r -> r.tableName(TABLE_NAME).key(key).consistentRead(true)).item();
+
+    // assert
+    assertThat(raw.get("dirty").bool()).isFalse();
+    assertThat(raw.get("gsi1pk").s()).isEqualTo("USER#clear-user#CLEAN");
+    assertThat(raw.get("version").n()).isEqualTo("5");
+    assertThat(raw.get("suggested_price").s()).isEqualTo("2.50");
+    assertThat(raw.get("custom_attribute").s()).isEqualTo("preserve");
+    assertThat(
+            auditTable.getItem(
+                r ->
+                    r.key(
+                            Key.builder()
+                                .partitionValue("USER#clear-user#AUDIT")
+                                .sortValue("audit-1")
+                                .build())
+                        .consistentRead(true)))
+        .isNull();
+  }
+
+  @Test
+  void updateSkuShouldMarkDirtyAndInvalidateEarlierAcknowledgement() throws Exception {
+    // arrange
+    var item = sku("mark-user", "mtg", "priced", "Priced Card", false, "2.50");
+    item.setVersion(3);
+    skuTable.putItem(item);
+    var key = rawSkuKey("mark-user", "priced");
+    dynamoDbClient.updateItem(
+        request ->
+            request
+                .tableName(TABLE_NAME)
+                .key(key)
+                .updateExpression("SET dirty = :clean")
+                .expressionAttributeValues(
+                    Map.of(":clean", AttributeValue.builder().bool(false).build())));
+
+    // act
+    updateSkuService.updateSku(
+        new RequestContext("mark-user"), new UpdateSkuRequest("priced", null, true, 3));
+    assertThatThrownBy(
+            () ->
+                updateSkuService.updateSku(
+                    new RequestContext("mark-user"),
+                    new UpdateSkuRequest("priced", null, false, 3)))
+        .isInstanceOf(ConditionalCheckFailedException.class);
+    var raw =
+        dynamoDbClient.getItem(r -> r.tableName(TABLE_NAME).key(key).consistentRead(true)).item();
+
+    // assert
+    assertThat(raw.get("dirty").bool()).isTrue();
+    assertThat(raw.get("gsi1pk").s()).isEqualTo("USER#mark-user#DIRTY");
+    assertThat(raw.get("gsi1sk").s()).isEqualTo("SKU#priced");
+    assertThat(raw.get("version").n()).isEqualTo("4");
+    assertThat(raw.get("suggested_price").s()).isEqualTo("2.50");
+    assertThat(
+            auditTable.getItem(
+                r ->
+                    r.key(
+                            Key.builder()
+                                .partitionValue("USER#mark-user#AUDIT")
+                                .sortValue("audit-1")
+                                .build())
+                        .consistentRead(true)))
+        .isNull();
+  }
+
+  @Test
+  void updateSkuShouldTreatMissingVersionAsZeroAndPropagateAlreadyCleanAcknowledgement()
+      throws Exception {
+    // arrange
+    var versionless = sku("versionless-user", "mtg", "priced", "Priced Card", true, "2.50");
+    versionless.setVersion(null);
+    skuTable.putItem(versionless);
+    var key = rawSkuKey("versionless-user", "priced");
+    dynamoDbClient.updateItem(
+        request ->
+            request
+                .tableName(TABLE_NAME)
+                .key(key)
+                .updateExpression("SET dirty = :dirty")
+                .expressionAttributeValues(
+                    Map.of(":dirty", AttributeValue.builder().bool(true).build())));
+
+    // act
+    updateSkuService.updateSku(
+        new RequestContext("versionless-user"), new UpdateSkuRequest("priced", null, false, 0));
+    assertThatThrownBy(
+            () ->
+                updateSkuService.updateSku(
+                    new RequestContext("versionless-user"),
+                    new UpdateSkuRequest("priced", null, false, 0)))
+        .isInstanceOf(ConditionalCheckFailedException.class);
+    var raw =
+        dynamoDbClient.getItem(r -> r.tableName(TABLE_NAME).key(key).consistentRead(true)).item();
+
+    // assert
+    assertThat(raw.get("dirty").bool()).isFalse();
+    assertThat(raw.get("gsi1pk").s()).isEqualTo("USER#versionless-user#CLEAN");
+    assertThat(raw).doesNotContainKey("version");
+    assertThatThrownBy(
+            () ->
+                updateSkuService.updateSku(
+                    new RequestContext("another-user"),
+                    new UpdateSkuRequest("priced", null, false, 0)))
+        .isInstanceOf(NotFoundException.class);
+  }
+
+  @Test
+  void updateSkuShouldRejectInvalidDirtyPatchBeforeReadingStorage() {
+    // arrange
+    var inventoryRepository = mock(InventoryReadRepository.class);
+    var mutationRepository = mock(InventoryMutationRepository.class);
+    var updateService = new UpdateSkuService(inventoryRepository, mutationRepository);
+    var ctx = new RequestContext("validation-user");
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                updateService.updateSku(ctx, new UpdateSkuRequest("sku", BigDecimal.ONE, true, 1)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("price and dirty cannot be updated together");
+    assertThatThrownBy(
+            () -> updateService.updateSku(ctx, new UpdateSkuRequest("sku", null, false, null)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("version is required when updating dirty state");
+    assertThatThrownBy(
+            () -> updateService.updateSku(ctx, new UpdateSkuRequest("sku", null, null, 1)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("version requires a dirty update");
+    verifyNoInteractions(inventoryRepository, mutationRepository);
+  }
+
+  @Test
+  void updateSkuShouldPropagateStorageFailuresForDirtyChanges() throws Exception {
+    // arrange
+    skuTable.putItem(sku("failure-user", "mtg", "priced", "Priced Card", false, "2.50"));
+    var repository = new InventoryReadRepository(skuTable, unitTable);
+    var mutationRepository = mock(InventoryMutationRepository.class);
+    var failure = new IllegalStateException("storage unavailable");
+    doThrow(failure).when(mutationRepository).markSkuDirty("failure-user", "priced", 1);
+    var updateService = new UpdateSkuService(repository, mutationRepository);
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                updateService.updateSku(
+                    new RequestContext("failure-user"),
+                    new UpdateSkuRequest("priced", null, true, 1)))
+        .isSameAs(failure);
+  }
+
+  @Test
+  void updateSkuRequestShouldDeserializeDirtyFieldsAndResponseShouldRemainEmpty() throws Exception {
+    // arrange
+    var objectMapper = new ObjectMapper();
+
+    // act
+    var request =
+        objectMapper.readValue(
+            "{\"sku_id\":\"sku\",\"dirty\":false,\"version\":5}", UpdateSkuRequest.class);
+
+    // assert
+    assertThat(request).isEqualTo(new UpdateSkuRequest("sku", null, false, 5));
+    assertThat(objectMapper.writeValueAsString(new UpdateSkuResponse())).isEqualTo("{}");
   }
 
   @Test
@@ -667,6 +861,12 @@ class InventoryReadServiceIntegrationTest {
     var item = new InventoryUnitItem.PhotoItem();
     item.setPhotoId(photoId);
     return item;
+  }
+
+  private static Map<String, AttributeValue> rawSkuKey(String user, String skuId) {
+    return Map.of(
+        "pk", AttributeValue.builder().s(InventorySkuItem.formatPk(user, skuId)).build(),
+        "sk", AttributeValue.builder().s("SKU").build());
   }
 
   private static InventorySkuItem sku(String user, String skuId, String name, String price) {

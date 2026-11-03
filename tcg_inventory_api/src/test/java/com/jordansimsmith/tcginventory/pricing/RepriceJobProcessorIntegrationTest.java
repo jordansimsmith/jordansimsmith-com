@@ -301,7 +301,9 @@ public class RepriceJobProcessorIntegrationTest {
     verify(inventoryService)
         .findUnits(new RequestContext(user), new FindUnitsRequest(skuId, 100, "removed-page"));
     verify(inventoryService)
-        .updateSku(new RequestContext(user), new UpdateSkuRequest(skuId, new BigDecimal("1.05")));
+        .updateSku(
+            new RequestContext(user),
+            new UpdateSkuRequest(skuId, new BigDecimal("1.05"), null, null));
   }
 
   @Test
