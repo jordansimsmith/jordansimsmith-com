@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
+import com.jordansimsmith.tcginventory.inventory.client.CreateUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.CreateUnitResponse;
 import com.jordansimsmith.tcginventory.inventory.client.DeleteUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.DeleteUnitResponse;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
@@ -51,13 +53,24 @@ public class InventoryModule {
     var getSkuService = new GetSkuService(inventoryRepository);
     var getUnitService = new GetUnitService(inventoryRepository);
     var findUnitsService = new FindUnitsService(inventoryRepository, objectMapper);
+    var unitCreationTable =
+        dynamoDb.table(tableName, TableSchema.fromBean(InventoryUnitCreationItem.class));
     var mutationRepository =
-        new InventoryMutationRepository(dynamoDbClient, tableName, clock, ulidGenerator);
+        new InventoryMutationRepository(
+            dynamoDbClient, unitCreationTable, tableName, clock, ulidGenerator);
     var deleteUnitService = new DeleteUnitService(inventoryRepository, mutationRepository);
     var updateUnitService =
         new UpdateUnitService(inventoryRepository, mutationRepository, gamesService);
     var updateSkuService = new UpdateSkuService(inventoryRepository, mutationRepository);
+    var createUnitService =
+        new CreateUnitService(inventoryRepository, mutationRepository, gamesService);
     return new InventoryService() {
+      @Override
+      public CreateUnitResponse createUnit(RequestContext ctx, CreateUnitRequest request)
+          throws ServiceException {
+        return createUnitService.createUnit(ctx, request);
+      }
+
       @Override
       public FindSkusResponse findSkus(RequestContext ctx, FindSkusRequest request)
           throws ServiceException {

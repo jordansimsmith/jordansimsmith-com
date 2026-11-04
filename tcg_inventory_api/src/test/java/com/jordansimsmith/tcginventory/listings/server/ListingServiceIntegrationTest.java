@@ -24,6 +24,7 @@ import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.fetchtcg.client.CreateListingImageResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
+import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import com.jordansimsmith.tcginventory.inventory.client.FakeInventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
@@ -278,7 +279,7 @@ class ListingServiceIntegrationTest {
   @Test
   void updateListingShouldSynchronizeAndRetainHistoryAfterDelisting() throws Exception {
     // arrange
-    var inventory = new FakeInventoryService();
+    var inventory = new FakeInventoryService(new FakeGamesService());
     var photos = new FakePhotosService();
     var provider = new FakeFetchTcgService();
     var ctx = new RequestContext("alice");
@@ -475,7 +476,7 @@ class ListingServiceIntegrationTest {
   @Test
   void updateListingShouldPropagateMissingSkuAndRejectIncompletePublicationData() throws Exception {
     // arrange
-    var inventory = new FakeInventoryService();
+    var inventory = new FakeInventoryService(new FakeGamesService());
     var service =
         new UpdateListingService(
             listingRepository, inventory, new FakePhotosService(), new FakeFetchTcgService());
@@ -541,7 +542,7 @@ class ListingServiceIntegrationTest {
       // arrange
       var condition = entry.getKey();
       var providerCondition = entry.getValue();
-      var inventory = new FakeInventoryService();
+      var inventory = new FakeInventoryService(new FakeGamesService());
       var provider = mock(FetchTcgService.class);
       var sku = listingSku();
       inventory.seedSku(

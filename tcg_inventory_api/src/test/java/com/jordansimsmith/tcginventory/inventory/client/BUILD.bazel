@@ -10,6 +10,7 @@ java_library(
     ],
     deps = [
         "//lib/service",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
     ],
 )

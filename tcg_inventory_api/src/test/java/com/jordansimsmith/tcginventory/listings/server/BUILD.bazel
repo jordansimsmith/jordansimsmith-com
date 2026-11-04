@@ -21,6 +21,7 @@ java_test_suite(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/listings/server",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/client",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/client:test-lib",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/games/client:test-lib",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/inventory/client:test-lib",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/photos/client:test-lib",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",

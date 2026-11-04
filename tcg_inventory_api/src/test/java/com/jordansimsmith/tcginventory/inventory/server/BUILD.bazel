@@ -16,6 +16,7 @@ java_test_suite(
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/server",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/games/client:test-lib",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",

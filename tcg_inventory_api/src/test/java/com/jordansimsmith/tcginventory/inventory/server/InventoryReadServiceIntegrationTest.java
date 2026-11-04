@@ -16,12 +16,16 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.service.BadRequestException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
+import com.jordansimsmith.tcginventory.inventory.client.CreateUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
 import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuRequest;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuResponse;
+import com.jordansimsmith.tcginventory.inventory.client.UpdateUnitRequest;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -42,6 +46,7 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
+import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 
 @Testcontainers
 class InventoryReadServiceIntegrationTest {
@@ -53,6 +58,7 @@ class InventoryReadServiceIntegrationTest {
   private static DynamoDbTable<InventoryUnitItem> unitTable;
   private static DynamoDbTable<InventorySkuItem> skuTable;
   private static DynamoDbTable<InventoryAuditItem> auditTable;
+  private static DynamoDbTable<InventoryUnitCreationItem> unitCreationTable;
 
   private FindUnitsService service;
   private FindSkusService findSkusService;
@@ -73,6 +79,8 @@ class InventoryReadServiceIntegrationTest {
     skuTable = enhancedClient.table(TABLE_NAME, TableSchema.fromBean(InventorySkuItem.class));
     unitTable = enhancedClient.table(TABLE_NAME, TableSchema.fromBean(InventoryUnitItem.class));
     auditTable = enhancedClient.table(TABLE_NAME, TableSchema.fromBean(InventoryAuditItem.class));
+    unitCreationTable =
+        enhancedClient.table(TABLE_NAME, TableSchema.fromBean(InventoryUnitCreationItem.class));
     DynamoDbUtils.createTable(dynamoDbClient, skuTable);
   }
 
@@ -93,10 +101,181 @@ class InventoryReadServiceIntegrationTest {
     var mutationRepository =
         new InventoryMutationRepository(
             dynamoDbClient,
+            unitCreationTable,
             TABLE_NAME,
             () -> Instant.ofEpochSecond(1700000000),
             () -> "audit-" + ++nextAuditId);
     updateSkuService = new UpdateSkuService(repository, mutationRepository);
+  }
+
+  @Test
+  void createUnitShouldPreserveSkuAndReplayOriginalResultAfterRemoval() throws Exception {
+    // arrange
+    var reads = new InventoryReadRepository(skuTable, unitTable);
+    var mutations =
+        new InventoryMutationRepository(
+            dynamoDbClient,
+            unitCreationTable,
+            TABLE_NAME,
+            () -> Instant.ofEpochSecond(1700000000),
+            () -> "audit-" + ++nextAuditId);
+    var service = new CreateUnitService(reads, mutations, new FakeGamesService());
+    var ctx = new RequestContext("creator");
+    var request =
+        new CreateUnitRequest(
+            "import:1#row:0",
+            "mtg",
+            "card",
+            "normal",
+            Condition.NM,
+            "Original",
+            "SET",
+            "Set",
+            "1",
+            new BigDecimal("2.5"),
+            "fetch-card",
+            42,
+            List.of("photo-b", "photo-a"));
+    // act
+    var created = service.createUnit(ctx, request);
+    mutations.deleteUnit(ctx.user(), created.skuId(), created.sequenceNumber(), null);
+    var replay =
+        service.createUnit(
+            ctx,
+            new CreateUnitRequest(
+                request.operationId(),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                0,
+                null));
+    var second =
+        service.createUnit(
+            ctx,
+            new CreateUnitRequest(
+                "second",
+                "mtg",
+                "card",
+                "normal",
+                Condition.NM,
+                "Replacement",
+                "OTHER",
+                "Other",
+                "9",
+                new BigDecimal("9.00"),
+                "other-card",
+                99,
+                List.of()));
+    // assert
+    assertThat(created.sequenceNumber()).isZero();
+    assertThat(created.location()).isEqualTo("A0-0");
+    assertThat(replay).isEqualTo(created);
+    assertThat(second.sequenceNumber()).isEqualTo(1);
+    var sku = reads.getSku(ctx.user(), created.skuId());
+    assertThat(sku.getName()).isEqualTo("Original");
+    assertThat(sku.getSuggestedPrice()).isEqualTo("2.50");
+    assertThat(sku.getFetchtcgSetId()).isEqualTo(42);
+    assertThat(sku.getVersion()).isEqualTo(3);
+    var unit = reads.getUnit(ctx.user(), created.skuId(), 0);
+    assertThat(unit.getStatus()).isEqualTo("removed");
+    assertThat(unit.getPhotos())
+        .extracting(InventoryUnitItem.PhotoItem::getPhotoId)
+        .containsExactly("photo-b", "photo-a");
+    assertThat(unit.getCreatedAt()).isEqualTo(Instant.ofEpochSecond(1700000000));
+    assertThat(
+            auditTable.scan().items().stream()
+                .filter(a -> "create".equals(a.getEventType()))
+                .count())
+        .isEqualTo(2);
+    var moved =
+        new UpdateUnitService(reads, mutations, new FakeGamesService())
+            .updateUnit(
+                ctx, new UpdateUnitRequest(second.skuId(), second.sequenceNumber(), Condition.LP));
+    assertThat(
+            service.createUnit(
+                ctx,
+                new CreateUnitRequest(
+                    "second", null, null, null, null, null, null, null, null, null, null, 0, null)))
+        .isEqualTo(second);
+    assertThat(reads.getUnit(ctx.user(), second.skuId(), second.sequenceNumber())).isNull();
+    assertThat(reads.getUnit(ctx.user(), moved.skuId(), second.sequenceNumber())).isNotNull();
+    assertThat(service.createUnit(new RequestContext("other"), request).sequenceNumber()).isZero();
+  }
+
+  @Test
+  void createUnitShouldValidateBeforeAllocatingAndLeaveNoPartialWrites() throws Exception {
+    // arrange
+    var reads = new InventoryReadRepository(skuTable, unitTable);
+    var mutations =
+        new InventoryMutationRepository(
+            dynamoDbClient,
+            unitCreationTable,
+            TABLE_NAME,
+            () -> Instant.ofEpochSecond(1700000000),
+            () -> "creation-audit");
+    var service = new CreateUnitService(reads, mutations, new FakeGamesService());
+    var ctx = new RequestContext("validation");
+    // act and assert
+    assertThatThrownBy(
+            () ->
+                service.createUnit(
+                    ctx,
+                    new CreateUnitRequest(
+                        "id",
+                        "mtg",
+                        "card",
+                        "normal",
+                        Condition.NM,
+                        "Card",
+                        "SET",
+                        "Set",
+                        "1",
+                        new BigDecimal("1.001"),
+                        null,
+                        1,
+                        List.of())))
+        .isInstanceOf(BadRequestException.class);
+    assertThat(dynamoDbClient.scan(r -> r.tableName(TABLE_NAME)).count()).isZero();
+    var request =
+        new CreateUnitRequest(
+            "id",
+            "mtg",
+            "card",
+            "normal",
+            Condition.NM,
+            "Card",
+            "SET",
+            "Set",
+            "1",
+            null,
+            null,
+            1,
+            List.of());
+    var json = new ObjectMapper();
+    assertThat(json.readValue(json.writeValueAsString(request), CreateUnitRequest.class))
+        .isEqualTo(request);
+    var created = service.createUnit(ctx, request);
+    assertThat(created.sequenceNumber()).isZero();
+    assertThat(json.readTree(json.writeValueAsString(created)).fieldNames())
+        .toIterable()
+        .containsExactlyInAnyOrder("sku_id", "sequence_number", "location");
+    assertThatThrownBy(
+            () ->
+                mutations.createUnit(
+                    ctx.user(),
+                    request.operationId(),
+                    reads.getSku(ctx.user(), created.skuId()),
+                    request.photos(),
+                    false))
+        .isInstanceOf(TransactionCanceledException.class);
+    assertThat(reads.getSku(ctx.user(), created.skuId()).getVersion()).isEqualTo(1);
   }
 
   @Test

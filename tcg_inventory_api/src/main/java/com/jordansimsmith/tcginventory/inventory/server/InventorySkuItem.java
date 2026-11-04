@@ -1,5 +1,6 @@
 package com.jordansimsmith.tcginventory.inventory.server;
 
+import java.util.Locale;
 import javax.annotation.Nullable;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
@@ -222,6 +223,44 @@ public class InventorySkuItem {
 
   public void setGsi2sk(@Nullable String gsi2sk) {
     this.gsi2sk = gsi2sk;
+  }
+
+  public static InventorySkuItem create(
+      String user,
+      String skuId,
+      String game,
+      String externalId,
+      String finish,
+      String condition,
+      String name,
+      String setCode,
+      String setName,
+      String collectorNumber,
+      @Nullable String price,
+      @Nullable String fetchtcgCardId,
+      int fetchtcgSetId) {
+    var sku = new InventorySkuItem();
+    sku.setPk(InventorySkuItem.formatPk(user, skuId));
+    sku.setSk("SKU");
+    sku.setSkuId(skuId);
+    sku.setGame(game);
+    sku.setExternalId(externalId);
+    sku.setFinish(finish);
+    sku.setCondition(condition);
+    sku.setName(name);
+    sku.setSetCode(setCode);
+    sku.setSetName(setName);
+    sku.setCollectorNumber(collectorNumber);
+    sku.setSuggestedPrice(price);
+    sku.setFetchtcgCardId(fetchtcgCardId);
+    sku.setFetchtcgSetId(fetchtcgSetId);
+    sku.setVersion(1);
+    sku.setGsi1pk(InventorySkuItem.formatGsi1pk(user, true));
+    sku.setGsi1sk("SKU#" + skuId);
+    sku.setGsi2pk(InventorySkuItem.formatGsi2pk(user));
+    sku.setGsi2sk("GAME#" + game + "#NAME#" + name.toLowerCase(Locale.ROOT) + "#" + skuId);
+
+    return sku;
   }
 
   public static String formatPk(String user, String skuId) {

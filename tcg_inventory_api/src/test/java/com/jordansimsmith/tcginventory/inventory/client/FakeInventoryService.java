@@ -5,6 +5,8 @@ import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.tcginventory.games.client.GamesService;
+import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
@@ -19,6 +21,92 @@ import java.util.Map;
 import java.util.Set;
 
 public class FakeInventoryService implements InventoryService {
+  private final GamesService gamesService;
+  private final Map<CreationKey, CreateUnitResponse> creations = new HashMap<>();
+  private final Map<GameKey, Integer> sequences = new HashMap<>();
+
+  public FakeInventoryService(GamesService gamesService) {
+    this.gamesService = gamesService;
+  }
+
+  @Override
+  public CreateUnitResponse createUnit(RequestContext ctx, CreateUnitRequest request)
+      throws ServiceException {
+    var key = new CreationKey(ctx.user(), request.operationId());
+    var previous = creations.get(key);
+    if (previous != null) return previous;
+    var game = gamesService.getGame(ctx, new GetGameRequest(request.game())).game();
+    var skuId =
+        game.id()
+            + "#"
+            + game.externalSource()
+            + "#"
+            + request.externalId()
+            + "#"
+            + request.finish()
+            + "#"
+            + request.condition();
+    var gameKey = new GameKey(ctx.user(), game.id());
+    var sequence = sequences.getOrDefault(gameKey, 0);
+    for (var entry : units.entrySet()) {
+      var seededSku = skus.get(new SkuKey(entry.getKey().user(), entry.getKey().skuId()));
+      if (entry.getKey().user().equals(ctx.user())
+          && seededSku != null
+          && seededSku.game().equals(game.id())) {
+        for (var unit : entry.getValue()) {
+          sequence = Math.max(sequence, unit.sequenceNumber() + 1);
+        }
+      }
+    }
+
+    sequences.put(gameKey, sequence + 1);
+    var skuKey = new SkuKey(ctx.user(), skuId);
+    var existing = skus.get(skuKey);
+    skus.put(
+        skuKey,
+        new Sku(
+            skuId,
+            game.id(),
+            existing == null ? request.externalId() : existing.externalId(),
+            existing == null ? request.name() : existing.name(),
+            existing == null ? request.setCode() : existing.setCode(),
+            existing == null ? request.setName() : existing.setName(),
+            existing == null ? request.collectorNumber() : existing.collectorNumber(),
+            existing == null ? request.finish() : existing.finish(),
+            existing == null ? request.condition() : existing.condition(),
+            existing == null
+                ? (request.price() == null
+                    ? null
+                    : request.price().setScale(2, RoundingMode.UNNECESSARY))
+                : existing.price(),
+            existing == null ? request.fetchtcgCardId() : existing.fetchtcgCardId(),
+            existing == null ? request.fetchtcgSetId() : existing.fetchtcgSetId(),
+            existing == null ? 1 : existing.version() + 1));
+    dirtySkus.add(skuKey);
+    var block = sequence / 100;
+    var location = "" + (char) ('A' + block / 100) + block % 100 + "-" + sequence % 100;
+    var unitsKey = new Key(ctx.user(), skuId);
+    var all = new ArrayList<>(units.getOrDefault(unitsKey, List.of()));
+    all.add(
+        new Unit(
+            sequence,
+            location,
+            UnitStatus.IN_STOCK,
+            request.photos(),
+            Instant.now().getEpochSecond(),
+            null,
+            null));
+    all.sort(Comparator.comparingInt(Unit::sequenceNumber));
+    units.put(unitsKey, all);
+    var response = new CreateUnitResponse(skuId, sequence, location);
+    creations.put(key, response);
+    return response;
+  }
+
+  private record CreationKey(String user, String operationId) {}
+
+  private record GameKey(String user, String game) {}
+
   private final Map<Key, List<Unit>> units = new HashMap<>();
   private final Map<SkuKey, Sku> skus = new HashMap<>();
   private final Set<SkuKey> dirtySkus = new HashSet<>();

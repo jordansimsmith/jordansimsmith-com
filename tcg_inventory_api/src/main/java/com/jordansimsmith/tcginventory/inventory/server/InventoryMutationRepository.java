@@ -3,30 +3,191 @@ package com.jordansimsmith.tcginventory.inventory.server;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import javax.annotation.Nullable;
+import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.Delete;
 import software.amazon.awssdk.services.dynamodb.model.Put;
+import software.amazon.awssdk.services.dynamodb.model.ReturnValue;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
 import software.amazon.awssdk.services.dynamodb.model.Update;
 
 public class InventoryMutationRepository {
   private final DynamoDbClient dynamoDbClient;
+  private final DynamoDbTable<InventoryUnitCreationItem> unitCreationTable;
   private final String tableName;
   private final Clock clock;
   private final UlidGenerator ulidGenerator;
 
   public InventoryMutationRepository(
-      DynamoDbClient dynamoDbClient, String tableName, Clock clock, UlidGenerator ulidGenerator) {
+      DynamoDbClient dynamoDbClient,
+      DynamoDbTable<InventoryUnitCreationItem> unitCreationTable,
+      String tableName,
+      Clock clock,
+      UlidGenerator ulidGenerator) {
     this.dynamoDbClient = dynamoDbClient;
+    this.unitCreationTable = unitCreationTable;
     this.tableName = tableName;
     this.clock = clock;
     this.ulidGenerator = ulidGenerator;
+  }
+
+  @Nullable
+  public InventoryUnitCreationItem getUnitCreation(String user, String operationId) {
+    var key =
+        Key.builder()
+            .partitionValue("USER#" + user + "#INVENTORY")
+            .sortValue("OPERATION#CREATE_UNIT#" + operationId)
+            .build();
+
+    return unitCreationTable.getItem(request -> request.key(key).consistentRead(true));
+  }
+
+  public InventoryUnitCreationItem createUnit(
+      String user,
+      String operationId,
+      InventorySkuItem sku,
+      List<String> photoIds,
+      boolean newSku) {
+    var skuId = sku.getSkuId();
+
+    var allocated =
+        dynamoDbClient.updateItem(
+            r ->
+                r.tableName(tableName)
+                    .key(
+                        Map.of(
+                            "pk",
+                            AttributeValue.builder().s("USER#" + user).build(),
+                            "sk",
+                            AttributeValue.builder()
+                                .s("COUNTER#SEQUENCE#" + sku.getGame())
+                                .build()))
+                    .updateExpression("SET game = :game ADD next_sequence_number :one")
+                    .expressionAttributeValues(
+                        Map.of(
+                            ":game",
+                            AttributeValue.builder().s(sku.getGame()).build(),
+                            ":one",
+                            AttributeValue.builder().n("1").build()))
+                    .returnValues(ReturnValue.ALL_NEW));
+    var sequence = Integer.parseInt(allocated.attributes().get("next_sequence_number").n()) - 1;
+
+    var now = clock.now();
+    var unit = new InventoryUnitItem();
+    unit.setPk(InventoryUnitItem.formatPk(user, skuId));
+    unit.setSk(InventoryUnitItem.formatSk(sequence));
+    unit.setSequenceNumber(sequence);
+    unit.setGame(sku.getGame());
+    unit.setGsi3pk("USER#" + user + "#UNITS#" + sku.getGame());
+    unit.setStatus("in_stock");
+    unit.setCreatedAt(now);
+    unit.setPhotos(
+        photoIds.stream()
+            .map(
+                id -> {
+                  var photo = new InventoryUnitItem.PhotoItem();
+                  photo.setPhotoId(id);
+                  return photo;
+                })
+            .toList());
+
+    var skuMap = new HashMap<>(TableSchema.fromBean(InventorySkuItem.class).itemToMap(sku, true));
+    skuMap.put("dirty", AttributeValue.builder().bool(true).build());
+
+    var receipt =
+        InventoryUnitCreationItem.create(
+            user, operationId, skuId, sequence, Locations.format(sequence));
+
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                TransactWriteItem.builder()
+                    .put(
+                        Put.builder()
+                            .tableName(tableName)
+                            .item(
+                                TableSchema.fromBean(InventoryUnitItem.class).itemToMap(unit, true))
+                            .conditionExpression("attribute_not_exists(pk)")
+                            .build())
+                    .build(),
+                newSku
+                    ? TransactWriteItem.builder()
+                        .put(
+                            Put.builder()
+                                .tableName(tableName)
+                                .item(skuMap)
+                                .conditionExpression("attribute_not_exists(pk)")
+                                .build())
+                        .build()
+                    : TransactWriteItem.builder()
+                        .update(
+                            Update.builder()
+                                .tableName(tableName)
+                                .key(
+                                    Map.of(
+                                        "pk",
+                                        AttributeValue.builder().s(sku.getPk()).build(),
+                                        "sk",
+                                        AttributeValue.builder().s("SKU").build()))
+                                .updateExpression(
+                                    "SET dirty = :dirty, gsi1pk = :pk, gsi1sk = :sk ADD #version"
+                                        + " :one")
+                                .conditionExpression("attribute_exists(pk)")
+                                .expressionAttributeNames(Map.of("#version", "version"))
+                                .expressionAttributeValues(
+                                    Map.of(
+                                        ":dirty",
+                                        AttributeValue.builder().bool(true).build(),
+                                        ":pk",
+                                        AttributeValue.builder().s(sku.getGsi1pk()).build(),
+                                        ":sk",
+                                        AttributeValue.builder().s(sku.getGsi1sk()).build(),
+                                        ":one",
+                                        AttributeValue.builder().n("1").build()))
+                                .build())
+                        .build(),
+                TransactWriteItem.builder()
+                    .put(
+                        Put.builder()
+                            .tableName(tableName)
+                            .item(
+                                TableSchema.fromBean(InventoryAuditItem.class)
+                                    .itemToMap(
+                                        InventoryAuditItem.create(
+                                            user,
+                                            ulidGenerator.generate(),
+                                            "create",
+                                            skuId,
+                                            sequence,
+                                            null,
+                                            "absent",
+                                            "in_stock",
+                                            null,
+                                            now),
+                                        true))
+                            .build())
+                    .build(),
+                TransactWriteItem.builder()
+                    .put(
+                        Put.builder()
+                            .tableName(tableName)
+                            .item(
+                                TableSchema.fromBean(InventoryUnitCreationItem.class)
+                                    .itemToMap(receipt, true))
+                            .conditionExpression("attribute_not_exists(pk)")
+                            .build())
+                    .build())
+            .build());
+
+    return receipt;
   }
 
   public void deleteUnit(String user, String skuId, int sequenceNumber, @Nullable String reason) {
@@ -284,7 +445,7 @@ public class InventoryMutationRepository {
                 + "game = if_not_exists(game, :game), "
                 + "external_id = if_not_exists(external_id, :externalId), "
                 + "#name = if_not_exists(#name, :name), "
-                + "finish = if_not_exists(finish, :finish), "
+                + "#finish = if_not_exists(#finish, :finish), "
                 + "#condition = if_not_exists(#condition, :condition), "
                 + "gsi1pk = :dirtyPk, gsi1sk = :dirtySk, gsi2pk = :browsePk, "
                 + "gsi2sk = if_not_exists(gsi2sk, :browseSk), dirty = :dirty");
@@ -374,7 +535,9 @@ public class InventoryMutationRepository {
                                     "#name",
                                     "name",
                                     "#condition",
-                                    "condition"))
+                                    "condition",
+                                    "#finish",
+                                    "finish"))
                             .expressionAttributeValues(destinationValues)
                             .build())
                     .build(),

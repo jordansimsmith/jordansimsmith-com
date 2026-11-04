@@ -14,6 +14,7 @@ import static org.mockito.Mockito.when;
 
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceUnavailableException;
+import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import com.jordansimsmith.tcginventory.inventory.client.FakeInventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
@@ -33,7 +34,7 @@ public class ListingPhaseProcessorTest {
   @Test
   void processShouldDrainFullBatchThenRestartAtHead() throws Exception {
     // arrange
-    var inventory = new FakeInventoryService();
+    var inventory = new FakeInventoryService(new FakeGamesService());
     for (int i = 0; i < 102; i++) inventory.seedSku("alice", sku("sku-" + i), true);
     var processor = new ListingPhaseProcessor(inventory, new FakeListingService(inventory));
     // act

@@ -4,6 +4,9 @@ import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 
 public interface InventoryService {
+  CreateUnitResponse createUnit(RequestContext ctx, CreateUnitRequest request)
+      throws ServiceException;
+
   FindSkusResponse findSkus(RequestContext ctx, FindSkusRequest request) throws ServiceException;
 
   GetSkuResponse getSku(RequestContext ctx, GetSkuRequest request) throws ServiceException;
