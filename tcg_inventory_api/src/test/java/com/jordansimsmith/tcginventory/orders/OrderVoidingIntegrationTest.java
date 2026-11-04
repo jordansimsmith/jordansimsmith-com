@@ -13,6 +13,7 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.listings.client.FakeListingService;
 import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
 import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
 import com.jordansimsmith.time.FakeClock;
@@ -38,6 +39,7 @@ public class OrderVoidingIntegrationTest {
   private static final String ORDER_ID = "83663";
   private static final Instant NOW = Instant.ofEpochSecond(1700000000);
 
+  private FakeListingService listingService;
   private FakeClock fakeClock;
   private FakeFetchTcgService fakeFetchTcgService;
   private TcgInventoryTestFactory factory;
@@ -62,6 +64,7 @@ public class OrderVoidingIntegrationTest {
     factory =
         TcgInventoryTestFactory.create(
             dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
+    listingService = new FakeListingService(factory.inventoryService());
     fakeClock = factory.fakeClock();
     fakeFetchTcgService = factory.fakeFetchTcgService();
     fakeClock.setTime(NOW);
@@ -87,7 +90,7 @@ public class OrderVoidingIntegrationTest {
     orderPhaseProcessor =
         new OrderPhaseProcessor(
             orderTable,
-            skuTable,
+            listingService,
             factory.settingsTable(),
             orderRepository,
             inventoryRepository,
@@ -327,7 +330,7 @@ public class OrderVoidingIntegrationTest {
     var orderPhaseProcessor =
         new OrderPhaseProcessor(
             orderTable,
-            skuTable,
+            listingService,
             factory.settingsTable(),
             orderRepository,
             inventoryRepository,

@@ -88,7 +88,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     var orderPhaseProcessor =
         new OrderPhaseProcessor(
             orderTable,
-            skuTable,
+            factory.listingService(),
             TcgInventoryTable.table(enhancedClient, SettingsItem.class),
             orderRepository,
             inventoryRepository,

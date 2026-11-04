@@ -88,6 +88,10 @@ public final class FakeFetchTcgService implements FetchTcgService {
     return new FindOffersResponse(pageOffers, nextContinuation);
   }
 
+  public void seedListingId(String user, String cardId, String condition, int listingId) {
+    listingIds.put(user + "#" + cardId + "#" + condition, listingId);
+  }
+
   @Override
   public UpdateListingResponse updateListing(RequestContext ctx, UpdateListingRequest request) {
     var listingKey = ctx.user() + "#" + request.cardId() + "#" + request.condition();

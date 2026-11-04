@@ -15,6 +15,7 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.fetchtcg.client.BuyerAddress;
 import com.jordansimsmith.tcginventory.fetchtcg.client.CardListing;
 import com.jordansimsmith.tcginventory.fetchtcg.client.CardSearchResult;
@@ -33,6 +34,7 @@ import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.listings.client.FindListingsRequest;
 import com.jordansimsmith.tcginventory.listings.client.Listing;
+import com.jordansimsmith.tcginventory.listings.client.UpdateListingRequest;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.tcginventory.pricing.client.Condition;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceRequest;
@@ -1581,9 +1583,6 @@ public class JobsHandlerIntegrationTest {
             "043/196",
             "fetch-card-9002",
             "12.00");
-    pokemonSku.setDirty(false);
-    pokemonSku.setGsi1pk(SkuItem.USER_PREFIX + "jordan#CLEAN");
-    pokemonSku.setFetchtcgListingId(2002);
     skuTable.putItem(pokemonSku);
     unitTable.putItem(
         UnitItem.create(
@@ -1594,6 +1593,7 @@ public class JobsHandlerIntegrationTest {
             "in_stock",
             "pokemon-import",
             Instant.ofEpochSecond(1700000000)));
+    synchronizeListing("jordan", pokemonSkuId, 2002);
     factory
         .fakeFetchTcgService()
         .seedOffers(
@@ -1986,9 +1986,6 @@ public class JobsHandlerIntegrationTest {
             "168",
             "mtg_168_c_dom_normal",
             "1.50");
-    skuItem.setDirty(false);
-    skuItem.setGsi1pk(SkuItem.USER_PREFIX + user + "#CLEAN");
-    skuItem.setFetchtcgListingId(fetchtcgListingId);
     skuTable.putItem(skuItem);
 
     for (int i = 1; i <= unitCount; i++) {
@@ -1997,6 +1994,7 @@ public class JobsHandlerIntegrationTest {
               user, "mtg", skuId, i, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
       unitTable.putItem(unit);
     }
+    synchronizeListing(user, skuId, fetchtcgListingId);
   }
 
   private void createSkuWithUnitAtSequence(
@@ -2016,9 +2014,6 @@ public class JobsHandlerIntegrationTest {
             "168",
             "mtg_168_c_dom_normal",
             "1.50");
-    skuItem.setDirty(false);
-    skuItem.setGsi1pk(SkuItem.USER_PREFIX + user + "#CLEAN");
-    skuItem.setFetchtcgListingId(fetchtcgListingId);
     skuTable.putItem(skuItem);
 
     var unit =
@@ -2031,6 +2026,7 @@ public class JobsHandlerIntegrationTest {
             "import1",
             Instant.ofEpochSecond(1700000000));
     unitTable.putItem(unit);
+    synchronizeListing(user, skuId, fetchtcgListingId);
   }
 
   private void createTrackOrdersAfter(String user, Instant trackOrdersAfter) {
@@ -2346,4 +2342,24 @@ public class JobsHandlerIntegrationTest {
       String condition,
       String language,
       String scryfallId) {}
+
+  private void synchronizeListing(String user, String skuId, int listingId) {
+    var sku =
+        skuTable.getItem(
+            Key.builder()
+                .partitionValue(SkuItem.formatPk(user, skuId))
+                .sortValue(SkuItem.formatSk())
+                .build());
+    factory
+        .fakeFetchTcgService()
+        .seedListingId(
+            user, sku.getFetchtcgCardId(), "raw-" + sku.getCondition().toLowerCase(), listingId);
+    try {
+      factory
+          .listingService()
+          .updateListing(new RequestContext(user), new UpdateListingRequest(skuId));
+    } catch (ServiceException e) {
+      throw new RuntimeException(e);
+    }
+  }
 }

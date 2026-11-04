@@ -2,7 +2,6 @@ package com.jordansimsmith.tcginventory.orders;
 
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
-import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.fetchtcg.client.BuyerAddress;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindOffersRequest;
@@ -10,6 +9,8 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.listings.client.FindListingsRequest;
+import com.jordansimsmith.tcginventory.listings.client.ListingService;
 import com.jordansimsmith.tcginventory.settings.SettingsItem;
 import com.jordansimsmith.time.Clock;
 import java.time.Instant;
@@ -20,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -71,7 +73,7 @@ public class OrderPhaseProcessor {
   }
 
   private final DynamoDbTable<OrderItem> orderTable;
-  private final DynamoDbTable<SkuItem> skuTable;
+  private final ListingService listingService;
   private final DynamoDbTable<SettingsItem> settingsTable;
   private final OrderRepository orderRepository;
   private final InventoryRepository inventoryRepository;
@@ -80,14 +82,14 @@ public class OrderPhaseProcessor {
 
   public OrderPhaseProcessor(
       DynamoDbTable<OrderItem> orderTable,
-      DynamoDbTable<SkuItem> skuTable,
+      ListingService listingService,
       DynamoDbTable<SettingsItem> settingsTable,
       OrderRepository orderRepository,
       InventoryRepository inventoryRepository,
       Clock clock,
       FetchTcgService fetchTcgService) {
     this.orderTable = orderTable;
-    this.skuTable = skuTable;
+    this.listingService = listingService;
     this.settingsTable = settingsTable;
     this.orderRepository = orderRepository;
     this.inventoryRepository = inventoryRepository;
@@ -124,7 +126,16 @@ public class OrderPhaseProcessor {
     var existingOrders = loadExistingOrders(user);
     LOGGER.info("found {} existing orders in DynamoDB", existingOrders.size());
 
-    var listingToSkuId = buildListingToSkuMap(user);
+    var existingOrderIds =
+        existingOrders.stream().map(OrderItem::getOrderId).collect(Collectors.toSet());
+    var newOffers =
+        allOffers.stream()
+            .filter(offer -> "ACCEPTED".equals(offer.status()))
+            .filter(offer -> trackOrdersAfter == null || isAfterCutoff(offer, trackOrdersAfter))
+            .filter(offer -> !existingOrderIds.contains(String.valueOf(offer.id())))
+            .toList();
+
+    var listingToSkuId = buildListingToSkuMap(new RequestContext(user), newOffers);
     LOGGER.info("built listing-to-sku map with {} entries", listingToSkuId.size());
 
     int advancedCount = 0;
@@ -174,15 +185,6 @@ public class OrderPhaseProcessor {
         advancedCount,
         voidedCount,
         refreshedCount);
-
-    var existingOrderIds =
-        existingOrders.stream().map(OrderItem::getOrderId).collect(Collectors.toSet());
-    var newOffers =
-        allOffers.stream()
-            .filter(offer -> "ACCEPTED".equals(offer.status()))
-            .filter(offer -> trackOrdersAfter == null || isAfterCutoff(offer, trackOrdersAfter))
-            .filter(offer -> !existingOrderIds.contains(String.valueOf(offer.id())))
-            .toList();
 
     var plans = planReservations(user, newOffers, listingToSkuId);
     for (var plan : plans) {
@@ -273,28 +275,10 @@ public class OrderPhaseProcessor {
     return results;
   }
 
-  private Map<Integer, String> buildListingToSkuMap(String user) {
-    var map = new HashMap<Integer, String>();
-    var request =
-        QueryEnhancedRequest.builder()
-            .queryConditional(
-                QueryConditional.keyEqualTo(
-                    Key.builder().partitionValue(SkuItem.formatGsi2pk(user)).build()))
-            .build();
-    for (var page : skuTable.index(TcgInventoryTable.GSI2_NAME).query(request)) {
-      for (var item : page.items()) {
-        if (item.getFetchtcgListingId() != null) {
-          map.put(item.getFetchtcgListingId(), item.getSkuId());
-        }
-      }
-    }
-    return map;
-  }
-
-  private List<PlannedReservation> planReservations(
-      String user, List<Offer> newOffers, Map<Integer, String> listingToSkuId) {
-    var requestedBySku = new LinkedHashMap<String, Integer>();
-    for (var offer : newOffers) {
+  private Map<Integer, String> buildListingToSkuMap(RequestContext ctx, List<Offer> offers)
+      throws ServiceException {
+    var ids = new LinkedHashSet<Integer>();
+    for (var offer : offers) {
       if (offer.items() == null || offer.items().isEmpty()) {
         throw new ReservationPreflightException(
             "Offer " + offer.id() + " has no card lines; check FetchTCG");
@@ -304,6 +288,29 @@ public class OrderPhaseProcessor {
           throw new ReservationPreflightException(
               "Offer " + offer.id() + " contains a line without a listing; check FetchTCG");
         }
+        ids.add(item.listing().id());
+      }
+    }
+    var listingIds = new ArrayList<>(ids);
+    var map = new HashMap<Integer, String>();
+    for (int start = 0; start < listingIds.size(); start += 100) {
+      var response =
+          listingService.findListings(
+              ctx,
+              new FindListingsRequest(
+                  listingIds.subList(start, Math.min(start + 100, listingIds.size()))));
+      for (var listing : response.listings()) {
+        map.put(listing.listingId(), listing.skuId());
+      }
+    }
+    return map;
+  }
+
+  private List<PlannedReservation> planReservations(
+      String user, List<Offer> newOffers, Map<Integer, String> listingToSkuId) {
+    var requestedBySku = new LinkedHashMap<String, Integer>();
+    for (var offer : newOffers) {
+      for (var item : offer.items()) {
         var listingId = item.listing().id();
         var skuId = listingToSkuId.get(listingId);
         if (skuId == null) {

@@ -3,6 +3,8 @@ package com.jordansimsmith.tcginventory.orders;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
@@ -23,6 +25,11 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.OfferListing;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.listings.client.FakeListingService;
+import com.jordansimsmith.tcginventory.listings.client.FindListingsRequest;
+import com.jordansimsmith.tcginventory.listings.client.FindListingsResponse;
+import com.jordansimsmith.tcginventory.listings.client.Listing;
+import com.jordansimsmith.tcginventory.listings.client.ListingService;
 import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
 import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
 import com.jordansimsmith.time.FakeClock;
@@ -48,6 +55,7 @@ public class OrderReservationIntegrationTest {
   private static final int LISTING_ID = 101;
   private static final Instant NOW = Instant.ofEpochSecond(1700000000);
 
+  private FakeListingService listingService;
   private FakeClock fakeClock;
   private FakeFetchTcgService fakeFetchTcgService;
   private TcgInventoryTestFactory factory;
@@ -74,6 +82,7 @@ public class OrderReservationIntegrationTest {
     factory =
         TcgInventoryTestFactory.create(
             dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
+    listingService = new FakeListingService(factory.inventoryService());
     fakeClock = factory.fakeClock();
     fakeFetchTcgService = factory.fakeFetchTcgService();
     fakeClock.setTime(NOW);
@@ -99,7 +108,7 @@ public class OrderReservationIntegrationTest {
     orderPhaseProcessor =
         new OrderPhaseProcessor(
             orderTable,
-            skuTable,
+            listingService,
             factory.settingsTable(),
             orderRepository,
             inventoryRepository,
@@ -204,7 +213,7 @@ public class OrderReservationIntegrationTest {
     var processor =
         new OrderPhaseProcessor(
             orderTable,
-            skuTable,
+            listingService,
             factory.settingsTable(),
             orderRepository,
             inventoryRepository,
@@ -375,6 +384,97 @@ public class OrderReservationIntegrationTest {
     assertThat(getAudits()).isEmpty();
   }
 
+  @Test
+  void processShouldResolveHistoricalAssociationsForTheCurrentUser() throws Exception {
+    // arrange
+    createSku();
+    createUnit(1, "in_stock", null);
+    listingService.seedListing(USER, new Listing(202, SKU_ID));
+    listingService.seedListing("another-user", new Listing(999, SKU_ID));
+    fakeFetchTcgService.seedOffers(
+        USER, List.of(offer(83663, null, List.of(offerItem(LISTING_ID, 1, "1.00", "2.00")))));
+
+    // act
+    orderPhaseProcessor.process(USER);
+
+    // assert
+    assertThat(getUnit(1).getStatus()).isEqualTo("reserved");
+    fakeFetchTcgService.seedOffers(
+        USER, List.of(offer(83664, null, List.of(offerItem(999, 1, "1.00", "2.00")))));
+    assertThatThrownBy(() -> orderPhaseProcessor.process(USER))
+        .isInstanceOf(OrderPhaseProcessor.ReservationPreflightException.class)
+        .hasMessageContaining("listing 999 with no matching inventory SKU");
+  }
+
+  @Test
+  void processShouldCompleteAllAssociationLookupsBeforeApplyingOffers() throws Exception {
+    // arrange
+    createSku();
+    createUnit(1, "in_stock", null);
+    var offers = new ArrayList<Offer>();
+    var ids = new ArrayList<Integer>();
+    for (int i = 0; i < 101; i++) {
+      ids.add(i);
+      offers.add(offer(90000 + i, null, List.of(offerItem(i, 1, "1.00", "2.00"))));
+    }
+    offers.add(offer(91000, null, List.of(offerItem(0, 1, "1.00", "2.00"))));
+    offers.add(
+        new Offer(92000, "COMPLETED", null, null, "PICKUP", null, null, null, null, List.of()));
+    fakeFetchTcgService.seedOffers(USER, offers);
+    var listings = mock(ListingService.class);
+    var ctx = new RequestContext(USER);
+    var firstRequest = new FindListingsRequest(ids.subList(0, 100));
+    when(listings.findListings(ctx, firstRequest))
+        .thenReturn(
+            new FindListingsResponse(
+                ids.subList(0, 100).stream().map(id -> new Listing(id, SKU_ID)).toList()));
+    var failure = new ServiceUnavailableException("Listings unavailable");
+    when(listings.findListings(ctx, new FindListingsRequest(List.of(100)))).thenThrow(failure);
+    var processor =
+        new OrderPhaseProcessor(
+            orderTable,
+            listings,
+            factory.settingsTable(),
+            orderRepository,
+            inventoryRepository,
+            fakeClock,
+            fakeFetchTcgService);
+
+    // act & assert
+    assertThatThrownBy(() -> processor.process(USER)).isSameAs(failure);
+    assertThat(getOrders()).isEmpty();
+    assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
+    verify(listings).findListings(ctx, firstRequest);
+    verify(listings).findListings(ctx, new FindListingsRequest(List.of(100)));
+    verifyNoMoreInteractions(listings);
+  }
+
+  @Test
+  void processShouldSkipAssociationLookupsWithoutNewAcceptedOffers() throws Exception {
+    // arrange
+    fakeFetchTcgService.seedOffers(
+        USER,
+        List.of(
+            new Offer(
+                92000, "COMPLETED", null, null, "PICKUP", null, null, null, null, List.of())));
+    var listings = mock(ListingService.class);
+    var processor =
+        new OrderPhaseProcessor(
+            orderTable,
+            listings,
+            factory.settingsTable(),
+            orderRepository,
+            inventoryRepository,
+            fakeClock,
+            fakeFetchTcgService);
+
+    // act
+    processor.process(USER);
+
+    // assert
+    verifyNoMoreInteractions(listings);
+  }
+
   private JobProcessor.JobResult processPublish() {
     return newPublishJobProcessor()
         .processBatch(USER, JobItem.create(USER, "publish-job", "publish", null, null, NOW));
@@ -390,7 +490,7 @@ public class OrderReservationIntegrationTest {
     var orderPhaseProcessor =
         new OrderPhaseProcessor(
             orderTable,
-            skuTable,
+            listingService,
             factory.settingsTable(),
             orderRepository,
             inventoryRepository,
@@ -437,7 +537,7 @@ public class OrderReservationIntegrationTest {
             "1",
             "fetchtcg-card-1",
             "2.00");
-    sku.setFetchtcgListingId(LISTING_ID);
+    listingService.seedListing(USER, new Listing(LISTING_ID, SKU_ID));
     skuTable.putItem(sku);
   }
 
