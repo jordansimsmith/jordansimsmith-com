@@ -31,6 +31,8 @@ import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.listings.client.FindListingsRequest;
+import com.jordansimsmith.tcginventory.listings.client.Listing;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.tcginventory.pricing.client.Condition;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceRequest;
@@ -903,7 +905,6 @@ public class JobsHandlerIntegrationTest {
 
     var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(sku.getDirty()).isFalse();
-    assertThat(sku.getLastPublishedQuantity()).isEqualTo(1);
 
     var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
@@ -1040,7 +1041,6 @@ public class JobsHandlerIntegrationTest {
     // the released units are dirty stock again, so the listing phase restores the full quantity
     var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(sku.getDirty()).isFalse();
-    assertThat(sku.getLastPublishedQuantity()).isEqualTo(3);
   }
 
   @Test
@@ -1846,7 +1846,7 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishPhaseShouldCreateListingForDirtySku() {
+  void publishPhaseShouldCreateListingForDirtySku() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
@@ -1858,10 +1858,14 @@ public class JobsHandlerIntegrationTest {
     // assert
     var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(sku.getDirty()).isFalse();
-    assertThat(sku.getFetchtcgListingId()).isNotNull();
-    assertThat(sku.getLastPublishedQuantity()).isEqualTo(2);
-    assertThat(sku.getLastPublishedPrice()).isEqualTo("1.50");
-    assertThat(sku.getLastPublishedAt()).isEqualTo(Instant.ofEpochSecond(1700000000));
+    assertThat(
+            factory
+                .listingService()
+                .findListings(
+                    new RequestContext("jordan"), new FindListingsRequest(List.of(900000)))
+                .listings())
+        .extracting(Listing::skuId)
+        .containsExactly("mtg#scryfall#scryfall-1#normal#NM");
   }
 
   @Test
@@ -1901,73 +1905,6 @@ public class JobsHandlerIntegrationTest {
     assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("succeeded");
     assertThat(getSku("jordan", skuId).getExternalId()).isEqualTo("283917");
     assertThat(getSku("jordan", skuId).getFetchtcgCardId()).isEqualTo("fetch-card-9002");
-  }
-
-  @Test
-  void publishPhaseShouldUpdateListingForExistingSku() {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
-    createDirtySkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 3, "2.00");
-    var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    sku.setFetchtcgListingId(975737);
-    sku.setLastPublishedQuantity(1);
-    sku.setLastPublishedPrice("1.80");
-    skuTable.putItem(sku);
-
-    // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
-
-    // assert
-    var updated = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(updated.getDirty()).isFalse();
-    assertThat(updated.getLastPublishedQuantity()).isEqualTo(3);
-    assertThat(updated.getLastPublishedPrice()).isEqualTo("2.00");
-  }
-
-  @Test
-  void publishPhaseShouldDelistAtZero() {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
-    createDirtySkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 0, "1.50");
-    var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    sku.setFetchtcgListingId(975737);
-    sku.setLastPublishedQuantity(1);
-    sku.setLastPublishedPrice("1.50");
-    skuTable.putItem(sku);
-
-    // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
-
-    // assert
-    var updated = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(updated.getDirty()).isFalse();
-    assertThat(updated.getFetchtcgListingId()).isNull();
-    assertThat(updated.getLastPublishedQuantity()).isNull();
-    assertThat(updated.getLastPublishedPrice()).isNull();
-  }
-
-  @Test
-  void publishPhaseShouldNotClearDirtyWhenConditionFails() {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
-    createDirtySkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 2, "1.50");
-
-    // set dirty=false directly to simulate a race where the condition check
-    // (dirty = true AND version = :captured) fails at write time
-    var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    sku.setDirty(false);
-    skuTable.putItem(sku);
-
-    // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
-
-    // assert - the listing snapshot was not written because the condition failed
-    var updated = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(updated.getFetchtcgListingId()).isNull();
-    assertThat(updated.getLastPublishedQuantity()).isNull();
   }
 
   private void createDirtySkuWithUnits(

@@ -334,13 +334,7 @@ public class OrderVoidingIntegrationTest {
             fakeClock,
             fakeFetchTcgService);
     var listingPhaseProcessor =
-        new ListingPhaseProcessor(
-            skuTable,
-            factory.inventoryService(),
-            dynamoDbClient,
-            fakeClock,
-            fakeFetchTcgService,
-            factory.photosService());
+        new ListingPhaseProcessor(factory.inventoryService(), factory.listingService());
     return new PublishJobProcessor(orderPhaseProcessor, listingPhaseProcessor);
   }
 

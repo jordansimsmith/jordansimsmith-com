@@ -6,21 +6,33 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.http.HttpResponseFactory;
+import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.queue.FakeQueueClient;
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
+import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
+import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
+import com.jordansimsmith.tcginventory.inventory.client.FindSkusResponse;
+import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.Sku;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -186,6 +198,54 @@ public class PublishHandlerIntegrationTest {
     assertThat(body.get("pending_sku_count").asInt()).isEqualTo(1);
     assertThat(body.get("started_at").asLong()).isEqualTo(1700000000);
     assertThat(body.get("finished_at").asLong()).isEqualTo(1700000200);
+  }
+
+  @Test
+  void getPublishShouldCountAllPagesAndMapServiceFailures() throws Exception {
+    // arrange
+    var job = JobItem.create("jordan", "pub", "publish", null, null, Instant.EPOCH);
+    jobTable.putItem(job);
+    var inventory = Mockito.mock(InventoryService.class);
+    var ctx = new RequestContext("jordan");
+    var first = new FindSkusRequest(null, null, true, 100, null);
+    var next = new FindSkusRequest(null, null, true, 100, "next");
+    var sku =
+        new Sku(
+            "sku",
+            "mtg",
+            "id",
+            "Card",
+            "s",
+            "Set",
+            "1",
+            "normal",
+            Condition.NM,
+            null,
+            null,
+            1,
+            null,
+            0);
+    Mockito.when(inventory.findSkus(ctx, first))
+        .thenReturn(new FindSkusResponse(List.of(sku), "next"));
+    Mockito.when(inventory.findSkus(ctx, next))
+        .thenReturn(new FindSkusResponse(List.of(sku), null));
+    var factory = Mockito.mock(TcgInventoryFactory.class);
+    Mockito.when(factory.requestContextFactory()).thenReturn(new RequestContextFactory());
+    Mockito.when(factory.httpResponseFactory())
+        .thenReturn(new HttpResponseFactory.Builder(objectMapper).build());
+    Mockito.when(factory.jobTable()).thenReturn(jobTable);
+    Mockito.when(factory.inventoryService()).thenReturn(inventory);
+    var handler = new GetPublishHandler(factory);
+    // act / assert
+    assertThat(
+            objectMapper
+                .readTree(handler.handleRequest(buildEvent("jordan"), null).getBody())
+                .get("pending_sku_count")
+                .asInt())
+        .isEqualTo(2);
+    Mockito.when(inventory.findSkus(ctx, first))
+        .thenThrow(new ServiceUnavailableException("unavailable"));
+    assertThat(handler.handleRequest(buildEvent("jordan"), null).getStatusCode()).isEqualTo(503);
   }
 
   @Test

@@ -95,13 +95,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             publishClock,
             factory.fetchTcgService());
     var listingPhaseProcessor =
-        new ListingPhaseProcessor(
-            skuTable,
-            factory.inventoryService(),
-            publishDynamoDbClient,
-            publishClock,
-            factory.fetchTcgService(),
-            factory.photosService());
+        new ListingPhaseProcessor(factory.inventoryService(), factory.listingService());
     this.publishJobProcessor = new PublishJobProcessor(orderPhaseProcessor, listingPhaseProcessor);
     this.reportJobProcessor =
         new ReportJobProcessor(

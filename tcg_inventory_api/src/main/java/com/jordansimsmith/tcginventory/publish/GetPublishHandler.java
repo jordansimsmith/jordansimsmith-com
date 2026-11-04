@@ -8,10 +8,12 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
-import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
+import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
+import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import javax.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,7 +40,7 @@ public class GetPublishHandler
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<JobItem> jobTable;
-  private final DynamoDbTable<SkuItem> skuTable;
+  private final InventoryService inventoryService;
 
   public GetPublishHandler() {
     this(TcgInventoryFactory.create());
@@ -49,20 +51,23 @@ public class GetPublishHandler
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.jobTable = factory.jobTable();
-    this.skuTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), SkuItem.class);
+    this.inventoryService = factory.inventoryService();
   }
 
   @Override
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     try {
       return doHandleRequest(event);
+    } catch (ServiceException e) {
+      return httpResponseFactory.serviceError(e);
     } catch (Exception e) {
       LOGGER.error("error processing get publish request", e);
       throw new RuntimeException(e);
     }
   }
 
-  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
+  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event)
+      throws ServiceException {
     var user = requestContextFactory.createCtx(event).user();
 
     var latestPublishJob = findLatestPublishJob(user);
@@ -113,19 +118,16 @@ public class GetPublishHandler
         .orElse(null);
   }
 
-  private int countDirtySkus(String user) {
-    var queryConditional =
-        QueryConditional.sortBeginsWith(
-            Key.builder()
-                .partitionValue(SkuItem.formatGsi1pk(user))
-                .sortValue(SkuItem.SKU_PREFIX)
-                .build());
-
-    var request = QueryEnhancedRequest.builder().queryConditional(queryConditional).build();
-
-    return (int)
-        skuTable.index(TcgInventoryTable.GSI1_NAME).query(request).stream()
-            .flatMap(page -> page.items().stream())
-            .count();
+  private int countDirtySkus(String user) throws ServiceException {
+    var ctx = new RequestContext(user);
+    int count = 0;
+    String continuation = null;
+    do {
+      var response =
+          inventoryService.findSkus(ctx, new FindSkusRequest(null, null, true, 100, continuation));
+      count += response.skus().size();
+      continuation = response.nextContinuation();
+    } while (continuation != null);
+    return count;
   }
 }
