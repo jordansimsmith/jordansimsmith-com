@@ -17,6 +17,8 @@ import com.jordansimsmith.tcginventory.inventory.client.GetSkuResponse;
 import com.jordansimsmith.tcginventory.inventory.client.GetUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.GetUnitResponse;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.ReleaseUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.ReleaseUnitResponse;
 import com.jordansimsmith.tcginventory.inventory.client.ReserveUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.ReserveUnitResponse;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuRequest;
@@ -63,6 +65,7 @@ public class InventoryModule {
             createUnitOperationTable,
             dynamoDb.table(
                 tableName, TableSchema.fromBean(InventoryReserveUnitOperationItem.class)),
+            dynamoDb.table(tableName, TableSchema.fromBean(InventoryReservationItem.class)),
             tableName,
             clock,
             ulidGenerator);
@@ -73,11 +76,18 @@ public class InventoryModule {
     var createUnitService =
         new CreateUnitService(inventoryRepository, mutationRepository, gamesService);
     var reserveUnitService = new ReserveUnitService(inventoryRepository, mutationRepository);
+    var releaseUnitService = new ReleaseUnitService(inventoryRepository, mutationRepository);
     return new InventoryService() {
       @Override
       public ReserveUnitResponse reserveUnit(RequestContext ctx, ReserveUnitRequest request)
           throws ServiceException {
         return reserveUnitService.reserveUnit(ctx, request);
+      }
+
+      @Override
+      public ReleaseUnitResponse releaseUnit(RequestContext ctx, ReleaseUnitRequest request)
+          throws ServiceException {
+        return releaseUnitService.releaseUnit(ctx, request);
       }
 
       @Override

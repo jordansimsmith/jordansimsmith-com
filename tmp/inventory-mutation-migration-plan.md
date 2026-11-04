@@ -4,7 +4,7 @@
 
 Each unchecked task is one reviewable commit, including its implementation, relevant tests, caller/build changes, and current-state README updates. Implement in order. Do not introduce all interface methods up front with unsupported placeholder implementations. Task details and acceptance criteria appear below.
 
-**Listings prerequisite complete:** the separate [Listings migration plan](listings-migration-plan.md) absorbs task 5. Tasks 6 through 9 are complete; continue at task 10. Production activation still requires the controlled Listings data copy. Do not build a second publication acknowledgement operation.
+**Listings prerequisite complete:** the separate [Listings migration plan](listings-migration-plan.md) absorbs task 5. Tasks 6 through 10 are complete; continue at task 11. Production activation still requires the controlled Listings data copy. Do not build a second publication acknowledgement operation.
 
 - [x] **1. Migrate unit removal.** Add `deleteUnit`, server-owned transactional mutation/audit infrastructure, and the thin Inventory API handler. This is the first implementation change.
 - [x] **2. Migrate condition changes.** Add `updateUnit`, the shared enum `Condition`, server-owned SKU identity derivation and lazy SKU initialization, and migrate the existing handler. `fetchtcg_set_id` is required; `getSku` is strongly consistent.
@@ -15,7 +15,7 @@ Each unchecked task is one reviewable commit, including its implementation, rele
 - [x] **7. Make import placement instructions handle gaps.** Split placement groups at sequence gaps as well as storage-block boundaries; preserve the frontend's existing instruction shape. Placement instructions now describe contiguous runs of assigned units and can repeat a block label.
 - [x] **8. Migrate import confirmation.** Create one unit per keep row through Inventory, persist actual results, and recover by stable operation ID.
 - [x] **9. Implement single-unit allocation.** Add `reserveUnit`, Inventory-owned selection, durable allocation results, and reservation lifecycle records.
-- [ ] **10. Implement reservation release.** Add ownership-checked, replay-safe `releaseUnit`, including compatibility with existing reserved units.
+- [x] **10. Implement reservation release.** Add ownership-checked, replay-safe `releaseUnit`, including compatibility with existing reserved units.
 - [ ] **11. Implement unit sale.** Add ownership-checked, replay-safe `sellUnit`, sharing the same reservation lifecycle foundation.
 - [ ] **12. Stop writing non-inventory audits.** Remove Orders' lifecycle audit writes and the cross-vertical audit-builder dependency; defer Reports freshness redesign.
 - [ ] **13. Migrate cancellation and reservation reads.** Use Inventory for release and the reads needed by cancellation/fulfillment checks. Keep legacy reservation selection working until task 15.

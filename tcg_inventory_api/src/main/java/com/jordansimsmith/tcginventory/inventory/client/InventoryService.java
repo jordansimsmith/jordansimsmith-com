@@ -7,6 +7,9 @@ public interface InventoryService {
   ReserveUnitResponse reserveUnit(RequestContext ctx, ReserveUnitRequest request)
       throws ServiceException;
 
+  ReleaseUnitResponse releaseUnit(RequestContext ctx, ReleaseUnitRequest request)
+      throws ServiceException;
+
   CreateUnitResponse createUnit(RequestContext ctx, CreateUnitRequest request)
       throws ServiceException;
 
