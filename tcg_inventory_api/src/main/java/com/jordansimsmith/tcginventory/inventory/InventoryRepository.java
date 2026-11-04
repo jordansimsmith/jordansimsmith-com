@@ -321,7 +321,7 @@ public class InventoryRepository {
         .build();
   }
 
-  public TransactWriteItem buildAuditPut(
+  private TransactWriteItem buildAuditPut(
       String user, String eventType, Map<String, AttributeValue> attributes) {
     var auditItem = new HashMap<>(attributes);
     auditItem.put(AuditItem.PK, AttributeValue.builder().s(AuditItem.formatPk(user)).build());

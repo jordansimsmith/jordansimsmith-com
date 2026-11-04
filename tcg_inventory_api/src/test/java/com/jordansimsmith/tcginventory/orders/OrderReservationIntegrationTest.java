@@ -167,9 +167,6 @@ public class OrderReservationIntegrationTest {
             });
     assertThat(getSku().getVersion()).isEqualTo(5);
     assertThat(getAudits()).filteredOn(audit -> "reserve".equals(audit.getEventType())).hasSize(4);
-    assertThat(getAudits())
-        .filteredOn(audit -> "order_reserved".equals(audit.getEventType()))
-        .hasSize(2);
   }
 
   @Test
@@ -327,9 +324,6 @@ public class OrderReservationIntegrationTest {
     assertThat(getUnit(1).getStatus()).isEqualTo("reserved");
     assertThat(getUnit(1).getReservationId()).isEqualTo("83663");
     assertThat(getAudits()).filteredOn(audit -> "reserve".equals(audit.getEventType())).hasSize(1);
-    assertThat(getAudits())
-        .filteredOn(audit -> "order_reserved".equals(audit.getEventType()))
-        .isEmpty();
 
     // arrange retry after repairing the conflicting saved allocation
     var repairedUnit = getUnit(2);
@@ -346,9 +340,6 @@ public class OrderReservationIntegrationTest {
     assertThat(getUnit(2).getReservationId()).isEqualTo("83663");
     assertThat(getSku().getVersion()).isEqualTo(3);
     assertThat(getAudits()).filteredOn(audit -> "reserve".equals(audit.getEventType())).hasSize(2);
-    assertThat(getAudits())
-        .filteredOn(audit -> "order_reserved".equals(audit.getEventType()))
-        .hasSize(1);
   }
 
   @Test

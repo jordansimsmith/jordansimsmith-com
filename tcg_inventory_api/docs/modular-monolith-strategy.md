@@ -187,7 +187,7 @@ Inventory owns authoritative unit reservations and availability. Orders asks inv
 
 Listing photos cross lifecycle boundaries: imports owns review-time attachments, while inventory must retain the immutable photo references needed by confirmed units. Shared S3 storage does not imply shared authority to change those references.
 
-Before completing a vertical migration, assign ownership for its audit records, job state, idempotency records, and any shared operational gates. These cannot remain implicit shared database access. Keep an inventory mutation and its authoritative audit entry in inventory's local transaction. A combined audit view can aggregate published records without becoming a synchronous dependency of every mutation.
+Before completing a vertical migration, assign ownership for its audit records, job state, idempotency records, and any shared operational gates. These cannot remain implicit shared database access. Inventory owns audits for its stock and price mutations and commits each audit with the corresponding mutation. Orders lifecycle transitions update Orders records without writing Inventory audits; historical order audit records remain untouched. A combined audit view can aggregate published records without becoming a synchronous dependency of every mutation.
 
 The Jobs vertical owns generic job identity, queued/running/terminal lifecycle, dispatch, and background-task admission. It does not own business rules, domain records, or workflow checkpoints. Job contracts carry generic owner and operation identity; the worker adapter routes these to the owning vertical. Each vertical retains its own durable progress and decides when its workflow is complete.
 
@@ -231,7 +231,7 @@ Cross-vertical reads use service contracts. Start with paginated or bounded bulk
 
 If fan-out or reporting cost justifies it, reports can own a read model populated from published changes. Such a projection needs duplicate handling, ordering/version semantics, a rebuild strategy, and an explicit freshness contract. Event-driven reporting is an option, not a prerequisite for the first migration.
 
-Separate owners do not provide a globally consistent snapshot merely because reads happen in one process. Specify whether a report is best-effort, uses per-owner watermarks, or needs another snapshot protocol. Preserve or deliberately replace the current audit-based staleness behavior when audit ownership changes.
+Separate owners do not provide a globally consistent snapshot merely because reads happen in one process. Specify whether a report is best-effort, uses per-owner watermarks, or needs another snapshot protocol. Until Reports replaces its legacy Inventory audit watermark, payment-only and other Orders-only changes may leave a report labelled fresh until a later Inventory audit or the existing 24-hour age check. Explicit report generation still reads current Orders data.
 
 ## Lambda handlers and deployment
 

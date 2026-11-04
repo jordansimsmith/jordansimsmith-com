@@ -20,7 +20,6 @@ import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.JobsHandler;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
-import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
@@ -825,75 +824,6 @@ public class ReportsHandlerIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
     assertThat(body.get("stale").asBoolean()).isTrue();
-  }
-
-  @Test
-  void getReportsShouldReturnStaleAfterOrderAdvance() throws Exception {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-
-    var auditEntry = new AuditItem();
-    auditEntry.setPk(AuditItem.formatPk("jordan"));
-    auditEntry.setSk("01JEXAMPLEULID0000000000");
-    auditEntry.setEventType("reserve");
-    auditTable.putItem(auditEntry);
-
-    var reportItem =
-        ReportItem.create(
-            "jordan", "{}", "01JEXAMPLEULID0000000000", Instant.ofEpochSecond(1700000000));
-    reportTable.putItem(reportItem);
-
-    var order =
-        OrderItem.create(
-            "jordan",
-            "83663",
-            "awaiting_payment",
-            "ACCEPTED",
-            null,
-            "PICKUP",
-            null,
-            null,
-            null,
-            "3.33",
-            List.of(),
-            Instant.ofEpochSecond(1699000000));
-    orderTable.putItem(order);
-
-    fakeFetchTcgService.seedOffers(
-        "jordan",
-        List.of(
-            new Offer(
-                83663,
-                "ACCEPTED",
-                "SEND_PICKUP_ADDRESS",
-                "2026-08-11T04:42:12.476+0000",
-                "PICKUP",
-                null,
-                null,
-                null,
-                new BigDecimal("3.33"),
-                List.of())));
-
-    jobTable.putItem(
-        JobItem.create(
-            "jordan", "publish-job", "publish", null, null, Instant.ofEpochSecond(1700000000)));
-
-    // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "publish-job", "publish"), null);
-    var response = getReportsHandler.handleRequest(buildHttpEvent("jordan"), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
-    assertThat(body.get("stale").asBoolean()).isTrue();
-
-    var updatedOrder =
-        orderTable.getItem(
-            Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
-                .sortValue(OrderItem.formatSk("83663"))
-                .build());
-    assertThat(updatedOrder.getStatus()).isEqualTo("to_pick");
   }
 
   @Test

@@ -17,7 +17,7 @@ Each unchecked task is one reviewable commit, including its implementation, rele
 - [x] **9. Implement single-unit allocation.** Add `reserveUnit`, Inventory-owned selection, durable allocation results, and reservation lifecycle records.
 - [x] **10. Implement reservation release.** Add ownership-checked, replay-safe `releaseUnit`, including compatibility with existing reserved units.
 - [x] **11. Implement unit sale.** Add ownership-checked, replay-safe `sellUnit`, sharing the same reservation lifecycle foundation.
-- [ ] **12. Stop writing non-inventory audits.** Remove Orders' lifecycle audit writes and the cross-vertical audit-builder dependency; defer Reports freshness redesign.
+- [x] **12. Stop writing non-inventory audits.** Remove Orders' lifecycle audit writes and the cross-vertical audit-builder dependency; defer Reports freshness redesign.
 - [ ] **13. Migrate cancellation and reservation reads.** Use Inventory for release and the reads needed by cancellation/fulfillment checks. Keep legacy reservation selection working until task 15.
 - [ ] **14. Migrate fulfillment.** Use `sellUnit` from the fulfillment processor, with explicit dependencies and preserved resumable order progress.
 - [ ] **15. Migrate Orders allocation and reservation progress.** Let Inventory select units; save actual allocations, recover partial orders, and remove explicit-unit planning.

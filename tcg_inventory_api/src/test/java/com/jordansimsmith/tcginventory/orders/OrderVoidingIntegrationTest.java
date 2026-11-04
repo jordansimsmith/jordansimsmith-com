@@ -135,7 +135,6 @@ public class OrderVoidingIntegrationTest {
               assertThat(audit.getBeforeStatus()).isEqualTo("reserved");
               assertThat(audit.getAfterStatus()).isEqualTo("in_stock");
             });
-    assertThat(audits).filteredOn(audit -> "order_voided".equals(audit.getEventType())).hasSize(1);
   }
 
   @Test
@@ -157,9 +156,6 @@ public class OrderVoidingIntegrationTest {
     assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
     assertThat(getUnit(1).getReservationId()).isNull();
     assertThat(getAudits()).filteredOn(audit -> "release".equals(audit.getEventType())).hasSize(1);
-    assertThat(getAudits())
-        .filteredOn(audit -> "order_voided".equals(audit.getEventType()))
-        .isEmpty();
 
     // arrange retry after repairing the conflicting saved allocation
     var repairedUnit = getUnit(2);
@@ -176,9 +172,6 @@ public class OrderVoidingIntegrationTest {
     assertThat(getUnit(2).getReservationId()).isNull();
     assertThat(getSku().getVersion()).isEqualTo(3);
     assertThat(getAudits()).filteredOn(audit -> "release".equals(audit.getEventType())).hasSize(2);
-    assertThat(getAudits())
-        .filteredOn(audit -> "order_voided".equals(audit.getEventType()))
-        .hasSize(1);
   }
 
   @Test
@@ -198,9 +191,6 @@ public class OrderVoidingIntegrationTest {
     assertThat(getUnit(1).getReservationId()).isNull();
     assertThat(getSku().getVersion()).isEqualTo(2);
     assertThat(getAudits()).filteredOn(audit -> "release".equals(audit.getEventType())).hasSize(1);
-    assertThat(getAudits())
-        .filteredOn(audit -> "order_voided".equals(audit.getEventType()))
-        .hasSize(1);
   }
 
   @Test
@@ -238,9 +228,6 @@ public class OrderVoidingIntegrationTest {
     assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voided");
     assertThat(getSku().getVersion()).isEqualTo(1);
     assertThat(getAudits()).filteredOn(audit -> "release".equals(audit.getEventType())).isEmpty();
-    assertThat(getAudits())
-        .filteredOn(audit -> "order_voided".equals(audit.getEventType()))
-        .hasSize(1);
 
     // arrange empty cancellation
     var emptyOrderId = "83664";
@@ -253,9 +240,6 @@ public class OrderVoidingIntegrationTest {
 
     // assert
     assertThat(getOrder(emptyOrderId).getStatus()).isEqualTo("voided");
-    assertThat(getAudits())
-        .filteredOn(audit -> "order_voided".equals(audit.getEventType()))
-        .hasSize(2);
   }
 
   private void createSku() {

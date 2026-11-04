@@ -1,6 +1,5 @@
 package com.jordansimsmith.tcginventory.orders;
 
-import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
@@ -53,42 +52,21 @@ public class OrderRepository {
   }
 
   public void finishReservation(String user, String orderId, String targetState) {
-    var finishOrder =
-        TransactWriteItem.builder()
-            .update(
-                Update.builder()
-                    .tableName(TcgInventoryTable.TABLE_NAME)
-                    .key(
-                        Map.of(
-                            OrderItem.PK,
-                            AttributeValue.builder().s(OrderItem.formatPk(user)).build(),
-                            OrderItem.SK,
-                            AttributeValue.builder().s(OrderItem.formatSk(orderId)).build()))
-                    .updateExpression("SET #status = :target, " + OrderItem.UPDATED_AT + " = :now")
-                    .conditionExpression("#status = :reserving")
-                    .expressionAttributeNames(Map.of("#status", OrderItem.STATUS))
-                    .expressionAttributeValues(
-                        Map.of(
-                            ":target", AttributeValue.builder().s(targetState).build(),
-                            ":reserving", AttributeValue.builder().s("reserving").build(),
-                            ":now",
-                                AttributeValue.builder()
-                                    .n(String.valueOf(clock.now().getEpochSecond()))
-                                    .build()))
-                    .build())
-            .build();
-
-    dynamoDbClient.transactWriteItems(
-        TransactWriteItemsRequest.builder()
-            .transactItems(
-                finishOrder,
-                inventoryRepository.buildAuditPut(
-                    user,
-                    "order_reserved",
-                    Map.of(
-                        OrderItem.ORDER_ID, AttributeValue.builder().s(orderId).build(),
-                        AuditItem.BEFORE_STATUS, AttributeValue.builder().s("reserving").build(),
-                        AuditItem.AFTER_STATUS, AttributeValue.builder().s(targetState).build())))
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(TcgInventoryTable.TABLE_NAME)
+            .key(orderKey(user, orderId))
+            .updateExpression("SET #status = :target, " + OrderItem.UPDATED_AT + " = :now")
+            .conditionExpression("#status = :reserving")
+            .expressionAttributeNames(Map.of("#status", OrderItem.STATUS))
+            .expressionAttributeValues(
+                Map.of(
+                    ":target", AttributeValue.builder().s(targetState).build(),
+                    ":reserving", AttributeValue.builder().s("reserving").build(),
+                    ":now",
+                        AttributeValue.builder()
+                            .n(String.valueOf(clock.now().getEpochSecond()))
+                            .build()))
             .build());
   }
 
@@ -150,58 +128,51 @@ public class OrderRepository {
   }
 
   public void finishFulfilling(String user, String orderId) {
-    var finishOrder =
-        TransactWriteItem.builder()
-            .update(
-                Update.builder()
-                    .tableName(TcgInventoryTable.TABLE_NAME)
-                    .key(orderKey(user, orderId))
-                    .updateExpression(
-                        "SET #status = :fulfilled, " + OrderItem.UPDATED_AT + " = :now")
-                    .conditionExpression("#status = :fulfilling")
-                    .expressionAttributeNames(Map.of("#status", OrderItem.STATUS))
-                    .expressionAttributeValues(
-                        Map.of(
-                            ":fulfilled", AttributeValue.builder().s("fulfilled").build(),
-                            ":fulfilling", AttributeValue.builder().s("fulfilling").build(),
-                            ":now",
-                                AttributeValue.builder()
-                                    .n(String.valueOf(clock.now().getEpochSecond()))
-                                    .build()))
-                    .build())
-            .build();
-
-    dynamoDbClient.transactWriteItems(
-        TransactWriteItemsRequest.builder()
-            .transactItems(
-                finishOrder,
-                inventoryRepository.buildAuditPut(
-                    user,
-                    "order_fulfilled",
-                    Map.of(
-                        OrderItem.ORDER_ID, AttributeValue.builder().s(orderId).build(),
-                        AuditItem.BEFORE_STATUS, AttributeValue.builder().s("fulfilling").build(),
-                        AuditItem.AFTER_STATUS, AttributeValue.builder().s("fulfilled").build())))
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(TcgInventoryTable.TABLE_NAME)
+            .key(orderKey(user, orderId))
+            .updateExpression("SET #status = :fulfilled, " + OrderItem.UPDATED_AT + " = :now")
+            .conditionExpression("#status = :fulfilling")
+            .expressionAttributeNames(Map.of("#status", OrderItem.STATUS))
+            .expressionAttributeValues(
+                Map.of(
+                    ":fulfilled", AttributeValue.builder().s("fulfilled").build(),
+                    ":fulfilling", AttributeValue.builder().s("fulfilling").build(),
+                    ":now",
+                        AttributeValue.builder()
+                            .n(String.valueOf(clock.now().getEpochSecond()))
+                            .build()))
             .build());
   }
 
   public void advanceOrderToPickReady(
       String user, String orderId, String fetchtcgStatus, String fetchtcgCurrentAction) {
-    dynamoDbClient.transactWriteItems(
-        TransactWriteItemsRequest.builder()
-            .transactItems(
-                List.of(
-                    buildOrderPickReadyUpdate(user, orderId, fetchtcgStatus, fetchtcgCurrentAction),
-                    inventoryRepository.buildAuditPut(
-                        user,
-                        "payment",
-                        Map.of(
-                            OrderItem.ORDER_ID,
-                            AttributeValue.builder().s(orderId).build(),
-                            AuditItem.BEFORE_STATUS,
-                            AttributeValue.builder().s("awaiting_payment").build(),
-                            AuditItem.AFTER_STATUS,
-                            AttributeValue.builder().s("to_pick").build()))))
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(TcgInventoryTable.TABLE_NAME)
+            .key(orderKey(user, orderId))
+            .updateExpression(
+                "SET #status = :toPick, "
+                    + OrderItem.FETCHTCG_STATUS
+                    + " = :fetchtcgStatus, "
+                    + OrderItem.FETCHTCG_CURRENT_ACTION
+                    + " = :fetchtcgCurrentAction, "
+                    + OrderItem.UPDATED_AT
+                    + " = :now")
+            .conditionExpression("#status = :awaitingPayment")
+            .expressionAttributeNames(Map.of("#status", OrderItem.STATUS))
+            .expressionAttributeValues(
+                Map.of(
+                    ":toPick", AttributeValue.builder().s("to_pick").build(),
+                    ":awaitingPayment", AttributeValue.builder().s("awaiting_payment").build(),
+                    ":fetchtcgStatus", AttributeValue.builder().s(fetchtcgStatus).build(),
+                    ":fetchtcgCurrentAction",
+                        AttributeValue.builder().s(fetchtcgCurrentAction).build(),
+                    ":now",
+                        AttributeValue.builder()
+                            .n(String.valueOf(clock.now().getEpochSecond()))
+                            .build()))
             .build());
   }
 
@@ -284,43 +255,25 @@ public class OrderRepository {
   }
 
   public void finishVoiding(String user, String orderId) {
-    var finishOrder =
-        TransactWriteItem.builder()
-            .update(
-                Update.builder()
-                    .tableName(TcgInventoryTable.TABLE_NAME)
-                    .key(
-                        Map.of(
-                            OrderItem.PK,
-                            AttributeValue.builder().s(OrderItem.formatPk(user)).build(),
-                            OrderItem.SK,
-                            AttributeValue.builder().s(OrderItem.formatSk(orderId)).build()))
-                    .updateExpression(
-                        "SET #status = :voided, "
-                            + OrderItem.UPDATED_AT
-                            + " = :now REMOVE "
-                            + OrderItem.FETCHTCG_CURRENT_ACTION)
-                    .conditionExpression("#status = :voiding")
-                    .expressionAttributeNames(Map.of("#status", OrderItem.STATUS))
-                    .expressionAttributeValues(
-                        Map.of(
-                            ":voided", AttributeValue.builder().s("voided").build(),
-                            ":voiding", AttributeValue.builder().s("voiding").build(),
-                            ":now",
-                                AttributeValue.builder()
-                                    .n(String.valueOf(clock.now().getEpochSecond()))
-                                    .build()))
-                    .build())
-            .build();
-
-    dynamoDbClient.transactWriteItems(
-        TransactWriteItemsRequest.builder()
-            .transactItems(
-                finishOrder,
-                inventoryRepository.buildAuditPut(
-                    user,
-                    "order_voided",
-                    Map.of(OrderItem.ORDER_ID, AttributeValue.builder().s(orderId).build())))
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(TcgInventoryTable.TABLE_NAME)
+            .key(orderKey(user, orderId))
+            .updateExpression(
+                "SET #status = :voided, "
+                    + OrderItem.UPDATED_AT
+                    + " = :now REMOVE "
+                    + OrderItem.FETCHTCG_CURRENT_ACTION)
+            .conditionExpression("#status = :voiding")
+            .expressionAttributeNames(Map.of("#status", OrderItem.STATUS))
+            .expressionAttributeValues(
+                Map.of(
+                    ":voided", AttributeValue.builder().s("voided").build(),
+                    ":voiding", AttributeValue.builder().s("voiding").build(),
+                    ":now",
+                        AttributeValue.builder()
+                            .n(String.valueOf(clock.now().getEpochSecond()))
+                            .build()))
             .build());
   }
 
@@ -332,43 +285,6 @@ public class OrderRepository {
       }
     }
     return result;
-  }
-
-  private TransactWriteItem buildOrderPickReadyUpdate(
-      String user, String orderId, String fetchtcgStatus, String fetchtcgCurrentAction) {
-    return TransactWriteItem.builder()
-        .update(
-            Update.builder()
-                .tableName(TcgInventoryTable.TABLE_NAME)
-                .key(
-                    Map.of(
-                        OrderItem.PK,
-                        AttributeValue.builder().s(OrderItem.formatPk(user)).build(),
-                        OrderItem.SK,
-                        AttributeValue.builder().s(OrderItem.formatSk(orderId)).build()))
-                .updateExpression(
-                    "SET #status = :toPick, "
-                        + OrderItem.FETCHTCG_STATUS
-                        + " = :fetchtcgStatus, "
-                        + OrderItem.FETCHTCG_CURRENT_ACTION
-                        + " = :fetchtcgCurrentAction, "
-                        + OrderItem.UPDATED_AT
-                        + " = :now")
-                .conditionExpression("#status = :awaitingPayment")
-                .expressionAttributeNames(Map.of("#status", OrderItem.STATUS))
-                .expressionAttributeValues(
-                    Map.of(
-                        ":toPick", AttributeValue.builder().s("to_pick").build(),
-                        ":awaitingPayment", AttributeValue.builder().s("awaiting_payment").build(),
-                        ":fetchtcgStatus", AttributeValue.builder().s(fetchtcgStatus).build(),
-                        ":fetchtcgCurrentAction",
-                            AttributeValue.builder().s(fetchtcgCurrentAction).build(),
-                        ":now",
-                            AttributeValue.builder()
-                                .n(String.valueOf(clock.now().getEpochSecond()))
-                                .build()))
-                .build())
-        .build();
   }
 
   private Map<String, AttributeValue> orderKey(String user, String orderId) {

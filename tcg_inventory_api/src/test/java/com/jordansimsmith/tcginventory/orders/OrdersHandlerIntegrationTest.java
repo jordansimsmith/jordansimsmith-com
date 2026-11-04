@@ -765,7 +765,6 @@ public class OrdersHandlerIntegrationTest {
     var sellAudits = audit.stream().filter(a -> "sell".equals(a.getEventType())).toList();
     assertThat(sellAudits).hasSize(2);
     assertThat(sellAudits).allSatisfy(a -> assertThat(a.getOrderId()).isEqualTo("83663"));
-    assertThat(audit.stream().filter(a -> "order_fulfilled".equals(a.getEventType()))).hasSize(1);
     assertThat(getJobItem("jordan", job.getJobId()).getStatus()).isEqualTo("succeeded");
 
     // arrange - the completion transaction committed before the job acknowledgement
@@ -780,10 +779,6 @@ public class OrdersHandlerIntegrationTest {
     assertThat(getJobItem("jordan", job.getJobId()).getStatus()).isEqualTo("succeeded");
     assertThat(getAuditEntries("jordan").stream().filter(a -> "sell".equals(a.getEventType())))
         .hasSize(2);
-    assertThat(
-            getAuditEntries("jordan").stream()
-                .filter(a -> "order_fulfilled".equals(a.getEventType())))
-        .hasSize(1);
 
     // act - confirm after fulfillment completed
     var fulfilledResponse =
@@ -843,10 +838,6 @@ public class OrdersHandlerIntegrationTest {
     var sellAudits =
         getAuditEntries("jordan").stream().filter(a -> "sell".equals(a.getEventType())).toList();
     assertThat(sellAudits).hasSize(60);
-    assertThat(
-            getAuditEntries("jordan").stream()
-                .filter(a -> "order_fulfilled".equals(a.getEventType())))
-        .hasSize(1);
   }
 
   @Test
@@ -928,10 +919,6 @@ public class OrdersHandlerIntegrationTest {
         getAuditEntries("jordan").stream().filter(a -> "sell".equals(a.getEventType())).toList();
     assertThat(sellAudits).hasSize(2);
     assertThat(sellAudits).extracting(AuditItem::getSequenceNumber).containsExactlyInAnyOrder(1, 2);
-    assertThat(
-            getAuditEntries("jordan").stream()
-                .filter(a -> "order_fulfilled".equals(a.getEventType())))
-        .hasSize(1);
     assertThat(getSkuItem("jordan", skuId).getVersion()).isEqualTo(3);
   }
 

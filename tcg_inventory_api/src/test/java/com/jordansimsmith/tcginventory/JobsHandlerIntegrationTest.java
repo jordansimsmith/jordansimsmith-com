@@ -949,20 +949,12 @@ public class JobsHandlerIntegrationTest {
     assertThat(order.getStatus()).isEqualTo("to_pick");
     assertThat(order.getFetchtcgCurrentAction()).isEqualTo("SEND_PICKUP_ADDRESS");
 
-    var paymentAudits =
-        getAuditEntries("jordan").stream().filter(a -> "payment".equals(a.getEventType())).toList();
-    assertThat(paymentAudits).hasSize(1);
-    assertThat(paymentAudits.get(0).getOrderId()).isEqualTo("83663");
-    assertThat(paymentAudits.get(0).getBeforeStatus()).isEqualTo("awaiting_payment");
-    assertThat(paymentAudits.get(0).getAfterStatus()).isEqualTo("to_pick");
-
     createPublishJob("jordan", "job2");
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job2", "publish"), null);
 
-    var replayPaymentAudits =
-        getAuditEntries("jordan").stream().filter(a -> "payment".equals(a.getEventType())).toList();
-    assertThat(replayPaymentAudits).hasSize(1);
-    assertThat(getOrder("jordan", "83663").getStatus()).isEqualTo("to_pick");
+    var replayedOrder = getOrder("jordan", "83663");
+    assertThat(replayedOrder.getStatus()).isEqualTo("to_pick");
+    assertThat(replayedOrder.getFetchtcgCurrentAction()).isEqualTo("SEND_PICKUP_ADDRESS");
   }
 
   @Test
@@ -996,11 +988,6 @@ public class JobsHandlerIntegrationTest {
     var order = getOrder("jordan", "91329");
     assertThat(order.getStatus()).isEqualTo("to_pick");
     assertThat(order.getFetchtcgCurrentAction()).isEqualTo("SEND_TRACKING_CODE");
-
-    var paymentAudits =
-        getAuditEntries("jordan").stream().filter(a -> "payment".equals(a.getEventType())).toList();
-    assertThat(paymentAudits).hasSize(1);
-    assertThat(paymentAudits.get(0).getOrderId()).isEqualTo("91329");
   }
 
   @Test
@@ -1036,9 +1023,6 @@ public class JobsHandlerIntegrationTest {
     assertThat(releaseAudits).hasSize(2);
     assertThat(releaseAudits)
         .allSatisfy(audit -> assertThat(audit.getOrderId()).isEqualTo("83663"));
-    assertThat(getAuditEntries("jordan"))
-        .filteredOn(audit -> "order_voided".equals(audit.getEventType()))
-        .hasSize(1);
 
     // the released units are dirty stock again, so the listing phase restores the full quantity
     var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
@@ -1176,9 +1160,6 @@ public class JobsHandlerIntegrationTest {
         getAuditEntries("jordan").stream().filter(a -> "release".equals(a.getEventType())).toList();
     assertThat(releaseAudits).hasSize(1);
     assertThat(releaseAudits.get(0).getSequenceNumber()).isEqualTo(2);
-    assertThat(getAuditEntries("jordan"))
-        .filteredOn(audit -> "order_voided".equals(audit.getEventType()))
-        .hasSize(1);
   }
 
   @Test
@@ -1219,9 +1200,6 @@ public class JobsHandlerIntegrationTest {
     var releaseAudits =
         getAuditEntries("jordan").stream().filter(a -> "release".equals(a.getEventType())).toList();
     assertThat(releaseAudits).hasSize(60);
-    assertThat(getAuditEntries("jordan"))
-        .filteredOn(audit -> "order_voided".equals(audit.getEventType()))
-        .hasSize(1);
   }
 
   @Test
@@ -1262,8 +1240,6 @@ public class JobsHandlerIntegrationTest {
                 "32 Abercrombie Street", null, "Howick", "Auckland", "2014", "NZ"));
 
     // the refresh moves no inventory or revenue, so it must not mark the report stale
-    var auditEventTypes = getAuditEntries("jordan").stream().map(AuditItem::getEventType);
-    assertThat(auditEventTypes).containsOnly("payment");
   }
 
   @Test
@@ -1751,9 +1727,6 @@ public class JobsHandlerIntegrationTest {
               assertThat(audit.getBeforeStatus()).isEqualTo("in_stock");
               assertThat(audit.getAfterStatus()).isEqualTo("reserved");
             });
-    assertThat(getAuditEntries("jordan"))
-        .filteredOn(audit -> "order_reserved".equals(audit.getEventType()))
-        .hasSize(1);
   }
 
   @Test
@@ -1803,9 +1776,6 @@ public class JobsHandlerIntegrationTest {
     assertThat(inStock.get(0).getSequenceNumber()).isEqualTo(3);
     assertThat(getAuditEntries("jordan"))
         .filteredOn(audit -> "reserve".equals(audit.getEventType()))
-        .hasSize(1);
-    assertThat(getAuditEntries("jordan"))
-        .filteredOn(audit -> "order_reserved".equals(audit.getEventType()))
         .hasSize(1);
   }
 
