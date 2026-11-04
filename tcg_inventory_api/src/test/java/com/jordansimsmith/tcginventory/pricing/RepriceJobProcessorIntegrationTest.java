@@ -117,12 +117,6 @@ public class RepriceJobProcessorIntegrationTest {
     var reservedSkuId = createSku("jordan", "pokemon", "12346", null, "3.00", "reserved");
     var otherUserSkuId =
         createSku("other-user", "mtg", "scryfall-001", "fetch-mtg", "2.90", "in_stock");
-    var mtgSku = getSku("jordan", mtgSkuId);
-    mtgSku.setFetchtcgListingId(975737);
-    mtgSku.setLastPublishedQuantity(1);
-    mtgSku.setLastPublishedPrice("2.90");
-    mtgSku.setLastPublishedAt(CREATED_AT);
-    skuTable.putItem(mtgSku);
 
     seedCard("fetch-mtg", "2.50");
     seedCard("fetch-pokemon", "1.00");
@@ -145,10 +139,6 @@ public class RepriceJobProcessorIntegrationTest {
     assertThat(mtgSkuAfter.getSuggestedPrice()).isEqualTo("2.90");
     assertThat(mtgSkuAfter.getDirty()).isTrue();
     assertThat(mtgSkuAfter.getVersion()).isEqualTo(2);
-    assertThat(mtgSkuAfter.getFetchtcgListingId()).isEqualTo(975737);
-    assertThat(mtgSkuAfter.getLastPublishedQuantity()).isEqualTo(1);
-    assertThat(mtgSkuAfter.getLastPublishedPrice()).isEqualTo("2.90");
-    assertThat(mtgSkuAfter.getLastPublishedAt()).isEqualTo(CREATED_AT);
 
     var pokemonSkuAfter = getSku("jordan", pokemonSkuId);
     assertThat(pokemonSkuAfter.getSuggestedPrice()).isEqualTo("1.00");
@@ -601,7 +591,6 @@ public class RepriceJobProcessorIntegrationTest {
             item.getSuggestedPrice() == null ? null : new BigDecimal(item.getSuggestedPrice()),
             item.getFetchtcgCardId(),
             item.getFetchtcgSetId(),
-            item.getFetchtcgListingId(),
             item.getVersion());
     var ctx = new RequestContext(user);
     when(inventoryService.findSkus(any(), any()))

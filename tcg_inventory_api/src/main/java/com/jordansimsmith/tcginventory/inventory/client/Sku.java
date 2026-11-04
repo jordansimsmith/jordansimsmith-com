@@ -17,5 +17,4 @@ public record Sku(
     @JsonProperty("price") @Nullable BigDecimal price,
     @JsonProperty("fetchtcg_card_id") @Nullable String fetchtcgCardId,
     @JsonProperty("fetchtcg_set_id") int fetchtcgSetId,
-    @JsonProperty("fetchtcg_listing_id") @Nullable Integer fetchtcgListingId,
     @JsonProperty("version") int version) {}

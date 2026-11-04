@@ -48,10 +48,14 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 @Testcontainers
 public class ReportsHandlerIntegrationTest {
 
+  private DynamoDbClient dynamoDbClient;
   private FakeClock fakeClock;
   private FakeUlidGenerator fakeUlidGenerator;
   private FakeQueueClient<JobMessage> fakeJobsQueue;
@@ -85,6 +89,7 @@ public class ReportsHandlerIntegrationTest {
         TcgInventoryTestFactory.create(
             dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
 
+    dynamoDbClient = factory.dynamoDbClient();
     fakeClock = factory.fakeClock();
     fakeUlidGenerator = factory.fakeUlidGenerator();
     fakeJobsQueue = factory.fakeJobsQueue();
@@ -256,9 +261,19 @@ public class ReportsHandlerIntegrationTest {
             "42",
             null,
             "1.00");
-    // Reports must use current Inventory price even when legacy publication data differs.
-    sku1.setLastPublishedPrice("0.30");
     skuTable.putItem(sku1);
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(skuTable.tableName())
+            .key(
+                Map.of(
+                    "pk",
+                    AttributeValue.builder().s(sku1.getPk()).build(),
+                    "sk",
+                    AttributeValue.builder().s(sku1.getSk()).build()))
+            .updateExpression("SET last_published_price = :price")
+            .expressionAttributeValues(Map.of(":price", AttributeValue.builder().s("0.30").build()))
+            .build());
 
     var sku2 =
         SkuItem.create(
@@ -953,7 +968,6 @@ public class ReportsHandlerIntegrationTest {
         new BigDecimal("1.00"),
         null,
         0,
-        null,
         0);
   }
 

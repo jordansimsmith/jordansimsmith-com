@@ -1,12 +1,9 @@
 package com.jordansimsmith.tcginventory.inventory;
 
-import com.jordansimsmith.dynamodb.EpochSecondConverter;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import java.time.Instant;
 import javax.annotation.Nullable;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
-import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbConvertedBy;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondaryPartitionKey;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondarySortKey;
@@ -40,10 +37,6 @@ public class SkuItem {
   public static final String FETCHTCG_SET_ID = "fetchtcg_set_id";
   public static final String VERSION = "version";
   public static final String DIRTY = "dirty";
-  public static final String FETCHTCG_LISTING_ID = "fetchtcg_listing_id";
-  public static final String LAST_PUBLISHED_QUANTITY = "last_published_quantity";
-  public static final String LAST_PUBLISHED_PRICE = "last_published_price";
-  public static final String LAST_PUBLISHED_AT = "last_published_at";
   public static final String SUGGESTED_PRICE = "suggested_price";
 
   private String pk;
@@ -65,10 +58,6 @@ public class SkuItem {
   private Integer fetchtcgSetId;
   private Integer version;
   private Boolean dirty;
-  private Integer fetchtcgListingId;
-  private Integer lastPublishedQuantity;
-  private String lastPublishedPrice;
-  private Instant lastPublishedAt;
   private String suggestedPrice;
 
   @DynamoDbPartitionKey
@@ -246,43 +235,6 @@ public class SkuItem {
 
   public void setDirty(@Nullable Boolean dirty) {
     this.dirty = dirty;
-  }
-
-  @DynamoDbAttribute(FETCHTCG_LISTING_ID)
-  public Integer getFetchtcgListingId() {
-    return fetchtcgListingId;
-  }
-
-  public void setFetchtcgListingId(@Nullable Integer fetchtcgListingId) {
-    this.fetchtcgListingId = fetchtcgListingId;
-  }
-
-  @DynamoDbAttribute(LAST_PUBLISHED_QUANTITY)
-  public Integer getLastPublishedQuantity() {
-    return lastPublishedQuantity;
-  }
-
-  public void setLastPublishedQuantity(@Nullable Integer lastPublishedQuantity) {
-    this.lastPublishedQuantity = lastPublishedQuantity;
-  }
-
-  @DynamoDbAttribute(LAST_PUBLISHED_PRICE)
-  public String getLastPublishedPrice() {
-    return lastPublishedPrice;
-  }
-
-  public void setLastPublishedPrice(@Nullable String lastPublishedPrice) {
-    this.lastPublishedPrice = lastPublishedPrice;
-  }
-
-  @DynamoDbConvertedBy(EpochSecondConverter.class)
-  @DynamoDbAttribute(LAST_PUBLISHED_AT)
-  public Instant getLastPublishedAt() {
-    return lastPublishedAt;
-  }
-
-  public void setLastPublishedAt(@Nullable Instant lastPublishedAt) {
-    this.lastPublishedAt = lastPublishedAt;
   }
 
   @DynamoDbAttribute(SUGGESTED_PRICE)

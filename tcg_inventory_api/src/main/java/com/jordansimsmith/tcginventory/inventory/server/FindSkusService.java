@@ -75,7 +75,6 @@ public class FindSkusService {
         parsePrice(item.getSuggestedPrice()),
         item.getFetchtcgCardId(),
         item.getFetchtcgSetId(),
-        item.getFetchtcgListingId(),
         item.getVersion() == null ? 0 : item.getVersion());
   }
 

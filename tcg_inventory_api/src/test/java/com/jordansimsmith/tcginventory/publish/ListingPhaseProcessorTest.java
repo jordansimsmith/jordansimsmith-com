@@ -91,19 +91,6 @@ public class ListingPhaseProcessorTest {
 
   private static Sku sku(String id) {
     return new Sku(
-        id,
-        "mtg",
-        "external",
-        id,
-        "set",
-        "Set",
-        "1",
-        "normal",
-        Condition.NM,
-        null,
-        "card",
-        1,
-        null,
-        0);
+        id, "mtg", "external", id, "set", "Set", "1", "normal", Condition.NM, null, "card", 1, 0);
   }
 }

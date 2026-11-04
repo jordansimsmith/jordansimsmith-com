@@ -135,7 +135,6 @@ class SkuReadHandlersTest {
         new BigDecimal("1.25"),
         "card-id",
         1,
-        null,
         4);
   }
 

@@ -22,7 +22,6 @@ public class InventorySkuItem {
   public static final String SUGGESTED_PRICE = "suggested_price";
   public static final String FETCHTCG_CARD_ID = "fetchtcg_card_id";
   public static final String FETCHTCG_SET_ID = "fetchtcg_set_id";
-  public static final String FETCHTCG_LISTING_ID = "fetchtcg_listing_id";
   public static final String VERSION = "version";
   public static final String GSI1PK = "gsi1pk";
   public static final String GSI1SK = "gsi1sk";
@@ -42,7 +41,6 @@ public class InventorySkuItem {
   private String suggestedPrice;
   private String fetchtcgCardId;
   private int fetchtcgSetId;
-  private Integer fetchtcgListingId;
   private Integer version;
   private String gsi1pk;
   private String gsi1sk;
@@ -175,15 +173,6 @@ public class InventorySkuItem {
 
   public void setFetchtcgSetId(int fetchtcgSetId) {
     this.fetchtcgSetId = fetchtcgSetId;
-  }
-
-  @DynamoDbAttribute(FETCHTCG_LISTING_ID)
-  public Integer getFetchtcgListingId() {
-    return fetchtcgListingId;
-  }
-
-  public void setFetchtcgListingId(@Nullable Integer fetchtcgListingId) {
-    this.fetchtcgListingId = fetchtcgListingId;
   }
 
   @DynamoDbAttribute(VERSION)

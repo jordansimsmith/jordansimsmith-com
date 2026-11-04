@@ -501,7 +501,6 @@ class ListingServiceIntegrationTest {
               missingPrice ? null : sku.price(),
               missingPrice ? sku.fetchtcgCardId() : null,
               sku.fetchtcgSetId(),
-              null,
               sku.version()),
           true);
       inventory.seedUnits(
@@ -560,7 +559,6 @@ class ListingServiceIntegrationTest {
               new BigDecimal("50.00"),
               sku.fetchtcgCardId(),
               sku.fetchtcgSetId(),
-              null,
               sku.version()),
           true);
       inventory.seedUnits(
@@ -601,7 +599,6 @@ class ListingServiceIntegrationTest {
         new BigDecimal("2.00"),
         "card",
         1,
-        null,
         7);
   }
 }

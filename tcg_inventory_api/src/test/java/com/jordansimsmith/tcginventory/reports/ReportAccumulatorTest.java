@@ -221,7 +221,6 @@ public class ReportAccumulatorTest {
         price == null ? null : new BigDecimal(price),
         null,
         0,
-        null,
         0);
   }
 

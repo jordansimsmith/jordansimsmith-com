@@ -181,7 +181,6 @@ public class FakeInventoryService implements InventoryService {
             sourceSku.price(),
             sourceSku.fetchtcgCardId(),
             sourceSku.fetchtcgSetId(),
-            sourceSku.fetchtcgListingId(),
             sourceSku.version()));
     units.put(
         sourceUnitsKey,
@@ -238,7 +237,6 @@ public class FakeInventoryService implements InventoryService {
                 sku.price(),
                 sku.fetchtcgCardId(),
                 sku.fetchtcgSetId(),
-                sku.fetchtcgListingId(),
                 sku.version() + 1));
         dirtySkus.add(key);
       } else {
@@ -271,7 +269,6 @@ public class FakeInventoryService implements InventoryService {
               price,
               sku.fetchtcgCardId(),
               sku.fetchtcgSetId(),
-              sku.fetchtcgListingId(),
               sku.version() + 1));
       dirtySkus.add(key);
     }

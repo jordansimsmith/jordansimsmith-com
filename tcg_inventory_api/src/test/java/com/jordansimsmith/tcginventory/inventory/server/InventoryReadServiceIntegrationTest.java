@@ -103,7 +103,6 @@ class InventoryReadServiceIntegrationTest {
   void updateSkuShouldNormalizePriceAndWriteDirtyVersionAndAuditTogether() throws Exception {
     // arrange
     var item = sku("price-user", "mtg", "priced", "Priced Card", false, "1.00");
-    item.setFetchtcgListingId(456);
     skuTable.putItem(item);
     var skuKey =
         Map.of(
@@ -115,13 +114,13 @@ class InventoryReadServiceIntegrationTest {
                 .tableName(TABLE_NAME)
                 .key(skuKey)
                 .updateExpression(
-                    "SET last_published_price = :publishedPrice, "
-                        + "last_published_quantity = :publishedQuantity")
+                    "SET unrelated_price = :unrelatedPrice, "
+                        + "unrelated_quantity = :unrelatedQuantity")
                 .expressionAttributeValues(
                     Map.of(
-                        ":publishedPrice",
+                        ":unrelatedPrice",
                         AttributeValue.builder().s("2.90").build(),
-                        ":publishedQuantity",
+                        ":unrelatedQuantity",
                         AttributeValue.builder().n("1").build())));
 
     // act
@@ -146,7 +145,6 @@ class InventoryReadServiceIntegrationTest {
     assertThat(response).isEqualTo(new UpdateSkuResponse());
     assertThat(updated.sku().price()).isEqualByComparingTo("2.50");
     assertThat(updated.sku().version()).isEqualTo(2);
-    assertThat(updated.sku().fetchtcgListingId()).isEqualTo(456);
     assertThat(
             skuTable
                 .getItem(
@@ -165,8 +163,8 @@ class InventoryReadServiceIntegrationTest {
         dynamoDbClient
             .getItem(request -> request.tableName(TABLE_NAME).key(skuKey).consistentRead(true))
             .item();
-    assertThat(rawSku.get("last_published_price").s()).isEqualTo("2.90");
-    assertThat(rawSku.get("last_published_quantity").n()).isEqualTo("1");
+    assertThat(rawSku.get("unrelated_price").s()).isEqualTo("2.90");
+    assertThat(rawSku.get("unrelated_quantity").n()).isEqualTo("1");
 
     // act
     updateSkuService.updateSku(
@@ -267,7 +265,6 @@ class InventoryReadServiceIntegrationTest {
         getSkuService.getSku(new RequestContext("empty-user"), new GetSkuRequest("priced"));
     assertThat(updated.sku().price()).isEqualByComparingTo("1.00");
     assertThat(updated.sku().version()).isEqualTo(1);
-    assertThat(updated.sku().fetchtcgListingId()).isEqualTo(100);
     assertThat(
             auditTable.getItem(
                 request ->
@@ -573,7 +570,6 @@ class InventoryReadServiceIntegrationTest {
     item.setSuggestedPrice("2.50");
     item.setFetchtcgCardId("fetch-card");
     item.setFetchtcgSetId(123);
-    item.setFetchtcgListingId(456);
     item.setVersion(7);
     skuTable.putItem(item);
     var versionless = sku("alice", "mtg", "versionless", "Versionless Card", false);
@@ -594,7 +590,6 @@ class InventoryReadServiceIntegrationTest {
     assertThat(listed.skus().getFirst().price()).isEqualByComparingTo("2.50");
     assertThat(listed.skus().getFirst().fetchtcgCardId()).isEqualTo("fetch-card");
     assertThat(listed.skus().getFirst().fetchtcgSetId()).isEqualTo(123);
-    assertThat(listed.skus().getFirst().fetchtcgListingId()).isEqualTo(456);
     assertThat(listed.skus().getFirst().version()).isEqualTo(7);
     assertThat(fetched).isEqualTo(listed.skus().getFirst());
     assertThat(oldSku.version()).isZero();
@@ -896,7 +891,6 @@ class InventoryReadServiceIntegrationTest {
     item.setFetchtcgCardId("fetch-" + skuId);
     item.setFetchtcgSetId(1);
     item.setVersion(1);
-    item.setFetchtcgListingId(dirty ? null : 100);
     item.setGsi1pk(InventorySkuItem.formatGsi1pk(user, dirty));
     item.setGsi1sk(InventorySkuItem.formatGsi1skPrefix() + skuId);
     item.setGsi2pk(InventorySkuItem.formatGsi2pk(user));

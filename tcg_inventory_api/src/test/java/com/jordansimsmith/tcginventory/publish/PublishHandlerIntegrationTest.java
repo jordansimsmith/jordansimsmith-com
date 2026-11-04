@@ -211,20 +211,7 @@ public class PublishHandlerIntegrationTest {
     var next = new FindSkusRequest(null, null, true, 100, "next");
     var sku =
         new Sku(
-            "sku",
-            "mtg",
-            "id",
-            "Card",
-            "s",
-            "Set",
-            "1",
-            "normal",
-            Condition.NM,
-            null,
-            null,
-            1,
-            null,
-            0);
+            "sku", "mtg", "id", "Card", "s", "Set", "1", "normal", Condition.NM, null, null, 1, 0);
     Mockito.when(inventory.findSkus(ctx, first))
         .thenReturn(new FindSkusResponse(List.of(sku), "next"));
     Mockito.when(inventory.findSkus(ctx, next))
