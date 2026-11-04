@@ -17,6 +17,8 @@ import com.jordansimsmith.tcginventory.inventory.client.GetSkuResponse;
 import com.jordansimsmith.tcginventory.inventory.client.GetUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.GetUnitResponse;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.ReserveUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.ReserveUnitResponse;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuRequest;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuResponse;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateUnitRequest;
@@ -53,18 +55,31 @@ public class InventoryModule {
     var getSkuService = new GetSkuService(inventoryRepository);
     var getUnitService = new GetUnitService(inventoryRepository);
     var findUnitsService = new FindUnitsService(inventoryRepository, objectMapper);
-    var unitCreationTable =
-        dynamoDb.table(tableName, TableSchema.fromBean(InventoryUnitCreationItem.class));
+    var createUnitOperationTable =
+        dynamoDb.table(tableName, TableSchema.fromBean(InventoryCreateUnitOperationItem.class));
     var mutationRepository =
         new InventoryMutationRepository(
-            dynamoDbClient, unitCreationTable, tableName, clock, ulidGenerator);
+            dynamoDbClient,
+            createUnitOperationTable,
+            dynamoDb.table(
+                tableName, TableSchema.fromBean(InventoryReserveUnitOperationItem.class)),
+            tableName,
+            clock,
+            ulidGenerator);
     var deleteUnitService = new DeleteUnitService(inventoryRepository, mutationRepository);
     var updateUnitService =
         new UpdateUnitService(inventoryRepository, mutationRepository, gamesService);
     var updateSkuService = new UpdateSkuService(inventoryRepository, mutationRepository);
     var createUnitService =
         new CreateUnitService(inventoryRepository, mutationRepository, gamesService);
+    var reserveUnitService = new ReserveUnitService(inventoryRepository, mutationRepository);
     return new InventoryService() {
+      @Override
+      public ReserveUnitResponse reserveUnit(RequestContext ctx, ReserveUnitRequest request)
+          throws ServiceException {
+        return reserveUnitService.reserveUnit(ctx, request);
+      }
+
       @Override
       public CreateUnitResponse createUnit(RequestContext ctx, CreateUnitRequest request)
           throws ServiceException {

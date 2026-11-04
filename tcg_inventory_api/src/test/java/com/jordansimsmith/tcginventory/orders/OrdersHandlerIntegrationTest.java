@@ -898,7 +898,7 @@ public class OrdersHandlerIntegrationTest {
             .filter(u -> u.getSequenceNumber() == 2)
             .findFirst()
             .orElseThrow();
-    secondUnit.setOrderId("another-order");
+    secondUnit.setReservationId("another-order");
     unitTable.putItem(secondUnit);
 
     // act - first delivery sells unit 1, then rejects unit 2 because its owner changed
@@ -915,7 +915,7 @@ public class OrdersHandlerIntegrationTest {
     assertThat(getJobItem("jordan", job.getJobId()).getStatus()).isEqualTo("running");
 
     // arrange - repair the saved unit owner
-    secondUnit.setOrderId("83663");
+    secondUnit.setReservationId("83663");
     unitTable.putItem(secondUnit);
 
     // act - replay walks the fixed allocation and skips the earlier sale
@@ -1059,7 +1059,7 @@ public class OrdersHandlerIntegrationTest {
             status,
             "import1",
             Instant.ofEpochSecond(1700000000));
-    unit.setOrderId(orderId);
+    unit.setReservationId(orderId);
     unitTable.putItem(unit);
   }
 
@@ -1073,7 +1073,7 @@ public class OrdersHandlerIntegrationTest {
                   .sortValue(UnitItem.formatSk(seqNum))
                   .build());
       unit.setStatus("reserved");
-      unit.setOrderId(orderId);
+      unit.setReservationId(orderId);
       unitTable.putItem(unit);
     }
   }

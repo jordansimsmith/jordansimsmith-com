@@ -117,7 +117,7 @@ public class OrderVoidingIntegrationTest {
 
     var unit = getUnit(1);
     assertThat(unit.getStatus()).isEqualTo("in_stock");
-    assertThat(unit.getOrderId()).isNull();
+    assertThat(unit.getReservationId()).isNull();
 
     var sku = getSku();
     assertThat(sku.getVersion()).isEqualTo(2);
@@ -155,7 +155,7 @@ public class OrderVoidingIntegrationTest {
     // assert
     assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voiding");
     assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
-    assertThat(getUnit(1).getOrderId()).isNull();
+    assertThat(getUnit(1).getReservationId()).isNull();
     assertThat(getAudits()).filteredOn(audit -> "release".equals(audit.getEventType())).hasSize(1);
     assertThat(getAudits())
         .filteredOn(audit -> "order_voided".equals(audit.getEventType()))
@@ -164,7 +164,7 @@ public class OrderVoidingIntegrationTest {
     // arrange retry after repairing the conflicting saved allocation
     var repairedUnit = getUnit(2);
     repairedUnit.setStatus("reserved");
-    repairedUnit.setOrderId(ORDER_ID);
+    repairedUnit.setReservationId(ORDER_ID);
     unitTable.putItem(repairedUnit);
 
     // act
@@ -173,7 +173,7 @@ public class OrderVoidingIntegrationTest {
     // assert
     assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voided");
     assertThat(getUnit(2).getStatus()).isEqualTo("in_stock");
-    assertThat(getUnit(2).getOrderId()).isNull();
+    assertThat(getUnit(2).getReservationId()).isNull();
     assertThat(getSku().getVersion()).isEqualTo(3);
     assertThat(getAudits()).filteredOn(audit -> "release".equals(audit.getEventType())).hasSize(2);
     assertThat(getAudits())
@@ -195,7 +195,7 @@ public class OrderVoidingIntegrationTest {
     // assert
     assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voided");
     assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
-    assertThat(getUnit(1).getOrderId()).isNull();
+    assertThat(getUnit(1).getReservationId()).isNull();
     assertThat(getSku().getVersion()).isEqualTo(2);
     assertThat(getAudits()).filteredOn(audit -> "release".equals(audit.getEventType())).hasSize(1);
     assertThat(getAudits())
@@ -219,7 +219,7 @@ public class OrderVoidingIntegrationTest {
 
     // assert
     assertThat(getOrder(secondOrderId).getStatus()).isEqualTo("awaiting_payment");
-    assertThat(getUnit(1).getOrderId()).isEqualTo(ORDER_ID);
+    assertThat(getUnit(1).getReservationId()).isEqualTo(ORDER_ID);
     assertThat(getAudits()).isEmpty();
   }
 
@@ -277,7 +277,7 @@ public class OrderVoidingIntegrationTest {
 
   private void createUnit(int sequenceNumber, String status, String orderId) {
     var unit = UnitItem.create(USER, "mtg", SKU_ID, sequenceNumber, status, "import-1", NOW);
-    unit.setOrderId(orderId);
+    unit.setReservationId(orderId);
     unitTable.putItem(unit);
   }
 

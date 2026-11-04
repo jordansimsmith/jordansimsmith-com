@@ -21,36 +21,39 @@ import software.amazon.awssdk.services.dynamodb.model.Update;
 
 public class InventoryMutationRepository {
   private final DynamoDbClient dynamoDbClient;
-  private final DynamoDbTable<InventoryUnitCreationItem> unitCreationTable;
+  private final DynamoDbTable<InventoryCreateUnitOperationItem> createUnitOperationTable;
+  private final DynamoDbTable<InventoryReserveUnitOperationItem> reserveUnitOperationTable;
   private final String tableName;
   private final Clock clock;
   private final UlidGenerator ulidGenerator;
 
   public InventoryMutationRepository(
       DynamoDbClient dynamoDbClient,
-      DynamoDbTable<InventoryUnitCreationItem> unitCreationTable,
+      DynamoDbTable<InventoryCreateUnitOperationItem> createUnitOperationTable,
+      DynamoDbTable<InventoryReserveUnitOperationItem> reserveUnitOperationTable,
       String tableName,
       Clock clock,
       UlidGenerator ulidGenerator) {
     this.dynamoDbClient = dynamoDbClient;
-    this.unitCreationTable = unitCreationTable;
+    this.createUnitOperationTable = createUnitOperationTable;
+    this.reserveUnitOperationTable = reserveUnitOperationTable;
     this.tableName = tableName;
     this.clock = clock;
     this.ulidGenerator = ulidGenerator;
   }
 
   @Nullable
-  public InventoryUnitCreationItem getUnitCreation(String user, String operationId) {
+  public InventoryCreateUnitOperationItem getCreateUnitOperation(String user, String operationId) {
     var key =
         Key.builder()
             .partitionValue("USER#" + user + "#INVENTORY")
             .sortValue("OPERATION#CREATE_UNIT#" + operationId)
             .build();
 
-    return unitCreationTable.getItem(request -> request.key(key).consistentRead(true));
+    return createUnitOperationTable.getItem(request -> request.key(key).consistentRead(true));
   }
 
-  public InventoryUnitCreationItem createUnit(
+  public InventoryCreateUnitOperationItem createUnit(
       String user,
       String operationId,
       InventorySkuItem sku,
@@ -103,7 +106,7 @@ public class InventoryMutationRepository {
     skuMap.put("dirty", AttributeValue.builder().bool(true).build());
 
     var receipt =
-        InventoryUnitCreationItem.create(
+        InventoryCreateUnitOperationItem.create(
             user, operationId, skuId, sequence, Locations.format(sequence));
 
     dynamoDbClient.transactWriteItems(
@@ -180,13 +183,149 @@ public class InventoryMutationRepository {
                         Put.builder()
                             .tableName(tableName)
                             .item(
-                                TableSchema.fromBean(InventoryUnitCreationItem.class)
+                                TableSchema.fromBean(InventoryCreateUnitOperationItem.class)
                                     .itemToMap(receipt, true))
                             .conditionExpression("attribute_not_exists(pk)")
                             .build())
                     .build())
             .build());
 
+    return receipt;
+  }
+
+  @Nullable
+  public InventoryReserveUnitOperationItem getReserveUnitOperation(
+      String user, String operationId) {
+    var key =
+        Key.builder()
+            .partitionValue("USER#" + user + "#INVENTORY")
+            .sortValue("OPERATION#RESERVE_UNIT#" + operationId)
+            .build();
+    return reserveUnitOperationTable.getItem(request -> request.key(key).consistentRead(true));
+  }
+
+  public InventoryReserveUnitOperationItem reserveUnit(
+      String user, String operationId, String reservationId, String skuId, int sequenceNumber) {
+    var now = clock.now();
+    var receipt =
+        InventoryReserveUnitOperationItem.create(
+            user, operationId, reservationId, skuId, sequenceNumber);
+    var reservation =
+        InventoryReservationItem.create(user, reservationId, skuId, sequenceNumber, "reserved");
+    var audit =
+        InventoryAuditItem.create(
+            user,
+            ulidGenerator.generate(),
+            "reserve",
+            skuId,
+            sequenceNumber,
+            null,
+            "in_stock",
+            "reserved",
+            null,
+            now);
+    audit.setReservationId(reservationId);
+
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                TransactWriteItem.builder()
+                    .update(
+                        Update.builder()
+                            .tableName(tableName)
+                            .key(
+                                Map.of(
+                                    "pk",
+                                    AttributeValue.builder()
+                                        .s(InventoryUnitItem.formatPk(user, skuId))
+                                        .build(),
+                                    "sk",
+                                    AttributeValue.builder()
+                                        .s(InventoryUnitItem.formatSk(sequenceNumber))
+                                        .build()))
+                            .updateExpression(
+                                "SET #status = :reserved, reservation_id = :owner, updated_at ="
+                                    + " :now")
+                            .conditionExpression(
+                                "attribute_exists(pk) AND #status = :inStock AND"
+                                    + " attribute_not_exists(reservation_id)")
+                            .expressionAttributeNames(Map.of("#status", "status"))
+                            .expressionAttributeValues(
+                                Map.of(
+                                    ":reserved",
+                                    AttributeValue.builder().s("reserved").build(),
+                                    ":inStock",
+                                    AttributeValue.builder().s("in_stock").build(),
+                                    ":owner",
+                                    AttributeValue.builder().s(reservationId).build(),
+                                    ":now",
+                                    AttributeValue.builder()
+                                        .n(Long.toString(now.getEpochSecond()))
+                                        .build()))
+                            .build())
+                    .build(),
+                TransactWriteItem.builder()
+                    .update(
+                        Update.builder()
+                            .tableName(tableName)
+                            .key(
+                                Map.of(
+                                    "pk",
+                                    AttributeValue.builder()
+                                        .s(InventorySkuItem.formatPk(user, skuId))
+                                        .build(),
+                                    "sk",
+                                    AttributeValue.builder().s("SKU").build()))
+                            .updateExpression(
+                                "SET dirty = :dirty, gsi1pk = :pk, gsi1sk = :sk ADD #version :one")
+                            .conditionExpression("attribute_exists(pk)")
+                            .expressionAttributeNames(Map.of("#version", "version"))
+                            .expressionAttributeValues(
+                                Map.of(
+                                    ":dirty",
+                                    AttributeValue.builder().bool(true).build(),
+                                    ":pk",
+                                    AttributeValue.builder()
+                                        .s(InventorySkuItem.formatGsi1pk(user, true))
+                                        .build(),
+                                    ":sk",
+                                    AttributeValue.builder()
+                                        .s(InventorySkuItem.formatGsi1skPrefix() + skuId)
+                                        .build(),
+                                    ":one",
+                                    AttributeValue.builder().n("1").build()))
+                            .build())
+                    .build(),
+                TransactWriteItem.builder()
+                    .put(
+                        Put.builder()
+                            .tableName(tableName)
+                            .item(
+                                TableSchema.fromBean(InventoryAuditItem.class)
+                                    .itemToMap(audit, true))
+                            .build())
+                    .build(),
+                TransactWriteItem.builder()
+                    .put(
+                        Put.builder()
+                            .tableName(tableName)
+                            .item(
+                                TableSchema.fromBean(InventoryReservationItem.class)
+                                    .itemToMap(reservation, true))
+                            .conditionExpression("attribute_not_exists(pk)")
+                            .build())
+                    .build(),
+                TransactWriteItem.builder()
+                    .put(
+                        Put.builder()
+                            .tableName(tableName)
+                            .item(
+                                TableSchema.fromBean(InventoryReserveUnitOperationItem.class)
+                                    .itemToMap(receipt, true))
+                            .conditionExpression("attribute_not_exists(pk)")
+                            .build())
+                    .build())
+            .build());
     return receipt;
   }
 

@@ -6,14 +6,14 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbParti
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
 
 @DynamoDbBean
-public class InventoryUnitCreationItem {
+public class InventoryReservationItem {
   private String pk;
   private String sk;
   private String user;
-  private String operationId;
+  private String reservationId;
   private String skuId;
   private int sequenceNumber;
-  private String location;
+  private String status;
 
   @DynamoDbPartitionKey
   @DynamoDbAttribute("pk")
@@ -44,13 +44,13 @@ public class InventoryUnitCreationItem {
     this.user = user;
   }
 
-  @DynamoDbAttribute("operation_id")
-  public String getOperationId() {
-    return operationId;
+  @DynamoDbAttribute("reservation_id")
+  public String getReservationId() {
+    return reservationId;
   }
 
-  public void setOperationId(String operationId) {
-    this.operationId = operationId;
+  public void setReservationId(String reservationId) {
+    this.reservationId = reservationId;
   }
 
   @DynamoDbAttribute("sku_id")
@@ -71,25 +71,25 @@ public class InventoryUnitCreationItem {
     this.sequenceNumber = sequenceNumber;
   }
 
-  @DynamoDbAttribute("location")
-  public String getLocation() {
-    return location;
+  @DynamoDbAttribute("status")
+  public String getStatus() {
+    return status;
   }
 
-  public void setLocation(String location) {
-    this.location = location;
+  public void setStatus(String status) {
+    this.status = status;
   }
 
-  public static InventoryUnitCreationItem create(
-      String user, String operationId, String skuId, int sequenceNumber, String location) {
-    var item = new InventoryUnitCreationItem();
+  public static InventoryReservationItem create(
+      String user, String reservationId, String skuId, int sequenceNumber, String status) {
+    var item = new InventoryReservationItem();
     item.setPk("USER#" + user + "#INVENTORY");
-    item.setSk("OPERATION#CREATE_UNIT#" + operationId);
+    item.setSk("RESERVATION#" + reservationId + "#SKU#" + skuId + "#UNIT#" + sequenceNumber);
     item.setUser(user);
-    item.setOperationId(operationId);
+    item.setReservationId(reservationId);
     item.setSkuId(skuId);
     item.setSequenceNumber(sequenceNumber);
-    item.setLocation(location);
+    item.setStatus(status);
     return item;
   }
 }

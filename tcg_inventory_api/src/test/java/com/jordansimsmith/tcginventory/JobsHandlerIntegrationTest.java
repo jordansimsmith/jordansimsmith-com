@@ -911,7 +911,7 @@ public class JobsHandlerIntegrationTest {
     var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
     assertThat(reserved).hasSize(2);
-    assertThat(reserved.get(0).getOrderId()).isEqualTo("83663");
+    assertThat(reserved.get(0).getReservationId()).isEqualTo("83663");
 
     var audit = getAuditEntries("jordan");
     assertThat(audit.stream().anyMatch(a -> "reserve".equals(a.getEventType()))).isTrue();
@@ -1029,7 +1029,7 @@ public class JobsHandlerIntegrationTest {
 
     var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("in_stock"));
-    assertThat(units).allSatisfy(unit -> assertThat(unit.getOrderId()).isNull());
+    assertThat(units).allSatisfy(unit -> assertThat(unit.getReservationId()).isNull());
 
     var releaseAudits =
         getAuditEntries("jordan").stream().filter(a -> "release".equals(a.getEventType())).toList();
@@ -1091,7 +1091,7 @@ public class JobsHandlerIntegrationTest {
     var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
     assertThat(reserved).hasSize(1);
-    assertThat(reserved.get(0).getOrderId()).isEqualTo("83663");
+    assertThat(reserved.get(0).getReservationId()).isEqualTo("83663");
 
     assertThat(getAuditEntries("jordan")).noneMatch(a -> "release".equals(a.getEventType()));
   }
@@ -1213,7 +1213,7 @@ public class JobsHandlerIntegrationTest {
       var units = getUnits("jordan", "mtg#scryfall#scryfall-" + i + "#normal#NM");
       assertThat(units).hasSize(1);
       assertThat(units.get(0).getStatus()).isEqualTo("in_stock");
-      assertThat(units.get(0).getOrderId()).isNull();
+      assertThat(units.get(0).getReservationId()).isNull();
     }
 
     var releaseAudits =
@@ -1633,7 +1633,7 @@ public class JobsHandlerIntegrationTest {
         .satisfies(
             unit -> {
               assertThat(unit.getStatus()).isEqualTo("reserved");
-              assertThat(unit.getOrderId()).isEqualTo("83663");
+              assertThat(unit.getReservationId()).isEqualTo("83663");
             });
     assertThat(getUnits("jordan", pokemonSkuId))
         .singleElement()
@@ -1641,7 +1641,7 @@ public class JobsHandlerIntegrationTest {
             unit -> {
               assertThat(unit.getGame()).isEqualTo("pokemon");
               assertThat(unit.getStatus()).isEqualTo("reserved");
-              assertThat(unit.getOrderId()).isEqualTo("83663");
+              assertThat(unit.getReservationId()).isEqualTo("83663");
             });
   }
 
@@ -1738,7 +1738,7 @@ public class JobsHandlerIntegrationTest {
       var units = getUnits("jordan", "mtg#scryfall#scryfall-" + i + "#normal#NM");
       assertThat(units).hasSize(1);
       assertThat(units.get(0).getStatus()).isEqualTo("reserved");
-      assertThat(units.get(0).getOrderId()).isEqualTo("91329");
+      assertThat(units.get(0).getReservationId()).isEqualTo("91329");
     }
 
     var reserveAudits =
@@ -1765,7 +1765,7 @@ public class JobsHandlerIntegrationTest {
     createSkuWithUnits("jordan", skuId, 1001, 3);
     var firstUnit = getUnits("jordan", skuId).get(0);
     firstUnit.setStatus("reserved");
-    firstUnit.setOrderId("83663");
+    firstUnit.setReservationId("83663");
     unitTable.putItem(firstUnit);
     orderTable.putItem(
         OrderItem.create(
@@ -1797,7 +1797,7 @@ public class JobsHandlerIntegrationTest {
     var units = getUnits("jordan", skuId);
     var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
     assertThat(reserved).hasSize(2);
-    assertThat(reserved).allSatisfy(u -> assertThat(u.getOrderId()).isEqualTo("83663"));
+    assertThat(reserved).allSatisfy(u -> assertThat(u.getReservationId()).isEqualTo("83663"));
     var inStock = units.stream().filter(u -> "in_stock".equals(u.getStatus())).toList();
     assertThat(inStock).hasSize(1);
     assertThat(inStock.get(0).getSequenceNumber()).isEqualTo(3);
@@ -1818,7 +1818,7 @@ public class JobsHandlerIntegrationTest {
     createSkuWithUnits("jordan", skuId, 1001, 1);
     var unit = getUnits("jordan", skuId).get(0);
     unit.setStatus("sold");
-    unit.setOrderId("another-order");
+    unit.setReservationId("another-order");
     unitTable.putItem(unit);
     orderTable.putItem(
         OrderItem.create(
@@ -2098,14 +2098,14 @@ public class JobsHandlerIntegrationTest {
   private void reserveUnit(String user, String skuId, int sequenceNumber, String orderId) {
     var unit = getUnit(user, skuId, sequenceNumber);
     unit.setStatus("reserved");
-    unit.setOrderId(orderId);
+    unit.setReservationId(orderId);
     unitTable.putItem(unit);
   }
 
   private void releaseUnit(String user, String skuId, int sequenceNumber) {
     var unit = getUnit(user, skuId, sequenceNumber);
     unit.setStatus("in_stock");
-    unit.setOrderId(null);
+    unit.setReservationId(null);
     unitTable.putItem(unit);
   }
 

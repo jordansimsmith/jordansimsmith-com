@@ -23,6 +23,17 @@ public class InventoryAuditItem {
   private String beforePrice;
   private String afterPrice;
   private Instant createdAt;
+  private String reservationId;
+
+  @Nullable
+  @DynamoDbAttribute("reservation_id")
+  public String getReservationId() {
+    return reservationId;
+  }
+
+  public void setReservationId(@Nullable String reservationId) {
+    this.reservationId = reservationId;
+  }
 
   @DynamoDbPartitionKey
   @DynamoDbAttribute("pk")

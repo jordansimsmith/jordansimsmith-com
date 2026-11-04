@@ -60,7 +60,7 @@ public class FindUnitsService {
                                 item.getCreatedAt(), "Inventory unit has no created_at")
                             .getEpochSecond(),
                         item.getUpdatedAt() == null ? null : item.getUpdatedAt().getEpochSecond(),
-                        item.getOrderId()))
+                        item.getReservationId()))
             .toList();
     var nextContinuation = Continuations.encode(page.lastEvaluatedKey(), objectMapper);
     return new FindUnitsResponse(units, nextContinuation);

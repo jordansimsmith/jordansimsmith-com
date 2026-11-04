@@ -14,6 +14,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.service.BadRequestException;
+import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
@@ -22,6 +23,7 @@ import com.jordansimsmith.tcginventory.inventory.client.CreateUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
 import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
+import com.jordansimsmith.tcginventory.inventory.client.ReserveUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuRequest;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuResponse;
@@ -58,7 +60,8 @@ class InventoryReadServiceIntegrationTest {
   private static DynamoDbTable<InventoryUnitItem> unitTable;
   private static DynamoDbTable<InventorySkuItem> skuTable;
   private static DynamoDbTable<InventoryAuditItem> auditTable;
-  private static DynamoDbTable<InventoryUnitCreationItem> unitCreationTable;
+  private static DynamoDbTable<InventoryCreateUnitOperationItem> createUnitOperationTable;
+  private static DynamoDbTable<InventoryReserveUnitOperationItem> reserveUnitOperationTable;
 
   private FindUnitsService service;
   private FindSkusService findSkusService;
@@ -79,8 +82,12 @@ class InventoryReadServiceIntegrationTest {
     skuTable = enhancedClient.table(TABLE_NAME, TableSchema.fromBean(InventorySkuItem.class));
     unitTable = enhancedClient.table(TABLE_NAME, TableSchema.fromBean(InventoryUnitItem.class));
     auditTable = enhancedClient.table(TABLE_NAME, TableSchema.fromBean(InventoryAuditItem.class));
-    unitCreationTable =
-        enhancedClient.table(TABLE_NAME, TableSchema.fromBean(InventoryUnitCreationItem.class));
+    createUnitOperationTable =
+        enhancedClient.table(
+            TABLE_NAME, TableSchema.fromBean(InventoryCreateUnitOperationItem.class));
+    reserveUnitOperationTable =
+        enhancedClient.table(
+            TABLE_NAME, TableSchema.fromBean(InventoryReserveUnitOperationItem.class));
     DynamoDbUtils.createTable(dynamoDbClient, skuTable);
   }
 
@@ -101,11 +108,211 @@ class InventoryReadServiceIntegrationTest {
     var mutationRepository =
         new InventoryMutationRepository(
             dynamoDbClient,
-            unitCreationTable,
+            createUnitOperationTable,
+            reserveUnitOperationTable,
             TABLE_NAME,
             () -> Instant.ofEpochSecond(1700000000),
             () -> "audit-" + ++nextAuditId);
     updateSkuService = new UpdateSkuService(repository, mutationRepository);
+  }
+
+  @Test
+  void reserveUnitShouldSelectAcrossPagesAndReplayOriginalSelection() throws Exception {
+    // arrange
+    var enhanced = DynamoDbEnhancedClient.builder().dynamoDbClient(dynamoDbClient).build();
+    var allocationTable =
+        enhanced.table(TABLE_NAME, TableSchema.fromBean(InventoryReserveUnitOperationItem.class));
+    var reservationTable =
+        enhanced.table(TABLE_NAME, TableSchema.fromBean(InventoryReservationItem.class));
+    var mutations =
+        new InventoryMutationRepository(
+            dynamoDbClient,
+            createUnitOperationTable,
+            allocationTable,
+            TABLE_NAME,
+            () -> Instant.ofEpochSecond(1700000010),
+            () -> "reservation-audit");
+    var reads = new InventoryReadRepository(skuTable, unitTable);
+    var service = new ReserveUnitService(reads, mutations);
+    skuTable.putItem(sku("alice", "sku", "Card", "1.00"));
+    for (int i = 0; i < 100; i++) unitTable.putItem(unit("alice", "sku", i, "sold"));
+    unitTable.putItem(unit("alice", "sku", 100, "in_stock", List.of(photo("front"))));
+    unitTable.putItem(unit("alice", "sku", 101, "in_stock"));
+    var ctx = new RequestContext("alice");
+
+    // act
+    var response = service.reserveUnit(ctx, new ReserveUnitRequest("allocation", "order", "sku"));
+
+    // assert
+    assertThat(response.sequenceNumber()).isEqualTo(100);
+    var reserved = reads.getUnit("alice", "sku", 100);
+    assertThat(reserved.getStatus()).isEqualTo("reserved");
+    assertThat(reserved.getReservationId()).isEqualTo("order");
+    var storedUnit =
+        dynamoDbClient
+            .getItem(
+                request ->
+                    request
+                        .tableName(TABLE_NAME)
+                        .key(
+                            Map.of(
+                                "pk",
+                                    AttributeValue.builder()
+                                        .s(InventoryUnitItem.formatPk("alice", "sku"))
+                                        .build(),
+                                "sk",
+                                    AttributeValue.builder()
+                                        .s(InventoryUnitItem.formatSk(100))
+                                        .build())))
+            .item();
+    assertThat(storedUnit.get("reservation_id").s()).isEqualTo("order");
+    assertThat(storedUnit).doesNotContainKey("order_id");
+    assertThat(reserved.getCreatedAt()).isEqualTo(Instant.ofEpochSecond(1700000000));
+    assertThat(reserved.getUpdatedAt()).isEqualTo(Instant.ofEpochSecond(1700000010));
+    assertThat(reserved.getPhotos())
+        .extracting(InventoryUnitItem.PhotoItem::getPhotoId)
+        .containsExactly("front");
+    assertThat(reads.getSku("alice", "sku").getVersion()).isEqualTo(2);
+    assertThat(reads.getSku("alice", "sku").getGsi1pk())
+        .isEqualTo(InventorySkuItem.formatGsi1pk("alice", true));
+    assertThat(
+            auditTable.scan().items().stream().filter(item -> item.getEventType() != null).toList())
+        .singleElement()
+        .satisfies(
+            audit -> {
+              assertThat(audit.getEventType()).isEqualTo("reserve");
+              assertThat(audit.getReservationId()).isEqualTo("order");
+            });
+    var lifecycle =
+        reservationTable.getItem(
+            Key.builder()
+                .partitionValue("USER#alice#INVENTORY")
+                .sortValue("RESERVATION#order#SKU#sku#UNIT#100")
+                .build());
+    assertThat(lifecycle.getStatus()).isEqualTo("reserved");
+    assertThat(lifecycle.getReservationId()).isEqualTo("order");
+    assertThat(mutations.getReserveUnitOperation("alice", "allocation").getSkuId())
+        .isEqualTo("sku");
+    assertThat(mutations.getReserveUnitOperation("bob", "allocation")).isNull();
+
+    // arrange
+    reserved.setStatus("sold");
+    unitTable.putItem(reserved);
+
+    // act / assert
+    assertThat(service.reserveUnit(ctx, new ReserveUnitRequest("allocation", null, null)))
+        .isEqualTo(response);
+    assertThat(reads.getUnit("alice", "sku", 101).getStatus()).isEqualTo("in_stock");
+    assertThat(reads.getSku("alice", "sku").getVersion()).isEqualTo(2);
+    assertThat(
+            auditTable.scan().items().stream().filter(item -> item.getEventType() != null).toList())
+        .hasSize(1);
+    assertThat(new ObjectMapper().writeValueAsString(response))
+        .isEqualTo("{\"sequence_number\":100}");
+    assertThat(
+            new ObjectMapper()
+                .readValue(
+                    "{\"operation_id\":\"a\",\"reservation_id\":\"r\",\"sku_id\":\"s\"}",
+                    ReserveUnitRequest.class))
+        .isEqualTo(new ReserveUnitRequest("a", "r", "s"));
+  }
+
+  @Test
+  void reserveUnitShouldPropagateReceiptStorageFailures() {
+    // arrange
+    var reads = mock(InventoryReadRepository.class);
+    var mutations = mock(InventoryMutationRepository.class);
+    var failure = new IllegalStateException("storage failed");
+    when(mutations.getReserveUnitOperation("alice", "operation")).thenThrow(failure);
+    var service = new ReserveUnitService(reads, mutations);
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                service.reserveUnit(
+                    new RequestContext("alice"),
+                    new ReserveUnitRequest("operation", "reservation", "sku")))
+        .isSameAs(failure);
+    verifyNoInteractions(reads);
+  }
+
+  @Test
+  void reserveUnitShouldValidateAndReportMissingOrExhaustedStock() throws Exception {
+    // arrange
+    var enhanced = DynamoDbEnhancedClient.builder().dynamoDbClient(dynamoDbClient).build();
+    var mutations =
+        new InventoryMutationRepository(
+            dynamoDbClient,
+            createUnitOperationTable,
+            enhanced.table(
+                TABLE_NAME, TableSchema.fromBean(InventoryReserveUnitOperationItem.class)),
+            TABLE_NAME,
+            () -> Instant.EPOCH,
+            () -> "audit");
+    var service =
+        new ReserveUnitService(new InventoryReadRepository(skuTable, unitTable), mutations);
+    var ctx = new RequestContext("alice");
+
+    // act / assert
+    assertThatThrownBy(() -> service.reserveUnit(ctx, new ReserveUnitRequest(" ", "r", "s")))
+        .isInstanceOf(BadRequestException.class);
+    assertThatThrownBy(() -> service.reserveUnit(ctx, new ReserveUnitRequest("a", " ", "s")))
+        .isInstanceOf(BadRequestException.class);
+    assertThatThrownBy(() -> service.reserveUnit(ctx, new ReserveUnitRequest("a", "r", null)))
+        .isInstanceOf(BadRequestException.class);
+    assertThatThrownBy(() -> service.reserveUnit(ctx, new ReserveUnitRequest("a", "r", "s")))
+        .isInstanceOf(NotFoundException.class);
+    skuTable.putItem(sku("alice", "s", "Card", null));
+    assertThatThrownBy(() -> service.reserveUnit(ctx, new ReserveUnitRequest("a", "r", "s")))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("No in-stock units are available for this SKU");
+    assertThatThrownBy(
+            () ->
+                service.reserveUnit(
+                    new RequestContext("bob"), new ReserveUnitRequest("a", "r", "s")))
+        .isInstanceOf(NotFoundException.class);
+  }
+
+  @Test
+  void reserveUnitShouldRollbackFailedConditionsAndAllowExplicitRetry() {
+    // arrange
+    var enhanced = DynamoDbEnhancedClient.builder().dynamoDbClient(dynamoDbClient).build();
+    var mutations =
+        new InventoryMutationRepository(
+            dynamoDbClient,
+            createUnitOperationTable,
+            enhanced.table(
+                TABLE_NAME, TableSchema.fromBean(InventoryReserveUnitOperationItem.class)),
+            TABLE_NAME,
+            () -> Instant.EPOCH,
+            () -> "audit");
+    skuTable.putItem(sku("alice", "sku", "Card", null));
+    unitTable.putItem(unit("alice", "sku", 1, "sold"));
+
+    // act / assert
+    assertThatThrownBy(() -> mutations.reserveUnit("alice", "a", "r", "sku", 1))
+        .isInstanceOf(TransactionCanceledException.class);
+    assertThat(mutations.getReserveUnitOperation("alice", "a")).isNull();
+    assertThat(new InventoryReadRepository(skuTable, unitTable).getSku("alice", "sku").getVersion())
+        .isEqualTo(1);
+    assertThat(
+            auditTable.scan().items().stream().filter(item -> item.getEventType() != null).toList())
+        .isEmpty();
+    assertThat(
+            enhanced
+                .table(TABLE_NAME, TableSchema.fromBean(InventoryReservationItem.class))
+                .scan()
+                .items()
+                .stream()
+                .filter(item -> item.getSk().startsWith("RESERVATION#"))
+                .toList())
+        .isEmpty();
+
+    // arrange
+    unitTable.putItem(unit("alice", "sku", 1, "in_stock"));
+
+    // act / assert
+    assertThat(mutations.reserveUnit("alice", "a", "r", "sku", 1).getSequenceNumber()).isEqualTo(1);
   }
 
   @Test
@@ -115,7 +322,8 @@ class InventoryReadServiceIntegrationTest {
     var mutations =
         new InventoryMutationRepository(
             dynamoDbClient,
-            unitCreationTable,
+            createUnitOperationTable,
+            reserveUnitOperationTable,
             TABLE_NAME,
             () -> Instant.ofEpochSecond(1700000000),
             () -> "audit-" + ++nextAuditId);
@@ -216,7 +424,8 @@ class InventoryReadServiceIntegrationTest {
     var mutations =
         new InventoryMutationRepository(
             dynamoDbClient,
-            unitCreationTable,
+            createUnitOperationTable,
+            reserveUnitOperationTable,
             TABLE_NAME,
             () -> Instant.ofEpochSecond(1700000000),
             () -> "creation-audit");
@@ -878,10 +1087,10 @@ class InventoryReadServiceIntegrationTest {
     var reserved = unit("alice", "sku", 2, "reserved", List.of(photo("front"), photo("back")));
     reserved.setCreatedAt(Instant.ofEpochSecond(1700000000));
     reserved.setUpdatedAt(Instant.ofEpochSecond(1700000001));
-    reserved.setOrderId("order-1");
+    reserved.setReservationId("order-1");
     unitTable.putItem(reserved);
     var sold = unit("alice", "sku", 3, "sold");
-    sold.setOrderId("order-2");
+    sold.setReservationId("order-2");
     unitTable.putItem(sold);
     unitTable.putItem(unit("bob", "sku", 2, "in_stock"));
 

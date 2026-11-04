@@ -4,7 +4,7 @@
 
 Each unchecked task is one reviewable commit, including its implementation, relevant tests, caller/build changes, and current-state README updates. Implement in order. Do not introduce all interface methods up front with unsupported placeholder implementations. Task details and acceptance criteria appear below.
 
-**Listings prerequisite complete:** the separate [Listings migration plan](listings-migration-plan.md) absorbs task 5. Tasks 6, 7, and 8 are complete; continue at task 9. Production activation still requires the controlled Listings data copy. Do not build a second publication acknowledgement operation.
+**Listings prerequisite complete:** the separate [Listings migration plan](listings-migration-plan.md) absorbs task 5. Tasks 6 through 9 are complete; continue at task 10. Production activation still requires the controlled Listings data copy. Do not build a second publication acknowledgement operation.
 
 - [x] **1. Migrate unit removal.** Add `deleteUnit`, server-owned transactional mutation/audit infrastructure, and the thin Inventory API handler. This is the first implementation change.
 - [x] **2. Migrate condition changes.** Add `updateUnit`, the shared enum `Condition`, server-owned SKU identity derivation and lazy SKU initialization, and migrate the existing handler. `fetchtcg_set_id` is required; `getSku` is strongly consistent.
@@ -14,7 +14,7 @@ Each unchecked task is one reviewable commit, including its implementation, rele
 - [x] **6. Implement retry-safe unit creation.** Add singular `createUnit`, sequence allocation, lazy initialize-only SKU creation, and immutable operation results.
 - [x] **7. Make import placement instructions handle gaps.** Split placement groups at sequence gaps as well as storage-block boundaries; preserve the frontend's existing instruction shape. Placement instructions now describe contiguous runs of assigned units and can repeat a block label.
 - [x] **8. Migrate import confirmation.** Create one unit per keep row through Inventory, persist actual results, and recover by stable operation ID.
-- [ ] **9. Implement single-unit allocation.** Add `reserveUnit`, Inventory-owned selection, durable allocation results, and reservation lifecycle records.
+- [x] **9. Implement single-unit allocation.** Add `reserveUnit`, Inventory-owned selection, durable allocation results, and reservation lifecycle records.
 - [ ] **10. Implement reservation release.** Add ownership-checked, replay-safe `releaseUnit`, including compatibility with existing reserved units.
 - [ ] **11. Implement unit sale.** Add ownership-checked, replay-safe `sellUnit`, sharing the same reservation lifecycle foundation.
 - [ ] **12. Stop writing non-inventory audits.** Remove Orders' lifecycle audit writes and the cross-vertical audit-builder dependency; defer Reports freshness redesign.
@@ -164,7 +164,7 @@ public record Unit(
     @JsonProperty("reservation_id") @Nullable String reservationId) {}
 ```
 
-The stored `order_id` already represents reservation ownership; map it to client `reservation_id` without renaming existing storage attributes. Retain owner information on sold units. Released units have no current owner; their historical reservation record still proves the completed release.
+The stored `reservation_id` already represents reservation ownership; map it to client `reservation_id` without renaming existing storage attributes. Retain owner information on sold units. Released units have no current owner; their historical reservation record still proves the completed release.
 
 `UnitStatus` retains `IN_STOCK`, `RESERVED`, `SOLD`, and `REMOVED`, with existing lowercase JSON values. `created_at` remains required. Do not reintroduce nullable creation timestamps, image URLs, unit counts, or embedded units on `Sku`.
 
@@ -331,7 +331,7 @@ public record ReserveUnitRequest(
     @JsonProperty("sku_id") String skuId) {}
 
 public record ReserveUnitResponse(
-    @JsonProperty("unit") Unit unit) {}
+    @JsonProperty("sequence_number") int sequenceNumber) {}
 ```
 
 Require nonblank IDs and scope everything to `ctx.user()`. The operation ID identifies one allocation attempt across retries. The reservation ID is the opaque owner reference shared by an order's allocations. These values are not interchangeable.
@@ -342,7 +342,7 @@ Commit that unit's reservation owner/status/time, SKU dirty/version update, rese
 
 The normal insufficient-stock result is safe `ConflictException("No in-stock units are available for this SKU")`. A missing SKU is not found. A conditional selection race may fail as an ordinary storage failure; the owner can retry the same operation ID. Do not add a reservation retry framework or arbitrary backoff in the service.
 
-A replay returns the original selected unit/result without allocating again, including when its reservation has since been released or sold. Do not revive a terminal reservation. Reused operation IDs are trusted and do not cause payload-comparison validation.
+A replay returns the original selected sequence number without allocating again, including when its reservation has since been released or sold. Do not revive a terminal reservation. Reused operation IDs are trusted and do not cause payload-comparison validation.
 
 ### Release or sell an allocated unit
 
@@ -389,18 +389,18 @@ The version condition is essential even though price patches are last-write-wins
 
 ## Atomic replay and persistence details
 
-Keep existing SKU/unit/counter/audit key layouts, attributes, GSI1 dirty queue, GSI2 browsing, and GSI3 physical-location access. Preserve standalone domain fields independently of key strings. Do not rename `order_id`, rewrite photo lists, or backfill stock data just to change ownership.
+Keep existing SKU/unit/counter/audit key layouts, attributes, GSI1 dirty queue, GSI2 browsing, and GSI3 physical-location access. Preserve standalone domain fields independently of key strings. Unit ownership uses `reservation_id`; rename legacy unit `order_id` through `006-rename-unit-reservation-id.py` before cutover. Pause processing and writes, execute the migration, deploy matching readers/writers, then resume. Both legacy and server-owned unit models use the new attribute, with no fallback or dual writes. Do not rewrite photo lists or backfill stock data just to change ownership.
 
 Introduce additive, private Inventory receipt/lifecycle records. One workable layout is an Inventory-owned user partition with keys:
 
 ```text
 pk = USER#<user>#INVENTORY
 sk = OPERATION#CREATE_UNIT#<operation_id>
-sk = OPERATION#RESERVE_UNIT#<base64url(operation_id)>
-sk = RESERVATION#<base64url(reservation_id)>#SKU#<base64url(sku_id)>#UNIT#<sequence>
+sk = OPERATION#RESERVE_UNIT#<operation_id>
+sk = RESERVATION#<reservation_id>#SKU#<sku_id>#UNIT#<sequence>
 ```
 
-Store original IDs as standalone attributes and original response values in operation receipts. Creation operation IDs occupy the entire fixed-prefix suffix and are stored verbatim. Encode opaque components only when several identifiers share a compound key. No caller knows this layout.
+Store original IDs as standalone attributes and original response values in operation receipts. Creation operation IDs occupy the entire fixed-prefix suffix and are stored verbatim. Reservation IDs follow the caller convention of containing no `#`; SKU IDs remain plain inside reservation keys. No Base64 encoding is needed. No caller knows this layout.
 
 Reservation lifecycle state is reserved/released/sold. It may be a small dedicated record rather than overwriting immutable operation results. Retain terminal state without TTL initially. This is the minimal durable evidence for release/sale replay, not an Orders aggregate or shared workflow engine.
 
@@ -483,7 +483,7 @@ for (int lineIndex = 0; lineIndex < order.lines().size(); lineIndex++) {
     var allocation = inventoryService.reserveUnit(
         ctx, new ReserveUnitRequest(operationId, order.id(), line.skuId()));
     orderRepository.recordAllocation(
-        user, order.id(), lineIndex, ordinal, allocation.unit().sequenceNumber());
+        user, order.id(), lineIndex, ordinal, allocation.sequenceNumber());
   }
 }
 ```
@@ -506,7 +506,7 @@ Instead, before releasing a partially allocated order, read every `findUnits` pa
 
 ### Existing orders and in-flight rollout
 
-Existing awaiting-payment/to-pick orders already have exact allocations and units carrying `order_id`, but no new reservation lifecycle records. Inventory can adopt that existing reserved ownership on the first release/sale: require the current unit to be reserved for the supplied owner and atomically create the terminal reservation evidence with its transition. This preserves compatibility without an automatic bulk backfill.
+Existing awaiting-payment/to-pick orders already have exact allocations and units carrying `reservation_id`, but no new reservation lifecycle records. Inventory can adopt that existing reserved ownership on the first release/sale: require the current unit to be reserved for the supplied owner and atomically create the terminal reservation evidence with its transition. This preserves compatibility without an automatic bulk backfill.
 
 Changing from preplanned allocations to selected allocations while an old `reserving` job is partially complete needs an explicit handoff. For this application's rollout, finish/drain old import-confirmation and order `reserving`/`voiding`/`fulfilling` executions before activating the new creation/allocation callers. This is a deployment precondition to check at implementation, not an action performed by this plan. Merely giving old in-flight rows new operation IDs is unsafe.
 

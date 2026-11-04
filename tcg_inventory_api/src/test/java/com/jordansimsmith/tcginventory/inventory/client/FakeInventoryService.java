@@ -21,6 +21,58 @@ import java.util.Map;
 import java.util.Set;
 
 public class FakeInventoryService implements InventoryService {
+  private final Map<CreationKey, ReserveUnitResponse> allocations = new HashMap<>();
+
+  @Override
+  public ReserveUnitResponse reserveUnit(RequestContext ctx, ReserveUnitRequest request)
+      throws ServiceException {
+    var operationKey = new CreationKey(ctx.user(), request.operationId());
+    var previous = allocations.get(operationKey);
+    if (previous != null) return previous;
+    var sku = getSku(ctx, new GetSkuRequest(request.skuId())).sku();
+    var key = new Key(ctx.user(), request.skuId());
+    var all = new ArrayList<>(units.getOrDefault(key, List.of()));
+    var selected =
+        all.stream()
+            .filter(unit -> unit.status() == UnitStatus.IN_STOCK)
+            .findFirst()
+            .orElseThrow(
+                () -> new ConflictException("No in-stock units are available for this SKU"));
+    all.replaceAll(
+        unit ->
+            unit.sequenceNumber() == selected.sequenceNumber()
+                ? new Unit(
+                    unit.sequenceNumber(),
+                    unit.location(),
+                    UnitStatus.RESERVED,
+                    unit.photos(),
+                    unit.createdAt(),
+                    Instant.now().getEpochSecond(),
+                    request.reservationId())
+                : unit);
+    units.put(key, all);
+    skus.put(
+        new SkuKey(ctx.user(), sku.skuId()),
+        new Sku(
+            sku.skuId(),
+            sku.game(),
+            sku.externalId(),
+            sku.name(),
+            sku.setCode(),
+            sku.setName(),
+            sku.collectorNumber(),
+            sku.finish(),
+            sku.condition(),
+            sku.price(),
+            sku.fetchtcgCardId(),
+            sku.fetchtcgSetId(),
+            sku.version() + 1));
+    dirtySkus.add(new SkuKey(ctx.user(), sku.skuId()));
+    var result = new ReserveUnitResponse(selected.sequenceNumber());
+    allocations.put(operationKey, result);
+    return result;
+  }
+
   private final GamesService gamesService;
   private final Map<CreationKey, CreateUnitResponse> creations = new HashMap<>();
   private final Map<GameKey, Integer> sequences = new HashMap<>();

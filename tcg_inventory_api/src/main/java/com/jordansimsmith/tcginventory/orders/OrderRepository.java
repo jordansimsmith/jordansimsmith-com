@@ -110,7 +110,7 @@ public class OrderRepository {
       var unit = inventoryRepository.getUnit(user, key.skuId(), key.sequenceNumber());
       if (unit == null
           || !"reserved".equals(unit.getStatus())
-          || !order.getOrderId().equals(unit.getOrderId())) {
+          || !order.getOrderId().equals(unit.getReservationId())) {
         throw new IllegalStateException("order has an unexpected allocated unit");
       }
     }
@@ -249,7 +249,7 @@ public class OrderRepository {
       var unit = inventoryRepository.getUnit(user, unitKey.skuId(), unitKey.sequenceNumber());
       if (unit == null
           || !"reserved".equals(unit.getStatus())
-          || !order.getOrderId().equals(unit.getOrderId())) {
+          || !order.getOrderId().equals(unit.getReservationId())) {
         throw new IllegalStateException("order has an unexpected allocated unit");
       }
     }

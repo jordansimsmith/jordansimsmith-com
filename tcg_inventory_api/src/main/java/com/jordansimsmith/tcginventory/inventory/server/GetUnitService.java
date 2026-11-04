@@ -38,6 +38,6 @@ public class GetUnitService {
             Objects.requireNonNull(item.getCreatedAt(), "Inventory unit has no created_at")
                 .getEpochSecond(),
             item.getUpdatedAt() == null ? null : item.getUpdatedAt().getEpochSecond(),
-            item.getOrderId()));
+            item.getReservationId()));
   }
 }

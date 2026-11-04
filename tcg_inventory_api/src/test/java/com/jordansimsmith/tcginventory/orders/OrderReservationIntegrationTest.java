@@ -163,7 +163,7 @@ public class OrderReservationIntegrationTest {
         .allSatisfy(
             unit -> {
               assertThat(unit.getStatus()).isEqualTo("reserved");
-              assertThat(unit.getOrderId()).isNotNull();
+              assertThat(unit.getReservationId()).isNotNull();
             });
     assertThat(getSku().getVersion()).isEqualTo(5);
     assertThat(getAudits()).filteredOn(audit -> "reserve".equals(audit.getEventType())).hasSize(4);
@@ -325,7 +325,7 @@ public class OrderReservationIntegrationTest {
     // assert
     assertThat(getOrder("83663").getStatus()).isEqualTo("reserving");
     assertThat(getUnit(1).getStatus()).isEqualTo("reserved");
-    assertThat(getUnit(1).getOrderId()).isEqualTo("83663");
+    assertThat(getUnit(1).getReservationId()).isEqualTo("83663");
     assertThat(getAudits()).filteredOn(audit -> "reserve".equals(audit.getEventType())).hasSize(1);
     assertThat(getAudits())
         .filteredOn(audit -> "order_reserved".equals(audit.getEventType()))
@@ -334,7 +334,7 @@ public class OrderReservationIntegrationTest {
     // arrange retry after repairing the conflicting saved allocation
     var repairedUnit = getUnit(2);
     repairedUnit.setStatus("in_stock");
-    repairedUnit.setOrderId(null);
+    repairedUnit.setReservationId(null);
     unitTable.putItem(repairedUnit);
 
     // act
@@ -343,7 +343,7 @@ public class OrderReservationIntegrationTest {
     // assert
     assertThat(getOrder("83663").getStatus()).isEqualTo("to_pick");
     assertThat(getUnit(2).getStatus()).isEqualTo("reserved");
-    assertThat(getUnit(2).getOrderId()).isEqualTo("83663");
+    assertThat(getUnit(2).getReservationId()).isEqualTo("83663");
     assertThat(getSku().getVersion()).isEqualTo(3);
     assertThat(getAudits()).filteredOn(audit -> "reserve".equals(audit.getEventType())).hasSize(2);
     assertThat(getAudits())
@@ -543,7 +543,7 @@ public class OrderReservationIntegrationTest {
 
   private void createUnit(int sequenceNumber, String status, String orderId) {
     var unit = UnitItem.create(USER, "mtg", SKU_ID, sequenceNumber, status, "import-1", NOW);
-    unit.setOrderId(orderId);
+    unit.setReservationId(orderId);
     unitTable.putItem(unit);
   }
 

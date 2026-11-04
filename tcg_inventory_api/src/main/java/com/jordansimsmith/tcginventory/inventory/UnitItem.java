@@ -28,7 +28,7 @@ public class UnitItem {
   public static final String SEQUENCE_NUMBER = "sequence_number";
   public static final String STATUS = "status";
   public static final String IMPORT_ID = "import_id";
-  public static final String ORDER_ID = "order_id";
+  public static final String RESERVATION_ID = "reservation_id";
   public static final String CREATED_AT = "created_at";
   public static final String UPDATED_AT = "updated_at";
   public static final String PHOTOS = "photos";
@@ -40,7 +40,7 @@ public class UnitItem {
   private Integer sequenceNumber;
   private String status;
   private String importId;
-  private String orderId;
+  private String reservationId;
   private Instant createdAt;
   private Instant updatedAt;
   private List<Photo> photos;
@@ -112,13 +112,13 @@ public class UnitItem {
     this.importId = importId;
   }
 
-  @DynamoDbAttribute(ORDER_ID)
-  public String getOrderId() {
-    return orderId;
+  @DynamoDbAttribute(RESERVATION_ID)
+  public String getReservationId() {
+    return reservationId;
   }
 
-  public void setOrderId(@Nullable String orderId) {
-    this.orderId = orderId;
+  public void setReservationId(@Nullable String reservationId) {
+    this.reservationId = reservationId;
   }
 
   @DynamoDbConvertedBy(EpochSecondConverter.class)

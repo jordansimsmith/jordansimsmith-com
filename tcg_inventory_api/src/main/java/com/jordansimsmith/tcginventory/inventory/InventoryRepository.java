@@ -80,12 +80,12 @@ public class InventoryRepository {
                         SkuItem.SK, AttributeValue.builder().s(unitSk).build()))
                 .updateExpression(
                     "SET #status = :reserved, "
-                        + "order_id"
+                        + "reservation_id"
                         + " = :orderId, "
                         + UnitItem.UPDATED_AT
                         + " = :now")
                 .conditionExpression(
-                    "#status = :inStock AND attribute_not_exists(" + UnitItem.ORDER_ID + ")")
+                    "#status = :inStock AND attribute_not_exists(" + UnitItem.RESERVATION_ID + ")")
                 .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                 .expressionAttributeValues(
                     Map.of(
@@ -103,7 +103,9 @@ public class InventoryRepository {
   public void updateUnitForReservation(
       String user, String orderId, String skuId, int sequenceNumber) {
     var unit = getUnit(user, skuId, sequenceNumber);
-    if (unit != null && "reserved".equals(unit.getStatus()) && orderId.equals(unit.getOrderId())) {
+    if (unit != null
+        && "reserved".equals(unit.getStatus())
+        && orderId.equals(unit.getReservationId())) {
       return;
     }
 
@@ -129,7 +131,9 @@ public class InventoryRepository {
 
   public void updateUnitForSale(String user, String orderId, String skuId, int sequenceNumber) {
     var unit = getUnit(user, skuId, sequenceNumber);
-    if (unit != null && "sold".equals(unit.getStatus()) && orderId.equals(unit.getOrderId())) {
+    if (unit != null
+        && "sold".equals(unit.getStatus())
+        && orderId.equals(unit.getReservationId())) {
       return;
     }
 
@@ -146,7 +150,7 @@ public class InventoryRepository {
                             AttributeValue.builder().s(UnitItem.formatSk(sequenceNumber)).build()))
                     .updateExpression("SET #status = :sold, " + UnitItem.UPDATED_AT + " = :now")
                     .conditionExpression(
-                        "#status = :reserved AND " + UnitItem.ORDER_ID + " = :orderId")
+                        "#status = :reserved AND " + UnitItem.RESERVATION_ID + " = :orderId")
                     .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                     .expressionAttributeValues(
                         Map.of(
@@ -185,7 +189,7 @@ public class InventoryRepository {
       throw new IllegalStateException("unit is not reserved for this order");
     }
     // a prior delivery may have committed this release before losing its response
-    if ("in_stock".equals(unit.getStatus()) && unit.getOrderId() == null) {
+    if ("in_stock".equals(unit.getStatus()) && unit.getReservationId() == null) {
       return;
     }
 
@@ -204,9 +208,9 @@ public class InventoryRepository {
                         "SET #status = :inStock, "
                             + UnitItem.UPDATED_AT
                             + " = :now REMOVE "
-                            + UnitItem.ORDER_ID)
+                            + UnitItem.RESERVATION_ID)
                     .conditionExpression(
-                        "#status = :reserved AND " + UnitItem.ORDER_ID + " = :orderId")
+                        "#status = :reserved AND " + UnitItem.RESERVATION_ID + " = :orderId")
                     .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
                     .expressionAttributeValues(
                         Map.of(

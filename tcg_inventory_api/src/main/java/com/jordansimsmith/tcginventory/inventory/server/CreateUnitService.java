@@ -29,7 +29,7 @@ public class CreateUnitService {
       throw new BadRequestException("operation_id is required");
     }
 
-    var previous = mutationRepository.getUnitCreation(ctx.user(), request.operationId());
+    var previous = mutationRepository.getCreateUnitOperation(ctx.user(), request.operationId());
     if (previous != null) {
       return new CreateUnitResponse(
           previous.getSkuId(), previous.getSequenceNumber(), previous.getLocation());
