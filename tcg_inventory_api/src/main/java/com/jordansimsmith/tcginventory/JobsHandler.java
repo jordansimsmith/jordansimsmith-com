@@ -14,7 +14,6 @@ import com.jordansimsmith.tcginventory.imports.ImportConfirmationJobProcessor;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.orders.OrderFulfillmentJobProcessor;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
@@ -71,7 +70,6 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     var publishClock = factory.clock();
     var publishUlidGenerator = factory.ulidGenerator();
     var orderTable = TcgInventoryTable.table(enhancedClient, OrderItem.class);
-    var skuTable = TcgInventoryTable.table(enhancedClient, SkuItem.class);
     var inventoryRepository =
         new InventoryRepository(
             TcgInventoryTable.table(enhancedClient, UnitItem.class),
@@ -102,7 +100,6 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             TcgInventoryTable.table(enhancedClient, ReportItem.class),
             factory.auditTable(),
             orderTable,
-            skuTable,
             factory.objectMapper(),
             factory.clock(),
             factory.gamesService(),

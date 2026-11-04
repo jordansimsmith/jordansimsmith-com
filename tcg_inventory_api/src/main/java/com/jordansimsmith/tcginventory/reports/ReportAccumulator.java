@@ -1,6 +1,6 @@
 package com.jordansimsmith.tcginventory.reports;
 
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
+import com.jordansimsmith.tcginventory.inventory.client.Sku;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
@@ -66,10 +66,10 @@ public class ReportAccumulator {
     this.generationDate = generationTime.atZone(AUCKLAND).toLocalDate();
   }
 
-  public void addSku(SkuItem sku, List<Unit> units) {
+  public void addSku(Sku sku, List<Unit> units) {
     skuCount++;
 
-    var price = resolvePrice(sku);
+    var price = sku.price();
 
     int skuInStockCount = 0;
     for (var unit : units) {
@@ -107,20 +107,20 @@ public class ReportAccumulator {
     }
 
     if (skuInStockCount > 0) {
-      inStockCardNames.add(sku.getName());
+      inStockCardNames.add(sku.name());
       setMap
-          .computeIfAbsent(sku.getSetCode(), k -> new SetAccumulator(sku.getSetName()))
+          .computeIfAbsent(sku.setCode(), k -> new SetAccumulator(sku.setName()))
           .addUnits(skuInStockCount);
 
       if (price != null) {
         hitCandidates.add(
             new HitCandidate(
-                sku.getSkuId(),
-                sku.getName(),
-                sku.getSetCode(),
-                sku.getCollectorNumber(),
-                sku.getFinish(),
-                sku.getCondition(),
+                sku.skuId(),
+                sku.name(),
+                sku.setCode(),
+                sku.collectorNumber(),
+                sku.finish(),
+                sku.condition().name(),
                 price,
                 skuInStockCount));
       }
@@ -278,16 +278,6 @@ public class ReportAccumulator {
     } else {
       return 3;
     }
-  }
-
-  private static BigDecimal resolvePrice(SkuItem sku) {
-    if (sku.getLastPublishedPrice() != null) {
-      return new BigDecimal(sku.getLastPublishedPrice());
-    }
-    if (sku.getSuggestedPrice() != null) {
-      return new BigDecimal(sku.getSuggestedPrice());
-    }
-    return null;
   }
 
   private static class SetAccumulator {

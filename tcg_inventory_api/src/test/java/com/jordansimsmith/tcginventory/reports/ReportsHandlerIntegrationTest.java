@@ -2,6 +2,9 @@ package com.jordansimsmith.tcginventory.reports;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.SQSEvent;
@@ -9,6 +12,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.queue.FakeQueueClient;
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
@@ -19,6 +24,13 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
+import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
+import com.jordansimsmith.tcginventory.inventory.client.FindSkusResponse;
+import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
+import com.jordansimsmith.tcginventory.inventory.client.FindUnitsResponse;
+import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.Sku;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
@@ -244,7 +256,8 @@ public class ReportsHandlerIntegrationTest {
             "42",
             null,
             "1.00");
-    sku1.setLastPublishedPrice("1.50");
+    // Reports must use current Inventory price even when legacy publication data differs.
+    sku1.setLastPublishedPrice("0.30");
     skuTable.putItem(sku1);
 
     var sku2 =
@@ -278,6 +291,31 @@ public class ReportsHandlerIntegrationTest {
             null,
             null);
     skuTable.putItem(sku3);
+
+    var anotherUsersSku =
+        SkuItem.create(
+            "another-user",
+            "mtg#scryfall#other-card#normal#NM",
+            FakeGamesService.MAGIC_THE_GATHERING.id(),
+            "other-card",
+            "normal",
+            "NM",
+            "Other User Card",
+            "sta",
+            "Strixhaven Mystical Archive",
+            "1",
+            null,
+            "100.00");
+    skuTable.putItem(anotherUsersSku);
+    unitTable.putItem(
+        UnitItem.create(
+            "another-user",
+            "mtg",
+            "mtg#scryfall#other-card#normal#NM",
+            1,
+            "in_stock",
+            "other-import",
+            Instant.ofEpochSecond(1699000000)));
 
     unitTable.putItem(
         UnitItem.create(
@@ -432,8 +470,8 @@ public class ReportsHandlerIntegrationTest {
     var reportJson = objectMapper.readTree(reportItem.getReport());
     var totals = reportJson.get("totals");
     assertThat(totals).isNotNull();
-    // sku1: 2 in_stock * 1.50 = 3.00, sku2: 1 in_stock * 3.00 = 3.00, sku3: unpriced
-    assertThat(totals.get("inventory_value").asText()).isEqualTo("6.00");
+    // sku1: 2 in_stock * 1.00 = 2.00, sku2: 1 in_stock * 3.00 = 3.00, sku3: unpriced
+    assertThat(totals.get("inventory_value").asText()).isEqualTo("5.00");
     // sku1: 2, sku2: 1, sku3: 1
     assertThat(totals.get("in_stock_units").asInt()).isEqualTo(4);
     assertThat(totals.get("sku_count").asInt()).isEqualTo(3);
@@ -480,20 +518,21 @@ public class ReportsHandlerIntegrationTest {
     assertThat(priceBuckets.size()).isEqualTo(6);
     assertThat(priceBuckets.get(0).get("label").asText()).isEqualTo("$0.25-$0.50");
     assertThat(priceBuckets.get(5).get("label").asText()).isEqualTo("$10+");
-    // sku1: 2 in_stock at $1.50 -> bucket "1-2", sku2: 1 in_stock at $3.00 -> bucket "2-5"
+    // sku1: 2 in_stock at $1.00 -> bucket "1-2", sku2: 1 in_stock at $3.00 -> bucket "2-5"
+    assertThat(priceBuckets.get(0).get("in_stock_units").asInt()).isZero();
     assertThat(priceBuckets.get(2).get("in_stock_units").asInt()).isEqualTo(2);
     assertThat(priceBuckets.get(3).get("in_stock_units").asInt()).isEqualTo(1);
 
     var topHits = gameReport.get("top_hits");
     assertThat(topHits).isNotNull();
     assertThat(topHits.isArray()).isTrue();
-    // sku2 (Sol Ring, $3.00) first, sku1 (Lightning Bolt, $1.50) second; sku3 unpriced excluded
+    // sku2 (Sol Ring, $3.00) first, sku1 (Lightning Bolt, $1.00) second; sku3 unpriced excluded
     assertThat(topHits.size()).isEqualTo(2);
     assertThat(topHits.get(0).get("name").asText()).isEqualTo("Sol Ring");
     assertThat(topHits.get(0).get("price").asText()).isEqualTo("3.00");
     assertThat(topHits.get(0).get("in_stock_units").asInt()).isEqualTo(1);
     assertThat(topHits.get(1).get("name").asText()).isEqualTo("Lightning Bolt");
-    assertThat(topHits.get(1).get("price").asText()).isEqualTo("1.50");
+    assertThat(topHits.get(1).get("price").asText()).isEqualTo("1.00");
     assertThat(topHits.get(1).get("in_stock_units").asInt()).isEqualTo(2);
 
     var agingBands = gameReport.get("aging_bands");
@@ -531,6 +570,61 @@ public class ReportsHandlerIntegrationTest {
     assertThat(intakeVsSales.get(1).get("week_start").asText()).isEqualTo("2023-11-06");
     assertThat(intakeVsSales.get(1).get("added_units").asInt()).isEqualTo(0);
     assertThat(intakeVsSales.get(1).get("sold_units").asInt()).isEqualTo(1);
+  }
+
+  @Test
+  void reportJobShouldFollowSkuPagesIncludingAnEmptyPage() throws Exception {
+    // arrange
+    var inventoryService = mock(InventoryService.class);
+    var ctx = new RequestContext("jordan");
+    var firstRequest = new FindSkusRequest(null, null, null, 100, null);
+    var secondRequest = new FindSkusRequest(null, null, null, 100, "next");
+    when(inventoryService.findSkus(ctx, firstRequest))
+        .thenReturn(new FindSkusResponse(List.of(), "next"));
+    when(inventoryService.findSkus(ctx, secondRequest))
+        .thenReturn(new FindSkusResponse(List.of(reportSku()), null));
+    when(inventoryService.findUnits(ctx, new FindUnitsRequest("sku", 100, null)))
+        .thenReturn(new FindUnitsResponse(List.of(), null));
+    var processor = createReportJobProcessor(inventoryService);
+
+    // act
+    processor.processBatch(
+        "jordan", JobItem.create("jordan", "report-job", "report", null, null, fakeClock.now()));
+
+    // assert
+    verify(inventoryService).findSkus(ctx, firstRequest);
+    verify(inventoryService).findSkus(ctx, secondRequest);
+    var report = reportTable.getItem(reportKey("jordan"));
+    assertThat(objectMapper.readTree(report.getReport()).get("totals").get("sku_count").asInt())
+        .isEqualTo(1);
+  }
+
+  @Test
+  void reportJobShouldKeepExistingSnapshotWhenLaterSkuPageFails() throws Exception {
+    // arrange
+    var previousUpdatedAt = Instant.ofEpochSecond(1600000000);
+    reportTable.putItem(ReportItem.create("jordan", "previous-report", null, previousUpdatedAt));
+    var inventoryService = mock(InventoryService.class);
+    var ctx = new RequestContext("jordan");
+    var failure = new ServiceUnavailableException("inventory is unavailable");
+    when(inventoryService.findSkus(ctx, new FindSkusRequest(null, null, null, 100, null)))
+        .thenReturn(new FindSkusResponse(List.of(reportSku()), "next"));
+    when(inventoryService.findSkus(ctx, new FindSkusRequest(null, null, null, 100, "next")))
+        .thenThrow(failure);
+    when(inventoryService.findUnits(ctx, new FindUnitsRequest("sku", 100, null)))
+        .thenReturn(new FindUnitsResponse(List.of(), null));
+    var processor = createReportJobProcessor(inventoryService);
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                processor.processBatch(
+                    "jordan",
+                    JobItem.create("jordan", "report-job", "report", null, null, fakeClock.now())))
+        .isSameAs(failure);
+    var report = reportTable.getItem(reportKey("jordan"));
+    assertThat(report.getReport()).isEqualTo("previous-report");
+    assertThat(report.getUpdatedAt()).isEqualTo(previousUpdatedAt);
   }
 
   @Test
@@ -832,6 +926,42 @@ public class ReportsHandlerIntegrationTest {
     assertThat(generation.get("error").asText()).isEqualTo("out of memory");
     assertThat(generation.get("started_at").asLong()).isEqualTo(1699999900);
     assertThat(generation.get("finished_at").asLong()).isEqualTo(1699999950);
+  }
+
+  private ReportJobProcessor createReportJobProcessor(InventoryService inventoryService) {
+    return new ReportJobProcessor(
+        reportTable,
+        auditTable,
+        orderTable,
+        objectMapper,
+        fakeClock,
+        new FakeGamesService(),
+        inventoryService);
+  }
+
+  private static Sku reportSku() {
+    return new Sku(
+        "sku",
+        "mtg",
+        "external-id",
+        "Card",
+        "set",
+        "Set",
+        "1",
+        "normal",
+        Condition.NM,
+        new BigDecimal("1.00"),
+        null,
+        0,
+        null,
+        0);
+  }
+
+  private static Key reportKey(String user) {
+    return Key.builder()
+        .partitionValue(SkuItem.formatUserPk(user))
+        .sortValue(ReportItem.formatSk())
+        .build();
   }
 
   private APIGatewayV2HTTPEvent buildHttpEvent(String user) {

@@ -6,11 +6,10 @@ import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobProcessor;
-import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.games.client.FindGamesRequest;
 import com.jordansimsmith.tcginventory.games.client.Game;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
+import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
@@ -24,7 +23,6 @@ import java.util.List;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbIndex;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
@@ -37,7 +35,6 @@ public class ReportJobProcessor implements JobProcessor {
   private final InventoryService inventoryService;
   private final DynamoDbTable<AuditItem> auditTable;
   private final DynamoDbTable<OrderItem> orderTable;
-  private final DynamoDbIndex<SkuItem> gsi2Index;
   private final ObjectMapper objectMapper;
   private final Clock clock;
   private final GamesService gamesService;
@@ -46,7 +43,6 @@ public class ReportJobProcessor implements JobProcessor {
       DynamoDbTable<ReportItem> reportTable,
       DynamoDbTable<AuditItem> auditTable,
       DynamoDbTable<OrderItem> orderTable,
-      DynamoDbTable<SkuItem> skuTable,
       ObjectMapper objectMapper,
       Clock clock,
       GamesService gamesService,
@@ -54,7 +50,6 @@ public class ReportJobProcessor implements JobProcessor {
     this.reportTable = reportTable;
     this.auditTable = auditTable;
     this.orderTable = orderTable;
-    this.gsi2Index = skuTable.index(TcgInventoryTable.GSI2_NAME);
     this.objectMapper = objectMapper;
     this.clock = clock;
     this.gamesService = gamesService;
@@ -80,25 +75,31 @@ public class ReportJobProcessor implements JobProcessor {
     }
     var skuGames = new HashMap<String, String>();
 
-    for (var sku : pageGsi2Skus(user)) {
-      var game = gamesById.get(sku.getGame());
-      if (game == null) {
-        throw new IllegalStateException(
-            "Inventory SKU references a game not returned by Games: " + sku.getGame());
+    String skuContinuation = null;
+    do {
+      var skuResponse =
+          inventoryService.findSkus(
+              ctx, new FindSkusRequest(null, null, null, 100, skuContinuation));
+      for (var sku : skuResponse.skus()) {
+        var game = gamesById.get(sku.game());
+        if (game == null) {
+          throw new IllegalStateException(
+              "Inventory SKU references a game not returned by Games: " + sku.game());
+        }
+        skuGames.put(sku.skuId(), game.id());
+        var units = new ArrayList<Unit>();
+        String continuation = null;
+        do {
+          var response =
+              inventoryService.findUnits(ctx, new FindUnitsRequest(sku.skuId(), 100, continuation));
+          units.addAll(response.units());
+          continuation = response.nextContinuation();
+        } while (continuation != null);
+        accumulator.addSku(sku, units);
+        gameAccumulators.get(game.id()).addSku(sku, units);
       }
-      skuGames.put(sku.getSkuId(), game.id());
-      var units = new ArrayList<Unit>();
-      String continuation = null;
-      do {
-        var response =
-            inventoryService.findUnits(
-                ctx, new FindUnitsRequest(sku.getSkuId(), 100, continuation));
-        units.addAll(response.units());
-        continuation = response.nextContinuation();
-      } while (continuation != null);
-      accumulator.addSku(sku, units);
-      gameAccumulators.get(game.id()).addSku(sku, units);
-    }
+      skuContinuation = skuResponse.nextContinuation();
+    } while (skuContinuation != null);
 
     for (var order : pageOrders(user)) {
       accumulator.addOrder(order);
@@ -165,25 +166,13 @@ public class ReportJobProcessor implements JobProcessor {
         .orElse(null);
   }
 
-  private List<SkuItem> pageGsi2Skus(String user) {
-    var gsi2pk = SkuItem.formatGsi2pk(user);
-    var request =
-        QueryEnhancedRequest.builder()
-            .queryConditional(
-                QueryConditional.keyEqualTo(Key.builder().partitionValue(gsi2pk).build()))
-            .scanIndexForward(true)
-            .build();
-
-    return gsi2Index.query(request).stream().flatMap(page -> page.items().stream()).toList();
-  }
-
   private List<OrderItem> pageOrders(String user) {
     var request =
         QueryEnhancedRequest.builder()
             .queryConditional(
                 QueryConditional.sortBeginsWith(
                     Key.builder()
-                        .partitionValue(SkuItem.formatUserPk(user))
+                        .partitionValue(OrderItem.formatPk(user))
                         .sortValue(OrderItem.ORDER_PREFIX)
                         .build()))
             .scanIndexForward(true)

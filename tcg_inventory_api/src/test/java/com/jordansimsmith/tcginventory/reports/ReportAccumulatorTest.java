@@ -2,10 +2,12 @@ package com.jordansimsmith.tcginventory.reports;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
+import com.jordansimsmith.tcginventory.inventory.client.Sku;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
@@ -16,10 +18,10 @@ public class ReportAccumulatorTest {
   private static final Instant GENERATION_TIME = Instant.ofEpochSecond(1700000000);
 
   @Test
-  void addSkuShouldPreferLastPublishedPriceOverSuggestedPrice() {
+  void addSkuShouldUseInventoryPrice() {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
-    var sku = createSku("sku1", "2.00", "1.00");
+    var sku = createSku("sku1", "1.00");
     var units = List.of(createUnit("in_stock"));
 
     // act
@@ -27,15 +29,15 @@ public class ReportAccumulatorTest {
 
     // assert
     var totals = accumulator.toTotals();
-    assertThat(totals.inventoryValue()).isEqualTo("2.00");
+    assertThat(totals.inventoryValue()).isEqualTo("1.00");
     assertThat(totals.inStockUnits()).isEqualTo(1);
   }
 
   @Test
-  void addSkuShouldFallBackToSuggestedPriceWhenLastPublishedPriceIsNull() {
+  void addSkuShouldUseZeroInventoryPrice() {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
-    var sku = createSku("sku1", null, "1.50");
+    var sku = createSku("sku1", "0.00");
     var units = List.of(createUnit("in_stock"));
 
     // act
@@ -43,14 +45,15 @@ public class ReportAccumulatorTest {
 
     // assert
     var totals = accumulator.toTotals();
-    assertThat(totals.inventoryValue()).isEqualTo("1.50");
+    assertThat(totals.inventoryValue()).isEqualTo("0.00");
+    assertThat(totals.unpricedUnits()).isZero();
   }
 
   @Test
-  void addSkuShouldCountUnpricedUnitsWhenBothPricesAreNull() {
+  void addSkuShouldCountUnpricedUnitsWhenInventoryPriceIsNull() {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
-    var sku = createSku("sku1", null, null);
+    var sku = createSku("sku1", null);
     var units = List.of(createUnit("in_stock"), createUnit("in_stock"));
 
     // act
@@ -67,7 +70,7 @@ public class ReportAccumulatorTest {
   void addSkuShouldCountReservedUnitsOnlyInReservedCount() {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
-    var sku = createSku("sku1", "5.00", null);
+    var sku = createSku("sku1", "5.00");
     var units = List.of(createUnit("in_stock"), createUnit("reserved"), createUnit("reserved"));
 
     // act
@@ -84,7 +87,7 @@ public class ReportAccumulatorTest {
   void addSkuShouldExcludeRemovedUnitsFromEverything() {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
-    var sku = createSku("sku1", "3.00", null);
+    var sku = createSku("sku1", "3.00");
     var units = List.of(createUnit("in_stock"), createUnit("removed"), createUnit("sold"));
 
     // act
@@ -152,8 +155,8 @@ public class ReportAccumulatorTest {
   void addSkuShouldAccumulateValueAcrossMultipleSkus() {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
-    var sku1 = createSku("sku1", "1.50", null);
-    var sku2 = createSku("sku2", "2.50", null);
+    var sku1 = createSku("sku1", "1.50");
+    var sku2 = createSku("sku2", "2.50");
 
     // act
     accumulator.addSku(sku1, List.of(createUnit("in_stock"), createUnit("in_stock")));
@@ -170,9 +173,9 @@ public class ReportAccumulatorTest {
   void uniqueCardNamesCountShouldDeduplicateInStockSkus() {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
-    var firstPrinting = createSku("sku1", "1.50", null, "set1", "Set One", "Lightning Bolt");
-    var secondPrinting = createSku("sku2", "2.50", null, "set2", "Set Two", "Lightning Bolt");
-    var soldOutCard = createSku("sku3", "3.50", null, "set3", "Set Three", "Opt");
+    var firstPrinting = createSku("sku1", "1.50", "set1", "Set One", "Lightning Bolt");
+    var secondPrinting = createSku("sku2", "2.50", "set2", "Set Two", "Lightning Bolt");
+    var soldOutCard = createSku("sku3", "3.50", "set3", "Set Three", "Opt");
 
     // act
     accumulator.addSku(firstPrinting, List.of(createUnit("in_stock")));
@@ -183,37 +186,43 @@ public class ReportAccumulatorTest {
     assertThat(accumulator.uniqueCardNamesCount()).isEqualTo(1);
   }
 
-  private static SkuItem createSku(String skuId, String lastPublishedPrice, String suggestedPrice) {
-    return createSku(skuId, lastPublishedPrice, suggestedPrice, "set1", "Set One");
+  private static Sku createSku(String skuId, String price) {
+    return createSku(skuId, price, "set1", "Set One");
   }
 
-  private static SkuItem createSku(
-      String skuId,
-      String lastPublishedPrice,
-      String suggestedPrice,
-      String setCode,
-      String setName) {
-    return createSku(skuId, lastPublishedPrice, suggestedPrice, setCode, setName, "Card " + skuId);
+  private static Sku createSku(String skuId, String price, String setCode, String setName) {
+    return createSku(skuId, price, setCode, setName, "Card " + skuId);
   }
 
-  private static SkuItem createSku(
+  private static Sku createSku(
+      String skuId, String price, String setCode, String setName, String name) {
+    return createSku(skuId, price, setCode, setName, name, "1", "normal", Condition.NM);
+  }
+
+  private static Sku createSku(
       String skuId,
-      String lastPublishedPrice,
-      String suggestedPrice,
+      String price,
       String setCode,
       String setName,
-      String name) {
-    var item = new SkuItem();
-    item.setSkuId(skuId);
-    item.setLastPublishedPrice(lastPublishedPrice);
-    item.setSuggestedPrice(suggestedPrice);
-    item.setSetCode(setCode);
-    item.setSetName(setName);
-    item.setName(name);
-    item.setCollectorNumber("1");
-    item.setFinish("normal");
-    item.setCondition("NM");
-    return item;
+      String name,
+      String collectorNumber,
+      String finish,
+      Condition condition) {
+    return new Sku(
+        skuId,
+        "mtg",
+        skuId,
+        name,
+        setCode,
+        setName,
+        collectorNumber,
+        finish,
+        condition,
+        price == null ? null : new BigDecimal(price),
+        null,
+        0,
+        null,
+        0);
   }
 
   private static Unit createUnit(String status) {
@@ -240,13 +249,12 @@ public class ReportAccumulatorTest {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
-        createSku("sku1", "1.00", null, "a25", "Masters 25"),
+        createSku("sku1", "1.00", "a25", "Masters 25"),
         List.of(createUnit("in_stock"), createUnit("in_stock"), createUnit("in_stock")));
     accumulator.addSku(
-        createSku("sku2", "1.00", null, "cmr", "Commander Legends"),
-        List.of(createUnit("in_stock")));
+        createSku("sku2", "1.00", "cmr", "Commander Legends"), List.of(createUnit("in_stock")));
     accumulator.addSku(
-        createSku("sku3", "1.00", null, "dom", "Dominaria"),
+        createSku("sku3", "1.00", "dom", "Dominaria"),
         List.of(createUnit("in_stock"), createUnit("in_stock")));
 
     // act
@@ -269,8 +277,7 @@ public class ReportAccumulatorTest {
     var accumulator = new ReportAccumulator(GENERATION_TIME);
     for (int i = 0; i < 12; i++) {
       accumulator.addSku(
-          createSku("sku" + i, "1.00", null, "set" + i, "Set " + i),
-          List.of(createUnit("in_stock")));
+          createSku("sku" + i, "1.00", "set" + i, "Set " + i), List.of(createUnit("in_stock")));
     }
 
     // act
@@ -285,13 +292,13 @@ public class ReportAccumulatorTest {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
-        createSku("sku1", "1.00", null, "dom", "Dominaria"),
+        createSku("sku1", "1.00", "dom", "Dominaria"),
         List.of(createUnit("in_stock"), createUnit("in_stock")));
     accumulator.addSku(
-        createSku("sku2", "1.00", null, "a25", "Masters 25"),
+        createSku("sku2", "1.00", "a25", "Masters 25"),
         List.of(createUnit("in_stock"), createUnit("in_stock")));
     accumulator.addSku(
-        createSku("sku3", "1.00", null, "cmr", "Commander Legends"),
+        createSku("sku3", "1.00", "cmr", "Commander Legends"),
         List.of(createUnit("in_stock"), createUnit("in_stock")));
 
     // act
@@ -309,10 +316,10 @@ public class ReportAccumulatorTest {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
-        createSku("sku1", "1.00", null, "a25", "Masters 25"),
+        createSku("sku1", "1.00", "a25", "Masters 25"),
         List.of(createUnit("in_stock"), createUnit("in_stock")));
     accumulator.addSku(
-        createSku("sku2", "2.00", null, "a25", "Masters 25"),
+        createSku("sku2", "2.00", "a25", "Masters 25"),
         List.of(createUnit("in_stock"), createUnit("in_stock"), createUnit("in_stock")));
 
     // act
@@ -329,7 +336,7 @@ public class ReportAccumulatorTest {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
-        createSku("sku1", "1.00", null, "a25", "Masters 25"),
+        createSku("sku1", "1.00", "a25", "Masters 25"),
         List.of(
             createUnit("in_stock"),
             createUnit("reserved"),
@@ -349,7 +356,7 @@ public class ReportAccumulatorTest {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
-        createSku("sku1", "1.00", null, "a25", "Masters 25"),
+        createSku("sku1", "1.00", "a25", "Masters 25"),
         List.of(createUnit("sold"), createUnit("removed")));
 
     // act
@@ -363,7 +370,7 @@ public class ReportAccumulatorTest {
   void toPriceBucketsShouldPlacePrice025InFirstBucket() {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
-    accumulator.addSku(createSku("sku1", "0.25", null), List.of(createUnit("in_stock")));
+    accumulator.addSku(createSku("sku1", "0.25"), List.of(createUnit("in_stock")));
 
     // act
     var buckets = accumulator.toPriceBuckets();
@@ -379,7 +386,7 @@ public class ReportAccumulatorTest {
   void toPriceBucketsShouldPlacePrice050InSecondBucket() {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
-    accumulator.addSku(createSku("sku1", "0.50", null), List.of(createUnit("in_stock")));
+    accumulator.addSku(createSku("sku1", "0.50"), List.of(createUnit("in_stock")));
 
     // act
     var buckets = accumulator.toPriceBuckets();
@@ -394,7 +401,7 @@ public class ReportAccumulatorTest {
   void toPriceBucketsShouldPlacePrice1000InLastBucket() {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
-    accumulator.addSku(createSku("sku1", "10.00", null), List.of(createUnit("in_stock")));
+    accumulator.addSku(createSku("sku1", "10.00"), List.of(createUnit("in_stock")));
 
     // act
     var buckets = accumulator.toPriceBuckets();
@@ -431,7 +438,7 @@ public class ReportAccumulatorTest {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
-        createSku("sku1", null, null), List.of(createUnit("in_stock"), createUnit("in_stock")));
+        createSku("sku1", null), List.of(createUnit("in_stock"), createUnit("in_stock")));
 
     // act
     var buckets = accumulator.toPriceBuckets();
@@ -446,13 +453,13 @@ public class ReportAccumulatorTest {
   void toPriceBucketsShouldDistributeAcrossMultipleBuckets() {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
-    accumulator.addSku(createSku("sku1", "0.30", null), List.of(createUnit("in_stock")));
-    accumulator.addSku(createSku("sku2", "0.75", null), List.of(createUnit("in_stock")));
+    accumulator.addSku(createSku("sku1", "0.30"), List.of(createUnit("in_stock")));
+    accumulator.addSku(createSku("sku2", "0.75"), List.of(createUnit("in_stock")));
     accumulator.addSku(
-        createSku("sku3", "1.50", null), List.of(createUnit("in_stock"), createUnit("in_stock")));
-    accumulator.addSku(createSku("sku4", "3.00", null), List.of(createUnit("in_stock")));
-    accumulator.addSku(createSku("sku5", "7.50", null), List.of(createUnit("in_stock")));
-    accumulator.addSku(createSku("sku6", "15.00", null), List.of(createUnit("in_stock")));
+        createSku("sku3", "1.50"), List.of(createUnit("in_stock"), createUnit("in_stock")));
+    accumulator.addSku(createSku("sku4", "3.00"), List.of(createUnit("in_stock")));
+    accumulator.addSku(createSku("sku5", "7.50"), List.of(createUnit("in_stock")));
+    accumulator.addSku(createSku("sku6", "15.00"), List.of(createUnit("in_stock")));
 
     // act
     var buckets = accumulator.toPriceBuckets();
@@ -471,13 +478,13 @@ public class ReportAccumulatorTest {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
-        createSku("sku1", "1.00", null, "a25", "Masters 25", "Cheap Card"),
+        createSku("sku1", "1.00", "a25", "Masters 25", "Cheap Card"),
         List.of(createUnit("in_stock")));
     accumulator.addSku(
-        createSku("sku2", "10.00", null, "a25", "Masters 25", "Expensive Card"),
+        createSku("sku2", "10.00", "a25", "Masters 25", "Expensive Card"),
         List.of(createUnit("in_stock")));
     accumulator.addSku(
-        createSku("sku3", "5.00", null, "a25", "Masters 25", "Mid Card"),
+        createSku("sku3", "5.00", "a25", "Masters 25", "Mid Card"),
         List.of(createUnit("in_stock")));
 
     // act
@@ -498,13 +505,13 @@ public class ReportAccumulatorTest {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
-        createSku("sku1", "5.00", null, "a25", "Masters 25", "Zebra Card"),
+        createSku("sku1", "5.00", "a25", "Masters 25", "Zebra Card"),
         List.of(createUnit("in_stock")));
     accumulator.addSku(
-        createSku("sku2", "5.00", null, "a25", "Masters 25", "Alpha Card"),
+        createSku("sku2", "5.00", "a25", "Masters 25", "Alpha Card"),
         List.of(createUnit("in_stock")));
     accumulator.addSku(
-        createSku("sku3", "5.00", null, "a25", "Masters 25", "Middle Card"),
+        createSku("sku3", "5.00", "a25", "Masters 25", "Middle Card"),
         List.of(createUnit("in_stock")));
 
     // act
@@ -523,7 +530,7 @@ public class ReportAccumulatorTest {
     var accumulator = new ReportAccumulator(GENERATION_TIME);
     for (int i = 0; i < 12; i++) {
       accumulator.addSku(
-          createSku("sku" + i, String.valueOf(i + 1) + ".00", null, "a25", "Masters 25"),
+          createSku("sku" + i, String.valueOf(i + 1) + ".00", "a25", "Masters 25"),
           List.of(createUnit("in_stock")));
     }
 
@@ -541,10 +548,10 @@ public class ReportAccumulatorTest {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
-        createSku("sku1", "5.00", null, "a25", "Masters 25", "Priced Card"),
+        createSku("sku1", "5.00", "a25", "Masters 25", "Priced Card"),
         List.of(createUnit("in_stock")));
     accumulator.addSku(
-        createSku("sku2", null, null, "a25", "Masters 25", "Unpriced Card"),
+        createSku("sku2", null, "a25", "Masters 25", "Unpriced Card"),
         List.of(createUnit("in_stock")));
 
     // act
@@ -560,10 +567,10 @@ public class ReportAccumulatorTest {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
-        createSku("sku1", "5.00", null, "a25", "Masters 25", "In Stock Card"),
+        createSku("sku1", "5.00", "a25", "Masters 25", "In Stock Card"),
         List.of(createUnit("in_stock")));
     accumulator.addSku(
-        createSku("sku2", "10.00", null, "a25", "Masters 25", "All Reserved Card"),
+        createSku("sku2", "10.00", "a25", "Masters 25", "All Reserved Card"),
         List.of(createUnit("reserved"), createUnit("sold")));
 
     // act
@@ -578,10 +585,16 @@ public class ReportAccumulatorTest {
   void toTopHitsShouldIncludeIdentityFieldsAndInStockCount() {
     // arrange
     var accumulator = new ReportAccumulator(GENERATION_TIME);
-    var sku = createSku("my-sku-id", "7.50", null, "mh2", "Modern Horizons 2", "Ragavan");
-    sku.setCollectorNumber("138");
-    sku.setFinish("foil");
-    sku.setCondition("LP");
+    var sku =
+        createSku(
+            "my-sku-id",
+            "7.50",
+            "mh2",
+            "Modern Horizons 2",
+            "Ragavan",
+            "138",
+            "foil",
+            Condition.LP);
     accumulator.addSku(sku, List.of(createUnit("in_stock"), createUnit("in_stock")));
 
     // act
@@ -606,8 +619,7 @@ public class ReportAccumulatorTest {
     var generationTime = GENERATION_TIME;
     var accumulator = new ReportAccumulator(generationTime);
     var unitCreatedAt = generationTime;
-    accumulator.addSku(
-        createSku("sku1", "1.00", null), List.of(createUnit("in_stock", unitCreatedAt)));
+    accumulator.addSku(createSku("sku1", "1.00"), List.of(createUnit("in_stock", unitCreatedAt)));
 
     // act
     var bands = accumulator.toAgingBands();
@@ -624,8 +636,7 @@ public class ReportAccumulatorTest {
     var unitDate = generationDate.minusDays(30);
     var unitCreatedAt = unitDate.atStartOfDay(AUCKLAND).toInstant();
     var accumulator = new ReportAccumulator(GENERATION_TIME);
-    accumulator.addSku(
-        createSku("sku1", "1.00", null), List.of(createUnit("in_stock", unitCreatedAt)));
+    accumulator.addSku(createSku("sku1", "1.00"), List.of(createUnit("in_stock", unitCreatedAt)));
 
     // act
     var bands = accumulator.toAgingBands();
@@ -642,8 +653,7 @@ public class ReportAccumulatorTest {
     var unitDate = generationDate.minusDays(31);
     var unitCreatedAt = unitDate.atStartOfDay(AUCKLAND).toInstant();
     var accumulator = new ReportAccumulator(GENERATION_TIME);
-    accumulator.addSku(
-        createSku("sku1", "1.00", null), List.of(createUnit("in_stock", unitCreatedAt)));
+    accumulator.addSku(createSku("sku1", "1.00"), List.of(createUnit("in_stock", unitCreatedAt)));
 
     // act
     var bands = accumulator.toAgingBands();
@@ -661,8 +671,7 @@ public class ReportAccumulatorTest {
     var unitDate = generationDate.minusDays(90);
     var unitCreatedAt = unitDate.atStartOfDay(AUCKLAND).toInstant();
     var accumulator = new ReportAccumulator(GENERATION_TIME);
-    accumulator.addSku(
-        createSku("sku1", "1.00", null), List.of(createUnit("in_stock", unitCreatedAt)));
+    accumulator.addSku(createSku("sku1", "1.00"), List.of(createUnit("in_stock", unitCreatedAt)));
 
     // act
     var bands = accumulator.toAgingBands();
@@ -679,8 +688,7 @@ public class ReportAccumulatorTest {
     var unitDate = generationDate.minusDays(91);
     var unitCreatedAt = unitDate.atStartOfDay(AUCKLAND).toInstant();
     var accumulator = new ReportAccumulator(GENERATION_TIME);
-    accumulator.addSku(
-        createSku("sku1", "1.00", null), List.of(createUnit("in_stock", unitCreatedAt)));
+    accumulator.addSku(createSku("sku1", "1.00"), List.of(createUnit("in_stock", unitCreatedAt)));
 
     // act
     var bands = accumulator.toAgingBands();
@@ -698,8 +706,7 @@ public class ReportAccumulatorTest {
     var unitDate = generationDate.minusDays(180);
     var unitCreatedAt = unitDate.atStartOfDay(AUCKLAND).toInstant();
     var accumulator = new ReportAccumulator(GENERATION_TIME);
-    accumulator.addSku(
-        createSku("sku1", "1.00", null), List.of(createUnit("in_stock", unitCreatedAt)));
+    accumulator.addSku(createSku("sku1", "1.00"), List.of(createUnit("in_stock", unitCreatedAt)));
 
     // act
     var bands = accumulator.toAgingBands();
@@ -716,8 +723,7 @@ public class ReportAccumulatorTest {
     var unitDate = generationDate.minusDays(181);
     var unitCreatedAt = unitDate.atStartOfDay(AUCKLAND).toInstant();
     var accumulator = new ReportAccumulator(GENERATION_TIME);
-    accumulator.addSku(
-        createSku("sku1", "1.00", null), List.of(createUnit("in_stock", unitCreatedAt)));
+    accumulator.addSku(createSku("sku1", "1.00"), List.of(createUnit("in_stock", unitCreatedAt)));
 
     // act
     var bands = accumulator.toAgingBands();
@@ -755,7 +761,7 @@ public class ReportAccumulatorTest {
     var unitCreatedAt = unitDate.atStartOfDay(AUCKLAND).toInstant();
     var accumulator = new ReportAccumulator(GENERATION_TIME);
     accumulator.addSku(
-        createSku("sku1", "1.00", null),
+        createSku("sku1", "1.00"),
         List.of(
             createUnit("in_stock", unitCreatedAt),
             createUnit("reserved", unitCreatedAt),
@@ -896,7 +902,7 @@ public class ReportAccumulatorTest {
     var createdAt = Instant.ofEpochSecond(1700000000);
     var soldAt = Instant.ofEpochSecond(1700100000);
     accumulator.addSku(
-        createSku("sku1", "1.00", null),
+        createSku("sku1", "1.00"),
         List.of(
             createUnit("in_stock", createdAt),
             createUnit("reserved", createdAt),
@@ -917,7 +923,7 @@ public class ReportAccumulatorTest {
     var accumulator = new ReportAccumulator(GENERATION_TIME);
     var createdAt = Instant.ofEpochSecond(1700000000);
     accumulator.addSku(
-        createSku("sku1", "1.00", null),
+        createSku("sku1", "1.00"),
         List.of(createUnit("in_stock", createdAt), createUnit("removed", createdAt)));
 
     // act
@@ -936,8 +942,7 @@ public class ReportAccumulatorTest {
     var createdAt = Instant.parse("2023-11-05T22:00:00Z");
     // sold Wednesday 2023-11-15 NZ time -> week start Monday 2023-11-13
     var soldAt = Instant.ofEpochSecond(1700000000);
-    accumulator.addSku(
-        createSku("sku1", "1.00", null), List.of(createUnit("sold", createdAt, soldAt)));
+    accumulator.addSku(createSku("sku1", "1.00"), List.of(createUnit("sold", createdAt, soldAt)));
 
     // act
     var result = accumulator.toIntakeVsSalesByWeek();
@@ -960,7 +965,7 @@ public class ReportAccumulatorTest {
     var accumulator = new ReportAccumulator(GENERATION_TIME);
     // 1700000000 is 2023-11-15 in NZ (Wednesday) -> week start 2023-11-13 (Monday)
     var wednesday = Instant.ofEpochSecond(1700000000);
-    accumulator.addSku(createSku("sku1", "1.00", null), List.of(createUnit("in_stock", wednesday)));
+    accumulator.addSku(createSku("sku1", "1.00"), List.of(createUnit("in_stock", wednesday)));
 
     // act
     var result = accumulator.toIntakeVsSalesByWeek();
@@ -979,7 +984,7 @@ public class ReportAccumulatorTest {
     // week 2: only sales (unit was created in week 1 but sold in week 2)
     var week2Sold = Instant.parse("2023-11-13T12:00:00Z");
     accumulator.addSku(
-        createSku("sku1", "1.00", null),
+        createSku("sku1", "1.00"),
         List.of(createUnit("in_stock", week1Created), createUnit("sold", week1Created, week2Sold)));
 
     // act
@@ -1003,7 +1008,7 @@ public class ReportAccumulatorTest {
     var laterWeek = Instant.parse("2023-11-13T12:00:00Z");
     var earlierWeek = Instant.parse("2023-11-06T12:00:00Z");
     accumulator.addSku(
-        createSku("sku1", "1.00", null),
+        createSku("sku1", "1.00"),
         List.of(createUnit("in_stock", laterWeek), createUnit("in_stock", earlierWeek)));
 
     // act
