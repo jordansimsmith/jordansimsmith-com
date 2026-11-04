@@ -13,6 +13,7 @@ import com.jordansimsmith.tcginventory.imports.AppraiseJobProcessor;
 import com.jordansimsmith.tcginventory.imports.ImportConfirmationJobProcessor;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
+import com.jordansimsmith.tcginventory.imports.ImportsRepository;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.orders.OrderFulfillmentJobProcessor;
@@ -105,7 +106,13 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             factory.gamesService(),
             factory.inventoryService());
     this.scanConfirmationJobProcessor = new ScanConfirmationJobProcessor(factory);
-    this.importConfirmationJobProcessor = new ImportConfirmationJobProcessor(factory);
+    this.importConfirmationJobProcessor =
+        new ImportConfirmationJobProcessor(
+            factory.clock(),
+            TcgInventoryTable.table(enhancedClient, ImportItem.class),
+            TcgInventoryTable.table(enhancedClient, ImportRowItem.class),
+            new ImportsRepository(factory.dynamoDbClient(), factory.jobTable()),
+            factory.inventoryService());
     this.orderFulfillmentJobProcessor = new OrderFulfillmentJobProcessor(factory);
     this.repriceJobProcessor =
         new RepriceJobProcessor(

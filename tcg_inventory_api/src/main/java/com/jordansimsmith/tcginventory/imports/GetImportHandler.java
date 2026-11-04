@@ -10,7 +10,6 @@ import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.tcginventory.inventory.InventoryLocation;
 import java.util.ArrayList;
 import java.util.List;
 import javax.annotation.Nullable;
@@ -185,36 +184,44 @@ public class GetImportHandler
 
     int blockStartIndex = 0;
     int previousSequenceNumber = keepRows.get(0).getSequenceNumber();
-    int currentBlockNumber = previousSequenceNumber / 100;
+    var currentBlock = blockOf(location(keepRows.get(0)));
     for (int index = 1; index < keepRows.size(); index++) {
-      int blockNumber = keepRows.get(index).getSequenceNumber() / 100;
       int sequenceNumber = keepRows.get(index).getSequenceNumber();
-      if (sequenceNumber != previousSequenceNumber + 1 || blockNumber != currentBlockNumber) {
+      var block = blockOf(location(keepRows.get(index)));
+      if (sequenceNumber != previousSequenceNumber + 1 || !block.equals(currentBlock)) {
         instructions.add(
-            buildPlacementInstruction(keepRows, blockStartIndex, index - 1, currentBlockNumber));
-        currentBlockNumber = blockNumber;
+            buildPlacementInstruction(keepRows, blockStartIndex, index - 1, currentBlock));
+        currentBlock = block;
         blockStartIndex = index;
       }
       previousSequenceNumber = sequenceNumber;
     }
     instructions.add(
-        buildPlacementInstruction(
-            keepRows, blockStartIndex, keepRows.size() - 1, currentBlockNumber));
+        buildPlacementInstruction(keepRows, blockStartIndex, keepRows.size() - 1, currentBlock));
     return List.copyOf(instructions);
   }
 
   private PlacementInstruction buildPlacementInstruction(
-      List<ImportRowItem> rows, int startIndex, int endIndex, int blockNumber) {
+      List<ImportRowItem> rows, int startIndex, int endIndex, String block) {
     var firstRow = rows.get(startIndex);
     var lastRow = rows.get(endIndex);
-    int firstSequenceNumber = firstRow.getSequenceNumber();
-    int lastSequenceNumber = lastRow.getSequenceNumber();
     return new PlacementInstruction(
-        InventoryLocation.formatBlock(blockNumber),
-        InventoryLocation.formatLocation(firstSequenceNumber),
-        InventoryLocation.formatLocation(lastSequenceNumber),
+        block,
+        location(firstRow),
+        location(lastRow),
         firstRow.getName(),
         lastRow.getName(),
         endIndex - startIndex + 1);
+  }
+
+  private String location(ImportRowItem row) {
+    if (row.getSkuId() == null || row.getLocation() == null) {
+      throw new IllegalStateException("confirmed import row is missing its saved creation result");
+    }
+    return row.getLocation();
+  }
+
+  private String blockOf(String location) {
+    return location.substring(0, location.lastIndexOf('-'));
   }
 }

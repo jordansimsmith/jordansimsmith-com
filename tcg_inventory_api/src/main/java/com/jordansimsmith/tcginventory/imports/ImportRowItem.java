@@ -32,6 +32,8 @@ public class ImportRowItem {
   public static final String FETCHTCG_CARD_ID = "fetchtcg_card_id";
   public static final String FETCHTCG_SET_ID = "fetchtcg_set_id";
   public static final String SEQUENCE_NUMBER = "sequence_number";
+  public static final String SKU_ID = "sku_id";
+  public static final String LOCATION = "location";
   public static final String PHOTOS = "photos";
 
   private String pk;
@@ -52,6 +54,8 @@ public class ImportRowItem {
   private String fetchtcgCardId;
   private Integer fetchtcgSetId;
   private Integer sequenceNumber;
+  private String skuId;
+  private String location;
   private List<Photo> photos;
 
   @DynamoDbPartitionKey
@@ -216,6 +220,24 @@ public class ImportRowItem {
 
   public void setSequenceNumber(@Nullable Integer sequenceNumber) {
     this.sequenceNumber = sequenceNumber;
+  }
+
+  @DynamoDbAttribute(SKU_ID)
+  public String getSkuId() {
+    return skuId;
+  }
+
+  public void setSkuId(@Nullable String skuId) {
+    this.skuId = skuId;
+  }
+
+  @DynamoDbAttribute(LOCATION)
+  public String getLocation() {
+    return location;
+  }
+
+  public void setLocation(@Nullable String location) {
+    this.location = location;
   }
 
   @DynamoDbAttribute(PHOTOS)

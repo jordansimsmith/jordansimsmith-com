@@ -195,11 +195,11 @@ java_library(
         exclude = ["src/main/java/com/jordansimsmith/tcginventory/imports/*Handler.java"],
     ),
     deps = [
-        ":inventory-lib",
         ":lib",
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
     ] + COMMON_DEPS,
 )
@@ -522,7 +522,6 @@ java_binary(
     ],
     deps = [
         ":import-lib",
-        ":inventory-lib",
         ":lib",
         "//lib/http:lib",
         "@maven//:ch_qos_logback_logback_classic",
@@ -743,7 +742,6 @@ java_binary(
     ],
     deps = [
         ":import-lib",
-        ":inventory-lib",
         ":lib",
         "//lib/http:lib",
         "//lib/queue:lib",

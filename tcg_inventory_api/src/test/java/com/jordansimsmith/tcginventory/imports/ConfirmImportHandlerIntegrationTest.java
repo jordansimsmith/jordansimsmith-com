@@ -2,17 +2,23 @@ package com.jordansimsmith.tcginventory.imports;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
-import com.jordansimsmith.tcginventory.inventory.SequenceCounterItem;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
+import com.jordansimsmith.tcginventory.inventory.client.CreateUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.nio.charset.StandardCharsets;
@@ -35,13 +41,13 @@ public class ConfirmImportHandlerIntegrationTest {
 
   private FakeClock fakeClock;
   private FakeUlidGenerator fakeUlidGenerator;
+  private TcgInventoryTestFactory factory;
   private ObjectMapper objectMapper;
   private DynamoDbTable<ImportItem> importTable;
   private DynamoDbTable<ImportRowItem> importRowTable;
   private DynamoDbTable<AuditItem> auditTable;
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
-  private DynamoDbTable<SequenceCounterItem> sequenceCounterTable;
   private DynamoDbTable<JobItem> jobTable;
 
   private ConfirmImportHandler confirmImportHandler;
@@ -61,7 +67,7 @@ public class ConfirmImportHandlerIntegrationTest {
 
   @BeforeEach
   void setUp() {
-    var factory =
+    factory =
         TcgInventoryTestFactory.create(
             dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
 
@@ -73,7 +79,6 @@ public class ConfirmImportHandlerIntegrationTest {
     auditTable = factory.auditTable();
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
-    sequenceCounterTable = factory.sequenceCounterTable();
     jobTable = factory.jobTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
@@ -81,7 +86,8 @@ public class ConfirmImportHandlerIntegrationTest {
 
     confirmImportHandler = new ConfirmImportHandler(factory);
     getImportHandler = new GetImportHandler(factory);
-    importConfirmationJobProcessor = new ImportConfirmationJobProcessor(factory);
+    importConfirmationJobProcessor =
+        createProcessor(new ImportsRepository(factory.dynamoDbClient(), jobTable));
   }
 
   @Test
@@ -124,7 +130,7 @@ public class ConfirmImportHandlerIntegrationTest {
             Key.builder().partitionValue(sku1Pk).sortValue(UnitItem.formatSk(0)).build());
     assertThat(unit0).isNotNull();
     assertThat(unit0.getStatus()).isEqualTo("in_stock");
-    assertThat(unit0.getImportId()).isEqualTo("import1");
+    assertThat(unit0.getImportId()).isNull();
     assertThat(unit0.getGame()).isEqualTo("mtg");
     assertThat(unit0.getGsi3pk()).isEqualTo("USER#jordan#UNITS#mtg");
 
@@ -144,14 +150,15 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(sku1.getGame()).isEqualTo("mtg");
     assertThat(sku1.getExternalId()).isEqualTo("scryfall-1");
 
-    var sequenceCounter =
-        sequenceCounterTable.getItem(
-            Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
-                .sortValue(SequenceCounterItem.formatSk("mtg"))
-                .build());
-    assertThat(sequenceCounter.getGame()).isEqualTo("mtg");
-    assertThat(sequenceCounter.getNextSequenceNumber()).isEqualTo(3);
+    assertThat(getImportRow("import1", 1).getSkuId())
+        .isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
+    assertThat(getImportRow("import1", 1).getSequenceNumber()).isZero();
+    assertThat(getImportRow("import1", 1).getLocation()).isEqualTo("A0-0");
+    assertThat(getImportRow("import1", 2).getSequenceNumber()).isEqualTo(1);
+    assertThat(getImportRow("import1", 2).getLocation()).isEqualTo("A0-1");
+    assertThat(getImportRow("import1", 3).getSkuId()).isEqualTo("mtg#scryfall#scryfall-2#foil#LP");
+    assertThat(getImportRow("import1", 3).getSequenceNumber()).isEqualTo(2);
+    assertThat(getImportRow("import1", 3).getLocation()).isEqualTo("A0-2");
 
     var sku2Pk = SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-2#foil#LP");
     var sku2 =
@@ -165,8 +172,8 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(auditEntries)
         .allSatisfy(
             audit -> {
-              assertThat(audit.getEventType()).isEqualTo("import_confirm");
-              assertThat(audit.getImportId()).isEqualTo("import1");
+              assertThat(audit.getEventType()).isEqualTo("create");
+              assertThat(audit.getImportId()).isNull();
               assertThat(audit.getSequenceNumber()).isNotNull();
               assertThat(audit.getBeforeStatus()).isEqualTo("absent");
               assertThat(audit.getAfterStatus()).isEqualTo("in_stock");
@@ -319,6 +326,8 @@ public class ConfirmImportHandlerIntegrationTest {
                   .sortValue(ImportRowItem.formatSk(position))
                   .build());
       row.setSequenceNumber(sequenceNumbers.get(index));
+      row.setSkuId("mtg#scryfall#card-" + position + "#normal#NM");
+      row.setLocation(List.of("A42-0", "A42-1", "A42-4", "A42-99", "A43-0").get(index));
       importRowTable.putItem(row);
     }
 
@@ -419,6 +428,82 @@ public class ConfirmImportHandlerIntegrationTest {
   }
 
   @Test
+  void confirmShouldUseInventoryReturnedNoncontiguousPlacements() throws Exception {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    createImportInReview("jordan", "import1", 2);
+    var importItem = getImportItem("import1");
+    importItem.setStatus("confirming");
+    importTable.putItem(importItem);
+    createKeepRow("jordan", "import1", 1, "scryfall-1", "normal", "NM", "Card A");
+    createKeepRow("jordan", "import1", 2, "scryfall-1", "normal", "NM", "Card B");
+
+    var inventoryService = factory.inventoryService();
+    var interleavingService = mock(InventoryService.class);
+    when(interleavingService.createUnit(any(RequestContext.class), any(CreateUnitRequest.class)))
+        .thenAnswer(
+            invocation -> {
+              var ctx = invocation.<RequestContext>getArgument(0);
+              var request = invocation.<CreateUnitRequest>getArgument(1);
+              var created = inventoryService.createUnit(ctx, request);
+              if (request.operationId().endsWith(":row:1")) {
+                inventoryService.createUnit(
+                    ctx,
+                    new CreateUnitRequest(
+                        "other-operation",
+                        "mtg",
+                        "interleaved-card",
+                        "normal",
+                        Condition.NM,
+                        "Interleaved card",
+                        "dom",
+                        "Dominaria",
+                        "999",
+                        null,
+                        null,
+                        2624,
+                        List.of()));
+              }
+              return created;
+            });
+    var processor =
+        new ImportConfirmationJobProcessor(
+            fakeClock,
+            importTable,
+            importRowTable,
+            new ImportsRepository(factory.dynamoDbClient(), jobTable),
+            interleavingService);
+
+    // act
+    processor.processBatch(
+        "jordan",
+        JobItem.create(
+            "jordan",
+            "confirm-job",
+            "import_confirmation",
+            "import1",
+            null,
+            Instant.ofEpochSecond(1700000000)));
+    var body =
+        objectMapper.readTree(
+            getImportHandler
+                .handleRequest(buildEvent("jordan", Map.of("import_id", "import1")), null)
+                .getBody());
+
+    // assert
+    assertThat(getImportRow("import1", 1).getLocation()).isEqualTo("A0-0");
+    assertThat(getImportRow("import1", 2).getLocation()).isEqualTo("A0-2");
+    var instructions = body.get("placement_instructions");
+    assertThat(instructions).hasSize(2);
+    assertThat(instructions.get(0).get("from_location").asText()).isEqualTo("A0-0");
+    assertThat(instructions.get(0).get("to_location").asText()).isEqualTo("A0-0");
+    assertThat(instructions.get(1).get("from_location").asText()).isEqualTo("A0-2");
+    assertThat(instructions.get(1).get("to_location").asText()).isEqualTo("A0-2");
+    assertThat(instructions.get(0).get("unit_count").asInt()).isEqualTo(1);
+    assertThat(instructions.get(1).get("unit_count").asInt()).isEqualTo(1);
+  }
+
+  @Test
   void confirmLargeImportShouldCreateEveryUnit() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
@@ -443,7 +528,7 @@ public class ConfirmImportHandlerIntegrationTest {
   }
 
   @Test
-  void confirmShouldSkipUnitsAlreadyPresentForImport() throws Exception {
+  void confirmShouldSkipRowsWithPersistedCreationResults() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     var importItem =
@@ -468,6 +553,8 @@ public class ConfirmImportHandlerIntegrationTest {
       row.setDecision("keep");
       row.setSuggestedPrice("1.50");
       row.setSequenceNumber(position - 1);
+      row.setSkuId("mtg#scryfall#scryfall-1#normal#NM");
+      row.setLocation("A0-" + (position - 1));
       importRowTable.putItem(row);
       unitTable.putItem(
           UnitItem.create(
@@ -478,22 +565,7 @@ public class ConfirmImportHandlerIntegrationTest {
               "in_stock",
               "import1",
               Instant.ofEpochSecond(1700000000)));
-      createImportAudit("import1", "mtg#scryfall#scryfall-1#normal#NM", position - 1);
     }
-    skuTable.putItem(
-        SkuItem.create(
-            "jordan",
-            "mtg#scryfall#scryfall-1#normal#NM",
-            "mtg",
-            "scryfall-1",
-            "normal",
-            "NM",
-            "Card 1",
-            "dom",
-            "Dominaria",
-            "1",
-            null,
-            null));
 
     // act
     importConfirmationJobProcessor.processBatch(
@@ -510,11 +582,11 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(getImportItem("import1").getStatus()).isEqualTo("confirmed");
     assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
         .isEqualTo(2);
-    assertThat(getAuditEntries("jordan")).hasSize(2);
+    assertThat(getAuditEntries("jordan")).isEmpty();
   }
 
   @Test
-  void confirmShouldResumeAfterACommittedUnitWhenAnotherImportOwnsTheNextKey() throws Exception {
+  void confirmShouldRecoverInventoryCreationWhenRowProgressWriteFails() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
@@ -564,16 +636,6 @@ public class ConfirmImportHandlerIntegrationTest {
     row2.setSequenceNumber(1);
     importRowTable.putItem(row2);
 
-    var conflictingUnit =
-        UnitItem.create(
-            "jordan",
-            "mtg",
-            "mtg#scryfall#scryfall-1#normal#NM",
-            1,
-            "in_stock",
-            "other-import",
-            Instant.ofEpochSecond(1700000000));
-    unitTable.putItem(conflictingUnit);
     var jobItem =
         JobItem.create(
             "jordan",
@@ -585,35 +647,37 @@ public class ConfirmImportHandlerIntegrationTest {
     jobTable.putItem(jobItem);
 
     // act
-    assertThatThrownBy(() -> importConfirmationJobProcessor.processBatch("jordan", jobItem))
+    var repository =
+        new ImportsRepository(factory.dynamoDbClient(), jobTable) {
+          private int writes;
+
+          @Override
+          public void recordCreatedUnit(
+              String user,
+              String importId,
+              int position,
+              String skuId,
+              int sequenceNumber,
+              String location) {
+            writes++;
+            if (writes == 2) {
+              throw new IllegalStateException("progress write failed");
+            }
+            super.recordCreatedUnit(user, importId, position, skuId, sequenceNumber, location);
+          }
+        };
+    var failingProcessor = createProcessor(repository);
+    assertThatThrownBy(() -> failingProcessor.processBatch("jordan", jobItem))
         .isInstanceOf(IllegalStateException.class)
-        .hasMessage("unit key belongs to another import");
+        .hasMessage("progress write failed");
 
     assertThat(getImportItem("import1").getStatus()).isEqualTo("confirming");
-    var committedUnit =
-        unitTable.getItem(
-            Key.builder()
-                .partitionValue(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM"))
-                .sortValue(UnitItem.formatSk(0))
-                .build());
-    assertThat(committedUnit.getImportId()).isEqualTo("import1");
-    var conflictingUnitResult =
-        unitTable.getItem(
-            Key.builder()
-                .partitionValue(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM"))
-                .sortValue(UnitItem.formatSk(1))
-                .build());
-    assertThat(conflictingUnitResult.getImportId()).isEqualTo("other-import");
+    assertThat(getImportRow("import1", 1).getSkuId())
+        .isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
+    assertThat(getImportRow("import1", 2).getSkuId()).isNull();
     assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
         .isEqualTo(2);
-    assertThat(getAuditEntries("jordan")).hasSize(1);
-
-    // arrange retry after the occupied key has been repaired
-    unitTable.deleteItem(
-        Key.builder()
-            .partitionValue(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM"))
-            .sortValue(UnitItem.formatSk(1))
-            .build());
+    assertThat(getAuditEntries("jordan")).hasSize(2);
 
     // act
     importConfirmationJobProcessor.processBatch("jordan", jobItem);
@@ -623,6 +687,10 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
         .isEqualTo(2);
     assertThat(getAuditEntries("jordan")).hasSize(2);
+    assertThat(getImportRow("import1", 2).getSkuId())
+        .isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
+    assertThat(getImportRow("import1", 2).getSequenceNumber()).isEqualTo(1);
+    assertThat(getImportRow("import1", 2).getLocation()).isEqualTo("A0-1");
   }
 
   @Test
@@ -808,20 +876,6 @@ public class ConfirmImportHandlerIntegrationTest {
     return jobTable.query(request).stream().flatMap(page -> page.items().stream()).toList();
   }
 
-  private void createImportAudit(String importId, String skuId, int sequenceNumber) {
-    var audit = new AuditItem();
-    audit.setPk(AuditItem.formatPk("jordan"));
-    audit.setSk("audit-" + importId + "-" + sequenceNumber);
-    audit.setEventType("import_confirm");
-    audit.setImportId(importId);
-    audit.setSkuId(skuId);
-    audit.setSequenceNumber(sequenceNumber);
-    audit.setBeforeStatus("absent");
-    audit.setAfterStatus("in_stock");
-    audit.setCreatedAt(Instant.ofEpochSecond(1700000000));
-    auditTable.putItem(audit);
-  }
-
   private void processConfirmation(String user, String importId) throws Exception {
     var jobItem =
         jobTable
@@ -843,6 +897,19 @@ public class ConfirmImportHandlerIntegrationTest {
             .findFirst()
             .orElseThrow();
     importConfirmationJobProcessor.processBatch(user, jobItem);
+  }
+
+  private ImportConfirmationJobProcessor createProcessor(ImportsRepository repository) {
+    return new ImportConfirmationJobProcessor(
+        fakeClock, importTable, importRowTable, repository, factory.inventoryService());
+  }
+
+  private ImportRowItem getImportRow(String importId, int position) {
+    return importRowTable.getItem(
+        Key.builder()
+            .partitionValue(ImportRowItem.formatPk("jordan", importId))
+            .sortValue(ImportRowItem.formatSk(position))
+            .build());
   }
 
   private void createImportInReview(String user, String importId, int rowCount) {

@@ -2,20 +2,13 @@ package com.jordansimsmith.tcginventory.imports;
 
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
-import com.jordansimsmith.tcginventory.CardIdentity;
-import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobProcessor;
-import com.jordansimsmith.tcginventory.SkuIds;
-import com.jordansimsmith.tcginventory.TcgInventoryFactory;
-import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.tcginventory.games.client.GamesService;
-import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
-import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
+import com.jordansimsmith.tcginventory.inventory.client.CreateUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.time.Clock;
-import java.util.HashMap;
+import java.math.BigDecimal;
 import java.util.List;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
@@ -27,22 +20,19 @@ public class ImportConfirmationJobProcessor implements JobProcessor {
   private final DynamoDbTable<ImportItem> importTable;
   private final DynamoDbTable<ImportRowItem> importRowTable;
   private final ImportsRepository importsRepository;
-  private final InventoryRepository inventoryRepository;
-  private final GamesService gamesService;
+  private final InventoryService inventoryService;
 
-  public ImportConfirmationJobProcessor(TcgInventoryFactory factory) {
-    this.clock = factory.clock();
-    this.importTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportItem.class);
-    this.importRowTable =
-        TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ImportRowItem.class);
-    this.importsRepository = new ImportsRepository(factory.dynamoDbClient(), factory.jobTable());
-    this.inventoryRepository =
-        new InventoryRepository(
-            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class),
-            factory.dynamoDbClient(),
-            factory.clock(),
-            factory.ulidGenerator());
-    this.gamesService = factory.gamesService();
+  public ImportConfirmationJobProcessor(
+      Clock clock,
+      DynamoDbTable<ImportItem> importTable,
+      DynamoDbTable<ImportRowItem> importRowTable,
+      ImportsRepository importsRepository,
+      InventoryService inventoryService) {
+    this.clock = clock;
+    this.importTable = importTable;
+    this.importRowTable = importRowTable;
+    this.importsRepository = importsRepository;
+    this.inventoryService = inventoryService;
   }
 
   @Override
@@ -69,59 +59,38 @@ public class ImportConfirmationJobProcessor implements JobProcessor {
     }
 
     var keepRows = queryKeepRows(user, importId);
-    if (!keepRows.isEmpty()) {
-      var game =
-          gamesService
-              .getGame(new RequestContext(user), new GetGameRequest(importItem.getGame()))
-              .game();
-      var firstSequenceNumber =
-          allocateSequenceRange(user, importItem.getGame(), keepRows.size(), keepRows);
-      assignSequenceNumbers(keepRows, firstSequenceNumber);
-
-      var skuSeeds = new HashMap<String, SkuItem>();
-      for (var row : keepRows) {
-        var identity = new CardIdentity(importItem.getGame(), row.getExternalId());
-        var skuId =
-            SkuIds.format(game, identity, row.getFinish(), Condition.valueOf(row.getCondition()));
-        var skuSeed =
-            skuSeeds.computeIfAbsent(
-                skuId,
-                ignored -> {
-                  var seed =
-                      SkuItem.create(
-                          user,
-                          skuId,
-                          importItem.getGame(),
-                          row.getExternalId(),
-                          row.getFinish(),
-                          row.getCondition(),
-                          row.getName(),
-                          row.getSetCode(),
-                          row.getSetName(),
-                          row.getCollectorNumber(),
-                          row.getFetchtcgCardId(),
-                          row.getSuggestedPrice());
-                  seed.setFetchtcgSetId(row.getFetchtcgSetId());
-                  return seed;
-                });
-
-        var unit =
-            UnitItem.create(
-                user,
-                importItem.getGame(),
-                skuId,
-                row.getSequenceNumber(),
-                "in_stock",
-                importId,
-                clock.now());
-        if (row.getPhotos() != null && !row.getPhotos().isEmpty()) {
-          unit.setPhotos(
-              row.getPhotos().stream()
-                  .map(photo -> UnitItem.Photo.create(photo.getPhotoId()))
-                  .toList());
-        }
-        inventoryRepository.confirmImportUnit(user, importId, skuSeed, unit);
+    var ctx = new RequestContext(user);
+    for (var row : keepRows) {
+      if (row.getSkuId() != null) {
+        continue;
       }
+
+      var created =
+          inventoryService.createUnit(
+              ctx,
+              new CreateUnitRequest(
+                  "import:" + importId + ":row:" + row.getPosition(),
+                  importItem.getGame(),
+                  row.getExternalId(),
+                  row.getFinish(),
+                  Condition.valueOf(row.getCondition()),
+                  row.getName(),
+                  row.getSetCode(),
+                  row.getSetName(),
+                  row.getCollectorNumber(),
+                  row.getSuggestedPrice() == null ? null : new BigDecimal(row.getSuggestedPrice()),
+                  row.getFetchtcgCardId(),
+                  row.getFetchtcgSetId(),
+                  row.getPhotos() == null
+                      ? List.of()
+                      : row.getPhotos().stream().map(ImportRowItem.Photo::getPhotoId).toList()));
+      importsRepository.recordCreatedUnit(
+          user,
+          importId,
+          row.getPosition(),
+          created.skuId(),
+          created.sequenceNumber(),
+          created.location());
     }
 
     importsRepository.finishConfirmation(user, importId, clock.now());
@@ -145,30 +114,5 @@ public class ImportConfirmationJobProcessor implements JobProcessor {
         .flatMap(page -> page.items().stream())
         .filter(row -> "keep".equals(row.getDecision()))
         .toList();
-  }
-
-  private int allocateSequenceRange(
-      String user, String game, int keepCount, List<ImportRowItem> keepRows) {
-    var firstRowWithSequenceNumber =
-        keepRows.stream().filter(row -> row.getSequenceNumber() != null).findFirst().orElse(null);
-    if (firstRowWithSequenceNumber != null) {
-      return keepRows.stream()
-          .filter(row -> row.getSequenceNumber() != null)
-          .mapToInt(ImportRowItem::getSequenceNumber)
-          .min()
-          .orElse(0);
-    }
-    return inventoryRepository.allocateSequenceRange(user, game, keepCount);
-  }
-
-  private void assignSequenceNumbers(List<ImportRowItem> keepRows, int firstSequenceNumber) {
-    var sequenceNumber = firstSequenceNumber;
-    for (var row : keepRows) {
-      if (row.getSequenceNumber() == null) {
-        row.setSequenceNumber(sequenceNumber);
-        importRowTable.putItem(row);
-      }
-      sequenceNumber++;
-    }
   }
 }

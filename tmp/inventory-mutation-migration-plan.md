@@ -4,7 +4,7 @@
 
 Each unchecked task is one reviewable commit, including its implementation, relevant tests, caller/build changes, and current-state README updates. Implement in order. Do not introduce all interface methods up front with unsupported placeholder implementations. Task details and acceptance criteria appear below.
 
-**Listings prerequisite complete:** the separate [Listings migration plan](listings-migration-plan.md) absorbs task 5. Tasks 6 and 7 are complete; continue at task 8. Production activation still requires the controlled Listings data copy. Do not build a second publication acknowledgement operation.
+**Listings prerequisite complete:** the separate [Listings migration plan](listings-migration-plan.md) absorbs task 5. Tasks 6, 7, and 8 are complete; continue at task 9. Production activation still requires the controlled Listings data copy. Do not build a second publication acknowledgement operation.
 
 - [x] **1. Migrate unit removal.** Add `deleteUnit`, server-owned transactional mutation/audit infrastructure, and the thin Inventory API handler. This is the first implementation change.
 - [x] **2. Migrate condition changes.** Add `updateUnit`, the shared enum `Condition`, server-owned SKU identity derivation and lazy SKU initialization, and migrate the existing handler. `fetchtcg_set_id` is required; `getSku` is strongly consistent.
@@ -13,7 +13,7 @@ Each unchecked task is one reviewable commit, including its implementation, rele
 - [x] **5. Complete the Listings prerequisite (absorbs this task).** Finish [Listings tasks 1–7](listings-migration-plan.md), including versioned dirty patches, publication/Orders/Reports caller changes, and transfer/removal of legacy listing fields. No separate Inventory implementation task remains here.
 - [x] **6. Implement retry-safe unit creation.** Add singular `createUnit`, sequence allocation, lazy initialize-only SKU creation, and immutable operation results.
 - [x] **7. Make import placement instructions handle gaps.** Split placement groups at sequence gaps as well as storage-block boundaries; preserve the frontend's existing instruction shape. Placement instructions now describe contiguous runs of assigned units and can repeat a block label.
-- [ ] **8. Migrate import confirmation.** Create one unit per keep row through Inventory, persist actual results, and recover by stable operation ID.
+- [x] **8. Migrate import confirmation.** Create one unit per keep row through Inventory, persist actual results, and recover by stable operation ID.
 - [ ] **9. Implement single-unit allocation.** Add `reserveUnit`, Inventory-owned selection, durable allocation results, and reservation lifecycle records.
 - [ ] **10. Implement reservation release.** Add ownership-checked, replay-safe `releaseUnit`, including compatibility with existing reserved units.
 - [ ] **11. Implement unit sale.** Add ownership-checked, replay-safe `sellUnit`, sharing the same reservation lifecycle foundation.
@@ -464,7 +464,7 @@ Use actual saved results in original row order. Location strings retain the docu
 
 For `101, 102, 108, 109`, emit two groups, even though all four belong to one block. A normal block boundary also splits groups. Use actual row count rather than `last - first + 1` across a gap. The frontend must render multiple instructions with the same block label; do not key instructions solely by block.
 
-Old confirmed imports already have sequences but not saved location/SKU result snapshots. Retain their existing placement display compatibility; it does not justify inventing new creation receipts or recreating historical stock. Keep any narrow legacy formatter dependency documented until its read migration is addressed.
+Old confirmed imports already have saved sequences. Backfill their SKU IDs by matching the user, game, and sequence to the existing Inventory unit, and derive their locations from the saved sequences before removing the read-time compatibility path. A unit's current SKU is sufficient as the row's completion marker if its condition changed after import. Do not invent creation receipts or recreate historical stock.
 
 ## Orders allocation and progress
 
@@ -578,7 +578,7 @@ This former implementation task is absorbed by [Listings tasks 1–7](listings-m
 
 ### 8. Migrate import confirmation
 
-**Ships:** row-level persisted creation results, sequential `createUnit` calls, stable row operation IDs, and explicit processor dependencies. Remove range allocation/inference, `SkuItem`/`UnitItem` construction, and `confirmImportUnit` use from Imports. Preserve old confirmed placement display.
+**Ships:** row-level persisted creation results, sequential `createUnit` calls, stable row operation IDs, and explicit processor dependencies. Remove range allocation/inference, `SkuItem`/`UnitItem` construction, and `confirmImportUnit` use from Imports. Add a one-time migration that fills historical confirmed rows from matching Inventory units and saved sequences, then remove the read-time location fallback.
 
 **Done when:** confirmation integration covers normal ordering, a repeated delivery recovering a committed creation before row progress, and the saved noncontiguous placement results. Preserve keep-row/photo/lifecycle gates, empty confirmation, and final parent completion. Document/check the in-flight rollout precondition. Delete obsolete range and import-creation helpers after their callers disappear.
 
@@ -678,7 +678,7 @@ After reviewing each implementation commit, run relevant scoped checks, then `ba
 
 - Reports uses Inventory client SKU/unit reads and current prices after the Listings prerequisite, but still has legacy order/audit reads. Its extraction must remove audit-based freshness and choose its own eventual-consistency behavior. Do not make new report code depend on Inventory audits.
 - `GetOrderHandler` still has specialized physical-block/neighbor reads and some legacy SKU/unit projections. A later Inventory read operation should own authoritative block-position/neighbor facts; do not expose GSI3 or persistence models through the client to finish this mutation work.
-- Historical import placement display can retain a narrow legacy formatting path until its read compatibility is migrated. New confirmation results use saved Inventory-returned locations.
+- Historical import placement results use the one-time backfill from matching Inventory units and saved sequences. Runtime placement display requires the persisted SKU and location result.
 - Other verticals' package extraction and Jobs/admission/framework cleanup remain independent. Existing root-package server visibility remains an acknowledged enforcement gap.
 
 Completion here means every Inventory mutation is invoked through the client and enforced by Inventory-owned persistence. It does not mean that all legacy read access, root shared models, or framework coupling has disappeared.

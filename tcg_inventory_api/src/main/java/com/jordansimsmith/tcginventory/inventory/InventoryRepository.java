@@ -18,7 +18,6 @@ import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItemsRequest;
 import software.amazon.awssdk.services.dynamodb.model.Update;
-import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 public class InventoryRepository {
   private final DynamoDbTable<UnitItem> unitTable;
@@ -64,77 +63,6 @@ public class InventoryRepository {
         .filter(unit -> "in_stock".equals(unit.getStatus()))
         .limit(quantity)
         .toList();
-  }
-
-  public int allocateSequenceRange(String user, String game, int count) {
-    var response =
-        dynamoDbClient.updateItem(
-            UpdateItemRequest.builder()
-                .tableName(TcgInventoryTable.TABLE_NAME)
-                .key(
-                    Map.of(
-                        SkuItem.PK,
-                        AttributeValue.builder().s(SkuItem.formatUserPk(user)).build(),
-                        SkuItem.SK,
-                        AttributeValue.builder().s(SequenceCounterItem.formatSk(game)).build()))
-                .updateExpression(
-                    "SET "
-                        + SequenceCounterItem.GAME
-                        + " = :game ADD "
-                        + SequenceCounterItem.NEXT_SEQUENCE_NUMBER
-                        + " :n")
-                .expressionAttributeValues(
-                    Map.of(
-                        ":game",
-                        AttributeValue.builder().s(game).build(),
-                        ":n",
-                        AttributeValue.builder().n(String.valueOf(count)).build()))
-                .returnValues("ALL_NEW")
-                .build());
-
-    var newValue =
-        Integer.parseInt(response.attributes().get(SequenceCounterItem.NEXT_SEQUENCE_NUMBER).n());
-    return newValue - count;
-  }
-
-  public void confirmImportUnit(String user, String importId, SkuItem skuSeed, UnitItem unit) {
-    var key = Key.builder().partitionValue(unit.getPk()).sortValue(unit.getSk()).build();
-    var existing = unitTable.getItem(request -> request.key(key).consistentRead(true));
-    if (existing != null) {
-      if (importId.equals(existing.getImportId())) {
-        return;
-      }
-      throw new IllegalStateException("unit key belongs to another import");
-    }
-
-    var putUnit =
-        TransactWriteItem.builder()
-            .put(
-                Put.builder()
-                    .tableName(TcgInventoryTable.TABLE_NAME)
-                    .item(unitTable.tableSchema().itemToMap(unit, true))
-                    .conditionExpression("attribute_not_exists(pk)")
-                    .build())
-            .build();
-
-    dynamoDbClient.transactWriteItems(
-        TransactWriteItemsRequest.builder()
-            .transactItems(
-                putUnit,
-                buildSkuUpsert(skuSeed),
-                buildAuditPut(
-                    user,
-                    "import_confirm",
-                    Map.of(
-                        AuditItem.IMPORT_ID, AttributeValue.builder().s(importId).build(),
-                        AuditItem.SKU_ID, AttributeValue.builder().s(skuSeed.getSkuId()).build(),
-                        AuditItem.SEQUENCE_NUMBER,
-                            AttributeValue.builder()
-                                .n(String.valueOf(unit.getSequenceNumber()))
-                                .build(),
-                        AuditItem.BEFORE_STATUS, AttributeValue.builder().s("absent").build(),
-                        AuditItem.AFTER_STATUS, AttributeValue.builder().s("in_stock").build())))
-            .build());
   }
 
   public TransactWriteItem buildUnitReserveUpdate(
@@ -338,92 +266,6 @@ public class InventoryRepository {
                 .item(unitTable.tableSchema().itemToMap(unitItem, true))
                 // preserve the existing unit if data already occupies this destination key.
                 .conditionExpression("attribute_not_exists(pk)")
-                .build())
-        .build();
-  }
-
-  public TransactWriteItem buildSkuUpsert(SkuItem skuSeed) {
-    var expression =
-        new StringBuilder(
-            "ADD "
-                + SkuItem.VERSION
-                + " :one SET "
-                + SkuItem.SKU_ID
-                + " = :skuId, "
-                + SkuItem.GAME
-                + " = :game, "
-                + SkuItem.EXTERNAL_ID
-                + " = :externalId, "
-                + "#finish = :finish, "
-                + "#condition = :condition, "
-                + "#name = :cardName, "
-                + SkuItem.SET_CODE
-                + " = :setCode, "
-                + SkuItem.SET_NAME
-                + " = :setName, "
-                + SkuItem.COLLECTOR_NUMBER
-                + " = :collectorNumber, "
-                + SkuItem.DIRTY
-                + " = :dirty, "
-                + SkuItem.GSI1PK
-                + " = :gsi1pk, "
-                + SkuItem.GSI1SK
-                + " = :gsi1sk, "
-                + SkuItem.GSI2PK
-                + " = :gsi2pk, "
-                + SkuItem.GSI2SK
-                + " = :gsi2sk");
-
-    var values = new HashMap<String, AttributeValue>();
-    values.put(":one", AttributeValue.builder().n("1").build());
-    values.put(":skuId", AttributeValue.builder().s(skuSeed.getSkuId()).build());
-    values.put(":game", AttributeValue.builder().s(skuSeed.getGame()).build());
-    values.put(":externalId", AttributeValue.builder().s(skuSeed.getExternalId()).build());
-    values.put(":finish", AttributeValue.builder().s(skuSeed.getFinish()).build());
-    values.put(":condition", AttributeValue.builder().s(skuSeed.getCondition()).build());
-    values.put(":cardName", AttributeValue.builder().s(skuSeed.getName()).build());
-    values.put(":setCode", AttributeValue.builder().s(skuSeed.getSetCode()).build());
-    values.put(":setName", AttributeValue.builder().s(skuSeed.getSetName()).build());
-    values.put(
-        ":collectorNumber", AttributeValue.builder().s(skuSeed.getCollectorNumber()).build());
-    values.put(":dirty", AttributeValue.builder().bool(true).build());
-    values.put(":gsi1pk", AttributeValue.builder().s(skuSeed.getGsi1pk()).build());
-    values.put(":gsi1sk", AttributeValue.builder().s(skuSeed.getGsi1sk()).build());
-    values.put(":gsi2pk", AttributeValue.builder().s(skuSeed.getGsi2pk()).build());
-    values.put(":gsi2sk", AttributeValue.builder().s(skuSeed.getGsi2sk()).build());
-
-    if (skuSeed.getSuggestedPrice() != null) {
-      expression.append(", " + SkuItem.SUGGESTED_PRICE + " = :suggestedPrice");
-      values.put(
-          ":suggestedPrice", AttributeValue.builder().s(skuSeed.getSuggestedPrice()).build());
-    }
-    if (skuSeed.getFetchtcgCardId() != null) {
-      expression.append(", " + SkuItem.FETCHTCG_CARD_ID + " = :fetchtcgCardId");
-      values.put(
-          ":fetchtcgCardId", AttributeValue.builder().s(skuSeed.getFetchtcgCardId()).build());
-    }
-    if (skuSeed.getFetchtcgSetId() != null) {
-      expression.append(", " + SkuItem.FETCHTCG_SET_ID + " = :fetchtcgSetId");
-      values.put(
-          ":fetchtcgSetId",
-          AttributeValue.builder().n(String.valueOf(skuSeed.getFetchtcgSetId())).build());
-    }
-
-    return TransactWriteItem.builder()
-        .update(
-            Update.builder()
-                .tableName(TcgInventoryTable.TABLE_NAME)
-                .key(
-                    Map.of(
-                        SkuItem.PK, AttributeValue.builder().s(skuSeed.getPk()).build(),
-                        SkuItem.SK, AttributeValue.builder().s(skuSeed.getSk()).build()))
-                .updateExpression(expression.toString())
-                .expressionAttributeNames(
-                    Map.of(
-                        "#finish", SkuItem.FINISH,
-                        "#condition", SkuItem.CONDITION,
-                        "#name", SkuItem.NAME))
-                .expressionAttributeValues(values)
                 .build())
         .build();
   }

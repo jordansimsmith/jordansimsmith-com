@@ -125,6 +125,34 @@ public class ImportsRepository {
             .build());
   }
 
+  public void recordCreatedUnit(
+      String user,
+      String importId,
+      int position,
+      String skuId,
+      int sequenceNumber,
+      String location) {
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(TcgInventoryTable.TABLE_NAME)
+            .key(rowKey(user, importId, position))
+            .updateExpression(
+                "SET #sku_id = :sku_id, #sequence_number = :sequence_number, #location = :location")
+            .conditionExpression("attribute_exists(pk) AND attribute_not_exists(#sku_id)")
+            .expressionAttributeNames(
+                Map.of(
+                    "#sku_id", ImportRowItem.SKU_ID,
+                    "#sequence_number", ImportRowItem.SEQUENCE_NUMBER,
+                    "#location", ImportRowItem.LOCATION))
+            .expressionAttributeValues(
+                Map.of(
+                    ":sku_id", AttributeValue.builder().s(skuId).build(),
+                    ":sequence_number",
+                        AttributeValue.builder().n(String.valueOf(sequenceNumber)).build(),
+                    ":location", AttributeValue.builder().s(location).build()))
+            .build());
+  }
+
   private Map<String, AttributeValue> rowKey(String user, String importId, int position) {
     return Map.of(
         ImportRowItem.PK,
