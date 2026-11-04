@@ -26,6 +26,8 @@ import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
 import com.jordansimsmith.tcginventory.inventory.client.ReleaseUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.ReleaseUnitResponse;
 import com.jordansimsmith.tcginventory.inventory.client.ReserveUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.SellUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.SellUnitResponse;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuRequest;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuResponse;
@@ -458,6 +460,238 @@ class InventoryReadServiceIntegrationTest {
                     new RequestContext("alice"), new ReleaseUnitRequest("sku", 1, "reservation")))
         .isSameAs(failure);
     verifyNoInteractions(reads);
+  }
+
+  @Test
+  void sellUnitShouldRetainOwnershipAndReplayAfterTheUnitIsDeleted() throws Exception {
+    // arrange
+    var mutations =
+        new InventoryMutationRepository(
+            dynamoDbClient,
+            createUnitOperationTable,
+            reserveUnitOperationTable,
+            reservationTable,
+            TABLE_NAME,
+            () -> Instant.ofEpochSecond(1700000060),
+            () -> "sell-audit-" + ++nextAuditId);
+    var reads = new InventoryReadRepository(skuTable, unitTable);
+    var service = new SellUnitService(reads, mutations);
+    skuTable.putItem(sku("alice", "sku", "Card", "1.00"));
+    var reserved = unit("alice", "sku", 1, "reserved", List.of(photo("front")));
+    reserved.setReservationId("reservation-a");
+    reserved.setUpdatedAt(Instant.ofEpochSecond(1700000010));
+    unitTable.putItem(reserved);
+    dynamoDbClient.updateItem(
+        updateRequest ->
+            updateRequest
+                .tableName(TABLE_NAME)
+                .key(
+                    Map.of(
+                        "pk", AttributeValue.builder().s(reserved.getPk()).build(),
+                        "sk", AttributeValue.builder().s(reserved.getSk()).build()))
+                .updateExpression("SET custom_attribute = :custom")
+                .expressionAttributeValues(
+                    Map.of(":custom", AttributeValue.builder().s("preserve").build())));
+    reservationTable.putItem(
+        InventoryReservationItem.create("alice", "reservation-a", "sku", 1, "reserved"));
+    var ctx = new RequestContext("alice");
+    var request = new SellUnitRequest("sku", 1, "reservation-a");
+    var skuBefore = reads.getSku("alice", "sku");
+
+    // act
+    service.sellUnit(ctx, request);
+    var sold = reads.getUnit("alice", "sku", 1);
+    var skuAfter = reads.getSku("alice", "sku");
+
+    // assert
+    assertThat(sold.getStatus()).isEqualTo("sold");
+    assertThat(sold.getReservationId()).isEqualTo("reservation-a");
+    assertThat(sold.getCreatedAt()).isEqualTo(Instant.ofEpochSecond(1700000000));
+    assertThat(sold.getUpdatedAt()).isEqualTo(Instant.ofEpochSecond(1700000060));
+    assertThat(sold.getPhotos())
+        .extracting(InventoryUnitItem.PhotoItem::getPhotoId)
+        .containsExactly("front");
+    assertThat(
+            dynamoDbClient
+                .getItem(
+                    getRequest ->
+                        getRequest
+                            .tableName(TABLE_NAME)
+                            .key(
+                                Map.of(
+                                    "pk", AttributeValue.builder().s(sold.getPk()).build(),
+                                    "sk", AttributeValue.builder().s(sold.getSk()).build()))
+                            .consistentRead(true))
+                .item()
+                .get("custom_attribute")
+                .s())
+        .isEqualTo("preserve");
+    assertThat(skuAfter.getVersion()).isEqualTo(skuBefore.getVersion() + 1);
+    assertThat(skuAfter.getGsi1pk()).isEqualTo(skuBefore.getGsi1pk());
+    assertThat(skuAfter.getGsi1sk()).isEqualTo(skuBefore.getGsi1sk());
+    assertThat(
+            auditTable.scan().items().stream().filter(item -> item.getEventType() != null).toList())
+        .singleElement()
+        .satisfies(
+            audit -> {
+              assertThat(audit.getEventType()).isEqualTo("sell");
+              assertThat(audit.getReservationId()).isEqualTo("reservation-a");
+              assertThat(audit.getBeforeStatus()).isEqualTo("reserved");
+              assertThat(audit.getAfterStatus()).isEqualTo("sold");
+            });
+    assertThat(mutations.getReservation("alice", "reservation-a", "sku", 1).getStatus())
+        .isEqualTo("sold");
+
+    // arrange
+    unitTable.deleteItem(
+        Key.builder().partitionValue(sold.getPk()).sortValue(sold.getSk()).build());
+
+    // act
+    service.sellUnit(ctx, request);
+
+    // assert
+    assertThat(reads.getSku("alice", "sku").getVersion()).isEqualTo(skuAfter.getVersion());
+    assertThat(
+            auditTable.scan().items().stream().filter(item -> item.getEventType() != null).toList())
+        .hasSize(1);
+  }
+
+  @Test
+  void sellUnitShouldAdoptLegacyReservationAndRejectConflictingStates() throws Exception {
+    // arrange
+    var mutations =
+        new InventoryMutationRepository(
+            dynamoDbClient,
+            createUnitOperationTable,
+            reserveUnitOperationTable,
+            reservationTable,
+            TABLE_NAME,
+            () -> Instant.ofEpochSecond(1700000070),
+            () -> "legacy-sell-audit");
+    var reads = new InventoryReadRepository(skuTable, unitTable);
+    var service = new SellUnitService(reads, mutations);
+    skuTable.putItem(sku("alice", "sku", "Card", "1.00"));
+    var legacyUnit = unit("alice", "sku", 1, "reserved");
+    legacyUnit.setReservationId("legacy-order");
+    unitTable.putItem(legacyUnit);
+    reservationTable.putItem(
+        InventoryReservationItem.create("alice", "released-order", "sku", 2, "released"));
+    reservationTable.putItem(
+        InventoryReservationItem.create("alice", "reserved-order", "sku", 3, "reserved"));
+    var inStock = unit("alice", "sku", 3, "in_stock");
+    inStock.setReservationId("reserved-order");
+    unitTable.putItem(inStock);
+    var reservedForOther = unit("alice", "sku", 4, "reserved");
+    reservedForOther.setReservationId("another-reservation");
+    unitTable.putItem(reservedForOther);
+    var ctx = new RequestContext("alice");
+
+    // act
+    service.sellUnit(ctx, new SellUnitRequest("sku", 1, "legacy-order"));
+
+    // assert
+    assertThat(mutations.getReservation("alice", "legacy-order", "sku", 1).getStatus())
+        .isEqualTo("sold");
+    assertThat(reads.getUnit("alice", "sku", 1).getStatus()).isEqualTo("sold");
+    assertThatThrownBy(() -> service.sellUnit(ctx, new SellUnitRequest("sku", 2, "released-order")))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("reservation has already been released");
+    assertThatThrownBy(() -> service.sellUnit(ctx, new SellUnitRequest("sku", 3, "reserved-order")))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("unit is not reserved for this reservation");
+    assertThatThrownBy(
+            () ->
+                service.sellUnit(
+                    new RequestContext("bob"), new SellUnitRequest("sku", 1, "legacy-order")))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+    assertThatThrownBy(() -> service.sellUnit(ctx, new SellUnitRequest("sku", 9, "missing")))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+    assertThatThrownBy(
+            () ->
+                service.sellUnit(
+                    ctx, new SellUnitRequest("sku", 4, "reservation-for-someone-else")))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("unit is not reserved for this reservation");
+  }
+
+  @Test
+  void sellUnitShouldRollBackWhenSkuIsMissing() throws Exception {
+    // arrange
+    var mutations =
+        new InventoryMutationRepository(
+            dynamoDbClient,
+            createUnitOperationTable,
+            reserveUnitOperationTable,
+            reservationTable,
+            TABLE_NAME,
+            () -> Instant.EPOCH,
+            () -> "rollback-sell-audit");
+    var reads = new InventoryReadRepository(skuTable, unitTable);
+    var service = new SellUnitService(reads, mutations);
+    var reserved = unit("alice", "missing-sku", 1, "reserved");
+    reserved.setReservationId("reservation");
+    unitTable.putItem(reserved);
+    var ctx = new RequestContext("alice");
+    var request = new SellUnitRequest("missing-sku", 1, "reservation");
+
+    // act / assert
+    assertThatThrownBy(() -> service.sellUnit(ctx, request))
+        .isInstanceOf(TransactionCanceledException.class);
+    assertThat(reads.getUnit("alice", "missing-sku", 1).getStatus()).isEqualTo("reserved");
+    assertThat(mutations.getReservation("alice", "reservation", "missing-sku", 1)).isNull();
+    assertThat(
+            auditTable.scan().items().stream().filter(item -> item.getEventType() != null).toList())
+        .isEmpty();
+    assertThat(reads.getUnit("alice", "missing-sku", 1).getReservationId())
+        .isEqualTo("reservation");
+  }
+
+  @Test
+  void sellUnitShouldValidateBeforeStorage() {
+    // arrange
+    var reads = mock(InventoryReadRepository.class);
+    var mutations = mock(InventoryMutationRepository.class);
+    var service = new SellUnitService(reads, mutations);
+    var ctx = new RequestContext("alice");
+
+    // act / assert
+    assertThatThrownBy(() -> service.sellUnit(ctx, new SellUnitRequest(" ", 1, "r")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("sku_id is required");
+    assertThatThrownBy(() -> service.sellUnit(ctx, new SellUnitRequest("sku", -1, "r")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("sequence_number must be nonnegative");
+    assertThatThrownBy(() -> service.sellUnit(ctx, new SellUnitRequest("sku", 1, " ")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("reservation_id is required");
+    verifyNoInteractions(reads, mutations);
+  }
+
+  @Test
+  void sellUnitShouldPropagateLifecycleReadFailureAndSerializeContract() throws Exception {
+    // arrange
+    var reads = mock(InventoryReadRepository.class);
+    var mutations = mock(InventoryMutationRepository.class);
+    var failure = new IllegalStateException("storage failed");
+    when(mutations.getReservation("alice", "reservation", "sku", 1)).thenThrow(failure);
+    var service = new SellUnitService(reads, mutations);
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                service.sellUnit(
+                    new RequestContext("alice"), new SellUnitRequest("sku", 1, "reservation")))
+        .isSameAs(failure);
+    verifyNoInteractions(reads);
+    assertThat(new ObjectMapper().writeValueAsString(new SellUnitResponse())).isEqualTo("{}");
+    assertThat(
+            new ObjectMapper()
+                .readValue(
+                    "{\"sku_id\":\"sku\",\"sequence_number\":1,\"reservation_id\":\"r\"}",
+                    SellUnitRequest.class))
+        .isEqualTo(new SellUnitRequest("sku", 1, "r"));
   }
 
   @Test

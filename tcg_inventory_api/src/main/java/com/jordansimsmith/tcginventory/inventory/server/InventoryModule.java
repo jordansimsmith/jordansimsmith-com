@@ -21,6 +21,8 @@ import com.jordansimsmith.tcginventory.inventory.client.ReleaseUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.ReleaseUnitResponse;
 import com.jordansimsmith.tcginventory.inventory.client.ReserveUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.ReserveUnitResponse;
+import com.jordansimsmith.tcginventory.inventory.client.SellUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.SellUnitResponse;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuRequest;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuResponse;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateUnitRequest;
@@ -77,6 +79,7 @@ public class InventoryModule {
         new CreateUnitService(inventoryRepository, mutationRepository, gamesService);
     var reserveUnitService = new ReserveUnitService(inventoryRepository, mutationRepository);
     var releaseUnitService = new ReleaseUnitService(inventoryRepository, mutationRepository);
+    var sellUnitService = new SellUnitService(inventoryRepository, mutationRepository);
     return new InventoryService() {
       @Override
       public ReserveUnitResponse reserveUnit(RequestContext ctx, ReserveUnitRequest request)
@@ -88,6 +91,12 @@ public class InventoryModule {
       public ReleaseUnitResponse releaseUnit(RequestContext ctx, ReleaseUnitRequest request)
           throws ServiceException {
         return releaseUnitService.releaseUnit(ctx, request);
+      }
+
+      @Override
+      public SellUnitResponse sellUnit(RequestContext ctx, SellUnitRequest request)
+          throws ServiceException {
+        return sellUnitService.sellUnit(ctx, request);
       }
 
       @Override

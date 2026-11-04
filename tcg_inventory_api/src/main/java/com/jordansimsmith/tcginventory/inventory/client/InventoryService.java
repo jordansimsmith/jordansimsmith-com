@@ -10,6 +10,8 @@ public interface InventoryService {
   ReleaseUnitResponse releaseUnit(RequestContext ctx, ReleaseUnitRequest request)
       throws ServiceException;
 
+  SellUnitResponse sellUnit(RequestContext ctx, SellUnitRequest request) throws ServiceException;
+
   CreateUnitResponse createUnit(RequestContext ctx, CreateUnitRequest request)
       throws ServiceException;
 

@@ -150,6 +150,77 @@ public class FakeInventoryService implements InventoryService {
     return new ReleaseUnitResponse();
   }
 
+  @Override
+  public SellUnitResponse sellUnit(RequestContext ctx, SellUnitRequest request)
+      throws ServiceException {
+    if (request.skuId() == null || request.skuId().isBlank()) {
+      throw new BadRequestException("sku_id is required");
+    }
+    if (request.sequenceNumber() < 0) {
+      throw new BadRequestException("sequence_number must be nonnegative");
+    }
+    if (request.reservationId() == null || request.reservationId().isBlank()) {
+      throw new BadRequestException("reservation_id is required");
+    }
+
+    var reservationKey =
+        new ReservationKey(
+            ctx.user(), request.reservationId(), request.skuId(), request.sequenceNumber());
+    var previous = reservations.get(reservationKey);
+    if ("sold".equals(previous)) return new SellUnitResponse();
+    if ("released".equals(previous)) {
+      throw new ConflictException("reservation has already been released");
+    }
+
+    var key = new Key(ctx.user(), request.skuId());
+    var all = new ArrayList<>(units.getOrDefault(key, List.of()));
+    var selected =
+        all.stream()
+            .filter(unit -> unit.sequenceNumber() == request.sequenceNumber())
+            .findFirst()
+            .orElseThrow(() -> new NotFoundException("Not Found"));
+    if (selected.status() != UnitStatus.RESERVED
+        || !request.reservationId().equals(selected.reservationId())) {
+      throw new ConflictException("unit is not reserved for this reservation");
+    }
+
+    all.replaceAll(
+        unit ->
+            unit.sequenceNumber() == request.sequenceNumber()
+                ? new Unit(
+                    unit.sequenceNumber(),
+                    unit.location(),
+                    UnitStatus.SOLD,
+                    unit.photos(),
+                    unit.createdAt(),
+                    Instant.now().getEpochSecond(),
+                    request.reservationId())
+                : unit);
+    units.put(key, all);
+    reservations.put(reservationKey, "sold");
+    var skuKey = new SkuKey(ctx.user(), request.skuId());
+    var sku = skus.get(skuKey);
+    if (sku != null) {
+      skus.put(
+          skuKey,
+          new Sku(
+              sku.skuId(),
+              sku.game(),
+              sku.externalId(),
+              sku.name(),
+              sku.setCode(),
+              sku.setName(),
+              sku.collectorNumber(),
+              sku.finish(),
+              sku.condition(),
+              sku.price(),
+              sku.fetchtcgCardId(),
+              sku.fetchtcgSetId(),
+              sku.version() + 1));
+    }
+    return new SellUnitResponse();
+  }
+
   private final GamesService gamesService;
   private final Map<CreationKey, CreateUnitResponse> creations = new HashMap<>();
   private final Map<GameKey, Integer> sequences = new HashMap<>();

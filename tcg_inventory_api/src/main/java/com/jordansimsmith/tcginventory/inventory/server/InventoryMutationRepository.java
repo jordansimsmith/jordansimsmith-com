@@ -331,6 +331,104 @@ public class InventoryMutationRepository {
             .build());
   }
 
+  public void sellUnit(String user, String reservationId, String skuId, int sequenceNumber) {
+    var now = clock.now();
+    var reservation =
+        InventoryReservationItem.create(user, reservationId, skuId, sequenceNumber, "sold");
+    var audit =
+        InventoryAuditItem.create(
+            user,
+            ulidGenerator.generate(),
+            "sell",
+            skuId,
+            sequenceNumber,
+            null,
+            "reserved",
+            "sold",
+            null,
+            now);
+    audit.setReservationId(reservationId);
+
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                TransactWriteItem.builder()
+                    .update(
+                        Update.builder()
+                            .tableName(tableName)
+                            .key(
+                                Map.of(
+                                    "pk",
+                                    AttributeValue.builder()
+                                        .s(InventoryUnitItem.formatPk(user, skuId))
+                                        .build(),
+                                    "sk",
+                                    AttributeValue.builder()
+                                        .s(InventoryUnitItem.formatSk(sequenceNumber))
+                                        .build()))
+                            .updateExpression("SET #status = :sold, updated_at = :now")
+                            .conditionExpression(
+                                "attribute_exists(pk) AND #status = :reserved AND"
+                                    + " reservation_id = :owner")
+                            .expressionAttributeNames(Map.of("#status", "status"))
+                            .expressionAttributeValues(
+                                Map.of(
+                                    ":sold",
+                                    AttributeValue.builder().s("sold").build(),
+                                    ":reserved",
+                                    AttributeValue.builder().s("reserved").build(),
+                                    ":owner",
+                                    AttributeValue.builder().s(reservationId).build(),
+                                    ":now",
+                                    AttributeValue.builder()
+                                        .n(Long.toString(now.getEpochSecond()))
+                                        .build()))
+                            .build())
+                    .build(),
+                TransactWriteItem.builder()
+                    .update(
+                        Update.builder()
+                            .tableName(tableName)
+                            .key(
+                                Map.of(
+                                    "pk",
+                                    AttributeValue.builder()
+                                        .s(InventorySkuItem.formatPk(user, skuId))
+                                        .build(),
+                                    "sk",
+                                    AttributeValue.builder().s("SKU").build()))
+                            .updateExpression("ADD #version :one")
+                            .conditionExpression("attribute_exists(pk)")
+                            .expressionAttributeNames(Map.of("#version", "version"))
+                            .expressionAttributeValues(
+                                Map.of(":one", AttributeValue.builder().n("1").build()))
+                            .build())
+                    .build(),
+                TransactWriteItem.builder()
+                    .put(
+                        Put.builder()
+                            .tableName(tableName)
+                            .item(
+                                TableSchema.fromBean(InventoryAuditItem.class)
+                                    .itemToMap(audit, true))
+                            .build())
+                    .build(),
+                TransactWriteItem.builder()
+                    .put(
+                        Put.builder()
+                            .tableName(tableName)
+                            .item(
+                                TableSchema.fromBean(InventoryReservationItem.class)
+                                    .itemToMap(reservation, true))
+                            .conditionExpression("attribute_not_exists(pk) OR #status = :reserved")
+                            .expressionAttributeNames(Map.of("#status", "status"))
+                            .expressionAttributeValues(
+                                Map.of(":reserved", AttributeValue.builder().s("reserved").build()))
+                            .build())
+                    .build())
+            .build());
+  }
+
   public InventoryReserveUnitOperationItem reserveUnit(
       String user, String operationId, String reservationId, String skuId, int sequenceNumber) {
     var now = clock.now();
