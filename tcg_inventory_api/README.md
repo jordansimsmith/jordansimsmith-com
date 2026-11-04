@@ -598,7 +598,7 @@ Query parameters: optional `continuation` (opaque token from a previous page) an
 
 `GET /imports/{import_id}`
 
-Response `200` is the import summary plus `rows`, `total_suggested_price`, `unit_count`, and `placement_instructions`. The total is the sum of keep rows' suggested listing prices (`0.00` when there are none) and is derived at read time. `unit_count` and `placement_instructions` are `null` until the import is confirmed; after confirmation they are derived from keep rows and their assigned sequence numbers. Each placement instruction carries the card names at its boundary locations.
+Response `200` is the import summary plus `rows`, `total_suggested_price`, `unit_count`, and `placement_instructions`. The total is the sum of keep rows' suggested listing prices (`0.00` when there are none) and is derived at read time. `unit_count` and `placement_instructions` are `null` until the import is confirmed; after confirmation they are derived from keep rows and their assigned sequence numbers. Each instruction describes a contiguous run within one storage block, so sequence gaps split instructions even when the block label repeats. It carries the card names at its boundary locations and counts only the assigned units in that run.
 
 `POST /imports/{import_id}/confirm`
 

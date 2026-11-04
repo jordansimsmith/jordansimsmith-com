@@ -870,7 +870,12 @@ function buildPlacementInstructions(
     while (endIndex + 1 < keepRows.length) {
       const nextRow = keepRows[endIndex + 1];
       const nextSequenceNumber = nextRow.sequence_number ?? endIndex + 1;
-      if (Math.floor(nextSequenceNumber / 100) !== block) {
+      const currentSequenceNumber =
+        keepRows[endIndex].sequence_number ?? endIndex;
+      if (
+        nextSequenceNumber !== currentSequenceNumber + 1 ||
+        Math.floor(nextSequenceNumber / 100) !== block
+      ) {
         break;
       }
       endIndex += 1;

@@ -183,16 +183,19 @@ public class GetImportHandler
       return instructions;
     }
 
-    int currentBlockNumber = keepRows.get(0).getSequenceNumber() / 100;
     int blockStartIndex = 0;
-    for (int index = 0; index < keepRows.size(); index++) {
+    int previousSequenceNumber = keepRows.get(0).getSequenceNumber();
+    int currentBlockNumber = previousSequenceNumber / 100;
+    for (int index = 1; index < keepRows.size(); index++) {
       int blockNumber = keepRows.get(index).getSequenceNumber() / 100;
-      if (blockNumber != currentBlockNumber) {
+      int sequenceNumber = keepRows.get(index).getSequenceNumber();
+      if (sequenceNumber != previousSequenceNumber + 1 || blockNumber != currentBlockNumber) {
         instructions.add(
             buildPlacementInstruction(keepRows, blockStartIndex, index - 1, currentBlockNumber));
         currentBlockNumber = blockNumber;
         blockStartIndex = index;
       }
+      previousSequenceNumber = sequenceNumber;
     }
     instructions.add(
         buildPlacementInstruction(

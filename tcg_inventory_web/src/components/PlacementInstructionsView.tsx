@@ -60,7 +60,10 @@ export function PlacementInstructionsView({
         </Box>
 
         {placementInstructions.map((instruction) => (
-          <Box key={instruction.block} className={classes.instructionRow}>
+          <Box
+            key={instruction.from_location}
+            className={classes.instructionRow}
+          >
             <Group className={classes.blockSummary} gap="md">
               <Text fz="lg" fw={700} className={classes.block}>
                 {instruction.block}

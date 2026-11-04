@@ -297,6 +297,68 @@ public class ConfirmImportHandlerIntegrationTest {
   }
 
   @Test
+  void getConfirmedImportShouldSplitPlacementInstructionsAtGapsAndBlockBoundaries()
+      throws Exception {
+    // arrange
+    var importItem =
+        ImportItem.create(
+            "jordan", "mtg", "import1", "test.csv", 5, null, Instant.ofEpochSecond(1700000000));
+    importItem.setStatus("confirmed");
+    importTable.putItem(importItem);
+
+    var sequenceNumbers = List.of(4200, 4201, 4204, 4299, 4300);
+    var names = List.of("Card A", "Card B", "Card C", "Card D", "Card E");
+    for (int index = 0; index < sequenceNumbers.size(); index++) {
+      int position = index + 1;
+      createKeepRow(
+          "jordan", "import1", position, "card-" + position, "normal", "NM", names.get(index));
+      var row =
+          importRowTable.getItem(
+              Key.builder()
+                  .partitionValue(ImportRowItem.formatPk("jordan", "import1"))
+                  .sortValue(ImportRowItem.formatSk(position))
+                  .build());
+      row.setSequenceNumber(sequenceNumbers.get(index));
+      importRowTable.putItem(row);
+    }
+
+    // act
+    var response =
+        getImportHandler.handleRequest(buildEvent("jordan", Map.of("import_id", "import1")), null);
+
+    // assert
+    var body = objectMapper.readTree(response.getBody());
+    assertThat(body.get("unit_count").asInt()).isEqualTo(5);
+    assertThat(body.get("total_suggested_price").asText()).isEqualTo("7.50");
+    var instructions = body.get("placement_instructions");
+    assertThat(instructions).hasSize(4);
+    assertThat(instructions.get(0).get("block").asText()).isEqualTo("A42");
+    assertThat(instructions.get(0).get("from_location").asText()).isEqualTo("A42-0");
+    assertThat(instructions.get(0).get("to_location").asText()).isEqualTo("A42-1");
+    assertThat(instructions.get(0).get("from_name").asText()).isEqualTo("Card A");
+    assertThat(instructions.get(0).get("to_name").asText()).isEqualTo("Card B");
+    assertThat(instructions.get(0).get("unit_count").asInt()).isEqualTo(2);
+    assertThat(instructions.get(1).get("block").asText()).isEqualTo("A42");
+    assertThat(instructions.get(1).get("from_location").asText()).isEqualTo("A42-4");
+    assertThat(instructions.get(1).get("to_location").asText()).isEqualTo("A42-4");
+    assertThat(instructions.get(1).get("from_name").asText()).isEqualTo("Card C");
+    assertThat(instructions.get(1).get("to_name").asText()).isEqualTo("Card C");
+    assertThat(instructions.get(1).get("unit_count").asInt()).isEqualTo(1);
+    assertThat(instructions.get(2).get("block").asText()).isEqualTo("A42");
+    assertThat(instructions.get(2).get("from_location").asText()).isEqualTo("A42-99");
+    assertThat(instructions.get(2).get("to_location").asText()).isEqualTo("A42-99");
+    assertThat(instructions.get(2).get("from_name").asText()).isEqualTo("Card D");
+    assertThat(instructions.get(2).get("to_name").asText()).isEqualTo("Card D");
+    assertThat(instructions.get(2).get("unit_count").asInt()).isEqualTo(1);
+    assertThat(instructions.get(3).get("block").asText()).isEqualTo("A43");
+    assertThat(instructions.get(3).get("from_location").asText()).isEqualTo("A43-0");
+    assertThat(instructions.get(3).get("to_location").asText()).isEqualTo("A43-0");
+    assertThat(instructions.get(3).get("from_name").asText()).isEqualTo("Card E");
+    assertThat(instructions.get(3).get("to_name").asText()).isEqualTo("Card E");
+    assertThat(instructions.get(3).get("unit_count").asInt()).isEqualTo(1);
+  }
+
+  @Test
   void confirmShouldSkipDiscardAndReviewRows() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));

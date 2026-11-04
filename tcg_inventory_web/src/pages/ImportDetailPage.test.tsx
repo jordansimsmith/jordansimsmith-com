@@ -643,6 +643,14 @@ describe('ImportDetailPage', () => {
           unit_count: 2,
         },
         {
+          block: 'A42',
+          from_location: 'A42-4',
+          to_location: 'A42-4',
+          from_name: 'Gap Card',
+          to_name: 'Gap Card',
+          unit_count: 1,
+        },
+        {
           block: 'A43',
           from_location: 'A43-0',
           to_location: 'A43-0',
@@ -658,11 +666,13 @@ describe('ImportDetailPage', () => {
     const placementSheet = await screen.findByRole('region', {
       name: 'Placement sheet',
     });
-    expect(within(placementSheet).getByText('A42')).toBeDefined();
+    expect(within(placementSheet).getAllByText('A42')).toHaveLength(2);
     expect(within(placementSheet).getByText('A43')).toBeDefined();
     expect(
       within(placementSheet).getByText('A42-98 through A42-99'),
     ).toBeDefined();
+    expect(within(placementSheet).getByText('A42-4')).toBeDefined();
+    expect(within(placementSheet).getByText('Gap Card')).toBeDefined();
     expect(within(placementSheet).getByText('A43-0')).toBeDefined();
     expect(
       within(placementSheet).getByText(
