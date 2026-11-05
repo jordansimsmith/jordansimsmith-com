@@ -14,7 +14,6 @@ import com.jordansimsmith.tcginventory.catalog.FakeTcgCsvClient;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
-import com.jordansimsmith.tcginventory.inventory.SequenceCounterItem;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
@@ -101,8 +100,6 @@ public interface TcgInventoryTestFactory extends CatalogFactory {
   DynamoDbTable<CatalogSnapshotItem> catalogSnapshotTable();
 
   DynamoDbTable<SettingsItem> settingsTable();
-
-  DynamoDbTable<SequenceCounterItem> sequenceCounterTable();
 
   ScanRepository scanRepository();
 

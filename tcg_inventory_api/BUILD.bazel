@@ -206,14 +206,17 @@ java_library(
 
 java_library(
     name = "inventory-lib",
-    srcs = glob(
-        ["src/main/java/com/jordansimsmith/tcginventory/inventory/*.java"],
-        exclude = ["src/main/java/com/jordansimsmith/tcginventory/inventory/*Handler.java"],
-    ),
+    srcs = [
+        "src/main/java/com/jordansimsmith/tcginventory/inventory/InventoryLocation.java",
+        "src/main/java/com/jordansimsmith/tcginventory/inventory/SkuItem.java",
+        "src/main/java/com/jordansimsmith/tcginventory/inventory/UnitItem.java",
+    ],
     deps = [
         ":lib",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
-    ] + COMMON_DEPS,
+        "//lib/dynamodb:lib",
+        "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+    ],
 )
 
 java_library(
@@ -223,7 +226,6 @@ java_library(
         exclude = ["src/main/java/com/jordansimsmith/tcginventory/orders/*Handler.java"],
     ),
     deps = [
-        ":inventory-lib",
         ":lib",
         ":settings-lib",
         "//lib/service",
@@ -773,7 +775,6 @@ java_binary(
     deps = [
         ":catalog-lib",
         ":import-lib",
-        ":inventory-lib",
         ":lib",
         ":order-lib",
         ":pricing-lib",

@@ -16,7 +16,6 @@ import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
-import com.jordansimsmith.tcginventory.inventory.SequenceCounterItem;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.inventory.server.InventoryModule;
@@ -152,13 +151,6 @@ public class TcgInventoryTestModule {
   DynamoDbTable<CatalogSnapshotItem> catalogSnapshotTable(DynamoDbEnhancedClient client) {
     return client.table(
         TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(CatalogSnapshotItem.class));
-  }
-
-  @Provides
-  @Singleton
-  DynamoDbTable<SequenceCounterItem> sequenceCounterTable(DynamoDbEnhancedClient client) {
-    return client.table(
-        TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(SequenceCounterItem.class));
   }
 
   @Provides

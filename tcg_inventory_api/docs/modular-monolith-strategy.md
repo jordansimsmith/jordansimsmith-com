@@ -8,12 +8,7 @@ This is a target architecture and an incremental migration strategy, not a descr
 
 The service already groups Java code into verticals: games, catalog, scans, imports, inventory, orders, reports, publish, settings, and pricing. Bazel gives these verticals separate libraries, but consumers can still depend on implementation libraries and persistence models. Shared infrastructure includes the top-level Dagger factory/module, job records and dispatch, audit records, table configuration, and storage helpers. The factory and module may remain at the top level while other root-package code migrates into vertical packages or `//lib` packages for truly shared libraries.
 
-Examples of coupling to remove include:
-
-- Import confirmation constructs inventory persistence models and calls `InventoryRepository` directly.
-- Reports query inventory and order records directly and aggregate their persistence models.
-- Pricing, orders, and publish depend on inventory implementation code.
-- HTTP handlers perform application work and return HTTP errors from within that work.
+Remaining ownership gaps include Reports' direct order and audit reads and Orders' direct SKU and unit reads for pick-sheet location and neighbor details. Orders otherwise uses Inventory services for reservation, release, sale, and admission checks. Root-package wiring still has access to server targets because Bazel visibility applies to the whole package.
 
 Existing import confirmation and order processing already use durable progress and replay to complete work in smaller transactions. Preserve those guarantees while changing ownership; service interfaces alone do not provide them.
 
@@ -183,7 +178,11 @@ The starting ownership model is:
 | FetchTCG  | Marketplace account, credentials, seller identity, and provider integration                |
 | Settings  | Application settings not assigned to another vertical                                      |
 
-Inventory owns authoritative unit reservations and availability. Orders asks inventory to reserve, release, or sell units and records its own workflow progress. Pricing asks inventory to apply price changes; publish obtains listing data and acknowledges publication through inventory's contract. These callers cannot mutate stock or SKU records themselves.
+Inventory owns SKUs, units, sequence and location allocation, receipts, reservation lifecycle, stock transitions, and stock and price mutation audits. It selects and reserves one unit per operation; callers save returned allocations as their own workflow progress. Imports creates units through a stable per-row operation ID, then records the returned location and SKU on its row. Creation is visible incrementally, and sequence gaps are accepted. If a downstream progress save fails, callers retry forward with the same operation ID.
+
+Orders asks Inventory to reserve, release, or sell units and records its own workflow progress. Reservation receipts return the original unit on replay; lifecycle records make completed releases and sales replay-safe. Releasing or selling a unit updates its lifecycle, the unit, related SKU bookkeeping, and an audit in one Inventory transaction. Pricing applies last-write-wins price patches through Inventory. Listings owns marketplace synchronization and current and historical listing associations; it acknowledges publication through a versioned dirty-state patch on Inventory. These callers do not write Inventory records directly.
+
+Inventory exposes read clients for SKU and unit facts used by other verticals. Order-detail picking still reads the legacy SKU and unit models to construct location, block, and neighbor details. Reports reads order and Inventory audit records directly; its audit watermark can miss payment-only and other order-only changes until another Inventory audit or the 24-hour age limit. These are read-side migration gaps, so mutation ownership is complete while Inventory isolation is not. The root Bazel package remains an enforcement gap because application wiring and business targets still share it.
 
 Listing photos cross lifecycle boundaries: imports owns review-time attachments, while inventory must retain the immutable photo references needed by confirmed units. Shared S3 storage does not imply shared authority to change those references.
 
@@ -214,12 +213,12 @@ For import confirmation, the intended flow is:
 
 1. Imports durably accepts confirmation and records stable operation identity.
 2. Imports calls inventory with ordered stock data and a stable identity for each retriable operation.
-3. Inventory owns sequence allocation, stock creation, associated audit writes, and deduplication. Replaying an accepted operation returns its prior outcome without creating more units or allocating a new sequence range.
+3. Inventory owns sequence allocation, stock creation, associated audit writes, and deduplication. Replaying an accepted operation returns its original SKU, sequence, and location without another unit or audit.
 4. Imports persists progress and marks the import confirmed only after inventory confirms all required effects.
 
 If inventory commits and imports crashes before saving progress, imports repeats the same operation. A new attempt must not generate a new idempotency key. Deduplication and its authoritative mutation must be committed atomically within inventory, or have an equivalent recoverable protocol. Define retention of deduplication records against the workflow's replay window.
 
-Preserve existing ordering, location, photo, and audit guarantees. Decide whether stock becomes visible incrementally or only after finalization; changing that behavior requires an explicit product contract change. Bulk service operations do not imply one unbounded DynamoDB transaction.
+Stock becomes visible as each row succeeds. Preserve row ordering, photo references, and each row's actual location; gaps and interleaving with other stock creation are allowed. Bulk service operations do not imply one unbounded DynamoDB transaction.
 
 Where committing local state must reliably schedule follow-up work, use a transactional outbox or an equivalent durable delivery mechanism. Sending a queue message after a database commit is not atomic. This is especially relevant to existing paths whose queue-send failures leave durable jobs awaiting manual enqueue.
 

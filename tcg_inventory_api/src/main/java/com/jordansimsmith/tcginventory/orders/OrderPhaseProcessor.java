@@ -6,7 +6,6 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.BuyerAddress;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindOffersRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.ReleaseUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.ReserveUnitRequest;
@@ -221,7 +220,7 @@ public class OrderPhaseProcessor {
   private Instant loadTrackOrdersAfter(String user) {
     var key =
         Key.builder()
-            .partitionValue(SkuItem.formatUserPk(user))
+            .partitionValue(OrderItem.formatPk(user))
             .sortValue(SettingsItem.formatSk())
             .build();
     var settingsItem = settingsTable.getItem(key);
@@ -263,7 +262,7 @@ public class OrderPhaseProcessor {
             .queryConditional(
                 QueryConditional.sortBeginsWith(
                     Key.builder()
-                        .partitionValue(SkuItem.formatUserPk(user))
+                        .partitionValue(OrderItem.formatPk(user))
                         .sortValue(OrderItem.ORDER_PREFIX)
                         .build()))
             .consistentRead(true)
