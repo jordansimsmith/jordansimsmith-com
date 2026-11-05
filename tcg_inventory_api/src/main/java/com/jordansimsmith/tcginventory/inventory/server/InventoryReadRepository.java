@@ -1,5 +1,6 @@
 package com.jordansimsmith.tcginventory.inventory.server;
 
+import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -77,6 +78,37 @@ public class InventoryReadRepository {
             .sortValue(InventoryUnitItem.formatSk(sequenceNumber))
             .build();
     return unitTable.getItem(request -> request.key(key).consistentRead(true));
+  }
+
+  @Nullable
+  public InventorySkuItem getSkuForUnit(InventoryUnitItem unit) {
+    return skuTable.getItem(
+        request ->
+            request
+                .key(Key.builder().partitionValue(unit.getPk()).sortValue("SKU").build())
+                .consistentRead(true));
+  }
+
+  public List<InventoryUnitItem> findBlockUnits(String user, String game, int blockNumber) {
+    var firstSequence = (long) blockNumber * 100;
+    var lastSequence = firstSequence + 99;
+    var request =
+        QueryEnhancedRequest.builder()
+            .queryConditional(
+                QueryConditional.sortBetween(
+                    Key.builder()
+                        .partitionValue(InventoryUnitItem.formatGsi3pk(user, game))
+                        .sortValue(firstSequence)
+                        .build(),
+                    Key.builder()
+                        .partitionValue(InventoryUnitItem.formatGsi3pk(user, game))
+                        .sortValue(lastSequence)
+                        .build()))
+            .scanIndexForward(true)
+            .build();
+    return unitTable.index(InventoryUnitItem.GSI3_NAME).query(request).stream()
+        .flatMap(page -> page.items().stream())
+        .toList();
   }
 
   public Page<InventoryUnitItem> findUnits(

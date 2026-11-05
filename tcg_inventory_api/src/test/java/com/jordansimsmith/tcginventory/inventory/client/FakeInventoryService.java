@@ -396,6 +396,81 @@ public class FakeInventoryService implements InventoryService {
   }
 
   @Override
+  public FindUnitLocationsResponse findUnitLocations(
+      RequestContext ctx, FindUnitLocationsRequest request) throws ServiceException {
+    if (request.units() == null) {
+      throw new BadRequestException("units is required");
+    }
+    if (request.units().size() > 100) {
+      throw new BadRequestException("units must contain at most 100 entries");
+    }
+    for (var reference : request.units()) {
+      if (reference == null) {
+        throw new BadRequestException("units must not contain null");
+      }
+      if (reference.skuId() == null || reference.skuId().isBlank()) {
+        throw new BadRequestException("sku_id is required");
+      }
+      if (reference.sequenceNumber() < 0) {
+        throw new BadRequestException("sequence_number must be nonnegative");
+      }
+    }
+    if (request.units().isEmpty()) {
+      return new FindUnitLocationsResponse(List.of());
+    }
+
+    var requestedSkus = new ArrayList<Sku>();
+    var blocks = new HashSet<BlockKey>();
+    for (var reference : request.units()) {
+      var sku = getSku(ctx, new GetSkuRequest(reference.skuId())).sku();
+      requestedSkus.add(sku);
+      blocks.add(new BlockKey(sku.game(), reference.sequenceNumber() / 100));
+    }
+
+    var blockUnits = new HashMap<BlockKey, List<UnitWithSku>>();
+    for (var block : blocks) {
+      var unitsInBlock = new ArrayList<UnitWithSku>();
+      for (var entry : units.entrySet()) {
+        if (!entry.getKey().user().equals(ctx.user())) {
+          continue;
+        }
+        var sku = skus.get(new SkuKey(ctx.user(), entry.getKey().skuId()));
+        if (sku == null || !sku.game().equals(block.game())) {
+          continue;
+        }
+        for (var unit : entry.getValue()) {
+          if (unit.sequenceNumber() / 100 == block.blockNumber()
+              && (unit.status() == UnitStatus.IN_STOCK || unit.status() == UnitStatus.RESERVED)) {
+            unitsInBlock.add(new UnitWithSku(unit, sku));
+          }
+        }
+      }
+      unitsInBlock.sort(Comparator.comparingInt(value -> value.unit().sequenceNumber()));
+      blockUnits.put(block, unitsInBlock);
+    }
+
+    var locations = new ArrayList<UnitLocation>();
+    for (var index = 0; index < request.units().size(); index++) {
+      var reference = request.units().get(index);
+      var sku = requestedSkus.get(index);
+      var blockNumber = reference.sequenceNumber() / 100;
+      var unitsInBlock = blockUnits.get(new BlockKey(sku.game(), blockNumber));
+      var position = findPosition(unitsInBlock, reference.sequenceNumber());
+      if (position != null) {
+        locations.add(
+            new UnitLocation(
+                sku,
+                reference.sequenceNumber(),
+                formatLocation(reference.sequenceNumber()),
+                formatLocation(blockNumber, position.offset()),
+                position.previous() == null ? null : position.previous().sku(),
+                position.next() == null ? null : position.next().sku()));
+      }
+    }
+    return new FindUnitLocationsResponse(locations);
+  }
+
+  @Override
   public DeleteUnitResponse deleteUnit(RequestContext ctx, DeleteUnitRequest request)
       throws ServiceException {
     var key = new Key(ctx.user(), request.skuId());
@@ -581,7 +656,42 @@ public class FakeInventoryService implements InventoryService {
     }
   }
 
+  private static String formatLocation(int sequenceNumber) {
+    return formatLocation(sequenceNumber / 100, sequenceNumber % 100);
+  }
+
+  private Position findPosition(List<UnitWithSku> units, int sequenceNumber) {
+    var positionIndex = 0;
+    while (positionIndex < units.size()
+        && units.get(positionIndex).unit().sequenceNumber() < sequenceNumber) {
+      positionIndex++;
+    }
+
+    if (positionIndex == units.size()
+        || units.get(positionIndex).unit().sequenceNumber() != sequenceNumber) {
+      return null;
+    }
+
+    return new Position(
+        positionIndex, unitAt(units, positionIndex - 1), unitAt(units, positionIndex + 1));
+  }
+
+  private UnitWithSku unitAt(List<UnitWithSku> units, int index) {
+    return index < 0 || index >= units.size() ? null : units.get(index);
+  }
+
+  private static String formatLocation(int blockNumber, int offset) {
+    var letter = (char) ('A' + blockNumber / 100);
+    return "" + letter + blockNumber % 100 + "-" + offset;
+  }
+
   private record Key(String user, String skuId) {}
 
   private record SkuKey(String user, String skuId) {}
+
+  private record BlockKey(String game, int blockNumber) {}
+
+  private record UnitWithSku(Unit unit, Sku sku) {}
+
+  private record Position(int offset, UnitWithSku previous, UnitWithSku next) {}
 }

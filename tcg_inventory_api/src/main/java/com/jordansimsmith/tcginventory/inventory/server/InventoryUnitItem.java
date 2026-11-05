@@ -9,6 +9,7 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbConvertedBy;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbPartitionKey;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondaryPartitionKey;
+import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSecondarySortKey;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortKey;
 
 @DynamoDbBean
@@ -20,6 +21,7 @@ public class InventoryUnitItem {
   public static final String GAME = "game";
   public static final String RESERVATION_ID = "reservation_id";
   public static final String GSI3PK = "gsi3pk";
+  public static final String GSI3_NAME = "gsi3";
   public static final String PHOTOS = "photos";
   public static final String CREATED_AT = "created_at";
   public static final String UPDATED_AT = "updated_at";
@@ -56,6 +58,7 @@ public class InventoryUnitItem {
     this.sk = sk;
   }
 
+  @DynamoDbSecondarySortKey(indexNames = GSI3_NAME)
   @DynamoDbAttribute(SEQUENCE_NUMBER)
   public Integer getSequenceNumber() {
     return sequenceNumber;
@@ -92,7 +95,7 @@ public class InventoryUnitItem {
     this.reservationId = reservationId;
   }
 
-  @DynamoDbSecondaryPartitionKey(indexNames = "gsi3")
+  @DynamoDbSecondaryPartitionKey(indexNames = GSI3_NAME)
   @DynamoDbAttribute(GSI3PK)
   public String getGsi3pk() {
     return gsi3pk;
@@ -137,6 +140,10 @@ public class InventoryUnitItem {
 
   public static String formatSk(int sequenceNumber) {
     return UNIT_PREFIX + "%010d".formatted(sequenceNumber);
+  }
+
+  public static String formatGsi3pk(String user, String game) {
+    return "USER#" + user + "#UNITS#" + game;
   }
 
   @DynamoDbBean

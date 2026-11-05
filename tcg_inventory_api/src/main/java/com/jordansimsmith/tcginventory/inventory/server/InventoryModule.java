@@ -10,6 +10,8 @@ import com.jordansimsmith.tcginventory.inventory.client.DeleteUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.DeleteUnitResponse;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusResponse;
+import com.jordansimsmith.tcginventory.inventory.client.FindUnitLocationsRequest;
+import com.jordansimsmith.tcginventory.inventory.client.FindUnitLocationsResponse;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsResponse;
 import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
@@ -59,6 +61,7 @@ public class InventoryModule {
     var getSkuService = new GetSkuService(inventoryRepository);
     var getUnitService = new GetUnitService(inventoryRepository);
     var findUnitsService = new FindUnitsService(inventoryRepository, objectMapper);
+    var findUnitLocationsService = new FindUnitLocationsService(inventoryRepository);
     var createUnitOperationTable =
         dynamoDb.table(tableName, TableSchema.fromBean(InventoryCreateUnitOperationItem.class));
     var mutationRepository =
@@ -127,6 +130,12 @@ public class InventoryModule {
       public FindUnitsResponse findUnits(RequestContext ctx, FindUnitsRequest request)
           throws ServiceException {
         return findUnitsService.findUnits(ctx, request);
+      }
+
+      @Override
+      public FindUnitLocationsResponse findUnitLocations(
+          RequestContext ctx, FindUnitLocationsRequest request) throws ServiceException {
+        return findUnitLocationsService.findUnitLocations(ctx, request);
       }
 
       @Override

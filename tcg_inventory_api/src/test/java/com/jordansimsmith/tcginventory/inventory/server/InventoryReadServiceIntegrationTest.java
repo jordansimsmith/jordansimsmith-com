@@ -21,6 +21,8 @@ import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import com.jordansimsmith.tcginventory.inventory.client.CreateUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
+import com.jordansimsmith.tcginventory.inventory.client.FindUnitLocationsRequest;
+import com.jordansimsmith.tcginventory.inventory.client.FindUnitLocationsResponse;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
 import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
 import com.jordansimsmith.tcginventory.inventory.client.ReleaseUnitRequest;
@@ -28,12 +30,14 @@ import com.jordansimsmith.tcginventory.inventory.client.ReleaseUnitResponse;
 import com.jordansimsmith.tcginventory.inventory.client.ReserveUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.SellUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.SellUnitResponse;
+import com.jordansimsmith.tcginventory.inventory.client.UnitReference;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuRequest;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuResponse;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateUnitRequest;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.AfterAll;
@@ -50,9 +54,19 @@ import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
+import software.amazon.awssdk.services.dynamodb.model.AttributeDefinition;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.BillingMode;
 import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
+import software.amazon.awssdk.services.dynamodb.model.CreateTableRequest;
+import software.amazon.awssdk.services.dynamodb.model.GlobalSecondaryIndex;
+import software.amazon.awssdk.services.dynamodb.model.KeySchemaElement;
+import software.amazon.awssdk.services.dynamodb.model.KeyType;
+import software.amazon.awssdk.services.dynamodb.model.Projection;
+import software.amazon.awssdk.services.dynamodb.model.ProjectionType;
+import software.amazon.awssdk.services.dynamodb.model.ScalarAttributeType;
 import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
+import software.amazon.awssdk.services.dynamodb.waiters.DynamoDbWaiter;
 
 @Testcontainers
 class InventoryReadServiceIntegrationTest {
@@ -68,9 +82,72 @@ class InventoryReadServiceIntegrationTest {
   private static DynamoDbTable<InventoryReserveUnitOperationItem> reserveUnitOperationTable;
   private static DynamoDbTable<InventoryReservationItem> reservationTable;
 
+  private static void createInventoryTable() {
+    var request =
+        CreateTableRequest.builder()
+            .tableName(TABLE_NAME)
+            .billingMode(BillingMode.PAY_PER_REQUEST)
+            .attributeDefinitions(
+                AttributeDefinition.builder()
+                    .attributeName("pk")
+                    .attributeType(ScalarAttributeType.S)
+                    .build(),
+                AttributeDefinition.builder()
+                    .attributeName("sk")
+                    .attributeType(ScalarAttributeType.S)
+                    .build(),
+                AttributeDefinition.builder()
+                    .attributeName("gsi1pk")
+                    .attributeType(ScalarAttributeType.S)
+                    .build(),
+                AttributeDefinition.builder()
+                    .attributeName("gsi1sk")
+                    .attributeType(ScalarAttributeType.S)
+                    .build(),
+                AttributeDefinition.builder()
+                    .attributeName("gsi2pk")
+                    .attributeType(ScalarAttributeType.S)
+                    .build(),
+                AttributeDefinition.builder()
+                    .attributeName("gsi2sk")
+                    .attributeType(ScalarAttributeType.S)
+                    .build(),
+                AttributeDefinition.builder()
+                    .attributeName("gsi3pk")
+                    .attributeType(ScalarAttributeType.S)
+                    .build(),
+                AttributeDefinition.builder()
+                    .attributeName("sequence_number")
+                    .attributeType(ScalarAttributeType.N)
+                    .build())
+            .keySchema(
+                KeySchemaElement.builder().attributeName("pk").keyType(KeyType.HASH).build(),
+                KeySchemaElement.builder().attributeName("sk").keyType(KeyType.RANGE).build())
+            .globalSecondaryIndexes(
+                index("gsi1", "gsi1pk", "gsi1sk"),
+                index("gsi2", "gsi2pk", "gsi2sk"),
+                index("gsi3", "gsi3pk", "sequence_number"))
+            .build();
+    dynamoDbClient.createTable(request);
+    try (var waiter = DynamoDbWaiter.builder().client(dynamoDbClient).build()) {
+      waiter.waitUntilTableExists(builder -> builder.tableName(TABLE_NAME).build()).matched();
+    }
+  }
+
+  private static GlobalSecondaryIndex index(String name, String partition, String sort) {
+    return GlobalSecondaryIndex.builder()
+        .indexName(name)
+        .keySchema(
+            KeySchemaElement.builder().attributeName(partition).keyType(KeyType.HASH).build(),
+            KeySchemaElement.builder().attributeName(sort).keyType(KeyType.RANGE).build())
+        .projection(Projection.builder().projectionType(ProjectionType.ALL).build())
+        .build();
+  }
+
   private FindUnitsService service;
   private FindSkusService findSkusService;
   private GetSkuService getSkuService;
+  private FindUnitLocationsService findUnitLocationsService;
   private UpdateSkuService updateSkuService;
   private int nextAuditId;
 
@@ -95,7 +172,7 @@ class InventoryReadServiceIntegrationTest {
             TABLE_NAME, TableSchema.fromBean(InventoryReserveUnitOperationItem.class));
     reservationTable =
         enhancedClient.table(TABLE_NAME, TableSchema.fromBean(InventoryReservationItem.class));
-    DynamoDbUtils.createTable(dynamoDbClient, skuTable);
+    createInventoryTable();
   }
 
   @AfterAll
@@ -111,6 +188,7 @@ class InventoryReadServiceIntegrationTest {
     var repository = new InventoryReadRepository(skuTable, unitTable);
     findSkusService = new FindSkusService(repository, new ObjectMapper());
     getSkuService = new GetSkuService(repository);
+    findUnitLocationsService = new FindUnitLocationsService(repository);
     nextAuditId = 0;
     var mutationRepository =
         new InventoryMutationRepository(
@@ -1562,6 +1640,213 @@ class InventoryReadServiceIntegrationTest {
   }
 
   @Test
+  void findUnitLocationsShouldUsePhysicalNeighborsAndPreserveInputOrder() throws Exception {
+    // arrange
+    for (var skuId : List.of("requested", "reserved", "sold", "removed", "next")) {
+      skuTable.putItem(sku("alice", skuId, skuId, null));
+    }
+    unitTable.putItem(locationUnit("alice", "previous-block", "mtg", 99, "in_stock"));
+    unitTable.putItem(locationUnit("alice", "reserved", "mtg", 100, "reserved"));
+    unitTable.putItem(locationUnit("alice", "sold", "mtg", 101, "sold"));
+    unitTable.putItem(locationUnit("alice", "removed", "mtg", 102, "removed"));
+    unitTable.putItem(locationUnit("alice", "requested", "mtg", 103, "in_stock"));
+    unitTable.putItem(locationUnit("alice", "next", "mtg", 104, "in_stock"));
+    unitTable.putItem(locationUnit("alice", "requested", "mtg", 105, "in_stock"));
+    unitTable.putItem(locationUnit("bob", "other-user", "mtg", 103, "in_stock"));
+    var request =
+        new FindUnitLocationsRequest(
+            List.of(
+                new UnitReference("requested", 103),
+                new UnitReference("requested", 105),
+                new UnitReference("sold", 101),
+                new UnitReference("removed", 102),
+                new UnitReference("requested", 106),
+                new UnitReference("requested", 103)));
+
+    // act
+    var response = findUnitLocationsService.findUnitLocations(new RequestContext("alice"), request);
+
+    // assert
+    assertThat(response.locations()).hasSize(3);
+    var first = response.locations().get(0);
+    assertThat(first.sequenceNumber()).isEqualTo(103);
+    assertThat(first.sku().skuId()).isEqualTo("requested");
+    assertThat(first.sequenceNumber()).isEqualTo(103);
+    assertThat(first.location()).isEqualTo("A1-3");
+    assertThat(first.currentLocation()).isEqualTo("A1-1");
+    assertThat(first.previousCard().skuId()).isEqualTo("reserved");
+    assertThat(first.nextCard().skuId()).isEqualTo("next");
+    var last = response.locations().get(1);
+    assertThat(last.sequenceNumber()).isEqualTo(105);
+    assertThat(last.currentLocation()).isEqualTo("A1-3");
+    assertThat(last.previousCard().skuId()).isEqualTo("next");
+    assertThat(last.nextCard()).isNull();
+    assertThat(response.locations().get(2)).isEqualTo(first);
+    var json = new ObjectMapper().valueToTree(last);
+    assertThat(json.has("sku")).isTrue();
+    assertThat(json.get("previous_card").isNull()).isFalse();
+    assertThat(json.get("next_card").isNull()).isTrue();
+  }
+
+  @Test
+  void findUnitLocationsShouldKeepGamesAndBlocksSeparateAndOmitAbsentUnits() throws Exception {
+    // arrange
+    skuTable.putItem(sku("alice", "mtg-card", "MTG card", null));
+    skuTable.putItem(sku("alice", "pokemon", "pokemon-card", "Pokémon card", true, null));
+    skuTable.putItem(sku("alice", "mtg-next-block", "MTG next block", null));
+    unitTable.putItem(locationUnit("alice", "mtg-card", "mtg", 100, "in_stock"));
+    unitTable.putItem(locationUnit("alice", "pokemon-card", "pokemon", 101, "in_stock"));
+    unitTable.putItem(locationUnit("alice", "mtg-card", "mtg", 102, "sold"));
+    unitTable.putItem(locationUnit("alice", "mtg-next-block", "mtg", 200, "in_stock"));
+
+    // act
+    var response =
+        findUnitLocationsService.findUnitLocations(
+            new RequestContext("alice"),
+            new FindUnitLocationsRequest(
+                List.of(
+                    new UnitReference("mtg-card", 100),
+                    new UnitReference("pokemon-card", 101),
+                    new UnitReference("mtg-card", 102))));
+
+    // assert
+    assertThat(response.locations()).hasSize(2);
+    assertThat(response.locations().get(0).currentLocation()).isEqualTo("A1-0");
+    assertThat(response.locations().get(0).previousCard()).isNull();
+    assertThat(response.locations().get(0).nextCard()).isNull();
+    assertThat(response.locations().get(1).currentLocation()).isEqualTo("A1-0");
+    assertThat(response.locations().get(1).previousCard()).isNull();
+    assertThat(response.locations().get(1).nextCard()).isNull();
+  }
+
+  @Test
+  void findUnitLocationsShouldValidateBeforeReadsAndSerializeContract() throws Exception {
+    // arrange
+    var repository = mock(InventoryReadRepository.class);
+    var service = new FindUnitLocationsService(repository);
+    var mapper = new ObjectMapper();
+
+    // act / assert
+    assertThat(
+            service
+                .findUnitLocations(
+                    new RequestContext("alice"), new FindUnitLocationsRequest(List.of()))
+                .locations())
+        .isEmpty();
+    assertThatThrownBy(
+            () ->
+                service.findUnitLocations(
+                    new RequestContext("alice"), new FindUnitLocationsRequest(null)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("units is required");
+    var nullReference = new ArrayList<UnitReference>();
+    nullReference.add(null);
+    assertThatThrownBy(
+            () ->
+                service.findUnitLocations(
+                    new RequestContext("alice"), new FindUnitLocationsRequest(nullReference)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("units must not contain null");
+    var tooManyReferences = new ArrayList<UnitReference>();
+    for (var index = 0; index < 101; index++) {
+      tooManyReferences.add(new UnitReference("sku", index));
+    }
+    assertThatThrownBy(
+            () ->
+                service.findUnitLocations(
+                    new RequestContext("alice"), new FindUnitLocationsRequest(tooManyReferences)))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("units must contain at most 100 entries");
+    assertThatThrownBy(
+            () ->
+                service.findUnitLocations(
+                    new RequestContext("alice"),
+                    new FindUnitLocationsRequest(List.of(new UnitReference(" ", 1)))))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("sku_id is required");
+    assertThatThrownBy(
+            () ->
+                service.findUnitLocations(
+                    new RequestContext("alice"),
+                    new FindUnitLocationsRequest(List.of(new UnitReference("sku", -1)))))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("sequence_number must be nonnegative");
+    assertThat(
+            mapper.writeValueAsString(
+                new FindUnitLocationsRequest(List.of(new UnitReference("sku", 7)))))
+        .isEqualTo("{\"units\":[{\"sku_id\":\"sku\",\"sequence_number\":7}]}");
+    assertThat(
+            mapper
+                .readTree(mapper.writeValueAsString(new FindUnitLocationsResponse(List.of())))
+                .has("locations"))
+        .isTrue();
+    verifyNoInteractions(repository);
+  }
+
+  @Test
+  void findUnitLocationsShouldFailForUnknownStatusesAndMissingNeighborSku() {
+    // arrange
+    skuTable.putItem(sku("alice", "requested", "Requested", null));
+    unitTable.putItem(locationUnit("alice", "requested", "mtg", 100, "lost"));
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                findUnitLocationsService.findUnitLocations(
+                    new RequestContext("alice"),
+                    new FindUnitLocationsRequest(List.of(new UnitReference("requested", 101)))))
+        .isInstanceOf(IllegalArgumentException.class);
+
+    // arrange
+    DynamoDbUtils.reset(dynamoDbClient);
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                findUnitLocationsService.findUnitLocations(
+                    new RequestContext("alice"),
+                    new FindUnitLocationsRequest(List.of(new UnitReference("missing", 101)))))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+
+    // arrange
+    DynamoDbUtils.reset(dynamoDbClient);
+    skuTable.putItem(sku("alice", "requested", "Requested", null));
+    var missingNeighbor = locationUnit("alice", "dangling", "mtg", 100, "in_stock");
+    missingNeighbor.setPk(InventoryUnitItem.formatPk("alice", "missing-sku"));
+    unitTable.putItem(missingNeighbor);
+    unitTable.putItem(locationUnit("alice", "requested", "mtg", 101, "in_stock"));
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                findUnitLocationsService.findUnitLocations(
+                    new RequestContext("alice"),
+                    new FindUnitLocationsRequest(List.of(new UnitReference("requested", 101)))))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("Inventory unit references a missing SKU");
+  }
+
+  @Test
+  void findUnitLocationsShouldPropagateStorageFailures() {
+    // arrange
+    var repository = mock(InventoryReadRepository.class);
+    var sku = sku("alice", "requested", "Requested", null);
+    when(repository.getSku("alice", "requested")).thenReturn(sku);
+    var failure = new IllegalStateException("storage failed");
+    when(repository.findBlockUnits("alice", "mtg", 1)).thenThrow(failure);
+    var service = new FindUnitLocationsService(repository);
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                service.findUnitLocations(
+                    new RequestContext("alice"),
+                    new FindUnitLocationsRequest(List.of(new UnitReference("requested", 101)))))
+        .isSameAs(failure);
+  }
+
+  @Test
   void findUnitsShouldPageInSequenceAndReturnOrderedPhotoIds() throws Exception {
     // arrange
     unitTable.putItem(unit("alice", "sku", 1, "removed"));
@@ -1718,6 +2003,14 @@ class InventoryReadServiceIntegrationTest {
     item.setStatus(status);
     item.setCreatedAt(Instant.ofEpochSecond(1700000000));
     item.setPhotos(photos);
+    return item;
+  }
+
+  private static InventoryUnitItem locationUnit(
+      String user, String skuId, String game, int sequenceNumber, String status) {
+    var item = unit(user, skuId, sequenceNumber, status);
+    item.setGame(game);
+    item.setGsi3pk(InventoryUnitItem.formatGsi3pk(user, game));
     return item;
   }
 

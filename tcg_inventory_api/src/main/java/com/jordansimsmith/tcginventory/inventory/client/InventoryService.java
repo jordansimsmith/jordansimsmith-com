@@ -23,6 +23,9 @@ public interface InventoryService {
 
   FindUnitsResponse findUnits(RequestContext ctx, FindUnitsRequest request) throws ServiceException;
 
+  FindUnitLocationsResponse findUnitLocations(RequestContext ctx, FindUnitLocationsRequest request)
+      throws ServiceException;
+
   DeleteUnitResponse deleteUnit(RequestContext ctx, DeleteUnitRequest request)
       throws ServiceException;
 
