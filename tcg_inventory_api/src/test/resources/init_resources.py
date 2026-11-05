@@ -175,13 +175,13 @@ lambdas = {
             "FIREBASE_TOKEN_URL": os.environ.get("FIREBASE_TOKEN_URL", ""),
         },
     },
-    "get_settings": {
-        "handler": "com.jordansimsmith.tcginventory.settings.GetSettingsHandler",
-        "zip_file": "get-settings-handler_deploy.jar",
+    "get_order_settings": {
+        "handler": "com.jordansimsmith.tcginventory.orders.api.GetOrderSettingsHandler",
+        "zip_file": "get-order-settings-handler_deploy.jar",
     },
-    "update_settings": {
-        "handler": "com.jordansimsmith.tcginventory.settings.UpdateSettingsHandler",
-        "zip_file": "update-settings-handler_deploy.jar",
+    "update_order_settings": {
+        "handler": "com.jordansimsmith.tcginventory.orders.api.UpdateOrderSettingsHandler",
+        "zip_file": "update-order-settings-handler_deploy.jar",
     },
     "get_pricing": {
         "handler": "com.jordansimsmith.tcginventory.pricing.api.GetPricingHandler",
@@ -331,7 +331,6 @@ root_resources = {
     "photos": {"path": "photos"},
     "games": {"path": "games"},
     "fetchtcg": {"path": "fetchtcg"},
-    "settings": {"path": "settings"},
     "pricing": {"path": "pricing"},
     "imports": {"path": "imports"},
     "scans": {"path": "scans"},
@@ -366,6 +365,7 @@ child_resources = {
     "sku_detail": {"parent": "skus", "path": "{sku_id}"},
     "sku_units": {"parent": "sku_detail", "path": "units"},
     "sku_unit_detail": {"parent": "sku_units", "path": "{sequence_number}"},
+    "order_settings": {"parent": "orders", "path": "settings"},
     "order_detail": {"parent": "orders", "path": "{order_id}"},
     "order_confirm": {"parent": "order_detail", "path": "confirm"},
 }
@@ -403,11 +403,15 @@ endpoints = {
         "method": "PUT",
         "lambda": "update_fetchtcg_credentials",
     },
-    "get_settings": {"resource": "settings", "method": "GET", "lambda": "get_settings"},
-    "update_settings": {
-        "resource": "settings",
+    "get_order_settings": {
+        "resource": "order_settings",
+        "method": "GET",
+        "lambda": "get_order_settings",
+    },
+    "update_order_settings": {
+        "resource": "order_settings",
         "method": "PATCH",
-        "lambda": "update_settings",
+        "lambda": "update_order_settings",
     },
     "get_pricing": {
         "resource": "pricing",

@@ -19,6 +19,7 @@ import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.listings.client.ListingService;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
+import com.jordansimsmith.tcginventory.orders.client.OrderService;
 import com.jordansimsmith.tcginventory.photos.client.FakePhotosService;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import com.jordansimsmith.tcginventory.pricing.client.PricingService;
@@ -27,7 +28,6 @@ import com.jordansimsmith.tcginventory.scans.ScanItem;
 import com.jordansimsmith.tcginventory.scans.ScanMessage;
 import com.jordansimsmith.tcginventory.scans.ScanRepository;
 import com.jordansimsmith.tcginventory.scans.ScanRowItem;
-import com.jordansimsmith.tcginventory.settings.SettingsItem;
 import com.jordansimsmith.time.ClockTestModule;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
@@ -99,7 +99,7 @@ public interface TcgInventoryTestFactory extends CatalogFactory {
 
   DynamoDbTable<CatalogSnapshotItem> catalogSnapshotTable();
 
-  DynamoDbTable<SettingsItem> settingsTable();
+  OrderService orderService();
 
   ScanRepository scanRepository();
 

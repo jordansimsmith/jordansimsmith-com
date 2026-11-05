@@ -59,8 +59,8 @@ describe('LoginPage', () => {
   });
 
   it('navigates to inventory page on successful login', async () => {
-    vi.spyOn(clientModule.apiClient, 'getSettings').mockResolvedValue({
-      track_orders_after: null,
+    vi.spyOn(clientModule.apiClient, 'getGames').mockResolvedValue({
+      games: [],
     });
     const accountSpy = vi.spyOn(clientModule.apiClient, 'getFetchTcgAccount');
 
@@ -74,12 +74,12 @@ describe('LoginPage', () => {
     await waitFor(() => {
       expect(screen.getByText('Inventory page')).toBeDefined();
     });
-    expect(clientModule.apiClient.getSettings).toHaveBeenCalled();
+    expect(clientModule.apiClient.getGames).toHaveBeenCalled();
     expect(accountSpy).not.toHaveBeenCalled();
   });
 
   it('shows error notification and clears session on failed login', async () => {
-    vi.spyOn(clientModule.apiClient, 'getSettings').mockRejectedValue(
+    vi.spyOn(clientModule.apiClient, 'getGames').mockRejectedValue(
       new Error('Unauthorized'),
     );
     const clearSessionSpy = vi.spyOn(sessionModule, 'clearSession');

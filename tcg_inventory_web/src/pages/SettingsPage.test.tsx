@@ -40,15 +40,15 @@ function tokenInput(): HTMLInputElement {
 
 describe('SettingsPage', () => {
   beforeEach(() => {
-    vi.spyOn(clientModule.apiClient, 'getSettings').mockResolvedValue({
+    vi.spyOn(clientModule.apiClient, 'getOrderSettings').mockResolvedValue({
       ...defaultSettings,
     });
     vi.spyOn(clientModule.apiClient, 'getFetchTcgAccount').mockResolvedValue(
       null,
     );
-    vi.spyOn(clientModule.apiClient, 'updateSettings').mockResolvedValue({
-      ...defaultSettings,
-    });
+    vi.spyOn(clientModule.apiClient, 'updateOrderSettings').mockResolvedValue(
+      undefined,
+    );
     vi.spyOn(
       clientModule.apiClient,
       'updateFetchTcgCredentials',
@@ -81,7 +81,7 @@ describe('SettingsPage', () => {
       within(connection).queryByLabelText('FetchTCG seller username'),
     ).toBeNull();
     expect(clientModule.apiClient.getFetchTcgAccount).toHaveBeenCalledTimes(1);
-    expect(clientModule.apiClient.getSettings).toHaveBeenCalledTimes(1);
+    expect(clientModule.apiClient.getOrderSettings).toHaveBeenCalledTimes(1);
   });
 
   it('shows the exact seller username read-only and formats the saved time', async () => {
@@ -117,7 +117,7 @@ describe('SettingsPage', () => {
     expect(
       clientModule.apiClient.updateFetchTcgCredentials,
     ).toHaveBeenCalledWith({ refresh_token: ' token with spaces ' });
-    expect(clientModule.apiClient.updateSettings).not.toHaveBeenCalled();
+    expect(clientModule.apiClient.updateOrderSettings).not.toHaveBeenCalled();
     await waitFor(() => expect(tokenInput().value).toBe(''));
     expect(
       (screen.getByLabelText('FetchTCG seller username') as HTMLInputElement)
@@ -159,7 +159,7 @@ describe('SettingsPage', () => {
       (screen.getByLabelText('FetchTCG seller username') as HTMLInputElement)
         .value,
     ).toBe(savedAccount.seller_username);
-    expect(clientModule.apiClient.updateSettings).not.toHaveBeenCalled();
+    expect(clientModule.apiClient.updateOrderSettings).not.toHaveBeenCalled();
   });
 
   it('replaces the displayed account only after credential verification succeeds', async () => {
@@ -191,7 +191,7 @@ describe('SettingsPage', () => {
         `Last updated ${new Date(replacement.credentials_updated_at * 1000).toLocaleString()}`,
       ),
     ).toBeDefined();
-    expect(clientModule.apiClient.updateSettings).not.toHaveBeenCalled();
+    expect(clientModule.apiClient.updateOrderSettings).not.toHaveBeenCalled();
   });
 
   it('keeps token entry available when the account read fails', async () => {
@@ -214,7 +214,7 @@ describe('SettingsPage', () => {
   });
 
   it('keeps the account view available when the settings read fails', async () => {
-    vi.spyOn(clientModule.apiClient, 'getSettings').mockRejectedValue(
+    vi.spyOn(clientModule.apiClient, 'getOrderSettings').mockRejectedValue(
       new Error('Settings unavailable'),
     );
     vi.spyOn(clientModule.apiClient, 'getFetchTcgAccount').mockResolvedValue({
@@ -306,7 +306,7 @@ describe('SettingsPage', () => {
     await user.type(cutoff, 'September 1, 2026');
     await user.click(screen.getByRole('button', { name: 'Save date' }));
 
-    expect(clientModule.apiClient.updateSettings).toHaveBeenCalledWith({
+    expect(clientModule.apiClient.updateOrderSettings).toHaveBeenCalledWith({
       track_orders_after: Math.floor(new Date(2026, 8, 1).getTime() / 1000),
     });
     expect(
@@ -315,7 +315,7 @@ describe('SettingsPage', () => {
   });
 
   it('shows an existing order tracking cutoff without prompting another save', async () => {
-    vi.spyOn(clientModule.apiClient, 'getSettings').mockResolvedValue({
+    vi.spyOn(clientModule.apiClient, 'getOrderSettings').mockResolvedValue({
       ...defaultSettings,
       track_orders_after: Math.floor(new Date(2026, 8, 1).getTime() / 1000),
     });

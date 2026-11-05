@@ -21,6 +21,7 @@ import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.inventory.server.InventoryModule;
 import com.jordansimsmith.tcginventory.listings.server.ListingsModule;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
+import com.jordansimsmith.tcginventory.orders.server.OrdersModule;
 import com.jordansimsmith.tcginventory.photos.client.FakePhotosService;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import com.jordansimsmith.tcginventory.pricing.server.PricingModule;
@@ -29,7 +30,6 @@ import com.jordansimsmith.tcginventory.scans.ScanItem;
 import com.jordansimsmith.tcginventory.scans.ScanMessage;
 import com.jordansimsmith.tcginventory.scans.ScanRepository;
 import com.jordansimsmith.tcginventory.scans.ScanRowItem;
-import com.jordansimsmith.tcginventory.settings.SettingsItem;
 import com.jordansimsmith.time.Clock;
 import dagger.Module;
 import dagger.Provides;
@@ -45,6 +45,7 @@ import software.amazon.awssdk.services.sqs.SqsClient;
 @Module(
     includes = {
       PricingModule.class,
+      OrdersModule.class,
       CatalogModule.class,
       InventoryModule.class,
       ListingsModule.class
@@ -126,12 +127,6 @@ public class TcgInventoryTestModule {
   @Singleton
   DynamoDbTable<JobItem> jobTable(DynamoDbEnhancedClient client) {
     return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(JobItem.class));
-  }
-
-  @Provides
-  @Singleton
-  DynamoDbTable<SettingsItem> settingsTable(DynamoDbEnhancedClient client) {
-    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(SettingsItem.class));
   }
 
   @Provides

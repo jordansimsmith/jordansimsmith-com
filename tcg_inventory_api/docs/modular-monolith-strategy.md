@@ -6,7 +6,7 @@ This is a target architecture and an incremental migration strategy, not a descr
 
 ## Starting point
 
-The service already groups Java code into verticals: games, catalog, scans, imports, inventory, orders, reports, publish, settings, and pricing. Bazel gives these verticals separate libraries, but consumers can still depend on implementation libraries and persistence models. Shared infrastructure includes the top-level Dagger factory/module, job records and dispatch, audit records, table configuration, and storage helpers. The factory and module may remain at the top level while other root-package code migrates into vertical packages or `//lib` packages for truly shared libraries.
+The service already groups Java code into verticals: games, catalog, scans, imports, inventory, orders, reports, publish, and pricing. Bazel gives these verticals separate libraries, but consumers can still depend on implementation libraries and persistence models. Shared infrastructure includes the top-level Dagger factory/module, job records and dispatch, audit records, table configuration, and storage helpers. The factory and module may remain at the top level while other root-package code migrates into vertical packages or `//lib` packages for truly shared libraries.
 
 Remaining ownership gaps include Reports' direct order and audit reads and Orders' direct SKU and unit reads for pick-sheet location and neighbor details. Orders otherwise uses Inventory services for reservation, release, sale, and admission checks. Root-package wiring still has access to server targets because Bazel visibility applies to the whole package.
 
@@ -163,20 +163,19 @@ An ownership change does not automatically require a data migration. Retain comp
 
 The starting ownership model is:
 
-| Vertical  | Authoritative responsibility                                                               |
-| --------- | ------------------------------------------------------------------------------------------ |
-| Games     | Registered game identity, supported finishes, and capabilities                             |
-| Catalog   | Normalized catalog lookup, provider adapters, and catalog snapshots                        |
-| Scans     | Scan sessions, recognition/review progress, and source-image lifecycle                     |
-| Imports   | Intake rows, appraisal/review progress, and import confirmation workflow                   |
-| Inventory | SKUs, physical units, sequence/location allocation, and stock transitions                  |
-| Orders    | Offer/order records, allocations recorded for the order workflow, and fulfillment progress |
-| Pricing   | Pricing policy, price-floor configuration, and repricing orchestration                     |
-| Publish   | Marketplace projection and publication progress                                            |
-| Reports   | Report generation and report snapshots/projections                                         |
-| Jobs      | Generic job records, lifecycle, dispatch, and per-user background-task admission           |
-| FetchTCG  | Marketplace account, credentials, seller identity, and provider integration                |
-| Settings  | Application settings not assigned to another vertical                                      |
+| Vertical  | Authoritative responsibility                                                                                  |
+| --------- | ------------------------------------------------------------------------------------------------------------- |
+| Games     | Registered game identity, supported finishes, and capabilities                                                |
+| Catalog   | Normalized catalog lookup, provider adapters, and catalog snapshots                                           |
+| Scans     | Scan sessions, recognition/review progress, and source-image lifecycle                                        |
+| Imports   | Intake rows, appraisal/review progress, and import confirmation workflow                                      |
+| Inventory | SKUs, physical units, sequence/location allocation, and stock transitions                                     |
+| Orders    | Offer/order records, order-tracking settings, allocations recorded for its workflow, and fulfillment progress |
+| Pricing   | Pricing policy, price-floor configuration, and repricing orchestration                                        |
+| Publish   | Marketplace projection and publication progress                                                               |
+| Reports   | Report generation and report snapshots/projections                                                            |
+| Jobs      | Generic job records, lifecycle, dispatch, and per-user background-task admission                              |
+| FetchTCG  | Marketplace account, credentials, seller identity, and provider integration                                   |
 
 Inventory owns SKUs, units, sequence and location allocation, receipts, reservation lifecycle, stock transitions, and stock and price mutation audits. It selects and reserves one unit per operation; callers save returned allocations as their own workflow progress. Imports creates units through a stable per-row operation ID, then records the returned location and SKU on its row. Creation is visible incrementally, and sequence gaps are accepted. If a downstream progress save fails, callers retry forward with the same operation ID.
 

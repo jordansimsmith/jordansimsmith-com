@@ -127,9 +127,10 @@ public class TcgInventoryE2ETest {
     assertThat(savedAccount.get("credentials_updated_at").isIntegralNumber()).isTrue();
 
     var trackingUpdateResponse =
-        sendAsUser("PATCH", "/settings", "{\"track_orders_after\":1723363200}", fetchTcgUser);
-    assertThat(trackingUpdateResponse.statusCode()).isEqualTo(200);
-    var settingsResponse = sendAsUser("GET", "/settings", "", fetchTcgUser);
+        sendAsUser(
+            "PATCH", "/orders/settings", "{\"track_orders_after\":1723363200}", fetchTcgUser);
+    assertThat(trackingUpdateResponse.statusCode()).isEqualTo(204);
+    var settingsResponse = sendAsUser("GET", "/orders/settings", "", fetchTcgUser);
     assertThat(settingsResponse.statusCode()).isEqualTo(200);
     assertThat(objectMapper.readTree(settingsResponse.body()))
         .isEqualTo(objectMapper.readTree("{\"track_orders_after\":1723363200}"));

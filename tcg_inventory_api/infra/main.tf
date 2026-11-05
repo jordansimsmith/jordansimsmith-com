@@ -92,13 +92,13 @@ module "java_api" {
       handler  = "com.jordansimsmith.tcginventory.fetchtcg.api.UpdateCredentialsHandler"
       artifact = var.artifacts["update_fetchtcg_credentials"]
     }
-    get_settings = {
-      handler  = "com.jordansimsmith.tcginventory.settings.GetSettingsHandler"
-      artifact = var.artifacts["get_settings"]
+    get_order_settings = {
+      handler  = "com.jordansimsmith.tcginventory.orders.api.GetOrderSettingsHandler"
+      artifact = var.artifacts["get_order_settings"]
     }
-    update_settings = {
-      handler  = "com.jordansimsmith.tcginventory.settings.UpdateSettingsHandler"
-      artifact = var.artifacts["update_settings"]
+    update_order_settings = {
+      handler  = "com.jordansimsmith.tcginventory.orders.api.UpdateOrderSettingsHandler"
+      artifact = var.artifacts["update_order_settings"]
     }
     get_pricing = {
       handler  = "com.jordansimsmith.tcginventory.pricing.api.GetPricingHandler"
@@ -244,8 +244,8 @@ module "java_api" {
     get_games                   = { path = "games", method = "GET", lambda = "get_games" }
     get_fetchtcg_account        = { path = "fetchtcg/account", method = "GET", lambda = "get_fetchtcg_account" }
     update_fetchtcg_credentials = { path = "fetchtcg/credentials", method = "PUT", lambda = "update_fetchtcg_credentials" }
-    get_settings                = { path = "settings", method = "GET", lambda = "get_settings" }
-    update_settings             = { path = "settings", method = "PATCH", lambda = "update_settings" }
+    get_order_settings          = { path = "orders/settings", method = "GET", lambda = "get_order_settings" }
+    update_order_settings       = { path = "orders/settings", method = "PATCH", lambda = "update_order_settings" }
     get_pricing                 = { path = "pricing", method = "GET", lambda = "get_pricing" }
     update_pricing              = { path = "pricing", method = "PATCH", lambda = "update_pricing" }
     create_reprice              = { path = "pricing/reprice", method = "POST", lambda = "create_reprice" }

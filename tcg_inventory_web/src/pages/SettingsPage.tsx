@@ -16,7 +16,7 @@ import { AppShellLayout } from '../layouts/AppShellLayout';
 import { apiClient } from '../api/client';
 import type {
   GetFetchTcgAccountResponse,
-  SettingsResponse,
+  OrderSettingsResponse,
 } from '../api/client';
 import { PageHeader } from '../components/PageHeader';
 import classes from './SettingsPage.module.css';
@@ -35,7 +35,7 @@ function dateStringToEpoch(dateStr: string): number {
 }
 
 export function SettingsPage() {
-  const [settings, setSettings] = useState<SettingsResponse | null>(null);
+  const [settings, setSettings] = useState<OrderSettingsResponse | null>(null);
   const [settingsLoading, setSettingsLoading] = useState(true);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [account, setAccount] = useState<GetFetchTcgAccountResponse | null>(
@@ -52,7 +52,7 @@ export function SettingsPage() {
     let cancelled = false;
     const fetchSettings = async () => {
       try {
-        const response = await apiClient.getSettings();
+        const response = await apiClient.getOrderSettings();
         if (!cancelled) {
           setSettings(response);
           if (response.track_orders_after !== null) {
@@ -126,10 +126,10 @@ export function SettingsPage() {
     setSavingDate(true);
     try {
       const epochSeconds = dateStringToEpoch(trackOrdersAfter);
-      const response = await apiClient.updateSettings({
+      await apiClient.updateOrderSettings({
         track_orders_after: epochSeconds,
       });
-      setSettings(response);
+      setSettings({ track_orders_after: epochSeconds });
       notifications.show({
         title: 'Settings saved',
         message: 'Track orders after date updated',

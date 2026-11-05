@@ -94,7 +94,7 @@ public class OrderVoidingIntegrationTest {
         new OrderPhaseProcessor(
             orderTable,
             listingService,
-            factory.settingsTable(),
+            factory.orderService(),
             orderRepository,
             factory.inventoryService(),
             fakeClock,
@@ -367,7 +367,7 @@ public class OrderVoidingIntegrationTest {
         new OrderPhaseProcessor(
             orderTable,
             listingService,
-            factory.settingsTable(),
+            factory.orderService(),
             orderRepository,
             factory.inventoryService(),
             fakeClock,

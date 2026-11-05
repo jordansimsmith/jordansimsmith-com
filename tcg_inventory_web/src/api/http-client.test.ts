@@ -16,7 +16,7 @@ describe('http client settings', () => {
     clearSession();
   });
 
-  it('gets settings and updates only the order-tracking cutoff', async () => {
+  it('gets order settings and updates them without a response body', async () => {
     const settings = { track_orders_after: 1723363200 };
     fetchSpy
       .mockResolvedValueOnce({
@@ -25,21 +25,23 @@ describe('http client settings', () => {
       })
       .mockResolvedValueOnce({
         ok: true,
-        json: vi.fn().mockResolvedValue(settings),
+        status: 204,
       });
     const client = createHttpClient();
 
-    await expect(client.getSettings()).resolves.toEqual(settings);
+    await expect(client.getOrderSettings()).resolves.toEqual(settings);
     await expect(
-      client.updateSettings({ track_orders_after: 1723363200 }),
-    ).resolves.toEqual(settings);
+      client.updateOrderSettings({ track_orders_after: 1723363200 }),
+    ).resolves.toBeUndefined();
 
     expect(fetchSpy).toHaveBeenCalledTimes(2);
     expect(fetchSpy.mock.calls[0][0]).toBe(
-      'https://api.tcg-inventory.jordansimsmith.com/settings',
+      'https://api.tcg-inventory.jordansimsmith.com/orders/settings',
     );
     const [url, init] = fetchSpy.mock.calls[1];
-    expect(url).toBe('https://api.tcg-inventory.jordansimsmith.com/settings');
+    expect(url).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/orders/settings',
+    );
     expect(init.method).toBe('PATCH');
     expect(init.headers['Content-Type']).toBe('application/json');
     expect(init.body).toBe(JSON.stringify({ track_orders_after: 1723363200 }));

@@ -12,7 +12,7 @@ export function LoginPage() {
     setSession(values.username.trim(), values.password);
 
     try {
-      await apiClient.getSettings();
+      await apiClient.getGames();
       navigate('/inventory');
     } catch {
       clearSession();

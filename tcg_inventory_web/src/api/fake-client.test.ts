@@ -1353,14 +1353,17 @@ describe('createFakeClient settings', () => {
   it('stores only track_orders_after', async () => {
     const client = createFakeClient();
 
-    expect(await client.getSettings()).toEqual({ track_orders_after: null });
+    expect(await client.getOrderSettings()).toEqual({
+      track_orders_after: null,
+    });
 
-    const response = await client.updateSettings({
+    await client.updateOrderSettings({
       track_orders_after: 1723363200,
     });
 
-    expect(response).toEqual({ track_orders_after: 1723363200 });
-    expect(await client.getSettings()).toEqual(response);
+    expect(await client.getOrderSettings()).toEqual({
+      track_orders_after: 1723363200,
+    });
   });
 });
 
@@ -1383,9 +1386,9 @@ describe('createFakeClient FetchTCG account', () => {
     expect(replacement.seller_username).toBe('demo-seller');
     await expect(client.getFetchTcgAccount()).resolves.toEqual(replacement);
 
-    await client.updateSettings({ track_orders_after: 1723363200 });
+    await client.updateOrderSettings({ track_orders_after: 1723363200 });
     await expect(client.getFetchTcgAccount()).resolves.toEqual(replacement);
-    await expect(client.getSettings()).resolves.toEqual({
+    await expect(client.getOrderSettings()).resolves.toEqual({
       track_orders_after: 1723363200,
     });
   });

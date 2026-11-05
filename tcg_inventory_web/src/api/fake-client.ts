@@ -54,12 +54,12 @@ import type {
   ScanStatus,
   ScanSuggestion,
   ScanSummary,
-  SettingsResponse,
+  OrderSettingsResponse,
   GetSkuResponse,
   Sku,
   SkuUnit,
   UnitStatus,
-  UpdateSettingsRequest,
+  UpdateOrderSettingsRequest,
   UpdateFetchTcgCredentialsRequest,
   UpdateFetchTcgCredentialsResponse,
   UpdatePricingRequest,
@@ -1654,7 +1654,7 @@ export function createFakeClient(): ApiClient {
   let publishRun: FakePublishRun | null = null;
   let repriceRun: FakeRepriceRun | null = null;
   let repriceCounter = 0;
-  let settings: SettingsResponse = {
+  let orderSettings: OrderSettingsResponse = {
     track_orders_after: null,
   };
   let fetchTcgAccount: GetFetchTcgAccountResponse | null = null;
@@ -1909,20 +1909,19 @@ export function createFakeClient(): ApiClient {
       };
     },
 
-    async getSettings(): Promise<SettingsResponse> {
-      return { ...settings };
+    async getOrderSettings(): Promise<OrderSettingsResponse> {
+      return { ...orderSettings };
     },
 
-    async updateSettings(
-      update: UpdateSettingsRequest,
-    ): Promise<SettingsResponse> {
-      if (update.track_orders_after !== undefined) {
-        settings = {
-          ...settings,
-          track_orders_after: update.track_orders_after,
-        };
+    async updateOrderSettings(
+      update: UpdateOrderSettingsRequest,
+    ): Promise<void> {
+      if (
+        update.track_orders_after !== null &&
+        update.track_orders_after !== undefined
+      ) {
+        orderSettings = { track_orders_after: update.track_orders_after };
       }
-      return { ...settings };
     },
 
     async getFetchTcgAccount(): Promise<GetFetchTcgAccountResponse | null> {

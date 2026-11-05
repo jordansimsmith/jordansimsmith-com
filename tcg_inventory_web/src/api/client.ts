@@ -31,7 +31,7 @@ export interface GamesResponse {
   games: Game[];
 }
 
-export interface SettingsResponse {
+export interface OrderSettingsResponse {
   track_orders_after: number | null;
 }
 
@@ -49,8 +49,8 @@ export interface UpdateFetchTcgCredentialsResponse {
   credentials_updated_at: number;
 }
 
-export interface UpdateSettingsRequest {
-  track_orders_after?: number;
+export interface UpdateOrderSettingsRequest {
+  track_orders_after?: number | null;
 }
 
 export interface PricingResponse {
@@ -516,8 +516,8 @@ export interface ReportResponse {
 
 export interface ApiClient {
   getGames(): Promise<GamesResponse>;
-  getSettings(): Promise<SettingsResponse>;
-  updateSettings(update: UpdateSettingsRequest): Promise<SettingsResponse>;
+  getOrderSettings(): Promise<OrderSettingsResponse>;
+  updateOrderSettings(update: UpdateOrderSettingsRequest): Promise<void>;
   getFetchTcgAccount(): Promise<GetFetchTcgAccountResponse | null>;
   updateFetchTcgCredentials(
     request: UpdateFetchTcgCredentialsRequest,

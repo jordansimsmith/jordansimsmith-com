@@ -37,9 +37,9 @@ import type {
   ReportResponse,
   IdentifyScanResponse,
   ScanDetail,
-  SettingsResponse,
+  OrderSettingsResponse,
   GetSkuResponse,
-  UpdateSettingsRequest,
+  UpdateOrderSettingsRequest,
   UpdateFetchTcgCredentialsRequest,
   UpdateFetchTcgCredentialsResponse,
   UpdatePricingRequest,
@@ -89,20 +89,19 @@ export function createHttpClient(): ApiClient {
       return response.json();
     },
 
-    async getSettings(): Promise<SettingsResponse> {
-      const response = await authenticatedFetch('/settings');
+    async getOrderSettings(): Promise<OrderSettingsResponse> {
+      const response = await authenticatedFetch('/orders/settings');
       return response.json();
     },
 
-    async updateSettings(
-      update: UpdateSettingsRequest,
-    ): Promise<SettingsResponse> {
-      const response = await authenticatedFetch('/settings', {
+    async updateOrderSettings(
+      update: UpdateOrderSettingsRequest,
+    ): Promise<void> {
+      await authenticatedFetch('/orders/settings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(update),
       });
-      return response.json();
     },
 
     async getFetchTcgAccount(): Promise<GetFetchTcgAccountResponse | null> {

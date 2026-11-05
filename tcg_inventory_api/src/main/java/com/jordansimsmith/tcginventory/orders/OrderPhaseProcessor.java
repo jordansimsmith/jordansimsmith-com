@@ -11,7 +11,8 @@ import com.jordansimsmith.tcginventory.inventory.client.ReleaseUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.ReserveUnitRequest;
 import com.jordansimsmith.tcginventory.listings.client.FindListingsRequest;
 import com.jordansimsmith.tcginventory.listings.client.ListingService;
-import com.jordansimsmith.tcginventory.settings.SettingsItem;
+import com.jordansimsmith.tcginventory.orders.client.GetOrderSettingsRequest;
+import com.jordansimsmith.tcginventory.orders.client.OrderService;
 import com.jordansimsmith.time.Clock;
 import java.time.Instant;
 import java.time.format.DateTimeFormatter;
@@ -73,7 +74,7 @@ public class OrderPhaseProcessor {
 
   private final DynamoDbTable<OrderItem> orderTable;
   private final ListingService listingService;
-  private final DynamoDbTable<SettingsItem> settingsTable;
+  private final OrderService orderService;
   private final OrderRepository orderRepository;
   private final InventoryService inventoryService;
   private final Clock clock;
@@ -82,14 +83,14 @@ public class OrderPhaseProcessor {
   public OrderPhaseProcessor(
       DynamoDbTable<OrderItem> orderTable,
       ListingService listingService,
-      DynamoDbTable<SettingsItem> settingsTable,
+      OrderService orderService,
       OrderRepository orderRepository,
       InventoryService inventoryService,
       Clock clock,
       FetchTcgService fetchTcgService) {
     this.orderTable = orderTable;
     this.listingService = listingService;
-    this.settingsTable = settingsTable;
+    this.orderService = orderService;
     this.orderRepository = orderRepository;
     this.inventoryService = inventoryService;
     this.clock = clock;
@@ -106,7 +107,12 @@ public class OrderPhaseProcessor {
       LOGGER.info("offer statuses: {}", statusCounts);
     }
 
-    var trackOrdersAfter = loadTrackOrdersAfter(user);
+    var orderSettings =
+        orderService.getOrderSettings(new RequestContext(user), new GetOrderSettingsRequest());
+    var trackOrdersAfter =
+        orderSettings.trackOrdersAfter() == null
+            ? null
+            : Instant.ofEpochSecond(orderSettings.trackOrdersAfter());
     if (trackOrdersAfter != null) {
       LOGGER.info("track_orders_after is set to {}", trackOrdersAfter);
     }
@@ -215,19 +221,6 @@ public class OrderPhaseProcessor {
       continuation = response.nextContinuation();
     } while (continuation != null);
     return allOffers;
-  }
-
-  private Instant loadTrackOrdersAfter(String user) {
-    var key =
-        Key.builder()
-            .partitionValue(OrderItem.formatPk(user))
-            .sortValue(SettingsItem.formatSk())
-            .build();
-    var settingsItem = settingsTable.getItem(key);
-    if (settingsItem == null) {
-      return null;
-    }
-    return settingsItem.getTrackOrdersAfter();
   }
 
   private boolean isAfterCutoff(Offer offer, Instant cutoff) {

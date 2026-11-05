@@ -14,6 +14,7 @@ import com.jordansimsmith.tcginventory.fetchtcg.server.FetchTcgModule;
 import com.jordansimsmith.tcginventory.games.server.GamesModule;
 import com.jordansimsmith.tcginventory.inventory.server.InventoryModule;
 import com.jordansimsmith.tcginventory.listings.server.ListingsModule;
+import com.jordansimsmith.tcginventory.orders.server.OrdersModule;
 import com.jordansimsmith.tcginventory.photos.server.PhotosModule;
 import com.jordansimsmith.tcginventory.pricing.server.PricingModule;
 import com.jordansimsmith.time.ClockModule;
@@ -45,7 +46,8 @@ import software.amazon.awssdk.services.sqs.SqsClient;
       ListingsModule.class,
       CatalogModule.class,
       PricingModule.class,
-      PhotosModule.class
+      PhotosModule.class,
+      OrdersModule.class
     })
 public class TcgInventoryModule {
   static final String JOBS_QUEUE_NAME = "tcg_inventory_jobs.fifo";

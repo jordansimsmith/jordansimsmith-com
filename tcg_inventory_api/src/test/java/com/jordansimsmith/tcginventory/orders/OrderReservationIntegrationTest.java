@@ -108,7 +108,7 @@ public class OrderReservationIntegrationTest {
         new OrderPhaseProcessor(
             orderTable,
             listingService,
-            factory.settingsTable(),
+            factory.orderService(),
             orderRepository,
             factory.inventoryService(),
             fakeClock,
@@ -258,7 +258,7 @@ public class OrderReservationIntegrationTest {
         new OrderPhaseProcessor(
             orderTable,
             listingService,
-            factory.settingsTable(),
+            factory.orderService(),
             orderRepository,
             factory.inventoryService(),
             fakeClock,
@@ -473,7 +473,7 @@ public class OrderReservationIntegrationTest {
         new OrderPhaseProcessor(
             orderTable,
             listings,
-            factory.settingsTable(),
+            factory.orderService(),
             orderRepository,
             factory.inventoryService(),
             fakeClock,
@@ -501,7 +501,7 @@ public class OrderReservationIntegrationTest {
         new OrderPhaseProcessor(
             orderTable,
             listings,
-            factory.settingsTable(),
+            factory.orderService(),
             orderRepository,
             factory.inventoryService(),
             fakeClock,
@@ -530,7 +530,7 @@ public class OrderReservationIntegrationTest {
         new OrderPhaseProcessor(
             orderTable,
             listingService,
-            factory.settingsTable(),
+            factory.orderService(),
             repository,
             factory.inventoryService(),
             fakeClock,
@@ -564,7 +564,7 @@ public class OrderReservationIntegrationTest {
         new OrderPhaseProcessor(
             orderTable,
             listingService,
-            factory.settingsTable(),
+            factory.orderService(),
             repository,
             factory.inventoryService(),
             fakeClock,
@@ -646,7 +646,7 @@ public class OrderReservationIntegrationTest {
         new OrderPhaseProcessor(
             orderTable,
             listingService,
-            factory.settingsTable(),
+            factory.orderService(),
             orderRepository,
             factory.inventoryService(),
             fakeClock,

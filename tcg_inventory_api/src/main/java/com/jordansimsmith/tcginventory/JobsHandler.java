@@ -25,7 +25,6 @@ import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
 import com.jordansimsmith.tcginventory.reports.ReportItem;
 import com.jordansimsmith.tcginventory.reports.ReportJobProcessor;
 import com.jordansimsmith.tcginventory.scans.ScanConfirmationJobProcessor;
-import com.jordansimsmith.tcginventory.settings.SettingsItem;
 import com.jordansimsmith.time.Clock;
 import java.io.IOException;
 import org.slf4j.Logger;
@@ -80,7 +79,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
         new OrderPhaseProcessor(
             orderTable,
             factory.listingService(),
-            TcgInventoryTable.table(enhancedClient, SettingsItem.class),
+            factory.orderService(),
             orderRepository,
             factory.inventoryService(),
             publishClock,

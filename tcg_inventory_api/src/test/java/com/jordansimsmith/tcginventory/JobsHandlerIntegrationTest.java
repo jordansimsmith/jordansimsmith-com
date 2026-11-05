@@ -45,7 +45,6 @@ import com.jordansimsmith.tcginventory.pricing.client.GetPricingRequest;
 import com.jordansimsmith.tcginventory.pricing.client.PricingService;
 import com.jordansimsmith.tcginventory.pricing.client.UpdatePricingRequest;
 import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
-import com.jordansimsmith.tcginventory.settings.SettingsItem;
 import com.jordansimsmith.time.FakeClock;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -78,7 +77,6 @@ public class JobsHandlerIntegrationTest {
   private DynamoDbTable<JobItem> jobTable;
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
-  private DynamoDbTable<SettingsItem> settingsTable;
   private DynamoDbTable<OrderItem> orderTable;
   private DynamoDbTable<AuditItem> auditTable;
   private TcgInventoryTestFactory factory;
@@ -113,7 +111,6 @@ public class JobsHandlerIntegrationTest {
     jobTable = factory.jobTable();
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
-    settingsTable = factory.settingsTable();
     orderTable = factory.orderTable();
     auditTable = factory.auditTable();
 
@@ -2025,11 +2022,19 @@ public class JobsHandlerIntegrationTest {
   }
 
   private void createTrackOrdersAfter(String user, Instant trackOrdersAfter) {
-    var settingsItem = new SettingsItem();
-    settingsItem.setPk(SkuItem.formatUserPk(user));
-    settingsItem.setSk(SettingsItem.formatSk());
-    settingsItem.setTrackOrdersAfter(trackOrdersAfter);
-    settingsTable.putItem(settingsItem);
+    factory
+        .dynamoDbClient()
+        .putItem(
+            PutItemRequest.builder()
+                .tableName(TcgInventoryTable.TABLE_NAME)
+                .item(
+                    Map.of(
+                        "pk", AttributeValue.fromS("USER#" + user),
+                        "sk", AttributeValue.fromS("ORDER_SETTINGS"),
+                        "user", AttributeValue.fromS(user),
+                        "track_orders_after",
+                            AttributeValue.fromN(Long.toString(trackOrdersAfter.getEpochSecond()))))
+                .build());
   }
 
   private void createExistingOrder(String user, String offerId, String status) {
