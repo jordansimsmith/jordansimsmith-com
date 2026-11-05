@@ -32,6 +32,7 @@ import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.ReleaseUnitRequest;
 import com.jordansimsmith.tcginventory.listings.client.FindListingsRequest;
 import com.jordansimsmith.tcginventory.listings.client.Listing;
 import com.jordansimsmith.tcginventory.listings.client.UpdateListingRequest;
@@ -1022,7 +1023,8 @@ public class JobsHandlerIntegrationTest {
         getAuditEntries("jordan").stream().filter(a -> "release".equals(a.getEventType())).toList();
     assertThat(releaseAudits).hasSize(2);
     assertThat(releaseAudits)
-        .allSatisfy(audit -> assertThat(audit.getOrderId()).isEqualTo("83663"));
+        .extracting(AuditItem::getSequenceNumber)
+        .containsExactlyInAnyOrder(1, 2);
 
     // the released units are dirty stock again, so the listing phase restores the full quantity
     var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
@@ -1133,7 +1135,7 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldResumePartiallyAppliedVoidingOrder() {
+  void publishOrderPhaseShouldResumePartiallyAppliedVoidingOrder() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
@@ -1142,7 +1144,11 @@ public class JobsHandlerIntegrationTest {
         "jordan", "83663", "voiding", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1, 2);
 
     // simulate a prior delivery that released one unit before stopping
-    releaseUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1);
+    factory
+        .inventoryService()
+        .releaseUnit(
+            new RequestContext("jordan"),
+            new ReleaseUnitRequest("mtg#scryfall#scryfall-1#normal#NM", 1, "83663"));
 
     factory.fakeFetchTcgService().seedOffers("jordan", List.of());
 
@@ -1158,8 +1164,9 @@ public class JobsHandlerIntegrationTest {
 
     var releaseAudits =
         getAuditEntries("jordan").stream().filter(a -> "release".equals(a.getEventType())).toList();
-    assertThat(releaseAudits).hasSize(1);
-    assertThat(releaseAudits.get(0).getSequenceNumber()).isEqualTo(2);
+    assertThat(releaseAudits)
+        .extracting(AuditItem::getSequenceNumber)
+        .containsExactlyInAnyOrder(1, 2);
   }
 
   @Test

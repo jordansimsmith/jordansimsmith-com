@@ -78,12 +78,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             publishClock,
             publishUlidGenerator);
     var orderRepository =
-        new OrderRepository(
-            orderTable,
-            factory.jobTable(),
-            inventoryRepository,
-            publishDynamoDbClient,
-            publishClock);
+        new OrderRepository(orderTable, factory.jobTable(), publishDynamoDbClient, publishClock);
     var orderPhaseProcessor =
         new OrderPhaseProcessor(
             orderTable,
@@ -91,6 +86,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             TcgInventoryTable.table(enhancedClient, SettingsItem.class),
             orderRepository,
             inventoryRepository,
+            factory.inventoryService(),
             publishClock,
             factory.fetchTcgService());
     var listingPhaseProcessor =

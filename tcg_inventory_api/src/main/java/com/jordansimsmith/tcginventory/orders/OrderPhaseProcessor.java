@@ -9,6 +9,8 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.ReleaseUnitRequest;
 import com.jordansimsmith.tcginventory.listings.client.FindListingsRequest;
 import com.jordansimsmith.tcginventory.listings.client.ListingService;
 import com.jordansimsmith.tcginventory.settings.SettingsItem;
@@ -77,6 +79,7 @@ public class OrderPhaseProcessor {
   private final DynamoDbTable<SettingsItem> settingsTable;
   private final OrderRepository orderRepository;
   private final InventoryRepository inventoryRepository;
+  private final InventoryService inventoryService;
   private final Clock clock;
   private final FetchTcgService fetchTcgService;
 
@@ -86,6 +89,7 @@ public class OrderPhaseProcessor {
       DynamoDbTable<SettingsItem> settingsTable,
       OrderRepository orderRepository,
       InventoryRepository inventoryRepository,
+      InventoryService inventoryService,
       Clock clock,
       FetchTcgService fetchTcgService) {
     this.orderTable = orderTable;
@@ -93,6 +97,7 @@ public class OrderPhaseProcessor {
     this.settingsTable = settingsTable;
     this.orderRepository = orderRepository;
     this.inventoryRepository = inventoryRepository;
+    this.inventoryService = inventoryService;
     this.clock = clock;
     this.fetchTcgService = fetchTcgService;
   }
@@ -248,11 +253,12 @@ public class OrderPhaseProcessor {
     }
   }
 
-  private void releaseVoidingOrder(String user, OrderItem order) {
+  private void releaseVoidingOrder(String user, OrderItem order) throws ServiceException {
+    var ctx = new RequestContext(user);
     for (var line : order.getLines()) {
       for (var sequenceNumber : line.getAllocatedSequenceNumbers()) {
-        inventoryRepository.updateUnitForRelease(
-            user, order.getOrderId(), line.getSkuId(), sequenceNumber);
+        inventoryService.releaseUnit(
+            ctx, new ReleaseUnitRequest(line.getSkuId(), sequenceNumber, order.getOrderId()));
       }
     }
     orderRepository.finishVoiding(user, order.getOrderId());

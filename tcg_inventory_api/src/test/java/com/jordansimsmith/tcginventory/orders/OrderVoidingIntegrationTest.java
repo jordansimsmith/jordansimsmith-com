@@ -5,14 +5,20 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.service.ConflictException;
+import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
+import com.jordansimsmith.tcginventory.JobProcessor;
+import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
 import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.ReleaseUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.ReserveUnitRequest;
 import com.jordansimsmith.tcginventory.listings.client.FakeListingService;
 import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
 import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
@@ -21,6 +27,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -30,7 +37,7 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
-import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 @Testcontainers
 public class OrderVoidingIntegrationTest {
@@ -81,12 +88,7 @@ public class OrderVoidingIntegrationTest {
         new InventoryRepository(
             unitTable, factory.dynamoDbClient(), fakeClock, factory.fakeUlidGenerator());
     var orderRepository =
-        new OrderRepository(
-            orderTable,
-            factory.jobTable(),
-            inventoryRepository,
-            factory.dynamoDbClient(),
-            fakeClock);
+        new OrderRepository(orderTable, factory.jobTable(), factory.dynamoDbClient(), fakeClock);
     orderPhaseProcessor =
         new OrderPhaseProcessor(
             orderTable,
@@ -94,6 +96,7 @@ public class OrderVoidingIntegrationTest {
             factory.settingsTable(),
             orderRepository,
             inventoryRepository,
+            factory.inventoryService(),
             fakeClock,
             fakeFetchTcgService);
   }
@@ -129,7 +132,22 @@ public class OrderVoidingIntegrationTest {
         .singleElement()
         .satisfies(
             audit -> {
-              assertThat(audit.getOrderId()).isEqualTo(ORDER_ID);
+              var rawAudit =
+                  factory
+                      .dynamoDbClient()
+                      .getItem(
+                          request ->
+                              request
+                                  .tableName(TcgInventoryTable.TABLE_NAME)
+                                  .key(
+                                      Map.of(
+                                          "pk",
+                                          AttributeValue.builder().s(audit.getPk()).build(),
+                                          "sk",
+                                          AttributeValue.builder().s(audit.getSk()).build()))
+                                  .consistentRead(true))
+                      .item();
+              assertThat(rawAudit.get("reservation_id").s()).isEqualTo(ORDER_ID);
               assertThat(audit.getSkuId()).isEqualTo(SKU_ID);
               assertThat(audit.getSequenceNumber()).isEqualTo(1);
               assertThat(audit.getBeforeStatus()).isEqualTo("reserved");
@@ -148,10 +166,11 @@ public class OrderVoidingIntegrationTest {
     // act
     var publishJobProcessor = newPublishJobProcessor();
     var jobItem = JobItem.create(USER, "publish-job", "publish", null, null, NOW);
-    assertThatThrownBy(() -> publishJobProcessor.processBatch(USER, jobItem))
-        .isInstanceOf(TransactionCanceledException.class);
+    var result = publishJobProcessor.processBatch(USER, jobItem);
 
     // assert
+    assertThat(result)
+        .isEqualTo(new JobProcessor.FailureJobResult("unit is not reserved for this reservation"));
     assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voiding");
     assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
     assertThat(getUnit(1).getReservationId()).isNull();
@@ -194,7 +213,7 @@ public class OrderVoidingIntegrationTest {
   }
 
   @Test
-  void processShouldRejectForeignAllocationBeforeVoiding() throws Exception {
+  void processShouldPreserveForeignAllocationAfterSavingVoiding() throws Exception {
     // arrange
     createSku();
     createUnit(1, "reserved", ORDER_ID);
@@ -204,11 +223,11 @@ public class OrderVoidingIntegrationTest {
 
     // act
     assertThatThrownBy(() -> orderPhaseProcessor.process(USER))
-        .isInstanceOf(IllegalStateException.class)
-        .hasMessage("order has an unexpected allocated unit");
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("unit is not reserved for this reservation");
 
     // assert
-    assertThat(getOrder(secondOrderId).getStatus()).isEqualTo("awaiting_payment");
+    assertThat(getOrder(secondOrderId).getStatus()).isEqualTo("voiding");
     assertThat(getUnit(1).getReservationId()).isEqualTo(ORDER_ID);
     assertThat(getAudits()).isEmpty();
   }
@@ -217,8 +236,12 @@ public class OrderVoidingIntegrationTest {
   void processShouldFinalizeAlreadyReleasedAndEmptyVoidingOrdersOnce() throws Exception {
     // arrange
     createSku();
-    createUnit(1, "in_stock", null);
+    createUnit(1, "reserved", ORDER_ID);
     createOrder(ORDER_ID, "voiding", List.of(line(List.of(1))));
+    factory
+        .inventoryService()
+        .releaseUnit(new RequestContext(USER), new ReleaseUnitRequest(SKU_ID, 1, ORDER_ID));
+    var auditsBefore = getAudits().size();
 
     // act
     orderPhaseProcessor.process(USER);
@@ -226,8 +249,8 @@ public class OrderVoidingIntegrationTest {
 
     // assert
     assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voided");
-    assertThat(getSku().getVersion()).isEqualTo(1);
-    assertThat(getAudits()).filteredOn(audit -> "release".equals(audit.getEventType())).isEmpty();
+    assertThat(getSku().getVersion()).isEqualTo(2);
+    assertThat(getAudits()).hasSize(auditsBefore);
 
     // arrange empty cancellation
     var emptyOrderId = "83664";
@@ -240,6 +263,29 @@ public class OrderVoidingIntegrationTest {
 
     // assert
     assertThat(getOrder(emptyOrderId).getStatus()).isEqualTo("voided");
+  }
+
+  @Test
+  void processShouldNotReleaseAnotherReservationOnReplay() throws Exception {
+    // arrange
+    createSku();
+    createUnit(1, "reserved", ORDER_ID);
+    createOrder(ORDER_ID, "voiding", List.of(line(List.of(1))));
+    var ctx = new RequestContext(USER);
+    factory.inventoryService().releaseUnit(ctx, new ReleaseUnitRequest(SKU_ID, 1, ORDER_ID));
+    factory
+        .inventoryService()
+        .reserveUnit(ctx, new ReserveUnitRequest("another-allocation", "another-order", SKU_ID));
+    var auditCount = getAudits().size();
+
+    // act
+    orderPhaseProcessor.process(USER);
+
+    // assert
+    assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voided");
+    assertThat(getUnit(1).getStatus()).isEqualTo("reserved");
+    assertThat(getUnit(1).getReservationId()).isEqualTo("another-order");
+    assertThat(getAudits()).hasSize(auditCount);
   }
 
   private void createSku() {
@@ -309,8 +355,7 @@ public class OrderVoidingIntegrationTest {
     var inventoryRepository =
         new InventoryRepository(unitTable, dynamoDbClient, fakeClock, factory.fakeUlidGenerator());
     var orderRepository =
-        new OrderRepository(
-            orderTable, factory.jobTable(), inventoryRepository, dynamoDbClient, fakeClock);
+        new OrderRepository(orderTable, factory.jobTable(), dynamoDbClient, fakeClock);
     var orderPhaseProcessor =
         new OrderPhaseProcessor(
             orderTable,
@@ -318,6 +363,7 @@ public class OrderVoidingIntegrationTest {
             factory.settingsTable(),
             orderRepository,
             inventoryRepository,
+            factory.inventoryService(),
             fakeClock,
             fakeFetchTcgService);
     var listingPhaseProcessor =

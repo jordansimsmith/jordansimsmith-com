@@ -9,13 +9,15 @@ import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.ActiveJob;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.GetUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
 import org.slf4j.Logger;
@@ -38,6 +40,7 @@ public class ConfirmOrderHandler
   private final ActiveJob activeJob;
   private final DynamoDbTable<OrderItem> orderTable;
   private final OrderRepository orderRepository;
+  private final InventoryService inventoryService;
   private final QueueClient<JobMessage> jobsQueue;
   private final Clock clock;
   private final UlidGenerator ulidGenerator;
@@ -56,29 +59,27 @@ public class ConfirmOrderHandler
     this.jobsQueue = factory.jobsQueue();
     this.clock = factory.clock();
     this.ulidGenerator = factory.ulidGenerator();
-    var inventoryRepository =
-        new InventoryRepository(
-            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class),
-            factory.dynamoDbClient(),
-            factory.clock(),
-            factory.ulidGenerator());
+    this.inventoryService = factory.inventoryService();
     this.orderRepository =
-        new OrderRepository(
-            this.orderTable, jobTable, inventoryRepository, factory.dynamoDbClient(), this.clock);
+        new OrderRepository(this.orderTable, jobTable, factory.dynamoDbClient(), this.clock);
   }
 
   @Override
   public APIGatewayV2HTTPResponse handleRequest(APIGatewayV2HTTPEvent event, Context context) {
     try {
       return doHandleRequest(event);
+    } catch (ServiceException e) {
+      return httpResponseFactory.serviceError(e);
     } catch (Exception e) {
       LOGGER.error("error processing confirm order request", e);
       throw new RuntimeException(e);
     }
   }
 
-  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event) {
-    var user = requestContextFactory.createCtx(event).user();
+  private APIGatewayV2HTTPResponse doHandleRequest(APIGatewayV2HTTPEvent event)
+      throws ServiceException {
+    var ctx = requestContextFactory.createCtx(event);
+    var user = ctx.user();
     var orderId = event.getPathParameters().get("order_id");
 
     String orderSk;
@@ -109,6 +110,18 @@ public class ConfirmOrderHandler
     // keep inventory consistent while a background job is running.
     if (activeJob.exists(user)) {
       return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
+    }
+
+    for (var line : orderItem.getLines()) {
+      for (var sequenceNumber : line.getAllocatedSequenceNumbers()) {
+        var unit =
+            inventoryService
+                .getUnit(ctx, new GetUnitRequest(line.getSkuId(), sequenceNumber))
+                .unit();
+        if (unit.status() != UnitStatus.RESERVED || !orderId.equals(unit.reservationId())) {
+          throw new IllegalStateException("order has an unexpected allocated unit");
+        }
+      }
     }
 
     var job =

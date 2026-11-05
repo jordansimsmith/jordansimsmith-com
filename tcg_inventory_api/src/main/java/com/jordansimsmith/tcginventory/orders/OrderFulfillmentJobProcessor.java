@@ -29,11 +29,7 @@ public class OrderFulfillmentJobProcessor implements JobProcessor {
             factory.ulidGenerator());
     this.orderRepository =
         new OrderRepository(
-            orderTable,
-            factory.jobTable(),
-            inventoryRepository,
-            factory.dynamoDbClient(),
-            factory.clock());
+            orderTable, factory.jobTable(), factory.dynamoDbClient(), factory.clock());
   }
 
   @Override

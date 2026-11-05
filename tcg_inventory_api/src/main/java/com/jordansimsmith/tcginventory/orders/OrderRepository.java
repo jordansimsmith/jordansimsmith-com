@@ -2,7 +2,6 @@ package com.jordansimsmith.tcginventory.orders;
 
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.time.Clock;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -25,19 +24,16 @@ public class OrderRepository {
 
   private final DynamoDbTable<OrderItem> orderTable;
   private final DynamoDbTable<JobItem> jobTable;
-  private final InventoryRepository inventoryRepository;
   private final DynamoDbClient dynamoDbClient;
   private final Clock clock;
 
   public OrderRepository(
       DynamoDbTable<OrderItem> orderTable,
       DynamoDbTable<JobItem> jobTable,
-      InventoryRepository inventoryRepository,
       DynamoDbClient dynamoDbClient,
       Clock clock) {
     this.orderTable = orderTable;
     this.jobTable = jobTable;
-    this.inventoryRepository = inventoryRepository;
     this.dynamoDbClient = dynamoDbClient;
     this.clock = clock;
   }
@@ -83,14 +79,6 @@ public class OrderRepository {
     var allocated = allocatedUnits(order);
     if (allocated.size() != new HashSet<>(allocated).size()) {
       throw new IllegalStateException("order allocation contains a duplicate unit");
-    }
-    for (var key : allocated) {
-      var unit = inventoryRepository.getUnit(user, key.skuId(), key.sequenceNumber());
-      if (unit == null
-          || !"reserved".equals(unit.getStatus())
-          || !order.getOrderId().equals(unit.getReservationId())) {
-        throw new IllegalStateException("order has an unexpected allocated unit");
-      }
     }
 
     var startOrder =
@@ -215,16 +203,6 @@ public class OrderRepository {
   }
 
   public void startVoiding(String user, OrderItem order, String cancelledStatus) {
-    var allocated = allocatedUnits(order);
-    for (var unitKey : allocated) {
-      var unit = inventoryRepository.getUnit(user, unitKey.skuId(), unitKey.sequenceNumber());
-      if (unit == null
-          || !"reserved".equals(unit.getStatus())
-          || !order.getOrderId().equals(unit.getReservationId())) {
-        throw new IllegalStateException("order has an unexpected allocated unit");
-      }
-    }
-
     dynamoDbClient.updateItem(
         UpdateItemRequest.builder()
             .tableName(TcgInventoryTable.TABLE_NAME)

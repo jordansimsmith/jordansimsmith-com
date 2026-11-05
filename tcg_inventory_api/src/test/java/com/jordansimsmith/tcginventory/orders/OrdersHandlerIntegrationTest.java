@@ -962,6 +962,53 @@ public class OrdersHandlerIntegrationTest {
   }
 
   @Test
+  void confirmOrderShouldRejectForeignReservation() {
+    // arrange
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    createSkuWithUnits("jordan", skuId, 1);
+    reserveUnits("jordan", skuId, "another-order", List.of(1));
+    createOrderWithLines(
+        "jordan", "83663", "to_pick", skuId, List.of(1), "PICKUP", "3.00", "3.00", null);
+    var jobIdsBefore = jobTable.scan().items().stream().map(JobItem::getJobId).toList();
+
+    // act
+    assertThatThrownBy(
+            () ->
+                confirmOrderHandler.handleRequest(
+                    buildEventWithPath("jordan", Map.of("order_id", "83663")), null))
+        .hasRootCauseMessage("order has an unexpected allocated unit");
+
+    // assert
+    assertThat(getOrderItem("jordan", "83663").getStatus()).isEqualTo("to_pick");
+    assertThat(jobTable.scan().items().stream().map(JobItem::getJobId))
+        .containsExactlyInAnyOrderElementsOf(jobIdsBefore);
+    assertThat(fakeJobsQueue.getMessages()).isEmpty();
+  }
+
+  @Test
+  void confirmOrderShouldReturn404ForMissingAllocatedUnit() throws Exception {
+    // arrange
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    createOrderWithLines(
+        "jordan", "83663", "to_pick", skuId, List.of(1), "PICKUP", "3.00", "3.00", null);
+    var jobIdsBefore = jobTable.scan().items().stream().map(JobItem::getJobId).toList();
+
+    // act
+    var response =
+        confirmOrderHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("order_id", "83663")), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(404);
+    assertThat(objectMapper.readTree(response.getBody()).get("message").asText())
+        .isEqualTo("Not Found");
+    assertThat(getOrderItem("jordan", "83663").getStatus()).isEqualTo("to_pick");
+    assertThat(jobTable.scan().items().stream().map(JobItem::getJobId))
+        .containsExactlyInAnyOrderElementsOf(jobIdsBefore);
+    assertThat(fakeJobsQueue.getMessages()).isEmpty();
+  }
+
+  @Test
   void confirmOrderShouldReturn409WhenNotToPick() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));

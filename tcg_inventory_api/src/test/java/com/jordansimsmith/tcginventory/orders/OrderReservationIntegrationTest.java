@@ -99,12 +99,7 @@ public class OrderReservationIntegrationTest {
         new InventoryRepository(
             unitTable, factory.dynamoDbClient(), fakeClock, factory.fakeUlidGenerator());
     orderRepository =
-        new OrderRepository(
-            orderTable,
-            factory.jobTable(),
-            inventoryRepository,
-            factory.dynamoDbClient(),
-            fakeClock);
+        new OrderRepository(orderTable, factory.jobTable(), factory.dynamoDbClient(), fakeClock);
     orderPhaseProcessor =
         new OrderPhaseProcessor(
             orderTable,
@@ -112,6 +107,7 @@ public class OrderReservationIntegrationTest {
             factory.settingsTable(),
             orderRepository,
             inventoryRepository,
+            factory.inventoryService(),
             fakeClock,
             fakeFetchTcgService);
   }
@@ -214,6 +210,7 @@ public class OrderReservationIntegrationTest {
             factory.settingsTable(),
             orderRepository,
             inventoryRepository,
+            factory.inventoryService(),
             fakeClock,
             fetchTcgService);
 
@@ -428,6 +425,7 @@ public class OrderReservationIntegrationTest {
             factory.settingsTable(),
             orderRepository,
             inventoryRepository,
+            factory.inventoryService(),
             fakeClock,
             fakeFetchTcgService);
 
@@ -456,6 +454,7 @@ public class OrderReservationIntegrationTest {
             factory.settingsTable(),
             orderRepository,
             inventoryRepository,
+            factory.inventoryService(),
             fakeClock,
             fakeFetchTcgService);
 
@@ -476,8 +475,7 @@ public class OrderReservationIntegrationTest {
     var inventoryRepository =
         new InventoryRepository(unitTable, dynamoDbClient, fakeClock, factory.fakeUlidGenerator());
     var orderRepository =
-        new OrderRepository(
-            orderTable, factory.jobTable(), inventoryRepository, dynamoDbClient, fakeClock);
+        new OrderRepository(orderTable, factory.jobTable(), dynamoDbClient, fakeClock);
     var orderPhaseProcessor =
         new OrderPhaseProcessor(
             orderTable,
@@ -485,6 +483,7 @@ public class OrderReservationIntegrationTest {
             factory.settingsTable(),
             orderRepository,
             inventoryRepository,
+            factory.inventoryService(),
             fakeClock,
             fakeFetchTcgService);
     var listingPhaseProcessor =

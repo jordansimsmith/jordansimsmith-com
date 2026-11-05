@@ -182,66 +182,6 @@ public class InventoryRepository {
             .build());
   }
 
-  public void updateUnitForRelease(String user, String orderId, String skuId, int sequenceNumber) {
-    var unit = getUnit(user, skuId, sequenceNumber);
-    // a saved order allocation cannot be released if its unit no longer exists
-    if (unit == null) {
-      throw new IllegalStateException("unit is not reserved for this order");
-    }
-    // a prior delivery may have committed this release before losing its response
-    if ("in_stock".equals(unit.getStatus()) && unit.getReservationId() == null) {
-      return;
-    }
-
-    var releaseUnit =
-        TransactWriteItem.builder()
-            .update(
-                Update.builder()
-                    .tableName(TcgInventoryTable.TABLE_NAME)
-                    .key(
-                        Map.of(
-                            UnitItem.PK,
-                            AttributeValue.builder().s(UnitItem.formatPk(user, skuId)).build(),
-                            UnitItem.SK,
-                            AttributeValue.builder().s(UnitItem.formatSk(sequenceNumber)).build()))
-                    .updateExpression(
-                        "SET #status = :inStock, "
-                            + UnitItem.UPDATED_AT
-                            + " = :now REMOVE "
-                            + UnitItem.RESERVATION_ID)
-                    .conditionExpression(
-                        "#status = :reserved AND " + UnitItem.RESERVATION_ID + " = :orderId")
-                    .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
-                    .expressionAttributeValues(
-                        Map.of(
-                            ":inStock", AttributeValue.builder().s("in_stock").build(),
-                            ":reserved", AttributeValue.builder().s("reserved").build(),
-                            ":orderId", AttributeValue.builder().s(orderId).build(),
-                            ":now",
-                                AttributeValue.builder()
-                                    .n(String.valueOf(clock.now().getEpochSecond()))
-                                    .build()))
-                    .build())
-            .build();
-
-    dynamoDbClient.transactWriteItems(
-        TransactWriteItemsRequest.builder()
-            .transactItems(
-                releaseUnit,
-                buildSkuDirtyUpdate(user, skuId),
-                buildAuditPut(
-                    user,
-                    "release",
-                    Map.of(
-                        AuditItem.ORDER_ID, AttributeValue.builder().s(orderId).build(),
-                        AuditItem.SKU_ID, AttributeValue.builder().s(skuId).build(),
-                        AuditItem.SEQUENCE_NUMBER,
-                            AttributeValue.builder().n(String.valueOf(sequenceNumber)).build(),
-                        AuditItem.BEFORE_STATUS, AttributeValue.builder().s("reserved").build(),
-                        AuditItem.AFTER_STATUS, AttributeValue.builder().s("in_stock").build())))
-            .build());
-  }
-
   public TransactWriteItem buildUnitDelete(String user, String skuId, int sequenceNumber) {
     var skuPk = SkuItem.formatPk(user, skuId);
     var unitSk = UnitItem.formatSk(sequenceNumber);
