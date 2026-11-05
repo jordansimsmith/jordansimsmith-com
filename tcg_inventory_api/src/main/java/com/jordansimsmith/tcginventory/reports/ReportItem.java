@@ -16,13 +16,11 @@ public class ReportItem {
   public static final String PK = "pk";
   public static final String SK = "sk";
   public static final String REPORT = "report";
-  public static final String AS_OF_AUDIT_ULID = "as_of_audit_ulid";
   public static final String UPDATED_AT = "updated_at";
 
   private String pk;
   private String sk;
   private String report;
-  private String asOfAuditUlid;
   private Instant updatedAt;
 
   @DynamoDbPartitionKey
@@ -54,15 +52,6 @@ public class ReportItem {
     this.report = report;
   }
 
-  @DynamoDbAttribute(AS_OF_AUDIT_ULID)
-  public String getAsOfAuditUlid() {
-    return asOfAuditUlid;
-  }
-
-  public void setAsOfAuditUlid(@Nullable String asOfAuditUlid) {
-    this.asOfAuditUlid = asOfAuditUlid;
-  }
-
   @DynamoDbConvertedBy(EpochSecondConverter.class)
   @DynamoDbAttribute(UPDATED_AT)
   public Instant getUpdatedAt() {
@@ -81,13 +70,11 @@ public class ReportItem {
     return "REPORT";
   }
 
-  public static ReportItem create(
-      String user, String report, @Nullable String asOfAuditUlid, Instant updatedAt) {
+  public static ReportItem create(String user, String report, Instant updatedAt) {
     var item = new ReportItem();
     item.setPk(formatPk(user));
     item.setSk(formatSk());
     item.setReport(report);
-    item.setAsOfAuditUlid(asOfAuditUlid);
     item.setUpdatedAt(updatedAt);
     return item;
   }

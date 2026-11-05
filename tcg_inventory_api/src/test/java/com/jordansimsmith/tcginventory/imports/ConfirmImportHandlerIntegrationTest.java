@@ -11,7 +11,6 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.service.RequestContext;
-import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
@@ -45,7 +44,6 @@ public class ConfirmImportHandlerIntegrationTest {
   private ObjectMapper objectMapper;
   private DynamoDbTable<ImportItem> importTable;
   private DynamoDbTable<ImportRowItem> importRowTable;
-  private DynamoDbTable<AuditItem> auditTable;
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
   private DynamoDbTable<JobItem> jobTable;
@@ -76,7 +74,6 @@ public class ConfirmImportHandlerIntegrationTest {
     objectMapper = factory.objectMapper();
     importTable = factory.importTable();
     importRowTable = factory.importRowTable();
-    auditTable = factory.auditTable();
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
     jobTable = factory.jobTable();
@@ -167,17 +164,6 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(countUnits(sku2Pk)).isEqualTo(1);
     assertThat(sku2.getVersion()).isEqualTo(1);
     assertThat(sku2.getDirty()).isTrue();
-    var auditEntries = getAuditEntries("jordan");
-    assertThat(auditEntries).hasSize(3);
-    assertThat(auditEntries)
-        .allSatisfy(
-            audit -> {
-              assertThat(audit.getEventType()).isEqualTo("create");
-              assertThat(audit.getImportId()).isNull();
-              assertThat(audit.getSequenceNumber()).isNotNull();
-              assertThat(audit.getBeforeStatus()).isEqualTo("absent");
-              assertThat(audit.getAfterStatus()).isEqualTo("in_stock");
-            });
   }
 
   @Test
@@ -524,7 +510,6 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
         .isEqualTo(200);
     assertThat(getImportItem("import1").getStatus()).isEqualTo("confirmed");
-    assertThat(getAuditEntries("jordan")).hasSize(200);
   }
 
   @Test
@@ -582,7 +567,6 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(getImportItem("import1").getStatus()).isEqualTo("confirmed");
     assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
         .isEqualTo(2);
-    assertThat(getAuditEntries("jordan")).isEmpty();
   }
 
   @Test
@@ -677,7 +661,6 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(getImportRow("import1", 2).getSkuId()).isNull();
     assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
         .isEqualTo(2);
-    assertThat(getAuditEntries("jordan")).hasSize(2);
 
     // act
     importConfirmationJobProcessor.processBatch("jordan", jobItem);
@@ -686,7 +669,6 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(getImportItem("import1").getStatus()).isEqualTo("confirmed");
     assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
         .isEqualTo(2);
-    assertThat(getAuditEntries("jordan")).hasSize(2);
     assertThat(getImportRow("import1", 2).getSkuId())
         .isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
     assertThat(getImportRow("import1", 2).getSequenceNumber()).isEqualTo(1);
@@ -718,7 +700,6 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(body.get("unit_count").asInt()).isEqualTo(0);
     assertThat(body.get("total_suggested_price").asText()).isEqualTo("0.00");
     assertThat(body.get("placement_instructions")).isEmpty();
-    assertThat(getAuditEntries("jordan")).isEmpty();
   }
 
   @Test
@@ -851,16 +832,6 @@ public class ConfirmImportHandlerIntegrationTest {
             .partitionValue(ImportItem.formatPk("jordan"))
             .sortValue(ImportItem.formatSk(importId))
             .build());
-  }
-
-  private List<AuditItem> getAuditEntries(String user) {
-    var request =
-        QueryEnhancedRequest.builder()
-            .queryConditional(
-                QueryConditional.keyEqualTo(
-                    Key.builder().partitionValue(AuditItem.formatPk(user)).build()))
-            .build();
-    return auditTable.query(request).stream().flatMap(page -> page.items().stream()).toList();
   }
 
   private List<JobItem> findJobs(String user) {

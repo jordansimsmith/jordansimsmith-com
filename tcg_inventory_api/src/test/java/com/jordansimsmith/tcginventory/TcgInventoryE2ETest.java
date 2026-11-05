@@ -343,12 +343,10 @@ public class TcgInventoryE2ETest {
                   .isZero();
             });
 
-    // Arrange - establish a fresh report baseline before repricing.
+    // Arrange - establish a report baseline before repricing.
     triggerReportAndWait();
     var reportBeforeReprice = get("/reports");
     assertThat(reportBeforeReprice.statusCode()).isEqualTo(200);
-    assertThat(objectMapper.readTree(reportBeforeReprice.body()).get("stale").asBoolean())
-        .isFalse();
 
     // act - raise the floor and reprice the confirmed, in-stock inventory
     var updatedFloor = patch("/pricing", "{\"price_floor\":49.00}");
@@ -379,7 +377,6 @@ public class TcgInventoryE2ETest {
         .isEqualTo(1);
     var reportAfterReprice = get("/reports");
     assertThat(reportAfterReprice.statusCode()).isEqualTo(200);
-    assertThat(objectMapper.readTree(reportAfterReprice.body()).get("stale").asBoolean()).isTrue();
 
     // act - publish run 2: publish the repriced price and stub returns offer with listing 900001,
     // order created directly as
@@ -465,9 +462,8 @@ public class TcgInventoryE2ETest {
     assertThat(reportResponse.statusCode()).isEqualTo(200);
     var reportBody = objectMapper.readTree(reportResponse.body());
 
-    // assert - freshness (just generated, no mutations since)
+    // assert - report generation
     assertThat(reportBody.get("generated_at").asLong()).isGreaterThan(0);
-    assertThat(reportBody.get("stale").asBoolean()).isFalse();
 
     // assert - generation status
     var generation = reportBody.get("generation");
@@ -598,12 +594,6 @@ public class TcgInventoryE2ETest {
               assertThat(objectMapper.readTree(pollResponse.body()).get("status").asText())
                   .isEqualTo("confirmed");
             });
-
-    // assert - report is now stale after mutation
-    var staleReportResponse = get("/reports");
-    assertThat(staleReportResponse.statusCode()).isEqualTo(200);
-    var staleReportBody = objectMapper.readTree(staleReportResponse.body());
-    assertThat(staleReportBody.get("stale").asBoolean()).isTrue();
   }
 
   private HttpResponse<String> get(String path) throws IOException, InterruptedException {

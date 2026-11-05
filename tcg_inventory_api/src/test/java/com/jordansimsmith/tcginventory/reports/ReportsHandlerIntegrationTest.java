@@ -14,7 +14,6 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceUnavailableException;
-import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.JobsHandler;
@@ -66,7 +65,6 @@ public class ReportsHandlerIntegrationTest {
   private ObjectMapper objectMapper;
   private DynamoDbTable<JobItem> jobTable;
   private DynamoDbTable<ReportItem> reportTable;
-  private DynamoDbTable<AuditItem> auditTable;
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
   private DynamoDbTable<OrderItem> orderTable;
@@ -100,7 +98,6 @@ public class ReportsHandlerIntegrationTest {
     objectMapper = factory.objectMapper();
     jobTable = factory.jobTable();
     reportTable = factory.reportTable();
-    auditTable = factory.auditTable();
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
     orderTable = factory.orderTable();
@@ -192,15 +189,9 @@ public class ReportsHandlerIntegrationTest {
   }
 
   @Test
-  void jobShouldWriteSnapshotWithAsOfAuditUlid() throws Exception {
+  void jobShouldWriteSnapshot() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-
-    var auditEntry = new AuditItem();
-    auditEntry.setPk(AuditItem.formatPk("jordan"));
-    auditEntry.setSk("01JEXAMPLEULID0000000000");
-    auditEntry.setEventType("import_confirm");
-    auditTable.putItem(auditEntry);
 
     var jobItem =
         JobItem.create(
@@ -218,7 +209,6 @@ public class ReportsHandlerIntegrationTest {
                 .sortValue(ReportItem.formatSk())
                 .build());
     assertThat(reportItem).isNotNull();
-    assertThat(reportItem.getAsOfAuditUlid()).isEqualTo("01JEXAMPLEULID0000000000");
     assertThat(reportItem.getReport()).isNotNull();
     assertThat(reportItem.getUpdatedAt()).isEqualTo(Instant.ofEpochSecond(1700000000));
 
@@ -620,7 +610,7 @@ public class ReportsHandlerIntegrationTest {
   void reportJobShouldKeepExistingSnapshotWhenLaterSkuPageFails() throws Exception {
     // arrange
     var previousUpdatedAt = Instant.ofEpochSecond(1600000000);
-    reportTable.putItem(ReportItem.create("jordan", "previous-report", null, previousUpdatedAt));
+    reportTable.putItem(ReportItem.create("jordan", "previous-report", previousUpdatedAt));
     var inventoryService = mock(InventoryService.class);
     var ctx = new RequestContext("jordan");
     var failure = new ServiceUnavailableException("inventory is unavailable");
@@ -767,15 +757,7 @@ public class ReportsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
-    var auditEntry = new AuditItem();
-    auditEntry.setPk(AuditItem.formatPk("jordan"));
-    auditEntry.setSk("01JEXAMPLEULID0000000000");
-    auditEntry.setEventType("import_confirm");
-    auditTable.putItem(auditEntry);
-
-    var reportItem =
-        ReportItem.create(
-            "jordan", "{}", "01JEXAMPLEULID0000000000", Instant.ofEpochSecond(1700000000));
+    var reportItem = ReportItem.create("jordan", "{}", Instant.ofEpochSecond(1700000000));
     reportTable.putItem(reportItem);
 
     var jobItem =
@@ -799,26 +781,13 @@ public class ReportsHandlerIntegrationTest {
   }
 
   @Test
-  void getReportsShouldReturnStaleAfterMutation() throws Exception {
+  void getReportsShouldRemainFreshAt24Hours() throws Exception {
     // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    var generatedAt = Instant.ofEpochSecond(1700000000);
+    fakeClock.setTime(generatedAt.plus(Duration.ofHours(24)));
 
-    var auditEntry1 = new AuditItem();
-    auditEntry1.setPk(AuditItem.formatPk("jordan"));
-    auditEntry1.setSk("01JEXAMPLEULID0000000000");
-    auditEntry1.setEventType("import_confirm");
-    auditTable.putItem(auditEntry1);
-
-    var reportItem =
-        ReportItem.create(
-            "jordan", "{}", "01JEXAMPLEULID0000000000", Instant.ofEpochSecond(1700000000));
+    var reportItem = ReportItem.create("jordan", "{}", generatedAt);
     reportTable.putItem(reportItem);
-
-    var auditEntry2 = new AuditItem();
-    auditEntry2.setPk(AuditItem.formatPk("jordan"));
-    auditEntry2.setSk("01JLATERULID00000000000");
-    auditEntry2.setEventType("adjustment");
-    auditTable.putItem(auditEntry2);
 
     // act
     var response = getReportsHandler.handleRequest(buildHttpEvent("jordan"), null);
@@ -826,7 +795,7 @@ public class ReportsHandlerIntegrationTest {
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
-    assertThat(body.get("stale").asBoolean()).isTrue();
+    assertThat(body.get("stale").asBoolean()).isFalse();
   }
 
   @Test
@@ -835,7 +804,7 @@ public class ReportsHandlerIntegrationTest {
     var generatedAt = Instant.ofEpochSecond(1700000000);
     fakeClock.setTime(generatedAt.plus(Duration.ofHours(25)));
 
-    var reportItem = ReportItem.create("jordan", "{}", null, generatedAt);
+    var reportItem = ReportItem.create("jordan", "{}", generatedAt);
     reportTable.putItem(reportItem);
 
     // act
@@ -852,7 +821,7 @@ public class ReportsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
-    var reportItem = ReportItem.create("jordan", "{}", null, Instant.ofEpochSecond(1700000000));
+    var reportItem = ReportItem.create("jordan", "{}", Instant.ofEpochSecond(1700000000));
     reportTable.putItem(reportItem);
 
     var jobItem =
@@ -879,7 +848,6 @@ public class ReportsHandlerIntegrationTest {
   private ReportJobProcessor createReportJobProcessor(InventoryService inventoryService) {
     return new ReportJobProcessor(
         reportTable,
-        auditTable,
         orderTable,
         new OrderRepository(
             orderTable,

@@ -19,7 +19,6 @@ import com.jordansimsmith.service.BadRequestException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceUnavailableException;
-import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.JobProcessor;
@@ -59,8 +58,6 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 
@@ -76,7 +73,6 @@ public class RepriceJobProcessorIntegrationTest {
   private DynamoDbTable<JobItem> jobTable;
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
-  private DynamoDbTable<AuditItem> auditTable;
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
@@ -99,7 +95,6 @@ public class RepriceJobProcessorIntegrationTest {
     jobTable = factory.jobTable();
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
-    auditTable = factory.auditTable();
     DynamoDbUtils.reset(factory.dynamoDbClient());
     jobsQueue.reset();
     factory.fakeFetchTcgService().reset();
@@ -150,36 +145,8 @@ public class RepriceJobProcessorIntegrationTest {
     assertThat(getSku("other-user", otherUserSkuId).getVersion()).isEqualTo(1);
     assertThat(getUnit("jordan", pokemonSkuId).getStatus()).isEqualTo("in_stock");
 
-    var auditItems = repriceAudits("jordan");
-    assertThat(auditItems).hasSize(3);
-    assertThat(auditItems)
-        .anySatisfy(
-            audit -> {
-              assertThat(audit.getEventType()).isEqualTo("price_update");
-              assertThat(audit.getJobId()).isNull();
-              assertThat(audit.getSkuId()).isEqualTo(mtgSkuId);
-              assertThat(audit.getBeforePrice()).isEqualTo("2.90");
-              assertThat(audit.getAfterPrice()).isEqualTo("2.90");
-            });
-    assertThat(auditItems)
-        .anySatisfy(
-            audit -> {
-              assertThat(audit.getSkuId()).isEqualTo(pokemonSkuId);
-              assertThat(audit.getBeforePrice()).isEqualTo("1.50");
-              assertThat(audit.getAfterPrice()).isEqualTo("1.00");
-            });
-    assertThat(auditItems)
-        .anySatisfy(
-            audit -> {
-              assertThat(audit.getSkuId()).isEqualTo(lowMarketSkuId);
-              assertThat(audit.getBeforePrice()).isEqualTo("0.10");
-              assertThat(audit.getAfterPrice()).isEqualTo("0.75");
-            });
-    assertThat(repriceAudits("other-user")).isEmpty();
-
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "reprice"), null);
     assertThat(getSku("jordan", mtgSkuId).getVersion()).isEqualTo(2);
-    assertThat(repriceAudits("jordan")).hasSize(3);
   }
 
   @Test
@@ -328,7 +295,6 @@ public class RepriceJobProcessorIntegrationTest {
     // assert
     assertThat(result).isEqualTo(new JobProcessor.FailureJobResult("unit page failed"));
     assertThat(getSku(user, skuId).getSuggestedPrice()).isEqualTo("1.00");
-    assertThat(repriceAudits(user)).isEmpty();
     verify(inventoryService, times(0)).updateSku(any(), any());
     verifyNoInteractions(pricingService);
   }
@@ -364,7 +330,6 @@ public class RepriceJobProcessorIntegrationTest {
     // assert
     assertThat(result)
         .isEqualTo(new JobProcessor.FailureJobResult("FetchTCG account is not configured"));
-    assertThat(repriceAudits(user)).isEmpty();
   }
 
   @Test
@@ -488,7 +453,6 @@ public class RepriceJobProcessorIntegrationTest {
     assertThat(getSku("jordan", skuId).getSuggestedPrice()).isEqualTo("0.75");
     assertThat(getSku("jordan", skuId).getVersion()).isEqualTo(2);
     assertThat(getSku("jordan", skuId).getDirty()).isTrue();
-    assertThat(repriceAudits("jordan")).hasSize(1);
   }
 
   private String createSku(
@@ -624,21 +588,6 @@ public class RepriceJobProcessorIntegrationTest {
             .sortValue(JobItem.formatSk(jobId))
             .build();
     return jobTable.getItem(request -> request.key(key).consistentRead(true));
-  }
-
-  private List<AuditItem> repriceAudits(String user) {
-    return auditTable
-        .query(
-            QueryEnhancedRequest.builder()
-                .queryConditional(
-                    QueryConditional.keyEqualTo(
-                        Key.builder().partitionValue(AuditItem.formatPk(user)).build()))
-                .consistentRead(true)
-                .build())
-        .stream()
-        .flatMap(page -> page.items().stream())
-        .filter(item -> "price_update".equals(item.getEventType()))
-        .toList();
   }
 
   private SQSEvent buildSqsEvent(String user, String jobId, String jobType) {

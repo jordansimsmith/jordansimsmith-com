@@ -14,7 +14,6 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceUnavailableException;
-import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobProcessor;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
@@ -65,7 +64,6 @@ public class OrderReservationIntegrationTest {
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
   private DynamoDbTable<OrderItem> orderTable;
-  private DynamoDbTable<AuditItem> auditTable;
   private OrderPhaseProcessor orderPhaseProcessor;
   private OrderRepository orderRepository;
 
@@ -91,7 +89,6 @@ public class OrderReservationIntegrationTest {
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
     orderTable = factory.orderTable();
-    auditTable = factory.auditTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeFetchTcgService.reset();
@@ -213,7 +210,6 @@ public class OrderReservationIntegrationTest {
               assertThat(unit.getReservationId()).isNotNull();
             });
     assertThat(getSku().getVersion()).isEqualTo(5);
-    assertThat(getAudits()).filteredOn(audit -> "reserve".equals(audit.getEventType())).hasSize(4);
   }
 
   @Test
@@ -289,7 +285,6 @@ public class OrderReservationIntegrationTest {
                 "Offer 83663 contains listing 999 with no matching inventory SKU"));
     assertThat(getOrders()).isEmpty();
     assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
-    assertThat(getAudits()).isEmpty();
   }
 
   @Test
@@ -308,7 +303,6 @@ public class OrderReservationIntegrationTest {
             new JobProcessor.FailureJobResult("Offer 83663 has no card lines; check FetchTCG"));
     assertThat(getOrders()).isEmpty();
     assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
-    assertThat(getAudits()).isEmpty();
   }
 
   @Test
@@ -335,7 +329,6 @@ public class OrderReservationIntegrationTest {
     assertThat(getOrders()).hasSize(2);
     assertThat(getUnit(1).getStatus()).isEqualTo("reserved");
     assertThat(getUnit(2).getStatus()).isEqualTo("reserved");
-    assertThat(getAudits()).hasSize(2);
   }
 
   @Test
@@ -369,7 +362,6 @@ public class OrderReservationIntegrationTest {
     assertThat(getOrder("83663").getStatus()).isEqualTo("reserving");
     assertThat(getUnit(1).getStatus()).isEqualTo("reserved");
     assertThat(getUnit(1).getReservationId()).isEqualTo("83663");
-    assertThat(getAudits()).filteredOn(audit -> "reserve".equals(audit.getEventType())).hasSize(1);
 
     // arrange retry after repairing the conflicting saved allocation
     var repairedUnit = getUnit(2);
@@ -385,7 +377,6 @@ public class OrderReservationIntegrationTest {
     assertThat(getUnit(2).getStatus()).isEqualTo("reserved");
     assertThat(getUnit(2).getReservationId()).isEqualTo("83663");
     assertThat(getSku().getVersion()).isEqualTo(3);
-    assertThat(getAudits()).filteredOn(audit -> "reserve".equals(audit.getEventType())).hasSize(2);
   }
 
   @Test
@@ -420,7 +411,6 @@ public class OrderReservationIntegrationTest {
     // assert
     assertThat(getOrder("83663").getStatus()).isEqualTo("reserving");
     assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
-    assertThat(getAudits()).isEmpty();
   }
 
   @Test
@@ -545,7 +535,6 @@ public class OrderReservationIntegrationTest {
     assertThat(getOrder("83663").getStatus()).isEqualTo("awaiting_payment");
     assertThat(findOrderRows(getOrder("83663")).getFirst().getAllocatedSequenceNumbers())
         .containsExactly(1);
-    assertThat(getAudits()).hasSize(1);
     assertThat(getSku().getVersion()).isEqualTo(version);
   }
 
@@ -604,7 +593,6 @@ public class OrderReservationIntegrationTest {
         .containsExactly(1, 2);
     assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
     assertThat(getUnit(2).getStatus()).isEqualTo("in_stock");
-    assertThat(getAudits()).hasSize(4);
   }
 
   @Test
@@ -625,7 +613,6 @@ public class OrderReservationIntegrationTest {
     assertThat(getOrder("83663").getStatus()).isEqualTo("awaiting_payment");
     assertThat(findOrderRows(getOrder("83663")).getFirst().getAllocatedSequenceNumbers())
         .containsExactlyElementsOf(IntStream.range(0, 101).boxed().toList());
-    assertThat(getAudits()).hasSize(101);
   }
 
   private JobProcessor.JobResult processPublish() {
@@ -747,15 +734,6 @@ public class OrderReservationIntegrationTest {
             .sortValue(SkuItem.formatSk())
             .build();
     return skuTable.getItem(request -> request.key(key).consistentRead(true));
-  }
-
-  private List<AuditItem> getAudits() {
-    var key = Key.builder().partitionValue(AuditItem.formatPk(USER)).build();
-    var request =
-        QueryEnhancedRequest.builder().queryConditional(QueryConditional.keyEqualTo(key)).build();
-    var results = new ArrayList<AuditItem>();
-    auditTable.query(request).items().forEach(results::add);
-    return results;
   }
 
   private OrderItem createOrderItem(

@@ -137,12 +137,6 @@ public class TcgInventoryTestModule {
 
   @Provides
   @Singleton
-  DynamoDbTable<AuditItem> auditTable(DynamoDbEnhancedClient client) {
-    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(AuditItem.class));
-  }
-
-  @Provides
-  @Singleton
   DynamoDbTable<CatalogSnapshotItem> catalogSnapshotTable(DynamoDbEnhancedClient client) {
     return client.table(
         TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(CatalogSnapshotItem.class));

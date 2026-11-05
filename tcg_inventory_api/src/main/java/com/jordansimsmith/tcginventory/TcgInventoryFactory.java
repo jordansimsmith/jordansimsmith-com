@@ -38,8 +38,6 @@ public interface TcgInventoryFactory {
 
   DynamoDbTable<JobItem> jobTable();
 
-  DynamoDbTable<AuditItem> auditTable();
-
   DynamoDbClient dynamoDbClient();
 
   SqsClient sqsClient();

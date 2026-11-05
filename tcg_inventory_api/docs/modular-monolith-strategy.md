@@ -6,9 +6,9 @@ This is a target architecture and an incremental migration strategy, not a descr
 
 ## Starting point
 
-The service already groups Java code into verticals: games, catalog, scans, imports, inventory, orders, reports, publish, and pricing. Bazel gives these verticals separate libraries, but consumers can still depend on implementation libraries and persistence models. Shared infrastructure includes the top-level Dagger factory/module, job records and dispatch, audit records, table configuration, and storage helpers. The factory and module may remain at the top level while other root-package code migrates into vertical packages or `//lib` packages for truly shared libraries.
+The service already groups Java code into verticals: games, catalog, scans, imports, inventory, orders, reports, publish, and pricing. Bazel gives these verticals separate libraries, but consumers can still depend on implementation libraries and persistence models. Shared infrastructure includes the top-level Dagger factory/module, job records and dispatch, table configuration, and storage helpers. The factory and module may remain at the top level while other root-package code migrates into vertical packages or `//lib` packages for truly shared libraries.
 
-Remaining ownership gaps include Reports' direct order and audit reads and Orders' direct SKU and unit reads for pick-sheet location and neighbor details. Orders otherwise uses Inventory services for reservation, release, sale, and admission checks. Root-package wiring still has access to server targets because Bazel visibility applies to the whole package.
+Remaining ownership gaps include Reports' direct order reads and Orders' direct SKU and unit reads for pick-sheet location and neighbor details. Orders otherwise uses Inventory services for reservation, release, sale, and admission checks. Root-package wiring still has access to server targets because Bazel visibility applies to the whole package.
 
 Existing import confirmation and order processing already use durable progress and replay to complete work in smaller transactions. Preserve those guarantees while changing ownership; service interfaces alone do not provide them.
 
@@ -181,7 +181,7 @@ Inventory owns SKUs, units, sequence and location allocation, receipts, reservat
 
 Orders asks Inventory to reserve, release, or sell units and records its own workflow progress. Reservation receipts return the original unit on replay; lifecycle records make completed releases and sales replay-safe. Releasing or selling a unit updates its lifecycle, the unit, related SKU bookkeeping, and an audit in one Inventory transaction. Pricing applies last-write-wins price patches through Inventory. Listings owns marketplace synchronization and current and historical listing associations; it acknowledges publication through a versioned dirty-state patch on Inventory. These callers do not write Inventory records directly.
 
-Inventory exposes read clients for SKU and unit facts used by other verticals. Order-detail picking still reads the legacy SKU and unit models to construct location, block, and neighbor details. Reports reads order and Inventory audit records directly; its audit watermark can miss payment-only and other order-only changes until another Inventory audit or the 24-hour age limit. These are read-side migration gaps, so mutation ownership is complete while Inventory isolation is not. The root Bazel package remains an enforcement gap because application wiring and business targets still share it.
+Inventory exposes read clients for SKU and unit facts used by other verticals. Order-detail picking still reads the legacy SKU and unit models to construct location, block, and neighbor details. Reports reads Orders records directly and marks snapshots stale only by age, after 24 hours. These are read-side migration gaps, so mutation ownership is complete while Inventory isolation is not. The root Bazel package remains an enforcement gap because application wiring and business targets still share it.
 
 Listing photos cross lifecycle boundaries: imports owns review-time attachments, while inventory must retain the immutable photo references needed by confirmed units. Shared S3 storage does not imply shared authority to change those references.
 
@@ -229,7 +229,7 @@ Cross-vertical reads use service contracts. Start with paginated or bounded bulk
 
 If fan-out or reporting cost justifies it, reports can own a read model populated from published changes. Such a projection needs duplicate handling, ordering/version semantics, a rebuild strategy, and an explicit freshness contract. Event-driven reporting is an option, not a prerequisite for the first migration.
 
-Separate owners do not provide a globally consistent snapshot merely because reads happen in one process. Specify whether a report is best-effort, uses per-owner watermarks, or needs another snapshot protocol. Until Reports replaces its legacy Inventory audit watermark, payment-only and other Orders-only changes may leave a report labelled fresh until a later Inventory audit or the existing 24-hour age check. Explicit report generation still reads current Orders data.
+Separate owners do not provide a globally consistent snapshot merely because reads happen in one process. Reports snapshots are best-effort and become stale only after 24 hours; intervening Inventory and Orders changes do not alter freshness. Explicit report generation reads current Inventory and Orders data.
 
 ## Lambda handlers and deployment
 

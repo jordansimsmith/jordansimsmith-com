@@ -13,7 +13,6 @@ import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.service.RequestContext;
-import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.JobsHandler;
@@ -41,7 +40,6 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 @Testcontainers
 public class OrdersHandlerIntegrationTest {
@@ -54,7 +52,6 @@ public class OrdersHandlerIntegrationTest {
   private DynamoDbTable<JobItem> jobTable;
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
-  private DynamoDbTable<AuditItem> auditTable;
 
   private FindOrdersHandler findOrdersHandler;
   private GetOrderHandler getOrderHandler;
@@ -86,7 +83,6 @@ public class OrdersHandlerIntegrationTest {
     orderTable = factory.orderTable();
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
-    auditTable = factory.auditTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
@@ -769,20 +765,6 @@ public class OrdersHandlerIntegrationTest {
     var sku = getSkuItem("jordan", skuId);
     assertThat(sku.getVersion()).isEqualTo(3);
 
-    var audit = getAuditEntries("jordan");
-    var sellAudits = audit.stream().filter(a -> "sell".equals(a.getEventType())).toList();
-    assertThat(sellAudits).hasSize(2);
-    var rawSellAudits =
-        getRawAuditEntries("jordan").stream()
-            .filter(a -> "sell".equals(a.get("event_type").s()))
-            .toList();
-    assertThat(rawSellAudits).hasSize(2);
-    assertThat(rawSellAudits)
-        .allSatisfy(
-            a -> {
-              assertThat(a.get("reservation_id").s()).isEqualTo("83663");
-              assertThat(a).doesNotContainKey("order_id");
-            });
     assertThat(getJobItem("jordan", job.getJobId()).getStatus()).isEqualTo("succeeded");
 
     // arrange - the completion transaction committed before the job acknowledgement
@@ -795,8 +777,6 @@ public class OrdersHandlerIntegrationTest {
 
     // assert
     assertThat(getJobItem("jordan", job.getJobId()).getStatus()).isEqualTo("succeeded");
-    assertThat(getAuditEntries("jordan").stream().filter(a -> "sell".equals(a.getEventType())))
-        .hasSize(2);
 
     // act - confirm after fulfillment completed
     var fulfilledResponse =
@@ -853,10 +833,6 @@ public class OrdersHandlerIntegrationTest {
     var units = getUnits("jordan", skuId);
     assertThat(units).hasSize(101);
     assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("sold"));
-
-    var sellAudits =
-        getAuditEntries("jordan").stream().filter(a -> "sell".equals(a.getEventType())).toList();
-    assertThat(sellAudits).hasSize(101);
   }
 
   @Test
@@ -921,9 +897,6 @@ public class OrdersHandlerIntegrationTest {
     assertThat(getJobItem("jordan", job.getJobId()).getStatus()).isEqualTo("failed");
     assertThat(getJobItem("jordan", job.getJobId()).getError())
         .isEqualTo("unit is not reserved for this reservation");
-    var sellAudits =
-        getAuditEntries("jordan").stream().filter(a -> "sell".equals(a.getEventType())).toList();
-    assertThat(sellAudits).hasSize(1);
     assertThat(getSkuItem("jordan", skuId).getVersion()).isEqualTo(2);
   }
 
@@ -972,16 +945,12 @@ public class OrdersHandlerIntegrationTest {
     assertThat(getOrderItem("jordan", "83663").getStatus()).isEqualTo("fulfilling");
     assertThat(getUnits("jordan", skuId))
         .allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("sold"));
-    assertThat(getAuditEntries("jordan").stream().filter(a -> "sell".equals(a.getEventType())))
-        .hasSize(2);
     var versionAfterSales = getSkuItem("jordan", skuId).getVersion();
 
     processor.processBatch("jordan", job);
 
     assertThat(getOrderItem("jordan", "83663").getStatus()).isEqualTo("fulfilled");
     assertThat(getSkuItem("jordan", skuId).getVersion()).isEqualTo(versionAfterSales);
-    assertThat(getAuditEntries("jordan").stream().filter(a -> "sell".equals(a.getEventType())))
-        .hasSize(2);
   }
 
   @Test
@@ -1249,32 +1218,6 @@ public class OrdersHandlerIntegrationTest {
             .build();
     unitTable.query(request).items().forEach(results::add);
     return results;
-  }
-
-  private List<AuditItem> getAuditEntries(String user) {
-    var results = new ArrayList<AuditItem>();
-    var request =
-        QueryEnhancedRequest.builder()
-            .queryConditional(
-                QueryConditional.keyEqualTo(
-                    Key.builder().partitionValue(AuditItem.formatPk(user)).build()))
-            .build();
-    auditTable.query(request).items().forEach(results::add);
-    return results;
-  }
-
-  private List<Map<String, AttributeValue>> getRawAuditEntries(String user) {
-    return factory
-        .dynamoDbClient()
-        .query(
-            request ->
-                request
-                    .tableName(TcgInventoryTable.TABLE_NAME)
-                    .keyConditionExpression("pk = :pk")
-                    .expressionAttributeValues(
-                        Map.of(
-                            ":pk", AttributeValue.builder().s(AuditItem.formatPk(user)).build())))
-        .items();
   }
 
   private APIGatewayV2HTTPEvent buildEvent(String user) {

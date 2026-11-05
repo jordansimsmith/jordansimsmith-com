@@ -90,7 +90,6 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     this.reportJobProcessor =
         new ReportJobProcessor(
             TcgInventoryTable.table(enhancedClient, ReportItem.class),
-            factory.auditTable(),
             orderTable,
             orderRepository,
             factory.objectMapper(),

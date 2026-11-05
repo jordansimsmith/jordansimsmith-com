@@ -9,7 +9,6 @@ import com.fasterxml.jackson.annotation.JsonRawValue;
 import com.google.common.annotations.VisibleForTesting;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
-import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
@@ -46,7 +45,6 @@ public class GetReportsHandler
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<ReportItem> reportTable;
-  private final DynamoDbTable<AuditItem> auditTable;
   private final DynamoDbTable<JobItem> jobTable;
 
   public GetReportsHandler() {
@@ -59,7 +57,6 @@ public class GetReportsHandler
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.reportTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), ReportItem.class);
-    this.auditTable = factory.auditTable();
     this.jobTable = factory.jobTable();
   }
 
@@ -87,12 +84,7 @@ public class GetReportsHandler
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
 
-    var latestAuditUlid = findLatestAuditUlid(user);
-    var stale =
-        (latestAuditUlid != null
-                && (reportItem.getAsOfAuditUlid() == null
-                    || latestAuditUlid.compareTo(reportItem.getAsOfAuditUlid()) > 0))
-            || clock.now().isAfter(reportItem.getUpdatedAt().plus(Duration.ofHours(24)));
+    var stale = clock.now().isAfter(reportItem.getUpdatedAt().plus(Duration.ofHours(24)));
 
     var latestReportJob = findLatestReportJob(user);
     GenerationResponse generation = null;
@@ -118,23 +110,6 @@ public class GetReportsHandler
 
     return httpResponseFactory.ok(
         new ReportsResponse(generatedAt, stale, generation, reportItem.getReport()));
-  }
-
-  private String findLatestAuditUlid(String user) {
-    var request =
-        QueryEnhancedRequest.builder()
-            .queryConditional(
-                QueryConditional.keyEqualTo(
-                    Key.builder().partitionValue(AuditItem.formatPk(user)).build()))
-            .scanIndexForward(false)
-            .limit(1)
-            .build();
-
-    return auditTable.query(request).stream()
-        .flatMap(page -> page.items().stream())
-        .findFirst()
-        .map(AuditItem::getSk)
-        .orElse(null);
   }
 
   private JobItem findLatestReportJob(String user) {

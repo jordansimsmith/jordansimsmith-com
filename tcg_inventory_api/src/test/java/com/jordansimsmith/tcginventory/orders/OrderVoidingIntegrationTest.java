@@ -7,7 +7,6 @@ import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.RequestContext;
-import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobProcessor;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
@@ -26,7 +25,6 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,9 +32,6 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 @Testcontainers
 public class OrderVoidingIntegrationTest {
@@ -52,7 +47,6 @@ public class OrderVoidingIntegrationTest {
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
   private DynamoDbTable<OrderItem> orderTable;
-  private DynamoDbTable<AuditItem> auditTable;
   private OrderPhaseProcessor orderPhaseProcessor;
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
@@ -77,7 +71,6 @@ public class OrderVoidingIntegrationTest {
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
     orderTable = factory.orderTable();
-    auditTable = factory.auditTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeFetchTcgService.reset();
@@ -125,34 +118,6 @@ public class OrderVoidingIntegrationTest {
     var sku = getSku();
     assertThat(sku.getVersion()).isEqualTo(2);
     assertThat(sku.getDirty()).isTrue();
-
-    var audits = getAudits();
-    assertThat(audits)
-        .filteredOn(audit -> "release".equals(audit.getEventType()))
-        .singleElement()
-        .satisfies(
-            audit -> {
-              var rawAudit =
-                  factory
-                      .dynamoDbClient()
-                      .getItem(
-                          request ->
-                              request
-                                  .tableName(TcgInventoryTable.TABLE_NAME)
-                                  .key(
-                                      Map.of(
-                                          "pk",
-                                          AttributeValue.builder().s(audit.getPk()).build(),
-                                          "sk",
-                                          AttributeValue.builder().s(audit.getSk()).build()))
-                                  .consistentRead(true))
-                      .item();
-              assertThat(rawAudit.get("reservation_id").s()).isEqualTo(ORDER_ID);
-              assertThat(audit.getSkuId()).isEqualTo(SKU_ID);
-              assertThat(audit.getSequenceNumber()).isEqualTo(1);
-              assertThat(audit.getBeforeStatus()).isEqualTo("reserved");
-              assertThat(audit.getAfterStatus()).isEqualTo("in_stock");
-            });
   }
 
   @Test
@@ -175,7 +140,6 @@ public class OrderVoidingIntegrationTest {
     assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voiding");
     assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
     assertThat(getUnit(1).getReservationId()).isNull();
-    assertThat(getAudits()).filteredOn(audit -> "release".equals(audit.getEventType())).hasSize(1);
 
     // arrange retry after repairing the conflicting saved allocation
     var repairedUnit = getUnit(2);
@@ -191,7 +155,6 @@ public class OrderVoidingIntegrationTest {
     assertThat(getUnit(2).getStatus()).isEqualTo("in_stock");
     assertThat(getUnit(2).getReservationId()).isNull();
     assertThat(getSku().getVersion()).isEqualTo(3);
-    assertThat(getAudits()).filteredOn(audit -> "release".equals(audit.getEventType())).hasSize(2);
   }
 
   @Test
@@ -210,7 +173,6 @@ public class OrderVoidingIntegrationTest {
     assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
     assertThat(getUnit(1).getReservationId()).isNull();
     assertThat(getSku().getVersion()).isEqualTo(2);
-    assertThat(getAudits()).filteredOn(audit -> "release".equals(audit.getEventType())).hasSize(1);
   }
 
   @Test
@@ -230,7 +192,6 @@ public class OrderVoidingIntegrationTest {
     // assert
     assertThat(getOrder(secondOrderId).getStatus()).isEqualTo("voiding");
     assertThat(getUnit(1).getReservationId()).isEqualTo(ORDER_ID);
-    assertThat(getAudits()).isEmpty();
   }
 
   @Test
@@ -243,7 +204,6 @@ public class OrderVoidingIntegrationTest {
     factory
         .inventoryService()
         .releaseUnit(new RequestContext(USER), new ReleaseUnitRequest(SKU_ID, 1, ORDER_ID));
-    var auditsBefore = getAudits().size();
 
     // act
     orderPhaseProcessor.process(USER);
@@ -252,7 +212,6 @@ public class OrderVoidingIntegrationTest {
     // assert
     assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voided");
     assertThat(getSku().getVersion()).isEqualTo(2);
-    assertThat(getAudits()).hasSize(auditsBefore);
 
     // arrange empty cancellation
     var emptyOrderId = "83664";
@@ -279,7 +238,6 @@ public class OrderVoidingIntegrationTest {
     factory
         .inventoryService()
         .reserveUnit(ctx, new ReserveUnitRequest("another-allocation", "another-order", SKU_ID));
-    var auditCount = getAudits().size();
 
     // act
     orderPhaseProcessor.process(USER);
@@ -288,7 +246,6 @@ public class OrderVoidingIntegrationTest {
     assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voided");
     assertThat(getUnit(1).getStatus()).isEqualTo("reserved");
     assertThat(getUnit(1).getReservationId()).isEqualTo("another-order");
-    assertThat(getAudits()).hasSize(auditCount);
   }
 
   private void createSku() {
@@ -402,18 +359,6 @@ public class OrderVoidingIntegrationTest {
             .sortValue(SkuItem.formatSk())
             .build();
     return skuTable.getItem(request -> request.key(key).consistentRead(true));
-  }
-
-  private List<AuditItem> getAudits() {
-    var request =
-        QueryEnhancedRequest.builder()
-            .queryConditional(
-                QueryConditional.keyEqualTo(
-                    Key.builder().partitionValue(AuditItem.formatPk(USER)).build()))
-            .build();
-    var result = new ArrayList<AuditItem>();
-    auditTable.query(request).items().forEach(result::add);
-    return result;
   }
 
   private OrderItem createOrderItem(

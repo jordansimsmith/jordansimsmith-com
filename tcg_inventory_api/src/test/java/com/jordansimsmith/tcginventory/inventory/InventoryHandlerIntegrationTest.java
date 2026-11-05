@@ -7,7 +7,6 @@ import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
-import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.inventory.api.DeleteUnitHandler;
@@ -28,8 +27,6 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
@@ -43,7 +40,6 @@ public class InventoryHandlerIntegrationTest {
   private DynamoDbClient dynamoDbClient;
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
-  private DynamoDbTable<AuditItem> auditTable;
 
   private FindSkusHandler findSkusHandler;
   private GetSkuHandler getSkuHandler;
@@ -73,7 +69,6 @@ public class InventoryHandlerIntegrationTest {
     dynamoDbClient = factory.dynamoDbClient();
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
-    auditTable = factory.auditTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
@@ -329,15 +324,6 @@ public class InventoryHandlerIntegrationTest {
         unitTable.getItem(
             Key.builder().partitionValue(skuPk).sortValue(UnitItem.formatSk(42)).build());
     assertThat(unit.getStatus()).isEqualTo("removed");
-
-    var auditItems = queryAuditEntries("jordan");
-    assertThat(auditItems).hasSize(1);
-    assertThat(auditItems.get(0).getEventType()).isEqualTo("adjustment");
-    assertThat(auditItems.get(0).getSkuId()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(auditItems.get(0).getSequenceNumber()).isEqualTo(42);
-    assertThat(auditItems.get(0).getBeforeStatus()).isEqualTo("in_stock");
-    assertThat(auditItems.get(0).getAfterStatus()).isEqualTo("removed");
-    assertThat(auditItems.get(0).getDecisionReason()).isEqualTo("damaged");
   }
 
   @Test
@@ -431,15 +417,6 @@ public class InventoryHandlerIntegrationTest {
     assertThat(targetSku.getSkuId()).isEqualTo("mtg#scryfall#scryfall-1#normal#LP");
     assertThat(targetSku.getGame()).isEqualTo("mtg");
     assertThat(targetSku.getExternalId()).isEqualTo("scryfall-1");
-
-    var auditItems = queryAuditEntries("jordan");
-    assertThat(auditItems).hasSize(1);
-    assertThat(auditItems.get(0).getEventType()).isEqualTo("adjustment");
-    assertThat(auditItems.get(0).getSkuId()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(auditItems.get(0).getTargetSkuId()).isEqualTo("mtg#scryfall#scryfall-1#normal#LP");
-    assertThat(auditItems.get(0).getSequenceNumber()).isEqualTo(42);
-    assertThat(auditItems.get(0).getBeforeStatus()).isEqualTo("in_stock");
-    assertThat(auditItems.get(0).getAfterStatus()).isEqualTo("in_stock");
   }
 
   @Test
@@ -505,7 +482,6 @@ public class InventoryHandlerIntegrationTest {
     assertThat(getSku("jordan", sourceSkuId).getVersion()).isEqualTo(1);
     assertThat(getSku("jordan", targetSkuId).getDirty()).isFalse();
     assertThat(getSku("jordan", targetSkuId).getVersion()).isEqualTo(1);
-    assertThat(queryAuditEntries("jordan")).isEmpty();
   }
 
   @Test
@@ -618,7 +594,6 @@ public class InventoryHandlerIntegrationTest {
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(200);
-    assertThat(queryAuditEntries("jordan")).isEmpty();
   }
 
   @Test
@@ -722,16 +697,6 @@ public class InventoryHandlerIntegrationTest {
             .partitionValue(SkuItem.formatPk(user, skuId))
             .sortValue(UnitItem.formatSk(sequenceNumber))
             .build());
-  }
-
-  private List<AuditItem> queryAuditEntries(String user) {
-    var queryConditional =
-        QueryConditional.keyEqualTo(Key.builder().partitionValue(AuditItem.formatPk(user)).build());
-    return auditTable
-        .query(QueryEnhancedRequest.builder().queryConditional(queryConditional).build())
-        .stream()
-        .flatMap(page -> page.items().stream())
-        .toList();
   }
 
   private APIGatewayV2HTTPEvent buildEvent(String user, Map<String, String> pathParams) {

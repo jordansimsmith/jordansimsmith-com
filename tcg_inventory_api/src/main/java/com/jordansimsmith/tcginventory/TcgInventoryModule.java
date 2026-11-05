@@ -105,12 +105,6 @@ public class TcgInventoryModule {
 
   @Provides
   @Singleton
-  DynamoDbTable<AuditItem> auditTable(DynamoDbEnhancedClient client) {
-    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(AuditItem.class));
-  }
-
-  @Provides
-  @Singleton
   SqsClient sqsClient() {
     var sqsClient =
         SqsClient.builder()

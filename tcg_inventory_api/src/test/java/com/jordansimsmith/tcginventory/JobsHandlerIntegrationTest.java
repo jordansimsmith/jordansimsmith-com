@@ -78,7 +78,6 @@ public class JobsHandlerIntegrationTest {
   private DynamoDbTable<SkuItem> skuTable;
   private DynamoDbTable<UnitItem> unitTable;
   private DynamoDbTable<OrderItem> orderTable;
-  private DynamoDbTable<AuditItem> auditTable;
   private TcgInventoryTestFactory factory;
 
   private JobsHandler jobsHandler;
@@ -112,7 +111,6 @@ public class JobsHandlerIntegrationTest {
     skuTable = factory.skuTable();
     unitTable = factory.unitTable();
     orderTable = factory.orderTable();
-    auditTable = factory.auditTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeJobsQueue.reset();
@@ -910,9 +908,6 @@ public class JobsHandlerIntegrationTest {
     var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
     assertThat(reserved).hasSize(2);
     assertThat(reserved.get(0).getReservationId()).isEqualTo("83663");
-
-    var audit = getAuditEntries("jordan");
-    assertThat(audit.stream().anyMatch(a -> "reserve".equals(a.getEventType()))).isTrue();
   }
 
   @Test
@@ -1016,13 +1011,6 @@ public class JobsHandlerIntegrationTest {
     assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("in_stock"));
     assertThat(units).allSatisfy(unit -> assertThat(unit.getReservationId()).isNull());
 
-    var releaseAudits =
-        getAuditEntries("jordan").stream().filter(a -> "release".equals(a.getEventType())).toList();
-    assertThat(releaseAudits).hasSize(2);
-    assertThat(releaseAudits)
-        .extracting(AuditItem::getSequenceNumber)
-        .containsExactlyInAnyOrder(1, 2);
-
     // the released units are dirty stock again, so the listing phase restores the full quantity
     var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(sku.getDirty()).isFalse();
@@ -1078,8 +1066,6 @@ public class JobsHandlerIntegrationTest {
     var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
     assertThat(reserved).hasSize(1);
     assertThat(reserved.get(0).getReservationId()).isEqualTo("83663");
-
-    assertThat(getAuditEntries("jordan")).noneMatch(a -> "release".equals(a.getEventType()));
   }
 
   @Test
@@ -1104,8 +1090,6 @@ public class JobsHandlerIntegrationTest {
     var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
     assertThat(reserved).hasSize(1);
-
-    assertThat(getAuditEntries("jordan")).noneMatch(a -> "release".equals(a.getEventType()));
   }
 
   @Test
@@ -1130,8 +1114,6 @@ public class JobsHandlerIntegrationTest {
 
     var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("in_stock"));
-
-    assertThat(getAuditEntries("jordan")).noneMatch(a -> "release".equals(a.getEventType()));
   }
 
   @Test
@@ -1163,12 +1145,6 @@ public class JobsHandlerIntegrationTest {
 
     var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("in_stock"));
-
-    var releaseAudits =
-        getAuditEntries("jordan").stream().filter(a -> "release".equals(a.getEventType())).toList();
-    assertThat(releaseAudits)
-        .extracting(AuditItem::getSequenceNumber)
-        .containsExactlyInAnyOrder(1, 2);
   }
 
   @Test
@@ -1205,10 +1181,6 @@ public class JobsHandlerIntegrationTest {
       assertThat(units.get(0).getStatus()).isEqualTo("in_stock");
       assertThat(units.get(0).getReservationId()).isNull();
     }
-
-    var releaseAudits =
-        getAuditEntries("jordan").stream().filter(a -> "release".equals(a.getEventType())).toList();
-    assertThat(releaseAudits).hasSize(60);
   }
 
   @Test
@@ -1428,9 +1400,6 @@ public class JobsHandlerIntegrationTest {
         .singleElement()
         .extracting(UnitItem::getStatus)
         .isEqualTo("reserved");
-    assertThat(getAuditEntries("jordan"))
-        .filteredOn(audit -> "reserve".equals(audit.getEventType()))
-        .hasSize(1);
   }
 
   @Test
@@ -1726,33 +1695,6 @@ public class JobsHandlerIntegrationTest {
       assertThat(units.get(0).getStatus()).isEqualTo("reserved");
       assertThat(units.get(0).getReservationId()).isEqualTo("91329");
     }
-
-    var reserveAudits =
-        getAuditEntries("jordan").stream().filter(a -> "reserve".equals(a.getEventType())).toList();
-    assertThat(reserveAudits).hasSize(60);
-    assertThat(reserveAudits)
-        .allSatisfy(
-            audit -> {
-              var attributes =
-                  factory
-                      .dynamoDbClient()
-                      .getItem(
-                          request ->
-                              request
-                                  .tableName(TcgInventoryTable.TABLE_NAME)
-                                  .key(
-                                      Map.of(
-                                          "pk",
-                                          AttributeValue.fromS(audit.getPk()),
-                                          "sk",
-                                          AttributeValue.fromS(audit.getSk())))
-                                  .consistentRead(true))
-                      .item();
-              assertThat(attributes.get("reservation_id").s()).isEqualTo("91329");
-              assertThat(attributes).doesNotContainKey("order_id");
-              assertThat(audit.getBeforeStatus()).isEqualTo("in_stock");
-              assertThat(audit.getAfterStatus()).isEqualTo("reserved");
-            });
   }
 
   @Test
@@ -1792,7 +1734,6 @@ public class JobsHandlerIntegrationTest {
     assertThat(getUnits("jordan", skuId))
         .filteredOn(unit -> "reserved".equals(unit.getStatus()))
         .hasSize(1);
-    assertThat(getAuditEntries("jordan")).isEmpty();
   }
 
   @Test
@@ -2159,18 +2100,6 @@ public class JobsHandlerIntegrationTest {
                         .build()))
             .build();
     unitTable.query(request).items().forEach(results::add);
-    return results;
-  }
-
-  private List<AuditItem> getAuditEntries(String user) {
-    var results = new ArrayList<AuditItem>();
-    var request =
-        QueryEnhancedRequest.builder()
-            .queryConditional(
-                QueryConditional.keyEqualTo(
-                    Key.builder().partitionValue(AuditItem.formatPk(user)).build()))
-            .build();
-    auditTable.query(request).items().forEach(results::add);
     return results;
   }
 

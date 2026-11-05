@@ -3,7 +3,6 @@ package com.jordansimsmith.tcginventory.reports;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
-import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobProcessor;
 import com.jordansimsmith.tcginventory.games.client.FindGamesRequest;
@@ -34,7 +33,6 @@ public class ReportJobProcessor implements JobProcessor {
 
   private final DynamoDbTable<ReportItem> reportTable;
   private final InventoryService inventoryService;
-  private final DynamoDbTable<AuditItem> auditTable;
   private final DynamoDbTable<OrderItem> orderTable;
   private final OrderRepository orderRepository;
   private final ObjectMapper objectMapper;
@@ -43,7 +41,6 @@ public class ReportJobProcessor implements JobProcessor {
 
   public ReportJobProcessor(
       DynamoDbTable<ReportItem> reportTable,
-      DynamoDbTable<AuditItem> auditTable,
       DynamoDbTable<OrderItem> orderTable,
       OrderRepository orderRepository,
       ObjectMapper objectMapper,
@@ -51,7 +48,6 @@ public class ReportJobProcessor implements JobProcessor {
       GamesService gamesService,
       InventoryService inventoryService) {
     this.reportTable = reportTable;
-    this.auditTable = auditTable;
     this.orderTable = orderTable;
     this.orderRepository = orderRepository;
     this.objectMapper = objectMapper;
@@ -64,9 +60,6 @@ public class ReportJobProcessor implements JobProcessor {
   public JobProcessor.SuccessJobResult processBatch(String user, JobItem jobItem)
       throws ServiceException {
     LOGGER.info("starting report job for user {}", user);
-
-    var asOfAuditUlid = findLatestAuditUlid(user);
-    LOGGER.info("captured as-of audit ULID: {}", asOfAuditUlid);
 
     var now = clock.now();
     var ctx = new RequestContext(user);
@@ -144,7 +137,7 @@ public class ReportJobProcessor implements JobProcessor {
                       })
                   .toList());
       var reportJson = objectMapper.writeValueAsString(payload);
-      var reportItem = ReportItem.create(user, reportJson, asOfAuditUlid, now);
+      var reportItem = ReportItem.create(user, reportJson, now);
       reportTable.putItem(reportItem);
     } catch (Exception e) {
       throw new RuntimeException(e);
@@ -152,23 +145,6 @@ public class ReportJobProcessor implements JobProcessor {
 
     LOGGER.info("wrote report snapshot");
     return new JobProcessor.SuccessJobResult(0, null);
-  }
-
-  private String findLatestAuditUlid(String user) {
-    var request =
-        QueryEnhancedRequest.builder()
-            .queryConditional(
-                QueryConditional.keyEqualTo(
-                    Key.builder().partitionValue(AuditItem.formatPk(user)).build()))
-            .scanIndexForward(false)
-            .limit(1)
-            .build();
-
-    return auditTable.query(request).stream()
-        .flatMap(page -> page.items().stream())
-        .findFirst()
-        .map(AuditItem::getSk)
-        .orElse(null);
   }
 
   private List<OrderItem> pageOrders(String user) {
