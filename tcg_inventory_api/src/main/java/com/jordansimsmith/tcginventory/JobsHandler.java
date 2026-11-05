@@ -14,8 +14,6 @@ import com.jordansimsmith.tcginventory.imports.ImportConfirmationJobProcessor;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.tcginventory.imports.ImportsRepository;
-import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.orders.OrderFulfillmentJobProcessor;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.tcginventory.orders.OrderPhaseProcessor;
@@ -69,14 +67,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             factory.pricingService());
     var publishDynamoDbClient = factory.dynamoDbClient();
     var publishClock = factory.clock();
-    var publishUlidGenerator = factory.ulidGenerator();
     var orderTable = TcgInventoryTable.table(enhancedClient, OrderItem.class);
-    var inventoryRepository =
-        new InventoryRepository(
-            TcgInventoryTable.table(enhancedClient, UnitItem.class),
-            publishDynamoDbClient,
-            publishClock,
-            publishUlidGenerator);
     var orderRepository =
         new OrderRepository(orderTable, factory.jobTable(), publishDynamoDbClient, publishClock);
     var orderPhaseProcessor =
@@ -85,7 +76,6 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             factory.listingService(),
             TcgInventoryTable.table(enhancedClient, SettingsItem.class),
             orderRepository,
-            inventoryRepository,
             factory.inventoryService(),
             publishClock,
             factory.fetchTcgService());

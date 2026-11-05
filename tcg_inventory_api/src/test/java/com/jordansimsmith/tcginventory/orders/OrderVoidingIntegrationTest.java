@@ -14,7 +14,6 @@ import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
-import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.inventory.client.ReleaseUnitRequest;
@@ -84,9 +83,6 @@ public class OrderVoidingIntegrationTest {
     fakeFetchTcgService.reset();
     factory.fakeUlidGenerator().reset();
 
-    var inventoryRepository =
-        new InventoryRepository(
-            unitTable, factory.dynamoDbClient(), fakeClock, factory.fakeUlidGenerator());
     var orderRepository =
         new OrderRepository(orderTable, factory.jobTable(), factory.dynamoDbClient(), fakeClock);
     orderPhaseProcessor =
@@ -95,7 +91,6 @@ public class OrderVoidingIntegrationTest {
             listingService,
             factory.settingsTable(),
             orderRepository,
-            inventoryRepository,
             factory.inventoryService(),
             fakeClock,
             fakeFetchTcgService);
@@ -156,12 +151,13 @@ public class OrderVoidingIntegrationTest {
   }
 
   @Test
-  void processShouldResumePartialReleaseBeforeOfferRead() throws Exception {
+  void processShouldResumePartialReleaseAfterOfferRead() throws Exception {
     // arrange
     createSku();
     createUnit(1, "reserved", ORDER_ID);
     createUnit(2, "sold", "another-order");
     createOrder(ORDER_ID, "voiding", List.of(line(List.of(1, 2))));
+    seedCancellation(ORDER_ID);
 
     // act
     var publishJobProcessor = newPublishJobProcessor();
@@ -238,6 +234,7 @@ public class OrderVoidingIntegrationTest {
     createSku();
     createUnit(1, "reserved", ORDER_ID);
     createOrder(ORDER_ID, "voiding", List.of(line(List.of(1))));
+    seedCancellation(ORDER_ID);
     factory
         .inventoryService()
         .releaseUnit(new RequestContext(USER), new ReleaseUnitRequest(SKU_ID, 1, ORDER_ID));
@@ -255,7 +252,7 @@ public class OrderVoidingIntegrationTest {
     // arrange empty cancellation
     var emptyOrderId = "83664";
     createOrder(emptyOrderId, "awaiting_payment", List.of());
-    seedCancellation(emptyOrderId);
+    seedCancellation(ORDER_ID, emptyOrderId);
 
     // act
     orderPhaseProcessor.process(USER);
@@ -271,6 +268,7 @@ public class OrderVoidingIntegrationTest {
     createSku();
     createUnit(1, "reserved", ORDER_ID);
     createOrder(ORDER_ID, "voiding", List.of(line(List.of(1))));
+    seedCancellation(ORDER_ID);
     var ctx = new RequestContext(USER);
     factory.inventoryService().releaseUnit(ctx, new ReleaseUnitRequest(SKU_ID, 1, ORDER_ID));
     factory
@@ -333,27 +331,27 @@ public class OrderVoidingIntegrationTest {
         SKU_ID, 1, sequenceNumbers.size(), "2.00", "2.00", sequenceNumbers);
   }
 
-  private void seedCancellation(String orderId) {
-    var offer =
-        new Offer(
-            Integer.parseInt(orderId),
-            "CANCELLED_BY_SELLER",
-            null,
-            null,
-            "PICKUP",
-            null,
-            null,
-            null,
-            new BigDecimal("2.00"),
-            List.of());
-    // replace the fake page so each test controls which local order sees a cancellation
-    factory.fakeFetchTcgService().seedOffers(USER, List.of(offer));
+  private void seedCancellation(String... orderIds) {
+    var offers = new ArrayList<Offer>();
+    for (var orderId : orderIds) {
+      offers.add(
+          new Offer(
+              Long.parseLong(orderId),
+              "CANCELLED_BY_SELLER",
+              null,
+              null,
+              "PICKUP",
+              null,
+              null,
+              null,
+              new BigDecimal("2.00"),
+              List.of()));
+    }
+    factory.fakeFetchTcgService().seedOffers(USER, offers);
   }
 
   private PublishJobProcessor newPublishJobProcessor() {
     var dynamoDbClient = factory.dynamoDbClient();
-    var inventoryRepository =
-        new InventoryRepository(unitTable, dynamoDbClient, fakeClock, factory.fakeUlidGenerator());
     var orderRepository =
         new OrderRepository(orderTable, factory.jobTable(), dynamoDbClient, fakeClock);
     var orderPhaseProcessor =
@@ -362,7 +360,6 @@ public class OrderVoidingIntegrationTest {
             listingService,
             factory.settingsTable(),
             orderRepository,
-            inventoryRepository,
             factory.inventoryService(),
             fakeClock,
             fakeFetchTcgService);

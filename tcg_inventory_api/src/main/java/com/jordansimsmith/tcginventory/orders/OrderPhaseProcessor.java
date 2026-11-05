@@ -6,11 +6,10 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.BuyerAddress;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindOffersRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
-import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.ReleaseUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.ReserveUnitRequest;
 import com.jordansimsmith.tcginventory.listings.client.FindListingsRequest;
 import com.jordansimsmith.tcginventory.listings.client.ListingService;
 import com.jordansimsmith.tcginventory.settings.SettingsItem;
@@ -22,7 +21,6 @@ import java.time.temporal.ChronoField;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -66,7 +64,7 @@ public class OrderPhaseProcessor {
 
   private record AllocatedUnit(String skuId, int sequenceNumber) {}
 
-  private record PlannedReservation(Offer offer, List<OrderItem.OrderLine> lines) {}
+  private record PreparedOrder(Offer offer, List<OrderItem.OrderLine> lines) {}
 
   public static class ReservationPreflightException extends RuntimeException {
     public ReservationPreflightException(String message) {
@@ -78,7 +76,6 @@ public class OrderPhaseProcessor {
   private final ListingService listingService;
   private final DynamoDbTable<SettingsItem> settingsTable;
   private final OrderRepository orderRepository;
-  private final InventoryRepository inventoryRepository;
   private final InventoryService inventoryService;
   private final Clock clock;
   private final FetchTcgService fetchTcgService;
@@ -88,7 +85,6 @@ public class OrderPhaseProcessor {
       ListingService listingService,
       DynamoDbTable<SettingsItem> settingsTable,
       OrderRepository orderRepository,
-      InventoryRepository inventoryRepository,
       InventoryService inventoryService,
       Clock clock,
       FetchTcgService fetchTcgService) {
@@ -96,21 +92,12 @@ public class OrderPhaseProcessor {
     this.listingService = listingService;
     this.settingsTable = settingsTable;
     this.orderRepository = orderRepository;
-    this.inventoryRepository = inventoryRepository;
     this.inventoryService = inventoryService;
     this.clock = clock;
     this.fetchTcgService = fetchTcgService;
   }
 
   public void process(String user) throws ServiceException {
-    for (var order : loadExistingOrders(user)) {
-      if ("reserving".equals(order.getStatus())) {
-        resumeReservingOrder(user, order);
-      } else if ("voiding".equals(order.getStatus())) {
-        releaseVoidingOrder(user, order);
-      }
-    }
-
     var allOffers = paginateOffers(new RequestContext(user));
     LOGGER.info("fetched {} offers from FetchTCG for user {}", allOffers.size(), user);
 
@@ -143,21 +130,27 @@ public class OrderPhaseProcessor {
     var listingToSkuId = buildListingToSkuMap(new RequestContext(user), newOffers);
     LOGGER.info("built listing-to-sku map with {} entries", listingToSkuId.size());
 
+    var preparedOrders = prepareOrders(newOffers, listingToSkuId);
+
     int advancedCount = 0;
     int voidedCount = 0;
     int refreshedCount = 0;
     for (var order : existingOrders) {
-      // an order missing from the list keeps its reservations: a truncated page must never
-      // release stock
       var offer = offerMap.get(order.getOrderId());
       if (offer == null) {
-        continue;
+        throw new IllegalStateException("FetchTCG offer not found for order " + order.getOrderId());
       }
 
       var cancelled = offer.status() != null && CANCELLED_STATUSES.contains(offer.status());
       var paymentReceived =
           offer.currentAction() != null && PAYMENT_ACTIONS.contains(offer.currentAction());
-      if ("awaiting_payment".equals(order.getStatus())) {
+      if ("reserving".equals(order.getStatus())) {
+        reserveOrderUnits(user, order);
+      }
+      if ("voiding".equals(order.getStatus())) {
+        releaseVoidingOrder(user, order);
+        voidedCount++;
+      } else if ("awaiting_payment".equals(order.getStatus())) {
         if (cancelled) {
           orderRepository.startVoiding(user, order, offer.status());
           releaseVoidingOrder(user, order);
@@ -191,9 +184,8 @@ public class OrderPhaseProcessor {
         voidedCount,
         refreshedCount);
 
-    var plans = planReservations(user, newOffers, listingToSkuId);
-    for (var plan : plans) {
-      var offer = plan.offer();
+    for (var preparedOrder : preparedOrders) {
+      var offer = preparedOrder.offer();
       var fulfillment = toFulfillment(offer);
       var order =
           OrderItem.create(
@@ -207,12 +199,12 @@ public class OrderPhaseProcessor {
               fulfillment.buyerAddress(),
               fulfillment.postageOption(),
               offer.totalOfferPrice() != null ? offer.totalOfferPrice().toPlainString() : null,
-              plan.lines(),
+              preparedOrder.lines(),
               clock.now());
       orderRepository.createReservingOrder(order);
-      resumeReservingOrder(user, order);
+      reserveOrderUnits(user, order);
     }
-    LOGGER.info("created {} new orders", plans.size());
+    LOGGER.info("created {} new orders", preparedOrders.size());
   }
 
   private List<Offer> paginateOffers(RequestContext ctx) throws ServiceException {
@@ -312,10 +304,11 @@ public class OrderPhaseProcessor {
     return map;
   }
 
-  private List<PlannedReservation> planReservations(
-      String user, List<Offer> newOffers, Map<Integer, String> listingToSkuId) {
-    var requestedBySku = new LinkedHashMap<String, Integer>();
+  private List<PreparedOrder> prepareOrders(
+      List<Offer> newOffers, Map<Integer, String> listingToSkuId) {
+    var preparedOrders = new ArrayList<PreparedOrder>();
     for (var offer : newOffers) {
+      var lines = new ArrayList<OrderItem.OrderLine>();
       for (var item : offer.items()) {
         var listingId = item.listing().id();
         var skuId = listingToSkuId.get(listingId);
@@ -327,44 +320,10 @@ public class OrderPhaseProcessor {
                   + listingId
                   + " with no matching inventory SKU");
         }
-        requestedBySku.merge(skuId, item.quantity(), Integer::sum);
-      }
-    }
-
-    var unitsBySku = new HashMap<String, List<UnitItem>>();
-    for (var entry : requestedBySku.entrySet()) {
-      unitsBySku.put(
-          entry.getKey(),
-          inventoryRepository.findUnitsToAllocate(user, entry.getKey(), entry.getValue()));
-    }
-
-    var nextBySku = new HashMap<String, Integer>();
-    var plans = new ArrayList<PlannedReservation>();
-    for (var offer : newOffers) {
-      var lines = new ArrayList<OrderItem.OrderLine>();
-      for (var item : offer.items()) {
-        var listingId = item.listing().id();
-        var skuId = listingToSkuId.get(listingId);
-        var selected = unitsBySku.get(skuId);
-        var start = nextBySku.getOrDefault(skuId, 0);
-        var end = start + item.quantity();
-        if (end > selected.size()) {
+        if (item.quantity() <= 0) {
           throw new ReservationPreflightException(
-              "Offer "
-                  + offer.id()
-                  + " needs "
-                  + item.quantity()
-                  + " units from listing "
-                  + listingId
-                  + " (SKU "
-                  + skuId
-                  + "); only "
-                  + Math.max(0, selected.size() - start)
-                  + " remain in stock");
+              "Offer " + offer.id() + " contains an invalid quantity");
         }
-        var allocated =
-            selected.subList(start, end).stream().map(UnitItem::getSequenceNumber).toList();
-        nextBySku.put(skuId, end);
         lines.add(
             new OrderItem.OrderLine(
                 skuId,
@@ -374,14 +333,14 @@ public class OrderPhaseProcessor {
                 item.listing().listedPrice() != null
                     ? item.listing().listedPrice().toPlainString()
                     : null,
-                allocated));
+                new ArrayList<>()));
       }
-      plans.add(new PlannedReservation(offer, List.copyOf(lines)));
+      preparedOrders.add(new PreparedOrder(offer, List.copyOf(lines)));
     }
-    return List.copyOf(plans);
+    return List.copyOf(preparedOrders);
   }
 
-  private void resumeReservingOrder(String user, OrderItem order) {
+  private void reserveOrderUnits(String user, OrderItem order) throws ServiceException {
     if (!"reserving".equals(order.getStatus())) {
       throw new IllegalStateException("order is not reserving");
     }
@@ -389,15 +348,28 @@ public class OrderPhaseProcessor {
     if (allocated.size() != new HashSet<>(allocated).size()) {
       throw new IllegalStateException("order allocation contains a duplicate unit");
     }
-    for (var unitKey : allocated) {
-      inventoryRepository.updateUnitForReservation(
-          user, order.getOrderId(), unitKey.skuId(), unitKey.sequenceNumber());
+    var ctx = new RequestContext(user);
+    for (int lineIndex = 0; lineIndex < order.getLines().size(); lineIndex++) {
+      var line = order.getLines().get(lineIndex);
+      for (int unitIndex = line.getAllocatedSequenceNumbers().size();
+          unitIndex < line.getQuantity();
+          unitIndex++) {
+        var operationId =
+            "order:" + order.getOrderId() + ":line:" + lineIndex + ":unit:" + unitIndex;
+        var result =
+            inventoryService.reserveUnit(
+                ctx, new ReserveUnitRequest(operationId, order.getOrderId(), line.getSkuId()));
+        orderRepository.recordReservation(
+            user, order.getOrderId(), lineIndex, unitIndex, result.sequenceNumber());
+        line.getAllocatedSequenceNumbers().add(result.sequenceNumber());
+      }
     }
 
     var action = order.getFetchtcgCurrentAction();
     var targetState =
         action != null && PAYMENT_ACTIONS.contains(action) ? "to_pick" : "awaiting_payment";
     orderRepository.finishReservation(user, order.getOrderId(), targetState);
+    order.setStatus(targetState);
   }
 
   private List<AllocatedUnit> allocatedUnits(OrderItem order) {

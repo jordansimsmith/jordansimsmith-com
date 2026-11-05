@@ -47,6 +47,29 @@ public class OrderRepository {
             .build());
   }
 
+  public void recordReservation(
+      String user, String orderId, int lineIndex, int unitIndex, int sequenceNumber) {
+    var path = "#lines[" + lineIndex + "].allocated_sequence_numbers";
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(TcgInventoryTable.TABLE_NAME)
+            .key(orderKey(user, orderId))
+            .updateExpression("SET " + path + "[" + unitIndex + "] = :sequence, updated_at = :now")
+            .conditionExpression("#status = :reserving AND size(" + path + ") = :unitIndex")
+            .expressionAttributeNames(
+                Map.of("#status", OrderItem.STATUS, "#lines", OrderItem.LINES))
+            .expressionAttributeValues(
+                Map.of(
+                    ":sequence", AttributeValue.builder().n(String.valueOf(sequenceNumber)).build(),
+                    ":unitIndex", AttributeValue.builder().n(String.valueOf(unitIndex)).build(),
+                    ":now",
+                        AttributeValue.builder()
+                            .n(String.valueOf(clock.now().getEpochSecond()))
+                            .build(),
+                    ":reserving", AttributeValue.builder().s("reserving").build()))
+            .build());
+  }
+
   public void finishReservation(String user, String orderId, String targetState) {
     dynamoDbClient.updateItem(
         UpdateItemRequest.builder()

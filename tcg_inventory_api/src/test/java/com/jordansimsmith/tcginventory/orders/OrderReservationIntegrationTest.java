@@ -2,13 +2,16 @@ package com.jordansimsmith.tcginventory.orders;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.AuditItem;
@@ -22,7 +25,6 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.FindOffersResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
 import com.jordansimsmith.tcginventory.fetchtcg.client.OfferItem;
 import com.jordansimsmith.tcginventory.fetchtcg.client.OfferListing;
-import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.listings.client.FakeListingService;
@@ -37,6 +39,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -46,7 +49,6 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
-import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
 
 @Testcontainers
 public class OrderReservationIntegrationTest {
@@ -64,7 +66,6 @@ public class OrderReservationIntegrationTest {
   private DynamoDbTable<OrderItem> orderTable;
   private DynamoDbTable<AuditItem> auditTable;
   private OrderPhaseProcessor orderPhaseProcessor;
-  private InventoryRepository inventoryRepository;
   private OrderRepository orderRepository;
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
@@ -95,9 +96,6 @@ public class OrderReservationIntegrationTest {
     fakeFetchTcgService.reset();
     factory.fakeUlidGenerator().reset();
 
-    inventoryRepository =
-        new InventoryRepository(
-            unitTable, factory.dynamoDbClient(), fakeClock, factory.fakeUlidGenerator());
     orderRepository =
         new OrderRepository(orderTable, factory.jobTable(), factory.dynamoDbClient(), fakeClock);
     orderPhaseProcessor =
@@ -106,7 +104,6 @@ public class OrderReservationIntegrationTest {
             listingService,
             factory.settingsTable(),
             orderRepository,
-            inventoryRepository,
             factory.inventoryService(),
             fakeClock,
             fakeFetchTcgService);
@@ -166,7 +163,7 @@ public class OrderReservationIntegrationTest {
   }
 
   @Test
-  void processShouldPreflightAcceptedOffersAcrossPagesBeforeReservingAnyUnits() {
+  void processShouldPreserveEarlierOrdersWhenLaterOffersHaveInsufficientStock() {
     // arrange
     createSku();
     createUnit(1, "in_stock", null);
@@ -182,10 +179,10 @@ public class OrderReservationIntegrationTest {
 
     // act & assert
     assertThatThrownBy(() -> orderPhaseProcessor.process(USER))
-        .isInstanceOf(OrderPhaseProcessor.ReservationPreflightException.class)
-        .hasMessageContaining("Offer 83664 needs 1 units");
-    assertThat(getOrders()).isEmpty();
-    assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("No in-stock units are available for this SKU");
+    assertThat(getOrders()).hasSize(2);
+    assertThat(getUnit(1).getStatus()).isEqualTo("reserved");
   }
 
   @Test
@@ -209,7 +206,6 @@ public class OrderReservationIntegrationTest {
             listingService,
             factory.settingsTable(),
             orderRepository,
-            inventoryRepository,
             factory.inventoryService(),
             fakeClock,
             fetchTcgService);
@@ -262,7 +258,7 @@ public class OrderReservationIntegrationTest {
   }
 
   @Test
-  void processShouldPreflightStockAcrossAllOffersBeforeWritingAnyOrder() throws Exception {
+  void processShouldPreserveReservationsWhenLaterOrderHasInsufficientStock() throws Exception {
     // arrange
     createSku();
     createUnit(1, "in_stock", null);
@@ -281,18 +277,15 @@ public class OrderReservationIntegrationTest {
     // assert
     assertThat(result)
         .isEqualTo(
-            new JobProcessor.FailureJobResult(
-                "Offer 83664 needs 2 units from listing 101 (SKU "
-                    + SKU_ID
-                    + "); only 0 remain in stock"));
-    assertThat(getOrders()).isEmpty();
-    assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
-    assertThat(getUnit(2).getStatus()).isEqualTo("in_stock");
-    assertThat(getAudits()).isEmpty();
+            new JobProcessor.FailureJobResult("No in-stock units are available for this SKU"));
+    assertThat(getOrders()).hasSize(2);
+    assertThat(getUnit(1).getStatus()).isEqualTo("reserved");
+    assertThat(getUnit(2).getStatus()).isEqualTo("reserved");
+    assertThat(getAudits()).hasSize(2);
   }
 
   @Test
-  void processShouldResumeSavedReservationBeforeFetchingOffers() throws Exception {
+  void processShouldResumePartialReservationAfterStockIsRepaired() throws Exception {
     // arrange
     createSku();
     createUnit(1, "in_stock", null);
@@ -309,12 +302,15 @@ public class OrderReservationIntegrationTest {
             null,
             null,
             "4.00",
-            List.of(new OrderItem.OrderLine(SKU_ID, LISTING_ID, 2, "4.00", "2.00", List.of(1, 2))),
+            List.of(
+                new OrderItem.OrderLine(SKU_ID, LISTING_ID, 2, "4.00", "2.00", new ArrayList<>())),
             NOW));
+
+    fakeFetchTcgService.seedOffers(USER, List.of(offer(83663, null, List.of())));
 
     // act
     assertThatThrownBy(() -> orderPhaseProcessor.process(USER))
-        .isInstanceOf(TransactionCanceledException.class);
+        .isInstanceOf(ConflictException.class);
 
     // assert
     assertThat(getOrder("83663").getStatus()).isEqualTo("reserving");
@@ -360,6 +356,8 @@ public class OrderReservationIntegrationTest {
                 new OrderItem.OrderLine(SKU_ID, LISTING_ID, 1, "1.00", "2.00", List.of(1)),
                 new OrderItem.OrderLine(SKU_ID, LISTING_ID, 1, "1.00", "2.00", List.of(1))),
             NOW));
+
+    fakeFetchTcgService.seedOffers(USER, List.of(offer(83663, null, List.of())));
 
     // act
     assertThatThrownBy(() -> orderPhaseProcessor.process(USER))
@@ -424,7 +422,6 @@ public class OrderReservationIntegrationTest {
             listings,
             factory.settingsTable(),
             orderRepository,
-            inventoryRepository,
             factory.inventoryService(),
             fakeClock,
             fakeFetchTcgService);
@@ -453,7 +450,6 @@ public class OrderReservationIntegrationTest {
             listings,
             factory.settingsTable(),
             orderRepository,
-            inventoryRepository,
             factory.inventoryService(),
             fakeClock,
             fakeFetchTcgService);
@@ -465,6 +461,120 @@ public class OrderReservationIntegrationTest {
     verifyNoMoreInteractions(listings);
   }
 
+  @Test
+  void processShouldRecoverReservationCommittedBeforeProgressSave() throws Exception {
+    // arrange
+    createSku();
+    createUnit(1, "in_stock", null);
+    fakeFetchTcgService.seedOffers(
+        USER, List.of(offer(83663, null, List.of(offerItem(LISTING_ID, 1, "2.00", "2.00")))));
+    var repository = spy(orderRepository);
+    doThrow(new IllegalStateException("progress unavailable"))
+        .doCallRealMethod()
+        .when(repository)
+        .recordReservation(USER, "83663", 0, 0, 1);
+    var processor =
+        new OrderPhaseProcessor(
+            orderTable,
+            listingService,
+            factory.settingsTable(),
+            repository,
+            factory.inventoryService(),
+            fakeClock,
+            fakeFetchTcgService);
+
+    // act
+    assertThatThrownBy(() -> processor.process(USER)).hasMessage("progress unavailable");
+    var version = getSku().getVersion();
+    processor.process(USER);
+
+    // assert
+    assertThat(getOrder("83663").getStatus()).isEqualTo("awaiting_payment");
+    assertThat(getOrder("83663").getLines().getFirst().getAllocatedSequenceNumbers())
+        .containsExactly(1);
+    assertThat(getAudits()).hasSize(1);
+    assertThat(getSku().getVersion()).isEqualTo(version);
+  }
+
+  @Test
+  void processShouldCompleteReservationBeforeCancellingAfterStockRepair() throws Exception {
+    // arrange
+    createSku();
+    createUnit(1, "in_stock", null);
+    fakeFetchTcgService.seedOffers(
+        USER, List.of(offer(83663, null, List.of(offerItem(LISTING_ID, 2, "4.00", "2.00")))));
+    var repository = spy(orderRepository);
+    doThrow(new IllegalStateException("progress unavailable"))
+        .when(repository)
+        .recordReservation(USER, "83663", 0, 0, 1);
+    var processor =
+        new OrderPhaseProcessor(
+            orderTable,
+            listingService,
+            factory.settingsTable(),
+            repository,
+            factory.inventoryService(),
+            fakeClock,
+            fakeFetchTcgService);
+    assertThatThrownBy(() -> processor.process(USER)).hasMessage("progress unavailable");
+    fakeFetchTcgService.seedOffers(
+        USER,
+        List.of(
+            new Offer(
+                83663,
+                "CANCELLED_BY_BUYER",
+                null,
+                null,
+                "PICKUP",
+                null,
+                null,
+                null,
+                null,
+                List.of())));
+
+    // act & assert
+    assertThatThrownBy(() -> orderPhaseProcessor.process(USER))
+        .isInstanceOf(ConflictException.class);
+    assertThat(getOrder("83663").getStatus()).isEqualTo("reserving");
+    assertThat(getUnit(1).getStatus()).isEqualTo("reserved");
+
+    // arrange
+    createUnit(2, "in_stock", null);
+
+    // act
+    orderPhaseProcessor.process(USER);
+    orderPhaseProcessor.process(USER);
+
+    // assert
+    assertThat(getOrder("83663").getStatus()).isEqualTo("voided");
+    assertThat(getOrder("83663").getLines().getFirst().getAllocatedSequenceNumbers())
+        .containsExactly(1, 2);
+    assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
+    assertThat(getUnit(2).getStatus()).isEqualTo("in_stock");
+    assertThat(getAudits()).hasSize(4);
+  }
+
+  @Test
+  void processShouldReserveAnOrderExceedingOneHundredUnits() throws Exception {
+    // arrange
+    createSku();
+    for (int sequence = 0; sequence < 101; sequence++) {
+      createUnit(sequence, "in_stock", null);
+    }
+    fakeFetchTcgService.seedOffers(
+        USER, List.of(offer(83663, null, List.of(offerItem(LISTING_ID, 101, "202.00", "2.00")))));
+
+    // act
+    orderPhaseProcessor.process(USER);
+    orderPhaseProcessor.process(USER);
+
+    // assert
+    assertThat(getOrder("83663").getStatus()).isEqualTo("awaiting_payment");
+    assertThat(getOrder("83663").getLines().getFirst().getAllocatedSequenceNumbers())
+        .containsExactlyElementsOf(IntStream.range(0, 101).boxed().toList());
+    assertThat(getAudits()).hasSize(101);
+  }
+
   private JobProcessor.JobResult processPublish() {
     return newPublishJobProcessor()
         .processBatch(USER, JobItem.create(USER, "publish-job", "publish", null, null, NOW));
@@ -472,8 +582,6 @@ public class OrderReservationIntegrationTest {
 
   private PublishJobProcessor newPublishJobProcessor() {
     var dynamoDbClient = factory.dynamoDbClient();
-    var inventoryRepository =
-        new InventoryRepository(unitTable, dynamoDbClient, fakeClock, factory.fakeUlidGenerator());
     var orderRepository =
         new OrderRepository(orderTable, factory.jobTable(), dynamoDbClient, fakeClock);
     var orderPhaseProcessor =
@@ -482,7 +590,6 @@ public class OrderReservationIntegrationTest {
             listingService,
             factory.settingsTable(),
             orderRepository,
-            inventoryRepository,
             factory.inventoryService(),
             fakeClock,
             fakeFetchTcgService);
