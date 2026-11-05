@@ -17,6 +17,7 @@ import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobProcessor;
+import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
@@ -97,7 +98,12 @@ public class OrderReservationIntegrationTest {
     factory.fakeUlidGenerator().reset();
 
     orderRepository =
-        new OrderRepository(orderTable, factory.jobTable(), factory.dynamoDbClient(), fakeClock);
+        new OrderRepository(
+            orderTable,
+            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class),
+            factory.jobTable(),
+            factory.dynamoDbClient(),
+            fakeClock);
     orderPhaseProcessor =
         new OrderPhaseProcessor(
             orderTable,
@@ -107,6 +113,53 @@ public class OrderReservationIntegrationTest {
             factory.inventoryService(),
             fakeClock,
             fakeFetchTcgService);
+  }
+
+  @Test
+  void createReservingOrderShouldCompleteInterruptedStagingForManyRows() {
+    // arrange
+    var rows = new ArrayList<OrderRowItem>();
+    for (int position = 0; position < 101; position++) {
+      rows.add(
+          OrderRowItem.create(
+              USER, "83663", position, SKU_ID, LISTING_ID, 1, "2.00", "3.00", new ArrayList<>()));
+    }
+    var table = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class);
+    table.putItem(rows.getFirst());
+    table.putItem(
+        OrderRowItem.create(
+            USER, "83663", 101, SKU_ID, LISTING_ID, 1, "9.00", null, new ArrayList<>()));
+    var order =
+        OrderItem.create(
+            USER,
+            "83663",
+            "reserving",
+            "ACCEPTED",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            rows.size(),
+            NOW);
+
+    // act
+    orderRepository.createReservingOrder(order, rows);
+    var saved = getOrder("83663");
+    var savedRows = orderRepository.findRows(USER, saved);
+
+    // assert
+    assertThat(saved.getRowCount()).isEqualTo(101);
+    assertThat(savedRows).hasSize(101);
+    assertThat(savedRows)
+        .extracting(OrderRowItem::getPosition)
+        .containsExactlyElementsOf(IntStream.range(0, 101).boxed().toList());
+    assertThat(savedRows.getFirst().getUser()).isEqualTo(USER);
+    assertThat(savedRows.getFirst().getOrderId()).isEqualTo("83663");
+    assertThat(savedRows.getFirst().getPk()).isEqualTo("USER#" + USER + "#ORDER#83663");
+    assertThat(savedRows.getFirst().getSk()).isEqualTo("ROW#0000000000");
+    assertThat(savedRows.getLast().getPrice()).isEqualTo("2.00");
   }
 
   @Test
@@ -140,17 +193,18 @@ public class OrderReservationIntegrationTest {
     var firstOrder = getOrder("83663");
     var secondOrder = getOrder("83664");
     assertThat(firstOrder.getStatus()).isEqualTo("awaiting_payment");
-    assertThat(firstOrder.getLines())
-        .extracting(OrderItem.OrderLine::getAllocatedSequenceNumbers)
+    assertThat(findOrderRows(firstOrder))
+        .extracting(OrderRowItem::getAllocatedSequenceNumbers)
         .containsExactly(List.of(1), List.of(2));
-    assertThat(firstOrder.getLines())
-        .extracting(OrderItem.OrderLine::getPrice)
+    assertThat(findOrderRows(firstOrder))
+        .extracting(OrderRowItem::getPrice)
         .containsExactly("1.10", "1.20");
-    assertThat(firstOrder.getLines())
-        .extracting(OrderItem.OrderLine::getListedPrice)
+    assertThat(findOrderRows(firstOrder))
+        .extracting(OrderRowItem::getListedPrice)
         .containsExactly("2.00", "2.00");
     assertThat(secondOrder.getStatus()).isEqualTo("to_pick");
-    assertThat(secondOrder.getLines().get(0).getAllocatedSequenceNumbers()).containsExactly(3, 4);
+    assertThat(findOrderRows(secondOrder).get(0).getAllocatedSequenceNumbers())
+        .containsExactly(3, 4);
     assertThat(secondOrder.getFetchtcgCurrentAction()).isEqualTo("SEND_TRACKING_CODE");
     assertThat(List.of(getUnit(1), getUnit(2), getUnit(3), getUnit(4)))
         .allSatisfy(
@@ -291,7 +345,7 @@ public class OrderReservationIntegrationTest {
     createUnit(1, "in_stock", null);
     createUnit(2, "sold", "another-order");
     createOrder(
-        OrderItem.create(
+        createOrderItem(
             USER,
             "83663",
             "reserving",
@@ -302,8 +356,7 @@ public class OrderReservationIntegrationTest {
             null,
             null,
             "4.00",
-            List.of(
-                new OrderItem.OrderLine(SKU_ID, LISTING_ID, 2, "4.00", "2.00", new ArrayList<>())),
+            List.of(new OrderRowItem(SKU_ID, LISTING_ID, 2, "4.00", "2.00", new ArrayList<>())),
             NOW));
 
     fakeFetchTcgService.seedOffers(USER, List.of(offer(83663, null, List.of())));
@@ -341,7 +394,7 @@ public class OrderReservationIntegrationTest {
     createSku();
     createUnit(1, "in_stock", null);
     createOrder(
-        OrderItem.create(
+        createOrderItem(
             USER,
             "83663",
             "reserving",
@@ -353,8 +406,8 @@ public class OrderReservationIntegrationTest {
             null,
             "2.00",
             List.of(
-                new OrderItem.OrderLine(SKU_ID, LISTING_ID, 1, "1.00", "2.00", List.of(1)),
-                new OrderItem.OrderLine(SKU_ID, LISTING_ID, 1, "1.00", "2.00", List.of(1))),
+                new OrderRowItem(SKU_ID, LISTING_ID, 1, "1.00", "2.00", List.of(1)),
+                new OrderRowItem(SKU_ID, LISTING_ID, 1, "1.00", "2.00", List.of(1))),
             NOW));
 
     fakeFetchTcgService.seedOffers(USER, List.of(offer(83663, null, List.of())));
@@ -490,7 +543,7 @@ public class OrderReservationIntegrationTest {
 
     // assert
     assertThat(getOrder("83663").getStatus()).isEqualTo("awaiting_payment");
-    assertThat(getOrder("83663").getLines().getFirst().getAllocatedSequenceNumbers())
+    assertThat(findOrderRows(getOrder("83663")).getFirst().getAllocatedSequenceNumbers())
         .containsExactly(1);
     assertThat(getAudits()).hasSize(1);
     assertThat(getSku().getVersion()).isEqualTo(version);
@@ -547,7 +600,7 @@ public class OrderReservationIntegrationTest {
 
     // assert
     assertThat(getOrder("83663").getStatus()).isEqualTo("voided");
-    assertThat(getOrder("83663").getLines().getFirst().getAllocatedSequenceNumbers())
+    assertThat(findOrderRows(getOrder("83663")).getFirst().getAllocatedSequenceNumbers())
         .containsExactly(1, 2);
     assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
     assertThat(getUnit(2).getStatus()).isEqualTo("in_stock");
@@ -570,7 +623,7 @@ public class OrderReservationIntegrationTest {
 
     // assert
     assertThat(getOrder("83663").getStatus()).isEqualTo("awaiting_payment");
-    assertThat(getOrder("83663").getLines().getFirst().getAllocatedSequenceNumbers())
+    assertThat(findOrderRows(getOrder("83663")).getFirst().getAllocatedSequenceNumbers())
         .containsExactlyElementsOf(IntStream.range(0, 101).boxed().toList());
     assertThat(getAudits()).hasSize(101);
   }
@@ -583,7 +636,12 @@ public class OrderReservationIntegrationTest {
   private PublishJobProcessor newPublishJobProcessor() {
     var dynamoDbClient = factory.dynamoDbClient();
     var orderRepository =
-        new OrderRepository(orderTable, factory.jobTable(), dynamoDbClient, fakeClock);
+        new OrderRepository(
+            orderTable,
+            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class),
+            factory.jobTable(),
+            dynamoDbClient,
+            fakeClock);
     var orderPhaseProcessor =
         new OrderPhaseProcessor(
             orderTable,
@@ -698,5 +756,64 @@ public class OrderReservationIntegrationTest {
     var results = new ArrayList<AuditItem>();
     auditTable.query(request).items().forEach(results::add);
     return results;
+  }
+
+  private OrderItem createOrderItem(
+      String user,
+      String orderId,
+      String status,
+      String providerStatus,
+      String action,
+      String delivery,
+      String buyer,
+      OrderItem.BuyerAddress address,
+      String postage,
+      String total,
+      List<OrderRowItem> lines,
+      Instant createdAt) {
+    var table = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class);
+    for (int position = 0; position < lines.size(); position++) {
+      var line = lines.get(position);
+      table.putItem(
+          OrderRowItem.create(
+              user,
+              orderId,
+              position,
+              line.getSkuId(),
+              line.getFetchtcgListingId(),
+              line.getQuantity(),
+              line.getPrice(),
+              line.getListedPrice(),
+              line.getAllocatedSequenceNumbers()));
+    }
+    return OrderItem.create(
+        user,
+        orderId,
+        status,
+        providerStatus,
+        action,
+        delivery,
+        buyer,
+        address,
+        postage,
+        total,
+        lines.size(),
+        createdAt);
+  }
+
+  private List<OrderRowItem> findOrderRows(OrderItem order) {
+    return TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class)
+        .query(
+            request ->
+                request
+                    .queryConditional(
+                        QueryConditional.keyEqualTo(
+                            Key.builder()
+                                .partitionValue(order.getPk() + "#ORDER#" + order.getOrderId())
+                                .build()))
+                    .consistentRead(true))
+        .items()
+        .stream()
+        .toList();
   }
 }

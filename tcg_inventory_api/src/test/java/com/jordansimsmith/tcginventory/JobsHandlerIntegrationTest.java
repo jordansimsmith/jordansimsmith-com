@@ -37,6 +37,7 @@ import com.jordansimsmith.tcginventory.listings.client.FindListingsRequest;
 import com.jordansimsmith.tcginventory.listings.client.Listing;
 import com.jordansimsmith.tcginventory.listings.client.UpdateListingRequest;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
+import com.jordansimsmith.tcginventory.orders.OrderRowItem;
 import com.jordansimsmith.tcginventory.pricing.client.Condition;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceRequest;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceResponse;
@@ -898,7 +899,7 @@ public class JobsHandlerIntegrationTest {
                 "32 Abercrombie Street", null, "Howick", "Auckland", "2014", "NZ"));
     assertThat(order.getTotalPrice()).isEqualTo("3.33");
     assertThat(order.getFetchtcgStatus()).isEqualTo("ACCEPTED");
-    var orderLines = order.getLines();
+    var orderLines = findOrderRows(order);
     assertThat(orderLines).hasSize(1);
     assertThat(orderLines.get(0).getSkuId()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
     assertThat(orderLines.get(0).getPrice()).isEqualTo("1.50");
@@ -1179,12 +1180,12 @@ public class JobsHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
 
-    var orderLines = new ArrayList<OrderItem.OrderLine>();
+    var orderLines = new ArrayList<OrderRowItem>();
     for (int i = 1; i <= 60; i++) {
       var skuId = "mtg#scryfall#scryfall-" + i + "#normal#NM";
       createSkuWithUnits("jordan", skuId, 1000 + i, 1);
       reserveUnit("jordan", skuId, 1, "91329");
-      orderLines.add(new OrderItem.OrderLine(skuId, 1000 + i, 1, "0.50", "0.50", List.of(1)));
+      orderLines.add(new OrderRowItem(skuId, 1000 + i, 1, "0.50", "0.50", List.of(1)));
     }
     createOrderWithLines("jordan", "91329", "awaiting_payment", orderLines);
 
@@ -1613,8 +1614,8 @@ public class JobsHandlerIntegrationTest {
     // assert
     var order = getOrder("jordan", "83663");
     assertThat(order.getStatus()).isEqualTo("awaiting_payment");
-    assertThat(order.getLines())
-        .extracting(OrderItem.OrderLine::getSkuId)
+    assertThat(findOrderRows(order))
+        .extracting(OrderRowItem::getSkuId)
         .containsExactly(magicSkuId, pokemonSkuId);
     assertThat(getUnits("jordan", magicSkuId))
         .singleElement()
@@ -1715,7 +1716,7 @@ public class JobsHandlerIntegrationTest {
     var order = getOrder("jordan", "91329");
     assertThat(order).isNotNull();
     assertThat(order.getStatus()).isEqualTo("awaiting_payment");
-    var orderLines = order.getLines();
+    var orderLines = findOrderRows(order);
     assertThat(orderLines).hasSize(60);
     var allocated =
         orderLines.stream().flatMap(l -> l.getAllocatedSequenceNumbers().stream()).toList();
@@ -1769,7 +1770,7 @@ public class JobsHandlerIntegrationTest {
     firstUnit.setReservationId("83663");
     unitTable.putItem(firstUnit);
     orderTable.putItem(
-        OrderItem.create(
+        createOrderItem(
             "jordan",
             "83663",
             "reserving",
@@ -1780,7 +1781,7 @@ public class JobsHandlerIntegrationTest {
             null,
             null,
             "3.33",
-            List.of(new OrderItem.OrderLine(skuId, 1001, 2, "3.00", "2.00", List.of(1))),
+            List.of(new OrderRowItem(skuId, 1001, 2, "3.00", "2.00", List.of(1))),
             Instant.ofEpochSecond(1700000000)));
 
     // act & assert
@@ -1790,7 +1791,7 @@ public class JobsHandlerIntegrationTest {
         .hasMessage("FetchTCG offer not found for order 83663");
     var order = getOrder("jordan", "83663");
     assertThat(order.getStatus()).isEqualTo("reserving");
-    assertThat(order.getLines().getFirst().getAllocatedSequenceNumbers()).containsExactly(1);
+    assertThat(findOrderRows(order).getFirst().getAllocatedSequenceNumbers()).containsExactly(1);
     assertThat(getUnits("jordan", skuId))
         .filteredOn(unit -> "reserved".equals(unit.getStatus()))
         .hasSize(1);
@@ -1809,7 +1810,7 @@ public class JobsHandlerIntegrationTest {
     unit.setReservationId("another-order");
     unitTable.putItem(unit);
     orderTable.putItem(
-        OrderItem.create(
+        createOrderItem(
             "jordan",
             "83663",
             "reserving",
@@ -1820,7 +1821,7 @@ public class JobsHandlerIntegrationTest {
             null,
             null,
             "1.50",
-            List.of(new OrderItem.OrderLine(skuId, 1001, 1, "1.50", "2.00", List.of())),
+            List.of(new OrderRowItem(skuId, 1001, 1, "1.50", "2.00", List.of())),
             Instant.ofEpochSecond(1700000000)));
 
     factory
@@ -2033,7 +2034,7 @@ public class JobsHandlerIntegrationTest {
 
   private void createExistingOrder(String user, String offerId, String status) {
     var order =
-        OrderItem.create(
+        createOrderItem(
             user,
             offerId,
             status,
@@ -2066,14 +2067,14 @@ public class JobsHandlerIntegrationTest {
         offerId,
         status,
         List.of(
-            new OrderItem.OrderLine(
+            new OrderRowItem(
                 skuId, fetchtcgListingId, allocated.size(), "3.33", "4.20", allocated)));
   }
 
   private void createOrderWithLines(
-      String user, String offerId, String status, List<OrderItem.OrderLine> lines) {
+      String user, String offerId, String status, List<OrderRowItem> lines) {
     var order =
-        OrderItem.create(
+        createOrderItem(
             user,
             offerId,
             status,
@@ -2355,5 +2356,64 @@ public class JobsHandlerIntegrationTest {
     } catch (ServiceException e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private OrderItem createOrderItem(
+      String user,
+      String orderId,
+      String status,
+      String providerStatus,
+      String action,
+      String delivery,
+      String buyer,
+      OrderItem.BuyerAddress address,
+      String postage,
+      String total,
+      List<OrderRowItem> lines,
+      Instant createdAt) {
+    var table = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class);
+    for (int position = 0; position < lines.size(); position++) {
+      var line = lines.get(position);
+      table.putItem(
+          OrderRowItem.create(
+              user,
+              orderId,
+              position,
+              line.getSkuId(),
+              line.getFetchtcgListingId(),
+              line.getQuantity(),
+              line.getPrice(),
+              line.getListedPrice(),
+              line.getAllocatedSequenceNumbers()));
+    }
+    return OrderItem.create(
+        user,
+        orderId,
+        status,
+        providerStatus,
+        action,
+        delivery,
+        buyer,
+        address,
+        postage,
+        total,
+        lines.size(),
+        createdAt);
+  }
+
+  private List<OrderRowItem> findOrderRows(OrderItem order) {
+    return TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class)
+        .query(
+            request ->
+                request
+                    .queryConditional(
+                        QueryConditional.keyEqualTo(
+                            Key.builder()
+                                .partitionValue(order.getPk() + "#ORDER#" + order.getOrderId())
+                                .build()))
+                    .consistentRead(true))
+        .items()
+        .stream()
+        .toList();
   }
 }

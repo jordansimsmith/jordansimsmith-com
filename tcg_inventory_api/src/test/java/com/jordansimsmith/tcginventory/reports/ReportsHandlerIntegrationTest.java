@@ -18,6 +18,7 @@ import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.JobsHandler;
+import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
@@ -31,6 +32,8 @@ import com.jordansimsmith.tcginventory.inventory.client.FindUnitsResponse;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.Sku;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
+import com.jordansimsmith.tcginventory.orders.OrderRepository;
+import com.jordansimsmith.tcginventory.orders.OrderRowItem;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.math.BigDecimal;
@@ -54,6 +57,7 @@ import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 @Testcontainers
 public class ReportsHandlerIntegrationTest {
 
+  private TcgInventoryTestFactory factory;
   private DynamoDbClient dynamoDbClient;
   private FakeClock fakeClock;
   private FakeUlidGenerator fakeUlidGenerator;
@@ -84,7 +88,7 @@ public class ReportsHandlerIntegrationTest {
 
   @BeforeEach
   void setUp() {
-    var factory =
+    factory =
         TcgInventoryTestFactory.create(
             dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
 
@@ -398,7 +402,7 @@ public class ReportsHandlerIntegrationTest {
             Instant.ofEpochSecond(1699000000)));
 
     orderTable.putItem(
-        OrderItem.create(
+        createOrderItem(
             "jordan",
             "1",
             "fulfilled",
@@ -410,13 +414,12 @@ public class ReportsHandlerIntegrationTest {
             null,
             "10.50",
             List.of(
-                new OrderItem.OrderLine(
+                new OrderRowItem(
                     "mtg#scryfall#scryfall1#normal#NM", 1, 2, "10.50", null, List.of()),
-                new OrderItem.OrderLine(
-                    "mtg#scryfall#scryfall1#normal#NM", 2, 1, null, null, List.of())),
+                new OrderRowItem("mtg#scryfall#scryfall1#normal#NM", 2, 1, null, null, List.of())),
             Instant.ofEpochSecond(1699500000)));
     orderTable.putItem(
-        OrderItem.create(
+        createOrderItem(
             "jordan",
             "2",
             "to_pick",
@@ -428,11 +431,11 @@ public class ReportsHandlerIntegrationTest {
             null,
             "5.25",
             List.of(
-                new OrderItem.OrderLine(
+                new OrderRowItem(
                     "mtg#scryfall#scryfall2#normal#NM", 1, 1, "5.25", null, List.of())),
             Instant.ofEpochSecond(1699600000)));
     orderTable.putItem(
-        OrderItem.create(
+        createOrderItem(
             "jordan",
             "4",
             "fulfilling",
@@ -444,11 +447,11 @@ public class ReportsHandlerIntegrationTest {
             null,
             "2.00",
             List.of(
-                new OrderItem.OrderLine(
+                new OrderRowItem(
                     "mtg#scryfall#scryfall1#normal#NM", 1, 1, "2.00", null, List.of())),
             Instant.ofEpochSecond(1699650000)));
     orderTable.putItem(
-        OrderItem.create(
+        createOrderItem(
             "jordan",
             "3",
             "voided",
@@ -460,7 +463,7 @@ public class ReportsHandlerIntegrationTest {
             null,
             "100.00",
             List.of(
-                new OrderItem.OrderLine(
+                new OrderRowItem(
                     "mtg#scryfall#scryfall2#normal#NM", 1, 1, "100.00", null, List.of())),
             Instant.ofEpochSecond(1699700000)));
 
@@ -680,7 +683,7 @@ public class ReportsHandlerIntegrationTest {
     soldUnit.setUpdatedAt(Instant.ofEpochSecond(1699500000));
     unitTable.putItem(soldUnit);
     orderTable.putItem(
-        OrderItem.create(
+        createOrderItem(
             "jordan",
             "83665",
             "fulfilled",
@@ -691,7 +694,7 @@ public class ReportsHandlerIntegrationTest {
             null,
             null,
             "12.50",
-            List.of(new OrderItem.OrderLine(skuId, 9001, 1, "12.50", null, List.of(2))),
+            List.of(new OrderRowItem(skuId, 9001, 1, "12.50", null, List.of(2))),
             Instant.ofEpochSecond(1699500000)));
     jobTable.putItem(
         JobItem.create(
@@ -726,7 +729,7 @@ public class ReportsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     orderTable.putItem(
-        OrderItem.create(
+        createOrderItem(
             "jordan",
             "1",
             "fulfilled",
@@ -737,7 +740,7 @@ public class ReportsHandlerIntegrationTest {
             null,
             null,
             "10.00",
-            List.of(new OrderItem.OrderLine("missing-sku", 1, 1, "10.00", null, List.of())),
+            List.of(new OrderRowItem("missing-sku", 1, 1, "10.00", null, List.of())),
             Instant.ofEpochSecond(1699500000)));
     jobTable.putItem(
         JobItem.create(
@@ -878,6 +881,12 @@ public class ReportsHandlerIntegrationTest {
         reportTable,
         auditTable,
         orderTable,
+        new OrderRepository(
+            orderTable,
+            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class),
+            factory.jobTable(),
+            factory.dynamoDbClient(),
+            fakeClock),
         objectMapper,
         fakeClock,
         new FakeGamesService(),
@@ -928,5 +937,48 @@ public class ReportsHandlerIntegrationTest {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private OrderItem createOrderItem(
+      String user,
+      String orderId,
+      String status,
+      String providerStatus,
+      String action,
+      String delivery,
+      String buyer,
+      OrderItem.BuyerAddress address,
+      String postage,
+      String total,
+      List<OrderRowItem> lines,
+      Instant createdAt) {
+    var table = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class);
+    for (int position = 0; position < lines.size(); position++) {
+      var line = lines.get(position);
+      table.putItem(
+          OrderRowItem.create(
+              user,
+              orderId,
+              position,
+              line.getSkuId(),
+              line.getFetchtcgListingId(),
+              line.getQuantity(),
+              line.getPrice(),
+              line.getListedPrice(),
+              line.getAllocatedSequenceNumbers()));
+    }
+    return OrderItem.create(
+        user,
+        orderId,
+        status,
+        providerStatus,
+        action,
+        delivery,
+        buyer,
+        address,
+        postage,
+        total,
+        lines.size(),
+        createdAt);
   }
 }

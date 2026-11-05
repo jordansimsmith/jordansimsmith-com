@@ -84,7 +84,12 @@ public class OrderVoidingIntegrationTest {
     factory.fakeUlidGenerator().reset();
 
     var orderRepository =
-        new OrderRepository(orderTable, factory.jobTable(), factory.dynamoDbClient(), fakeClock);
+        new OrderRepository(
+            orderTable,
+            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class),
+            factory.jobTable(),
+            factory.dynamoDbClient(),
+            fakeClock);
     orderPhaseProcessor =
         new OrderPhaseProcessor(
             orderTable,
@@ -309,9 +314,9 @@ public class OrderVoidingIntegrationTest {
     unitTable.putItem(unit);
   }
 
-  private void createOrder(String orderId, String status, List<OrderItem.OrderLine> lines) {
+  private void createOrder(String orderId, String status, List<OrderRowItem> lines) {
     orderTable.putItem(
-        OrderItem.create(
+        createOrderItem(
             USER,
             orderId,
             status,
@@ -326,9 +331,8 @@ public class OrderVoidingIntegrationTest {
             NOW));
   }
 
-  private OrderItem.OrderLine line(List<Integer> sequenceNumbers) {
-    return new OrderItem.OrderLine(
-        SKU_ID, 1, sequenceNumbers.size(), "2.00", "2.00", sequenceNumbers);
+  private OrderRowItem line(List<Integer> sequenceNumbers) {
+    return new OrderRowItem(SKU_ID, 1, sequenceNumbers.size(), "2.00", "2.00", sequenceNumbers);
   }
 
   private void seedCancellation(String... orderIds) {
@@ -353,7 +357,12 @@ public class OrderVoidingIntegrationTest {
   private PublishJobProcessor newPublishJobProcessor() {
     var dynamoDbClient = factory.dynamoDbClient();
     var orderRepository =
-        new OrderRepository(orderTable, factory.jobTable(), dynamoDbClient, fakeClock);
+        new OrderRepository(
+            orderTable,
+            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class),
+            factory.jobTable(),
+            dynamoDbClient,
+            fakeClock);
     var orderPhaseProcessor =
         new OrderPhaseProcessor(
             orderTable,
@@ -405,5 +414,48 @@ public class OrderVoidingIntegrationTest {
     var result = new ArrayList<AuditItem>();
     auditTable.query(request).items().forEach(result::add);
     return result;
+  }
+
+  private OrderItem createOrderItem(
+      String user,
+      String orderId,
+      String status,
+      String providerStatus,
+      String action,
+      String delivery,
+      String buyer,
+      OrderItem.BuyerAddress address,
+      String postage,
+      String total,
+      List<OrderRowItem> lines,
+      Instant createdAt) {
+    var table = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class);
+    for (int position = 0; position < lines.size(); position++) {
+      var line = lines.get(position);
+      table.putItem(
+          OrderRowItem.create(
+              user,
+              orderId,
+              position,
+              line.getSkuId(),
+              line.getFetchtcgListingId(),
+              line.getQuantity(),
+              line.getPrice(),
+              line.getListedPrice(),
+              line.getAllocatedSequenceNumbers()));
+    }
+    return OrderItem.create(
+        user,
+        orderId,
+        status,
+        providerStatus,
+        action,
+        delivery,
+        buyer,
+        address,
+        postage,
+        total,
+        lines.size(),
+        createdAt);
   }
 }

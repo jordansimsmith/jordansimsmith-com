@@ -14,6 +14,7 @@ import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
+import com.jordansimsmith.tcginventory.orders.OrderRepository;
 import com.jordansimsmith.time.Clock;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -35,6 +36,7 @@ public class ReportJobProcessor implements JobProcessor {
   private final InventoryService inventoryService;
   private final DynamoDbTable<AuditItem> auditTable;
   private final DynamoDbTable<OrderItem> orderTable;
+  private final OrderRepository orderRepository;
   private final ObjectMapper objectMapper;
   private final Clock clock;
   private final GamesService gamesService;
@@ -43,6 +45,7 @@ public class ReportJobProcessor implements JobProcessor {
       DynamoDbTable<ReportItem> reportTable,
       DynamoDbTable<AuditItem> auditTable,
       DynamoDbTable<OrderItem> orderTable,
+      OrderRepository orderRepository,
       ObjectMapper objectMapper,
       Clock clock,
       GamesService gamesService,
@@ -50,6 +53,7 @@ public class ReportJobProcessor implements JobProcessor {
     this.reportTable = reportTable;
     this.auditTable = auditTable;
     this.orderTable = orderTable;
+    this.orderRepository = orderRepository;
     this.objectMapper = objectMapper;
     this.clock = clock;
     this.gamesService = gamesService;
@@ -102,12 +106,13 @@ public class ReportJobProcessor implements JobProcessor {
     } while (skuContinuation != null);
 
     for (var order : pageOrders(user)) {
-      accumulator.addOrder(order);
+      var rows = orderRepository.findRows(user, order);
+      accumulator.addOrder(order, rows);
       var paid =
           "to_pick".equals(order.getStatus())
               || "fulfilling".equals(order.getStatus())
               || "fulfilled".equals(order.getStatus());
-      for (var line : order.getLines()) {
+      for (var line : rows) {
         var game = skuGames.get(line.getSkuId());
         if (game == null) {
           throw new IllegalStateException("order line references missing SKU: " + line.getSkuId());

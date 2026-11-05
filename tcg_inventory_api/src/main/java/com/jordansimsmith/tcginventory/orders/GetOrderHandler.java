@@ -100,6 +100,7 @@ public class GetOrderHandler
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<OrderItem> orderTable;
+  private final OrderRepository orderRepository;
   private final DynamoDbTable<UnitItem> unitTable;
   private final DynamoDbTable<SkuItem> skuTable;
 
@@ -112,6 +113,13 @@ public class GetOrderHandler
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.orderTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderItem.class);
+    this.orderRepository =
+        new OrderRepository(
+            orderTable,
+            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class),
+            factory.jobTable(),
+            factory.dynamoDbClient(),
+            factory.clock());
     this.unitTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), UnitItem.class);
     this.skuTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), SkuItem.class);
   }
@@ -146,7 +154,7 @@ public class GetOrderHandler
       return httpResponseFactory.notFound(new ErrorResponse("Not Found"));
     }
 
-    var orderLines = orderItem.getLines();
+    var orderLines = orderRepository.findRows(user, orderItem);
     Map<String, SkuItem> skuCache = new HashMap<>();
     var blockUnits = findBlockUnits(user, orderLines, skuCache);
     var units = new ArrayList<OrderUnitResponse>();
@@ -202,15 +210,15 @@ public class GetOrderHandler
             toBuyerAddress(orderItem.getBuyerAddress()),
             orderItem.getPostageOption(),
             orderItem.getTotalPrice(),
-            OrderLines.itemsTotalPrice(orderLines),
-            OrderLines.listedTotalPrice(orderLines),
+            OrderRows.itemsTotalPrice(orderLines),
+            OrderRows.listedTotalPrice(orderLines),
             units.size(),
             lines,
             units));
   }
 
   private Map<GameBlock, List<UnitItem>> findBlockUnits(
-      String user, List<OrderItem.OrderLine> orderLines, Map<String, SkuItem> skuCache) {
+      String user, List<OrderRowItem> orderLines, Map<String, SkuItem> skuCache) {
     var blocks = new HashSet<GameBlock>();
     for (var line : orderLines) {
       var skuItem = getSku(SkuItem.formatPk(user, line.getSkuId()), skuCache);
@@ -312,7 +320,7 @@ public class GetOrderHandler
   }
 
   @Nullable
-  private static String perUnitPrice(OrderItem.OrderLine line) {
+  private static String perUnitPrice(OrderRowItem line) {
     if (line.getPrice() == null) {
       return null;
     }

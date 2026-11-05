@@ -7,6 +7,7 @@ import com.jordansimsmith.tcginventory.inventory.client.Sku;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
+import com.jordansimsmith.tcginventory.orders.OrderRowItem;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
@@ -108,11 +109,11 @@ public class ReportAccumulatorTest {
     var accumulator = new ReportAccumulator(GENERATION_TIME);
 
     // act
-    accumulator.addOrder(createOrder("to_pick", "10.50"));
-    accumulator.addOrder(createOrder("fulfilling", "2.50"));
-    accumulator.addOrder(createOrder("fulfilled", "5.25"));
-    accumulator.addOrder(createOrder("awaiting_payment", "100.00"));
-    accumulator.addOrder(createOrder("voided", "20.00"));
+    addOrder(accumulator, createOrder("to_pick", "10.50"));
+    addOrder(accumulator, createOrder("fulfilling", "2.50"));
+    addOrder(accumulator, createOrder("fulfilled", "5.25"));
+    addOrder(accumulator, createOrder("awaiting_payment", "100.00"));
+    addOrder(accumulator, createOrder("voided", "20.00"));
 
     // assert
     var totals = accumulator.toTotals();
@@ -125,8 +126,8 @@ public class ReportAccumulatorTest {
     var accumulator = new ReportAccumulator(GENERATION_TIME);
 
     // act
-    accumulator.addOrder(
-        createOrder("fulfilled", "19.50", "12.00", Instant.ofEpochSecond(1700000000)));
+    addOrder(
+        accumulator, createOrder("fulfilled", "19.50", "12.00", Instant.ofEpochSecond(1700000000)));
 
     // assert
     var totals = accumulator.toTotals();
@@ -774,22 +775,28 @@ public class ReportAccumulatorTest {
     assertThat(bands.get(0).inStockUnits()).isEqualTo(1);
   }
 
-  private static OrderItem createOrder(String status, String totalPrice) {
+  private static OrderFixture createOrder(String status, String totalPrice) {
     return createOrder(status, totalPrice, Instant.ofEpochSecond(1700000000));
   }
 
-  private static OrderItem createOrder(String status, String totalPrice, Instant createdAt) {
+  private static OrderFixture createOrder(String status, String totalPrice, Instant createdAt) {
     return createOrder(status, totalPrice, totalPrice, createdAt);
   }
 
-  private static OrderItem createOrder(
+  private static OrderFixture createOrder(
       String status, String totalPrice, String itemsTotal, Instant createdAt) {
     var item = new OrderItem();
     item.setStatus(status);
     item.setTotalPrice(totalPrice);
-    item.setLines(List.of(new OrderItem.OrderLine("s", 1, 1, itemsTotal, null, List.of())));
+    var rows = List.of(new OrderRowItem("s", 1, 1, itemsTotal, null, List.of()));
     item.setCreatedAt(createdAt);
-    return item;
+    return new OrderFixture(item, rows);
+  }
+
+  private record OrderFixture(OrderItem order, List<OrderRowItem> rows) {}
+
+  private static void addOrder(ReportAccumulator accumulator, OrderFixture fixture) {
+    accumulator.addOrder(fixture.order(), fixture.rows());
   }
 
   @Test
@@ -800,11 +807,11 @@ public class ReportAccumulatorTest {
     var nov2023 = Instant.ofEpochSecond(1700000000);
 
     // act
-    accumulator.addOrder(createOrder("to_pick", "10.50", nov2023));
-    accumulator.addOrder(createOrder("fulfilled", "5.25", nov2023));
-    accumulator.addOrder(createOrder("awaiting_payment", "100.00", nov2023));
-    accumulator.addOrder(createOrder("voided", "20.00", nov2023));
-    accumulator.addOrder(createOrder("reserving", "30.00", nov2023));
+    addOrder(accumulator, createOrder("to_pick", "10.50", nov2023));
+    addOrder(accumulator, createOrder("fulfilled", "5.25", nov2023));
+    addOrder(accumulator, createOrder("awaiting_payment", "100.00", nov2023));
+    addOrder(accumulator, createOrder("voided", "20.00", nov2023));
+    addOrder(accumulator, createOrder("reserving", "30.00", nov2023));
 
     // assert
     var result = accumulator.toRevenueByMonth();
@@ -823,9 +830,9 @@ public class ReportAccumulatorTest {
     var lateNov = Instant.ofEpochSecond(1700000000);
 
     // act
-    accumulator.addOrder(createOrder("fulfilled", "10.00", earlyNov));
-    accumulator.addOrder(createOrder("fulfilled", "5.50", lateNov));
-    accumulator.addOrder(createOrder("to_pick", "3.25", lateNov));
+    addOrder(accumulator, createOrder("fulfilled", "10.00", earlyNov));
+    addOrder(accumulator, createOrder("fulfilled", "5.50", lateNov));
+    addOrder(accumulator, createOrder("to_pick", "3.25", lateNov));
 
     // assert
     var result = accumulator.toRevenueByMonth();
@@ -847,9 +854,9 @@ public class ReportAccumulatorTest {
     var november = Instant.ofEpochSecond(1700000000);
 
     // act (add in non-chronological order)
-    accumulator.addOrder(createOrder("fulfilled", "5.00", march));
-    accumulator.addOrder(createOrder("fulfilled", "3.00", january));
-    accumulator.addOrder(createOrder("fulfilled", "7.00", november));
+    addOrder(accumulator, createOrder("fulfilled", "5.00", march));
+    addOrder(accumulator, createOrder("fulfilled", "3.00", january));
+    addOrder(accumulator, createOrder("fulfilled", "7.00", november));
 
     // assert
     var result = accumulator.toRevenueByMonth();
@@ -884,8 +891,8 @@ public class ReportAccumulatorTest {
     var instant = Instant.ofEpochSecond(1700000000);
 
     // act
-    accumulator.addOrder(createOrder("fulfilled", "0.10", instant));
-    accumulator.addOrder(createOrder("fulfilled", "0.20", instant));
+    addOrder(accumulator, createOrder("fulfilled", "0.10", instant));
+    addOrder(accumulator, createOrder("fulfilled", "0.20", instant));
 
     // assert
     var result = accumulator.toRevenueByMonth();

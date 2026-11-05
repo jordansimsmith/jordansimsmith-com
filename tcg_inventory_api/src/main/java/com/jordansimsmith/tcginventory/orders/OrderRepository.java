@@ -10,6 +10,9 @@ import java.util.List;
 import java.util.Map;
 import javax.annotation.Nullable;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
+import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.Put;
@@ -24,21 +27,28 @@ public class OrderRepository {
 
   private final DynamoDbTable<OrderItem> orderTable;
   private final DynamoDbTable<JobItem> jobTable;
+  private final DynamoDbTable<OrderRowItem> rowTable;
   private final DynamoDbClient dynamoDbClient;
   private final Clock clock;
 
   public OrderRepository(
       DynamoDbTable<OrderItem> orderTable,
+      DynamoDbTable<OrderRowItem> rowTable,
       DynamoDbTable<JobItem> jobTable,
       DynamoDbClient dynamoDbClient,
       Clock clock) {
     this.orderTable = orderTable;
+    this.rowTable = rowTable;
     this.jobTable = jobTable;
     this.dynamoDbClient = dynamoDbClient;
     this.clock = clock;
   }
 
-  public void createReservingOrder(OrderItem order) {
+  public void createReservingOrder(OrderItem order, List<OrderRowItem> rows) {
+    for (var row : rows) {
+      rowTable.putItem(row);
+    }
+
     dynamoDbClient.putItem(
         PutItemRequest.builder()
             .tableName(TcgInventoryTable.TABLE_NAME)
@@ -48,26 +58,87 @@ public class OrderRepository {
   }
 
   public void recordReservation(
-      String user, String orderId, int lineIndex, int unitIndex, int sequenceNumber) {
-    var path = "#lines[" + lineIndex + "].allocated_sequence_numbers";
-    dynamoDbClient.updateItem(
-        UpdateItemRequest.builder()
-            .tableName(TcgInventoryTable.TABLE_NAME)
-            .key(orderKey(user, orderId))
-            .updateExpression("SET " + path + "[" + unitIndex + "] = :sequence, updated_at = :now")
-            .conditionExpression("#status = :reserving AND size(" + path + ") = :unitIndex")
-            .expressionAttributeNames(
-                Map.of("#status", OrderItem.STATUS, "#lines", OrderItem.LINES))
-            .expressionAttributeValues(
-                Map.of(
-                    ":sequence", AttributeValue.builder().n(String.valueOf(sequenceNumber)).build(),
-                    ":unitIndex", AttributeValue.builder().n(String.valueOf(unitIndex)).build(),
-                    ":now",
-                        AttributeValue.builder()
-                            .n(String.valueOf(clock.now().getEpochSecond()))
-                            .build(),
-                    ":reserving", AttributeValue.builder().s("reserving").build()))
+      String user, String orderId, int position, int unitIndex, int sequenceNumber) {
+    var now = AttributeValue.builder().n(String.valueOf(clock.now().getEpochSecond())).build();
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                TransactWriteItem.builder()
+                    .update(
+                        Update.builder()
+                            .tableName(TcgInventoryTable.TABLE_NAME)
+                            .key(orderKey(user, orderId))
+                            .updateExpression("SET updated_at = :now")
+                            .conditionExpression("#status = :reserving")
+                            .expressionAttributeNames(Map.of("#status", "status"))
+                            .expressionAttributeValues(
+                                Map.of(
+                                    ":now",
+                                    now,
+                                    ":reserving",
+                                    AttributeValue.builder().s("reserving").build()))
+                            .build())
+                    .build(),
+                TransactWriteItem.builder()
+                    .update(
+                        Update.builder()
+                            .tableName(TcgInventoryTable.TABLE_NAME)
+                            .key(
+                                Map.of(
+                                    "pk",
+                                    AttributeValue.builder()
+                                        .s(OrderRowItem.formatPk(user, orderId))
+                                        .build(),
+                                    "sk",
+                                    AttributeValue.builder()
+                                        .s(OrderRowItem.formatSk(position))
+                                        .build()))
+                            .updateExpression(
+                                "SET allocated_sequence_numbers[" + unitIndex + "] = :sequence")
+                            .conditionExpression(
+                                "attribute_exists(pk) AND size(allocated_sequence_numbers) ="
+                                    + " :unitIndex")
+                            .expressionAttributeValues(
+                                Map.of(
+                                    ":sequence",
+                                    AttributeValue.builder()
+                                        .n(String.valueOf(sequenceNumber))
+                                        .build(),
+                                    ":unitIndex",
+                                    AttributeValue.builder().n(String.valueOf(unitIndex)).build()))
+                            .build())
+                    .build())
             .build());
+  }
+
+  public List<OrderRowItem> findRows(String user, OrderItem order) {
+    if (order.getRowCount() == 0) {
+      return List.of();
+    }
+    var rows =
+        rowTable
+            .query(
+                QueryEnhancedRequest.builder()
+                    .queryConditional(
+                        QueryConditional.sortBetween(
+                            Key.builder()
+                                .partitionValue(OrderRowItem.formatPk(user, order.getOrderId()))
+                                .sortValue(OrderRowItem.formatSk(0))
+                                .build(),
+                            Key.builder()
+                                .partitionValue(OrderRowItem.formatPk(user, order.getOrderId()))
+                                .sortValue(OrderRowItem.formatSk(order.getRowCount() - 1))
+                                .build()))
+                    .consistentRead(true)
+                    .scanIndexForward(true)
+                    .build())
+            .items()
+            .stream()
+            .toList();
+    if (rows.size() != order.getRowCount()) {
+      throw new IllegalStateException("order rows are incomplete");
+    }
+    return rows;
   }
 
   public void finishReservation(String user, String orderId, String targetState) {
@@ -89,17 +160,17 @@ public class OrderRepository {
             .build());
   }
 
-  public void startFulfilling(String user, OrderItem order, JobItem job) {
-    if (order.getLines().isEmpty()) {
+  public void startFulfilling(String user, OrderItem order, List<OrderRowItem> rows, JobItem job) {
+    if (rows.isEmpty()) {
       throw new IllegalStateException("order has no lines to fulfill");
     }
-    for (var line : order.getLines()) {
+    for (var line : rows) {
       if (line.getQuantity() <= 0
           || line.getAllocatedSequenceNumbers().size() != line.getQuantity()) {
         throw new IllegalStateException("order line is not fully allocated");
       }
     }
-    var allocated = allocatedUnits(order);
+    var allocated = allocatedUnits(rows);
     if (allocated.size() != new HashSet<>(allocated).size()) {
       throw new IllegalStateException("order allocation contains a duplicate unit");
     }
@@ -278,9 +349,9 @@ public class OrderRepository {
             .build());
   }
 
-  private List<AllocatedUnit> allocatedUnits(OrderItem order) {
+  private List<AllocatedUnit> allocatedUnits(List<OrderRowItem> rows) {
     var result = new ArrayList<AllocatedUnit>();
-    for (var line : order.getLines()) {
+    for (var line : rows) {
       for (var sequenceNumber : line.getAllocatedSequenceNumbers()) {
         result.add(new AllocatedUnit(line.getSkuId(), sequenceNumber));
       }

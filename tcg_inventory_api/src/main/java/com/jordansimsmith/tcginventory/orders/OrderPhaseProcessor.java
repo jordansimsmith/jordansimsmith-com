@@ -63,7 +63,7 @@ public class OrderPhaseProcessor {
 
   private record AllocatedUnit(String skuId, int sequenceNumber) {}
 
-  private record PreparedOrder(Offer offer, List<OrderItem.OrderLine> lines) {}
+  private record PreparedOrder(Offer offer, List<OrderRowItem> rows) {}
 
   public static class ReservationPreflightException extends RuntimeException {
     public ReservationPreflightException(String message) {
@@ -129,7 +129,7 @@ public class OrderPhaseProcessor {
     var listingToSkuId = buildListingToSkuMap(new RequestContext(user), newOffers);
     LOGGER.info("built listing-to-sku map with {} entries", listingToSkuId.size());
 
-    var preparedOrders = prepareOrders(newOffers, listingToSkuId);
+    var preparedOrders = prepareOrders(user, newOffers, listingToSkuId);
 
     int advancedCount = 0;
     int voidedCount = 0;
@@ -198,9 +198,9 @@ public class OrderPhaseProcessor {
               fulfillment.buyerAddress(),
               fulfillment.postageOption(),
               offer.totalOfferPrice() != null ? offer.totalOfferPrice().toPlainString() : null,
-              preparedOrder.lines(),
+              preparedOrder.rows().size(),
               clock.now());
-      orderRepository.createReservingOrder(order);
+      orderRepository.createReservingOrder(order, preparedOrder.rows());
       reserveOrderUnits(user, order);
     }
     LOGGER.info("created {} new orders", preparedOrders.size());
@@ -246,7 +246,7 @@ public class OrderPhaseProcessor {
 
   private void releaseVoidingOrder(String user, OrderItem order) throws ServiceException {
     var ctx = new RequestContext(user);
-    for (var line : order.getLines()) {
+    for (var line : orderRepository.findRows(user, order)) {
       for (var sequenceNumber : line.getAllocatedSequenceNumbers()) {
         inventoryService.releaseUnit(
             ctx, new ReleaseUnitRequest(line.getSkuId(), sequenceNumber, order.getOrderId()));
@@ -304,10 +304,10 @@ public class OrderPhaseProcessor {
   }
 
   private List<PreparedOrder> prepareOrders(
-      List<Offer> newOffers, Map<Integer, String> listingToSkuId) {
+      String user, List<Offer> newOffers, Map<Integer, String> listingToSkuId) {
     var preparedOrders = new ArrayList<PreparedOrder>();
     for (var offer : newOffers) {
-      var lines = new ArrayList<OrderItem.OrderLine>();
+      var lines = new ArrayList<OrderRowItem>();
       for (var item : offer.items()) {
         var listingId = item.listing().id();
         var skuId = listingToSkuId.get(listingId);
@@ -324,7 +324,10 @@ public class OrderPhaseProcessor {
               "Offer " + offer.id() + " contains an invalid quantity");
         }
         lines.add(
-            new OrderItem.OrderLine(
+            OrderRowItem.create(
+                user,
+                String.valueOf(offer.id()),
+                lines.size(),
                 skuId,
                 listingId,
                 item.quantity(),
@@ -343,23 +346,23 @@ public class OrderPhaseProcessor {
     if (!"reserving".equals(order.getStatus())) {
       throw new IllegalStateException("order is not reserving");
     }
-    var allocated = allocatedUnits(order);
+    var rows = orderRepository.findRows(user, order);
+    var allocated = allocatedUnits(rows);
     if (allocated.size() != new HashSet<>(allocated).size()) {
       throw new IllegalStateException("order allocation contains a duplicate unit");
     }
     var ctx = new RequestContext(user);
-    for (int lineIndex = 0; lineIndex < order.getLines().size(); lineIndex++) {
-      var line = order.getLines().get(lineIndex);
+    for (var line : rows) {
       for (int unitIndex = line.getAllocatedSequenceNumbers().size();
           unitIndex < line.getQuantity();
           unitIndex++) {
         var operationId =
-            "order:" + order.getOrderId() + ":line:" + lineIndex + ":unit:" + unitIndex;
+            "order:" + order.getOrderId() + ":line:" + line.getPosition() + ":unit:" + unitIndex;
         var result =
             inventoryService.reserveUnit(
                 ctx, new ReserveUnitRequest(operationId, order.getOrderId(), line.getSkuId()));
         orderRepository.recordReservation(
-            user, order.getOrderId(), lineIndex, unitIndex, result.sequenceNumber());
+            user, order.getOrderId(), line.getPosition(), unitIndex, result.sequenceNumber());
         line.getAllocatedSequenceNumbers().add(result.sequenceNumber());
       }
     }
@@ -371,9 +374,9 @@ public class OrderPhaseProcessor {
     order.setStatus(targetState);
   }
 
-  private List<AllocatedUnit> allocatedUnits(OrderItem order) {
+  private List<AllocatedUnit> allocatedUnits(List<OrderRowItem> rows) {
     var result = new ArrayList<AllocatedUnit>();
-    for (var line : order.getLines()) {
+    for (var line : rows) {
       for (var sequenceNumber : line.getAllocatedSequenceNumbers()) {
         result.add(new AllocatedUnit(line.getSkuId(), sequenceNumber));
       }

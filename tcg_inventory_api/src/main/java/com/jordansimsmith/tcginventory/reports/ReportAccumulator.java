@@ -4,7 +4,8 @@ import com.jordansimsmith.tcginventory.inventory.client.Sku;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
-import com.jordansimsmith.tcginventory.orders.OrderLines;
+import com.jordansimsmith.tcginventory.orders.OrderRowItem;
+import com.jordansimsmith.tcginventory.orders.OrderRows;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -127,12 +128,12 @@ public class ReportAccumulator {
     }
   }
 
-  public void addOrder(OrderItem order) {
+  public void addOrder(OrderItem order, List<OrderRowItem> rows) {
     var status = order.getStatus();
     if (!"to_pick".equals(status) && !"fulfilling".equals(status) && !"fulfilled".equals(status)) {
       return;
     }
-    var price = OrderLines.itemsTotal(order.getLines());
+    var price = OrderRows.itemsTotal(rows);
     addRevenue(price);
 
     var month = YearMonth.from(order.getCreatedAt().atZone(AUCKLAND));

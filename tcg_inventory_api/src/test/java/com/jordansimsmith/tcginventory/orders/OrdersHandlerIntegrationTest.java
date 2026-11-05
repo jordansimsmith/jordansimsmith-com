@@ -322,10 +322,10 @@ public class OrdersHandlerIntegrationTest {
 
     var lines =
         List.of(
-            new OrderItem.OrderLine(skuId1, 1001, 1, "1.50", "2.00", List.of(1)),
-            new OrderItem.OrderLine(skuId2, 1002, 1, "2.00", "1.80", List.of(3)));
+            new OrderRowItem(skuId1, 1001, 1, "1.50", "2.00", List.of(1)),
+            new OrderRowItem(skuId2, 1002, 1, "2.00", "1.80", List.of(3)));
     var order =
-        OrderItem.create(
+        createOrderItem(
             "jordan",
             "83663",
             "to_pick",
@@ -383,10 +383,10 @@ public class OrdersHandlerIntegrationTest {
     createUnit("jordan", pokemonSkuId, 20, "in_stock", null);
     var lines =
         List.of(
-            new OrderItem.OrderLine(magicSkuId, 1001, 1, "2.00", "2.00", List.of(10)),
-            new OrderItem.OrderLine(pokemonSkuId, 283917, 1, "12.00", "10.00", List.of(10)));
+            new OrderRowItem(magicSkuId, 1001, 1, "2.00", "2.00", List.of(10)),
+            new OrderRowItem(pokemonSkuId, 283917, 1, "12.00", "10.00", List.of(10)));
     orderTable.putItem(
-        OrderItem.create(
+        createOrderItem(
             "jordan",
             "83664",
             "to_pick",
@@ -481,7 +481,7 @@ public class OrdersHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     var order =
-        OrderItem.create(
+        createOrderItem(
             "jordan",
             "91329",
             "to_pick",
@@ -812,7 +812,7 @@ public class OrdersHandlerIntegrationTest {
   void confirmOrderShouldSellLargeOrderAcrossTransactions() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var lines = new ArrayList<OrderItem.OrderLine>();
+    var lines = new ArrayList<OrderRowItem>();
     var skuId = "mtg#scryfall#scryfall-1#normal#NM";
     var sequenceNumbers = new ArrayList<Integer>();
     for (int i = 1; i <= 101; i++) {
@@ -821,10 +821,9 @@ public class OrdersHandlerIntegrationTest {
     createSkuWithUnits("jordan", skuId, sequenceNumbers.size());
     reserveUnits("jordan", skuId, "83663", sequenceNumbers);
     lines.add(
-        new OrderItem.OrderLine(
-            skuId, 1001, sequenceNumbers.size(), "50.50", "0.50", sequenceNumbers));
+        new OrderRowItem(skuId, 1001, sequenceNumbers.size(), "50.50", "0.50", sequenceNumbers));
     var order =
-        OrderItem.create(
+        createOrderItem(
             "jordan",
             "83663",
             "to_pick",
@@ -938,7 +937,12 @@ public class OrdersHandlerIntegrationTest {
     createOrderWithLines(
         "jordan", "83663", "fulfilling", skuId, List.of(1, 2), "PICKUP", "3.00", "3.00", null);
     var orderRepository =
-        new OrderRepository(orderTable, jobTable, factory.dynamoDbClient(), fakeClock);
+        new OrderRepository(
+            orderTable,
+            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class),
+            jobTable,
+            factory.dynamoDbClient(),
+            fakeClock);
     var actualInventoryService = factory.inventoryService();
     var inventoryService = mock(InventoryService.class);
     var callCount = new AtomicInteger();
@@ -988,7 +992,7 @@ public class OrdersHandlerIntegrationTest {
     createSkuWithUnits("jordan", skuId, 1);
     reserveUnits("jordan", skuId, "83663", List.of(1));
     var order =
-        OrderItem.create(
+        createOrderItem(
             "jordan",
             "83663",
             "to_pick",
@@ -999,7 +1003,7 @@ public class OrdersHandlerIntegrationTest {
             null,
             null,
             "3.00",
-            List.of(new OrderItem.OrderLine(skuId, 1001, 2, "3.00", null, List.of(1, 1))),
+            List.of(new OrderRowItem(skuId, 1001, 2, "3.00", null, List.of(1, 1))),
             Instant.ofEpochSecond(1700000000));
     orderTable.putItem(order);
     var jobIdsBefore = jobTable.scan().items().stream().map(JobItem::getJobId).toList();
@@ -1097,7 +1101,7 @@ public class OrdersHandlerIntegrationTest {
   private void createOrder(
       String user, String offerId, String status, String deliveryMode, String totalPrice) {
     var order =
-        OrderItem.create(
+        createOrderItem(
             user,
             offerId,
             status,
@@ -1182,10 +1186,10 @@ public class OrdersHandlerIntegrationTest {
       String listedPrice) {
     var lines =
         List.of(
-            new OrderItem.OrderLine(
+            new OrderRowItem(
                 skuId, 1001, sequenceNumbers.size(), linePrice, listedPrice, sequenceNumbers));
     var order =
-        OrderItem.create(
+        createOrderItem(
             user,
             offerId,
             status,
@@ -1316,5 +1320,48 @@ public class OrdersHandlerIntegrationTest {
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
+  }
+
+  private OrderItem createOrderItem(
+      String user,
+      String orderId,
+      String status,
+      String providerStatus,
+      String action,
+      String delivery,
+      String buyer,
+      OrderItem.BuyerAddress address,
+      String postage,
+      String total,
+      List<OrderRowItem> lines,
+      Instant createdAt) {
+    var table = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class);
+    for (int position = 0; position < lines.size(); position++) {
+      var line = lines.get(position);
+      table.putItem(
+          OrderRowItem.create(
+              user,
+              orderId,
+              position,
+              line.getSkuId(),
+              line.getFetchtcgListingId(),
+              line.getQuantity(),
+              line.getPrice(),
+              line.getListedPrice(),
+              line.getAllocatedSequenceNumbers()));
+    }
+    return OrderItem.create(
+        user,
+        orderId,
+        status,
+        providerStatus,
+        action,
+        delivery,
+        buyer,
+        address,
+        postage,
+        total,
+        lines.size(),
+        createdAt);
   }
 }

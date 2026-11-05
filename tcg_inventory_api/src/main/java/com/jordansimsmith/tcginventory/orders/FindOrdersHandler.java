@@ -44,6 +44,7 @@ public class FindOrdersHandler
   private final RequestContextFactory requestContextFactory;
   private final HttpResponseFactory httpResponseFactory;
   private final DynamoDbTable<OrderItem> orderTable;
+  private final OrderRepository orderRepository;
   private final ObjectMapper objectMapper;
 
   public FindOrdersHandler() {
@@ -55,6 +56,13 @@ public class FindOrdersHandler
     this.requestContextFactory = factory.requestContextFactory();
     this.httpResponseFactory = factory.httpResponseFactory();
     this.orderTable = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderItem.class);
+    this.orderRepository =
+        new OrderRepository(
+            orderTable,
+            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class),
+            factory.jobTable(),
+            factory.dynamoDbClient(),
+            factory.clock());
     this.objectMapper = factory.objectMapper();
   }
 
@@ -106,7 +114,7 @@ public class FindOrdersHandler
         page.items().stream()
             .map(
                 item -> {
-                  var orderLines = item.getLines();
+                  var orderLines = orderRepository.findRows(user, item);
                   var unitCount = 0;
                   for (var line : orderLines) {
                     unitCount += line.getQuantity();
@@ -117,8 +125,8 @@ public class FindOrdersHandler
                       item.getCreatedAt() != null ? item.getCreatedAt().getEpochSecond() : 0,
                       item.getDeliveryMode(),
                       item.getTotalPrice(),
-                      OrderLines.itemsTotalPrice(orderLines),
-                      OrderLines.listedTotalPrice(orderLines),
+                      OrderRows.itemsTotalPrice(orderLines),
+                      OrderRows.listedTotalPrice(orderLines),
                       unitCount);
                 })
             .toList();

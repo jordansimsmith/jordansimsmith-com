@@ -61,7 +61,12 @@ public class ConfirmOrderHandler
     this.ulidGenerator = factory.ulidGenerator();
     this.inventoryService = factory.inventoryService();
     this.orderRepository =
-        new OrderRepository(this.orderTable, jobTable, factory.dynamoDbClient(), this.clock);
+        new OrderRepository(
+            this.orderTable,
+            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class),
+            jobTable,
+            factory.dynamoDbClient(),
+            this.clock);
   }
 
   @Override
@@ -112,7 +117,8 @@ public class ConfirmOrderHandler
       return httpResponseFactory.conflict(new ErrorResponse("another job is in progress"));
     }
 
-    for (var line : orderItem.getLines()) {
+    var rows = orderRepository.findRows(user, orderItem);
+    for (var line : rows) {
       for (var sequenceNumber : line.getAllocatedSequenceNumbers()) {
         var unit =
             inventoryService
@@ -127,7 +133,7 @@ public class ConfirmOrderHandler
     var job =
         JobItem.create(
             user, ulidGenerator.generate(), "order_fulfillment", null, orderId, clock.now());
-    orderRepository.startFulfilling(user, orderItem, job);
+    orderRepository.startFulfilling(user, orderItem, rows, job);
     var message = new JobMessage(user, job.getJobId(), "order_fulfillment");
     jobsQueue.send(message, user, message.deduplicationId(0));
     return httpResponseFactory.accepted(new ConfirmOrderResponse(orderId, "fulfilling"));

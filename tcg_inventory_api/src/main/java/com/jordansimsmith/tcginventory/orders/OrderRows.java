@@ -4,8 +4,8 @@ import java.math.BigDecimal;
 import java.util.List;
 import javax.annotation.Nullable;
 
-public class OrderLines {
-  public static BigDecimal itemsTotal(List<OrderItem.OrderLine> lines) {
+public class OrderRows {
+  public static BigDecimal itemsTotal(List<OrderRowItem> lines) {
     var total = BigDecimal.ZERO;
     for (var line : lines) {
       if (line.getPrice() != null) {
@@ -16,7 +16,7 @@ public class OrderLines {
   }
 
   @Nullable
-  public static String itemsTotalPrice(List<OrderItem.OrderLine> lines) {
+  public static String itemsTotalPrice(List<OrderRowItem> lines) {
     if (lines.isEmpty()) {
       return null;
     }
@@ -24,7 +24,7 @@ public class OrderLines {
   }
 
   @Nullable
-  public static String listedTotalPrice(List<OrderItem.OrderLine> lines) {
+  public static String listedTotalPrice(List<OrderRowItem> lines) {
     if (lines.isEmpty()) {
       return null;
     }

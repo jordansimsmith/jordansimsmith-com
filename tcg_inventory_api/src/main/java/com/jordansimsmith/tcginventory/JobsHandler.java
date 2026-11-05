@@ -18,6 +18,7 @@ import com.jordansimsmith.tcginventory.orders.OrderFulfillmentJobProcessor;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.tcginventory.orders.OrderPhaseProcessor;
 import com.jordansimsmith.tcginventory.orders.OrderRepository;
+import com.jordansimsmith.tcginventory.orders.OrderRowItem;
 import com.jordansimsmith.tcginventory.pricing.RepriceJobProcessor;
 import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
 import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
@@ -69,7 +70,12 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     var publishClock = factory.clock();
     var orderTable = TcgInventoryTable.table(enhancedClient, OrderItem.class);
     var orderRepository =
-        new OrderRepository(orderTable, factory.jobTable(), publishDynamoDbClient, publishClock);
+        new OrderRepository(
+            orderTable,
+            TcgInventoryTable.table(enhancedClient, OrderRowItem.class),
+            factory.jobTable(),
+            publishDynamoDbClient,
+            publishClock);
     var orderPhaseProcessor =
         new OrderPhaseProcessor(
             orderTable,
@@ -87,6 +93,7 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             TcgInventoryTable.table(enhancedClient, ReportItem.class),
             factory.auditTable(),
             orderTable,
+            orderRepository,
             factory.objectMapper(),
             factory.clock(),
             factory.gamesService(),

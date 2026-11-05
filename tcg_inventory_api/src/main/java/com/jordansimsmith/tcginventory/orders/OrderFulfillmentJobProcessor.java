@@ -53,12 +53,13 @@ public class OrderFulfillmentJobProcessor implements JobProcessor {
     if (!"fulfilling".equals(order.getStatus())) {
       throw new IllegalStateException("order is not fulfilling");
     }
-    if (order.getLines().isEmpty()) {
+    var rows = orderRepository.findRows(user, order);
+    if (rows.isEmpty()) {
       throw new IllegalStateException("order has no lines to fulfill");
     }
 
     var allocated = new ArrayList<AllocatedUnit>();
-    for (var line : order.getLines()) {
+    for (var line : rows) {
       if (line.getQuantity() <= 0
           || line.getAllocatedSequenceNumbers().size() != line.getQuantity()) {
         throw new IllegalStateException("order line is not fully allocated");

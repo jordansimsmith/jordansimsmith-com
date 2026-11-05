@@ -2,7 +2,6 @@ package com.jordansimsmith.tcginventory.orders;
 
 import com.jordansimsmith.dynamodb.EpochSecondConverter;
 import java.time.Instant;
-import java.util.List;
 import java.util.Locale;
 import java.util.Objects;
 import javax.annotation.Nullable;
@@ -28,7 +27,7 @@ public class OrderItem {
   public static final String BUYER_ADDRESS = "buyer_address";
   public static final String POSTAGE_OPTION = "postage_option";
   public static final String TOTAL_PRICE = "total_price";
-  public static final String LINES = "lines";
+  public static final String ROW_COUNT = "row_count";
   public static final String CREATED_AT = "created_at";
   public static final String UPDATED_AT = "updated_at";
 
@@ -43,7 +42,7 @@ public class OrderItem {
   private BuyerAddress buyerAddress;
   private String postageOption;
   private String totalPrice;
-  private List<OrderLine> lines;
+  private Integer rowCount;
   private Instant createdAt;
   private Instant updatedAt;
 
@@ -148,13 +147,13 @@ public class OrderItem {
     this.totalPrice = totalPrice;
   }
 
-  @DynamoDbAttribute(LINES)
-  public List<OrderLine> getLines() {
-    return lines;
+  @DynamoDbAttribute(ROW_COUNT)
+  public Integer getRowCount() {
+    return rowCount;
   }
 
-  public void setLines(List<OrderLine> lines) {
-    this.lines = lines;
+  public void setRowCount(Integer rowCount) {
+    this.rowCount = rowCount;
   }
 
   @DynamoDbConvertedBy(EpochSecondConverter.class)
@@ -199,7 +198,7 @@ public class OrderItem {
       @Nullable BuyerAddress buyerAddress,
       @Nullable String postageOption,
       @Nullable String totalPrice,
-      List<OrderLine> lines,
+      int rowCount,
       Instant createdAt) {
     var item = new OrderItem();
     item.setPk(formatPk(user));
@@ -213,100 +212,10 @@ public class OrderItem {
     item.setBuyerAddress(buyerAddress);
     item.setPostageOption(postageOption);
     item.setTotalPrice(totalPrice);
-    item.setLines(lines);
+    item.setRowCount(rowCount);
     item.setCreatedAt(createdAt);
     item.setUpdatedAt(createdAt);
     return item;
-  }
-
-  @DynamoDbBean
-  public static class OrderLine {
-    public static final String SKU_ID = "sku_id";
-    public static final String FETCHTCG_LISTING_ID = "fetchtcg_listing_id";
-    public static final String QUANTITY = "quantity";
-    public static final String PRICE = "price";
-    public static final String LISTED_PRICE = "listed_price";
-    public static final String ALLOCATED_SEQUENCE_NUMBERS = "allocated_sequence_numbers";
-
-    private String skuId;
-    private int fetchtcgListingId;
-    private int quantity;
-    private String price;
-    private String listedPrice;
-    private List<Integer> allocatedSequenceNumbers;
-
-    public OrderLine() {}
-
-    public OrderLine(
-        String skuId,
-        int fetchtcgListingId,
-        int quantity,
-        @Nullable String price,
-        @Nullable String listedPrice,
-        List<Integer> allocatedSequenceNumbers) {
-      this.skuId = skuId;
-      this.fetchtcgListingId = fetchtcgListingId;
-      this.quantity = quantity;
-      this.price = price;
-      this.listedPrice = listedPrice;
-      this.allocatedSequenceNumbers = allocatedSequenceNumbers;
-    }
-
-    @DynamoDbAttribute(SKU_ID)
-    public String getSkuId() {
-      return skuId;
-    }
-
-    public void setSkuId(String skuId) {
-      this.skuId = skuId;
-    }
-
-    @DynamoDbAttribute(FETCHTCG_LISTING_ID)
-    public int getFetchtcgListingId() {
-      return fetchtcgListingId;
-    }
-
-    public void setFetchtcgListingId(int fetchtcgListingId) {
-      this.fetchtcgListingId = fetchtcgListingId;
-    }
-
-    @DynamoDbAttribute(QUANTITY)
-    public int getQuantity() {
-      return quantity;
-    }
-
-    public void setQuantity(int quantity) {
-      this.quantity = quantity;
-    }
-
-    @Nullable
-    @DynamoDbAttribute(PRICE)
-    public String getPrice() {
-      return price;
-    }
-
-    public void setPrice(@Nullable String price) {
-      this.price = price;
-    }
-
-    @Nullable
-    @DynamoDbAttribute(LISTED_PRICE)
-    public String getListedPrice() {
-      return listedPrice;
-    }
-
-    public void setListedPrice(@Nullable String listedPrice) {
-      this.listedPrice = listedPrice;
-    }
-
-    @DynamoDbAttribute(ALLOCATED_SEQUENCE_NUMBERS)
-    public List<Integer> getAllocatedSequenceNumbers() {
-      return allocatedSequenceNumbers;
-    }
-
-    public void setAllocatedSequenceNumbers(List<Integer> allocatedSequenceNumbers) {
-      this.allocatedSequenceNumbers = allocatedSequenceNumbers;
-    }
   }
 
   @DynamoDbBean
