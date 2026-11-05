@@ -109,7 +109,8 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             TcgInventoryTable.table(enhancedClient, ImportRowItem.class),
             new ImportsRepository(factory.dynamoDbClient(), factory.jobTable()),
             factory.inventoryService());
-    this.orderFulfillmentJobProcessor = new OrderFulfillmentJobProcessor(factory);
+    this.orderFulfillmentJobProcessor =
+        new OrderFulfillmentJobProcessor(orderTable, factory.inventoryService(), orderRepository);
     this.repriceJobProcessor =
         new RepriceJobProcessor(
             factory.inventoryService(), factory.pricingService(), factory.gamesService());

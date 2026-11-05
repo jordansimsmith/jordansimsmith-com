@@ -2,6 +2,9 @@ package com.jordansimsmith.tcginventory.orders;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.mock;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.amazonaws.services.lambda.runtime.events.SQSEvent;
@@ -9,13 +12,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.queue.FakeQueueClient;
+import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.AuditItem;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.JobsHandler;
+import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.SellUnitRequest;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.nio.charset.StandardCharsets;
@@ -24,6 +31,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -33,7 +41,7 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
-import software.amazon.awssdk.services.dynamodb.model.TransactionCanceledException;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 
 @Testcontainers
 public class OrdersHandlerIntegrationTest {
@@ -764,7 +772,17 @@ public class OrdersHandlerIntegrationTest {
     var audit = getAuditEntries("jordan");
     var sellAudits = audit.stream().filter(a -> "sell".equals(a.getEventType())).toList();
     assertThat(sellAudits).hasSize(2);
-    assertThat(sellAudits).allSatisfy(a -> assertThat(a.getOrderId()).isEqualTo("83663"));
+    var rawSellAudits =
+        getRawAuditEntries("jordan").stream()
+            .filter(a -> "sell".equals(a.get("event_type").s()))
+            .toList();
+    assertThat(rawSellAudits).hasSize(2);
+    assertThat(rawSellAudits)
+        .allSatisfy(
+            a -> {
+              assertThat(a.get("reservation_id").s()).isEqualTo("83663");
+              assertThat(a).doesNotContainKey("order_id");
+            });
     assertThat(getJobItem("jordan", job.getJobId()).getStatus()).isEqualTo("succeeded");
 
     // arrange - the completion transaction committed before the job acknowledgement
@@ -795,12 +813,16 @@ public class OrdersHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     var lines = new ArrayList<OrderItem.OrderLine>();
-    for (int i = 1; i <= 60; i++) {
-      var skuId = "mtg#scryfall#scryfall-" + i + "#normal#NM";
-      createSkuWithUnits("jordan", skuId, 1);
-      reserveUnits("jordan", skuId, "83663", List.of(1));
-      lines.add(new OrderItem.OrderLine(skuId, 1000 + i, 1, "0.50", "0.50", List.of(1)));
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    var sequenceNumbers = new ArrayList<Integer>();
+    for (int i = 1; i <= 101; i++) {
+      sequenceNumbers.add(i);
     }
+    createSkuWithUnits("jordan", skuId, sequenceNumbers.size());
+    reserveUnits("jordan", skuId, "83663", sequenceNumbers);
+    lines.add(
+        new OrderItem.OrderLine(
+            skuId, 1001, sequenceNumbers.size(), "50.50", "0.50", sequenceNumbers));
     var order =
         OrderItem.create(
             "jordan",
@@ -829,15 +851,13 @@ public class OrdersHandlerIntegrationTest {
     var updatedOrder = getOrderItem("jordan", "83663");
     assertThat(updatedOrder.getStatus()).isEqualTo("fulfilled");
 
-    for (int i = 1; i <= 60; i++) {
-      var units = getUnits("jordan", "mtg#scryfall#scryfall-" + i + "#normal#NM");
-      assertThat(units).hasSize(1);
-      assertThat(units.get(0).getStatus()).isEqualTo("sold");
-    }
+    var units = getUnits("jordan", skuId);
+    assertThat(units).hasSize(101);
+    assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("sold"));
 
     var sellAudits =
         getAuditEntries("jordan").stream().filter(a -> "sell".equals(a.getEventType())).toList();
-    assertThat(sellAudits).hasSize(60);
+    assertThat(sellAudits).hasSize(101);
   }
 
   @Test
@@ -872,7 +892,7 @@ public class OrdersHandlerIntegrationTest {
   }
 
   @Test
-  void fulfillmentShouldResumeAfterOneSaleAndRejectForeignOwner() {
+  void fulfillmentShouldFailWhenAUnitHasAnotherReservationOwner() {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     var skuId = "mtg#scryfall#scryfall-1#normal#NM";
@@ -893,33 +913,71 @@ public class OrdersHandlerIntegrationTest {
     unitTable.putItem(secondUnit);
 
     // act - first delivery sells unit 1, then rejects unit 2 because its owner changed
-    assertThatThrownBy(
-            () ->
-                new JobsHandler(factory)
-                    .handleRequest(buildSqsEvent("jordan", job.getJobId()), null))
-        .isInstanceOf(TransactionCanceledException.class);
+    new JobsHandler(factory).handleRequest(buildSqsEvent("jordan", job.getJobId()), null);
 
     // assert
     assertThat(getOrderItem("jordan", "83663").getStatus()).isEqualTo("fulfilling");
     assertThat(getUnits("jordan", skuId).stream().filter(u -> "sold".equals(u.getStatus())))
         .hasSize(1);
-    assertThat(getJobItem("jordan", job.getJobId()).getStatus()).isEqualTo("running");
-
-    // arrange - repair the saved unit owner
-    secondUnit.setReservationId("83663");
-    unitTable.putItem(secondUnit);
-
-    // act - replay walks the fixed allocation and skips the earlier sale
-    new JobsHandler(factory).handleRequest(buildSqsEvent("jordan", job.getJobId()), null);
-
-    // assert
-    assertThat(getOrderItem("jordan", "83663").getStatus()).isEqualTo("fulfilled");
-    assertThat(getJobItem("jordan", job.getJobId()).getStatus()).isEqualTo("succeeded");
+    assertThat(getJobItem("jordan", job.getJobId()).getStatus()).isEqualTo("failed");
+    assertThat(getJobItem("jordan", job.getJobId()).getError())
+        .isEqualTo("unit is not reserved for this reservation");
     var sellAudits =
         getAuditEntries("jordan").stream().filter(a -> "sell".equals(a.getEventType())).toList();
-    assertThat(sellAudits).hasSize(2);
-    assertThat(sellAudits).extracting(AuditItem::getSequenceNumber).containsExactlyInAnyOrder(1, 2);
-    assertThat(getSkuItem("jordan", skuId).getVersion()).isEqualTo(3);
+    assertThat(sellAudits).hasSize(1);
+    assertThat(getSkuItem("jordan", skuId).getVersion()).isEqualTo(2);
+  }
+
+  @Test
+  void fulfillmentShouldResumeAfterACommittedSaleAndRuntimeFailure() throws Exception {
+    // arrange
+    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
+    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
+    createSkuWithUnits("jordan", skuId, 2);
+    reserveUnits("jordan", skuId, "83663", List.of(1, 2));
+    createOrderWithLines(
+        "jordan", "83663", "fulfilling", skuId, List.of(1, 2), "PICKUP", "3.00", "3.00", null);
+    var orderRepository =
+        new OrderRepository(orderTable, jobTable, factory.dynamoDbClient(), fakeClock);
+    var actualInventoryService = factory.inventoryService();
+    var inventoryService = mock(InventoryService.class);
+    var callCount = new AtomicInteger();
+    doAnswer(
+            invocation -> {
+              var ctx = invocation.getArgument(0, RequestContext.class);
+              var request = invocation.getArgument(1, SellUnitRequest.class);
+              var response = actualInventoryService.sellUnit(ctx, request);
+              if (callCount.incrementAndGet() == 2) {
+                throw new RuntimeException("lost response after sale committed");
+              }
+              return response;
+            })
+        .when(inventoryService)
+        .sellUnit(any(), any());
+    var processor = new OrderFulfillmentJobProcessor(orderTable, inventoryService, orderRepository);
+    var job =
+        JobItem.create(
+            "jordan", "fulfillment-retry", "order_fulfillment", null, "83663", Instant.EPOCH);
+
+    // act - the second sale commits, then its response is lost
+    assertThatThrownBy(() -> processor.processBatch("jordan", job))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessage("lost response after sale committed");
+
+    // assert - retry uses Inventory's lifecycle evidence for both completed sales
+    assertThat(getOrderItem("jordan", "83663").getStatus()).isEqualTo("fulfilling");
+    assertThat(getUnits("jordan", skuId))
+        .allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("sold"));
+    assertThat(getAuditEntries("jordan").stream().filter(a -> "sell".equals(a.getEventType())))
+        .hasSize(2);
+    var versionAfterSales = getSkuItem("jordan", skuId).getVersion();
+
+    processor.processBatch("jordan", job);
+
+    assertThat(getOrderItem("jordan", "83663").getStatus()).isEqualTo("fulfilled");
+    assertThat(getSkuItem("jordan", skuId).getVersion()).isEqualTo(versionAfterSales);
+    assertThat(getAuditEntries("jordan").stream().filter(a -> "sell".equals(a.getEventType())))
+        .hasSize(2);
   }
 
   @Test
@@ -1199,6 +1257,20 @@ public class OrdersHandlerIntegrationTest {
             .build();
     auditTable.query(request).items().forEach(results::add);
     return results;
+  }
+
+  private List<Map<String, AttributeValue>> getRawAuditEntries(String user) {
+    return factory
+        .dynamoDbClient()
+        .query(
+            request ->
+                request
+                    .tableName(TcgInventoryTable.TABLE_NAME)
+                    .keyConditionExpression("pk = :pk")
+                    .expressionAttributeValues(
+                        Map.of(
+                            ":pk", AttributeValue.builder().s(AuditItem.formatPk(user)).build())))
+        .items();
   }
 
   private APIGatewayV2HTTPEvent buildEvent(String user) {

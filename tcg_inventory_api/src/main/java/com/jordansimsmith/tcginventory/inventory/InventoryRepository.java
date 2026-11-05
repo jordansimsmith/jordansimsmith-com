@@ -129,59 +129,6 @@ public class InventoryRepository {
             .build());
   }
 
-  public void updateUnitForSale(String user, String orderId, String skuId, int sequenceNumber) {
-    var unit = getUnit(user, skuId, sequenceNumber);
-    if (unit != null
-        && "sold".equals(unit.getStatus())
-        && orderId.equals(unit.getReservationId())) {
-      return;
-    }
-
-    var sellUnit =
-        TransactWriteItem.builder()
-            .update(
-                Update.builder()
-                    .tableName(TcgInventoryTable.TABLE_NAME)
-                    .key(
-                        Map.of(
-                            UnitItem.PK,
-                            AttributeValue.builder().s(SkuItem.formatPk(user, skuId)).build(),
-                            UnitItem.SK,
-                            AttributeValue.builder().s(UnitItem.formatSk(sequenceNumber)).build()))
-                    .updateExpression("SET #status = :sold, " + UnitItem.UPDATED_AT + " = :now")
-                    .conditionExpression(
-                        "#status = :reserved AND " + UnitItem.RESERVATION_ID + " = :orderId")
-                    .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
-                    .expressionAttributeValues(
-                        Map.of(
-                            ":sold", AttributeValue.builder().s("sold").build(),
-                            ":reserved", AttributeValue.builder().s("reserved").build(),
-                            ":orderId", AttributeValue.builder().s(orderId).build(),
-                            ":now",
-                                AttributeValue.builder()
-                                    .n(String.valueOf(clock.now().getEpochSecond()))
-                                    .build()))
-                    .build())
-            .build();
-
-    dynamoDbClient.transactWriteItems(
-        TransactWriteItemsRequest.builder()
-            .transactItems(
-                sellUnit,
-                buildSkuVersionBump(user, skuId),
-                buildAuditPut(
-                    user,
-                    "sell",
-                    Map.of(
-                        AuditItem.ORDER_ID, AttributeValue.builder().s(orderId).build(),
-                        AuditItem.SKU_ID, AttributeValue.builder().s(skuId).build(),
-                        AuditItem.SEQUENCE_NUMBER,
-                            AttributeValue.builder().n(String.valueOf(sequenceNumber)).build(),
-                        AuditItem.BEFORE_STATUS, AttributeValue.builder().s("reserved").build(),
-                        AuditItem.AFTER_STATUS, AttributeValue.builder().s("sold").build())))
-            .build());
-  }
-
   public TransactWriteItem buildUnitDelete(String user, String skuId, int sequenceNumber) {
     var skuPk = SkuItem.formatPk(user, skuId);
     var unitSk = UnitItem.formatSk(sequenceNumber);
@@ -238,25 +185,6 @@ public class InventoryRepository {
                         ":one", AttributeValue.builder().n("1").build(),
                         ":dirty", AttributeValue.builder().bool(true).build(),
                         ":gsi1pk", AttributeValue.builder().s(SkuItem.formatGsi1pk(user)).build()))
-                .build())
-        .build();
-  }
-
-  public TransactWriteItem buildSkuVersionBump(String user, String skuId) {
-    var skuPk = SkuItem.formatPk(user, skuId);
-
-    return TransactWriteItem.builder()
-        .update(
-            Update.builder()
-                .tableName(TcgInventoryTable.TABLE_NAME)
-                .key(
-                    Map.of(
-                        SkuItem.PK, AttributeValue.builder().s(skuPk).build(),
-                        SkuItem.SK, AttributeValue.builder().s(SkuItem.formatSk()).build()))
-                .updateExpression("ADD " + SkuItem.VERSION + " :one")
-                .conditionExpression(
-                    "attribute_exists(" + SkuItem.PK + ") AND attribute_exists(" + SkuItem.SK + ")")
-                .expressionAttributeValues(Map.of(":one", AttributeValue.builder().n("1").build()))
                 .build())
         .build();
   }

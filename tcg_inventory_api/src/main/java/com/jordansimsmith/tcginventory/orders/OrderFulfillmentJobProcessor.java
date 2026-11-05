@@ -1,11 +1,11 @@
 package com.jordansimsmith.tcginventory.orders;
 
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobProcessor;
-import com.jordansimsmith.tcginventory.TcgInventoryFactory;
-import com.jordansimsmith.tcginventory.TcgInventoryTable;
-import com.jordansimsmith.tcginventory.inventory.InventoryRepository;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.SellUnitRequest;
 import java.util.ArrayList;
 import java.util.HashSet;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
@@ -15,25 +15,20 @@ public class OrderFulfillmentJobProcessor implements JobProcessor {
   private record AllocatedUnit(String skuId, int sequenceNumber) {}
 
   private final DynamoDbTable<OrderItem> orderTable;
-  private final InventoryRepository inventoryRepository;
+  private final InventoryService inventoryService;
   private final OrderRepository orderRepository;
 
-  public OrderFulfillmentJobProcessor(TcgInventoryFactory factory) {
-    var enhancedClient = factory.dynamoDbEnhancedClient();
-    this.orderTable = TcgInventoryTable.table(enhancedClient, OrderItem.class);
-    this.inventoryRepository =
-        new InventoryRepository(
-            TcgInventoryTable.table(enhancedClient, UnitItem.class),
-            factory.dynamoDbClient(),
-            factory.clock(),
-            factory.ulidGenerator());
-    this.orderRepository =
-        new OrderRepository(
-            orderTable, factory.jobTable(), factory.dynamoDbClient(), factory.clock());
+  public OrderFulfillmentJobProcessor(
+      DynamoDbTable<OrderItem> orderTable,
+      InventoryService inventoryService,
+      OrderRepository orderRepository) {
+    this.orderTable = orderTable;
+    this.inventoryService = inventoryService;
+    this.orderRepository = orderRepository;
   }
 
   @Override
-  public SuccessJobResult processBatch(String user, JobItem job) {
+  public SuccessJobResult processBatch(String user, JobItem job) throws ServiceException {
     var orderId = job.getOrderId();
     if (orderId == null) {
       throw new IllegalStateException("order fulfillment job is missing order_id");
@@ -76,8 +71,10 @@ public class OrderFulfillmentJobProcessor implements JobProcessor {
       throw new IllegalStateException("order allocation contains a duplicate unit");
     }
 
+    var ctx = new RequestContext(user);
     for (var unit : allocated) {
-      inventoryRepository.updateUnitForSale(user, orderId, unit.skuId(), unit.sequenceNumber());
+      inventoryService.sellUnit(
+          ctx, new SellUnitRequest(unit.skuId(), unit.sequenceNumber(), orderId));
     }
     orderRepository.finishFulfilling(user, orderId);
     return new SuccessJobResult(allocated.size(), null);
