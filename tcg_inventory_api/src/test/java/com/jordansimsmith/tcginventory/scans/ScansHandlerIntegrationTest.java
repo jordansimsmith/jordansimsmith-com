@@ -21,8 +21,6 @@ import com.jordansimsmith.tcginventory.catalog.CatalogException;
 import com.jordansimsmith.tcginventory.catalog.FakeCardCatalogs;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.io.IOException;
@@ -195,7 +193,7 @@ public class ScansHandlerIntegrationTest {
     var scanItem =
         scanTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(ScanItem.formatPk("jordan"))
                 .sortValue(ScanItem.formatSk(scanId))
                 .build());
     assertThat(scanItem).isNotNull();
@@ -399,7 +397,7 @@ public class ScansHandlerIntegrationTest {
     var scanItem =
         scanTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(ScanItem.formatPk("jordan"))
                 .sortValue(ScanItem.formatSk(scanId))
                 .build());
     assertThat(scanItem.getStatus()).isEqualTo("identifying");
@@ -481,7 +479,7 @@ public class ScansHandlerIntegrationTest {
     var scanId = createScan("alice", "001.jpg", 5);
     scanTable.deleteItem(
         Key.builder()
-            .partitionValue(SkuItem.formatUserPk("alice"))
+            .partitionValue(ScanItem.formatPk("alice"))
             .sortValue(ScanItem.formatSk(scanId))
             .build());
 
@@ -911,13 +909,13 @@ public class ScansHandlerIntegrationTest {
                             .tableName(TcgInventoryTable.TABLE_NAME)
                             .key(
                                 Map.of(
-                                    SkuItem.PK,
+                                    ScanRowItem.PK,
                                     AttributeValue.builder().s(row.getPk()).build(),
-                                    SkuItem.SK,
+                                    ScanRowItem.SK,
                                     AttributeValue.builder().s(row.getSk()).build()))
                             .updateExpression("SET #status = :suggested")
                             .conditionExpression("attribute_exists(pk)")
-                            .expressionAttributeNames(Map.of("#status", UnitItem.STATUS))
+                            .expressionAttributeNames(Map.of("#status", ScanRowItem.STATUS))
                             .expressionAttributeValues(
                                 Map.of(
                                     ":suggested", AttributeValue.builder().s("suggested").build()))
@@ -996,7 +994,7 @@ public class ScansHandlerIntegrationTest {
     var importItem =
         importTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk(user))
+                .partitionValue(ImportItem.formatPk(user))
                 .sortValue(ImportItem.formatSk(importId))
                 .build());
     assertThat(importItem).isNotNull();
@@ -1040,7 +1038,7 @@ public class ScansHandlerIntegrationTest {
     var jobItem =
         jobTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk(user))
+                .partitionValue(JobItem.formatPk(user))
                 .sortValue(JobItem.formatSk(importItem.getJobId()))
                 .build());
     assertThat(jobItem).isNotNull();
@@ -1258,7 +1256,7 @@ public class ScansHandlerIntegrationTest {
                         .queryConditional(
                             QueryConditional.sortBeginsWith(
                                 Key.builder()
-                                    .partitionValue(SkuItem.formatUserPk("jordan"))
+                                    .partitionValue(ImportItem.formatPk("jordan"))
                                     .sortValue(ImportItem.IMPORT_PREFIX)
                                     .build()))
                         .build())
@@ -1285,7 +1283,7 @@ public class ScansHandlerIntegrationTest {
                     .queryConditional(
                         QueryConditional.sortBeginsWith(
                             Key.builder()
-                                .partitionValue(SkuItem.formatUserPk(user))
+                                .partitionValue(ImportItem.formatPk(user))
                                 .sortValue(ImportItem.IMPORT_PREFIX)
                                 .build()))
                     .build())
@@ -1294,7 +1292,7 @@ public class ScansHandlerIntegrationTest {
             .toList();
     assertThat(imports).isEmpty();
     assertThat(importRowTable.scan().items())
-        .noneMatch(row -> row.getPk().startsWith(SkuItem.formatUserPk(user) + "#IMPORT#"));
+        .noneMatch(row -> row.getPk().startsWith(ScanItem.formatPk(user) + "#IMPORT#"));
   }
 
   private String confirmationRequest(String... rowValues) {
@@ -1351,7 +1349,7 @@ public class ScansHandlerIntegrationTest {
   private ScanItem getScanItem(String user, String scanId) {
     return scanTable.getItem(
         Key.builder()
-            .partitionValue(SkuItem.formatUserPk(user))
+            .partitionValue(ScanItem.formatPk(user))
             .sortValue(ScanItem.formatSk(scanId))
             .build());
   }

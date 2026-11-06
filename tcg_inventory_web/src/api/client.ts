@@ -365,8 +365,8 @@ export interface OrderNeighborCard {
 export interface OrderUnit {
   game: GameId;
   sequence_number: number;
-  location: string;
-  current_location: string;
+  location: string | null;
+  current_location: string | null;
   external_id: string;
   name: string;
   set_code: string;

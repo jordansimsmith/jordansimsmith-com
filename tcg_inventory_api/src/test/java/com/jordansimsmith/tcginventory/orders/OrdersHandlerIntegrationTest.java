@@ -18,13 +18,20 @@ import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.JobsHandler;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
+import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
+import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
+import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.SellUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.Sku;
+import com.jordansimsmith.tcginventory.inventory.client.Unit;
+import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.orders.api.FindOrdersHandler;
+import com.jordansimsmith.tcginventory.orders.api.GetOrderHandler;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -39,8 +46,6 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 @Testcontainers
 public class OrdersHandlerIntegrationTest {
@@ -51,8 +56,6 @@ public class OrdersHandlerIntegrationTest {
   private TcgInventoryTestFactory factory;
   private DynamoDbTable<OrderItem> orderTable;
   private DynamoDbTable<JobItem> jobTable;
-  private DynamoDbTable<SkuItem> skuTable;
-  private DynamoDbTable<UnitItem> unitTable;
 
   private FindOrdersHandler findOrdersHandler;
   private GetOrderHandler getOrderHandler;
@@ -82,8 +85,6 @@ public class OrdersHandlerIntegrationTest {
     jobTable = factory.jobTable();
     fakeJobsQueue = factory.fakeJobsQueue();
     orderTable = factory.orderTable();
-    skuTable = factory.skuTable();
-    unitTable = factory.unitTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
@@ -427,38 +428,39 @@ public class OrdersHandlerIntegrationTest {
         "jordan", "83663", "to_pick", skuId, List.of(1), "PICKUP", "1.50", "1.50", null);
 
     // act
-    var assertion =
-        assertThatThrownBy(
-            () ->
-                getOrderHandler.handleRequest(
-                    buildEventWithPath("jordan", Map.of("order_id", "83663")), null));
+    var response =
+        getOrderHandler.handleRequest(
+            buildEventWithPath("jordan", Map.of("order_id", "83663")), null);
 
     // assert
-    assertion
-        .hasCauseInstanceOf(IllegalStateException.class)
-        .hasRootCauseMessage("sku record missing: " + SkuItem.formatPk("jordan", skuId));
+    assertThat(response.getStatusCode()).isEqualTo(404);
   }
 
   @Test
   void getOrderShouldReturnCatalogReferenceWithoutResolvingGameMetadata() throws Exception {
     // arrange
     var skuId = "digimon#unknown#123#normal#NM";
-    skuTable.putItem(
-        SkuItem.create(
+    factory
+        .fakeInventoryService()
+        .seedSku(
             "jordan",
-            skuId,
-            "digimon",
-            "123",
-            "normal",
-            "NM",
-            "Test Card",
-            "set",
-            "Test Set",
-            "1",
-            null,
-            null));
+            new Sku(
+                skuId,
+                "digimon",
+                "123",
+                "Test Card",
+                "set",
+                "Test Set",
+                "1",
+                "normal",
+                Condition.NM,
+                null,
+                null,
+                0,
+                1),
+            false);
     createOrderWithLines(
-        "jordan", "83663", "to_pick", skuId, List.of(1), "PICKUP", "1.50", "1.50", null);
+        "jordan", "83663", "fulfilled", skuId, List.of(1), "PICKUP", "1.50", "1.50", null);
 
     // act
     var response =
@@ -669,7 +671,7 @@ public class OrdersHandlerIntegrationTest {
   }
 
   @Test
-  void getOrderShouldComputeCurrentLocationForFulfilledOrder() throws Exception {
+  void getOrderShouldReturnAllocatedCardsWithoutLocationsForFulfilledOrder() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     var skuId = "mtg#scryfall#scryfall-1#normal#NM";
@@ -691,10 +693,11 @@ public class OrdersHandlerIntegrationTest {
     assertThat(response.getStatusCode()).isEqualTo(200);
     var body = objectMapper.readTree(response.getBody());
     var unit = body.get("units").get(0);
-    assertThat(unit.get("location").asText()).isEqualTo("A0-2");
-    assertThat(unit.get("current_location").asText()).isEqualTo("A0-1");
-    assertThat(unit.get("previous_card").get("name").asText()).isEqualTo("Other Card");
-    assertThat(unit.get("next_card").get("name").asText()).isEqualTo("Other Card");
+    assertThat(unit.get("name").asText()).isEqualTo("Test Card");
+    assertThat(unit.get("location").isNull()).isTrue();
+    assertThat(unit.get("current_location").isNull()).isTrue();
+    assertThat(unit.get("previous_card").isNull()).isTrue();
+    assertThat(unit.get("next_card").isNull()).isTrue();
   }
 
   @Test
@@ -743,8 +746,8 @@ public class OrdersHandlerIntegrationTest {
         .isEqualTo("fulfilling");
 
     var units = getUnits("jordan", skuId);
-    assertThat(units.stream().filter(u -> "reserved".equals(u.getStatus())).toList()).hasSize(2);
-    assertThat(units.stream().filter(u -> "in_stock".equals(u.getStatus())).toList()).hasSize(1);
+    assertThat(units.stream().filter(u -> u.status() == UnitStatus.RESERVED).toList()).hasSize(2);
+    assertThat(units.stream().filter(u -> u.status() == UnitStatus.IN_STOCK).toList()).hasSize(1);
 
     // act - duplicate request while the worker is queued
     var duplicateResponse =
@@ -761,10 +764,10 @@ public class OrdersHandlerIntegrationTest {
     // assert
     assertThat(getOrderItem("jordan", "83663").getStatus()).isEqualTo("fulfilled");
     units = getUnits("jordan", skuId);
-    assertThat(units.stream().filter(u -> "sold".equals(u.getStatus())).toList()).hasSize(2);
-    assertThat(units.stream().filter(u -> "in_stock".equals(u.getStatus())).toList()).hasSize(1);
+    assertThat(units.stream().filter(u -> u.status() == UnitStatus.SOLD).toList()).hasSize(2);
+    assertThat(units.stream().filter(u -> u.status() == UnitStatus.IN_STOCK).toList()).hasSize(1);
     var sku = getSkuItem("jordan", skuId);
-    assertThat(sku.getVersion()).isEqualTo(3);
+    assertThat(sku.version()).isEqualTo(3);
 
     assertThat(getJobItem("jordan", job.getJobId()).getStatus()).isEqualTo("succeeded");
 
@@ -833,7 +836,7 @@ public class OrdersHandlerIntegrationTest {
 
     var units = getUnits("jordan", skuId);
     assertThat(units).hasSize(101);
-    assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("sold"));
+    assertThat(units).allSatisfy(unit -> assertThat(unit.status()).isEqualTo(UnitStatus.SOLD));
   }
 
   @Test
@@ -843,10 +846,7 @@ public class OrdersHandlerIntegrationTest {
     var skuId = "mtg#scryfall#scryfall-1#normal#NM";
     createSkuWithUnits("jordan", skuId, 2);
 
-    var sku = getSkuItem("jordan", skuId);
-    sku.setDirty(false);
-    sku.setGsi1pk(SkuItem.USER_PREFIX + "jordan" + "#CLEAN");
-    skuTable.putItem(sku);
+    seedSkuDirty("jordan", skuId, false);
 
     reserveUnits("jordan", skuId, "83663", List.of(1));
     createOrderWithLines(
@@ -862,9 +862,8 @@ public class OrdersHandlerIntegrationTest {
     // assert
     assertThat(response.getStatusCode()).isEqualTo(202);
     var updatedSku = getSkuItem("jordan", skuId);
-    assertThat(updatedSku.getDirty()).isFalse();
-    assertThat(updatedSku.getGsi1pk()).isEqualTo(SkuItem.USER_PREFIX + "jordan" + "#CLEAN");
-    assertThat(updatedSku.getVersion()).isEqualTo(2);
+    assertThat(isDirty("jordan", skuId)).isFalse();
+    assertThat(updatedSku.version()).isEqualTo(2);
   }
 
   @Test
@@ -882,23 +881,32 @@ public class OrdersHandlerIntegrationTest {
     var job = getFulfillmentJob("83663");
     var secondUnit =
         getUnits("jordan", skuId).stream()
-            .filter(u -> u.getSequenceNumber() == 2)
+            .filter(u -> u.sequenceNumber() == 2)
             .findFirst()
             .orElseThrow();
-    secondUnit.setReservationId("another-order");
-    unitTable.putItem(secondUnit);
+    seedUnit(
+        "jordan",
+        skuId,
+        new Unit(
+            secondUnit.sequenceNumber(),
+            secondUnit.location(),
+            secondUnit.status(),
+            secondUnit.photos(),
+            secondUnit.createdAt(),
+            secondUnit.updatedAt(),
+            "another-order"));
 
     // act - first delivery sells unit 1, then rejects unit 2 because its owner changed
     new JobsHandler(factory).handleRequest(buildSqsEvent("jordan", job.getJobId()), null);
 
     // assert
     assertThat(getOrderItem("jordan", "83663").getStatus()).isEqualTo("fulfilling");
-    assertThat(getUnits("jordan", skuId).stream().filter(u -> "sold".equals(u.getStatus())))
+    assertThat(getUnits("jordan", skuId).stream().filter(u -> u.status() == UnitStatus.SOLD))
         .hasSize(1);
     assertThat(getJobItem("jordan", job.getJobId()).getStatus()).isEqualTo("failed");
     assertThat(getJobItem("jordan", job.getJobId()).getError())
         .isEqualTo("unit is not reserved for this reservation");
-    assertThat(getSkuItem("jordan", skuId).getVersion()).isEqualTo(2);
+    assertThat(getSkuItem("jordan", skuId).version()).isEqualTo(2);
   }
 
   @Test
@@ -945,13 +953,13 @@ public class OrdersHandlerIntegrationTest {
     // assert - retry uses Inventory's lifecycle evidence for both completed sales
     assertThat(getOrderItem("jordan", "83663").getStatus()).isEqualTo("fulfilling");
     assertThat(getUnits("jordan", skuId))
-        .allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("sold"));
-    var versionAfterSales = getSkuItem("jordan", skuId).getVersion();
+        .allSatisfy(unit -> assertThat(unit.status()).isEqualTo(UnitStatus.SOLD));
+    var versionAfterSales = getSkuItem("jordan", skuId).version();
 
     processor.processBatch("jordan", job);
 
     assertThat(getOrderItem("jordan", "83663").getStatus()).isEqualTo("fulfilled");
-    assertThat(getSkuItem("jordan", skuId).getVersion()).isEqualTo(versionAfterSales);
+    assertThat(getSkuItem("jordan", skuId).version()).isEqualTo(versionAfterSales);
   }
 
   @Test
@@ -1097,50 +1105,67 @@ public class OrdersHandlerIntegrationTest {
   private void createSku(
       String user, String skuId, String name, String setCode, String collectorNumber) {
     var parts = skuId.split("#");
-    var skuItem =
-        SkuItem.create(
+    factory
+        .fakeInventoryService()
+        .seedSku(
             user,
-            skuId,
-            parts[0],
-            parts[2],
-            parts[3],
-            parts[4],
-            name,
-            setCode,
-            "Test Set",
-            collectorNumber,
-            null,
-            null);
-    skuTable.putItem(skuItem);
+            new Sku(
+                skuId,
+                parts[0],
+                parts[2],
+                name,
+                setCode,
+                "Test Set",
+                collectorNumber,
+                parts[3],
+                Condition.valueOf(parts[4]),
+                new BigDecimal("1.50"),
+                null,
+                0,
+                1),
+            true);
   }
 
   private void createUnit(
       String user, String skuId, int sequenceNumber, String status, String orderId) {
-    var unit =
-        UnitItem.create(
-            user,
-            skuId.split("#")[0],
-            skuId,
+    var units = new ArrayList<>(getUnits(user, skuId));
+    units.add(
+        new Unit(
             sequenceNumber,
-            status,
-            "import1",
-            Instant.ofEpochSecond(1700000000));
-    unit.setReservationId(orderId);
-    unitTable.putItem(unit);
+            "A0-" + sequenceNumber,
+            UnitStatus.valueOf(status.toUpperCase()),
+            List.of(),
+            Instant.ofEpochSecond(1700000000).getEpochSecond(),
+            null,
+            orderId));
+    factory.fakeInventoryService().seedUnits(user, skuId, units);
+  }
+
+  private void seedUnit(String user, String skuId, Unit updated) {
+    var units = new ArrayList<>(getUnits(user, skuId));
+    units.replaceAll(unit -> unit.sequenceNumber() == updated.sequenceNumber() ? updated : unit);
+    factory.fakeInventoryService().seedUnits(user, skuId, units);
   }
 
   private void reserveUnits(
       String user, String skuId, String orderId, List<Integer> sequenceNumbers) {
-    for (var seqNum : sequenceNumbers) {
+    for (var sequenceNumber : sequenceNumbers) {
       var unit =
-          unitTable.getItem(
-              Key.builder()
-                  .partitionValue(SkuItem.formatPk(user, skuId))
-                  .sortValue(UnitItem.formatSk(seqNum))
-                  .build());
-      unit.setStatus("reserved");
-      unit.setReservationId(orderId);
-      unitTable.putItem(unit);
+          getUnits(user, skuId).stream()
+              .filter(candidate -> candidate.sequenceNumber() == sequenceNumber)
+              .findFirst()
+              .orElseThrow();
+      seedUnit(
+          user,
+          skuId,
+          new Unit(
+              unit.sequenceNumber(),
+              unit.location(),
+              UnitStatus.RESERVED,
+              unit.photos(),
+              unit.createdAt(),
+              unit.updatedAt(),
+              orderId));
     }
   }
 
@@ -1178,7 +1203,7 @@ public class OrdersHandlerIntegrationTest {
   private OrderItem getOrderItem(String user, String offerId) {
     return orderTable.getItem(
         Key.builder()
-            .partitionValue(SkuItem.formatUserPk(user))
+            .partitionValue(OrderItem.formatPk(user))
             .sortValue(OrderItem.formatSk(offerId))
             .build());
   }
@@ -1198,27 +1223,51 @@ public class OrdersHandlerIntegrationTest {
         .orElseThrow();
   }
 
-  private SkuItem getSkuItem(String user, String skuId) {
-    return skuTable.getItem(
-        Key.builder()
-            .partitionValue(SkuItem.formatPk(user, skuId))
-            .sortValue(SkuItem.formatSk())
-            .build());
+  private Sku getSkuItem(String user, String skuId) {
+    try {
+      return factory
+          .inventoryService()
+          .getSku(new RequestContext(user), new GetSkuRequest(skuId))
+          .sku();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
-  private List<UnitItem> getUnits(String user, String skuId) {
-    var results = new ArrayList<UnitItem>();
-    var request =
-        QueryEnhancedRequest.builder()
-            .queryConditional(
-                QueryConditional.sortBeginsWith(
-                    Key.builder()
-                        .partitionValue(SkuItem.formatPk(user, skuId))
-                        .sortValue(UnitItem.UNIT_PREFIX)
-                        .build()))
-            .build();
-    unitTable.query(request).items().forEach(results::add);
-    return results;
+  private List<Unit> getUnits(String user, String skuId) {
+    try {
+      var units = new ArrayList<Unit>();
+      String continuation = null;
+      do {
+        var response =
+            factory
+                .inventoryService()
+                .findUnits(
+                    new RequestContext(user), new FindUnitsRequest(skuId, 100, continuation));
+        units.addAll(response.units());
+        continuation = response.nextContinuation();
+      } while (continuation != null);
+      return units;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private void seedSkuDirty(String user, String skuId, boolean dirty) {
+    factory.fakeInventoryService().seedSku(user, getSkuItem(user, skuId), dirty);
+  }
+
+  private boolean isDirty(String user, String skuId) {
+    try {
+      return factory
+          .inventoryService()
+          .findSkus(new RequestContext(user), new FindSkusRequest(null, null, true, 100, null))
+          .skus()
+          .stream()
+          .anyMatch(sku -> sku.skuId().equals(skuId));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private APIGatewayV2HTTPEvent buildEvent(String user) {

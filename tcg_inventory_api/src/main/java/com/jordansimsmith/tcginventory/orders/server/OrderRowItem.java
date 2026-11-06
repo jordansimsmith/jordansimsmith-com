@@ -1,5 +1,6 @@
 package com.jordansimsmith.tcginventory.orders.server;
 
+import java.util.List;
 import java.util.Locale;
 import javax.annotation.Nullable;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
@@ -18,6 +19,7 @@ public class OrderRowItem {
   public static final String QUANTITY = "quantity";
   public static final String PRICE = "price";
   public static final String LISTED_PRICE = "listed_price";
+  public static final String ALLOCATED_SEQUENCE_NUMBERS = "allocated_sequence_numbers";
 
   private String pk;
   private String sk;
@@ -28,6 +30,7 @@ public class OrderRowItem {
   private Integer quantity;
   private String price;
   private String listedPrice;
+  private List<Integer> allocatedSequenceNumbers;
 
   @DynamoDbPartitionKey
   @DynamoDbAttribute(PK)
@@ -112,6 +115,16 @@ public class OrderRowItem {
 
   public void setListedPrice(@Nullable String value) {
     listedPrice = value;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(ALLOCATED_SEQUENCE_NUMBERS)
+  public List<Integer> getAllocatedSequenceNumbers() {
+    return allocatedSequenceNumbers;
+  }
+
+  public void setAllocatedSequenceNumbers(@Nullable List<Integer> value) {
+    allocatedSequenceNumbers = value;
   }
 
   public static String formatPk(String user, String orderId) {

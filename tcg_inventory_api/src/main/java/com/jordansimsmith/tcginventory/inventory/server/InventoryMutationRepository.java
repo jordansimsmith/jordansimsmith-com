@@ -106,7 +106,6 @@ public class InventoryMutationRepository {
             .toList());
 
     var skuMap = new HashMap<>(TableSchema.fromBean(InventorySkuItem.class).itemToMap(sku, true));
-    skuMap.put("dirty", AttributeValue.builder().bool(true).build());
 
     var receipt =
         InventoryCreateUnitOperationItem.create(

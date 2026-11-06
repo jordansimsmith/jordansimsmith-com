@@ -20,6 +20,9 @@ public class OrderItem {
   public static final String TOTAL_PRICE = "total_price";
   public static final String ROW_COUNT = "row_count";
   public static final String CREATED_AT = "created_at";
+  public static final String BUYER_NAME = "buyer_name";
+  public static final String BUYER_ADDRESS = "buyer_address";
+  public static final String POSTAGE_OPTION = "postage_option";
 
   private String pk;
   private String sk;
@@ -29,6 +32,9 @@ public class OrderItem {
   private String totalPrice;
   private Integer rowCount;
   private Instant createdAt;
+  private String buyerName;
+  private BuyerAddress buyerAddress;
+  private String postageOption;
 
   @DynamoDbPartitionKey
   @DynamoDbAttribute(PK)
@@ -108,7 +114,118 @@ public class OrderItem {
     createdAt = value;
   }
 
+  @Nullable
+  @DynamoDbAttribute(BUYER_NAME)
+  public String getBuyerName() {
+    return buyerName;
+  }
+
+  public void setBuyerName(@Nullable String value) {
+    buyerName = value;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(BUYER_ADDRESS)
+  public BuyerAddress getBuyerAddress() {
+    return buyerAddress;
+  }
+
+  public void setBuyerAddress(@Nullable BuyerAddress value) {
+    buyerAddress = value;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(POSTAGE_OPTION)
+  public String getPostageOption() {
+    return postageOption;
+  }
+
+  public void setPostageOption(@Nullable String value) {
+    postageOption = value;
+  }
+
+  @DynamoDbBean
+  public static class BuyerAddress {
+    public static final String LINE1 = "line1";
+    public static final String LINE2 = "line2";
+    public static final String SUBURB = "suburb";
+    public static final String CITY = "city";
+    public static final String POST_CODE = "post_code";
+    public static final String COUNTRY = "country";
+
+    private String line1;
+    private String line2;
+    private String suburb;
+    private String city;
+    private String postCode;
+    private String country;
+
+    @Nullable
+    @DynamoDbAttribute(LINE1)
+    public String getLine1() {
+      return line1;
+    }
+
+    public void setLine1(@Nullable String value) {
+      line1 = value;
+    }
+
+    @Nullable
+    @DynamoDbAttribute(LINE2)
+    public String getLine2() {
+      return line2;
+    }
+
+    public void setLine2(@Nullable String value) {
+      line2 = value;
+    }
+
+    @Nullable
+    @DynamoDbAttribute(SUBURB)
+    public String getSuburb() {
+      return suburb;
+    }
+
+    public void setSuburb(@Nullable String value) {
+      suburb = value;
+    }
+
+    @Nullable
+    @DynamoDbAttribute(CITY)
+    public String getCity() {
+      return city;
+    }
+
+    public void setCity(@Nullable String value) {
+      city = value;
+    }
+
+    @Nullable
+    @DynamoDbAttribute(POST_CODE)
+    public String getPostCode() {
+      return postCode;
+    }
+
+    public void setPostCode(@Nullable String value) {
+      postCode = value;
+    }
+
+    @Nullable
+    @DynamoDbAttribute(COUNTRY)
+    public String getCountry() {
+      return country;
+    }
+
+    public void setCountry(@Nullable String value) {
+      country = value;
+    }
+  }
+
   public static String formatPk(String user) {
     return "USER#" + user;
+  }
+
+  public static String formatSk(String orderId) {
+    return ORDER_PREFIX + "0".repeat(Math.max(0, 20 - orderId.length())) + orderId;
   }
 }

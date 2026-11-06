@@ -1576,7 +1576,10 @@ function toOrderDetail(order: FakeOrder, skus: FakeSku[]): OrderDetail {
       return {
         game: sku.game,
         sequence_number: ref.sequence_number,
-        location: deriveLocation(ref.sequence_number),
+        location:
+          order.state === 'to_pick'
+            ? deriveLocation(ref.sequence_number)
+            : null,
         name: sku.name,
         external_id: sku.external_id,
         set_code: sku.set_code,
@@ -1584,7 +1587,13 @@ function toOrderDetail(order: FakeOrder, skus: FakeSku[]): OrderDetail {
         finish: sku.finish,
         condition: sku.condition,
         price: unitPriceBySkuId.get(ref.sku_id) ?? null,
-        ...computeBlockPosition(allUnits, sku.game, ref.sequence_number),
+        ...(order.state === 'to_pick'
+          ? computeBlockPosition(allUnits, sku.game, ref.sequence_number)
+          : {
+              current_location: null,
+              previous_card: null,
+              next_card: null,
+            }),
       };
     })
     .sort(

@@ -10,7 +10,6 @@ import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.nio.charset.StandardCharsets;
@@ -138,7 +137,7 @@ public class ImportsHandlerIntegrationTest {
     var importItem =
         importTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(ImportItem.formatPk("jordan"))
                 .sortValue(ImportItem.formatSk(importId))
                 .build());
     assertThat(importItem.getGame()).isEqualTo("mtg");
@@ -147,7 +146,7 @@ public class ImportsHandlerIntegrationTest {
     var jobItem =
         jobTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(JobItem.formatPk("jordan"))
                 .sortValue(JobItem.formatSk(importItem.getJobId()))
                 .build());
     assertThat(jobItem).isNotNull();
@@ -436,7 +435,7 @@ public class ImportsHandlerIntegrationTest {
     var importItem =
         importTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(ImportItem.formatPk("jordan"))
                 .sortValue(ImportItem.formatSk(importId))
                 .build());
     importItem.setStatus("review");
@@ -453,7 +452,7 @@ public class ImportsHandlerIntegrationTest {
     var deletedImport =
         importTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(ImportItem.formatPk("jordan"))
                 .sortValue(ImportItem.formatSk(importId))
                 .build());
     assertThat(deletedImport).isNull();
@@ -531,7 +530,7 @@ public class ImportsHandlerIntegrationTest {
     var importItem =
         importTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(ImportItem.formatPk("jordan"))
                 .sortValue(ImportItem.formatSk(importId))
                 .build());
     importItem.setStatus("confirmed");
@@ -585,7 +584,7 @@ public class ImportsHandlerIntegrationTest {
     var importQuery =
         QueryConditional.sortBeginsWith(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk(user))
+                .partitionValue(ImportItem.formatPk(user))
                 .sortValue(ImportItem.IMPORT_PREFIX)
                 .build());
     var imports =
@@ -601,7 +600,7 @@ public class ImportsHandlerIntegrationTest {
     var importItem =
         importTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(ImportItem.formatPk("jordan"))
                 .sortValue(ImportItem.formatSk(importId))
                 .build());
     var jobItem =
@@ -725,7 +724,7 @@ public class ImportsHandlerIntegrationTest {
     var importItem =
         importTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(ImportItem.formatPk("jordan"))
                 .sortValue(ImportItem.formatSk(importId))
                 .build());
     importItem.setStatus("appraising");
@@ -808,7 +807,7 @@ public class ImportsHandlerIntegrationTest {
     var importItem =
         importTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(ImportItem.formatPk("jordan"))
                 .sortValue(ImportItem.formatSk("import1"))
                 .build());
     importItem.setStatus("appraising");

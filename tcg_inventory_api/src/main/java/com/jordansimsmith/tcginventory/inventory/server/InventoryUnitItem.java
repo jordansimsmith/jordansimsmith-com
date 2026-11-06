@@ -138,6 +138,24 @@ public class InventoryUnitItem {
     return "USER#" + user + "#SKU#" + skuId;
   }
 
+  public static InventoryUnitItem create(
+      String user,
+      String game,
+      String skuId,
+      int sequenceNumber,
+      String status,
+      Instant createdAt) {
+    var item = new InventoryUnitItem();
+    item.setPk(formatPk(user, skuId));
+    item.setSk(formatSk(sequenceNumber));
+    item.setGame(game);
+    item.setSequenceNumber(sequenceNumber);
+    item.setGsi3pk(formatGsi3pk(user, game));
+    item.setStatus(status);
+    item.setCreatedAt(createdAt);
+    return item;
+  }
+
   public static String formatSk(int sequenceNumber) {
     return UNIT_PREFIX + "%010d".formatted(sequenceNumber);
   }
@@ -159,6 +177,12 @@ public class InventoryUnitItem {
 
     public void setPhotoId(String photoId) {
       this.photoId = photoId;
+    }
+
+    public static PhotoItem create(String photoId) {
+      var photo = new PhotoItem();
+      photo.setPhotoId(photoId);
+      return photo;
     }
   }
 }

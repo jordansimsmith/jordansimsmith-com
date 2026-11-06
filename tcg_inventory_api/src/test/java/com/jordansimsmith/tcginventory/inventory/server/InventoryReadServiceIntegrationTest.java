@@ -89,44 +89,53 @@ class InventoryReadServiceIntegrationTest {
             .billingMode(BillingMode.PAY_PER_REQUEST)
             .attributeDefinitions(
                 AttributeDefinition.builder()
-                    .attributeName("pk")
+                    .attributeName(InventorySkuItem.PK)
                     .attributeType(ScalarAttributeType.S)
                     .build(),
                 AttributeDefinition.builder()
-                    .attributeName("sk")
+                    .attributeName(InventorySkuItem.SK)
                     .attributeType(ScalarAttributeType.S)
                     .build(),
                 AttributeDefinition.builder()
-                    .attributeName("gsi1pk")
+                    .attributeName(InventorySkuItem.GSI1PK)
                     .attributeType(ScalarAttributeType.S)
                     .build(),
                 AttributeDefinition.builder()
-                    .attributeName("gsi1sk")
+                    .attributeName(InventorySkuItem.GSI1SK)
                     .attributeType(ScalarAttributeType.S)
                     .build(),
                 AttributeDefinition.builder()
-                    .attributeName("gsi2pk")
+                    .attributeName(InventorySkuItem.GSI2PK)
                     .attributeType(ScalarAttributeType.S)
                     .build(),
                 AttributeDefinition.builder()
-                    .attributeName("gsi2sk")
+                    .attributeName(InventorySkuItem.GSI2SK)
                     .attributeType(ScalarAttributeType.S)
                     .build(),
                 AttributeDefinition.builder()
-                    .attributeName("gsi3pk")
+                    .attributeName(InventoryUnitItem.GSI3PK)
                     .attributeType(ScalarAttributeType.S)
                     .build(),
                 AttributeDefinition.builder()
-                    .attributeName("sequence_number")
+                    .attributeName(InventoryUnitItem.SEQUENCE_NUMBER)
                     .attributeType(ScalarAttributeType.N)
                     .build())
             .keySchema(
-                KeySchemaElement.builder().attributeName("pk").keyType(KeyType.HASH).build(),
-                KeySchemaElement.builder().attributeName("sk").keyType(KeyType.RANGE).build())
+                KeySchemaElement.builder()
+                    .attributeName(InventorySkuItem.PK)
+                    .keyType(KeyType.HASH)
+                    .build(),
+                KeySchemaElement.builder()
+                    .attributeName(InventorySkuItem.SK)
+                    .keyType(KeyType.RANGE)
+                    .build())
             .globalSecondaryIndexes(
-                index("gsi1", "gsi1pk", "gsi1sk"),
-                index("gsi2", "gsi2pk", "gsi2sk"),
-                index("gsi3", "gsi3pk", "sequence_number"))
+                index(InventorySkuItem.GSI1_NAME, InventorySkuItem.GSI1PK, InventorySkuItem.GSI1SK),
+                index(InventorySkuItem.GSI2_NAME, InventorySkuItem.GSI2PK, InventorySkuItem.GSI2SK),
+                index(
+                    InventoryUnitItem.GSI3_NAME,
+                    InventoryUnitItem.GSI3PK,
+                    InventoryUnitItem.SEQUENCE_NUMBER))
             .build();
     dynamoDbClient.createTable(request);
     try (var waiter = DynamoDbWaiter.builder().client(dynamoDbClient).build()) {
@@ -2053,6 +2062,7 @@ class InventoryReadServiceIntegrationTest {
     item.setFetchtcgCardId("fetch-" + skuId);
     item.setFetchtcgSetId(1);
     item.setVersion(1);
+    item.setDirty(dirty);
     item.setGsi1pk(InventorySkuItem.formatGsi1pk(user, dirty));
     item.setGsi1sk(InventorySkuItem.formatGsi1skPrefix() + skuId);
     item.setGsi2pk(InventorySkuItem.formatGsi2pk(user));

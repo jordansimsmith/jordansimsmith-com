@@ -11,6 +11,10 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortK
 
 @DynamoDbBean
 public class InventorySkuItem {
+  public static final String PK = "pk";
+  public static final String SK = "sk";
+  public static final String USER_PREFIX = "USER#";
+  public static final String SORT_KEY = "SKU";
   public static final String GAME = "game";
   public static final String SKU_ID = "sku_id";
   public static final String EXTERNAL_ID = "external_id";
@@ -24,10 +28,13 @@ public class InventorySkuItem {
   public static final String FETCHTCG_CARD_ID = "fetchtcg_card_id";
   public static final String FETCHTCG_SET_ID = "fetchtcg_set_id";
   public static final String VERSION = "version";
+  public static final String DIRTY = "dirty";
   public static final String GSI1PK = "gsi1pk";
   public static final String GSI1SK = "gsi1sk";
   public static final String GSI2PK = "gsi2pk";
   public static final String GSI2SK = "gsi2sk";
+  public static final String GSI1_NAME = "gsi1";
+  public static final String GSI2_NAME = "gsi2";
   private String pk;
   private String sk;
   private String game;
@@ -43,13 +50,14 @@ public class InventorySkuItem {
   private String fetchtcgCardId;
   private int fetchtcgSetId;
   private Integer version;
+  private Boolean dirty;
   private String gsi1pk;
   private String gsi1sk;
   private String gsi2pk;
   private String gsi2sk;
 
   @DynamoDbPartitionKey
-  @DynamoDbAttribute("pk")
+  @DynamoDbAttribute(PK)
   public String getPk() {
     return pk;
   }
@@ -59,7 +67,7 @@ public class InventorySkuItem {
   }
 
   @DynamoDbSortKey
-  @DynamoDbAttribute("sk")
+  @DynamoDbAttribute(SK)
   public String getSk() {
     return sk;
   }
@@ -185,7 +193,17 @@ public class InventorySkuItem {
     this.version = version;
   }
 
-  @DynamoDbSecondaryPartitionKey(indexNames = "gsi1")
+  @Nullable
+  @DynamoDbAttribute(DIRTY)
+  public Boolean getDirty() {
+    return dirty;
+  }
+
+  public void setDirty(@Nullable Boolean dirty) {
+    this.dirty = dirty;
+  }
+
+  @DynamoDbSecondaryPartitionKey(indexNames = GSI1_NAME)
   @DynamoDbAttribute(GSI1PK)
   public String getGsi1pk() {
     return gsi1pk;
@@ -195,7 +213,7 @@ public class InventorySkuItem {
     this.gsi1pk = gsi1pk;
   }
 
-  @DynamoDbSecondarySortKey(indexNames = "gsi1")
+  @DynamoDbSecondarySortKey(indexNames = GSI1_NAME)
   @DynamoDbAttribute(GSI1SK)
   public String getGsi1sk() {
     return gsi1sk;
@@ -205,7 +223,7 @@ public class InventorySkuItem {
     this.gsi1sk = gsi1sk;
   }
 
-  @DynamoDbSecondaryPartitionKey(indexNames = "gsi2")
+  @DynamoDbSecondaryPartitionKey(indexNames = GSI2_NAME)
   @DynamoDbAttribute(GSI2PK)
   public String getGsi2pk() {
     return gsi2pk;
@@ -215,7 +233,7 @@ public class InventorySkuItem {
     this.gsi2pk = gsi2pk;
   }
 
-  @DynamoDbSecondarySortKey(indexNames = "gsi2")
+  @DynamoDbSecondarySortKey(indexNames = GSI2_NAME)
   @DynamoDbAttribute(GSI2SK)
   public String getGsi2sk() {
     return gsi2sk;
@@ -241,7 +259,7 @@ public class InventorySkuItem {
       int fetchtcgSetId) {
     var sku = new InventorySkuItem();
     sku.setPk(InventorySkuItem.formatPk(user, skuId));
-    sku.setSk("SKU");
+    sku.setSk(SORT_KEY);
     sku.setSkuId(skuId);
     sku.setGame(game);
     sku.setExternalId(externalId);
@@ -255,16 +273,37 @@ public class InventorySkuItem {
     sku.setFetchtcgCardId(fetchtcgCardId);
     sku.setFetchtcgSetId(fetchtcgSetId);
     sku.setVersion(1);
+    sku.setDirty(true);
     sku.setGsi1pk(InventorySkuItem.formatGsi1pk(user, true));
-    sku.setGsi1sk("SKU#" + skuId);
+    sku.setGsi1sk(formatGsi1sk(skuId));
     sku.setGsi2pk(InventorySkuItem.formatGsi2pk(user));
-    sku.setGsi2sk("GAME#" + game + "#NAME#" + name.toLowerCase(Locale.ROOT) + "#" + skuId);
+    sku.setGsi2sk(formatGsi2sk(game, name.toLowerCase(Locale.ROOT), skuId));
 
     return sku;
   }
 
   public static String formatPk(String user, String skuId) {
-    return "USER#" + user + "#SKU#" + skuId;
+    return USER_PREFIX + user + "#SKU#" + skuId;
+  }
+
+  public static String formatUserPk(String user) {
+    return USER_PREFIX + user;
+  }
+
+  public static String formatSk() {
+    return SORT_KEY;
+  }
+
+  public static String formatGsi1pk(String user) {
+    return formatGsi1pk(user, true);
+  }
+
+  public static String formatGsi1sk(String skuId) {
+    return formatGsi1skPrefix() + skuId;
+  }
+
+  public static String formatGsi2sk(String game, String normalizedName, String skuId) {
+    return "GAME#" + game + "#NAME#" + normalizedName + "#" + skuId;
   }
 
   public static String formatGsi2pk(String user) {

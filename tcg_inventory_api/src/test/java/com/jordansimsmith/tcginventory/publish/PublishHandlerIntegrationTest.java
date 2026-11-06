@@ -15,9 +15,8 @@ import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
-import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.client.Condition;
+import com.jordansimsmith.tcginventory.inventory.client.CreateUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusResponse;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
@@ -46,7 +45,7 @@ public class PublishHandlerIntegrationTest {
   private FakeQueueClient<JobMessage> fakeJobsQueue;
   private ObjectMapper objectMapper;
   private DynamoDbTable<JobItem> jobTable;
-  private DynamoDbTable<SkuItem> skuTable;
+  private InventoryService inventoryService;
 
   private CreatePublishHandler createPublishHandler;
   private GetPublishHandler getPublishHandler;
@@ -73,7 +72,7 @@ public class PublishHandlerIntegrationTest {
     fakeJobsQueue = factory.fakeJobsQueue();
     objectMapper = factory.objectMapper();
     jobTable = factory.jobTable();
-    skuTable = factory.skuTable();
+    inventoryService = factory.inventoryService();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeUlidGenerator.reset();
@@ -104,7 +103,7 @@ public class PublishHandlerIntegrationTest {
     var jobItem =
         jobTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(JobItem.formatPk("jordan"))
                 .sortValue(JobItem.formatSk(jobId))
                 .build());
     assertThat(jobItem).isNotNull();
@@ -169,21 +168,22 @@ public class PublishHandlerIntegrationTest {
     jobItem.setUpdatedAt(Instant.ofEpochSecond(1700000200));
     jobTable.putItem(jobItem);
 
-    var dirtySku =
-        SkuItem.create(
-            "jordan",
-            "mtg#scryfall#sku1#normal#NM",
-            FakeGamesService.MAGIC_THE_GATHERING.id(),
+    inventoryService.createUnit(
+        new RequestContext("jordan"),
+        new CreateUnitRequest(
+            "publish-test-sku",
+            "mtg",
             "sku1",
             "normal",
-            "NM",
+            Condition.NM,
             "Test Card",
             "dom",
             "Dominaria",
             "1",
             null,
-            null);
-    skuTable.putItem(dirtySku);
+            null,
+            0,
+            List.of()));
 
     // act
     var response = getPublishHandler.handleRequest(buildEvent("jordan"), null);

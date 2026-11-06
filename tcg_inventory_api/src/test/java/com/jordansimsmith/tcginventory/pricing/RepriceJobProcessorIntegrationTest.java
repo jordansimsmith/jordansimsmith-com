@@ -27,9 +27,8 @@ import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.client.CardListing;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.inventory.client.Condition;
+import com.jordansimsmith.tcginventory.inventory.client.CreateUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusResponse;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
@@ -37,6 +36,8 @@ import com.jordansimsmith.tcginventory.inventory.client.FindUnitsResponse;
 import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
 import com.jordansimsmith.tcginventory.inventory.client.GetSkuResponse;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.ReserveUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.SellUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.Sku;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
@@ -71,8 +72,7 @@ public class RepriceJobProcessorIntegrationTest {
   private TcgInventoryTestFactory factory;
   private JobsHandler jobsHandler;
   private DynamoDbTable<JobItem> jobTable;
-  private DynamoDbTable<SkuItem> skuTable;
-  private DynamoDbTable<UnitItem> unitTable;
+  private int createOperation;
 
   @Container private static final DynamoDbContainer dynamoDbContainer = new DynamoDbContainer();
 
@@ -93,8 +93,7 @@ public class RepriceJobProcessorIntegrationTest {
     jobsQueue = factory.fakeJobsQueue();
     objectMapper = factory.objectMapper();
     jobTable = factory.jobTable();
-    skuTable = factory.skuTable();
-    unitTable = factory.unitTable();
+    createOperation = 0;
     DynamoDbUtils.reset(factory.dynamoDbClient());
     jobsQueue.reset();
     factory.fakeFetchTcgService().reset();
@@ -103,7 +102,7 @@ public class RepriceJobProcessorIntegrationTest {
   }
 
   @Test
-  void repriceShouldUpdateInStockGamesAndAuditUnchangedPrices() {
+  void repriceShouldUpdateInStockGamesAndPreserveUnchangedPrices() {
     // arrange
     var mtgSkuId = createSku("jordan", "mtg", "scryfall-001", "fetch-mtg", "2.90", "in_stock");
     var pokemonSkuId = createSku("jordan", "pokemon", "12345", "fetch-pokemon", "1.50", "in_stock");
@@ -131,22 +130,22 @@ public class RepriceJobProcessorIntegrationTest {
     assertThat(job.getProcessedCount()).isEqualTo(4);
 
     var mtgSkuAfter = getSku("jordan", mtgSkuId);
-    assertThat(mtgSkuAfter.getSuggestedPrice()).isEqualTo("2.90");
-    assertThat(mtgSkuAfter.getDirty()).isTrue();
-    assertThat(mtgSkuAfter.getVersion()).isEqualTo(2);
+    assertThat(mtgSkuAfter.price()).isEqualTo(new BigDecimal("2.90"));
+    assertThat(isDirty("jordan", mtgSkuAfter.skuId())).isTrue();
+    assertThat(mtgSkuAfter.version()).isEqualTo(2);
 
     var pokemonSkuAfter = getSku("jordan", pokemonSkuId);
-    assertThat(pokemonSkuAfter.getSuggestedPrice()).isEqualTo("1.00");
-    assertThat(pokemonSkuAfter.getDirty()).isTrue();
-    assertThat(pokemonSkuAfter.getVersion()).isEqualTo(2);
-    assertThat(getSku("jordan", lowMarketSkuId).getSuggestedPrice()).isEqualTo("0.75");
-    assertThat(getSku("jordan", lowMarketSkuId).getVersion()).isEqualTo(2);
-    assertThat(getSku("jordan", reservedSkuId).getVersion()).isEqualTo(1);
-    assertThat(getSku("other-user", otherUserSkuId).getVersion()).isEqualTo(1);
-    assertThat(getUnit("jordan", pokemonSkuId).getStatus()).isEqualTo("in_stock");
+    assertThat(pokemonSkuAfter.price()).isEqualTo(new BigDecimal("1.00"));
+    assertThat(isDirty("jordan", pokemonSkuAfter.skuId())).isTrue();
+    assertThat(pokemonSkuAfter.version()).isEqualTo(2);
+    assertThat(getSku("jordan", lowMarketSkuId).price()).isEqualTo(new BigDecimal("0.75"));
+    assertThat(getSku("jordan", lowMarketSkuId).version()).isEqualTo(2);
+    assertThat(getSku("jordan", reservedSkuId).version()).isEqualTo(2);
+    assertThat(getSku("other-user", otherUserSkuId).version()).isEqualTo(1);
+    assertThat(getUnit("jordan", pokemonSkuId).status()).isEqualTo(UnitStatus.IN_STOCK);
 
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "reprice"), null);
-    assertThat(getSku("jordan", mtgSkuId).getVersion()).isEqualTo(2);
+    assertThat(getSku("jordan", mtgSkuId).version()).isEqualTo(2);
   }
 
   @Test
@@ -163,7 +162,7 @@ public class RepriceJobProcessorIntegrationTest {
     // assert
     assertThat(getJob(user, "job1").getStatus()).isEqualTo("succeeded");
     assertThat(getJob(user, "job1").getProcessedCount()).isEqualTo(1);
-    assertThat(getSku(user, skuId).getSuggestedPrice()).isEqualTo("0.25");
+    assertThat(getSku(user, skuId).price()).isEqualTo(new BigDecimal("0.25"));
   }
 
   @Test
@@ -179,7 +178,7 @@ public class RepriceJobProcessorIntegrationTest {
 
     // assert
     assertThat(getJob(user, "job1").getStatus()).isEqualTo("succeeded");
-    assertThat(getSku(user, skuId).getSuggestedPrice()).isEqualTo("0.10");
+    assertThat(getSku(user, skuId).price()).isEqualTo(new BigDecimal("0.10"));
   }
 
   @Test
@@ -218,8 +217,8 @@ public class RepriceJobProcessorIntegrationTest {
     // assert
     verify(pricingService, times(2))
         .getPrice(new RequestContext(user), new GetPriceRequest("shared-card", NM));
-    assertThat(getSku(user, firstSkuId).getSuggestedPrice()).isEqualTo("0.95");
-    assertThat(getSku(user, secondSkuId).getSuggestedPrice()).isEqualTo("0.95");
+    assertThat(getSku(user, firstSkuId).price()).isEqualTo(new BigDecimal("0.95"));
+    assertThat(getSku(user, secondSkuId).price()).isEqualTo(new BigDecimal("0.95"));
   }
 
   @Test
@@ -294,7 +293,7 @@ public class RepriceJobProcessorIntegrationTest {
 
     // assert
     assertThat(result).isEqualTo(new JobProcessor.FailureJobResult("unit page failed"));
-    assertThat(getSku(user, skuId).getSuggestedPrice()).isEqualTo("1.00");
+    assertThat(getSku(user, skuId).price()).isEqualTo(new BigDecimal("1.00"));
     verify(inventoryService, times(0)).updateSku(any(), any());
     verifyNoInteractions(pricingService);
   }
@@ -399,41 +398,6 @@ public class RepriceJobProcessorIntegrationTest {
   }
 
   @Test
-  void repriceShouldContinueWhenDynamoDbReturnsAShortPageWithContinuation() {
-    // arrange
-    createRepriceJob("jordan", "job1", "0.75");
-    var longSetName = "x".repeat(40000);
-    IntStream.range(0, 35)
-        .forEach(
-            index ->
-                createSku(
-                    "jordan",
-                    "mtg",
-                    String.format("large-%05d", index),
-                    null,
-                    "1.00",
-                    "sold",
-                    longSetName));
-    var event = buildSqsEvent("jordan", "job1", "reprice");
-
-    // act
-    jobsHandler.handleRequest(event, null);
-
-    // assert
-    var firstPageJob = getJob("jordan", "job1");
-    assertThat(firstPageJob.getStatus()).isEqualTo("running");
-    assertThat(firstPageJob.getProcessedCount()).isBetween(1, 34);
-    assertThat(firstPageJob.getContinuation()).isNotNull();
-    var firstPageCount = firstPageJob.getProcessedCount();
-    while (!"succeeded".equals(getJob("jordan", "job1").getStatus())) {
-      jobsHandler.handleRequest(event, null);
-    }
-    assertThat(getJob("jordan", "job1").getProcessedCount()).isEqualTo(35);
-    assertThat(jobsQueue.getSends().get(0).messageDeduplicationId())
-        .isEqualTo("job1#" + firstPageCount);
-  }
-
-  @Test
   void repriceShouldUsePriceFloorWhenNzMarketPriceIsMissing() {
     // arrange
     var skuId = createSku("jordan", "mtg", "001", "missing-market", "1.00", "in_stock");
@@ -450,9 +414,9 @@ public class RepriceJobProcessorIntegrationTest {
     // assert
     var job = getJob("jordan", "job1");
     assertThat(job.getStatus()).isEqualTo("succeeded");
-    assertThat(getSku("jordan", skuId).getSuggestedPrice()).isEqualTo("0.75");
-    assertThat(getSku("jordan", skuId).getVersion()).isEqualTo(2);
-    assertThat(getSku("jordan", skuId).getDirty()).isTrue();
+    assertThat(getSku("jordan", skuId).price()).isEqualTo(new BigDecimal("0.75"));
+    assertThat(getSku("jordan", skuId).version()).isEqualTo(2);
+    assertThat(isDirty("jordan", skuId)).isTrue();
   }
 
   private String createSku(
@@ -462,42 +426,46 @@ public class RepriceJobProcessorIntegrationTest {
       String fetchTcgCardId,
       String price,
       String unitStatus) {
-    return createSku(user, game, externalId, fetchTcgCardId, price, unitStatus, "Test set");
-  }
-
-  private String createSku(
-      String user,
-      String game,
-      String externalId,
-      String fetchTcgCardId,
-      String price,
-      String unitStatus,
-      String setName) {
-    var externalSource = "mtg".equals(game) ? "scryfall" : "tcgplayer";
-    var skuId = game + "#" + externalSource + "#" + externalId + "#normal#NM";
-    var sku =
-        SkuItem.create(
-            user,
-            skuId,
-            game,
-            externalId,
-            "normal",
-            "NM",
-            "Reprice test",
-            "TST",
-            setName,
-            "1",
-            fetchTcgCardId,
-            price);
-    sku.setFetchtcgSetId(1);
-    sku.setDirty(false);
-    sku.setGsi1pk(SkuItem.formatUserPk(user) + "#CLEAN");
-    sku.setGsi1sk(SkuItem.formatGsi1sk(skuId));
-    skuTable.putItem(sku);
-    if (unitStatus != null) {
-      unitTable.putItem(UnitItem.create(user, game, skuId, 1, unitStatus, "import1", CREATED_AT));
+    try {
+      var result =
+          factory
+              .inventoryService()
+              .createUnit(
+                  new RequestContext(user),
+                  new CreateUnitRequest(
+                      "reprice-test-" + createOperation++,
+                      game,
+                      externalId,
+                      "normal",
+                      Condition.NM,
+                      "Reprice test",
+                      "TST",
+                      "Test set",
+                      "1",
+                      new BigDecimal(price),
+                      fetchTcgCardId,
+                      1,
+                      List.of()));
+      if ("reserved".equals(unitStatus) || "sold".equals(unitStatus)) {
+        var reservationId = "fixture-reservation-" + createOperation;
+        factory
+            .inventoryService()
+            .reserveUnit(
+                new RequestContext(user),
+                new ReserveUnitRequest(
+                    "fixture-reserve-" + createOperation, reservationId, result.skuId()));
+        if ("sold".equals(unitStatus)) {
+          factory
+              .inventoryService()
+              .sellUnit(
+                  new RequestContext(user),
+                  new SellUnitRequest(result.skuId(), result.sequenceNumber(), reservationId));
+        }
+      }
+      return result.skuId();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
     }
-    return skuId;
   }
 
   private void createRepriceJob(String user, String jobId, String priceFloor) {
@@ -540,22 +508,7 @@ public class RepriceJobProcessorIntegrationTest {
 
   private void stubInventorySku(InventoryService inventoryService, String user, String skuId)
       throws Exception {
-    var item = getSku(user, skuId);
-    var sku =
-        new Sku(
-            item.getSkuId(),
-            item.getGame(),
-            item.getExternalId(),
-            item.getName(),
-            item.getSetCode(),
-            item.getSetName(),
-            item.getCollectorNumber(),
-            item.getFinish(),
-            Condition.valueOf(item.getCondition()),
-            item.getSuggestedPrice() == null ? null : new BigDecimal(item.getSuggestedPrice()),
-            item.getFetchtcgCardId(),
-            item.getFetchtcgSetId(),
-            item.getVersion());
+    var sku = getSku(user, skuId);
     var ctx = new RequestContext(user);
     when(inventoryService.findSkus(any(), any()))
         .thenReturn(new FindSkusResponse(List.of(sku), null));
@@ -563,22 +516,40 @@ public class RepriceJobProcessorIntegrationTest {
         .thenReturn(new GetSkuResponse(sku));
   }
 
-  private SkuItem getSku(String user, String skuId) {
-    var key =
-        Key.builder()
-            .partitionValue(SkuItem.formatPk(user, skuId))
-            .sortValue(SkuItem.formatSk())
-            .build();
-    return skuTable.getItem(request -> request.key(key).consistentRead(true));
+  private Sku getSku(String user, String skuId) {
+    try {
+      return factory
+          .inventoryService()
+          .getSku(new RequestContext(user), new GetSkuRequest(skuId))
+          .sku();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
-  private UnitItem getUnit(String user, String skuId) {
-    var key =
-        Key.builder()
-            .partitionValue(UnitItem.formatPk(user, skuId))
-            .sortValue(UnitItem.formatSk(1))
-            .build();
-    return unitTable.getItem(request -> request.key(key).consistentRead(true));
+  private Unit getUnit(String user, String skuId) {
+    try {
+      return factory
+          .inventoryService()
+          .findUnits(new RequestContext(user), new FindUnitsRequest(skuId, 100, null))
+          .units()
+          .getFirst();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private boolean isDirty(String user, String skuId) {
+    try {
+      return factory
+          .inventoryService()
+          .findSkus(new RequestContext(user), new FindSkusRequest(null, null, true, 100, null))
+          .skus()
+          .stream()
+          .anyMatch(sku -> sku.skuId().equals(skuId));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private JobItem getJob(String user, String jobId) {

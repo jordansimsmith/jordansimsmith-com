@@ -13,15 +13,23 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import com.jordansimsmith.tcginventory.inventory.client.CreateUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.CreateUnitResponse;
+import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
+import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
+import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
+import com.jordansimsmith.tcginventory.inventory.client.GetUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.Sku;
+import com.jordansimsmith.tcginventory.inventory.client.Unit;
+import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
+import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
@@ -44,8 +52,8 @@ public class ConfirmImportHandlerIntegrationTest {
   private ObjectMapper objectMapper;
   private DynamoDbTable<ImportItem> importTable;
   private DynamoDbTable<ImportRowItem> importRowTable;
-  private DynamoDbTable<SkuItem> skuTable;
-  private DynamoDbTable<UnitItem> unitTable;
+  private InventoryService inventoryService;
+  private int nextOperationId;
   private DynamoDbTable<JobItem> jobTable;
 
   private ConfirmImportHandler confirmImportHandler;
@@ -74,8 +82,8 @@ public class ConfirmImportHandlerIntegrationTest {
     objectMapper = factory.objectMapper();
     importTable = factory.importTable();
     importRowTable = factory.importRowTable();
-    skuTable = factory.skuTable();
-    unitTable = factory.unitTable();
+    inventoryService = factory.inventoryService();
+    nextOperationId = 0;
     jobTable = factory.jobTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
@@ -121,34 +129,23 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(body.get("unit_count").asInt()).isEqualTo(3);
     assertThat(body.get("total_suggested_price").asText()).isEqualTo("4.50");
 
-    var sku1Pk = SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    var unit0 =
-        unitTable.getItem(
-            Key.builder().partitionValue(sku1Pk).sortValue(UnitItem.formatSk(0)).build());
-    assertThat(unit0).isNotNull();
-    assertThat(unit0.getStatus()).isEqualTo("in_stock");
-    assertThat(unit0.getImportId()).isNull();
-    assertThat(unit0.getGame()).isEqualTo("mtg");
-    assertThat(unit0.getGsi3pk()).isEqualTo("USER#jordan#UNITS#mtg");
+    var sku1Id = "mtg#scryfall#scryfall-1#normal#NM";
+    var unit0 = getUnit(sku1Id, 0);
+    assertThat(unit0.status()).isEqualTo(UnitStatus.IN_STOCK);
+    assertThat(unit0.location()).isEqualTo("A0-0");
 
-    var unit1 =
-        unitTable.getItem(
-            Key.builder().partitionValue(sku1Pk).sortValue(UnitItem.formatSk(1)).build());
-    assertThat(unit1).isNotNull();
+    var unit1 = getUnit(sku1Id, 1);
+    assertThat(unit1.status()).isEqualTo(UnitStatus.IN_STOCK);
 
-    var sku1 =
-        skuTable.getItem(
-            Key.builder().partitionValue(sku1Pk).sortValue(SkuItem.formatSk()).build());
-    assertThat(countUnits(sku1Pk)).isEqualTo(2);
-    assertThat(sku1.getVersion()).isEqualTo(2);
-    assertThat(sku1.getDirty()).isTrue();
-    assertThat(sku1.getGsi1pk()).isEqualTo(SkuItem.formatGsi1pk("jordan"));
-    assertThat(sku1.getSkuId()).isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(sku1.getGame()).isEqualTo("mtg");
-    assertThat(sku1.getExternalId()).isEqualTo("scryfall-1");
+    var sku1 = getSku(sku1Id);
+    assertThat(countUnits(sku1Id)).isEqualTo(2);
+    assertThat(sku1.version()).isEqualTo(2);
+    assertThat(findDirtySkus()).extracting(Sku::skuId).contains(sku1Id);
+    assertThat(sku1.skuId()).isEqualTo(sku1Id);
+    assertThat(sku1.game()).isEqualTo("mtg");
+    assertThat(sku1.externalId()).isEqualTo("scryfall-1");
 
-    assertThat(getImportRow("import1", 1).getSkuId())
-        .isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
+    assertThat(getImportRow("import1", 1).getSkuId()).isEqualTo(sku1Id);
     assertThat(getImportRow("import1", 1).getSequenceNumber()).isZero();
     assertThat(getImportRow("import1", 1).getLocation()).isEqualTo("A0-0");
     assertThat(getImportRow("import1", 2).getSequenceNumber()).isEqualTo(1);
@@ -157,13 +154,11 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(getImportRow("import1", 3).getSequenceNumber()).isEqualTo(2);
     assertThat(getImportRow("import1", 3).getLocation()).isEqualTo("A0-2");
 
-    var sku2Pk = SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-2#foil#LP");
-    var sku2 =
-        skuTable.getItem(
-            Key.builder().partitionValue(sku2Pk).sortValue(SkuItem.formatSk()).build());
-    assertThat(countUnits(sku2Pk)).isEqualTo(1);
-    assertThat(sku2.getVersion()).isEqualTo(1);
-    assertThat(sku2.getDirty()).isTrue();
+    var sku2Id = "mtg#scryfall#scryfall-2#foil#LP";
+    var sku2 = getSku(sku2Id);
+    assertThat(countUnits(sku2Id)).isEqualTo(1);
+    assertThat(sku2.version()).isEqualTo(1);
+    assertThat(findDirtySkus()).extracting(Sku::skuId).contains(sku2Id);
   }
 
   @Test
@@ -405,12 +400,9 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(body.get("unit_count").asInt()).isEqualTo(4);
     assertThat(body.get("total_suggested_price").asText()).isEqualTo("6.00");
 
-    assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
-        .isEqualTo(2);
-    assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-2#foil#LP")))
-        .isEqualTo(1);
-    assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-3#normal#MP")))
-        .isEqualTo(1);
+    assertThat(countUnits("mtg#scryfall#scryfall-1#normal#NM")).isEqualTo(2);
+    assertThat(countUnits("mtg#scryfall#scryfall-2#foil#LP")).isEqualTo(1);
+    assertThat(countUnits("mtg#scryfall#scryfall-3#normal#MP")).isEqualTo(1);
   }
 
   @Test
@@ -507,8 +499,7 @@ public class ConfirmImportHandlerIntegrationTest {
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(202);
-    assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
-        .isEqualTo(200);
+    assertThat(countUnits("mtg#scryfall#scryfall-1#normal#NM")).isEqualTo(200);
     assertThat(getImportItem("import1").getStatus()).isEqualTo("confirmed");
   }
 
@@ -537,19 +528,13 @@ public class ConfirmImportHandlerIntegrationTest {
               "en");
       row.setDecision("keep");
       row.setSuggestedPrice("1.50");
-      row.setSequenceNumber(position - 1);
-      row.setSkuId("mtg#scryfall#scryfall-1#normal#NM");
-      row.setLocation("A0-" + (position - 1));
+      var created =
+          createUnit(
+              "jordan", "scryfall-1", "normal", Condition.NM, new BigDecimal("1.50"), List.of());
+      row.setSequenceNumber(created.sequenceNumber());
+      row.setSkuId(created.skuId());
+      row.setLocation(created.location());
       importRowTable.putItem(row);
-      unitTable.putItem(
-          UnitItem.create(
-              "jordan",
-              "mtg",
-              "mtg#scryfall#scryfall-1#normal#NM",
-              position - 1,
-              "in_stock",
-              "import1",
-              Instant.ofEpochSecond(1700000000)));
     }
 
     // act
@@ -565,8 +550,7 @@ public class ConfirmImportHandlerIntegrationTest {
 
     // assert
     assertThat(getImportItem("import1").getStatus()).isEqualTo("confirmed");
-    assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
-        .isEqualTo(2);
+    assertThat(countUnits("mtg#scryfall#scryfall-1#normal#NM")).isEqualTo(2);
   }
 
   @Test
@@ -659,16 +643,14 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(getImportRow("import1", 1).getSkuId())
         .isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
     assertThat(getImportRow("import1", 2).getSkuId()).isNull();
-    assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
-        .isEqualTo(2);
+    assertThat(countUnits("mtg#scryfall#scryfall-1#normal#NM")).isEqualTo(2);
 
     // act
     importConfirmationJobProcessor.processBatch("jordan", jobItem);
 
     // assert
     assertThat(getImportItem("import1").getStatus()).isEqualTo("confirmed");
-    assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
-        .isEqualTo(2);
+    assertThat(countUnits("mtg#scryfall#scryfall-1#normal#NM")).isEqualTo(2);
     assertThat(getImportRow("import1", 2).getSkuId())
         .isEqualTo("mtg#scryfall#scryfall-1#normal#NM");
     assertThat(getImportRow("import1", 2).getSequenceNumber()).isEqualTo(1);
@@ -734,14 +716,12 @@ public class ConfirmImportHandlerIntegrationTest {
     var importResult =
         importTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(ImportItem.formatPk("jordan"))
                 .sortValue(ImportItem.formatSk("import1"))
                 .build());
     assertThat(importResult.getStatus()).isEqualTo("review");
-    assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM")))
-        .isEqualTo(0);
-    assertThat(countUnits(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-2#normal#NM")))
-        .isEqualTo(0);
+    assertThat(countUnits("mtg#scryfall#scryfall-1#normal#NM")).isEqualTo(0);
+    assertThat(countUnits("mtg#scryfall#scryfall-2#normal#NM")).isEqualTo(0);
   }
 
   @Test
@@ -797,33 +777,14 @@ public class ConfirmImportHandlerIntegrationTest {
     assertThat(body.get("unit_count").asInt()).isEqualTo(3);
     assertThat(body.get("total_suggested_price").asText()).isEqualTo("46.50");
 
-    var unitA =
-        unitTable.getItem(
-            Key.builder()
-                .partitionValue(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-1#normal#NM"))
-                .sortValue(UnitItem.formatSk(0))
-                .build());
-    assertThat(unitA.getPhotos()).hasSize(2);
-    assertThat(unitA.getPhotos().get(0).getPhotoId()).isEqualTo("photo-a1");
-    assertThat(unitA.getPhotos().get(1).getPhotoId()).isEqualTo("photo-a2");
+    var unitA = getUnit("mtg#scryfall#scryfall-1#normal#NM", 0);
+    assertThat(unitA.photos()).containsExactly("photo-a1", "photo-a2");
 
-    var unitB =
-        unitTable.getItem(
-            Key.builder()
-                .partitionValue(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-2#normal#NM"))
-                .sortValue(UnitItem.formatSk(1))
-                .build());
-    assertThat(unitB.getPhotos()).hasSize(1);
-    assertThat(unitB.getPhotos().get(0).getPhotoId()).isEqualTo("photo-b1");
+    var unitB = getUnit("mtg#scryfall#scryfall-2#normal#NM", 1);
+    assertThat(unitB.photos()).containsExactly("photo-b1");
 
-    var unitC =
-        unitTable.getItem(
-            Key.builder()
-                .partitionValue(SkuItem.formatPk("jordan", "mtg#scryfall#scryfall-3#normal#NM"))
-                .sortValue(UnitItem.formatSk(2))
-                .build());
-    assertThat(unitC.getPhotos()).hasSize(1);
-    assertThat(unitC.getPhotos().get(0).getPhotoId()).isEqualTo("photo-c1");
+    var unitC = getUnit("mtg#scryfall#scryfall-3#normal#NM", 2);
+    assertThat(unitC.photos()).containsExactly("photo-c1");
   }
 
   private ImportItem getImportItem(String importId) {
@@ -955,15 +916,59 @@ public class ConfirmImportHandlerIntegrationTest {
     importRowTable.putItem(rowItem);
   }
 
-  private long countUnits(String skuPk) {
-    var queryConditional =
-        QueryConditional.sortBeginsWith(
-            Key.builder().partitionValue(skuPk).sortValue(UnitItem.UNIT_PREFIX).build());
-    return unitTable
-        .query(QueryEnhancedRequest.builder().queryConditional(queryConditional).build())
-        .stream()
-        .flatMap(page -> page.items().stream())
-        .count();
+  private long countUnits(String skuId) throws Exception {
+    var units = new ArrayList<Unit>();
+    String continuation = null;
+    do {
+      var response =
+          inventoryService.findUnits(
+              new RequestContext("jordan"), new FindUnitsRequest(skuId, 100, continuation));
+      units.addAll(response.units());
+      continuation = response.nextContinuation();
+    } while (continuation != null);
+    return units.size();
+  }
+
+  private Unit getUnit(String skuId, int sequenceNumber) throws Exception {
+    return inventoryService
+        .getUnit(new RequestContext("jordan"), new GetUnitRequest(skuId, sequenceNumber))
+        .unit();
+  }
+
+  private Sku getSku(String skuId) throws Exception {
+    return inventoryService.getSku(new RequestContext("jordan"), new GetSkuRequest(skuId)).sku();
+  }
+
+  private List<Sku> findDirtySkus() throws Exception {
+    return inventoryService
+        .findSkus(new RequestContext("jordan"), new FindSkusRequest(null, null, true, 100, null))
+        .skus();
+  }
+
+  private CreateUnitResponse createUnit(
+      String user,
+      String externalId,
+      String finish,
+      Condition condition,
+      BigDecimal price,
+      List<String> photos)
+      throws Exception {
+    return inventoryService.createUnit(
+        new RequestContext(user),
+        new CreateUnitRequest(
+            "test:" + nextOperationId++ + ":" + externalId + ":" + finish + ":" + condition,
+            "mtg",
+            externalId,
+            finish,
+            condition,
+            "Card " + externalId,
+            "dom",
+            "Dominaria",
+            externalId,
+            price,
+            null,
+            2624,
+            photos));
   }
 
   private APIGatewayV2HTTPEvent buildEvent(String user, Map<String, String> pathParams) {

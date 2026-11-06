@@ -9,7 +9,6 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.s3.S3Container;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.photos.client.GetPhotoBytesRequest;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
@@ -214,7 +213,7 @@ public class RowPhotoHandlerIntegrationTest {
     var importItem =
         importTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(ImportItem.formatPk("jordan"))
                 .sortValue(ImportItem.formatSk(importId))
                 .build());
     importItem.setStatus("confirmed");

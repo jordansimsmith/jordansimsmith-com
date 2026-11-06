@@ -21,8 +21,6 @@ import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusResponse;
@@ -30,6 +28,8 @@ import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsResponse;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.Sku;
+import com.jordansimsmith.tcginventory.inventory.client.Unit;
+import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.tcginventory.orders.OrderRowItem;
 import com.jordansimsmith.tcginventory.orders.client.FindOrdersRequest;
@@ -54,15 +54,11 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
-import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 @Testcontainers
 public class ReportsHandlerIntegrationTest {
 
   private TcgInventoryTestFactory factory;
-  private DynamoDbClient dynamoDbClient;
   private FakeClock fakeClock;
   private FakeUlidGenerator fakeUlidGenerator;
   private FakeQueueClient<JobMessage> fakeJobsQueue;
@@ -70,8 +66,6 @@ public class ReportsHandlerIntegrationTest {
   private ObjectMapper objectMapper;
   private DynamoDbTable<JobItem> jobTable;
   private DynamoDbTable<ReportItem> reportTable;
-  private DynamoDbTable<SkuItem> skuTable;
-  private DynamoDbTable<UnitItem> unitTable;
   private DynamoDbTable<OrderItem> orderTable;
 
   private CreateReportHandler createReportHandler;
@@ -95,7 +89,6 @@ public class ReportsHandlerIntegrationTest {
         TcgInventoryTestFactory.create(
             dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
 
-    dynamoDbClient = factory.dynamoDbClient();
     fakeClock = factory.fakeClock();
     fakeUlidGenerator = factory.fakeUlidGenerator();
     fakeJobsQueue = factory.fakeJobsQueue();
@@ -103,8 +96,6 @@ public class ReportsHandlerIntegrationTest {
     objectMapper = factory.objectMapper();
     jobTable = factory.jobTable();
     reportTable = factory.reportTable();
-    skuTable = factory.skuTable();
-    unitTable = factory.unitTable();
     orderTable = factory.orderTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
@@ -147,7 +138,7 @@ public class ReportsHandlerIntegrationTest {
     var jobItem =
         jobTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(JobItem.formatPk("jordan"))
                 .sortValue(JobItem.formatSk(jobId))
                 .build());
     assertThat(jobItem).isNotNull();
@@ -210,7 +201,7 @@ public class ReportsHandlerIntegrationTest {
     var reportItem =
         reportTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(ReportItem.formatPk("jordan"))
                 .sortValue(ReportItem.formatSk())
                 .build());
     assertThat(reportItem).isNotNull();
@@ -234,7 +225,7 @@ public class ReportsHandlerIntegrationTest {
     var updatedJob =
         jobTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(JobItem.formatPk("jordan"))
                 .sortValue(JobItem.formatSk("report-job"))
                 .build());
     assertThat(updatedJob.getStatus()).isEqualTo("succeeded");
@@ -245,156 +236,60 @@ public class ReportsHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
 
-    var sku1 =
-        SkuItem.create(
-            "jordan",
-            "mtg#scryfall#scryfall1#normal#NM",
-            FakeGamesService.MAGIC_THE_GATHERING.id(),
-            "scryfall1",
-            "normal",
-            "NM",
-            "Lightning Bolt",
-            "sta",
-            "Strixhaven Mystical Archive",
-            "42",
-            null,
-            "1.00");
-    skuTable.putItem(sku1);
-    dynamoDbClient.updateItem(
-        UpdateItemRequest.builder()
-            .tableName(skuTable.tableName())
-            .key(
-                Map.of(
-                    "pk",
-                    AttributeValue.builder().s(sku1.getPk()).build(),
-                    "sk",
-                    AttributeValue.builder().s(sku1.getSk()).build()))
-            .updateExpression("SET last_published_price = :price")
-            .expressionAttributeValues(Map.of(":price", AttributeValue.builder().s("0.30").build()))
-            .build());
+    var sku1Id = "mtg#scryfall#scryfall1#normal#NM";
+    var sku2Id = "mtg#scryfall#scryfall2#normal#NM";
+    var sku3Id = "mtg#scryfall#scryfall3#normal#NM";
+    seedSku(
+        "jordan",
+        sku1Id,
+        "mtg",
+        "scryfall1",
+        "Lightning Bolt",
+        "sta",
+        "Strixhaven Mystical Archive",
+        "42",
+        new BigDecimal("1.00"));
+    seedSku(
+        "jordan",
+        sku2Id,
+        "mtg",
+        "scryfall2",
+        "Sol Ring",
+        "cmr",
+        "Commander Legends",
+        "472",
+        new BigDecimal("3.00"));
+    seedSku("jordan", sku3Id, "mtg", "scryfall3", "Opt", "dom", "Dominaria", "60", null);
+    seedSku(
+        "another-user",
+        "mtg#scryfall#other-card#normal#NM",
+        "mtg",
+        "other-card",
+        "Other User Card",
+        "sta",
+        "Strixhaven Mystical Archive",
+        "1",
+        new BigDecimal("100.00"));
 
-    var sku2 =
-        SkuItem.create(
-            "jordan",
-            "mtg#scryfall#scryfall2#normal#NM",
-            FakeGamesService.MAGIC_THE_GATHERING.id(),
-            "scryfall2",
-            "normal",
-            "NM",
-            "Sol Ring",
-            "cmr",
-            "Commander Legends",
-            "472",
-            null,
-            "3.00");
-    skuTable.putItem(sku2);
-
-    var sku3 =
-        SkuItem.create(
-            "jordan",
-            "mtg#scryfall#scryfall3#normal#NM",
-            FakeGamesService.MAGIC_THE_GATHERING.id(),
-            "scryfall3",
-            "normal",
-            "NM",
-            "Opt",
-            "dom",
-            "Dominaria",
-            "60",
-            null,
-            null);
-    skuTable.putItem(sku3);
-
-    var anotherUsersSku =
-        SkuItem.create(
-            "another-user",
-            "mtg#scryfall#other-card#normal#NM",
-            FakeGamesService.MAGIC_THE_GATHERING.id(),
-            "other-card",
-            "normal",
-            "NM",
-            "Other User Card",
-            "sta",
-            "Strixhaven Mystical Archive",
-            "1",
-            null,
-            "100.00");
-    skuTable.putItem(anotherUsersSku);
-    unitTable.putItem(
-        UnitItem.create(
-            "another-user",
-            "mtg",
-            "mtg#scryfall#other-card#normal#NM",
-            1,
-            "in_stock",
-            "other-import",
-            Instant.ofEpochSecond(1699000000)));
-
-    unitTable.putItem(
-        UnitItem.create(
-            "jordan",
-            "mtg",
-            "mtg#scryfall#scryfall1#normal#NM",
-            1,
-            "in_stock",
-            "import1",
-            Instant.ofEpochSecond(1699000000)));
-    unitTable.putItem(
-        UnitItem.create(
-            "jordan",
-            "mtg",
-            "mtg#scryfall#scryfall1#normal#NM",
-            2,
-            "in_stock",
-            "import1",
-            Instant.ofEpochSecond(1699000000)));
-    unitTable.putItem(
-        UnitItem.create(
-            "jordan",
-            "mtg",
-            "mtg#scryfall#scryfall1#normal#NM",
-            3,
-            "reserved",
-            "import1",
-            Instant.ofEpochSecond(1699000000)));
-    unitTable.putItem(
-        UnitItem.create(
-            "jordan",
-            "mtg",
-            "mtg#scryfall#scryfall2#normal#NM",
-            4,
-            "in_stock",
-            "import1",
-            Instant.ofEpochSecond(1699000000)));
-    var soldUnit =
-        UnitItem.create(
-            "jordan",
-            "mtg",
-            "mtg#scryfall#scryfall2#normal#NM",
-            5,
-            "sold",
-            "import1",
-            Instant.ofEpochSecond(1699000000));
-    soldUnit.setUpdatedAt(Instant.ofEpochSecond(1699500000));
-    unitTable.putItem(soldUnit);
-    unitTable.putItem(
-        UnitItem.create(
-            "jordan",
-            "mtg",
-            "mtg#scryfall#scryfall2#normal#NM",
-            6,
-            "removed",
-            "import1",
-            Instant.ofEpochSecond(1699000000)));
-    unitTable.putItem(
-        UnitItem.create(
-            "jordan",
-            "mtg",
-            "mtg#scryfall#scryfall3#normal#NM",
-            7,
-            "in_stock",
-            "import1",
-            Instant.ofEpochSecond(1699000000)));
+    seedUnits(
+        "another-user",
+        "mtg#scryfall#other-card#normal#NM",
+        List.of(unit(1, UnitStatus.IN_STOCK, null, 1699000000L)));
+    seedUnits(
+        "jordan",
+        sku1Id,
+        List.of(
+            unit(1, UnitStatus.IN_STOCK, null, 1699000000L),
+            unit(2, UnitStatus.IN_STOCK, null, 1699000000L),
+            unit(3, UnitStatus.RESERVED, null, 1699000000L)));
+    seedUnits(
+        "jordan",
+        sku2Id,
+        List.of(
+            unit(4, UnitStatus.IN_STOCK, null, 1699000000L),
+            unit(5, UnitStatus.SOLD, 1699500000L, 1699000000L),
+            unit(6, UnitStatus.REMOVED, null, 1699000000L)));
+    seedUnits("jordan", sku3Id, List.of(unit(7, UnitStatus.IN_STOCK, null, 1699000000L)));
 
     orderTable.putItem(
         createOrderItem(
@@ -474,7 +369,7 @@ public class ReportsHandlerIntegrationTest {
     var reportItem =
         reportTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(ReportItem.formatPk("jordan"))
                 .sortValue(ReportItem.formatSk())
                 .build());
     assertThat(reportItem).isNotNull();
@@ -643,40 +538,24 @@ public class ReportsHandlerIntegrationTest {
   void jobShouldAttributePokemonStockAndPaidRevenueToPokemon() throws Exception {
     // arrange
     var skuId = "pokemon#tcgplayer#283917#normal#NM";
-    skuTable.putItem(
-        SkuItem.create(
-            "jordan",
-            skuId,
-            "pokemon",
-            "283917",
-            "normal",
-            "NM",
-            "Abomasnow",
-            "lost-origin",
-            "Lost Origin",
-            "043/196",
-            "fetch-card-9001",
-            "5.00"));
-    unitTable.putItem(
-        UnitItem.create(
-            "jordan",
-            "pokemon",
-            skuId,
-            1,
-            "in_stock",
-            "pokemon-import",
-            Instant.ofEpochSecond(1699000000)));
-    var soldUnit =
-        UnitItem.create(
-            "jordan",
-            "pokemon",
-            skuId,
-            2,
-            "sold",
-            "pokemon-import",
-            Instant.ofEpochSecond(1699000000));
-    soldUnit.setUpdatedAt(Instant.ofEpochSecond(1699500000));
-    unitTable.putItem(soldUnit);
+    seedSku(
+        "jordan",
+        skuId,
+        "pokemon",
+        "283917",
+        "Abomasnow",
+        "lost-origin",
+        "Lost Origin",
+        "043/196",
+        new BigDecimal("5.00"),
+        "fetch-card-9001");
+    seedUnits(
+        "jordan",
+        skuId,
+        List.of(
+            unit(1, UnitStatus.IN_STOCK, null, 1699000000L),
+            unit(2, UnitStatus.SOLD, 1699500000L, 1699000000L)));
+
     orderTable.putItem(
         createOrderItem(
             "jordan",
@@ -707,7 +586,7 @@ public class ReportsHandlerIntegrationTest {
     var reportItem =
         reportTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(ReportItem.formatPk("jordan"))
                 .sortValue(ReportItem.formatSk())
                 .build());
     var pokemonReport = objectMapper.readTree(reportItem.getReport()).get("games").get(1);
@@ -750,7 +629,7 @@ public class ReportsHandlerIntegrationTest {
     var job =
         jobTable.getItem(
             Key.builder()
-                .partitionValue(SkuItem.formatUserPk("jordan"))
+                .partitionValue(JobItem.formatPk("jordan"))
                 .sortValue(JobItem.formatSk("report-job"))
                 .build());
     assertThat(job.getStatus()).isEqualTo("running");
@@ -920,9 +799,66 @@ public class ReportsHandlerIntegrationTest {
         0);
   }
 
+  private void seedSku(
+      String user,
+      String skuId,
+      String game,
+      String externalId,
+      String name,
+      String setCode,
+      String setName,
+      String collectorNumber,
+      BigDecimal price) {
+    seedSku(user, skuId, game, externalId, name, setCode, setName, collectorNumber, price, null);
+  }
+
+  private void seedSku(
+      String user,
+      String skuId,
+      String game,
+      String externalId,
+      String name,
+      String setCode,
+      String setName,
+      String collectorNumber,
+      BigDecimal price,
+      String fetchTcgCardId) {
+    var sku =
+        new Sku(
+            skuId,
+            game,
+            externalId,
+            name,
+            setCode,
+            setName,
+            collectorNumber,
+            "normal",
+            Condition.NM,
+            price,
+            fetchTcgCardId,
+            0,
+            1);
+    factory.fakeInventoryService().seedSku(user, sku, true);
+  }
+
+  private void seedUnits(String user, String skuId, List<Unit> units) {
+    factory.fakeInventoryService().seedUnits(user, skuId, units);
+  }
+
+  private Unit unit(int sequence, UnitStatus status, Long updatedAt, long createdAt) {
+    return new Unit(
+        sequence,
+        "A0-" + sequence,
+        status,
+        List.of(),
+        createdAt,
+        updatedAt,
+        status == UnitStatus.RESERVED ? "reservation" : null);
+  }
+
   private static Key reportKey(String user) {
     return Key.builder()
-        .partitionValue(SkuItem.formatUserPk(user))
+        .partitionValue(ReportItem.formatPk(user))
         .sortValue(ReportItem.formatSk())
         .build();
   }

@@ -391,7 +391,10 @@ public class FakeInventoryService implements InventoryService {
     var limit = request.limit() == null ? 100 : request.limit();
     var offset = request.continuation() == null ? 0 : Integer.parseInt(request.continuation());
     var end = Math.min(offset + limit, allUnits.size());
-    var page = allUnits.subList(offset, end);
+    var page =
+        allUnits.subList(offset, end).stream()
+            .filter(unit -> unit.status() != UnitStatus.REMOVED)
+            .toList();
     return new FindUnitsResponse(page, end < allUnits.size() ? Integer.toString(end) : null);
   }
 
@@ -502,7 +505,10 @@ public class FakeInventoryService implements InventoryService {
                 candidate ->
                     candidate.sequenceNumber() == request.sequenceNumber() ? removed : candidate)
             .toList());
-    dirtySkus.add(new SkuKey(ctx.user(), request.skuId()));
+    var skuKey = new SkuKey(ctx.user(), request.skuId());
+    var sku = skus.get(skuKey);
+    skus.put(skuKey, withVersion(sku, sku.version() + 1));
+    dirtySkus.add(skuKey);
     return new DeleteUnitResponse();
   }
 
@@ -531,22 +537,26 @@ public class FakeInventoryService implements InventoryService {
     var destinationSkuId =
         String.join("#", Arrays.copyOf(parts, parts.length - 1)) + "#" + request.condition();
     var destinationKey = new SkuKey(ctx.user(), destinationSkuId);
-    skus.putIfAbsent(
-        destinationKey,
-        new Sku(
-            destinationSkuId,
-            sourceSku.game(),
-            sourceSku.externalId(),
-            sourceSku.name(),
-            sourceSku.setCode(),
-            sourceSku.setName(),
-            sourceSku.collectorNumber(),
-            sourceSku.finish(),
-            request.condition(),
-            sourceSku.price(),
-            sourceSku.fetchtcgCardId(),
-            sourceSku.fetchtcgSetId(),
-            sourceSku.version()));
+    var destinationSku =
+        skus.computeIfAbsent(
+            destinationKey,
+            ignored ->
+                new Sku(
+                    destinationSkuId,
+                    sourceSku.game(),
+                    sourceSku.externalId(),
+                    sourceSku.name(),
+                    sourceSku.setCode(),
+                    sourceSku.setName(),
+                    sourceSku.collectorNumber(),
+                    sourceSku.finish(),
+                    request.condition(),
+                    sourceSku.price(),
+                    sourceSku.fetchtcgCardId(),
+                    sourceSku.fetchtcgSetId(),
+                    0));
+    skus.put(sourceKey, withVersion(sourceSku, sourceSku.version() + 1));
+    skus.put(destinationKey, withVersion(destinationSku, destinationSku.version() + 1));
     units.put(
         sourceUnitsKey,
         sourceUnits.stream()
@@ -554,7 +564,15 @@ public class FakeInventoryService implements InventoryService {
             .toList());
     var destinationUnitsKey = new Key(ctx.user(), destinationSkuId);
     var destinationUnits = new ArrayList<>(units.getOrDefault(destinationUnitsKey, List.of()));
-    destinationUnits.add(unit);
+    destinationUnits.add(
+        new Unit(
+            unit.sequenceNumber(),
+            unit.location(),
+            unit.status(),
+            unit.photos(),
+            unit.createdAt(),
+            Instant.now().getEpochSecond(),
+            unit.reservationId()));
     destinationUnits.sort(Comparator.comparingInt(Unit::sequenceNumber));
     units.put(destinationUnitsKey, List.copyOf(destinationUnits));
     dirtySkus.add(sourceKey);
@@ -658,6 +676,23 @@ public class FakeInventoryService implements InventoryService {
 
   private static String formatLocation(int sequenceNumber) {
     return formatLocation(sequenceNumber / 100, sequenceNumber % 100);
+  }
+
+  private static Sku withVersion(Sku sku, int version) {
+    return new Sku(
+        sku.skuId(),
+        sku.game(),
+        sku.externalId(),
+        sku.name(),
+        sku.setCode(),
+        sku.setName(),
+        sku.collectorNumber(),
+        sku.finish(),
+        sku.condition(),
+        sku.price(),
+        sku.fetchtcgCardId(),
+        sku.fetchtcgSetId(),
+        version);
   }
 
   private Position findPosition(List<UnitWithSku> units, int sequenceNumber) {

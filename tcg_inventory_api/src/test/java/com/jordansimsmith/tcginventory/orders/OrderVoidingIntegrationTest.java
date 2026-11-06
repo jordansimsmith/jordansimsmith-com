@@ -13,11 +13,17 @@ import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
+import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
+import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
+import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
 import com.jordansimsmith.tcginventory.inventory.client.ReleaseUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.ReserveUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.Sku;
+import com.jordansimsmith.tcginventory.inventory.client.Unit;
+import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.listings.client.FakeListingService;
+import com.jordansimsmith.tcginventory.listings.client.Listing;
 import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
 import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
 import com.jordansimsmith.time.FakeClock;
@@ -37,6 +43,7 @@ import software.amazon.awssdk.enhanced.dynamodb.Key;
 public class OrderVoidingIntegrationTest {
   private static final String USER = "jordan";
   private static final String SKU_ID = "mtg#scryfall#card-1#normal#NM";
+  private static final int LISTING_ID = 101;
   private static final String ORDER_ID = "83663";
   private static final Instant NOW = Instant.ofEpochSecond(1700000000);
 
@@ -44,8 +51,6 @@ public class OrderVoidingIntegrationTest {
   private FakeClock fakeClock;
   private FakeFetchTcgService fakeFetchTcgService;
   private TcgInventoryTestFactory factory;
-  private DynamoDbTable<SkuItem> skuTable;
-  private DynamoDbTable<UnitItem> unitTable;
   private DynamoDbTable<OrderItem> orderTable;
   private OrderPhaseProcessor orderPhaseProcessor;
 
@@ -68,8 +73,6 @@ public class OrderVoidingIntegrationTest {
     fakeClock = factory.fakeClock();
     fakeFetchTcgService = factory.fakeFetchTcgService();
     fakeClock.setTime(NOW);
-    skuTable = factory.skuTable();
-    unitTable = factory.unitTable();
     orderTable = factory.orderTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
@@ -112,12 +115,18 @@ public class OrderVoidingIntegrationTest {
     assertThat(order.getFetchtcgCurrentAction()).isNull();
 
     var unit = getUnit(1);
-    assertThat(unit.getStatus()).isEqualTo("in_stock");
-    assertThat(unit.getReservationId()).isNull();
+    assertThat(unit.status()).isEqualTo(UnitStatus.IN_STOCK);
 
     var sku = getSku();
-    assertThat(sku.getVersion()).isEqualTo(2);
-    assertThat(sku.getDirty()).isTrue();
+    assertThat(sku.version()).isEqualTo(2);
+    assertThat(
+            factory
+                .inventoryService()
+                .findSkus(
+                    new RequestContext(USER), new FindSkusRequest(null, null, true, 100, null))
+                .skus())
+        .extracting(Sku::skuId)
+        .contains(SKU_ID);
   }
 
   @Test
@@ -138,23 +147,20 @@ public class OrderVoidingIntegrationTest {
     assertThat(result)
         .isEqualTo(new JobProcessor.FailureJobResult("unit is not reserved for this reservation"));
     assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voiding");
-    assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
-    assertThat(getUnit(1).getReservationId()).isNull();
+    assertThat(getUnit(1).status()).isEqualTo(UnitStatus.IN_STOCK);
+    assertThat(getUnit(1).reservationId()).isNull();
 
     // arrange retry after repairing the conflicting saved allocation
-    var repairedUnit = getUnit(2);
-    repairedUnit.setStatus("reserved");
-    repairedUnit.setReservationId(ORDER_ID);
-    unitTable.putItem(repairedUnit);
+    seedUnit(2, "reserved", ORDER_ID);
 
     // act
     orderPhaseProcessor.process(USER);
 
     // assert
     assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voided");
-    assertThat(getUnit(2).getStatus()).isEqualTo("in_stock");
-    assertThat(getUnit(2).getReservationId()).isNull();
-    assertThat(getSku().getVersion()).isEqualTo(3);
+    assertThat(getUnit(2).status()).isEqualTo(UnitStatus.IN_STOCK);
+    assertThat(getUnit(2).reservationId()).isNull();
+    assertThat(getSku().version()).isEqualTo(3);
   }
 
   @Test
@@ -170,9 +176,9 @@ public class OrderVoidingIntegrationTest {
 
     // assert
     assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voided");
-    assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
-    assertThat(getUnit(1).getReservationId()).isNull();
-    assertThat(getSku().getVersion()).isEqualTo(2);
+    assertThat(getUnit(1).status()).isEqualTo(UnitStatus.IN_STOCK);
+    assertThat(getUnit(1).reservationId()).isNull();
+    assertThat(getSku().version()).isEqualTo(2);
   }
 
   @Test
@@ -191,7 +197,7 @@ public class OrderVoidingIntegrationTest {
 
     // assert
     assertThat(getOrder(secondOrderId).getStatus()).isEqualTo("voiding");
-    assertThat(getUnit(1).getReservationId()).isEqualTo(ORDER_ID);
+    assertThat(getUnit(1).reservationId()).isEqualTo(ORDER_ID);
   }
 
   @Test
@@ -211,7 +217,7 @@ public class OrderVoidingIntegrationTest {
 
     // assert
     assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voided");
-    assertThat(getSku().getVersion()).isEqualTo(2);
+    assertThat(getSku().version()).isEqualTo(2);
 
     // arrange empty cancellation
     var emptyOrderId = "83664";
@@ -244,31 +250,62 @@ public class OrderVoidingIntegrationTest {
 
     // assert
     assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voided");
-    assertThat(getUnit(1).getStatus()).isEqualTo("reserved");
-    assertThat(getUnit(1).getReservationId()).isEqualTo("another-order");
+    assertThat(getUnit(1).status()).isEqualTo(UnitStatus.RESERVED);
+    assertThat(getUnit(1).reservationId()).isEqualTo("another-order");
   }
 
   private void createSku() {
-    skuTable.putItem(
-        SkuItem.create(
+    factory
+        .fakeInventoryService()
+        .seedSku(
             USER,
-            SKU_ID,
-            "mtg",
-            "card-1",
-            "normal",
-            "NM",
-            "Card",
-            "dom",
-            "Dominaria",
-            "1",
-            "fetchtcg-card-1",
-            "2.00"));
+            new Sku(
+                SKU_ID,
+                "mtg",
+                "card-1",
+                "Card",
+                "dom",
+                "Dominaria",
+                "1",
+                "normal",
+                Condition.NM,
+                new BigDecimal("2.00"),
+                "fetchtcg-card-1",
+                2,
+                1),
+            false);
+    listingService.seedListing(USER, new Listing(LISTING_ID, SKU_ID));
   }
 
   private void createUnit(int sequenceNumber, String status, String orderId) {
-    var unit = UnitItem.create(USER, "mtg", SKU_ID, sequenceNumber, status, "import-1", NOW);
-    unit.setReservationId(orderId);
-    unitTable.putItem(unit);
+    var units = new ArrayList<>(getUnits());
+    units.add(
+        new Unit(
+            sequenceNumber,
+            "A0-" + sequenceNumber,
+            UnitStatus.valueOf(status.toUpperCase()),
+            List.of(),
+            NOW.getEpochSecond(),
+            null,
+            orderId));
+    factory.fakeInventoryService().seedUnits(USER, SKU_ID, units);
+  }
+
+  private void seedUnit(int sequenceNumber, String status, String orderId) {
+    var units = new ArrayList<>(getUnits());
+    units.replaceAll(
+        unit ->
+            unit.sequenceNumber() == sequenceNumber
+                ? new Unit(
+                    unit.sequenceNumber(),
+                    unit.location(),
+                    UnitStatus.valueOf(status.toUpperCase()),
+                    unit.photos(),
+                    unit.createdAt(),
+                    unit.updatedAt(),
+                    orderId)
+                : unit);
+    factory.fakeInventoryService().seedUnits(USER, SKU_ID, units);
   }
 
   private void createOrder(String orderId, String status, List<OrderRowItem> lines) {
@@ -343,22 +380,33 @@ public class OrderVoidingIntegrationTest {
     return orderTable.getItem(request -> request.key(key).consistentRead(true));
   }
 
-  private UnitItem getUnit(int sequenceNumber) {
-    var key =
-        Key.builder()
-            .partitionValue(UnitItem.formatPk(USER, SKU_ID))
-            .sortValue(UnitItem.formatSk(sequenceNumber))
-            .build();
-    return unitTable.getItem(request -> request.key(key).consistentRead(true));
+  private Unit getUnit(int sequenceNumber) {
+    return getUnits().stream()
+        .filter(unit -> unit.sequenceNumber() == sequenceNumber)
+        .findFirst()
+        .orElseThrow();
   }
 
-  private SkuItem getSku() {
-    var key =
-        Key.builder()
-            .partitionValue(SkuItem.formatPk(USER, SKU_ID))
-            .sortValue(SkuItem.formatSk())
-            .build();
-    return skuTable.getItem(request -> request.key(key).consistentRead(true));
+  private List<Unit> getUnits() {
+    try {
+      return factory
+          .inventoryService()
+          .findUnits(new RequestContext(USER), new FindUnitsRequest(SKU_ID, 100, null))
+          .units();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private Sku getSku() {
+    try {
+      return factory
+          .inventoryService()
+          .getSku(new RequestContext(USER), new GetSkuRequest(SKU_ID))
+          .sku();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private OrderItem createOrderItem(

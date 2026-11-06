@@ -1,6 +1,29 @@
 load("@rules_java//java:defs.bzl", "java_binary")
 
 java_binary(
+    name = "get-order-handler",
+    srcs = ["GetOrderHandler.java"],
+    create_executable = False,
+    resources = ["//tcg_inventory_api:lambda-logback-resource"],
+    visibility = [
+        "//tcg_inventory_api:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/orders/api:__pkg__",
+    ],
+    deps = [
+        "//lib/http:lib",
+        "//lib/service",
+        "//tcg_inventory_api:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/client",
+        "@maven//:ch_qos_logback_logback_classic",
+        "@maven//:ch_qos_logback_logback_core",
+        "@maven//:com_amazonaws_aws_lambda_java_core",
+        "@maven//:com_amazonaws_aws_lambda_java_events",
+        "@maven//:com_google_guava_guava",
+        "@maven//:org_slf4j_slf4j_api",
+    ],
+)
+
+java_binary(
     name = "find-orders-handler",
     srcs = ["FindOrdersHandler.java"],
     create_executable = False,

@@ -290,7 +290,7 @@ lambdas = {
         "zip_file": "find-orders-handler_deploy.jar",
     },
     "get_order": {
-        "handler": "com.jordansimsmith.tcginventory.orders.GetOrderHandler",
+        "handler": "com.jordansimsmith.tcginventory.orders.api.GetOrderHandler",
         "zip_file": "get-order-handler_deploy.jar",
     },
     "confirm_order": {

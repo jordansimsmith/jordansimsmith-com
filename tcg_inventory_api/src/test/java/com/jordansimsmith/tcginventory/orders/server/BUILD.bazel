@@ -14,6 +14,7 @@ java_test_suite(
     deps = [
         "//lib/dynamodb:test-lib",
         "//lib/service",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/server",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",

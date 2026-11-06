@@ -166,7 +166,7 @@
         "remove_unit": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/api:delete-unit-handler_deploy.jar",
         "update_unit": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/api:update-unit-handler_deploy.jar",
         "find_orders": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:find-orders-handler_deploy.jar",
-        "get_order": "//tcg_inventory_api:get-order-handler_deploy.jar",
+        "get_order": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:get-order-handler_deploy.jar",
         "confirm_order": "//tcg_inventory_api:confirm-order-handler_deploy.jar",
         "jobs_handler": "//tcg_inventory_api:jobs-handler_deploy.jar"
       },

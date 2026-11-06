@@ -7,6 +7,8 @@ public interface OrderService {
   FindOrdersResponse findOrders(RequestContext ctx, FindOrdersRequest request)
       throws ServiceException;
 
+  GetOrderResponse getOrder(RequestContext ctx, GetOrderRequest request) throws ServiceException;
+
   GetOrderSettingsResponse getOrderSettings(RequestContext ctx, GetOrderSettingsRequest request)
       throws ServiceException;
 

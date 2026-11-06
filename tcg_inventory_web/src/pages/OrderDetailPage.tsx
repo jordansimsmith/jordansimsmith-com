@@ -190,11 +190,7 @@ export function OrderDetailPage() {
     };
   }, [orderId, order?.state]);
 
-  const showPullContext =
-    order?.state === 'awaiting_payment' ||
-    order?.state === 'reserving' ||
-    order?.state === 'to_pick' ||
-    order?.state === 'fulfilling';
+  const showPullLocations = order?.state === 'to_pick';
   const unitsByGame = new Map<string, OrderUnit[]>();
   for (const unit of order?.units ?? []) {
     const gameUnits = unitsByGame.get(unit.game) ?? [];
@@ -388,16 +384,12 @@ export function OrderDetailPage() {
                 <Box p="md" className={classes.pullHeader}>
                   <Group justify="space-between" align="baseline" gap="sm">
                     <Title order={3} fz="md">
-                      {order.state === 'to_pick' || order.state === 'fulfilling'
-                        ? 'Pull sheet'
-                        : 'Cards'}
+                      {order.state === 'to_pick' ? 'Pull sheet' : 'Cards'}
                     </Title>
                     <Text size="xs" c="dimmed" className={classes.numeric}>
                       {order.unit_count}{' '}
                       {order.unit_count === 1 ? 'card' : 'cards'}
-                      {(order.state === 'to_pick' ||
-                        order.state === 'fulfilling') &&
-                        ' · location order'}
+                      {showPullLocations && ' · location order'}
                     </Text>
                   </Group>
                   {order.state === 'fulfilling' && (
@@ -447,11 +439,11 @@ export function OrderDetailPage() {
                           gap="xs"
                         >
                           <Text fz={26} fw={700} className={classes.location}>
-                            {showPullContext
+                            {showPullLocations
                               ? unit.current_location
                               : unit.location}
                           </Text>
-                          {showPullContext &&
+                          {showPullLocations &&
                             unit.current_location !== unit.location && (
                               <Text
                                 size="sm"
@@ -477,7 +469,7 @@ export function OrderDetailPage() {
                             ${unit.price}
                           </Text>
                         )}
-                        {showPullContext &&
+                        {showPullLocations &&
                           (unit.previous_card != null ||
                             unit.next_card != null) && (
                             <Stack gap={2} className={classes.neighbors}>

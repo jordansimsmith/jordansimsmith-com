@@ -16,9 +16,8 @@ import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
-import com.jordansimsmith.tcginventory.inventory.server.InventoryModule;
+import com.jordansimsmith.tcginventory.inventory.client.FakeInventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.listings.server.ListingsModule;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.tcginventory.orders.server.OrdersModule;
@@ -43,13 +42,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Module(
-    includes = {
-      PricingModule.class,
-      OrdersModule.class,
-      CatalogModule.class,
-      InventoryModule.class,
-      ListingsModule.class
-    })
+    includes = {PricingModule.class, OrdersModule.class, CatalogModule.class, ListingsModule.class})
 public class TcgInventoryTestModule {
   @Provides
   @Singleton
@@ -79,18 +72,6 @@ public class TcgInventoryTestModule {
       DynamoDbEnhancedClient dynamoDbEnhancedClient) {
     var schema = TableSchema.fromBean(TcgInventoryTableDefinition.class);
     return dynamoDbEnhancedClient.table(TcgInventoryTable.TABLE_NAME, schema);
-  }
-
-  @Provides
-  @Singleton
-  DynamoDbTable<SkuItem> skuTable(DynamoDbEnhancedClient client) {
-    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(SkuItem.class));
-  }
-
-  @Provides
-  @Singleton
-  DynamoDbTable<UnitItem> unitTable(DynamoDbEnhancedClient client) {
-    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(UnitItem.class));
   }
 
   @Provides
@@ -180,6 +161,18 @@ public class TcgInventoryTestModule {
   @Singleton
   QueueClient<ScanMessage> scanQueue(FakeQueueClient<ScanMessage> fakeScanQueue) {
     return fakeScanQueue;
+  }
+
+  @Provides
+  @Singleton
+  FakeInventoryService fakeInventoryService(GamesService gamesService) {
+    return new FakeInventoryService(gamesService);
+  }
+
+  @Provides
+  @Singleton
+  InventoryService inventoryService(FakeInventoryService fakeInventoryService) {
+    return fakeInventoryService;
   }
 
   @Provides

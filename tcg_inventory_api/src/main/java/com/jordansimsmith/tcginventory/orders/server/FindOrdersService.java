@@ -11,7 +11,6 @@ import com.jordansimsmith.tcginventory.orders.client.FindOrdersResponse;
 import com.jordansimsmith.tcginventory.orders.client.OrderState;
 import com.jordansimsmith.tcginventory.orders.client.OrderSummary;
 import com.jordansimsmith.tcginventory.orders.client.OrderSummaryRow;
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -74,8 +73,8 @@ public class FindOrdersService {
         order.getCreatedAt() == null ? 0 : order.getCreatedAt().getEpochSecond(),
         toDeliveryMode(order.getDeliveryMode()),
         order.getTotalPrice(),
-        itemsTotalPrice(rows),
-        listedTotalPrice(rows),
+        OrderRows.itemsTotalPrice(rows),
+        OrderRows.listedTotalPrice(rows),
         unitCount,
         rows.stream().map(FindOrdersService::toSummaryRow).toList());
   }
@@ -87,36 +86,5 @@ public class FindOrdersService {
   @Nullable
   private static DeliveryMode toDeliveryMode(@Nullable String value) {
     return value == null ? null : DeliveryMode.valueOf(value);
-  }
-
-  @Nullable
-  private static String itemsTotalPrice(List<OrderRowItem> rows) {
-    if (rows.isEmpty()) {
-      return null;
-    }
-    var total = BigDecimal.ZERO;
-    for (var row : rows) {
-      if (row.getPrice() != null) {
-        total = total.add(new BigDecimal(row.getPrice()));
-      }
-    }
-    return total.toPlainString();
-  }
-
-  @Nullable
-  private static String listedTotalPrice(List<OrderRowItem> rows) {
-    if (rows.isEmpty()) {
-      return null;
-    }
-    var total = BigDecimal.ZERO;
-    for (var row : rows) {
-      if (row.getListedPrice() == null) {
-        return null;
-      }
-      total =
-          total.add(
-              new BigDecimal(row.getListedPrice()).multiply(BigDecimal.valueOf(row.getQuantity())));
-    }
-    return total.toPlainString();
   }
 }

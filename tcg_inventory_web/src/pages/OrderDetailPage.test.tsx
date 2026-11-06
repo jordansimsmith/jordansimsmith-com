@@ -45,7 +45,7 @@ const REGISTERED_GAMES = [
 ];
 
 function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
-  return {
+  const order: OrderDetail = {
     order_id: '83647',
     state: 'to_pick',
     accepted_at: 1765420932,
@@ -153,6 +153,19 @@ function orderDetail(overrides: Partial<OrderDetail> = {}): OrderDetail {
       },
     ],
     ...overrides,
+  };
+  if (order.state === 'to_pick') {
+    return order;
+  }
+  return {
+    ...order,
+    units: order.units.map((unit) => ({
+      ...unit,
+      location: null,
+      current_location: null,
+      previous_card: null,
+      next_card: null,
+    })),
   };
 }
 
@@ -549,16 +562,14 @@ describe('OrderDetailPage', () => {
     expect(screen.queryByText('Pull sheet')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Confirm pull' })).toBeNull();
 
-    // fulfilled orders show insertion locations only, without pull context
-    const locations = screen
-      .getAllByText(/^A\d+-\d+$/)
-      .map((element) => element.textContent);
-    expect(locations).toEqual(['A0-37', 'A0-74', 'A2-59']);
+    // fulfilled orders retain cards without physical location information
+    expect(screen.getAllByText('Sol Ring').length).toBeGreaterThan(0);
+    expect(screen.queryAllByText(/^A\d+-\d+$/)).toHaveLength(0);
     expect(screen.queryByText(/^Prev ·/)).toBeNull();
     expect(screen.queryByText(/^Next ·/)).toBeNull();
   });
 
-  it('keeps pull context visible without confirm while fulfilling', async () => {
+  it('shows allocated cards without locations while fulfilling', async () => {
     vi.spyOn(clientModule.apiClient, 'getOrder').mockResolvedValue(
       orderDetail({ state: 'fulfilling' }),
     );
@@ -567,7 +578,8 @@ describe('OrderDetailPage', () => {
 
     expect(await screen.findByText('fulfilling')).toBeDefined();
     expect(screen.getByText(/Pull confirmation is processing/)).toBeDefined();
-    expect(screen.getAllByText(/^Prev ·/).length).toBeGreaterThan(0);
+    expect(screen.queryByText(/^Prev ·/)).toBeNull();
+    expect(screen.queryAllByText(/^A\d+-\d+$/)).toHaveLength(0);
     expect(screen.queryByRole('button', { name: 'Confirm pull' })).toBeNull();
   });
 
@@ -690,8 +702,7 @@ describe('OrderDetailPage', () => {
     expect(screen.getByText('Cards')).toBeDefined();
     expect(screen.queryByText('Pull sheet')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Confirm pull' })).toBeNull();
-    // reserved cards are still boxed, so pull context renders before payment
-    expect(screen.getByText('A0-35')).toBeDefined();
+    expect(screen.queryAllByText(/^A\d+-\d+$/)).toHaveLength(0);
     expect(document.querySelectorAll('img')).toHaveLength(3);
   });
 
@@ -720,7 +731,7 @@ describe('OrderDetailPage', () => {
     expect(screen.getByText('reserving')).toBeDefined();
     expect(screen.queryByText('Pull sheet')).toBeNull();
     expect(screen.queryByRole('button', { name: 'Confirm pull' })).toBeNull();
-    expect(screen.getByText('A0-35')).toBeDefined();
+    expect(screen.queryAllByText(/^A\d+-\d+$/)).toHaveLength(0);
   });
 
   it('renders thumbnails for voided orders', async () => {

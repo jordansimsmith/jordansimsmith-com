@@ -25,8 +25,12 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.FindOffersResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
 import com.jordansimsmith.tcginventory.fetchtcg.client.OfferItem;
 import com.jordansimsmith.tcginventory.fetchtcg.client.OfferListing;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
+import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
+import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
+import com.jordansimsmith.tcginventory.inventory.client.Sku;
+import com.jordansimsmith.tcginventory.inventory.client.Unit;
+import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.listings.client.FakeListingService;
 import com.jordansimsmith.tcginventory.listings.client.FindListingsRequest;
 import com.jordansimsmith.tcginventory.listings.client.FindListingsResponse;
@@ -61,8 +65,6 @@ public class OrderReservationIntegrationTest {
   private FakeClock fakeClock;
   private FakeFetchTcgService fakeFetchTcgService;
   private TcgInventoryTestFactory factory;
-  private DynamoDbTable<SkuItem> skuTable;
-  private DynamoDbTable<UnitItem> unitTable;
   private DynamoDbTable<OrderItem> orderTable;
   private OrderPhaseProcessor orderPhaseProcessor;
   private OrderRepository orderRepository;
@@ -86,8 +88,6 @@ public class OrderReservationIntegrationTest {
     fakeClock = factory.fakeClock();
     fakeFetchTcgService = factory.fakeFetchTcgService();
     fakeClock.setTime(NOW);
-    skuTable = factory.skuTable();
-    unitTable = factory.unitTable();
     orderTable = factory.orderTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
@@ -206,10 +206,9 @@ public class OrderReservationIntegrationTest {
     assertThat(List.of(getUnit(1), getUnit(2), getUnit(3), getUnit(4)))
         .allSatisfy(
             unit -> {
-              assertThat(unit.getStatus()).isEqualTo("reserved");
-              assertThat(unit.getReservationId()).isNotNull();
+              assertThat(unit.status()).isEqualTo(UnitStatus.RESERVED);
             });
-    assertThat(getSku().getVersion()).isEqualTo(5);
+    assertThat(getSku().version()).isEqualTo(5);
   }
 
   @Test
@@ -232,7 +231,7 @@ public class OrderReservationIntegrationTest {
         .isInstanceOf(ConflictException.class)
         .hasMessage("No in-stock units are available for this SKU");
     assertThat(getOrders()).hasSize(2);
-    assertThat(getUnit(1).getStatus()).isEqualTo("reserved");
+    assertThat(getUnit(1).status()).isEqualTo(UnitStatus.RESERVED);
   }
 
   @Test
@@ -263,7 +262,7 @@ public class OrderReservationIntegrationTest {
     // act & assert
     assertThatThrownBy(() -> processor.process(USER)).isSameAs(failure);
     assertThat(getOrders()).isEmpty();
-    assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
+    assertThat(getUnit(1).status()).isEqualTo(UnitStatus.IN_STOCK);
   }
 
   @Test
@@ -284,7 +283,7 @@ public class OrderReservationIntegrationTest {
             new JobProcessor.FailureJobResult(
                 "Offer 83663 contains listing 999 with no matching inventory SKU"));
     assertThat(getOrders()).isEmpty();
-    assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
+    assertThat(getUnit(1).status()).isEqualTo(UnitStatus.IN_STOCK);
   }
 
   @Test
@@ -302,7 +301,7 @@ public class OrderReservationIntegrationTest {
         .isEqualTo(
             new JobProcessor.FailureJobResult("Offer 83663 has no card lines; check FetchTCG"));
     assertThat(getOrders()).isEmpty();
-    assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
+    assertThat(getUnit(1).status()).isEqualTo(UnitStatus.IN_STOCK);
   }
 
   @Test
@@ -327,8 +326,8 @@ public class OrderReservationIntegrationTest {
         .isEqualTo(
             new JobProcessor.FailureJobResult("No in-stock units are available for this SKU"));
     assertThat(getOrders()).hasSize(2);
-    assertThat(getUnit(1).getStatus()).isEqualTo("reserved");
-    assertThat(getUnit(2).getStatus()).isEqualTo("reserved");
+    assertThat(getUnit(1).status()).isEqualTo(UnitStatus.RESERVED);
+    assertThat(getUnit(2).status()).isEqualTo(UnitStatus.RESERVED);
   }
 
   @Test
@@ -360,23 +359,20 @@ public class OrderReservationIntegrationTest {
 
     // assert
     assertThat(getOrder("83663").getStatus()).isEqualTo("reserving");
-    assertThat(getUnit(1).getStatus()).isEqualTo("reserved");
-    assertThat(getUnit(1).getReservationId()).isEqualTo("83663");
+    assertThat(getUnit(1).status()).isEqualTo(UnitStatus.RESERVED);
+    assertThat(getUnit(1).reservationId()).isEqualTo("83663");
 
     // arrange retry after repairing the conflicting saved allocation
-    var repairedUnit = getUnit(2);
-    repairedUnit.setStatus("in_stock");
-    repairedUnit.setReservationId(null);
-    unitTable.putItem(repairedUnit);
+    seedUnit(2, "in_stock", null);
 
     // act
     orderPhaseProcessor.process(USER);
 
     // assert
     assertThat(getOrder("83663").getStatus()).isEqualTo("to_pick");
-    assertThat(getUnit(2).getStatus()).isEqualTo("reserved");
-    assertThat(getUnit(2).getReservationId()).isEqualTo("83663");
-    assertThat(getSku().getVersion()).isEqualTo(3);
+    assertThat(getUnit(2).status()).isEqualTo(UnitStatus.RESERVED);
+    assertThat(getUnit(2).reservationId()).isEqualTo("83663");
+    assertThat(getSku().version()).isEqualTo(3);
   }
 
   @Test
@@ -410,7 +406,7 @@ public class OrderReservationIntegrationTest {
 
     // assert
     assertThat(getOrder("83663").getStatus()).isEqualTo("reserving");
-    assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
+    assertThat(getUnit(1).status()).isEqualTo(UnitStatus.IN_STOCK);
   }
 
   @Test
@@ -427,7 +423,7 @@ public class OrderReservationIntegrationTest {
     orderPhaseProcessor.process(USER);
 
     // assert
-    assertThat(getUnit(1).getStatus()).isEqualTo("reserved");
+    assertThat(getUnit(1).status()).isEqualTo(UnitStatus.RESERVED);
     fakeFetchTcgService.seedOffers(
         USER, List.of(offer(83664, null, List.of(offerItem(999, 1, "1.00", "2.00")))));
     assertThatThrownBy(() -> orderPhaseProcessor.process(USER))
@@ -472,7 +468,7 @@ public class OrderReservationIntegrationTest {
     // act & assert
     assertThatThrownBy(() -> processor.process(USER)).isSameAs(failure);
     assertThat(getOrders()).isEmpty();
-    assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
+    assertThat(getUnit(1).status()).isEqualTo(UnitStatus.IN_STOCK);
     verify(listings).findListings(ctx, firstRequest);
     verify(listings).findListings(ctx, new FindListingsRequest(List.of(100)));
     verifyNoMoreInteractions(listings);
@@ -528,14 +524,14 @@ public class OrderReservationIntegrationTest {
 
     // act
     assertThatThrownBy(() -> processor.process(USER)).hasMessage("progress unavailable");
-    var version = getSku().getVersion();
+    var version = getSku().version();
     processor.process(USER);
 
     // assert
     assertThat(getOrder("83663").getStatus()).isEqualTo("awaiting_payment");
     assertThat(findOrderRows(getOrder("83663")).getFirst().getAllocatedSequenceNumbers())
         .containsExactly(1);
-    assertThat(getSku().getVersion()).isEqualTo(version);
+    assertThat(getSku().version()).isEqualTo(version);
   }
 
   @Test
@@ -578,7 +574,7 @@ public class OrderReservationIntegrationTest {
     assertThatThrownBy(() -> orderPhaseProcessor.process(USER))
         .isInstanceOf(ConflictException.class);
     assertThat(getOrder("83663").getStatus()).isEqualTo("reserving");
-    assertThat(getUnit(1).getStatus()).isEqualTo("reserved");
+    assertThat(getUnit(1).status()).isEqualTo(UnitStatus.RESERVED);
 
     // arrange
     createUnit(2, "in_stock", null);
@@ -591,8 +587,8 @@ public class OrderReservationIntegrationTest {
     assertThat(getOrder("83663").getStatus()).isEqualTo("voided");
     assertThat(findOrderRows(getOrder("83663")).getFirst().getAllocatedSequenceNumbers())
         .containsExactly(1, 2);
-    assertThat(getUnit(1).getStatus()).isEqualTo("in_stock");
-    assertThat(getUnit(2).getStatus()).isEqualTo("in_stock");
+    assertThat(getUnit(1).status()).isEqualTo(UnitStatus.IN_STOCK);
+    assertThat(getUnit(2).status()).isEqualTo(UnitStatus.IN_STOCK);
   }
 
   @Test
@@ -665,28 +661,57 @@ public class OrderReservationIntegrationTest {
   }
 
   private void createSku() {
-    var sku =
-        SkuItem.create(
+    factory
+        .fakeInventoryService()
+        .seedSku(
             USER,
-            SKU_ID,
-            "mtg",
-            "card-1",
-            "normal",
-            "NM",
-            "Card",
-            "dom",
-            "Dominaria",
-            "1",
-            "fetchtcg-card-1",
-            "2.00");
+            new Sku(
+                SKU_ID,
+                "mtg",
+                "card-1",
+                "Card",
+                "dom",
+                "Dominaria",
+                "1",
+                "normal",
+                Condition.NM,
+                new BigDecimal("2.00"),
+                "fetchtcg-card-1",
+                2,
+                1),
+            false);
     listingService.seedListing(USER, new Listing(LISTING_ID, SKU_ID));
-    skuTable.putItem(sku);
   }
 
   private void createUnit(int sequenceNumber, String status, String orderId) {
-    var unit = UnitItem.create(USER, "mtg", SKU_ID, sequenceNumber, status, "import-1", NOW);
-    unit.setReservationId(orderId);
-    unitTable.putItem(unit);
+    var units = new ArrayList<>(getUnits());
+    units.add(
+        new Unit(
+            sequenceNumber,
+            "A0-" + sequenceNumber,
+            UnitStatus.valueOf(status.toUpperCase()),
+            List.of(),
+            NOW.getEpochSecond(),
+            null,
+            orderId));
+    factory.fakeInventoryService().seedUnits(USER, SKU_ID, units);
+  }
+
+  private void seedUnit(int sequenceNumber, String status, String orderId) {
+    var units = new ArrayList<>(getUnits());
+    units.replaceAll(
+        unit ->
+            unit.sequenceNumber() == sequenceNumber
+                ? new Unit(
+                    unit.sequenceNumber(),
+                    unit.location(),
+                    UnitStatus.valueOf(status.toUpperCase()),
+                    unit.photos(),
+                    unit.createdAt(),
+                    unit.updatedAt(),
+                    orderId)
+                : unit);
+    factory.fakeInventoryService().seedUnits(USER, SKU_ID, units);
   }
 
   private void createOrder(OrderItem order) {
@@ -718,22 +743,33 @@ public class OrderReservationIntegrationTest {
     return results;
   }
 
-  private UnitItem getUnit(int sequenceNumber) {
-    var key =
-        Key.builder()
-            .partitionValue(UnitItem.formatPk(USER, SKU_ID))
-            .sortValue(UnitItem.formatSk(sequenceNumber))
-            .build();
-    return unitTable.getItem(request -> request.key(key).consistentRead(true));
+  private Unit getUnit(int sequenceNumber) {
+    return getUnits().stream()
+        .filter(unit -> unit.sequenceNumber() == sequenceNumber)
+        .findFirst()
+        .orElseThrow();
   }
 
-  private SkuItem getSku() {
-    var key =
-        Key.builder()
-            .partitionValue(SkuItem.formatPk(USER, SKU_ID))
-            .sortValue(SkuItem.formatSk())
-            .build();
-    return skuTable.getItem(request -> request.key(key).consistentRead(true));
+  private List<Unit> getUnits() {
+    try {
+      return factory
+          .inventoryService()
+          .findUnits(new RequestContext(USER), new FindUnitsRequest(SKU_ID, 100, null))
+          .units();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private Sku getSku() {
+    try {
+      return factory
+          .inventoryService()
+          .getSku(new RequestContext(USER), new GetSkuRequest(SKU_ID))
+          .sku();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private OrderItem createOrderItem(

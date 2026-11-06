@@ -71,4 +71,13 @@ public class OrderReadRepository {
     }
     return rows;
   }
+
+  @Nullable
+  public OrderItem getOrder(String user, String orderId) {
+    return orderTable.getItem(
+        Key.builder()
+            .partitionValue(OrderItem.formatPk(user))
+            .sortValue(OrderItem.formatSk(orderId))
+            .build());
+  }
 }

@@ -1020,7 +1020,7 @@ describe('createFakeClient orders', () => {
     for (const unit of detail.units) {
       expect(unit.current_location).toMatch(/^A\d+-\d+$/);
       // gaps only ever pull a card forward from its insertion offset
-      const currentOffset = Number(unit.current_location.split('-')[1]);
+      const currentOffset = Number(unit.current_location!.split('-')[1]);
       expect(currentOffset).toBeLessThanOrEqual(unit.sequence_number % 100);
     }
     const neighbors = detail.units.flatMap((unit) =>

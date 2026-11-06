@@ -3,8 +3,11 @@ package com.jordansimsmith.tcginventory.orders.server;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.orders.client.FindOrdersRequest;
 import com.jordansimsmith.tcginventory.orders.client.FindOrdersResponse;
+import com.jordansimsmith.tcginventory.orders.client.GetOrderRequest;
+import com.jordansimsmith.tcginventory.orders.client.GetOrderResponse;
 import com.jordansimsmith.tcginventory.orders.client.GetOrderSettingsRequest;
 import com.jordansimsmith.tcginventory.orders.client.GetOrderSettingsResponse;
 import com.jordansimsmith.tcginventory.orders.client.OrderService;
@@ -25,7 +28,8 @@ public class OrdersModule {
   OrderService orderService(
       DynamoDbEnhancedClient dynamoDbEnhancedClient,
       @Named("tcgInventoryTableName") String tableName,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      InventoryService inventoryService) {
     DynamoDbTable<OrderSettingsItem> settingsTable =
         dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(OrderSettingsItem.class));
     var settingsRepository = new OrderSettingsRepository(settingsTable);
@@ -36,11 +40,18 @@ public class OrdersModule {
             dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(OrderItem.class)),
             dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(OrderRowItem.class)));
     var findOrdersService = new FindOrdersService(orderReadRepository, objectMapper);
+    var getOrderService = new GetOrderService(orderReadRepository, inventoryService);
     return new OrderService() {
       @Override
       public FindOrdersResponse findOrders(RequestContext ctx, FindOrdersRequest request)
           throws ServiceException {
         return findOrdersService.findOrders(ctx, request);
+      }
+
+      @Override
+      public GetOrderResponse getOrder(RequestContext ctx, GetOrderRequest request)
+          throws ServiceException {
+        return getOrderService.getOrder(ctx, request);
       }
 
       @Override

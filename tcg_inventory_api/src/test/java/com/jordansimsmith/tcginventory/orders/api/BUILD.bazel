@@ -2,7 +2,11 @@ load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 
 java_test_suite(
     name = "api-unit-tests",
-    srcs = ["FindOrdersHandlerTest.java"],
+    size = "small",
+    srcs = [
+        "FindOrdersHandlerTest.java",
+        "GetOrderHandlerTest.java",
+    ],
     runner = "junit5",
     test_suffixes = ["Test.java"],
     runtime_deps = JUNIT5_DEPS,
@@ -11,6 +15,7 @@ java_test_suite(
         "//lib/service",
         "//tcg_inventory_api:lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:find-orders-handler",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:get-order-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/client",
         "@maven//:com_amazonaws_aws_lambda_java_core",
         "@maven//:com_amazonaws_aws_lambda_java_events",

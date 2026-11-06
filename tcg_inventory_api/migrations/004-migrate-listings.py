@@ -66,7 +66,9 @@ def build_plan(client, table):
                 dict(fields, sk={"S": f"SKU#{sku_id}"}),
                 dict(fields, sk={"S": f"LISTING#{listing_id}"}),
             ]
-            print(f"Validating destination records for SKU {len(pairs) + 1}", flush=True)
+            print(
+                f"Validating destination records for SKU {len(pairs) + 1}", flush=True
+            )
             for item in pair:
                 key = (item["pk"]["S"], item["sk"]["S"])
                 if key in destinations and destinations[key] != item:

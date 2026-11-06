@@ -30,15 +30,19 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.ShippingOption;
 import com.jordansimsmith.tcginventory.imports.AppraiseJobProcessor;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
-import com.jordansimsmith.tcginventory.inventory.SkuItem;
-import com.jordansimsmith.tcginventory.inventory.UnitItem;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
+import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
+import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
+import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
 import com.jordansimsmith.tcginventory.inventory.client.ReleaseUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.Sku;
+import com.jordansimsmith.tcginventory.inventory.client.Unit;
+import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.listings.client.FindListingsRequest;
 import com.jordansimsmith.tcginventory.listings.client.Listing;
 import com.jordansimsmith.tcginventory.listings.client.UpdateListingRequest;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.tcginventory.orders.OrderRowItem;
-import com.jordansimsmith.tcginventory.pricing.client.Condition;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceRequest;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceResponse;
 import com.jordansimsmith.tcginventory.pricing.client.GetPricingRequest;
@@ -61,7 +65,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 
@@ -75,8 +78,6 @@ public class JobsHandlerIntegrationTest {
   private DynamoDbTable<ImportItem> importTable;
   private DynamoDbTable<ImportRowItem> importRowTable;
   private DynamoDbTable<JobItem> jobTable;
-  private DynamoDbTable<SkuItem> skuTable;
-  private DynamoDbTable<UnitItem> unitTable;
   private DynamoDbTable<OrderItem> orderTable;
   private TcgInventoryTestFactory factory;
 
@@ -108,8 +109,6 @@ public class JobsHandlerIntegrationTest {
     importTable = factory.importTable();
     importRowTable = factory.importRowTable();
     jobTable = factory.jobTable();
-    skuTable = factory.skuTable();
-    unitTable = factory.unitTable();
     orderTable = factory.orderTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
@@ -222,7 +221,9 @@ public class JobsHandlerIntegrationTest {
     var pricingService = mock(PricingService.class);
     when(pricingService.getPrice(
             new RequestContext("jordan"),
-            new GetPriceRequest("mtg_168_c_dom_normal", Condition.NM)))
+            new GetPriceRequest(
+                "mtg_168_c_dom_normal",
+                com.jordansimsmith.tcginventory.pricing.client.Condition.NM)))
         .thenThrow(new NotFoundException("missing"));
 
     var result =
@@ -251,14 +252,23 @@ public class JobsHandlerIntegrationTest {
     var fetchTcgService = factory.fakeFetchTcgService();
     var ctx = new RequestContext("jordan");
     var pricingService = mock(PricingService.class);
-    when(pricingService.getPrice(ctx, new GetPriceRequest("mtg_168_c_dom_normal", Condition.NM)))
+    when(pricingService.getPrice(
+            ctx,
+            new GetPriceRequest(
+                "mtg_168_c_dom_normal",
+                com.jordansimsmith.tcginventory.pricing.client.Condition.NM)))
         .thenReturn(new GetPriceResponse(new BigDecimal("1.20"), new BigDecimal("1.20")));
 
     // act
     newAppraiseJobProcessor(fetchTcgService, pricingService).processBatch("jordan", jobItem);
 
     // assert
-    verify(pricingService).getPrice(ctx, new GetPriceRequest("mtg_168_c_dom_normal", Condition.NM));
+    verify(pricingService)
+        .getPrice(
+            ctx,
+            new GetPriceRequest(
+                "mtg_168_c_dom_normal",
+                com.jordansimsmith.tcginventory.pricing.client.Condition.NM));
     var row = getRow("jordan", "import1", 1);
     assertThat(row.getMarketPrice()).isEqualTo("1.20");
     assertThat(row.getSuggestedPrice()).isEqualTo("1.20");
@@ -279,7 +289,9 @@ public class JobsHandlerIntegrationTest {
             "shared-card", "Card", BigDecimal.ONE, Map.of("scryfallId", SCRYFALL_ID)));
     var pricingService = mock(PricingService.class);
     var ctx = new RequestContext("jordan");
-    var request = new GetPriceRequest("shared-card", Condition.NM);
+    var request =
+        new GetPriceRequest(
+            "shared-card", com.jordansimsmith.tcginventory.pricing.client.Condition.NM);
     when(pricingService.getPrice(ctx, request))
         .thenReturn(new GetPriceResponse(new BigDecimal("1.00"), new BigDecimal("0.95")));
 
@@ -902,12 +914,12 @@ public class JobsHandlerIntegrationTest {
     assertThat(orderLines.get(0).getQuantity()).isEqualTo(2);
 
     var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(sku.getDirty()).isFalse();
+    assertThat(isDirty("jordan", sku.skuId())).isFalse();
 
     var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
+    var reserved = units.stream().filter(u -> u.status() == UnitStatus.RESERVED).toList();
     assertThat(reserved).hasSize(2);
-    assertThat(reserved.get(0).getReservationId()).isEqualTo("83663");
+    assertThat(reserved.get(0).reservationId()).isEqualTo("83663");
   }
 
   @Test
@@ -1008,12 +1020,12 @@ public class JobsHandlerIntegrationTest {
     assertThat(order.getFetchtcgCurrentAction()).isNull();
 
     var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("in_stock"));
-    assertThat(units).allSatisfy(unit -> assertThat(unit.getReservationId()).isNull());
+    assertThat(units).allSatisfy(unit -> assertThat(unit.status()).isEqualTo(UnitStatus.IN_STOCK));
+    assertThat(units).allSatisfy(unit -> assertThat(unit.reservationId()).isNull());
 
     // the released units are dirty stock again, so the listing phase restores the full quantity
     var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(sku.getDirty()).isFalse();
+    assertThat(isDirty("jordan", sku.skuId())).isFalse();
   }
 
   @Test
@@ -1038,7 +1050,7 @@ public class JobsHandlerIntegrationTest {
     assertThat(order.getFetchtcgStatus()).isEqualTo("CANCELLED_BY_BUYER");
 
     var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("in_stock"));
+    assertThat(units).allSatisfy(unit -> assertThat(unit.status()).isEqualTo(UnitStatus.IN_STOCK));
   }
 
   @Test
@@ -1063,9 +1075,9 @@ public class JobsHandlerIntegrationTest {
     assertThat(order.getStatus()).isEqualTo("awaiting_payment");
 
     var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
+    var reserved = units.stream().filter(u -> u.status() == UnitStatus.RESERVED).toList();
     assertThat(reserved).hasSize(1);
-    assertThat(reserved.get(0).getReservationId()).isEqualTo("83663");
+    assertThat(reserved.get(0).reservationId()).isEqualTo("83663");
   }
 
   @Test
@@ -1088,7 +1100,7 @@ public class JobsHandlerIntegrationTest {
     assertThat(order.getStatus()).isEqualTo("to_pick");
 
     var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    var reserved = units.stream().filter(u -> "reserved".equals(u.getStatus())).toList();
+    var reserved = units.stream().filter(u -> u.status() == UnitStatus.RESERVED).toList();
     assertThat(reserved).hasSize(1);
   }
 
@@ -1113,7 +1125,7 @@ public class JobsHandlerIntegrationTest {
     assertThat(order.getStatus()).isEqualTo("voided");
 
     var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("in_stock"));
+    assertThat(units).allSatisfy(unit -> assertThat(unit.status()).isEqualTo(UnitStatus.IN_STOCK));
   }
 
   @Test
@@ -1144,7 +1156,7 @@ public class JobsHandlerIntegrationTest {
     assertThat(order.getStatus()).isEqualTo("voided");
 
     var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(units).allSatisfy(unit -> assertThat(unit.getStatus()).isEqualTo("in_stock"));
+    assertThat(units).allSatisfy(unit -> assertThat(unit.status()).isEqualTo(UnitStatus.IN_STOCK));
   }
 
   @Test
@@ -1178,8 +1190,8 @@ public class JobsHandlerIntegrationTest {
     for (int i = 1; i <= 60; i++) {
       var units = getUnits("jordan", "mtg#scryfall#scryfall-" + i + "#normal#NM");
       assertThat(units).hasSize(1);
-      assertThat(units.get(0).getStatus()).isEqualTo("in_stock");
-      assertThat(units.get(0).getReservationId()).isNull();
+      assertThat(units.get(0).status()).isEqualTo(UnitStatus.IN_STOCK);
+      assertThat(units.get(0).reservationId()).isNull();
     }
   }
 
@@ -1398,8 +1410,8 @@ public class JobsHandlerIntegrationTest {
     assertThat(getOrder("jordan", "83663").getStatus()).isEqualTo("reserving");
     assertThat(getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM"))
         .singleElement()
-        .extracting(UnitItem::getStatus)
-        .isEqualTo("reserved");
+        .extracting(Unit::status)
+        .isEqualTo(UnitStatus.RESERVED);
   }
 
   @Test
@@ -1439,7 +1451,7 @@ public class JobsHandlerIntegrationTest {
     assertThat(order).isNull();
 
     var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(units.stream().allMatch(u -> "in_stock".equals(u.getStatus()))).isTrue();
+    assertThat(units.stream().allMatch(u -> u.status() == UnitStatus.IN_STOCK)).isTrue();
   }
 
   @Test
@@ -1524,30 +1536,8 @@ public class JobsHandlerIntegrationTest {
     var magicSkuId = "mtg#scryfall#scryfall-1#normal#NM";
     var pokemonSkuId = "pokemon#tcgplayer#283917#reverse_holofoil#NM";
     createSkuWithUnits("jordan", magicSkuId, 1001, 1);
-    var pokemonSku =
-        SkuItem.create(
-            "jordan",
-            pokemonSkuId,
-            "pokemon",
-            "283917",
-            "reverse_holofoil",
-            "NM",
-            "Abomasnow",
-            "lost-origin",
-            "Lost Origin",
-            "043/196",
-            "fetch-card-9002",
-            "12.00");
-    skuTable.putItem(pokemonSku);
-    unitTable.putItem(
-        UnitItem.create(
-            "jordan",
-            "pokemon",
-            pokemonSkuId,
-            1,
-            "in_stock",
-            "pokemon-import",
-            Instant.ofEpochSecond(1700000000)));
+    createInventorySku("jordan", pokemonSkuId, "fetch-card-9002", "12.00", true);
+    seedUnits("jordan", pokemonSkuId, List.of(inStockUnit(1)));
     synchronizeListing("jordan", pokemonSkuId, 2002);
     factory
         .fakeFetchTcgService()
@@ -1587,16 +1577,16 @@ public class JobsHandlerIntegrationTest {
         .singleElement()
         .satisfies(
             unit -> {
-              assertThat(unit.getStatus()).isEqualTo("reserved");
-              assertThat(unit.getReservationId()).isEqualTo("83663");
+              assertThat(unit.status()).isEqualTo(UnitStatus.RESERVED);
+              assertThat(unit.reservationId()).isEqualTo("83663");
             });
     assertThat(getUnits("jordan", pokemonSkuId))
         .singleElement()
         .satisfies(
             unit -> {
-              assertThat(unit.getGame()).isEqualTo("pokemon");
-              assertThat(unit.getStatus()).isEqualTo("reserved");
-              assertThat(unit.getReservationId()).isEqualTo("83663");
+              assertThat(getSku("jordan", pokemonSkuId).game()).isEqualTo("pokemon");
+              assertThat(unit.status()).isEqualTo(UnitStatus.RESERVED);
+              assertThat(unit.reservationId()).isEqualTo("83663");
             });
   }
 
@@ -1692,8 +1682,8 @@ public class JobsHandlerIntegrationTest {
     for (int i = 1; i <= 60; i++) {
       var units = getUnits("jordan", "mtg#scryfall#scryfall-" + i + "#normal#NM");
       assertThat(units).hasSize(1);
-      assertThat(units.get(0).getStatus()).isEqualTo("reserved");
-      assertThat(units.get(0).getReservationId()).isEqualTo("91329");
+      assertThat(units.get(0).status()).isEqualTo(UnitStatus.RESERVED);
+      assertThat(units.get(0).reservationId()).isEqualTo("91329");
     }
   }
 
@@ -1705,9 +1695,7 @@ public class JobsHandlerIntegrationTest {
     var skuId = "mtg#scryfall#scryfall-1#normal#NM";
     createSkuWithUnits("jordan", skuId, 1001, 3);
     var firstUnit = getUnits("jordan", skuId).get(0);
-    firstUnit.setStatus("reserved");
-    firstUnit.setReservationId("83663");
-    unitTable.putItem(firstUnit);
+    seedUnitState("jordan", skuId, firstUnit, UnitStatus.RESERVED, "83663");
     orderTable.putItem(
         createOrderItem(
             "jordan",
@@ -1732,7 +1720,7 @@ public class JobsHandlerIntegrationTest {
     assertThat(order.getStatus()).isEqualTo("reserving");
     assertThat(findOrderRows(order).getFirst().getAllocatedSequenceNumbers()).containsExactly(1);
     assertThat(getUnits("jordan", skuId))
-        .filteredOn(unit -> "reserved".equals(unit.getStatus()))
+        .filteredOn(unit -> unit.status() == UnitStatus.RESERVED)
         .hasSize(1);
   }
 
@@ -1744,9 +1732,7 @@ public class JobsHandlerIntegrationTest {
     var skuId = "mtg#scryfall#scryfall-1#normal#NM";
     createSkuWithUnits("jordan", skuId, 1001, 1);
     var unit = getUnits("jordan", skuId).get(0);
-    unit.setStatus("sold");
-    unit.setReservationId("another-order");
-    unitTable.putItem(unit);
+    seedUnitState("jordan", skuId, unit, UnitStatus.SOLD, "another-order");
     orderTable.putItem(
         createOrderItem(
             "jordan",
@@ -1790,7 +1776,7 @@ public class JobsHandlerIntegrationTest {
 
     // assert
     var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(sku.getDirty()).isFalse();
+    assertThat(isDirty("jordan", sku.skuId())).isFalse();
     assertThat(
             factory
                 .listingService()
@@ -1807,64 +1793,25 @@ public class JobsHandlerIntegrationTest {
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createPublishJob("jordan", "job1");
     var skuId = "pokemon#tcgplayer#283917#reverse_holofoil#NM";
-    skuTable.putItem(
-        SkuItem.create(
-            "jordan",
-            skuId,
-            "pokemon",
-            "283917",
-            "reverse_holofoil",
-            "NM",
-            "Abomasnow",
-            "lost-origin",
-            "Lost Origin",
-            "043/196",
-            "fetch-card-9002",
-            "12.00"));
-    unitTable.putItem(
-        UnitItem.create(
-            "jordan",
-            "pokemon",
-            skuId,
-            42,
-            "in_stock",
-            "pokemon-import",
-            Instant.ofEpochSecond(1700000000)));
+    createInventorySku("jordan", skuId, "fetch-card-9002", "12.00", true);
+    seedUnits("jordan", skuId, List.of(inStockUnit(42)));
 
     // act
     jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
 
     // assert
     assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("succeeded");
-    assertThat(getSku("jordan", skuId).getExternalId()).isEqualTo("283917");
-    assertThat(getSku("jordan", skuId).getFetchtcgCardId()).isEqualTo("fetch-card-9002");
+    assertThat(getSku("jordan", skuId).externalId()).isEqualTo("283917");
+    assertThat(getSku("jordan", skuId).fetchtcgCardId()).isEqualTo("fetch-card-9002");
   }
 
   private void createDirtySkuWithUnits(
       String user, String skuId, int unitCount, String suggestedPrice) {
-    var parts = skuId.split("#");
-    var skuItem =
-        SkuItem.create(
-            user,
-            skuId,
-            parts[0],
-            parts[2],
-            parts[3],
-            parts[4],
-            "Test Card",
-            "dom",
-            "Dominaria",
-            "168",
-            "mtg_168_c_dom_normal",
-            suggestedPrice);
-    skuTable.putItem(skuItem);
-
-    for (int i = 1; i <= unitCount; i++) {
-      var unit =
-          UnitItem.create(
-              user, "mtg", skuId, i, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
-      unitTable.putItem(unit);
-    }
+    createInventorySku(user, skuId, "mtg_168_c_dom_normal", suggestedPrice, true);
+    seedUnits(
+        user,
+        skuId,
+        IntStream.rangeClosed(1, unitCount).mapToObj(sequence -> inStockUnit(sequence)).toList());
   }
 
   private void createPublishJob(String user, String jobId) {
@@ -1874,92 +1821,81 @@ public class JobsHandlerIntegrationTest {
   }
 
   private void createDirtySkuWithUnit(String user, String skuId, int sequenceNumber) {
-    var parts = skuId.split("#");
-    var skuItem =
-        SkuItem.create(
-            user,
-            skuId,
-            parts[0],
-            parts[2],
-            parts[3],
-            parts[4],
-            "Test Card",
-            "dom",
-            "Dominaria",
-            "168",
-            "mtg_168_c_dom_normal",
-            "1.50");
-    skuTable.putItem(skuItem);
-
-    var unit =
-        UnitItem.create(
-            user,
-            "mtg",
-            skuId,
-            sequenceNumber,
-            "in_stock",
-            "import1",
-            Instant.ofEpochSecond(1700000000));
-    unitTable.putItem(unit);
+    createInventorySku(user, skuId, "mtg_168_c_dom_normal", "1.50", true);
+    seedUnits(user, skuId, List.of(inStockUnit(sequenceNumber)));
   }
 
-  private void createSkuWithUnits(String user, String skuId, int fetchtcgListingId, int unitCount) {
-    var parts = skuId.split("#");
-    var skuItem =
-        SkuItem.create(
-            user,
-            skuId,
-            parts[0],
-            parts[2],
-            parts[3],
-            parts[4],
-            "Test Card",
-            "dom",
-            "Dominaria",
-            "168",
-            "mtg_168_c_dom_normal",
-            "1.50");
-    skuTable.putItem(skuItem);
-
-    for (int i = 1; i <= unitCount; i++) {
-      var unit =
-          UnitItem.create(
-              user, "mtg", skuId, i, "in_stock", "import1", Instant.ofEpochSecond(1700000000));
-      unitTable.putItem(unit);
-    }
-    synchronizeListing(user, skuId, fetchtcgListingId);
+  private void createSkuWithUnits(String user, String skuId, int fetchTcgListingId, int unitCount) {
+    createInventorySku(user, skuId, "mtg_168_c_dom_normal", "1.50", true);
+    seedUnits(
+        user,
+        skuId,
+        IntStream.rangeClosed(1, unitCount).mapToObj(sequence -> inStockUnit(sequence)).toList());
+    synchronizeListing(user, skuId, fetchTcgListingId);
   }
 
   private void createSkuWithUnitAtSequence(
-      String user, String skuId, int fetchtcgListingId, int sequenceNumber) {
+      String user, String skuId, int fetchTcgListingId, int sequenceNumber) {
+    createInventorySku(user, skuId, "mtg_168_c_dom_normal", "1.50", true);
+    seedUnits(user, skuId, List.of(inStockUnit(sequenceNumber)));
+    synchronizeListing(user, skuId, fetchTcgListingId);
+  }
+
+  private Sku createInventorySku(
+      String user, String skuId, String fetchTcgCardId, String suggestedPrice, boolean dirty) {
     var parts = skuId.split("#");
-    var skuItem =
-        SkuItem.create(
-            user,
+    var game = parts[0];
+    var externalId = parts[2];
+    var finish = parts[3];
+    var condition = Condition.valueOf(parts[4]);
+    var sku =
+        new Sku(
             skuId,
-            parts[0],
-            parts[2],
-            parts[3],
-            parts[4],
+            game,
+            externalId,
             "Test Card",
             "dom",
             "Dominaria",
             "168",
-            "mtg_168_c_dom_normal",
-            "1.50");
-    skuTable.putItem(skuItem);
+            finish,
+            condition,
+            suggestedPrice == null ? null : new BigDecimal(suggestedPrice),
+            fetchTcgCardId,
+            "mtg".equals(game) ? 2624 : 1,
+            1);
+    factory.fakeInventoryService().seedSku(user, sku, dirty);
+    return sku;
+  }
 
-    var unit =
-        UnitItem.create(
-            user,
-            "mtg",
-            skuId,
-            sequenceNumber,
-            "in_stock",
-            "import1",
-            Instant.ofEpochSecond(1700000000));
-    unitTable.putItem(unit);
-    synchronizeListing(user, skuId, fetchtcgListingId);
+  private Unit inStockUnit(int sequenceNumber) {
+    return new Unit(
+        sequenceNumber,
+        "A0-" + sequenceNumber,
+        UnitStatus.IN_STOCK,
+        List.of(),
+        Instant.ofEpochSecond(1700000000).getEpochSecond(),
+        null,
+        null);
+  }
+
+  private void seedUnits(String user, String skuId, List<Unit> units) {
+    factory.fakeInventoryService().seedUnits(user, skuId, units);
+  }
+
+  private void seedUnitState(
+      String user, String skuId, Unit current, UnitStatus status, String reservationId) {
+    var updated =
+        new Unit(
+            current.sequenceNumber(),
+            current.location(),
+            status,
+            current.photos(),
+            current.createdAt(),
+            current.updatedAt(),
+            reservationId);
+    var units = new ArrayList<>(getUnits(user, skuId));
+    units.replaceAll(unit -> unit.sequenceNumber() == current.sequenceNumber() ? updated : unit);
+    seedUnits(user, skuId, units);
   }
 
   private void createTrackOrdersAfter(String user, Instant trackOrdersAfter) {
@@ -2037,25 +1973,18 @@ public class JobsHandlerIntegrationTest {
   }
 
   private void reserveUnit(String user, String skuId, int sequenceNumber, String orderId) {
-    var unit = getUnit(user, skuId, sequenceNumber);
-    unit.setStatus("reserved");
-    unit.setReservationId(orderId);
-    unitTable.putItem(unit);
+    seedUnitState(user, skuId, getUnit(user, skuId, sequenceNumber), UnitStatus.RESERVED, orderId);
   }
 
   private void releaseUnit(String user, String skuId, int sequenceNumber) {
-    var unit = getUnit(user, skuId, sequenceNumber);
-    unit.setStatus("in_stock");
-    unit.setReservationId(null);
-    unitTable.putItem(unit);
+    seedUnitState(user, skuId, getUnit(user, skuId, sequenceNumber), UnitStatus.IN_STOCK, null);
   }
 
-  private UnitItem getUnit(String user, String skuId, int sequenceNumber) {
-    return unitTable.getItem(
-        Key.builder()
-            .partitionValue(SkuItem.formatPk(user, skuId))
-            .sortValue(UnitItem.formatSk(sequenceNumber))
-            .build());
+  private Unit getUnit(String user, String skuId, int sequenceNumber) {
+    return getUnits(user, skuId).stream()
+        .filter(unit -> unit.sequenceNumber() == sequenceNumber)
+        .findFirst()
+        .orElseThrow();
   }
 
   private static Offer cancelledOffer(int offerId, String status) {
@@ -2075,32 +2004,52 @@ public class JobsHandlerIntegrationTest {
   private OrderItem getOrder(String user, String offerId) {
     return orderTable.getItem(
         Key.builder()
-            .partitionValue(SkuItem.formatUserPk(user))
+            .partitionValue(OrderItem.formatPk(user))
             .sortValue(OrderItem.formatSk(offerId))
             .build());
   }
 
-  private SkuItem getSku(String user, String skuId) {
-    return skuTable.getItem(
-        Key.builder()
-            .partitionValue(SkuItem.formatPk(user, skuId))
-            .sortValue(SkuItem.formatSk())
-            .build());
+  private Sku getSku(String user, String skuId) {
+    try {
+      return factory
+          .inventoryService()
+          .getSku(new RequestContext(user), new GetSkuRequest(skuId))
+          .sku();
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
-  private List<UnitItem> getUnits(String user, String skuId) {
-    var results = new ArrayList<UnitItem>();
-    var request =
-        QueryEnhancedRequest.builder()
-            .queryConditional(
-                QueryConditional.sortBeginsWith(
-                    Key.builder()
-                        .partitionValue(SkuItem.formatPk(user, skuId))
-                        .sortValue(UnitItem.UNIT_PREFIX)
-                        .build()))
-            .build();
-    unitTable.query(request).items().forEach(results::add);
-    return results;
+  private List<Unit> getUnits(String user, String skuId) {
+    try {
+      var units = new ArrayList<Unit>();
+      String continuation = null;
+      do {
+        var response =
+            factory
+                .inventoryService()
+                .findUnits(
+                    new RequestContext(user), new FindUnitsRequest(skuId, 100, continuation));
+        units.addAll(response.units());
+        continuation = response.nextContinuation();
+      } while (continuation != null);
+      return units;
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private boolean isDirty(String user, String skuId) {
+    try {
+      return factory
+          .inventoryService()
+          .findSkus(new RequestContext(user), new FindSkusRequest(null, null, true, 100, null))
+          .skus()
+          .stream()
+          .anyMatch(sku -> sku.skuId().equals(skuId));
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
   }
 
   private void seedDefaultCardForDom168() {
@@ -2237,7 +2186,7 @@ public class JobsHandlerIntegrationTest {
   private ImportItem getImport(String user, String importId) {
     return importTable.getItem(
         Key.builder()
-            .partitionValue(SkuItem.formatUserPk(user))
+            .partitionValue(ImportItem.formatPk(user))
             .sortValue(ImportItem.formatSk(importId))
             .build());
   }
@@ -2245,7 +2194,7 @@ public class JobsHandlerIntegrationTest {
   private JobItem getJob(String user, String jobId) {
     return jobTable.getItem(
         Key.builder()
-            .partitionValue(SkuItem.formatUserPk(user))
+            .partitionValue(JobItem.formatPk(user))
             .sortValue(JobItem.formatSk(jobId))
             .build());
   }
@@ -2273,16 +2222,11 @@ public class JobsHandlerIntegrationTest {
       String scryfallId) {}
 
   private void synchronizeListing(String user, String skuId, int listingId) {
-    var sku =
-        skuTable.getItem(
-            Key.builder()
-                .partitionValue(SkuItem.formatPk(user, skuId))
-                .sortValue(SkuItem.formatSk())
-                .build());
+    var sku = getSku(user, skuId);
     factory
         .fakeFetchTcgService()
         .seedListingId(
-            user, sku.getFetchtcgCardId(), "raw-" + sku.getCondition().toLowerCase(), listingId);
+            user, sku.fetchtcgCardId(), "raw-" + sku.condition().name().toLowerCase(), listingId);
     try {
       factory
           .listingService()
