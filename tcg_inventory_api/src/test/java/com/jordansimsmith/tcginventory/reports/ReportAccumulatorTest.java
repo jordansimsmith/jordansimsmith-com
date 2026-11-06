@@ -6,12 +6,14 @@ import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import com.jordansimsmith.tcginventory.inventory.client.Sku;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
-import com.jordansimsmith.tcginventory.orders.OrderItem;
-import com.jordansimsmith.tcginventory.orders.OrderRowItem;
+import com.jordansimsmith.tcginventory.orders.client.OrderState;
+import com.jordansimsmith.tcginventory.orders.client.OrderSummary;
+import com.jordansimsmith.tcginventory.orders.client.OrderSummaryRow;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Locale;
 import org.junit.jupiter.api.Test;
 
 public class ReportAccumulatorTest {
@@ -775,28 +777,30 @@ public class ReportAccumulatorTest {
     assertThat(bands.get(0).inStockUnits()).isEqualTo(1);
   }
 
-  private static OrderFixture createOrder(String status, String totalPrice) {
+  private static OrderSummary createOrder(String status, String totalPrice) {
     return createOrder(status, totalPrice, Instant.ofEpochSecond(1700000000));
   }
 
-  private static OrderFixture createOrder(String status, String totalPrice, Instant createdAt) {
+  private static OrderSummary createOrder(String status, String totalPrice, Instant createdAt) {
     return createOrder(status, totalPrice, totalPrice, createdAt);
   }
 
-  private static OrderFixture createOrder(
+  private static OrderSummary createOrder(
       String status, String totalPrice, String itemsTotal, Instant createdAt) {
-    var item = new OrderItem();
-    item.setStatus(status);
-    item.setTotalPrice(totalPrice);
-    var rows = List.of(new OrderRowItem("s", 1, 1, itemsTotal, null, List.of()));
-    item.setCreatedAt(createdAt);
-    return new OrderFixture(item, rows);
+    return new OrderSummary(
+        "order",
+        OrderState.valueOf(status.toUpperCase(Locale.ROOT)),
+        createdAt.getEpochSecond(),
+        null,
+        totalPrice,
+        itemsTotal,
+        null,
+        1,
+        List.of(new OrderSummaryRow("sku", itemsTotal)));
   }
 
-  private record OrderFixture(OrderItem order, List<OrderRowItem> rows) {}
-
-  private static void addOrder(ReportAccumulator accumulator, OrderFixture fixture) {
-    accumulator.addOrder(fixture.order(), fixture.rows());
+  private static void addOrder(ReportAccumulator accumulator, OrderSummary order) {
+    accumulator.addOrder(order);
   }
 
   @Test

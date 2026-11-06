@@ -31,8 +31,13 @@ import com.jordansimsmith.tcginventory.inventory.client.FindUnitsResponse;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.Sku;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
-import com.jordansimsmith.tcginventory.orders.OrderRepository;
 import com.jordansimsmith.tcginventory.orders.OrderRowItem;
+import com.jordansimsmith.tcginventory.orders.client.FindOrdersRequest;
+import com.jordansimsmith.tcginventory.orders.client.FindOrdersResponse;
+import com.jordansimsmith.tcginventory.orders.client.OrderService;
+import com.jordansimsmith.tcginventory.orders.client.OrderState;
+import com.jordansimsmith.tcginventory.orders.client.OrderSummary;
+import com.jordansimsmith.tcginventory.orders.client.OrderSummaryRow;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.math.BigDecimal;
@@ -398,7 +403,7 @@ public class ReportsHandlerIntegrationTest {
             "fulfilled",
             null,
             null,
-            "SHIPPING",
+            "DELIVERY",
             null,
             null,
             null,
@@ -592,7 +597,7 @@ public class ReportsHandlerIntegrationTest {
         .thenReturn(new FindSkusResponse(List.of(reportSku()), null));
     when(inventoryService.findUnits(ctx, new FindUnitsRequest("sku", 100, null)))
         .thenReturn(new FindUnitsResponse(List.of(), null));
-    var processor = createReportJobProcessor(inventoryService);
+    var processor = createReportJobProcessor(inventoryService, factory.orderService());
 
     // act
     processor.processBatch(
@@ -620,7 +625,7 @@ public class ReportsHandlerIntegrationTest {
         .thenThrow(failure);
     when(inventoryService.findUnits(ctx, new FindUnitsRequest("sku", 100, null)))
         .thenReturn(new FindUnitsResponse(List.of(), null));
-    var processor = createReportJobProcessor(inventoryService);
+    var processor = createReportJobProcessor(inventoryService, factory.orderService());
 
     // act / assert
     assertThatThrownBy(
@@ -679,7 +684,7 @@ public class ReportsHandlerIntegrationTest {
             "fulfilled",
             null,
             null,
-            "SHIPPING",
+            "DELIVERY",
             null,
             null,
             null,
@@ -725,7 +730,7 @@ public class ReportsHandlerIntegrationTest {
             "fulfilled",
             null,
             null,
-            "SHIPPING",
+            "DELIVERY",
             null,
             null,
             null,
@@ -845,20 +850,57 @@ public class ReportsHandlerIntegrationTest {
     assertThat(generation.get("finished_at").asLong()).isEqualTo(1699999950);
   }
 
-  private ReportJobProcessor createReportJobProcessor(InventoryService inventoryService) {
+  @Test
+  void reportJobShouldKeepExistingSnapshotWhenLaterOrderPageFails() throws Exception {
+    // arrange
+    var previousUpdatedAt = Instant.ofEpochSecond(1600000000);
+    reportTable.putItem(ReportItem.create("jordan", "previous-report", previousUpdatedAt));
+    var orderService = mock(OrderService.class);
+    var ctx = new RequestContext("jordan");
+    var firstRequest = new FindOrdersRequest(100, null);
+    var secondRequest = new FindOrdersRequest(100, "next");
+    when(orderService.findOrders(ctx, firstRequest))
+        .thenReturn(
+            new FindOrdersResponse(
+                List.of(
+                    new OrderSummary(
+                        "1",
+                        OrderState.TO_PICK,
+                        1700000000,
+                        null,
+                        null,
+                        null,
+                        null,
+                        1,
+                        List.of(new OrderSummaryRow("missing-sku", "1.00")))),
+                "next"));
+    var failure = new ServiceUnavailableException("orders are unavailable");
+    when(orderService.findOrders(ctx, secondRequest)).thenThrow(failure);
+    var processor = createReportJobProcessor(factory.inventoryService(), orderService);
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                processor.processBatch(
+                    "jordan",
+                    JobItem.create("jordan", "report-job", "report", null, null, fakeClock.now())))
+        .isSameAs(failure);
+    verify(orderService).findOrders(ctx, firstRequest);
+    verify(orderService).findOrders(ctx, secondRequest);
+    var report = reportTable.getItem(reportKey("jordan"));
+    assertThat(report.getReport()).isEqualTo("previous-report");
+    assertThat(report.getUpdatedAt()).isEqualTo(previousUpdatedAt);
+  }
+
+  private ReportJobProcessor createReportJobProcessor(
+      InventoryService inventoryService, OrderService orderService) {
     return new ReportJobProcessor(
         reportTable,
-        orderTable,
-        new OrderRepository(
-            orderTable,
-            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class),
-            factory.jobTable(),
-            factory.dynamoDbClient(),
-            fakeClock),
         objectMapper,
         fakeClock,
         new FakeGamesService(),
-        inventoryService);
+        inventoryService,
+        orderService);
   }
 
   private static Sku reportSku() {

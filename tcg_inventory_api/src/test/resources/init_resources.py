@@ -286,7 +286,7 @@ lambdas = {
         "zip_file": "update-unit-handler_deploy.jar",
     },
     "find_orders": {
-        "handler": "com.jordansimsmith.tcginventory.orders.FindOrdersHandler",
+        "handler": "com.jordansimsmith.tcginventory.orders.api.FindOrdersHandler",
         "zip_file": "find-orders-handler_deploy.jar",
     },
     "get_order": {

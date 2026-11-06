@@ -3,14 +3,19 @@ load("@rules_java//java:defs.bzl", "java_library")
 java_library(
     name = "server",
     srcs = glob(["*.java"]),
-    visibility = ["//tcg_inventory_api:__pkg__"],
+    visibility = [
+        "//tcg_inventory_api:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/orders/server:__pkg__",
+    ],
     deps = [
         "//lib/dynamodb:lib",
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/client",
         "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_annotations",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:com_google_code_findbugs_jsr305",
+        "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
     ],
 )

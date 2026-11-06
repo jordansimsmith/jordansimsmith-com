@@ -22,6 +22,7 @@ import com.jordansimsmith.tcginventory.inventory.SkuItem;
 import com.jordansimsmith.tcginventory.inventory.UnitItem;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.SellUnitRequest;
+import com.jordansimsmith.tcginventory.orders.api.FindOrdersHandler;
 import com.jordansimsmith.time.FakeClock;
 import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.nio.charset.StandardCharsets;
@@ -109,7 +110,7 @@ public class OrdersHandlerIntegrationTest {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createOrder("jordan", "10001", "awaiting_payment", "PICKUP", "2.00");
-    createOrder("jordan", "10002", "to_pick", "SHIPPING", "5.50");
+    createOrder("jordan", "10002", "to_pick", "DELIVERY", "5.50");
 
     // act
     var response = findOrdersHandler.handleRequest(buildEvent("jordan"), null);
@@ -121,7 +122,7 @@ public class OrdersHandlerIntegrationTest {
     assertThat(orders).hasSize(2);
     assertThat(orders.get(0).get("order_id").asText()).isEqualTo("10002");
     assertThat(orders.get(0).get("state").asText()).isEqualTo("to_pick");
-    assertThat(orders.get(0).get("delivery_mode").asText()).isEqualTo("SHIPPING");
+    assertThat(orders.get(0).get("delivery_mode").asText()).isEqualTo("DELIVERY");
     assertThat(orders.get(0).get("total_price").asText()).isEqualTo("5.50");
     assertThat(orders.get(0).get("accepted_at").asLong()).isEqualTo(1700000000);
     assertThat(orders.get(0).get("items_total_price").isNull()).isTrue();
@@ -136,8 +137,8 @@ public class OrdersHandlerIntegrationTest {
     // arrange
     createOrder("jordan", "99998", "fulfilled", "PICKUP", "1.00");
     createOrder("jordan", "99999", "fulfilled", "PICKUP", "1.00");
-    createOrder("jordan", "100000", "to_pick", "SHIPPING", "1.00");
-    createOrder("other", "200000", "to_pick", "SHIPPING", "1.00");
+    createOrder("jordan", "100000", "to_pick", "DELIVERY", "1.00");
+    createOrder("other", "200000", "to_pick", "DELIVERY", "1.00");
 
     // act
     var response1 =
@@ -164,7 +165,7 @@ public class OrdersHandlerIntegrationTest {
   void findOrdersShouldSupportContinuationPaging() throws Exception {
     // arrange
     createOrder("jordan", "10001", "awaiting_payment", "PICKUP", "2.00");
-    createOrder("jordan", "10002", "to_pick", "SHIPPING", "5.50");
+    createOrder("jordan", "10002", "to_pick", "DELIVERY", "5.50");
     createOrder("jordan", "10003", "fulfilled", "PICKUP", "1.00");
 
     // act - first page

@@ -90,12 +90,11 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     this.reportJobProcessor =
         new ReportJobProcessor(
             TcgInventoryTable.table(enhancedClient, ReportItem.class),
-            orderTable,
-            orderRepository,
             factory.objectMapper(),
             factory.clock(),
             factory.gamesService(),
-            factory.inventoryService());
+            factory.inventoryService(),
+            factory.orderService());
     this.scanConfirmationJobProcessor = new ScanConfirmationJobProcessor(factory);
     this.importConfirmationJobProcessor =
         new ImportConfirmationJobProcessor(

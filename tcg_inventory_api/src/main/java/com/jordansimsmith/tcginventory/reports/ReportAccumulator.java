@@ -3,9 +3,8 @@ package com.jordansimsmith.tcginventory.reports;
 import com.jordansimsmith.tcginventory.inventory.client.Sku;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
-import com.jordansimsmith.tcginventory.orders.OrderItem;
-import com.jordansimsmith.tcginventory.orders.OrderRowItem;
-import com.jordansimsmith.tcginventory.orders.OrderRows;
+import com.jordansimsmith.tcginventory.orders.client.OrderState;
+import com.jordansimsmith.tcginventory.orders.client.OrderSummary;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -128,15 +127,17 @@ public class ReportAccumulator {
     }
   }
 
-  public void addOrder(OrderItem order, List<OrderRowItem> rows) {
-    var status = order.getStatus();
-    if (!"to_pick".equals(status) && !"fulfilling".equals(status) && !"fulfilled".equals(status)) {
+  public void addOrder(OrderSummary order) {
+    if (order.state() != OrderState.TO_PICK
+        && order.state() != OrderState.FULFILLING
+        && order.state() != OrderState.FULFILLED) {
       return;
     }
-    var price = OrderRows.itemsTotal(rows);
+    var price =
+        order.itemsTotalPrice() == null ? BigDecimal.ZERO : new BigDecimal(order.itemsTotalPrice());
     addRevenue(price);
 
-    var month = YearMonth.from(order.getCreatedAt().atZone(AUCKLAND));
+    var month = YearMonth.from(Instant.ofEpochSecond(order.acceptedAt()).atZone(AUCKLAND));
     monthMap.computeIfAbsent(month, k -> new MonthAccumulator()).add(price);
   }
 

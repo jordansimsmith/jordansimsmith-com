@@ -12,48 +12,43 @@ import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
-import com.jordansimsmith.tcginventory.orders.OrderItem;
-import com.jordansimsmith.tcginventory.orders.OrderRepository;
+import com.jordansimsmith.tcginventory.orders.client.FindOrdersRequest;
+import com.jordansimsmith.tcginventory.orders.client.OrderService;
+import com.jordansimsmith.tcginventory.orders.client.OrderState;
+import com.jordansimsmith.tcginventory.orders.client.OrderSummary;
 import com.jordansimsmith.time.Clock;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
-import software.amazon.awssdk.enhanced.dynamodb.Key;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
-import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
 public class ReportJobProcessor implements JobProcessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(ReportJobProcessor.class);
 
   private final DynamoDbTable<ReportItem> reportTable;
   private final InventoryService inventoryService;
-  private final DynamoDbTable<OrderItem> orderTable;
-  private final OrderRepository orderRepository;
+  private final OrderService orderService;
   private final ObjectMapper objectMapper;
   private final Clock clock;
   private final GamesService gamesService;
 
   public ReportJobProcessor(
       DynamoDbTable<ReportItem> reportTable,
-      DynamoDbTable<OrderItem> orderTable,
-      OrderRepository orderRepository,
       ObjectMapper objectMapper,
       Clock clock,
       GamesService gamesService,
-      InventoryService inventoryService) {
+      InventoryService inventoryService,
+      OrderService orderService) {
     this.reportTable = reportTable;
-    this.orderTable = orderTable;
-    this.orderRepository = orderRepository;
     this.objectMapper = objectMapper;
     this.clock = clock;
     this.gamesService = gamesService;
     this.inventoryService = inventoryService;
+    this.orderService = orderService;
   }
 
   @Override
@@ -98,20 +93,28 @@ public class ReportJobProcessor implements JobProcessor {
       skuContinuation = skuResponse.nextContinuation();
     } while (skuContinuation != null);
 
-    for (var order : pageOrders(user)) {
-      var rows = orderRepository.findRows(user, order);
-      accumulator.addOrder(order, rows);
+    var orders = new ArrayList<OrderSummary>();
+    String orderContinuation = null;
+    do {
+      var orderResponse =
+          orderService.findOrders(ctx, new FindOrdersRequest(100, orderContinuation));
+      orders.addAll(orderResponse.orders());
+      orderContinuation = orderResponse.nextContinuation();
+    } while (orderContinuation != null);
+
+    for (var order : orders) {
+      accumulator.addOrder(order);
       var paid =
-          "to_pick".equals(order.getStatus())
-              || "fulfilling".equals(order.getStatus())
-              || "fulfilled".equals(order.getStatus());
-      for (var line : rows) {
-        var game = skuGames.get(line.getSkuId());
+          order.state() == OrderState.TO_PICK
+              || order.state() == OrderState.FULFILLING
+              || order.state() == OrderState.FULFILLED;
+      for (var row : order.rows()) {
+        var game = skuGames.get(row.skuId());
         if (game == null) {
-          throw new IllegalStateException("order line references missing SKU: " + line.getSkuId());
+          throw new IllegalStateException("order line references missing SKU: " + row.skuId());
         }
-        if (paid && line.getPrice() != null) {
-          gameAccumulators.get(game).addRevenue(new BigDecimal(line.getPrice()));
+        if (paid && row.price() != null) {
+          gameAccumulators.get(game).addRevenue(new BigDecimal(row.price()));
         }
       }
     }
@@ -145,20 +148,5 @@ public class ReportJobProcessor implements JobProcessor {
 
     LOGGER.info("wrote report snapshot");
     return new JobProcessor.SuccessJobResult(0, null);
-  }
-
-  private List<OrderItem> pageOrders(String user) {
-    var request =
-        QueryEnhancedRequest.builder()
-            .queryConditional(
-                QueryConditional.sortBeginsWith(
-                    Key.builder()
-                        .partitionValue(OrderItem.formatPk(user))
-                        .sortValue(OrderItem.ORDER_PREFIX)
-                        .build()))
-            .scanIndexForward(true)
-            .build();
-
-    return orderTable.query(request).stream().flatMap(page -> page.items().stream()).toList();
   }
 }

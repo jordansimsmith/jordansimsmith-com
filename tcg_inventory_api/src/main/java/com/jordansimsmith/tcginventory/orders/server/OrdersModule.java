@@ -1,7 +1,10 @@
 package com.jordansimsmith.tcginventory.orders.server;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.tcginventory.orders.client.FindOrdersRequest;
+import com.jordansimsmith.tcginventory.orders.client.FindOrdersResponse;
 import com.jordansimsmith.tcginventory.orders.client.GetOrderSettingsRequest;
 import com.jordansimsmith.tcginventory.orders.client.GetOrderSettingsResponse;
 import com.jordansimsmith.tcginventory.orders.client.OrderService;
@@ -21,13 +24,25 @@ public class OrdersModule {
   @Singleton
   OrderService orderService(
       DynamoDbEnhancedClient dynamoDbEnhancedClient,
-      @Named("tcgInventoryTableName") String tableName) {
+      @Named("tcgInventoryTableName") String tableName,
+      ObjectMapper objectMapper) {
     DynamoDbTable<OrderSettingsItem> settingsTable =
         dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(OrderSettingsItem.class));
     var settingsRepository = new OrderSettingsRepository(settingsTable);
     var getOrderSettingsService = new GetOrderSettingsService(settingsRepository);
     var updateOrderSettingsService = new UpdateOrderSettingsService(settingsRepository);
+    var orderReadRepository =
+        new OrderReadRepository(
+            dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(OrderItem.class)),
+            dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(OrderRowItem.class)));
+    var findOrdersService = new FindOrdersService(orderReadRepository, objectMapper);
     return new OrderService() {
+      @Override
+      public FindOrdersResponse findOrders(RequestContext ctx, FindOrdersRequest request)
+          throws ServiceException {
+        return findOrdersService.findOrders(ctx, request);
+      }
+
       @Override
       public GetOrderSettingsResponse getOrderSettings(
           RequestContext ctx, GetOrderSettingsRequest request) throws ServiceException {

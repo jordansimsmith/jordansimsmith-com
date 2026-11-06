@@ -156,6 +156,7 @@ java_library(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/catalog/api:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/inventory/api:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/orders/api:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/photos/api:__pkg__",
     ],
     deps = [
@@ -263,10 +264,10 @@ java_library(
     ),
     deps = [
         ":lib",
-        ":order-lib",
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/client",
     ] + COMMON_DEPS,
 )
 
@@ -869,33 +870,6 @@ java_binary(
 )
 
 java_binary(
-    name = "find-orders-handler",
-    srcs = ["src/main/java/com/jordansimsmith/tcginventory/orders/FindOrdersHandler.java"],
-    create_executable = False,
-    resources = [
-        "src/main/resources/logback.xml",
-    ],
-    deps = [
-        ":lib",
-        ":order-lib",
-        "//lib/dynamodb:lib",
-        "//lib/http:lib",
-        "@maven//:ch_qos_logback_logback_classic",
-        "@maven//:ch_qos_logback_logback_core",
-        "@maven//:com_amazonaws_aws_lambda_java_core",
-        "@maven//:com_amazonaws_aws_lambda_java_events",
-        "@maven//:com_fasterxml_jackson_core_jackson_annotations",
-        "@maven//:com_fasterxml_jackson_core_jackson_core",
-        "@maven//:com_fasterxml_jackson_core_jackson_databind",
-        "@maven//:com_google_code_findbugs_jsr305",
-        "@maven//:com_google_guava_guava",
-        "@maven//:org_slf4j_slf4j_api",
-        "@maven//:software_amazon_awssdk_dynamodb",
-        "@maven//:software_amazon_awssdk_dynamodb_enhanced",
-    ],
-)
-
-java_binary(
     name = "get-order-handler",
     srcs = ["src/main/java/com/jordansimsmith/tcginventory/orders/GetOrderHandler.java"],
     create_executable = False,
@@ -1208,7 +1182,6 @@ java_test_suite(
         ":find-catalog-alternatives-handler",
         ":find-catalog-cards-handler",
         ":find-imports-handler",
-        ":find-orders-handler",
         ":find-scans-handler",
         ":get-catalog-card-handler",
         ":get-import-handler",
@@ -1247,6 +1220,7 @@ java_test_suite(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/listings/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/listings/server",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:find-orders-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:get-order-settings-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:update-order-settings-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/client",
@@ -1292,7 +1266,7 @@ localstack_image(
         ":create-scan-handler_deploy.jar",
         ":delete-scan-handler_deploy.jar",
         ":delete-scan-row-handler_deploy.jar",
-        ":find-orders-handler_deploy.jar",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:find-orders-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/api:find-skus-handler_deploy.jar",
         ":find-scans-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/api:find-games-handler_deploy.jar",
