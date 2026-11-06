@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
-import com.jordansimsmith.tcginventory.CardIdentity;
 import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.games.client.Game;
 import java.io.IOException;

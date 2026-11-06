@@ -2,7 +2,6 @@ package com.jordansimsmith.tcginventory.imports;
 
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
-import com.jordansimsmith.tcginventory.CardIdentity;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
 import java.util.Map;

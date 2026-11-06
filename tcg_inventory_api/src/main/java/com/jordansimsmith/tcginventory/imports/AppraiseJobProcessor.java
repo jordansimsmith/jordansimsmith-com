@@ -3,7 +3,6 @@ package com.jordansimsmith.tcginventory.imports;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.service.ServiceUnavailableException;
-import com.jordansimsmith.tcginventory.CardIdentity;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobProcessor;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
