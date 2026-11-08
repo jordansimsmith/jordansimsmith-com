@@ -233,6 +233,11 @@ module "java_api" {
       artifact = var.artifacts["jobs_handler"]
       timeout  = 900
     }
+    reports_worker = {
+      handler  = "com.jordansimsmith.tcginventory.reports.worker.ReportWorkerHandler"
+      artifact = var.artifacts["report_worker"]
+      timeout  = 900
+    }
   }
 
   endpoints = {
@@ -296,6 +301,7 @@ module "java_api" {
   depends_on = [
     aws_sqs_queue.jobs,
     aws_sqs_queue.scan_jobs,
+    aws_sqs_queue.reports,
     aws_dynamodb_table.tcg_inventory,
     aws_s3_bucket.tcg_inventory,
   ]
@@ -437,6 +443,31 @@ resource "aws_lambda_event_source_mapping" "jobs" {
   maximum_batching_window_in_seconds = 0
 }
 
+resource "aws_sqs_queue" "reports_dlq" {
+  name                        = "tcg_inventory_reports_dlq.fifo"
+  fifo_queue                  = true
+  content_based_deduplication = false
+}
+
+resource "aws_sqs_queue" "reports" {
+  name                        = "tcg_inventory_reports.fifo"
+  fifo_queue                  = true
+  content_based_deduplication = false
+  visibility_timeout_seconds  = 960
+
+  redrive_policy = jsonencode({
+    deadLetterTargetArn = aws_sqs_queue.reports_dlq.arn
+    maxReceiveCount     = 5
+  })
+}
+
+resource "aws_lambda_event_source_mapping" "reports" {
+  event_source_arn                   = aws_sqs_queue.reports.arn
+  function_name                      = module.java_api.lambda_functions["reports_worker"].qualified_arn
+  batch_size                         = 1
+  maximum_batching_window_in_seconds = 0
+}
+
 resource "aws_sqs_queue" "scan_jobs_dlq" {
   name                        = "tcg_inventory_scan_jobs_dlq.fifo"
   fifo_queue                  = true
@@ -522,6 +553,7 @@ data "aws_iam_policy_document" "lambda_sqs" {
 
     resources = [
       aws_sqs_queue.jobs.arn,
+      aws_sqs_queue.reports.arn,
     ]
 
     actions = [

@@ -62,6 +62,7 @@ filegroup(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:__pkg__",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/api:__pkg__",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:__pkg__",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/worker:__pkg__",
     ],
 )
 
@@ -154,10 +155,12 @@ java_library(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:__pkg__",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/api:__pkg__",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:__pkg__",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/worker:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/catalog/api:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/inventory/api:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/orders/api:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/photos/api:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/reports/worker:__pkg__",
     ],
     deps = [
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/catalog/client",
@@ -1249,6 +1252,7 @@ localstack_image(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:get-pricing-handler_deploy.jar",
         ":get-reprice-handler_deploy.jar",
         ":jobs-handler_deploy.jar",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/worker:report-worker-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:update-pricing-handler_deploy.jar",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/api:update-fetchtcg-credentials-handler_deploy.jar",
     ],
