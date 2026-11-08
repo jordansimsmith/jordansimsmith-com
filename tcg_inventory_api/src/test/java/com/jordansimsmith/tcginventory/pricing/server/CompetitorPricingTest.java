@@ -13,7 +13,7 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FindCardListingsResponse;
-import com.jordansimsmith.tcginventory.pricing.client.Condition;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;

@@ -1,6 +1,6 @@
 package com.jordansimsmith.tcginventory.pricing;
 
-import static com.jordansimsmith.tcginventory.pricing.client.Condition.NM;
+import static com.jordansimsmith.tcginventory.inventory.client.Condition.NM;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;

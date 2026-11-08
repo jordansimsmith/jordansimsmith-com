@@ -13,6 +13,7 @@ java_test_suite(
     deps = [
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/server",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/client:test-lib",
@@ -39,6 +40,7 @@ java_test_suite(
         "//lib/dynamodb:test-lib",
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/server",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/client:test-lib",

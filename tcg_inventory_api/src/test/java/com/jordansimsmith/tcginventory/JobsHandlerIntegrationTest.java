@@ -221,9 +221,7 @@ public class JobsHandlerIntegrationTest {
     var pricingService = mock(PricingService.class);
     when(pricingService.getPrice(
             new RequestContext("jordan"),
-            new GetPriceRequest(
-                "mtg_168_c_dom_normal",
-                com.jordansimsmith.tcginventory.pricing.client.Condition.NM)))
+            new GetPriceRequest("mtg_168_c_dom_normal", Condition.NM)))
         .thenThrow(new NotFoundException("missing"));
 
     var result =
@@ -252,23 +250,14 @@ public class JobsHandlerIntegrationTest {
     var fetchTcgService = factory.fakeFetchTcgService();
     var ctx = new RequestContext("jordan");
     var pricingService = mock(PricingService.class);
-    when(pricingService.getPrice(
-            ctx,
-            new GetPriceRequest(
-                "mtg_168_c_dom_normal",
-                com.jordansimsmith.tcginventory.pricing.client.Condition.NM)))
+    when(pricingService.getPrice(ctx, new GetPriceRequest("mtg_168_c_dom_normal", Condition.NM)))
         .thenReturn(new GetPriceResponse(new BigDecimal("1.20"), new BigDecimal("1.20")));
 
     // act
     newAppraiseJobProcessor(fetchTcgService, pricingService).processBatch("jordan", jobItem);
 
     // assert
-    verify(pricingService)
-        .getPrice(
-            ctx,
-            new GetPriceRequest(
-                "mtg_168_c_dom_normal",
-                com.jordansimsmith.tcginventory.pricing.client.Condition.NM));
+    verify(pricingService).getPrice(ctx, new GetPriceRequest("mtg_168_c_dom_normal", Condition.NM));
     var row = getRow("jordan", "import1", 1);
     assertThat(row.getMarketPrice()).isEqualTo("1.20");
     assertThat(row.getSuggestedPrice()).isEqualTo("1.20");
@@ -289,9 +278,7 @@ public class JobsHandlerIntegrationTest {
             "shared-card", "Card", BigDecimal.ONE, Map.of("scryfallId", SCRYFALL_ID)));
     var pricingService = mock(PricingService.class);
     var ctx = new RequestContext("jordan");
-    var request =
-        new GetPriceRequest(
-            "shared-card", com.jordansimsmith.tcginventory.pricing.client.Condition.NM);
+    var request = new GetPriceRequest("shared-card", Condition.NM);
     when(pricingService.getPrice(ctx, request))
         .thenReturn(new GetPriceResponse(new BigDecimal("1.00"), new BigDecimal("0.95")));
 

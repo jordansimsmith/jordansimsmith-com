@@ -1,6 +1,7 @@
 package com.jordansimsmith.tcginventory.pricing.client;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
 
 public record GetPriceRequest(
     @JsonProperty("fetchtcg_card_id") String fetchtcgCardId,

@@ -8,6 +8,7 @@ import com.jordansimsmith.tcginventory.JobProcessor;
 import com.jordansimsmith.tcginventory.games.client.Game;
 import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.games.client.GetGameRequest;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
 import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
@@ -16,7 +17,6 @@ import com.jordansimsmith.tcginventory.inventory.client.Sku;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.inventory.client.UpdateSkuRequest;
-import com.jordansimsmith.tcginventory.pricing.client.Condition;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceRequest;
 import com.jordansimsmith.tcginventory.pricing.client.PricingService;
 import java.util.ArrayList;
@@ -103,7 +103,7 @@ public class RepriceJobProcessor implements JobProcessor {
     if (sku.condition() == null) {
       throw new UnpriceableSkuException("unsupported condition for SKU " + sku.skuId());
     }
-    return Condition.valueOf(sku.condition().name());
+    return sku.condition();
   }
 
   private int requiredCount(Integer value, String attribute) {

@@ -4,8 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import com.fasterxml.jackson.dataformat.csv.CsvMapper;
 import com.fasterxml.jackson.dataformat.csv.CsvSchema;
-import com.jordansimsmith.tcginventory.Condition;
 import com.jordansimsmith.tcginventory.games.client.Game;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -84,7 +84,7 @@ public class ManaBoxCsvParser {
 
     requireNonBlank(raw.condition(), "Condition", rowNumber);
     var conditionValue = raw.condition().toLowerCase();
-    var condition = Condition.fromManaBox(conditionValue);
+    var condition = fromManaBox(conditionValue);
     if (condition == null) {
       throw new IllegalArgumentException(
           "row " + rowNumber + ": unknown Condition " + conditionValue);
@@ -100,6 +100,17 @@ public class ManaBoxCsvParser {
         identity.externalId(),
         raw.language().toLowerCase(),
         raw.quantity());
+  }
+
+  private static Condition fromManaBox(String value) {
+    return switch (value) {
+      case "mint", "near_mint" -> Condition.NM;
+      case "excellent" -> Condition.LP;
+      case "good" -> Condition.MP;
+      case "light_played", "played" -> Condition.HP;
+      case "poor" -> Condition.DMG;
+      default -> null;
+    };
   }
 
   private static void requireNonBlank(String value, String column, int rowNumber) {

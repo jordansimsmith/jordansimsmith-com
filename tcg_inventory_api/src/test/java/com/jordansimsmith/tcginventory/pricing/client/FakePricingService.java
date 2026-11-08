@@ -2,6 +2,7 @@ package com.jordansimsmith.tcginventory.pricing.client;
 
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import java.util.HashMap;
 import java.util.Map;
 

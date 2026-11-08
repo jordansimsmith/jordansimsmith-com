@@ -19,7 +19,7 @@ import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetAccountResponse;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardRequest;
 import com.jordansimsmith.tcginventory.fetchtcg.client.GetCardResponse;
-import com.jordansimsmith.tcginventory.pricing.client.Condition;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceRequest;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceResponse;
 import java.math.BigDecimal;
