@@ -1231,8 +1231,6 @@ public class JobsHandlerIntegrationTest {
         .isEqualTo(
             OrderItem.BuyerAddress.create(
                 "32 Abercrombie Street", null, "Howick", "Auckland", "2014", "NZ"));
-
-    // the refresh moves no inventory or revenue, so it must not mark the report stale
   }
 
   @Test

@@ -343,14 +343,11 @@ lambdas = {
         "zip_file": "delete-import-row-photo-handler_deploy.jar",
     },
     "create_report": {
-        "handler": "com.jordansimsmith.tcginventory.reports.CreateReportHandler",
+        "handler": "com.jordansimsmith.tcginventory.reports.api.CreateReportHandler",
         "zip_file": "create-report-handler_deploy.jar",
-        "environment": {
-            "JOBS_QUEUE_URL": queue_url,
-        },
     },
     "get_reports": {
-        "handler": "com.jordansimsmith.tcginventory.reports.GetReportsHandler",
+        "handler": "com.jordansimsmith.tcginventory.reports.api.GetReportsHandler",
         "zip_file": "get-reports-handler_deploy.jar",
     },
 }

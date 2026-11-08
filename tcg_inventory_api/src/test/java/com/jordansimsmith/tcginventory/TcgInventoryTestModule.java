@@ -24,7 +24,6 @@ import com.jordansimsmith.tcginventory.orders.server.OrdersModule;
 import com.jordansimsmith.tcginventory.photos.client.FakePhotosService;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import com.jordansimsmith.tcginventory.pricing.server.PricingModule;
-import com.jordansimsmith.tcginventory.reports.ReportItem;
 import com.jordansimsmith.tcginventory.reports.server.ReportsModule;
 import com.jordansimsmith.tcginventory.scans.ScanItem;
 import com.jordansimsmith.tcginventory.scans.ScanMessage;
@@ -122,12 +121,6 @@ public class TcgInventoryTestModule {
   @Singleton
   DynamoDbTable<JobItem> jobTable(DynamoDbEnhancedClient client) {
     return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(JobItem.class));
-  }
-
-  @Provides
-  @Singleton
-  DynamoDbTable<ReportItem> reportTable(DynamoDbEnhancedClient client) {
-    return client.table(TcgInventoryTable.TABLE_NAME, TableSchema.fromBean(ReportItem.class));
   }
 
   @Provides

@@ -22,8 +22,6 @@ import com.jordansimsmith.tcginventory.orders.OrderRowItem;
 import com.jordansimsmith.tcginventory.pricing.RepriceJobProcessor;
 import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
 import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
-import com.jordansimsmith.tcginventory.reports.ReportItem;
-import com.jordansimsmith.tcginventory.reports.ReportJobProcessor;
 import com.jordansimsmith.tcginventory.scans.ScanConfirmationJobProcessor;
 import com.jordansimsmith.time.Clock;
 import java.io.IOException;
@@ -41,7 +39,6 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
   private final QueueClient<JobMessage> jobsQueue;
   private final JobProcessor appraiseJobProcessor;
   private final JobProcessor publishJobProcessor;
-  private final JobProcessor reportJobProcessor;
   private final JobProcessor scanConfirmationJobProcessor;
   private final JobProcessor importConfirmationJobProcessor;
   private final JobProcessor orderFulfillmentJobProcessor;
@@ -87,14 +84,6 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     var listingPhaseProcessor =
         new ListingPhaseProcessor(factory.inventoryService(), factory.listingService());
     this.publishJobProcessor = new PublishJobProcessor(orderPhaseProcessor, listingPhaseProcessor);
-    this.reportJobProcessor =
-        new ReportJobProcessor(
-            TcgInventoryTable.table(enhancedClient, ReportItem.class),
-            factory.objectMapper(),
-            factory.clock(),
-            factory.gamesService(),
-            factory.inventoryService(),
-            factory.orderService());
     this.scanConfirmationJobProcessor = new ScanConfirmationJobProcessor(factory);
     this.importConfirmationJobProcessor =
         new ImportConfirmationJobProcessor(
@@ -210,7 +199,6 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     return switch (jobType) {
       case "appraise" -> appraiseJobProcessor;
       case "publish" -> publishJobProcessor;
-      case "report" -> reportJobProcessor;
       case "scan_confirmation" -> scanConfirmationJobProcessor;
       case "import_confirmation" -> importConfirmationJobProcessor;
       case "order_fulfillment" -> orderFulfillmentJobProcessor;

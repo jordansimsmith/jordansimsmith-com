@@ -189,11 +189,11 @@ module "java_api" {
       artifact = var.artifacts["get_publish"]
     }
     create_report = {
-      handler  = "com.jordansimsmith.tcginventory.reports.CreateReportHandler"
+      handler  = "com.jordansimsmith.tcginventory.reports.api.CreateReportHandler"
       artifact = var.artifacts["create_report"]
     }
     get_reports = {
-      handler  = "com.jordansimsmith.tcginventory.reports.GetReportsHandler"
+      handler  = "com.jordansimsmith.tcginventory.reports.api.GetReportsHandler"
       artifact = var.artifacts["get_reports"]
     }
     find_skus = {
