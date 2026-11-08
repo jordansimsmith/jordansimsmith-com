@@ -16,6 +16,7 @@ import com.jordansimsmith.tcginventory.orders.client.FindOrdersRequest;
 import com.jordansimsmith.tcginventory.orders.client.OrderService;
 import com.jordansimsmith.tcginventory.orders.client.OrderState;
 import com.jordansimsmith.tcginventory.orders.client.OrderSummary;
+import com.jordansimsmith.tcginventory.reports.client.ReportPayload;
 import com.jordansimsmith.time.Clock;
 import java.math.BigDecimal;
 import java.util.ArrayList;

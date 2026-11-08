@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory.reports;
+package com.jordansimsmith.tcginventory.reports.client;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;

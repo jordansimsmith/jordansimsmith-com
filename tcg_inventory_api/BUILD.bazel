@@ -253,6 +253,7 @@ java_library(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/client",
     ] + COMMON_DEPS,
 )
 

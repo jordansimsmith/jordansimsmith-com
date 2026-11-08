@@ -5,6 +5,7 @@ import com.jordansimsmith.tcginventory.inventory.client.Unit;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.orders.client.OrderState;
 import com.jordansimsmith.tcginventory.orders.client.OrderSummary;
+import com.jordansimsmith.tcginventory.reports.client.ReportPayload;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.Instant;
