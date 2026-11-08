@@ -4,20 +4,23 @@ This strategy defines how to evolve the TCG inventory API into a loosely coupled
 
 This is a target architecture and an incremental migration strategy, not a description of boundaries already enforced everywhere. The [service README](../README.md) remains the specification for current behavior. Update it as each migration changes the implementation or observable contracts.
 
+The adjacent [worker strategy](modular-monolith-worker-strategy.md) defines background-work ownership, internal queue adapters, concurrency, retries, and operational recovery. It replaces the earlier proposal for a generic Jobs vertical and global background-task admission.
+
 ## Starting point
 
 The service already groups Java code into verticals: games, catalog, scans, imports, inventory, orders, reports, publish, and pricing. Bazel gives these verticals separate libraries, but consumers can still depend on implementation libraries and persistence models. Shared infrastructure includes the top-level Dagger factory/module, job records and dispatch, table configuration, and storage helpers. The factory and module may remain at the top level while other root-package code migrates into vertical packages or `//lib` packages for truly shared libraries.
 
-Remaining ownership gaps include Reports' direct order reads and Orders' direct SKU and unit reads for pick-sheet location and neighbor details. Orders otherwise uses Inventory services for reservation, release, sale, and admission checks. Root-package wiring still has access to server targets because Bazel visibility applies to the whole package.
+Remaining ownership gaps include shared job records, dispatch, global active-job checks, and workers that access other verticals' implementations or persistence. Orders detail and Reports now read Inventory and Orders facts through service clients. Root-package wiring still has access to server targets because Bazel visibility applies to the whole package.
 
 Existing import confirmation and order processing already use durable progress and replay to complete work in smaller transactions. Preserve those guarantees while changing ownership; service interfaces alone do not provide them.
 
 ## Goals and scope
 
 - Keep vertical slices as the organizing structure, revisiting a boundary when its invariants require a different owner.
-- Give each vertical a runtime-facing API adapter package, a public client package, and a private server package.
+- Give each vertical a public client package, a private server package, and separate HTTP (`api`) and queue (`worker`) adapter packages where needed.
 - Make cross-vertical access go through runtime-independent service contracts.
 - Give each persisted record and business invariant one authoritative owner.
+- Keep background-work lifecycle, progress, internal messages, and admission in the vertical that owns the workflow.
 - Keep direct in-process calls initially and preserve one Lambda per HTTP endpoint.
 - Make future RPC implementations possible without changing callers' business logic.
 - Replace cross-vertical atomicity with explicit, recoverable workflows.
@@ -26,11 +29,13 @@ Immediate service extraction, an RPC framework, an event bus for every interacti
 
 ## Package and build boundaries
 
-Each vertical has `api`, `client`, and `server` packages. The `api` package contains HTTP handlers and other runtime-facing adapters; they translate transport input into client requests, call the client interface, and translate service errors into transport responses. The `api` package does not depend directly on the vertical's server implementation. The `client` package contains the service interface and the request, response, and vertical-specific error types needed to use it. The `server` package contains the implementation, repositories, persistence models, internal policies, operation services, and the vertical's Dagger module. Shared types such as `ServiceException` and `RequestContext` belong in `//lib/service`.
+Each vertical has `client` and `server` packages, with `api` for HTTP adapters and `worker` for queue-consumption adapters where needed. The `api` package translates HTTP input into client requests, calls the client interface, and translates service errors into HTTP responses. It does not depend directly on the vertical's server implementation. The `worker` package contains thin queue adapters that may call their own vertical's server entry points directly. Background business logic, dispatch decisions, progress, and recovery remain in `server`.
+
+The `client` package contains the service interface and the request, response, and vertical-specific error types needed by callers. Services expose business operations that can initiate background work; internal worker messages and processing entry points stay in `server`. Name queue Lambda adapters `FooWorkerHandler` in `worker` and their processing classes `FooMessageHandler` in `server`, such as `PublishWorkerHandler` delegating to `PublishMessageHandler`. The internal entry point is `void handleMessage(RequestContext ctx, FooMessage message)`, declaring checked exceptions such as `ServiceException` when needed. It owns message processing and progress without returning a service response or batch-result object. A concrete message handler is sufficient; introducing a public worker interface is unnecessary. The `server` package also contains repositories, persistence models, internal policies, operation services, and the vertical's Dagger module. Shared types such as `ServiceException` and `RequestContext` belong in `//lib/service`.
 
 The JDK-only `//lib/service:service` target contains `RequestContext`, `ServiceException`, and its shared subclasses. `ServiceException` is sealed to the six final HTTP-named exception categories, keeping the set of service errors closed for exhaustive HTTP mapping. Future service clients depend directly on this target, which has no Lambda, API Gateway, Dagger, or JSON dependencies. The existing `//lib/http:lib` target depends on and re-exports `//lib/service:service` for HTTP adapters and existing consumers.
 
-Each `api`, `client`, and `server` directory has its own `BUILD.bazel`, making them separate Bazel packages. The API BUILD defines HTTP adapter targets separately from server implementation targets; the client BUILD defines the public contract target and its tests; the server BUILD defines the private implementation target and its tests. A single BUILD at the vertical root does not replace these package build files. Configure visibility to enforce the service boundary.
+Each `api`, `worker`, `client`, and `server` directory that exists has its own `BUILD.bazel`, making them separate Bazel packages. Adapter BUILD files define their runtime targets separately from server implementation targets; the client BUILD defines the public contract target and any test helpers; the server BUILD defines the private implementation target and its tests. A single BUILD at the vertical root does not replace these package build files. Configure visibility to enforce the service boundary.
 
 An illustrative package structure is:
 
@@ -38,10 +43,10 @@ An illustrative package structure is:
 tcginventory/
   inventory/
     api/
-      BUILD.bazel            # HTTP handlers and other runtime adapters
+      BUILD.bazel            # HTTP handlers
       ...                    # delegates to InventoryService
     client/
-      BUILD.bazel            # public client target and contract tests
+      BUILD.bazel            # public client target and optional test helpers
       InventoryService.java
       ...                    # request and response types
     server/
@@ -51,7 +56,10 @@ tcginventory/
   imports/
     api/
       BUILD.bazel
-      ...                    # HTTP handlers and other runtime adapters
+      ...                    # HTTP handlers, delegates to ImportService
+    worker/
+      BUILD.bazel            # queue adapters, may depend on imports.server
+      ...                    # Lambda entry points, no business logic
     client/
       BUILD.bazel
       ImportService.java
@@ -59,20 +67,21 @@ tcginventory/
     server/
       BUILD.bazel
       ImportModule.java      # provides ImportService, consumes InventoryService
-      ...                    # operation services, repositories, persistence models
+      ...                    # operations, message handlers, messages, persistence
 ```
 
-This illustrates responsibilities; exact target names are chosen during implementation. Once a vertical's migration is complete, its production classes live under `api`, `client`, or `server`; no production classes remain directly in the vertical root. Legacy root-level classes may remain temporarily during migration, but they are an explicit unfinished boundary and must be moved or removed before declaring the vertical complete. There is no separate contracts package: vertical contracts live in their client packages, shared service/context types live in `//lib/service`, and HTTP response mapping lives in `//lib/http`. RPC transport packages are deferred until RPC is introduced. Dagger modules live in their owning server packages; no separate wiring package is required. Bazel target names remain kebab-case.
+This illustrates responsibilities; exact target names are chosen during implementation. Once a vertical's migration is complete, its production classes live under `api`, `worker`, `client`, or `server`; no production classes remain directly in the vertical root. Legacy root-level classes may remain temporarily during migration, but they are an explicit unfinished boundary and must be moved or removed before declaring the vertical complete. There is no separate contracts package: vertical contracts live in their client packages, shared service/context types live in `//lib/service`, and HTTP response mapping lives in `//lib/http`. RPC transport packages are deferred until RPC is introduced. Dagger modules live in their owning server packages; no separate wiring package is required. Bazel target names remain kebab-case.
 
 | Consumer                   | Allowed dependencies                                                            |
 | -------------------------- | ------------------------------------------------------------------------------- |
 | Any target                 | Public client targets and shared service/context types from `//lib/service`     |
 | A vertical's server        | Its own client, other verticals' clients, and required infrastructure libraries |
 | HTTP adapter in `api`      | Service clients, HTTP/runtime libraries, and narrow composition-root factories  |
-| Top-level composition root | Server modules needed to construct and expose service interfaces                |
+| Queue adapter in `worker`  | Its own server entry points, queue/runtime libraries, and narrow wiring         |
+| Top-level composition root | Server modules needed to construct services and internal worker entry points    |
 | Server tests               | The implementation under test and required test setup                           |
 
-No other production target may depend on a vertical's server. Enforce this with Bazel target visibility and strict Java dependencies (`strict_java_deps`): visibility restricts which packages can declare a server dependency, and strict dependencies require imported classes to come from declared direct dependencies. These checks run during normal Bazel builds and tests; no separate architecture-checking framework is required. Do not bypass them through `exports`, a shared implementation library, broad source globs, or factories that expose repositories. The top-level composition root is the deliberate construction exception and must contain no business logic.
+No other production target may depend on a vertical's server. The owning `worker` package has an explicit runtime-entry exception; other verticals' workers still use only client contracts. Enforce this with Bazel target visibility and strict Java dependencies (`strict_java_deps`): visibility restricts which packages can declare a server dependency, and strict dependencies require imported classes to come from declared direct dependencies. These checks run during normal Bazel builds and tests; no separate architecture-checking framework is required. Do not bypass them through `exports`, a shared implementation library, broad source globs, or factories that expose repositories. The top-level composition root is the deliberate construction exception and must contain no business logic.
 
 Bazel visibility operates at package granularity, not individual target granularity. Keep the composition root limited to construction responsibilities. It may remain in the top-level Java/Bazel package while other code moves into vertical and `//lib` packages. Until that migration is complete, allowing the root package to depend on a vertical server also permits every target in that package to declare the dependency; document this as an enforcement gap rather than claiming visibility isolates one factory target. Close the gap by moving non-wiring root code out, without requiring a separate composition package.
 
@@ -112,6 +121,8 @@ The object implementing `FooService` is a thin delegate. A named `FooServiceImpl
 
 Each vertical defines a Dagger `FooModule` in `foo.server` with one `@Provides` method returning `FooService`. Construct private repositories, adapters, and operation services inside that provider, using private construction helpers when useful. The provider accepts required infrastructure, runtime configuration, and other verticals' client interfaces as parameters. Resolve environment-specific values in the application composition root and pass them into the vertical module; server modules should not read environment variables. It does not expose operation classes, repositories, tokens, or persistence models as public Dagger bindings, and it does not include another vertical's server module.
 
+A vertical with background work may additionally provide a server-owned message handler to its own `worker` adapter through application wiring. This internal runtime binding does not belong in `client` and does not make the message handler available to other verticals. Keep worker construction inside the owning server module; it is not a reason to expose repositories or persistence models. The one-class-per-service-method rule does not require an interface or service-operation wrapper around each internal worker entry point.
+
 An illustrative module is:
 
 ```java
@@ -149,7 +160,7 @@ public interface AppFactory {
 }
 ```
 
-Modules can alternatively be included by the existing top-level application module. Dagger supplies cross-vertical dependencies by interface type; `FooModule` does not construct `BarService` or depend on `BarModule`. The factory exposes service interfaces for migrated verticals, with required shared infrastructure bindings supplied by the application. Existing factory accessors exposing implementation details are migration gaps to remove as their callers move.
+Modules can alternatively be included by the existing top-level application module. Dagger supplies cross-vertical dependencies by interface type; `FooModule` does not construct `BarService` or depend on `BarModule`. The factory exposes service interfaces for cross-vertical and HTTP callers, with required shared infrastructure bindings supplied by the application. Worker wiring may expose a vertical's internal message handler only to its own queue adapter. Other factory accessors exposing implementation details are migration gaps to remove as their callers move.
 
 Scope the service provider to the component lifecycle where appropriate. A singleton belongs to one component in one process; it does not create shared instances across Lambda environments. The same client interface can later be provided by an RPC implementation without changing callers.
 
@@ -172,9 +183,10 @@ The starting ownership model is:
 | Inventory | SKUs, physical units, sequence/location allocation, and stock transitions                                     |
 | Orders    | Offer/order records, order-tracking settings, allocations recorded for its workflow, and fulfillment progress |
 | Pricing   | Pricing policy, price-floor configuration, and repricing orchestration                                        |
-| Publish   | Marketplace projection and publication progress                                                               |
+| Listings  | Single-SKU marketplace synchronization and current/historical listing associations                            |
+| Publish   | Publication admission, Orders-before-Listings orchestration, and publication progress                         |
 | Reports   | Report generation and report snapshots/projections                                                            |
-| Jobs      | Generic job records, lifecycle, dispatch, and per-user background-task admission                              |
+| Photos    | Physical-photo bytes, identifiers, and retrieval                                                              |
 | FetchTCG  | Marketplace account, credentials, seller identity, and provider integration                                   |
 
 Inventory owns SKUs, units, sequence and location allocation, receipts, reservation lifecycle, stock transitions, and stock and price mutation audits. It selects and reserves one unit per operation; callers save returned allocations as their own workflow progress. Imports creates units through a stable per-row operation ID, then records the returned location and SKU on its row. Creation is visible incrementally, and sequence gaps are accepted. If a downstream progress save fails, callers retry forward with the same operation ID.
@@ -187,11 +199,13 @@ Listing photos cross lifecycle boundaries: imports owns review-time attachments,
 
 Before completing a vertical migration, assign ownership for its audit records, job state, idempotency records, and any shared operational gates. These cannot remain implicit shared database access. Inventory owns audits for its stock and price mutations and commits each audit with the corresponding mutation. Orders lifecycle transitions update Orders records without writing Inventory audits; historical order audit records remain untouched. A combined audit view can aggregate published records without becoming a synchronous dependency of every mutation.
 
-The Jobs vertical owns generic job identity, queued/running/terminal lifecycle, dispatch, and background-task admission. It does not own business rules, domain records, or workflow checkpoints. Job contracts carry generic owner and operation identity; the worker adapter routes these to the owning vertical. Each vertical retains its own durable progress and decides when its workflow is complete.
+## Background workflows and admission
 
-Allow at most one logical background task per user at a time across application queues, including report generation and scan recognition. Continuations and retries remain part of the admitted task and retain its admission until terminal completion. A handoff to a related follow-up task must transfer admission safely rather than briefly allowing overlapping work. Duplicate requests for an already active equivalent task preserve the endpoint's idempotent response; conflicting work reports the existing conflict behavior. Do not make job admission depend on vertical-specific fields or behavior.
+Each vertical owns its background-operation lifecycle, messages, progress, dispatch, and any admission rules. Existing domain lifecycle and row progress may be sufficient; a separate job record is optional. There is no target Jobs vertical, shared job record, or global rule limiting a user to one background task. Shared libraries may provide queue infrastructure without owning workflow state or business policy. See the [worker strategy](modular-monolith-worker-strategy.md) for the full execution and migration rules.
 
-Background-task admission and synchronous mutation invariants are separate concerns. Synchronous edits must not query global active-job state or acquire a cross-vertical mutation permit. Each owner protects its lifecycle and authoritative writes with local transactions and conditional updates. Configuration changes during jobs, stale marketplace projections, mixed-time reports, and recoverable pricing conflicts are accepted application tradeoffs. Existing background-start checks and execution remain in place until background orchestration is redesigned separately.
+Different verticals' work may execute concurrently. Keep lifecycle restrictions and ordering at the owner and resource that require them. Publish atomically admits at most one active publication per user, including queued work, continuation batches, and retries; duplicate requests return `202`. It waits for Orders synchronization to complete successfully through an Orders service operation before synchronizing Listings. No independent order-synchronization path may bypass this ordering without revisiting its concurrency guarantees. Publish owns its admission state; Orders and Listings retain exclusive ownership of their own records.
+
+Remove global active-job checks from endpoints as their workflows migrate, while preserving local import/scan lifecycle restrictions and order-fulfillment transitions. Establish Publish-owned admission before retiring its shared guard. Synchronous edits do not acquire a cross-vertical mutation permit. Configuration changes during jobs, stale marketplace projections, mixed-time reports, and recoverable pricing conflicts remain accepted application tradeoffs. The existing shared dispatcher and checks remain legacy behavior until the corresponding implementation migration changes them.
 
 ## Transactions and workflow recovery
 
@@ -219,7 +233,7 @@ If inventory commits and imports crashes before saving progress, imports repeats
 
 Stock becomes visible as each row succeeds. Preserve row ordering, photo references, and each row's actual location; gaps and interleaving with other stock creation are allowed. Bulk service operations do not imply one unbounded DynamoDB transaction.
 
-Where committing local state must reliably schedule follow-up work, use a transactional outbox or an equivalent durable delivery mechanism. Sending a queue message after a database commit is not atomic. This is especially relevant to existing paths whose queue-send failures leave durable jobs awaiting manual enqueue.
+Sending a queue message after a database commit is not atomic. Manual recovery is accepted initially for both initial dispatch and continuation-send failures: the owner retains durable operation state so an operator can enqueue or resume the same work with its existing identity. Do not claim guaranteed scheduling or introduce a shared dispatch owner. Consider an owner-local transactional outbox or equivalent durable delivery mechanism if these gaps become an operational problem.
 
 Compensation is a business operation with its own rules, not an automatic rollback. Receiving physical stock and reserving a unit for an order may require different recovery policies.
 
@@ -233,17 +247,21 @@ Separate owners do not provide a globally consistent snapshot merely because rea
 
 ## Lambda handlers and deployment
 
-Keep one Lambda per HTTP endpoint. A handler decodes the HTTP request, constructs runtime-independent context, calls the owning service, and maps the result or typed error to the existing HTTP response contract. Domain validation, persistence, and workflow orchestration belong in services. Background consumers likewise enter through the appropriate service boundary.
+Keep one Lambda per HTTP endpoint in `api`. A handler decodes the HTTP request, constructs runtime-independent context, calls the owning service, and maps the result or typed error to the existing HTTP response contract. Domain validation, persistence, and workflow orchestration belong in services and server-owned message handlers.
+
+Use a queue and worker Lambda handler per vertical initially, with additional queue/handler pairs when workloads need different runtimes or execution settings. Place queue adapters in `worker`; `FooWorkerHandler` decodes the message, constructs `RequestContext`, and delegates to its server-owned `FooMessageHandler#handleMessage` directly. Calls into another vertical always use that vertical's client interface, including requests that schedule background work. Internal worker messages and entry points are not public service contracts.
 
 Initially, bind service interfaces to direct implementations through each vertical's server-local Dagger module and the top-level component/factory. Business code depends only on client targets. Existing Lambda handlers provide HTTP adaptation without introducing an RPC transport package.
 
 Separate Lambda functions do not share a JVM. Initially, each deployment artifact bundles the implementations required by its reachable call graph: an imports Lambda making direct inventory calls includes both implementations. Instances may share the same physical database while remaining separate processes. A single-host deployment could use the same interfaces and direct wiring.
 
+Queue ownership is independent of JVM ownership. One worker JVM can host consumers for multiple vertical queues, while API and worker processes may be separate. Provider calls may execute concurrently; process-local caches, synchronization, and pacing do not provide coordination across JVMs. Shared FetchTCG rate limiting and additional credential-refresh coordination are deferred until needed.
+
 Future extraction replaces an interface binding with an RPC adapter and gives the remote service its own deployment and data configuration. It also requires transport security, compatibility, monitoring, and data migration. It must not require callers to adopt new business workflows because local calls previously hid partial failure.
 
 ## Service errors and HTTP mapping
 
-Define the shared checked, sealed base `ServiceException extends Exception` and its six permitted subclasses in `//lib/service` before adding the service client declarations that use `throws ServiceException`. The exception types remain runtime-independent, without Lambda or API Gateway dependencies. Vertical-specific error contracts belong in the owning client's package. Lambda handlers catch `ServiceException` and use shared HTTP error mapping from `//lib/http`:
+Define the shared checked, sealed base `ServiceException extends Exception` and its six permitted subclasses in `//lib/service` before adding the service client declarations that use `throws ServiceException`. The exception types remain runtime-independent, without Lambda or API Gateway dependencies. Vertical-specific error contracts belong in the owning client's package. HTTP Lambda handlers catch `ServiceException` and use shared HTTP error mapping from `//lib/http`:
 
 | Exception                     | HTTP response                                                                    |
 | ----------------------------- | -------------------------------------------------------------------------------- |
@@ -263,18 +281,20 @@ Use `UnauthorizedException` when authentication is missing or invalid, and `Forb
 
 A calling service interprets dependency errors in the context of its operation. It can propagate the checked `ServiceException` unchanged through its declared contract or catch a specific subtype to translate its meaning. An inventory `NotFoundException` does not automatically mean an imports endpoint should return `404`; it may represent invalid input or a broken internal invariant. Unexpected invariant and infrastructure failures remain loud and are not disguised as validation failures or silent fallbacks.
 
-Future RPC transports encode the defined error vocabulary and reconstruct client-side exceptions. They do not serialize arbitrary Java exception objects. Expected service exceptions must reach the adapter without being obscured by generic runtime wrappers. Background adapters preserve retryable failures for the job runtime rather than converting them into HTTP responses.
+Future RPC transports encode the defined error vocabulary and reconstruct client-side exceptions. They do not serialize arbitrary Java exception objects. Expected service exceptions must reach the HTTP adapter without being obscured by generic runtime wrappers.
+
+Worker adapters default to failing the invocation for every processing failure, including all `ServiceException` categories. SQS retries and then routes exhausted messages to the owning queue's DLQ. An HTTP-named exception does not automatically become an acknowledged terminal business failure in a worker. Define explicit business-failure handling only when a concrete workflow needs it; manual DLQ recovery is the initial default.
 
 ## Incremental migration
 
 Apply these steps to any vertical. Choose the next vertical from its ownership boundaries, dependency graph, and coupling rather than following a fixed domain order. Before changing code, identify its authoritative records, invariants, callers, dependencies, and cross-vertical workflows.
 
-1. First establish shared context/error types in `//lib/service`, including `ServiceException` and the required HTTP-named subclasses. Then define the selected vertical's contracts in its client package, with `throws ServiceException` on every operation. Place runtime-facing HTTP adapters in its `api` package, with a separate `BUILD.bazel` for each of `api`, `client`, and `server`. Restrict server visibility, and provide the service through its server-local Dagger module.
+1. First establish shared context/error types in `//lib/service`, including `ServiceException` and the required HTTP-named subclasses. Then define the selected vertical's contracts in its client package, with `throws ServiceException` on every operation. Place HTTP adapters in `api` and queue adapters in `worker`, with a separate `BUILD.bazel` for each package that exists. Restrict server visibility to its own worker adapters, construction wiring, and implementation tests, and provide the service through its server-local Dagger module.
 2. Migrate one complete operation behind the vertical's service interface, with a dedicated operation class and a thin delegate from the provided service. Keep its persistence models and mutations in its server package, replace cross-vertical implementation access with client contracts, and preserve validation, authorization, concurrency, and replay behavior. Define recovery wherever the operation crosses owners.
 3. Enforce the migrated boundary in Bazel and remove the old repository/model dependencies for that path. Mark remaining migration gaps explicitly; do not describe a vertical as isolated while its other callers still bypass the interface.
 4. Move endpoint application logic into services and adopt the shared HTTP error mapper while preserving public responses.
 5. Repeat for the vertical's remaining operations and callers, then apply the same process to other verticals. Choose the order from the dependency graph and ownership decisions. Cross-vertical reads use client contracts or explicitly owned projections.
-6. Shrink shared domain state and infrastructure access as ownership becomes explicit. Resolve ownership and recovery for any shared jobs, concurrency gates, audit records, or resource lifecycles used by the selected vertical before declaring isolation complete.
+6. Shrink shared domain state and infrastructure access as ownership becomes explicit. Move background records, dispatch, and progress into their workflow owners; replace global active-job checks with required local lifecycle rules and Publish-owned admission. Preserve replay and manual recovery before removing legacy job access. Resolve any remaining audit or resource-lifecycle ownership before declaring isolation complete.
 7. Consider RPC or separate databases only when a deployment need justifies them. No extraction is required to benefit from the boundaries.
 
 Each migration should be small enough to review and leave a working system. When replacing an existing implementation, build the service implementation to behavioral parity first, switch consumers to the service boundary, then remove the legacy implementation after its final callers move. Temporary duplication is acceptable when it keeps the new implementation independent of legacy callers during parity work. Update the README's current architecture, dependency graph, and behavioral contracts in the same implementation change.
@@ -285,11 +305,12 @@ A vertical is migrated when its callers use only client contracts, its records h
 
 Verify this with:
 
-- Bazel visibility and dependency checks that prevent implementation access outside explicit wiring and tests.
+- Bazel visibility and dependency checks that prevent implementation access outside the owning worker adapters, explicit wiring, and implementation tests.
 - Service-level tests for domain rules, authorization, and expected errors without a Lambda runtime.
 - Integration tests of real persistence behavior, including concurrent/repeated requests and atomic idempotency enforcement.
 - Recovery tests for a real dependency committing before its caller records completion, plus duplicate delivery and workflow resumption.
 - Adapter tests preserving HTTP status codes, response bodies, and safe error disclosure.
+- Focused worker coverage for replay, owner-local progress, Publish admission, and failure propagation to queue retries and DLQ recovery. Avoid a concurrency matrix or a generic worker framework solely for testing.
 - Existing end-to-end import, publish, order, pricing, scanning, photo, and reporting workflows where affected.
 
 Use existing repository quality gates for implementation work. Tests should verify observable invariants and recovery guarantees rather than reproduce service wiring.
@@ -299,7 +320,8 @@ Use existing repository quality gates for implementation work. Tests should veri
 The boundary principles above are the strategy. Before migrating affected paths, settle these implementation details in concrete contracts:
 
 - Exact service operation shapes, bulk bounds, idempotency retention, and concurrency semantics.
-- Ownership of shared job admission, durable dispatch, audit aggregation, and long-lived photo references.
+- Concrete owner-local operation records, replay identities, FIFO grouping, and manual recovery procedures; outbox delivery is deferred until justified.
+- Audit aggregation and long-lived photo references.
 - The dependency graph and whether any current vertical boundary splits an invariant that must remain atomic.
 - Reporting freshness and consistency across owners.
 - Exact Bazel labels and composition-root package boundaries needed to keep module-construction access narrow.
