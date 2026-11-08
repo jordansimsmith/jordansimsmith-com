@@ -1,6 +1,22 @@
 load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 
 java_test_suite(
+    name = "server-unit-tests",
+    size = "small",
+    srcs = ["ReportAccumulatorTest.java"],
+    runner = "junit5",
+    test_suffixes = ["Test.java"],
+    runtime_deps = JUNIT5_DEPS,
+    deps = [
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/server",
+        "@maven//:org_assertj_assertj_core",
+        "@maven//:org_junit_jupiter_junit_jupiter_api",
+    ],
+)
+
+java_test_suite(
     name = "server-integration-tests",
     size = "medium",
     srcs = ["ReportRepositoryIntegrationTest.java"],
@@ -14,7 +30,17 @@ java_test_suite(
     runtime_deps = JUNIT5_DEPS,
     deps = [
         "//lib/dynamodb:test-lib",
+        "//lib/service",
+        "//lib/time:lib",
+        "//lib/time:test-lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/server",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/games/client:test-lib",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/inventory/client:test-lib",
+        "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",
         "@maven//:org_mockito_mockito_core",
