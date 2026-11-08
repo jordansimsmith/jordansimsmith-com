@@ -25,6 +25,7 @@ import com.jordansimsmith.tcginventory.photos.client.FakePhotosService;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import com.jordansimsmith.tcginventory.pricing.server.PricingModule;
 import com.jordansimsmith.tcginventory.reports.ReportItem;
+import com.jordansimsmith.tcginventory.reports.server.ReportsModule;
 import com.jordansimsmith.tcginventory.scans.ScanItem;
 import com.jordansimsmith.tcginventory.scans.ScanMessage;
 import com.jordansimsmith.tcginventory.scans.ScanRepository;
@@ -42,13 +43,26 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Module(
-    includes = {PricingModule.class, OrdersModule.class, CatalogModule.class, ListingsModule.class})
+    includes = {
+      PricingModule.class,
+      OrdersModule.class,
+      CatalogModule.class,
+      ListingsModule.class,
+      ReportsModule.class
+    })
 public class TcgInventoryTestModule {
   @Provides
   @Singleton
   @Named("tcgInventoryTableName")
   String tcgInventoryTableName() {
     return TcgInventoryTable.TABLE_NAME;
+  }
+
+  @Provides
+  @Singleton
+  @Named("reportsQueueName")
+  String reportsQueueName() {
+    return "tcg_inventory_reports.fifo";
   }
 
   @Provides

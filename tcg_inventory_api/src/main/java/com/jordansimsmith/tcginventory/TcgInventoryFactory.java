@@ -12,6 +12,8 @@ import com.jordansimsmith.tcginventory.listings.client.ListingService;
 import com.jordansimsmith.tcginventory.orders.client.OrderService;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import com.jordansimsmith.tcginventory.pricing.client.PricingService;
+import com.jordansimsmith.tcginventory.reports.client.ReportService;
+import com.jordansimsmith.tcginventory.reports.server.ReportMessageHandler;
 import com.jordansimsmith.time.Clock;
 import com.jordansimsmith.ulid.UlidGenerator;
 import dagger.Component;
@@ -61,6 +63,10 @@ public interface TcgInventoryFactory {
   OrderService orderService();
 
   PhotosService photosService();
+
+  ReportService reportService();
+
+  ReportMessageHandler reportMessageHandler();
 
   S3Client s3Client();
 

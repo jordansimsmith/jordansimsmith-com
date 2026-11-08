@@ -23,6 +23,8 @@ import com.jordansimsmith.tcginventory.photos.client.FakePhotosService;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import com.jordansimsmith.tcginventory.pricing.client.PricingService;
 import com.jordansimsmith.tcginventory.reports.ReportItem;
+import com.jordansimsmith.tcginventory.reports.client.ReportService;
+import com.jordansimsmith.tcginventory.reports.server.ReportMessageHandler;
 import com.jordansimsmith.tcginventory.scans.ScanItem;
 import com.jordansimsmith.tcginventory.scans.ScanMessage;
 import com.jordansimsmith.tcginventory.scans.ScanRepository;
@@ -105,6 +107,10 @@ public interface TcgInventoryTestFactory extends CatalogFactory {
   FakeInventoryService fakeInventoryService();
 
   ListingService listingService();
+
+  ReportService reportService();
+
+  ReportMessageHandler reportMessageHandler();
 
   @Component.Factory
   interface Factory {

@@ -17,6 +17,7 @@ import com.jordansimsmith.tcginventory.listings.server.ListingsModule;
 import com.jordansimsmith.tcginventory.orders.server.OrdersModule;
 import com.jordansimsmith.tcginventory.photos.server.PhotosModule;
 import com.jordansimsmith.tcginventory.pricing.server.PricingModule;
+import com.jordansimsmith.tcginventory.reports.server.ReportsModule;
 import com.jordansimsmith.time.ClockModule;
 import com.jordansimsmith.ulid.UlidModule;
 import dagger.Module;
@@ -47,16 +48,26 @@ import software.amazon.awssdk.services.sqs.SqsClient;
       CatalogModule.class,
       PricingModule.class,
       PhotosModule.class,
-      OrdersModule.class
+      OrdersModule.class,
+      ReportsModule.class
     })
 public class TcgInventoryModule {
   static final String JOBS_QUEUE_NAME = "tcg_inventory_jobs.fifo";
+
+  static final String REPORTS_QUEUE_NAME = "tcg_inventory_reports.fifo";
 
   @Provides
   @Singleton
   @Named("tcgInventoryTableName")
   String tcgInventoryTableName() {
     return TcgInventoryTable.TABLE_NAME;
+  }
+
+  @Provides
+  @Singleton
+  @Named("reportsQueueName")
+  String reportsQueueName() {
+    return REPORTS_QUEUE_NAME;
   }
 
   @Provides

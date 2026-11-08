@@ -9,12 +9,15 @@ java_library(
     ],
     deps = [
         "//lib/dynamodb:lib",
+        "//lib/queue:lib",
         "//lib/service",
         "//lib/time:lib",
+        "//lib/ulid:lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/client",
+        "//third_party/dagger",
         "@maven//:com_fasterxml_jackson_core_jackson_annotations",
         "@maven//:com_fasterxml_jackson_core_jackson_core",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
@@ -22,5 +25,6 @@ java_library(
         "@maven//:org_slf4j_slf4j_api",
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
+        "@maven//:software_amazon_awssdk_sqs",
     ],
 )

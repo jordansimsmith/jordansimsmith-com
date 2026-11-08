@@ -176,6 +176,8 @@ java_library(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/server",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/server",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/server",
     ] + COMMON_DEPS,
 )
 
@@ -1027,6 +1029,8 @@ java_library(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/server",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/server",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/server",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/client:test-lib",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/games/client:test-lib",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/inventory/client:test-lib",

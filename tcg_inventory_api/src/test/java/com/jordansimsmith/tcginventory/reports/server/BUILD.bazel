@@ -30,9 +30,12 @@ java_test_suite(
     runtime_deps = JUNIT5_DEPS,
     deps = [
         "//lib/dynamodb:test-lib",
+        "//lib/queue:lib",
+        "//lib/queue:test-lib",
         "//lib/service",
         "//lib/time:lib",
         "//lib/time:test-lib",
+        "//lib/ulid:test-lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/client",

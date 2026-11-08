@@ -3,6 +3,7 @@ package com.jordansimsmith.tcginventory.reports.server;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -12,6 +13,9 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.queue.FakeQueueClient;
+import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
@@ -30,7 +34,13 @@ import com.jordansimsmith.tcginventory.orders.client.OrderService;
 import com.jordansimsmith.tcginventory.orders.client.OrderState;
 import com.jordansimsmith.tcginventory.orders.client.OrderSummary;
 import com.jordansimsmith.tcginventory.orders.client.OrderSummaryRow;
+import com.jordansimsmith.tcginventory.reports.client.CreateReportRequest;
+import com.jordansimsmith.tcginventory.reports.client.GetReportRequest;
+import com.jordansimsmith.tcginventory.reports.client.ReportGenerationStatus;
+import com.jordansimsmith.tcginventory.reports.client.ReportPayload;
 import com.jordansimsmith.time.Clock;
+import com.jordansimsmith.time.FakeClock;
+import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -486,6 +496,234 @@ class ReportRepositoryIntegrationTest {
                     new RequestContext("alice"), new ReportMessage("alice", "generation-1")))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("Report generation has an unknown status");
+  }
+
+  @Test
+  void createReportShouldQueueOneUserScopedGenerationAndAcceptActiveRetries() throws Exception {
+    // arrange
+    var clock = new FakeClock();
+    clock.setTime(Instant.ofEpochSecond(1_700_000_001L));
+    var ids = new FakeUlidGenerator();
+    var queue = new FakeQueueClient<ReportMessage>();
+    var service = new CreateReportService(reportRepository, queue, clock, ids);
+    var ctx = new RequestContext("alice");
+
+    // act
+    service.createReport(ctx, new CreateReportRequest());
+    service.createReport(ctx, new CreateReportRequest());
+
+    // assert
+    assertThat(queue.getSends())
+        .containsExactly(
+            new FakeQueueClient.SentMessage<>(
+                new ReportMessage("alice", "FAKE_ULID_0000000001"),
+                "FAKE_ULID_0000000001",
+                "FAKE_ULID_0000000001"));
+    var queued = reportRepository.get("alice");
+    assertThat(queued.getGenerationId()).isEqualTo("FAKE_ULID_0000000001");
+    assertThat(queued.getGenerationStatus()).isEqualTo("queued");
+    assertThat(queued.getGenerationStartedAt()).isEqualTo(Instant.ofEpochSecond(1_700_000_001L));
+    assertThat(reportRepository.get("bob")).isNull();
+
+    reportRepository.startGeneration("alice", "FAKE_ULID_0000000001");
+    service.createReport(ctx, new CreateReportRequest());
+    assertThat(queue.getSends()).hasSize(1);
+  }
+
+  @Test
+  void createReportShouldPreserveSnapshotAndQueueFreshGenerationAfterSuccess() throws Exception {
+    // arrange
+    var oldTimestamp = Instant.ofEpochSecond(1_700_000_000L);
+    reportTable.putItem(legacySnapshot("alice", "old-report", oldTimestamp));
+    var queue = new FakeQueueClient<ReportMessage>();
+    var service =
+        new CreateReportService(reportRepository, queue, new FakeClock(), new FakeUlidGenerator());
+
+    // act
+    service.createReport(new RequestContext("alice"), new CreateReportRequest());
+    reportRepository.startGeneration("alice", "FAKE_ULID_0000000001");
+    reportRepository.completeGeneration(
+        "alice",
+        "FAKE_ULID_0000000001",
+        "new-report",
+        Instant.ofEpochSecond(1_700_000_010L),
+        Instant.ofEpochSecond(1_700_000_020L));
+    service.createReport(new RequestContext("alice"), new CreateReportRequest());
+
+    // assert
+    var item = reportRepository.get("alice");
+    assertThat(item.getGenerationId()).isEqualTo("FAKE_ULID_0000000002");
+    assertThat(item.getGenerationStatus()).isEqualTo("queued");
+    assertThat(item.getReport()).isEqualTo("new-report");
+    assertThat(item.getUpdatedAt()).isEqualTo(Instant.ofEpochSecond(1_700_000_010L));
+    assertThat(item.getGenerationFinishedAt()).isNull();
+    assertThat(queue.getSends()).hasSize(2);
+  }
+
+  @Test
+  void getReportShouldReturnLegacyAndActiveSnapshotsWithExactFreshnessBoundary() throws Exception {
+    // arrange
+    var payload = new ObjectMapper().writeValueAsString(emptyPayload());
+    var updatedAt = Instant.ofEpochSecond(1_700_000_000L);
+    reportTable.putItem(legacySnapshot("alice", payload, updatedAt));
+    var clock = new FakeClock();
+    var service = new GetReportService(reportRepository, new ObjectMapper(), clock);
+
+    // act / assert
+    clock.setTime(updatedAt.plusSeconds(86_399));
+    assertThat(service.getReport(new RequestContext("alice"), new GetReportRequest()).stale())
+        .isFalse();
+    clock.setTime(updatedAt.plusSeconds(86_400));
+    var atBoundary = service.getReport(new RequestContext("alice"), new GetReportRequest());
+    assertThat(atBoundary.stale()).isFalse();
+    assertThat(atBoundary.generatedAt()).isEqualTo(updatedAt.getEpochSecond());
+    assertThat(atBoundary.generation()).isNull();
+    assertThat(atBoundary.report()).isEqualTo(emptyPayload());
+    clock.setTime(updatedAt.plusSeconds(86_401));
+    assertThat(service.getReport(new RequestContext("alice"), new GetReportRequest()).stale())
+        .isTrue();
+    assertThatThrownBy(() -> service.getReport(new RequestContext("bob"), new GetReportRequest()))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+
+    reportRepository.createGeneration(
+        "alice", "generation-1", Instant.ofEpochSecond(1_700_000_100));
+    clock.setTime(updatedAt);
+    var active = service.getReport(new RequestContext("alice"), new GetReportRequest());
+    assertThat(active.report()).isEqualTo(emptyPayload());
+    assertThat(active.generation().status()).isEqualTo(ReportGenerationStatus.QUEUED);
+    assertThat(active.generation().startedAt()).isEqualTo(1_700_000_100L);
+    assertThat(active.generation().finishedAt()).isNull();
+    var responseJson = new ObjectMapper().valueToTree(active);
+    assertThat(responseJson.path("generated_at").asLong()).isEqualTo(1_700_000_000L);
+    assertThat(responseJson.path("generation").path("status").asText()).isEqualTo("queued");
+    assertThat(responseJson.path("generation").path("error").isNull()).isTrue();
+    assertThat(responseJson.path("generation").path("finished_at").isNull()).isTrue();
+
+    reportRepository.startGeneration("alice", "generation-1");
+    var running = service.getReport(new RequestContext("alice"), new GetReportRequest());
+    assertThat(running.generation().status()).isEqualTo(ReportGenerationStatus.RUNNING);
+  }
+
+  @Test
+  void getReportShouldReturnNotFoundBeforeFirstSuccessfulSnapshot() {
+    // arrange
+    var service = new GetReportService(reportRepository, new ObjectMapper(), new FakeClock());
+    reportRepository.createGeneration("alice", "generation-1", Instant.EPOCH);
+
+    // act / assert
+    assertThatThrownBy(() -> service.getReport(new RequestContext("alice"), new GetReportRequest()))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+  }
+
+  @Test
+  void getReportShouldRejectMalformedSnapshotAndGenerationMetadata() {
+    // arrange
+    var service = new GetReportService(reportRepository, new ObjectMapper(), new FakeClock());
+    reportTable.putItem(legacySnapshot("alice", "not-json", Instant.EPOCH));
+
+    // act / assert
+    assertThatThrownBy(() -> service.getReport(new RequestContext("alice"), new GetReportRequest()))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("Could not read report snapshot");
+
+    var item = legacySnapshot("alice", "{}", Instant.EPOCH);
+    item.setGenerationId("generation-1");
+    item.setGenerationStatus("queued");
+    reportTable.putItem(item);
+    assertThatThrownBy(() -> service.getReport(new RequestContext("alice"), new GetReportRequest()))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("Report generation metadata is incomplete");
+
+    item.setGenerationStatus("unknown");
+    item.setGenerationStartedAt(Instant.EPOCH);
+    reportTable.putItem(item);
+    assertThatThrownBy(() -> service.getReport(new RequestContext("alice"), new GetReportRequest()))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("Report generation has an unknown status");
+
+    reportTable.putItem(legacySnapshot("alice", "{}", null));
+    assertThatThrownBy(() -> service.getReport(new RequestContext("alice"), new GetReportRequest()))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("Report snapshot timestamp is missing");
+  }
+
+  @Test
+  void createReportShouldNotSendAfterStorageFailureOrReplaceQueuedGenerationAfterSendFailure()
+      throws Exception {
+    // arrange
+    var table = mock(DynamoDbTable.class);
+    var failure = new IllegalStateException("storage failed");
+    when(table.getItem(any(GetItemEnhancedRequest.class))).thenThrow(failure);
+    var readFailingRepository = new ReportRepository(table, dynamoDbClient, TABLE_NAME);
+    var queue = mock(QueueClient.class);
+    var readFailingService =
+        new CreateReportService(
+            readFailingRepository, queue, new FakeClock(), new FakeUlidGenerator());
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                readFailingService.createReport(
+                    new RequestContext("alice"), new CreateReportRequest()))
+        .isSameAs(failure);
+    verifyNoInteractions(queue);
+
+    doThrow(new IllegalStateException("queue failed")).when(queue).send(any(), any(), any());
+    var service =
+        new CreateReportService(reportRepository, queue, new FakeClock(), new FakeUlidGenerator());
+    assertThatThrownBy(
+            () -> service.createReport(new RequestContext("alice"), new CreateReportRequest()))
+        .hasMessage("queue failed");
+    assertThat(reportRepository.get("alice").getGenerationStatus()).isEqualTo("queued");
+
+    var retryQueue = new FakeQueueClient<ReportMessage>();
+    var retry =
+        new CreateReportService(
+            reportRepository, retryQueue, new FakeClock(), new FakeUlidGenerator());
+    retry.createReport(new RequestContext("alice"), new CreateReportRequest());
+    assertThat(retryQueue.getMessages()).isEmpty();
+  }
+
+  @Test
+  void createProcessAndGetShouldCompleteReportThroughReportsOwnedOperations() throws Exception {
+    // arrange
+    var user = "alice";
+    var ctx = new RequestContext(user);
+    var queue = new FakeQueueClient<ReportMessage>();
+    var clock = new FakeClock();
+    clock.setTime(Instant.ofEpochSecond(1_700_000_001L));
+    var generator = new FakeUlidGenerator();
+    var createService = new CreateReportService(reportRepository, queue, clock, generator);
+    createService.createReport(ctx, new CreateReportRequest());
+    var orderService = mock(OrderService.class);
+    when(orderService.findOrders(any(), any())).thenReturn(new FindOrdersResponse(List.of(), null));
+    var messageHandler =
+        new ReportMessageHandler(
+            reportRepository,
+            new ObjectMapper(),
+            clock,
+            new FakeGamesService(),
+            new FakeInventoryService(new FakeGamesService()),
+            orderService);
+
+    // act
+    messageHandler.handleMessage(ctx, queue.getMessages().getFirst());
+    var response =
+        new GetReportService(reportRepository, new ObjectMapper(), clock)
+            .getReport(ctx, new GetReportRequest());
+
+    // assert
+    assertThat(response.generation().status()).isEqualTo(ReportGenerationStatus.SUCCEEDED);
+    assertThat(response.generation().error()).isNull();
+    assertThat(response.generation().finishedAt()).isEqualTo(1_700_000_001L);
+    assertThat(response.report().games()).isNotEmpty();
+  }
+
+  private ReportPayload emptyPayload() {
+    return new ReportPayload(
+        new ReportPayload.Totals("0.00", 0, 0, 0, 0, "0.00", 0), List.of(), List.of(), List.of());
   }
 
   private Map<String, AttributeValue> getRaw(String user) {
