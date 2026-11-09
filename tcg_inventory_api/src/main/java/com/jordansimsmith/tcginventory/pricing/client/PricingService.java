@@ -11,4 +11,10 @@ public interface PricingService {
       throws ServiceException;
 
   GetPriceResponse getPrice(RequestContext ctx, GetPriceRequest request) throws ServiceException;
+
+  CreateRepricingResponse createRepricing(RequestContext ctx, CreateRepricingRequest request)
+      throws ServiceException;
+
+  GetRepricingResponse getRepricing(RequestContext ctx, GetRepricingRequest request)
+      throws ServiceException;
 }

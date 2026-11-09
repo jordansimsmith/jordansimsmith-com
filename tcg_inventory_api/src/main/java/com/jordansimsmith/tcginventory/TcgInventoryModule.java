@@ -56,6 +56,8 @@ public class TcgInventoryModule {
 
   static final String REPORTS_QUEUE_NAME = "tcg_inventory_reports.fifo";
 
+  static final String PRICING_QUEUE_NAME = "tcg_inventory_pricing.fifo";
+
   @Provides
   @Singleton
   @Named("tcgInventoryTableName")
@@ -68,6 +70,13 @@ public class TcgInventoryModule {
   @Named("reportsQueueName")
   String reportsQueueName() {
     return REPORTS_QUEUE_NAME;
+  }
+
+  @Provides
+  @Singleton
+  @Named("pricingQueueName")
+  String pricingQueueName() {
+    return PRICING_QUEUE_NAME;
   }
 
   @Provides

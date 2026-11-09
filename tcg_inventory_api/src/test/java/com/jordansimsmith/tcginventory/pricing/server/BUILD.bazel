@@ -43,6 +43,7 @@ java_test_suite(
         "//lib/service",
         "//lib/time:lib",
         "//lib/time:test-lib",
+        "//lib/ulid:test-lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",

@@ -66,6 +66,13 @@ public class TcgInventoryTestModule {
 
   @Provides
   @Singleton
+  @Named("pricingQueueName")
+  String pricingQueueName() {
+    return "tcg_inventory_pricing.fifo";
+  }
+
+  @Provides
+  @Singleton
   @Named("photosBucket")
   String photosBucket() {
     return "api.tcg-inventory.jordansimsmith.com";

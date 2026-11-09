@@ -17,6 +17,7 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.service.BadRequestException;
+import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.inventory.client.Condition;
@@ -30,10 +31,15 @@ import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.Sku;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
+import com.jordansimsmith.tcginventory.pricing.client.CreateRepricingRequest;
 import com.jordansimsmith.tcginventory.pricing.client.FakePricingService;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceResponse;
+import com.jordansimsmith.tcginventory.pricing.client.GetRepricingRequest;
+import com.jordansimsmith.tcginventory.pricing.client.GetRepricingResponse;
 import com.jordansimsmith.tcginventory.pricing.client.PricingService;
+import com.jordansimsmith.tcginventory.pricing.client.RepricingStatus;
 import com.jordansimsmith.time.FakeClock;
+import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -47,6 +53,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
+import software.amazon.awssdk.enhanced.dynamodb.Key;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.GetItemEnhancedRequest;
 import software.amazon.awssdk.regions.Region;
@@ -281,6 +288,219 @@ class RepricingServiceIntegrationTest {
     assertThatThrownBy(
             () -> writeFailingRepository.createRepricing("alice", "run-1", Instant.EPOCH))
         .isSameAs(failure);
+  }
+
+  @Test
+  void repricingOperationsShouldCreateOnceAndExposeEveryRunStatus() throws Exception {
+    // arrange
+    var clock = new FakeClock();
+    clock.setTime(Instant.ofEpochSecond(1_700_000_001L));
+    var ids = new FakeUlidGenerator();
+    var queue = new FakeQueueClient<RepricingMessage>();
+    var create = new CreateRepricingService(repricingRepository, queue, clock, ids);
+    var get = new GetRepricingService(repricingRepository);
+    var ctx = new RequestContext("alice");
+
+    // act
+    create.createRepricing(ctx, new CreateRepricingRequest());
+    create.createRepricing(ctx, new CreateRepricingRequest());
+
+    // assert queued
+    var message = new RepricingMessage("alice", "FAKE_ULID_0000000001");
+    assertThat(queue.getSends())
+        .containsExactly(
+            new FakeQueueClient.SentMessage<>(
+                message, message.repricingId(), message.repricingId()));
+    assertThat(get.getRepricing(ctx, new GetRepricingRequest()))
+        .isEqualTo(new GetRepricingResponse(RepricingStatus.QUEUED, 0, 1_700_000_001L, null));
+
+    // act / assert running
+    repricingRepository.startRepricing("alice", message.repricingId(), clock.now());
+    repricingRepository.checkpointRepricing(
+        "alice", message.repricingId(), 0, 4, "next", clock.now());
+    assertThat(get.getRepricing(ctx, new GetRepricingRequest()).status())
+        .isEqualTo(RepricingStatus.RUNNING);
+    assertThat(get.getRepricing(ctx, new GetRepricingRequest()).processedSkuCount()).isEqualTo(4);
+    create.createRepricing(ctx, new CreateRepricingRequest());
+    assertThat(queue.getSends()).hasSize(1);
+
+    // act / assert succeeded
+    repricingRepository.completeRepricing("alice", message.repricingId(), 4, 4, clock.now());
+    var succeeded = get.getRepricing(ctx, new GetRepricingRequest());
+    assertThat(succeeded.status()).isEqualTo(RepricingStatus.SUCCEEDED);
+    assertThat(succeeded.finishedAt()).isEqualTo(1_700_000_001L);
+    create.createRepricing(ctx, new CreateRepricingRequest());
+
+    assertThat(repricingRepository.get("alice").getRepricingId()).isEqualTo("FAKE_ULID_0000000002");
+    assertThat(queue.getSends()).hasSize(2);
+    assertThat(repricingRepository.get("bob")).isNull();
+    assertThatThrownBy(() -> get.getRepricing(new RequestContext("bob"), new GetRepricingRequest()))
+        .isInstanceOf(NotFoundException.class);
+  }
+
+  @Test
+  void getRepricingShouldReturnNotFoundForUsersWithoutARun() {
+    // arrange
+    var service = new GetRepricingService(repricingRepository);
+
+    // act / assert
+    assertThatThrownBy(
+            () -> service.getRepricing(new RequestContext("alice"), new GetRepricingRequest()))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+  }
+
+  @Test
+  void repricingOperationsShouldLeaveRunValidationToMessageHandler() throws Exception {
+    // arrange
+    var item = new RepricingItem();
+    item.setPk(RepricingItem.formatPk("alice"));
+    item.setSk(RepricingItem.formatSk());
+    item.setUser("alice");
+    item.setRepricingId("run-1");
+    item.setStatus("queued");
+    item.setProcessedSkuCount(1);
+    item.setStartedAt(Instant.EPOCH);
+    item.setUpdatedAt(Instant.EPOCH);
+    repricingTable.putItem(item);
+    var get = new GetRepricingService(repricingRepository);
+    var create =
+        new CreateRepricingService(
+            repricingRepository, new FakeQueueClient<>(), new FakeClock(), new FakeUlidGenerator());
+    var inventory = mock(InventoryService.class);
+    var pricing = mock(PricingService.class);
+    var handler = newHandler(new FakeQueueClient<>(), new FakeClock(), inventory, pricing);
+
+    // act / assert
+    create.createRepricing(new RequestContext("alice"), new CreateRepricingRequest());
+    assertThat(get.getRepricing(new RequestContext("alice"), new GetRepricingRequest()))
+        .isEqualTo(new GetRepricingResponse(RepricingStatus.QUEUED, 1, 0, null));
+    assertThatThrownBy(
+            () ->
+                handler.handleMessage(
+                    new RequestContext("alice"), new RepricingMessage("alice", "run-1")))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("Queued repricing run has inconsistent progress metadata");
+    verifyNoInteractions(inventory, pricing);
+
+    item.setStatus("unknown");
+    item.setProcessedSkuCount(0);
+    repricingTable.putItem(item);
+    assertThatThrownBy(
+            () -> get.getRepricing(new RequestContext("alice"), new GetRepricingRequest()))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("Repricing run has an unknown status");
+  }
+
+  @Test
+  void createRepricingShouldLeaveQueuedRunWhenDispatchFailsAndNotResend() throws Exception {
+    // arrange
+    @SuppressWarnings("unchecked")
+    var failingQueue = (QueueClient<RepricingMessage>) mock(QueueClient.class);
+    doThrow(new IllegalStateException("queue failed")).when(failingQueue).send(any(), any(), any());
+    var create =
+        new CreateRepricingService(
+            repricingRepository, failingQueue, new FakeClock(), new FakeUlidGenerator());
+    var ctx = new RequestContext("alice");
+
+    // act / assert
+    assertThatThrownBy(() -> create.createRepricing(ctx, new CreateRepricingRequest()))
+        .hasMessage("queue failed");
+    assertThat(repricingRepository.get("alice").getStatus()).isEqualTo("queued");
+
+    var retryQueue = new FakeQueueClient<RepricingMessage>();
+    new CreateRepricingService(
+            repricingRepository, retryQueue, new FakeClock(), new FakeUlidGenerator())
+        .createRepricing(ctx, new CreateRepricingRequest());
+    assertThat(retryQueue.getMessages()).isEmpty();
+  }
+
+  @Test
+  void createRepricingShouldNotDispatchWhenRunReadFails() {
+    // arrange
+    @SuppressWarnings("unchecked")
+    var table = (DynamoDbTable<RepricingItem>) mock(DynamoDbTable.class);
+    var failure = new IllegalStateException("storage failed");
+    when(table.getItem(any(GetItemEnhancedRequest.class))).thenThrow(failure);
+    var repository = new RepricingRepository(table, dynamoDbClient, TABLE_NAME);
+    @SuppressWarnings("unchecked")
+    var queue = (QueueClient<RepricingMessage>) mock(QueueClient.class);
+    var create =
+        new CreateRepricingService(repository, queue, new FakeClock(), new FakeUlidGenerator());
+
+    // act / assert
+    assertThatThrownBy(
+            () -> create.createRepricing(new RequestContext("alice"), new CreateRepricingRequest()))
+        .isSameAs(failure);
+    verifyNoInteractions(queue);
+  }
+
+  @Test
+  void repricingResponseShouldSerializeOnlyPublicFields() throws Exception {
+    // arrange
+    repricingRepository.createRepricing("alice", "run-1", Instant.ofEpochSecond(1_700_000_001L));
+    var json =
+        new ObjectMapper()
+            .writeValueAsString(
+                new GetRepricingService(repricingRepository)
+                    .getRepricing(new RequestContext("alice"), new GetRepricingRequest()));
+
+    // assert
+    assertThat(json)
+        .isEqualTo(
+            "{\"status\":\"queued\",\"processed_sku_count\":0,"
+                + "\"started_at\":1700000001,\"finished_at\":null}");
+  }
+
+  @Test
+  void repricingOperationsShouldPreserveFloorConfiguration() throws Exception {
+    // arrange
+    var pricingTable =
+        DynamoDbEnhancedClient.builder()
+            .dynamoDbClient(dynamoDbClient)
+            .build()
+            .table(TABLE_NAME, TableSchema.fromBean(PricingItem.class));
+    pricingTable.putItem(PricingItem.create("alice", "0.50"));
+
+    // act
+    new CreateRepricingService(
+            repricingRepository,
+            new FakeQueueClient<RepricingMessage>(),
+            new FakeClock(),
+            new FakeUlidGenerator())
+        .createRepricing(new RequestContext("alice"), new CreateRepricingRequest());
+
+    // assert
+    assertThat(
+            pricingTable
+                .getItem(Key.builder().partitionValue("USER#alice").sortValue("PRICING").build())
+                .getPriceFloor())
+        .isEqualTo("0.50");
+  }
+
+  @Test
+  void createProcessAndGetShouldExposeTheCompletedRun() throws Exception {
+    // arrange
+    var clock = new FakeClock();
+    clock.setTime(Instant.ofEpochSecond(1_700_000_001L));
+    var queue = new FakeQueueClient<RepricingMessage>();
+    var ctx = new RequestContext("alice");
+    var create =
+        new CreateRepricingService(repricingRepository, queue, clock, new FakeUlidGenerator());
+    create.createRepricing(ctx, new CreateRepricingRequest());
+    var inventory = new FakeInventoryService(new FakeGamesService());
+    var handler = newHandler(queue, clock, inventory, new FakePricingService());
+
+    // act
+    handler.handleMessage(ctx, queue.getMessages().getFirst());
+    var response =
+        new GetRepricingService(repricingRepository).getRepricing(ctx, new GetRepricingRequest());
+
+    // assert
+    assertThat(response.status()).isEqualTo(RepricingStatus.SUCCEEDED);
+    assertThat(response.processedSkuCount()).isZero();
+    assertThat(response.startedAt()).isEqualTo(1_700_000_001L);
+    assertThat(response.finishedAt()).isEqualTo(1_700_000_001L);
   }
 
   @Test
