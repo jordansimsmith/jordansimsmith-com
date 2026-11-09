@@ -35,6 +35,7 @@ locals {
     "tcg_inventory_jobs_dlq.fifo",
     "tcg_inventory_scan_jobs_dlq.fifo",
     "tcg_inventory_reports_dlq.fifo",
+    "tcg_inventory_pricing_dlq.fifo",
     "auction_tracker_jobs_dlq.fifo",
     "price_tracker_jobs_dlq.fifo",
   ]

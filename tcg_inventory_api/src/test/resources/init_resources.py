@@ -81,44 +81,31 @@ while True:
         break
     time.sleep(1)
 
-queue_name = "tcg_inventory_jobs.fifo"
-queue_url = sqs_client.create_queue(
-    QueueName=queue_name,
-    Attributes={"FifoQueue": "true", "ContentBasedDeduplication": "false"},
-)["QueueUrl"]
-queue_arn = sqs_client.get_queue_attributes(
-    QueueUrl=queue_url, AttributeNames=["QueueArn"]
-)["Attributes"]["QueueArn"]
-
-scan_queue_name = "tcg_inventory_scan_jobs.fifo"
-sqs_client.create_queue(
-    QueueName=scan_queue_name,
-    Attributes={"FifoQueue": "true", "ContentBasedDeduplication": "false"},
-)
-
-reports_dlq_name = "tcg_inventory_reports_dlq.fifo"
-reports_dlq_url = sqs_client.create_queue(
-    QueueName=reports_dlq_name,
-    Attributes={"FifoQueue": "true", "ContentBasedDeduplication": "false"},
-)["QueueUrl"]
-reports_dlq_arn = sqs_client.get_queue_attributes(
-    QueueUrl=reports_dlq_url, AttributeNames=["QueueArn"]
-)["Attributes"]["QueueArn"]
-reports_queue_name = "tcg_inventory_reports.fifo"
-reports_queue_url = sqs_client.create_queue(
-    QueueName=reports_queue_name,
-    Attributes={
-        "FifoQueue": "true",
-        "ContentBasedDeduplication": "false",
-        "VisibilityTimeout": "960",
-        "RedrivePolicy": json.dumps(
-            {"deadLetterTargetArn": reports_dlq_arn, "maxReceiveCount": "5"}
-        ),
+queue_configs = {
+    "jobs": {"name": "tcg_inventory_jobs.fifo"},
+    "scan_jobs": {"name": "tcg_inventory_scan_jobs.fifo"},
+    "reports": {
+        "name": "tcg_inventory_reports.fifo",
+        "visibility_timeout": 960,
     },
-)["QueueUrl"]
-reports_queue_arn = sqs_client.get_queue_attributes(
-    QueueUrl=reports_queue_url, AttributeNames=["QueueArn"]
-)["Attributes"]["QueueArn"]
+    "pricing": {
+        "name": "tcg_inventory_pricing.fifo",
+        "visibility_timeout": 960,
+    },
+}
+
+queue_urls = {}
+queue_arns = {}
+for queue_key, config in queue_configs.items():
+    attributes = {"FifoQueue": "true", "ContentBasedDeduplication": "false"}
+    if "visibility_timeout" in config:
+        attributes["VisibilityTimeout"] = str(config["visibility_timeout"])
+    queue_urls[queue_key] = sqs_client.create_queue(
+        QueueName=config["name"], Attributes=attributes
+    )["QueueUrl"]
+    queue_arns[queue_key] = sqs_client.get_queue_attributes(
+        QueueUrl=queue_urls[queue_key], AttributeNames=["QueueArn"]
+    )["Attributes"]["QueueArn"]
 
 secretsmanager_client.create_secret(
     Name="tcg_inventory",
@@ -284,7 +271,7 @@ lambdas = {
         "zip_file": "jobs-handler_deploy.jar",
         "timeout": 900,
         "environment": {
-            "JOBS_QUEUE_URL": queue_url,
+            "JOBS_QUEUE_URL": queue_urls["jobs"],
             "FETCHTCG_BASE_URL": os.environ.get("FETCHTCG_BASE_URL", ""),
             "FIREBASE_TOKEN_URL": os.environ.get("FIREBASE_TOKEN_URL", ""),
         },
@@ -293,6 +280,14 @@ lambdas = {
         "handler": "com.jordansimsmith.tcginventory.reports.worker.ReportWorkerHandler",
         "zip_file": "report-worker-handler_deploy.jar",
         "timeout": 900,
+    },
+    "pricing_worker": {
+        "handler": "com.jordansimsmith.tcginventory.pricing.worker.PricingWorkerHandler",
+        "zip_file": "pricing-worker-handler_deploy.jar",
+        "timeout": 900,
+        "environment": {
+            "FETCHTCG_BASE_URL": os.environ.get("FETCHTCG_BASE_URL", ""),
+        },
     },
     "find_skus": {
         "handler": "com.jordansimsmith.tcginventory.inventory.api.FindSkusHandler",
@@ -587,14 +582,21 @@ for function_name, config in lambdas.items():
     lambda_client.create_function(**create_kwargs)
 
 lambda_client.create_event_source_mapping(
-    EventSourceArn=queue_arn,
+    EventSourceArn=queue_arns["jobs"],
     FunctionName="jobs_handler",
     BatchSize=1,
 )
 
 lambda_client.create_event_source_mapping(
-    EventSourceArn=reports_queue_arn,
+    EventSourceArn=queue_arns["reports"],
     FunctionName="reports_worker",
+    BatchSize=1,
+    MaximumBatchingWindowInSeconds=0,
+)
+
+lambda_client.create_event_source_mapping(
+    EventSourceArn=queue_arns["pricing"],
+    FunctionName="pricing_worker",
     BatchSize=1,
     MaximumBatchingWindowInSeconds=0,
 )

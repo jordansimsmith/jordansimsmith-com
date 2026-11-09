@@ -6,7 +6,9 @@ java_library(
     visibility = [
         "//tcg_inventory_api:__pkg__",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:__pkg__",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/worker:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/pricing/server:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/pricing/worker:__pkg__",
     ],
     deps = [
         "//lib/dynamodb:lib",
