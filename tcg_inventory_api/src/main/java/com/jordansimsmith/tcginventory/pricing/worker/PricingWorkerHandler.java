@@ -36,7 +36,7 @@ public class PricingWorkerHandler implements RequestHandler<SQSEvent, Void> {
       doHandleRequest(event);
       return null;
     } catch (Exception e) {
-      LOGGER.error("repricing worker invocation failed: {}", e.getClass().getSimpleName());
+      LOGGER.error("pricing worker invocation failed: {}", e.getClass().getSimpleName());
       throw new RuntimeException(e);
     }
   }

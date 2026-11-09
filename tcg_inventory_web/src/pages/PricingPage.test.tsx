@@ -13,7 +13,7 @@ import { MemoryRouter } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { apiClient } from '../api/client';
 import { PricingPage } from './PricingPage';
-import type { RepriceResponse } from '../api/client';
+import type { RepricingResponse } from '../api/client';
 
 function renderPricingPage() {
   return render(
@@ -27,8 +27,8 @@ function renderPricingPage() {
 
 describe('PricingPage', () => {
   beforeEach(() => {
-    vi.spyOn(apiClient, 'getReprice').mockResolvedValue(null);
-    vi.spyOn(apiClient, 'createReprice').mockResolvedValue(undefined);
+    vi.spyOn(apiClient, 'getRepricing').mockResolvedValue(null);
+    vi.spyOn(apiClient, 'createRepricing').mockResolvedValue(undefined);
     vi.spyOn(apiClient, 'getPricing').mockResolvedValue({
       price_floor: '0.25',
     });
@@ -162,12 +162,10 @@ describe('PricingPage', () => {
     expect(screen.getByRole('alert')).toBeDefined();
     expect(screen.queryByLabelText('Price floor (NZD)')).toBeNull();
   });
-  function run(overrides: Partial<RepriceResponse> = {}): RepriceResponse {
+  function run(overrides: Partial<RepricingResponse> = {}): RepricingResponse {
     return {
-      job_id: 'reprice-1',
       status: 'running',
       processed_sku_count: 100,
-      error: null,
       started_at: 1765420900,
       finished_at: null,
       ...overrides,
@@ -193,11 +191,11 @@ describe('PricingPage', () => {
     });
     await user.click(screen.getByRole('button', { name: 'Save price floor' }));
     await waitFor(() => expect(start).toHaveProperty('disabled', false));
-    vi.mocked(apiClient.getReprice).mockResolvedValue(
+    vi.mocked(apiClient.getRepricing).mockResolvedValue(
       run({ status: 'queued', processed_sku_count: 0 }),
     );
     await user.click(start);
-    expect(apiClient.createReprice).toHaveBeenCalledOnce();
+    expect(apiClient.createRepricing).toHaveBeenCalledOnce();
     expect(await screen.findByText('Repricing queued')).toBeDefined();
     expect(input).toHaveProperty('disabled', true);
     expect(
@@ -207,11 +205,11 @@ describe('PricingPage', () => {
 
   it('polls active runs, retains progress on read errors, and stops on completion', async () => {
     vi.useFakeTimers();
-    vi.mocked(apiClient.getReprice).mockResolvedValue(run());
+    vi.mocked(apiClient.getRepricing).mockResolvedValue(run());
     renderPricingPage();
     await act(async () => {});
     expect(screen.getByText('100 SKUs checked')).toBeDefined();
-    vi.mocked(apiClient.getReprice).mockRejectedValueOnce(
+    vi.mocked(apiClient.getRepricing).mockRejectedValueOnce(
       new Error('Connection lost'),
     );
     await act(async () => {
@@ -219,14 +217,14 @@ describe('PricingPage', () => {
     });
     expect(screen.getByText('100 SKUs checked')).toBeDefined();
     expect(screen.getByText('Connection lost')).toBeDefined();
-    vi.mocked(apiClient.getReprice).mockResolvedValue(
+    vi.mocked(apiClient.getRepricing).mockResolvedValue(
       run({ processed_sku_count: 200 }),
     );
     fireEvent.click(screen.getByRole('button', { name: 'Retry status' }));
     await act(async () => {});
     expect(screen.getByText('200 SKUs checked')).toBeDefined();
     expect(screen.queryByText('Connection lost')).toBeNull();
-    vi.mocked(apiClient.getReprice).mockResolvedValue(
+    vi.mocked(apiClient.getRepricing).mockResolvedValue(
       run({
         status: 'succeeded',
         processed_sku_count: 201,
@@ -237,11 +235,11 @@ describe('PricingPage', () => {
       await vi.advanceTimersByTimeAsync(2000);
     });
     expect(screen.getByText('Repricing complete')).toBeDefined();
-    const calls = vi.mocked(apiClient.getReprice).mock.calls.length;
+    const calls = vi.mocked(apiClient.getRepricing).mock.calls.length;
     await act(async () => {
       await vi.advanceTimersByTimeAsync(6000);
     });
-    expect(apiClient.getReprice).toHaveBeenCalledTimes(calls);
+    expect(apiClient.getRepricing).toHaveBeenCalledTimes(calls);
   });
 
   it('restores on focus without losing edits and cleans up polling on unmount', async () => {
@@ -251,7 +249,7 @@ describe('PricingPage', () => {
     fireEvent.change(screen.getByLabelText('Price floor (NZD)'), {
       target: { value: '1.25' },
     });
-    vi.mocked(apiClient.getReprice).mockResolvedValue(run());
+    vi.mocked(apiClient.getRepricing).mockResolvedValue(run());
     fireEvent(window, new Event('focus'));
     await act(async () => {});
     expect(screen.getByText('Repricing inventory')).toBeDefined();
@@ -260,16 +258,16 @@ describe('PricingPage', () => {
       '1.25',
     );
     cleanup();
-    const calls = vi.mocked(apiClient.getReprice).mock.calls.length;
+    const calls = vi.mocked(apiClient.getRepricing).mock.calls.length;
     fireEvent(window, new Event('focus'));
     await act(async () => {
       await vi.advanceTimersByTimeAsync(4000);
     });
-    expect(apiClient.getReprice).toHaveBeenCalledTimes(calls);
+    expect(apiClient.getRepricing).toHaveBeenCalledTimes(calls);
   });
 
-  it('shows an empty completed run and a failed run with actionable feedback', async () => {
-    vi.mocked(apiClient.getReprice).mockResolvedValue(
+  it('shows an empty completed run', async () => {
+    vi.mocked(apiClient.getRepricing).mockResolvedValue(
       run({
         status: 'succeeded',
         processed_sku_count: 0,
@@ -280,37 +278,19 @@ describe('PricingPage', () => {
     expect(
       await screen.findByText('No inventory needed repricing.'),
     ).toBeDefined();
-    vi.mocked(apiClient.getReprice).mockResolvedValue(
-      run({
-        status: 'failed',
-        error: 'Update your FetchTCG credentials',
-        finished_at: 1765420932,
-      }),
-    );
-    fireEvent(window, new Event('focus'));
-    expect(await screen.findByText('Repricing failed')).toBeDefined();
-    expect(screen.getByText('Update your FetchTCG credentials')).toBeDefined();
-    expect(
-      screen.getByText(
-        '100 SKUs checked before the run stopped. Price changes already made remain ready to publish.',
-      ),
-    ).toBeDefined();
-    expect(
-      screen.getByRole('button', { name: 'Reprice inventory' }),
-    ).toHaveProperty('disabled', false);
   });
 
-  it('surfaces a start conflict and restores the current run', async () => {
+  it('surfaces a request failure and restores the current run', async () => {
     const user = userEvent.setup();
     renderPricingPage();
     await screen.findByText('Ready to reprice inventory');
-    vi.mocked(apiClient.createReprice).mockRejectedValue(
-      new Error('Another job is active'),
+    vi.mocked(apiClient.createRepricing).mockRejectedValue(
+      new Error('Queue unavailable'),
     );
-    vi.mocked(apiClient.getReprice).mockResolvedValue(run());
+    vi.mocked(apiClient.getRepricing).mockResolvedValue(run());
     await user.click(screen.getByRole('button', { name: 'Reprice inventory' }));
     expect(notifications.show).toHaveBeenCalledWith(
-      expect.objectContaining({ message: 'Another job is active' }),
+      expect.objectContaining({ message: 'Queue unavailable' }),
     );
     expect(await screen.findByText('Repricing inventory')).toBeDefined();
   });
@@ -319,7 +299,7 @@ describe('PricingPage', () => {
     const user = userEvent.setup();
     renderPricingPage();
     await screen.findByText('Ready to reprice inventory');
-    vi.mocked(apiClient.getReprice).mockRejectedValueOnce(
+    vi.mocked(apiClient.getRepricing).mockRejectedValueOnce(
       new Error('Status offline'),
     );
     await user.click(screen.getByRole('button', { name: 'Reprice inventory' }));
@@ -329,14 +309,14 @@ describe('PricingPage', () => {
       true,
     );
     expect(screen.getByText('Repricing queued')).toBeDefined();
-    vi.mocked(apiClient.getReprice).mockResolvedValue(run());
+    vi.mocked(apiClient.getRepricing).mockResolvedValue(run());
     await user.click(screen.getByRole('button', { name: 'Retry status' }));
     expect(await screen.findByText('100 SKUs checked')).toBeDefined();
   });
 
   it('offers retry when the initial status read fails', async () => {
     const user = userEvent.setup();
-    vi.mocked(apiClient.getReprice).mockRejectedValueOnce(
+    vi.mocked(apiClient.getRepricing).mockRejectedValueOnce(
       new Error('Status offline'),
     );
     renderPricingPage();

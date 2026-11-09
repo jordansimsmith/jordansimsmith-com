@@ -1,8 +1,6 @@
 package com.jordansimsmith.tcginventory.pricing.server;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.queue.QueueClient;
-import com.jordansimsmith.queue.SqsQueueClient;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
@@ -28,7 +26,6 @@ import software.amazon.awssdk.enhanced.dynamodb.DynamoDbEnhancedClient;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
-import software.amazon.awssdk.services.sqs.SqsClient;
 
 @Module
 public class PricingModule {
@@ -41,13 +38,6 @@ public class PricingModule {
     DynamoDbTable<RepricingItem> repricingTable =
         dynamoDb.table(tableName, TableSchema.fromBean(RepricingItem.class));
     return new RepricingRepository(repricingTable, dynamoDbClient, tableName);
-  }
-
-  @Provides
-  @Singleton
-  QueueClient<RepricingMessage> pricingQueue(
-      SqsClient sqsClient, ObjectMapper objectMapper, @Named("pricingQueueName") String queueName) {
-    return SqsQueueClient.create(sqsClient, objectMapper, queueName);
   }
 
   @Provides

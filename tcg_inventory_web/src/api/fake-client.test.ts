@@ -1313,7 +1313,7 @@ describe('createFakeClient repricing', () => {
   it('reports no run before repricing starts', async () => {
     const client = createFakeClient();
 
-    await expect(client.getReprice()).resolves.toBeNull();
+    await expect(client.getRepricing()).resolves.toBeNull();
   });
 
   it('checks candidates in batches and dirties in-stock SKUs', async () => {
@@ -1321,21 +1321,19 @@ describe('createFakeClient repricing', () => {
     const client = createFakeClient();
     await client.updatePricing({ price_floor: '1000.00' });
 
-    await client.createReprice();
-    await expect(client.getReprice()).resolves.toMatchObject({
-      job_id: 'fake-reprice-1',
+    await client.createRepricing();
+    await expect(client.getRepricing()).resolves.toMatchObject({
       status: 'queued',
       processed_sku_count: 0,
     });
-    await client.createReprice();
-    await expect(client.getReprice()).resolves.toMatchObject({
-      job_id: 'fake-reprice-1',
+    await client.createRepricing();
+    await expect(client.getRepricing()).resolves.toMatchObject({
       status: 'running',
       processed_sku_count: 0,
     });
 
     vi.advanceTimersByTime(1000);
-    const completed = await client.getReprice();
+    const completed = await client.getRepricing();
     expect(completed?.status).toBe('succeeded');
     expect(completed?.processed_sku_count).toBeGreaterThan(0);
     expect(completed?.finished_at).not.toBeNull();

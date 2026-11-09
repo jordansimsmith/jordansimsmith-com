@@ -24,6 +24,7 @@ import com.jordansimsmith.tcginventory.orders.server.OrdersModule;
 import com.jordansimsmith.tcginventory.photos.client.FakePhotosService;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import com.jordansimsmith.tcginventory.pricing.server.PricingModule;
+import com.jordansimsmith.tcginventory.pricing.server.RepricingMessage;
 import com.jordansimsmith.tcginventory.reports.server.ReportsModule;
 import com.jordansimsmith.tcginventory.scans.ScanItem;
 import com.jordansimsmith.tcginventory.scans.ScanMessage;
@@ -62,13 +63,6 @@ public class TcgInventoryTestModule {
   @Named("reportsQueueName")
   String reportsQueueName() {
     return "tcg_inventory_reports.fifo";
-  }
-
-  @Provides
-  @Singleton
-  @Named("pricingQueueName")
-  String pricingQueueName() {
-    return "tcg_inventory_pricing.fifo";
   }
 
   @Provides
@@ -163,6 +157,18 @@ public class TcgInventoryTestModule {
   @Singleton
   QueueClient<JobMessage> jobsQueue(FakeQueueClient<JobMessage> fakeJobsQueue) {
     return fakeJobsQueue;
+  }
+
+  @Provides
+  @Singleton
+  FakeQueueClient<RepricingMessage> fakePricingQueue() {
+    return new FakeQueueClient<>();
+  }
+
+  @Provides
+  @Singleton
+  QueueClient<RepricingMessage> pricingQueue(FakeQueueClient<RepricingMessage> fakePricingQueue) {
+    return fakePricingQueue;
   }
 
   @Provides

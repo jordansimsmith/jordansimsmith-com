@@ -40,8 +40,8 @@ import type {
   PlacementInstruction,
   PricingResponse,
   PublishResponse,
-  RepriceResponse,
-  RepriceStatus,
+  RepricingResponse,
+  RepricingStatus,
   Report,
   ReportResponse,
   RowDecision,
@@ -1445,7 +1445,7 @@ function toOrderSummary(order: FakeOrder): OrderSummary {
 }
 
 const PUBLISH_SKUS_PER_SECOND = 2;
-const REPRICE_BATCH_SIZE = 100;
+const REPRICING_BATCH_SIZE = 100;
 const FAKE_FETCHTCG_USERNAME = 'fake-seller';
 const FAKE_RIVAL_USERNAME = 'fake-rival';
 
@@ -1457,16 +1457,15 @@ interface FakePublishRun {
   cleared_count: number;
 }
 
-interface FakeRepriceRun {
-  job_id: string;
-  status: RepriceStatus;
+interface FakeRepricingRun {
+  status: RepricingStatus;
   processed_sku_count: number;
   worklist: string[];
   started_at_ms: number;
   finished_at_ms: number | null;
 }
 
-function fakeRepricedPrice(sku: FakeSku, priceFloor: string): string {
+function fakeRepricingPrice(sku: FakeSku, priceFloor: string): string {
   let hash = 0;
   for (const character of sku.sku_id) {
     hash = (hash * 31 + character.charCodeAt(0)) >>> 0;
@@ -1661,8 +1660,7 @@ export function createFakeClient(): ApiClient {
     skus.filter((_, index) => index % 4 === 0).map((sku) => sku.sku_id),
   );
   let publishRun: FakePublishRun | null = null;
-  let repriceRun: FakeRepriceRun | null = null;
-  let repriceCounter = 0;
+  let repricingRun: FakeRepricingRun | null = null;
   let orderSettings: OrderSettingsResponse = {
     track_orders_after: null,
   };
@@ -1735,17 +1733,17 @@ export function createFakeClient(): ApiClient {
     }
   };
 
-  const progressReprice = (): void => {
-    if (!repriceRun || repriceRun.status !== 'running') {
+  const progressRepricing = (): void => {
+    if (!repricingRun || repricingRun.status !== 'running') {
       return;
     }
     const processedCount = Math.min(
-      repriceRun.worklist.length,
-      Math.floor((Date.now() - repriceRun.started_at_ms) / 1000) *
-        REPRICE_BATCH_SIZE,
+      repricingRun.worklist.length,
+      Math.floor((Date.now() - repricingRun.started_at_ms) / 1000) *
+        REPRICING_BATCH_SIZE,
     );
-    for (const skuId of repriceRun.worklist.slice(
-      repriceRun.processed_sku_count,
+    for (const skuId of repricingRun.worklist.slice(
+      repricingRun.processed_sku_count,
       processedCount,
     )) {
       const sku = skus.find((candidate) => candidate.sku_id === skuId);
@@ -1753,25 +1751,23 @@ export function createFakeClient(): ApiClient {
         throw new Error(`SKU not found: ${skuId}`);
       }
       if (sku.units.some((unit) => unit.status === 'in_stock')) {
-        sku.suggested_price = fakeRepricedPrice(sku, pricing.price_floor);
+        sku.suggested_price = fakeRepricingPrice(sku, pricing.price_floor);
         dirtySkuIds.add(skuId);
         reportStale = true;
       }
     }
-    repriceRun.processed_sku_count = processedCount;
-    if (processedCount >= repriceRun.worklist.length) {
-      repriceRun.status = 'succeeded';
-      repriceRun.finished_at_ms =
-        repriceRun.started_at_ms +
-        Math.ceil(repriceRun.worklist.length / REPRICE_BATCH_SIZE) * 1000;
+    repricingRun.processed_sku_count = processedCount;
+    if (processedCount >= repricingRun.worklist.length) {
+      repricingRun.status = 'succeeded';
+      repricingRun.finished_at_ms =
+        repricingRun.started_at_ms +
+        Math.ceil(repricingRun.worklist.length / REPRICING_BATCH_SIZE) * 1000;
     }
   };
 
-  const toRepriceResponse = (run: FakeRepriceRun): RepriceResponse => ({
-    job_id: run.job_id,
+  const toRepricingResponse = (run: FakeRepricingRun): RepricingResponse => ({
     status: run.status,
     processed_sku_count: run.processed_sku_count,
-    error: null,
     started_at: Math.floor(run.started_at_ms / 1000),
     finished_at:
       run.finished_at_ms === null
@@ -2537,16 +2533,17 @@ export function createFakeClient(): ApiClient {
       return toPublishResponse();
     },
 
-    async createReprice(): Promise<void> {
-      progressReprice();
-      if (repriceRun?.status === 'queued' || repriceRun?.status === 'running') {
+    async createRepricing(): Promise<void> {
+      progressRepricing();
+      if (
+        repricingRun?.status === 'queued' ||
+        repricingRun?.status === 'running'
+      ) {
         return;
       }
-      repriceCounter += 1;
       const worklist = skus.map((sku) => sku.sku_id);
       const now = Date.now();
-      repriceRun = {
-        job_id: `fake-reprice-${repriceCounter}`,
+      repricingRun = {
         status: worklist.length === 0 ? 'succeeded' : 'queued',
         processed_sku_count: 0,
         worklist,
@@ -2555,17 +2552,17 @@ export function createFakeClient(): ApiClient {
       };
     },
 
-    async getReprice(): Promise<RepriceResponse | null> {
-      if (!repriceRun) {
+    async getRepricing(): Promise<RepricingResponse | null> {
+      if (!repricingRun) {
         return null;
       }
-      if (repriceRun.status === 'queued') {
-        const response = toRepriceResponse(repriceRun);
-        repriceRun.status = 'running';
+      if (repricingRun.status === 'queued') {
+        const response = toRepricingResponse(repricingRun);
+        repricingRun.status = 'running';
         return response;
       }
-      progressReprice();
-      return toRepriceResponse(repriceRun);
+      progressRepricing();
+      return toRepricingResponse(repricingRun);
     },
 
     async getReport(): Promise<ReportResponse> {

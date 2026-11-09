@@ -22,6 +22,7 @@ import com.jordansimsmith.tcginventory.orders.client.OrderService;
 import com.jordansimsmith.tcginventory.photos.client.FakePhotosService;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import com.jordansimsmith.tcginventory.pricing.client.PricingService;
+import com.jordansimsmith.tcginventory.pricing.server.RepricingMessage;
 import com.jordansimsmith.tcginventory.pricing.server.RepricingMessageHandler;
 import com.jordansimsmith.tcginventory.reports.client.ReportService;
 import com.jordansimsmith.tcginventory.reports.server.ReportMessageHandler;
@@ -67,6 +68,8 @@ public interface TcgInventoryTestFactory extends CatalogFactory {
   FakeQueueClient<JobMessage> fakeJobsQueue();
 
   FakeQueueClient<ScanMessage> fakeScanQueue();
+
+  FakeQueueClient<RepricingMessage> fakePricingQueue();
 
   FakeFetchTcgService fakeFetchTcgService();
 

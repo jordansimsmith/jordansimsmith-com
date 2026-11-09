@@ -33,7 +33,7 @@ import type {
   OrderDetail,
   PricingResponse,
   PublishResponse,
-  RepriceResponse,
+  RepricingResponse,
   ReportResponse,
   IdentifyScanResponse,
   ScanDetail,
@@ -463,11 +463,11 @@ export function createHttpClient(): ApiClient {
       return response.json();
     },
 
-    async createReprice(): Promise<void> {
+    async createRepricing(): Promise<void> {
       await authenticatedFetch('/pricing/reprice', { method: 'POST' });
     },
 
-    async getReprice(): Promise<RepriceResponse | null> {
+    async getRepricing(): Promise<RepricingResponse | null> {
       const response = await authenticatedFetch(
         '/pricing/reprice',
         undefined,

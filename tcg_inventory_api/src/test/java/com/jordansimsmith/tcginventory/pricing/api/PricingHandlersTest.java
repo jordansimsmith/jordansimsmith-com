@@ -12,11 +12,17 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.http.HttpResponseFactory;
 import com.jordansimsmith.http.RequestContextFactory;
 import com.jordansimsmith.service.BadRequestException;
+import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.TcgInventoryFactory;
+import com.jordansimsmith.tcginventory.pricing.client.CreateRepricingRequest;
+import com.jordansimsmith.tcginventory.pricing.client.CreateRepricingResponse;
 import com.jordansimsmith.tcginventory.pricing.client.GetPricingRequest;
 import com.jordansimsmith.tcginventory.pricing.client.GetPricingResponse;
+import com.jordansimsmith.tcginventory.pricing.client.GetRepricingRequest;
+import com.jordansimsmith.tcginventory.pricing.client.GetRepricingResponse;
 import com.jordansimsmith.tcginventory.pricing.client.PricingService;
+import com.jordansimsmith.tcginventory.pricing.client.RepricingStatus;
 import com.jordansimsmith.tcginventory.pricing.client.UpdatePricingRequest;
 import com.jordansimsmith.tcginventory.pricing.client.UpdatePricingResponse;
 import java.math.BigDecimal;
@@ -33,6 +39,8 @@ public class PricingHandlersTest {
   private PricingService pricingService;
   private GetPricingHandler getPricingHandler;
   private UpdatePricingHandler updatePricingHandler;
+  private CreateRepricingHandler createRepricingHandler;
+  private GetRepricingHandler getRepricingHandler;
 
   @BeforeEach
   void setUp() {
@@ -49,6 +57,8 @@ public class PricingHandlersTest {
     when(factory.pricingService()).thenReturn(pricingService);
     getPricingHandler = new GetPricingHandler(factory);
     updatePricingHandler = new UpdatePricingHandler(factory);
+    createRepricingHandler = new CreateRepricingHandler(factory);
+    getRepricingHandler = new GetRepricingHandler(factory);
   }
 
   @Test
@@ -135,6 +145,82 @@ public class PricingHandlersTest {
             () ->
                 updatePricingHandler.handleRequest(
                     buildEvent("alice", "{\"price_floor\":\"1.00\"}"), null))
+        .isInstanceOf(RuntimeException.class)
+        .hasCauseInstanceOf(IllegalStateException.class);
+  }
+
+  @Test
+  void createRepricingShouldDelegateAndReturnBodylessAcceptedWithCors() throws Exception {
+    // arrange
+    var ctx = new RequestContext("alice");
+    when(pricingService.createRepricing(ctx, new CreateRepricingRequest()))
+        .thenReturn(new CreateRepricingResponse());
+
+    // act
+    var response = createRepricingHandler.handleRequest(buildEvent("alice", null), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(202);
+    assertThat(response.getBody()).isNull();
+    assertThat(response.getHeaders()).containsEntry("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
+    verify(pricingService).createRepricing(ctx, new CreateRepricingRequest());
+  }
+
+  @Test
+  void createRepricingShouldMapCheckedServiceFailure() throws Exception {
+    // arrange
+    when(pricingService.createRepricing(
+            any(RequestContext.class), any(CreateRepricingRequest.class)))
+        .thenThrow(new BadRequestException("pricing unavailable for request"));
+
+    // act
+    var response = createRepricingHandler.handleRequest(buildEvent("alice", null), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(400);
+    assertThat(objectMapper.readTree(response.getBody()).get("message").asText())
+        .isEqualTo("pricing unavailable for request");
+  }
+
+  @Test
+  void getRepricingShouldReturnOnlyTheClientFieldsAndMapNotFound() throws Exception {
+    // arrange
+    var ctx = new RequestContext("alice");
+    when(pricingService.getRepricing(ctx, new GetRepricingRequest()))
+        .thenReturn(new GetRepricingResponse(RepricingStatus.RUNNING, 100, 1_700_000_000L, null));
+
+    // act
+    var response = getRepricingHandler.handleRequest(buildEvent("alice", null), null);
+
+    // assert
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    assertThat(response.getHeaders())
+        .containsEntry("Content-Type", "application/json; charset=utf-8")
+        .containsEntry("Access-Control-Allow-Origin", ALLOWED_ORIGIN);
+    var body = objectMapper.readTree(response.getBody());
+    assertThat(body.fieldNames())
+        .toIterable()
+        .containsExactlyInAnyOrder("status", "processed_sku_count", "started_at", "finished_at");
+    assertThat(body.get("status").asText()).isEqualTo("running");
+    assertThat(body.get("processed_sku_count").asInt()).isEqualTo(100);
+    assertThat(body.get("started_at").asLong()).isEqualTo(1_700_000_000L);
+    assertThat(body.get("finished_at").isNull()).isTrue();
+    verify(pricingService).getRepricing(ctx, new GetRepricingRequest());
+
+    when(pricingService.getRepricing(any(RequestContext.class), any(GetRepricingRequest.class)))
+        .thenThrow(new NotFoundException("Not Found"));
+    var missing = getRepricingHandler.handleRequest(buildEvent("alice", null), null);
+    assertThat(missing.getStatusCode()).isEqualTo(404);
+  }
+
+  @Test
+  void getRepricingShouldPropagateUnexpectedFailures() throws Exception {
+    // arrange
+    when(pricingService.getRepricing(any(RequestContext.class), any(GetRepricingRequest.class)))
+        .thenThrow(new IllegalStateException("unexpected failure"));
+
+    // act / assert
+    assertThatThrownBy(() -> getRepricingHandler.handleRequest(buildEvent("alice", null), null))
         .isInstanceOf(RuntimeException.class)
         .hasCauseInstanceOf(IllegalStateException.class);
   }

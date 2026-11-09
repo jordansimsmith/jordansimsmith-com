@@ -16,9 +16,8 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { apiClient } from '../api/client';
-import type { PricingResponse, RepriceResponse } from '../api/client';
+import type { PricingResponse, RepricingResponse } from '../api/client';
 import { PageHeader } from '../components/PageHeader';
-import { JobFailureAlert } from '../components/JobFailureAlert';
 
 dayjs.extend(relativeTime);
 
@@ -28,7 +27,7 @@ export function PricingPage() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [reprice, setReprice] = useState<RepriceResponse | null>(null);
+  const [reprice, setReprice] = useState<RepricingResponse | null>(null);
   const [statusLoaded, setStatusLoaded] = useState(false);
   const [statusError, setStatusError] = useState<string | null>(null);
   const [triggering, setTriggering] = useState(false);
@@ -42,7 +41,7 @@ export function PricingPage() {
     if (reading.current) return;
     reading.current = true;
     try {
-      const response = await apiClient.getReprice();
+      const response = await apiClient.getRepricing();
       if (!mounted.current) return;
       setReprice(response);
       setAwaitingStatus(false);
@@ -127,7 +126,7 @@ export function PricingPage() {
   const handleReprice = async () => {
     setTriggering(true);
     try {
-      await apiClient.createReprice();
+      await apiClient.createRepricing();
       setReprice(null);
       setAwaitingStatus(true);
     } catch (e) {
@@ -149,7 +148,6 @@ export function PricingPage() {
     queued: 'Repricing queued',
     running: 'Repricing inventory',
     succeeded: 'Repricing complete',
-    failed: 'Repricing needs attention',
   };
   const headline = !statusLoaded
     ? 'Checking repricing status…'
@@ -262,16 +260,7 @@ export function PricingPage() {
                     Inventory repricing
                   </Text>
                   {runStatus && (
-                    <Badge
-                      variant="light"
-                      color={
-                        runActive
-                          ? 'blue'
-                          : runStatus === 'failed'
-                            ? 'red'
-                            : 'green'
-                      }
-                    >
+                    <Badge variant="light" color={runActive ? 'blue' : 'green'}>
                       {runStatus === 'succeeded'
                         ? 'Completed'
                         : runStatus === 'running'
@@ -323,19 +312,6 @@ export function PricingPage() {
                 </Button>
               </Group>
             )}
-            {reprice && runStatus === 'failed' && (
-              <Stack gap="xs">
-                <JobFailureAlert
-                  title="Repricing failed"
-                  error={reprice.error}
-                />
-                <Text size="sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
-                  {reprice.processed_sku_count.toLocaleString()} SKUs checked
-                  before the run stopped. Price changes already made remain
-                  ready to publish.
-                </Text>
-              </Stack>
-            )}
             {runActive && (
               <Stack gap={6}>
                 <Group justify="space-between" gap="xs">
@@ -385,7 +361,7 @@ export function PricingPage() {
               </Text>
               <Text size="sm" fw={500}>
                 {latestTime
-                  ? `${runActive ? 'Started' : runStatus === 'failed' ? 'Failed' : 'Completed'} ${dayjs(latestTime * 1000).fromNow()}`
+                  ? `${runActive ? 'Started' : 'Completed'} ${dayjs(latestTime * 1000).fromNow()}`
                   : runActive
                     ? 'Queued'
                     : statusLoaded

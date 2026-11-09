@@ -17,6 +17,7 @@ import com.jordansimsmith.tcginventory.listings.server.ListingsModule;
 import com.jordansimsmith.tcginventory.orders.server.OrdersModule;
 import com.jordansimsmith.tcginventory.photos.server.PhotosModule;
 import com.jordansimsmith.tcginventory.pricing.server.PricingModule;
+import com.jordansimsmith.tcginventory.pricing.server.RepricingMessage;
 import com.jordansimsmith.tcginventory.reports.server.ReportsModule;
 import com.jordansimsmith.time.ClockModule;
 import com.jordansimsmith.ulid.UlidModule;
@@ -138,5 +139,12 @@ public class TcgInventoryModule {
   @Singleton
   QueueClient<JobMessage> jobsQueue(ObjectMapper objectMapper, SqsClient sqsClient) {
     return SqsQueueClient.create(sqsClient, objectMapper, JOBS_QUEUE_NAME);
+  }
+
+  @Provides
+  @Singleton
+  QueueClient<RepricingMessage> pricingQueue(
+      ObjectMapper objectMapper, SqsClient sqsClient, @Named("pricingQueueName") String queueName) {
+    return SqsQueueClient.create(sqsClient, objectMapper, queueName);
   }
 }

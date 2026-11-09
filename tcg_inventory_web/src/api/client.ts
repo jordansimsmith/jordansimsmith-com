@@ -423,13 +423,11 @@ export interface PublishResponse {
   pending_sku_count: number;
 }
 
-export type RepriceStatus = 'queued' | 'running' | 'succeeded' | 'failed';
+export type RepricingStatus = 'queued' | 'running' | 'succeeded';
 
-export interface RepriceResponse {
-  job_id: string;
-  status: RepriceStatus;
+export interface RepricingResponse {
+  status: RepricingStatus;
   processed_sku_count: number;
-  error: string | null;
   started_at: number;
   finished_at: number | null;
 }
@@ -581,8 +579,8 @@ export interface ApiClient {
   confirmOrder(orderId: string): Promise<ConfirmOrderResponse>;
   createPublish(): Promise<void>;
   getPublish(): Promise<PublishResponse>;
-  createReprice(): Promise<void>;
-  getReprice(): Promise<RepriceResponse | null>;
+  createRepricing(): Promise<void>;
+  getRepricing(): Promise<RepricingResponse | null>;
   getReport(): Promise<ReportResponse>;
   createReport(): Promise<void>;
 }

@@ -206,7 +206,7 @@ describe('http client repricing', () => {
     const json = vi.fn();
     fetchSpy.mockResolvedValue({ ok: true, status: 202, json });
 
-    await expect(createHttpClient().createReprice()).resolves.toBeUndefined();
+    await expect(createHttpClient().createRepricing()).resolves.toBeUndefined();
 
     const [url, init] = fetchSpy.mock.calls[0];
     expect(url).toBe(
@@ -226,7 +226,7 @@ describe('http client repricing', () => {
       json: vi.fn(),
     });
 
-    await expect(createHttpClient().getReprice()).resolves.toBeNull();
+    await expect(createHttpClient().getRepricing()).resolves.toBeNull();
     expect(fetchSpy.mock.calls[0][0]).toBe(
       'https://api.tcg-inventory.jordansimsmith.com/pricing/reprice',
     );
@@ -234,10 +234,8 @@ describe('http client repricing', () => {
 
   it('returns the latest repricing status and surfaces other errors', async () => {
     const response = {
-      job_id: 'job-1',
       status: 'running',
       processed_sku_count: 100,
-      error: null,
       started_at: 1723363200,
       finished_at: null,
     };
@@ -246,7 +244,7 @@ describe('http client repricing', () => {
       status: 200,
       json: vi.fn().mockResolvedValue(response),
     });
-    await expect(createHttpClient().getReprice()).resolves.toEqual(response);
+    await expect(createHttpClient().getRepricing()).resolves.toEqual(response);
 
     fetchSpy.mockResolvedValueOnce({
       ok: false,
@@ -254,23 +252,8 @@ describe('http client repricing', () => {
       statusText: 'Service Unavailable',
       json: vi.fn().mockResolvedValue({ message: 'temporarily unavailable' }),
     });
-    await expect(createHttpClient().getReprice()).rejects.toThrow(
+    await expect(createHttpClient().getRepricing()).rejects.toThrow(
       'temporarily unavailable',
-    );
-  });
-
-  it('surfaces a conflict when another job is active', async () => {
-    fetchSpy.mockResolvedValue({
-      ok: false,
-      status: 409,
-      statusText: 'Conflict',
-      json: vi
-        .fn()
-        .mockResolvedValue({ message: 'another job is in progress' }),
-    });
-
-    await expect(createHttpClient().createReprice()).rejects.toThrow(
-      'another job is in progress',
     );
   });
 });
