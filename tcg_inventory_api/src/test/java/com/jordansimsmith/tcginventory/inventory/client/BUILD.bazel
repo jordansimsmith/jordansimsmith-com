@@ -7,6 +7,7 @@ java_library(
     visibility = [
         "//tcg_inventory_api:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/listings/server:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/pricing/server:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/reports/server:__pkg__",
     ],
     deps = [

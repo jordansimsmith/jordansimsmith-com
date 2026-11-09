@@ -3,13 +3,43 @@ package com.jordansimsmith.tcginventory.pricing.server;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.queue.FakeQueueClient;
+import com.jordansimsmith.queue.QueueClient;
+import com.jordansimsmith.service.BadRequestException;
+import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
+import com.jordansimsmith.tcginventory.inventory.client.Condition;
+import com.jordansimsmith.tcginventory.inventory.client.FakeInventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.FindSkusResponse;
+import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
+import com.jordansimsmith.tcginventory.inventory.client.FindUnitsResponse;
+import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
+import com.jordansimsmith.tcginventory.inventory.client.GetSkuResponse;
+import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
+import com.jordansimsmith.tcginventory.inventory.client.Sku;
+import com.jordansimsmith.tcginventory.inventory.client.Unit;
+import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
+import com.jordansimsmith.tcginventory.pricing.client.FakePricingService;
+import com.jordansimsmith.tcginventory.pricing.client.GetPriceResponse;
+import com.jordansimsmith.tcginventory.pricing.client.PricingService;
+import com.jordansimsmith.time.FakeClock;
+import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -24,6 +54,7 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.ConditionalCheckFailedException;
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest;
+import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.UpdateItemRequest;
 
 @Testcontainers
@@ -250,6 +281,336 @@ class RepricingServiceIntegrationTest {
     assertThatThrownBy(
             () -> writeFailingRepository.createRepricing("alice", "run-1", Instant.EPOCH))
         .isSameAs(failure);
+  }
+
+  @Test
+  void messageHandlerShouldPriceStockAndCompleteRun() throws Exception {
+    // arrange
+    var startedAt = Instant.ofEpochSecond(100);
+    var clock = new FakeClock();
+    clock.setTime(startedAt);
+    repricingRepository.createRepricing("alice", "run-1", startedAt);
+    var games = new FakeGamesService();
+    var inventory = new FakeInventoryService(games);
+    var pricing = new FakePricingService();
+    var sku = sku("mtg#scryfall#card-1#normal#NM", "card-1");
+    inventory.seedSku("alice", sku, false);
+    var units = new ArrayList<Unit>();
+    for (var sequence = 0; sequence < 100; sequence++) {
+      units.add(new Unit(sequence, "A0-" + sequence, UnitStatus.REMOVED, List.of(), 1, null, null));
+    }
+    units.add(new Unit(100, "A1-0", UnitStatus.IN_STOCK, List.of(), 1, null, null));
+    inventory.seedUnits("alice", sku.skuId(), units);
+    pricing.seedPrice(
+        "alice",
+        "card-1",
+        Condition.NM,
+        new GetPriceResponse(new BigDecimal("1.23"), new BigDecimal("1.45")));
+    var queue = new FakeQueueClient<RepricingMessage>();
+    var handler = newHandler(queue, clock, inventory, pricing);
+
+    // act
+    handler.handleMessage(new RequestContext("alice"), new RepricingMessage("alice", "run-1"));
+
+    // assert
+    var completed = repricingRepository.get("alice");
+    assertThat(completed.getStatus()).isEqualTo("succeeded");
+    assertThat(completed.getProcessedSkuCount()).isEqualTo(1);
+    assertThat(completed.getStartedAt()).isEqualTo(startedAt);
+    assertThat(completed.getFinishedAt()).isEqualTo(startedAt);
+    assertThat(
+            inventory
+                .getSku(new RequestContext("alice"), new GetSkuRequest(sku.skuId()))
+                .sku()
+                .price())
+        .isEqualByComparingTo("1.45");
+    assertThat(queue.getSends()).isEmpty();
+
+    var unusedInventory = mock(InventoryService.class);
+    var unusedPricing = mock(PricingService.class);
+    newHandler(queue, clock, unusedInventory, unusedPricing)
+        .handleMessage(new RequestContext("alice"), new RepricingMessage("alice", "run-1"));
+    verifyNoInteractions(unusedInventory, unusedPricing);
+  }
+
+  @Test
+  void messageHandlerShouldCheckpointEveryCandidateIncludingCandidatesWithoutStock()
+      throws Exception {
+    // arrange
+    var clock = new FakeClock();
+    repricingRepository.createRepricing("alice", "run-1", clock.now());
+    var games = new FakeGamesService();
+    var inventory = new FakeInventoryService(games);
+    for (var index = 0; index < 101; index++) {
+      var sku = sku("mtg#scryfall#card-" + index + "#normal#NM", "card-" + index);
+      inventory.seedSku("alice", sku, false);
+    }
+    var queue = new FakeQueueClient<RepricingMessage>();
+    var pricing = new FakePricingService();
+    var handler = newHandler(queue, clock, inventory, pricing);
+    var ctx = new RequestContext("alice");
+    var message = new RepricingMessage("alice", "run-1");
+
+    // act
+    handler.handleMessage(ctx, message);
+
+    // assert first page is checkpointed and dispatched
+    var checkpoint = repricingRepository.get("alice");
+    assertThat(checkpoint.getStatus()).isEqualTo("running");
+    assertThat(checkpoint.getProcessedSkuCount()).isEqualTo(100);
+    assertThat(checkpoint.getContinuation()).isEqualTo("100");
+    assertThat(queue.getSends())
+        .containsExactly(new FakeQueueClient.SentMessage<>(message, "run-1", "run-1#100"));
+
+    // act on the next delivery
+    handler.handleMessage(ctx, message);
+
+    // assert
+    var completed = repricingRepository.get("alice");
+    assertThat(completed.getStatus()).isEqualTo("succeeded");
+    assertThat(completed.getProcessedSkuCount()).isEqualTo(101);
+    assertThat(completed.getContinuation()).isNull();
+    assertThat(queue.getSends()).hasSize(1);
+  }
+
+  @Test
+  void messageHandlerShouldCompleteAnEmptyRunWithoutDispatching() throws Exception {
+    // arrange
+    var clock = new FakeClock();
+    repricingRepository.createRepricing("alice", "run-1", clock.now());
+    var games = new FakeGamesService();
+    var inventory = new FakeInventoryService(games);
+    var queue = new FakeQueueClient<RepricingMessage>();
+    var handler = newHandler(queue, clock, inventory, new FakePricingService());
+
+    // act
+    handler.handleMessage(new RequestContext("alice"), new RepricingMessage("alice", "run-1"));
+
+    // assert
+    var completed = repricingRepository.get("alice");
+    assertThat(completed.getStatus()).isEqualTo("succeeded");
+    assertThat(completed.getProcessedSkuCount()).isZero();
+    assertThat(queue.getSends()).isEmpty();
+  }
+
+  @Test
+  void messageHandlerShouldLeavePageUncheckpointedWhenLaterCandidateFails() throws Exception {
+    // arrange
+    var clock = new FakeClock();
+    repricingRepository.createRepricing("alice", "run-1", clock.now());
+    var inventory = mock(InventoryService.class);
+    var first = sku("mtg#scryfall#first#normal#NM", "first");
+    var second = sku("mtg#scryfall#second#normal#NM", "second");
+    var failSecondCandidate = new AtomicBoolean(true);
+    when(inventory.findSkus(any(), any()))
+        .thenReturn(new FindSkusResponse(List.of(first, second), null));
+    when(inventory.getSku(any(), any()))
+        .thenAnswer(
+            invocation -> {
+              var request = (GetSkuRequest) invocation.getArgument(1);
+              return new GetSkuResponse(request.skuId().equals(first.skuId()) ? first : second);
+            });
+    when(inventory.findUnits(any(), any()))
+        .thenAnswer(
+            invocation -> {
+              var request = (FindUnitsRequest) invocation.getArgument(1);
+              if (request.skuId().equals(second.skuId())) {
+                if (failSecondCandidate.getAndSet(false)) {
+                  throw new BadRequestException("later candidate failed");
+                }
+                return new FindUnitsResponse(List.of(), null);
+              }
+              return new FindUnitsResponse(
+                  List.of(new Unit(1, "A0-1", UnitStatus.IN_STOCK, List.of(), 1, null, null)),
+                  null);
+            });
+    var pricing = mock(PricingService.class);
+    when(pricing.getPrice(any(), any()))
+        .thenReturn(new GetPriceResponse(BigDecimal.ONE, new BigDecimal("1.25")));
+    var queue = new FakeQueueClient<RepricingMessage>();
+    var handler = newHandler(queue, clock, inventory, pricing);
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                handler.handleMessage(
+                    new RequestContext("alice"), new RepricingMessage("alice", "run-1")))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("later candidate failed");
+    assertThat(repricingRepository.get("alice").getStatus()).isEqualTo("running");
+    assertThat(repricingRepository.get("alice").getProcessedSkuCount()).isZero();
+    assertThat(queue.getSends()).isEmpty();
+    verify(inventory).updateSku(any(), any());
+
+    // act on retry
+    handler.handleMessage(new RequestContext("alice"), new RepricingMessage("alice", "run-1"));
+
+    // assert
+    assertThat(repricingRepository.get("alice").getStatus()).isEqualTo("succeeded");
+    assertThat(repricingRepository.get("alice").getProcessedSkuCount()).isEqualTo(2);
+    verify(inventory, times(2)).updateSku(any(), any());
+  }
+
+  @Test
+  void messageHandlerShouldRejectMissingAndIncompleteRunMetadata() throws Exception {
+    // arrange
+    var clock = new FakeClock();
+    var inventory = mock(InventoryService.class);
+    var pricing = mock(PricingService.class);
+    var queue = new FakeQueueClient<RepricingMessage>();
+    var handler = newHandler(queue, clock, inventory, pricing);
+
+    // act / assert missing
+    assertThatThrownBy(
+            () ->
+                handler.handleMessage(
+                    new RequestContext("alice"), new RepricingMessage("alice", "run-1")))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("Repricing run metadata is missing or incomplete");
+
+    // arrange incomplete persisted record
+    dynamoDbClient.putItem(
+        PutItemRequest.builder()
+            .tableName(TABLE_NAME)
+            .item(
+                Map.of(
+                    RepricingItem.PK, AttributeValue.fromS(RepricingItem.formatPk("alice")),
+                    RepricingItem.SK, AttributeValue.fromS(RepricingItem.formatSk()),
+                    RepricingItem.USER, AttributeValue.fromS("alice"),
+                    RepricingItem.REPRICING_ID, AttributeValue.fromS("run-1"),
+                    RepricingItem.STATUS, AttributeValue.fromS("queued"),
+                    RepricingItem.STARTED_AT, AttributeValue.fromN("100"),
+                    RepricingItem.UPDATED_AT, AttributeValue.fromN("100")))
+            .build());
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                handler.handleMessage(
+                    new RequestContext("alice"), new RepricingMessage("alice", "run-1")))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("Repricing run metadata is missing or incomplete");
+    verifyNoInteractions(inventory, pricing);
+    assertThat(queue.getSends()).isEmpty();
+  }
+
+  @Test
+  void messageHandlerShouldNotDispatchWhenCheckpointFails() throws Exception {
+    // arrange
+    var clock = new FakeClock();
+    repricingRepository.createRepricing("alice", "run-1", clock.now());
+    repricingRepository.startRepricing("alice", "run-1", clock.now());
+    var failure = new IllegalStateException("checkpoint failed");
+    var dynamoDbClient = mock(DynamoDbClient.class);
+    when(dynamoDbClient.updateItem(any(UpdateItemRequest.class))).thenThrow(failure);
+    var failingRepository = new RepricingRepository(repricingTable, dynamoDbClient, TABLE_NAME);
+    var inventory = mock(InventoryService.class);
+    var sku = sku("mtg#scryfall#card-1#normal#NM", "card-1");
+    when(inventory.findSkus(any(), any()))
+        .thenReturn(new FindSkusResponse(List.of(sku), "opaque-next"));
+    when(inventory.getSku(any(), any())).thenReturn(new GetSkuResponse(sku));
+    when(inventory.findUnits(any(), any())).thenReturn(new FindUnitsResponse(List.of(), null));
+    var queue = mock(QueueClient.class);
+    var handler =
+        new RepricingMessageHandler(
+            failingRepository, queue, clock, inventory, new FakePricingService());
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                handler.handleMessage(
+                    new RequestContext("alice"), new RepricingMessage("alice", "run-1")))
+        .isSameAs(failure);
+    assertThat(repricingRepository.get("alice").getProcessedSkuCount()).isZero();
+    verify(queue, never()).send(any(), any(), any());
+  }
+
+  @Test
+  void messageHandlerShouldPreserveCheckpointWhenContinuationDispatchFails() throws Exception {
+    // arrange
+    var clock = new FakeClock();
+    repricingRepository.createRepricing("alice", "run-1", clock.now());
+    repricingRepository.startRepricing("alice", "run-1", clock.now());
+    var inventory = mock(InventoryService.class);
+    var sku = sku("mtg#scryfall#card-1#normal#NM", "card-1");
+    when(inventory.findSkus(any(), any()))
+        .thenReturn(new FindSkusResponse(List.of(sku), "opaque-next"));
+    when(inventory.getSku(any(), any())).thenReturn(new GetSkuResponse(sku));
+    when(inventory.findUnits(any(), any())).thenReturn(new FindUnitsResponse(List.of(), null));
+    var failure = new IllegalStateException("dispatch failed");
+    var queue = mock(QueueClient.class);
+    doThrow(failure).when(queue).send(any(), any(), any());
+    var handler = newHandler(queue, clock, inventory, new FakePricingService());
+
+    // act / assert
+    assertThatThrownBy(
+            () ->
+                handler.handleMessage(
+                    new RequestContext("alice"), new RepricingMessage("alice", "run-1")))
+        .isSameAs(failure);
+    var checkpoint = repricingRepository.get("alice");
+    assertThat(checkpoint.getProcessedSkuCount()).isEqualTo(1);
+    assertThat(checkpoint.getContinuation()).isEqualTo("opaque-next");
+  }
+
+  @Test
+  void messageHandlerShouldIgnoreSupersededAndSucceededMessages() throws Exception {
+    // arrange
+    var clock = new FakeClock();
+    repricingRepository.createRepricing("alice", "old-run", clock.now());
+    repricingRepository.startRepricing("alice", "old-run", clock.now());
+    repricingRepository.completeRepricing("alice", "old-run", 0, 0, clock.now());
+    repricingRepository.createRepricing("alice", "current-run", clock.now());
+    var inventory = mock(InventoryService.class);
+    var pricing = mock(PricingService.class);
+    var queue = mock(QueueClient.class);
+    var handler = newHandler(queue, clock, inventory, pricing);
+
+    // act
+    handler.handleMessage(new RequestContext("alice"), new RepricingMessage("alice", "old-run"));
+
+    // assert
+    verify(inventory, never()).findSkus(any(), any());
+    verify(queue, never()).send(any(), any(), any());
+  }
+
+  @Test
+  void messageShouldUseExplicitJsonFields() throws Exception {
+    // arrange
+    var objectMapper = new ObjectMapper();
+
+    // act
+    var json = objectMapper.writeValueAsString(new RepricingMessage("alice", "run-1"));
+
+    // assert
+    assertThat(json).isEqualTo("{\"user\":\"alice\",\"repricing_id\":\"run-1\"}");
+    assertThat(objectMapper.readValue(json, RepricingMessage.class))
+        .isEqualTo(new RepricingMessage("alice", "run-1"));
+  }
+
+  private RepricingMessageHandler newHandler(
+      QueueClient<RepricingMessage> queue,
+      FakeClock clock,
+      InventoryService inventory,
+      PricingService pricing) {
+    return new RepricingMessageHandler(repricingRepository, queue, clock, inventory, pricing);
+  }
+
+  private Sku sku(String skuId, String cardId) {
+    return new Sku(
+        skuId,
+        "mtg",
+        cardId,
+        "Card " + cardId,
+        "SET",
+        "Set",
+        "1",
+        "normal",
+        Condition.NM,
+        new BigDecimal("1.00"),
+        cardId,
+        1,
+        0);
   }
 
   private Map<String, AttributeValue> getRaw(String user) {
