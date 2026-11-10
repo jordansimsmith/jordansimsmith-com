@@ -5,7 +5,6 @@ import type {
   CatalogCardsResponse,
   Condition,
   ConfirmScanRequest,
-  ConfirmOrderResponse,
   CreateScanRequest,
   CreateScanResponse,
   Finish,
@@ -2487,10 +2486,10 @@ export function createFakeClient(): ApiClient {
       return toOrderDetail(getOrderOrThrow(orderId), skus);
     },
 
-    async confirmOrder(orderId: string): Promise<ConfirmOrderResponse> {
+    async confirmOrder(orderId: string): Promise<void> {
       const order = getOrderOrThrow(orderId);
       if (order.state === 'fulfilled' || order.state === 'fulfilling') {
-        return { order_id: orderId, state: order.state };
+        return;
       }
       if (order.state !== 'to_pick') {
         throw new Error('order is not ready to pick');
@@ -2508,7 +2507,6 @@ export function createFakeClient(): ApiClient {
         reportStale = true;
       };
       window.setTimeout(finishFulfillment, 500);
-      return { order_id: orderId, state: order.state };
     },
 
     async createPublish(): Promise<void> {

@@ -204,21 +204,20 @@ export function OrderDetailPage() {
     }
     setConfirming(true);
     try {
-      const response = await apiClient.confirmOrder(orderId);
-      setOrder((current) =>
-        current == null ? current : { ...current, state: response.state },
-      );
+      await apiClient.confirmOrder(orderId);
+      const latestOrder = await apiClient.getOrder(orderId);
+      setOrder(latestOrder);
       setConfirmOpen(false);
       notifications.show({
         title:
-          response.state === 'fulfilled'
+          latestOrder.state === 'fulfilled'
             ? 'Order fulfilled'
             : 'Pull confirmation started',
         message:
-          response.state === 'fulfilled'
+          latestOrder.state === 'fulfilled'
             ? 'All cards are marked sold.'
             : 'This order will show fulfilled after its cards are marked sold.',
-        color: response.state === 'fulfilled' ? 'green' : 'blue',
+        color: latestOrder.state === 'fulfilled' ? 'green' : 'blue',
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Failed to confirm pull';

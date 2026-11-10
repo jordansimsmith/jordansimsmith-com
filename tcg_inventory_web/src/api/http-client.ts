@@ -5,7 +5,6 @@ import type {
   ConfirmScanRequest,
   CreateScanRequest,
   CreateScanResponse,
-  ConfirmOrderResponse,
   CatalogCard,
   CatalogCardsResponse,
   FindScansParams,
@@ -446,12 +445,11 @@ export function createHttpClient(): ApiClient {
       return response.json();
     },
 
-    async confirmOrder(orderId: string): Promise<ConfirmOrderResponse> {
-      const response = await authenticatedFetch(
+    async confirmOrder(orderId: string): Promise<void> {
+      await authenticatedFetch(
         `/orders/${encodeURIComponent(orderId)}/confirm`,
         { method: 'POST' },
       );
-      return response.json();
     },
 
     async createPublish(): Promise<void> {

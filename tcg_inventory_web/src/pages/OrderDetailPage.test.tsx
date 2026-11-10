@@ -529,11 +529,9 @@ describe('OrderDetailPage', () => {
     const user = userEvent.setup();
     vi.spyOn(clientModule.apiClient, 'getOrder')
       .mockResolvedValueOnce(orderDetail())
+      .mockResolvedValueOnce(orderDetail({ state: 'fulfilling' }))
       .mockResolvedValue(orderDetail({ state: 'fulfilled' }));
-    vi.spyOn(clientModule.apiClient, 'confirmOrder').mockResolvedValue({
-      order_id: '83647',
-      state: 'fulfilling',
-    });
+    vi.spyOn(clientModule.apiClient, 'confirmOrder').mockResolvedValue();
 
     renderOrderDetailPage();
     await screen.findByText('Order 83647');
@@ -549,13 +547,14 @@ describe('OrderDetailPage', () => {
     await waitFor(() => {
       expect(clientModule.apiClient.confirmOrder).toHaveBeenCalledWith('83647');
     });
+    expect(clientModule.apiClient.getOrder).toHaveBeenCalledTimes(2);
     expect(await screen.findByText('Pull confirmation started')).toBeDefined();
     expect(screen.getByText(/Pull confirmation is processing/)).toBeDefined();
 
     expect(
       await screen.findByText('fulfilled', {}, { timeout: 4000 }),
     ).toBeDefined();
-    expect(clientModule.apiClient.getOrder).toHaveBeenCalledTimes(2);
+    expect(clientModule.apiClient.getOrder).toHaveBeenCalledTimes(3);
     expect(clientModule.apiClient.findCardImages).toHaveBeenCalledTimes(1);
     expect(screen.queryByText('Pull confirmation started')).toBeDefined();
     expect(screen.getByText('Cards')).toBeDefined();
@@ -643,6 +642,26 @@ describe('OrderDetailPage', () => {
     expect(await screen.findByText('order is not ready to pick')).toBeDefined();
     expect(screen.getByText('Pull sheet')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Confirm pull' })).toBeDefined();
+  });
+
+  it('surfaces a detail refresh failure after confirmation acceptance', async () => {
+    const user = userEvent.setup();
+    vi.spyOn(clientModule.apiClient, 'getOrder')
+      .mockResolvedValueOnce(orderDetail())
+      .mockRejectedValueOnce(new Error('refresh failed'));
+    vi.spyOn(clientModule.apiClient, 'confirmOrder').mockResolvedValue();
+
+    renderOrderDetailPage();
+    await screen.findByText('Order 83647');
+
+    await user.click(screen.getByRole('button', { name: 'Confirm pull' }));
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Confirm' }));
+
+    expect(await screen.findByText('refresh failed')).toBeDefined();
+    expect(screen.getByText('Pull sheet')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Confirm pull' })).toBeDefined();
+    expect(clientModule.apiClient.findCardImages).toHaveBeenCalledTimes(1);
   });
 
   it('omits the vs-list badge when the offer matches list', async () => {

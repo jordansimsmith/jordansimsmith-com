@@ -1098,9 +1098,7 @@ describe('createFakeClient orders', () => {
     vi.useFakeTimers();
     const client = createFakeClient();
 
-    const confirmed = await client.confirmOrder('83647');
-
-    expect(confirmed).toEqual({ order_id: '83647', state: 'fulfilling' });
+    await expect(client.confirmOrder('83647')).resolves.toBeUndefined();
 
     const fulfilling = await client.getOrder('83647');
     expect(fulfilling.state).toBe('fulfilling');
@@ -1153,19 +1151,10 @@ describe('createFakeClient orders', () => {
     );
 
     vi.useFakeTimers();
-    await expect(client.confirmOrder('83647')).resolves.toEqual({
-      order_id: '83647',
-      state: 'fulfilling',
-    });
-    await expect(client.confirmOrder('83647')).resolves.toEqual({
-      order_id: '83647',
-      state: 'fulfilling',
-    });
+    await expect(client.confirmOrder('83647')).resolves.toBeUndefined();
+    await expect(client.confirmOrder('83647')).resolves.toBeUndefined();
     await vi.advanceTimersByTimeAsync(500);
-    await expect(client.confirmOrder('83647')).resolves.toEqual({
-      order_id: '83647',
-      state: 'fulfilled',
-    });
+    await expect(client.confirmOrder('83647')).resolves.toBeUndefined();
   });
 });
 

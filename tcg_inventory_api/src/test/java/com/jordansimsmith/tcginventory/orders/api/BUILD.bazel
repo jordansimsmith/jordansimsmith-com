@@ -4,6 +4,7 @@ java_test_suite(
     name = "api-unit-tests",
     size = "small",
     srcs = [
+        "ConfirmOrderHandlerTest.java",
         "FindOrdersHandlerTest.java",
         "GetOrderHandlerTest.java",
     ],
@@ -14,6 +15,7 @@ java_test_suite(
         "//lib/http:lib",
         "//lib/service",
         "//tcg_inventory_api:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:confirm-order-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:find-orders-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:get-order-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/client",

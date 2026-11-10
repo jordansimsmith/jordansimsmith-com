@@ -225,7 +225,7 @@ module "java_api" {
       artifact = var.artifacts["get_order"]
     }
     confirm_order = {
-      handler  = "com.jordansimsmith.tcginventory.orders.ConfirmOrderHandler"
+      handler  = "com.jordansimsmith.tcginventory.orders.api.ConfirmOrderHandler"
       artifact = var.artifacts["confirm_order"]
     }
     jobs_handler = {

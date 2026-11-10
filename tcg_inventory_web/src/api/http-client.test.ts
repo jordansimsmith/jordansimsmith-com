@@ -48,6 +48,35 @@ describe('http client settings', () => {
   });
 });
 
+describe('http client order confirmation', () => {
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    localStorage.clear();
+    setSession('alice', 'pw');
+  });
+
+  afterEach(() => {
+    clearSession();
+  });
+
+  it('sends an authenticated confirmation POST and ignores its empty response', async () => {
+    fetchSpy.mockResolvedValue({ ok: true, status: 202 });
+    const client = createHttpClient();
+
+    await expect(client.confirmOrder('83647 /#')).resolves.toBeUndefined();
+
+    expect(fetchSpy).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/orders/83647%20%2F%23/confirm',
+    );
+    expect(init.method).toBe('POST');
+    expect(init.headers.Authorization).toBe(`Basic ${btoa('alice:pw')}`);
+    expect(init.body).toBeUndefined();
+  });
+});
+
 describe('http client FetchTCG account', () => {
   beforeEach(() => {
     fetchSpy.mockReset();
