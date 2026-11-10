@@ -20,7 +20,6 @@ function publishResponse(
   return {
     status: 'succeeded',
     published_sku_count: 3,
-    error: null,
     started_at: 1765420900,
     finished_at: 1765420932,
     pending_sku_count: 0,
@@ -244,15 +243,12 @@ describe('PublishPage', () => {
     expect(getPublishMock).toHaveBeenCalledTimes(1);
   });
 
-  it('shows the failed run, marks pending work, and allows another publish', async () => {
+  it('clears the attention dot after starting a publish', async () => {
     const getPublishMock = vi
       .spyOn(clientModule.apiClient, 'getPublish')
-      .mockResolvedValue(
-        publishResponse({
-          status: 'failed',
-          error: 'FetchTCG authentication failed',
-          pending_sku_count: 5,
-        }),
+      .mockResolvedValueOnce(publishResponse({ pending_sku_count: 5 }))
+      .mockResolvedValueOnce(
+        publishResponse({ status: 'running', pending_sku_count: 5 }),
       );
     const createPublishMock = vi
       .spyOn(clientModule.apiClient, 'createPublish')
@@ -260,11 +256,7 @@ describe('PublishPage', () => {
 
     renderPublishPage();
 
-    expect(
-      await screen.findByText('5 SKUs still need publishing'),
-    ).toBeDefined();
-    expect(screen.getByText('Publish failed')).toBeDefined();
-    expect(screen.getByText('FetchTCG authentication failed')).toBeDefined();
+    expect(await screen.findByText('5 SKUs ready to publish')).toBeDefined();
     expect(publishLink('Publish, unpublished inventory changes')).toBeDefined();
 
     fireEvent.click(screen.getByRole('button', { name: 'Publish changes' }));
@@ -273,10 +265,30 @@ describe('PublishPage', () => {
     expect(createPublishMock).toHaveBeenCalledTimes(1);
     expect(getPublishMock).toHaveBeenCalledTimes(2);
     expect(
+      await screen.findByText('Publishing inventory changes'),
+    ).toBeDefined();
+    expect(
       screen.queryByRole('link', {
         name: 'Publish, unpublished inventory changes',
       }),
     ).toBeNull();
+  });
+
+  it('shows an error when starting a publish fails', async () => {
+    vi.spyOn(clientModule.apiClient, 'getPublish').mockResolvedValue(
+      publishResponse({ pending_sku_count: 2 }),
+    );
+    vi.spyOn(clientModule.apiClient, 'createPublish').mockRejectedValue(
+      new Error('Service unavailable'),
+    );
+
+    renderPublishPage();
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: 'Publish changes' }),
+    );
+
+    expect(await screen.findByText('Service unavailable')).toBeDefined();
   });
 
   it('shows the last successful publish time as relative time', async () => {
@@ -300,7 +312,7 @@ describe('PublishPage', () => {
     expect(
       await screen.findByText('Publish status needs attention'),
     ).toBeDefined();
-    expect(screen.getByText('Service unavailable')).toBeDefined();
+    expect(await screen.findAllByText('Service unavailable')).toHaveLength(2);
     expect(
       (
         screen.getByRole('button', {

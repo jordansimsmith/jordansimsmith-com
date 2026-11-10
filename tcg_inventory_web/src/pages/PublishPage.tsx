@@ -14,7 +14,6 @@ import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import { AppShellLayout } from '../layouts/AppShellLayout';
 import { PageHeader } from '../components/PageHeader';
-import { JobFailureAlert } from '../components/JobFailureAlert';
 import { usePublishStatus } from '../PublishStatusProvider';
 import type { PublishResponse } from '../api/client';
 
@@ -81,26 +80,6 @@ function getPublishPresentation(
         latestRunRelativeTime === null
           ? 'In progress'
           : `Started ${latestRunRelativeTime}`,
-    };
-  }
-
-  if (publish.status === 'failed') {
-    return {
-      headline:
-        publish.pending_sku_count > 0
-          ? `${publish.pending_sku_count} SKUs still need publishing`
-          : 'Latest publish needs attention',
-      description:
-        publish.pending_sku_count > 0
-          ? `Resolve the issue below, then republish ${publish.pending_sku_count} pending SKUs.`
-          : 'Resolve the issue below, then try publishing again.',
-      statusLabel: 'Failed',
-      statusColor: 'red',
-      runContextLabel: 'Latest run',
-      runContextValue:
-        latestRunRelativeTime === null
-          ? 'Failed'
-          : `Failed ${latestRunRelativeTime}`,
     };
   }
 
@@ -224,10 +203,6 @@ export function PublishPage() {
                   Retry status
                 </Button>
               </Group>
-            )}
-
-            {publish?.status === 'failed' && (
-              <JobFailureAlert title="Publish failed" error={publish.error} />
             )}
 
             {publish?.status === 'queued' && (

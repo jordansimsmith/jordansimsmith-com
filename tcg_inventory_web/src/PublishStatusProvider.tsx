@@ -50,10 +50,7 @@ export function PublishStatusProvider({ children }: { children: ReactNode }) {
         if (!initialStatusReadRef.current) {
           initialStatusReadRef.current = true;
           setAttentionDotVisible(
-            response.status !== null &&
-              response.status !== 'queued' &&
-              response.status !== 'running' &&
-              response.pending_sku_count > 0,
+            response.status === 'succeeded' && response.pending_sku_count > 0,
           );
         }
       } catch (e) {
@@ -62,7 +59,6 @@ export function PublishStatusProvider({ children }: { children: ReactNode }) {
           setPublish({
             status: null,
             published_sku_count: 0,
-            error: null,
             started_at: null,
             finished_at: null,
             pending_sku_count: 0,

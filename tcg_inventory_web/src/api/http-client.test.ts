@@ -258,6 +258,82 @@ describe('http client repricing', () => {
   });
 });
 
+describe('http client publish', () => {
+  beforeEach(() => {
+    fetchSpy.mockReset();
+    globalThis.fetch = fetchSpy as unknown as typeof fetch;
+    localStorage.clear();
+    setSession('alice', 'pw');
+  });
+
+  afterEach(() => {
+    clearSession();
+  });
+
+  it('creates a publish run with an authenticated bodyless request', async () => {
+    const json = vi.fn();
+    fetchSpy.mockResolvedValue({ ok: true, status: 202, json });
+
+    await expect(createHttpClient().createPublish()).resolves.toBeUndefined();
+
+    const [url, init] = fetchSpy.mock.calls[0];
+    expect(url).toBe('https://api.tcg-inventory.jordansimsmith.com/publish');
+    expect(init.method).toBe('POST');
+    expect(init.headers.Authorization).toBe(`Basic ${btoa('alice:pw')}`);
+    expect(init.body).toBeUndefined();
+    expect(json).not.toHaveBeenCalled();
+  });
+
+  it('reads publish status, tolerates legacy fields, and surfaces request errors', async () => {
+    const response = {
+      status: 'running',
+      published_sku_count: 4,
+      started_at: 1723363200,
+      finished_at: null,
+      pending_sku_count: 2,
+      error: 'legacy processing error field',
+    };
+    fetchSpy.mockResolvedValueOnce({
+      ok: true,
+      status: 200,
+      json: vi.fn().mockResolvedValue(response),
+    });
+
+    const publish = await createHttpClient().getPublish();
+    expect(publish).toMatchObject({
+      status: 'running',
+      published_sku_count: 4,
+      started_at: 1723363200,
+      finished_at: null,
+      pending_sku_count: 2,
+    });
+    expect(fetchSpy.mock.calls[0][0]).toBe(
+      'https://api.tcg-inventory.jordansimsmith.com/publish',
+    );
+    expect(fetchSpy.mock.calls[0][1].headers.Authorization).toBe(
+      `Basic ${btoa('alice:pw')}`,
+    );
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      statusText: 'Service Unavailable',
+      json: vi.fn().mockResolvedValue({ message: 'temporarily unavailable' }),
+    });
+    await expect(createHttpClient().getPublish()).rejects.toThrow(
+      'temporarily unavailable',
+    );
+
+    fetchSpy.mockResolvedValueOnce({
+      ok: false,
+      status: 404,
+      statusText: 'Not Found',
+      json: vi.fn(),
+    });
+    await expect(createHttpClient().getPublish()).rejects.toThrow('Not Found');
+  });
+});
+
 describe('http client inventory units', () => {
   beforeEach(() => {
     fetchSpy.mockReset();

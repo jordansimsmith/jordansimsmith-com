@@ -1780,7 +1780,6 @@ export function createFakeClient(): ApiClient {
       return {
         status: null,
         published_sku_count: 0,
-        error: null,
         started_at: null,
         finished_at: null,
         pending_sku_count: dirtySkuIds.size,
@@ -1789,7 +1788,6 @@ export function createFakeClient(): ApiClient {
     return {
       status: publishRun.status,
       published_sku_count: publishedCount(publishRun),
-      error: null,
       started_at: Math.floor(publishRun.started_at_ms / 1000),
       finished_at:
         publishRun.finished_at_ms === null
