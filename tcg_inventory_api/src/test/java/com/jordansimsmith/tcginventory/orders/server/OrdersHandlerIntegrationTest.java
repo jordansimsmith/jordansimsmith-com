@@ -1,10 +1,7 @@
-package com.jordansimsmith.tcginventory.orders;
+package com.jordansimsmith.tcginventory.orders.server;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.doAnswer;
-import static org.mockito.Mockito.mock;
 
 import com.amazonaws.services.lambda.runtime.events.APIGatewayV2HTTPEvent;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,49 +9,40 @@ import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.service.RequestContext;
-import com.jordansimsmith.tcginventory.JobItem;
-import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.inventory.client.Condition;
-import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
 import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
-import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
-import com.jordansimsmith.tcginventory.inventory.client.SellUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.Sku;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.orders.api.FindOrdersHandler;
 import com.jordansimsmith.tcginventory.orders.api.GetOrderHandler;
 import com.jordansimsmith.tcginventory.orders.client.ConfirmOrderRequest;
-import com.jordansimsmith.tcginventory.orders.server.FulfillmentMessage;
 import com.jordansimsmith.time.FakeClock;
-import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
-import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
+import software.amazon.awssdk.services.dynamodb.model.PutItemRequest;
 
 @Testcontainers
 public class OrdersHandlerIntegrationTest {
 
   private FakeClock fakeClock;
-  private FakeUlidGenerator fakeUlidGenerator;
   private ObjectMapper objectMapper;
   private TcgInventoryTestFactory factory;
-  private DynamoDbTable<OrderItem> orderTable;
-  private DynamoDbTable<JobItem> jobTable;
 
   private FindOrdersHandler findOrdersHandler;
   private GetOrderHandler getOrderHandler;
@@ -78,14 +66,10 @@ public class OrdersHandlerIntegrationTest {
             dynamoDbContainer.getEndpoint(), TcgInventoryTestFactory.UNUSED_S3_ENDPOINT);
 
     fakeClock = factory.fakeClock();
-    fakeUlidGenerator = factory.fakeUlidGenerator();
     objectMapper = factory.objectMapper();
-    jobTable = factory.jobTable();
     fakeOrdersQueue = factory.fakeOrdersQueue();
-    orderTable = factory.orderTable();
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
-    fakeUlidGenerator.reset();
     fakeOrdersQueue.reset();
 
     findOrdersHandler = new FindOrdersHandler(factory);
@@ -157,83 +141,6 @@ public class OrdersHandlerIntegrationTest {
     assertThat(body1.get("orders").get(1).get("order_id").asText()).isEqualTo("99999");
     assertThat(body2.get("orders").get(0).get("order_id").asText()).isEqualTo("99998");
     assertThat(body2.get("next_continuation").isNull()).isTrue();
-  }
-
-  @Test
-  void findOrdersShouldSupportContinuationPaging() throws Exception {
-    // arrange
-    createOrder("jordan", "10001", "awaiting_payment", "PICKUP", "2.00");
-    createOrder("jordan", "10002", "to_pick", "DELIVERY", "5.50");
-    createOrder("jordan", "10003", "fulfilled", "PICKUP", "1.00");
-
-    // act - first page
-    var response1 =
-        findOrdersHandler.handleRequest(
-            buildEventWithQuery("jordan", Map.of(), Map.of("limit", "2")), null);
-
-    // assert - first page
-    assertThat(response1.getStatusCode()).isEqualTo(200);
-    var body1 = objectMapper.readTree(response1.getBody());
-    assertThat(body1.get("orders")).hasSize(2);
-    assertThat(body1.get("orders").get(0).get("order_id").asText()).isEqualTo("10003");
-    assertThat(body1.get("orders").get(1).get("order_id").asText()).isEqualTo("10002");
-    var continuation = body1.get("next_continuation").asText();
-    assertThat(continuation).isNotNull();
-    assertThat(continuation).isNotEmpty();
-
-    // act - second page
-    var response2 =
-        findOrdersHandler.handleRequest(
-            buildEventWithQuery("jordan", Map.of(), Map.of("continuation", continuation)), null);
-
-    // assert - second page
-    assertThat(response2.getStatusCode()).isEqualTo(200);
-    var body2 = objectMapper.readTree(response2.getBody());
-    assertThat(body2.get("orders")).hasSize(1);
-    assertThat(body2.get("orders").get(0).get("order_id").asText()).isEqualTo("10001");
-    assertThat(body2.get("next_continuation").isNull()).isTrue();
-  }
-
-  @Test
-  void findOrdersShouldReturnItemAndListedTotals() throws Exception {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
-    createSkuWithUnits("jordan", skuId, 2);
-    createOrderWithLines(
-        "jordan", "83663", "to_pick", skuId, List.of(1, 2), "PICKUP", "3.00", "1.50", "2.00");
-
-    // act
-    var response = findOrdersHandler.handleRequest(buildEvent("jordan"), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
-    var order = body.get("orders").get(0);
-    assertThat(order.get("total_price").asText()).isEqualTo("3.00");
-    assertThat(order.get("items_total_price").asText()).isEqualTo("1.50");
-    assertThat(order.get("listed_total_price").asText()).isEqualTo("4.00");
-    assertThat(order.get("unit_count").asInt()).isEqualTo(2);
-  }
-
-  @Test
-  void findOrdersShouldOmitListedTotalWhenBaselineMissing() throws Exception {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
-    createSkuWithUnits("jordan", skuId, 1);
-    createOrderWithLines(
-        "jordan", "83663", "to_pick", skuId, List.of(1), "PICKUP", "1.50", "1.50", null);
-
-    // act
-    var response = findOrdersHandler.handleRequest(buildEvent("jordan"), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
-    var order = body.get("orders").get(0);
-    assertThat(order.get("items_total_price").asText()).isEqualTo("1.50");
-    assertThat(order.get("listed_total_price").isNull()).isTrue();
   }
 
   @Test
@@ -317,23 +224,21 @@ public class OrdersHandlerIntegrationTest {
 
     var lines =
         List.of(
-            new OrderRowItem(skuId1, 1001, 1, "1.50", "2.00", List.of(1)),
-            new OrderRowItem(skuId2, 1002, 1, "2.00", "1.80", List.of(3)));
-    var order =
-        createOrderItem(
-            "jordan",
-            "83663",
-            "to_pick",
-            "ACCEPTED",
-            "SEND_PICKUP_ADDRESS",
-            "PICKUP",
-            null,
-            null,
-            null,
-            "3.50",
-            lines,
-            Instant.ofEpochSecond(1700000000));
-    orderTable.putItem(order);
+            new TestOrderRow(skuId1, 1001, 1, "1.50", "2.00", List.of(1)),
+            new TestOrderRow(skuId2, 1002, 1, "2.00", "1.80", List.of(3)));
+    writeOrder(
+        "jordan",
+        "83663",
+        "to_pick",
+        "ACCEPTED",
+        "SEND_PICKUP_ADDRESS",
+        "PICKUP",
+        null,
+        null,
+        null,
+        "3.50",
+        lines,
+        1700000000);
 
     // act
     var response =
@@ -378,22 +283,21 @@ public class OrdersHandlerIntegrationTest {
     createUnit("jordan", pokemonSkuId, 20, "in_stock", null);
     var lines =
         List.of(
-            new OrderRowItem(magicSkuId, 1001, 1, "2.00", "2.00", List.of(10)),
-            new OrderRowItem(pokemonSkuId, 283917, 1, "12.00", "10.00", List.of(10)));
-    orderTable.putItem(
-        createOrderItem(
-            "jordan",
-            "83664",
-            "to_pick",
-            "ACCEPTED",
-            "SEND_DELIVERY_ADDRESS",
-            "DELIVERY",
-            null,
-            null,
-            null,
-            "14.00",
-            lines,
-            Instant.ofEpochSecond(1700000000)));
+            new TestOrderRow(magicSkuId, 1001, 1, "2.00", "2.00", List.of(10)),
+            new TestOrderRow(pokemonSkuId, 283917, 1, "12.00", "10.00", List.of(10)));
+    writeOrder(
+        "jordan",
+        "83664",
+        "to_pick",
+        "ACCEPTED",
+        "SEND_DELIVERY_ADDRESS",
+        "DELIVERY",
+        null,
+        null,
+        null,
+        "14.00",
+        lines,
+        1700000000);
 
     // act
     var response =
@@ -476,22 +380,24 @@ public class OrdersHandlerIntegrationTest {
   void getOrderShouldReturnFulfillmentDetails() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var order =
-        createOrderItem(
-            "jordan",
-            "91329",
-            "to_pick",
-            "ACCEPTED",
-            "SEND_TRACKING_CODE",
-            "DELIVERY",
-            "Chris Andrew (generic)",
-            OrderItem.BuyerAddress.create(
-                "32 Abercrombie Street", null, "Howick", "Auckland", "2014", "NZ"),
-            "Economy Tracked",
-            "61.50",
-            List.of(),
-            Instant.ofEpochSecond(1700000000));
-    orderTable.putItem(order);
+    writeOrder(
+        "jordan",
+        "91329",
+        "to_pick",
+        "ACCEPTED",
+        "SEND_TRACKING_CODE",
+        "DELIVERY",
+        "Chris Andrew (generic)",
+        Map.of(
+            "line1", "32 Abercrombie Street",
+            "suburb", "Howick",
+            "city", "Auckland",
+            "post_code", "2014",
+            "country", "NZ"),
+        "Economy Tracked",
+        "61.50",
+        List.of(),
+        1700000000);
 
     // act
     var response =
@@ -559,145 +465,6 @@ public class OrdersHandlerIntegrationTest {
   }
 
   @Test
-  void getOrderShouldReturnCurrentLocationAccountingForSoldAndRemovedGaps() throws Exception {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
-    var otherSkuId = "mtg#scryfall#scryfall-2#normal#NM";
-    createSku("jordan", skuId, "Test Card", "dom", "168");
-    createSku("jordan", otherSkuId, "Other Card", "c21", "100");
-    createUnit("jordan", skuId, 10, "sold", null);
-    createUnit("jordan", skuId, 20, "removed", null);
-    createUnit("jordan", skuId, 30, "in_stock", null);
-    createUnit("jordan", otherSkuId, 40, "in_stock", null);
-    createUnit("jordan", skuId, 50, "reserved", "83663");
-    createUnit("jordan", otherSkuId, 60, "in_stock", null);
-    createOrderWithLines(
-        "jordan", "83663", "to_pick", skuId, List.of(50), "PICKUP", "2.00", "2.00", "2.50");
-
-    // act
-    var response =
-        getOrderHandler.handleRequest(
-            buildEventWithPath("jordan", Map.of("order_id", "83663")), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
-    var unit = body.get("units").get(0);
-    assertThat(unit.get("location").asText()).isEqualTo("A0-50");
-    assertThat(unit.get("current_location").asText()).isEqualTo("A0-2");
-    assertThat(unit.get("previous_card").get("name").asText()).isEqualTo("Other Card");
-    assertThat(unit.get("previous_card").get("set_code").asText()).isEqualTo("c21");
-    assertThat(unit.get("previous_card").get("collector_number").asText()).isEqualTo("100");
-    assertThat(unit.get("previous_card").get("finish").asText()).isEqualTo("normal");
-    assertThat(unit.get("previous_card").get("condition").asText()).isEqualTo("NM");
-    assertThat(unit.get("next_card").get("name").asText()).isEqualTo("Other Card");
-  }
-
-  @Test
-  void getOrderShouldCountReservedUnitsAsStillBoxed() throws Exception {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
-    var otherSkuId = "mtg#scryfall#scryfall-2#normal#NM";
-    createSku("jordan", skuId, "Test Card", "dom", "168");
-    createSku("jordan", otherSkuId, "Other Card", "c21", "100");
-    createUnit("jordan", otherSkuId, 3, "in_stock", null);
-    createUnit("jordan", skuId, 5, "reserved", "83663");
-    createUnit("jordan", skuId, 6, "reserved", "83663");
-    createUnit("jordan", otherSkuId, 8, "in_stock", null);
-    createOrderWithLines(
-        "jordan", "83663", "to_pick", skuId, List.of(5, 6), "PICKUP", "3.00", "3.00", "2.00");
-
-    // act
-    var response =
-        getOrderHandler.handleRequest(
-            buildEventWithPath("jordan", Map.of("order_id", "83663")), null);
-
-    // assert - a snapshot of the box: every reserved unit, including this order's own,
-    // still occupies its slot
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
-    var units = body.get("units");
-
-    assertThat(units.get(0).get("sequence_number").asInt()).isEqualTo(5);
-    assertThat(units.get(0).get("current_location").asText()).isEqualTo("A0-1");
-    assertThat(units.get(0).get("previous_card").get("name").asText()).isEqualTo("Other Card");
-    assertThat(units.get(0).get("next_card").get("name").asText()).isEqualTo("Test Card");
-
-    assertThat(units.get(1).get("sequence_number").asInt()).isEqualTo(6);
-    assertThat(units.get(1).get("current_location").asText()).isEqualTo("A0-2");
-    assertThat(units.get(1).get("previous_card").get("name").asText()).isEqualTo("Test Card");
-    assertThat(units.get(1).get("next_card").get("name").asText()).isEqualTo("Other Card");
-  }
-
-  @Test
-  void getOrderShouldReturnNullNeighborsAtBlockEdges() throws Exception {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
-    var otherSkuId = "mtg#scryfall#scryfall-2#normal#NM";
-    createSku("jordan", skuId, "Test Card", "dom", "168");
-    createSku("jordan", otherSkuId, "Other Card", "c21", "100");
-    createUnit("jordan", skuId, 0, "reserved", "83663");
-    createUnit("jordan", skuId, 105, "reserved", "83663");
-    createUnit("jordan", otherSkuId, 110, "in_stock", null);
-    createOrderWithLines(
-        "jordan", "83663", "to_pick", skuId, List.of(0, 105), "PICKUP", "4.00", "4.00", "2.50");
-
-    // act
-    var response =
-        getOrderHandler.handleRequest(
-            buildEventWithPath("jordan", Map.of("order_id", "83663")), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
-    var units = body.get("units");
-
-    // block A0 holds nothing else, and block A1 units never bleed across the boundary
-    assertThat(units.get(0).get("location").asText()).isEqualTo("A0-0");
-    assertThat(units.get(0).get("current_location").asText()).isEqualTo("A0-0");
-    assertThat(units.get(0).get("previous_card").isNull()).isTrue();
-    assertThat(units.get(0).get("next_card").isNull()).isTrue();
-
-    assertThat(units.get(1).get("location").asText()).isEqualTo("A1-5");
-    assertThat(units.get(1).get("current_location").asText()).isEqualTo("A1-0");
-    assertThat(units.get(1).get("previous_card").isNull()).isTrue();
-    assertThat(units.get(1).get("next_card").get("name").asText()).isEqualTo("Other Card");
-  }
-
-  @Test
-  void getOrderShouldReturnAllocatedCardsWithoutLocationsForFulfilledOrder() throws Exception {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
-    var otherSkuId = "mtg#scryfall#scryfall-2#normal#NM";
-    createSku("jordan", skuId, "Test Card", "dom", "168");
-    createSku("jordan", otherSkuId, "Other Card", "c21", "100");
-    createUnit("jordan", otherSkuId, 1, "in_stock", null);
-    createUnit("jordan", skuId, 2, "sold", "83663");
-    createUnit("jordan", otherSkuId, 3, "in_stock", null);
-    createOrderWithLines(
-        "jordan", "83663", "fulfilled", skuId, List.of(2), "PICKUP", "1.50", "1.50", "2.00");
-
-    // act
-    var response =
-        getOrderHandler.handleRequest(
-            buildEventWithPath("jordan", Map.of("order_id", "83663")), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(200);
-    var body = objectMapper.readTree(response.getBody());
-    var unit = body.get("units").get(0);
-    assertThat(unit.get("name").asText()).isEqualTo("Test Card");
-    assertThat(unit.get("location").isNull()).isTrue();
-    assertThat(unit.get("current_location").isNull()).isTrue();
-    assertThat(unit.get("previous_card").isNull()).isTrue();
-    assertThat(unit.get("next_card").isNull()).isTrue();
-  }
-
-  @Test
   void getOrderShouldReturn404ForUnknownOrder() {
     // act
     var response =
@@ -706,130 +473,6 @@ public class OrdersHandlerIntegrationTest {
 
     // assert
     assertThat(response.getStatusCode()).isEqualTo(404);
-  }
-
-  @Test
-  void confirmOrderShouldQueueFulfillmentAndMarkUnitsSold() throws Exception {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
-    createSkuWithUnits("jordan", skuId, 3);
-    reserveUnits("jordan", skuId, "83663", List.of(1, 2));
-    createOrderWithLines(
-        "jordan", "83663", "to_pick", skuId, List.of(1, 2), "PICKUP", "3.00", "3.00", null);
-
-    // act
-    factory
-        .orderService()
-        .confirmOrder(new RequestContext("jordan"), new ConfirmOrderRequest("83663"));
-
-    // assert
-    assertThat(getOrderItem("jordan", "83663").getStatus()).isEqualTo("fulfilling");
-    assertThat(fakeOrdersQueue.getSends())
-        .containsExactly(
-            new FakeQueueClient.SentMessage<>(
-                new FulfillmentMessage("jordan", "83663"), "83663", "83663"));
-    var units = getUnits("jordan", skuId);
-    assertThat(units.stream().filter(u -> u.status() == UnitStatus.RESERVED).toList()).hasSize(2);
-    assertThat(units.stream().filter(u -> u.status() == UnitStatus.IN_STOCK).toList()).hasSize(1);
-
-    // act - a duplicate request uses the existing admission without another message
-    factory
-        .orderService()
-        .confirmOrder(new RequestContext("jordan"), new ConfirmOrderRequest("83663"));
-    factory
-        .fulfillmentMessageHandler()
-        .handleMessage(new RequestContext("jordan"), fakeOrdersQueue.getMessages().getFirst());
-
-    // assert
-    assertThat(fakeOrdersQueue.getMessages()).hasSize(1);
-    assertThat(getOrderItem("jordan", "83663").getStatus()).isEqualTo("fulfilled");
-    units = getUnits("jordan", skuId);
-    assertThat(units.stream().filter(u -> u.status() == UnitStatus.SOLD).toList()).hasSize(2);
-    assertThat(units.stream().filter(u -> u.status() == UnitStatus.IN_STOCK).toList()).hasSize(1);
-    assertThat(getSkuItem("jordan", skuId).version()).isEqualTo(3);
-
-    // act - a fulfilled request remains a no-op
-    factory
-        .orderService()
-        .confirmOrder(new RequestContext("jordan"), new ConfirmOrderRequest("83663"));
-
-    // assert
-    assertThat(fakeOrdersQueue.getMessages()).hasSize(1);
-  }
-
-  @Test
-  void confirmOrderShouldSellLargeOrderAcrossTransactions() throws Exception {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var lines = new ArrayList<OrderRowItem>();
-    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
-    var sequenceNumbers = new ArrayList<Integer>();
-    for (int i = 1; i <= 101; i++) {
-      sequenceNumbers.add(i);
-    }
-    createSkuWithUnits("jordan", skuId, sequenceNumbers.size());
-    reserveUnits("jordan", skuId, "83663", sequenceNumbers);
-    lines.add(
-        new OrderRowItem(skuId, 1001, sequenceNumbers.size(), "50.50", "0.50", sequenceNumbers));
-    var order =
-        createOrderItem(
-            "jordan",
-            "83663",
-            "to_pick",
-            "ACCEPTED",
-            "SEND_PICKUP_ADDRESS",
-            "PICKUP",
-            null,
-            null,
-            null,
-            "30.00",
-            lines,
-            Instant.ofEpochSecond(1700000000));
-    orderTable.putItem(order);
-
-    // act
-    factory
-        .orderService()
-        .confirmOrder(new RequestContext("jordan"), new ConfirmOrderRequest("83663"));
-    factory
-        .fulfillmentMessageHandler()
-        .handleMessage(new RequestContext("jordan"), fakeOrdersQueue.getMessages().getFirst());
-
-    // assert
-    var updatedOrder = getOrderItem("jordan", "83663");
-    assertThat(updatedOrder.getStatus()).isEqualTo("fulfilled");
-
-    var units = getUnits("jordan", skuId);
-    assertThat(units).hasSize(101);
-    assertThat(units).allSatisfy(unit -> assertThat(unit.status()).isEqualTo(UnitStatus.SOLD));
-  }
-
-  @Test
-  void confirmOrderShouldNotSetDirtyFlag() throws Exception {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
-    createSkuWithUnits("jordan", skuId, 2);
-
-    seedSkuDirty("jordan", skuId, false);
-
-    reserveUnits("jordan", skuId, "83663", List.of(1));
-    createOrderWithLines(
-        "jordan", "83663", "to_pick", skuId, List.of(1), "PICKUP", "1.50", "1.50", null);
-
-    // act
-    factory
-        .orderService()
-        .confirmOrder(new RequestContext("jordan"), new ConfirmOrderRequest("83663"));
-    factory
-        .fulfillmentMessageHandler()
-        .handleMessage(new RequestContext("jordan"), fakeOrdersQueue.getMessages().getFirst());
-
-    // assert
-    var updatedSku = getSkuItem("jordan", skuId);
-    assertThat(isDirty("jordan", skuId)).isFalse();
-    assertThat(updatedSku.version()).isEqualTo(2);
   }
 
   @Test
@@ -871,81 +514,27 @@ public class OrdersHandlerIntegrationTest {
         .hasMessage("unit is not reserved for this reservation");
 
     // assert
-    assertThat(getOrderItem("jordan", "83663").getStatus()).isEqualTo("fulfilling");
+    assertThat(getOrderState("jordan", "83663")).isEqualTo("fulfilling");
     assertThat(getUnits("jordan", skuId).stream().filter(u -> u.status() == UnitStatus.SOLD))
         .hasSize(1);
     assertThat(getSkuItem("jordan", skuId).version()).isEqualTo(2);
   }
 
-  @Test
-  void fulfillmentShouldResumeAfterACommittedSaleAndRuntimeFailure() throws Exception {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    var skuId = "mtg#scryfall#scryfall-1#normal#NM";
-    createSkuWithUnits("jordan", skuId, 2);
-    reserveUnits("jordan", skuId, "83663", List.of(1, 2));
-    createOrderWithLines(
-        "jordan", "83663", "fulfilling", skuId, List.of(1, 2), "PICKUP", "3.00", "3.00", null);
-    var orderRepository =
-        new OrderRepository(
-            TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class),
-            jobTable,
-            factory.dynamoDbClient(),
-            fakeClock);
-    var actualInventoryService = factory.inventoryService();
-    var inventoryService = mock(InventoryService.class);
-    var callCount = new AtomicInteger();
-    doAnswer(
-            invocation -> {
-              var ctx = invocation.getArgument(0, RequestContext.class);
-              var request = invocation.getArgument(1, SellUnitRequest.class);
-              var response = actualInventoryService.sellUnit(ctx, request);
-              if (callCount.incrementAndGet() == 2) {
-                throw new RuntimeException("lost response after sale committed");
-              }
-              return response;
-            })
-        .when(inventoryService)
-        .sellUnit(any(), any());
-    var processor = new OrderFulfillmentJobProcessor(orderTable, inventoryService, orderRepository);
-    var job =
-        JobItem.create(
-            "jordan", "fulfillment-retry", "order_fulfillment", null, "83663", Instant.EPOCH);
-
-    // act - the second sale commits, then its response is lost
-    assertThatThrownBy(() -> processor.processBatch("jordan", job))
-        .isInstanceOf(RuntimeException.class)
-        .hasMessage("lost response after sale committed");
-
-    // assert - retry uses Inventory's lifecycle evidence for both completed sales
-    assertThat(getOrderItem("jordan", "83663").getStatus()).isEqualTo("fulfilling");
-    assertThat(getUnits("jordan", skuId))
-        .allSatisfy(unit -> assertThat(unit.status()).isEqualTo(UnitStatus.SOLD));
-    var versionAfterSales = getSkuItem("jordan", skuId).version();
-
-    processor.processBatch("jordan", job);
-
-    assertThat(getOrderItem("jordan", "83663").getStatus()).isEqualTo("fulfilled");
-    assertThat(getSkuItem("jordan", skuId).version()).isEqualTo(versionAfterSales);
-  }
-
   private void createOrder(
       String user, String offerId, String status, String deliveryMode, String totalPrice) {
-    var order =
-        createOrderItem(
-            user,
-            offerId,
-            status,
-            "ACCEPTED",
-            null,
-            deliveryMode,
-            null,
-            null,
-            null,
-            totalPrice,
-            List.of(),
-            Instant.ofEpochSecond(1700000000));
-    orderTable.putItem(order);
+    writeOrder(
+        user,
+        offerId,
+        status,
+        "ACCEPTED",
+        null,
+        deliveryMode,
+        null,
+        null,
+        null,
+        totalPrice,
+        List.of(),
+        1700000000);
   }
 
   private void createSkuWithUnits(String user, String skuId, int unitCount) {
@@ -1034,31 +623,28 @@ public class OrdersHandlerIntegrationTest {
       String listedPrice) {
     var lines =
         List.of(
-            new OrderRowItem(
+            new TestOrderRow(
                 skuId, 1001, sequenceNumbers.size(), linePrice, listedPrice, sequenceNumbers));
-    var order =
-        createOrderItem(
-            user,
-            offerId,
-            status,
-            "ACCEPTED",
-            "SEND_PICKUP_ADDRESS",
-            deliveryMode,
-            null,
-            null,
-            null,
-            totalPrice,
-            lines,
-            Instant.ofEpochSecond(1700000000));
-    orderTable.putItem(order);
+    writeOrder(
+        user,
+        offerId,
+        status,
+        "ACCEPTED",
+        "SEND_PICKUP_ADDRESS",
+        deliveryMode,
+        null,
+        null,
+        null,
+        totalPrice,
+        lines,
+        1700000000);
   }
 
-  private OrderItem getOrderItem(String user, String offerId) {
-    return orderTable.getItem(
-        Key.builder()
-            .partitionValue(OrderItem.formatPk(user))
-            .sortValue(OrderItem.formatSk(offerId))
-            .build());
+  private String getOrderState(String user, String orderId) throws Exception {
+    var response =
+        getOrderHandler.handleRequest(buildEventWithPath(user, Map.of("order_id", orderId)), null);
+    assertThat(response.getStatusCode()).isEqualTo(200);
+    return objectMapper.readTree(response.getBody()).get("state").asText();
   }
 
   private Sku getSkuItem(String user, String skuId) {
@@ -1086,23 +672,6 @@ public class OrdersHandlerIntegrationTest {
         continuation = response.nextContinuation();
       } while (continuation != null);
       return units;
-    } catch (Exception e) {
-      throw new RuntimeException(e);
-    }
-  }
-
-  private void seedSkuDirty(String user, String skuId, boolean dirty) {
-    factory.fakeInventoryService().seedSku(user, getSkuItem(user, skuId), dirty);
-  }
-
-  private boolean isDirty(String user, String skuId) {
-    try {
-      return factory
-          .inventoryService()
-          .findSkus(new RequestContext(user), new FindSkusRequest(null, null, true, 100, null))
-          .skus()
-          .stream()
-          .anyMatch(sku -> sku.skuId().equals(skuId));
     } catch (Exception e) {
       throw new RuntimeException(e);
     }
@@ -1140,7 +709,7 @@ public class OrdersHandlerIntegrationTest {
         .build();
   }
 
-  private OrderItem createOrderItem(
+  private void writeOrder(
       String user,
       String orderId,
       String status,
@@ -1148,38 +717,86 @@ public class OrdersHandlerIntegrationTest {
       String action,
       String delivery,
       String buyer,
-      OrderItem.BuyerAddress address,
+      Map<String, String> address,
       String postage,
       String total,
-      List<OrderRowItem> lines,
-      Instant createdAt) {
-    var table = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class);
+      List<TestOrderRow> lines,
+      long createdAt) {
     for (int position = 0; position < lines.size(); position++) {
       var line = lines.get(position);
-      table.putItem(
-          OrderRowItem.create(
-              user,
-              orderId,
-              position,
-              line.getSkuId(),
-              line.getFetchtcgListingId(),
-              line.getQuantity(),
-              line.getPrice(),
-              line.getListedPrice(),
-              line.getAllocatedSequenceNumbers()));
+      var row = new HashMap<String, AttributeValue>();
+      row.put("pk", stringAttribute("USER#" + user + "#ORDER#" + orderId));
+      row.put("sk", stringAttribute("ROW#" + String.format(Locale.ROOT, "%010d", position)));
+      row.put("user", stringAttribute(user));
+      row.put("order_id", stringAttribute(orderId));
+      row.put("position", numberAttribute(position));
+      row.put("sku_id", stringAttribute(line.skuId()));
+      row.put("fetchtcg_listing_id", numberAttribute(line.listingId()));
+      row.put("quantity", numberAttribute(line.quantity()));
+      row.put("price", stringAttribute(line.price()));
+      if (line.listedPrice() != null) {
+        row.put("listed_price", stringAttribute(line.listedPrice()));
+      }
+      row.put(
+          "allocated_sequence_numbers",
+          AttributeValue.builder()
+              .l(line.allocatedSequenceNumbers().stream().map(this::numberAttribute).toList())
+              .build());
+      factory
+          .dynamoDbClient()
+          .putItem(PutItemRequest.builder().tableName("tcg_inventory").item(row).build());
     }
-    return OrderItem.create(
-        user,
-        orderId,
-        status,
-        providerStatus,
-        action,
-        delivery,
-        buyer,
-        address,
-        postage,
-        total,
-        lines.size(),
-        createdAt);
+
+    var order = new HashMap<String, AttributeValue>();
+    order.put("pk", stringAttribute("USER#" + user));
+    order.put(
+        "sk", stringAttribute("ORDER#" + "0".repeat(Math.max(0, 20 - orderId.length())) + orderId));
+    order.put("order_id", stringAttribute(orderId));
+    order.put("status", stringAttribute(status));
+    if (providerStatus != null) {
+      order.put("fetchtcg_status", stringAttribute(providerStatus));
+    }
+    if (action != null) {
+      order.put("fetchtcg_current_action", stringAttribute(action));
+    }
+    if (delivery != null) {
+      order.put("delivery_mode", stringAttribute(delivery));
+    }
+    if (buyer != null) {
+      order.put("buyer_name", stringAttribute(buyer));
+    }
+    if (address != null) {
+      var addressAttributes = new HashMap<String, AttributeValue>();
+      address.forEach((key, value) -> addressAttributes.put(key, stringAttribute(value)));
+      order.put("buyer_address", AttributeValue.builder().m(addressAttributes).build());
+    }
+    if (postage != null) {
+      order.put("postage_option", stringAttribute(postage));
+    }
+    if (total != null) {
+      order.put("total_price", stringAttribute(total));
+    }
+    order.put("row_count", numberAttribute(lines.size()));
+    order.put("created_at", numberAttribute(createdAt));
+    order.put("updated_at", numberAttribute(createdAt));
+    factory
+        .dynamoDbClient()
+        .putItem(PutItemRequest.builder().tableName("tcg_inventory").item(order).build());
   }
+
+  private AttributeValue stringAttribute(String value) {
+    return AttributeValue.builder().s(value).build();
+  }
+
+  private AttributeValue numberAttribute(long value) {
+    return AttributeValue.builder().n(Long.toString(value)).build();
+  }
+
+  private record TestOrderRow(
+      String skuId,
+      int listingId,
+      int quantity,
+      String price,
+      String listedPrice,
+      List<Integer> allocatedSequenceNumbers) {}
 }

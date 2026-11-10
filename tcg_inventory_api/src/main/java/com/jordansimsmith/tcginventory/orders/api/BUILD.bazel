@@ -8,6 +8,7 @@ java_binary(
     visibility = [
         "//tcg_inventory_api:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/orders/api:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/orders/server:__pkg__",
     ],
     deps = [
         "//lib/http:lib",
@@ -31,6 +32,7 @@ java_binary(
     visibility = [
         "//tcg_inventory_api:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/orders/api:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/orders/server:__pkg__",
     ],
     deps = [
         "//lib/http:lib",

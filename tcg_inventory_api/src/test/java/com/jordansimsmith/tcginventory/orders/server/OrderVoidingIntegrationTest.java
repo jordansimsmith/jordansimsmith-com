@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory.orders;
+package com.jordansimsmith.tcginventory.orders.server;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -7,7 +7,6 @@ import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.RequestContext;
-import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
@@ -34,6 +33,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 
 @Testcontainers
 public class OrderVoidingIntegrationTest {
@@ -66,7 +66,10 @@ public class OrderVoidingIntegrationTest {
     fakeClock = factory.fakeClock();
     fakeFetchTcgService = factory.fakeFetchTcgService();
     fakeClock.setTime(NOW);
-    orderTable = factory.orderTable();
+    orderTable =
+        factory
+            .dynamoDbEnhancedClient()
+            .table("tcg_inventory", TableSchema.fromBean(OrderItem.class));
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeFetchTcgService.reset();
@@ -376,7 +379,10 @@ public class OrderVoidingIntegrationTest {
       String total,
       List<OrderRowItem> lines,
       Instant createdAt) {
-    var table = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class);
+    var table =
+        factory
+            .dynamoDbEnhancedClient()
+            .table("tcg_inventory", TableSchema.fromBean(OrderRowItem.class));
     for (int position = 0; position < lines.size(); position++) {
       var line = lines.get(position);
       table.putItem(

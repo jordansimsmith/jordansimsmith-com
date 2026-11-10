@@ -20,7 +20,6 @@ public class JobItem {
   public static final String JOB_TYPE = "job_type";
   public static final String STATUS = "status";
   public static final String IMPORT_ID = "import_id";
-  public static final String ORDER_ID = "order_id";
   public static final String CONTINUATION = "continuation";
   public static final String PROCESSED_COUNT = "processed_count";
   public static final String ERROR = "error";
@@ -34,7 +33,6 @@ public class JobItem {
   private String jobType;
   private String status;
   private String importId;
-  private String orderId;
   private String continuation;
   private Integer processedCount;
   private String error;
@@ -96,15 +94,6 @@ public class JobItem {
 
   public void setImportId(@Nullable String importId) {
     this.importId = importId;
-  }
-
-  @DynamoDbAttribute(ORDER_ID)
-  public String getOrderId() {
-    return orderId;
-  }
-
-  public void setOrderId(@Nullable String orderId) {
-    this.orderId = orderId;
   }
 
   @DynamoDbAttribute(CONTINUATION)
@@ -172,12 +161,7 @@ public class JobItem {
   }
 
   public static JobItem create(
-      String user,
-      String jobId,
-      String jobType,
-      @Nullable String importId,
-      @Nullable String orderId,
-      Instant createdAt) {
+      String user, String jobId, String jobType, @Nullable String importId, Instant createdAt) {
     var item = new JobItem();
     item.setPk(formatPk(user));
     item.setSk(formatSk(jobId));
@@ -185,7 +169,6 @@ public class JobItem {
     item.setJobType(jobType);
     item.setStatus("queued");
     item.setImportId(importId);
-    item.setOrderId(orderId);
     item.setCreatedAt(createdAt);
     return item;
   }

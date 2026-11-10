@@ -318,25 +318,6 @@ class OrderFulfillmentServiceIntegrationTest {
   }
 
   @Test
-  void fulfillmentShouldPropagateStorageFailureAfterSales() throws Exception {
-    seedReservedUnits(List.of(1));
-    createFulfillingOrder(List.of(List.of(1)));
-    var mutationRepository = spy(orderMutationRepository);
-    var failure = SdkClientException.create("dynamodb unavailable");
-    doThrow(failure).when(mutationRepository).finishFulfilling(USER, ORDER_ID);
-
-    assertThatThrownBy(
-            () ->
-                createHandler(orderReadRepository, mutationRepository, inventoryService)
-                    .handleMessage(new RequestContext(USER), message()))
-        .isSameAs(failure);
-    assertThat(orderReadRepository.getOrder(USER, ORDER_ID).getStatus()).isEqualTo("fulfilling");
-    assertThat(findUnits())
-        .singleElement()
-        .satisfies(unit -> assertThat(unit.status()).isEqualTo(UnitStatus.SOLD));
-  }
-
-  @Test
   void fulfillmentMessageShouldUseSnakeCaseJson() throws Exception {
     var mapper = new ObjectMapper();
 

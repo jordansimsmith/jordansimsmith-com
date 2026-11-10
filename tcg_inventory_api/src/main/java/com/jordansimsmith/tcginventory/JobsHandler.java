@@ -14,10 +14,6 @@ import com.jordansimsmith.tcginventory.imports.ImportConfirmationJobProcessor;
 import com.jordansimsmith.tcginventory.imports.ImportItem;
 import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.tcginventory.imports.ImportsRepository;
-import com.jordansimsmith.tcginventory.orders.OrderFulfillmentJobProcessor;
-import com.jordansimsmith.tcginventory.orders.OrderItem;
-import com.jordansimsmith.tcginventory.orders.OrderRepository;
-import com.jordansimsmith.tcginventory.orders.OrderRowItem;
 import com.jordansimsmith.tcginventory.scans.ScanConfirmationJobProcessor;
 import com.jordansimsmith.time.Clock;
 import java.io.IOException;
@@ -36,7 +32,6 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
   private final JobProcessor appraiseJobProcessor;
   private final JobProcessor scanConfirmationJobProcessor;
   private final JobProcessor importConfirmationJobProcessor;
-  private final JobProcessor orderFulfillmentJobProcessor;
 
   public JobsHandler() {
     this(CatalogFactory.create());
@@ -56,13 +51,6 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             factory.clock(),
             factory.fetchTcgService(),
             factory.pricingService());
-    var orderTable = TcgInventoryTable.table(enhancedClient, OrderItem.class);
-    var orderRepository =
-        new OrderRepository(
-            TcgInventoryTable.table(enhancedClient, OrderRowItem.class),
-            factory.jobTable(),
-            factory.dynamoDbClient(),
-            factory.clock());
     this.scanConfirmationJobProcessor = new ScanConfirmationJobProcessor(factory);
     this.importConfirmationJobProcessor =
         new ImportConfirmationJobProcessor(
@@ -71,8 +59,6 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             TcgInventoryTable.table(enhancedClient, ImportRowItem.class),
             new ImportsRepository(factory.dynamoDbClient(), factory.jobTable()),
             factory.inventoryService());
-    this.orderFulfillmentJobProcessor =
-        new OrderFulfillmentJobProcessor(orderTable, factory.inventoryService(), orderRepository);
   }
 
   @Override
@@ -176,7 +162,6 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
       case "appraise" -> appraiseJobProcessor;
       case "scan_confirmation" -> scanConfirmationJobProcessor;
       case "import_confirmation" -> importConfirmationJobProcessor;
-      case "order_fulfillment" -> orderFulfillmentJobProcessor;
       default -> throw new IllegalArgumentException("unknown job type: " + jobType);
     };
   }

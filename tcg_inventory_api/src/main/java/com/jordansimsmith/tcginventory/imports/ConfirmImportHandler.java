@@ -127,7 +127,7 @@ public class ConfirmImportHandler
 
     var now = clock.now();
     var jobItem =
-        JobItem.create(user, ulidGenerator.generate(), "import_confirmation", importId, null, now);
+        JobItem.create(user, ulidGenerator.generate(), "import_confirmation", importId, now);
     importsRepository.startConfirmation(user, importId, jobItem, now);
 
     var message = new JobMessage(user, jobItem.getJobId(), "import_confirmation");

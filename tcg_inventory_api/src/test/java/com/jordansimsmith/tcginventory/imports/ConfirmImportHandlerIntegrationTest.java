@@ -168,7 +168,7 @@ public class ConfirmImportHandlerIntegrationTest {
     createKeepRow("jordan", "import1", 1, "scryfall-1", "normal", "NM", "Card A");
     jobTable.putItem(
         JobItem.create(
-            "jordan", "publish-job", "publish", null, null, Instant.ofEpochSecond(1700000000)));
+            "jordan", "publish-job", "publish", null, Instant.ofEpochSecond(1700000000)));
 
     // act
     var response =
@@ -218,7 +218,7 @@ public class ConfirmImportHandlerIntegrationTest {
     importTable.putItem(importItem);
     jobTable.putItem(
         JobItem.create(
-            "jordan", "publish-job", "publish", null, null, Instant.ofEpochSecond(1700000000)));
+            "jordan", "publish-job", "publish", null, Instant.ofEpochSecond(1700000000)));
 
     // act
     var response =
@@ -239,7 +239,7 @@ public class ConfirmImportHandlerIntegrationTest {
     importTable.putItem(importItem);
     jobTable.putItem(
         JobItem.create(
-            "jordan", "publish-job", "publish", null, null, Instant.ofEpochSecond(1700000000)));
+            "jordan", "publish-job", "publish", null, Instant.ofEpochSecond(1700000000)));
 
     var jobCount = jobTable.scan().items().stream().count();
 
@@ -460,7 +460,6 @@ public class ConfirmImportHandlerIntegrationTest {
             "confirm-job",
             "import_confirmation",
             "import1",
-            null,
             Instant.ofEpochSecond(1700000000)));
     var body =
         objectMapper.readTree(
@@ -545,7 +544,6 @@ public class ConfirmImportHandlerIntegrationTest {
             "confirm-job",
             "import_confirmation",
             "import1",
-            null,
             Instant.ofEpochSecond(1700000000)));
 
     // assert
@@ -610,7 +608,6 @@ public class ConfirmImportHandlerIntegrationTest {
             "confirm-job",
             "import_confirmation",
             "import1",
-            null,
             Instant.ofEpochSecond(1700000000));
     jobTable.putItem(jobItem);
 

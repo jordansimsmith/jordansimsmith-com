@@ -116,8 +116,7 @@ public class PricingConfigurationHandlerIntegrationTest {
   @Test
   void updatePricingShouldAllowWritesWhileJobIsActivePendingJobsIntegration() throws Exception {
     // arrange
-    var job =
-        JobItem.create("jordan", "job1", "publish", null, null, Instant.ofEpochSecond(1700000000));
+    var job = JobItem.create("jordan", "job1", "publish", null, Instant.ofEpochSecond(1700000000));
     job.setStatus("running");
     factory.jobTable().putItem(job);
 

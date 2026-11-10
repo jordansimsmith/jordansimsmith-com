@@ -1,4 +1,4 @@
-package com.jordansimsmith.tcginventory.orders;
+package com.jordansimsmith.tcginventory.orders.server;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -7,7 +7,6 @@ import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.RequestContext;
-import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
 import com.jordansimsmith.tcginventory.fetchtcg.client.Offer;
@@ -35,6 +34,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 import software.amazon.awssdk.enhanced.dynamodb.DynamoDbTable;
 import software.amazon.awssdk.enhanced.dynamodb.Key;
+import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryConditional;
 import software.amazon.awssdk.enhanced.dynamodb.model.QueryEnhancedRequest;
 
@@ -69,7 +69,10 @@ public class OrderReservationIntegrationTest {
     fakeClock = factory.fakeClock();
     fakeFetchTcgService = factory.fakeFetchTcgService();
     fakeClock.setTime(NOW);
-    orderTable = factory.orderTable();
+    orderTable =
+        factory
+            .dynamoDbEnhancedClient()
+            .table("tcg_inventory", TableSchema.fromBean(OrderItem.class));
 
     DynamoDbUtils.reset(factory.dynamoDbClient());
     fakeFetchTcgService.reset();
@@ -135,14 +138,15 @@ public class OrderReservationIntegrationTest {
     // arrange
     createSku();
     createUnit(1, "in_stock", null);
+    createUnit(2, "in_stock", null);
     var offers = new ArrayList<Offer>();
     for (int i = 0; i < 99; i++) {
       offers.add(
           new Offer(
               90000 + i, "COMPLETED", null, null, "PICKUP", null, null, null, null, List.of()));
     }
-    offers.add(offer(83663, null, List.of(offerItem(LISTING_ID, 1, "1.00", "2.00"))));
-    offers.add(offer(83664, null, List.of(offerItem(LISTING_ID, 1, "1.00", "2.00"))));
+    offers.add(offer(83663, null, List.of(offerItem(LISTING_ID, 2, "1.00", "2.00"))));
+    offers.add(offer(83664, null, List.of(offerItem(LISTING_ID, 2, "1.00", "2.00"))));
     factory.fakeFetchTcgService().seedOffers(USER, offers);
 
     // act & assert
@@ -151,7 +155,12 @@ public class OrderReservationIntegrationTest {
         .isInstanceOf(ConflictException.class)
         .hasMessage("No in-stock units are available for this SKU");
     assertThat(getOrders()).hasSize(2);
-    assertThat(getUnit(1).status()).isEqualTo(UnitStatus.RESERVED);
+    assertThat(getOrder("83663").getStatus()).isEqualTo("awaiting_payment");
+    assertThat(findOrderRows(getOrder("83663")).getFirst().getAllocatedSequenceNumbers())
+        .containsExactly(1, 2);
+    assertThat(List.of(getUnit(1), getUnit(2)))
+        .extracting(Unit::status)
+        .containsOnly(UnitStatus.RESERVED);
   }
 
   @Test
@@ -188,31 +197,6 @@ public class OrderReservationIntegrationTest {
     // assert
     assertThat(getOrders()).isEmpty();
     assertThat(getUnit(1).status()).isEqualTo(UnitStatus.IN_STOCK);
-  }
-
-  @Test
-  void processShouldPreserveReservationsWhenLaterOrderHasInsufficientStock() throws Exception {
-    // arrange
-    createSku();
-    createUnit(1, "in_stock", null);
-    createUnit(2, "in_stock", null);
-    factory
-        .fakeFetchTcgService()
-        .seedOffers(
-            USER,
-            List.of(
-                offer(83663, null, List.of(offerItem(LISTING_ID, 2, "2.00", "2.00"))),
-                offer(83664, null, List.of(offerItem(LISTING_ID, 2, "2.00", "2.00")))));
-
-    // act
-    assertThatThrownBy(this::updateOrders)
-        .isInstanceOf(ConflictException.class)
-        .hasMessage("No in-stock units are available for this SKU");
-
-    // assert
-    assertThat(getOrders()).hasSize(2);
-    assertThat(getUnit(1).status()).isEqualTo(UnitStatus.RESERVED);
-    assertThat(getUnit(2).status()).isEqualTo(UnitStatus.RESERVED);
   }
 
   @Test
@@ -529,7 +513,10 @@ public class OrderReservationIntegrationTest {
       String total,
       List<OrderRowItem> lines,
       Instant createdAt) {
-    var table = TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class);
+    var table =
+        factory
+            .dynamoDbEnhancedClient()
+            .table("tcg_inventory", TableSchema.fromBean(OrderRowItem.class));
     for (int position = 0; position < lines.size(); position++) {
       var line = lines.get(position);
       table.putItem(
@@ -560,7 +547,9 @@ public class OrderReservationIntegrationTest {
   }
 
   private List<OrderRowItem> findOrderRows(OrderItem order) {
-    return TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class)
+    return factory
+        .dynamoDbEnhancedClient()
+        .table("tcg_inventory", TableSchema.fromBean(OrderRowItem.class))
         .query(
             request ->
                 request

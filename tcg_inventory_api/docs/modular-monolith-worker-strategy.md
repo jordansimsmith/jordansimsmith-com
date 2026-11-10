@@ -2,7 +2,7 @@
 
 This document extends the [modular monolith engineering strategy](modular-monolith-strategy.md) with the ownership, execution, and recovery rules for background work. Each vertical may have synchronous service operations and asynchronous processing. Both belong to the same domain owner.
 
-This is the target architecture. The [service README](../README.md) describes current behavior, including the legacy shared job records, dispatcher, active-job checks, and error classification. Documentation changes do not change that runtime behavior. Migrate those paths incrementally rather than introducing a generic Jobs vertical.
+The [service README](../README.md) describes the runtime currently implemented. Orders, Pricing, Reports, and Publish own their worker records or lifecycle, messages, and queue adapters. Imports and Scans still use the shared Jobs records and dispatcher. This document describes the target architecture and migration rules; it does not change those remaining shared workflows. Do not introduce a generic Jobs vertical.
 
 ## Ownership and public contracts
 
@@ -139,7 +139,7 @@ For each workflow:
 
 1. Identify the owner, authoritative lifecycle/progress, current callers, and recovery identity. Define only the business service contracts callers need.
 2. Move processing and internal messages into `server`, and its thin queue adapter into `worker`. Establish the owning queue/DLQ and appropriate FIFO group while keeping runtime wiring explicit.
-3. Route cross-vertical requests through clients. Replace shared job writes and global active-job checks with owner-local state and required lifecycle restrictions. Establish Publish admission before removing its existing guard.
+3. Route cross-vertical requests through clients. Replace shared job writes and global active-job checks with owner-local state and required lifecycle restrictions. Add owner-local admission before removing any guard that protects the workflow being migrated.
 4. Preserve forward recovery, stable dependency-operation IDs, and checkpoint behavior. Apply the default failure-to-SQS policy; document any concrete business-failure handling that needs different semantics.
 5. Remove the migrated path's shared dispatcher, job-model, and foreign implementation dependencies after their final callers move. Update the service README to describe the behavior actually implemented, including manual recovery gaps.
 

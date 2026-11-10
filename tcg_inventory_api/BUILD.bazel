@@ -232,23 +232,6 @@ java_library(
     ] + COMMON_DEPS,
 )
 
-java_library(
-    name = "order-lib",
-    srcs = glob(
-        ["src/main/java/com/jordansimsmith/tcginventory/orders/*.java"],
-        exclude = ["src/main/java/com/jordansimsmith/tcginventory/orders/*Handler.java"],
-    ),
-    deps = [
-        ":lib",
-        "//lib/service",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/games/client",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/listings/client",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/client",
-    ] + COMMON_DEPS,
-)
-
 java_binary(
     name = "get-catalog-card-handler",
     srcs = ["src/main/java/com/jordansimsmith/tcginventory/catalog/GetCatalogCardHandler.java"],
@@ -644,7 +627,6 @@ java_binary(
         ":catalog-lib",
         ":import-lib",
         ":lib",
-        ":order-lib",
         ":scan-lib",
         "//lib/queue:lib",
         "//lib/service",
@@ -802,7 +784,6 @@ java_library(
         ":catalog-lib",
         ":import-lib",
         ":lib",
-        ":order-lib",
         ":scan-lib",
         "//lib/dynamodb:test-lib",
         "//lib/http:lib",
@@ -866,7 +847,6 @@ java_test_suite(
         ":get-catalog-card-handler",
         ":import-lib",
         ":lib",
-        ":order-lib",
         ":scan-lib",
         ":test-lib",
         "//lib/http:lib",
@@ -954,7 +934,6 @@ java_test_suite(
         ":import-lib",
         ":jobs-handler",
         ":lib",
-        ":order-lib",
         ":scan-lib",
         ":test-lib",
         ":update-import-row-handler",
@@ -972,13 +951,6 @@ java_test_suite(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/listings/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/listings/server",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:confirm-order-handler",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:find-orders-handler",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:get-order-handler",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:get-order-settings-handler",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/api:update-order-settings-handler",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/client",
-        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/server",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:create-repricing-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/api:get-pricing-handler",
@@ -1095,7 +1067,6 @@ java_test_suite(
         ":catalog-lib",
         ":import-lib",
         ":lib",
-        ":order-lib",
         ":scan-lib",
         ":test-lib",
         "//lib/http:test-lib",
