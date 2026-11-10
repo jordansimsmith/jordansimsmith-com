@@ -72,6 +72,24 @@ public class OrderReadRepository {
     return rows;
   }
 
+  public List<OrderItem> findAllOrders(String user) {
+    var orders = new ArrayList<OrderItem>();
+    var pages =
+        orderTable.query(
+            QueryEnhancedRequest.builder()
+                .queryConditional(
+                    QueryConditional.sortBeginsWith(
+                        Key.builder()
+                            .partitionValue(OrderItem.formatPk(user))
+                            .sortValue(OrderItem.ORDER_PREFIX)
+                            .build()))
+                .consistentRead(true)
+                .scanIndexForward(true)
+                .build());
+    pages.forEach(page -> orders.addAll(page.items()));
+    return orders;
+  }
+
   @Nullable
   public OrderItem getOrder(String user, String orderId) {
     return orderTable.getItem(

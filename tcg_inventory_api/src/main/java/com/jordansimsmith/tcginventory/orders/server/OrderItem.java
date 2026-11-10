@@ -2,6 +2,7 @@ package com.jordansimsmith.tcginventory.orders.server;
 
 import com.jordansimsmith.dynamodb.EpochSecondConverter;
 import java.time.Instant;
+import java.util.Objects;
 import javax.annotation.Nullable;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbAttribute;
 import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbBean;
@@ -11,30 +12,38 @@ import software.amazon.awssdk.enhanced.dynamodb.mapper.annotations.DynamoDbSortK
 
 @DynamoDbBean
 public class OrderItem {
-  public static final String ORDER_PREFIX = "ORDER#";
+  public static final String DELIMITER = "#";
+  public static final String USER_PREFIX = "USER" + DELIMITER;
+  public static final String ORDER_PREFIX = "ORDER" + DELIMITER;
   public static final String PK = "pk";
   public static final String SK = "sk";
   public static final String ORDER_ID = "order_id";
   public static final String STATUS = "status";
+  public static final String FETCHTCG_STATUS = "fetchtcg_status";
+  public static final String FETCHTCG_CURRENT_ACTION = "fetchtcg_current_action";
   public static final String DELIVERY_MODE = "delivery_mode";
-  public static final String TOTAL_PRICE = "total_price";
-  public static final String ROW_COUNT = "row_count";
-  public static final String CREATED_AT = "created_at";
   public static final String BUYER_NAME = "buyer_name";
   public static final String BUYER_ADDRESS = "buyer_address";
   public static final String POSTAGE_OPTION = "postage_option";
+  public static final String TOTAL_PRICE = "total_price";
+  public static final String ROW_COUNT = "row_count";
+  public static final String CREATED_AT = "created_at";
+  public static final String UPDATED_AT = "updated_at";
 
   private String pk;
   private String sk;
   private String orderId;
   private String status;
+  private String fetchtcgStatus;
+  private String fetchtcgCurrentAction;
   private String deliveryMode;
-  private String totalPrice;
-  private Integer rowCount;
-  private Instant createdAt;
   private String buyerName;
   private BuyerAddress buyerAddress;
   private String postageOption;
+  private String totalPrice;
+  private Integer rowCount;
+  private Instant createdAt;
+  private Instant updatedAt;
 
   @DynamoDbPartitionKey
   @DynamoDbAttribute(PK)
@@ -42,8 +51,8 @@ public class OrderItem {
     return pk;
   }
 
-  public void setPk(String value) {
-    pk = value;
+  public void setPk(String pk) {
+    this.pk = pk;
   }
 
   @DynamoDbSortKey
@@ -52,8 +61,8 @@ public class OrderItem {
     return sk;
   }
 
-  public void setSk(String value) {
-    sk = value;
+  public void setSk(String sk) {
+    this.sk = sk;
   }
 
   @DynamoDbAttribute(ORDER_ID)
@@ -61,8 +70,8 @@ public class OrderItem {
     return orderId;
   }
 
-  public void setOrderId(String value) {
-    orderId = value;
+  public void setOrderId(@Nullable String orderId) {
+    this.orderId = orderId;
   }
 
   @DynamoDbAttribute(STATUS)
@@ -70,8 +79,28 @@ public class OrderItem {
     return status;
   }
 
-  public void setStatus(String value) {
-    status = value;
+  public void setStatus(@Nullable String status) {
+    this.status = status;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(FETCHTCG_STATUS)
+  public String getFetchtcgStatus() {
+    return fetchtcgStatus;
+  }
+
+  public void setFetchtcgStatus(@Nullable String fetchtcgStatus) {
+    this.fetchtcgStatus = fetchtcgStatus;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(FETCHTCG_CURRENT_ACTION)
+  public String getFetchtcgCurrentAction() {
+    return fetchtcgCurrentAction;
+  }
+
+  public void setFetchtcgCurrentAction(@Nullable String fetchtcgCurrentAction) {
+    this.fetchtcgCurrentAction = fetchtcgCurrentAction;
   }
 
   @Nullable
@@ -80,8 +109,38 @@ public class OrderItem {
     return deliveryMode;
   }
 
-  public void setDeliveryMode(@Nullable String value) {
-    deliveryMode = value;
+  public void setDeliveryMode(@Nullable String deliveryMode) {
+    this.deliveryMode = deliveryMode;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(BUYER_NAME)
+  public String getBuyerName() {
+    return buyerName;
+  }
+
+  public void setBuyerName(@Nullable String buyerName) {
+    this.buyerName = buyerName;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(BUYER_ADDRESS)
+  public BuyerAddress getBuyerAddress() {
+    return buyerAddress;
+  }
+
+  public void setBuyerAddress(@Nullable BuyerAddress buyerAddress) {
+    this.buyerAddress = buyerAddress;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(POSTAGE_OPTION)
+  public String getPostageOption() {
+    return postageOption;
+  }
+
+  public void setPostageOption(@Nullable String postageOption) {
+    this.postageOption = postageOption;
   }
 
   @Nullable
@@ -90,8 +149,8 @@ public class OrderItem {
     return totalPrice;
   }
 
-  public void setTotalPrice(@Nullable String value) {
-    totalPrice = value;
+  public void setTotalPrice(@Nullable String totalPrice) {
+    this.totalPrice = totalPrice;
   }
 
   @DynamoDbAttribute(ROW_COUNT)
@@ -99,8 +158,8 @@ public class OrderItem {
     return rowCount;
   }
 
-  public void setRowCount(Integer value) {
-    rowCount = value;
+  public void setRowCount(Integer rowCount) {
+    this.rowCount = rowCount;
   }
 
   @Nullable
@@ -110,38 +169,58 @@ public class OrderItem {
     return createdAt;
   }
 
-  public void setCreatedAt(@Nullable Instant value) {
-    createdAt = value;
+  public void setCreatedAt(@Nullable Instant createdAt) {
+    this.createdAt = createdAt;
   }
 
   @Nullable
-  @DynamoDbAttribute(BUYER_NAME)
-  public String getBuyerName() {
-    return buyerName;
+  @DynamoDbConvertedBy(EpochSecondConverter.class)
+  @DynamoDbAttribute(UPDATED_AT)
+  public Instant getUpdatedAt() {
+    return updatedAt;
   }
 
-  public void setBuyerName(@Nullable String value) {
-    buyerName = value;
+  public void setUpdatedAt(@Nullable Instant updatedAt) {
+    this.updatedAt = updatedAt;
   }
 
-  @Nullable
-  @DynamoDbAttribute(BUYER_ADDRESS)
-  public BuyerAddress getBuyerAddress() {
-    return buyerAddress;
+  public static String formatPk(String user) {
+    return USER_PREFIX + user;
   }
 
-  public void setBuyerAddress(@Nullable BuyerAddress value) {
-    buyerAddress = value;
+  public static String formatSk(String orderId) {
+    return ORDER_PREFIX + "0".repeat(Math.max(0, 20 - orderId.length())) + orderId;
   }
 
-  @Nullable
-  @DynamoDbAttribute(POSTAGE_OPTION)
-  public String getPostageOption() {
-    return postageOption;
-  }
-
-  public void setPostageOption(@Nullable String value) {
-    postageOption = value;
+  public static OrderItem create(
+      String user,
+      String orderId,
+      String status,
+      @Nullable String fetchtcgStatus,
+      @Nullable String fetchtcgCurrentAction,
+      @Nullable String deliveryMode,
+      @Nullable String buyerName,
+      @Nullable BuyerAddress buyerAddress,
+      @Nullable String postageOption,
+      @Nullable String totalPrice,
+      int rowCount,
+      Instant createdAt) {
+    var item = new OrderItem();
+    item.setPk(formatPk(user));
+    item.setSk(formatSk(orderId));
+    item.setOrderId(orderId);
+    item.setStatus(status);
+    item.setFetchtcgStatus(fetchtcgStatus);
+    item.setFetchtcgCurrentAction(fetchtcgCurrentAction);
+    item.setDeliveryMode(deliveryMode);
+    item.setBuyerName(buyerName);
+    item.setBuyerAddress(buyerAddress);
+    item.setPostageOption(postageOption);
+    item.setTotalPrice(totalPrice);
+    item.setRowCount(rowCount);
+    item.setCreatedAt(createdAt);
+    item.setUpdatedAt(createdAt);
+    return item;
   }
 
   @DynamoDbBean
@@ -166,8 +245,8 @@ public class OrderItem {
       return line1;
     }
 
-    public void setLine1(@Nullable String value) {
-      line1 = value;
+    public void setLine1(@Nullable String line1) {
+      this.line1 = line1;
     }
 
     @Nullable
@@ -176,8 +255,8 @@ public class OrderItem {
       return line2;
     }
 
-    public void setLine2(@Nullable String value) {
-      line2 = value;
+    public void setLine2(@Nullable String line2) {
+      this.line2 = line2;
     }
 
     @Nullable
@@ -186,8 +265,8 @@ public class OrderItem {
       return suburb;
     }
 
-    public void setSuburb(@Nullable String value) {
-      suburb = value;
+    public void setSuburb(@Nullable String suburb) {
+      this.suburb = suburb;
     }
 
     @Nullable
@@ -196,8 +275,8 @@ public class OrderItem {
       return city;
     }
 
-    public void setCity(@Nullable String value) {
-      city = value;
+    public void setCity(@Nullable String city) {
+      this.city = city;
     }
 
     @Nullable
@@ -206,8 +285,8 @@ public class OrderItem {
       return postCode;
     }
 
-    public void setPostCode(@Nullable String value) {
-      postCode = value;
+    public void setPostCode(@Nullable String postCode) {
+      this.postCode = postCode;
     }
 
     @Nullable
@@ -216,16 +295,43 @@ public class OrderItem {
       return country;
     }
 
-    public void setCountry(@Nullable String value) {
-      country = value;
+    public void setCountry(@Nullable String country) {
+      this.country = country;
     }
-  }
 
-  public static String formatPk(String user) {
-    return "USER#" + user;
-  }
+    public static BuyerAddress create(
+        @Nullable String line1,
+        @Nullable String line2,
+        @Nullable String suburb,
+        @Nullable String city,
+        @Nullable String postCode,
+        @Nullable String country) {
+      var address = new BuyerAddress();
+      address.setLine1(line1);
+      address.setLine2(line2);
+      address.setSuburb(suburb);
+      address.setCity(city);
+      address.setPostCode(postCode);
+      address.setCountry(country);
+      return address;
+    }
 
-  public static String formatSk(String orderId) {
-    return ORDER_PREFIX + "0".repeat(Math.max(0, 20 - orderId.length())) + orderId;
+    @Override
+    public boolean equals(Object o) {
+      if (this == o) return true;
+      if (o == null || getClass() != o.getClass()) return false;
+      BuyerAddress that = (BuyerAddress) o;
+      return Objects.equals(line1, that.line1)
+          && Objects.equals(line2, that.line2)
+          && Objects.equals(suburb, that.suburb)
+          && Objects.equals(city, that.city)
+          && Objects.equals(postCode, that.postCode)
+          && Objects.equals(country, that.country);
+    }
+
+    @Override
+    public int hashCode() {
+      return Objects.hash(line1, line2, suburb, city, postCode, country);
+    }
   }
 }

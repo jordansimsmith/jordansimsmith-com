@@ -62,7 +62,6 @@ public class ConfirmOrderHandler
     this.inventoryService = factory.inventoryService();
     this.orderRepository =
         new OrderRepository(
-            this.orderTable,
             TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class),
             jobTable,
             factory.dynamoDbClient(),

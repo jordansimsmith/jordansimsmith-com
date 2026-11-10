@@ -2,7 +2,10 @@ load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 
 java_test_suite(
     name = "server-integration-tests",
-    srcs = ["OrderReadServiceIntegrationTest.java"],
+    srcs = [
+        "OrderReadServiceIntegrationTest.java",
+        "UpdateOrdersServiceIntegrationTest.java",
+    ],
     env = {
         "AWS_ACCESS_KEY_ID": "fake",
         "AWS_SECRET_ACCESS_KEY": "fake",
@@ -14,9 +17,17 @@ java_test_suite(
     deps = [
         "//lib/dynamodb:test-lib",
         "//lib/service",
+        "//lib/testcontainers:test-lib",
+        "//lib/time:test-lib",
+        "//tcg_inventory_api:test-lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/fetchtcg/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/listings/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/server",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/fetchtcg/client:test-lib",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/inventory/client:test-lib",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/listings/client:test-lib",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",

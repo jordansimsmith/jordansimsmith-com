@@ -245,10 +245,10 @@ java_library(
     ),
     deps = [
         ":lib",
-        ":order-lib",
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/listings/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/client",
     ] + COMMON_DEPS,
 )
 
@@ -877,6 +877,10 @@ java_library(
     resources = [
         "src/test/resources/logback-test.xml",
         "src/test/resources/test.properties",
+    ],
+    visibility = [
+        "//tcg_inventory_api:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/orders/server:__pkg__",
     ],
     deps = [
         ":catalog-lib",

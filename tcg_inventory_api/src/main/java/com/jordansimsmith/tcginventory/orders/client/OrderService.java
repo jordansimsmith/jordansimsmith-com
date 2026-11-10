@@ -14,4 +14,7 @@ public interface OrderService {
 
   UpdateOrderSettingsResponse updateOrderSettings(
       RequestContext ctx, UpdateOrderSettingsRequest request) throws ServiceException;
+
+  UpdateOrdersResponse updateOrders(RequestContext ctx, UpdateOrdersRequest request)
+      throws ServiceException;
 }

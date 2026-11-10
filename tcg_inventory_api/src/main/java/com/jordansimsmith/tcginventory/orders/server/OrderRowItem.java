@@ -16,6 +16,7 @@ public class OrderRowItem {
   public static final String ORDER_ID = "order_id";
   public static final String POSITION = "position";
   public static final String SKU_ID = "sku_id";
+  public static final String FETCHTCG_LISTING_ID = "fetchtcg_listing_id";
   public static final String QUANTITY = "quantity";
   public static final String PRICE = "price";
   public static final String LISTED_PRICE = "listed_price";
@@ -27,10 +28,85 @@ public class OrderRowItem {
   private String orderId;
   private Integer position;
   private String skuId;
+  private int fetchtcgListingId;
   private Integer quantity;
   private String price;
   private String listedPrice;
   private List<Integer> allocatedSequenceNumbers;
+
+  public OrderRowItem() {}
+
+  public OrderRowItem(
+      String skuId,
+      int fetchtcgListingId,
+      int quantity,
+      @Nullable String price,
+      @Nullable String listedPrice,
+      List<Integer> allocatedSequenceNumbers) {
+    this.skuId = skuId;
+    this.fetchtcgListingId = fetchtcgListingId;
+    this.quantity = quantity;
+    this.price = price;
+    this.listedPrice = listedPrice;
+    this.allocatedSequenceNumbers = allocatedSequenceNumbers;
+  }
+
+  @DynamoDbAttribute(SKU_ID)
+  public String getSkuId() {
+    return skuId;
+  }
+
+  public void setSkuId(String skuId) {
+    this.skuId = skuId;
+  }
+
+  @DynamoDbAttribute(FETCHTCG_LISTING_ID)
+  public int getFetchtcgListingId() {
+    return fetchtcgListingId;
+  }
+
+  public void setFetchtcgListingId(int fetchtcgListingId) {
+    this.fetchtcgListingId = fetchtcgListingId;
+  }
+
+  @DynamoDbAttribute(QUANTITY)
+  public int getQuantity() {
+    return quantity;
+  }
+
+  public void setQuantity(int quantity) {
+    this.quantity = quantity;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(PRICE)
+  public String getPrice() {
+    return price;
+  }
+
+  public void setPrice(@Nullable String price) {
+    this.price = price;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(LISTED_PRICE)
+  public String getListedPrice() {
+    return listedPrice;
+  }
+
+  public void setListedPrice(@Nullable String listedPrice) {
+    this.listedPrice = listedPrice;
+  }
+
+  @Nullable
+  @DynamoDbAttribute(ALLOCATED_SEQUENCE_NUMBERS)
+  public List<Integer> getAllocatedSequenceNumbers() {
+    return allocatedSequenceNumbers;
+  }
+
+  public void setAllocatedSequenceNumbers(@Nullable List<Integer> allocatedSequenceNumbers) {
+    this.allocatedSequenceNumbers = allocatedSequenceNumbers;
+  }
 
   @DynamoDbPartitionKey
   @DynamoDbAttribute(PK)
@@ -79,59 +155,30 @@ public class OrderRowItem {
     position = value;
   }
 
-  @DynamoDbAttribute(SKU_ID)
-  public String getSkuId() {
-    return skuId;
-  }
-
-  public void setSkuId(String value) {
-    skuId = value;
-  }
-
-  @DynamoDbAttribute(QUANTITY)
-  public Integer getQuantity() {
-    return quantity;
-  }
-
-  public void setQuantity(Integer value) {
-    quantity = value;
-  }
-
-  @Nullable
-  @DynamoDbAttribute(PRICE)
-  public String getPrice() {
-    return price;
-  }
-
-  public void setPrice(@Nullable String value) {
-    price = value;
-  }
-
-  @Nullable
-  @DynamoDbAttribute(LISTED_PRICE)
-  public String getListedPrice() {
-    return listedPrice;
-  }
-
-  public void setListedPrice(@Nullable String value) {
-    listedPrice = value;
-  }
-
-  @Nullable
-  @DynamoDbAttribute(ALLOCATED_SEQUENCE_NUMBERS)
-  public List<Integer> getAllocatedSequenceNumbers() {
-    return allocatedSequenceNumbers;
-  }
-
-  public void setAllocatedSequenceNumbers(@Nullable List<Integer> value) {
-    allocatedSequenceNumbers = value;
-  }
-
   public static String formatPk(String user, String orderId) {
     return "USER#" + user + "#ORDER#" + orderId;
   }
 
   public static String formatSk(int position) {
     return "ROW#" + String.format(Locale.ROOT, "%010d", position);
+  }
+
+  public static OrderRowItem create(
+      String user,
+      String orderId,
+      int position,
+      String skuId,
+      int listingId,
+      int quantity,
+      @Nullable String price,
+      @Nullable String listedPrice,
+      List<Integer> sequences) {
+    var item = new OrderRowItem(skuId, listingId, quantity, price, listedPrice, sequences);
+    item.setPk(formatPk(user, orderId));
+    item.setSk(formatSk(position));
+    item.setUser(user);
+    item.setOrderId(orderId);
+    item.setPosition(position);
+    return item;
   }
 }

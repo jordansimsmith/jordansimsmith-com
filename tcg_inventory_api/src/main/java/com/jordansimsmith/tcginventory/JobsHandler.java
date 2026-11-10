@@ -16,7 +16,6 @@ import com.jordansimsmith.tcginventory.imports.ImportRowItem;
 import com.jordansimsmith.tcginventory.imports.ImportsRepository;
 import com.jordansimsmith.tcginventory.orders.OrderFulfillmentJobProcessor;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
-import com.jordansimsmith.tcginventory.orders.OrderPhaseProcessor;
 import com.jordansimsmith.tcginventory.orders.OrderRepository;
 import com.jordansimsmith.tcginventory.orders.OrderRowItem;
 import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
@@ -65,23 +64,14 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
     var orderTable = TcgInventoryTable.table(enhancedClient, OrderItem.class);
     var orderRepository =
         new OrderRepository(
-            orderTable,
             TcgInventoryTable.table(enhancedClient, OrderRowItem.class),
             factory.jobTable(),
             publishDynamoDbClient,
             publishClock);
-    var orderPhaseProcessor =
-        new OrderPhaseProcessor(
-            orderTable,
-            factory.listingService(),
-            factory.orderService(),
-            orderRepository,
-            factory.inventoryService(),
-            publishClock,
-            factory.fetchTcgService());
     var listingPhaseProcessor =
         new ListingPhaseProcessor(factory.inventoryService(), factory.listingService());
-    this.publishJobProcessor = new PublishJobProcessor(orderPhaseProcessor, listingPhaseProcessor);
+    this.publishJobProcessor =
+        new PublishJobProcessor(factory.orderService(), listingPhaseProcessor);
     this.scanConfirmationJobProcessor = new ScanConfirmationJobProcessor(factory);
     this.importConfirmationJobProcessor =
         new ImportConfirmationJobProcessor(

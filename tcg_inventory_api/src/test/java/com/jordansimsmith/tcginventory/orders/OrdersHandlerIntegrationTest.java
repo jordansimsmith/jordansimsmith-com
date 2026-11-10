@@ -920,7 +920,6 @@ public class OrdersHandlerIntegrationTest {
         "jordan", "83663", "fulfilling", skuId, List.of(1, 2), "PICKUP", "3.00", "3.00", null);
     var orderRepository =
         new OrderRepository(
-            orderTable,
             TcgInventoryTable.table(factory.dynamoDbEnhancedClient(), OrderRowItem.class),
             jobTable,
             factory.dynamoDbClient(),

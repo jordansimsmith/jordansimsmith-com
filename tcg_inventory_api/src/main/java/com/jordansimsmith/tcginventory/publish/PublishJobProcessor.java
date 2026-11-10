@@ -1,22 +1,24 @@
 package com.jordansimsmith.tcginventory.publish;
 
+import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobProcessor;
-import com.jordansimsmith.tcginventory.orders.OrderPhaseProcessor;
+import com.jordansimsmith.tcginventory.orders.client.OrderService;
+import com.jordansimsmith.tcginventory.orders.client.UpdateOrdersRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class PublishJobProcessor implements JobProcessor {
   private static final Logger LOGGER = LoggerFactory.getLogger(PublishJobProcessor.class);
 
-  private final OrderPhaseProcessor orderPhaseProcessor;
+  private final OrderService orderService;
   private final ListingPhaseProcessor listingPhaseProcessor;
 
   public PublishJobProcessor(
-      OrderPhaseProcessor orderPhaseProcessor, ListingPhaseProcessor listingPhaseProcessor) {
-    this.orderPhaseProcessor = orderPhaseProcessor;
+      OrderService orderService, ListingPhaseProcessor listingPhaseProcessor) {
+    this.orderService = orderService;
     this.listingPhaseProcessor = listingPhaseProcessor;
   }
 
@@ -27,8 +29,6 @@ public class PublishJobProcessor implements JobProcessor {
     } catch (ServiceUnavailableException e) {
       throw new RuntimeException("FetchTCG request failed", e);
     } catch (ServiceException e) {
-      return new JobProcessor.FailureJobResult(e.getMessage());
-    } catch (OrderPhaseProcessor.ReservationPreflightException e) {
       return new JobProcessor.FailureJobResult(e.getMessage());
     }
   }
@@ -42,7 +42,7 @@ public class PublishJobProcessor implements JobProcessor {
 
     if (continuation == 0) {
       LOGGER.info("running order phase (continuation=0)");
-      orderPhaseProcessor.process(user);
+      orderService.updateOrders(new RequestContext(user), new UpdateOrdersRequest());
       LOGGER.info("order phase complete");
     } else {
       LOGGER.info("skipping order phase (continuation={})", continuation);
