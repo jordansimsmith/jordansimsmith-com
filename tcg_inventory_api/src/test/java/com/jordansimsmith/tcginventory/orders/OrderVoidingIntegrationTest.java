@@ -7,8 +7,6 @@ import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.RequestContext;
-import com.jordansimsmith.tcginventory.JobItem;
-import com.jordansimsmith.tcginventory.JobProcessor;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
@@ -24,8 +22,6 @@ import com.jordansimsmith.tcginventory.inventory.client.Unit;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.orders.client.OrderService;
 import com.jordansimsmith.tcginventory.orders.client.UpdateOrdersRequest;
-import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
-import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
 import com.jordansimsmith.time.FakeClock;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -121,13 +117,12 @@ public class OrderVoidingIntegrationTest {
     seedCancellation(ORDER_ID);
 
     // act
-    var publishJobProcessor = newPublishJobProcessor();
-    var jobItem = JobItem.create(USER, "publish-job", "publish", null, null, NOW);
-    var result = publishJobProcessor.processBatch(USER, jobItem);
+    assertThatThrownBy(
+            () -> orderService.updateOrders(new RequestContext(USER), new UpdateOrdersRequest()))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("unit is not reserved for this reservation");
 
     // assert
-    assertThat(result)
-        .isEqualTo(new JobProcessor.FailureJobResult("unit is not reserved for this reservation"));
     assertThat(getOrder(ORDER_ID).getStatus()).isEqualTo("voiding");
     assertThat(getUnit(1).status()).isEqualTo(UnitStatus.IN_STOCK);
     assertThat(getUnit(1).reservationId()).isNull();
@@ -328,12 +323,6 @@ public class OrderVoidingIntegrationTest {
               List.of()));
     }
     factory.fakeFetchTcgService().seedOffers(USER, offers);
-  }
-
-  private PublishJobProcessor newPublishJobProcessor() {
-    var listingPhaseProcessor =
-        new ListingPhaseProcessor(factory.inventoryService(), factory.listingService());
-    return new PublishJobProcessor(factory.orderService(), listingPhaseProcessor);
   }
 
   private OrderItem getOrder(String orderId) {

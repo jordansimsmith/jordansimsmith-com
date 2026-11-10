@@ -681,7 +681,7 @@ public class TcgInventoryE2ETest {
               var pollResponse = get("/publish");
               assertThat(pollResponse.statusCode()).isEqualTo(200);
               var body = objectMapper.readTree(pollResponse.body());
-              assertThat(body.get("status").asText()).isIn("succeeded", "failed");
+              assertThat(body.get("status").asText()).isEqualTo("succeeded");
             });
 
     var result = get("/publish");

@@ -18,8 +18,6 @@ import com.jordansimsmith.tcginventory.orders.OrderFulfillmentJobProcessor;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.tcginventory.orders.OrderRepository;
 import com.jordansimsmith.tcginventory.orders.OrderRowItem;
-import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
-import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
 import com.jordansimsmith.tcginventory.scans.ScanConfirmationJobProcessor;
 import com.jordansimsmith.time.Clock;
 import java.io.IOException;
@@ -36,7 +34,6 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
   private final DynamoDbTable<JobItem> jobTable;
   private final QueueClient<JobMessage> jobsQueue;
   private final JobProcessor appraiseJobProcessor;
-  private final JobProcessor publishJobProcessor;
   private final JobProcessor scanConfirmationJobProcessor;
   private final JobProcessor importConfirmationJobProcessor;
   private final JobProcessor orderFulfillmentJobProcessor;
@@ -59,19 +56,13 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
             factory.clock(),
             factory.fetchTcgService(),
             factory.pricingService());
-    var publishDynamoDbClient = factory.dynamoDbClient();
-    var publishClock = factory.clock();
     var orderTable = TcgInventoryTable.table(enhancedClient, OrderItem.class);
     var orderRepository =
         new OrderRepository(
             TcgInventoryTable.table(enhancedClient, OrderRowItem.class),
             factory.jobTable(),
-            publishDynamoDbClient,
-            publishClock);
-    var listingPhaseProcessor =
-        new ListingPhaseProcessor(factory.inventoryService(), factory.listingService());
-    this.publishJobProcessor =
-        new PublishJobProcessor(factory.orderService(), listingPhaseProcessor);
+            factory.dynamoDbClient(),
+            factory.clock());
     this.scanConfirmationJobProcessor = new ScanConfirmationJobProcessor(factory);
     this.importConfirmationJobProcessor =
         new ImportConfirmationJobProcessor(
@@ -183,7 +174,6 @@ public class JobsHandler implements RequestHandler<SQSEvent, Void> {
   private JobProcessor jobProcessor(String jobType) {
     return switch (jobType) {
       case "appraise" -> appraiseJobProcessor;
-      case "publish" -> publishJobProcessor;
       case "scan_confirmation" -> scanConfirmationJobProcessor;
       case "import_confirmation" -> importConfirmationJobProcessor;
       case "order_fulfillment" -> orderFulfillmentJobProcessor;

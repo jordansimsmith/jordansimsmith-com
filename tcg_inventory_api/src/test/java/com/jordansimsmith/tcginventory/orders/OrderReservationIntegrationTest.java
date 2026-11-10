@@ -7,8 +7,6 @@ import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.RequestContext;
-import com.jordansimsmith.tcginventory.JobItem;
-import com.jordansimsmith.tcginventory.JobProcessor;
 import com.jordansimsmith.tcginventory.TcgInventoryTable;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FakeFetchTcgService;
@@ -24,8 +22,6 @@ import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
 import com.jordansimsmith.tcginventory.listings.client.UpdateListingRequest;
 import com.jordansimsmith.tcginventory.orders.client.OrderService;
 import com.jordansimsmith.tcginventory.orders.client.UpdateOrdersRequest;
-import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
-import com.jordansimsmith.tcginventory.publish.PublishJobProcessor;
 import com.jordansimsmith.time.FakeClock;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -168,13 +164,11 @@ public class OrderReservationIntegrationTest {
         .seedOffers(USER, List.of(offer(83663, null, List.of(offerItem(999, 1, "1.00", "2.00")))));
 
     // act
-    var result = processPublish();
+    assertThatThrownBy(this::updateOrders)
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("Offer 83663 contains listing 999 with no matching inventory SKU");
 
     // assert
-    assertThat(result)
-        .isEqualTo(
-            new JobProcessor.FailureJobResult(
-                "Offer 83663 contains listing 999 with no matching inventory SKU"));
     assertThat(getOrders()).isEmpty();
     assertThat(getUnit(1).status()).isEqualTo(UnitStatus.IN_STOCK);
   }
@@ -187,12 +181,11 @@ public class OrderReservationIntegrationTest {
     factory.fakeFetchTcgService().seedOffers(USER, List.of(offer(83663, null, List.of())));
 
     // act
-    var result = processPublish();
+    assertThatThrownBy(this::updateOrders)
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("Offer 83663 has no card lines; check FetchTCG");
 
     // assert
-    assertThat(result)
-        .isEqualTo(
-            new JobProcessor.FailureJobResult("Offer 83663 has no card lines; check FetchTCG"));
     assertThat(getOrders()).isEmpty();
     assertThat(getUnit(1).status()).isEqualTo(UnitStatus.IN_STOCK);
   }
@@ -212,12 +205,11 @@ public class OrderReservationIntegrationTest {
                 offer(83664, null, List.of(offerItem(LISTING_ID, 2, "2.00", "2.00")))));
 
     // act
-    var result = processPublish();
+    assertThatThrownBy(this::updateOrders)
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("No in-stock units are available for this SKU");
 
     // assert
-    assertThat(result)
-        .isEqualTo(
-            new JobProcessor.FailureJobResult("No in-stock units are available for this SKU"));
     assertThat(getOrders()).hasSize(2);
     assertThat(getUnit(1).status()).isEqualTo(UnitStatus.RESERVED);
     assertThat(getUnit(2).status()).isEqualTo(UnitStatus.RESERVED);
@@ -374,15 +366,8 @@ public class OrderReservationIntegrationTest {
         .containsExactlyElementsOf(IntStream.range(0, 101).boxed().toList());
   }
 
-  private JobProcessor.JobResult processPublish() {
-    return newPublishJobProcessor()
-        .processBatch(USER, JobItem.create(USER, "publish-job", "publish", null, null, NOW));
-  }
-
-  private PublishJobProcessor newPublishJobProcessor() {
-    var listingPhaseProcessor =
-        new ListingPhaseProcessor(factory.inventoryService(), factory.listingService());
-    return new PublishJobProcessor(factory.orderService(), listingPhaseProcessor);
+  private void updateOrders() throws Exception {
+    orderService.updateOrders(new RequestContext(USER), new UpdateOrdersRequest());
   }
 
   private Offer offer(int orderId, String currentAction, List<OfferItem> items) {

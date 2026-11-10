@@ -181,11 +181,11 @@ module "java_api" {
       artifact = var.artifacts["delete_import_row_photo"]
     }
     create_publish = {
-      handler  = "com.jordansimsmith.tcginventory.publish.CreatePublishHandler"
+      handler  = "com.jordansimsmith.tcginventory.publish.api.CreatePublishHandler"
       artifact = var.artifacts["create_publish"]
     }
     get_publish = {
-      handler  = "com.jordansimsmith.tcginventory.publish.GetPublishHandler"
+      handler  = "com.jordansimsmith.tcginventory.publish.api.GetPublishHandler"
       artifact = var.artifacts["get_publish"]
     }
     create_report = {

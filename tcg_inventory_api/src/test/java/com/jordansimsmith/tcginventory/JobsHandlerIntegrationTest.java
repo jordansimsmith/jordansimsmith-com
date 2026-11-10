@@ -38,17 +38,15 @@ import com.jordansimsmith.tcginventory.inventory.client.ReleaseUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.Sku;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
-import com.jordansimsmith.tcginventory.listings.client.FindListingsRequest;
-import com.jordansimsmith.tcginventory.listings.client.Listing;
 import com.jordansimsmith.tcginventory.listings.client.UpdateListingRequest;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
 import com.jordansimsmith.tcginventory.orders.OrderRowItem;
+import com.jordansimsmith.tcginventory.orders.client.UpdateOrdersRequest;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceRequest;
 import com.jordansimsmith.tcginventory.pricing.client.GetPriceResponse;
 import com.jordansimsmith.tcginventory.pricing.client.GetPricingRequest;
 import com.jordansimsmith.tcginventory.pricing.client.PricingService;
 import com.jordansimsmith.tcginventory.pricing.client.UpdatePricingRequest;
-import com.jordansimsmith.tcginventory.publish.ListingPhaseProcessor;
 import com.jordansimsmith.time.FakeClock;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -810,46 +808,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishShouldCheckpointAndContinue() {
+  void updateOrdersShouldReserveUnitsForNewOffer() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    int totalSkus = ListingPhaseProcessor.BATCH_SIZE + 2;
-    createPublishJob("jordan", "job1");
-    for (int i = 1; i <= totalSkus; i++) {
-      createDirtySkuWithUnit("jordan", "mtg#scryfall#scryfall-" + i + "#normal#NM", i);
-    }
-
-    // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
-
-    // assert
-    var jobItem = getJob("jordan", "job1");
-    assertThat(jobItem.getStatus()).isEqualTo("running");
-    assertThat(jobItem.getContinuation())
-        .isEqualTo(Integer.toString(ListingPhaseProcessor.BATCH_SIZE));
-    assertThat(fakeJobsQueue.getSends()).hasSize(1);
-    var continuationSend = fakeJobsQueue.getSends().get(0);
-    assertThat(continuationSend.messageGroupId()).isEqualTo("jordan");
-    assertThat(continuationSend.messageDeduplicationId())
-        .isEqualTo("job1#" + ListingPhaseProcessor.BATCH_SIZE);
-
-    // act - second batch
-    fakeJobsQueue.reset();
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
-
-    // assert
-    var completedJob = getJob("jordan", "job1");
-    assertThat(completedJob.getStatus()).isEqualTo("succeeded");
-    assertThat(completedJob.getProcessedCount()).isEqualTo(totalSkus);
-    assertThat(completedJob.getContinuation()).isNull();
-    assertThat(fakeJobsQueue.getMessages()).isEmpty();
-  }
-
-  @Test
-  void publishOrderPhaseShouldReserveUnitsForNewOffer() {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
 
     factory
@@ -875,11 +836,9 @@ public class JobsHandlerIntegrationTest {
                             new BigDecimal("1.50"))))));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
-    var updatedJob = getJob("jordan", "job1");
-    assertThat(updatedJob.getStatus()).isEqualTo("succeeded");
 
     var order = getOrder("jordan", "83663");
     assertThat(order).isNotNull();
@@ -901,7 +860,7 @@ public class JobsHandlerIntegrationTest {
     assertThat(orderLines.get(0).getQuantity()).isEqualTo(2);
 
     var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(isDirty("jordan", sku.skuId())).isFalse();
+    assertThat(isDirty("jordan", sku.skuId())).isTrue();
 
     var units = getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM");
     var reserved = units.stream().filter(u -> u.status() == UnitStatus.RESERVED).toList();
@@ -910,10 +869,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldAdvanceToPickOnPayment() {
+  void updateOrdersShouldAdvanceToPickOnPayment() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     createExistingOrder("jordan", "83663", "awaiting_payment");
 
     factory
@@ -934,15 +892,14 @@ public class JobsHandlerIntegrationTest {
                     List.of())));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
     var order = getOrder("jordan", "83663");
     assertThat(order.getStatus()).isEqualTo("to_pick");
     assertThat(order.getFetchtcgCurrentAction()).isEqualTo("SEND_PICKUP_ADDRESS");
 
-    createPublishJob("jordan", "job2");
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job2", "publish"), null);
+    updateOrders("jordan");
 
     var replayedOrder = getOrder("jordan", "83663");
     assertThat(replayedOrder.getStatus()).isEqualTo("to_pick");
@@ -950,10 +907,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldAdvanceToPickOnTrackingCode() {
+  void updateOrdersShouldAdvanceToPickOnTrackingCode() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     createExistingOrder("jordan", "91329", "awaiting_payment");
 
     factory
@@ -974,7 +930,7 @@ public class JobsHandlerIntegrationTest {
                     List.of())));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
     var order = getOrder("jordan", "91329");
@@ -983,10 +939,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldVoidOrderCancelledBySeller() {
+  void updateOrdersShouldVoidOrderCancelledBySeller() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
     createReservedOrder(
         "jordan", "83663", "awaiting_payment", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1, 2);
@@ -996,10 +951,9 @@ public class JobsHandlerIntegrationTest {
         .seedOffers("jordan", List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
-    assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("succeeded");
 
     var order = getOrder("jordan", "83663");
     assertThat(order.getStatus()).isEqualTo("voided");
@@ -1010,16 +964,15 @@ public class JobsHandlerIntegrationTest {
     assertThat(units).allSatisfy(unit -> assertThat(unit.status()).isEqualTo(UnitStatus.IN_STOCK));
     assertThat(units).allSatisfy(unit -> assertThat(unit.reservationId()).isNull());
 
-    // the released units are dirty stock again, so the listing phase restores the full quantity
+    // Released units dirty the SKU so a later Publish run can restore its quantity.
     var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(isDirty("jordan", sku.skuId())).isFalse();
+    assertThat(isDirty("jordan", sku.skuId())).isTrue();
   }
 
   @Test
-  void publishOrderPhaseShouldVoidOrderCancelledByBuyer() {
+  void updateOrdersShouldVoidOrderCancelledByBuyer() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 2);
     createReservedOrder(
         "jordan", "83663", "awaiting_payment", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1);
@@ -1029,7 +982,7 @@ public class JobsHandlerIntegrationTest {
         .seedOffers("jordan", List.of(cancelledOffer(83663, "CANCELLED_BY_BUYER")));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
     var order = getOrder("jordan", "83663");
@@ -1041,10 +994,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldThrowForMissingOffer() {
+  void updateOrdersShouldThrowForMissingOffer() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 2);
     createReservedOrder(
         "jordan", "83663", "awaiting_payment", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1);
@@ -1052,8 +1004,7 @@ public class JobsHandlerIntegrationTest {
     factory.fakeFetchTcgService().seedOffers("jordan", List.of());
 
     // act
-    assertThatThrownBy(
-            () -> jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null))
+    assertThatThrownBy(() -> updateOrders("jordan"))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("FetchTCG offer not found for order 83663");
 
@@ -1068,10 +1019,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldNotVoidPaidOrder() {
+  void updateOrdersShouldNotVoidPaidOrder() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 2);
     createReservedOrder("jordan", "83663", "to_pick", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1);
 
@@ -1080,7 +1030,7 @@ public class JobsHandlerIntegrationTest {
         .seedOffers("jordan", List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
     var order = getOrder("jordan", "83663");
@@ -1092,10 +1042,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldNotReleaseAgainWhenOrderAlreadyVoided() {
+  void updateOrdersShouldNotReleaseAgainWhenOrderAlreadyVoided() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 2);
     createReservedOrder("jordan", "83663", "voided", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1);
     releaseUnit("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1);
@@ -1105,7 +1054,7 @@ public class JobsHandlerIntegrationTest {
         .seedOffers("jordan", List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
     var order = getOrder("jordan", "83663");
@@ -1116,10 +1065,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldResumePartiallyAppliedVoidingOrder() throws Exception {
+  void updateOrdersShouldResumePartiallyAppliedVoidingOrder() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 2);
     createReservedOrder(
         "jordan", "83663", "voiding", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1, 2);
@@ -1136,7 +1084,7 @@ public class JobsHandlerIntegrationTest {
         .seedOffers("jordan", List.of(cancelledOffer(83663, "CANCELLED_BY_SELLER")));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
     var order = getOrder("jordan", "83663");
@@ -1147,10 +1095,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldReleaseLargeOrderAcrossTransactions() {
+  void updateOrdersShouldReleaseLargeOrderAcrossTransactions() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
 
     var orderLines = new ArrayList<OrderRowItem>();
     for (int i = 1; i <= 60; i++) {
@@ -1166,10 +1113,9 @@ public class JobsHandlerIntegrationTest {
         .seedOffers("jordan", List.of(cancelledOffer(91329, "CANCELLED_BY_SELLER")));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
-    assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("succeeded");
 
     var order = getOrder("jordan", "91329");
     assertThat(order.getStatus()).isEqualTo("voided");
@@ -1183,10 +1129,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldRefreshFulfillmentDetailsOnExistingOrders() {
+  void updateOrdersShouldRefreshFulfillmentDetailsOnExistingOrders() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     createExistingOrder("jordan", "91329", "awaiting_payment");
 
     factory
@@ -1208,7 +1153,7 @@ public class JobsHandlerIntegrationTest {
                     List.of())));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
     var order = getOrder("jordan", "91329");
@@ -1221,10 +1166,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldStoreNoAddressWhenEveryPartIsBlank() {
+  void updateOrdersShouldStoreNoAddressWhenEveryPartIsBlank() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     createExistingOrder("jordan", "83663", "awaiting_payment");
 
     factory
@@ -1245,7 +1189,7 @@ public class JobsHandlerIntegrationTest {
                     List.of())));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
     var order = getOrder("jordan", "83663");
@@ -1255,7 +1199,7 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldNotRewriteUnchangedFulfillmentDetails() {
+  void updateOrdersShouldNotRewriteUnchangedFulfillmentDetails() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
     createExistingOrder("jordan", "83663", "to_pick");
@@ -1277,15 +1221,13 @@ public class JobsHandlerIntegrationTest {
                     List.of())));
 
     fakeClock.setTime(Instant.ofEpochSecond(1700005000));
-    createPublishJob("jordan", "job1");
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
     assertThat(getOrder("jordan", "83663").getUpdatedAt())
         .isEqualTo(Instant.ofEpochSecond(1700005000));
 
     // act
     fakeClock.setTime(Instant.ofEpochSecond(1700009999));
-    createPublishJob("jordan", "job2");
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job2", "publish"), null);
+    updateOrders("jordan");
 
     // assert
     var order = getOrder("jordan", "83663");
@@ -1294,10 +1236,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldNotAdvanceWhenAwaitingPayment() {
+  void updateOrdersShouldNotAdvanceWhenAwaitingPayment() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     createExistingOrder("jordan", "91101", "awaiting_payment");
 
     factory
@@ -1318,7 +1259,7 @@ public class JobsHandlerIntegrationTest {
                     List.of())));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
     var order = getOrder("jordan", "91101");
@@ -1326,10 +1267,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldBeIdempotentOnReprocessing() {
+  void updateOrdersShouldBeIdempotentOnReprocessing() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     createExistingOrder("jordan", "83663", "awaiting_payment");
 
     factory
@@ -1350,7 +1290,7 @@ public class JobsHandlerIntegrationTest {
                     List.of())));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
     var order = getOrder("jordan", "83663");
@@ -1358,10 +1298,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldFailJobForInsufficientStock() {
+  void updateOrdersShouldFailForInsufficientStock() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 1);
 
     factory
@@ -1386,12 +1325,9 @@ public class JobsHandlerIntegrationTest {
                             new BigDecimal("1.50"))))));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    assertThatThrownBy(() -> updateOrders("jordan")).isInstanceOf(ServiceException.class);
 
     // assert
-    assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("failed");
-    assertThat(getJob("jordan", "job1").getError())
-        .isEqualTo("No in-stock units are available for this SKU");
     assertThat(getOrder("jordan", "83663").getStatus()).isEqualTo("reserving");
     assertThat(getUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM"))
         .singleElement()
@@ -1400,10 +1336,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldSkipOffersBeforeCutoff() {
+  void updateOrdersShouldSkipOffersBeforeCutoff() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
     createTrackOrdersAfter("jordan", Instant.parse("2026-08-15T00:00:00Z"));
 
@@ -1429,7 +1364,7 @@ public class JobsHandlerIntegrationTest {
                             new BigDecimal("1.50"))))));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
     var order = getOrder("jordan", "83663");
@@ -1440,10 +1375,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldSkipOffersWithNullAcceptedAtWhenCutoffSet() {
+  void updateOrdersShouldSkipOffersWithNullAcceptedAtWhenCutoffSet() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
     createTrackOrdersAfter("jordan", Instant.parse("2026-08-01T00:00:00Z"));
 
@@ -1469,7 +1403,7 @@ public class JobsHandlerIntegrationTest {
                             new BigDecimal("1.50"))))));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
     var order = getOrder("jordan", "83663");
@@ -1477,10 +1411,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldCreateOrderWhenCutoffNotSet() {
+  void updateOrdersShouldCreateOrderWhenCutoffNotSet() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
 
     factory
@@ -1505,7 +1438,7 @@ public class JobsHandlerIntegrationTest {
                             new BigDecimal("1.50"))))));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
     var order = getOrder("jordan", "83663");
@@ -1514,10 +1447,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldReserveMixedMagicAndPokemonOffer() {
+  void updateOrdersShouldReserveMixedMagicAndPokemonOffer() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     var magicSkuId = "mtg#scryfall#scryfall-1#normal#NM";
     var pokemonSkuId = "pokemon#tcgplayer#283917#reverse_holofoil#NM";
     createSkuWithUnits("jordan", magicSkuId, 1001, 1);
@@ -1550,7 +1482,7 @@ public class JobsHandlerIntegrationTest {
                             new BigDecimal("12.00"))))));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
     var order = getOrder("jordan", "83663");
@@ -1576,10 +1508,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldCreateOrderAcceptedAfterCutoff() {
+  void updateOrdersShouldCreateOrderAcceptedAfterCutoff() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     createSkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 1001, 3);
     createTrackOrdersAfter("jordan", Instant.parse("2026-08-10T00:00:00Z"));
 
@@ -1605,7 +1536,7 @@ public class JobsHandlerIntegrationTest {
                             new BigDecimal("1.50"))))));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
     var order = getOrder("jordan", "83663");
@@ -1614,10 +1545,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldReserveLargeOfferWithPerUnitTransactions() {
+  void updateOrdersShouldReserveLargeOfferWithPerUnitTransactions() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
 
     var offerItems = new ArrayList<OfferItem>();
     for (int i = 1; i <= 60; i++) {
@@ -1648,11 +1578,9 @@ public class JobsHandlerIntegrationTest {
                     offerItems)));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    updateOrders("jordan");
 
     // assert
-    var jobItem = getJob("jordan", "job1");
-    assertThat(jobItem.getStatus()).isEqualTo("succeeded");
 
     var order = getOrder("jordan", "91329");
     assertThat(order).isNotNull();
@@ -1673,10 +1601,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldFailForMissingReservingOffer() {
+  void updateOrdersShouldFailForMissingReservingOffer() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     var skuId = "mtg#scryfall#scryfall-1#normal#NM";
     createSkuWithUnits("jordan", skuId, 1001, 3);
     var firstUnit = getUnits("jordan", skuId).get(0);
@@ -1697,8 +1624,7 @@ public class JobsHandlerIntegrationTest {
             Instant.ofEpochSecond(1700000000)));
 
     // act & assert
-    assertThatThrownBy(
-            () -> jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null))
+    assertThatThrownBy(() -> updateOrders("jordan"))
         .isInstanceOf(IllegalStateException.class)
         .hasMessage("FetchTCG offer not found for order 83663");
     var order = getOrder("jordan", "83663");
@@ -1710,10 +1636,9 @@ public class JobsHandlerIntegrationTest {
   }
 
   @Test
-  void publishOrderPhaseShouldFailWhenPartialReservationHasNoAvailableStock() {
+  void updateOrdersShouldFailWhenPartialReservationHasNoAvailableStock() throws Exception {
     // arrange
     fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
     var skuId = "mtg#scryfall#scryfall-1#normal#NM";
     createSkuWithUnits("jordan", skuId, 1001, 1);
     var unit = getUnits("jordan", skuId).get(0);
@@ -1742,72 +1667,14 @@ public class JobsHandlerIntegrationTest {
                     83663, "ACCEPTED", null, null, "PICKUP", null, null, null, null, List.of())));
 
     // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
+    assertThatThrownBy(() -> updateOrders("jordan")).isInstanceOf(ServiceException.class);
 
     // assert
-    assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("failed");
     assertThat(getOrder("jordan", "83663").getStatus()).isEqualTo("reserving");
   }
 
-  @Test
-  void publishPhaseShouldCreateListingForDirtySku() throws Exception {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
-    createDirtySkuWithUnits("jordan", "mtg#scryfall#scryfall-1#normal#NM", 2, "1.50");
-
-    // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
-
-    // assert
-    var sku = getSku("jordan", "mtg#scryfall#scryfall-1#normal#NM");
-    assertThat(isDirty("jordan", sku.skuId())).isFalse();
-    assertThat(
-            factory
-                .listingService()
-                .findListings(
-                    new RequestContext("jordan"), new FindListingsRequest(List.of(900000)))
-                .listings())
-        .extracting(Listing::skuId)
-        .containsExactly("mtg#scryfall#scryfall-1#normal#NM");
-  }
-
-  @Test
-  void publishPhaseShouldUseStoredFetchTcgCardIdForPokemonProductSku() {
-    // arrange
-    fakeClock.setTime(Instant.ofEpochSecond(1700000000));
-    createPublishJob("jordan", "job1");
-    var skuId = "pokemon#tcgplayer#283917#reverse_holofoil#NM";
-    createInventorySku("jordan", skuId, "fetch-card-9002", "12.00", true);
-    seedUnits("jordan", skuId, List.of(inStockUnit(42)));
-
-    // act
-    jobsHandler.handleRequest(buildSqsEvent("jordan", "job1", "publish"), null);
-
-    // assert
-    assertThat(getJob("jordan", "job1").getStatus()).isEqualTo("succeeded");
-    assertThat(getSku("jordan", skuId).externalId()).isEqualTo("283917");
-    assertThat(getSku("jordan", skuId).fetchtcgCardId()).isEqualTo("fetch-card-9002");
-  }
-
-  private void createDirtySkuWithUnits(
-      String user, String skuId, int unitCount, String suggestedPrice) {
-    createInventorySku(user, skuId, "mtg_168_c_dom_normal", suggestedPrice, true);
-    seedUnits(
-        user,
-        skuId,
-        IntStream.rangeClosed(1, unitCount).mapToObj(sequence -> inStockUnit(sequence)).toList());
-  }
-
-  private void createPublishJob(String user, String jobId) {
-    var jobItem =
-        JobItem.create(user, jobId, "publish", null, null, Instant.ofEpochSecond(1700000000));
-    jobTable.putItem(jobItem);
-  }
-
-  private void createDirtySkuWithUnit(String user, String skuId, int sequenceNumber) {
-    createInventorySku(user, skuId, "mtg_168_c_dom_normal", "1.50", true);
-    seedUnits(user, skuId, List.of(inStockUnit(sequenceNumber)));
+  private void updateOrders(String user) throws ServiceException {
+    factory.orderService().updateOrders(new RequestContext(user), new UpdateOrdersRequest());
   }
 
   private void createSkuWithUnits(String user, String skuId, int fetchTcgListingId, int unitCount) {

@@ -263,11 +263,11 @@ lambdas = {
         "zip_file": "delete-scan-handler_deploy.jar",
     },
     "create_publish": {
-        "handler": "com.jordansimsmith.tcginventory.publish.CreatePublishHandler",
+        "handler": "com.jordansimsmith.tcginventory.publish.api.CreatePublishHandler",
         "zip_file": "create-publish-handler_deploy.jar",
     },
     "get_publish": {
-        "handler": "com.jordansimsmith.tcginventory.publish.GetPublishHandler",
+        "handler": "com.jordansimsmith.tcginventory.publish.api.GetPublishHandler",
         "zip_file": "get-publish-handler_deploy.jar",
     },
     "jobs_handler": {
