@@ -181,6 +181,40 @@ public class OrderMutationRepository {
             .build());
   }
 
+  public void startFulfilling(String user, String orderId) {
+    var now = now();
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(tableName)
+            .key(orderKey(user, orderId))
+            .updateExpression("SET #status = :fulfilling, updated_at = :now")
+            .conditionExpression("#status = :toPick")
+            .expressionAttributeNames(Map.of("#status", "status"))
+            .expressionAttributeValues(
+                Map.of(
+                    ":fulfilling", AttributeValue.fromS("fulfilling"),
+                    ":toPick", AttributeValue.fromS("to_pick"),
+                    ":now", now))
+            .build());
+  }
+
+  public void finishFulfilling(String user, String orderId) {
+    var now = now();
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(tableName)
+            .key(orderKey(user, orderId))
+            .updateExpression("SET #status = :fulfilled, updated_at = :now")
+            .conditionExpression("#status = :fulfilling")
+            .expressionAttributeNames(Map.of("#status", "status"))
+            .expressionAttributeValues(
+                Map.of(
+                    ":fulfilled", AttributeValue.fromS("fulfilled"),
+                    ":fulfilling", AttributeValue.fromS("fulfilling"),
+                    ":now", now))
+            .build());
+  }
+
   private Map<String, AttributeValue> orderKey(String user, String orderId) {
     return Map.of(
         OrderItem.PK, AttributeValue.fromS(OrderItem.formatPk(user)),

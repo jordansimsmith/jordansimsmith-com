@@ -93,9 +93,13 @@ public class OrderReadRepository {
   @Nullable
   public OrderItem getOrder(String user, String orderId) {
     return orderTable.getItem(
-        Key.builder()
-            .partitionValue(OrderItem.formatPk(user))
-            .sortValue(OrderItem.formatSk(orderId))
-            .build());
+        request ->
+            request
+                .key(
+                    Key.builder()
+                        .partitionValue(OrderItem.formatPk(user))
+                        .sortValue(OrderItem.formatSk(orderId))
+                        .build())
+                .consistentRead(true));
   }
 }

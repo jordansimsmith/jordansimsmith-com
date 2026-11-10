@@ -3,6 +3,7 @@ load("@contrib_rules_jvm//java:defs.bzl", "JUNIT5_DEPS", "java_test_suite")
 java_test_suite(
     name = "server-integration-tests",
     srcs = [
+        "OrderFulfillmentServiceIntegrationTest.java",
         "OrderReadServiceIntegrationTest.java",
         "UpdateOrdersServiceIntegrationTest.java",
     ],
@@ -36,5 +37,6 @@ java_test_suite(
         "@maven//:software_amazon_awssdk_dynamodb",
         "@maven//:software_amazon_awssdk_dynamodb_enhanced",
         "@maven//:software_amazon_awssdk_regions",
+        "@maven//:software_amazon_awssdk_sdk_core",
     ],
 )
