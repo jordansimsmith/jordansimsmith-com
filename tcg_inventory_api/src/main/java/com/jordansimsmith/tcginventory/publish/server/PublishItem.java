@@ -17,7 +17,6 @@ public class PublishItem {
   public static final String PUBLISH_ID = "publish_id";
   public static final String STATUS = "status";
   public static final String PUBLISHED_SKU_COUNT = "published_sku_count";
-  public static final String CONTINUATION = "continuation";
   public static final String STARTED_AT = "started_at";
   public static final String UPDATED_AT = "updated_at";
   public static final String FINISHED_AT = "finished_at";
@@ -28,7 +27,6 @@ public class PublishItem {
   private String publishId;
   private String status;
   private Integer publishedSkuCount;
-  private String continuation;
   private Instant startedAt;
   private Instant updatedAt;
   private Instant finishedAt;
@@ -91,16 +89,6 @@ public class PublishItem {
 
   public void setPublishedSkuCount(@Nullable Integer value) {
     publishedSkuCount = value;
-  }
-
-  @Nullable
-  @DynamoDbAttribute(CONTINUATION)
-  public String getContinuation() {
-    return continuation;
-  }
-
-  public void setContinuation(@Nullable String value) {
-    continuation = value;
   }
 
   @Nullable

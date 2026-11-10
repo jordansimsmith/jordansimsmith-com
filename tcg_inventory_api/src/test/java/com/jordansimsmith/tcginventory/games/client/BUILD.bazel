@@ -10,6 +10,7 @@ java_library(
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/inventory/server:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/listings/server:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/pricing/server:__pkg__",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/publish/server:__pkg__",
         "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/reports/server:__pkg__",
     ],
     deps = [

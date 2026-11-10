@@ -48,7 +48,7 @@ public class PublishRepository {
                 "SET #user = :user, #publish_id = :publish_id, #status = :queued, "
                     + "#published_sku_count = :zero, "
                     + "#started_at = :started_at, #updated_at = :started_at "
-                    + "REMOVE #continuation, #finished_at")
+                    + "REMOVE #finished_at")
             .expressionAttributeNames(
                 Map.of(
                     "#user", PublishItem.USER,
@@ -57,7 +57,6 @@ public class PublishRepository {
                     "#published_sku_count", PublishItem.PUBLISHED_SKU_COUNT,
                     "#started_at", PublishItem.STARTED_AT,
                     "#updated_at", PublishItem.UPDATED_AT,
-                    "#continuation", PublishItem.CONTINUATION,
                     "#finished_at", PublishItem.FINISHED_AT))
             .expressionAttributeValues(
                 Map.of(
@@ -101,7 +100,6 @@ public class PublishRepository {
       String publishId,
       int expectedPublishedSkuCount,
       int publishedSkuCount,
-      String continuation,
       Instant updatedAt) {
     if (publishedSkuCount <= expectedPublishedSkuCount) {
       throw new IllegalArgumentException("checkpoint must advance published_sku_count");
@@ -119,14 +117,12 @@ public class PublishRepository {
                 "#publish_id = :publish_id AND #status = :running "
                     + "AND #published_sku_count = :expected_published_sku_count")
             .updateExpression(
-                "SET #published_sku_count = :published_sku_count, #continuation = :continuation, "
-                    + "#updated_at = :updated_at")
+                "SET #published_sku_count = :published_sku_count, #updated_at = :updated_at")
             .expressionAttributeNames(
                 Map.of(
                     "#publish_id", PublishItem.PUBLISH_ID,
                     "#status", PublishItem.STATUS,
                     "#published_sku_count", PublishItem.PUBLISHED_SKU_COUNT,
-                    "#continuation", PublishItem.CONTINUATION,
                     "#updated_at", PublishItem.UPDATED_AT))
             .expressionAttributeValues(
                 Map.of(
@@ -136,7 +132,6 @@ public class PublishRepository {
                         AttributeValue.fromN(Integer.toString(expectedPublishedSkuCount)),
                     ":published_sku_count",
                         AttributeValue.fromN(Integer.toString(publishedSkuCount)),
-                    ":continuation", AttributeValue.fromS(continuation),
                     ":updated_at", AttributeValue.fromN(Long.toString(updatedAt.getEpochSecond()))))
             .build());
   }
@@ -164,16 +159,14 @@ public class PublishRepository {
                     + "AND #published_sku_count = :expected_published_sku_count")
             .updateExpression(
                 "SET #published_sku_count = :published_sku_count, #status = :succeeded, "
-                    + "#updated_at = :finished_at, #finished_at = :finished_at "
-                    + "REMOVE #continuation")
+                    + "#updated_at = :finished_at, #finished_at = :finished_at")
             .expressionAttributeNames(
                 Map.of(
                     "#publish_id", PublishItem.PUBLISH_ID,
                     "#status", PublishItem.STATUS,
                     "#published_sku_count", PublishItem.PUBLISHED_SKU_COUNT,
                     "#updated_at", PublishItem.UPDATED_AT,
-                    "#finished_at", PublishItem.FINISHED_AT,
-                    "#continuation", PublishItem.CONTINUATION))
+                    "#finished_at", PublishItem.FINISHED_AT))
             .expressionAttributeValues(
                 Map.of(
                     ":publish_id", AttributeValue.fromS(publishId),
