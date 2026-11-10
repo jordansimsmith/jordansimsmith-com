@@ -25,6 +25,8 @@ import com.jordansimsmith.tcginventory.photos.client.FakePhotosService;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import com.jordansimsmith.tcginventory.pricing.server.PricingModule;
 import com.jordansimsmith.tcginventory.pricing.server.RepricingMessage;
+import com.jordansimsmith.tcginventory.publish.server.PublishMessage;
+import com.jordansimsmith.tcginventory.publish.server.PublishModule;
 import com.jordansimsmith.tcginventory.reports.server.ReportsModule;
 import com.jordansimsmith.tcginventory.scans.ScanItem;
 import com.jordansimsmith.tcginventory.scans.ScanMessage;
@@ -48,7 +50,8 @@ import software.amazon.awssdk.services.sqs.SqsClient;
       OrdersModule.class,
       CatalogModule.class,
       ListingsModule.class,
-      ReportsModule.class
+      ReportsModule.class,
+      PublishModule.class
     })
 public class TcgInventoryTestModule {
   @Provides
@@ -63,6 +66,13 @@ public class TcgInventoryTestModule {
   @Named("reportsQueueName")
   String reportsQueueName() {
     return "tcg_inventory_reports.fifo";
+  }
+
+  @Provides
+  @Singleton
+  @Named("publishQueueName")
+  String publishQueueName() {
+    return "tcg_inventory_publish.fifo";
   }
 
   @Provides
@@ -169,6 +179,18 @@ public class TcgInventoryTestModule {
   @Singleton
   QueueClient<RepricingMessage> pricingQueue(FakeQueueClient<RepricingMessage> fakePricingQueue) {
     return fakePricingQueue;
+  }
+
+  @Provides
+  @Singleton
+  FakeQueueClient<PublishMessage> fakePublishQueue() {
+    return new FakeQueueClient<>();
+  }
+
+  @Provides
+  @Singleton
+  QueueClient<PublishMessage> publishQueue(FakeQueueClient<PublishMessage> fakePublishQueue) {
+    return fakePublishQueue;
   }
 
   @Provides

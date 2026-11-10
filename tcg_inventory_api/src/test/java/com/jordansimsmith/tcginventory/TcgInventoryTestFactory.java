@@ -24,6 +24,9 @@ import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import com.jordansimsmith.tcginventory.pricing.client.PricingService;
 import com.jordansimsmith.tcginventory.pricing.server.RepricingMessage;
 import com.jordansimsmith.tcginventory.pricing.server.RepricingMessageHandler;
+import com.jordansimsmith.tcginventory.publish.client.PublishService;
+import com.jordansimsmith.tcginventory.publish.server.PublishMessage;
+import com.jordansimsmith.tcginventory.publish.server.PublishMessageHandler;
 import com.jordansimsmith.tcginventory.reports.client.ReportService;
 import com.jordansimsmith.tcginventory.reports.server.ReportMessageHandler;
 import com.jordansimsmith.tcginventory.scans.ScanItem;
@@ -71,6 +74,8 @@ public interface TcgInventoryTestFactory extends CatalogFactory {
 
   FakeQueueClient<RepricingMessage> fakePricingQueue();
 
+  FakeQueueClient<PublishMessage> fakePublishQueue();
+
   FakeFetchTcgService fakeFetchTcgService();
 
   FakePhotosService fakePhotosService();
@@ -114,6 +119,10 @@ public interface TcgInventoryTestFactory extends CatalogFactory {
   ReportService reportService();
 
   ReportMessageHandler reportMessageHandler();
+
+  PublishService publishService();
+
+  PublishMessageHandler publishMessageHandler();
 
   @Component.Factory
   interface Factory {

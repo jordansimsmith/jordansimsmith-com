@@ -18,6 +18,8 @@ import com.jordansimsmith.tcginventory.orders.server.OrdersModule;
 import com.jordansimsmith.tcginventory.photos.server.PhotosModule;
 import com.jordansimsmith.tcginventory.pricing.server.PricingModule;
 import com.jordansimsmith.tcginventory.pricing.server.RepricingMessage;
+import com.jordansimsmith.tcginventory.publish.server.PublishMessage;
+import com.jordansimsmith.tcginventory.publish.server.PublishModule;
 import com.jordansimsmith.tcginventory.reports.server.ReportsModule;
 import com.jordansimsmith.time.ClockModule;
 import com.jordansimsmith.ulid.UlidModule;
@@ -50,7 +52,8 @@ import software.amazon.awssdk.services.sqs.SqsClient;
       PricingModule.class,
       PhotosModule.class,
       OrdersModule.class,
-      ReportsModule.class
+      ReportsModule.class,
+      PublishModule.class
     })
 public class TcgInventoryModule {
   static final String JOBS_QUEUE_NAME = "tcg_inventory_jobs.fifo";
@@ -58,6 +61,8 @@ public class TcgInventoryModule {
   static final String REPORTS_QUEUE_NAME = "tcg_inventory_reports.fifo";
 
   static final String PRICING_QUEUE_NAME = "tcg_inventory_pricing.fifo";
+
+  static final String PUBLISH_QUEUE_NAME = "tcg_inventory_publish.fifo";
 
   @Provides
   @Singleton
@@ -78,6 +83,13 @@ public class TcgInventoryModule {
   @Named("pricingQueueName")
   String pricingQueueName() {
     return PRICING_QUEUE_NAME;
+  }
+
+  @Provides
+  @Singleton
+  @Named("publishQueueName")
+  String publishQueueName() {
+    return PUBLISH_QUEUE_NAME;
   }
 
   @Provides
@@ -145,6 +157,13 @@ public class TcgInventoryModule {
   @Singleton
   QueueClient<RepricingMessage> pricingQueue(
       ObjectMapper objectMapper, SqsClient sqsClient, @Named("pricingQueueName") String queueName) {
+    return SqsQueueClient.create(sqsClient, objectMapper, queueName);
+  }
+
+  @Provides
+  @Singleton
+  QueueClient<PublishMessage> publishQueue(
+      ObjectMapper objectMapper, SqsClient sqsClient, @Named("publishQueueName") String queueName) {
     return SqsQueueClient.create(sqsClient, objectMapper, queueName);
   }
 }

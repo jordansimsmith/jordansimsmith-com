@@ -18,6 +18,7 @@ java_test_suite(
         "//lib/service",
         "//lib/time:lib",
         "//lib/time:test-lib",
+        "//lib/ulid:test-lib",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/listings/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/orders/client",

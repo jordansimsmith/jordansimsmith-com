@@ -18,6 +18,7 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.service.BadRequestException;
+import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.games.client.FakeGamesService;
 import com.jordansimsmith.tcginventory.inventory.client.Condition;
@@ -42,6 +43,7 @@ import com.jordansimsmith.tcginventory.publish.client.GetPublishRequest;
 import com.jordansimsmith.tcginventory.publish.client.GetPublishResponse;
 import com.jordansimsmith.tcginventory.publish.client.PublishStatus;
 import com.jordansimsmith.time.FakeClock;
+import com.jordansimsmith.ulid.FakeUlidGenerator;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
@@ -72,6 +74,7 @@ class PublishServiceIntegrationTest {
   private static DynamoDbTable<PublishItem> publishTable;
   private PublishRepository publishRepository;
   private FakeClock clock;
+  private FakeUlidGenerator ulidGenerator;
 
   @BeforeAll
   static void setUpBeforeClass() {
@@ -91,6 +94,7 @@ class PublishServiceIntegrationTest {
     publishRepository = new PublishRepository(publishTable, dynamoDbClient, TABLE_NAME);
     clock = new FakeClock();
     clock.setTime(Instant.ofEpochSecond(1_700_000_000L));
+    ulidGenerator = new FakeUlidGenerator();
   }
 
   @Test
@@ -234,6 +238,219 @@ class PublishServiceIntegrationTest {
                 + "\"started_at\":10,\"finished_at\":null,\"pending_sku_count\":2}");
     assertThat(mapper.readValue(json, GetPublishResponse.class)).isEqualTo(response);
     assertThat(mapper.readValue("{}", GetPublishRequest.class)).isEqualTo(new GetPublishRequest());
+  }
+
+  @Test
+  void createServiceShouldPersistAndDispatchOnceForAnActiveRun() throws Exception {
+    var ctx = new RequestContext(USER);
+    var queue = new FakeQueueClient<PublishMessage>();
+    var service = new CreatePublishService(publishRepository, queue, clock, ulidGenerator);
+
+    service.createPublish(ctx, new CreatePublishRequest());
+    service.createPublish(ctx, new CreatePublishRequest());
+    publishRepository.startPublish(USER, "FAKE_ULID_0000000001", clock.now());
+    service.createPublish(ctx, new CreatePublishRequest());
+
+    assertThat(publishRepository.get(USER).getPublishId()).isEqualTo("FAKE_ULID_0000000001");
+    assertThat(publishRepository.get(USER).getStartedAt()).isEqualTo(clock.now());
+    assertThat(queue.getSends())
+        .containsExactly(
+            new FakeQueueClient.SentMessage<>(
+                new PublishMessage(USER, "FAKE_ULID_0000000001"), USER, "FAKE_ULID_0000000001#0"));
+  }
+
+  @Test
+  void createServiceShouldAllowFreshRunAfterSuccess() throws Exception {
+    var ctx = new RequestContext(USER);
+    var queue = new FakeQueueClient<PublishMessage>();
+    var service = new CreatePublishService(publishRepository, queue, clock, ulidGenerator);
+
+    service.createPublish(ctx, new CreatePublishRequest());
+    publishRepository.startPublish(USER, "FAKE_ULID_0000000001", clock.now());
+    publishRepository.completePublish(USER, "FAKE_ULID_0000000001", 0, 0, clock.now());
+    service.createPublish(ctx, new CreatePublishRequest());
+
+    assertThat(publishRepository.get(USER).getPublishId()).isEqualTo("FAKE_ULID_0000000002");
+    assertThat(queue.getMessages())
+        .containsExactly(
+            new PublishMessage(USER, "FAKE_ULID_0000000001"),
+            new PublishMessage(USER, "FAKE_ULID_0000000002"));
+  }
+
+  @Test
+  void createServiceShouldNotDispatchWhenAdmissionWriteFails() throws Exception {
+    var ctx = new RequestContext(USER);
+    var repository = mock(PublishRepository.class);
+    when(repository.get(USER)).thenReturn(null);
+    var failure = ConditionalCheckFailedException.builder().message("active run").build();
+    doThrow(failure).when(repository).createPublish(eq(USER), any(), any());
+    var queue = new FakeQueueClient<PublishMessage>();
+    var service = new CreatePublishService(repository, queue, clock, ulidGenerator);
+
+    assertThatThrownBy(() -> service.createPublish(ctx, new CreatePublishRequest()))
+        .isSameAs(failure);
+
+    assertThat(queue.getSends()).isEmpty();
+  }
+
+  @Test
+  void createServiceShouldNotDispatchWhenStorageFails() throws Exception {
+    var ctx = new RequestContext(USER);
+    var repository = mock(PublishRepository.class);
+    when(repository.get(USER)).thenReturn(null);
+    var failure = DynamoDbException.builder().message("storage unavailable").build();
+    doThrow(failure).when(repository).createPublish(eq(USER), any(), any());
+    var queue = new FakeQueueClient<PublishMessage>();
+
+    assertThatThrownBy(
+            () ->
+                new CreatePublishService(repository, queue, clock, ulidGenerator)
+                    .createPublish(ctx, new CreatePublishRequest()))
+        .isSameAs(failure);
+
+    assertThat(queue.getSends()).isEmpty();
+  }
+
+  @Test
+  void createServiceShouldLeaveQueuedRunWhenQueueSendFails() throws Exception {
+    var ctx = new RequestContext(USER);
+    var queue = mockQueue();
+    var failure = new IllegalStateException("queue unavailable");
+    doThrow(failure).when(queue).send(any(), eq(USER), eq("FAKE_ULID_0000000001#0"));
+    var service = new CreatePublishService(publishRepository, queue, clock, ulidGenerator);
+
+    assertThatThrownBy(() -> service.createPublish(ctx, new CreatePublishRequest()))
+        .isSameAs(failure);
+    assertThat(publishRepository.get(USER).getStatus()).isEqualTo("queued");
+
+    service.createPublish(ctx, new CreatePublishRequest());
+
+    verify(queue).send(any(), eq(USER), eq("FAKE_ULID_0000000001#0"));
+  }
+
+  @Test
+  void getServiceShouldReturnNotFoundBeforeInventoryRead() throws Exception {
+    var inventory = mock(InventoryService.class);
+    var service = new GetPublishService(publishRepository, inventory);
+
+    assertThatThrownBy(() -> service.getPublish(new RequestContext(USER), new GetPublishRequest()))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+
+    verify(inventory, never()).findSkus(any(), any());
+  }
+
+  @Test
+  void getServiceShouldCountAllDirtyPagesAndPreserveStatusTimes() throws Exception {
+    var ctx = new RequestContext(USER);
+    var inventory = mock(InventoryService.class);
+    when(inventory.findSkus(ctx, new FindSkusRequest(null, null, true, 100, null)))
+        .thenReturn(new FindSkusResponse(List.of(), "empty-page"));
+    when(inventory.findSkus(ctx, new FindSkusRequest(null, null, true, 100, "empty-page")))
+        .thenReturn(new FindSkusResponse(List.of(sku("sku-1"), sku("sku-2")), "next"));
+    when(inventory.findSkus(ctx, new FindSkusRequest(null, null, true, 100, "next")))
+        .thenReturn(new FindSkusResponse(List.of(sku("sku-3")), null));
+    publishRepository.createPublish(USER, "publish-1", Instant.ofEpochSecond(10));
+
+    var response =
+        new GetPublishService(publishRepository, inventory)
+            .getPublish(ctx, new GetPublishRequest());
+
+    assertThat(response).isEqualTo(new GetPublishResponse(PublishStatus.QUEUED, 0, 10, null, 3));
+    verify(inventory).findSkus(ctx, new FindSkusRequest(null, null, true, 100, null));
+    verify(inventory).findSkus(ctx, new FindSkusRequest(null, null, true, 100, "empty-page"));
+    verify(inventory).findSkus(ctx, new FindSkusRequest(null, null, true, 100, "next"));
+  }
+
+  @Test
+  void getServiceShouldNotReturnPartialCountWhenLaterPageFails() throws Exception {
+    var ctx = new RequestContext(USER);
+    var inventory = mock(InventoryService.class);
+    when(inventory.findSkus(ctx, new FindSkusRequest(null, null, true, 100, null)))
+        .thenReturn(new FindSkusResponse(List.of(sku("sku-1")), "next"));
+    var failure = new BadRequestException("inventory failed");
+    when(inventory.findSkus(ctx, new FindSkusRequest(null, null, true, 100, "next")))
+        .thenThrow(failure);
+    publishRepository.createPublish(USER, "publish-1", Instant.ofEpochSecond(10));
+
+    assertThatThrownBy(
+            () ->
+                new GetPublishService(publishRepository, inventory)
+                    .getPublish(ctx, new GetPublishRequest()))
+        .isSameAs(failure);
+  }
+
+  @Test
+  void getServiceShouldScopeRunLookupToTheRequestUser() throws Exception {
+    publishRepository.createPublish(USER, "alice-run", Instant.ofEpochSecond(10));
+    var inventory = mock(InventoryService.class);
+
+    assertThatThrownBy(
+            () ->
+                new GetPublishService(publishRepository, inventory)
+                    .getPublish(new RequestContext("bob"), new GetPublishRequest()))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+
+    verify(inventory, never()).findSkus(any(), any());
+  }
+
+  @Test
+  void getServiceShouldFailVisiblyForUnknownStatus() throws Exception {
+    var inventory = mock(InventoryService.class);
+    publishRepository.createPublish(USER, "publish-1", Instant.ofEpochSecond(10));
+    dynamoDbClient.updateItem(
+        UpdateItemRequest.builder()
+            .tableName(TABLE_NAME)
+            .key(key(USER))
+            .updateExpression("SET #status = :status")
+            .expressionAttributeNames(Map.of("#status", PublishItem.STATUS))
+            .expressionAttributeValues(Map.of(":status", AttributeValue.fromS("failed")))
+            .build());
+
+    assertThatThrownBy(
+            () ->
+                new GetPublishService(publishRepository, inventory)
+                    .getPublish(new RequestContext(USER), new GetPublishRequest()))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("Publish run has an unknown status");
+
+    verify(inventory, never()).findSkus(any(), any());
+  }
+
+  @Test
+  void createProcessAndReadShouldWorkThroughClientOperations() throws Exception {
+    var ctx = new RequestContext(USER);
+    var queue = new FakeQueueClient<PublishMessage>();
+    var createService = new CreatePublishService(publishRepository, queue, clock, ulidGenerator);
+    var games = new FakeGamesService();
+    var inventory = new FakeInventoryService(games);
+    var sku = sku("mtg#scryfall#card-1#normal#NM");
+    inventory.seedSku(USER, sku, true);
+    inventory.seedUnits(
+        USER,
+        sku.skuId(),
+        List.of(new Unit(0, "A0-0", UnitStatus.IN_STOCK, List.of(), 1L, null, null)));
+    var listings = new FakeListingService(inventory);
+    var orderService = mock(OrderService.class);
+
+    createService.createPublish(ctx, new CreatePublishRequest());
+    var message = queue.getMessages().getFirst();
+    new PublishMessageHandler(publishRepository, queue, clock, orderService, inventory, listings)
+        .handleMessage(ctx, message);
+    var response =
+        new GetPublishService(publishRepository, inventory)
+            .getPublish(ctx, new GetPublishRequest());
+
+    assertThat(response)
+        .isEqualTo(
+            new GetPublishResponse(
+                PublishStatus.SUCCEEDED,
+                1,
+                clock.now().getEpochSecond(),
+                clock.now().getEpochSecond(),
+                0));
+    verify(orderService).updateOrders(ctx, new UpdateOrdersRequest());
   }
 
   @Test
