@@ -96,6 +96,10 @@ queue_configs = {
         "name": "tcg_inventory_publish.fifo",
         "visibility_timeout": 960,
     },
+    "orders": {
+        "name": "tcg_inventory_orders.fifo",
+        "visibility_timeout": 960,
+    },
 }
 
 queue_urls = {}
@@ -300,6 +304,11 @@ lambdas = {
         "environment": {
             "FETCHTCG_BASE_URL": os.environ.get("FETCHTCG_BASE_URL", ""),
         },
+    },
+    "orders_worker": {
+        "handler": "com.jordansimsmith.tcginventory.orders.worker.OrdersWorkerHandler",
+        "zip_file": "orders-worker-handler_deploy.jar",
+        "timeout": 900,
     },
     "find_skus": {
         "handler": "com.jordansimsmith.tcginventory.inventory.api.FindSkusHandler",
@@ -616,6 +625,13 @@ lambda_client.create_event_source_mapping(
 lambda_client.create_event_source_mapping(
     EventSourceArn=queue_arns["publish"],
     FunctionName="publish_worker",
+    BatchSize=1,
+    MaximumBatchingWindowInSeconds=0,
+)
+
+lambda_client.create_event_source_mapping(
+    EventSourceArn=queue_arns["orders"],
+    FunctionName="orders_worker",
     BatchSize=1,
     MaximumBatchingWindowInSeconds=0,
 )

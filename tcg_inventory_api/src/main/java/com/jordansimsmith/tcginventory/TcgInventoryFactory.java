@@ -10,6 +10,7 @@ import com.jordansimsmith.tcginventory.games.client.GamesService;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.listings.client.ListingService;
 import com.jordansimsmith.tcginventory.orders.client.OrderService;
+import com.jordansimsmith.tcginventory.orders.server.FulfillmentMessageHandler;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import com.jordansimsmith.tcginventory.pricing.client.PricingService;
 import com.jordansimsmith.tcginventory.pricing.server.RepricingMessageHandler;
@@ -66,6 +67,8 @@ public interface TcgInventoryFactory {
   ListingService listingService();
 
   OrderService orderService();
+
+  FulfillmentMessageHandler fulfillmentMessageHandler();
 
   PhotosService photosService();
 

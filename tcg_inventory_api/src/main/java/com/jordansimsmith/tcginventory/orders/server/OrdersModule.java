@@ -31,6 +31,42 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 public class OrdersModule {
   @Provides
   @Singleton
+  OrderReadRepository orderReadRepository(
+      DynamoDbEnhancedClient dynamoDbEnhancedClient,
+      @Named("tcgInventoryTableName") String tableName) {
+    DynamoDbTable<OrderItem> orderTable =
+        dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(OrderItem.class));
+    DynamoDbTable<OrderRowItem> rowTable =
+        dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(OrderRowItem.class));
+    return new OrderReadRepository(orderTable, rowTable);
+  }
+
+  @Provides
+  @Singleton
+  OrderMutationRepository orderMutationRepository(
+      DynamoDbEnhancedClient dynamoDbEnhancedClient,
+      DynamoDbClient dynamoDbClient,
+      @Named("tcgInventoryTableName") String tableName,
+      Clock clock) {
+    DynamoDbTable<OrderItem> orderTable =
+        dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(OrderItem.class));
+    DynamoDbTable<OrderRowItem> rowTable =
+        dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(OrderRowItem.class));
+    return new OrderMutationRepository(orderTable, rowTable, dynamoDbClient, tableName, clock);
+  }
+
+  @Provides
+  @Singleton
+  FulfillmentMessageHandler fulfillmentMessageHandler(
+      OrderReadRepository orderReadRepository,
+      OrderMutationRepository orderMutationRepository,
+      InventoryService inventoryService) {
+    return new FulfillmentMessageHandler(
+        orderReadRepository, orderMutationRepository, inventoryService);
+  }
+
+  @Provides
+  @Singleton
   OrderService orderService(
       DynamoDbEnhancedClient dynamoDbEnhancedClient,
       @Named("tcgInventoryTableName") String tableName,
@@ -38,20 +74,14 @@ public class OrdersModule {
       InventoryService inventoryService,
       FetchTcgService fetchTcgService,
       ListingService listingService,
-      DynamoDbClient dynamoDbClient,
+      OrderReadRepository orderReadRepository,
+      OrderMutationRepository orderMutationRepository,
       Clock clock) {
     DynamoDbTable<OrderSettingsItem> settingsTable =
         dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(OrderSettingsItem.class));
     var settingsRepository = new OrderSettingsRepository(settingsTable);
     var getOrderSettingsService = new GetOrderSettingsService(settingsRepository);
     var updateOrderSettingsService = new UpdateOrderSettingsService(settingsRepository);
-    DynamoDbTable<OrderItem> orderTable =
-        dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(OrderItem.class));
-    DynamoDbTable<OrderRowItem> rowTable =
-        dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(OrderRowItem.class));
-    var orderReadRepository = new OrderReadRepository(orderTable, rowTable);
-    var orderMutationRepository =
-        new OrderMutationRepository(orderTable, rowTable, dynamoDbClient, tableName, clock);
     var findOrdersService = new FindOrdersService(orderReadRepository, objectMapper);
     var getOrderService = new GetOrderService(orderReadRepository, inventoryService);
     var updateOrdersService =
