@@ -1,11 +1,14 @@
 package com.jordansimsmith.tcginventory.orders.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.jordansimsmith.queue.QueueClient;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 import com.jordansimsmith.tcginventory.fetchtcg.client.FetchTcgService;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.listings.client.ListingService;
+import com.jordansimsmith.tcginventory.orders.client.ConfirmOrderRequest;
+import com.jordansimsmith.tcginventory.orders.client.ConfirmOrderResponse;
 import com.jordansimsmith.tcginventory.orders.client.FindOrdersRequest;
 import com.jordansimsmith.tcginventory.orders.client.FindOrdersResponse;
 import com.jordansimsmith.tcginventory.orders.client.GetOrderRequest;
@@ -76,6 +79,7 @@ public class OrdersModule {
       ListingService listingService,
       OrderReadRepository orderReadRepository,
       OrderMutationRepository orderMutationRepository,
+      QueueClient<FulfillmentMessage> ordersQueue,
       Clock clock) {
     DynamoDbTable<OrderSettingsItem> settingsTable =
         dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(OrderSettingsItem.class));
@@ -93,7 +97,16 @@ public class OrdersModule {
             listingService,
             inventoryService,
             clock);
+    var confirmOrderService =
+        new ConfirmOrderService(
+            orderReadRepository, orderMutationRepository, inventoryService, ordersQueue);
     return new OrderService() {
+      @Override
+      public ConfirmOrderResponse confirmOrder(RequestContext ctx, ConfirmOrderRequest request)
+          throws ServiceException {
+        return confirmOrderService.confirmOrder(ctx, request);
+      }
+
       @Override
       public FindOrdersResponse findOrders(RequestContext ctx, FindOrdersRequest request)
           throws ServiceException {

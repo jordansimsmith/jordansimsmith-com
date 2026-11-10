@@ -14,6 +14,7 @@ import com.jordansimsmith.tcginventory.fetchtcg.server.FetchTcgModule;
 import com.jordansimsmith.tcginventory.games.server.GamesModule;
 import com.jordansimsmith.tcginventory.inventory.server.InventoryModule;
 import com.jordansimsmith.tcginventory.listings.server.ListingsModule;
+import com.jordansimsmith.tcginventory.orders.server.FulfillmentMessage;
 import com.jordansimsmith.tcginventory.orders.server.OrdersModule;
 import com.jordansimsmith.tcginventory.photos.server.PhotosModule;
 import com.jordansimsmith.tcginventory.pricing.server.PricingModule;
@@ -64,6 +65,8 @@ public class TcgInventoryModule {
 
   static final String PUBLISH_QUEUE_NAME = "tcg_inventory_publish.fifo";
 
+  static final String ORDERS_QUEUE_NAME = "tcg_inventory_orders.fifo";
+
   @Provides
   @Singleton
   @Named("tcgInventoryTableName")
@@ -90,6 +93,13 @@ public class TcgInventoryModule {
   @Named("publishQueueName")
   String publishQueueName() {
     return PUBLISH_QUEUE_NAME;
+  }
+
+  @Provides
+  @Singleton
+  @Named("ordersQueueName")
+  String ordersQueueName() {
+    return ORDERS_QUEUE_NAME;
   }
 
   @Provides
@@ -164,6 +174,13 @@ public class TcgInventoryModule {
   @Singleton
   QueueClient<PublishMessage> publishQueue(
       ObjectMapper objectMapper, SqsClient sqsClient, @Named("publishQueueName") String queueName) {
+    return SqsQueueClient.create(sqsClient, objectMapper, queueName);
+  }
+
+  @Provides
+  @Singleton
+  QueueClient<FulfillmentMessage> ordersQueue(
+      ObjectMapper objectMapper, SqsClient sqsClient, @Named("ordersQueueName") String queueName) {
     return SqsQueueClient.create(sqsClient, objectMapper, queueName);
   }
 }

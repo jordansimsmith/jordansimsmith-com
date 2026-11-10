@@ -17,6 +17,8 @@ java_test_suite(
     runtime_deps = JUNIT5_DEPS,
     deps = [
         "//lib/dynamodb:test-lib",
+        "//lib/queue:lib",
+        "//lib/queue:test-lib",
         "//lib/service",
         "//lib/testcontainers:test-lib",
         "//lib/time:test-lib",

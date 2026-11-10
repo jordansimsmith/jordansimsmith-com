@@ -4,6 +4,9 @@ import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
 
 public interface OrderService {
+  ConfirmOrderResponse confirmOrder(RequestContext ctx, ConfirmOrderRequest request)
+      throws ServiceException;
+
   FindOrdersResponse findOrders(RequestContext ctx, FindOrdersRequest request)
       throws ServiceException;
 

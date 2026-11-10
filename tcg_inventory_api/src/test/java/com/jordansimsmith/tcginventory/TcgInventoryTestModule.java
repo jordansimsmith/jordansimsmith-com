@@ -20,6 +20,7 @@ import com.jordansimsmith.tcginventory.inventory.client.FakeInventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.listings.server.ListingsModule;
 import com.jordansimsmith.tcginventory.orders.OrderItem;
+import com.jordansimsmith.tcginventory.orders.server.FulfillmentMessage;
 import com.jordansimsmith.tcginventory.orders.server.OrdersModule;
 import com.jordansimsmith.tcginventory.photos.client.FakePhotosService;
 import com.jordansimsmith.tcginventory.photos.client.PhotosService;
@@ -191,6 +192,18 @@ public class TcgInventoryTestModule {
   @Singleton
   QueueClient<PublishMessage> publishQueue(FakeQueueClient<PublishMessage> fakePublishQueue) {
     return fakePublishQueue;
+  }
+
+  @Provides
+  @Singleton
+  FakeQueueClient<FulfillmentMessage> fakeOrdersQueue() {
+    return new FakeQueueClient<>();
+  }
+
+  @Provides
+  @Singleton
+  QueueClient<FulfillmentMessage> ordersQueue(FakeQueueClient<FulfillmentMessage> fakeOrdersQueue) {
+    return fakeOrdersQueue;
   }
 
   @Provides

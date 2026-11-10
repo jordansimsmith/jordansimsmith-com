@@ -15,6 +15,10 @@ import static org.mockito.Mockito.when;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.dynamodb.DynamoDbContainer;
 import com.jordansimsmith.dynamodb.DynamoDbUtils;
+import com.jordansimsmith.queue.FakeQueueClient;
+import com.jordansimsmith.service.BadRequestException;
+import com.jordansimsmith.service.ConflictException;
+import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceUnavailableException;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
@@ -22,15 +26,20 @@ import com.jordansimsmith.tcginventory.inventory.client.Condition;
 import com.jordansimsmith.tcginventory.inventory.client.FindSkusRequest;
 import com.jordansimsmith.tcginventory.inventory.client.FindUnitsRequest;
 import com.jordansimsmith.tcginventory.inventory.client.GetSkuRequest;
+import com.jordansimsmith.tcginventory.inventory.client.GetUnitRequest;
+import com.jordansimsmith.tcginventory.inventory.client.GetUnitResponse;
 import com.jordansimsmith.tcginventory.inventory.client.InventoryService;
 import com.jordansimsmith.tcginventory.inventory.client.SellUnitRequest;
 import com.jordansimsmith.tcginventory.inventory.client.Sku;
 import com.jordansimsmith.tcginventory.inventory.client.Unit;
 import com.jordansimsmith.tcginventory.inventory.client.UnitStatus;
+import com.jordansimsmith.tcginventory.orders.client.ConfirmOrderRequest;
+import com.jordansimsmith.tcginventory.orders.client.ConfirmOrderResponse;
 import com.jordansimsmith.time.FakeClock;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -338,6 +347,287 @@ class OrderFulfillmentServiceIntegrationTest {
     assertThat(mapper.readValue(json, FulfillmentMessage.class)).isEqualTo(message());
   }
 
+  @Test
+  void confirmOrderShouldAdmitAndDispatchBeforeFulfillment() throws Exception {
+    // arrange
+    seedReservedUnits(List.of(2, 1));
+    createAllocatedOrder("to_pick", List.of(List.of(2, 1)));
+    clock.setTime(NOW.plusSeconds(10));
+
+    // act
+    var response =
+        factory
+            .orderService()
+            .confirmOrder(new RequestContext(USER), new ConfirmOrderRequest(ORDER_ID));
+
+    // assert
+    assertThat(response).isEqualTo(new ConfirmOrderResponse());
+    var order = orderReadRepository.getOrder(USER, ORDER_ID);
+    assertThat(order.getStatus()).isEqualTo("fulfilling");
+    assertThat(order.getUpdatedAt()).isEqualTo(NOW.plusSeconds(10));
+    assertThat(order.getBuyerName()).isEqualTo("Buyer");
+    assertThat(order.getPostageOption()).isEqualTo("Courier");
+    assertThat(findUnits()).extracting(Unit::status).containsOnly(UnitStatus.RESERVED);
+    assertThat(factory.fakeOrdersQueue().getSends())
+        .containsExactly(new FakeQueueClient.SentMessage<>(message(), ORDER_ID, ORDER_ID));
+
+    factory
+        .fulfillmentMessageHandler()
+        .handleMessage(
+            new RequestContext(USER), factory.fakeOrdersQueue().getMessages().getFirst());
+    assertThat(orderReadRepository.getOrder(USER, ORDER_ID).getStatus()).isEqualTo("fulfilled");
+    assertThat(findUnits()).extracting(Unit::status).containsOnly(UnitStatus.SOLD);
+  }
+
+  @Test
+  void confirmOrderShouldReturnWithoutDownstreamWorkForAdmittedOrCompletedOrders()
+      throws Exception {
+    // arrange
+    var readRepository = spy(orderReadRepository);
+    var mutationRepository = mock(OrderMutationRepository.class);
+    var inventory = mock(InventoryService.class);
+    var queue = new FakeQueueClient<FulfillmentMessage>();
+    var service = new ConfirmOrderService(readRepository, mutationRepository, inventory, queue);
+
+    // act
+    for (var status : List.of("fulfilling", "fulfilled")) {
+      orderTable.putItem(createOrder(status, List.of()));
+      assertThat(service.confirmOrder(new RequestContext(USER), new ConfirmOrderRequest(ORDER_ID)))
+          .isEqualTo(new ConfirmOrderResponse());
+    }
+
+    // assert
+    verify(readRepository, never()).findRows(any(), any());
+    verifyNoInteractions(mutationRepository, inventory);
+    assertThat(queue.getSends()).isEmpty();
+  }
+
+  @Test
+  void confirmOrderShouldValidateIdsBeforeStorageAndPreserveOpaqueValues() throws Exception {
+    // arrange
+    var readRepository = mock(OrderReadRepository.class);
+    var mutationRepository = mock(OrderMutationRepository.class);
+    var inventory = mock(InventoryService.class);
+    var queue = new FakeQueueClient<FulfillmentMessage>();
+    var service = new ConfirmOrderService(readRepository, mutationRepository, inventory, queue);
+
+    // act
+    for (var id : Arrays.asList(null, "", "  ")) {
+      assertThatThrownBy(
+              () -> service.confirmOrder(new RequestContext(USER), new ConfirmOrderRequest(id)))
+          .isInstanceOf(BadRequestException.class)
+          .hasMessage("order_id is required");
+    }
+
+    // assert
+    verifyNoInteractions(readRepository, mutationRepository, inventory);
+    var opaqueId = " offer:# / ";
+    orderTable.putItem(createOrder(USER, opaqueId, "fulfilled", List.of()));
+    assertThat(
+            factory
+                .orderService()
+                .confirmOrder(new RequestContext(USER), new ConfirmOrderRequest(opaqueId)))
+        .isEqualTo(new ConfirmOrderResponse());
+    assertThat(queue.getSends()).isEmpty();
+  }
+
+  @Test
+  void confirmOrderShouldRejectMissingForeignAndUnreadyOrders() {
+    // arrange
+    var service =
+        new ConfirmOrderService(
+            orderReadRepository,
+            orderMutationRepository,
+            inventoryService,
+            factory.fakeOrdersQueue());
+    orderTable.putItem(createOrder("another-user", ORDER_ID, "to_pick", List.of()));
+
+    // act
+    assertThatThrownBy(
+            () -> service.confirmOrder(new RequestContext(USER), new ConfirmOrderRequest(ORDER_ID)))
+        .isInstanceOf(NotFoundException.class)
+        .hasMessage("Not Found");
+    for (var status : List.of("reserving", "awaiting_payment", "voiding", "voided")) {
+      orderTable.putItem(createOrder(status, List.of()));
+      assertThatThrownBy(
+              () ->
+                  service.confirmOrder(new RequestContext(USER), new ConfirmOrderRequest(ORDER_ID)))
+          .isInstanceOf(ConflictException.class)
+          .hasMessage("order is not ready to pick");
+      assertThat(orderReadRepository.getOrder(USER, ORDER_ID).getStatus()).isEqualTo(status);
+    }
+
+    // assert
+    assertThat(factory.fakeOrdersQueue().getSends()).isEmpty();
+  }
+
+  @Test
+  void confirmOrderShouldValidateAllAllocationsBeforeInventoryReads() {
+    // arrange
+    var inventory = mock(InventoryService.class);
+    var service =
+        new ConfirmOrderService(
+            orderReadRepository, orderMutationRepository, inventory, factory.fakeOrdersQueue());
+
+    // act
+    createAllocatedOrder("to_pick", List.of());
+    assertThatThrownBy(
+            () -> service.confirmOrder(new RequestContext(USER), new ConfirmOrderRequest(ORDER_ID)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("order has no lines to fulfill");
+    createAllocatedOrder("to_pick", List.of(List.of(1), List.of(1)));
+    assertThatThrownBy(
+            () -> service.confirmOrder(new RequestContext(USER), new ConfirmOrderRequest(ORDER_ID)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("order allocation contains a duplicate unit");
+    for (var quantity : List.of(0, 2)) {
+      rowTable.putItem(
+          OrderRowItem.create(
+              USER, ORDER_ID, 1, SKU_ID, 101, quantity, "2.00", "2.00", List.of(2)));
+      assertThatThrownBy(
+              () ->
+                  service.confirmOrder(new RequestContext(USER), new ConfirmOrderRequest(ORDER_ID)))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessage("order line is not fully allocated");
+    }
+
+    // assert
+    verifyNoInteractions(inventory);
+    assertThat(orderReadRepository.getOrder(USER, ORDER_ID).getStatus()).isEqualTo("to_pick");
+    assertThat(factory.fakeOrdersQueue().getSends()).isEmpty();
+  }
+
+  @Test
+  void confirmOrderShouldRejectUnexpectedInventoryOwnership() throws Exception {
+    // arrange
+    createAllocatedOrder("to_pick", List.of(List.of(1)));
+    var inventory = mock(InventoryService.class);
+    var ctx = new RequestContext(USER);
+    var request = new GetUnitRequest(SKU_ID, 1);
+    var service =
+        new ConfirmOrderService(
+            orderReadRepository, orderMutationRepository, inventory, factory.fakeOrdersQueue());
+
+    // act
+    for (var unit :
+        List.of(
+            new Unit(1, "A0-1", UnitStatus.IN_STOCK, List.of(), NOW.getEpochSecond(), null, null),
+            new Unit(
+                1,
+                "A0-1",
+                UnitStatus.RESERVED,
+                List.of(),
+                NOW.getEpochSecond(),
+                null,
+                "other-order"))) {
+      when(inventory.getUnit(ctx, request)).thenReturn(new GetUnitResponse(unit));
+      assertThatThrownBy(() -> service.confirmOrder(ctx, new ConfirmOrderRequest(ORDER_ID)))
+          .isInstanceOf(IllegalStateException.class)
+          .hasMessage("order has an unexpected allocated unit");
+    }
+
+    // assert
+    assertThat(orderReadRepository.getOrder(USER, ORDER_ID).getStatus()).isEqualTo("to_pick");
+    assertThat(factory.fakeOrdersQueue().getSends()).isEmpty();
+  }
+
+  @Test
+  void confirmOrderShouldNotDispatchWhenAdmissionFails() {
+    // arrange
+    seedReservedUnits(List.of(1));
+    createAllocatedOrder("to_pick", List.of(List.of(1)));
+    var mutationRepository = spy(orderMutationRepository);
+    var failure = ConditionalCheckFailedException.builder().message("admission lost").build();
+    doThrow(failure).when(mutationRepository).startFulfilling(USER, ORDER_ID);
+    var service =
+        new ConfirmOrderService(
+            orderReadRepository, mutationRepository, inventoryService, factory.fakeOrdersQueue());
+
+    // act
+    assertThatThrownBy(
+            () -> service.confirmOrder(new RequestContext(USER), new ConfirmOrderRequest(ORDER_ID)))
+        .isSameAs(failure);
+
+    // assert
+    assertThat(factory.fakeOrdersQueue().getSends()).isEmpty();
+    assertThat(orderReadRepository.getOrder(USER, ORDER_ID).getStatus()).isEqualTo("to_pick");
+  }
+
+  @Test
+  void confirmOrderShouldRetainAdmissionWithoutResendingAfterQueueFailure() throws Exception {
+    // arrange
+    seedReservedUnits(List.of(1));
+    createAllocatedOrder("to_pick", List.of(List.of(1)));
+    var queue = spy(new FakeQueueClient<FulfillmentMessage>());
+    var failure = SdkClientException.create("sqs unavailable");
+    doThrow(failure).when(queue).send(message(), ORDER_ID, ORDER_ID);
+    var service =
+        new ConfirmOrderService(
+            orderReadRepository, orderMutationRepository, inventoryService, queue);
+
+    // act
+    assertThatThrownBy(
+            () -> service.confirmOrder(new RequestContext(USER), new ConfirmOrderRequest(ORDER_ID)))
+        .isSameAs(failure);
+    assertThat(service.confirmOrder(new RequestContext(USER), new ConfirmOrderRequest(ORDER_ID)))
+        .isEqualTo(new ConfirmOrderResponse());
+
+    // assert
+    assertThat(orderReadRepository.getOrder(USER, ORDER_ID).getStatus()).isEqualTo("fulfilling");
+    verify(queue).send(message(), ORDER_ID, ORDER_ID);
+  }
+
+  @Test
+  void confirmOrderShouldPropagateDependencyFailuresWithoutAdmission() throws Exception {
+    // arrange
+    createAllocatedOrder("to_pick", List.of(List.of(1)));
+    var inventory = mock(InventoryService.class);
+    var failure = new ServiceUnavailableException("inventory unavailable");
+    when(inventory.getUnit(new RequestContext(USER), new GetUnitRequest(SKU_ID, 1)))
+        .thenThrow(failure);
+    var service =
+        new ConfirmOrderService(
+            orderReadRepository, orderMutationRepository, inventory, factory.fakeOrdersQueue());
+
+    // act
+    assertThatThrownBy(
+            () -> service.confirmOrder(new RequestContext(USER), new ConfirmOrderRequest(ORDER_ID)))
+        .isSameAs(failure);
+
+    var readRepository = spy(orderReadRepository);
+    var storageFailure = SdkClientException.create("dynamodb unavailable");
+    doThrow(storageFailure).when(readRepository).getOrder(USER, ORDER_ID);
+    var unavailableService =
+        new ConfirmOrderService(
+            readRepository, orderMutationRepository, inventory, factory.fakeOrdersQueue());
+    assertThatThrownBy(
+            () ->
+                unavailableService.confirmOrder(
+                    new RequestContext(USER), new ConfirmOrderRequest(ORDER_ID)))
+        .isSameAs(storageFailure);
+
+    // assert
+    assertThat(orderReadRepository.getOrder(USER, ORDER_ID).getStatus()).isEqualTo("to_pick");
+    assertThat(factory.fakeOrdersQueue().getSends()).isEmpty();
+  }
+
+  @Test
+  void confirmationRecordsShouldUseOrderIdAndEmptyResponseJson() throws Exception {
+    // arrange
+    var mapper = new ObjectMapper();
+    var request = new ConfirmOrderRequest(ORDER_ID);
+
+    // act
+    var json = mapper.writeValueAsString(request);
+
+    // assert
+    assertThat(json).isEqualTo("{\"order_id\":\"order-opaque-id\"}");
+    assertThat(mapper.readValue(json, ConfirmOrderRequest.class)).isEqualTo(request);
+    assertThat(mapper.writeValueAsString(new ConfirmOrderResponse())).isEqualTo("{}");
+    assertThat(mapper.readValue("{}", ConfirmOrderResponse.class))
+        .isEqualTo(new ConfirmOrderResponse());
+  }
+
   private void seedReservedUnits(List<Integer> sequences) {
     var fakeInventory = factory.fakeInventoryService();
     fakeInventory.seedSku(
@@ -375,6 +665,10 @@ class OrderFulfillmentServiceIntegrationTest {
   }
 
   private void createFulfillingOrder(List<List<Integer>> allocationByRow) {
+    createAllocatedOrder("fulfilling", allocationByRow);
+  }
+
+  private void createAllocatedOrder(String status, List<List<Integer>> allocationByRow) {
     var rows = new ArrayList<OrderRowItem>();
     for (var sequences : allocationByRow) {
       rows.add(
@@ -389,7 +683,7 @@ class OrderFulfillmentServiceIntegrationTest {
               "2.00",
               sequences));
     }
-    orderTable.putItem(createOrder("fulfilling", rows));
+    orderTable.putItem(createOrder(status, rows));
     rows.forEach(rowTable::putItem);
   }
 
