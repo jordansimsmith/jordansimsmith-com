@@ -92,6 +92,10 @@ queue_configs = {
         "name": "tcg_inventory_pricing.fifo",
         "visibility_timeout": 960,
     },
+    "publish": {
+        "name": "tcg_inventory_publish.fifo",
+        "visibility_timeout": 960,
+    },
 }
 
 queue_urls = {}
@@ -284,6 +288,14 @@ lambdas = {
     "pricing_worker": {
         "handler": "com.jordansimsmith.tcginventory.pricing.worker.PricingWorkerHandler",
         "zip_file": "pricing-worker-handler_deploy.jar",
+        "timeout": 900,
+        "environment": {
+            "FETCHTCG_BASE_URL": os.environ.get("FETCHTCG_BASE_URL", ""),
+        },
+    },
+    "publish_worker": {
+        "handler": "com.jordansimsmith.tcginventory.publish.worker.PublishWorkerHandler",
+        "zip_file": "publish-worker-handler_deploy.jar",
         "timeout": 900,
         "environment": {
             "FETCHTCG_BASE_URL": os.environ.get("FETCHTCG_BASE_URL", ""),
@@ -597,6 +609,13 @@ lambda_client.create_event_source_mapping(
 lambda_client.create_event_source_mapping(
     EventSourceArn=queue_arns["pricing"],
     FunctionName="pricing_worker",
+    BatchSize=1,
+    MaximumBatchingWindowInSeconds=0,
+)
+
+lambda_client.create_event_source_mapping(
+    EventSourceArn=queue_arns["publish"],
+    FunctionName="publish_worker",
     BatchSize=1,
     MaximumBatchingWindowInSeconds=0,
 )

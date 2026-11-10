@@ -170,7 +170,8 @@
         "confirm_order": "//tcg_inventory_api:confirm-order-handler_deploy.jar",
         "jobs_handler": "//tcg_inventory_api:jobs-handler_deploy.jar",
         "report_worker": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/reports/worker:report-worker-handler_deploy.jar",
-        "pricing_worker": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/worker:pricing-worker-handler_deploy.jar"
+        "pricing_worker": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/pricing/worker:pricing-worker-handler_deploy.jar",
+        "publish_worker": "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/publish/worker:publish-worker-handler_deploy.jar"
       },
       "images": {
         "scan_worker": {
