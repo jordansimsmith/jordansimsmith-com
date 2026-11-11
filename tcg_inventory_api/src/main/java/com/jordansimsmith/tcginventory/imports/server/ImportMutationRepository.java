@@ -137,4 +137,56 @@ public class ImportMutationRepository {
               .build());
     }
   }
+
+  public void updateRowPhotos(
+      String user, String importId, int position, List<ImportRowItem.Photo> photos) {
+    var storedPhotos =
+        photos.stream()
+            .map(
+                photo ->
+                    AttributeValue.builder()
+                        .m(
+                            Map.of(
+                                ImportRowItem.Photo.PHOTO_ID,
+                                AttributeValue.fromS(photo.getPhotoId())))
+                        .build())
+            .toList();
+    dynamoDbClient.transactWriteItems(
+        TransactWriteItemsRequest.builder()
+            .transactItems(
+                TransactWriteItem.builder()
+                    .conditionCheck(
+                        ConditionCheck.builder()
+                            .tableName(tableName)
+                            .key(
+                                Map.of(
+                                    ImportItem.PK, AttributeValue.fromS(ImportItem.formatPk(user)),
+                                    ImportItem.SK,
+                                        AttributeValue.fromS(ImportItem.formatSk(importId))))
+                            .conditionExpression("attribute_exists(pk) AND #status = :review")
+                            .expressionAttributeNames(Map.of("#status", ImportItem.STATUS))
+                            .expressionAttributeValues(
+                                Map.of(":review", AttributeValue.fromS("review")))
+                            .build())
+                    .build(),
+                TransactWriteItem.builder()
+                    .update(
+                        Update.builder()
+                            .tableName(tableName)
+                            .key(
+                                Map.of(
+                                    ImportRowItem.PK,
+                                        AttributeValue.fromS(
+                                            ImportRowItem.formatPk(user, importId)),
+                                    ImportRowItem.SK,
+                                        AttributeValue.fromS(ImportRowItem.formatSk(position))))
+                            .updateExpression("SET #photos = :photos")
+                            .conditionExpression("attribute_exists(pk)")
+                            .expressionAttributeNames(Map.of("#photos", ImportRowItem.PHOTOS))
+                            .expressionAttributeValues(
+                                Map.of(":photos", AttributeValue.builder().l(storedPhotos).build()))
+                            .build())
+                    .build())
+            .build());
+  }
 }

@@ -17,12 +17,16 @@ import com.jordansimsmith.service.BadRequestException;
 import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
+import com.jordansimsmith.tcginventory.imports.client.CreateImportRowPhotoRequest;
 import com.jordansimsmith.tcginventory.imports.client.DeleteImportRequest;
 import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowRequest;
 import com.jordansimsmith.tcginventory.imports.client.GetImportRequest;
 import com.jordansimsmith.tcginventory.imports.client.ImportRow;
 import com.jordansimsmith.tcginventory.imports.client.UpdateImportRowRequest;
 import com.jordansimsmith.tcginventory.inventory.client.Condition;
+import com.jordansimsmith.tcginventory.photos.client.FakePhotosService;
+import com.jordansimsmith.tcginventory.photos.client.GetPhotoBytesRequest;
+import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -59,6 +63,8 @@ class ImportReviewServiceIntegrationTest {
   private UpdateImportRowService updateImportRowService;
   private DeleteImportRowService deleteImportRowService;
   private DeleteImportService deleteImportService;
+  private FakePhotosService fakePhotosService;
+  private CreateImportRowPhotoService createImportRowPhotoService;
 
   @BeforeAll
   static void setUpBeforeClass() {
@@ -83,6 +89,10 @@ class ImportReviewServiceIntegrationTest {
     deleteImportRowService =
         new DeleteImportRowService(importReadRepository, importMutationRepository);
     deleteImportService = new DeleteImportService(importReadRepository, importMutationRepository);
+    fakePhotosService = new FakePhotosService();
+    createImportRowPhotoService =
+        new CreateImportRowPhotoService(
+            importReadRepository, importMutationRepository, fakePhotosService);
   }
 
   @Test
@@ -111,7 +121,7 @@ class ImportReviewServiceIntegrationTest {
     assertThat(saved.getDecision()).isEqualTo("keep");
     assertThat(saved.getDecisionReason()).isEqualTo("matched");
     assertThat(saved.getMarketPrice()).isEqualTo("1.50");
-    assertThat(saved.getSuggestedPrice()).isEqualTo("1.25");
+    assertThat(saved.getSuggestedPrice()).isEqualTo("25.00");
     assertThat(saved.getPhotos())
         .extracting(ImportRowItem.Photo::getPhotoId)
         .containsExactly("photo-1");
@@ -588,6 +598,243 @@ class ImportReviewServiceIntegrationTest {
         .isSameAs(failure);
     verify(readRepository, never()).findRows("alice", "import-1");
     verify(mutationRepository, never()).deleteRows(anyList());
+  }
+
+  @Test
+  void createImportRowPhotoAppendsInOrderAndPreservesRowAttributes() throws Exception {
+    importTable.putItem(importItem("alice", "import-1", "review"));
+    var row = importRow("alice", "import-1", 1);
+    row.setSuggestedPrice("25.00");
+    row.setPhotos(List.of(ImportRowItem.Photo.create("first-photo")));
+    importRowTable.putItem(row);
+    dynamoDbClient.updateItem(
+        request ->
+            request
+                .tableName(TABLE_NAME)
+                .key(
+                    Map.of(
+                        ImportRowItem.PK, AttributeValue.fromS(row.getPk()),
+                        ImportRowItem.SK, AttributeValue.fromS(row.getSk())))
+                .updateExpression("SET unrelated = :unrelated")
+                .expressionAttributeValues(
+                    Map.of(":unrelated", AttributeValue.fromS("preserved"))));
+
+    createImportRowPhotoService.createImportRowPhoto(
+        new RequestContext("alice"),
+        new CreateImportRowPhotoRequest("import-1", 1, new byte[] {1, 2, 3}));
+
+    var saved = importReadRepository.getRow("alice", "import-1", 1);
+    assertThat(saved.getPhotos())
+        .extracting(ImportRowItem.Photo::getPhotoId)
+        .containsExactly("first-photo", "FAKE_PHOTO_0000000001");
+    assertThat(saved.getDecision()).isEqualTo("keep");
+    assertThat(saved.getSuggestedPrice()).isEqualTo("1.25");
+    assertThat(saved.getSkuId()).isEqualTo("sku-1");
+    assertThat(
+            dynamoDbClient
+                .getItem(
+                    request ->
+                        request
+                            .tableName(TABLE_NAME)
+                            .key(
+                                Map.of(
+                                    ImportRowItem.PK, AttributeValue.fromS(row.getPk()),
+                                    ImportRowItem.SK, AttributeValue.fromS(row.getSk()))))
+                .item()
+                .get("unrelated"))
+        .isEqualTo(AttributeValue.fromS("preserved"));
+    assertThat(
+            fakePhotosService
+                .getPhotoBytes(
+                    new RequestContext("alice"), new GetPhotoBytesRequest("FAKE_PHOTO_0000000001"))
+                .photoBytes())
+        .containsExactly(1, 2, 3);
+    var detail =
+        new GetImportService(importReadRepository)
+            .getImport(new RequestContext("alice"), new GetImportRequest("import-1"));
+    assertThat(detail.rows().getFirst().photos())
+        .containsExactly("first-photo", "FAKE_PHOTO_0000000001");
+    assertThat(detail.rows().getFirst().needsPhotos()).isFalse();
+  }
+
+  @Test
+  void createImportRowPhotoSupportsMissingPhotoListAndRequestJson() throws Exception {
+    importTable.putItem(importItem("alice", "opaque/id", "review"));
+    var row = importRow("alice", "opaque/id", 1);
+    row.setPhotos(null);
+    importRowTable.putItem(row);
+    var objectMapper = new ObjectMapper();
+
+    var response =
+        createImportRowPhotoService.createImportRowPhoto(
+            new RequestContext("alice"),
+            new CreateImportRowPhotoRequest("opaque/id", 1, new byte[] {4}));
+
+    assertThat(importReadRepository.getRow("alice", "opaque/id", 1).getPhotos())
+        .extracting(ImportRowItem.Photo::getPhotoId)
+        .containsExactly("FAKE_PHOTO_0000000001");
+    assertThat(
+            objectMapper.writeValueAsString(
+                new CreateImportRowPhotoRequest("opaque/id", 1, new byte[] {4})))
+        .isEqualTo("{\"import_id\":\"opaque/id\",\"position\":1,\"photo_bytes\":\"BA==\"}");
+    assertThat(objectMapper.writeValueAsString(response)).isEqualTo("{}");
+  }
+
+  @Test
+  void createImportRowPhotoValidatesPolicyBeforePhotosCall() {
+    var readRepository = mock(ImportReadRepository.class);
+    var mutationRepository = mock(ImportMutationRepository.class);
+    var photosService = mock(PhotosService.class);
+    var service =
+        new CreateImportRowPhotoService(readRepository, mutationRepository, photosService);
+    assertThatThrownBy(
+            () ->
+                service.createImportRowPhoto(
+                    new RequestContext("alice"),
+                    new CreateImportRowPhotoRequest(" ", 1, new byte[] {1})))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("import_id is required");
+    assertThatThrownBy(
+            () ->
+                service.createImportRowPhoto(
+                    new RequestContext("alice"),
+                    new CreateImportRowPhotoRequest("import-1", 0, new byte[] {1})))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("position must be positive");
+    verifyNoInteractions(readRepository, mutationRepository, photosService);
+
+    when(readRepository.getImport("alice", "import-1"))
+        .thenReturn(importItem("alice", "import-1", "review"));
+    var nonKeepRow = importRow("alice", "import-1", 1);
+    nonKeepRow.setDecision("discard");
+    when(readRepository.getRow("alice", "import-1", 1)).thenReturn(nonKeepRow);
+    assertThatThrownBy(
+            () ->
+                service.createImportRowPhoto(
+                    new RequestContext("alice"),
+                    new CreateImportRowPhotoRequest("import-1", 1, new byte[] {1})))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("photos can only be created on keep rows");
+    verifyNoInteractions(photosService, mutationRepository);
+  }
+
+  @Test
+  void createImportRowPhotoEnforcesReviewKeepAndPhotoLimit() {
+    assertThatThrownBy(
+            () ->
+                createImportRowPhotoService.createImportRowPhoto(
+                    new RequestContext("alice"),
+                    new CreateImportRowPhotoRequest("missing", 1, new byte[] {1})))
+        .isInstanceOf(NotFoundException.class);
+    importTable.putItem(importItem("alice", "import-1", "review"));
+    assertThatThrownBy(
+            () ->
+                createImportRowPhotoService.createImportRowPhoto(
+                    new RequestContext("alice"),
+                    new CreateImportRowPhotoRequest("import-1", 1, new byte[] {1})))
+        .isInstanceOf(NotFoundException.class);
+    importRowTable.putItem(importRow("alice", "import-1", 1));
+    assertThatThrownBy(
+            () ->
+                createImportRowPhotoService.createImportRowPhoto(
+                    new RequestContext("bob"),
+                    new CreateImportRowPhotoRequest("import-1", 1, new byte[] {1})))
+        .isInstanceOf(NotFoundException.class);
+    importTable.putItem(importItem("alice", "import-1", "appraising"));
+    assertThatThrownBy(
+            () ->
+                createImportRowPhotoService.createImportRowPhoto(
+                    new RequestContext("alice"),
+                    new CreateImportRowPhotoRequest("import-1", 1, new byte[] {1})))
+        .isInstanceOf(ConflictException.class)
+        .hasMessage("import is not in review status");
+    importTable.putItem(importItem("alice", "import-1", "review"));
+    var row = importRow("alice", "import-1", 1);
+    row.setPhotos(
+        List.of(
+            ImportRowItem.Photo.create("1"),
+            ImportRowItem.Photo.create("2"),
+            ImportRowItem.Photo.create("3"),
+            ImportRowItem.Photo.create("4"),
+            ImportRowItem.Photo.create("5")));
+    importRowTable.putItem(row);
+    assertThatThrownBy(
+            () ->
+                createImportRowPhotoService.createImportRowPhoto(
+                    new RequestContext("alice"),
+                    new CreateImportRowPhotoRequest("import-1", 1, new byte[] {1})))
+        .isInstanceOf(BadRequestException.class)
+        .hasMessage("a row may have at most 5 photos");
+  }
+
+  @Test
+  void createImportRowPhotoLeavesPhotosObjectWhenReferenceWriteFails() {
+    importTable.putItem(importItem("alice", "import-1", "review"));
+    importRowTable.putItem(importRow("alice", "import-1", 1));
+    var failure = new IllegalStateException("transaction failed");
+    var mutationRepository = mock(ImportMutationRepository.class);
+    doThrow(failure).when(mutationRepository).updateRowPhotos("alice", "import-1", 1, anyList());
+    var service =
+        new CreateImportRowPhotoService(
+            importReadRepository, mutationRepository, fakePhotosService);
+
+    assertThatThrownBy(
+            () ->
+                service.createImportRowPhoto(
+                    new RequestContext("alice"),
+                    new CreateImportRowPhotoRequest("import-1", 1, new byte[] {9})))
+        .isSameAs(failure);
+    assertThat(
+            fakePhotosService
+                .getPhotoBytes(
+                    new RequestContext("alice"), new GetPhotoBytesRequest("FAKE_PHOTO_0000000001"))
+                .photoBytes())
+        .containsExactly(9);
+    assertThat(importReadRepository.getRow("alice", "import-1", 1).getPhotos())
+        .extracting(ImportRowItem.Photo::getPhotoId)
+        .containsExactly("photo-1");
+  }
+
+  @Test
+  void createImportRowPhotoDoesNotWriteReferenceWhenPhotosFails() throws Exception {
+    importTable.putItem(importItem("alice", "import-1", "review"));
+    importRowTable.putItem(importRow("alice", "import-1", 1));
+    var photosService = mock(PhotosService.class);
+    var failure = new NotFoundException("photo service failed");
+    when(photosService.createPhoto(any(), any())).thenThrow(failure);
+    var service =
+        new CreateImportRowPhotoService(
+            importReadRepository, importMutationRepository, photosService);
+
+    assertThatThrownBy(
+            () ->
+                service.createImportRowPhoto(
+                    new RequestContext("alice"),
+                    new CreateImportRowPhotoRequest("import-1", 1, new byte[] {1})))
+        .isSameAs(failure);
+    assertThat(importReadRepository.getRow("alice", "import-1", 1).getPhotos())
+        .extracting(ImportRowItem.Photo::getPhotoId)
+        .containsExactly("photo-1");
+  }
+
+  @Test
+  void updateRowPhotosTransactionRejectsChangedParentAndMissingRow() {
+    importTable.putItem(importItem("alice", "import-1", "review"));
+    var row = importRow("alice", "import-1", 1);
+    importRowTable.putItem(row);
+    var photos = List.of(ImportRowItem.Photo.create("new-photo"));
+    importTable.putItem(importItem("alice", "import-1", "appraising"));
+    assertThatThrownBy(
+            () -> importMutationRepository.updateRowPhotos("alice", "import-1", 1, photos))
+        .isInstanceOf(TransactionCanceledException.class);
+    assertThat(importReadRepository.getRow("alice", "import-1", 1).getPhotos())
+        .extracting(ImportRowItem.Photo::getPhotoId)
+        .containsExactly("photo-1");
+    importTable.putItem(importItem("alice", "import-1", "review"));
+    importRowTable.deleteItem(row);
+    assertThatThrownBy(
+            () -> importMutationRepository.updateRowPhotos("alice", "import-1", 1, photos))
+        .isInstanceOf(TransactionCanceledException.class);
   }
 
   private void putLargeRows(String user, String importId, int count) {

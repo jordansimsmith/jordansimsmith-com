@@ -22,6 +22,8 @@ java_test_suite(
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/client",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/server",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/inventory/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/client",
+        "//tcg_inventory_api/src/test/java/com/jordansimsmith/tcginventory/photos/client:test-lib",
         "@maven//:com_fasterxml_jackson_core_jackson_databind",
         "@maven//:org_assertj_assertj_core",
         "@maven//:org_junit_jupiter_junit_jupiter_api",

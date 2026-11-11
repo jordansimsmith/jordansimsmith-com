@@ -17,4 +17,7 @@ public interface ImportService {
 
   DeleteImportResponse deleteImport(RequestContext ctx, DeleteImportRequest request)
       throws ServiceException;
+
+  CreateImportRowPhotoResponse createImportRowPhoto(
+      RequestContext ctx, CreateImportRowPhotoRequest request) throws ServiceException;
 }

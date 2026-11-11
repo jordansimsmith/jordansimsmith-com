@@ -3,6 +3,8 @@ package com.jordansimsmith.tcginventory.imports.server;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.tcginventory.imports.client.CreateImportRowPhotoRequest;
+import com.jordansimsmith.tcginventory.imports.client.CreateImportRowPhotoResponse;
 import com.jordansimsmith.tcginventory.imports.client.DeleteImportRequest;
 import com.jordansimsmith.tcginventory.imports.client.DeleteImportResponse;
 import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowRequest;
@@ -14,6 +16,7 @@ import com.jordansimsmith.tcginventory.imports.client.GetImportResponse;
 import com.jordansimsmith.tcginventory.imports.client.ImportService;
 import com.jordansimsmith.tcginventory.imports.client.UpdateImportRowRequest;
 import com.jordansimsmith.tcginventory.imports.client.UpdateImportRowResponse;
+import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import dagger.Module;
 import dagger.Provides;
 import javax.inject.Named;
@@ -30,7 +33,8 @@ public class ImportsModule {
       DynamoDbEnhancedClient dynamoDbEnhancedClient,
       DynamoDbClient dynamoDbClient,
       @Named("tcgInventoryTableName") String tableName,
-      ObjectMapper objectMapper) {
+      ObjectMapper objectMapper,
+      PhotosService photosService) {
     var importTable =
         dynamoDbEnhancedClient.table(tableName, TableSchema.fromBean(ImportItem.class));
     var importRowTable =
@@ -45,6 +49,9 @@ public class ImportsModule {
         new DeleteImportRowService(importReadRepository, importMutationRepository);
     var deleteImportService =
         new DeleteImportService(importReadRepository, importMutationRepository);
+    var createImportRowPhotoService =
+        new CreateImportRowPhotoService(
+            importReadRepository, importMutationRepository, photosService);
     return new ImportService() {
       @Override
       public FindImportsResponse findImports(RequestContext ctx, FindImportsRequest request)
@@ -74,6 +81,12 @@ public class ImportsModule {
       public DeleteImportResponse deleteImport(RequestContext ctx, DeleteImportRequest request)
           throws ServiceException {
         return deleteImportService.deleteImport(ctx, request);
+      }
+
+      @Override
+      public CreateImportRowPhotoResponse createImportRowPhoto(
+          RequestContext ctx, CreateImportRowPhotoRequest request) throws ServiceException {
+        return createImportRowPhotoService.createImportRowPhoto(ctx, request);
       }
     };
   }

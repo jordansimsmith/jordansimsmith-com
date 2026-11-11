@@ -236,5 +236,11 @@ public class ImportRowItem {
     public void setPhotoId(@Nullable String value) {
       photoId = value;
     }
+
+    public static Photo create(String photoId) {
+      var photo = new Photo();
+      photo.setPhotoId(photoId);
+      return photo;
+    }
   }
 }

@@ -9,6 +9,7 @@ import com.jordansimsmith.dynamodb.DynamoDbUtils;
 import com.jordansimsmith.s3.S3Container;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
+import com.jordansimsmith.tcginventory.imports.api.CreateImportRowPhotoHandler;
 import com.jordansimsmith.tcginventory.imports.api.GetImportHandler;
 import com.jordansimsmith.tcginventory.photos.client.GetPhotoBytesRequest;
 import java.nio.charset.StandardCharsets;
@@ -86,94 +87,6 @@ public class RowPhotoHandlerIntegrationTest {
                 .getPhotoBytes(new RequestContext("jordan"), new GetPhotoBytesRequest(photoId))
                 .photoBytes())
         .isEqualTo(JPEG_BYTES);
-  }
-
-  @Test
-  void createPhotoShouldRejectNonJpeg() {
-    // arrange
-    var importId = seedImport("jordan", "review", "keep", "25.00");
-
-    // act
-    var response =
-        createImportRowPhotoHandler.handleRequest(
-            buildCreateEvent("jordan", importId, 1, JPEG_BYTES, "image/png"), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(400);
-  }
-
-  @Test
-  void createPhotoShouldRejectSixthPhoto() {
-    // arrange
-    var importId = seedImport("jordan", "review", "keep", "25.00");
-    for (int i = 0; i < ImportPhotos.MAX_PHOTOS; i++) {
-      var response =
-          createImportRowPhotoHandler.handleRequest(
-              buildCreateEvent("jordan", importId, 1, JPEG_BYTES), null);
-      assertThat(response.getStatusCode()).isEqualTo(204);
-    }
-
-    // act
-    var response =
-        createImportRowPhotoHandler.handleRequest(
-            buildCreateEvent("jordan", importId, 1, JPEG_BYTES), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(400);
-  }
-
-  @Test
-  void createPhotoShouldRejectNonKeepRow() {
-    // arrange
-    var importId = seedImport("jordan", "review", "discard", "25.00");
-
-    // act
-    var response =
-        createImportRowPhotoHandler.handleRequest(
-            buildCreateEvent("jordan", importId, 1, JPEG_BYTES), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(400);
-  }
-
-  @Test
-  void createPhotoShouldConflictWhenImportNotInReview() {
-    // arrange
-    var importId = seedImport("jordan", "appraising", "keep", "25.00");
-
-    // act
-    var response =
-        createImportRowPhotoHandler.handleRequest(
-            buildCreateEvent("jordan", importId, 1, JPEG_BYTES), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(409);
-    assertThat(response.getBody()).contains("import is not in review status");
-  }
-
-  @Test
-  void createPhotoShouldReturn404ForUnknownImport() {
-    // act
-    var response =
-        createImportRowPhotoHandler.handleRequest(
-            buildCreateEvent("jordan", "missing", 1, JPEG_BYTES), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(404);
-  }
-
-  @Test
-  void createPhotoShouldReturn404ForUnknownRow() {
-    // arrange
-    var importId = seedImport("jordan", "review", "keep", "25.00");
-
-    // act
-    var response =
-        createImportRowPhotoHandler.handleRequest(
-            buildCreateEvent("jordan", importId, 99, JPEG_BYTES), null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(404);
   }
 
   @Test
@@ -367,13 +280,8 @@ public class RowPhotoHandlerIntegrationTest {
 
   private APIGatewayV2HTTPEvent buildCreateEvent(
       String user, String importId, int position, byte[] body) {
-    return buildCreateEvent(user, importId, position, body, "image/jpeg");
-  }
-
-  private APIGatewayV2HTTPEvent buildCreateEvent(
-      String user, String importId, int position, byte[] body, String contentType) {
     return APIGatewayV2HTTPEvent.builder()
-        .withHeaders(Map.of("Authorization", authHeader(user), "content-type", contentType))
+        .withHeaders(Map.of("Authorization", authHeader(user), "content-type", "image/jpeg"))
         .withPathParameters(Map.of("import_id", importId, "position", Integer.toString(position)))
         .withBody(Base64.getEncoder().encodeToString(body))
         .withIsBase64Encoded(true)

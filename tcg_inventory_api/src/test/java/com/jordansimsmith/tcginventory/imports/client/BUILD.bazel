@@ -11,5 +11,6 @@ java_library(
     deps = [
         "//lib/service",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/client",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/photos/client",
     ],
 )

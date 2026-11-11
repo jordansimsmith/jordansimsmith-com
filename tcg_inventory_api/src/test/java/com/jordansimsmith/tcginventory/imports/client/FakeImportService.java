@@ -5,6 +5,8 @@ import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.tcginventory.photos.client.CreatePhotoRequest;
+import com.jordansimsmith.tcginventory.photos.client.PhotosService;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -13,6 +15,83 @@ import java.util.Map;
 
 public class FakeImportService implements ImportService {
   private final Map<UserImport, GetImportResponse> imports = new HashMap<>();
+  private final PhotosService photosService;
+
+  public FakeImportService(PhotosService photosService) {
+    this.photosService = photosService;
+  }
+
+  @Override
+  public CreateImportRowPhotoResponse createImportRowPhoto(
+      RequestContext ctx, CreateImportRowPhotoRequest request) throws ServiceException {
+    if (request.importId() == null || request.importId().isBlank()) {
+      throw new BadRequestException("import_id is required");
+    }
+    if (request.position() <= 0) {
+      throw new BadRequestException("position must be positive");
+    }
+    var key = new UserImport(ctx.user(), request.importId());
+    var importDetail = imports.get(key);
+    if (importDetail == null) {
+      throw new NotFoundException("Not Found");
+    }
+    if (importDetail.status() != ImportStatus.REVIEW) {
+      throw new ConflictException("import is not in review status");
+    }
+    var rows = new ArrayList<>(importDetail.rows());
+    var rowIndex = -1;
+    for (int index = 0; index < rows.size(); index++) {
+      if (rows.get(index).position() == request.position()) {
+        rowIndex = index;
+        break;
+      }
+    }
+    if (rowIndex == -1) {
+      throw new NotFoundException("Not Found");
+    }
+    var row = rows.get(rowIndex);
+    if (row.decision() != ImportDecision.KEEP) {
+      throw new BadRequestException("photos can only be created on keep rows");
+    }
+    if (row.photos().size() >= 5) {
+      throw new BadRequestException("a row may have at most 5 photos");
+    }
+    var photoId =
+        photosService.createPhoto(ctx, new CreatePhotoRequest(request.photoBytes())).photoId();
+    var photoIds = new ArrayList<>(row.photos());
+    photoIds.add(photoId);
+    rows.set(
+        rowIndex,
+        new ImportRow(
+            row.position(),
+            row.name(),
+            row.setCode(),
+            row.setName(),
+            row.collectorNumber(),
+            row.finish(),
+            row.condition(),
+            row.externalId(),
+            row.decision(),
+            row.decisionReason(),
+            row.marketPrice(),
+            row.suggestedPrice(),
+            photoIds,
+            false));
+    imports.put(
+        key,
+        new GetImportResponse(
+            importDetail.importId(),
+            importDetail.game(),
+            importDetail.filename(),
+            importDetail.status(),
+            importDetail.rowCount(),
+            importDetail.createdAt(),
+            importDetail.totalSuggestedPrice(),
+            importDetail.unitCount(),
+            importDetail.placementInstructions(),
+            rows));
+    return new CreateImportRowPhotoResponse();
+  }
 
   @Override
   public DeleteImportResponse deleteImport(RequestContext ctx, DeleteImportRequest request)

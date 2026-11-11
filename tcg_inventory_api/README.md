@@ -658,7 +658,9 @@ Representative failures:
 
 `POST /imports/{import_id}/rows/{position}/photos` (body: raw JPEG bytes)
 
-Response `204` (both photo mutations; no body). Updated `photos` and `needs_photos` are observed on `GET /imports/{import_id}`. Photos order by upload and the first is the listing front image — removing one promotes the next, so reordering is delete + re-upload. The import response returns ordered photo IDs; the browser resolves their 15-minute URLs through `GET /photos`.
+`ImportService#createImportRowPhoto` creates the object through Photos, then appends its ID to the row's ordered photo references in a two-item transaction that rechecks the import is still in review and the row exists. The endpoint requires `image/jpeg`, accepts the existing Base64-encoded Lambda body, and returns bodyless `204`. Photos validates the bytes and enforces the 4 MiB limit. The row must be a keep row and can reference at most five photos. A persistence failure after Photos succeeds leaves an unreferenced photo object; there is no compensation. Concurrent uploads use last-write-wins reference updates and can overwrite each other's appends. The operation performs two strongly consistent reads, one Photos creation, and one transaction. Updated `photos` and `needs_photos` are observed on `GET /imports/{import_id}`; the browser resolves returned ordered IDs to 15-minute URLs through `GET /photos`.
+
+Photo deletion remains on the legacy handler until its service migration. Photos order by upload and the first is the listing front image; removing one promotes the next, so reordering is delete plus re-upload.
 
 Representative failures: `409` unless the import is in review; `400` for a non-keep row, a non-JPEG body, a body over 4 MB, or a sixth photo. Rows in `GET /imports/{import_id}` carry `photos` (an ordered list of photo ID strings, empty when none) and `needs_photos` (keep, appraised at NZ$20+, no photos yet).
 
