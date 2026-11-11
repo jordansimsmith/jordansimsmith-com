@@ -10,7 +10,6 @@ import software.amazon.awssdk.enhanced.dynamodb.TableSchema;
 import software.amazon.awssdk.services.dynamodb.DynamoDbClient;
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue;
 import software.amazon.awssdk.services.dynamodb.model.ConditionCheck;
-import software.amazon.awssdk.services.dynamodb.model.Delete;
 import software.amazon.awssdk.services.dynamodb.model.DeleteItemRequest;
 import software.amazon.awssdk.services.dynamodb.model.Put;
 import software.amazon.awssdk.services.dynamodb.model.TransactWriteItem;
@@ -68,20 +67,6 @@ public class ImportsRepository {
                             .item(jobTable.tableSchema().itemToMap(jobItem, true))
                             .conditionExpression("attribute_not_exists(" + JobItem.PK + ")")
                             .build())
-                    .build())
-            .build());
-  }
-
-  public void deleteRow(String user, String importId, int position) {
-    mutateReviewRow(
-        user,
-        importId,
-        TransactWriteItem.builder()
-            .delete(
-                Delete.builder()
-                    .tableName(TcgInventoryTable.TABLE_NAME)
-                    .key(rowKey(user, importId, position))
-                    .conditionExpression("attribute_exists(pk)")
                     .build())
             .build());
   }

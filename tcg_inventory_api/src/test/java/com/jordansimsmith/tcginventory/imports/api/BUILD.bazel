@@ -4,6 +4,7 @@ java_test_suite(
     name = "api-unit-tests",
     size = "small",
     srcs = [
+        "DeleteImportRowHandlerTest.java",
         "FindImportsHandlerTest.java",
         "GetImportHandlerTest.java",
         "UpdateImportRowHandlerTest.java",
@@ -15,6 +16,7 @@ java_test_suite(
         "//lib/http:lib",
         "//lib/service",
         "//tcg_inventory_api:lib",
+        "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:delete-import-row-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:find-imports-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:get-import-handler",
         "//tcg_inventory_api/src/main/java/com/jordansimsmith/tcginventory/imports/api:update-import-row-handler",

@@ -10,6 +10,7 @@ import com.jordansimsmith.queue.FakeQueueClient;
 import com.jordansimsmith.tcginventory.JobItem;
 import com.jordansimsmith.tcginventory.JobMessage;
 import com.jordansimsmith.tcginventory.TcgInventoryTestFactory;
+import com.jordansimsmith.tcginventory.imports.api.DeleteImportRowHandler;
 import com.jordansimsmith.tcginventory.imports.api.GetImportHandler;
 import com.jordansimsmith.tcginventory.imports.api.UpdateImportRowHandler;
 import com.jordansimsmith.time.FakeClock;
@@ -676,7 +677,7 @@ public class ImportsHandlerIntegrationTest {
   }
 
   @Test
-  void deleteImportRowShouldDeleteRowAndDecrementCounts() {
+  void deleteImportRowShouldDeleteRowAndPreserveOriginalCount() throws Exception {
     // arrange
     createReviewImportWithRow("jordan");
 
@@ -696,43 +697,19 @@ public class ImportsHandlerIntegrationTest {
                 .sortValue(ImportRowItem.formatSk(1))
                 .build());
     assertThat(rowItem).isNull();
-  }
-
-  @Test
-  void deleteImportRowShouldReturn409WhenNotInReview() {
-    // arrange
-    createReviewImportWithRow("jordan");
-    var importItem =
+    var savedImport =
         importTable.getItem(
             Key.builder()
                 .partitionValue(ImportItem.formatPk("jordan"))
                 .sortValue(ImportItem.formatSk("import1"))
                 .build());
-    importItem.setStatus("appraising");
-    importTable.putItem(importItem);
-
-    // act
-    var response =
-        deleteImportRowHandler.handleRequest(
-            buildEventWithPathParam("jordan", Map.of("import_id", "import1", "position", "1")),
-            null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(409);
-  }
-
-  @Test
-  void deleteImportRowShouldReturn404ForMissingRow() {
-    // arrange
-    createReviewImportWithRow("jordan");
-
-    // act
-    var response =
-        deleteImportRowHandler.handleRequest(
-            buildEventWithPathParam("jordan", Map.of("import_id", "import1", "position", "99")),
-            null);
-
-    // assert
-    assertThat(response.getStatusCode()).isEqualTo(404);
+    assertThat(savedImport.getRowCount()).isEqualTo(1);
+    var detailResponse =
+        getImportHandler.handleRequest(
+            buildEventWithPathParam("jordan", Map.of("import_id", "import1")), null);
+    var detail = objectMapper.readTree(detailResponse.getBody());
+    assertThat(detail.get("row_count").asInt()).isEqualTo(1);
+    assertThat(detail.get("rows")).isEmpty();
+    assertThat(detail.get("total_suggested_price").asText()).isEqualTo("0.00");
   }
 }

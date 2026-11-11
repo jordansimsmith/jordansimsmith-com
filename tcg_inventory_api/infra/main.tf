@@ -169,7 +169,7 @@ module "java_api" {
       artifact = var.artifacts["update_import_row"]
     }
     delete_import_row = {
-      handler  = "com.jordansimsmith.tcginventory.imports.DeleteImportRowHandler"
+      handler  = "com.jordansimsmith.tcginventory.imports.api.DeleteImportRowHandler"
       artifact = var.artifacts["delete_import_row"]
     }
     create_import_row_photo = {

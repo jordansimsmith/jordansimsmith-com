@@ -3,6 +3,8 @@ package com.jordansimsmith.tcginventory.imports.server;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
+import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowRequest;
+import com.jordansimsmith.tcginventory.imports.client.DeleteImportRowResponse;
 import com.jordansimsmith.tcginventory.imports.client.FindImportsRequest;
 import com.jordansimsmith.tcginventory.imports.client.FindImportsResponse;
 import com.jordansimsmith.tcginventory.imports.client.GetImportRequest;
@@ -37,6 +39,8 @@ public class ImportsModule {
     var getImportService = new GetImportService(importReadRepository);
     var updateImportRowService =
         new UpdateImportRowService(importReadRepository, importMutationRepository);
+    var deleteImportRowService =
+        new DeleteImportRowService(importReadRepository, importMutationRepository);
     return new ImportService() {
       @Override
       public FindImportsResponse findImports(RequestContext ctx, FindImportsRequest request)
@@ -54,6 +58,12 @@ public class ImportsModule {
       public UpdateImportRowResponse updateImportRow(
           RequestContext ctx, UpdateImportRowRequest request) throws ServiceException {
         return updateImportRowService.updateImportRow(ctx, request);
+      }
+
+      @Override
+      public DeleteImportRowResponse deleteImportRow(
+          RequestContext ctx, DeleteImportRowRequest request) throws ServiceException {
+        return deleteImportRowService.deleteImportRow(ctx, request);
       }
     };
   }

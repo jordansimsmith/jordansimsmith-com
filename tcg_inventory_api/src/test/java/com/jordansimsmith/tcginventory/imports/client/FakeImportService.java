@@ -5,6 +5,7 @@ import com.jordansimsmith.service.ConflictException;
 import com.jordansimsmith.service.NotFoundException;
 import com.jordansimsmith.service.RequestContext;
 import com.jordansimsmith.service.ServiceException;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -114,6 +115,50 @@ public class FakeImportService implements ImportService {
             importDetail.placementInstructions(),
             rows));
     return new UpdateImportRowResponse();
+  }
+
+  @Override
+  public DeleteImportRowResponse deleteImportRow(RequestContext ctx, DeleteImportRowRequest request)
+      throws ServiceException {
+    if (request.importId() == null || request.importId().isBlank()) {
+      throw new BadRequestException("import_id is required");
+    }
+    if (request.position() <= 0) {
+      throw new BadRequestException("position must be positive");
+    }
+    var key = new UserImport(ctx.user(), request.importId());
+    var importDetail = imports.get(key);
+    if (importDetail == null) {
+      throw new NotFoundException("Not Found");
+    }
+    if (importDetail.status() != ImportStatus.REVIEW) {
+      throw new ConflictException("import is not in review status");
+    }
+    var rows = new ArrayList<>(importDetail.rows());
+    var rowRemoved = rows.removeIf(row -> row.position() == request.position());
+    if (!rowRemoved) {
+      throw new NotFoundException("Not Found");
+    }
+    var totalSuggestedPrice =
+        rows.stream()
+            .filter(row -> row.decision() == ImportDecision.KEEP)
+            .map(row -> new BigDecimal(row.suggestedPrice()))
+            .reduce(new BigDecimal("0.00"), BigDecimal::add)
+            .toPlainString();
+    imports.put(
+        key,
+        new GetImportResponse(
+            importDetail.importId(),
+            importDetail.game(),
+            importDetail.filename(),
+            importDetail.status(),
+            importDetail.rowCount(),
+            importDetail.createdAt(),
+            totalSuggestedPrice,
+            importDetail.unitCount(),
+            importDetail.placementInstructions(),
+            rows));
+    return new DeleteImportRowResponse();
   }
 
   private static int decodeContinuation(String continuation) throws BadRequestException {
